@@ -13,9 +13,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/gastime"
-	"github.com/ava-labs/strevm/hook/hookstest"
-	"github.com/ava-labs/strevm/proxytime"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
 func TestGasTime(t *testing.T) {

@@ -27,12 +27,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/blocks/blockstest"
-	"github.com/ava-labs/strevm/gastime"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/hook/hookstest"
-	"github.com/ava-labs/strevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 type SUT struct {

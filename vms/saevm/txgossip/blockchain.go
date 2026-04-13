@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
 
-	"github.com/ava-labs/strevm/saexec"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 
 	// Imported for [core.ChainHeadEvent] comment resolution. Already a
 	// downstream dependency.

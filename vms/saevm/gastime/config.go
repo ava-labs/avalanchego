@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 
-	"github.com/ava-labs/strevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE

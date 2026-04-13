@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/strevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 // BeforeBlock is intended to be called before processing a block, with the

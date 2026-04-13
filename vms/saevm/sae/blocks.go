@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/strevm/blocks"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // maxFutureBlockDuration is the maximum time from the current time allowed for

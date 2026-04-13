@@ -22,8 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/cmputils"
-	"github.com/ava-labs/strevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 func TestIntegration(t *testing.T) {

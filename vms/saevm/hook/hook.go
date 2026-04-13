@@ -26,9 +26,9 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/strevm/intmath"
-	saeparams "github.com/ava-labs/strevm/params"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // PointsG define user-injected hook points.

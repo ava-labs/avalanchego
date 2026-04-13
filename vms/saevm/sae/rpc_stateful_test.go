@@ -25,9 +25,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/blocks"
-	saeparams "github.com/ava-labs/strevm/params"
-	"github.com/ava-labs/strevm/saetest/escrow"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 )
 
 // TestStateQueryOnNonCanonicalBlock verifies that state-dependent RPC calls

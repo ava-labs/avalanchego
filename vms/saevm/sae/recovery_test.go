@@ -25,11 +25,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/cmputils"
-	saeparams "github.com/ava-labs/strevm/params"
-	"github.com/ava-labs/strevm/saedb"
-	"github.com/ava-labs/strevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 func TestRecoverFromDatabase(t *testing.T) {

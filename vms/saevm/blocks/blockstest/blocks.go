@@ -25,10 +25,10 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/hook/hookstest"
-	"github.com/ava-labs/strevm/saetest"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // An EthBlockOption configures the default block properties created by

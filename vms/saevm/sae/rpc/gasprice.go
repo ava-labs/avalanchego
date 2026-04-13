@@ -9,8 +9,8 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/rpc"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/gasprice"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/gasprice"
 )
 
 type estimatorBackend struct {

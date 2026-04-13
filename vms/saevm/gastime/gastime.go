@@ -12,9 +12,9 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/intmath"
-	"github.com/ava-labs/strevm/proxytime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE

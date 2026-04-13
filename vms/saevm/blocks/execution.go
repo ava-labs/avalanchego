@@ -22,10 +22,10 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/strevm/gastime"
-	saeparams "github.com/ava-labs/strevm/params"
-	"github.com/ava-labs/strevm/proxytime"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // SetInterimExecutionTime is expected to be called during execution of b's

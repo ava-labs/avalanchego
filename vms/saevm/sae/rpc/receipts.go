@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/saexec"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
 func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {

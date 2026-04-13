@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 
-	saetypes "github.com/ava-labs/strevm/types"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 var _ core.ChainContext = (*chainContext)(nil)

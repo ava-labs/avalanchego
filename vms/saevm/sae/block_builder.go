@@ -18,13 +18,13 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/hook"
-	saeparams "github.com/ava-labs/strevm/params"
-	"github.com/ava-labs/strevm/saexec"
-	"github.com/ava-labs/strevm/txgossip"
-	saetypes "github.com/ava-labs/strevm/types"
-	"github.com/ava-labs/strevm/worstcase"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 )
 
 // blockBuilder hides [blockBuilderG]'s generic type behind non-generic methods.

@@ -9,9 +9,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/strevm/gastime"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/proxytime"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
 // PreciseTime calls [hook.Points.SubSecondBlockTime] on the header and returns

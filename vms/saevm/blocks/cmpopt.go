@@ -11,8 +11,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/ava-labs/strevm/cmputils"
-	"github.com/ava-labs/strevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 // CmpOpt returns a configuration for [cmp.Diff] to compare [Block] instances in

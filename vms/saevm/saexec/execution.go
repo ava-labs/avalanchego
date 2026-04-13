@@ -22,10 +22,10 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/gastime"
-	"github.com/ava-labs/strevm/hook"
-	"github.com/ava-labs/strevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 var errExecutorClosed = errors.New("saexec.Executor closed")

@@ -26,9 +26,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/intmath"
-	saeparams "github.com/ava-labs/strevm/params"
-	"github.com/ava-labs/strevm/worstcase"
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 )
 
 var worstCaseFuzzFlags struct {

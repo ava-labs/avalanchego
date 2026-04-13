@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/strevm/hook/hookstest"
-	"github.com/ava-labs/strevm/saetest"
-	saetypes "github.com/ava-labs/strevm/types"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 func newEthBlock(num, time uint64, parent *types.Block) *types.Block {
