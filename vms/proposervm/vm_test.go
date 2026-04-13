@@ -1048,7 +1048,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	require.NoError(proVM.SetPreference(t.Context(), parsedBlock.ID()))
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		t.Fatalf("%w: BuildBlock", errUnexpectedCall)
+		t.Fatalf("%v: BuildBlock", errUnexpectedCall)
 		return nil, errUnexpectedCall
 	}
 
