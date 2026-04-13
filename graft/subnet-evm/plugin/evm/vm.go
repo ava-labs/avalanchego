@@ -1205,25 +1205,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return apis, nil
 }
 
-// NewHTTPHandler implements the block.ChainVM interface
-func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
-	handlers, err := vm.CreateHandlers(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return the main RPC handler as the primary HTTP handler
-	if handler, exists := handlers[ethRPCEndpoint]; exists {
-		return handler, nil
-	}
-
-	// Fallback to a default handler if no RPC handler exists
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "No HTTP handler available", http.StatusNotFound)
-	}), nil
-}
-
-func (*VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
+func (*VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	return nil, nil
 }
 

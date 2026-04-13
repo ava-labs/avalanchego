@@ -19,9 +19,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-nix
       - name: Run all lint checks
-        run: nix develop --command ./scripts/run_task.sh lint-all-ci
+        run: ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
-        run: nix develop --command ./scripts/run_task.sh check-go-mod-tidy
+        run: ./scripts/run_task.sh check-go-mod-tidy
 
   unit_test:
     name: Unit Tests (${{ matrix.os }})
@@ -104,7 +104,7 @@ jobs:
     name: Build Antithesis images
     runs-on: ubuntu-latest
     steps:
-      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be #v1.3.1
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
         with:
           tool-cache: true
           docker-images: true
