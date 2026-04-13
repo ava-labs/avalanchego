@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"golang.org/x/exp/slog"
 
@@ -154,4 +155,28 @@ func (c *Client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*confi
 	res := &ConfigReply{}
 	err := c.adminRequester.SendRequest(ctx, "admin.getVMConfig", struct{}{}, res, options...)
 	return res.Config, err
+}
+
+// AwaitTxAccepted polls GetAtomicTxStatus every freq until txID is accepted
+// or ctx is cancelled.
+func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) error {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		status, err := c.GetAtomicTxStatus(ctx, txID, options...)
+		if err != nil {
+			return err
+		}
+
+		if status == atomic.Accepted {
+			return nil
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
