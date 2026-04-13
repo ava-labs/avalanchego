@@ -10,7 +10,7 @@ linters:
     forbidigo:
       forbid:
         - pattern: ^assert\.(# continues on failure; consider require for fail-fast)?
-        - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the assert and require libraries should be used instead)?
+        - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# consider the assert and require libraries for succinct tests)?
   exclusions:
     rules:
       # Exclude antithesis tests which use a different assert package
