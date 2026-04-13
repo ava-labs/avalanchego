@@ -46,7 +46,7 @@ jobs:
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
@@ -91,7 +91,7 @@ jobs:
       contents: write
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install ARC Dependencies
         shell: bash
         run: |

@@ -28,7 +28,7 @@ jobs:
   check-metadata-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Check Bazel metadata
         uses: ./.github/actions/run-bazel-task
         with:
@@ -39,7 +39,7 @@ jobs:
   check-metadata-darwin:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Check Bazel metadata
         uses: ./.github/actions/run-bazel-task
         with:
@@ -49,7 +49,7 @@ jobs:
     needs: check-metadata-linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Run unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
@@ -58,7 +58,7 @@ jobs:
     needs: check-metadata-linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Run coreth unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
@@ -68,7 +68,7 @@ jobs:
     needs: check-metadata-linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Run subnet-evm unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
@@ -77,7 +77,7 @@ jobs:
     needs: check-metadata-linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Run e2e tests with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
