@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -44,12 +45,13 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 
 func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
 	return &snow.ConsensusContext{
-		Context:        ctx,
-		PrimaryAlias:   ctx.ChainID.String(),
-		Registerer:     prometheus.NewRegistry(),
-		BlockAcceptor:  noOpAcceptor{},
-		TxAcceptor:     noOpAcceptor{},
-		VertexAcceptor: noOpAcceptor{},
+		ChainHeightUpdater: lock.NewProgressSubscription[uint64](0),
+		Context:            ctx,
+		PrimaryAlias:       ctx.ChainID.String(),
+		Registerer:         prometheus.NewRegistry(),
+		BlockAcceptor:      noOpAcceptor{},
+		TxAcceptor:         noOpAcceptor{},
+		VertexAcceptor:     noOpAcceptor{},
 	}
 }
 

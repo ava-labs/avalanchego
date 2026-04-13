@@ -3307,27 +3307,21 @@ func TestPChainProgressUpdaterCalledOnAccept(t *testing.T) {
 
 	engCfg := DefaultConfig(t)
 
-	var updatedHeight uint64
-	var progressUpdated bool
-	engCfg.PChainProgressUpdater = &mockPChainProgressUpdater{
-		setProgressF: func(height uint64) {
-			progressUpdated = true
-			updatedHeight = height
-		},
-	}
-
 	vdr, _, sender, vm, te := setup(t, engCfg)
 
 	sender.Default(true)
 
-	blk := snowmantest.BuildChild(snowmantest.Genesis)
+	blk1 := snowmantest.BuildChild(snowmantest.Genesis)
+	blk2 := snowmantest.BuildChild(blk1)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case snowmantest.GenesisID:
 			return snowmantest.Genesis, nil
-		case blk.ID():
-			return blk, nil
+		case blk1.ID():
+			return blk1, nil
+		case blk2.ID():
+			return blk2, nil
 		default:
 			return nil, errUnknownBlock
 		}
@@ -3339,24 +3333,31 @@ func TestPChainProgressUpdaterCalledOnAccept(t *testing.T) {
 	}
 
 	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return blk, nil
+		return blk1, nil
 	}
 	require.NoError(te.Notify(t.Context(), common.PendingTxs))
 
-	require.False(progressUpdated)
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	err := engCfg.Ctx.ChainHeightUpdater.WaitForProgress(ctx, blk1.Height())
+	require.ErrorIs(err, context.DeadlineExceeded)
+	cancel()
 
-	// Vote for the block to accept it
-	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
+	// Vote for the first block to accept it
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk1.ID(), blk1.ID(), blk1.ID(), blk1.Height()))
+	require.Equal(snowtest.Accepted, blk1.Status)
 
-	require.Equal(snowtest.Accepted, blk.Status)
-	require.True(progressUpdated)
-	require.Equal(blk.Height(), updatedHeight)
-}
+	// Build and issue a second block on top of the accepted one
+	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return blk2, nil
+	}
+	require.NoError(te.Notify(t.Context(), common.PendingTxs))
 
-type mockPChainProgressUpdater struct {
-	setProgressF func(height uint64)
-}
+	// Vote for the second block to accept it
+	require.NoError(te.Chits(t.Context(), vdr, *queryRequestID, blk2.ID(), blk2.ID(), blk2.ID(), blk2.Height()))
+	require.Equal(snowtest.Accepted, blk2.Status)
 
-func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
-	m.setProgressF(height)
+	// Now progress (blk2.Height()) is above blk1.Height(), so WaitForProgress unblocks
+	ctx, cancel = context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	require.NoError(engCfg.Ctx.ChainHeightUpdater.WaitForProgress(ctx, blk1.Height()))
 }

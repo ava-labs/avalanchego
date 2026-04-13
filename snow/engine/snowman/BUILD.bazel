@@ -32,6 +32,7 @@ go_library(
         "//utils/bag",
         "//utils/bimap",
         "//utils/constants",
+        "//utils/lock",
         "//utils/logging",
         "//utils/math",
         "//utils/metric",
