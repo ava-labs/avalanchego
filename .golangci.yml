@@ -58,7 +58,6 @@ linters:
     - durationcheck
     # - embeddedstructfieldcheck
     - errcheck
-    - errorlint
     - forbidigo
     - goconst
     - gocheckcompilerdirectives
@@ -105,11 +104,6 @@ linters:
             # in lint.sh to produce warnings instead of errors.
             - pkg: io/ioutil
               desc: io/ioutil is deprecated. Use package io or os instead.
-    errorlint:
-      # Check for plain type assertions and type switches.
-      asserts: false
-      # Check for plain error comparisons.
-      comparison: false
     forbidigo:
       # Forbid the following identifiers (list of regexp).
       forbid:
@@ -146,6 +140,11 @@ linters:
         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
         - name: bool-literal-in-expr
           disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-as-argument
+        - name: context-as-argument
+          disabled: false
+          arguments:
+            - allowTypesBefore: "*testing.T,*testing.B,*testing.F,testing.TB"
         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
         - name: early-return
           disabled: false
@@ -198,6 +197,8 @@ linters:
         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
         - name: unused-parameter
           disabled: false
+          arguments:
+            - allowRegex: "^ctx$"
         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-receiver
         - name: unused-receiver
           disabled: false
