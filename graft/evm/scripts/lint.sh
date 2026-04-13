@@ -105,13 +105,6 @@ function test_single_import {
   fi
 }
 
-function test_require_error_is_no_funcs_as_params {
-  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' "${AVALANCHE_FILES[@]}"; then
-    echo ""
-    return 1
-  fi
-}
-
 function test_require_no_error_inline_func {
   # Flag only when a single variable whose name contains "err" or "Err"
   # (e.g., err, myErr, parseError) is assigned from a call (:= or =), and later

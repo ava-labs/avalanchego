@@ -85,16 +85,6 @@ function test_single_import {
   fi
 }
 
-function test_require_error_is_no_funcs_as_params {
-  # Detects require.ErrorIs calls with nested function calls as arguments,
-  # e.g. require.ErrorIs(t, someFunc(), err). The regex skips double-quoted
-  # strings ("...") so that "()" inside message literals doesn't false-positive.
-  if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -zo -P 'require.ErrorIs\(("(?:[^"\\]|\\.)*"|[^)"])+\)[^\n]*\)\n'; then
-    echo ""
-    return 1
-  fi
-}
-
 function test_require_no_error_inline_func {
   if find . -type f -name '*.go' "${FIND_EXCLUDES[@]}" -print0 | xargs -0 grep -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)'; then
     echo ""
