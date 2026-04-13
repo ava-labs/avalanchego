@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/libevm/common"
 )
 
 func TestACP224FeeConfigVerify(t *testing.T) {
@@ -108,18 +109,55 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 	}
 }
 
-func FuzzACP224FeeConfigPacking(f *testing.F) {
-	for _, v := range []bool{true, false} {
-		for _, s := range []bool{true, false} {
-			for t := range uint64(3) {
-				for m := range uint64(3) {
-					for d := range uint64(3) {
-						f.Add(v, s, t, m, d)
-					}
-				}
-			}
-		}
+// TestACP224FeeConfigPackFormat asserts exact packed bytes for known configs.
+// This catches backward-incompatible format changes that round-trip tests miss.
+func TestACP224FeeConfigPackFormat(t *testing.T) {
+	tests := []struct {
+		name   string
+		config ACP224FeeConfig
+		want   common.Hash
+	}{
+		{
+			name:   "default config",
+			config: DefaultACP224FeeConfig(),
+			want:   common.HexToHash("0x0000000000000f4240000000000000000001000000000000003c000000000000"),
+		},
+		{
+			name: "all flags true and max uint64",
+			config: ACP224FeeConfig{
+				ValidatorTargetGas: true,
+				TargetGas:          ^uint64(0),
+				StaticPricing:      true,
+				MinGasPrice:        ^uint64(0),
+				TimeToDouble:       ^uint64(0),
+			},
+			want: common.HexToHash("0x01ffffffffffffffff01ffffffffffffffffffffffffffffffff000000000000"),
+		},
+		{
+			name: "validatorTargetGas mode",
+			config: ACP224FeeConfig{
+				ValidatorTargetGas: true,
+				MinGasPrice:        1,
+				TimeToDouble:       60,
+			},
+			want: common.HexToHash("0x010000000000000000000000000000000001000000000000003c000000000000"),
+		},
 	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, tt.config.Pack(), "Pack")
+		})
+	}
+}
+
+func FuzzACP224FeeConfigPacking(f *testing.F) {
+	f.Add(false, false, uint64(0), uint64(0), uint64(0))
+	f.Add(true, true, ^uint64(0), ^uint64(0), ^uint64(0))
+	f.Add(false, false, MinTargetGasACP224, uint64(1), uint64(60))
+	f.Add(true, false, uint64(0), uint64(1), uint64(60))
+	f.Add(false, true, MinTargetGasACP224, uint64(1), uint64(0))
+	f.Add(true, true, uint64(0), uint64(1), uint64(0))
 
 	f.Fuzz(func(t *testing.T, validator, static bool, target, minGas, double uint64) {
 		in := &ACP224FeeConfig{validator, target, static, minGas, double}
