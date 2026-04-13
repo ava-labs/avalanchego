@@ -20,7 +20,7 @@ func WaitGroupWithContext(t *testing.T, ctx context.Context, wg *sync.WaitGroup)
 	select {
 	case <-ctx.Done():
 		// include context error for easier debugging
-		t.Fatal("timeout waiting for response", "error", ctx.Err())
+		t.Fatalf("waiting for response: %v", ctx.Err())
 	case <-done:
 	}
 }
