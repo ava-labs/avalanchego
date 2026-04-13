@@ -42,7 +42,7 @@ func (vm *StateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 		return vm.StateSyncEnabledF(ctx)
 	}
 	if vm.CantStateSyncEnabled && vm.T != nil {
-		vm.T.Fatal(errStateSyncEnabled.Error())
+		vm.T.Fatal(errStateSyncEnabled)
 	}
 	return false, errStateSyncEnabled
 }
@@ -52,7 +52,7 @@ func (vm *StateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (bloc
 		return vm.GetOngoingSyncStateSummaryF(ctx)
 	}
 	if vm.CantStateSyncGetOngoingSummary && vm.T != nil {
-		vm.T.Fatal(errStateSyncGetOngoingSummary.Error())
+		vm.T.Fatal(errStateSyncGetOngoingSummary)
 	}
 	return nil, errStateSyncGetOngoingSummary
 }
@@ -62,7 +62,7 @@ func (vm *StateSyncableVM) GetLastStateSummary(ctx context.Context) (block.State
 		return vm.GetLastStateSummaryF(ctx)
 	}
 	if vm.CantGetLastStateSummary && vm.T != nil {
-		vm.T.Fatal(errGetLastStateSummary.Error())
+		vm.T.Fatal(errGetLastStateSummary)
 	}
 	return nil, errGetLastStateSummary
 }
@@ -72,7 +72,7 @@ func (vm *StateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes [
 		return vm.ParseStateSummaryF(ctx, summaryBytes)
 	}
 	if vm.CantParseStateSummary && vm.T != nil {
-		vm.T.Fatal(errParseStateSummary.Error())
+		vm.T.Fatal(errParseStateSummary)
 	}
 	return nil, errParseStateSummary
 }
@@ -82,7 +82,7 @@ func (vm *StateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight ui
 		return vm.GetStateSummaryF(ctx, summaryHeight)
 	}
 	if vm.CantGetStateSummary && vm.T != nil {
-		vm.T.Fatal(errGetStateSummary.Error())
+		vm.T.Fatal(errGetStateSummary)
 	}
 	return nil, errGetStateSummary
 }

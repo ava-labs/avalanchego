@@ -252,7 +252,7 @@ func (s *Sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	case s.SendAppRequestF != nil:
 		return s.SendAppRequestF(ctx, nodeIDs, requestID, appRequestBytes)
 	case s.CantSendAppRequest && s.T != nil:
-		s.T.Fatal(errSendAppRequest.Error())
+		s.T.Fatal(errSendAppRequest)
 	}
 	return errSendAppRequest
 }
@@ -265,7 +265,7 @@ func (s *Sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	case s.SendAppResponseF != nil:
 		return s.SendAppResponseF(ctx, nodeID, requestID, appResponseBytes)
 	case s.CantSendAppResponse && s.T != nil:
-		s.T.Fatal(errSendAppResponse.Error())
+		s.T.Fatal(errSendAppResponse)
 	}
 	return errSendAppResponse
 }
@@ -278,7 +278,7 @@ func (s *Sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 	case s.SendAppErrorF != nil:
 		return s.SendAppErrorF(ctx, nodeID, requestID, code, message)
 	case s.CantSendAppError && s.T != nil:
-		s.T.Fatal(errSendAppError.Error())
+		s.T.Fatal(errSendAppError)
 	}
 	return errSendAppError
 }
@@ -295,7 +295,7 @@ func (s *Sender) SendAppGossip(
 	case s.SendAppGossipF != nil:
 		return s.SendAppGossipF(ctx, config, appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
-		s.T.Fatal(errSendAppGossip.Error())
+		s.T.Fatal(errSendAppGossip)
 	}
 	return errSendAppGossip
 }

@@ -31,7 +31,7 @@ func (p *TestParser) Parse(ctx context.Context, b []byte) (Job, error) {
 		return p.ParseF(ctx, b)
 	}
 	if p.CantParse && p.T != nil {
-		require.False(p.T, p.CantParse, errParse.Error())
+		require.False(p.T, p.CantParse, errParse)
 	}
 	return nil, errParse
 }

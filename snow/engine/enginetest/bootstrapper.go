@@ -35,7 +35,7 @@ func (b *Bootstrapper) Clear(ctx context.Context) error {
 		return b.ClearF(ctx)
 	}
 	if b.CantClear && b.T != nil {
-		b.T.Fatal(errClear.Error())
+		b.T.Fatal(errClear)
 	}
 	return errClear
 }

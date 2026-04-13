@@ -45,7 +45,7 @@ func (s *StateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) 
 		return s.AcceptF(ctx)
 	}
 	if s.CantAccept && s.T != nil {
-		s.T.Fatal(errAccept.Error())
+		s.T.Fatal(errAccept)
 	}
 	return block.StateSyncSkipped, errAccept
 }

@@ -34,7 +34,7 @@ func (b *Builder) BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (avalanc
 		return b.BuildStopVtxF(ctx, parentIDs)
 	}
 	if b.CantBuildVtx && b.T != nil {
-		b.T.Fatal(errBuild.Error())
+		b.T.Fatal(errBuild)
 	}
 	return nil, errBuild
 }

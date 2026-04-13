@@ -39,7 +39,7 @@ func (s *Storage) GetVtx(ctx context.Context, vtxID ids.ID) (avalanche.Vertex, e
 		return s.GetVtxF(ctx, vtxID)
 	}
 	if s.CantGetVtx && s.T != nil {
-		s.T.Fatal(errGet.Error())
+		s.T.Fatal(errGet)
 	}
 	return nil, errGet
 }
@@ -49,7 +49,7 @@ func (s *Storage) Edge(ctx context.Context) []ids.ID {
 		return s.EdgeF(ctx)
 	}
 	if s.CantEdge && s.T != nil {
-		s.T.Fatal(errEdge.Error())
+		s.T.Fatal(errEdge)
 	}
 	return nil
 }
@@ -59,7 +59,7 @@ func (s *Storage) StopVertexAccepted(ctx context.Context) (bool, error) {
 		return s.StopVertexAcceptedF(ctx)
 	}
 	if s.CantStopVertexAccepted && s.T != nil {
-		s.T.Fatal(errStopVertexAccepted.Error())
+		s.T.Fatal(errStopVertexAccepted)
 	}
 	return false, nil
 }

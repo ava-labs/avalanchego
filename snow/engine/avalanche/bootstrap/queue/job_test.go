@@ -68,7 +68,7 @@ func (j *TestJob) Execute(ctx context.Context) error {
 		return j.ExecuteF(ctx)
 	}
 	if j.CantExecute && j.T != nil {
-		j.T.Fatal(errExecute.Error())
+		j.T.Fatal(errExecute)
 	}
 	return errExecute
 }
@@ -88,7 +88,7 @@ func (j *TestJob) HasMissingDependencies(ctx context.Context) (bool, error) {
 		return j.HasMissingDependenciesF(ctx)
 	}
 	if j.CantHasMissingDependencies && j.T != nil {
-		j.T.Fatal(errHasMissingDependencies.Error())
+		j.T.Fatal(errHasMissingDependencies)
 	}
 	return false, errHasMissingDependencies
 }

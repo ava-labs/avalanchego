@@ -57,7 +57,7 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return vm.BuildBlockF(ctx)
 	}
 	if vm.CantBuildBlock && vm.T != nil {
-		vm.T.Fatal(errBuildBlock.Error())
+		vm.T.Fatal(errBuildBlock)
 	}
 	return nil, errBuildBlock
 }
@@ -67,7 +67,7 @@ func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 		return vm.ParseBlockF(ctx, b)
 	}
 	if vm.CantParseBlock && vm.T != nil {
-		vm.T.Fatal(errParseBlock.Error())
+		vm.T.Fatal(errParseBlock)
 	}
 	return nil, errParseBlock
 }
@@ -77,7 +77,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 		return vm.GetBlockF(ctx, id)
 	}
 	if vm.CantGetBlock && vm.T != nil {
-		vm.T.Fatal(errGetBlock.Error())
+		vm.T.Fatal(errGetBlock)
 	}
 	return nil, errGetBlock
 }
@@ -97,7 +97,7 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 		return vm.LastAcceptedF(ctx)
 	}
 	if vm.CantLastAccepted && vm.T != nil {
-		vm.T.Fatal(errLastAccepted.Error())
+		vm.T.Fatal(errLastAccepted)
 	}
 	return ids.Empty, errLastAccepted
 }
@@ -107,7 +107,7 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 		return vm.GetBlockIDAtHeightF(ctx, height)
 	}
 	if vm.CantGetBlockIDAtHeight && vm.T != nil {
-		vm.T.Fatal(errGetAncestor.Error())
+		vm.T.Fatal(errGetAncestor)
 	}
 	return ids.Empty, errGetBlockIDAtHeight
 }

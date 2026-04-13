@@ -247,7 +247,7 @@ func TestEngineQuery(t *testing.T) {
 		switch blkID {
 		case parent.ID(), child.ID():
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 		}
 		return nil, errUnknownBlock
 	}
@@ -290,7 +290,7 @@ func TestEngineQuery(t *testing.T) {
 			case child.ID():
 				return child, nil
 			default:
-				t.Fatal(errUnknownBlock.Error())
+				t.Fatal(errUnknownBlock)
 			}
 			return nil, errUnknownBlock
 		}
@@ -402,7 +402,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		case blk1.ID():
 			return nil, errUnknownBlock
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 		}
 		return nil, errUnknownBlock
 	}
@@ -427,7 +427,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 			case blkID == blk1.ID():
 				return blk1, nil
 			default:
-				t.Fatal(errUnknownBlock.Error())
+				t.Fatal(errUnknownBlock)
 			}
 			return nil, errUnknownBlock
 		}
@@ -842,7 +842,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		case blk.ID():
 			return nil, errUnknownBlock
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 		}
 		return nil, errUnknownBlock
 	}
@@ -896,7 +896,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		case blk.ID():
 			return nil, errUnknownBlock
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 		}
 		return nil, errUnknownBlock
 	}
@@ -1556,7 +1556,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 		}
 		return nil, errUnknownBlock
 	}
@@ -1733,7 +1733,7 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		case bytes.Equal(b, nonPreferredBlk.Bytes()):
 			return nonPreferredBlk, nil
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 			return nil, errUnknownBlock
 		}
 	}
@@ -1791,7 +1791,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		case bytes.Equal(b, blk2.Bytes()):
 			return blk2, nil
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 			return nil, errUnknownBlock
 		}
 	}
@@ -1951,7 +1951,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		case bytes.Equal(b, blk3.Bytes()):
 			return blk3, nil
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 			return nil, errUnknownBlock
 		}
 	}
@@ -2224,7 +2224,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 		}
 		return nil, errUnknownBlock
 	}
@@ -2337,7 +2337,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		default:
-			t.Fatal(errUnknownBlock.Error())
+			t.Fatal(errUnknownBlock)
 		}
 		return nil, errUnknownBlock
 	}

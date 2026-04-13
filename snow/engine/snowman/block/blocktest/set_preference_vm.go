@@ -34,7 +34,7 @@ func (vm *SetPreferenceVM) SetPreferenceWithContext(ctx context.Context, id ids.
 		return vm.SetPreferenceWithContextF(ctx, id, blockCtx)
 	}
 	if vm.CantSetPreferenceWithContext && vm.T != nil {
-		vm.T.Fatal(errSetPreferenceWithContext.Error())
+		vm.T.Fatal(errSetPreferenceWithContext)
 	}
 	return errSetPreferenceWithContext
 }

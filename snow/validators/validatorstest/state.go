@@ -46,7 +46,7 @@ func (vm *State) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return vm.GetMinimumHeightF(ctx)
 	}
 	if vm.CantGetMinimumHeight && vm.T != nil {
-		vm.T.Fatal(errMinimumHeight.Error())
+		vm.T.Fatal(errMinimumHeight)
 	}
 	return 0, errMinimumHeight
 }
@@ -56,7 +56,7 @@ func (vm *State) GetCurrentHeight(ctx context.Context) (uint64, error) {
 		return vm.GetCurrentHeightF(ctx)
 	}
 	if vm.CantGetCurrentHeight && vm.T != nil {
-		vm.T.Fatal(errCurrentHeight.Error())
+		vm.T.Fatal(errCurrentHeight)
 	}
 	return 0, errCurrentHeight
 }
@@ -66,7 +66,7 @@ func (vm *State) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 		return vm.GetSubnetIDF(ctx, chainID)
 	}
 	if vm.CantGetSubnetID && vm.T != nil {
-		vm.T.Fatal(errSubnetID.Error())
+		vm.T.Fatal(errSubnetID)
 	}
 	return ids.Empty, errSubnetID
 }
@@ -79,7 +79,7 @@ func (vm *State) GetWarpValidatorSets(
 		return vm.GetWarpValidatorSetsF(ctx, height)
 	}
 	if vm.CantGetWarpValidatorSets && vm.T != nil {
-		vm.T.Fatal(errGetWarpValidatorSets.Error())
+		vm.T.Fatal(errGetWarpValidatorSets)
 	}
 	return nil, errGetWarpValidatorSets
 }
@@ -93,7 +93,7 @@ func (vm *State) GetValidatorSet(
 		return vm.GetValidatorSetF(ctx, height, subnetID)
 	}
 	if vm.CantGetValidatorSet && vm.T != nil {
-		vm.T.Fatal(errGetValidatorSet.Error())
+		vm.T.Fatal(errGetValidatorSet)
 	}
 	return nil, errGetValidatorSet
 }
@@ -106,7 +106,7 @@ func (vm *State) GetCurrentValidatorSet(
 		return vm.GetCurrentValidatorSetF(ctx, subnetID)
 	}
 	if vm.CantGetCurrentValidatorSet && vm.T != nil {
-		vm.T.Fatal(errGetCurrentValidatorSet.Error())
+		vm.T.Fatal(errGetCurrentValidatorSet)
 	}
 	return nil, 0, errGetCurrentValidatorSet
 }

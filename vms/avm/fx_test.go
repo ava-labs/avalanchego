@@ -48,7 +48,7 @@ func (fx *FxTest) Initialize(vm interface{}) error {
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatal(errCalledInitialize.Error())
+		fx.T.Fatal(errCalledInitialize)
 	}
 	return errCalledInitialize
 }
@@ -61,7 +61,7 @@ func (fx *FxTest) Bootstrapping() error {
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatal(errCalledBootstrapping.Error())
+		fx.T.Fatal(errCalledBootstrapping)
 	}
 	return errCalledBootstrapping
 }
@@ -74,7 +74,7 @@ func (fx *FxTest) Bootstrapped() error {
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatal(errCalledBootstrapped.Error())
+		fx.T.Fatal(errCalledBootstrapped)
 	}
 	return errCalledBootstrapped
 }
@@ -87,7 +87,7 @@ func (fx *FxTest) VerifyTransfer(tx, in, cred, utxo interface{}) error {
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatal(errCalledVerifyTransfer.Error())
+		fx.T.Fatal(errCalledVerifyTransfer)
 	}
 	return errCalledVerifyTransfer
 }
@@ -100,7 +100,7 @@ func (fx *FxTest) VerifyOperation(tx, op, cred interface{}, utxos []interface{})
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatal(errCalledVerifyOperation.Error())
+		fx.T.Fatal(errCalledVerifyOperation)
 	}
 	return errCalledVerifyOperation
 }

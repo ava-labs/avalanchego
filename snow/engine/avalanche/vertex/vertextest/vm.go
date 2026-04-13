@@ -39,7 +39,7 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 		return vm.LinearizeF(ctx, stopVertexID)
 	}
 	if vm.CantLinearize && vm.T != nil {
-		vm.T.Fatal(errLinearize.Error())
+		vm.T.Fatal(errLinearize)
 	}
 	return errLinearize
 }
@@ -49,7 +49,7 @@ func (vm *VM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
 		return vm.ParseTxF(ctx, b)
 	}
 	if vm.CantParse && vm.T != nil {
-		vm.T.Fatal(errParse.Error())
+		vm.T.Fatal(errParse)
 	}
 	return nil, errParse
 }

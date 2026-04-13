@@ -64,7 +64,7 @@ func (vm *BatchedVM) GetAncestors(
 		)
 	}
 	if vm.CantGetAncestors && vm.T != nil {
-		vm.T.Fatal(errGetAncestor.Error())
+		vm.T.Fatal(errGetAncestor)
 	}
 	return nil, errGetAncestor
 }
@@ -77,7 +77,7 @@ func (vm *BatchedVM) BatchedParseBlock(
 		return vm.BatchedParseBlockF(ctx, blks)
 	}
 	if vm.CantBatchParseBlock && vm.T != nil {
-		vm.T.Fatal(errBatchedParseBlock.Error())
+		vm.T.Fatal(errBatchedParseBlock)
 	}
 	return nil, errBatchedParseBlock
 }
