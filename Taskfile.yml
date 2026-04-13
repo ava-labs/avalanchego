@@ -298,9 +298,11 @@ tasks:
     desc: Runs static analysis tests of golang code
     cmd: '{{.NIX_RUN}} ./scripts/lint.sh'
 
-  lint-yaml:
-    desc: Runs yamllint to check YAML file formatting
-    cmd: '{{.NIX_RUN}} yamllint -c .yamllint.yml .'
+  check-yaml-fmt:
+    desc: Checks that YAML files are formatted with yamlfmt (requires a clean git working tree)
+    cmds:
+      - task: yaml-fmt
+      - task: check-clean-branch
 
   lint-action:
     desc: Runs actionlint to check sanity of github action configuration
@@ -313,6 +315,7 @@ tasks:
       - task: _lint-readonly
       # Phase 2: Tree-mutating checks (must be sequential to avoid
       # git index and bazel server contention)
+      - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-require-directives-round-trip
       - task: bazel-check-metadata
@@ -323,7 +326,6 @@ tasks:
       - lint
       - lint-action
       - lint-shell
-      - lint-yaml
       - check-go-version
       - check-require-directives
 
@@ -333,7 +335,7 @@ tasks:
       - task: lint
       - task: lint-action
       - task: lint-shell
-      - task: lint-yaml
+      - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
       - task: check-require-directives
