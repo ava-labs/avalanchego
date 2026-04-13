@@ -35,7 +35,7 @@ func (p *Parser) ParseVtx(ctx context.Context, b []byte) (avalanche.Vertex, erro
 		return p.ParseVtxF(ctx, b)
 	}
 	if p.T != nil {
-		require.False(p.T, p.CantParseVtx, errParse.Error())
+		require.False(p.T, p.CantParseVtx, errParse)
 	}
 	return nil, errParse
 }

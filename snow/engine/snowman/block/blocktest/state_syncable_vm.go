@@ -44,7 +44,7 @@ func (vm *StateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 		return vm.StateSyncEnabledF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantStateSyncEnabled, errStateSyncEnabled.Error())
+		require.False(vm.T, vm.CantStateSyncEnabled, errStateSyncEnabled)
 	}
 	return false, errStateSyncEnabled
 }
@@ -54,7 +54,7 @@ func (vm *StateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (bloc
 		return vm.GetOngoingSyncStateSummaryF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantStateSyncGetOngoingSummary, errStateSyncGetOngoingSummary.Error())
+		require.False(vm.T, vm.CantStateSyncGetOngoingSummary, errStateSyncGetOngoingSummary)
 	}
 	return nil, errStateSyncGetOngoingSummary
 }
@@ -64,7 +64,7 @@ func (vm *StateSyncableVM) GetLastStateSummary(ctx context.Context) (block.State
 		return vm.GetLastStateSummaryF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetLastStateSummary, errGetLastStateSummary.Error())
+		require.False(vm.T, vm.CantGetLastStateSummary, errGetLastStateSummary)
 	}
 	return nil, errGetLastStateSummary
 }
@@ -74,7 +74,7 @@ func (vm *StateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes [
 		return vm.ParseStateSummaryF(ctx, summaryBytes)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantParseStateSummary, errParseStateSummary.Error())
+		require.False(vm.T, vm.CantParseStateSummary, errParseStateSummary)
 	}
 	return nil, errParseStateSummary
 }
@@ -84,7 +84,7 @@ func (vm *StateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight ui
 		return vm.GetStateSummaryF(ctx, summaryHeight)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetStateSummary, errGetStateSummary.Error())
+		require.False(vm.T, vm.CantGetStateSummary, errGetStateSummary)
 	}
 	return nil, errGetStateSummary
 }

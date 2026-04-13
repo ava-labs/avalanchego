@@ -48,7 +48,7 @@ func (vm *State) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return vm.GetMinimumHeightF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetMinimumHeight, errMinimumHeight.Error())
+		require.False(vm.T, vm.CantGetMinimumHeight, errMinimumHeight)
 	}
 	return 0, errMinimumHeight
 }
@@ -58,7 +58,7 @@ func (vm *State) GetCurrentHeight(ctx context.Context) (uint64, error) {
 		return vm.GetCurrentHeightF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetCurrentHeight, errCurrentHeight.Error())
+		require.False(vm.T, vm.CantGetCurrentHeight, errCurrentHeight)
 	}
 	return 0, errCurrentHeight
 }
@@ -68,7 +68,7 @@ func (vm *State) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 		return vm.GetSubnetIDF(ctx, chainID)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetSubnetID, errSubnetID.Error())
+		require.False(vm.T, vm.CantGetSubnetID, errSubnetID)
 	}
 	return ids.Empty, errSubnetID
 }
@@ -81,7 +81,7 @@ func (vm *State) GetWarpValidatorSets(
 		return vm.GetWarpValidatorSetsF(ctx, height)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetWarpValidatorSets, errGetWarpValidatorSets.Error())
+		require.False(vm.T, vm.CantGetWarpValidatorSets, errGetWarpValidatorSets)
 	}
 	return nil, errGetWarpValidatorSets
 }
@@ -95,7 +95,7 @@ func (vm *State) GetValidatorSet(
 		return vm.GetValidatorSetF(ctx, height, subnetID)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetValidatorSet, errGetValidatorSet.Error())
+		require.False(vm.T, vm.CantGetValidatorSet, errGetValidatorSet)
 	}
 	return nil, errGetValidatorSet
 }
@@ -108,7 +108,7 @@ func (vm *State) GetCurrentValidatorSet(
 		return vm.GetCurrentValidatorSetF(ctx, subnetID)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetCurrentValidatorSet, errGetCurrentValidatorSet.Error())
+		require.False(vm.T, vm.CantGetCurrentValidatorSet, errGetCurrentValidatorSet)
 	}
 	return nil, 0, errGetCurrentValidatorSet
 }

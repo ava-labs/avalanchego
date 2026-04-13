@@ -66,7 +66,7 @@ func (vm *BatchedVM) GetAncestors(
 		)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetAncestors, errGetAncestor.Error())
+		require.False(vm.T, vm.CantGetAncestors, errGetAncestor)
 	}
 	return nil, errGetAncestor
 }
@@ -79,7 +79,7 @@ func (vm *BatchedVM) BatchedParseBlock(
 		return vm.BatchedParseBlockF(ctx, blks)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantBatchParseBlock, errBatchedParseBlock.Error())
+		require.False(vm.T, vm.CantBatchParseBlock, errBatchedParseBlock)
 	}
 	return nil, errBatchedParseBlock
 }

@@ -59,7 +59,7 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return vm.BuildBlockF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantBuildBlock, errBuildBlock.Error())
+		require.False(vm.T, vm.CantBuildBlock, errBuildBlock)
 	}
 	return nil, errBuildBlock
 }
@@ -69,7 +69,7 @@ func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 		return vm.ParseBlockF(ctx, b)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantParseBlock, errParseBlock.Error())
+		require.False(vm.T, vm.CantParseBlock, errParseBlock)
 	}
 	return nil, errParseBlock
 }
@@ -79,7 +79,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 		return vm.GetBlockF(ctx, id)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetBlock, errGetBlock.Error())
+		require.False(vm.T, vm.CantGetBlock, errGetBlock)
 	}
 	return nil, errGetBlock
 }
@@ -99,7 +99,7 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 		return vm.LastAcceptedF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantLastAccepted, errLastAccepted.Error())
+		require.False(vm.T, vm.CantLastAccepted, errLastAccepted)
 	}
 	return ids.Empty, errLastAccepted
 }
@@ -109,7 +109,7 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 		return vm.GetBlockIDAtHeightF(ctx, height)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantGetBlockIDAtHeight, errGetAncestor.Error())
+		require.False(vm.T, vm.CantGetBlockIDAtHeight, errGetAncestor)
 	}
 	return ids.Empty, errGetBlockIDAtHeight
 }

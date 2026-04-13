@@ -254,7 +254,7 @@ func (s *Sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	case s.SendAppRequestF != nil:
 		return s.SendAppRequestF(ctx, nodeIDs, requestID, appRequestBytes)
 	case s.T != nil:
-		require.False(s.T, s.CantSendAppRequest, errSendAppRequest.Error())
+		require.False(s.T, s.CantSendAppRequest, errSendAppRequest)
 	}
 	return errSendAppRequest
 }
@@ -267,7 +267,7 @@ func (s *Sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	case s.SendAppResponseF != nil:
 		return s.SendAppResponseF(ctx, nodeID, requestID, appResponseBytes)
 	case s.T != nil:
-		require.False(s.T, s.CantSendAppResponse, errSendAppResponse.Error())
+		require.False(s.T, s.CantSendAppResponse, errSendAppResponse)
 	}
 	return errSendAppResponse
 }
@@ -280,7 +280,7 @@ func (s *Sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 	case s.SendAppErrorF != nil:
 		return s.SendAppErrorF(ctx, nodeID, requestID, code, message)
 	case s.T != nil:
-		require.False(s.T, s.CantSendAppError, errSendAppError.Error())
+		require.False(s.T, s.CantSendAppError, errSendAppError)
 	}
 	return errSendAppError
 }
@@ -297,7 +297,7 @@ func (s *Sender) SendAppGossip(
 	case s.SendAppGossipF != nil:
 		return s.SendAppGossipF(ctx, config, appGossipBytes)
 	case s.T != nil:
-		require.False(s.T, s.CantSendAppGossip, errSendAppGossip.Error())
+		require.False(s.T, s.CantSendAppGossip, errSendAppGossip)
 	}
 	return errSendAppGossip
 }

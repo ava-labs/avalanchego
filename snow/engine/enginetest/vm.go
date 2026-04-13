@@ -109,7 +109,7 @@ func (vm *VM) Initialize(
 		)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantInitialize, errInitialize.Error())
+		require.False(vm.T, vm.CantInitialize, errInitialize)
 	}
 	return errInitialize
 }
@@ -145,7 +145,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		return vm.CreateHandlers(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantCreateHandlers, errCreateHandlers.Error())
+		require.False(vm.T, vm.CantCreateHandlers, errCreateHandlers)
 	}
 	return nil, nil
 }
@@ -155,7 +155,7 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 		return vm.NewHTTPHandlerF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantNewHTTPHandler, errNewHTTPHandler.Error())
+		require.False(vm.T, vm.CantNewHTTPHandler, errNewHTTPHandler)
 	}
 	return nil, nil
 }
@@ -165,7 +165,7 @@ func (vm *VM) HealthCheck(ctx context.Context) (interface{}, error) {
 		return vm.HealthCheckF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantHealthCheck, errHealthCheck.Error())
+		require.False(vm.T, vm.CantHealthCheck, errHealthCheck)
 	}
 	return nil, errHealthCheck
 }
@@ -227,7 +227,7 @@ func (vm *VM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *version
 		return vm.ConnectedF(ctx, id, nodeVersion)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantConnected, errConnected.Error())
+		require.False(vm.T, vm.CantConnected, errConnected)
 	}
 	return nil
 }
@@ -237,7 +237,7 @@ func (vm *VM) Disconnected(ctx context.Context, id ids.NodeID) error {
 		return vm.DisconnectedF(ctx, id)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantDisconnected, errDisconnected.Error())
+		require.False(vm.T, vm.CantDisconnected, errDisconnected)
 	}
 	return nil
 }
@@ -247,7 +247,7 @@ func (vm *VM) Version(ctx context.Context) (string, error) {
 		return vm.VersionF(ctx)
 	}
 	if vm.T != nil {
-		require.False(vm.T, vm.CantVersion, errVersion.Error())
+		require.False(vm.T, vm.CantVersion, errVersion)
 	}
 	return "", nil
 }
