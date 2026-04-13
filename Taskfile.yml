@@ -301,7 +301,7 @@ tasks:
   check-yaml-fmt:
     desc: Checks that YAML files are formatted with yamlfmt (requires a clean git working tree)
     cmds:
-      - task: yaml-fmt
+      - task: lint-yaml-fix
       - task: check-clean-branch
 
   lint-action:
@@ -345,7 +345,7 @@ tasks:
     desc: Runs automated fixing for failing static analysis of golang code
     cmd: '{{.NIX_RUN}} ./scripts/run_tool.sh golangci-lint run --config .golangci.yml --fix'
 
-  yaml-fmt:
+  lint-yaml-fix:
     desc: Formats YAML files with yamlfmt
     cmd: '{{.NIX_RUN}} yamlfmt .'
 
