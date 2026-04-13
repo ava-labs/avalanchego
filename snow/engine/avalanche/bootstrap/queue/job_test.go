@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -47,7 +48,7 @@ func (j *TestJob) ID() ids.ID {
 		return j.IDF()
 	}
 	if j.CantID && j.T != nil {
-		j.T.Fatal("Unexpectedly called ID")
+		require.False(j.T, j.CantID, "unexpectedly called ID")
 	}
 	return ids.Empty
 }
