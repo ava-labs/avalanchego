@@ -173,7 +173,7 @@ func allFieldsSet[T interface {
 			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:
 				require.NotEmpty(t, f)
 			default:
-				t.Fatalf("Field has unsupported type: Field %q has unsupported type %T", field.Name, f)
+				t.Fatalf("Field %q has unsupported type %T", field.Name, f)
 			}
 		})
 	}
