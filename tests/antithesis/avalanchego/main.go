@@ -147,7 +147,7 @@ func main() {
 			wallet:    wallet,
 			addrs:     set.Of(addr),
 			uris:      c.URIs,
-			cChainKey: newFundedCChainKey(tc, ctx, i, genesisWorkload),
+			cChainKey: newFundedCChainKey(ctx, tc, i, genesisWorkload),
 		}
 	}
 
@@ -885,7 +885,7 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 	)
 }
 
-func newFundedCChainKey(tc *tests.SimpleTestContext, ctx context.Context, i int, funder *workload) *ecdsa.PrivateKey {
+func newFundedCChainKey(ctx context.Context, tc *tests.SimpleTestContext, i int, funder *workload) *ecdsa.PrivateKey {
 	require := require.New(tc)
 
 	key, err := crypto.ToECDSA(crypto.Keccak256([]byte("C-Chain worker"), []byte(strconv.Itoa(i))))
