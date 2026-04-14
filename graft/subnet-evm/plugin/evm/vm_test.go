@@ -393,7 +393,7 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 	require.Equal(t, common.Hash(blk1.ID()), newHead.Head.Hash(), "Expected new block to match")
 
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), key.PrivateKey)
 		require.NoError(t, err)
@@ -535,7 +535,7 @@ func testSetPreferenceRace(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		require.NoError(t, err)
@@ -713,7 +713,7 @@ func testReorgProtection(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		require.NoError(t, err)
@@ -858,7 +858,7 @@ func testNonCanonicalAccept(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		require.NoError(t, err)
@@ -996,7 +996,7 @@ func testStickyPreference(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		require.NoError(t, err)
@@ -1174,7 +1174,7 @@ func testUncleBlock(t *testing.T, scheme string) {
 	require.Equal(t, common.Hash(vm2BlkA.ID()), newHead.Head.Hash(), "Expected new block to match")
 
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		require.NoError(t, err)
@@ -1383,7 +1383,7 @@ func testAcceptReorg(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		tx := types.NewTransaction(uint64(i), testEthAddrs[0], big.NewInt(10), 21000, big.NewInt(testMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[1].ToECDSA())
 		require.NoError(t, err)
@@ -3182,7 +3182,7 @@ func TestCreateHandlers(t *testing.T) {
 	defer client.Close()
 
 	// Make a request at limit, ensure that all requests are handled
-	for i := 0; i < maxResponses; i++ {
+	for range maxResponses {
 		batch = append(batch, rpc.BatchElem{
 			Method: "test_echo",
 			Args:   []any{"x", 1},

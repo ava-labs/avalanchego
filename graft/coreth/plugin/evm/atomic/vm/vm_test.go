@@ -939,7 +939,7 @@ func TestBuildBlockDoesNotExceedAtomicGasLimit(t *testing.T) {
 	require.NoError(err)
 
 	mempoolTxs := 200
-	for i := 0; i < mempoolTxs; i++ {
+	for i := range mempoolTxs {
 		utxo, err := addUTXO(tvm.AtomicMemory, vm.Ctx, txID, uint32(i), vm.Ctx.AVAXAssetID, importAmount, vmtest.TestShortIDAddrs[0])
 		require.NoError(err)
 
@@ -990,7 +990,7 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 
 	// Add enough UTXOs, such that the created import transaction will attempt to consume more gas than allowed
 	// in ApricotPhase5.
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		_, err := addUTXO(tvm1.AtomicMemory, vm1.Ctx, txID, uint32(i), vm1.Ctx.AVAXAssetID, importAmount, vmtest.TestShortIDAddrs[0])
 		require.NoError(err)
 
@@ -1183,7 +1183,7 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 	require.Equal(common.Hash(blk.ID()), newHead.Head.Hash())
 
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		tx := types.NewTransaction(uint64(i), address, big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice*3), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.Ethereum().BlockChain().Config().ChainID), key)
 		require.NoError(err)
@@ -1312,7 +1312,7 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 
 	txs := make([]*types.Transaction, 10)
 	chainID := vm.Ethereum().BlockChain().Config().ChainID
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		tx := types.NewTransaction(uint64(i), address, big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), key)
 		require.NoError(err)
@@ -1551,7 +1551,7 @@ func TestWaitForEvent(t *testing.T) {
 				t.Log("WaitForEvent returns when regular transactions are added to the mempool")
 
 				txs := make([]*types.Transaction, 10)
-				for i := 0; i < 10; i++ {
+				for i := range 10 {
 					tx := types.NewTransaction(uint64(i), address, big.NewInt(10), 21000, big.NewInt(3*ap0.MinGasPrice), nil)
 					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.Ethereum().BlockChain().Config().ChainID), key)
 					require.NoError(t, err)

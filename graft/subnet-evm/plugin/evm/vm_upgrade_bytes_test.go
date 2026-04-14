@@ -215,7 +215,7 @@ func TestNetworkUpgradesOverridden(t *testing.T) {
 	require.ErrorContains(t, err, "mismatching Granite fork block timestamp") //nolint:forbidigo // uses upstream code
 }
 
-func mustMarshal(t *testing.T, v interface{}) string {
+func mustMarshal(t *testing.T, v any) string {
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
 	return string(b)

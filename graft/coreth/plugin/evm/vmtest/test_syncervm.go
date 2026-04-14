@@ -591,11 +591,9 @@ func testSyncerVM(t *testing.T, testSyncVMSetup *testSyncVMSetup, test SyncTestP
 	},
 		func(block *types.Block) {
 			if syncerVM.Ethereum().BlockChain().CacheConfig().TransactionHistory != 0 {
-				tail := block.NumberU64() - syncerVM.Ethereum().BlockChain().CacheConfig().TransactionHistory + 1
-				// tail should be the minimum last synced block, since we skipped it to the last block
-				if tail < lastSyncedBlock.NumberU64() {
-					tail = lastSyncedBlock.NumberU64()
-				}
+				tail := max(
+					// tail should be the minimum last synced block, since we skipped it to the last block
+					block.NumberU64()-syncerVM.Ethereum().BlockChain().CacheConfig().TransactionHistory+1, lastSyncedBlock.NumberU64())
 				coretest.CheckTxIndices(t, &tail, tail, block.NumberU64(), block.NumberU64(), syncerVM.Ethereum().ChainDb(), true)
 			}
 		},
@@ -625,11 +623,9 @@ func testSyncerVM(t *testing.T, testSyncVMSetup *testSyncVMSetup, test SyncTestP
 	},
 		func(block *types.Block) {
 			if syncerVM.Ethereum().BlockChain().CacheConfig().TransactionHistory != 0 {
-				tail := block.NumberU64() - syncerVM.Ethereum().BlockChain().CacheConfig().TransactionHistory + 1
-				// tail should be the minimum last synced block, since we skipped it to the last block
-				if tail < lastSyncedBlock.NumberU64() {
-					tail = lastSyncedBlock.NumberU64()
-				}
+				tail := max(
+					// tail should be the minimum last synced block, since we skipped it to the last block
+					block.NumberU64()-syncerVM.Ethereum().BlockChain().CacheConfig().TransactionHistory+1, lastSyncedBlock.NumberU64())
 				coretest.CheckTxIndices(t, &tail, tail, block.NumberU64(), block.NumberU64(), syncerVM.Ethereum().ChainDb(), true)
 			}
 		},

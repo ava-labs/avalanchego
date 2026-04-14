@@ -55,7 +55,7 @@ func TestPeerTracker(t *testing.T) {
 
 	// Expect requests to go to responsive or new peers, so long as they are available
 	numRequests := 50
-	for i := 0; i < numRequests; i++ {
+	for i := range numRequests {
 		peer, ok, err := p.GetAnyPeer(nil)
 		require.NoError(err)
 		require.True(ok)

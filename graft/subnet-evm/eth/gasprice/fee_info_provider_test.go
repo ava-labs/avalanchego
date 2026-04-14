@@ -56,7 +56,7 @@ func TestFeeInfoProviderCacheSize(t *testing.T) {
 	}
 
 	// these numbers should be evicted
-	for i := 0; i < overflow; i++ {
+	for i := range overflow {
 		feeInfo, ok := f.get(uint64(i))
 		require.False(t, ok)
 		require.Nil(t, feeInfo)

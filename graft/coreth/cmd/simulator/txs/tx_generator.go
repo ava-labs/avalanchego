@@ -60,7 +60,7 @@ func addTxs(ctx context.Context, txSequence *txSequence, generator CreateTx, cli
 	if err != nil {
 		return err
 	}
-	for i := uint64(0); i < numTxs; i++ {
+	for i := range numTxs {
 		tx, err := generator(key, startingNonce+i)
 		if err != nil {
 			return err

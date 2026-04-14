@@ -30,10 +30,8 @@ func NewBoundedWorkers(count int) *BoundedWorkers {
 // alive to continue executing new work.
 func (b *BoundedWorkers) startWorker(f func()) {
 	b.workerCount.Add(1)
-	b.outstandingWorkers.Add(1)
 
-	go func() {
-		defer b.outstandingWorkers.Done()
+	b.outstandingWorkers.Go(func() {
 
 		if f != nil {
 			f()
@@ -41,7 +39,7 @@ func (b *BoundedWorkers) startWorker(f func()) {
 		for f := range b.work {
 			f()
 		}
-	}()
+	})
 }
 
 // Execute the given function on an existing goroutine waiting for more work, a new goroutine,

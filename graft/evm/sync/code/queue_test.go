@@ -161,7 +161,7 @@ func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 	// Prepare multiple distinct hashes to exceed the buffer and cause AddCode to block on enqueue.
 	hashes := make([]common.Hash, capacity+2)
 	for i := range hashes {
-		hashes[i] = crypto.Keccak256Hash([]byte(fmt.Sprintf("code-%d", i)))
+		hashes[i] = crypto.Keccak256Hash(fmt.Appendf(nil, "code-%d", i))
 	}
 
 	addDone := make(chan error, 1)

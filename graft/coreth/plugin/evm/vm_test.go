@@ -240,7 +240,7 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 	require.Equal(common.Hash(blk1.ID()), newHead.Head.Hash())
 
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[1].ToECDSA(), uint64(i), &vmtest.TestEthAddrs[1], big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
 		txs[i] = signedTx
 	}
@@ -363,7 +363,7 @@ func testSetPreferenceRace(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		signedTx := newSignedLegacyTx(t, vm1.chainConfig, vmtest.TestKeys[1].ToECDSA(), uint64(i), &vmtest.TestEthAddrs[1], big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
 		txs[i] = signedTx
 	}
@@ -490,7 +490,7 @@ func testReorgProtection(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		signedTx := newSignedLegacyTx(t, vm1.chainConfig, key, uint64(i), &address, big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
 		txs[i] = signedTx
 	}
@@ -596,7 +596,7 @@ func testNonCanonicalAccept(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		signedTx := newSignedLegacyTx(t, vm1.chainConfig, key, uint64(i), &address, big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
 		txs[i] = signedTx
 	}
@@ -701,7 +701,7 @@ func testStickyPreference(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		signedTx := newSignedLegacyTx(t, vm1.chainConfig, key, uint64(i), &address, big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
 		txs[i] = signedTx
 	}
@@ -843,7 +843,7 @@ func testUncleBlock(t *testing.T, scheme string) {
 	require.Equal(common.Hash(vm2BlkA.ID()), newHead.Head.Hash())
 
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		signedTx := newSignedLegacyTx(t, vm1.chainConfig, key, uint64(i), &address, big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
 		txs[i] = signedTx
 	}
@@ -946,7 +946,7 @@ func testAcceptReorg(t *testing.T, scheme string) {
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		signedTx = newSignedLegacyTx(t, vm1.chainConfig, key, uint64(i), &address, big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
 		txs[i] = signedTx
 	}
@@ -1167,7 +1167,7 @@ func testBuildApricotPhase1Block(t *testing.T, scheme string) {
 	require.Equal(common.Hash(blk.ID()), newHead.Head.Hash())
 
 	txs := make([]*types.Transaction, 10)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		signedTx := newSignedLegacyTx(t, vm.chainConfig, key, uint64(i), &address, big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
 		txs[i] = signedTx
 	}
@@ -1418,7 +1418,7 @@ func TestBuildBlockWithInsufficientCapacity(t *testing.T) {
 		txs = make([]*types.Transaction, 2)
 		err error
 	)
-	for i := uint64(0); i < 2; i++ {
+	for i := range uint64(2) {
 		tx := types.NewContractCreation(
 			i,
 			big.NewInt(0),
@@ -1487,7 +1487,7 @@ func TestBuildBlockLargeTxStarvation(t *testing.T) {
 	// Refill capacity
 	vm.clock.Set(vm.clock.Time().Add(acp176.TimeToFillCapacity * time.Second))
 	maxSizeTxs := make([]*types.Transaction, 2)
-	for i := uint64(0); i < 2; i++ {
+	for i := range uint64(2) {
 		tx := types.NewContractCreation(
 			i,
 			big.NewInt(0),
@@ -1774,7 +1774,7 @@ func TestCreateHandlers(t *testing.T) {
 	defer client.Close()
 
 	// Make a request at limit, ensure that all requests are handled
-	for i := 0; i < maxResponses; i++ {
+	for range maxResponses {
 		batch = append(batch, rpc.BatchElem{
 			Method: "test_echo",
 			Args:   []any{"x", 1},

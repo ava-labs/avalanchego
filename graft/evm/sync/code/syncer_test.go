@@ -114,7 +114,7 @@ func TestCodeSyncerManyCodeHashes(t *testing.T) {
 	numCodeSlices := 5000
 	codeHashes := make([]common.Hash, 0, numCodeSlices)
 	codeByteSlices := make([][]byte, 0, numCodeSlices)
-	for i := 0; i < numCodeSlices; i++ {
+	for range numCodeSlices {
 		codeBytes := utils.RandomBytes(100)
 		codeHash := crypto.Keccak256Hash(codeBytes)
 		codeHashes = append(codeHashes, codeHash)
@@ -167,7 +167,7 @@ func TestCodeSyncerAddsMoreInProgressThanQueueSize(t *testing.T) {
 	numCodeSlices := 100
 	codeHashes := make([]common.Hash, 0, numCodeSlices)
 	codeByteSlices := make([][]byte, 0, numCodeSlices)
-	for i := 0; i < numCodeSlices; i++ {
+	for range numCodeSlices {
 		codeBytes := utils.RandomBytes(100)
 		codeHash := crypto.Keccak256Hash(codeBytes)
 		codeHashes = append(codeHashes, codeHash)

@@ -263,9 +263,7 @@ func (c *client) startAsync(executor Executor, summary message.Syncable) block.S
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
 
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
+	c.wg.Go(func() {
 		defer cancel()
 
 		if err := executor.Execute(ctx, summary); err != nil {
@@ -276,7 +274,7 @@ func (c *client) startAsync(executor Executor, summary message.Syncable) block.S
 		// vm.SetState(snow.Bootstrapping)
 		log.Info("state sync completed, notifying engine", "err", c.err)
 		close(c.config.StateSyncDone)
-	}()
+	})
 
 	log.Info("state sync started", "mode", block.StateSyncStatic)
 	return block.StateSyncStatic

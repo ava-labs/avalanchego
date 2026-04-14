@@ -56,7 +56,7 @@ func testBytesToHashSlice(t testing.TB, b []byte) {
 }
 
 func FuzzHashSliceToBytes(f *testing.F) {
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		f.Add(utils.RandomBytes(i))
 	}
 
