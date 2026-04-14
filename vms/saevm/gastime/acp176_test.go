@@ -459,3 +459,50 @@ func (tm *Time) exponent() *big.Rat {
 		new(big.Int).SetUint64(uint64(tm.excessScalingFactor())),
 	)
 }
+
+// TestOscillatingMinPrice verifies that oscillating MinPrice between two values
+// does not impact gas price growth. When blocks consistently consume
+// above-target gas, the price should increase over time regardless of MinPrice
+// changes.
+func TestOscillatingMinPrice(t *testing.T) {
+	const (
+		target       gas.Gas   = 1_000_000
+		scaling      gas.Gas   = 87
+		gasPerBlock  gas.Gas   = target // value doesn't actually matter, we never idle in the test
+		numBlocks              = 1000
+		highMinPrice gas.Price = 2
+		lowMinPrice  gas.Price = 1
+	)
+
+	initialConfig := hook.GasPriceConfig{
+		TargetToExcessScaling: scaling,
+		MinPrice:              highMinPrice,
+	}
+	control := mustNew(t, time.Unix(0, 0), target, 0, initialConfig)
+	modified := mustNew(t, time.Unix(0, 0), target, 0, initialConfig)
+
+	require.Equal(t, highMinPrice, control.Price())
+	require.Equal(t, highMinPrice, modified.Price())
+
+	for i := range numBlocks {
+		require.NoError(t, control.AfterBlock(
+			gasPerBlock,
+			hookstest.NewStub(target, hookstest.WithGasPriceConfig(initialConfig)),
+			nil,
+		))
+
+		oscillatingConfig := initialConfig
+		if i%2 == 0 {
+			oscillatingConfig.MinPrice = lowMinPrice
+		}
+		require.NoError(t, modified.AfterBlock(
+			gasPerBlock,
+			hookstest.NewStub(target, hookstest.WithGasPriceConfig(oscillatingConfig)),
+			nil,
+		))
+	}
+
+	// Sanity check that price normally increases.
+	assert.Greater(t, control.Price(), highMinPrice, "control price must increase with sustained above-target usage")
+	assert.Equal(t, control.Price(), modified.Price(), "alternating MinPrice must not impact price growth")
+}
