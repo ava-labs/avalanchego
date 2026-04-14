@@ -61,10 +61,9 @@ func (tm *Time) setGasPriceConfig(target gas.Gas, c config) {
 	tm.excess = max(tm.excess, minExcess)
 }
 
-// minPriceExcess returns the lowest excess that produces minPrice exactly, if
-// one exists. If the integer approximation in [calculatePrice] skips over
-// minPrice, it returns the maximum excess where the price is strictly less
-// than minPrice.
+// minPriceExcess returns the lowest excess that produces minPrice, if one
+// exists. If the integer approximation in [calculatePrice] skips over minPrice,
+// it returns the maximum excess where the price is strictly less than minPrice.
 //
 // Mathematically, it is calculating: ln(minPrice) * k.
 func minPriceExcess(minPrice gas.Price, k gas.Gas) gas.Gas {
