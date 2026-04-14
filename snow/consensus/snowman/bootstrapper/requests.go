@@ -28,7 +28,7 @@ func (r *requests) GetPeers(context.Context) set.Set[ids.NodeID] {
 		r.pendingSend.Len(),
 	)
 	nodeIDs := set.NewSet[ids.NodeID](numToSend)
-	for i := 0; i < numToSend; i++ {
+	for range numToSend {
 		nodeID, _ := r.pendingSend.Pop()
 		nodeIDs.Add(nodeID)
 	}

@@ -54,7 +54,7 @@ func NewTestBlock(i uint64, parentID ids.ID) *snowmantest.Block {
 func NewTestBlocks(numBlocks uint64) []*snowmantest.Block {
 	blks := make([]*snowmantest.Block, 0, numBlocks)
 	parentID := ids.Empty
-	for i := uint64(0); i < numBlocks; i++ {
+	for i := range numBlocks {
 		blks = append(blks, NewTestBlock(i, parentID))
 		parent := blks[len(blks)-1]
 		parentID = parent.ID()

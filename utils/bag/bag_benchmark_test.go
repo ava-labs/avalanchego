@@ -12,7 +12,7 @@ func BenchmarkBagListSmall(b *testing.B) {
 	rand := rand.New(rand.NewSource(1337)) //#nosec G404
 	smallLen := 5
 	bag := Bag[int]{}
-	for i := 0; i < smallLen; i++ {
+	for range smallLen {
 		bag.Add(rand.Int())
 	}
 	b.ResetTimer()
@@ -25,7 +25,7 @@ func BenchmarkBagListMedium(b *testing.B) {
 	rand := rand.New(rand.NewSource(1337)) //#nosec G404
 	mediumLen := 25
 	bag := Bag[int]{}
-	for i := 0; i < mediumLen; i++ {
+	for range mediumLen {
 		bag.Add(rand.Int())
 	}
 	b.ResetTimer()
@@ -39,7 +39,7 @@ func BenchmarkBagListLarge(b *testing.B) {
 	rand := rand.New(rand.NewSource(1337)) //#nosec G404
 	largeLen := 100000
 	bag := Bag[int]{}
-	for i := 0; i < largeLen; i++ {
+	for range largeLen {
 		bag.Add(rand.Int())
 	}
 	b.ResetTimer()

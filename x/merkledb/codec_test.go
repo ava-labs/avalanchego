@@ -138,7 +138,7 @@ var (
 					value:    maybe.Some([]byte("value")),
 					children: make(map[byte]*child),
 				}
-				for i := byte(0); i < 16; i++ {
+				for i := range byte(16) {
 					n.children[i] = &child{
 						compressedKey: ToKey([]byte{i}),
 						id: ids.ID{
@@ -499,7 +499,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				numChildren := r.Intn(int(bf))
 
 				children := map[byte]*child{}
-				for i := 0; i < numChildren; i++ {
+				for i := range numChildren {
 					var childID ids.ID
 					_, _ = r.Read(childID[:])
 
@@ -604,7 +604,7 @@ func TestUintSize(t *testing.T) {
 	require.Equal(t, expectedSize, actualSize)
 
 	// Test powers of 2
-	for power := 0; power < 64; power++ {
+	for power := range 64 {
 		n := uint64(1) << uint(power)
 		expectedSize := uintSize(n)
 		actualSize := binary.PutUvarint(make([]byte, binary.MaxVarintLen64), n)

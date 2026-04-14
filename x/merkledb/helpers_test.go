@@ -59,7 +59,7 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 	_, _ = r.Read(val)
 
 	children := map[byte]ids.ID{}
-	for j := 0; j < 16; j++ {
+	for j := range 16 {
 		if r.Float64() < 0.5 {
 			var childID ids.ID
 			_, _ = r.Read(childID[:])

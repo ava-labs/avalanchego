@@ -134,7 +134,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 
 			testVdrCount := 4
 			vdrIDs := set.NewSet[ids.NodeID](testVdrCount)
-			for i := 0; i < testVdrCount; i++ {
+			for range testVdrCount {
 				vdrID := ids.GenerateTestNodeID()
 				vdrIDs.Add(vdrID)
 

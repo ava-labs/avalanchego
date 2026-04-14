@@ -70,7 +70,7 @@ var sha256HashNodeTests = []struct {
 		n: func() *node {
 			n := newNode(Key{})
 
-			for i := byte(0); i < 16; i++ {
+			for i := range byte(16) {
 				childNode := newNode(ToKey([]byte{i << 4}))
 				childNode.setValue(SHA256Hasher, maybe.Some([]byte("some value")))
 
@@ -95,7 +95,7 @@ func Fuzz_SHA256_HashNode(f *testing.F) {
 
 				children := map[byte]*child{}
 				numChildren := r.Intn(int(bf))
-				for i := 0; i < numChildren; i++ {
+				for i := range numChildren {
 					compressedKeyLen := r.Intn(32)
 					compressedKeyBytes := make([]byte, compressedKeyLen)
 					_, _ = r.Read(compressedKeyBytes)

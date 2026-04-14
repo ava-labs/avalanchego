@@ -59,7 +59,7 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) ([]int, error) {
 
 	numFields := t.NumField()
 	serializedFields := make([]int, 0, numFields)
-	for i := 0; i < numFields; i++ { // Go through all fields of this struct
+	for i := range numFields { // Go through all fields of this struct
 		field := t.Field(i)
 
 		// Multiple tags per fields can be specified.

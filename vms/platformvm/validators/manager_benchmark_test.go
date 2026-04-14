@@ -70,7 +70,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		nodeIDs       []ids.NodeID
 		currentHeight uint64
 	)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		currentHeight++
 		nodeID, err := addPrimaryValidator(s, genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime, currentHeight)
 		require.NoError(err)
@@ -81,7 +81,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		currentHeight++
 		require.NoError(addSubnetValidator(s, subnetID, genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime, nodeID, currentHeight))
 	}
-	for i := 0; i < 9900; i++ {
+	for range 9900 {
 		currentHeight++
 		require.NoError(addSubnetDelegator(s, subnetID, genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime, nodeIDs, currentHeight))
 	}

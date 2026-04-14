@@ -207,7 +207,7 @@ func Test_View_Iterator_Random(t *testing.T) {
 	)
 
 	keyChanges := []KeyChange{}
-	for i := 0; i < numKeyChanges; i++ {
+	for range numKeyChanges {
 		key := make([]byte, rand.Intn(maxKeyLen))
 		_, _ = rand.Read(key)
 		value := make([]byte, rand.Intn(maxValLen))
@@ -281,7 +281,7 @@ func Test_View_Iterator_Random(t *testing.T) {
 	iter = view3.NewIteratorWithStartAndPrefix(start, prefix)
 	startPrefixUniqueKeys := []string{}
 	// Remove keys that don't have the prefix/are before the start.
-	for i := 0; i < len(uniqueKeys); i++ {
+	for i := range uniqueKeys {
 		if bytes.HasPrefix([]byte(uniqueKeys[i]), prefix) && bytes.Compare([]byte(uniqueKeys[i]), start) >= 0 {
 			startPrefixUniqueKeys = append(startPrefixUniqueKeys, uniqueKeys[i])
 		}

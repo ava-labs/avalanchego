@@ -288,7 +288,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			// race condition in between writes where UpdateSyncTarget might
 			// error because it has already reached the sync target before it
 			// is called.
-			for i := 0; i < 50; i++ {
+			for range 50 {
 				addkey := make([]byte, r.Intn(50))
 				_, err = r.Read(addkey)
 				require.NoError(err)
@@ -407,7 +407,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	firstSyncRoot, err := dbToSync.GetMerkleRoot(t.Context())
 	require.NoError(err)
 
-	for x := 0; x < 100; x++ {
+	for range 100 {
 		key := make([]byte, r.Intn(50))
 		_, err = r.Read(key)
 		require.NoError(err)

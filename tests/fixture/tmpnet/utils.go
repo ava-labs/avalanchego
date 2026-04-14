@@ -126,7 +126,7 @@ func DefaultJSONMarshal(v any) ([]byte, error) {
 // Helper simplifying creation of a set of private keys
 func NewPrivateKeys(keyCount int) ([]*secp256k1.PrivateKey, error) {
 	keys := make([]*secp256k1.PrivateKey, 0, keyCount)
-	for i := 0; i < keyCount; i++ {
+	for range keyCount {
 		key, err := secp256k1.NewPrivateKey()
 		if err != nil {
 			return nil, stacktrace.Errorf("failed to generate private key: %w", err)

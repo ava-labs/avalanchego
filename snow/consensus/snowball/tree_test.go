@@ -690,7 +690,7 @@ func TestSnowball5Colors(t *testing.T) {
 	}
 
 	colors := []ids.ID{}
-	for i := 0; i < numColors; i++ {
+	for i := range numColors {
 		colors = append(colors, ids.Empty.Prefix(uint64(i)))
 	}
 
@@ -847,7 +847,7 @@ func TestSnowballConsistent(t *testing.T) {
 	n := NewNetwork(SnowballFactory, params, numColors, source)
 
 	source.Seed(seed)
-	for i := 0; i < numNodes; i++ {
+	for range numNodes {
 		n.AddNode(NewTree)
 	}
 

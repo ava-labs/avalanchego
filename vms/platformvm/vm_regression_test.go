@@ -2380,7 +2380,7 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 		ctx, cancel = context.WithCancel(t.Context())
 	)
 	// keep 10 workers running
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		eg.Go(func() error {
 			for ctx.Err() == nil {
 				err := vm.AppRequest(
@@ -2399,7 +2399,7 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 	}
 
 	// If the validator set lock isn't held, the race detector should fail here.
-	for i := uint64(0); i < 1000; i++ {
+	for i := range uint64(1000) {
 		blk, err := block.NewBanffStandardBlock(
 			time.Now(),
 			vm.state.GetLastAccepted(),

@@ -125,7 +125,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	keyCount := 100
 	ops := make([]database.BatchOp, 0, keyCount)
 	require.NoError(err)
-	for i := 0; i < keyCount; i++ {
+	for i := range keyCount {
 		k := []byte(strconv.Itoa(i))
 		ops = append(ops, database.BatchOp{
 			Key:   k,
@@ -175,7 +175,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	// Populate initial set of keys
 	ops := make([]database.BatchOp, 0, initialSize)
 	require.NoError(err)
-	for i := 0; i < initialSize; i++ {
+	for i := range initialSize {
 		k := []byte(strconv.Itoa(i))
 		ops = append(ops, database.BatchOp{
 			Key:   k,
@@ -718,7 +718,7 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < numRuns; i++ {
+	for i := range numRuns {
 		now := time.Now().UnixNano()
 		t.Logf("seed for iter %d: %d", i, now)
 		r := rand.New(rand.NewSource(now))
@@ -726,7 +726,7 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 		// Insert key-value pairs into a database.
 		ops := make([]database.BatchOp, 0, numKeyValues)
 		keys = [][]byte{}
-		for x := 0; x < numKeyValues; x++ {
+		for range numKeyValues {
 			key := genKey(r)
 			value := make([]byte, r.Intn(51))
 			if r.Float64() < nilValueProbability {
@@ -753,7 +753,7 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 		// Assert that the same operations applied in a different order
 		// result in the same root. Note this is only true because
 		// all keys inserted are unique.
-		for shuffleIndex := 0; shuffleIndex < numShuffles; shuffleIndex++ {
+		for range numShuffles {
 			r.Shuffle(numKeyValues, func(i, j int) {
 				ops[i], ops[j] = ops[j], ops[i]
 			})
@@ -1186,7 +1186,7 @@ func generateInitialValues(
 	}
 
 	var steps randTest
-	for i := uint(0); i < numInitialKeyValues; i++ {
+	for range numInitialKeyValues {
 		step := randTestStep{
 			op:    opUpdate,
 			key:   genKey(),
@@ -1225,7 +1225,7 @@ func insertRandomKeyValues(
 
 	require.GreaterOrEqual(deletePortion, float64(0))
 	require.LessOrEqual(deletePortion, float64(1))
-	for i := uint(0); i < numKeyValues; i++ {
+	for range numKeyValues {
 		keyLen := rand.Intn(maxKeyLen)
 		key := make([]byte, keyLen)
 		_, _ = rand.Read(key)
@@ -1677,7 +1677,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 	// Put random keys into the databases
 	for _, db := range []database.Database{remoteDB, localDB} {
-		for i := 0; i < numKeyValues; i++ {
+		for range numKeyValues {
 			key := make([]byte, rand.Intn(maxKeyLen))
 			_, _ = rand.Read(key)
 			val := make([]byte, rand.Intn(maxValLen))
@@ -1688,7 +1688,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 	// Repeatedly generate end proofs from the remote database and compare
 	// the result of findNextKey to the expected result.
-	for proofIndex := 0; proofIndex < numProofsToTest; proofIndex++ {
+	for range numProofsToTest {
 		// Generate a proof for a random key
 		var (
 			rangeStart []byte

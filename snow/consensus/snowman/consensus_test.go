@@ -1328,7 +1328,7 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 
 	n := NewNetwork(params, numColors, source)
 
-	for i := 0; i < numNodes; i++ {
+	for range numNodes {
 		require.NoError(n.AddNode(t, factory.New()))
 	}
 

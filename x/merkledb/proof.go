@@ -542,7 +542,7 @@ func (c *ChangeProof) Empty() bool {
 func verifySortedKeyChanges(keyChanges []KeyChange, start maybe.Maybe[Key], end maybe.Maybe[Key]) error {
 	hasLowerBound := start.HasValue()
 	hasUpperBound := end.HasValue()
-	for i := 0; i < len(keyChanges); i++ {
+	for i := range keyChanges {
 		if i < len(keyChanges)-1 && bytes.Compare(keyChanges[i].Key, keyChanges[i+1].Key) >= 0 {
 			return ErrNonIncreasingValues
 		}

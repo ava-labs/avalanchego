@@ -927,7 +927,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			ops := make([]database.BatchOp, 0, initialSet)
 			require.NoError(err)
 			kv := [][]byte{}
-			for i := 0; i < initialSet; i++ {
+			for i := range initialSet {
 				k := []byte(strconv.Itoa(i))
 				kv = append(kv, k)
 				ops = append(ops, database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
@@ -950,7 +950,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 
 			// Populate additional states
 			concurrentStates := []Trie{}
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				newState, err := root.NewView(t.Context(), ViewChanges{})
 				require.NoError(err)
 				concurrentStates = append(concurrentStates, newState)
@@ -963,7 +963,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			// Process ops
 			newStart := initialSet
 			concurrentOps := make([][]database.BatchOp, len(concurrentStates))
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				if r.Intn(100) < 20 {
 					// New Key
 					for index := range concurrentStates {

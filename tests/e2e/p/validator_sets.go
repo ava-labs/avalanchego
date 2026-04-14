@@ -55,7 +55,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 				weight = genesis.LocalParams.StakingConfig.MinDelegatorStake
 			)
 
-			for i := 0; i < delegatorCount; i++ {
+			for range delegatorCount {
 				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{

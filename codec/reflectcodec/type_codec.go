@@ -387,7 +387,7 @@ func (c *genericCodec) marshal(
 			p.PackFixedBytes(value.Bytes())
 			return p.Err
 		}
-		for i := 0; i < numElts; i++ { // Process each element in the slice
+		for i := range numElts { // Process each element in the slice
 			startOffset := p.Offset
 			if err := c.marshal(value.Index(i), p, typeStack); err != nil {
 				return err
@@ -403,7 +403,7 @@ func (c *genericCodec) marshal(
 			return p.Err
 		}
 		numElts := value.Len()
-		for i := 0; i < numElts; i++ { // Process each element in the array
+		for i := range numElts { // Process each element in the array
 			if err := c.marshal(value.Index(i), p, typeStack); err != nil {
 				return err
 			}
@@ -598,7 +598,7 @@ func (c *genericCodec) unmarshal(
 		// Unmarshal each element and append it into the slice.
 		value.Set(reflect.MakeSlice(sliceType, 0, initialSliceLen))
 		zeroValue := reflect.Zero(innerType)
-		for i := 0; i < numElts; i++ {
+		for i := range numElts {
 			value.Set(reflect.Append(value, zeroValue))
 
 			startOffset := p.Offset
@@ -622,7 +622,7 @@ func (c *genericCodec) unmarshal(
 			copy(underlyingSlice, unpackedBytes)
 			return nil
 		}
-		for i := 0; i < numElts; i++ {
+		for i := range numElts {
 			if err := c.unmarshal(p, value.Index(i), typeStack); err != nil {
 				return err
 			}
@@ -702,7 +702,7 @@ func (c *genericCodec) unmarshal(
 		// Set [value] to be a new map of the appropriate type.
 		value.Set(reflect.MakeMap(mapType))
 
-		for i := 0; i < numElts; i++ {
+		for i := range numElts {
 			mapKey := reflect.New(mapKeyType).Elem()
 
 			keyStartOffset := p.Offset

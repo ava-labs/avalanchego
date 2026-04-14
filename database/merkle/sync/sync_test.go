@@ -52,7 +52,7 @@ func Test_Midpoint(t *testing.T) {
 	mid = midPoint(maybe.Some([]byte{255}), maybe.Nothing[[]byte]())
 	require.Equal(maybe.Some([]byte{255, 127, 127}), mid)
 
-	for i := 0; i < 5000; i++ {
+	for i := range 5000 {
 		r := rand.New(rand.NewSource(int64(i)))
 
 		start := make([]byte, r.Intn(99)+1)

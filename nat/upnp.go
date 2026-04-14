@@ -167,7 +167,7 @@ func discover(target string) *upnpRouter {
 	}
 
 	router := make(chan *upnpRouter)
-	for i := 0; i < len(devs); i++ {
+	for i := range devs {
 		if devs[i].Root == nil {
 			continue
 		}
@@ -201,7 +201,7 @@ func discover(target string) *upnpRouter {
 		}(&devs[i])
 	}
 
-	for i := 0; i < len(devs); i++ {
+	for range devs {
 		if r := <-router; r != nil {
 			return r
 		}
@@ -226,7 +226,7 @@ func getUPnPRouter() *upnpRouter {
 		}(urn)
 	}
 
-	for i := 0; i < len(targets); i++ {
+	for range targets {
 		if r := <-routers; r != nil {
 			return r
 		}

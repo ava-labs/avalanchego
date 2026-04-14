@@ -163,10 +163,10 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	// create changes
-	for x := 0; x < sync.DefaultRequestKeyLimit/2; x++ {
+	for range sync.DefaultRequestKeyLimit / 2 {
 		ops := make([]database.BatchOp, 0, 11)
 		// add some key/values
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			key := make([]byte, r.Intn(100))
 			_, err = r.Read(key)
 			require.NoError(t, err)

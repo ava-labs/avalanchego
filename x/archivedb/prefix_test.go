@@ -61,7 +61,7 @@ func TestDBEfficientLookups(t *testing.T) {
 	require.NoError(batch.Put(key, []byte("value")))
 	require.NoError(batch.Write())
 
-	for i := 0; i < 10000; i++ {
+	for i := range 10000 {
 		batch = db.NewBatch(uint64(i) + 2)
 		require.NoError(batch.Put(maliciousKey, []byte{byte(i)}))
 		require.NoError(batch.Write())

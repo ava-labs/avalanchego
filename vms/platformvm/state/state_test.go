@@ -461,7 +461,7 @@ func TestState_writeStakers(t *testing.T) {
 
 			// Perform the checks once immediately after committing to the
 			// state, and once after re-loading the state from disk.
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				currentValidator, err := state.GetCurrentValidator(test.staker.SubnetID, test.staker.NodeID)
 				if test.expectedCurrentValidator == nil {
 					require.ErrorIs(err, database.ErrNotFound)
@@ -1029,7 +1029,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 
 		// Verify that applying diffs against the current state results in the
 		// expected state.
-		for i := 0; i < currentIndex; i++ {
+		for i := range currentIndex {
 			prevDiff := diffs[i]
 			prevHeight := uint64(i + 1)
 

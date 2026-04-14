@@ -40,7 +40,7 @@ func TestList_PushBack(t *testing.T) {
 
 	l := NewList[int]()
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		l.PushBack(&ListElement[int]{
 			Value: i,
 		})
@@ -72,7 +72,7 @@ func TestList_PushFront(t *testing.T) {
 
 	l := NewList[int]()
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		l.PushFront(&ListElement[int]{
 			Value: i,
 		})

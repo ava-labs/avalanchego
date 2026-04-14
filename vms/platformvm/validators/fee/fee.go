@@ -62,7 +62,7 @@ func (s State) CostOf(c Config, seconds uint64) uint64 {
 		cost uint64
 		err  error
 	)
-	for i := uint64(0); i < seconds; i++ {
+	for i := range seconds {
 		s = s.AdvanceTime(c.Target, 1)
 
 		// Advancing the time is going to either hold excess constant,
@@ -109,7 +109,7 @@ func (s State) SecondsRemaining(c Config, maxSeconds uint64, fundsRemaining uint
 		return min(seconds, maxSeconds)
 	}
 
-	for seconds := uint64(0); seconds < maxSeconds; seconds++ {
+	for seconds := range maxSeconds {
 		s = s.AdvanceTime(c.Target, 1)
 
 		// Advancing the time is going to either hold excess constant,

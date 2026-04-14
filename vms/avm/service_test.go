@@ -2018,7 +2018,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 
 	numUTXOs := 10
 	// Put a bunch of UTXOs
-	for i := 0; i < numUTXOs; i++ {
+	for range numUTXOs {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),

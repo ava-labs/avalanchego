@@ -150,7 +150,7 @@ func newSimplexChainParams(nodes []*testNode) *simplexparams.Parameters {
 
 func generateTestNodes(t *testing.T, num uint64) []*testNode {
 	nodes := make([]*testNode, num)
-	for i := uint64(0); i < num; i++ {
+	for i := range num {
 		ls, err := localsigner.New()
 		require.NoError(t, err)
 
