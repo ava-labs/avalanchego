@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -174,28 +175,50 @@ func TestGetConfig(t *testing.T) {
 	}
 }
 
-// TestFirewoodCommitInterval ensures that we can use arbitrary commit intervals with Firewood for production networks.
-func TestFirewoodCommitInterval(t *testing.T) {
+// TestCommitInterval verifies that production networks reject non-default commit
+// intervals for non-Firewood state schemes, while Firewood is allowed to use
+// arbitrary commit intervals.
+func TestCommitInterval(t *testing.T) {
 	tests := []struct {
 		name       string
-		configJSON string
+		configJSON []byte
+		wantError  error
 	}{
 		{
+			name: "default state scheme with default commit interval",
+		},
+		{
+			name:       "default state scheme with non-default commit interval",
+			configJSON: fmt.Appendf(nil, `{"commit-interval": %d}`, defaultCommitInterval+1),
+			wantError:  ErrNonDefaultCommitInterval,
+		},
+		{
+			name:       "hashdb scheme with default commit interval",
+			configJSON: fmt.Appendf(nil, `{"state-scheme": "%s"}`, rawdb.HashScheme),
+		},
+		{
+			name:       "hashdb scheme with non-default commit interval",
+			configJSON: fmt.Appendf(nil, `{"state-scheme": "%s", "commit-interval": %d}`, rawdb.HashScheme, defaultCommitInterval+1),
+			wantError:  ErrNonDefaultCommitInterval,
+		},
+		{
 			name:       "firewood scheme with default commit interval",
-			configJSON: fmt.Sprintf(`{"state-scheme": "%s"}`, customrawdb.FirewoodScheme),
+			configJSON: fmt.Appendf(nil, `{"state-scheme": "%s"}`, customrawdb.FirewoodScheme),
 		},
 		{
 			name:       "firewood scheme with non-default commit interval",
-			configJSON: fmt.Sprintf(`{"state-scheme": "%s", "commit-interval": %d}`, customrawdb.FirewoodScheme, defaultCommitInterval+1),
+			configJSON: fmt.Appendf(nil, `{"state-scheme": "%s", "commit-interval": %d}`, customrawdb.FirewoodScheme, defaultCommitInterval+1),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := require.New(t)
-
-			_, _, err := GetConfig([]byte(tt.configJSON), constants.MainnetID)
-			r.NoError(err)
+			_, _, err := GetConfig(tt.configJSON, constants.MainnetID)
+			if tt.wantError != nil {
+				require.ErrorIs(t, err, tt.wantError)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

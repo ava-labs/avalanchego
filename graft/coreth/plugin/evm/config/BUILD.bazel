@@ -30,6 +30,7 @@ graft_go_test(
         "//utils/constants",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_stretchr_testify//require",
     ],
 )
