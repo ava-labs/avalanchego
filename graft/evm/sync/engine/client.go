@@ -150,11 +150,12 @@ type client struct {
 	config           *ClientConfig
 	resumableSummary message.Syncable
 	cancel           context.CancelFunc
+	codeQueue        *code.Queue
 	wg               sync.WaitGroup
 	executorLock     sync.RWMutex
 	executor         Executor
 	err              error
-	stateSyncOnce    sync.Once // ensures completion signaling happens exactly once
+	stateSyncOnce    sync.Once
 }
 
 func NewClient(config *ClientConfig) Client {
@@ -358,6 +359,9 @@ func (c *client) startAsync(executor Executor, summary message.Syncable, mode bl
 
 func (c *client) Shutdown() error {
 	c.signalDone(context.Canceled)
+	if c.codeQueue != nil {
+		c.codeQueue.Shutdown()
+	}
 	c.wg.Wait()
 	return nil
 }
@@ -535,10 +539,11 @@ func (c *client) newCodeAndStateSyncers(summary message.Syncable) (types.Syncer,
 }
 
 func (c *client) newFirewoodSyncers(summary message.Syncable, tdb *firewood.TrieDB) (types.Syncer, types.Syncer, error) {
-	codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
+	codeQueue, err := code.NewQueue(c.config.ChainDB)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create code queue: %w", err)
 	}
+	c.codeQueue = codeQueue
 
 	codeSyncer, err := code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
 	if err != nil {
@@ -591,10 +596,11 @@ func (c *client) newHashDBDynamicSyncers(summary message.Syncable) (types.Syncer
 }
 
 func (c *client) newHashDBStaticSyncers(summary message.Syncable) (types.Syncer, types.Syncer, error) {
-	codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
+	codeQueue, err := code.NewQueue(c.config.ChainDB)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create code queue: %w", err)
 	}
+	c.codeQueue = codeQueue
 
 	codeSyncer, err := code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
 	if err != nil {

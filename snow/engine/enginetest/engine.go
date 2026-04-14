@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -188,7 +186,7 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errStart.Error())
+		e.T.Fatal(errStart)
 	}
 	return errStart
 }
@@ -201,7 +199,7 @@ func (e *Engine) Gossip(ctx context.Context) error {
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGossip.Error())
+		e.T.Fatal(errGossip)
 	}
 	return errGossip
 }
@@ -214,7 +212,7 @@ func (e *Engine) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errShutdown.Error())
+		e.T.Fatal(errShutdown)
 	}
 	return errShutdown
 }
@@ -227,7 +225,7 @@ func (e *Engine) Notify(ctx context.Context, msg common.Message) error {
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errNotify.Error())
+		e.T.Fatal(errNotify)
 	}
 	return errNotify
 }
@@ -240,7 +238,7 @@ func (e *Engine) GetStateSummaryFrontier(ctx context.Context, validatorID ids.No
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetStateSummaryFrontier.Error())
+		e.T.Fatal(errGetStateSummaryFrontier)
 	}
 	return errGetStateSummaryFrontier
 }
@@ -253,7 +251,7 @@ func (e *Engine) StateSummaryFrontier(ctx context.Context, validatorID ids.NodeI
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errStateSummaryFrontier.Error())
+		e.T.Fatal(errStateSummaryFrontier)
 	}
 	return errStateSummaryFrontier
 }
@@ -266,7 +264,7 @@ func (e *Engine) GetStateSummaryFrontierFailed(ctx context.Context, validatorID 
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetStateSummaryFrontierFailed.Error())
+		e.T.Fatal(errGetStateSummaryFrontierFailed)
 	}
 	return errGetStateSummaryFrontierFailed
 }
@@ -279,7 +277,7 @@ func (e *Engine) GetAcceptedStateSummary(ctx context.Context, validatorID ids.No
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetAcceptedStateSummary.Error())
+		e.T.Fatal(errGetAcceptedStateSummary)
 	}
 	return errGetAcceptedStateSummary
 }
@@ -292,7 +290,7 @@ func (e *Engine) AcceptedStateSummary(ctx context.Context, validatorID ids.NodeI
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errAcceptedStateSummary.Error())
+		e.T.Fatal(errAcceptedStateSummary)
 	}
 	return errAcceptedStateSummary
 }
@@ -305,7 +303,7 @@ func (e *Engine) GetAcceptedStateSummaryFailed(ctx context.Context, validatorID 
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetAcceptedStateSummaryFailed.Error())
+		e.T.Fatal(errGetAcceptedStateSummaryFailed)
 	}
 	return errGetAcceptedStateSummaryFailed
 }
@@ -318,7 +316,7 @@ func (e *Engine) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, req
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetAcceptedFrontier.Error())
+		e.T.Fatal(errGetAcceptedFrontier)
 	}
 	return errGetAcceptedFrontier
 }
@@ -331,7 +329,7 @@ func (e *Engine) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeI
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetAcceptedFrontierFailed.Error())
+		e.T.Fatal(errGetAcceptedFrontierFailed)
 	}
 	return errGetAcceptedFrontierFailed
 }
@@ -344,7 +342,7 @@ func (e *Engine) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, reques
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errAcceptedFrontier.Error())
+		e.T.Fatal(errAcceptedFrontier)
 	}
 	return errAcceptedFrontier
 }
@@ -357,7 +355,7 @@ func (e *Engine) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID u
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetAccepted.Error())
+		e.T.Fatal(errGetAccepted)
 	}
 	return errGetAccepted
 }
@@ -370,7 +368,7 @@ func (e *Engine) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, reque
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetAcceptedFailed.Error())
+		e.T.Fatal(errGetAcceptedFailed)
 	}
 	return errGetAcceptedFailed
 }
@@ -383,7 +381,7 @@ func (e *Engine) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errAccepted.Error())
+		e.T.Fatal(errAccepted)
 	}
 	return errAccepted
 }
@@ -396,7 +394,7 @@ func (e *Engine) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, c
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGet.Error())
+		e.T.Fatal(errGet)
 	}
 	return errGet
 }
@@ -409,7 +407,7 @@ func (e *Engine) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID 
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetAncestors.Error())
+		e.T.Fatal(errGetAncestors)
 	}
 	return errGetAncestors
 }
@@ -422,7 +420,7 @@ func (e *Engine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uin
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetFailed.Error())
+		e.T.Fatal(errGetFailed)
 	}
 	return errGetFailed
 }
@@ -435,7 +433,7 @@ func (e *Engine) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requ
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errGetAncestorsFailed.Error())
+		e.T.Fatal(errGetAncestorsFailed)
 	}
 	return errGetAncestorsFailed
 }
@@ -448,7 +446,7 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, c
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errPut.Error())
+		e.T.Fatal(errPut)
 	}
 	return errPut
 }
@@ -461,7 +459,7 @@ func (e *Engine) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uin
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errAncestors.Error())
+		e.T.Fatal(errAncestors)
 	}
 	return errAncestors
 }
@@ -474,7 +472,7 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errPushQuery.Error())
+		e.T.Fatal(errPushQuery)
 	}
 	return errPushQuery
 }
@@ -487,7 +485,7 @@ func (e *Engine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errPullQuery.Error())
+		e.T.Fatal(errPullQuery)
 	}
 	return errPullQuery
 }
@@ -500,7 +498,7 @@ func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID u
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errQueryFailed.Error())
+		e.T.Fatal(errQueryFailed)
 	}
 	return errQueryFailed
 }
@@ -513,7 +511,7 @@ func (e *Engine) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errAppRequest.Error())
+		e.T.Fatal(errAppRequest)
 	}
 	return errAppRequest
 }
@@ -526,7 +524,7 @@ func (e *Engine) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errAppResponse.Error())
+		e.T.Fatal(errAppResponse)
 	}
 	return errAppResponse
 }
@@ -539,7 +537,7 @@ func (e *Engine) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errAppRequestFailed.Error())
+		e.T.Fatal(errAppRequestFailed)
 	}
 	return errAppRequestFailed
 }
@@ -552,7 +550,7 @@ func (e *Engine) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) e
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errAppGossip.Error())
+		e.T.Fatal(errAppGossip)
 	}
 	return errAppGossip
 }
@@ -565,7 +563,7 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errChits.Error())
+		e.T.Fatal(errChits)
 	}
 	return errChits
 }
@@ -578,7 +576,7 @@ func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simple
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errSimplex.Error())
+		e.T.Fatal(errSimplex)
 	}
 	return errSimplex
 }
@@ -591,7 +589,7 @@ func (e *Engine) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errConnected.Error())
+		e.T.Fatal(errConnected)
 	}
 	return errConnected
 }
@@ -604,7 +602,7 @@ func (e *Engine) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 		return nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errDisconnected.Error())
+		e.T.Fatal(errDisconnected)
 	}
 	return errDisconnected
 }
@@ -617,7 +615,7 @@ func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
 		return nil, nil
 	}
 	if e.T != nil {
-		require.FailNow(e.T, errHealthCheck.Error())
+		e.T.Fatal(errHealthCheck)
 	}
 	return nil, errHealthCheck
 }

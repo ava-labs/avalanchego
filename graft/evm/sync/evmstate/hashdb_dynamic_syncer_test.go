@@ -213,7 +213,7 @@ func TestDynamicSync_UpdateTarget_StaticNoop(t *testing.T) {
 		codeHandler := handlers.NewCodeRequestHandler(serverDB.DiskDB(), c, handlerstats.NewNoopHandlerStats())
 		mockClient := client.NewTestClient(c, leafsHandler, codeHandler, nil)
 
-		codeQueue, err := code.NewQueue(clientEthDB, make(chan struct{}))
+		codeQueue, err := code.NewQueue(clientEthDB)
 		require.NoError(t, err)
 
 		stateSyncer, err := NewHashDBSyncer(mockClient, clientEthDB, root, codeQueue, testRequestSize, leafReqType, WithFinalizeCodeQueue(codeQueue.Finalize))

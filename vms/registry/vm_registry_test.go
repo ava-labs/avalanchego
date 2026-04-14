@@ -10,6 +10,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/registry/registrymock"
 	"github.com/ava-labs/avalanchego/vms/vmsmock"
@@ -43,18 +44,14 @@ func TestReload_Success(t *testing.T) {
 		id4: factory4,
 	}
 
+	// Set up factory expectations for RegisterFactory calls
+	factory3.EXPECT().New(gomock.Any()).Return(nil, nil)
+	factory4.EXPECT().New(gomock.Any()).Return(nil, nil)
+
 	resources.mockVMGetter.EXPECT().
 		Get().
 		Times(1).
 		Return(registeredVms, unregisteredVms, nil)
-	resources.mockVMManager.EXPECT().
-		RegisterFactory(gomock.Any(), id3, factory3).
-		Times(1).
-		Return(nil)
-	resources.mockVMManager.EXPECT().
-		RegisterFactory(gomock.Any(), id4, factory4).
-		Times(1).
-		Return(nil)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload(t.Context())
 	require.NoError(err)
@@ -97,18 +94,15 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 		id4: factory4,
 	}
 
+	// factory3.New fails, causing RegisterFactory to fail for id3
+	factory3.EXPECT().New(gomock.Any()).Return(nil, errTest)
+	// factory4.New succeeds
+	factory4.EXPECT().New(gomock.Any()).Return(nil, nil)
+
 	resources.mockVMGetter.EXPECT().
 		Get().
 		Times(1).
 		Return(registeredVms, unregisteredVms, nil)
-	resources.mockVMManager.EXPECT().
-		RegisterFactory(gomock.Any(), id3, factory3).
-		Times(1).
-		Return(errTest)
-	resources.mockVMManager.EXPECT().
-		RegisterFactory(gomock.Any(), id4, factory4).
-		Times(1).
-		Return(nil)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload(t.Context())
 	require.NoError(err)
@@ -119,29 +113,27 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 }
 
 type registryTestResources struct {
-	ctrl          *gomock.Controller
-	mockVMGetter  *registrymock.VMGetter
-	mockVMManager *vmsmock.Manager
-	vmRegistry    VMRegistry
+	ctrl         *gomock.Controller
+	mockVMGetter *registrymock.VMGetter
+	vmRegistry   VMRegistry
 }
 
 func initVMRegistryTest(t *testing.T) *registryTestResources {
 	ctrl := gomock.NewController(t)
 
 	mockVMGetter := registrymock.NewVMGetter(ctrl)
-	mockVMManager := vmsmock.NewManager(ctrl)
+	vmManager := vms.NewManager(logging.NoLog{}, ids.NewAliaser())
 
 	vmRegistry := NewVMRegistry(
 		VMRegistryConfig{
 			VMGetter:  mockVMGetter,
-			VMManager: mockVMManager,
+			VMManager: vmManager,
 		},
 	)
 
 	return &registryTestResources{
-		ctrl:          ctrl,
-		mockVMGetter:  mockVMGetter,
-		mockVMManager: mockVMManager,
-		vmRegistry:    vmRegistry,
+		ctrl:         ctrl,
+		mockVMGetter: mockVMGetter,
+		vmRegistry:   vmRegistry,
 	}
 }

@@ -22,6 +22,8 @@ import (
 var (
 	_ types.CodeRequestQueue = (*SessionedQueue)(nil)
 
+	ErrFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
+	errFailedToFinalizeCodeQueue    = errors.New("failed to finalize code queue")
 	errSessionedQueueNotStarted     = errors.New("sessioned code queue not started")
 	errSessionedQueueAlreadyStarted = errors.New("sessioned code queue already started")
 	errSessionBoundarySendTimeout   = errors.New("session boundary event send timed out")

@@ -76,7 +76,7 @@ func testSyncWithConfig(t *testing.T, clientDB, serverDB state.Database, root co
 		mockClient.GetCodeIntercept = cfg.codeIntercept
 	}
 
-	queue, err := code.NewQueue(clientEthDB, make(chan struct{}))
+	queue, err := code.NewQueue(clientEthDB)
 	require.NoError(t, err, "failed to create code queue")
 
 	codeSyncer, err := code.NewSyncer(mockClient, clientEthDB, queue.CodeHashes())
