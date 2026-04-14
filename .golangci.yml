@@ -267,3 +267,6 @@ linters:
         linters:
           - gosec
           - prealloc
+      - path: "^graft/"
+        linters:
+          - modernize
