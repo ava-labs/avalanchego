@@ -294,20 +294,7 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 
 	co.setCommitTarget(newTarget)
 	co.targetEpoch.Add(1)
-	// Remove blocks below the effective target. The effective target is the
-	// minimum of the new pivot target and the slowest syncer's reported height
-	// (e.g., the atomic syncer stays at its initial target). This preserves
-	// blocks that may be needed later for syncer-specific gap filling.
-	//
-	// NOTE: these preserved blocks are NOT replayed via the normal batch
-	// replay loop (blockChain.Accept requires sequential parent chaining
-	// from the commit target). Atomic gap-fill requires a separate mechanism
-	// that applies atomic operations without full block acceptance.
-	pruneHeight := newTarget.Height()
-	if minTarget := co.syncerRegistry.MinTargetHeight(); minTarget < pruneHeight {
-		pruneHeight = minTarget
-	}
-	co.queue.removeBelowHeight(pruneHeight)
+	co.queue.removeBelowHeight(newTarget.Height())
 	co.pivot.advance()
 	return nil
 }

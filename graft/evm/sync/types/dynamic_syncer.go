@@ -14,9 +14,8 @@ import (
 )
 
 var (
-	_ Syncer         = (*DynamicSyncer)(nil)
-	_ Finalizer      = (*DynamicSyncer)(nil)
-	_ TargetReporter = (*DynamicSyncer)(nil)
+	_ Syncer    = (*DynamicSyncer)(nil)
+	_ Finalizer = (*DynamicSyncer)(nil)
 
 	errPivotRequested = errors.New("pivot requested")
 )

@@ -6,7 +6,6 @@ package engine
 import (
 	"context"
 	"errors"
-	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -55,22 +54,18 @@ func (m *mockEthBlockWrapper) Verify(context.Context) error {
 var _ EthBlockWrapper = (*mockEthBlockWrapper)(nil)
 
 // FuncSyncer adapts a function to the simple Syncer shape used in tests. It is
-// useful for defining small, behavior-driven syncers inline. When targetHeight
-// is set, the syncer also implements [types.TargetReporter]. When updateFn is
+// useful for defining small, behavior-driven syncers inline. When updateFn is
 // set, it is called on UpdateTarget instead of the default no-op.
 type FuncSyncer struct {
-	name         string
-	fn           func(ctx context.Context) error
-	updateFn     func(message.Syncable) error
-	targetHeight *uint64
+	name     string
+	fn       func(ctx context.Context) error
+	updateFn func(message.Syncable) error
 }
 
-// Sync calls the wrapped function and returns its result.
 func (f FuncSyncer) Sync(ctx context.Context) error { return f.fn(ctx) }
 func (f FuncSyncer) Name() string                   { return f.name }
 func (f FuncSyncer) ID() string                     { return f.name }
 
-// UpdateTarget delegates to updateFn if set, otherwise returns nil.
 func (f FuncSyncer) UpdateTarget(target message.Syncable) error {
 	if f.updateFn != nil {
 		return f.updateFn(target)
@@ -78,23 +73,7 @@ func (f FuncSyncer) UpdateTarget(target message.Syncable) error {
 	return nil
 }
 
-// TargetHeight returns the configured target height, or math.MaxUint64 if none
-// was set (meaning no block preservation constraint).
-func (f FuncSyncer) TargetHeight() uint64 {
-	if f.targetHeight != nil {
-		return *f.targetHeight
-	}
-	return math.MaxUint64
-}
-
-var (
-	_ types.Syncer         = FuncSyncer{}
-	_ types.TargetReporter = FuncSyncer{}
-)
-
-func NewTargetReporterSyncer(name string, height uint64) FuncSyncer {
-	return FuncSyncer{name: name, targetHeight: &height}
-}
+var _ types.Syncer = (*FuncSyncer)(nil)
 
 // NewBarrierSyncer returns a syncer that signals startedWG.Done() when Sync begins,
 // then blocks until releaseCh is closed (returns nil) or ctx is canceled (returns ctx.Err).

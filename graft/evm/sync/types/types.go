@@ -29,14 +29,6 @@ type Finalizer interface {
 	Finalize() error
 }
 
-// TargetReporter reports the height a syncer is working toward. The
-// coordinator uses the minimum across all reporters to preserve queued
-// blocks that slower syncers still need. Syncers that do not implement
-// this are assumed to need no block preservation.
-type TargetReporter interface {
-	TargetHeight() uint64
-}
-
 // PivotSession represents one sync session inside a DynamicSyncer. When the
 // target changes, the current session is cancelled and Rebuild creates a
 // fresh session for the new target.

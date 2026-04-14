@@ -203,7 +203,6 @@ func TestCoordinator_PivotCycleBlockReplay(t *testing.T) {
 	tests := []struct {
 		name             string
 		initialHeight    uint64
-		syncerHeight     *uint64 // if set, syncer reports this as TargetHeight
 		blockLo, blockHi uint64
 		pivots           []uint64
 		wantFinalHeight  uint64
@@ -211,14 +210,13 @@ func TestCoordinator_PivotCycleBlockReplay(t *testing.T) {
 		wantReplayedHi   uint64
 	}{
 		{
-			name:            "slow syncer preserves blocks at its target",
+			name:            "single pivot prunes below target",
 			initialHeight:   500,
-			syncerHeight:    ptrUint64(500),
 			blockLo:         490,
 			blockHi:         510,
 			pivots:          []uint64{505},
 			wantFinalHeight: 505,
-			wantReplayedLo:  506, // blocks 500-505 preserved during pivots by MinTargetHeight but pruned before replay (blockChain.Accept requires chaining from commit target)
+			wantReplayedLo:  506,
 			wantReplayedHi:  510,
 		},
 		{
@@ -240,11 +238,7 @@ func TestCoordinator_PivotCycleBlockReplay(t *testing.T) {
 			release := make(chan struct{})
 
 			registry := NewSyncerRegistry()
-			syncer := NewBarrierSyncer("syncer", &started, release)
-			if tt.syncerHeight != nil {
-				syncer.targetHeight = tt.syncerHeight
-			}
-			require.NoError(t, registry.Register(syncer))
+			require.NoError(t, registry.Register(NewBarrierSyncer("syncer", &started, release)))
 
 			done := make(chan error, 1)
 			var finalizedTarget message.Syncable
@@ -280,8 +274,6 @@ func TestCoordinator_PivotCycleBlockReplay(t *testing.T) {
 		})
 	}
 }
-
-func ptrUint64(v uint64) *uint64 { return &v }
 
 func TestCoordinator_UpdateTargetFailureAborts(t *testing.T) {
 	wantErr := errors.New("syncer rejected update")
