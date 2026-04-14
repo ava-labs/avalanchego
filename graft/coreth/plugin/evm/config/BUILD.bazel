@@ -28,6 +28,7 @@ graft_go_test(
     deps = [
         "//utils",
         "//utils/constants",
+        "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_stretchr_testify//require",
     ],
