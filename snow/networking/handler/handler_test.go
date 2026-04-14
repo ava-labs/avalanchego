@@ -95,7 +95,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		return ctx
 	}
 	bootstrapper.GetAcceptedFrontierF = func(context.Context, ids.NodeID, uint32) error {
-		require.FailNow("GetAcceptedFrontier message should have timed out")
+		t.Fatal("GetAcceptedFrontier message should have timed out")
 		return nil
 	}
 	bootstrapper.GetAcceptedF = func(context.Context, ids.NodeID, uint32, set.Set[ids.ID]) error {
@@ -144,7 +144,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	defer ticker.Stop()
 	select {
 	case <-ticker.C:
-		require.FailNow("Calling engine function timed out")
+		t.Fatal("Calling engine function timed out")
 	case <-called:
 	}
 }
@@ -254,7 +254,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	ticker := time.NewTicker(time.Second)
 	select {
 	case <-ticker.C:
-		require.FailNow("Handler shutdown timed out before calling toClose")
+		t.Fatal("Handler shutdown timed out before calling toClose")
 	case <-closed:
 	}
 }
@@ -347,7 +347,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	ticker := time.NewTicker(time.Second)
 	select {
 	case <-ticker.C:
-		require.FailNow("Handler shutdown timed out before calling toClose")
+		t.Fatal("Handler shutdown timed out before calling toClose")
 	case <-closed:
 	}
 }
@@ -442,7 +442,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	case msg := <-notified:
 		require.Equal(common.PendingTxs, msg)
 	case <-time.After(time.Minute):
-		require.FailNow("Handler did not dispatch expected message")
+		t.Fatal("Handler did not dispatch expected message")
 	}
 }
 
