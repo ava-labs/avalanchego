@@ -217,7 +217,7 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 				scaling:  87,
 			},
 			change: state{
-				minPrice: 100, // 100x inital
+				minPrice: 100, // 100x initial
 			},
 		},
 		// MinPrice decrease: price should be maintained
@@ -334,23 +334,23 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 			},
 		},
 	} {
-		new := s.change
+		newState := s.change
 		if s.change.target == 0 {
-			new.target = s.init.target
+			newState.target = s.init.target
 		}
 		if s.change.minPrice == 0 {
-			new.minPrice = s.init.minPrice
+			newState.minPrice = s.init.minPrice
 		}
 		if s.change.scaling == 0 {
-			new.scaling = s.init.scaling
+			newState.scaling = s.init.scaling
 		}
-		new.staticPricing = s.init.staticPricing
+		newState.staticPricing = s.init.staticPricing
 		if s.change.staticPricing {
-			new.staticPricing = !s.init.staticPricing
+			newState.staticPricing = !s.init.staticPricing
 		}
 		f.Add(
 			s.init.target, s.init.excess, s.init.minPrice, s.init.scaling, s.init.staticPricing,
-			new.target, new.minPrice, new.scaling, new.staticPricing,
+			newState.target, newState.minPrice, newState.scaling, newState.staticPricing,
 		)
 	}
 
@@ -544,7 +544,7 @@ func TestOscillatingMinPrice(t *testing.T) {
 func TestStaticPriceRemoval(t *testing.T) {
 	const (
 		target    gas.Gas = 1_000_000
-		numBlocks         = 1000
+		numBlocks gas.Gas = 1000
 	)
 
 	initialConfig := DefaultGasPriceConfig()
