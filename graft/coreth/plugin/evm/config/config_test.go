@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 func TestUnmarshalConfig(t *testing.T) {
@@ -181,11 +182,11 @@ func TestFirewoodCommitInterval(t *testing.T) {
 	}{
 		{
 			name:       "firewood scheme with default commit interval",
-			configJSON: `{"state-scheme": "firewood"}`,
+			configJSON: fmt.Sprintf(`{"state-scheme": "%s"}`, customrawdb.FirewoodScheme),
 		},
 		{
 			name:       "firewood scheme with non-default commit interval",
-			configJSON: fmt.Sprintf(`{"state-scheme": "firewood", "commit-interval": %d}`, defaultCommitInterval+1),
+			configJSON: fmt.Sprintf(`{"state-scheme": "%s", "commit-interval": %d}`, customrawdb.FirewoodScheme, defaultCommitInterval+1),
 		},
 	}
 
