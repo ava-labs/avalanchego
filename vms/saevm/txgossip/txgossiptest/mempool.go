@@ -24,6 +24,7 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 	if len(txs) == 0 {
 		return
 	}
+	tb.Logf("Looking for %d transactions to be pending", len(txs))
 
 	txCh := make(chan core.NewTxsEvent, 1) // size arbitrary
 	sub := pool.SubscribeTransactions(txCh, true /*reorgs but ignored by legacypool*/)
@@ -68,8 +69,12 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 				return
 			}
 		case <-ticker.C:
+			tb.Logf("still waiting for %T.SubscribeTransactions(): %v", pool, s)
+			pending, queued := pool.Stats()
+			tb.Logf("pending: %d, queued: %d", pending, queued)
 			check()
 			if s.Len() == 0 {
+				tb.Log("exiting with ticker")
 				return
 			}
 		}

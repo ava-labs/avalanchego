@@ -18,14 +18,11 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
-	"github.com/ava-labs/libevm/libevm/ethtest"
 	"github.com/ava-labs/libevm/libevm/options"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slog"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
@@ -113,8 +110,6 @@ func (*guzzler) guzzle(env vm.PrecompileEnvironment, input []byte) ([]byte, erro
 }
 
 func TestWorstCase(t *testing.T) {
-	log.SetDefault(log.NewLogger(ethtest.NewTBLogHandler(t, slog.LevelError)))
-
 	flags := worstCaseFuzzFlags
 	t.Logf("Flags: %+v", flags)
 
