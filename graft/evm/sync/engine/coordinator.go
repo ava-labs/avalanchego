@@ -154,6 +154,18 @@ func contextCause(ctx context.Context, fallback error) error {
 	return fallback
 }
 
+// freezeCommitTarget prevents further sync target updates and ensures the
+// commitTarget reflects only roots the syncers actually synced to.
+func (co *Coordinator) freezeCommitTarget(cctx context.Context) error {
+	co.updateMu.Lock()
+	defer co.updateMu.Unlock()
+
+	if err := co.beginFinalizing(); err != nil {
+		return contextCause(cctx, err)
+	}
+	return nil
+}
+
 func (co *Coordinator) abort(err error) {
 	co.markAborted()
 	if co.cancel != nil {
@@ -184,10 +196,7 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 			err = contextCause(cctx, err)
 		}
 		if err == nil {
-			// Close the target update window as soon as syncers finish.
-			if errTransition := co.beginFinalizing(); errTransition != nil {
-				err = contextCause(cctx, errTransition)
-			}
+			err = co.freezeCommitTarget(cctx)
 		}
 
 		finalizeTarget := co.getCommitTarget()
@@ -280,11 +289,6 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 	}
 	if !co.pivot.shouldForward(newTarget.Height()) {
 		return nil
-	}
-
-	// Re-check state before modifying queue to handle concurrent transitions.
-	if co.CurrentState() != StateRunning {
-		return errInvalidState
 	}
 
 	if err := co.syncerRegistry.UpdateSyncTarget(newTarget); err != nil {

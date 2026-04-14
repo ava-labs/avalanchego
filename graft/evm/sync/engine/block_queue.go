@@ -112,7 +112,7 @@ func (q *blockQueue) forget(ops []blockOperation) {
 }
 
 // removeBelowHeight drops blocks with height < targetHeight.
-// Called during pivots, keeps the target block for slow-syncer gap-fill.
+// Called during pivots to discard blocks below the new target.
 func (q *blockQueue) removeBelowHeight(targetHeight uint64) {
 	q.remove(func(height uint64) bool { return height >= targetHeight })
 }
