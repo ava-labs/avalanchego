@@ -190,7 +190,7 @@ func TestCommitInterval(t *testing.T) {
 		{
 			name:       "default state scheme with non-default commit interval",
 			configJSON: fmt.Appendf(nil, `{"commit-interval": %d}`, defaultCommitInterval+1),
-			wantError:  ErrNonDefaultCommitInterval,
+			wantError:  errNonDefaultCommitInterval,
 		},
 		{
 			name:       "hashdb scheme with default commit interval",
@@ -199,7 +199,7 @@ func TestCommitInterval(t *testing.T) {
 		{
 			name:       "hashdb scheme with non-default commit interval",
 			configJSON: fmt.Appendf(nil, `{"state-scheme": "%s", "commit-interval": %d}`, rawdb.HashScheme, defaultCommitInterval+1),
-			wantError:  ErrNonDefaultCommitInterval,
+			wantError:  errNonDefaultCommitInterval,
 		},
 		{
 			name:       "firewood scheme with default commit interval",
@@ -214,11 +214,7 @@ func TestCommitInterval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, err := GetConfig(tt.configJSON, constants.MainnetID)
-			if tt.wantError != nil {
-				require.ErrorIs(t, err, tt.wantError)
-			} else {
-				require.NoError(t, err)
-			}
+			require.ErrorIs(t, err, tt.wantError)
 		})
 	}
 }

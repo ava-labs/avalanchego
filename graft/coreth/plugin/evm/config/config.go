@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
-var ErrNonDefaultCommitInterval = errors.New("cannot use non-default commit interval on production network")
+var errNonDefaultCommitInterval = errors.New("cannot use non-default commit interval on production network")
 
 type Duration struct {
 	time.Duration
@@ -238,7 +238,7 @@ func (c *Config) validate(networkID uint32) error {
 		defaultConfig := NewDefaultConfig()
 		// Firewood allows arbitrary commit intervals even on production networks
 		if c.StateScheme != customrawdb.FirewoodScheme && c.CommitInterval != defaultConfig.CommitInterval {
-			return fmt.Errorf("%w: got %d, expected %d", ErrNonDefaultCommitInterval, c.CommitInterval, defaultConfig.CommitInterval)
+			return fmt.Errorf("%w: got %d, expected %d", errNonDefaultCommitInterval, c.CommitInterval, defaultConfig.CommitInterval)
 		}
 		// All nodes must agree on the state sync commit interval so they produce
 		// syncable summaries at the same block heights.
