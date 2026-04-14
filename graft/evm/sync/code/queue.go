@@ -53,6 +53,7 @@ type Queue struct {
 
 type QueueOption = options.Option[Queue]
 
+// WithCapacity overrides the queue buffer capacity.
 func WithCapacity(n int) QueueOption {
 	return options.Func[Queue](func(q *Queue) {
 		if n > 0 {
