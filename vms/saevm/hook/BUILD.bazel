@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "hook",
+    srcs = ["hook.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/hook",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/engine/snowman/block",
+        "//vms/components/gas",
+        "//vms/saevm/intmath",
+        "//vms/saevm/params",
+        "//vms/saevm/types",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+go_test(
+    name = "hook_test",
+    srcs = ["hook_test.go"],
+    embed = [":hook"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//libevm/ethtest",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
