@@ -446,8 +446,10 @@ func DynamicSyncWithBlockInjectionTest(t *testing.T, testSetup *SyncTestSetup) {
 			require.NoError(t, syncerVM.SyncerClient().Error())
 
 			require.NoError(t, syncerVM.SetState(t.Context(), snow.Bootstrapping))
+			// Verify both chain.State and the blockchain agree on the height.
+			require.Equal(t, serverHeight, syncerVM.LastAcceptedExtendedBlock().Height(), "chain.State height mismatch after block injection")
 			syncerChain := syncerVM.Ethereum().BlockChain()
-			require.Equal(t, serverHeight, syncerChain.LastAcceptedBlock().NumberU64(), "syncer height mismatch after block injection")
+			require.Equal(t, serverHeight, syncerChain.LastAcceptedBlock().NumberU64(), "blockchain height mismatch after block injection")
 			require.True(t, syncerChain.HasState(syncerChain.LastAcceptedBlock().Root()), "state unavailable for last accepted block")
 
 			generateAndAcceptBlocks(t, syncerVM, 5, extraBlockGen, nil, syncerCB)

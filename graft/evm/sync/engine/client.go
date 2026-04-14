@@ -464,6 +464,27 @@ func (c *client) commitMarkers(summary message.Syncable) error {
 // DrainAcceptorQueue implements Acceptor.
 func (c *client) DrainAcceptorQueue() {
 	c.config.Chain.BlockChain().DrainAcceptorQueue()
+
+	// Batch replay advances the blockchain but not chain.State. Sync the
+	// two so the engine sees the correct tip during bootstrapping.
+	if err := c.syncLastAcceptedToChainState(); err != nil {
+		log.Error("failed to reconcile chain.State after batch replay", "err", err)
+	}
+}
+
+// syncLastAcceptedToChainState propagates the blockchain's last accepted
+// block into chain.State.
+func (c *client) syncLastAcceptedToChainState() error {
+	lastAccepted := c.config.Chain.BlockChain().LastAcceptedBlock()
+	blk, err := c.config.State.GetBlock(context.Background(), ids.ID(lastAccepted.Hash()))
+	if err != nil {
+		return err
+	}
+	// Unwrap to avoid double-wrapping inside SetLastAcceptedBlock.
+	if bw, ok := blk.(*chain.BlockWrapper); ok {
+		blk = bw.Block
+	}
+	return c.config.State.SetLastAcceptedBlock(blk)
 }
 
 // newSyncerRegistry creates a registry with all required syncers for the given summary.

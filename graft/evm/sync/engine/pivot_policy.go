@@ -42,7 +42,7 @@ func (p *pivotPolicy) shouldForward(height uint64) bool {
 		// Round up the initial height to the next multiple of interval.
 		// Ceil division: ((h + interval - 1) / interval) * interval
 		init := ((height + p.interval - 1) / p.interval) * p.interval
-		// Initialize once; if another goroutine wins, read the established value.
+		// Initialize once. If another goroutine wins, read the established value.
 		if !p.nextHeight.CompareAndSwap(0, init) {
 			next = p.nextHeight.Load()
 		} else {
