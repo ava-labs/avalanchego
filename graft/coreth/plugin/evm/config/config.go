@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 type Duration struct {
@@ -233,7 +234,8 @@ func (c *Config) validate(networkID uint32) error {
 	// Ensure that non-standard commit interval is not allowed for production networks
 	if constants.ProductionNetworkIDs.Contains(networkID) {
 		defaultConfig := NewDefaultConfig()
-		if c.CommitInterval != defaultConfig.CommitInterval {
+		// Firewood allows arbitrary commit intervals even on production networks
+		if c.StateScheme != customrawdb.FirewoodScheme && c.CommitInterval != defaultConfig.CommitInterval {
 			return fmt.Errorf("cannot start non-local network with commit interval %d different than %d", c.CommitInterval, defaultConfig.CommitInterval)
 		}
 		if c.StateSyncCommitInterval != defaultConfig.StateSyncCommitInterval {

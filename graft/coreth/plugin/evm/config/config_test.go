@@ -172,3 +172,29 @@ func TestGetConfig(t *testing.T) {
 		})
 	}
 }
+
+// TestFirewoodCommitInterval ensures that we can use arbitrary commit intervals with Firewood for production networks.
+func TestFirewoodCommitInterval(t *testing.T) {
+	tests := []struct {
+		name       string
+		configJSON string
+	}{
+		{
+			name:       "firewood scheme with default commit interval",
+			configJSON: `{"state-scheme": "firewood"}`,
+		},
+		{
+			name:       "firewood scheme with non-default commit interval",
+			configJSON: fmt.Sprintf(`{"state-scheme": "firewood", "commit-interval": %d}`, defaultCommitInterval+1),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := require.New(t)
+
+			_, _, err := GetConfig([]byte(tt.configJSON), constants.MainnetID)
+			r.NoError(err)
+		})
+	}
+}
