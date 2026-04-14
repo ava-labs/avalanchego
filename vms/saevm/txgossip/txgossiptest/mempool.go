@@ -7,6 +7,7 @@ package txgossiptest
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
@@ -33,20 +34,25 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 		s.Add(tx.Hash())
 	}
 
-	// Optimistically check current mempool - any reorgs after this will
-	// certainly be caught by the subscription.
-	pendingByAddr, _ := pool.Content()
-	for _, list := range pendingByAddr {
-		for _, tx := range list {
-			s.Remove(tx.Hash())
+	check := func() {
+		// Optimistically check current mempool - any reorgs after this will
+		// certainly be caught by the subscription.
+		pendingByAddr, _ := pool.Content()
+		for _, list := range pendingByAddr {
+			for _, tx := range list {
+				s.Remove(tx.Hash())
+			}
 		}
 	}
+	check()
 
 	if s.Len() == 0 {
 		// already found all txs
 		return
 	}
 
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -58,6 +64,11 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 				s.Remove(tx.Hash())
 			}
 
+			if s.Len() == 0 {
+				return
+			}
+		case <-ticker.C:
+			check()
 			if s.Len() == 0 {
 				return
 			}
