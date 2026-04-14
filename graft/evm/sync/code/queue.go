@@ -112,10 +112,8 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 		return ErrQueueClosed
 	}
 
-	// Persist all input hashes as to-fetch markers. Consumer will dedupe and
-	// skip already-present code. Markers are keyed by code hash, so repeated
-	// persists overwrite the same key. The consumer deletes the marker after
-	// fulfilling the request (or when it detects code is already present).
+	// Persist to-fetch markers keyed by code hash (idempotent overwrites).
+	// The consumer deletes markers after fetching or if code is already present.
 	batch := q.db.NewBatch()
 	for _, codeHash := range codeHashes {
 		if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
@@ -219,19 +217,17 @@ func (q *Queue) drainPending() bool {
 	}
 }
 
-// init enqueues any persisted code markers found on disk.
+// init recovers persisted code markers from disk and re-enqueues them.
+// AddCode will re-persist the same markers, which is a harmless redundancy
+// that only happens on resume after restart.
 func (q *Queue) init() error {
-	// Recover any persisted code markers and enqueue them.
-	// Note: dbCodeHashes are already present as "to-fetch" markers. AddCode will
-	// re-persist them, which is a trivial redundancy that happens only on resume
-	// (e.g., after restart). We accept this to keep the code simple.
 	dbCodeHashes, err := recoverUnfetchedCodeHashes(q.db)
 	if err != nil {
 		return fmt.Errorf("unable to recover previous sync state: %w", err)
 	}
 
-	// Use context.Background() since init() runs during construction before
-	// sync starts. The queue is not closed yet, so AddCode will always succeed.
+	// context.Background: init runs during construction before sync starts,
+	// the queue is not closed yet so AddCode will always succeed.
 	if err := q.AddCode(context.Background(), dbCodeHashes); err != nil {
 		return fmt.Errorf("unable to resume previous sync: %w", err)
 	}
@@ -239,8 +235,8 @@ func (q *Queue) init() error {
 	return nil
 }
 
-// recoverUnfetchedCodeHashes cleans out any codeToFetch markers from the database that are no longer
-// needed and returns any outstanding markers to the queue.
+// recoverUnfetchedCodeHashes returns persisted code markers that still need fetching
+// and deletes markers for code already present locally.
 func recoverUnfetchedCodeHashes(db ethdb.Database) ([]common.Hash, error) {
 	it := customrawdb.NewCodeToFetchIterator(db)
 	defer it.Release()
@@ -251,7 +247,6 @@ func recoverUnfetchedCodeHashes(db ethdb.Database) ([]common.Hash, error) {
 	for it.Next() {
 		codeHash := common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):])
 
-		// If we already have the codeHash, delete the marker from the database and continue.
 		if !rawdb.HasCode(db, codeHash) {
 			codeHashes = append(codeHashes, codeHash)
 			continue
@@ -264,7 +259,6 @@ func recoverUnfetchedCodeHashes(db ethdb.Database) ([]common.Hash, error) {
 			continue
 		}
 
-		// Write the batch to disk if it has reached the ideal batch size.
 		if err := batch.Write(); err != nil {
 			return nil, fmt.Errorf("failed to write batch removing old code markers: %w", err)
 		}

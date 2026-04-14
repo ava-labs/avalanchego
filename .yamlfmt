@@ -1,0 +1,14 @@
+extensions:
+  - default
+  - with
+
+exclude:
+  - header_upstream.yml
+
+formatter:
+  type: basic
+  include_document_start: false
+  retain_line_breaks: true
+  pad_line_comments: 1
+  trim_trailing_whitespace: true
+  eof_newline: true

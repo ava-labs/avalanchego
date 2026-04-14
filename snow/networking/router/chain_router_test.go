@@ -188,7 +188,7 @@ func TestShutdown(t *testing.T) {
 
 	select {
 	case <-ctx.Done():
-		require.FailNow("Handler shutdown was not called or timed out after 250ms during chainRouter shutdown")
+		t.Fatal("Handler shutdown was not called or timed out after 250ms during chainRouter shutdown")
 	case <-shutdownCalled:
 	}
 
@@ -459,7 +459,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	select {
 	case <-bootstrapFinished:
-		require.FailNow("Shutdown should have finished in one millisecond before timing out instead of waiting for engine to finish shutting down.")
+		t.Fatal("Shutdown should have finished in one millisecond before timing out instead of waiting for engine to finish shutting down.")
 	case <-shutdownFinished:
 	}
 }
@@ -1609,7 +1609,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 
 				select {
 				case <-unwantedCall:
-					require.FailNow("unexpected duplicate failure message")
+					t.Fatal("unexpected duplicate failure message")
 				case <-time.After(50 * time.Millisecond):
 				}
 			}

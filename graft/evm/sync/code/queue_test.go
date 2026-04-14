@@ -141,7 +141,7 @@ func TestCodeQueue(t *testing.T) {
 }
 
 // TestFinalizeFlushesAllHashes verifies that AddCode is non-blocking and
-// Finalize waits for the sender goroutine to drain all pending hashes.
+// Finalize waits for the forwarder goroutine to drain all pending hashes.
 func TestFinalizeFlushesAllHashes(t *testing.T) {
 	const (
 		capacity  = 1
@@ -165,7 +165,7 @@ func TestFinalizeFlushesAllHashes(t *testing.T) {
 }
 
 // TestShutdownUnblocksGoroutines verifies that Shutdown cancels the stuck
-// sender goroutine, is idempotent with Finalize, and rejects later AddCode calls.
+// forwarder goroutine, is idempotent with Finalize, and rejects later AddCode calls.
 func TestShutdownUnblocksGoroutines(t *testing.T) {
 	const capacity = 1
 	db := rawdb.NewMemoryDatabase()
