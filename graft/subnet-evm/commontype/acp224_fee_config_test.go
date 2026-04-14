@@ -152,22 +152,21 @@ func TestACP224FeeConfigPackFormat(t *testing.T) {
 	}
 }
 
-func TestACP224FeeConfigPackRoundTrip(t *testing.T) {
-	tests := []ACP224FeeConfig{
-		{},
-		{ValidatorTargetGas: true, StaticPricing: true, TargetGas: math.MaxUint64, MinGasPrice: math.MaxUint64, TimeToDouble: math.MaxUint64},
-		{TargetGas: MinTargetGasACP224, MinGasPrice: 1, TimeToDouble: 60},
-		{ValidatorTargetGas: true, MinGasPrice: 1, TimeToDouble: 60},
-		{StaticPricing: true, TargetGas: MinTargetGasACP224, MinGasPrice: 1},
-		{ValidatorTargetGas: true, StaticPricing: true, MinGasPrice: 1},
-	}
+func FuzzACP224FeeConfigPacking(f *testing.F) {
+	f.Add(false, false, uint64(0), uint64(0), uint64(0))
+	f.Add(true, true, uint64(math.MaxUint64), uint64(math.MaxUint64), uint64(math.MaxUint64))
+	f.Add(false, false, MinTargetGasACP224, uint64(1), uint64(60))
+	f.Add(true, false, uint64(0), uint64(1), uint64(60))
+	f.Add(false, true, MinTargetGasACP224, uint64(1), uint64(0))
+	f.Add(true, true, uint64(0), uint64(1), uint64(0))
 
-	for _, in := range tests {
+	f.Fuzz(func(t *testing.T, validator, static bool, target, minGas, double uint64) {
+		in := &ACP224FeeConfig{validator, target, static, minGas, double}
 		got := new(ACP224FeeConfig)
 		got.UnpackFrom(in.Pack())
-		require.Equalf(t, in, *got, "%T.UnpackFrom(%[1]T.Pack()) round trip", &in)
-		require.Truef(t, got.Equal(&in), "%T.Equal([packed original])", got)
-	}
+		require.Equalf(t, *in, *got, "%T.UnpackFrom(%[1]T.Pack()) round trip", in)
+		require.Truef(t, got.Equal(in), "%T.Equal([packed original])", got)
+	})
 }
 
 func TestACP224FeeConfigEqual(t *testing.T) {
