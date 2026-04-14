@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
@@ -23,18 +24,36 @@ const hashDBDynamicSyncerName = "HashDB EVM State Syncer (dynamic)"
 var _ types.PivotSession = (*hashDBPivotSession)(nil)
 
 // hashDBPivotSession implements types.PivotSession for EVM state sync with HashDB.
+// It owns the code queue and code syncer, running both alongside the state
+// syncer inside Run. On pivot, all three are shut down and rebuilt.
 type hashDBPivotSession struct {
-	inner            *HashDBSyncer
+	inner      *HashDBSyncer
+	codeQueue  *code.Queue
+	codeSyncer *code.Syncer
+
+	// Retained for rebuilding on pivot.
 	syncClient       client.Client
 	db               ethdb.Database
 	leafsRequestSize uint16
 	leafsRequestType message.LeafsRequestType
 	opts             []HashDBSyncerOption
-	codeQueue        *code.SessionedQueue
 }
 
 func (s *hashDBPivotSession) Run(ctx context.Context) error {
-	return s.inner.Sync(ctx)
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		log.Info("code syncer started", "root", s.inner.root)
+		err := s.codeSyncer.Sync(egCtx)
+		log.Info("code syncer finished", "root", s.inner.root, "err", err)
+		return err
+	})
+	eg.Go(func() error {
+		log.Info("state syncer started", "root", s.inner.root)
+		err := s.inner.Sync(egCtx)
+		log.Info("state syncer finished", "root", s.inner.root, "err", err)
+		return err
+	})
+	return eg.Wait()
 }
 
 func (s *hashDBPivotSession) ShouldPivot(newRoot common.Hash) bool {
@@ -44,31 +63,19 @@ func (s *hashDBPivotSession) ShouldPivot(newRoot common.Hash) bool {
 func (s *hashDBPivotSession) Rebuild(newRoot common.Hash, _ uint64) (types.PivotSession, error) {
 	log.Info("state syncer pivoting to new root", "oldRoot", s.inner.root, "newRoot", newRoot)
 
-	if _, _, err := s.codeQueue.PivotTo(newRoot); err != nil {
-		return nil, fmt.Errorf("failed to pivot code queue: %w", err)
-	}
 	if err := s.inner.Finalize(); err != nil {
 		log.Error("failed to flush in-progress batches during pivot", "err", err)
 	}
+	s.codeQueue.Shutdown()
 	<-snapshot.WipeSnapshot(s.db, false)
 
-	newInner, err := NewHashDBSyncer(s.syncClient, s.db, newRoot, s.codeQueue, s.leafsRequestSize, s.leafsRequestType, s.opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create syncer for root %s: %w", newRoot, err)
-	}
-	return &hashDBPivotSession{
-		inner:            newInner,
-		syncClient:       s.syncClient,
-		db:               s.db,
-		leafsRequestSize: s.leafsRequestSize,
-		leafsRequestType: s.leafsRequestType,
-		opts:             s.opts,
-		codeQueue:        s.codeQueue,
-	}, nil
+	return newHashDBPivotSession(s.syncClient, s.db, newRoot, s.leafsRequestSize, s.leafsRequestType, s.opts...)
 }
 
-func (s *hashDBPivotSession) OnSessionComplete() error {
-	return s.codeQueue.Finalize()
+func (*hashDBPivotSession) OnSessionComplete() error {
+	// Code queue finalization is handled by the inner syncer's
+	// onMainTrieFinished callback (via WithFinalizeCodeQueue).
+	return nil
 }
 
 // Finalize flushes the inner syncer's in-progress work.
@@ -76,26 +83,40 @@ func (s *hashDBPivotSession) Finalize() error {
 	return s.inner.Finalize()
 }
 
-// NewHashDBDynamicSyncer creates a state syncer that supports pivoting to a new
-// root mid-sync via UpdateTarget. It returns a DynamicSyncer backed by a
-// hashDBPivotSession.
-func NewHashDBDynamicSyncer(syncClient client.Client, db ethdb.Database, root common.Hash, codeQueue *code.SessionedQueue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...HashDBSyncerOption) (*types.DynamicSyncer, error) {
-	inner, err := NewHashDBSyncer(syncClient, db, root, codeQueue, leafsRequestSize, leafsRequestType, opts...)
+func newHashDBPivotSession(syncClient client.Client, db ethdb.Database, root common.Hash, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...HashDBSyncerOption) (*hashDBPivotSession, error) {
+	codeQueue, err := code.NewQueue(db)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create code queue: %w", err)
 	}
-	if _, err := codeQueue.Start(root); err != nil {
-		return nil, err
+	codeSyncer, err := code.NewSyncer(syncClient, db, codeQueue.CodeHashes())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create code syncer: %w", err)
 	}
-
-	session := &hashDBPivotSession{
+	inner, err := NewHashDBSyncer(syncClient, db, root, codeQueue, leafsRequestSize, leafsRequestType,
+		append(opts, WithFinalizeCodeQueue(codeQueue.Finalize))...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create state syncer for root %s: %w", root, err)
+	}
+	return &hashDBPivotSession{
 		inner:            inner,
+		codeQueue:        codeQueue,
+		codeSyncer:       codeSyncer,
 		syncClient:       syncClient,
 		db:               db,
 		leafsRequestSize: leafsRequestSize,
 		leafsRequestType: leafsRequestType,
 		opts:             opts,
-		codeQueue:        codeQueue,
+	}, nil
+}
+
+// NewHashDBDynamicSyncer creates a state syncer that supports pivoting to a new
+// root mid-sync via UpdateTarget. The returned DynamicSyncer internally manages
+// a code queue and code syncer per session.
+func NewHashDBDynamicSyncer(syncClient client.Client, db ethdb.Database, root common.Hash, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...HashDBSyncerOption) (*types.DynamicSyncer, error) {
+	session, err := newHashDBPivotSession(syncClient, db, root, leafsRequestSize, leafsRequestType, opts...)
+	if err != nil {
+		return nil, err
 	}
 	return types.NewDynamicSyncer(
 		hashDBDynamicSyncerName,

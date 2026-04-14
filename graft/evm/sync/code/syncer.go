@@ -5,7 +5,6 @@ package code
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -17,7 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/session"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
@@ -29,12 +27,7 @@ const (
 	SyncerID = "state_code_sync"
 )
 
-var (
-	_ types.Syncer = (*Syncer)(nil)
-
-	errExactlyOneSourceRequired = errors.New("exactly one code syncer source must be set")
-	errSessionedQueueRequired   = errors.New("sessioned queue required")
-)
+var _ types.Syncer = (*Syncer)(nil)
 
 // Syncer syncs code bytes from the network in a separate thread.
 // It consumes code hashes from a queue and persists code into the DB.
@@ -43,33 +36,26 @@ var (
 type Syncer struct {
 	db     ethdb.Database
 	client client.Client
+
 	// Channel of incoming code hash requests provided by the fetcher.
 	codeHashes <-chan common.Hash
-	// Optional stream of session-tagged events (dynamic mode).
-	events <-chan Event
 
 	// Config options.
 	numWorkers       int
-	codeHashesPerReq int // best-effort target size - final batch may be smaller
+	codeHashesPerReq int // best-effort target size, final batch may be smaller
 
 	// inFlight tracks code hashes currently being processed to dedupe work
 	// across workers and across repeated queue submissions.
 	inFlight sync.Map // key: common.Hash, value: struct{}
 }
 
-func (c *Syncer) releaseInFlight(codeHashes []common.Hash) {
-	for _, h := range codeHashes {
-		c.inFlight.Delete(h)
-	}
-}
-
-// codeSyncerConfig carries construction-time options for code syncer.
+// syncerConfig carries construction-time options for the code syncer.
 type syncerConfig struct {
 	numWorkers       int
 	codeHashesPerReq int
 }
 
-// CodeSyncerOption configures CodeSyncer at construction time.
+// SyncerOption configures the code syncer at construction time.
 type SyncerOption = options.Option[syncerConfig]
 
 // WithNumWorkers overrides the number of concurrent workers.
@@ -92,174 +78,51 @@ func WithCodeHashesPerRequest(n int) SyncerOption {
 	})
 }
 
-func newSyncer(
-	client client.Client,
-	db ethdb.Database,
-	codeHashes <-chan common.Hash,
-	events <-chan Event,
-	opts ...SyncerOption,
-) (*Syncer, error) {
+func NewSyncer(client client.Client, db ethdb.Database, codeHashes <-chan common.Hash, opts ...SyncerOption) (*Syncer, error) {
 	cfg := syncerConfig{
 		numWorkers:       defaultNumCodeFetchingWorkers,
 		codeHashesPerReq: message.MaxCodeHashesPerRequest,
 	}
 	options.ApplyTo(&cfg, opts...)
 
-	if (codeHashes == nil) == (events == nil) {
-		return nil, errExactlyOneSourceRequired
-	}
-
 	return &Syncer{
 		db:               db,
 		client:           client,
 		codeHashes:       codeHashes,
-		events:           events,
 		numWorkers:       cfg.numWorkers,
 		codeHashesPerReq: cfg.codeHashesPerReq,
 	}, nil
 }
 
-// NewSyncer allows external packages (e.g., registry wiring) to create a code syncer
-// that consumes hashes from a provided fetcher queue.
-func NewSyncer(client client.Client, db ethdb.Database, codeHashes <-chan common.Hash, opts ...SyncerOption) (*Syncer, error) {
-	return newSyncer(client, db, codeHashes, nil, opts...)
-}
-
-// NewDynamicSyncer creates a code syncer that consumes code hashes from
-// sessioned queue events and ignores stale hashes from prior sessions.
-func NewDynamicSyncer(client client.Client, db ethdb.Database, queue *SessionedQueue, opts ...SyncerOption) (*Syncer, error) {
-	if queue == nil {
-		return nil, errSessionedQueueRequired
-	}
-	return newSyncer(client, db, nil, queue.Events(), opts...)
-}
-
 // Name returns the human-readable name for this sync task.
-func (*Syncer) Name() string {
-	return "Code Syncer"
-}
+func (*Syncer) Name() string { return "Code Syncer" }
 
 // ID returns the stable identifier for this sync task.
-func (*Syncer) ID() string {
-	return SyncerID
-}
+func (*Syncer) ID() string { return SyncerID }
 
-// Sync starts the worker thread and populates the code hashes queue with active work.
-// Blocks until all outstanding code requests from a previous sync have been
-// fetched and the code channel has been closed, or the context is cancelled.
+// Sync starts the worker threads and blocks until all outstanding code
+// requests have been fetched and the code channel has been closed, or
+// the context is cancelled.
 func (c *Syncer) Sync(ctx context.Context) error {
-	if c.events != nil {
-		return c.syncFromEvents(ctx)
-	}
-
 	eg, egCtx := errgroup.WithContext(ctx)
-
-	// Start NumCodeFetchingWorkers threads to fetch code from the network.
 	for range c.numWorkers {
 		eg.Go(func() error { return c.work(egCtx, c.codeHashes) })
 	}
-
 	return eg.Wait()
 }
 
 func (*Syncer) UpdateTarget(message.Syncable) error {
-	// Non-functional compatibility scaffolding.
 	return nil
 }
 
-func (c *Syncer) startSession(parent context.Context, id session.ID) *sessionRunner {
-	ctx, cancel := context.WithCancel(parent)
-	hashes := make(chan common.Hash, c.codeHashesPerReq*c.numWorkers)
-
-	eg, egCtx := errgroup.WithContext(ctx)
-	for range c.numWorkers {
-		eg.Go(func() error { return c.work(egCtx, hashes) })
-	}
-
-	// Propagate errgroup cancellation to runner.ctx so sendHash unblocks
-	// when a worker fails. Without this, runner.ctx stays alive after
-	// egCtx is cancelled and sendHash blocks on a full hashes channel.
-	context.AfterFunc(egCtx, cancel)
-
-	return &sessionRunner{
-		id:     id,
-		ctx:    ctx,
-		cancel: cancel,
-		hashes: hashes,
-		eg:     eg,
+func (c *Syncer) releaseInFlight(codeHashes []common.Hash) {
+	for _, h := range codeHashes {
+		c.inFlight.Delete(h)
 	}
 }
 
-func (c *Syncer) syncFromEvents(ctx context.Context) error {
-	var runner *sessionRunner
-
-	stopAndWait := func(shouldPivot bool) error {
-		if runner == nil {
-			return nil
-		}
-		if shouldPivot {
-			runner.stopPivot()
-		} else {
-			runner.stopDrain()
-		}
-		err := runner.waitIgnoreCanceled()
-		runner = nil
-		return err
-	}
-
-	sendHash := func(ev Event) error {
-		if runner == nil || runner.id != ev.SessionID {
-			// Stale hash from a previous session.
-			return nil
-		}
-		select {
-		case runner.hashes <- ev.Hash:
-			return nil
-		case <-runner.ctx.Done():
-			return nil
-		case <-ctx.Done():
-			_ = stopAndWait(true)
-			return ctx.Err()
-		}
-	}
-
-	for {
-		var (
-			ev Event
-			ok bool
-		)
-		select {
-		case <-ctx.Done():
-			_ = stopAndWait(true)
-			return ctx.Err()
-		case ev, ok = <-c.events:
-		}
-		if !ok {
-			return stopAndWait(false)
-		}
-
-		switch ev.Type {
-		case EventSessionStart:
-			if err := stopAndWait(true); err != nil {
-				return err
-			}
-			runner = c.startSession(ctx, ev.SessionID)
-		case EventSessionEnd:
-			if runner != nil && runner.id == ev.SessionID {
-				if err := stopAndWait(true); err != nil {
-					return err
-				}
-			}
-		case EventCodeHash:
-			if err := sendHash(ev); err != nil {
-				return err
-			}
-		}
-	}
-}
-
-// work fulfills any incoming requests from the producer channel by fetching code bytes
-// from the network and fulfilling them by updating the database.
+// work fulfills incoming requests from the producer channel by fetching code
+// bytes from the network and persisting them to the database.
 func (c *Syncer) work(ctx context.Context, codeHashesCh <-chan common.Hash) error {
 	codeHashes := make([]common.Hash, 0, message.MaxCodeHashesPerRequest)
 
@@ -316,10 +179,9 @@ func (c *Syncer) work(ctx context.Context, codeHashesCh <-chan common.Hash) erro
 	}
 }
 
-// fulfillCodeRequest sends a request for [codeHashes], writes the result to the database, and
-// marks the work as complete.
-// codeHashes should not be empty or contain duplicate hashes.
-// Returns an error if one is encountered, signaling the worker thread to terminate.
+// fulfillCodeRequest sends a request for codeHashes, writes the result to the
+// database, and marks the work as complete. Returns an error if one is
+// encountered, signaling the worker thread to terminate.
 func (c *Syncer) fulfillCodeRequest(ctx context.Context, codeHashes []common.Hash) error {
 	defer c.releaseInFlight(codeHashes)
 
@@ -338,31 +200,6 @@ func (c *Syncer) fulfillCodeRequest(ctx context.Context, codeHashes []common.Has
 
 	if err := batch.Write(); err != nil {
 		return fmt.Errorf("failed to write batch for fulfilled code requests: %w", err)
-	}
-	return nil
-}
-
-type sessionRunner struct {
-	id     session.ID
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	hashes chan common.Hash
-	eg     *errgroup.Group
-}
-
-func (r *sessionRunner) stopPivot() {
-	r.cancel()
-	r.stopDrain()
-}
-
-func (r *sessionRunner) stopDrain() {
-	close(r.hashes)
-}
-
-func (r *sessionRunner) waitIgnoreCanceled() error {
-	if err := r.eg.Wait(); err != nil && !errors.Is(err, context.Canceled) {
-		return err
 	}
 	return nil
 }

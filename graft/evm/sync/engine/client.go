@@ -509,7 +509,10 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, err
 	}
 
-	syncers := []types.Syncer{blockSyncer, codeSyncer, stateSyncer}
+	syncers := []types.Syncer{blockSyncer, stateSyncer}
+	if codeSyncer != nil {
+		syncers = append(syncers, codeSyncer)
+	}
 
 	if c.config.Extender != nil {
 		extenderSyncer, err := c.config.Extender.CreateSyncer(c.config.Client, c.config.VerDB, summary)
@@ -573,26 +576,19 @@ func (c *client) newFirewoodSyncers(summary message.Syncable, tdb *firewood.Trie
 }
 
 func (c *client) newHashDBDynamicSyncers(summary message.Syncable) (types.Syncer, types.Syncer, error) {
-	codeQueue, err := code.NewSessionedQueue(c.config.ChainDB, c.config.StateSyncDone)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create sessioned code queue: %w", err)
-	}
-
-	codeSyncer, err := code.NewDynamicSyncer(c.config.Client, c.config.ChainDB, codeQueue)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create sessioned code syncer: %w", err)
-	}
-
+	// The code syncer is managed internally by the pivot session, not
+	// registered separately. Each pivot creates a fresh code queue and
+	// code syncer alongside the state syncer.
 	stateSyncer, err := evmstate.NewHashDBDynamicSyncer(
 		c.config.Client, c.config.ChainDB,
 		summary.GetBlockRoot(),
-		codeQueue, c.config.RequestSize,
+		c.config.RequestSize,
 		c.config.LeafsRequestType,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create dynamic EVM state syncer: %w", err)
 	}
-	return codeSyncer, stateSyncer, nil
+	return nil, stateSyncer, nil
 }
 
 func (c *client) newHashDBStaticSyncers(summary message.Syncable) (types.Syncer, types.Syncer, error) {
