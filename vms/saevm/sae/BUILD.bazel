@@ -129,6 +129,7 @@ go_test(
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/ethapi",
+        "@com_github_ava_labs_libevm//libevm/ethtest",
         "@com_github_ava_labs_libevm//libevm/hookstest",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//log",
@@ -140,6 +141,7 @@ go_test(
         "@com_github_holiman_uint256//:uint256",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
+        "@org_golang_x_exp//slog",
         "@org_uber_go_goleak//:goleak",
     ],
 )

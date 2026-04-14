@@ -50,7 +50,7 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 	for {
 		select {
 		case <-ctx.Done():
-			tb.Fatalf("%v waiting for %T.SubscribeTransactions()", context.Cause(ctx), pool)
+			tb.Fatalf("%v waiting for %T.SubscribeTransactions(): %v", context.Cause(ctx), pool, s)
 		case err := <-sub.Err():
 			tb.Fatalf("%T.SubscribeTransactions.Err() returned %v", pool, err)
 		case txEvent := <-txCh:
