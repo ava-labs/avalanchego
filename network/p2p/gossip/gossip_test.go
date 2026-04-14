@@ -636,7 +636,7 @@ func TestPushGossiper(t *testing.T) {
 					} else {
 						select {
 						case <-sender.SentAppGossip:
-							require.FailNow("unexpectedly sent gossip message")
+							t.Fatal("unexpectedly sent gossip message")
 						default:
 						}
 					}

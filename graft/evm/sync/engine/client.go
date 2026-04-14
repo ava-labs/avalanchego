@@ -130,6 +130,7 @@ type client struct {
 	config           *ClientConfig
 	resumableSummary message.Syncable
 	cancel           context.CancelFunc
+	codeQueue        *code.Queue
 	wg               sync.WaitGroup
 	err              error
 }
@@ -284,6 +285,9 @@ func (c *client) Shutdown() error {
 	if c.cancel != nil {
 		c.cancel()
 	}
+	if c.codeQueue != nil {
+		c.codeQueue.Shutdown()
+	}
 	c.wg.Wait() // wait for the background goroutine to exit
 	return nil
 }
@@ -388,10 +392,11 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 		return nil, fmt.Errorf("failed to create block syncer: %w", err)
 	}
 
-	codeQueue, err := code.NewQueue(c.config.ChainDB, c.config.StateSyncDone)
+	codeQueue, err := code.NewQueue(c.config.ChainDB)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create code queue: %w", err)
 	}
+	c.codeQueue = codeQueue
 
 	codeSyncer, err := code.NewSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
 	if err != nil {

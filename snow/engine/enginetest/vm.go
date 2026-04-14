@@ -108,8 +108,8 @@ func (vm *VM) Initialize(
 			appSender,
 		)
 	}
-	if vm.CantInitialize && vm.T != nil {
-		require.FailNow(vm.T, errInitialize.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantInitialize, errInitialize)
 	}
 	return errInitialize
 }
@@ -120,7 +120,7 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	}
 	if vm.CantSetState {
 		if vm.T != nil {
-			require.FailNow(vm.T, errSetState.Error())
+			vm.T.Fatal(errSetState)
 		}
 		return errSetState
 	}
@@ -133,7 +133,7 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	}
 	if vm.CantShutdown {
 		if vm.T != nil {
-			require.FailNow(vm.T, errShutdown.Error())
+			vm.T.Fatal(errShutdown)
 		}
 		return errShutdown
 	}
@@ -144,8 +144,8 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	if vm.CreateHandlersF != nil {
 		return vm.CreateHandlers(ctx)
 	}
-	if vm.CantCreateHandlers && vm.T != nil {
-		require.FailNow(vm.T, errCreateHandlers.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantCreateHandlers, errCreateHandlers)
 	}
 	return nil, nil
 }
@@ -154,8 +154,8 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 	if vm.NewHTTPHandlerF != nil {
 		return vm.NewHTTPHandlerF(ctx)
 	}
-	if vm.CantNewHTTPHandler && vm.T != nil {
-		require.FailNow(vm.T, errNewHTTPHandler.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantNewHTTPHandler, errNewHTTPHandler)
 	}
 	return nil, nil
 }
@@ -164,8 +164,8 @@ func (vm *VM) HealthCheck(ctx context.Context) (any, error) {
 	if vm.HealthCheckF != nil {
 		return vm.HealthCheckF(ctx)
 	}
-	if vm.CantHealthCheck && vm.T != nil {
-		require.FailNow(vm.T, errHealthCheck.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantHealthCheck, errHealthCheck)
 	}
 	return nil, errHealthCheck
 }
@@ -178,7 +178,7 @@ func (vm *VM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		return nil
 	}
 	if vm.T != nil {
-		require.FailNow(vm.T, errAppRequest.Error())
+		vm.T.Fatal(errAppRequest)
 	}
 	return errAppRequest
 }
@@ -191,7 +191,7 @@ func (vm *VM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID
 		return nil
 	}
 	if vm.T != nil {
-		require.FailNow(vm.T, errAppRequestFailed.Error())
+		vm.T.Fatal(errAppRequestFailed)
 	}
 	return errAppRequestFailed
 }
@@ -204,7 +204,7 @@ func (vm *VM) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint
 		return nil
 	}
 	if vm.T != nil {
-		require.FailNow(vm.T, errAppResponse.Error())
+		vm.T.Fatal(errAppResponse)
 	}
 	return errAppResponse
 }
@@ -217,7 +217,7 @@ func (vm *VM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) erro
 		return nil
 	}
 	if vm.T != nil {
-		require.FailNow(vm.T, errAppGossip.Error())
+		vm.T.Fatal(errAppGossip)
 	}
 	return errAppGossip
 }
@@ -226,8 +226,8 @@ func (vm *VM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *version
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(ctx, id, nodeVersion)
 	}
-	if vm.CantConnected && vm.T != nil {
-		require.FailNow(vm.T, errConnected.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantConnected, errConnected)
 	}
 	return nil
 }
@@ -236,8 +236,8 @@ func (vm *VM) Disconnected(ctx context.Context, id ids.NodeID) error {
 	if vm.DisconnectedF != nil {
 		return vm.DisconnectedF(ctx, id)
 	}
-	if vm.CantDisconnected && vm.T != nil {
-		require.FailNow(vm.T, errDisconnected.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantDisconnected, errDisconnected)
 	}
 	return nil
 }
@@ -246,8 +246,8 @@ func (vm *VM) Version(ctx context.Context) (string, error) {
 	if vm.VersionF != nil {
 		return vm.VersionF(ctx)
 	}
-	if vm.CantVersion && vm.T != nil {
-		require.FailNow(vm.T, errVersion.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantVersion, errVersion)
 	}
 	return "", nil
 }

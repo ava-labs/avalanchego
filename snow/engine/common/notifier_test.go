@@ -152,19 +152,19 @@ func TestNotifierReSubscribeAtPrefChange(t *testing.T) {
 	case <-signal:
 		nf.CheckForEvent()
 	case <-time.After(time.Minute):
-		require.FailNow(t, "Timed out waiting for the notification forwarder to subscribe")
+		t.Fatal("Timed out waiting for the notification forwarder to subscribe")
 	}
 
 	select {
 	case messages <- PendingTxs:
 	case <-time.After(time.Minute):
-		require.FailNow(t, "Timed out waiting to send message to notification forwarder")
+		t.Fatal("Timed out waiting to send message to notification forwarder")
 	}
 
 	select {
 	case msg := <-notifications:
 		require.Equal(t, PendingTxs, msg)
 	case <-time.After(time.Minute):
-		require.FailNow(t, "Timed out waiting for notification forwarder to forward message")
+		t.Fatal("Timed out waiting for notification forwarder to forward message")
 	}
 }
