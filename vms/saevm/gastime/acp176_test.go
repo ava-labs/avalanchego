@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
 
 // TestInvalidConfigRejected verifies that zero values for TargetToExcessScaling
@@ -184,137 +185,173 @@ func FuzzWorstCasePrice(f *testing.F) {
 }
 
 func FuzzPriceInvarianceAfterBlock(f *testing.F) {
+	type state struct {
+		target        uint64
+		excess        uint64
+		minPrice      uint64
+		scaling       uint64
+		staticPricing bool
+	}
 	for _, s := range []struct {
-		T, x, M, KonT         uint64
-		newT, newM, newKonT   uint64
-		initStatic, newStatic bool
+		init   state
+		change state
 	}{
 		// Basic scaling change: K doubles, price should be maintained
 		{
-			T: 1e6, M: 1, KonT: 1, // i.e. K == 1e6
-			x:    2e6,          // Initial price is M⋅exp(x/K) = exp(2/1) ~= 7
-			newT: 1e6, newM: 1, // both unchanged
-			newKonT: 2, // i.e. K == 2e6; without proper scaling, price becomes exp(2/2) ~= 2
-		},
-		// K at MaxUint64 boundary
-		{
-			T: 1e6, M: 1, KonT: math.MaxUint64,
-			x:    2e6,
-			newT: 1e6, newM: 1,
-			newKonT: math.MaxUint64,
+			init: state{
+				target:   1e6,
+				excess:   2e6, // Initial price is M⋅exp(x/K) = exp(2/1) ~= 7
+				minPrice: 1,
+				scaling:  1, // K == T
+			},
+			change: state{
+				scaling: 2, // doubled; without proper scaling, price becomes exp(2/2) ~= 2
+			},
 		},
 		// MinPrice increase above current price: price should bump to new M
 		{
-			T: 1e6, M: 1, KonT: 87,
-			x:       2e6, // price = 1 * e^(2/87) ~= 1.023
-			newT:    1e6,
-			newM:    100, // new M > current price, should bump
-			newKonT: 87,
+			init: state{
+				target:   1e6,
+				excess:   2e6, // price = 1 * e^(2/87) ~= 1.023
+				minPrice: 1,
+				scaling:  87,
+			},
+			change: state{
+				minPrice: 100, // 100x inital
+			},
 		},
 		// MinPrice decrease: price should be maintained
 		{
-			T: 1e6, M: 100, KonT: 87,
-			x:       1e6, // price > 100
-			newT:    1e6,
-			newM:    50, // M decreases
-			newKonT: 87,
+			init: state{
+				target:   1e6,
+				excess:   1e6, // price = 1 * e^(1/87) ~= 1.012
+				minPrice: 100,
+				scaling:  87,
+			},
+			change: state{
+				minPrice: 50, // halved
+			},
 		},
 		// MinPrice increase below current price: price should be maintained
 		{
-			T: 1e6, M: 1, KonT: 87,
-			x:       100e6, // high excess = high price >> 10
-			newT:    1e6,
-			newM:    10, // new M < current price
-			newKonT: 87,
+			init: state{
+				target:   1e6,
+				excess:   100e6, // high excess = high price >> 10
+				minPrice: 1,
+				scaling:  87,
+			},
+			change: state{
+				minPrice: 10, // new M < current price
+			},
 		},
 		// Large excess value
 		{
-			T: 1e6, M: 1, KonT: 87,
-			x:       1e9, // very high excess
-			newT:    1e6,
-			newM:    1,
-			newKonT: 100,
+			init: state{
+				target:   1e6,
+				excess:   1e9, // very high excess
+				minPrice: 1,
+				scaling:  87,
+			},
+			change: state{
+				scaling: 100,
+			},
 		},
 		// High MinPrice with scaling change
 		{
-			T: 1e6, M: 1e9, KonT: 87,
-			x:       5e6,
-			newT:    1e6,
-			newM:    1e9,
-			newKonT: 50,
+			init: state{
+				target:   1e6,
+				excess:   5e6,
+				minPrice: 1e9,
+				scaling:  87,
+			},
+			change: state{
+				scaling: 50,
+			},
 		},
 		// Zero excess with config changes
 		{
-			T: 1e6, M: 1, KonT: 87,
-			x:       0,
-			newT:    1e6,
-			newM:    1,
-			newKonT: 50,
-		},
-		// Around MaxUint64 scaling with MinPrice decrease
-		{
-			T: 1e6, M: 26, KonT: math.MaxInt64 - 100,
-			x:       1e6,
-			newT:    1e6,
-			newM:    1,
-			newKonT: math.MaxInt64 - 10,
-		},
-		// MaxUint64 scaling with high excess min price at 11 gwei
-		{
-			T: 1e6, M: 1e12, KonT: 87,
-			x:       1e9,
-			newT:    1e6,
-			newM:    1e12,
-			newKonT: math.MaxUint64,
+			init: state{
+				target:   1e6,
+				excess:   0,
+				minPrice: 1,
+				scaling:  87,
+			},
+			change: state{
+				scaling: 50,
+			},
 		},
 		// Dynamic to static pricing: price should snap to newMinPrice
 		{
-			T: 1e6, M: 1, KonT: 87,
-			x:         1e9, // high excess = high price
-			newT:      1e6,
-			newM:      1,
-			newKonT:   87,
-			newStatic: true,
+			init: state{
+				target:   1e6,
+				excess:   1e9, // high excess = high price
+				minPrice: 1,
+				scaling:  87,
+			},
+			change: state{
+				staticPricing: true,
+			},
 		},
 		// Static to dynamic pricing: price continuity from initMinPrice
 		{
-			T: 1e6, M: 100, KonT: 87,
-			x:          5e6,
-			initStatic: true,
-			newT:       1e6,
-			newM:       50, // M decreases, should maintain initMinPrice via excess
-			newKonT:    87,
+			init: state{
+				target:        1e6,
+				excess:        5e6,
+				minPrice:      100,
+				scaling:       87,
+				staticPricing: true,
+			},
+			change: state{
+				minPrice:      50, // M decreases, should maintain initMinPrice via excess
+				staticPricing: true,
+			},
 		},
 		// Static to static with MinPrice change: price should be newMinPrice
 		{
-			T: 1e6, M: 100, KonT: 87,
-			x:          5e6,
-			initStatic: true,
-			newT:       1e6,
-			newM:       200,
-			newKonT:    87,
-			newStatic:  true,
+			init: state{
+				target:        1e6,
+				excess:        5e6,
+				minPrice:      100,
+				scaling:       87,
+				staticPricing: true,
+			},
+			change: state{
+				minPrice: 200,
+			},
 		},
 		{
-			KonT: 0, // invalid
-			T:    1, M: 1,
+			init: state{
+				target:   1,
+				minPrice: 1,
+				scaling:  0, // invalid
+			},
 		},
 		{
-			M: 0, // invalid
-			T: 1, KonT: 1,
-		},
-		{
-			newM: 0, // invalid
-			T:    1, M: 1, KonT: 1,
-			newKonT: 1,
-		},
-		{
-			newKonT: 0, // invalid
-			T:       1, M: 1, KonT: 1,
-			newM: 1,
+			init: state{
+				target:   1,
+				minPrice: 0, // invalid
+				scaling:  1,
+			},
 		},
 	} {
-		f.Add(s.T, s.x, s.M, s.KonT, s.initStatic, s.newT, s.newM, s.newKonT, s.newStatic)
+		new := s.change
+		if s.change.target == 0 {
+			new.target = s.init.target
+		}
+		if s.change.minPrice == 0 {
+			new.minPrice = s.init.minPrice
+		}
+		if s.change.scaling == 0 {
+			new.scaling = s.init.scaling
+		}
+		new.staticPricing = s.init.staticPricing
+		if s.change.staticPricing {
+			new.staticPricing = !s.init.staticPricing
+		}
+		f.Add(
+			s.init.target, s.init.excess, s.init.minPrice, s.init.scaling, s.init.staticPricing,
+			new.target, new.minPrice, new.scaling, new.staticPricing,
+		)
 	}
 
 	f.Fuzz(func(
@@ -325,8 +362,7 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 	) {
 		if initScaling > 1e6 || newScaling > 1e6 {
 			// The scaling factor controls the rate of gas-price doubling, where
-			// 87 is approximately half an hour, and price is inversely
-			// proportional to the value.
+			// 87 is approximately one minute.
 			t.Skip("Excessive scaling")
 		}
 
@@ -404,15 +440,23 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 		log("Excess", initExcess, uint64(tm.excess))
 		log("Price (value under test)", uint64(initPrice), uint64(tm.Price()))
 
-		switch minP := gas.Price(newMinPrice); {
-		case minP > initPrice:
-			require.Equal(t, minP, tm.Price(), "minimum price > initial price -> price == min")
+		minP := gas.Price(newMinPrice)
+		assert.GreaterOrEqual(t, tm.Price(), minP, "price >= minimum price")
+		if newStaticPricing {
+			assert.Equal(t, minP, tm.Price(), "static pricing -> price == min")
+			return
+		}
 
-		case newStaticPricing:
-			require.Equal(t, minP, tm.Price(), "static pricing -> price == min")
+		// Integer approximation may cause the price to be slightly lowered, but
+		// it should be marginal.
+		{
+			allowedPrice, _, err := intmath.MulDiv(initPrice, 999, 1000) // 99.9% accurate
+			require.NoError(t, err, "intmath.MulDiv unexpected error")
+			assert.GreaterOrEqual(t, tm.Price(), allowedPrice, "price >= allowed price")
+		}
 
-		case tm.config.equalHookConfig(t, initConfig):
-			// Target-only changes keep the x/K exponent as close to equal as
+		if tm.config.minPrice == initConfig.MinPrice {
+			// Exponent-only changes keep the x/K exponent as close to equal as
 			// possible given the resolution of the denominator.
 			newExp := tm.exponent()
 
@@ -426,27 +470,19 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 			if diff.Cmp(tolerance) >= 0 {
 				t.Errorf("Exponent of price equation changed from %v to %v; diff = %v >= %v", initExp, newExp, diff, tolerance)
 			}
+		}
 
-		default:
+		if tm.config.minPrice > initPrice {
+			assert.Equal(t, tm.config.minPrice, tm.Price(), "price == minimum price")
 			// Due to integer arithmetic in binary search, exact price
 			// continuity isn't always achievable. [Time.findExcessForPrice]
 			// finds the lowest excess that results in >= the targeted price.
-			assert.GreaterOrEqual(t, tm.Price(), initPrice, "binary search on excess results in price >= initial")
-			if tm.excess > 0 {
-				tm.excess--
-				assert.Less(t, tm.Price(), initPrice, "binary search on excess results in lowest price >= initial")
+			if calculatePrice(tm.excess, tm.excessScalingFactor()) < tm.config.minPrice {
+				tm.excess++
+				assert.Greater(t, tm.Price(), tm.config.minPrice, "binary search on excess results in lowest price >= initial")
 			}
 		}
 	})
-}
-
-// equalHookConfig is equivalent to [config.equal] but accepts a
-// [hook.GasPriceConfig] that is first converted and validated.
-func (c *config) equalHookConfig(tb testing.TB, hookCfg hook.GasPriceConfig) bool {
-	tb.Helper()
-	other, err := newConfig(hookCfg)
-	require.NoError(tb, err)
-	return c.equals(other)
 }
 
 // exponent returns x/K, the exponent of the gas price. For fixed M, equal
@@ -467,17 +503,15 @@ func (tm *Time) exponent() *big.Rat {
 func TestOscillatingMinPrice(t *testing.T) {
 	const (
 		target       gas.Gas   = 1_000_000
-		scaling      gas.Gas   = 87
-		gasPerBlock  gas.Gas   = target // value doesn't actually matter, we never idle in the test
+		gasPerBlock  gas.Gas   = target // must be sufficiently large
 		numBlocks              = 1000
 		highMinPrice gas.Price = 2
 		lowMinPrice  gas.Price = 1
 	)
 
-	initialConfig := hook.GasPriceConfig{
-		TargetToExcessScaling: scaling,
-		MinPrice:              highMinPrice,
-	}
+	initialConfig := DefaultGasPriceConfig()
+	initialConfig.MinPrice = highMinPrice
+
 	control := mustNew(t, time.Unix(0, 0), target, 0, initialConfig)
 	modified := mustNew(t, time.Unix(0, 0), target, 0, initialConfig)
 
@@ -505,4 +539,37 @@ func TestOscillatingMinPrice(t *testing.T) {
 	// Sanity check that price normally increases.
 	assert.Greater(t, control.Price(), highMinPrice, "control price must increase with sustained above-target usage")
 	assert.Equal(t, control.Price(), modified.Price(), "alternating MinPrice must not impact price growth")
+}
+
+func TestStaticPriceRemoval(t *testing.T) {
+	const (
+		target    gas.Gas = 1_000_000
+		numBlocks         = 1000
+	)
+
+	initialConfig := DefaultGasPriceConfig()
+	initialConfig.StaticPricing = true
+	g := mustNew(t, time.Unix(0, 0), target, 0, initialConfig)
+
+	for range numBlocks {
+		const gas gas.Gas = target // must be sufficiently large
+		require.NoError(t, g.AfterBlock(
+			gas,
+			hookstest.NewStub(target, hookstest.WithGasPriceConfig(initialConfig)),
+			nil,
+		))
+	}
+
+	var (
+		want      = g.Price()
+		newConfig = DefaultGasPriceConfig()
+	)
+
+	const gas gas.Gas = 0
+	require.NoError(t, g.AfterBlock(
+		gas,
+		hookstest.NewStub(target, hookstest.WithGasPriceConfig(newConfig)),
+		nil,
+	))
+	assert.Equal(t, want, g.Price(), "price invariant static price removal")
 }

@@ -54,12 +54,20 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig hook.GasPr
 	target = clampTarget(target)
 	tm.SetRate(rateOf(target))
 
-	return &Time{
+	t := &Time{
 		Time:   tm,
 		target: target,
-		excess: startingExcess,
 		config: cfg,
-	}, nil
+	}
+
+	// TODO(StephenButtolph): taking in startingExcess is pretty jank. Should we
+	// instead take in startingPrice?
+	if cfg.staticPricing {
+		startingExcess = 0
+	}
+	k := t.excessScalingFactor()
+	t.excess = max(startingExcess, minPriceExcess(cfg.minPrice, k))
+	return t, nil
 }
 
 // SubSecond scales the value returned by [hook.Points.SubSecondBlockTime] to
@@ -138,15 +146,11 @@ func (tm *Time) Excess() gas.Gas {
 }
 
 // Price returns the price of a unit of gas, i.e. the "base fee", determined by
-// [gas.CalculatePrice]. However, when [hook.GasPriceConfig.StaticPricing] is
-// true, Price always returns [hook.GasPriceConfig.MinPrice].
+// [gas.CalculatePrice].
 func (tm *Time) Price() gas.Price {
-	if tm.config.staticPricing {
-		return tm.config.minPrice
-	}
-	// TODO (ceyonur): Consider omitting `MinPrice` in favor of `MinExcess`.
-	// https://github.com/ava-labs/strevm/issues/267
-	return gas.CalculatePrice(tm.config.minPrice, tm.excess, tm.excessScalingFactor())
+	p := calculatePrice(tm.excess, tm.excessScalingFactor())
+	// When minPrice can't be represented by e^(x/k), we must adjust p.
+	return max(tm.config.minPrice, p)
 }
 
 // excessScalingFactor returns the K variable of ACP-103/176, i.e.
@@ -189,6 +193,11 @@ func (tm *Time) SetTarget(t gas.Gas) {
 // gas excess.
 func (tm *Time) Tick(g gas.Gas) {
 	tm.Time.Tick(g)
+
+	// static pricing keeps excess at its minimum
+	if tm.config.staticPricing {
+		return
+	}
 
 	R, T := tm.Rate(), tm.Target()         //nolint:revive // unexported-naming: mathematical convention
 	quo, _, _ := intmath.MulDiv(g, R-T, R) // overflow is impossible as (R-T)/R < 1
@@ -234,4 +243,7 @@ func (tm *Time) FastForwardTo(to uint64, toFrac gas.Gas) {
 	// -fT/R
 	quo, _, _ := intmath.MulDiv(frac.Numerator, T, R) // overflow is impossible as T/R < 1
 	tm.excess = intmath.BoundedSubtract(tm.excess, quo, 0)
+
+	minExcess := minPriceExcess(tm.config.minPrice, tm.excessScalingFactor())
+	tm.excess = max(tm.excess, minExcess)
 }

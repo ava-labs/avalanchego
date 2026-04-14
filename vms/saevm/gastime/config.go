@@ -36,11 +36,3 @@ func newConfig(from hook.GasPriceConfig) (config, error) {
 	}
 	return c, nil
 }
-
-// equal returns true if the logical fields of c and other are equal.
-// It ignores canoto internal fields.
-func (c config) equals(other config) bool {
-	return c.targetToExcessScaling == other.targetToExcessScaling &&
-		c.minPrice == other.minPrice &&
-		c.staticPricing == other.staticPricing
-}

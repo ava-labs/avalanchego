@@ -333,32 +333,43 @@ func TestExcess(t *testing.T) {
 }
 
 func TestMinAndStaticPrice(t *testing.T) {
-	const (
-		target = 1e6
-		excess = target * DefaultTargetToExcessScaling // i.e. Price == floor(e)*MinPrice
-	)
+	const target = 1e6
 
 	tests := []struct {
-		name     string
-		minPrice gas.Price
-		static   bool
-		want     gas.Price
-		wantErr  testerr.Want
+		name           string
+		minPrice       gas.Price
+		static         bool
+		startingExcess gas.Gas
+		want           gas.Price
+		wantErr        testerr.Want
 	}{
 		{
 			name:     "min=1",
 			minPrice: 1,
-			want:     2,
+			want:     1,
+		},
+		{
+			name:           "min=1_x=T*K",
+			minPrice:       1,
+			startingExcess: target * DefaultTargetToExcessScaling,
+			want:           2,
 		},
 		{
 			name:     "min=100",
 			minPrice: 100,
-			want:     271,
+			want:     100,
 		},
 		{
-			name:     "high_min_no_overflow",
-			minPrice: math.MaxUint64 / 2,
-			want:     math.MaxUint64,
+			name:           "min=100_x=T*K",
+			minPrice:       100,
+			startingExcess: target * DefaultTargetToExcessScaling,
+			want:           100,
+		},
+		{
+			name:           "high_min_no_overflow",
+			minPrice:       math.MaxUint64 / 2,
+			startingExcess: math.MaxUint64,
+			want:           math.MaxUint64,
 		},
 		{
 			name:     "zero_min_errors",
@@ -366,10 +377,11 @@ func TestMinAndStaticPrice(t *testing.T) {
 			wantErr:  testerr.Is(errInvalidGasPriceConfig),
 		},
 		{
-			name:     "static_pricing_returns_min",
-			minPrice: 123_456,
-			static:   true,
-			want:     123_456,
+			name:           "static_pricing_returns_min",
+			minPrice:       123_456,
+			static:         true,
+			startingExcess: math.MaxUint64,
+			want:           123_456,
 		},
 	}
 
@@ -379,7 +391,7 @@ func TestMinAndStaticPrice(t *testing.T) {
 			cfg.MinPrice = tt.minPrice
 			cfg.StaticPricing = tt.static
 
-			tm, err := New(time.Unix(0, 0), target, excess, cfg)
+			tm, err := New(time.Unix(0, 0), target, tt.startingExcess, cfg)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("New(..., %+v) %s", cfg, diff)
 			}
@@ -387,7 +399,7 @@ func TestMinAndStaticPrice(t *testing.T) {
 				return
 			}
 			if got := tm.Price(); got != tt.want {
-				t.Errorf("New(..., excess=%d, %+v).Price() got %d; want %d", gas.Gas(excess), cfg, got, tt.want)
+				t.Errorf("New(..., excess=%d, %+v).Price() got %d; want %d", tt.startingExcess, cfg, got, tt.want)
 			}
 		})
 	}
