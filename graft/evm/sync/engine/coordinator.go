@@ -35,15 +35,13 @@ var (
 	errCommitTargetRequired = errors.New("commit target not set")
 )
 
-// Callbacks allows the coordinator to delegate VM-specific work back to the client.
+// Callbacks delegates VM-specific work back to the client.
 type Callbacks struct {
-	// FinalizeVM performs the same actions as [Acceptor.AcceptSync].
-	// The context is used for cancellation checks during finalization.
+	// FinalizeVM applies the sync result to the blockchain (same as AcceptSync).
 	FinalizeVM func(ctx context.Context, target message.Syncable) error
-	// DrainAcceptorQueue blocks until the blockchain's acceptor queue has
-	// processed all pending blocks from batch replay.
+	// DrainAcceptorQueue waits for all batch-replayed blocks to be fully processed.
 	DrainAcceptorQueue func()
-	// OnDone is called when the coordinator finishes (successfully or with error).
+	// OnDone signals sync completion (success or failure).
 	OnDone func(err error)
 }
 
@@ -67,19 +65,12 @@ type Coordinator struct {
 	// doneOnce ensures [Callbacks.OnDone] is invoked at most once.
 	doneOnce sync.Once
 
-	// pivotInterval configures the pivot policy throttling. 0 disables caller-provided throttle
-	// and falls back to default policy behavior.
 	pivotInterval uint64
 	pivot         *pivotPolicy
 
-	// initial is the original sync target passed to Start. It is kept for
-	// logging/fallback but finalization uses [commitTarget].
+	// initial is the first sync target, used as fallback if commitTarget is nil.
 	initial message.Syncable
-
-	// cancel is the lifecycle cancel function set once in Start before
-	// transitioning to StateRunning. Reads after observing StateRunning
-	// are safe without a lock (atomic state store provides happens-before).
-	cancel context.CancelCauseFunc
+	cancel  context.CancelCauseFunc
 }
 
 // CoordinatorOption follows the functional options pattern for Coordinator.
@@ -106,73 +97,6 @@ func NewCoordinator(syncerRegistry *SyncerRegistry, cbs Callbacks, opts ...Coord
 	return co
 }
 
-func (co *Coordinator) setCommitTarget(target message.Syncable) {
-	co.targetMu.Lock()
-	defer co.targetMu.Unlock()
-	co.commitTarget = target
-}
-
-func (co *Coordinator) getCommitTarget() message.Syncable {
-	co.targetMu.RLock()
-	defer co.targetMu.RUnlock()
-	return co.commitTarget
-}
-
-func (co *Coordinator) markAborted() {
-	for {
-		state := co.CurrentState()
-		if state == StateAborted || state == StateCompleted {
-			return
-		}
-		if co.state.CompareAndSwap(int32(state), int32(StateAborted)) {
-			return
-		}
-	}
-}
-
-func (co *Coordinator) beginFinalizing() error {
-	for {
-		switch co.CurrentState() {
-		case StateRunning:
-			if co.state.CompareAndSwap(int32(StateRunning), int32(StateFinalizing)) {
-				return nil
-			}
-		case StateFinalizing:
-			return nil
-		default:
-			return errInvalidState
-		}
-	}
-}
-
-// contextCause returns the underlying cause stored via [context.WithCancelCause],
-// or fallback if the cause is nil or plain [context.Canceled].
-func contextCause(ctx context.Context, fallback error) error {
-	if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
-		return cause
-	}
-	return fallback
-}
-
-// freezeCommitTarget prevents further sync target updates and ensures the
-// commitTarget reflects only roots the syncers actually synced to.
-func (co *Coordinator) freezeCommitTarget(cctx context.Context) error {
-	co.updateMu.Lock()
-	defer co.updateMu.Unlock()
-
-	if err := co.beginFinalizing(); err != nil {
-		return contextCause(cctx, err)
-	}
-	return nil
-}
-
-func (co *Coordinator) abort(err error) {
-	co.markAborted()
-	if co.cancel != nil {
-		co.cancel(err)
-	}
-}
-
 // Start launches all syncers and returns immediately. Failures are monitored
 // in the background and will transition to [StateAborted].
 func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
@@ -188,11 +112,8 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 	co.state.Store(int32(StateRunning))
 
 	go func() {
-		// Ensure registered syncers that implement [types.Finalizer] get a chance to flush
-		// best-effort cleanup regardless of success or failure.
 		err := g.Wait()
 		if errors.Is(err, context.Canceled) {
-			// Preserve the original abort cause stored via context.WithCancelCause.
 			err = contextCause(cctx, err)
 		}
 		if err == nil {
@@ -212,16 +133,14 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 	}()
 }
 
-// ProcessQueuedBlockOperations finalizes the VM and processes queued block operations
-// in FIFO order. Called after syncers complete to finalize state and execute deferred operations.
+// ProcessQueuedBlockOperations finalizes the VM at the commit target and
+// replays deferred block operations in FIFO order.
 func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	// Transition to StateFinalizing if not already there. The caller
-	// (coordinator goroutine) may have already transitioned to close the
-	// UpdateSyncTarget window before calling this method.
+	// The caller may have already transitioned to StateFinalizing.
 	if co.CurrentState() != StateFinalizing {
 		if err := co.beginFinalizing(); err != nil {
 			return errInvalidState
@@ -250,20 +169,17 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 		return errInvalidState
 	}
 
-	// Drop blocks <= commit target. FinalizeVM already applied the commit-target
-	// block, and blocks below it cannot be accepted because blockChain.Accept
-	// requires sequential parent chaining from the commit target.
+	// Drop blocks <= commit target (already applied by FinalizeVM).
 	co.queue.removeThroughHeight(target.Height())
 
-	// Drain the queue in batches. Enqueues are allowed during batch execution. Any
-	// operations arriving mid-batch will be picked up by a subsequent iteration.
+	// Drain the queue. New enqueues during execution are picked up in subsequent iterations.
 	for {
 		operations := co.queue.dequeueBatch()
 		if len(operations) == 0 {
 			break
 		}
 		err := executeBlockOperations(ctx, operations)
-		// Ensure we drop dedupe markers even on error to avoid leaking memory.
+		// Drop dedupe markers regardless of outcome.
 		co.queue.forget(operations)
 		if err != nil {
 			co.markAborted()
@@ -316,8 +232,67 @@ func (co *Coordinator) AddBlockOperation(b EthBlockWrapper, op BlockOperationTyp
 	return co.queue.enqueue(b, op)
 }
 
+// CurrentState returns the current lifecycle state of the coordinator.
 func (co *Coordinator) CurrentState() State {
 	return State(co.state.Load())
+}
+
+func (co *Coordinator) setCommitTarget(target message.Syncable) {
+	co.targetMu.Lock()
+	defer co.targetMu.Unlock()
+	co.commitTarget = target
+}
+
+func (co *Coordinator) getCommitTarget() message.Syncable {
+	co.targetMu.RLock()
+	defer co.targetMu.RUnlock()
+	return co.commitTarget
+}
+
+func (co *Coordinator) markAborted() {
+	for {
+		state := co.CurrentState()
+		if state == StateAborted || state == StateCompleted {
+			return
+		}
+		if co.state.CompareAndSwap(int32(state), int32(StateAborted)) {
+			return
+		}
+	}
+}
+
+func (co *Coordinator) beginFinalizing() error {
+	for {
+		switch co.CurrentState() {
+		case StateRunning:
+			if co.state.CompareAndSwap(int32(StateRunning), int32(StateFinalizing)) {
+				return nil
+			}
+		case StateFinalizing:
+			return nil
+		default:
+			return errInvalidState
+		}
+	}
+}
+
+// freezeCommitTarget prevents further sync target updates and ensures the
+// commitTarget reflects only roots the syncers actually synced to.
+func (co *Coordinator) freezeCommitTarget(cctx context.Context) error {
+	co.updateMu.Lock()
+	defer co.updateMu.Unlock()
+
+	if err := co.beginFinalizing(); err != nil {
+		return contextCause(cctx, err)
+	}
+	return nil
+}
+
+func (co *Coordinator) abort(err error) {
+	co.markAborted()
+	if co.cancel != nil {
+		co.cancel(err)
+	}
 }
 
 func (co *Coordinator) finish(cancel context.CancelCauseFunc, err error) {
@@ -340,6 +315,15 @@ func (co *Coordinator) finish(cancel context.CancelCauseFunc, err error) {
 	if co.callbacks.OnDone != nil {
 		co.doneOnce.Do(func() { co.callbacks.OnDone(err) })
 	}
+}
+
+// contextCause extracts the cancel cause, falling back to fallback if the
+// cause is nil or plain context.Canceled.
+func contextCause(ctx context.Context, fallback error) error {
+	if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+		return cause
+	}
+	return fallback
 }
 
 // executeBlockOperations executes a batch of queued block operations in FIFO order.
