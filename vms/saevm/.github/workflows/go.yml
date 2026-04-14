@@ -1,0 +1,135 @@
+name: Go
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # If adding a new job, add it to the `needs` list of the `go` job as this is
+  # what gates PRs.
+  go:
+    runs-on: ubuntu-latest
+    needs: [go_build_prod, go_test, go_test_race, go_generate, go_tidy, go_fuzz]
+    steps:
+      - run: echo "Dependencies successful"
+
+  go_build_prod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: "go.mod"
+      - run: | # Ensures no leakage of test-only helpers into production code
+          go build -tags prod,nocmpopts -o /dev/null ./...
+
+  go_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: "go.mod"
+      - run: go test ./...
+
+  go_test_race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: "go.mod"
+      - run: go test ./... -race
+
+  go_generate:
+    env:
+      EXCLUDE_REGEX: "ava-labs/libevm/(accounts/usbwallet/trezor)$"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run `go generate`
+        run: go list ./... | grep -Pv "${EXCLUDE_REGEX}" | xargs go generate;
+
+      - name: git diff
+        run: git diff --exit-code
+
+  go_tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: "go.mod"
+      - run: go mod tidy
+      - run: git diff --exit-code
+
+  find_fuzz_targets:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.find.outputs.targets }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - id: find
+        run: |
+          targets=$(grep --recursive --include '**_test.go' -oP "^func \KFuzz[^(]+" | while IFS=: read -r file func; do
+            jq -c -n --arg p "$(dirname "$file")" --arg f "$func" '{package: $p, function: $f}'
+          done | jq -c -s '.')
+          echo "targets=${targets}" >> $GITHUB_OUTPUT
+
+  go_fuzz:
+    needs: [find_fuzz_targets]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{fromJSON(needs.find_fuzz_targets.outputs.targets)}}
+    env:
+      PACKAGE: ${{ matrix.package }}
+      FUNCTION: ${{ matrix.function }}
+      CORPUS_DIR: ./${{ matrix.package }}/testdata/fuzz/${{ matrix.function }}
+      # The actual corpus size is dependent on the test in question and how many
+      # "interesting" cases can be found. This only ensures that the corpus
+      # extension has actually been performed.
+      MIN_CORPUS_SIZE: 1
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Require existing corpus of at least ${MIN_CORPUS_SIZE}
+        run: |
+          [ -d "${CORPUS_DIR}" ] && [ $(ls "${CORPUS_DIR}" | wc -l) -gt ${MIN_CORPUS_SIZE} ]
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: "go.mod"
+      - name: Get Go cache directory
+        run: echo "GOCACHE=$(go env GOCACHE)" >> "$GITHUB_ENV"
+      - name: Compute cache keys
+        run: |
+          CORPUS_KEY="${{ matrix.package }}-${{ matrix.function }}_static-corpus_${{ hashFiles(format('{0}/testdata/fuzz/{1}/**', matrix.package, matrix.function)) }}"
+          COMMIT_KEY="${CORPUS_KEY}_commit_${{ github.sha }}"
+          echo "CORPUS_KEY=${CORPUS_KEY}" >> "$GITHUB_ENV"
+          echo "COMMIT_KEY=${COMMIT_KEY}" >> "$GITHUB_ENV"
+      - name: Restore fuzz corpus cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ env.GOCACHE }}/fuzz
+          key: ${{ env.COMMIT_KEY }}
+          restore-keys: |
+            ${{ env.CORPUS_KEY }}
+      - run: go test ./${PACKAGE} -fuzz=${FUNCTION} -fuzztime=30s
