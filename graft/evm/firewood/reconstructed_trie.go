@@ -27,6 +27,7 @@ var (
 // Not concurrent-safe (matching Reconstructed's guarantees).
 type reconstructedAccountTrie struct {
 	baseTrie
+
 	recon *ffi.Reconstructed
 }
 

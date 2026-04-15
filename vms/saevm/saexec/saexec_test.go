@@ -65,6 +65,7 @@ func TestMain(m *testing.M) {
 // SUT is the system under test, primarily the [Executor].
 type SUT struct {
 	*Executor
+
 	saedbConfig saedb.Config
 	chain       *blockstest.ChainBuilder
 	wallet      *saetest.Wallet

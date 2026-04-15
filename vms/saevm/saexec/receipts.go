@@ -41,6 +41,7 @@ func (e *Executor) createReceiptBuffers(b *blocks.Block) {
 // response.
 type Receipt struct {
 	*types.Receipt
+
 	Signer types.Signer
 	Tx     *types.Transaction
 }
@@ -81,6 +82,7 @@ type syncMap[K ~[32]byte, V any] struct {
 
 type bucket[K comparable, V any] struct {
 	sync.RWMutex
+
 	data map[K]V
 }
 

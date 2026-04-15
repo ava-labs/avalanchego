@@ -49,6 +49,7 @@ import (
 // provide a last-synchronous block, which MAY be the genesis.
 type VM struct {
 	*p2p.Network
+
 	Peers          *p2p.Peers
 	ValidatorPeers *p2p.Validators
 

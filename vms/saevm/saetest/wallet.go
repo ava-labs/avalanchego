@@ -58,6 +58,7 @@ func (kc *KeyChain) SignTx(tb testing.TB, signer types.Signer, account int, data
 // to sign transactions.
 type Wallet struct {
 	*KeyChain
+
 	nonces []uint64 // MUST have same length as `kc.keys`
 	signer types.Signer
 }

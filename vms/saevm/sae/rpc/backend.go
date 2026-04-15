@@ -34,14 +34,14 @@ var _ GethBackends = (*backend)(nil)
 
 type backend struct {
 	Chain
-	config         Config
-	accountManager *accounts.Manager
-
 	*gasprice.Estimator
 	*txgossip.Set
 	chainIndexer
 	bloomOverrider
 	*bloomIndexer
+
+	config         Config
+	accountManager *accounts.Manager
 }
 
 func (b *backend) close() error {

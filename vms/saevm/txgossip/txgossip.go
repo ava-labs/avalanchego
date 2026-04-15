@@ -56,6 +56,7 @@ func (Marshaller) UnmarshalGossip(buf []byte) (Transaction, error) {
 // backing for the set.
 type Set struct {
 	*gossip.BloomSet[Transaction]
+
 	Pool *txpool.TxPool
 
 	set    *txSet

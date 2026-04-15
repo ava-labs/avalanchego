@@ -24,6 +24,7 @@ var _ state.Trie = (*accountTrie)(nil)
 // Note this is not concurrent safe.
 type accountTrie struct {
 	*baseTrie
+
 	fw         *TrieDB
 	parentRoot common.Hash
 }

@@ -33,6 +33,7 @@ var _ saedb.StateDBOpener = (*Executor)(nil)
 // An Executor accepts and executes a [blocks.Block] FIFO queue.
 type Executor struct {
 	*saedb.Tracker
+
 	quit, done chan struct{}
 	log        logging.Logger
 	hooks      hook.Points
