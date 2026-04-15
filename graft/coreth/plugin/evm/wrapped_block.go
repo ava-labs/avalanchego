@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	libevmcore "github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
@@ -304,7 +305,7 @@ func (b *wrappedBlock) verifyIntrinsicGas() error {
 	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
 	var totalIntrinsicGasCost uint64
 	for _, tx := range b.ethBlock.Transactions() {
-		intrinsicGas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, rules)
+		intrinsicGas, err := libevmcore.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, rules)
 		if err != nil {
 			return fmt.Errorf("failed to calculate intrinsic gas: %w for tx %s", err, tx.Hash())
 		}

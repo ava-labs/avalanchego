@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	libevmcore "github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 
@@ -51,7 +52,7 @@ func CheckTxPredicates(
 	// Check that the transaction can cover its IntrinsicGas, including the gas
 	// required by the predicate, before verifying the predicate.
 	accessList := tx.AccessList()
-	intrinsicGas, err := IntrinsicGas(tx.Data(), accessList, tx.To() == nil, rules)
+	intrinsicGas, err := libevmcore.IntrinsicGas(tx.Data(), accessList, tx.To() == nil, rules)
 	if err != nil {
 		return nil, err
 	}
