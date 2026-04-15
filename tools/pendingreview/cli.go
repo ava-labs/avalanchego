@@ -4,6 +4,7 @@
 package pendingreview
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 
 type command interface {
 	isCommand()
+	name() string
 }
 
 type createCommand struct {
@@ -24,7 +26,8 @@ type createCommand struct {
 	JSON      bool
 }
 
-func (createCommand) isCommand() {}
+func (createCommand) isCommand()   {}
+func (createCommand) name() string { return "create" }
 
 type deleteCommand struct {
 	Repo         string
@@ -35,7 +38,8 @@ type deleteCommand struct {
 	JSON         bool
 }
 
-func (deleteCommand) isCommand() {}
+func (deleteCommand) isCommand()   {}
+func (deleteCommand) name() string { return "delete" }
 
 type getCommand struct {
 	Repo      string
@@ -45,7 +49,8 @@ type getCommand struct {
 	Pretty    bool
 }
 
-func (getCommand) isCommand() {}
+func (getCommand) isCommand()   {}
+func (getCommand) name() string { return "get" }
 
 type getStateCommand struct {
 	Repo      string
@@ -55,7 +60,8 @@ type getStateCommand struct {
 	Pretty    bool
 }
 
-func (getStateCommand) isCommand() {}
+func (getStateCommand) isCommand()   {}
+func (getStateCommand) name() string { return "get-state" }
 
 type updateBodyCommand struct {
 	Repo      string
@@ -68,7 +74,8 @@ type updateBodyCommand struct {
 	JSON      bool
 }
 
-func (updateBodyCommand) isCommand() {}
+func (updateBodyCommand) isCommand()   {}
+func (updateBodyCommand) name() string { return "update-body" }
 
 type deleteStateCommand struct {
 	Repo      string
@@ -78,12 +85,14 @@ type deleteStateCommand struct {
 	JSON      bool
 }
 
-func (deleteStateCommand) isCommand() {}
+func (deleteStateCommand) isCommand()   {}
+func (deleteStateCommand) name() string { return "delete-state" }
 
 type replaceCommentsCommand struct {
 	Repo            string
 	PRNumber        int
 	CommentsFile    string
+	Comments        []DraftReviewEntry
 	ConfigDir       string
 	StateDir        string
 	Force           bool
@@ -93,7 +102,8 @@ type replaceCommentsCommand struct {
 	JSON            bool
 }
 
-func (replaceCommentsCommand) isCommand() {}
+func (replaceCommentsCommand) isCommand()   {}
+func (replaceCommentsCommand) name() string { return "replace-comments" }
 
 type upsertCommentCommand struct {
 	Repo            string
@@ -115,11 +125,44 @@ type upsertCommentCommand struct {
 	JSON            bool
 }
 
-func (upsertCommentCommand) isCommand() {}
+func (upsertCommentCommand) isCommand()   {}
+func (upsertCommentCommand) name() string { return "upsert-comment" }
 
 type versionCommand struct{}
 
-func (versionCommand) isCommand() {}
+func (versionCommand) isCommand()   {}
+func (versionCommand) name() string { return "version" }
+
+type commandSpec struct {
+	name        string
+	parse       func(args []string) (command, error)
+	decodeProxy func(payload json.RawMessage) (command, error)
+}
+
+var commandRegistry = []commandSpec{
+	{name: "version", parse: func(_ []string) (command, error) { return versionCommand{}, nil }, decodeProxy: decodeProxyVersionCommand},
+	{name: "create", parse: parseCreateCommand, decodeProxy: decodeProxyCreateCommand},
+	{name: "delete", parse: parseDeleteCommand, decodeProxy: decodeProxyDeleteCommand},
+	{name: "get", parse: parseGetCommand, decodeProxy: decodeProxyGetCommand},
+	{name: "get-state", parse: parseGetStateCommand, decodeProxy: decodeProxyGetStateCommand},
+	{name: "replace-comments", parse: parseReplaceCommentsCommand, decodeProxy: decodeProxyReplaceCommentsCommand},
+	{name: "upsert-comment", parse: parseUpsertCommentCommand, decodeProxy: decodeProxyUpsertCommentCommand},
+	{name: "delete-state", parse: parseDeleteStateCommand, decodeProxy: decodeProxyDeleteStateCommand},
+	{name: "update-body", parse: parseUpdateBodyCommand, decodeProxy: decodeProxyUpdateBodyCommand},
+}
+
+func proxyCommandRegistry() []commandSpec {
+	return commandRegistry
+}
+
+func lookupCommandSpec(name string) (commandSpec, bool) {
+	for _, spec := range commandRegistry {
+		if spec.name == name {
+			return spec, true
+		}
+	}
+	return commandSpec{}, false
+}
 
 func parseCommand(args []string) (command, error) {
 	if len(args) == 0 {
@@ -129,26 +172,14 @@ func parseCommand(args []string) (command, error) {
 	switch args[0] {
 	case "-h", "--help", "help":
 		return nil, usageError("")
-	case "--version", "version":
+	case "--version":
 		return versionCommand{}, nil
-	case "create":
-		return parseCreateCommand(args[1:])
-	case "delete":
-		return parseDeleteCommand(args[1:])
-	case "get":
-		return parseGetCommand(args[1:])
-	case "get-state":
-		return parseGetStateCommand(args[1:])
-	case "replace-comments":
-		return parseReplaceCommentsCommand(args[1:])
-	case "upsert-comment":
-		return parseUpsertCommentCommand(args[1:])
-	case "delete-state":
-		return parseDeleteStateCommand(args[1:])
-	case "update-body":
-		return parseUpdateBodyCommand(args[1:])
 	default:
-		return nil, usageError(fmt.Sprintf("unknown command %q", args[0]))
+		spec, ok := lookupCommandSpec(args[0])
+		if !ok {
+			return nil, usageError(fmt.Sprintf("unknown command %q", args[0]))
+		}
+		return spec.parse(args[1:])
 	}
 }
 
@@ -490,6 +521,7 @@ func Usage() string {
 	return `gh-pending-review creates and manages pending GitHub pull request reviews.
 
 Usage:
+  gh-pending-review serve-proxy [--addr 127.0.0.1:18080]
   gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--json]
   gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--ensure-absent] [--json]
   gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--pretty]
@@ -501,6 +533,7 @@ Usage:
   gh-pending-review version
 
 Notes:
+  - serve-proxy runs a loopback-only HTTP proxy for pending-review commands.
   - This tool only manipulates pending reviews owned by the authenticated user.
   - It uses isolated gh auth from --config-dir.
   - It stores the last published review body and comment set locally to detect user edits before update.
@@ -525,6 +558,10 @@ func (e usageErr) Error() string {
 
 func usageError(message string) error {
 	return usageErr{message: message}
+}
+
+func UsageError(message string) error {
+	return usageError(message)
 }
 
 func IsUsageError(err error) bool {
