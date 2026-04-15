@@ -527,7 +527,7 @@ func TestStateBytesToIDCache(t *testing.T) {
 
 	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
-		require.FailNow("shouldn't have been called")
+		t.Fatal("shouldn't have been called")
 		return nil, nil
 	}
 
