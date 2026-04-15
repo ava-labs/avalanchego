@@ -40,7 +40,7 @@ func TestReviewBriefUsesCurrentWorktreePaths(t *testing.T) {
 			gitPath, err := exec.LookPath("git")
 			require.NoError(t, err)
 
-			workDir := newReviewBriefTestRepo(t, true)
+			workDir := newReviewBriefTestRepo(t, false)
 			logPath := filepath.Join(t.TempDir(), "git.log")
 			targetBrief := filepath.Join(workDir, ".review-briefs", "widget-change.md")
 			sourceBrief := filepath.Join(repoRoot(t), ".review-briefs", "widget-change.md")
@@ -73,7 +73,7 @@ func TestReviewBriefUsesCurrentWorktreePaths(t *testing.T) {
 	}
 }
 
-func TestReviewBriefStopsWhenConventionMissing(t *testing.T) {
+func TestReviewBriefUsesBundledConventionWhenRepoHasNone(t *testing.T) {
 	requireReviewBriefSkillTests(t)
 
 	for _, agent := range []string{skilltest.AgentClaude, skilltest.AgentCodex} {
@@ -96,11 +96,12 @@ func TestReviewBriefStopsWhenConventionMissing(t *testing.T) {
 			})
 
 			output := readOutput(t, result.OutputPath)
-			require.NoFileExists(t, targetBrief)
+			require.Equal(t, 0, result.ExitCode, output)
+			require.FileExists(t, targetBrief)
 			require.NoFileExists(t, sourceBrief)
-			require.Contains(t, output, ".review-briefs/README.md")
-			require.Contains(t, strings.ToLower(output), "this repo")
-			require.Contains(t, strings.ToLower(output), "does not contain")
+			brief := mustReadFile(t, targetBrief)
+			require.Contains(t, strings.ToLower(brief), "overview")
+			require.Contains(t, brief, "widget.txt")
 		})
 	}
 }
