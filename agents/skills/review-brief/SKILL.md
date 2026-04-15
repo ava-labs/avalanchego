@@ -13,11 +13,21 @@ Produce or refine a PR-scoped review brief that helps reviewers understand the c
 
 ## Required first step
 
-Always read `.review-briefs/README.md` completely before writing or editing a review brief.
+Always read the bundled review-brief convention before writing or editing a review brief.
 
-Treat paths like `.review-briefs/...` as relative to the current working repository, not the skill source location.
+Resolve the convention reference like this:
 
-Treat that README as the repository convention for:
+```bash
+convention_path="${SKILLTEST_SKILL_DIR:-<path-to-skill>}/references/review-briefs-README.md"
+```
+
+Notes:
+- In native skill runtimes, replace `<path-to-skill>` with the absolute path to this skill directory.
+- In `skilltest` runs, `SKILLTEST_SKILL_DIR` is set automatically and points to this skill directory.
+- The bundled convention is the pre-merge fallback and default reference for what a review brief is for.
+- Write the actual review brief into the target repository's `.review-briefs/`, not into the skill checkout.
+
+Treat the bundled convention as the source for:
 - what a review brief is for
 - what belongs in it
 - naming guidance
@@ -43,8 +53,8 @@ Do not use this skill for:
 ## Validation criteria
 
 A successful review-brief task means:
-1. `.review-briefs/README.md` was read first.
-2. The brief lives in `.review-briefs/` and uses a stable descriptive filename.
+1. The bundled convention at `references/review-briefs-README.md` was read first.
+2. The brief lives in the target repository's `.review-briefs/` and uses a stable descriptive filename.
 3. The brief matches the current change scope.
 4. The brief includes reviewer-useful context such as overview, scope, validation, and review focus when those sections materially help.
 5. Claims in the brief are supported by the diff, code, durable docs, or explicit user-provided context.
@@ -54,17 +64,17 @@ A successful review-brief task means:
 
 ### 1. Read the convention
 
-Read `.review-briefs/README.md` in full from the current working repository.
+Read the bundled convention at `"${SKILLTEST_SKILL_DIR:-<path-to-skill>}/references/review-briefs-README.md"` in full.
 
-If the current working repository does not contain `.review-briefs/README.md`, stop and explain that this repo does not provide the review-brief convention needed by this skill.
+Do not require the target repository to already contain `.review-briefs/README.md`. This skill is intended to work pre-merge across repos and worktrees.
 
 ### 2. Identify the target brief path
 
 If the user gave a specific review-brief filename or path, use it.
 
 Otherwise:
-- inspect `.review-briefs/` for an obvious existing PR-specific brief to update
-- if creating a new brief, choose a stable descriptive filename that follows the README guidance
+- inspect the target repository's `.review-briefs/` for an obvious existing PR-specific brief to update
+- if creating a new brief, choose a stable descriptive filename that follows the bundled convention guidance
 - avoid using transient branch-only names unless they would still make sense after merge
 
 If there is not enough context to pick a sensible filename, make a reasonable choice instead of blocking on a question, unless the user explicitly asked to choose the name themselves.
@@ -86,9 +96,9 @@ Also read the key changed files and any relevant durable docs needed to explain 
 
 ### 4. Draft the brief from evidence
 
-Write the review brief in `.review-briefs/`.
+Write the review brief in the target repository's `.review-briefs/`. Create that directory first if needed.
 
-Use the README's suggested structure as a guide, not a checklist. Include only sections that materially help review. Common useful sections are:
+Use the bundled convention's suggested structure as a guide, not a checklist. Include only sections that materially help review. Common useful sections are:
 - `## Overview`
 - `## Why now`
 - `## What reviewers should know`
@@ -134,13 +144,13 @@ When done, report:
 ## Default behavior
 
 When the user says something like "let's create a review brief":
-1. read `.review-briefs/README.md`
+1. read the bundled convention in `references/review-briefs-README.md`
 2. inspect the current diff and changed files
-3. choose a stable filename in `.review-briefs/`
+3. choose a stable filename in the target repository's `.review-briefs/`
 4. draft the brief
 5. reconcile it against the code
 6. summarize the result
 
 If there is no meaningful diff or review scope to describe, do not fabricate a brief. Explain what is missing and what you need to proceed.
 
-Do not read or write `.review-briefs/...` relative to the skill source checkout unless the user explicitly asks you to work there.
+Do not write `.review-briefs/...` relative to the skill source checkout unless the user explicitly asks you to work there.
