@@ -52,6 +52,9 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 	}
 	check()
 
+	pending, queued := pool.Stats()
+	tb.Logf("pending txs: %d, queued txs: %d", pending, queued)
+
 	if s.Len() == 0 {
 		// already found all txs
 		tb.Logf("found tx first try: %+x", txs[0].Hash())
@@ -73,6 +76,8 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 
 			if s.Len() == 0 {
 				return
+			} else {
+				tb.Logf("uninformative update: %+v", txEvent)
 			}
 		case <-ticker.C:
 			tb.Logf("still waiting for %T.SubscribeTransactions(): %+x", pool, txs[0].Hash())

@@ -217,6 +217,7 @@ func TestWorstCase(t *testing.T) {
 						data = binary.BigEndian.AppendUint64(nil, rng.Uint64N(gasLim))
 					}
 
+					t.Logf("From: %d", from)
 					tx := sut.wallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
 						To:        &addrs[to],
 						GasFeeCap: big.NewInt(1 + rng.Int64N(100)),
