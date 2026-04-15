@@ -18,6 +18,9 @@ behavior rather than just inspect its text.
   `claude` via `--append-system-prompt`, `codex` by wrapping the prompt
 - Removes nested-session environment variables before launching Claude
 - Captures combined stdout/stderr to a temp file
+- Exposes `SKILLTEST_SKILL_DIR` to the spawned agent process when a skill is
+  injected, pointing at the resolved skill directory for harness-only fallbacks
+  such as skill-bundled script launchers
 - Supports per-test command wrappers by prepending a temporary directory to
   `PATH`
 

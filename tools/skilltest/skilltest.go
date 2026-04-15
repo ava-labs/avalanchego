@@ -94,24 +94,33 @@ func resolveModel(cfg Config) string {
 	return ""
 }
 
-// readSkillFile reads the SKILL.md content, resolving the path relative to the
-// calling test file's directory.
-func readSkillFile(skillPath string) (string, error) {
+func resolveSkillFilePathAtDepth(skillPath string, callerSkip int) (string, error) {
 	if filepath.IsAbs(skillPath) {
-		content, err := os.ReadFile(skillPath)
-		if err != nil {
-			return "", stacktrace.Errorf("reading skill file %s: %w", skillPath, err)
-		}
-		return string(content), nil
+		return skillPath, nil
 	}
 
-	// Resolve relative to the caller's test file location.
-	// Skip 3: readSkillFile(0), run(1), Run/RunWithout(2) -> caller at 3
-	_, callerFile, _, ok := runtime.Caller(3)
+	_, callerFile, _, ok := runtime.Caller(callerSkip)
 	if !ok {
 		return "", stacktrace.Errorf("unable to determine caller file for relative skill path %s", skillPath)
 	}
-	absPath := filepath.Join(filepath.Dir(callerFile), skillPath)
+	return filepath.Join(filepath.Dir(callerFile), skillPath), nil
+}
+
+func resolveSkillFilePath(skillPath string) (string, error) {
+	// resolveSkillFilePathAtDepth(0), resolveSkillFilePath(1), run/test helper(2),
+	// Run/RunWithout/test wrapper(3), caller test(4)
+	return resolveSkillFilePathAtDepth(skillPath, 4)
+}
+
+// readSkillFile reads the SKILL.md content, resolving the path relative to the
+// calling test file's directory.
+func readSkillFile(skillPath string) (string, error) {
+	// resolveSkillFilePathAtDepth(0), readSkillFile(1), helper/run(2),
+	// Run/RunWithout/test wrapper(3), caller test(4)
+	absPath, err := resolveSkillFilePathAtDepth(skillPath, 4)
+	if err != nil {
+		return "", err
+	}
 	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return "", stacktrace.Errorf("reading skill file %s: %w", absPath, err)
@@ -147,13 +156,17 @@ func run(t *testing.T, cfg Config, withSkill bool) Result {
 
 	prompt := cfg.Prompt
 	var skillContent string
+	var skillFilePath string
 
 	if withSkill {
 		var err error
+		skillFilePath, err = resolveSkillFilePath(cfg.SkillPath)
+		require.NoError(t, err, "failed to resolve skill file path")
 		skillContent, err = readSkillFile(cfg.SkillPath)
 		require.NoError(t, err, "failed to read skill file")
 		logger.Info("loaded skill file",
 			zap.String("path", cfg.SkillPath),
+			zap.String("resolvedPath", skillFilePath),
 			zap.Int("contentLen", len(skillContent)),
 		)
 	}
@@ -198,6 +211,11 @@ func run(t *testing.T, cfg Config, withSkill bool) Result {
 	cmd := exec.Command(command, args...)
 	cmd.Dir = workDir
 	cmd.Env = filteredEnv()
+	if withSkill {
+		cmd.Env = mergeEnv(cmd.Env, map[string]string{
+			"SKILLTEST_SKILL_DIR": filepath.Dir(skillFilePath),
+		})
+	}
 	cmd.Env = mergeEnv(cmd.Env, cfg.Env)
 
 	if len(cfg.BinWrappers) > 0 {
