@@ -6,7 +6,9 @@ go_library(
     srcs = [
         "precompile_bind.go",
         "precompile_config_template.go",
+        "precompile_config_test_template.go",
         "precompile_contract_template.go",
+        "precompile_contract_test_template.go",
         "precompile_event_template.go",
         "precompile_module_template.go",
     ],
@@ -14,7 +16,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/subnet-evm/accounts/abi/bind",
-        "//graft/subnet-evm/accounts/abi/bind/precompilebind/templatetest",
         "//graft/subnet-evm/precompile/allowlist",
         "@com_github_ava_labs_libevm//accounts/abi",
     ],
