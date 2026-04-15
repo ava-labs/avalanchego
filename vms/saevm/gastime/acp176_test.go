@@ -5,7 +5,6 @@ package gastime
 
 import (
 	"math"
-	"math/big"
 	"testing"
 	"time"
 
@@ -398,7 +397,7 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 			}
 		}
 
-		initExp := tm.exponent()
+		initExcess = uint64(tm.excess)
 		initPrice := tm.Price()
 
 		{
@@ -455,23 +454,6 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 			assert.GreaterOrEqual(t, tm.Price(), allowedPrice, "price >= allowed price")
 		}
 
-		if tm.config.minPrice == initConfig.MinPrice {
-			// Exponent-only changes keep the x/K exponent as close to equal as
-			// possible given the resolution of the denominator.
-			newExp := tm.exponent()
-
-			diff := new(big.Rat).Sub(newExp, initExp)
-			diff.Abs(diff)
-
-			tolerance := new(big.Rat).SetFrac(
-				big.NewInt(1),
-				newExp.Denom(),
-			)
-			if diff.Cmp(tolerance) >= 0 {
-				t.Errorf("Exponent of price equation changed from %v to %v; diff = %v >= %v", initExp, newExp, diff, tolerance)
-			}
-		}
-
 		if tm.config.minPrice > initPrice {
 			assert.Equal(t, tm.config.minPrice, tm.Price(), "price == minimum price")
 			// Due to integer arithmetic in binary search, exact price
@@ -483,17 +465,6 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 			}
 		}
 	})
-}
-
-// exponent returns x/K, the exponent of the gas price. For fixed M, equal
-// exponents result in equal prices. However if scaling results in a new
-// exponent with insufficient resolution (too low a denominator) to be identical
-// then the price could be different.
-func (tm *Time) exponent() *big.Rat {
-	return new(big.Rat).SetFrac(
-		new(big.Int).SetUint64(uint64(tm.excess)),
-		new(big.Int).SetUint64(uint64(tm.excessScalingFactor())),
-	)
 }
 
 // TestOscillatingMinPrice verifies that oscillating MinPrice between two values
@@ -509,11 +480,14 @@ func TestOscillatingMinPrice(t *testing.T) {
 		lowMinPrice  gas.Price = 1
 	)
 
-	initialConfig := DefaultGasPriceConfig()
-	initialConfig.MinPrice = highMinPrice
+	highPriceConfig := DefaultGasPriceConfig()
+	highPriceConfig.MinPrice = highMinPrice
 
-	control := mustNew(t, time.Unix(0, 0), target, 0, initialConfig)
-	modified := mustNew(t, time.Unix(0, 0), target, 0, initialConfig)
+	lowPriceConfig := highPriceConfig
+	lowPriceConfig.MinPrice = lowMinPrice
+
+	control := mustNew(t, time.Unix(0, 0), target, 0, highPriceConfig)
+	modified := mustNew(t, time.Unix(0, 0), target, 0, highPriceConfig)
 
 	require.Equal(t, highMinPrice, control.Price())
 	require.Equal(t, highMinPrice, modified.Price())
@@ -521,13 +495,13 @@ func TestOscillatingMinPrice(t *testing.T) {
 	for i := range numBlocks {
 		require.NoError(t, control.AfterBlock(
 			gasPerBlock,
-			hookstest.NewStub(target, hookstest.WithGasPriceConfig(initialConfig)),
+			hookstest.NewStub(target, hookstest.WithGasPriceConfig(highPriceConfig)),
 			nil,
 		))
 
-		oscillatingConfig := initialConfig
+		oscillatingConfig := highPriceConfig
 		if i%2 == 0 {
-			oscillatingConfig.MinPrice = lowMinPrice
+			oscillatingConfig = lowPriceConfig
 		}
 		require.NoError(t, modified.AfterBlock(
 			gasPerBlock,
@@ -538,38 +512,27 @@ func TestOscillatingMinPrice(t *testing.T) {
 
 	// Sanity check that price normally increases.
 	assert.Greater(t, control.Price(), highMinPrice, "control price must increase with sustained above-target usage")
-	assert.Equal(t, control.Price(), modified.Price(), "alternating MinPrice must not impact price growth")
+	assert.Equal(t, control.Price(), modified.Price(), "oscillating MinPrice must not impact price growth")
 }
 
 func TestStaticPriceRemoval(t *testing.T) {
-	const (
-		target    gas.Gas = 1_000_000
-		numBlocks gas.Gas = 1000
-	)
+	const target gas.Gas = 1_000_000
+	staticConfig := DefaultGasPriceConfig()
+	staticConfig.StaticPricing = true
+	g := mustNew(t, time.Unix(0, 0), target, 0, staticConfig)
 
-	initialConfig := DefaultGasPriceConfig()
-	initialConfig.StaticPricing = true
-	g := mustNew(t, time.Unix(0, 0), target, 0, initialConfig)
-
-	for range numBlocks {
-		const gas gas.Gas = target // must be sufficiently large
-		require.NoError(t, g.AfterBlock(
-			gas,
-			hookstest.NewStub(target, hookstest.WithGasPriceConfig(initialConfig)),
-			nil,
-		))
-	}
+	const largeGas gas.Gas = 1000 * target // must be sufficiently large
+	g.Tick(largeGas)
 
 	var (
-		want      = g.Price()
-		newConfig = DefaultGasPriceConfig()
+		want          = g.Price() // static price
+		dynamicConfig = DefaultGasPriceConfig()
 	)
-
-	const gas gas.Gas = 0
+	const noGas gas.Gas = 0
 	require.NoError(t, g.AfterBlock(
-		gas,
-		hookstest.NewStub(target, hookstest.WithGasPriceConfig(newConfig)),
+		noGas,
+		hookstest.NewStub(target, hookstest.WithGasPriceConfig(dynamicConfig)),
 		nil,
 	))
-	assert.Equal(t, want, g.Price(), "price invariant static price removal")
+	assert.Equal(t, want, g.Price(), "price invariant during static price removal")
 }

@@ -65,8 +65,8 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig hook.GasPr
 	if cfg.staticPricing {
 		startingExcess = 0
 	}
-	k := t.excessScalingFactor()
-	t.excess = max(startingExcess, minPriceExcess(cfg.minPrice, k))
+	minExcess := priceExcess(cfg.minPrice, t.excessScalingFactor())
+	t.excess = max(startingExcess, minExcess)
 	return t, nil
 }
 
@@ -242,8 +242,6 @@ func (tm *Time) FastForwardTo(to uint64, toFrac gas.Gas) {
 
 	// -fT/R
 	quo, _, _ := intmath.MulDiv(frac.Numerator, T, R) // overflow is impossible as T/R < 1
-	tm.excess = intmath.BoundedSubtract(tm.excess, quo, 0)
-
-	minExcess := minPriceExcess(tm.config.minPrice, tm.excessScalingFactor())
-	tm.excess = max(tm.excess, minExcess)
+	minExcess := priceExcess(tm.config.minPrice, tm.excessScalingFactor())
+	tm.excess = intmath.BoundedSubtract(tm.excess, quo, minExcess)
 }

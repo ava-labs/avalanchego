@@ -27,6 +27,7 @@ func (tm *Time) BeforeBlock(hooks hook.Points, h *types.Header) {
 // target and gas configuration sourced from [hook.Points] and [types.Header].
 func (tm *Time) AfterBlock(used gas.Gas, hooks hook.Points, h *types.Header) error {
 	tm.Tick(used)
+
 	target, hookCfg := hooks.GasConfigAfter(h)
 	c, err := newConfig(hookCfg)
 	if err != nil {
@@ -57,17 +58,17 @@ func (tm *Time) setGasPriceConfig(target gas.Gas, c config) {
 	}
 
 	// x := max(x, ln(minPrice) * K' * T')
-	minExcess := minPriceExcess(c.minPrice, newK)
+	minExcess := priceExcess(c.minPrice, newK)
 	tm.excess = max(tm.excess, minExcess)
 }
 
-// minPriceExcess returns the lowest excess that produces minPrice, if one
-// exists. If the integer approximation in [calculatePrice] skips over minPrice,
-// it returns the maximum excess where the price is strictly less than minPrice.
+// priceExcess returns the lowest excess that produces p, if one exists. If the
+// integer approximation in [calculatePrice] skips over p, it returns the
+// maximum excess where the price is less than p.
 //
-// Mathematically, it is calculating: ln(minPrice) * k.
-func minPriceExcess(minPrice gas.Price, k gas.Gas) gas.Gas {
-	if minPrice <= 1 {
+// Mathematically, it returns ln(p) * k.
+func priceExcess(p gas.Price, k gas.Gas) gas.Gas {
+	if p <= 1 {
 		return 0
 	}
 	// Binary search for the minimum x where calculatePrice(x, k) >= minPrice.
@@ -76,7 +77,7 @@ func minPriceExcess(minPrice gas.Price, k gas.Gas) gas.Gas {
 	lo, hi := gas.Gas(1), gas.Gas(math.MaxUint64)
 	for lo < hi {
 		mid := lo + (hi-lo)/2
-		if calculatePrice(mid, k) >= minPrice {
+		if calculatePrice(mid, k) >= p {
 			hi = mid
 		} else {
 			lo = mid + 1
@@ -84,12 +85,13 @@ func minPriceExcess(minPrice gas.Price, k gas.Gas) gas.Gas {
 	}
 	// Ensure [Time.Price] can return minPrice even if the approximation can't
 	// represent it.
-	if calculatePrice(lo, k) == minPrice {
+	if calculatePrice(lo, k) == p {
 		return lo
 	}
 	return lo - 1
 }
 
+// calculatePrice returns an integer approximation of e^(x/k).
 func calculatePrice(x, k gas.Gas) gas.Price {
 	return gas.CalculatePrice(1, x, k)
 }
