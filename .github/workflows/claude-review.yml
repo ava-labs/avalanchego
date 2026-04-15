@@ -16,7 +16,7 @@ jobs:
       id-token: write # Required for OIDC authentication with Anthropic's API
     steps:
       - name: Checkout trusted prompt from master
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@v4
         with:
           ref: master
           sparse-checkout: agents/pr-review.md
@@ -31,10 +31,10 @@ jobs:
             cat trusted-prompt/agents/pr-review.md
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - uses: anthropics/claude-code-action@b47fd721da662d48c5680e154ad16a73ed74d2e0
+      - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
