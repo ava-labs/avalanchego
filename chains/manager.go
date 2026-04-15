@@ -1812,7 +1812,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("couldn't create simplex engine: %w", err)
 	}
 
-	bootstrapper := &simplex.TODOBootstrapper{
+	bootstrapper := &simplex.NoopBootstrapper{
 		BootstrapTracker: sb,
 		Engine:           engine,
 	}
@@ -1822,6 +1822,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		Chain: &handler.Engine{
 			Bootstrapper: bootstrapper,
 			Consensus:    engine,
+			StateSyncer:  nil, // a nil StateSyncer, skips StateSync in favor of the Bootstrapper.
 		},
 	})
 
