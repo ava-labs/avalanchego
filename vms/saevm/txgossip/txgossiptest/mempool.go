@@ -6,6 +6,7 @@ package txgossiptest
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -24,6 +25,11 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 	if len(txs) == 0 {
 		return
 	}
+	marshaled, err := json.MarshalIndent(txs[0], "", "  ")
+	if err != nil {
+		tb.Fatalf("marshal failed: %v", err)
+	}
+	tb.Logf("tx:\n%s", marshaled)
 
 	txCh := make(chan core.NewTxsEvent, 1) // size arbitrary
 	sub := pool.SubscribeTransactions(txCh, true /*reorgs but ignored by legacypool*/)
@@ -48,7 +54,7 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 
 	if s.Len() == 0 {
 		// already found all txs
-		tb.Logf("found tx first try: %+v", txs[0])
+		tb.Logf("found tx first try: %+x", txs[0].Hash())
 		return
 	}
 
@@ -57,7 +63,7 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 	for {
 		select {
 		case <-ctx.Done():
-			tb.Fatalf("%v waiting for %T.SubscribeTransactions(): %v", context.Cause(ctx), pool, s)
+			tb.Fatalf("%v waiting for %T.SubscribeTransactions()", context.Cause(ctx), pool)
 		case err := <-sub.Err():
 			tb.Fatalf("%T.SubscribeTransactions.Err() returned %v", pool, err)
 		case txEvent := <-txCh:
@@ -69,9 +75,7 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 				return
 			}
 		case <-ticker.C:
-			tb.Logf("still waiting for %T.SubscribeTransactions(): %+v", pool, txs[0])
-			pending, queued := pool.Stats()
-			tb.Logf("pending: %d, queued: %d", pending, queued)
+			tb.Logf("still waiting for %T.SubscribeTransactions(): %+x", pool, txs[0].Hash())
 			check()
 			if s.Len() == 0 {
 				tb.Log("exiting with ticker")
