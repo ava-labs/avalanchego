@@ -1,0 +1,55 @@
+name: CI
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  test:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Run bazel test in each workspace
+    strategy:
+      matrix:
+        folder:
+          - "."
+          - "e2e/workspace"
+          - "e2e/fake_remote_repo"
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+      # Cache build and external artifacts so that the next ci build is incremental.
+      # Because github action caches cannot be updated after a build, we need to
+      # store the contents of each build in a unique cache key, then fall back to loading
+      # it on the next ci run. We use hashFiles(...) in the key and restore-keys- with
+      # the prefix to load the most recent cache for the branch on a cache miss. You
+      # should customize the contents of hashFiles to capture any bazel input sources,
+      # although this doesn't need to be perfect. If none of the input sources change
+      # then a cache hit will load an existing cache and bazel won't have to do any work.
+      # In the case of a cache miss, you want the fallback cache to contain most of the
+      # previously built artifacts to minimize build time. The more precise you are with
+      # hashFiles sources the less work bazel will have to do.
+      - name: Mount bazel caches
+        uses: actions/cache@v3
+        with:
+          path: |
+            "~/.cache/bazel"
+            "~/.cache/bazel-repo"
+          key: bazel-cache-${{ hashFiles('**/BUILD.bazel', '**/*.bzl', 'WORKSPACE') }}
+          restore-keys: bazel-cache-
+      - name: bazel test //...
+        env:
+          # Bazelisk will download bazel to here, ensure it is cached between runs.
+          XDG_CACHE_HOME: ~/.cache/bazel-repo
+        working-directory: ${{ matrix.folder }}
+        run: bazel --bazelrc=$GITHUB_WORKSPACE/.github/workflows/ci.bazelrc --bazelrc=.bazelrc test //...

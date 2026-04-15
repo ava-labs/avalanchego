@@ -1,0 +1,27 @@
+"""Example of building your own solidity support.
+
+Most users should use the sol_* rules distributed in this module.
+However, by using Bazel's toolchains feature, you can get access to the solidity compiler.
+"""
+
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load(":sol.bzl", "my_sol_macro")
+load("@bazel_skylib//rules:build_test.bzl", "build_test")
+
+my_sol_macro(
+    name = "run",
+    srcs = ["HelloWorld.sol"],
+    solc_version = "0.8.9",
+)
+
+# Just verify that the above target builds
+build_test(
+    name = "test",
+    targets = [":run"],
+)
+
+bzl_library(
+    name = "sol",
+    srcs = ["sol.bzl"],
+    visibility = ["//visibility:public"],
+)

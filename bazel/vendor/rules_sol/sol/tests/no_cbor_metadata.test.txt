@@ -1,0 +1,4 @@
+{
+  "appendCBOR": false,
+  "bytecodeHash": "ipfs"
+}

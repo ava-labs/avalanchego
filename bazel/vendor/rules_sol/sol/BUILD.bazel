@@ -1,0 +1,50 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+
+# For stardoc to reference the files
+exports_files(["defs.bzl"])
+
+# This is the target rule authors should put in their "toolchains"
+# attribute in order to get a runtime for the correct platform.
+# See https://docs.bazel.build/versions/main/toolchains.html#writing-rules-that-use-toolchains
+toolchain_type(
+    name = "toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+bzl_library(
+    name = "repositories",
+    srcs = ["repositories.bzl"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//sol/private:toolchains_repo",
+        "//sol/private:versions",
+        "@bazel_tools//tools/build_defs/repo:http.bzl",
+        "@bazel_tools//tools/build_defs/repo:utils.bzl",
+    ],
+)
+
+bzl_library(
+    name = "defs",
+    srcs = ["defs.bzl"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//sol/private:sol_binary",
+        "//sol/private:sol_imports",
+        "//sol/private:sol_remappings",
+        "//sol/private:sol_remappings_info",
+    ],
+)
+
+bzl_library(
+    name = "providers",
+    srcs = ["providers.bzl"],
+    visibility = ["//visibility:public"],
+    deps = ["//sol/private:sol_remappings_info"],
+)
+
+bzl_library(
+    name = "toolchain",
+    srcs = ["toolchain.bzl"],
+    visibility = ["//visibility:public"],
+    deps = ["//sol/private:versions"],
+)

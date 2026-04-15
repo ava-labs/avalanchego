@@ -1,0 +1,80 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@bazel_skylib//rules:common_settings.bzl", "string_setting")
+load(":versions.bzl", "LATEST_VERSION", "TOOL_VERSIONS")
+load(":utils.bzl", "normalize_version_string")
+
+string_setting(
+    name = "solc_version",
+    build_setting_default = LATEST_VERSION,
+    visibility = ["//visibility:public"],
+)
+
+[
+    config_setting(
+        name = "solc_version_{}".format(normalize_version_string(version)),
+        flag_values = {":solc_version": version},
+        visibility = ["//visibility:public"],
+    )
+    # NB: this assumes that the keys of any element of TOOL_VERSIONS are the same,
+    # so we can use an arbitrary one like "linux-amd64".
+    for version in TOOL_VERSIONS["linux-amd64"].keys()
+]
+
+bzl_library(
+    name = "sol_binary",
+    srcs = ["sol_binary.bzl"],
+    visibility = ["//sol:__subpackages__"],
+    deps = [
+        "//sol:providers",
+        "@aspect_rules_js//js:libs",
+        "@aspect_rules_js//js:providers",
+        "@bazel_skylib//lib:paths",
+        "@bazel_skylib//lib:versions",
+    ],
+)
+
+bzl_library(
+    name = "sol_remappings",
+    srcs = ["sol_remappings.bzl"],
+    visibility = ["//sol:__subpackages__"],
+    deps = [
+        "//sol:providers",
+        "@aspect_bazel_lib//lib:write_source_files",
+    ],
+)
+
+bzl_library(
+    name = "sol_imports",
+    srcs = ["sol_imports.bzl"],
+    visibility = ["//sol:__subpackages__"],
+    deps = [
+        "//sol:providers",
+        "@aspect_rules_js//js:libs",
+        "@aspect_rules_js//js:providers",
+    ],
+)
+
+bzl_library(
+    name = "sol_remappings_info",
+    srcs = ["sol_remappings_info.bzl"],
+    visibility = ["//sol:__subpackages__"],
+)
+
+bzl_library(
+    name = "toolchains_repo",
+    srcs = ["toolchains_repo.bzl"],
+    visibility = ["//sol:__subpackages__"],
+    deps = [":utils"],
+)
+
+bzl_library(
+    name = "utils",
+    srcs = ["utils.bzl"],
+    visibility = ["//sol:__subpackages__"],
+)
+
+bzl_library(
+    name = "versions",
+    srcs = ["versions.bzl"],
+    visibility = ["//sol:__subpackages__"],
+)

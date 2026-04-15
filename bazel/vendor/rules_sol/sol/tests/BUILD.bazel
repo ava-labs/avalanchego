@@ -1,0 +1,25 @@
+load(":sol_binary_test.bzl", "sol_binary_test_suite", "solc_no_metdata_test", "solc_optimizer_test", "solc_version_test")
+
+sol_binary_test_suite(name = "sol_binary_test")
+
+[solc_version_test(version = v) for v in [
+    "0.7.6",
+    "0.8.9",
+]]
+
+[solc_optimizer_test(
+    optimize = True,
+    optimize_runs = runs,
+) for runs in [
+    42,
+    1337,
+]]
+
+solc_optimizer_test(
+    optimize = False,
+)
+
+[solc_no_metdata_test(no_cbor_metadata = b) for b in [
+    True,
+    False,
+]]

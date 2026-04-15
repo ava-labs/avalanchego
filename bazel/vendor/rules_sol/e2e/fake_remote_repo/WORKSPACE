@@ -1,0 +1,22 @@
+# Override http_archive for local testing
+local_repository(
+    name = "aspect_rules_sol",
+    path = "../..",
+)
+
+######################
+# rules_sol setup    #
+######################
+load("@aspect_rules_sol//sol:repositories.bzl", "LATEST_VERSION", "rules_sol_dependencies", "sol_register_toolchains")
+
+# Fetches the rules_sol dependencies.
+# If you want to have a different version of some dependency,
+# you should fetch it *before* calling this.
+# Alternatively, you can skip calling this function, so long as you've
+# already fetched all the dependencies.
+rules_sol_dependencies()
+
+sol_register_toolchains(
+    name = "solc",
+    sol_version = LATEST_VERSION,
+)

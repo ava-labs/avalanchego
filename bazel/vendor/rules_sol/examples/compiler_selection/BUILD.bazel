@@ -1,0 +1,8 @@
+load("@aspect_rules_sol//sol:defs.bzl", "sol_binary")
+
+sol_binary(
+    name = "old",
+    srcs = ["Older.sol"],
+    no_cbor_metadata = False,  # Not supported by versions <0.8.18
+    solc_version = "0.7.6",
+)

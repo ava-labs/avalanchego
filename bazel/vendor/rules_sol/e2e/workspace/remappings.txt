@@ -1,0 +1,4 @@
+extra-prefix/=path/to/extra/
+indirect-remapping/=propagated-by-using-sol_imports-as-src/
+remapped-fake-remote-repo/=./external/fake_remote_repo/
+alternate-remapped-fake-remote-repo/=./external/fake_remote_repo/

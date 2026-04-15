@@ -1,0 +1,8 @@
+load("@aspect_rules_sol//sol:defs.bzl", "sol_binary")
+
+sol_binary(
+    name = "contracts",
+    srcs = ["Signer.sol"],
+    bin = True,
+    deps = ["//examples/npm_deps/utils"],
+)
