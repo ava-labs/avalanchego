@@ -618,7 +618,7 @@ func TestMempoolTxGetters(t *testing.T) {
 		GasFeeCap: big.NewInt(1),
 	})
 	sut.mustSendTx(t, mempoolTx)
-	sut.syncMempool(t)
+	sut.waitUntilTxsPending(t, mempoolTx)
 
 	marshaled, err := mempoolTx.MarshalBinary()
 	require.NoErrorf(t, err, "%T.MarshalBinary()", mempoolTx)
