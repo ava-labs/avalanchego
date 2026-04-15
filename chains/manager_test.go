@@ -5,6 +5,7 @@ package chains
 
 import (
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -29,6 +31,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
 // startChainCreatorNoPChain is used for testing to bypass setting up the pchain
@@ -97,14 +101,24 @@ func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 	return subnets
 }
 
+func newTestVMManager(t *testing.T, vmID ids.ID) *vms.Manager {
+	vmManager := vms.NewManager(logging.NoLog{}, ids.NewAliaser())
+	require.NoError(t, vmManager.RegisterFactory(t.Context(), vmID, &xsvm.Factory{}))
+	return vmManager
+}
+
 func TestCreateSimplexChain(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
+	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{})
+	require.NoError(t, err)
+
 	chainParams := ChainParameters{
-		ID:       ids.GenerateTestID(),
-		SubnetID: ids.GenerateTestID(),
-		VMID:     ids.GenerateTestID(),
+		ID:          ids.GenerateTestID(),
+		SubnetID:    ids.GenerateTestID(),
+		VMID:        ids.GenerateTestID(),
+		GenesisData: genesisBytes,
 	}
-	logger := logging.NoLog{}
+	logger := logging.NewLogger("test", logging.NewWrappedCore(logging.Debug, os.Stdout, logging.Plain.ConsoleEncoder()))
 	subnets := newTestSubnets(t, chainParams.SubnetID)
 	signer, err := localsigner.New()
 	require.NoError(t, err)
@@ -142,7 +156,7 @@ func TestCreateSimplexChain(t *testing.T) {
 			LoggerName: "chain_logger",
 		}),
 
-		VMManager:  vms.NewManager(logging.NoLog{}, ids.NewAliaser()),
+		VMManager:  newTestVMManager(t, chainParams.VMID),
 		Validators: validators,
 
 		// For handler initialization
@@ -153,6 +167,9 @@ func TestCreateSimplexChain(t *testing.T) {
 		// For health check
 		Health: healthChecker,
 
+		// Database
+		DB: memdb.New(),
+
 		// Register the chain with router and timeout manager
 		TimeoutManager: tm,
 		Router:         router,
@@ -160,7 +177,6 @@ func TestCreateSimplexChain(t *testing.T) {
 
 	chainManager, err := New(managerConfig)
 	require.NoError(t, err)
-
 	chainManager.(*manager).startChainCreatorNoPChain()
 
 	// Queue chain creation

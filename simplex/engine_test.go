@@ -427,6 +427,7 @@ var (
 	canotoBlock = &canotoSimplexBlock{
 		Metadata:   blockMetadata.Bytes(),
 		InnerBlock: []byte("inner-block"),
+		Blacklist:  emptyBlacklist.Bytes(),
 	}
 
 	blockBytes = canotoBlock.MarshalCanoto()

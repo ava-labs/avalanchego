@@ -1735,7 +1735,6 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.Initializing,
 	})
-
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 	m.Log.Info("creating simplex chain", zap.String("chain", primaryAlias))
 
@@ -1816,7 +1815,6 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		BootstrapTracker: sb,
 		Engine:           engine,
 	}
-
 	h.SetEngineManager(&handler.EngineManager{
 		DAG: nil,
 		Chain: &handler.Engine{
