@@ -75,6 +75,8 @@ func TestMain(m *testing.M) {
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/state/snapshot.(*diskLayer).generate"),
 		// TxPool.Close() doesn't wait for its loop() method to signal termination.
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/txpool.(*TxPool).loop.func2"),
+		// All filters subscriptions can't be closed after the TxPool is closed.
+		goleak.IgnoreAnyFunction("github.com/ava-labs/libevm/eth/filters.(*Subscription).Unsubscribe"),
 	)
 }
 
