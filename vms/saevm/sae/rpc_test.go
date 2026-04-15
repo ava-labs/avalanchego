@@ -904,15 +904,15 @@ func TestGetReceipts(t *testing.T) {
 			want: wantUnsettled,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //nolint:gosec // Test block heights won't overflow
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())),
 			want: wantOnDisk,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //nolint:gosec // Test block heights won't overflow
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())),
 			want: wantSettled,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //nolint:gosec // Test block heights won't overflow
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())),
 			want: wantUnsettled,
 		},
 		{
