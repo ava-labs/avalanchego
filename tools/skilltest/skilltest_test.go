@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -52,6 +53,12 @@ func TestReadSkillFile_Absolute(t *testing.T) {
 	require.Equal(t, expected, content)
 }
 
+func TestResolveSkillFilePath_Absolute(t *testing.T) {
+	got, err := resolveSkillFilePath("/nonexistent/SKILL.md")
+	require.NoError(t, err)
+	require.Equal(t, "/nonexistent/SKILL.md", got)
+}
+
 func TestReadSkillFile_Missing(t *testing.T) {
 	_, err := readSkillFile("/nonexistent/SKILL.md")
 	require.ErrorIs(t, err, fs.ErrNotExist)
@@ -61,6 +68,17 @@ func TestReadSkillFile_Missing(t *testing.T) {
 // TestReadSkillFile_Relative tests relative path resolution.
 // readSkillFile uses runtime.Caller(3) to find the caller's file,
 // so we simulate the real call depth: test -> depth1 -> depth2 -> readSkillFile.
+func TestResolveSkillFilePath_Relative(t *testing.T) {
+	got, err := resolveSkillFilePathAtDepth3("../../go.mod")
+	require.NoError(t, err)
+	require.True(t, filepath.IsAbs(got))
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	expected := filepath.Join(filepath.Dir(currentFile), "..", "..", "go.mod")
+	require.Equal(t, filepath.Clean(expected), filepath.Clean(got))
+}
+
 func TestReadSkillFile_Relative(t *testing.T) {
 	// This test file lives in tools/skilltest/, so "../../go.mod" should
 	// resolve to the repo root go.mod.
@@ -81,6 +99,16 @@ func readSkillFileAtDepth3(path string) (string, error) {
 //go:noinline
 func readSkillFileDepth2(path string) (string, error) {
 	return readSkillFile(path)
+}
+
+//go:noinline
+func resolveSkillFilePathAtDepth3(path string) (string, error) {
+	return resolveSkillFilePathDepth2(path)
+}
+
+//go:noinline
+func resolveSkillFilePathDepth2(path string) (string, error) {
+	return resolveSkillFilePath(path)
 }
 
 func TestFilteredEnv_RemovesClaudeVars(t *testing.T) {

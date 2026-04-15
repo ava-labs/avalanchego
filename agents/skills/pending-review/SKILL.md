@@ -1,11 +1,11 @@
 ---
 name: pending-review
-description: Use when the user wants to create, read, update, or delete their GitHub pending review through the repo-local `gh-pending-review` tool as part of a human-in-the-loop PR review workflow. This skill covers top-level review body iteration, inline comment replacement, and local state inspection, but never review submission.
+description: Use when the user wants to create, read, update, or delete their GitHub pending review through the skill-bundled `gh-pending-review` launcher as part of a human-in-the-loop PR review workflow. This skill covers top-level review body iteration, inline comment replacement, and local state inspection, but never review submission.
 ---
 
 # Pending Review
 
-Use the repo-local `gh-pending-review` tool to manipulate the authenticated
+Use the skill-bundled `gh-pending-review` launcher to manipulate the authenticated
 user's pending GitHub review on `ava-labs/avalanchego`.
 
 ## When To Use
@@ -31,11 +31,24 @@ Do not use this skill for:
 
 ## Tool Boundary
 
-Use the repo-local launcher:
+Use the skill-bundled launcher, not a repo-local launcher from the current
+working repository.
+
+Resolve the launcher like this:
 
 ```bash
-./bin/gh-pending-review
+launcher="${SKILLTEST_SKILL_DIR:-<path-to-skill>}/scripts/gh-pending-review"
 ```
+
+Notes:
+- In native skill runtimes, replace `<path-to-skill>` with the absolute path to
+  this skill directory and use that bundled script.
+- In `skilltest` runs, `SKILLTEST_SKILL_DIR` is set automatically and points to
+  this skill directory, so the same launcher expression works without needing a
+  repo-local `./bin/gh-pending-review`.
+- Do not swap this out for `./bin/gh-pending-review` from the current working
+  repository unless the user explicitly asks you to bypass the skill-bundled
+  launcher.
 
 This tool is only the GitHub pending review interface. Keep instruction
 interpretation, review drafting, and reconciliation in the agent, not in the
@@ -43,7 +56,7 @@ tool.
 
 For routine pending-review work, stay at the CLI boundary:
 
-- use `./bin/gh-pending-review`
+- use `"$launcher"`
 - write any temporary body or comments payloads you need
 - do not inspect or modify `tools/pendingreview`, tests, or other repo source
   just to complete a normal pending-review task
@@ -102,7 +115,7 @@ Token-efficiency defaults:
 When the user asks to post a pending review body:
 
 ```bash
-./bin/gh-pending-review create --pr <number> --body-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
+"$launcher" create --pr <number> --body-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 Use `--body` instead of `--body-file` only when the body is short enough to be
@@ -116,7 +129,7 @@ When the user says they edited the review in GitHub or wants the current draft
 state:
 
 ```bash
-./bin/gh-pending-review get --pr <number> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
+"$launcher" get --pr <number> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review"
 ```
 
 Read the returned JSON and inspect:
@@ -145,7 +158,7 @@ selector.
 If the user wants you to revise only the top-level review body:
 
 ```bash
-./bin/gh-pending-review update-body --pr <number> --body-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
+"$launcher" update-body --pr <number> --body-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 Use `--force` only after reading the current pending review and intentionally
@@ -157,7 +170,7 @@ Prefer `upsert-comment` when the user wants to revise exactly one managed
 new-thread comment and you do not need to reconstruct unrelated comments:
 
 ```bash
-./bin/gh-pending-review upsert-comment --pr <number> --path <path> --line <line> --side RIGHT --body-file <path> --create-if-missing --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
+"$launcher" upsert-comment --pr <number> --path <path> --line <line> --side RIGHT --body-file <path> --create-if-missing --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 Use `--comment-id` instead of an anchor when the user identified the exact draft
@@ -179,7 +192,7 @@ If the user wants to replace the current managed inline comment set, write the
 desired comments to a JSON file and apply them with:
 
 ```bash
-./bin/gh-pending-review replace-comments --pr <number> --comments-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
+"$launcher" replace-comments --pr <number> --comments-file <path> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 Prefer a simple temp file write such as a heredoc over complex shell quoting or
@@ -199,7 +212,7 @@ cat >"$tmp" <<'EOF'
   }
 ]
 EOF
-./bin/gh-pending-review replace-comments --pr <number> --comments-file "$tmp" --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
+"$launcher" replace-comments --pr <number> --comments-file "$tmp" --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 rc=$?
 rm -f "$tmp"
 exit $rc
@@ -297,8 +310,8 @@ read-only fields such as reply comment IDs inherited from `get`.
 Use local-only state commands for inspection or recovery:
 
 ```bash
-./bin/gh-pending-review get-state --pr <number> --user <github-login> --state-dir "$HOME/.local/state/gh-pending-review"
-./bin/gh-pending-review delete-state --pr <number> --user <github-login> --state-dir "$HOME/.local/state/gh-pending-review"
+"$launcher" get-state --pr <number> --user <github-login> --state-dir "$HOME/.local/state/gh-pending-review"
+"$launcher" delete-state --pr <number> --user <github-login> --state-dir "$HOME/.local/state/gh-pending-review"
 ```
 
 These commands do not talk to GitHub and do not mutate pending reviews.
@@ -308,7 +321,7 @@ These commands do not talk to GitHub and do not mutate pending reviews.
 If the instruction is to remove the pending review entirely:
 
 ```bash
-./bin/gh-pending-review delete --pr <number> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
+"$launcher" delete --pr <number> --config-dir "$HOME/.config/gh-pending-review" --state-dir "$HOME/.local/state/gh-pending-review" --json
 ```
 
 If the goal is "make sure no pending review is left behind" in one command, use

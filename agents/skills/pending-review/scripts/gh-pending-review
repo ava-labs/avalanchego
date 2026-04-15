@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
+skill_dir=$(cd "${script_dir}/.." && pwd)
+repo_root=$(cd "${skill_dir}/../../.." && pwd)
+
+if [[ -n "${PENDING_REVIEW_LAUNCHER_OVERRIDE:-}" ]]; then
+  exec "${PENDING_REVIEW_LAUNCHER_OVERRIDE}" "$@"
+fi
+
+if command -v gh-pending-review >/dev/null 2>&1; then
+  exec gh-pending-review "$@"
+fi
+
+if [[ -x "${repo_root}/bin/gh-pending-review" ]]; then
+  exec "${repo_root}/bin/gh-pending-review" "$@"
+fi
+
+cd "${repo_root}"
+exec "${repo_root}/scripts/nix_run.sh" go run ./tools/pendingreview/cmd "$@"

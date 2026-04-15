@@ -1360,8 +1360,7 @@ func TestPendingReviewReplaceCommentsWithThreadReplyEndToEnd(t *testing.T) {
 				WorkDir:   repoRoot,
 				Prompt: "Write a comments file containing exactly " +
 					`[{"kind":"thread_reply","thread_id":"thread-42","body":"new reply"}] ` +
-					"and use the repo-local ./bin/gh-pending-review replace-comments command " +
-					"to replace the current managed pending review comments on PR 123. " +
+					"and use the pending-review launcher to replace the current managed pending review comments on PR 123. " +
 					"Keep the existing top-level review body unchanged. " +
 					`Use --config-dir "$XDG_CONFIG_HOME/gh-pending-review" and ` +
 					`--state-dir "$XDG_STATE_HOME/gh-pending-review". ` +
