@@ -29,11 +29,13 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	cmath "github.com/ava-labs/libevm/common/math"
 	libevmcore "github.com/ava-labs/libevm/core"
@@ -79,6 +81,114 @@ func (result *ExecutionResult) Revert() []byte {
 		return nil
 	}
 	return common.CopyBytes(result.ReturnData)
+}
+
+// legacyIntrinsicGas is the original Subnet-EVM implementation of IntrinsicGas.
+// It is preserved here (unexported) to verify that libevm/core.IntrinsicGas
+// with hooks produces identical results. This function should not be used
+// in production code - use libevmcore.IntrinsicGas instead.
+func legacyIntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, rules params.Rules) (uint64, error) {
+	var gas uint64
+	if isContractCreation && rules.IsHomestead {
+		gas = ethparams.TxGasContractCreation
+	} else {
+		gas = ethparams.TxGas
+	}
+	dataLen := uint64(len(data))
+	// Bump the required gas by the amount of transactional data
+	if dataLen > 0 {
+		// Zero and non-zero bytes are priced differently
+		var nz uint64
+		for _, byt := range data {
+			if byt != 0 {
+				nz++
+			}
+		}
+		// Make sure we don't exceed uint64 for all data combinations
+		nonZeroGas := ethparams.TxDataNonZeroGasFrontier
+		if rules.IsIstanbul {
+			nonZeroGas = ethparams.TxDataNonZeroGasEIP2028
+		}
+		if (math.MaxUint64-gas)/nonZeroGas < nz {
+			return 0, ErrGasUintOverflow
+		}
+		gas += nz * nonZeroGas
+
+		z := dataLen - nz
+		if (math.MaxUint64-gas)/ethparams.TxDataZeroGas < z {
+			return 0, ErrGasUintOverflow
+		}
+		gas += z * ethparams.TxDataZeroGas
+
+		if isContractCreation && params.GetRulesExtra(rules).IsDurango {
+			lenWords := toWordSize(dataLen)
+			if (math.MaxUint64-gas)/ethparams.InitCodeWordGas < lenWords {
+				return 0, ErrGasUintOverflow
+			}
+			gas += lenWords * ethparams.InitCodeWordGas
+		}
+	}
+	if accessList != nil {
+		accessListGas, err := accessListGas(rules, accessList)
+		if err != nil {
+			return 0, err
+		}
+		totalGas, overflow := cmath.SafeAdd(gas, accessListGas)
+		if overflow {
+			return 0, ErrGasUintOverflow
+		}
+		gas = totalGas
+	}
+
+	return gas, nil
+}
+
+func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, error) {
+	var gas uint64
+	rulesExtra := params.GetRulesExtra(rules)
+	if !rulesExtra.PredicatersExist() {
+		gas += uint64(len(accessList)) * ethparams.TxAccessListAddressGas
+		gas += uint64(accessList.StorageKeys()) * ethparams.TxAccessListStorageKeyGas
+		return gas, nil
+	}
+
+	for _, accessTuple := range accessList {
+		address := accessTuple.Address
+		predicaterContract, ok := rulesExtra.Predicaters[address]
+		if !ok {
+			// Previous access list gas calculation does not use safemath because an overflow would not be possible with
+			// the size of access lists that could be included in a block and standard access list gas costs.
+			// Therefore, we only check for overflow when adding to [totalGas], which could include the sum of values
+			// returned by a predicate.
+			accessTupleGas := ethparams.TxAccessListAddressGas + uint64(len(accessTuple.StorageKeys))*ethparams.TxAccessListStorageKeyGas
+			totalGas, overflow := cmath.SafeAdd(gas, accessTupleGas)
+			if overflow {
+				return 0, ErrGasUintOverflow
+			}
+			gas = totalGas
+		} else {
+			predicateGas, err := predicaterContract.PredicateGas(predicate.Predicate(accessTuple.StorageKeys), rulesExtra)
+			if err != nil {
+				return 0, err
+			}
+			totalGas, overflow := cmath.SafeAdd(gas, predicateGas)
+			if overflow {
+				return 0, ErrGasUintOverflow
+			}
+			gas = totalGas
+		}
+	}
+
+	return gas, nil
+}
+
+// toWordSize returns the ceiled word size required for init code payment calculation.
+func toWordSize(size uint64) uint64 {
+	if size > math.MaxUint64-31 {
+		return math.MaxUint64/32 + 1
+	}
+
+	return (size + 31) / 32
 }
 
 // A Message contains the data derived from a single transaction that is relevant to state

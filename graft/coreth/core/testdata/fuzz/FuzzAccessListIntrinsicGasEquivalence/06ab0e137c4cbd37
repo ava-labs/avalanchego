@@ -1,0 +1,7 @@
+go test fuzz v1
+byte('W')
+[]byte("1")
+[]byte("00000000000000000000000000000000")
+uint16(1)
+[]byte("0")
+bool(false)
