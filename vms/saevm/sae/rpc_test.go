@@ -612,34 +612,60 @@ func TestEthGetters(t *testing.T) {
 func TestMempoolTxGetters(t *testing.T) {
 	ctx, sut := newSUT(t, 1, withDebugAPI())
 
-	mempoolTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+	// These RPC methods use GetPoolTransaction, which returns any transaction
+	// accepted into the pool regardless of pending/queued status. A
+	// transaction only needs to have been accepted by the pool (i.e.
+	// mustSendTx succeeds) to be returned.
+	pendingTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &zeroAddr,
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.mustSendTx(t, mempoolTx)
-	sut.waitUntilTxsPending(t, mempoolTx)
+	// Skip nonce 1 to create a gap so queuedTx (nonce 2) is accepted into
+	// the pool but not marked as pending.
+	sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	queuedTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.mustSendTx(t, pendingTx, queuedTx)
+	sut.waitUntilTxsPending(t, pendingTx)
 
-	marshaled, err := mempoolTx.MarshalBinary()
-	require.NoErrorf(t, err, "%T.MarshalBinary()", mempoolTx)
+	for _, tt := range []struct {
+		name string
+		tx   *types.Transaction
+	}{
+		{"pending", pendingTx},
+		{"queued", queuedTx},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			marshaled, err := tt.tx.MarshalBinary()
+			require.NoErrorf(t, err, "%T.MarshalBinary()", tt.tx)
 
-	sut.testRPC(ctx, t, []rpcTest{
-		{
-			method: "eth_getTransactionByHash",
-			args:   []any{mempoolTx.Hash()},
-			want:   mempoolTx,
-		},
-		{
-			method: "eth_getRawTransactionByHash",
-			args:   []any{mempoolTx.Hash()},
-			want:   hexutil.Bytes(marshaled),
-		},
-		{
-			method: "debug_getRawTransaction",
-			args:   []any{mempoolTx.Hash()},
-			want:   hexutil.Bytes(marshaled),
-		},
-	}...)
+			sut.testRPC(ctx, t, []rpcTest{
+				{
+					method: "eth_getTransactionByHash",
+					args:   []any{tt.tx.Hash()},
+					want:   tt.tx,
+				},
+				{
+					method: "eth_getRawTransactionByHash",
+					args:   []any{tt.tx.Hash()},
+					want:   hexutil.Bytes(marshaled),
+				},
+				{
+					method: "debug_getRawTransaction",
+					args:   []any{tt.tx.Hash()},
+					want:   hexutil.Bytes(marshaled),
+				},
+			}...)
+		})
+	}
 }
 
 func TestGetLogs(t *testing.T) {
