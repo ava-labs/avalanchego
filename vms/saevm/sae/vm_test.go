@@ -67,7 +67,7 @@ func TestMain(m *testing.M) {
 	createWorstCaseFuzzFlags(flag.CommandLine)
 	flag.Parse()
 
-	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelError, true)))
+	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelTrace, true)))
 
 	goleak.VerifyTestMain(
 		m,
