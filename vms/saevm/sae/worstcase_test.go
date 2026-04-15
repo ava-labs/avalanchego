@@ -233,6 +233,8 @@ func TestWorstCase(t *testing.T) {
 					sut.waitUntilTxsPending(t, tx)
 				}
 
+				t.Log("building block")
+
 				for accepted := false; !accepted; {
 					vmTime.advance(time.Millisecond * time.Duration(rng.IntN(1000*3*saeparams.TauSeconds)))
 
