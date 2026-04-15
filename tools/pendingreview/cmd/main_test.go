@@ -4,11 +4,15 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/tools/pendingreview"
 )
 
 func TestMainPrintsStackTraceWhenEnabled(t *testing.T) {
@@ -32,4 +36,11 @@ func TestMainPrintsStackTraceWhenEnabled(t *testing.T) {
 	require.Contains(t, stderr, "missing command")
 	require.Contains(t, stderr, "Stack trace:")
 	require.Contains(t, stderr, "/tools/pendingreview/cmd/main.go:")
+}
+
+func TestRunServeProxyRejectsUnexpectedArgs(t *testing.T) {
+	var stdout bytes.Buffer
+
+	err := run(context.Background(), []string{"serve-proxy", "extra"}, bytes.NewReader(nil), &stdout, &stdout)
+	require.EqualError(t, err, "unexpected trailing arguments: [extra]\n\n"+pendingreview.Usage())
 }

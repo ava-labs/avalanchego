@@ -57,6 +57,60 @@ Intentionally out of scope:
 - approve or request-changes flows
 - generic GitHub write operations outside pending review endpoints
 
+## Proxy Mode
+
+Proxy mode is for running `gh-pending-review` from an unprivileged client that
+should not hold a reusable GitHub write token.
+
+Security model:
+
+- the client may manage pending reviews, but must not receive a reusable
+  GitHub write token
+- the proxy exposes only the pending-review command surface, not generic GitHub
+  write access
+- the proxy keeps GitHub auth and local pending-review state on the machine
+  where it runs
+
+Client behavior:
+
+- set `GH_PENDING_REVIEW_PROXY_URL=http://127.0.0.1:PORT`
+- invoke the normal `gh-pending-review` commands unchanged
+- the client resolves `--body-file`, `--comments-file`, and
+  `--review-body-file` locally before sending the request
+
+Proxy behavior:
+
+- run `gh-pending-review serve-proxy`
+- the proxy binds to loopback only and accepts only the supported
+  pending-review command set
+- the proxy uses local `GH_PENDING_REVIEW_CONFIG_DIR` and
+  `GH_PENDING_REVIEW_STATE_DIR`
+- the proxy defaults to allowing only `ava-labs/avalanchego`; override with
+  `GH_PENDING_REVIEW_PROXY_ALLOWED_REPO`
+
+Typical remote deployment shape:
+
+- run the proxy on a trusted machine, bound to `127.0.0.1`
+- expose it to the client through an SSH-forwarded localhost port
+- point the client at the forwarded URL with `GH_PENDING_REVIEW_PROXY_URL`
+
+Example proxy invocation:
+
+```bash
+GH_PENDING_REVIEW_CONFIG_DIR="$HOME/.config/gh-pending-review" \
+GH_PENDING_REVIEW_STATE_DIR="$HOME/.local/state/gh-pending-review" \
+gh-pending-review serve-proxy --addr 127.0.0.1:18080
+```
+
+Relevant env vars:
+
+- `GH_PENDING_REVIEW_PROXY_URL`: client-side proxy base URL
+- `GH_PENDING_REVIEW_PROXY_LISTEN_ADDR`: default listen address for
+  `serve-proxy` when `--addr` is not provided
+- `GH_PENDING_REVIEW_PROXY_ALLOWED_REPO`: proxy-side allowed repo override
+- `GH_PENDING_REVIEW_CONFIG_DIR`: proxy-side isolated GitHub auth dir
+- `GH_PENDING_REVIEW_STATE_DIR`: proxy-side draft review state dir
+
 ## Auth Boundary
 
 Normal `gh` usage on this machine may be read-only through ambient token
@@ -99,6 +153,7 @@ Use a GitHub account with the repo access needed to create pending reviews.
 ## Command Surface
 
 ```text
+gh-pending-review serve-proxy [--addr 127.0.0.1:18080]
 gh-pending-review create --pr NUMBER [--repo OWNER/REPO] (--body TEXT | --body-file PATH) [--config-dir DIR] [--state-dir DIR] [--json]
 gh-pending-review delete --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--ensure-absent] [--json]
 gh-pending-review get --pr NUMBER [--repo OWNER/REPO] [--config-dir DIR] [--state-dir DIR] [--pretty]
@@ -112,6 +167,7 @@ gh-pending-review version
 
 Notes:
 
+- `serve-proxy` binds to loopback only and serves `POST /pending-review`
 - the tool only operates on pending reviews owned by the authenticated user
 - `create` and `update-body` require exactly one of `--body` or `--body-file`
 - `replace-comments` requires `--comments-file`

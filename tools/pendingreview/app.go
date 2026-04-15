@@ -26,6 +26,7 @@ type App struct {
 	tokenProvider TokenProvider
 	httpClient    HTTPDoer
 	baseURL       string
+	proxyURL      string
 	log           logging.Logger
 }
 
@@ -42,6 +43,7 @@ func NewApp(stdin io.Reader, stdout io.Writer, stderr io.Writer) *App {
 		tokenProvider: NewGHTokenProvider(log),
 		httpClient:    DefaultHTTPClient(),
 		baseURL:       baseURL,
+		proxyURL:      proxyURL(),
 		log:           log,
 	}
 }
@@ -53,7 +55,14 @@ func (a *App) Run(ctx context.Context, args []string) error {
 	}
 
 	a.log.Debug("running command", zap.String("command", commandName(command)))
+	if a.shouldUseProxy() {
+		return stacktrace.Wrap(a.runProxy(ctx, command))
+	}
 
+	return a.runCommand(ctx, command)
+}
+
+func (a *App) runCommand(ctx context.Context, command command) error {
 	switch command := command.(type) {
 	case createCommand:
 		return a.runCreate(ctx, command)
@@ -427,9 +436,13 @@ func (a *App) runReplaceComments(ctx context.Context, command replaceCommentsCom
 		zap.Bool("createIfMissing", command.CreateIfMissing),
 	)
 
-	entries, err := loadCommentsFile(command.CommentsFile)
-	if err != nil {
-		return stacktrace.Wrap(formatCommentsPathError(command.CommentsFile, err))
+	entries := command.Comments
+	if command.CommentsFile != "" {
+		var err error
+		entries, err = loadCommentsFile(command.CommentsFile)
+		if err != nil {
+			return stacktrace.Wrap(formatCommentsPathError(command.CommentsFile, err))
+		}
 	}
 
 	client, viewer, err := a.newClientAndViewer(ctx, command.ConfigDir)
@@ -707,28 +720,7 @@ var (
 )
 
 func commandName(cmd command) string {
-	switch cmd.(type) {
-	case createCommand:
-		return "create"
-	case deleteCommand:
-		return "delete"
-	case getCommand:
-		return "get"
-	case getStateCommand:
-		return "get-state"
-	case replaceCommentsCommand:
-		return "replace-comments"
-	case upsertCommentCommand:
-		return "upsert-comment"
-	case deleteStateCommand:
-		return "delete-state"
-	case updateBodyCommand:
-		return "update-body"
-	case versionCommand:
-		return "version"
-	default:
-		return fmt.Sprintf("%T", cmd)
-	}
+	return cmd.name()
 }
 
 func resolveBodyInput(body string, bodyFile string) (string, error) {

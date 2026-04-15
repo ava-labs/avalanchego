@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -115,6 +116,84 @@ func TestCreatePendingReviewLive(t *testing.T) {
 	fetched, err = client.GetPendingReview(ctx, repo, prNumber, viewer.Login)
 	require.NoError(t, err)
 	require.Equal(t, "agent reconciled result", fetched.Body)
+}
+
+func TestCreateDeletePendingReviewProxyLive(t *testing.T) {
+	if os.Getenv("GH_PENDING_REVIEW_PROXY_LIVE_TEST") != "1" {
+		t.Skip("set GH_PENDING_REVIEW_PROXY_LIVE_TEST=1 to run live pending-review proxy integration test")
+	}
+
+	prValue := envOrFallback("GH_PENDING_REVIEW_TEST_PR", "GH_DRAFT_REVIEW_TEST_PR")
+	require.NotEmpty(t, prValue, "GH_PENDING_REVIEW_TEST_PR is required")
+	prNumber, err := strconv.Atoi(prValue)
+	require.NoError(t, err)
+	require.Positive(t, prNumber, "invalid GH_PENDING_REVIEW_TEST_PR %q", prValue)
+
+	repo := envOrFallback("GH_PENDING_REVIEW_TEST_REPO", "GH_DRAFT_REVIEW_TEST_REPO")
+	if repo == "" {
+		repo = defaultRepo
+	}
+
+	configDir := envOrFallback("GH_PENDING_REVIEW_CONFIG_DIR", "GH_DRAFT_REVIEW_CONFIG_DIR")
+	if configDir == "" {
+		configDir = defaultConfigDir()
+	}
+	stateDir := t.TempDir()
+
+	ctx := t.Context()
+	tokenProvider := NewGHTokenProvider(logging.NoLog{})
+	token, err := tokenProvider.Token(ctx, configDir)
+	require.NoError(t, err)
+
+	client := NewGitHubClient(logging.NoLog{}, DefaultHTTPClient(), defaultGitHubAPIBaseURL, token)
+	viewer, err := client.Viewer(ctx)
+	require.NoError(t, err)
+
+	deleteExisting := envOrFallback("GH_PENDING_REVIEW_TEST_DELETE_EXISTING", "GH_DRAFT_REVIEW_TEST_DELETE_EXISTING")
+	require.NoError(t, ensureNoLivePendingReviewOrDelete(ctx, t, client, repo, prNumber, viewer.Login, deleteExisting == "1"))
+
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+		defer cancel()
+		require.NoError(t, deleteCurrentPendingReview(cleanupCtx, client, repo, prNumber, viewer.Login))
+		_, err := client.GetPendingReview(cleanupCtx, repo, prNumber, viewer.Login)
+		require.ErrorIs(t, err, ErrNoPendingReview)
+	})
+
+	t.Setenv(proxyAllowedRepoVarName, repo)
+	server := httptest.NewServer(NewProxyHandler())
+	defer server.Close()
+	t.Setenv(proxyURLVarName, server.URL)
+
+	var stdout bytes.Buffer
+	app := NewApp(strings.NewReader(""), &stdout, io.Discard)
+	app.tokenProvider = failTokenProvider{t: t}
+
+	require.NoError(t, app.Run(ctx, []string{
+		"create",
+		"--repo", repo,
+		"--pr", strconv.Itoa(prNumber),
+		"--body", "proxy live test",
+		"--config-dir", configDir,
+		"--state-dir", stateDir,
+	}))
+
+	review, err := client.GetPendingReview(ctx, repo, prNumber, viewer.Login)
+	require.NoError(t, err, "expected pending review for %s after proxy create; stdout=%q", viewer.Login, stdout.String())
+	require.Equal(t, "proxy live test", review.Body)
+
+	stdout.Reset()
+	require.NoError(t, app.Run(ctx, []string{
+		"delete",
+		"--repo", repo,
+		"--pr", strconv.Itoa(prNumber),
+		"--config-dir", configDir,
+		"--state-dir", stateDir,
+		"--ensure-absent",
+	}))
+
+	_, err = client.GetPendingReview(ctx, repo, prNumber, viewer.Login)
+	require.ErrorIs(t, err, ErrNoPendingReview)
 }
 
 func TestReplacePendingReviewCommentsLive(t *testing.T) {
