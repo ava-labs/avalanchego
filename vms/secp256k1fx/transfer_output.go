@@ -21,7 +21,7 @@ type TransferOutput struct {
 
 	Amt uint64 `serialize:"true" json:"amount"`
 
-	OutputOwners `serialize:"true"` //nolint:embeddedstructfieldcheck
+	OutputOwners `serialize:"true"` //nolint:embeddedstructfieldcheck // Field order determines serialization order.
 }
 
 // MarshalJSON marshals Amt and the embedded OutputOwners struct

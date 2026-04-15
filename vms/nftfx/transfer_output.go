@@ -29,7 +29,7 @@ type TransferOutput struct {
 
 	GroupID                  uint32              `serialize:"true" json:"groupID"`
 	Payload                  types.JSONByteSlice `serialize:"true" json:"payload"`
-	secp256k1fx.OutputOwners `serialize:"true"`  //nolint:embeddedstructfieldcheck
+	secp256k1fx.OutputOwners `serialize:"true"`  //nolint:embeddedstructfieldcheck // Field order determines serialization order.
 }
 
 // MarshalJSON marshals Amt and the embedded OutputOwners struct

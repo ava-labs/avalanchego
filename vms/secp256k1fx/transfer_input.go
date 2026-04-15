@@ -13,7 +13,7 @@ var ErrNoValueInput = errors.New("input has no value")
 
 type TransferInput struct {
 	Amt   uint64             `serialize:"true" json:"amount"`
-	Input `serialize:"true"` //nolint:embeddedstructfieldcheck
+	Input `serialize:"true"` //nolint:embeddedstructfieldcheck // Field order determines serialization order.
 }
 
 func (*TransferInput) InitCtx(*snow.Context) {}

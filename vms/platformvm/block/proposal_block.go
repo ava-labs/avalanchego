@@ -20,7 +20,7 @@ var (
 type BanffProposalBlock struct {
 	Time                 uint64             `serialize:"true" json:"time"`
 	Transactions         []*txs.Tx          `serialize:"true" json:"txs"`
-	ApricotProposalBlock `serialize:"true"` //nolint:embeddedstructfieldcheck
+	ApricotProposalBlock `serialize:"true"` //nolint:embeddedstructfieldcheck // Field order determines serialization order.
 }
 
 func (b *BanffProposalBlock) initialize(bytes []byte) error {

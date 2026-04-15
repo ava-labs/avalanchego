@@ -18,7 +18,7 @@ var (
 
 type BanffCommitBlock struct {
 	Time               uint64             `serialize:"true" json:"time"`
-	ApricotCommitBlock `serialize:"true"` //nolint:embeddedstructfieldcheck
+	ApricotCommitBlock `serialize:"true"` //nolint:embeddedstructfieldcheck // Field order determines serialization order.
 }
 
 func (b *BanffCommitBlock) Timestamp() time.Time {

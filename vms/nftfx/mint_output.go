@@ -16,7 +16,7 @@ type MintOutput struct {
 	verify.IsState `json:"-"`
 
 	GroupID                  uint32             `serialize:"true" json:"groupID"`
-	secp256k1fx.OutputOwners `serialize:"true"` //nolint:embeddedstructfieldcheck
+	secp256k1fx.OutputOwners `serialize:"true"` //nolint:embeddedstructfieldcheck // Field order determines serialization order.
 }
 
 // MarshalJSON marshals Amt and the embedded OutputOwners struct

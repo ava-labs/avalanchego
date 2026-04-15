@@ -19,7 +19,7 @@ var (
 
 type BanffStandardBlock struct {
 	Time                 uint64             `serialize:"true" json:"time"`
-	ApricotStandardBlock `serialize:"true"` //nolint:embeddedstructfieldcheck
+	ApricotStandardBlock `serialize:"true"` //nolint:embeddedstructfieldcheck // Field order determines serialization order.
 }
 
 func (b *BanffStandardBlock) Timestamp() time.Time {
