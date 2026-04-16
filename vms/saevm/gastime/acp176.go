@@ -33,7 +33,7 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, cfg GasPriceConfig) err
 	tm.SetTarget(target)
 
 	if err := cfg.Validate(); err != nil {
-		return fmt.Errorf("%T.newConfig() after block: %w", tm, err)
+		return fmt.Errorf("%T.Validate() after block: %w", cfg, err)
 	}
 	if cfg.equals(tm.config) {
 		return nil
