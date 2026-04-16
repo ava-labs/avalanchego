@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	libevmcore "github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 
@@ -15,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+
+	libevmcore "github.com/ava-labs/libevm/core"
 )
 
 var ErrMissingPredicateContext = errors.New("missing predicate context")
