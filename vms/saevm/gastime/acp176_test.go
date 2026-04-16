@@ -744,15 +744,23 @@ func TestOscillatingMinPrice(t *testing.T) {
 }
 
 func FuzzPriceExcess(f *testing.F) {
-	f.Add(uint64(0), uint64(1))
-	f.Add(uint64(1), uint64(0))
-	f.Add(uint64(1), uint64(1))
-	f.Add(uint64(2), uint64(1))
-	f.Add(uint64(2), uint64(1_000_000_000))
-	f.Add(uint64(1_000_000_000), uint64(1))
-	f.Add(uint64(2), uint64(math.MaxUint64))
-	f.Add(uint64(math.MaxUint64), uint64(1))
-	f.Add(uint64(math.MaxUint64), uint64(math.MaxUint64))
+	seeds := []struct {
+		p gas.Price
+		k gas.Gas
+	}{
+		{0, 1},
+		{1, 0},
+		{1, 1},
+		{2, 1},
+		{2, 1_000_000_000},
+		{1_000_000_000, 1},
+		{2, math.MaxUint64},
+		{math.MaxUint64, 1},
+		{math.MaxUint64, math.MaxUint64},
+	}
+	for _, s := range seeds {
+		f.Add(uint64(s.p), uint64(s.k))
+	}
 	f.Fuzz(func(t *testing.T, pInt, kInt uint64) {
 		p, k := gas.Price(pInt), gas.Gas(kInt)
 		if p == 0 {
