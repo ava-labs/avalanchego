@@ -10,7 +10,6 @@ require (
 	github.com/ava-labs/libevm v1.13.15-0.20260416083601-c2d170a8fb2f
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/rpc v1.2.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/holiman/bloomfilter/v2 v2.0.3
