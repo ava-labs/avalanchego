@@ -9,15 +9,24 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
 
 // BeforeBlock is intended to be called before processing a block, with the
 // timestamp portions provided. `subSec` must be in [0, second).
-func (tm *Time) BeforeBlock(sec uint64, subSec time.Duration) { //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
-	tm.FastForwardTo(
-		sec,
-		SubSecond(subSec, tm.Rate()),
+func (tm *Time) BeforeBlock(bTime time.Time) {
+	// g scales `subSec` by the rate provided relative to 1 second.
+	//
+	// `subSec` is in [0,second). The lower bound guarantees that the conversion to unsigned
+	// [gas.Gas] is safe while the upper bound guarantees that the mul-div
+	// result can't overflow so we don't have to check the error.
+	sec, subSec := bTime.Unix(), bTime.Nanosecond()
+	g, _, _ := intmath.MulDivCeil(
+		gas.Gas(subSec), //#nosec G115 -- See above
+		tm.Rate(),
+		gas.Gas(time.Second),
 	)
+	tm.FastForwardTo(uint64(sec), g) //#nosec G115 -- won't overflow for a long time.
 }
 
 // AfterBlock is intended to be called after processing a block, with the

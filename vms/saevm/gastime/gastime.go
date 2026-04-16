@@ -59,40 +59,6 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceCo
 	}, nil
 }
 
-// SubSecond scales [time.Duration] to reflect the given gas rate.
-// `subSec` MUST be in [0, second).
-func SubSecond(subSec time.Duration, rate gas.Gas) gas.Gas { //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
-	// `subSec` is in [0,second). The lower bound guarantees that the conversion to unsigned
-	// [gas.Gas] is safe while the upper bound guarantees that the mul-div
-	// result can't overflow so we don't have to check the error.
-	g, _, _ := intmath.MulDivCeil(
-		gas.Gas(subSec), //#nosec G115 -- See above
-		rate,
-		gas.Gas(time.Second),
-	)
-	return g
-}
-
-// TargetToRate is the ratio between [Time.Target] and [proxytime.Time.Rate].
-const TargetToRate = 2
-
-// DefaultTargetToExcessScaling is the default ratio between gas target and the
-// reciprocal of the excess coefficient used in price calculation (K variable in ACP-176).
-const DefaultTargetToExcessScaling = 87
-
-// DefaultMinPrice is the default minimum gas price (base fee), i.e. the M
-// parameter in ACP-176's price calculation.
-const DefaultMinPrice gas.Price = 1
-
-// DefaultGasPriceConfig returns the default [GasPriceConfig] values.
-func DefaultGasPriceConfig() GasPriceConfig {
-	return GasPriceConfig{
-		TargetToExcessScaling: DefaultTargetToExcessScaling,
-		MinPrice:              DefaultMinPrice,
-		StaticPricing:         false,
-	}
-}
-
 // MinTarget is the minimum allowable [Time.Target] to avoid division by zero.
 // Values below this are silently clamped.
 const MinTarget = gas.Gas(1)

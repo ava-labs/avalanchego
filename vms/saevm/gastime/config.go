@@ -28,6 +28,26 @@ type GasPriceConfig struct {
 	canotoData canotoData_GasPriceConfig
 }
 
+// TargetToRate is the ratio between [Time.Target] and [proxytime.Time.Rate].
+const TargetToRate = 2
+
+// DefaultTargetToExcessScaling is the default ratio between gas target and the
+// reciprocal of the excess coefficient used in price calculation (K variable in ACP-176).
+const DefaultTargetToExcessScaling = 87
+
+// DefaultMinPrice is the default minimum gas price (base fee), i.e. the M
+// parameter in ACP-176's price calculation.
+const DefaultMinPrice gas.Price = 1
+
+// DefaultGasPriceConfig returns the default [GasPriceConfig] values.
+func DefaultGasPriceConfig() GasPriceConfig {
+	return GasPriceConfig{
+		TargetToExcessScaling: DefaultTargetToExcessScaling,
+		MinPrice:              DefaultMinPrice,
+		StaticPricing:         false,
+	}
+}
+
 var (
 	errTargetToExcessScalingZero = errors.New("targetToExcessScaling must be non-zero")
 	errMinPriceZero              = errors.New("minPrice must be non-zero")

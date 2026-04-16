@@ -57,14 +57,13 @@ type Points interface {
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.
 	ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error)
-
 	// GasConfigAfter returns the gas target and configuration that should go
 	// into effect immediately after the provided block.
 	GasConfigAfter(*types.Header) (target gas.Gas, c gastime.GasPriceConfig)
-	// SubSecondBlockTime returns the sub-second portion of the block time,
-	// which MUST be non-negative and strictly shorter than a second; i.e. a
-	// value d such that 0 <= d < [time.Second].
-	SubSecondBlockTime(h *types.Header) time.Duration
+	// BlockTime returns the exact block time for the given header, as
+	// recorded in [BlockBuilder.BuildHeader]. The returned time MUST match
+	// the header ([time.Time.Unix] == [types.Header.Time]).
+	BlockTime(h *types.Header) time.Time
 	// SettledHeight returns the block height which [types.Header.Root] corresponds
 	// with as the post-execution state root. It MUST match the value passed to
 	// [BlockBuilder.BuildBlock], from which the [types.Header] will be sourced.

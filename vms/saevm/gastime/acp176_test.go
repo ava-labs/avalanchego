@@ -69,13 +69,13 @@ func TestTargetUpdateTiming(t *testing.T) {
 	initialRate := tm.Rate()
 
 	const (
-		newTime   uint64 = initialTime + 1
-		newTarget        = initialTarget + 100_000
+		newTime   = initialTime + 1
+		newTarget = initialTarget + 100_000
 	)
 
 	initialPrice := tm.Price()
-	tm.BeforeBlock(newTime, 0)
-	assert.Equal(t, newTime, tm.Unix(), "Unix time advanced by BeforeBlock()")
+	tm.BeforeBlock(time.Unix(newTime, 0))
+	assert.Equal(t, uint64(newTime), tm.Unix(), "Unix time advanced by BeforeBlock()")
 	assert.Equal(t, initialTarget, tm.Target(), "Target not changed by BeforeBlock()")
 	// While the price technically could remain the same, being more strict
 	// ensures the test is meaningful.
@@ -91,7 +91,7 @@ func TestTargetUpdateTiming(t *testing.T) {
 	)
 	used := initialRate * secondsOfGasUsed
 	require.NoError(t, tm.AfterBlock(used, newTarget, DefaultGasPriceConfig()), "AfterBlock()")
-	assert.Equal(t, expectedEndTime, tm.Unix(), "Unix time advanced by AfterBlock() due to gas consumption")
+	assert.Equal(t, uint64(expectedEndTime), tm.Unix(), "Unix time advanced by AfterBlock() due to gas consumption")
 	assert.Equal(t, newTarget, tm.Target(), "Target updated by AfterBlock()")
 	// While the price technically could remain the same, being more strict
 	// ensures the test is meaningful.
@@ -154,8 +154,12 @@ func FuzzWorstCasePrice(f *testing.F) {
 			block.limit = max(block.used, block.limit)
 			block.target = clampTarget(max(block.target, 1))
 
-			worstcase.BeforeBlock(block.time, block.nanos)
-			actual.BeforeBlock(block.time, block.nanos)
+			if block.time > math.MaxInt64 {
+				t.Skip("Block time too large")
+			}
+			tm := time.Unix(int64(block.time), int64(block.nanos))
+			worstcase.BeforeBlock(tm)
+			actual.BeforeBlock(tm)
 
 			// The crux of this test lies in the maintaining of this inequality
 			// through the use of `limit` instead of `used` in `AfterBlock()`
