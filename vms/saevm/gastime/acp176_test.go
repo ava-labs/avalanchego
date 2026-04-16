@@ -680,7 +680,7 @@ func TestAfterBlock(t *testing.T) {
 			tm := mustNew(t, time.Unix(0, 0), tt.init.target, tt.init.excess, tt.init.config)
 			assert.Equal(t, tt.init.excess, tm.Excess(), "init Excess")
 			assert.Equal(t, tt.init.price, tm.Price(), "init Price")
-			assert.Equal(t, tm.Rate(), tm.Target()*TargetToRate, "init Rate")
+			assert.Equal(t, tm.Target()*TargetToRate, tm.Rate(), "init Rate")
 
 			hooks := hookstest.NewStub(
 				tt.new.target,
@@ -690,7 +690,7 @@ func TestAfterBlock(t *testing.T) {
 			require.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.new.excess, tm.Excess(), "new Excess")
 			assert.Equal(t, tt.new.price, tm.Price(), "new Price")
-			assert.Equal(t, tm.Rate(), tm.Target()*TargetToRate, "new Rate")
+			assert.Equal(t, tm.Target()*TargetToRate, tm.Rate(), "new Rate")
 		})
 	}
 }
