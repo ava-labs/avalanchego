@@ -105,9 +105,11 @@ graft_go_test(
         "rlp_test.go",
         "state_manager_test.go",
         "state_processor_test.go",
+        "state_transition_extra_test.go",
         "state_transition_test.go",
         "txindexer_test.go",
     ],
+    data = glob(["testdata/**"]),
     embed = [":core"],
     deps = [
         "//graft/coreth/consensus",
