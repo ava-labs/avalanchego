@@ -207,18 +207,18 @@ func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, hook.GasPriceConfig) {
 // [Stub.BuildHeader] in the header's `Extra` field. If said field is empty,
 // SubSecondBlockTime returns 0.
 func (*Stub) SubSecondBlockTime(hdr *types.Header) time.Duration {
-	return getHeaderExtra(hdr, func(e extra) time.Duration { return e.subSec })
+	return getHeaderExtra(hdr).subSec
 }
 
 // SettledHeight returns the height encoded in the Header by [Stub.BuildBlock]
 // or [BuildBlock].
 func (*Stub) SettledHeight(hdr *types.Header) uint64 {
-	return getHeaderExtra(hdr, func(e extra) uint64 { return e.settledHeight })
+	return getHeaderExtra(hdr).settledHeight
 }
 
 // EndOfBlockOps return the ops included in the block by [BuildBlock].
 func (*Stub) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	eOps := getHeaderExtra(b.Header(), func(e extra) []Op { return e.ops })
+	eOps := getHeaderExtra(b.Header()).ops
 	hookOps := make([]hook.Op, len(eOps))
 	for i, op := range eOps {
 		hookOps[i] = op.AsOp()
@@ -226,14 +226,14 @@ func (*Stub) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	return hookOps, nil
 }
 
-func getHeaderExtra[T any](hdr *types.Header, get func(extra) T) T {
+func getHeaderExtra(hdr *types.Header) extra {
 	var e extra
 	if err := e.UnmarshalCanoto(hdr.Extra); err != nil {
 		// This is left as a panic to avoid polluting various functions with
 		// error returns when no error is possible in production.
 		panic(err)
 	}
-	return get(e)
+	return e
 }
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
