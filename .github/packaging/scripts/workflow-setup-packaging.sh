@@ -2,8 +2,8 @@
 
 # Set up packaging workflow environment: resolve tag and import GPG key.
 #
-# Called via Taskfile (task packaging:setup-packaging) from workflow YAML
-# after the packaging overlay has been applied.
+# Called directly from workflow YAML (workflow-*.sh scripts are CI glue,
+# not developer entrypoints, and are exempt from the run_task.sh policy).
 #
 # Writes key=value outputs to $GITHUB_OUTPUT when running in CI, or to
 # stdout when running locally (for inspection / testing).

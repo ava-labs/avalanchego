@@ -37,11 +37,6 @@ tasks:
     silent: true
     cmd: task --list | grep packaging
 
-  setup-packaging:
-    desc: Resolves packaging tag and imports GPG key for workflow use
-    cmds:
-      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/setup-packaging.sh'
-
   build-rpms:
     desc: Builds RPMs for both avalanchego and subnet-evm
     cmds:
