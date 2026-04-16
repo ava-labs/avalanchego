@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	libevmcore "github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
@@ -29,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
+
+	libevmcore "github.com/ava-labs/libevm/core"
 )
 
 var (

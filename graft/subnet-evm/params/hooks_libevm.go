@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
-	libevmcore "github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
@@ -26,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
 	cmath "github.com/ava-labs/libevm/common/math"
+	libevmcore "github.com/ava-labs/libevm/core"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
