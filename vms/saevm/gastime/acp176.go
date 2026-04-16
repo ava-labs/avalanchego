@@ -90,12 +90,12 @@ func priceExcess(p gas.Price, k gas.Gas) gas.Gas {
 			lo = mid + 1
 		}
 	}
-	// Ensure [Time.Price] can return minPrice even if the approximation can't
-	// represent it.
-	if calculatePrice(lo, k) <= p {
-		return lo
+	// If [calculatePrice] can't generate p, make sure to honor the lower price
+	// expectation.
+	if calculatePrice(lo, k) > p {
+		return lo - 1
 	}
-	return lo - 1
+	return lo
 }
 
 // calculatePrice returns an integer approximation of e^(x/k).
