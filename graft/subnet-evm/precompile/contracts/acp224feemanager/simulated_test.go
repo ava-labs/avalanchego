@@ -1,24 +1,28 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// simulated_test.go validates the ACP-224 fee manager precompile through its
-// generated Go bindings, exercising the full
-// Solidity interface -> ABI encoding -> precompile -> ABI decoding -> Go
-// binding path on a simulated backend. Some tests overlap with
-// contract_test.go (e.g. authorization, fee config validation) but the overlap
-// is intentional. contract_test.go tests the precompile logic directly, while
-// these tests verify the ABI round-trip.
+// simulated_test.go validates the ACP-224 fee manager precompile by routing
+// calls through a deployed Solidity wrapper contract (ACP224FeeManagerTest.sol),
+// which acts as contract as an integration test with the EVM interpreter:
 //
-// Errors from the precompile lose their identity when serialized as EVM revert
+//	Go abi.Pack() -> wrapper (solc-compiled) -> ABI re-encoding -> precompile -> Go abi.Unpack()
+//
+// catching any disagreement between Go's ABI package and solc's ABI
+// implementation. Note that some tests overlap with contract_test.go (e.g. fee config
+// validation) but the overlap is intentional: contract_test.go tests precompile
+// logic directly, while these tests verify the ABI round-trip through the EVM
+// interpreter.
+//
+// Also, errors from the precompile lose their identity when serialized as EVM revert
 // data, so error assertions use ErrorContains instead of ErrorIs.
 
 package acp224feemanager_test
 
 import (
-	"crypto/ecdsa"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
@@ -39,17 +43,8 @@ import (
 )
 
 var (
-	adminKey, _        = crypto.GenerateKey()
-	enabledKey, _      = crypto.GenerateKey()
-	managerKey, _      = crypto.GenerateKey()
-	unprivilegedKey, _ = crypto.GenerateKey()
-
-	adminAddress        = crypto.PubkeyToAddress(adminKey.PublicKey)
-	enabledAddress      = crypto.PubkeyToAddress(enabledKey.PublicKey)
-	managerAddress      = crypto.PubkeyToAddress(managerKey.PublicKey)
-	unprivilegedAddress = crypto.PubkeyToAddress(unprivilegedKey.PublicKey)
-
-	fundedAddresses = []common.Address{adminAddress, enabledAddress, managerAddress, unprivilegedAddress}
+	adminKey, _  = crypto.GenerateKey()
+	adminAddress = crypto.PubkeyToAddress(adminKey.PublicKey)
 )
 
 var (
@@ -70,6 +65,13 @@ var (
 		StaticPricing:      true,
 		MinGasPrice:        7,
 	}
+
+	testPrecompileConfig = acp224feemanager.NewConfig(
+		utils.PointerTo[uint64](0),
+		[]common.Address{adminAddress},
+		nil, nil,
+		&genesisFeeConfig,
+	)
 )
 
 func TestMain(m *testing.M) {
@@ -104,7 +106,15 @@ func toCommonFeeConfig(c bindings.IACP224FeeManagerFeeConfig) commontype.ACP224F
 	}
 }
 
-func setFeeConfig(t *testing.T, b *sim.Backend, contract *bindings.IACP224FeeManager, auth *bind.TransactOpts, config commontype.ACP224FeeConfig) uint64 {
+func deployTestContract(t *testing.T, b *sim.Backend, auth *bind.TransactOpts) (common.Address, *bindings.ACP224FeeManagerTest) {
+	t.Helper()
+	addr, tx, contract, err := bindings.DeployACP224FeeManagerTest(auth, b.Client(), acp224feemanager.ContractAddress)
+	require.NoError(t, err, "DeployACP224FeeManagerTest()")
+	utilstest.WaitReceiptSuccessful(t, b, tx)
+	return addr, contract
+}
+
+func setFeeConfig(t *testing.T, b *sim.Backend, contract *bindings.ACP224FeeManagerTest, auth *bind.TransactOpts, config commontype.ACP224FeeConfig) uint64 {
 	t.Helper()
 	tx, err := contract.SetFeeConfig(auth, toBindingsFeeConfig(config))
 	require.NoError(t, err, "SetFeeConfig()")
@@ -112,142 +122,121 @@ func setFeeConfig(t *testing.T, b *sim.Backend, contract *bindings.IACP224FeeMan
 	return receipt.BlockNumber.Uint64()
 }
 
-func newPrecompileCfg() *acp224feemanager.Config {
-	return acp224feemanager.NewConfig(
-		utils.PointerTo[uint64](0),
-		[]common.Address{adminAddress},
-		[]common.Address{enabledAddress},
-		[]common.Address{managerAddress},
-		&genesisFeeConfig,
-	)
-}
+func TestACP224FeeManager(t *testing.T) {
+	chainID := params.TestChainConfig.ChainID
+	admin := utilstest.NewAuth(t, adminKey, chainID)
 
-func newFeeManagerBackend(t *testing.T, cfg *acp224feemanager.Config, funded []common.Address) (*sim.Backend, *bindings.IACP224FeeManager) {
-	t.Helper()
-	backend := utilstest.NewBackendWithPrecompile(t, cfg, funded)
-	t.Cleanup(func() { backend.Close() })
-	feeManager, err := bindings.NewIACP224FeeManager(acp224feemanager.ContractAddress, backend.Client())
-	require.NoError(t, err, "NewIACP224FeeManager()")
-	return backend, feeManager
-}
+	type testCase struct {
+		name string
+		test func(t *testing.T, backend *sim.Backend, feeManager *bindings.IACP224FeeManager)
+	}
 
-func TestACP224FeeManager_AdminHasAdminRole(t *testing.T) {
-	_, feeManager := newFeeManagerBackend(t, newPrecompileCfg(), fundedAddresses)
-	allowlisttest.VerifyRole(t, feeManager, adminAddress, allowlist.AdminRole)
-}
-
-func TestACP224FeeManager_GrantEnabledRole(t *testing.T) {
-	backend, feeManager := newFeeManagerBackend(t, newPrecompileCfg(), fundedAddresses)
-	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
-
-	newAddr := common.HexToAddress("0x706F6C79746F706961")
-	allowlisttest.VerifyRole(t, feeManager, newAddr, allowlist.NoRole)
-	allowlisttest.SetAsEnabled(t, backend, feeManager, admin, newAddr)
-	allowlisttest.VerifyRole(t, feeManager, newAddr, allowlist.EnabledRole)
-}
-
-func TestACP224FeeManager_SetFeeConfigAuthorization(t *testing.T) {
-	tests := []struct {
-		name    string
-		key     *ecdsa.PrivateKey
-		wantErr string
-	}{
+	testCases := []testCase{
 		{
-			name:    "NoRole rejected",
-			key:     unprivilegedKey,
-			wantErr: acp224feemanager.ErrCannotSetFeeConfig.Error(),
+			name: "should verify admin has admin role",
+			test: func(t *testing.T, _ *sim.Backend, feeManager *bindings.IACP224FeeManager) {
+				allowlisttest.VerifyRole(t, feeManager, adminAddress, allowlist.AdminRole)
+			},
 		},
 		{
-			name: "Enabled succeeds",
-			key:  enabledKey,
+			name: "should verify new contract has no role",
+			test: func(t *testing.T, backend *sim.Backend, feeManager *bindings.IACP224FeeManager) {
+				testContractAddr, _ := deployTestContract(t, backend, admin)
+				allowlisttest.VerifyRole(t, feeManager, testContractAddr, allowlist.NoRole)
+			},
 		},
 		{
-			name: "Manager succeeds",
-			key:  managerKey,
+			name: "contract should not be able to change fee without enabled",
+			test: func(t *testing.T, backend *sim.Backend, feeManager *bindings.IACP224FeeManager) {
+				_, testContract := deployTestContract(t, backend, admin)
+
+				_, err := testContract.SetFeeConfig(admin, toBindingsFeeConfig(updatedFeeConfig))
+				require.ErrorContains(t, err, vm.ErrExecutionReverted.Error()) //nolint:forbidigo // upstream error wrapped as string
+			},
 		},
 		{
-			name: "Admin succeeds",
-			key:  adminKey,
+			name: "contract should be added to enabled list",
+			test: func(t *testing.T, backend *sim.Backend, feeManager *bindings.IACP224FeeManager) {
+				testContractAddr, _ := deployTestContract(t, backend, admin)
+				allowlisttest.SetAsEnabled(t, backend, feeManager, admin, testContractAddr)
+				allowlisttest.VerifyRole(t, feeManager, testContractAddr, allowlist.EnabledRole)
+			},
+		},
+		{
+			name: "enabled contract should set and read fee config",
+			test: func(t *testing.T, backend *sim.Backend, feeManager *bindings.IACP224FeeManager) {
+				testContractAddr, testContract := deployTestContract(t, backend, admin)
+				allowlisttest.SetAsEnabled(t, backend, feeManager, admin, testContractAddr)
+
+				got, err := testContract.GetFeeConfig(nil)
+				require.NoError(t, err, "GetFeeConfig() before set")
+				require.Equal(t, genesisFeeConfig, toCommonFeeConfig(got), "genesis fee config")
+
+				blockNum := setFeeConfig(t, backend, testContract, admin, updatedFeeConfig)
+
+				got, err = testContract.GetFeeConfig(nil)
+				require.NoError(t, err, "GetFeeConfig() after set")
+				require.Equal(t, updatedFeeConfig, toCommonFeeConfig(got), "updated fee config")
+
+				lastChangedAt, err := testContract.GetFeeConfigLastChangedAt(nil)
+				require.NoError(t, err, "GetFeeConfigLastChangedAt()")
+				require.Equal(t, blockNum, lastChangedAt.Uint64(), "last changed at block number")
+			},
+		},
+		{
+			name: "bool fields round-trip through contract",
+			test: func(t *testing.T, backend *sim.Backend, feeManager *bindings.IACP224FeeManager) {
+				testContractAddr, testContract := deployTestContract(t, backend, admin)
+				allowlisttest.SetAsEnabled(t, backend, feeManager, admin, testContractAddr)
+
+				setFeeConfig(t, backend, testContract, admin, boolFeeConfig)
+
+				got, err := testContract.GetFeeConfig(nil)
+				require.NoError(t, err, "GetFeeConfig()")
+				require.Equal(t, boolFeeConfig, toCommonFeeConfig(got), "boolean fee config round-trip")
+			},
+		},
+		{
+			name: "contract role can be revoked",
+			test: func(t *testing.T, backend *sim.Backend, feeManager *bindings.IACP224FeeManager) {
+				testContractAddr, testContract := deployTestContract(t, backend, admin)
+				allowlisttest.SetAsEnabled(t, backend, feeManager, admin, testContractAddr)
+
+				setFeeConfig(t, backend, testContract, admin, updatedFeeConfig)
+
+				got, err := testContract.GetFeeConfig(nil)
+				require.NoError(t, err, "GetFeeConfig() after set")
+				require.Equal(t, updatedFeeConfig, toCommonFeeConfig(got), "config set by enabled contract")
+
+				allowlisttest.SetAsNone(t, backend, feeManager, admin, testContractAddr)
+				allowlisttest.VerifyRole(t, feeManager, testContractAddr, allowlist.NoRole)
+
+				_, err = testContract.SetFeeConfig(admin, toBindingsFeeConfig(boolFeeConfig))
+				require.ErrorContains(t, err, vm.ErrExecutionReverted.Error()) //nolint:forbidigo // upstream error wrapped as string
+			},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			backend, feeManager := newFeeManagerBackend(t, newPrecompileCfg(), fundedAddresses)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			backend := utilstest.NewBackendWithPrecompile(t, testPrecompileConfig, []common.Address{adminAddress})
+			defer backend.Close()
 
-			auth := utilstest.NewAuth(t, tt.key, params.TestChainConfig.ChainID)
-			tx, err := feeManager.SetFeeConfig(auth, toBindingsFeeConfig(updatedFeeConfig))
-			if tt.wantErr != "" {
-				require.ErrorContains(t, err, tt.wantErr) //nolint:forbidigo
-				return
-			}
-			require.NoError(t, err, "SetFeeConfig()")
-			utilstest.WaitReceiptSuccessful(t, backend, tx)
+			feeManager, err := bindings.NewIACP224FeeManager(acp224feemanager.ContractAddress, backend.Client())
+			require.NoError(t, err, "NewIACP224FeeManager()")
 
-			got, err := feeManager.GetFeeConfig(nil)
-			require.NoError(t, err, "GetFeeConfig()")
-			require.Equal(t, updatedFeeConfig, toCommonFeeConfig(got), "fee config after set")
+			tc.test(t, backend, feeManager)
 		})
 	}
 }
 
-func TestACP224FeeManager_SetAndReadFeeConfig(t *testing.T) {
-	backend, feeManager := newFeeManagerBackend(t, newPrecompileCfg(), fundedAddresses)
-	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
-
-	got, err := feeManager.GetFeeConfig(nil)
-	require.NoError(t, err, "GetFeeConfig() before set")
-	require.Equal(t, genesisFeeConfig, toCommonFeeConfig(got), "genesis fee config")
-
-	blockNum := setFeeConfig(t, backend, feeManager, admin, updatedFeeConfig)
-
-	got, err = feeManager.GetFeeConfig(nil)
-	require.NoError(t, err, "GetFeeConfig() after set")
-	require.Equal(t, updatedFeeConfig, toCommonFeeConfig(got), "updated fee config")
-
-	lastChangedAt, err := feeManager.GetFeeConfigLastChangedAt(nil)
-	require.NoError(t, err, "GetFeeConfigLastChangedAt()")
-	require.Equal(t, blockNum, lastChangedAt.Uint64(), "last changed at block number")
-}
-
-func TestACP224FeeManager_BoolFieldsRoundTrip(t *testing.T) {
-	backend, feeManager := newFeeManagerBackend(t, newPrecompileCfg(), fundedAddresses)
-	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
-
-	setFeeConfig(t, backend, feeManager, admin, boolFeeConfig)
-
-	got, err := feeManager.GetFeeConfig(nil)
-	require.NoError(t, err, "GetFeeConfig()")
-	require.Equal(t, boolFeeConfig, toCommonFeeConfig(got), "boolean fee config round-trip")
-}
-
-func TestACP224FeeManager_Revocation(t *testing.T) {
-	backend, feeManager := newFeeManagerBackend(t, newPrecompileCfg(), fundedAddresses)
-
-	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
-	enabled := utilstest.NewAuth(t, enabledKey, params.TestChainConfig.ChainID)
-
-	// Enabled can set config before revocation.
-	setFeeConfig(t, backend, feeManager, enabled, updatedFeeConfig)
-
-	got, err := feeManager.GetFeeConfig(nil)
-	require.NoError(t, err, "GetFeeConfig() after enabled set")
-	require.Equal(t, updatedFeeConfig, toCommonFeeConfig(got), "config set by enabled")
-
-	// Admin revokes enabled to NoRole.
-	allowlisttest.SetAsNone(t, backend, feeManager, admin, enabledAddress)
-	allowlisttest.VerifyRole(t, feeManager, enabledAddress, allowlist.NoRole)
-
-	// Enabled can no longer set config.
-	_, err = feeManager.SetFeeConfig(enabled, toBindingsFeeConfig(boolFeeConfig))
-	require.ErrorContains(t, err, acp224feemanager.ErrCannotSetFeeConfig.Error()) //nolint:forbidigo
-}
-
 func TestACP224FeeManager_InvalidFeeConfig(t *testing.T) {
+	// Validation errors from the precompile revert through the wrapper
+	// contract, so only the generic "execution reverted" is visible. The
+	// specific error messages are tested in contract_test.go.
 	tests := []struct {
-		name    string
-		config  bindings.IACP224FeeManagerFeeConfig
-		wantErr string
+		name   string
+		config bindings.IACP224FeeManagerFeeConfig
 	}{
 		{
 			name: "zero MinGasPrice",
@@ -255,7 +244,6 @@ func TestACP224FeeManager_InvalidFeeConfig(t *testing.T) {
 				TargetGas:    1_000_000,
 				TimeToDouble: 60,
 			},
-			wantErr: commontype.ErrMinGasPriceTooLow.Error(),
 		},
 		{
 			name: "ValidatorTargetGas with non-zero TargetGas",
@@ -264,7 +252,6 @@ func TestACP224FeeManager_InvalidFeeConfig(t *testing.T) {
 				TargetGas:          1_000_000,
 				MinGasPrice:        1,
 			},
-			wantErr: commontype.ErrTargetGasMustBeZero.Error(),
 		},
 		{
 			name: "StaticPricing with non-zero TimeToDouble",
@@ -274,17 +261,24 @@ func TestACP224FeeManager_InvalidFeeConfig(t *testing.T) {
 				MinGasPrice:   1,
 				TimeToDouble:  60,
 			},
-			wantErr: commontype.ErrTimeToDoubleMustBeZero.Error(),
 		},
 	}
 
+	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
+
+	backend := utilstest.NewBackendWithPrecompile(t, testPrecompileConfig, []common.Address{adminAddress})
+	defer backend.Close()
+
+	feeManager, err := bindings.NewIACP224FeeManager(acp224feemanager.ContractAddress, backend.Client())
+	require.NoError(t, err, "NewIACP224FeeManager()")
+
+	testContractAddr, testContract := deployTestContract(t, backend, admin)
+	allowlisttest.SetAsEnabled(t, backend, feeManager, admin, testContractAddr)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, feeManager := newFeeManagerBackend(t, newPrecompileCfg(), fundedAddresses)
-			admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
-
-			_, err := feeManager.SetFeeConfig(admin, tt.config)
-			require.ErrorContains(t, err, tt.wantErr) //nolint:forbidigo
+			_, err := testContract.SetFeeConfig(admin, tt.config)
+			require.ErrorContains(t, err, vm.ErrExecutionReverted.Error()) //nolint:forbidigo // upstream error wrapped as string
 		})
 	}
 }
@@ -292,23 +286,25 @@ func TestACP224FeeManager_InvalidFeeConfig(t *testing.T) {
 func TestACP224FeeManager_Events(t *testing.T) {
 	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
 
-	precompileCfg := acp224feemanager.NewConfig(
-		utils.PointerTo[uint64](0),
-		[]common.Address{adminAddress},
-		nil, nil,
-		&genesisFeeConfig,
-	)
-	backend, feeManager := newFeeManagerBackend(t, precompileCfg, []common.Address{adminAddress})
+	backend := utilstest.NewBackendWithPrecompile(t, testPrecompileConfig, []common.Address{adminAddress})
+	defer backend.Close()
 
-	setFeeConfig(t, backend, feeManager, admin, updatedFeeConfig)
+	feeManager, err := bindings.NewIACP224FeeManager(acp224feemanager.ContractAddress, backend.Client())
+	require.NoError(t, err, "NewIACP224FeeManager()")
 
-	iter, err := feeManager.FilterFeeConfigUpdated(nil, []common.Address{adminAddress})
+	testContractAddr, testContract := deployTestContract(t, backend, admin)
+	allowlisttest.SetAsEnabled(t, backend, feeManager, admin, testContractAddr)
+
+	setFeeConfig(t, backend, testContract, admin, updatedFeeConfig)
+
+	// The event sender is the wrapper contract address, not adminAddress.
+	iter, err := feeManager.FilterFeeConfigUpdated(nil, []common.Address{testContractAddr})
 	require.NoError(t, err, "FilterFeeConfigUpdated()")
 	defer iter.Close()
 
 	require.True(t, iter.Next(), "expected FeeConfigUpdated event")
 	event := iter.Event
-	require.Equal(t, adminAddress, event.Sender, "event sender")
+	require.Equal(t, testContractAddr, event.Sender, "event sender")
 	require.Equal(t, genesisFeeConfig, toCommonFeeConfig(event.OldFeeConfig), "old fee config in event")
 	require.Equal(t, updatedFeeConfig, toCommonFeeConfig(event.NewFeeConfig), "new fee config in event")
 	require.False(t, iter.Next(), "expected no more events")

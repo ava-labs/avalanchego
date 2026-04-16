@@ -22,6 +22,7 @@ graft_go_test(
         "acp224_fee_config_test.go",
         "fee_config_test.go",
     ],
+    data = glob(["testdata/**"]),
     embed = [":commontype"],
     deps = [
         "//utils",
