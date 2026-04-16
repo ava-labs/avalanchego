@@ -60,8 +60,8 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig hook.GasPr
 		config: cfg,
 	}
 
-	// TODO(StephenButtolph): taking in startingExcess is pretty jank. Should we
-	// instead take in startingPrice?
+	// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
+	// meaningfully provide. We should instead take in startingPrice.
 	if cfg.staticPricing {
 		startingExcess = 0
 	}
