@@ -344,6 +344,27 @@ func TestAfterBlock(t *testing.T) {
 			},
 		},
 		{
+			name: "min_price_increase_approximation",
+			init: state{
+				target: 1_000_000,
+				excess: 0,
+				config: hook.GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				price: 1,
+			},
+			new: state{
+				target: 1_000_000,
+				excess: 1_802_924_127,
+				config: hook.GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1_000_000_000,
+				},
+				price: 1_000_000_000,
+			},
+		},
+		{
 			name: "min_price_increase_below_current",
 			init: state{
 				target: 1_000_000,
@@ -659,6 +680,7 @@ func TestAfterBlock(t *testing.T) {
 			tm := mustNew(t, time.Unix(0, 0), tt.init.target, tt.init.excess, tt.init.config)
 			assert.Equal(t, tt.init.excess, tm.Excess(), "init Excess")
 			assert.Equal(t, tt.init.price, tm.Price(), "init Price")
+			assert.Equal(t, tm.Rate(), tm.Target()*TargetToRate, "init Rate")
 
 			hooks := hookstest.NewStub(
 				tt.new.target,
@@ -668,6 +690,7 @@ func TestAfterBlock(t *testing.T) {
 			require.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.new.excess, tm.Excess(), "new Excess")
 			assert.Equal(t, tt.new.price, tm.Price(), "new Price")
+			assert.Equal(t, tm.Rate(), tm.Target()*TargetToRate, "new Rate")
 		})
 	}
 }
