@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -59,7 +60,7 @@ type Points interface {
 
 	// GasConfigAfter returns the gas target and configuration that should go
 	// into effect immediately after the provided block.
-	GasConfigAfter(*types.Header) (target gas.Gas, c saetypes.GasPriceConfig)
+	GasConfigAfter(*types.Header) (target gas.Gas, c gastime.GasPriceConfig)
 	// SubSecondBlockTime returns the sub-second portion of the block time,
 	// which MUST be non-negative and strictly shorter than a second; i.e. a
 	// value d such that 0 <= d < [time.Second].

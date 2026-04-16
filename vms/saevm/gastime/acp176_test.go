@@ -16,8 +16,6 @@ import (
 	"golang.org/x/text/message"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // TestInvalidConfigRejected verifies that zero values for TargetToExcessScaling
@@ -28,18 +26,18 @@ func TestInvalidConfigRejected(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		config   saetypes.GasPriceConfig
+		config   GasPriceConfig
 		expected error
 	}{
 		{
 			"zero_scaling",
-			saetypes.GasPriceConfig{TargetToExcessScaling: 0, MinPrice: DefaultGasPriceConfig().MinPrice},
-			errInvalidGasPriceConfig,
+			GasPriceConfig{TargetToExcessScaling: 0, MinPrice: DefaultGasPriceConfig().MinPrice},
+			errTargetToExcessScalingZero,
 		},
 		{
 			"zero_min_price",
-			saetypes.GasPriceConfig{TargetToExcessScaling: DefaultGasPriceConfig().TargetToExcessScaling, MinPrice: 0},
-			errInvalidGasPriceConfig,
+			GasPriceConfig{TargetToExcessScaling: DefaultGasPriceConfig().TargetToExcessScaling, MinPrice: 0},
+			errMinPriceZero,
 		},
 	}
 
@@ -47,14 +45,14 @@ func TestInvalidConfigRejected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tm := mustNew(t, time.Unix(42, 0), target, 0, DefaultGasPriceConfig())
 
-			initialScaling := tm.config.targetToExcessScaling
-			initialMinPrice := tm.config.minPrice
+			initialScaling := tm.config.TargetToExcessScaling
+			initialMinPrice := tm.config.MinPrice
 			err := tm.AfterBlock(0, target, tt.config)
 			require.ErrorIs(t, err, tt.expected, "AfterBlock()")
 
 			// Config unchanged after rejected update
-			assert.Equal(t, initialScaling, tm.config.targetToExcessScaling, "targetToExcessScaling changed")
-			assert.Equal(t, initialMinPrice, tm.config.minPrice, "minPrice changed")
+			assert.Equal(t, initialScaling, tm.config.TargetToExcessScaling, "targetToExcessScaling changed")
+			assert.Equal(t, initialMinPrice, tm.config.MinPrice, "minPrice changed")
 		})
 	}
 }
@@ -324,7 +322,7 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 			t.Skip("New target too low")
 		}
 
-		initConfig := saetypes.GasPriceConfig{
+		initConfig := GasPriceConfig{
 			TargetToExcessScaling: gas.Gas(initScaling),
 			MinPrice:              gas.Price(initMinPrice),
 			StaticPricing:         initStaticPricing,
@@ -338,8 +336,11 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 
 		{
 			var wantErrIs error
-			if initScaling == 0 || initMinPrice == 0 {
-				wantErrIs = errInvalidGasPriceConfig
+			switch {
+			case initScaling == 0:
+				wantErrIs = errTargetToExcessScalingZero
+			case initMinPrice == 0:
+				wantErrIs = errMinPriceZero
 			}
 			require.ErrorIsf(t, err, wantErrIs, "New(... %+v)", initConfig)
 			if wantErrIs != nil {
@@ -351,17 +352,19 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 		initPrice := tm.Price()
 
 		{
-			cfg := saetypes.GasPriceConfig{
+			cfg := GasPriceConfig{
 				MinPrice:              gas.Price(newMinPrice),
 				TargetToExcessScaling: gas.Gas(newScaling),
 				StaticPricing:         newStaticPricing,
 			}
 
 			var wantErrIs error
-			if newScaling == 0 || newMinPrice == 0 {
-				wantErrIs = errInvalidGasPriceConfig
+			switch {
+			case newScaling == 0:
+				wantErrIs = errTargetToExcessScalingZero
+			case newMinPrice == 0:
+				wantErrIs = errMinPriceZero
 			}
-
 			// Consuming gas increases the excess, which changes the price.
 			// We're only interested in invariance under changes in config.
 			const gasUsed = 0
@@ -394,7 +397,7 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 		case newStaticPricing:
 			require.Equal(t, minP, tm.Price(), "static pricing -> price == min")
 
-		case tm.config.equalHookConfig(t, initConfig):
+		case tm.config.equals(initConfig):
 			// Target-only changes keep the x/K exponent as close to equal as
 			// possible given the resolution of the denominator.
 			newExp := tm.exponent()
@@ -421,15 +424,6 @@ func FuzzPriceInvarianceAfterBlock(f *testing.F) {
 			}
 		}
 	})
-}
-
-// equalHookConfig is equivalent to [config.equal] but accepts a
-// [saetypes.GasPriceConfig] that is first converted and validated.
-func (c *config) equalHookConfig(tb testing.TB, hookCfg saetypes.GasPriceConfig) bool {
-	tb.Helper()
-	other, err := newConfig(hookCfg)
-	require.NoError(tb, err)
-	return c.equals(other)
 }
 
 // exponent returns x/K, the exponent of the gas price. For fixed M, equal

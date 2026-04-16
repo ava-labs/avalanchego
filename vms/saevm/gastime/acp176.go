@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // BeforeBlock is intended to be called before processing a block, with the
@@ -24,7 +22,7 @@ func (tm *Time) BeforeBlock(sec uint64, subSec time.Duration) { //nolint:staticc
 
 // AfterBlock is intended to be called after processing a block, with the
 // target and gas configuration provided.
-func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, hookCfg saetypes.GasPriceConfig) error {
+func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, cfg GasPriceConfig) error {
 	tm.Tick(used)
 	// Although [Time.SetTarget] scales the excess by the same factor as the
 	// change in target, it rounds when necessary, which might alter the price
@@ -34,8 +32,7 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, hookCfg saetypes.GasPri
 	p := tm.Price()
 	tm.SetTarget(target)
 
-	cfg, err := newConfig(hookCfg)
-	if err != nil {
+	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("%T.newConfig() after block: %w", tm, err)
 	}
 	if cfg.equals(tm.config) {
@@ -48,8 +45,8 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, hookCfg saetypes.GasPri
 }
 
 // findExcessForPrice uses binary search over uint64 to find the smallest excess
-// value that produces targetPrice with the current [config]. This maintains
-// price continuity under a change in [config], with the following scenarios:
+// value that produces targetPrice with the current [GasPriceConfig]. This maintains
+// price continuity under a change in [GasPriceConfig], with the following scenarios:
 //
 //   - K changes (via TargetToExcessScaling): Scale excess to maintain current price
 //   - StaticPricing is true: Set excess to 0, enabling fixed price mode
@@ -60,7 +57,7 @@ func (tm *Time) findExcessForPrice(targetPrice gas.Price) gas.Gas {
 	// We return 0 in case targetPrice < minPrice because we should at least maintain the minimum price
 	// by setting the excess to 0. ( P = M * e^(0 / K) = M )
 	// Note: Even though we return 0 for excess it won't avoid accumulating excess in the long run.
-	if targetPrice <= tm.config.minPrice || tm.config.staticPricing {
+	if targetPrice <= tm.config.MinPrice || tm.config.StaticPricing {
 		return 0
 	}
 
@@ -70,7 +67,7 @@ func (tm *Time) findExcessForPrice(targetPrice gas.Price) gas.Gas {
 	lo, hi := gas.Gas(0), gas.Gas(math.MaxUint64)
 	for lo < hi {
 		mid := lo + (hi-lo)/2
-		if gas.CalculatePrice(tm.config.minPrice, mid, k) >= targetPrice {
+		if gas.CalculatePrice(tm.config.MinPrice, mid, k) >= targetPrice {
 			hi = mid
 		} else {
 			lo = mid + 1

@@ -173,7 +173,7 @@ type selfAsHasher common.Hash
 
 func (h selfAsHasher) Hash() common.Hash { return common.Hash(h) }
 
-func mustNewGasTime(tb testing.TB, at time.Time, target, excess gas.Gas, gasPriceConfig saetypes.GasPriceConfig) *gastime.Time {
+func mustNewGasTime(tb testing.TB, at time.Time, target, excess gas.Gas, gasPriceConfig gastime.GasPriceConfig) *gastime.Time {
 	tb.Helper()
 	tm, err := gastime.New(at, target, excess, gasPriceConfig)
 	require.NoError(tb, err, "gastime.New()")

@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
@@ -33,9 +32,9 @@ import (
 //nolint:tagliatelle,revive // tagliatelle: can't handle embedded field; struct-tag: canoto allows unexported fields
 type Time struct {
 	*proxytime.Time[gas.Gas] `canoto:"pointer,1"`
-	target                   gas.Gas `canoto:"uint,2"`
-	excess                   gas.Gas `canoto:"uint,3"`
-	config                   config  `canoto:"value,4"`
+	target                   gas.Gas        `canoto:"uint,2"`
+	excess                   gas.Gas        `canoto:"uint,3"`
+	config                   GasPriceConfig `canoto:"value,4"`
 
 	canotoData canotoData_Time `canoto:"nocopy"`
 }
@@ -43,9 +42,8 @@ type Time struct {
 // New returns a new [Time], derived from a [time.Time]. The consumption of
 // `target` * [TargetToRate] units of [gas.Gas] is equivalent to a tick of 1
 // second.
-func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig saetypes.GasPriceConfig) (*Time, error) {
-	cfg, err := newConfig(gasPriceConfig)
-	if err != nil {
+func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceConfig) (*Time, error) {
+	if err := gasPriceConfig.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -57,7 +55,7 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig saetypes.G
 		Time:   tm,
 		target: target,
 		excess: startingExcess,
-		config: cfg,
+		config: gasPriceConfig,
 	}, nil
 }
 
@@ -86,9 +84,9 @@ const DefaultTargetToExcessScaling = 87
 // parameter in ACP-176's price calculation.
 const DefaultMinPrice gas.Price = 1
 
-// DefaultGasPriceConfig returns the default [saetypes.GasPriceConfig] values.
-func DefaultGasPriceConfig() saetypes.GasPriceConfig {
-	return saetypes.GasPriceConfig{
+// DefaultGasPriceConfig returns the default [GasPriceConfig] values.
+func DefaultGasPriceConfig() GasPriceConfig {
+	return GasPriceConfig{
 		TargetToExcessScaling: DefaultTargetToExcessScaling,
 		MinPrice:              DefaultMinPrice,
 		StaticPricing:         false,
@@ -136,21 +134,21 @@ func (tm *Time) Excess() gas.Gas {
 }
 
 // Price returns the price of a unit of gas, i.e. the "base fee", determined by
-// [gas.CalculatePrice]. However, when [saetypes.GasPriceConfig.StaticPricing] is
-// true, Price always returns [saetypes.GasPriceConfig.MinPrice].
+// [gas.CalculatePrice]. However, when [GasPriceConfig.StaticPricing] is
+// true, Price always returns [GasPriceConfig.MinPrice].
 func (tm *Time) Price() gas.Price {
-	if tm.config.staticPricing {
-		return tm.config.minPrice
+	if tm.config.StaticPricing {
+		return tm.config.MinPrice
 	}
 	// TODO (ceyonur): Consider omitting `MinPrice` in favor of `MinExcess`.
 	// https://github.com/ava-labs/strevm/issues/267
-	return gas.CalculatePrice(tm.config.minPrice, tm.excess, tm.excessScalingFactor())
+	return gas.CalculatePrice(tm.config.MinPrice, tm.excess, tm.excessScalingFactor())
 }
 
 // excessScalingFactor returns the K variable of ACP-103/176, i.e.
-// [config.targetToExcessScaling] * T, capped at [math.MaxUint64].
+// [GasPriceConfig.TargetToExcessScaling] * T, capped at [math.MaxUint64].
 func (tm *Time) excessScalingFactor() gas.Gas {
-	return intmath.BoundedMultiply(tm.config.targetToExcessScaling, tm.target, math.MaxUint64)
+	return intmath.BoundedMultiply(tm.config.TargetToExcessScaling, tm.target, math.MaxUint64)
 }
 
 // BaseFee is equivalent to [Time.Price], returning the result as a uint256 for

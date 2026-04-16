@@ -37,7 +37,7 @@ type Stub struct {
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
-	GasPriceConfig          saetypes.GasPriceConfig
+	GasPriceConfig          gastime.GasPriceConfig
 }
 
 var _ hook.PointsG[Op] = (*Stub)(nil)
@@ -46,7 +46,7 @@ var _ hook.PointsG[Op] = (*Stub)(nil)
 type HookOption = options.Option[Stub]
 
 // WithGasPriceConfig overrides the default gas config.
-func WithGasPriceConfig(cfg saetypes.GasPriceConfig) HookOption {
+func WithGasPriceConfig(cfg gastime.GasPriceConfig) HookOption {
 	return options.Func[Stub](func(s *Stub) {
 		s.GasPriceConfig = cfg
 	})
@@ -193,7 +193,7 @@ func (s *Stub) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[Op], error)
 }
 
 // GasConfigAfter ignores its argument and always returns [Stub.Target] and [Stub.GasPriceConfig].
-func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, saetypes.GasPriceConfig) {
+func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	return s.Target, s.GasPriceConfig
 }
 
