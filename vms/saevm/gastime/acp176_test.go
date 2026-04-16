@@ -668,7 +668,7 @@ func TestAfterBlock(t *testing.T) {
 			assert.Equal(t, tm.Target()*TargetToRate, tm.Rate(), "init Rate")
 
 			err := tm.AfterBlock(tt.gasUsed, tt.new.target, tt.new.config)
-			require.ErrorIs(t, err, tt.wantErr)
+			require.ErrorIsf(t, err, tt.wantErr, "%T.AfterBlock", tm)
 			assert.Equal(t, tt.new.excess, tm.Excess(), "new Excess")
 			assert.Equal(t, tt.new.price, tm.Price(), "new Price")
 			assert.Equal(t, tm.Target()*TargetToRate, tm.Rate(), "new Rate")
@@ -698,25 +698,25 @@ func TestOscillatingMinPrice(t *testing.T) {
 	control := mustNew(t, time.Unix(0, 0), target, 0, highPriceConfig)
 	modified := mustNew(t, time.Unix(0, 0), target, 0, highPriceConfig)
 
-	require.Equal(t, highMinPrice, control.Price())
-	require.Equal(t, highMinPrice, modified.Price())
+	require.Equalf(t, highMinPrice, control.Price(), "%T.Price()", control)
+	require.Equalf(t, highMinPrice, modified.Price(), "%T.Price()", modified)
 
 	for i := range numBlocks {
-		require.NoError(t, control.AfterBlock(
+		require.NoErrorf(t, control.AfterBlock(
 			gasPerBlock,
 			target,
 			highPriceConfig,
-		))
+		), "%T.AfterBlock(static)", control)
 
 		oscillatingConfig := highPriceConfig
 		if i%2 == 0 {
 			oscillatingConfig = lowPriceConfig
 		}
-		require.NoError(t, modified.AfterBlock(
+		require.NoErrorf(t, modified.AfterBlock(
 			gasPerBlock,
 			target,
 			oscillatingConfig,
-		))
+		), "%T.AfterBlock(oscillating)", modified)
 	}
 
 	// Sanity check that price normally increases.
@@ -753,13 +753,13 @@ func FuzzPriceExcess(f *testing.F) {
 
 		x := priceExcess(p, k)
 		gotP := calculatePrice(x, k)
-		assert.LessOrEqual(t, gotP, p, "priceExcess should round down")
+		assert.LessOrEqual(t, gotP, p, "gotPrice <= wantPrice")
 
 		if gotP < p && x != math.MaxUint64 {
-			require.Greater(t, calculatePrice(x+1, k), p, "calculatePrice can't represent p")
+			require.Greater(t, calculatePrice(x+1, k), p, "calculatePrice(x+1) > wantPrice")
 		}
 		if gotP == p && x != 0 {
-			require.Less(t, calculatePrice(x-1, k), p, "excess should be minimal")
+			require.Less(t, calculatePrice(x-1, k), p, "calculatePrice(x-1) < wantPrice")
 		}
 	})
 }
