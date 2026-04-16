@@ -149,7 +149,7 @@ func (tm *Time) Excess() gas.Gas {
 // [gas.CalculatePrice].
 func (tm *Time) Price() gas.Price {
 	p := calculatePrice(tm.excess, tm.excessScalingFactor())
-	// When minPrice can't be represented by e^(x/k), we must adjust p.
+	// When minPrice can't be represented by e^(x/k), p may be too low.
 	return max(tm.config.minPrice, p)
 }
 
