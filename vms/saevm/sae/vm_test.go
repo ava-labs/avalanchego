@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"math/big"
 	"net/http/httptest"
 	"os"
@@ -64,9 +63,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	createWorstCaseFuzzFlags(flag.CommandLine)
-	flag.Parse()
-
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelError, true)))
 
 	goleak.VerifyTestMain(

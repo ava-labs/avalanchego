@@ -6,7 +6,6 @@ package sae
 import (
 	"encoding/binary"
 	"errors"
-	"flag"
 	"math"
 	"math/big"
 	"math/rand/v2"
@@ -31,33 +30,6 @@ import (
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
-
-var worstCaseFuzzFlags struct {
-	numAccounts       uint
-	balance           uint256.Int
-	parallel          uint
-	numBlocks         uint
-	maxNewTxsPerBlock uint
-	maxGasLimit       uint64
-	maxTxValue        uint64
-	rngSeed           uint64
-}
-
-func createWorstCaseFuzzFlags(set *flag.FlagSet) {
-	name := func(n string) string {
-		return "worstcase.fuzz." + n
-	}
-	fs := &worstCaseFuzzFlags
-
-	set.UintVar(&fs.numAccounts, name("num_eoa"), 10, "Number of EOAs to send funds between")
-	set.TextVar(&fs.balance, name("eoa_balance"), uint256.NewInt(params.Ether), "Starting balance of EOAs")
-	set.UintVar(&fs.parallel, name("parallel"), uint(runtime.GOMAXPROCS(0)), "Number of parallel tests to run; defaults to GOMAXPROCS") //#nosec G115 -- Known to be positive
-	set.UintVar(&fs.numBlocks, name("blocks"), 50, "Number of blocks to build and execute (fixed)")
-	set.UintVar(&fs.maxNewTxsPerBlock, name("max_new_txs"), 100, "Maximum number of new transactions to send before building each block (uniform distribution)")
-	set.Uint64Var(&fs.maxGasLimit, name("max_gas_limit"), 60e6, "Maximum gas limit per transaction (uniform distribution)")
-	set.Uint64Var(&fs.maxTxValue, name("max_tx_value"), params.Ether/1000, "Maximum tx value to send per transaction (uniform distribution)")
-	set.Uint64Var(&fs.rngSeed, name("rng_seed"), 0, "Seed for random-number generator; ignored if zero")
-}
 
 // A guzzler is both a [params.ChainConfigHooks] and [params.RulesHooks]. When
 // registered as libevm extras they result in the [guzzler.guzzle] method being
@@ -118,8 +90,18 @@ func TestWorstCase(t *testing.T) {
 	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
 		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
 	}
-	flags := worstCaseFuzzFlags
-	t.Logf("Flags: %+v", flags)
+
+	const (
+		numAccounts       = 10
+		numBlocks         = 50
+		maxNewTxsPerBlock = 100
+		maxGasLimit       = 60e6
+		maxTxValue        = params.Ether / 1000
+	)
+	var (
+		balance  = uint256.NewInt(params.Ether)
+		parallel = runtime.GOMAXPROCS(0)
+	)
 
 	guzzle := common.Address{'g', 'u', 'z', 'z', 'l', 'e'}
 	g := &guzzler{Addr: guzzle}
@@ -135,7 +117,7 @@ func TestWorstCase(t *testing.T) {
 
 		for _, acc := range c.genesis.Alloc {
 			// Note that `acc` isn't a pointer, but `Balance` is.
-			acc.Balance.Set(flags.balance.ToBig())
+			acc.Balance.Set(balance.ToBig())
 		}
 	})
 
@@ -193,33 +175,26 @@ func TestWorstCase(t *testing.T) {
 		t.FailNow()
 	}
 
-	for range flags.parallel {
+	for range parallel {
 		t.Run("fuzz", func(t *testing.T) {
 			t.Parallel()
 
 			timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
-			ctx, sut := newSUT(t, flags.numAccounts, sutOpt, timeOpt)
+			ctx, sut := newSUT(t, numAccounts, sutOpt, timeOpt)
 
 			addrs := sut.wallet.Addresses()
 			numEOAs := len(addrs)
 			addrs = append(addrs, guzzle)
 			guzzlerIdx := numEOAs
 
-			var seed uint64
-			if flags.rngSeed != 0 {
-				seed = flags.rngSeed
-			} else {
-				seed = rand.Uint64() //#nosec G404 -- Not for security
-			}
-			t.Logf("RNG seed: %d", seed)
-			rng := rand.New(rand.NewPCG(0, seed)) //#nosec G404 -- Allow for reproducibility
+			rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Allow for reproducibility
 
-			for range flags.numBlocks {
-				for range rng.UintN(flags.maxNewTxsPerBlock) {
+			for range numBlocks {
+				for range rng.UintN(maxNewTxsPerBlock) {
 					from := rng.IntN(numEOAs)
 					to := rng.IntN(numEOAs + 1)
-					gasLim := params.TxGas + rng.Uint64N(flags.maxGasLimit)
+					gasLim := params.TxGas + rng.Uint64N(maxGasLimit)
 					var data []byte
 					if to == guzzlerIdx {
 						data = binary.BigEndian.AppendUint64(nil, rng.Uint64N(gasLim))
@@ -230,7 +205,7 @@ func TestWorstCase(t *testing.T) {
 						GasFeeCap: big.NewInt(1 + rng.Int64N(100)),
 						Gas:       gasLim,
 						Data:      data,
-						Value:     uint256.NewInt(rng.Uint64N(flags.maxTxValue)).ToBig(),
+						Value:     uint256.NewInt(rng.Uint64N(maxTxValue)).ToBig(),
 					})
 
 					if err := sut.SendTransaction(ctx, tx); err != nil {
