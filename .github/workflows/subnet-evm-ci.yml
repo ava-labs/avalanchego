@@ -96,7 +96,7 @@ jobs:
       - name: Install qemu (required for cross-platform builds)
         run: |
           sudo apt update
-          sudo apt -y install qemu-system qemu-user-static
+          sudo apt -y install qemu-user-static
       - name: Check image build
         run: ./scripts/run_task.sh test-build-image
 
