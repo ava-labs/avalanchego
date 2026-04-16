@@ -26,9 +26,7 @@ else
     timeout=$((fuzzTime + 1200))
 fi
 
-EXCLUDE_DIR="graft"
-
-files=$(grep -r --exclude-dir="$EXCLUDE_DIR" --include='**_test.go' --files-with-matches 'func Fuzz' "$fuzzDir")
+files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' "$fuzzDir")
 failed=false
 for file in ${files}
 do
