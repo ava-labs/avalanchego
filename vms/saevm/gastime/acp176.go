@@ -6,39 +6,46 @@ package gastime
 import (
 	"fmt"
 	"math"
-
-	"github.com/ava-labs/libevm/core/types"
+	"time"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
 
-// BeforeBlock is intended to be called before processing a block, with the
-// timestamp sourced from [hook.Points] and [types.Header].
-func (tm *Time) BeforeBlock(hooks hook.Points, h *types.Header) {
-	tm.FastForwardTo(
-		h.Time,
-		SubSecond(hooks, h, tm.Rate()),
+// BeforeBlock is intended to be called before processing a block with the
+// provided time. The gastime is advanced to be no earlier than the block time.
+func (tm *Time) BeforeBlock(bTime time.Time) {
+	s, ns := bTime.Unix(), bTime.Nanosecond()
+	// g = ceil(ns * rate / time.Second)
+	g, _, err := intmath.MulDivCeil(
+		gas.Gas(ns), //#nosec G115 -- ns is in [0, time.Second)
+		tm.Rate(),
+		gas.Gas(time.Second),
 	)
+	if err != nil {
+		// [time.Time.Nanosecond] is documented as only returning values in the
+		// range [0, time.Second). So either Nanosecond returned an incorrect
+		// value, or [intmath.MulDivCeil] incorrectly returned an error.
+		// Regardless, this failure MUST be detected in tests, hence not just
+		// dropping the error.
+		panic(fmt.Sprintf("broken invariant: %v", err))
+	}
+	tm.FastForwardTo(uint64(s), g) //#nosec G115 -- known non-negative.
 }
 
 // AfterBlock is intended to be called after processing a block, with the
-// target and gas configuration sourced from [hook.Points] and [types.Header].
-func (tm *Time) AfterBlock(used gas.Gas, hooks hook.Points, h *types.Header) error {
-	tm.Tick(used)
-
-	target, hookCfg := hooks.GasConfigAfter(h)
-	c, err := newConfig(hookCfg)
-	if err != nil {
-		return fmt.Errorf("%T.newConfig() after block: %w", tm, err)
+// target and gas configuration provided.
+func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error {
+	if err := c.Validate(); err != nil {
+		return fmt.Errorf("%T.Validate() after block: %w", c, err)
 	}
 
+	tm.Tick(used)
 	tm.setGasPriceConfig(target, c)
 	return nil
 }
 
-func (tm *Time) setGasPriceConfig(target gas.Gas, c config) {
+func (tm *Time) setGasPriceConfig(target gas.Gas, c GasPriceConfig) {
 	// x := x * (K' * T') / (K * T)
 	oldK := tm.excessScalingFactor() // K * T
 
@@ -53,12 +60,12 @@ func (tm *Time) setGasPriceConfig(target gas.Gas, c config) {
 	}
 	tm.excess = scaled
 
-	if c.staticPricing {
+	if c.StaticPricing {
 		tm.excess = 0
 	}
 
 	// x := max(x, ln(minPrice) * K' * T')
-	minExcess := priceExcess(c.minPrice, newK)
+	minExcess := priceExcess(c.MinPrice, newK)
 	tm.excess = max(tm.excess, minExcess)
 }
 

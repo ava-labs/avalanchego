@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
@@ -36,7 +37,7 @@ type Stub struct {
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
-	GasPriceConfig          hook.GasPriceConfig
+	GasPriceConfig          gastime.GasPriceConfig
 }
 
 var _ hook.PointsG[Op] = (*Stub)(nil)
@@ -45,7 +46,7 @@ var _ hook.PointsG[Op] = (*Stub)(nil)
 type HookOption = options.Option[Stub]
 
 // WithGasPriceConfig overrides the default gas config.
-func WithGasPriceConfig(cfg hook.GasPriceConfig) HookOption {
+func WithGasPriceConfig(cfg gastime.GasPriceConfig) HookOption {
 	return options.Func[Stub](func(s *Stub) {
 		s.GasPriceConfig = cfg
 	})
@@ -82,16 +83,9 @@ func WithExecutionResultsDBFn(fn func(string) (saetypes.ExecutionResults, error)
 // NewStub returns a stub with defaults applied.
 // It uses [gastime.DefaultGasPriceConfig] unless overridden by [WithGasPriceConfig].
 func NewStub(target gas.Gas, opts ...HookOption) *Stub {
-	// defaultGasPriceConfig is the same as [gastime.DefaultGasPriceConfig]. It is defined
-	// here to avoid a circular dependency between [gastime] and [hookstest].
-	defaultGasPriceConfig := hook.GasPriceConfig{
-		TargetToExcessScaling: 87,
-		MinPrice:              1,
-		StaticPricing:         false,
-	}
 	return options.ApplyTo(&Stub{
 		Target:         target,
-		GasPriceConfig: defaultGasPriceConfig,
+		GasPriceConfig: gastime.DefaultGasPriceConfig(),
 	}, opts...)
 }
 
@@ -199,15 +193,16 @@ func (s *Stub) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[Op], error)
 }
 
 // GasConfigAfter ignores its argument and always returns [Stub.Target] and [Stub.GasPriceConfig].
-func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, hook.GasPriceConfig) {
+func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	return s.Target, s.GasPriceConfig
 }
 
-// SubSecondBlockTime returns the sub-second time encoded and stored by
-// [Stub.BuildHeader] in the header's `Extra` field. If said field is empty,
-// SubSecondBlockTime returns 0.
-func (*Stub) SubSecondBlockTime(hdr *types.Header) time.Duration {
-	return getHeaderExtra(hdr, func(e extra) time.Duration { return e.subSec })
+// BlockTime returns exact block time from [Stub.BuildHeader] by combining the
+// stored seconds in [types.Header.Time] and the sub-second component from
+// [types.Header.Extra].
+func (*Stub) BlockTime(hdr *types.Header) time.Time {
+	subSec := getHeaderExtra(hdr, func(e extra) time.Duration { return e.subSec }) //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
+	return time.Unix(int64(hdr.Time), int64(subSec))                               //#nosec G115 -- Won't overflow for a few millennia
 }
 
 // SettledHeight returns the height encoded in the Header by [Stub.BuildBlock]

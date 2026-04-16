@@ -8,13 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 )
 
 // TestInvalidConfigRejected verifies that zero values for TargetToExcessScaling
@@ -25,18 +22,18 @@ func TestInvalidConfigRejected(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		config   hook.GasPriceConfig
+		config   GasPriceConfig
 		expected error
 	}{
 		{
 			"zero_scaling",
-			hook.GasPriceConfig{TargetToExcessScaling: 0, MinPrice: DefaultGasPriceConfig().MinPrice},
-			errInvalidGasPriceConfig,
+			GasPriceConfig{TargetToExcessScaling: 0, MinPrice: DefaultGasPriceConfig().MinPrice},
+			errTargetToExcessScalingZero,
 		},
 		{
 			"zero_min_price",
-			hook.GasPriceConfig{TargetToExcessScaling: DefaultGasPriceConfig().TargetToExcessScaling, MinPrice: 0},
-			errInvalidGasPriceConfig,
+			GasPriceConfig{TargetToExcessScaling: DefaultGasPriceConfig().TargetToExcessScaling, MinPrice: 0},
+			errMinPriceZero,
 		},
 	}
 
@@ -44,15 +41,14 @@ func TestInvalidConfigRejected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tm := mustNew(t, time.Unix(42, 0), target, 0, DefaultGasPriceConfig())
 
-			initialScaling := tm.config.targetToExcessScaling
-			initialMinPrice := tm.config.minPrice
-			hooks := hookstest.NewStub(target, hookstest.WithGasPriceConfig(tt.config))
-			err := tm.AfterBlock(0, hooks, &types.Header{Time: 42})
+			initialScaling := tm.config.TargetToExcessScaling
+			initialMinPrice := tm.config.MinPrice
+			err := tm.AfterBlock(0, target, tt.config)
 			require.ErrorIs(t, err, tt.expected, "AfterBlock()")
 
 			// Config unchanged after rejected update
-			assert.Equal(t, initialScaling, tm.config.targetToExcessScaling, "targetToExcessScaling changed")
-			assert.Equal(t, initialMinPrice, tm.config.minPrice, "minPrice changed")
+			assert.Equal(t, initialScaling, tm.config.TargetToExcessScaling, "targetToExcessScaling changed")
+			assert.Equal(t, initialMinPrice, tm.config.MinPrice, "minPrice changed")
 		})
 	}
 }
@@ -69,17 +65,13 @@ func TestTargetUpdateTiming(t *testing.T) {
 	initialRate := tm.Rate()
 
 	const (
-		newTime   uint64 = initialTime + 1
-		newTarget        = initialTarget + 100_000
+		newTime   = initialTime + 1
+		newTarget = initialTarget + 100_000
 	)
-	hook := hookstest.NewStub(newTarget)
-	header := &types.Header{
-		Time: newTime,
-	}
 
 	initialPrice := tm.Price()
-	tm.BeforeBlock(hook, header)
-	assert.Equal(t, newTime, tm.Unix(), "Unix time advanced by BeforeBlock()")
+	tm.BeforeBlock(time.Unix(newTime, 0))
+	assert.Equal(t, uint64(newTime), tm.Unix(), "Unix time advanced by BeforeBlock()")
 	assert.Equal(t, initialTarget, tm.Target(), "Target not changed by BeforeBlock()")
 	// While the price technically could remain the same, being more strict
 	// ensures the test is meaningful.
@@ -94,8 +86,8 @@ func TestTargetUpdateTiming(t *testing.T) {
 		expectedEndTime  = newTime + secondsOfGasUsed
 	)
 	used := initialRate * secondsOfGasUsed
-	require.NoError(t, tm.AfterBlock(used, hook, header), "AfterBlock()")
-	assert.Equal(t, expectedEndTime, tm.Unix(), "Unix time advanced by AfterBlock() due to gas consumption")
+	require.NoError(t, tm.AfterBlock(used, newTarget, DefaultGasPriceConfig()), "AfterBlock()")
+	assert.Equal(t, uint64(expectedEndTime), tm.Unix(), "Unix time advanced by AfterBlock() due to gas consumption")
 	assert.Equal(t, newTarget, tm.Target(), "Target updated by AfterBlock()")
 	// While the price technically could remain the same, being more strict
 	// ensures the test is meaningful.
@@ -112,6 +104,7 @@ func FuzzWorstCasePrice(f *testing.F) {
 		time3, nanos3, used3, limit3, target3 uint64,
 	) {
 		initTarget = max(initTarget, 1)
+		gasCfg := DefaultGasPriceConfig()
 
 		initUnix := int64(min(initTimestamp, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
 		worstcase := mustNew(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
@@ -156,25 +149,17 @@ func FuzzWorstCasePrice(f *testing.F) {
 		for _, block := range blocks {
 			block.limit = max(block.used, block.limit)
 			block.target = clampTarget(max(block.target, 1))
+			blockSeconds := int64(min(block.time, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
 
-			header := &types.Header{
-				Time: block.time,
-			}
-			hook := hookstest.NewStub(block.target, hookstest.WithNow(func() time.Time {
-				return time.Unix(
-					int64(block.time), //#nosec G115 -- Won't overflow for a few millennia
-					int64(block.nanos),
-				)
-			}))
-
-			worstcase.BeforeBlock(hook, header)
-			actual.BeforeBlock(hook, header)
+			tm := time.Unix(blockSeconds, int64(block.nanos))
+			worstcase.BeforeBlock(tm)
+			actual.BeforeBlock(tm)
 
 			// The crux of this test lies in the maintaining of this inequality
 			// through the use of `limit` instead of `used` in `AfterBlock()`
 			require.LessOrEqualf(t, actual.Price(), worstcase.Price(), "actual <= worst-case %T.Price()", actual)
-			require.NoError(t, worstcase.AfterBlock(block.limit, hook, header), "worstcase.AfterBlock()")
-			require.NoError(t, actual.AfterBlock(block.used, hook, header), "actual.AfterBlock()")
+			require.NoError(t, worstcase.AfterBlock(block.limit, block.target, gasCfg), "worstcase.AfterBlock()")
+			require.NoError(t, actual.AfterBlock(block.used, block.target, gasCfg), "actual.AfterBlock()")
 		}
 	})
 }
@@ -183,7 +168,7 @@ func TestAfterBlock(t *testing.T) {
 	type state struct {
 		target gas.Gas
 		excess gas.Gas
-		config hook.GasPriceConfig
+		config GasPriceConfig
 		price  gas.Price
 	}
 	tests := []struct {
@@ -199,7 +184,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 2_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -208,7 +193,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 2_000_000,
 				excess: 4_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -220,7 +205,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 2_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -229,7 +214,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 4_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 2,
 					MinPrice:              1,
 				},
@@ -241,7 +226,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 2_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -250,7 +235,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 2_000_000,
 				excess: 8_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 2,
 					MinPrice:              1,
 				},
@@ -262,7 +247,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -271,7 +256,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 2_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 2,
 					MinPrice:              1,
 				},
@@ -283,7 +268,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -293,7 +278,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 500_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -305,7 +290,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 2_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -315,7 +300,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 2_000_000,
 				excess: 5_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -327,7 +312,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 2_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -336,7 +321,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 400_649_807,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              100,
 				},
@@ -348,7 +333,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -357,7 +342,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 1_802_924_127,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1_000_000_000,
 				},
@@ -369,7 +354,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 400_649_807,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -378,7 +363,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 400_649_807,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              50,
 				},
@@ -390,7 +375,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 400_649_807,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              100,
 				},
@@ -399,7 +384,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 400_649_807,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -413,7 +398,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 					StaticPricing:         true,
@@ -424,7 +409,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 					StaticPricing:         true,
@@ -437,7 +422,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 1_000_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -446,7 +431,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 					StaticPricing:         true,
@@ -459,7 +444,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 400_649_807,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              100,
 					StaticPricing:         true,
@@ -469,7 +454,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 400_649_807,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              50,
 				},
@@ -481,7 +466,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 400_649_807,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              100,
 					StaticPricing:         true,
@@ -491,7 +476,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 460_953_612,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              200,
 					StaticPricing:         true,
@@ -506,7 +491,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 2_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -515,7 +500,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: math.MaxUint64,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: math.MaxUint64,
 					MinPrice:              1,
 				},
@@ -527,7 +512,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 10_000_000_000_000_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -536,7 +521,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 11_494_252_873_563_218_391,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 100,
 					MinPrice:              1,
 				},
@@ -548,7 +533,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 1_802_924_127,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -557,7 +542,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 1_036_163_292,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 50,
 					MinPrice:              1,
 				},
@@ -569,7 +554,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: math.MaxUint64 - 1,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: math.MaxInt64,
 					MinPrice:              1,
 				},
@@ -578,7 +563,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 1_000_000,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -590,7 +575,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
@@ -599,7 +584,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 44_361_420,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              math.MaxUint64,
 				},
@@ -613,7 +598,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 0,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -622,7 +607,7 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -634,7 +619,7 @@ func TestAfterBlock(t *testing.T) {
 			init: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -643,20 +628,20 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 0,
 					MinPrice:              1,
 				},
 				price: 1,
 			},
-			wantErr: errInvalidGasPriceConfig,
+			wantErr: errTargetToExcessScalingZero,
 		},
 		{
 			name: "invalid_zero_min_price",
 			init: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              1,
 				},
@@ -665,13 +650,13 @@ func TestAfterBlock(t *testing.T) {
 			new: state{
 				target: 1_000_000,
 				excess: 0,
-				config: hook.GasPriceConfig{
+				config: GasPriceConfig{
 					TargetToExcessScaling: 87,
 					MinPrice:              0,
 				},
 				price: 1,
 			},
-			wantErr: errInvalidGasPriceConfig,
+			wantErr: errMinPriceZero,
 		},
 	}
 
@@ -682,11 +667,7 @@ func TestAfterBlock(t *testing.T) {
 			assert.Equal(t, tt.init.price, tm.Price(), "init Price")
 			assert.Equal(t, tm.Target()*TargetToRate, tm.Rate(), "init Rate")
 
-			hooks := hookstest.NewStub(
-				tt.new.target,
-				hookstest.WithGasPriceConfig(tt.new.config),
-			)
-			err := tm.AfterBlock(tt.gasUsed, hooks, nil)
+			err := tm.AfterBlock(tt.gasUsed, tt.new.target, tt.new.config)
 			require.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.new.excess, tm.Excess(), "new Excess")
 			assert.Equal(t, tt.new.price, tm.Price(), "new Price")
@@ -723,8 +704,8 @@ func TestOscillatingMinPrice(t *testing.T) {
 	for i := range numBlocks {
 		require.NoError(t, control.AfterBlock(
 			gasPerBlock,
-			hookstest.NewStub(target, hookstest.WithGasPriceConfig(highPriceConfig)),
-			nil,
+			target,
+			highPriceConfig,
 		))
 
 		oscillatingConfig := highPriceConfig
@@ -733,8 +714,8 @@ func TestOscillatingMinPrice(t *testing.T) {
 		}
 		require.NoError(t, modified.AfterBlock(
 			gasPerBlock,
-			hookstest.NewStub(target, hookstest.WithGasPriceConfig(oscillatingConfig)),
-			nil,
+			target,
+			oscillatingConfig,
 		))
 	}
 

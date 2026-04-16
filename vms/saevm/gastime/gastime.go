@@ -8,11 +8,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
@@ -34,9 +32,9 @@ import (
 //nolint:tagliatelle,revive // tagliatelle: can't handle embedded field; struct-tag: canoto allows unexported fields
 type Time struct {
 	*proxytime.Time[gas.Gas] `canoto:"pointer,1"`
-	target                   gas.Gas `canoto:"uint,2"`
-	excess                   gas.Gas `canoto:"uint,3"`
-	config                   config  `canoto:"value,4"`
+	target                   gas.Gas        `canoto:"uint,2"`
+	excess                   gas.Gas        `canoto:"uint,3"`
+	config                   GasPriceConfig `canoto:"value,4"`
 
 	canotoData canotoData_Time `canoto:"nocopy"`
 }
@@ -44,9 +42,8 @@ type Time struct {
 // New returns a new [Time], derived from a [time.Time]. The consumption of
 // `target` * [TargetToRate] units of [gas.Gas] is equivalent to a tick of 1
 // second.
-func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig hook.GasPriceConfig) (*Time, error) {
-	cfg, err := newConfig(gasPriceConfig)
-	if err != nil {
+func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time, error) {
+	if err := c.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -57,57 +54,25 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig hook.GasPr
 	t := &Time{
 		Time:   tm,
 		target: target,
-		config: cfg,
+		config: c,
 	}
 
 	// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
 	// meaningfully provide. We should instead take in startingPrice.
-	if cfg.staticPricing {
+	if c.StaticPricing {
 		startingExcess = 0
 	}
-	minExcess := priceExcess(cfg.minPrice, t.excessScalingFactor())
+	minExcess := priceExcess(c.MinPrice, t.excessScalingFactor())
 	t.excess = max(startingExcess, minExcess)
 	return t, nil
-}
-
-// SubSecond scales the value returned by [hook.Points.SubSecondBlockTime] to
-// reflect the given gas rate.
-func SubSecond(hooks hook.Points, hdr *types.Header, rate gas.Gas) gas.Gas {
-	// [hook.Points.SubSecondBlockTime] is required to return values in
-	// [0,second). The lower bound guarantees that the conversion to unsigned
-	// [gas.Gas] is safe while the upper bound guarantees that the mul-div
-	// result can't overflow so we don't have to check the error.
-	g, _, _ := intmath.MulDivCeil(
-		gas.Gas(hooks.SubSecondBlockTime(hdr)), //#nosec G115 -- See above
-		rate,
-		gas.Gas(time.Second),
-	)
-	return g
-}
-
-// TargetToRate is the ratio between [Time.Target] and [proxytime.Time.Rate].
-const TargetToRate = 2
-
-// DefaultTargetToExcessScaling is the default ratio between gas target and the
-// reciprocal of the excess coefficient used in price calculation (K variable in ACP-176).
-const DefaultTargetToExcessScaling = 87
-
-// DefaultMinPrice is the default minimum gas price (base fee), i.e. the M
-// parameter in ACP-176's price calculation.
-const DefaultMinPrice gas.Price = 1
-
-// DefaultGasPriceConfig returns the default [hook.GasPriceConfig] values.
-func DefaultGasPriceConfig() hook.GasPriceConfig {
-	return hook.GasPriceConfig{
-		TargetToExcessScaling: DefaultTargetToExcessScaling,
-		MinPrice:              DefaultMinPrice,
-		StaticPricing:         false,
-	}
 }
 
 // MinTarget is the minimum allowable [Time.Target] to avoid division by zero.
 // Values below this are silently clamped.
 const MinTarget = gas.Gas(1)
+
+// TargetToRate is the ratio between [Time.Target] and [proxytime.Time.Rate].
+const TargetToRate = 2
 
 // MaxTarget is the maximum allowable [Time.Target] to avoid overflows of the
 // associated [proxytime.Time.Rate]. Values above this are silently clamped.
@@ -150,13 +115,13 @@ func (tm *Time) Excess() gas.Gas {
 func (tm *Time) Price() gas.Price {
 	p := calculatePrice(tm.excess, tm.excessScalingFactor())
 	// When minPrice can't be represented by e^(x/k), p may be too low.
-	return max(tm.config.minPrice, p)
+	return max(tm.config.MinPrice, p)
 }
 
 // excessScalingFactor returns the K variable of ACP-103/176, i.e.
-// [config.targetToExcessScaling] * T, capped at [math.MaxUint64].
+// [GasPriceConfig.TargetToExcessScaling] * T, capped at [math.MaxUint64].
 func (tm *Time) excessScalingFactor() gas.Gas {
-	return intmath.BoundedMultiply(tm.config.targetToExcessScaling, tm.target, math.MaxUint64)
+	return intmath.BoundedMultiply(tm.config.TargetToExcessScaling, tm.target, math.MaxUint64)
 }
 
 // BaseFee is equivalent to [Time.Price], returning the result as a uint256 for
@@ -195,7 +160,7 @@ func (tm *Time) Tick(g gas.Gas) {
 	tm.Time.Tick(g)
 
 	// static pricing keeps excess at its minimum
-	if tm.config.staticPricing {
+	if tm.config.StaticPricing {
 		return
 	}
 
@@ -242,6 +207,6 @@ func (tm *Time) FastForwardTo(to uint64, toFrac gas.Gas) {
 
 	// -fT/R
 	quo, _, _ := intmath.MulDiv(frac.Numerator, T, R) // overflow is impossible as T/R < 1
-	minExcess := priceExcess(tm.config.minPrice, tm.excessScalingFactor())
+	minExcess := priceExcess(tm.config.MinPrice, tm.excessScalingFactor())
 	tm.excess = intmath.BoundedSubtract(tm.excess, quo, minExcess)
 }

@@ -16,12 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
-func mustNew(tb testing.TB, at time.Time, target, startingExcess gas.Gas, gasPriceConfig hook.GasPriceConfig) *Time {
+func mustNew(tb testing.TB, at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceConfig) *Time {
 	tb.Helper()
 	tm, err := New(at, target, startingExcess, gasPriceConfig)
 	require.NoError(tb, err, "New(%v, %d, %d, %v)", at, target, startingExcess, gasPriceConfig)
@@ -36,7 +35,7 @@ func (tm *Time) cloneViaCanotoRoundTrip(tb testing.TB) *Time {
 }
 
 func TestClone(t *testing.T) {
-	tm := mustNew(t, time.Unix(42, 1), 1e6, 1e5, hook.GasPriceConfig{TargetToExcessScaling: 100, MinPrice: 200})
+	tm := mustNew(t, time.Unix(42, 1), 1e6, 1e5, GasPriceConfig{TargetToExcessScaling: 100, MinPrice: 200})
 
 	if diff := cmp.Diff(tm, tm.Clone(), CmpOpt()); diff != "" {
 		t.Errorf("%T.Clone() diff (-want +got):\n%s", tm, diff)
@@ -374,7 +373,7 @@ func TestMinAndStaticPrice(t *testing.T) {
 		{
 			name:     "zero_min_errors",
 			minPrice: 0,
-			wantErr:  testerr.Is(errInvalidGasPriceConfig),
+			wantErr:  testerr.Is(errMinPriceZero),
 		},
 		{
 			name:           "static_pricing_returns_min",
