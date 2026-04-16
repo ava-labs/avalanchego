@@ -153,11 +153,9 @@ func FuzzWorstCasePrice(f *testing.F) {
 		for _, block := range blocks {
 			block.limit = max(block.used, block.limit)
 			block.target = clampTarget(max(block.target, 1))
+			blockSeconds := int64(min(block.time, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
 
-			if block.time > math.MaxInt64 {
-				t.Skip("Block time too large")
-			}
-			tm := time.Unix(int64(block.time), int64(block.nanos))
+			tm := time.Unix(blockSeconds, int64(block.nanos))
 			worstcase.BeforeBlock(tm)
 			actual.BeforeBlock(tm)
 

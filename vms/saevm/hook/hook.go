@@ -60,9 +60,10 @@ type Points interface {
 	// GasConfigAfter returns the gas target and configuration that should go
 	// into effect immediately after the provided block.
 	GasConfigAfter(*types.Header) (target gas.Gas, c gastime.GasPriceConfig)
-	// BlockTime returns the exact block time for the given header, as
-	// recorded in [BlockBuilder.BuildHeader]. The returned time MUST match
-	// the header ([time.Time.Unix] == [types.Header.Time]).
+	// BlockTime returns the exact block time for the given header, as recorded
+	// in [BlockBuilder.BuildHeader]. The returned time MUST match the header
+	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
+	// component.
 	BlockTime(h *types.Header) time.Time
 	// SettledHeight returns the block height which [types.Header.Root] corresponds
 	// with as the post-execution state root. It MUST match the value passed to

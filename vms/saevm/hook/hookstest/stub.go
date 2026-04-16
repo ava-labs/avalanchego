@@ -197,9 +197,9 @@ func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	return s.Target, s.GasPriceConfig
 }
 
-// BlockTime returns the sub-second time encoded and stored by
-// [Stub.BuildHeader] in the header's `Extra` field. If said field is empty,
-// BlockTime returns 0.
+// BlockTime returns exact block time from [Stub.BuildHeader] by combining the
+// stored seconds in [types.Header.Time] and the sub-second component from
+// [types.Header.Extra].
 func (*Stub) BlockTime(hdr *types.Header) time.Time {
 	subSec := getHeaderExtra(hdr, func(e extra) time.Duration { return e.subSec }) //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
 	return time.Unix(int64(hdr.Time), int64(subSec))                               //#nosec G115 -- Won't overflow for a few millennia

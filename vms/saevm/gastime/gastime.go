@@ -63,6 +63,9 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceCo
 // Values below this are silently clamped.
 const MinTarget = gas.Gas(1)
 
+// TargetToRate is the ratio between [Time.Target] and [proxytime.Time.Rate].
+const TargetToRate = 2
+
 // MaxTarget is the maximum allowable [Time.Target] to avoid overflows of the
 // associated [proxytime.Time.Rate]. Values above this are silently clamped.
 const MaxTarget = gas.Gas(math.MaxUint64 / TargetToRate)

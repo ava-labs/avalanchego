@@ -12,21 +12,25 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
 
-// BeforeBlock is intended to be called before processing a block, with the
-// timestamp portions provided. `subSec` must be in [0, second).
+// BeforeBlock is intended to be called before processing a block with the
+// provided time. The gastime is advanced to be no earlier than the block time.
 func (tm *Time) BeforeBlock(bTime time.Time) {
-	// g scales `subSec` by the rate provided relative to 1 second.
-	//
-	// `subSec` is in [0,second). The lower bound guarantees that the conversion to unsigned
-	// [gas.Gas] is safe while the upper bound guarantees that the mul-div
-	// result can't overflow so we don't have to check the error.
-	sec, subSec := bTime.Unix(), bTime.Nanosecond()
-	g, _, _ := intmath.MulDivCeil(
-		gas.Gas(subSec), //#nosec G115 -- See above
+	s, ns := bTime.Unix(), bTime.Nanosecond()
+	// g = ceil(ns * rate / time.Second)
+	g, _, err := intmath.MulDivCeil(
+		gas.Gas(ns), //#nosec G115 -- ns is in [0, time.Second)
 		tm.Rate(),
 		gas.Gas(time.Second),
 	)
-	tm.FastForwardTo(uint64(sec), g) //#nosec G115 -- won't overflow for a long time.
+	if err != nil {
+		// [time.Time.Nanosecond] is documented as only returning values in the
+		// range [0, time.Second). So either Nanosecond returned an incorrect
+		// value, or [intmath.MulDivCeil] incorrectly returned an error.
+		// Regardless, this failure MUST be detected in tests, hence not just
+		// dropping the error.
+		panic(fmt.Sprintf("broken invariant: %v", err))
+	}
+	tm.FastForwardTo(uint64(s), g) //#nosec G115 -- known non-negative.
 }
 
 // AfterBlock is intended to be called after processing a block, with the

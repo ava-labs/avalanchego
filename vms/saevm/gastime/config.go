@@ -28,9 +28,6 @@ type GasPriceConfig struct {
 	canotoData canotoData_GasPriceConfig
 }
 
-// TargetToRate is the ratio between [Time.Target] and [proxytime.Time.Rate].
-const TargetToRate = 2
-
 // DefaultTargetToExcessScaling is the default ratio between gas target and the
 // reciprocal of the excess coefficient used in price calculation (K variable in ACP-176).
 const DefaultTargetToExcessScaling = 87
