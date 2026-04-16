@@ -211,6 +211,7 @@ go_test(
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//eth/tracers/logger",
         "@com_github_ava_labs_libevm//ethclient",
+        "@com_github_ava_labs_libevm//ethclient/gethclient",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/ethapi",

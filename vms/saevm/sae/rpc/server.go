@@ -64,6 +64,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		// - eth_getBlockByHash
 		// - eth_getBlockByNumber
 		// - eth_getCode
+		// - eth_getProof
 		// - eth_getStorageAt
 		// - eth_getUncleByBlockHashAndIndex
 		// - eth_getUncleByBlockNumberAndIndex
@@ -77,7 +78,6 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		//
 		// Undocumented APIs:
 		// - eth_getBlockReceipts
-		// - eth_getProof
 		{"eth", &blockChainAPI{ethapi.NewBlockChainAPI(b), b}},
 		// Standard Ethereum node APIs:
 		// - eth_getBlockTransactionCountByHash

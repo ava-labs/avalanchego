@@ -325,7 +325,7 @@ func TestStatefulRPCs(t *testing.T) {
 		al, gas, errMsg, err := gc.CreateAccessList(ctx, callMsg)
 		require.NoError(t, err, "CreateAccessList()")
 		assert.Empty(t, errMsg, "CreateAccessList() error message")
-		assert.NotNil(t, al, "CreateAccessList() access list")
+		assert.NotEmpty(t, al, "CreateAccessList() access list")
 		assert.Positive(t, gas, "CreateAccessList() gasUsed")
 	})
 }
