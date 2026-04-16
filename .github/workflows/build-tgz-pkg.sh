@@ -8,15 +8,19 @@ set -euo pipefail
 # a sign_tarball() helper. Otherwise, define a no-op stub.
 
 if [[ -n "${GPG_KEY_FILE:-}" && -s "${GPG_KEY_FILE}" ]]; then
+    GNUPGHOME=$(mktemp -d)
+    export GNUPGHOME
+    trap 'gpgconf --kill gpg-agent 2>/dev/null || true; rm -rf "${GNUPGHOME}"' EXIT
+
     echo "Importing GPG key for tarball signing..."
     gpg --batch --import "${GPG_KEY_FILE}"
 
     sign_tarball() {
         local tarball="$1"
         echo "Signing ${tarball}..."
-        gpg --batch --yes --detach-sign \
+        printf '%s' "${GPG_PASSPHRASE:-}" | gpg --batch --yes --detach-sign \
             --pinentry-mode loopback \
-            --passphrase "${GPG_PASSPHRASE:-}" \
+            --passphrase-fd 0 \
             "${tarball}"
         echo "Verifying signature for ${tarball}..."
         gpg --batch --verify "${tarball}.sig" "${tarball}"
