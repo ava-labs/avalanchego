@@ -825,6 +825,7 @@ func TestGetReceipts(t *testing.T) {
 			r.BlockNumber = b.Number()
 			r.TransactionIndex = uint(i) //#nosec G115 -- Known non-negative
 		}
+		require.NoError(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		return b, rs
 	}
 
@@ -834,7 +835,6 @@ func TestGetReceipts(t *testing.T) {
 	settled, wantSettled := slice(t, 2, 4)
 	vmTime.advanceToSettle(ctx, t, settled)
 	unsettled, wantUnsettled := slice(t, 4, 6)
-	require.NoError(t, unsettled.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
 
 	pending := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 		To:       &blockingPrecompile,

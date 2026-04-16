@@ -10,6 +10,7 @@ import (
 	"math"
 	"math/big"
 	"math/rand/v2"
+	"os"
 	"runtime"
 	"testing"
 	"time"
@@ -110,6 +111,13 @@ func (*guzzler) guzzle(env vm.PrecompileEnvironment, input []byte) ([]byte, erro
 }
 
 func TestWorstCase(t *testing.T) {
+	// TODO(alarso16): This test flakes due to a race in the legacypool. When
+	// a block executes, it sends an event to the pool, which causes an
+	// incorrect nonce update if the pool already had a pending transaction from
+	// the same account.
+	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
+		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
+	}
 	flags := worstCaseFuzzFlags
 	t.Logf("Flags: %+v", flags)
 
