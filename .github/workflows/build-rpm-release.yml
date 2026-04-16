@@ -55,7 +55,7 @@ jobs:
 
       - name: Set up packaging environment
         id: setup
-        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml setup-packaging
+        run: ./.github/packaging/scripts/workflow-setup-packaging.sh
         shell: bash
         env:
           TAG_INPUT: ${{ github.event.inputs.tag }}
