@@ -85,6 +85,7 @@ go_test(
     deps = [
         "//api/health",
         "//api/metrics",
+        "//database/memdb",
         "//ids",
         "//snow/consensus/simplex",
         "//snow/networking/benchlist",
@@ -101,6 +102,8 @@ go_test(
         "//utils/set",
         "//utils/timer",
         "//vms",
+        "//vms/example/xsvm",
+        "//vms/example/xsvm/genesis",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
     ],
