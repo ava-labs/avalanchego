@@ -750,6 +750,8 @@ func FuzzPriceExcess(f *testing.F) {
 	f.Add(uint64(2), uint64(1))
 	f.Add(uint64(1), uint64(1_000_000_000))
 	f.Add(uint64(1_000_000_000), uint64(1))
+	f.Add(uint64(1), uint64(math.MaxUint64))
+	f.Add(uint64(math.MaxUint64), uint64(1))
 	f.Add(uint64(math.MaxUint64), uint64(math.MaxUint64))
 	f.Fuzz(func(t *testing.T, pInt, kInt uint64) {
 		p, k := gas.Price(pInt), gas.Gas(kInt)
