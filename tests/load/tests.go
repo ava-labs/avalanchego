@@ -74,8 +74,8 @@ func NewRandomTest(
 		// twice is practically zero. Using random values simplifies gas calculations
 		// as it removes the need to use an SLOAD operation to verify a different
 		// value is being written.
-		writeRand  = rand.New(rand.NewSource(0)) //#nosec G404
-		modifyRand = rand.New(rand.NewSource(1)) //#nosec G404
+		writeRand  = rand.New(rand.NewSource(0))
+		modifyRand = rand.New(rand.NewSource(1))
 	)
 
 	weightedTests := []WeightedTest{
@@ -190,7 +190,7 @@ func NewRandomWeightedTest(
 		)
 	}
 
-	rand := rand.New(source) //#nosec G404
+	rand := rand.New(source)
 
 	return &RandomWeightedTest{
 		tests:       tests,

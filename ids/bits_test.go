@@ -70,7 +70,7 @@ func TestEqualSubsetBadMiddle(t *testing.T) {
 }
 
 func TestEqualSubsetAll3Bytes(t *testing.T) {
-	seed := rand.Uint64() //#nosec G404
+	seed := rand.Uint64()
 	t.Logf("seed: %d", seed)
 	id1 := ID{}.Prefix(seed)
 

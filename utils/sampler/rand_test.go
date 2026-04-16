@@ -169,7 +169,7 @@ func TestRNG(t *testing.T) {
 				onInvalid: t.FailNow,
 				nums:      test.nums,
 			}
-			mathRNG := rand.New(stdSource) //#nosec G404
+			mathRNG := rand.New(stdSource)
 			stdVal := mathRNG.Int63n(int64(test.maximum + 1))
 			require.Equal(test.expected, uint64(stdVal))
 			require.Empty(source.nums)
@@ -202,7 +202,7 @@ func FuzzRNG(f *testing.F) {
 			onInvalid: t.SkipNow,
 			nums:      sourceNums,
 		}
-		mathRNG := rand.New(stdSource) //#nosec G404
+		mathRNG := rand.New(stdSource)
 		stdVal := mathRNG.Int63n(int64(maximum + 1))
 		require.Equal(val, uint64(stdVal))
 		require.Len(stdSource.nums, len(source.nums))

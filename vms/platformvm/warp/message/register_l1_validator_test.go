@@ -32,20 +32,20 @@ func TestRegisterL1Validator(t *testing.T) {
 		ids.GenerateTestID(),
 		ids.GenerateTestNodeID(),
 		newBLSPublicKey(t),
-		rand.Uint64(), //#nosec G404
+		rand.Uint64(),
 		PChainOwner{
-			Threshold: rand.Uint32(), //#nosec G404
+			Threshold: rand.Uint32(),
 			Addresses: []ids.ShortID{
 				ids.GenerateTestShortID(),
 			},
 		},
 		PChainOwner{
-			Threshold: rand.Uint32(), //#nosec G404
+			Threshold: rand.Uint32(),
 			Addresses: []ids.ShortID{
 				ids.GenerateTestShortID(),
 			},
 		},
-		rand.Uint64(), //#nosec G404
+		rand.Uint64(),
 	)
 	require.NoError(err)
 
@@ -74,7 +74,7 @@ func TestRegisterL1Validator_Verify(t *testing.T) {
 				constants.PrimaryNetworkID,
 				ids.GenerateTestNodeID(),
 				newBLSPublicKey(t),
-				rand.Uint64(), //#nosec G404
+				rand.Uint64(),
 				PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{
@@ -94,7 +94,7 @@ func TestRegisterL1Validator_Verify(t *testing.T) {
 				ids.GenerateTestID(),
 				ids.GenerateTestNodeID(),
 				newBLSPublicKey(t),
-				rand.Uint64(), //#nosec G404
+				rand.Uint64(),
 				PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{
@@ -114,7 +114,7 @@ func TestRegisterL1Validator_Verify(t *testing.T) {
 				SubnetID:     ids.GenerateTestID(),
 				NodeID:       nil,
 				BLSPublicKey: newBLSPublicKey(t),
-				Expiry:       rand.Uint64(), //#nosec G404
+				Expiry:       rand.Uint64(),
 				RemainingBalanceOwner: PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{
@@ -134,7 +134,7 @@ func TestRegisterL1Validator_Verify(t *testing.T) {
 				ids.GenerateTestID(),
 				ids.EmptyNodeID,
 				newBLSPublicKey(t),
-				rand.Uint64(), //#nosec G404
+				rand.Uint64(),
 				PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{
@@ -154,7 +154,7 @@ func TestRegisterL1Validator_Verify(t *testing.T) {
 				ids.GenerateTestID(),
 				ids.GenerateTestNodeID(),
 				newBLSPublicKey(t),
-				rand.Uint64(), //#nosec G404
+				rand.Uint64(),
 				PChainOwner{
 					Threshold: 0,
 					Addresses: []ids.ShortID{
@@ -174,7 +174,7 @@ func TestRegisterL1Validator_Verify(t *testing.T) {
 				ids.GenerateTestID(),
 				ids.GenerateTestNodeID(),
 				newBLSPublicKey(t),
-				rand.Uint64(), //#nosec G404
+				rand.Uint64(),
 				PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{

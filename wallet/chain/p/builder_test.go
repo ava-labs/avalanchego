@@ -587,7 +587,7 @@ func TestConvertSubnetToL1Tx(t *testing.T) {
 		validators = []*txs.ConvertSubnetToL1Validator{
 			{
 				NodeID:  utils.RandomBytes(ids.NodeIDLen),
-				Weight:  rand.Uint64(), //#nosec G404
+				Weight:  rand.Uint64(),
 				Balance: units.Avax,
 				Signer:  *pop0,
 				RemainingBalanceOwner: message.PChainOwner{
@@ -605,7 +605,7 @@ func TestConvertSubnetToL1Tx(t *testing.T) {
 			},
 			{
 				NodeID:                utils.RandomBytes(ids.NodeIDLen),
-				Weight:                rand.Uint64(), //#nosec G404
+				Weight:                rand.Uint64(),
 				Balance:               2 * units.Avax,
 				Signer:                *pop1,
 				RemainingBalanceOwner: message.PChainOwner{},

@@ -364,8 +364,8 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 			// Initialize subnetID, weight, and endAccumulatedFee as they are
 			// constant among all tests.
 			test.l1Validator.SubnetID = l1Validator.SubnetID
-			test.l1Validator.Weight = 1                        // Not removed
-			test.l1Validator.EndAccumulatedFee = rand.Uint64() //#nosec G404
+			test.l1Validator.Weight = 1 // Not removed
+			test.l1Validator.EndAccumulatedFee = rand.Uint64()
 			err = d.PutL1Validator(test.l1Validator)
 			require.ErrorIs(err, test.expectedErr)
 

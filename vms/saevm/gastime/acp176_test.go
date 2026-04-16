@@ -110,7 +110,7 @@ func FuzzWorstCasePrice(f *testing.F) {
 		initTarget = max(initTarget, 1)
 		gasCfg := DefaultGasPriceConfig()
 
-		initUnix := int64(min(initTimestamp, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
+		initUnix := int64(min(initTimestamp, math.MaxInt64))
 		worstcase := mustNew(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
 		actual := mustNew(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
 
@@ -123,28 +123,28 @@ func FuzzWorstCasePrice(f *testing.F) {
 		}{
 			{
 				time:   time0,
-				nanos:  time.Duration(nanos0 % 1e9), //#nosec G115
+				nanos:  time.Duration(nanos0 % 1e9),
 				used:   gas.Gas(used0),
 				limit:  gas.Gas(limit0),
 				target: gas.Gas(target0),
 			},
 			{
 				time:   time1,
-				nanos:  time.Duration(nanos1 % 1e9), //#nosec G115
+				nanos:  time.Duration(nanos1 % 1e9),
 				used:   gas.Gas(used1),
 				limit:  gas.Gas(limit1),
 				target: gas.Gas(target1),
 			},
 			{
 				time:   time2,
-				nanos:  time.Duration(nanos2 % 1e9), //#nosec G115
+				nanos:  time.Duration(nanos2 % 1e9),
 				used:   gas.Gas(used2),
 				limit:  gas.Gas(limit2),
 				target: gas.Gas(target2),
 			},
 			{
 				time:   time3,
-				nanos:  time.Duration(nanos3 % 1e9), //#nosec G115
+				nanos:  time.Duration(nanos3 % 1e9),
 				used:   gas.Gas(used3),
 				limit:  gas.Gas(limit3),
 				target: gas.Gas(target3),
@@ -153,7 +153,7 @@ func FuzzWorstCasePrice(f *testing.F) {
 		for _, block := range blocks {
 			block.limit = max(block.used, block.limit)
 			block.target = clampTarget(max(block.target, 1))
-			blockSeconds := int64(min(block.time, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
+			blockSeconds := int64(min(block.time, math.MaxInt64))
 
 			tm := time.Unix(blockSeconds, int64(block.nanos))
 			worstcase.BeforeBlock(tm)

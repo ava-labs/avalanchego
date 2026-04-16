@@ -18,8 +18,8 @@ func TestL1ValidatorWeight(t *testing.T) {
 
 	msg, err := NewL1ValidatorWeight(
 		ids.GenerateTestID(),
-		rand.Uint64(), //#nosec G404
-		rand.Uint64(), //#nosec G404
+		rand.Uint64(),
+		rand.Uint64(),
 	)
 	require.NoError(err)
 

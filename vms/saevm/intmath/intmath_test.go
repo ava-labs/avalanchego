@@ -160,7 +160,7 @@ func TestCeilDiv(t *testing.T) {
 		{num: max64, den: 2, want: 1 << 63}, // must not overflow
 	}
 
-	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
+	rng := rand.New(rand.NewPCG(0, 0))
 	for range 50 {
 		l := uint64(rng.Uint32())
 		r := uint64(rng.Uint32())

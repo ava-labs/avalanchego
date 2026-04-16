@@ -118,7 +118,7 @@ func (s *Stub) BuildHeader(parent *types.Header) (*types.Header, error) {
 	hdr := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number, common.Big1),
-		Time:       uint64(now.Unix()), //#nosec G115 -- Known non-negative
+		Time:       uint64(now.Unix()),
 		Extra:      e.MarshalCanoto(),
 	}
 	return hdr, nil
@@ -186,7 +186,7 @@ func (s *Stub) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[Op], error)
 
 	return NewStub(s.Target, WithInvalidOpIDs(s.InvalidOpIDs), WithOps(e.ops), WithNow(func() time.Time {
 		return time.Unix(
-			int64(b.Time()), //#nosec G115 -- Won't overflow for a few millennia
+			int64(b.Time()),
 			int64(e.subSec),
 		)
 	})), nil
@@ -201,8 +201,8 @@ func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
 // stored seconds in [types.Header.Time] and the sub-second component from
 // [types.Header.Extra].
 func (*Stub) BlockTime(hdr *types.Header) time.Time {
-	subSec := getHeaderExtra(hdr).subSec             //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
-	return time.Unix(int64(hdr.Time), int64(subSec)) //#nosec G115 -- Won't overflow for a few millennia
+	subSec := getHeaderExtra(hdr).subSec //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
+	return time.Unix(int64(hdr.Time), int64(subSec))
 }
 
 // SettledHeight returns the height encoded in the Header by [Stub.BuildBlock]

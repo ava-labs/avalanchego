@@ -235,7 +235,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	var (
 		tc             = te.testContext
-		r              = rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
+		r              = rand.New(rand.NewSource(time.Now().Unix()))
 		network        = te.GetNetwork()
 		availableNodes = []*tmpnet.Node{}
 	)

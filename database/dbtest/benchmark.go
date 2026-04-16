@@ -46,9 +46,9 @@ func SetupBenchmark(b *testing.B, count int, keySize, valueSize int) ([][]byte, 
 	for i := 0; i < count; i++ {
 		keyBytes := make([]byte, keySize)
 		valueBytes := make([]byte, valueSize)
-		_, err := rand.Read(keyBytes) // #nosec G404
+		_, err := rand.Read(keyBytes)
 		require.NoError(err)
-		_, err = rand.Read(valueBytes) // #nosec G404
+		_, err = rand.Read(valueBytes)
 		require.NoError(err)
 		keys[i], values[i] = keyBytes, valueBytes
 	}

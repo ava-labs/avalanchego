@@ -289,7 +289,7 @@ func TestTxPoolNamespace(t *testing.T) {
 		t.Helper()
 		return sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
 			To:        &addresses[i],
-			Gas:       params.TxGas + uint64(i), //#nosec G115 -- Won't overflow
+			Gas:       params.TxGas + uint64(i),
 			GasFeeCap: big.NewInt(int64(i + 1)),
 			Value:     big.NewInt(int64(i + 10)),
 		})
@@ -823,7 +823,7 @@ func TestGetReceipts(t *testing.T) {
 			r.CumulativeGasUsed = totalGas
 			r.BlockHash = b.Hash()
 			r.BlockNumber = b.Number()
-			r.TransactionIndex = uint(i) //#nosec G115 -- Known non-negative
+			r.TransactionIndex = uint(i)
 		}
 		return b, rs
 	}
@@ -1262,7 +1262,7 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 	}...)
 
 	for i, wantTx := range want.Transactions() {
-		txIdx := hexutil.Uint(i) //#nosec G115 -- Won't overflow
+		txIdx := hexutil.Uint(i)
 		marshaled, err := wantTx.MarshalBinary()
 		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
 
@@ -1290,7 +1290,7 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 		}...)
 	}
 
-	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //#nosec G115 -- Known to not overflow
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1)
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getTransactionByBlockHashAndIndex",
@@ -1378,7 +1378,7 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 	}...)
 
 	for i, wantTx := range want.Transactions() {
-		txIdx := hexutil.Uint(i) //#nosec G115 -- Won't overflow
+		txIdx := hexutil.Uint(i)
 		marshaled, err := wantTx.MarshalBinary()
 		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
 
@@ -1396,7 +1396,7 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 		}...)
 	}
 
-	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //#nosec G115 -- Known to not overflow
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1)
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getTransactionByBlockNumberAndIndex",

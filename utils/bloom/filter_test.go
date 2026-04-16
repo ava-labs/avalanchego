@@ -60,7 +60,7 @@ func TestNormalUsage(t *testing.T) {
 
 	toAdd := make([]uint64, 1024)
 	for i := range toAdd {
-		toAdd[i] = rand.Uint64() //#nosec G404
+		toAdd[i] = rand.Uint64()
 	}
 
 	initialNumHashes, initialNumBytes := OptimalParameters(1024, 0.01)

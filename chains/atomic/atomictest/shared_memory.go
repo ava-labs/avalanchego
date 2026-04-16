@@ -46,14 +46,14 @@ func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1
 // can support large values.
 func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 atomic.SharedMemory, _ database.Database) {
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(0)) //#nosec G404
+	rand := rand.New(rand.NewSource(0))
 
 	totalSize := 16 * units.MiB  // 16 MiB
 	elementSize := 4 * units.KiB // 4 KiB
 	pairSize := 2 * elementSize  // 8 KiB
 
 	b := make([]byte, totalSize)
-	_, err := rand.Read(b) // #nosec G404
+	_, err := rand.Read(b)
 	require.NoError(err)
 
 	elems := []*atomic.Element{}
@@ -152,7 +152,7 @@ func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, 
 	pairSize := 3 * elementSize  // 3 KiB
 
 	b := make([]byte, totalSize)
-	_, err := rand.Read(b) // #nosec G404
+	_, err := rand.Read(b)
 	require.NoError(err)
 
 	elems := []*atomic.Element{}
@@ -307,14 +307,14 @@ func TestPutAndRemoveBatch(t *testing.T, chainID0, _ ids.ID, _, sm1 atomic.Share
 // support large batches.
 func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ atomic.SharedMemory, db database.Database) {
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(0)) //#nosec G404
+	rand := rand.New(rand.NewSource(0))
 
 	totalSize := 8 * units.MiB   // 8 MiB
 	elementSize := 4 * units.KiB // 4 KiB
 	pairSize := 2 * elementSize  // 8 KiB
 
 	bytes := make([]byte, totalSize)
-	_, err := rand.Read(bytes) // #nosec G404
+	_, err := rand.Read(bytes)
 	require.NoError(err)
 
 	batch := db.NewBatch()

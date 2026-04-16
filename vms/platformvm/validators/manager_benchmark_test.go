@@ -178,7 +178,7 @@ func addSubnetDelegator(
 	nodeIDs []ids.NodeID,
 	height uint64,
 ) error {
-	i := rand.Intn(len(nodeIDs)) //#nosec G404
+	i := rand.Intn(len(nodeIDs))
 	nodeID := nodeIDs[i]
 	s.PutCurrentDelegator(&state.Staker{
 		TxID:            ids.GenerateTestID(),

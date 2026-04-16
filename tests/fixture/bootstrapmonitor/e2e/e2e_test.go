@@ -254,7 +254,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 		tc.ContextWithTimeout(e2e.DefaultTimeout*2), // Double the timeout to account for CI being really slow
 		"bash",
 		args...,
-	) // #nosec G204
+	)
 	cmd.Env = append(os.Environ(),
 		"DOCKER_IMAGE="+imageName,
 		"FORCE_TAG_MASTER=1",

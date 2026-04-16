@@ -50,7 +50,7 @@ func createWorstCaseFuzzFlags(set *flag.FlagSet) {
 
 	set.UintVar(&fs.numAccounts, name("num_eoa"), 10, "Number of EOAs to send funds between")
 	set.TextVar(&fs.balance, name("eoa_balance"), uint256.NewInt(params.Ether), "Starting balance of EOAs")
-	set.UintVar(&fs.parallel, name("parallel"), uint(runtime.GOMAXPROCS(0)), "Number of parallel tests to run; defaults to GOMAXPROCS") //#nosec G115 -- Known to be positive
+	set.UintVar(&fs.parallel, name("parallel"), uint(runtime.GOMAXPROCS(0)), "Number of parallel tests to run; defaults to GOMAXPROCS")
 	set.UintVar(&fs.numBlocks, name("blocks"), 50, "Number of blocks to build and execute (fixed)")
 	set.UintVar(&fs.maxNewTxsPerBlock, name("max_new_txs"), 100, "Maximum number of new transactions to send before building each block (uniform distribution)")
 	set.Uint64Var(&fs.maxGasLimit, name("max_gas_limit"), 60e6, "Maximum gas limit per transaction (uniform distribution)")
@@ -202,10 +202,10 @@ func TestWorstCase(t *testing.T) {
 			if flags.rngSeed != 0 {
 				seed = flags.rngSeed
 			} else {
-				seed = rand.Uint64() //#nosec G404 -- Not for security
+				seed = rand.Uint64()
 			}
 			t.Logf("RNG seed: %d", seed)
-			rng := rand.New(rand.NewPCG(0, seed)) //#nosec G404 -- Allow for reproducibility
+			rng := rand.New(rand.NewPCG(0, seed))
 
 			for range flags.numBlocks {
 				for range rng.UintN(flags.maxNewTxsPerBlock) {

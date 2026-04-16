@@ -79,7 +79,7 @@ func BenchmarkBytesPool_Random(b *testing.B) {
 	p := NewBytesPool()
 	sizes := make([]int, 1_000)
 	for i := range sizes {
-		sizes[i] = rand.Intn(100_000) //#nosec G404
+		sizes[i] = rand.Intn(100_000)
 	}
 
 	b.ResetTimer()

@@ -123,7 +123,7 @@ func TestExecutorIntegration(t *testing.T) {
 	const numAccounts = 3
 	s := newSUT(t, numAccounts)
 
-	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is valuable for tests
+	rng := rand.New(rand.NewPCG(0, 0))
 
 	const txPerAccount = 5
 	const numTxs = numAccounts * txPerAccount

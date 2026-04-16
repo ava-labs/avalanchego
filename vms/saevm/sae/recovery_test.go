@@ -47,7 +47,7 @@ func TestRecoverFromDatabase(t *testing.T) {
 	}))
 	srcCtx := ctx
 
-	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
+	rng := rand.New(rand.NewPCG(0, 0))
 
 	for final := false; !final; {
 		// We need to test rebuilding from trie roots reflecting (a) the last

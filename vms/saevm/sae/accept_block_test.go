@@ -44,7 +44,7 @@ func TestAcceptBlock(t *testing.T) {
 	unsettled := []*blocks.Block{sut.genesis}
 	sut.genesis = nil // allow it to be GCd when appropriate
 
-	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
+	rng := rand.New(rand.NewPCG(0, 0))
 	for range 100 {
 		ffMillis := 100 + rng.IntN(1000*(1+saeparams.TauSeconds))
 		vmTime.advance(time.Millisecond * time.Duration(ffMillis))
