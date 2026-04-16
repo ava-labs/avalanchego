@@ -93,7 +93,7 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 	// would also require them to be received as an argument to MarkSynchronous.
 	target, cfg := hooks.GasConfigAfter(b.Header())
 	execTime, err := gastime.New(
-		PreciseTime(hooks, b.Header()),
+		hooks.BlockTime(b.Header()),
 		// Target, excess, and config _after_ are a requirement of
 		// [Block.MarkExecuted].
 		target,
@@ -283,7 +283,7 @@ func LastToSettleAt(hooks hook.Points, settleAt time.Time, parent *Block) (b *Bl
 			return block, known, nil
 		}
 
-		if startsNoEarlierThan := PreciseTime(hooks, block.Header()); startsNoEarlierThan.Compare(settleAt) > 0 {
+		if startsNoEarlierThan := hooks.BlockTime(block.Header()); startsNoEarlierThan.Compare(settleAt) > 0 {
 			known = true
 			continue
 		}
