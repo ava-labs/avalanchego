@@ -45,6 +45,7 @@ tests/state_test_util.go
 !core/state_manager_test.go
 !core/state_processor_ext.go
 !core/state_processor_ext_test.go
+!core/state_transition_extra_test.go
 !eth/chain_with_final_block.go
 !eth/gasprice/fee_info_provider_test.go
 !eth/tracers/api_extra_test.go

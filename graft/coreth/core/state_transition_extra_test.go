@@ -10,14 +10,14 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 
 	cmath "github.com/ava-labs/libevm/common/math"
 	libevmcore "github.com/ava-labs/libevm/core"
@@ -67,8 +67,7 @@ func TestIntrinsicGasEquivalenceErrors(t *testing.T) {
 			_, legacyErr := legacyIntrinsicGas(nil, tt.accessList, false, rules)
 			_, libevmErr := libevmcore.IntrinsicGas(nil, tt.accessList, false, rules)
 
-			require.Error(legacyErr)
-			require.Error(libevmErr)
+			require.ErrorIs(legacyErr, libevmErr)
 		})
 	}
 }
