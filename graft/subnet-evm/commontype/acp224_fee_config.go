@@ -30,10 +30,10 @@ func DefaultACP224FeeConfig() ACP224FeeConfig {
 var (
 	ErrMinGasPriceTooLow = errors.New("minGasPrice must be greater than 0")
 
-	ErrTargetGasMustBeZero    = errors.New("targetGas must be 0 when validatorTargetGas is true")
-	ErrTargetGasTooLowACP224  = errors.New("targetGas must be at least MinTargetGasACP224")
-	ErrTimeToDoubleTooLow     = errors.New("timeToDouble must be greater than 0")
-	ErrTimeToDoubleMustBeZero = errors.New("timeToDouble must be 0 when staticPricing is true")
+	errTargetGasMustBeZero    = errors.New("targetGas must be 0 when validatorTargetGas is true")
+	errTargetGasTooLowACP224  = errors.New("targetGas must be at least MinTargetGasACP224")
+	errTimeToDoubleTooLow     = errors.New("timeToDouble must be greater than 0")
+	errTimeToDoubleMustBeZero = errors.New("timeToDouble must be 0 when staticPricing is true")
 )
 
 // ACP224FeeConfig specifies the parameters for the ACP-224 dynamic gas limit mechanism.
@@ -52,13 +52,13 @@ func (a *ACP224FeeConfig) Verify() error {
 	case a.MinGasPrice == 0:
 		return ErrMinGasPriceTooLow
 	case a.ValidatorTargetGas && a.TargetGas != 0:
-		return ErrTargetGasMustBeZero
+		return errTargetGasMustBeZero
 	case !a.ValidatorTargetGas && a.TargetGas < MinTargetGasACP224:
-		return ErrTargetGasTooLowACP224
+		return errTargetGasTooLowACP224
 	case a.StaticPricing && a.TimeToDouble != 0:
-		return ErrTimeToDoubleMustBeZero
+		return errTimeToDoubleMustBeZero
 	case !a.StaticPricing && a.TimeToDouble == 0:
-		return ErrTimeToDoubleTooLow
+		return errTimeToDoubleTooLow
 	default:
 		return nil
 	}

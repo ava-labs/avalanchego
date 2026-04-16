@@ -34,12 +34,12 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager/acp224feemanagertest/bindings"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/utils"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager/acp224feemanagertest/bindings"
 )
 
 var (
@@ -147,7 +147,7 @@ func TestACP224FeeManager(t *testing.T) {
 		},
 		{
 			name: "contract should not be able to change fee without enabled",
-			test: func(t *testing.T, backend *sim.Backend, feeManager *bindings.IACP224FeeManager) {
+			test: func(t *testing.T, backend *sim.Backend, _ *bindings.IACP224FeeManager) {
 				_, testContract := deployTestContract(t, backend, admin)
 
 				_, err := testContract.SetFeeConfig(admin, toBindingsFeeConfig(updatedFeeConfig))
