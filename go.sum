@@ -335,6 +335,8 @@ github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1 h1:2LXaw0vQ/nSjSKyNil2NoNXXuH
 github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1/go.mod h1:0Z60sYkUFvvOlOc0XHGbP+271EjP5KjaaOA0EQxCCSA=
 github.com/ava-labs/libevm v1.13.15-0.20260413170814-ee3bc95885c2 h1:U4D1uj3vqRBMcIoylt9y5NMFgP30TS/hRBmEeqgsmIk=
 github.com/ava-labs/libevm v1.13.15-0.20260413170814-ee3bc95885c2/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
+github.com/ava-labs/libevm v1.13.15-0.20260416083601-c2d170a8fb2f h1:PWlpQR/MFU1luR0qb8aluXEECSYYmrbIVta/UiVYCX4=
+github.com/ava-labs/libevm v1.13.15-0.20260416083601-c2d170a8fb2f/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
 github.com/ava-labs/simplex v0.0.0-20260320130759-afe09323fdd1 h1:Y9UdRQj28/t+GNzVSlP6nvoNLtzNRo3fNXLUc/NscVM=
 github.com/ava-labs/simplex v0.0.0-20260320130759-afe09323fdd1/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
