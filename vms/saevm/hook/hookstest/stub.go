@@ -201,19 +201,19 @@ func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
 // stored seconds in [types.Header.Time] and the sub-second component from
 // [types.Header.Extra].
 func (*Stub) BlockTime(hdr *types.Header) time.Time {
-	subSec := getHeaderExtra(hdr, func(e extra) time.Duration { return e.subSec }) //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
-	return time.Unix(int64(hdr.Time), int64(subSec))                               //#nosec G115 -- Won't overflow for a few millennia
+	subSec := getHeaderExtra(hdr).subSec             //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
+	return time.Unix(int64(hdr.Time), int64(subSec)) //#nosec G115 -- Won't overflow for a few millennia
 }
 
 // SettledHeight returns the height encoded in the Header by [Stub.BuildBlock]
 // or [BuildBlock].
 func (*Stub) SettledHeight(hdr *types.Header) uint64 {
-	return getHeaderExtra(hdr, func(e extra) uint64 { return e.settledHeight })
+	return getHeaderExtra(hdr).settledHeight
 }
 
 // EndOfBlockOps return the ops included in the block by [BuildBlock].
 func (*Stub) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	eOps := getHeaderExtra(b.Header(), func(e extra) []Op { return e.ops })
+	eOps := getHeaderExtra(b.Header()).ops
 	hookOps := make([]hook.Op, len(eOps))
 	for i, op := range eOps {
 		hookOps[i] = op.AsOp()
@@ -221,14 +221,14 @@ func (*Stub) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	return hookOps, nil
 }
 
-func getHeaderExtra[T any](hdr *types.Header, get func(extra) T) T {
+func getHeaderExtra(hdr *types.Header) extra {
 	var e extra
 	if err := e.UnmarshalCanoto(hdr.Extra); err != nil {
 		// This is left as a panic to avoid polluting various functions with
 		// error returns when no error is possible in production.
 		panic(err)
 	}
-	return get(e)
+	return e
 }
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
