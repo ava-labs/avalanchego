@@ -101,7 +101,6 @@ func accessListGasWithPredicates(rules extras.Rules, accessList libevm.AccessLis
 	return gas, true, nil
 }
 
-// safeAdd returns the sum of x and y, and whether the addition overflowed.
 var PrecompiledContractsApricotPhase2 = map[common.Address]vm.PrecompiledContract{
 	nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.NativeAssetBalance{GasCost: AssetBalanceApricot}),

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("888888CCc0000\x04\x04\x04\x04\x04\x04\x04\x04")
