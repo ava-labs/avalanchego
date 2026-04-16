@@ -742,3 +742,26 @@ func TestOscillatingMinPrice(t *testing.T) {
 	assert.Greater(t, control.Price(), highMinPrice, "control price must increase with sustained above-target usage")
 	assert.Equal(t, control.Price(), modified.Price(), "oscillating MinPrice must not impact price growth")
 }
+
+func FuzzPriceExcess(f *testing.F) {
+	f.Fuzz(func(t *testing.T, pInt, kInt uint64) {
+		p, k := gas.Price(pInt), gas.Gas(kInt)
+		if p == 0 {
+			t.Skip("ln(0) is undefined")
+		}
+		if k == 0 {
+			t.Skip("div by zero is undefined")
+		}
+
+		x := priceExcess(p, k)
+		gotP := calculatePrice(x, k)
+		assert.LessOrEqual(t, gotP, p, "priceExcess should round down")
+
+		if gotP < p && x != math.MaxUint64 {
+			require.Greater(t, calculatePrice(x+1, k), p, "calculatePrice can't represent p")
+		}
+		if gotP == p && x != 0 {
+			require.Less(t, calculatePrice(x-1, k), p, "excess should be minimal")
+		}
+	})
+}
