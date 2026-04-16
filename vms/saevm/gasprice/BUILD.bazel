@@ -1,0 +1,46 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "gasprice",
+    srcs = [
+        "block_cache.go",
+        "estimator.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/gasprice",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache/lru",
+        "//utils/logging",
+        "//vms/saevm/blocks",
+        "//vms/saevm/intmath",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rpc",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "gasprice_test",
+    srcs = ["estimator_test.go"],
+    embed = [":gasprice"],
+    deps = [
+        "//utils/logging",
+        "//vms/saevm/blocks",
+        "//vms/saevm/blocks/blockstest",
+        "//vms/saevm/gastime",
+        "//vms/saevm/saetest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rpc",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+    ],
+)

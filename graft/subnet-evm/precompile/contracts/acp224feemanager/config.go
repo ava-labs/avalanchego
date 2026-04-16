@@ -56,7 +56,7 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 		return cfg == nil
 	}
 	other, ok := (cfg).(*Config)
-	if !ok {
+	if !ok || other == nil {
 		return false
 	}
 	eq := c.Upgrade.Equal(&other.Upgrade) && c.AllowListConfig.Equal(&other.AllowListConfig)

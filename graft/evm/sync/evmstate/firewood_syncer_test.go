@@ -81,7 +81,7 @@ func TestFirewoodSync(t *testing.T) {
 
 			// Code queue should be closed.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
-			require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+			require.ErrorIs(t, err, code.ErrQueueClosed)
 		})
 	}
 }
@@ -135,7 +135,7 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 
 			// After finalize, the queue should reject new code additions.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
-			require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+			require.ErrorIs(t, err, code.ErrQueueClosed)
 		})
 	}
 }
@@ -154,7 +154,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	)
 
 	// Create the producer code queue.
-	codeQueue, err := code.NewQueue(clientState.DiskDB().(ethdb.Database), make(chan struct{}))
+	codeQueue, err := code.NewQueue(clientState.DiskDB().(ethdb.Database))
 	require.NoError(t, err, "NewCodeQueue()")
 
 	// Create the consumer code syncer.

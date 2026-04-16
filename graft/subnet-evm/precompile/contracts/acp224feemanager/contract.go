@@ -121,7 +121,7 @@ func UnpackGetFeeConfigOutput(output []byte) (commontype.ACP224FeeConfig, error)
 func getFeeConfig(
 	accessibleState contract.AccessibleState,
 	caller common.Address,
-	addr common.Address,
+	self common.Address, // EVM-semantic self; see libevm.AddressContext
 	input []byte,
 	suppliedGas uint64,
 	readOnly bool,
@@ -130,7 +130,7 @@ func getFeeConfig(
 		return nil, 0, err
 	}
 
-	feeConfig := GetStoredFeeConfig(accessibleState.GetStateDB(), addr)
+	feeConfig := GetStoredFeeConfig(accessibleState.GetStateDB(), self)
 
 	output, err := PackGetFeeConfigOutput(feeConfig)
 	if err != nil {
@@ -164,7 +164,7 @@ func UnpackGetFeeConfigLastChangedAtOutput(output []byte) (*big.Int, error) {
 func getFeeConfigLastChangedAt(
 	accessibleState contract.AccessibleState,
 	caller common.Address,
-	addr common.Address,
+	self common.Address, // EVM-semantic self; see libevm.AddressContext
 	input []byte,
 	suppliedGas uint64,
 	readOnly bool,
@@ -173,7 +173,7 @@ func getFeeConfigLastChangedAt(
 		return nil, 0, err
 	}
 
-	lastChangedAt := GetFeeConfigLastChangedAt(accessibleState.GetStateDB(), addr)
+	lastChangedAt := GetFeeConfigLastChangedAt(accessibleState.GetStateDB(), self)
 	packedOutput, err := PackGetFeeConfigLastChangedAtOutput(lastChangedAt)
 	if err != nil {
 		return nil, remainingGas, err
@@ -210,7 +210,7 @@ func UnpackSetFeeConfigInput(input []byte) (commontype.ACP224FeeConfig, error) {
 func setFeeConfig(
 	accessibleState contract.AccessibleState,
 	caller common.Address,
-	addr common.Address,
+	self common.Address, // EVM-semantic self; see libevm.AddressContext
 	input []byte,
 	suppliedGas uint64,
 	readOnly bool,
@@ -224,7 +224,7 @@ func setFeeConfig(
 	}
 
 	stateDB := accessibleState.GetStateDB()
-	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, addr, caller)
+	callerStatus := GetACP224FeeManagerAllowListStatus(stateDB, self, caller)
 	if !callerStatus.IsEnabled() {
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotSetFeeConfig, caller)
 	}
@@ -239,7 +239,11 @@ func setFeeConfig(
 		return nil, remainingGas, errNilBlockNumber
 	}
 
-	oldConfig := GetStoredFeeConfig(stateDB, addr)
+	oldConfig := GetStoredFeeConfig(stateDB, self)
+
+	if err := StoreFeeConfig(stateDB, self, feeConfig, blockNumber); err != nil {
+		return nil, remainingGas, err
+	}
 	topics, data, err := PackFeeConfigUpdatedEvent(
 		caller,
 		oldConfig,
@@ -249,12 +253,8 @@ func setFeeConfig(
 		return nil, remainingGas, err
 	}
 
-	if err := StoreFeeConfig(stateDB, addr, feeConfig, blockNumber); err != nil {
-		return nil, remainingGas, err
-	}
-
 	stateDB.AddLog(&types.Log{
-		Address:     addr,
+		Address:     self,
 		Topics:      topics,
 		Data:        data,
 		BlockNumber: blockNumber.Uint64(),
