@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -56,14 +57,14 @@ type Points interface {
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.
 	ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error)
-
 	// GasConfigAfter returns the gas target and configuration that should go
 	// into effect immediately after the provided block.
-	GasConfigAfter(*types.Header) (target gas.Gas, c GasPriceConfig)
-	// SubSecondBlockTime returns the sub-second portion of the block time,
-	// which MUST be non-negative and strictly shorter than a second; i.e. a
-	// value d such that 0 <= d < [time.Second].
-	SubSecondBlockTime(h *types.Header) time.Duration
+	GasConfigAfter(*types.Header) (target gas.Gas, c gastime.GasPriceConfig)
+	// BlockTime returns the exact block time for the given header, as recorded
+	// in [BlockBuilder.BuildHeader]. The returned time MUST match the header
+	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
+	// component.
+	BlockTime(h *types.Header) time.Time
 	// SettledHeight returns the block height which [types.Header.Root] corresponds
 	// with as the post-execution state root. It MUST match the value passed to
 	// [BlockBuilder.BuildBlock], from which the [types.Header] will be sourced.
@@ -190,40 +191,6 @@ func (o *Op) ApplyTo(stateDB *state.StateDB) error {
 	}
 	for to, amount := range o.Mint {
 		stateDB.AddBalance(to, &amount)
-	}
-	return nil
-}
-
-// GasPriceConfig contains gas-related parameters that can be configured via hooks.
-type GasPriceConfig struct {
-	// TargetToExcessScaling is the ratio between the gas target and the
-	// reciprocal of the excess coefficient used in price calculation
-	// (K variable in ACP-176, where K = TargetToExcessScaling * T).
-	// MUST be non-zero.
-	TargetToExcessScaling gas.Gas
-	// MinPrice is the minimum gas price / base fee (M parameter in ACP-176).
-	// MUST be non-zero.
-	MinPrice gas.Price
-	// StaticPricing is a flag indicating whether the gas price should be static
-	// at the minimum price.
-	StaticPricing bool
-}
-
-var (
-	errTargetToExcessScalingZero = errors.New("targetToExcessScaling must be non-zero")
-	errMinPriceZero              = errors.New("minPrice must be non-zero")
-)
-
-// Validate checks that the GasPriceConfig fields are valid.
-func (c *GasPriceConfig) Validate() error {
-	if c.TargetToExcessScaling == 0 {
-		return errTargetToExcessScalingZero
-	}
-	// TODO (ceyonur): Decide whether we want to allow zero min price exclusive for static pricing,
-	// to support fee-less networks.
-	// https://github.com/ava-labs/strevm/issues/266
-	if c.MinPrice == 0 {
-		return errMinPriceZero
 	}
 	return nil
 }
