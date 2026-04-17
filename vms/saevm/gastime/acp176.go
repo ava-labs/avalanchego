@@ -95,7 +95,7 @@ func scaleExcess(x, newT, newScale, oldT, oldScale gas.Gas) gas.Gas {
 	return gas.Gas(v.Uint64())
 }
 
-// priceExcess returns an iteger approximation of ln(p) * k.
+// priceExcess returns an integer approximation of ln(p) * k.
 //
 // If [calculatePrice] can produce p, priceExcess returns the minimum excess to
 // produce p. Otherwise, it returns the maximum excess to produce a number < p,
