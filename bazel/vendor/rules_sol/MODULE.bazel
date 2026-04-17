@@ -1,0 +1,28 @@
+module(
+    name = "aspect_rules_sol",
+    version = "0.0.0",
+    compatibility_level = 1,
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "aspect_rules_js", version = "1.42.3")
+bazel_dep(name = "aspect_bazel_lib", version = "1.42.3")
+
+sol_toolchains = use_extension("//sol:extensions.bzl", "sol_toolchains")
+use_repo(
+    sol_toolchains,
+    "solc_0_7_6_toolchains",
+    "solc_0_8_9_toolchains",
+    "solc_0_8_18_toolchains",
+    "solc_0_8_19_toolchains",
+    "solc_0_8_24_toolchains",
+)
+
+register_toolchains(
+    "@solc_0_7_6_toolchains//:all",
+    "@solc_0_8_9_toolchains//:all",
+    "@solc_0_8_18_toolchains//:all",
+    "@solc_0_8_19_toolchains//:all",
+    "@solc_0_8_24_toolchains//:all",
+)

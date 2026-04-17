@@ -60,6 +60,10 @@ tests/e2e/e2e.test
 tests/upgrade/upgrade.test
 
 vendor
+!bazel/vendor/
+bazel/vendor/*
+!bazel/vendor/rules_sol/
+!bazel/vendor/rules_sol/**
 
 **/testdata
 

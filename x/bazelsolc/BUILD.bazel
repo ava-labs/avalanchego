@@ -1,0 +1,60 @@
+load("@aspect_bazel_lib//lib:write_source_files.bzl", "write_source_files")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@rules_sol//sol:defs.bzl", "sol_binary", "sol_imports")
+
+package(default_visibility = ["//x:__subpackages__"])
+
+# Although not necessary just for compilation, creating a sol_imports
+# also allows this contract to be used as a dependency of another.
+sol_imports(
+    name = "hello_sol_src",
+    srcs = ["HelloWorld.sol"],
+)
+
+# Equivalent to running solc in combined-json mode.
+sol_binary(
+    name = "hello_sol",
+    srcs = [":hello_sol_src"],
+    solc_version = "0.8.24",
+)
+
+# Pipes the combined.json output of :hello_sol into libevm's abigen.
+# In a Bazel-only world the output would just be a .go file but we
+# want to also write it to the git tree. If we had two .go files then
+# gazelle would include both in the go_library().
+genrule(
+    name = "hello_sol_abigen",
+    srcs = [":hello_sol"],
+    outs = ["hello_sol_abigen.go.gen"],
+    cmd = """
+        $(location @com_github_ava_labs_libevm//cmd/abigen) \
+            --combined-json $(location :hello_sol) \
+            --pkg bazelsolc \
+            --out $@
+    """,
+    tools = ["@com_github_ava_labs_libevm//cmd/abigen"],
+)
+
+# Ensures that helloworld.sol.go, as committed to the repo, is
+# identical to the output of :hello_sol_abigen. Creates one target that
+# can be `bazel run` to write the output and another that can be
+# `bazel test`-ed to ensure no diff.
+write_source_files(
+    name = "hello_sol_go",
+    files = {"helloworld.sol.go": ":hello_sol_abigen"},
+)
+
+# Regular Go target!
+go_library(
+    name = "bazelsolc",
+    srcs = ["helloworld.sol.go"],
+    importpath = "github.com/ava-labs/avalanchego/x/bazelsolc",
+    deps = [
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//accounts/abi/bind",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//event",
+    ],
+)

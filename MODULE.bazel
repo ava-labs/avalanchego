@@ -9,6 +9,13 @@ bazel_dep(name = "rules_proto", version = "7.0.2")
 bazel_dep(name = "protobuf", version = "29.3", repo_name = "com_google_protobuf")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "aspect_bazel_lib", version = "1.42.3")
+
+bazel_dep(name = "aspect_rules_sol", version = "0.0.0", repo_name = "rules_sol")
+local_path_override(
+    module_name = "aspect_rules_sol",
+    path = "bazel/vendor/rules_sol",
+)
 
 # Go SDK - reads version from go.mod (ensured consistent with all go.mod files)
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
