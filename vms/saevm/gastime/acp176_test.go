@@ -329,7 +329,7 @@ func TestAfterBlock(t *testing.T) {
 			},
 		},
 		{
-			name: "min_price_increase_approximation",
+			name: "min_price_unrepresentable",
 			init: state{
 				target: 1_000_000,
 				excess: 0,
@@ -347,6 +347,27 @@ func TestAfterBlock(t *testing.T) {
 					MinPrice:              1_000_000_000,
 				},
 				price: 1_000_000_000,
+			},
+		},
+		{
+			name: "min_price_unrepresentable_decrease",
+			init: state{
+				target: 1_000_000,
+				excess: 1_802_924_127,
+				config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1_000_000_000,
+				},
+				price: 1_000_000_000,
+			},
+			new: state{
+				target: 1_000_000,
+				excess: 1_802_924_127,
+				config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				price: 999_999_990,
 			},
 		},
 		{
@@ -555,7 +576,7 @@ func TestAfterBlock(t *testing.T) {
 				target: 1_000_000,
 				excess: math.MaxUint64 - 1,
 				config: GasPriceConfig{
-					TargetToExcessScaling: math.MaxInt64,
+					TargetToExcessScaling: math.MaxUint64,
 					MinPrice:              1,
 				},
 				price: 2,

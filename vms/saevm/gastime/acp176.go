@@ -66,18 +66,17 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error
 	return nil
 }
 
-// priceExcess returns the lowest excess that produces p, if one exists. If the
-// integer approximation in [calculatePrice] skips over p, it returns the
-// maximum excess where the price is less than p.
+// priceExcess returns an iteger approximation of ln(p) * k.
 //
-// Mathematically, it returns ln(p) * k.
+// If [calculatePrice] can produce p, priceExcess returns the minimum excess to
+// produce p. Otherwise, it returns the maximum excess to produce a number < p.
 func priceExcess(p gas.Price, k gas.Gas) gas.Gas {
 	if p <= 1 {
 		return 0
 	}
-	// Binary search for the minimum x where calculatePrice(x, k) >= minPrice.
+	// Binary search for the minimum x where calculatePrice(x, k) >= p.
 	//
-	// calculatePrice(0, k) == 1, and minPrice > 1, so lo > 0.
+	// calculatePrice(0, k) == 1 and p > 1, so lo > 0.
 	lo, hi := gas.Gas(1), gas.Gas(math.MaxUint64)
 	for lo < hi {
 		mid := lo + (hi-lo)/2
@@ -87,8 +86,8 @@ func priceExcess(p gas.Price, k gas.Gas) gas.Gas {
 			lo = mid + 1
 		}
 	}
-	// If [calculatePrice] can't generate p, make sure to honor the lower price
-	// expectation.
+	// If [calculatePrice] can't generate p due to integer appoximation, honor
+	// the lower price expectation.
 	if calculatePrice(lo, k) > p {
 		return lo - 1
 	}
