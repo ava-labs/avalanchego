@@ -69,7 +69,8 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error
 // priceExcess returns an iteger approximation of ln(p) * k.
 //
 // If [calculatePrice] can produce p, priceExcess returns the minimum excess to
-// produce p. Otherwise, it returns the maximum excess to produce a number < p.
+// produce p. Otherwise, it returns the maximum excess to produce a number < p,
+// which may happen due to overflow or integer approximation.
 func priceExcess(p gas.Price, k gas.Gas) gas.Gas {
 	if p <= 1 {
 		return 0
