@@ -67,18 +67,18 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error
 	return nil
 }
 
-// scaleExcess returns x * T' * K' / (T * K) rounded up and capped to
-// [math.MaxUint64].
+// scaleExcess returns x * newT * newScale / (oldT * oldScale) rounded up and
+// capped to [math.MaxUint64].
 func scaleExcess(x, newT, newScale, oldT, oldScale gas.Gas) gas.Gas {
 	var (
-		newK uint256.Int // T' * K'
+		newK uint256.Int
 		v    uint256.Int
 	)
 	newK.SetUint64(uint64(newT))
 	v.SetUint64(uint64(newScale))
 	newK.Mul(&newK, &v)
 
-	var oldK uint256.Int // T * K
+	var oldK uint256.Int
 	oldK.SetUint64(uint64(oldT))
 	v.SetUint64(uint64(oldScale))
 	oldK.Mul(&oldK, &v)
