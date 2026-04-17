@@ -29,11 +29,15 @@ func getValidatorRules(
 	subnetID ids.ID,
 ) (*addValidatorRules, error) {
 	if subnetID == constants.PrimaryNetworkID {
+		minStakeDuration := backend.Config.MinStakeDuration
+		if backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
+			minStakeDuration = backend.Config.HeliconMinStakeDuration
+		}
 		return &addValidatorRules{
 			assetID:           backend.Ctx.AVAXAssetID,
 			minValidatorStake: backend.Config.MinValidatorStake,
 			maxValidatorStake: backend.Config.MaxValidatorStake,
-			minStakeDuration:  backend.Config.MinStakeDuration,
+			minStakeDuration:  minStakeDuration,
 			maxStakeDuration:  backend.Config.MaxStakeDuration,
 			minDelegationFee:  backend.Config.MinDelegationFee,
 		}, nil
@@ -69,11 +73,15 @@ func getDelegatorRules(
 	subnetID ids.ID,
 ) (*addDelegatorRules, error) {
 	if subnetID == constants.PrimaryNetworkID {
+		minStakeDuration := backend.Config.MinStakeDuration
+		if backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
+			minStakeDuration = backend.Config.HeliconMinStakeDuration
+		}
 		return &addDelegatorRules{
 			assetID:                  backend.Ctx.AVAXAssetID,
 			minDelegatorStake:        backend.Config.MinDelegatorStake,
 			maxValidatorStake:        backend.Config.MaxValidatorStake,
-			minStakeDuration:         backend.Config.MinStakeDuration,
+			minStakeDuration:         minStakeDuration,
 			maxStakeDuration:         backend.Config.MaxStakeDuration,
 			maxValidatorWeightFactor: MaxValidatorWeightFactor,
 		}, nil
