@@ -41,11 +41,7 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error
 	}
 
 	tm.Tick(used)
-	tm.setGasPriceConfig(target, c)
-	return nil
-}
 
-func (tm *Time) setGasPriceConfig(target gas.Gas, c GasPriceConfig) {
 	// x := x * (K' * T') / (K * T)
 	oldK := tm.excessScalingFactor() // K * T
 
@@ -67,6 +63,7 @@ func (tm *Time) setGasPriceConfig(target gas.Gas, c GasPriceConfig) {
 	// x := max(x, ln(minPrice) * K' * T')
 	minExcess := priceExcess(c.MinPrice, newK)
 	tm.excess = max(tm.excess, minExcess)
+	return nil
 }
 
 // priceExcess returns the lowest excess that produces p, if one exists. If the
