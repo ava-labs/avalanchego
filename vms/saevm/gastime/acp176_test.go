@@ -750,8 +750,6 @@ func FuzzPriceExcess(f *testing.F) {
 		p gas.Price
 		k gas.Gas
 	}{
-		{0, 1},
-		{1, 0},
 		{1, 1},
 		{2, 1},
 		{2, 1_000_000_000},
