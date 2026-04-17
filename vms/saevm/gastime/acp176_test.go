@@ -350,7 +350,7 @@ func TestAfterBlock(t *testing.T) {
 			},
 		},
 		{
-			name: "min_price_unrepresentable_decrease",
+			name: "min_price_previously_unrepresentable",
 			init: state{
 				target: 1_000_000,
 				excess: 1_802_924_127,
