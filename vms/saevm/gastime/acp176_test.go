@@ -574,7 +574,7 @@ func TestAfterBlock(t *testing.T) {
 			name: "intermediate_scaling_overflow",
 			init: state{
 				target: 1_000_000,
-				excess: math.MaxUint64 - 1,
+				excess: math.MaxUint64,
 				config: GasPriceConfig{
 					TargetToExcessScaling: math.MaxUint64,
 					MinPrice:              1,
@@ -583,12 +583,33 @@ func TestAfterBlock(t *testing.T) {
 			},
 			new: state{
 				target: 1_000_000,
-				excess: 1_000_000,
+				excess: 1,
 				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
-				price: 2,
+				price: 1,
+			},
+		},
+		{
+			name: "intermediate_scaling_overflow_rounds_up",
+			init: state{
+				target: 1_000_000,
+				excess: 1,
+				config: GasPriceConfig{
+					TargetToExcessScaling: math.MaxUint64,
+					MinPrice:              1,
+				},
+				price: 1,
+			},
+			new: state{
+				target: 1_000_000,
+				excess: 1,
+				config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				price: 1,
 			},
 		},
 		{

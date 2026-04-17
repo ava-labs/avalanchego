@@ -8,6 +8,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/holiman/uint256"
+
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
@@ -43,31 +45,53 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error
 	if err := c.Validate(); err != nil {
 		return fmt.Errorf("%T.Validate() after block: %w", c, err)
 	}
+	target = clampTarget(target)
 
 	tm.Tick(used)
 
-	// x := x * (K' * T') / (K * T)
-	oldK := tm.excessScalingFactor() // K * T
-
-	tm.target = clampTarget(target)
-	tm.Time.SetRate(rateOf(tm.target))
-	tm.config = c
-
-	newK := tm.excessScalingFactor() // K' * T'
-	scaled, _, err := intmath.MulDivCeil(tm.excess, newK, oldK)
-	if err != nil {
-		scaled = math.MaxUint64
-	}
-	tm.excess = scaled
-
+	tm.excess = scaleExcess(
+		tm.excess,
+		target, c.TargetToExcessScaling,
+		tm.target, tm.config.TargetToExcessScaling,
+	)
 	if c.StaticPricing {
 		tm.excess = 0
 	}
 
-	// x := max(x, ln(minPrice) * K' * T')
-	minExcess := priceExcess(c.MinPrice, newK)
+	tm.target = target
+	tm.Time.SetRate(rateOf(tm.target))
+	tm.config = c
+
+	minExcess := priceExcess(c.MinPrice, tm.excessScalingFactor())
 	tm.excess = max(tm.excess, minExcess)
 	return nil
+}
+
+// scaleExcess returns x * T' * K' / (T * K) rounded up.
+func scaleExcess(x, newT, newScale, oldT, oldScale gas.Gas) gas.Gas {
+	var (
+		newK uint256.Int // T' * K'
+		v    uint256.Int
+	)
+	newK.SetUint64(uint64(newT))
+	v.SetUint64(uint64(newScale))
+	newK.Mul(&newK, &v)
+
+	var oldK uint256.Int // T * K
+	oldK.SetUint64(uint64(oldT))
+	v.SetUint64(uint64(oldScale))
+	oldK.Mul(&oldK, &v)
+
+	v.SetUint64(uint64(x))
+	v.Mul(&v, &newK)
+	v.Add(&v, &oldK) // round up by adding oldK - 1
+	v.SubUint64(&v, 1)
+	v.Div(&v, &oldK)
+
+	if !v.IsUint64() {
+		return math.MaxUint64
+	}
+	return gas.Gas(v.Uint64())
 }
 
 // priceExcess returns an iteger approximation of ln(p) * k.

@@ -120,6 +120,10 @@ func (tm *Time) Price() gas.Price {
 
 // excessScalingFactor returns the K variable of ACP-103/176, i.e.
 // [GasPriceConfig.TargetToExcessScaling] * T, capped at [math.MaxUint64].
+//
+// TODO(StephenButtolph): Rather than capping this at MaxUint64, we should move
+// the evaluation of T * K into the exponential calculation. This would allow us
+// to never round any values during calculation of extreme inputs.
 func (tm *Time) excessScalingFactor() gas.Gas {
 	return intmath.BoundedMultiply(tm.config.TargetToExcessScaling, tm.target, math.MaxUint64)
 }
