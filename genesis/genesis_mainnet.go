@@ -59,6 +59,7 @@ var (
 			MinDelegationFee:  20000, // 2%
 			MinStakeDuration:  2 * 7 * 24 * time.Hour,
 			MaxStakeDuration:  365 * 24 * time.Hour,
+			HeliconMinStakeDuration: 48 * time.Hour,
 			RewardConfig: reward.Config{
 				MaxConsumptionRate: .12 * reward.PercentDenominator,
 				MinConsumptionRate: .10 * reward.PercentDenominator,

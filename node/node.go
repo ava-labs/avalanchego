@@ -1212,6 +1212,7 @@ func (n *Node) initVMs() error {
 				MinDelegationFee:          n.Config.MinDelegationFee,
 				MinStakeDuration:          n.Config.MinStakeDuration,
 				MaxStakeDuration:          n.Config.MaxStakeDuration,
+				HeliconMinStakeDuration:   n.Config.HeliconMinStakeDuration,
 				RewardConfig:              n.Config.RewardConfig,
 				UpgradeConfig:             n.Config.UpgradeConfig,
 				UseCurrentHeight:          n.Config.UseCurrentHeight,

@@ -561,16 +561,19 @@ func TestGetValidatorRules(t *testing.T) {
 	}
 
 	var (
-		config = &config.Internal{
+		now           = time.Now().Truncate(time.Second)
+		avaxAssetID   = ids.GenerateTestID()
+		customAssetID = ids.GenerateTestID()
+		subnetID      = ids.GenerateTestID()
+
+		validatorConfig = &config.Internal{
 			MinValidatorStake: 1,
 			MaxValidatorStake: 2,
 			MinStakeDuration:  time.Second,
 			MaxStakeDuration:  2 * time.Second,
 			MinDelegationFee:  1337,
+			HeliconMinStakeDuration: 3 * time.Second,
 		}
-		avaxAssetID   = ids.GenerateTestID()
-		customAssetID = ids.GenerateTestID()
-		subnetID      = ids.GenerateTestID()
 	)
 
 	tests := []test{
@@ -578,19 +581,62 @@ func TestGetValidatorRules(t *testing.T) {
 			name:     "primary network",
 			subnetID: constants.PrimaryNetworkID,
 			backend: &Backend{
-				Config: config,
+				Config: &config.Internal{
+					MinValidatorStake: validatorConfig.MinValidatorStake,
+					MaxValidatorStake: validatorConfig.MaxValidatorStake,
+					MinStakeDuration:  validatorConfig.MinStakeDuration,
+					MaxStakeDuration:  validatorConfig.MaxStakeDuration,
+					MinDelegationFee:  validatorConfig.MinDelegationFee,
+					HeliconMinStakeDuration: validatorConfig.HeliconMinStakeDuration,
+					UpgradeConfig:     upgradetest.GetConfig(upgradetest.Granite),
+				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,
 				},
 			},
-			chain: nil,
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				return s
+			}(),
 			expectedRules: &addValidatorRules{
 				assetID:           avaxAssetID,
-				minValidatorStake: config.MinValidatorStake,
-				maxValidatorStake: config.MaxValidatorStake,
-				minStakeDuration:  config.MinStakeDuration,
-				maxStakeDuration:  config.MaxStakeDuration,
-				minDelegationFee:  config.MinDelegationFee,
+				minValidatorStake: validatorConfig.MinValidatorStake,
+				maxValidatorStake: validatorConfig.MaxValidatorStake,
+				minStakeDuration:  validatorConfig.MinStakeDuration,
+				maxStakeDuration:  validatorConfig.MaxStakeDuration,
+				minDelegationFee:  validatorConfig.MinDelegationFee,
+			},
+		},
+		{
+			name:     "primary network post-Helicon",
+			subnetID: constants.PrimaryNetworkID,
+			backend: &Backend{
+				Config: &config.Internal{
+					MinValidatorStake: validatorConfig.MinValidatorStake,
+					MaxValidatorStake: validatorConfig.MaxValidatorStake,
+					MinStakeDuration:  validatorConfig.MinStakeDuration,
+					MaxStakeDuration:  validatorConfig.MaxStakeDuration,
+					MinDelegationFee:  validatorConfig.MinDelegationFee,
+					HeliconMinStakeDuration: validatorConfig.HeliconMinStakeDuration,
+					UpgradeConfig:     upgradetest.GetConfig(upgradetest.Helicon),
+				},
+				Ctx: &snow.Context{
+					AVAXAssetID: avaxAssetID,
+				},
+			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				return s
+			}(),
+			expectedRules: &addValidatorRules{
+				assetID:           avaxAssetID,
+				minValidatorStake: validatorConfig.MinValidatorStake,
+				maxValidatorStake: validatorConfig.MaxValidatorStake,
+				minStakeDuration:  validatorConfig.HeliconMinStakeDuration,
+				maxStakeDuration:  validatorConfig.MaxStakeDuration,
+				minDelegationFee:  validatorConfig.MinDelegationFee,
 			},
 		},
 		{
@@ -610,11 +656,11 @@ func TestGetValidatorRules(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &txs.TransformSubnetTx{
 						AssetID:           customAssetID,
-						MinValidatorStake: config.MinValidatorStake,
-						MaxValidatorStake: config.MaxValidatorStake,
+						MinValidatorStake: validatorConfig.MinValidatorStake,
+						MaxValidatorStake: validatorConfig.MaxValidatorStake,
 						MinStakeDuration:  1337,
 						MaxStakeDuration:  42,
-						MinDelegationFee:  config.MinDelegationFee,
+						MinDelegationFee:  validatorConfig.MinDelegationFee,
 						Subnet:            subnetID,
 					},
 				}
@@ -623,11 +669,11 @@ func TestGetValidatorRules(t *testing.T) {
 			}(),
 			expectedRules: &addValidatorRules{
 				assetID:           customAssetID,
-				minValidatorStake: config.MinValidatorStake,
-				maxValidatorStake: config.MaxValidatorStake,
+				minValidatorStake: validatorConfig.MinValidatorStake,
+				maxValidatorStake: validatorConfig.MaxValidatorStake,
 				minStakeDuration:  1337 * time.Second,
 				maxStakeDuration:  42 * time.Second,
-				minDelegationFee:  config.MinDelegationFee,
+				minDelegationFee:  validatorConfig.MinDelegationFee,
 			},
 			expectedErr: nil,
 		},
@@ -658,33 +704,77 @@ func TestGetDelegatorRules(t *testing.T) {
 		expectedErr   error
 	}
 	var (
-		config = &config.Internal{
+		now           = time.Now().Truncate(time.Second)
+		avaxAssetID   = ids.GenerateTestID()
+		customAssetID = ids.GenerateTestID()
+		subnetID      = ids.GenerateTestID()
+
+		delegatorConfig = &config.Internal{
 			MinDelegatorStake: 1,
 			MaxValidatorStake: 2,
 			MinStakeDuration:  time.Second,
 			MaxStakeDuration:  2 * time.Second,
+			HeliconMinStakeDuration: 3 * time.Second,
 		}
-		avaxAssetID   = ids.GenerateTestID()
-		customAssetID = ids.GenerateTestID()
-		subnetID      = ids.GenerateTestID()
 	)
 	tests := []test{
 		{
 			name:     "primary network",
 			subnetID: constants.PrimaryNetworkID,
 			backend: &Backend{
-				Config: config,
+				Config: &config.Internal{
+					MinDelegatorStake: delegatorConfig.MinDelegatorStake,
+					MaxValidatorStake: delegatorConfig.MaxValidatorStake,
+					MinStakeDuration:  delegatorConfig.MinStakeDuration,
+					MaxStakeDuration:  delegatorConfig.MaxStakeDuration,
+					HeliconMinStakeDuration: delegatorConfig.HeliconMinStakeDuration,
+					UpgradeConfig:     upgradetest.GetConfig(upgradetest.Granite),
+				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,
 				},
 			},
-			chain: nil,
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				return s
+			}(),
 			expectedRules: &addDelegatorRules{
 				assetID:                  avaxAssetID,
-				minDelegatorStake:        config.MinDelegatorStake,
-				maxValidatorStake:        config.MaxValidatorStake,
-				minStakeDuration:         config.MinStakeDuration,
-				maxStakeDuration:         config.MaxStakeDuration,
+				minDelegatorStake:        delegatorConfig.MinDelegatorStake,
+				maxValidatorStake:        delegatorConfig.MaxValidatorStake,
+				minStakeDuration:         delegatorConfig.MinStakeDuration,
+				maxStakeDuration:         delegatorConfig.MaxStakeDuration,
+				maxValidatorWeightFactor: MaxValidatorWeightFactor,
+			},
+		},
+		{
+			name:     "primary network post-Helicon",
+			subnetID: constants.PrimaryNetworkID,
+			backend: &Backend{
+				Config: &config.Internal{
+					MinDelegatorStake: delegatorConfig.MinDelegatorStake,
+					MaxValidatorStake: delegatorConfig.MaxValidatorStake,
+					MinStakeDuration:  delegatorConfig.MinStakeDuration,
+					MaxStakeDuration:  delegatorConfig.MaxStakeDuration,
+					HeliconMinStakeDuration: delegatorConfig.HeliconMinStakeDuration,
+					UpgradeConfig:     upgradetest.GetConfig(upgradetest.Helicon),
+				},
+				Ctx: &snow.Context{
+					AVAXAssetID: avaxAssetID,
+				},
+			},
+			chain: func() *state.State {
+				s := statetest.New(t, statetest.Config{})
+				s.SetTimestamp(now)
+				return s
+			}(),
+			expectedRules: &addDelegatorRules{
+				assetID:                  avaxAssetID,
+				minDelegatorStake:        delegatorConfig.MinDelegatorStake,
+				maxValidatorStake:        delegatorConfig.MaxValidatorStake,
+				minStakeDuration:         delegatorConfig.HeliconMinStakeDuration,
+				maxStakeDuration:         delegatorConfig.MaxStakeDuration,
 				maxValidatorWeightFactor: MaxValidatorWeightFactor,
 			},
 		},
@@ -705,12 +795,12 @@ func TestGetDelegatorRules(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &txs.TransformSubnetTx{
 						AssetID:                  customAssetID,
-						MinDelegatorStake:        config.MinDelegatorStake,
-						MinValidatorStake:        config.MinValidatorStake,
-						MaxValidatorStake:        config.MaxValidatorStake,
+						MinDelegatorStake:        delegatorConfig.MinDelegatorStake,
+						MinValidatorStake:        delegatorConfig.MinValidatorStake,
+						MaxValidatorStake:        delegatorConfig.MaxValidatorStake,
 						MinStakeDuration:         1337,
 						MaxStakeDuration:         42,
-						MinDelegationFee:         config.MinDelegationFee,
+						MinDelegationFee:         delegatorConfig.MinDelegationFee,
 						MaxValidatorWeightFactor: 21,
 						Subnet:                   subnetID,
 					},
@@ -720,8 +810,8 @@ func TestGetDelegatorRules(t *testing.T) {
 			}(),
 			expectedRules: &addDelegatorRules{
 				assetID:                  customAssetID,
-				minDelegatorStake:        config.MinDelegatorStake,
-				maxValidatorStake:        config.MaxValidatorStake,
+				minDelegatorStake:        delegatorConfig.MinDelegatorStake,
+				maxValidatorStake:        delegatorConfig.MaxValidatorStake,
 				minStakeDuration:         1337 * time.Second,
 				maxStakeDuration:         42 * time.Second,
 				maxValidatorWeightFactor: 21,

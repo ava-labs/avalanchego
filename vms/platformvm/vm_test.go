@@ -79,7 +79,7 @@ const (
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
 	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
 
-	defaultMinStakingDuration = 24 * time.Hour
+	defaultMinStakingDuration = 48 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 )
 
@@ -142,6 +142,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		MinDelegatorStake:      defaultMinDelegatorStake,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
+		HeliconMinStakeDuration: defaultMinStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(f, latestForkTime),
 	}}
