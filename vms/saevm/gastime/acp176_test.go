@@ -74,7 +74,7 @@ func TestTargetUpdateTiming(t *testing.T) {
 	)
 
 	initialPrice := tm.Price()
-	tm.BeforeBlock(time.Unix(newTime, 0))
+	tm.FastForwardToTime(time.Unix(newTime, 0))
 	assert.Equal(t, uint64(newTime), tm.Unix(), "Unix time advanced by BeforeBlock()")
 	assert.Equal(t, initialTarget, tm.Target(), "Target not changed by BeforeBlock()")
 	// While the price technically could remain the same, being more strict
@@ -156,8 +156,8 @@ func FuzzWorstCasePrice(f *testing.F) {
 			blockSeconds := int64(min(block.time, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
 
 			tm := time.Unix(blockSeconds, int64(block.nanos))
-			worstcase.BeforeBlock(tm)
-			actual.BeforeBlock(tm)
+			worstcase.FastForwardToTime(tm)
+			actual.FastForwardToTime(tm)
 
 			// The crux of this test lies in the maintaining of this inequality
 			// through the use of `limit` instead of `used` in `AfterBlock()`

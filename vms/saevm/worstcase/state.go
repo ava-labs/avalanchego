@@ -117,7 +117,7 @@ func (s *State) StartBlock(h *types.Header) error {
 		)
 	}
 
-	s.clock.BeforeBlock(s.hooks.BlockTime(h))
+	s.clock.FastForwardToTime(s.hooks.BlockTime(h))
 	s.blockSize = 0
 
 	s.maxBlockSize = safeMaxBlockSize(s.clock)
