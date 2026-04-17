@@ -116,7 +116,7 @@ func priceExcess(p gas.Price, k gas.Gas) gas.Gas {
 			lo = mid + 1
 		}
 	}
-	// If [calculatePrice] can't generate p due to integer appoximation, honor
+	// If [calculatePrice] can't generate p due to integer approximation, honor
 	// the lower price expectation.
 	if calculatePrice(lo, k) > p {
 		return lo - 1
