@@ -14,11 +14,15 @@ import (
 
 // BeforeBlock is intended to be called before processing a block with the
 // provided time. The gastime is advanced to be no earlier than the block time.
-func (tm *Time) BeforeBlock(bTime time.Time) {
-	s, ns := bTime.Unix(), bTime.Nanosecond()
-	// g = ceil(ns * rate / time.Second)
+func (tm *Time) BeforeBlock(t time.Time) {
+	tm.FastForwardToTime(t)
+}
+
+// FastForwardToTime is equivalent to [Time.FastForwardTo] except that it
+// accepts a [time.Time].
+func (tm *Time) FastForwardToTime(t time.Time) {
 	g, _, err := intmath.MulDivCeil(
-		gas.Gas(ns), //#nosec G115 -- ns is in [0, time.Second)
+		gas.Gas(t.Nanosecond()), //#nosec G115 -- ns is in [0, time.Second)
 		tm.Rate(),
 		gas.Gas(time.Second),
 	)
@@ -30,7 +34,7 @@ func (tm *Time) BeforeBlock(bTime time.Time) {
 		// dropping the error.
 		panic(fmt.Sprintf("broken invariant: %v", err))
 	}
-	tm.FastForwardTo(uint64(s), g) //#nosec G115 -- known non-negative.
+	tm.FastForwardTo(uint64(t.Unix()), g) //#nosec G115 -- known non-negative.
 }
 
 // AfterBlock is intended to be called after processing a block, with the
