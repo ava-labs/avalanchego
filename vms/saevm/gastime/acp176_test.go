@@ -766,6 +766,28 @@ func TestOscillatingMinPrice(t *testing.T) {
 	assert.Equal(t, control.Price(), modified.Price(), "oscillating MinPrice must not impact price growth")
 }
 
+func BenchmarkPriceExcess(b *testing.B) {
+	benchmarks := []struct {
+		name string
+		p    gas.Price
+		k    gas.Gas
+	}{
+		{"p=1", 1, 87_000_000},
+		{"small", 100, 87_000_000},
+		{"medium", 1_000_000_000, 87_000_000},
+		{"large", math.MaxUint64, 87_000_000},
+		{"large_k", 1_000_000_000, math.MaxUint64},
+		{"slowest", math.MaxUint64, 1 << 58},
+	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			for b.Loop() {
+				priceExcess(bm.p, bm.k)
+			}
+		})
+	}
+}
+
 func FuzzPriceExcess(f *testing.F) {
 	seeds := []struct {
 		p gas.Price

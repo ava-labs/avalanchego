@@ -61,10 +61,21 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error
 	tm.target = target
 	tm.Time.SetRate(rateOf(tm.target))
 	tm.config = c
-
-	minExcess := priceExcess(c.MinPrice, tm.excessScalingFactor())
-	tm.excess = max(tm.excess, minExcess)
+	tm.enforceMinExcess()
 	return nil
+}
+
+// enforceMinExcess bounds excess to be no less than priceExcess(minPrice, k).
+func (tm *Time) enforceMinExcess() {
+	k := tm.excessScalingFactor()
+	// Avoid the binary search in [priceExcess] when the current excess already
+	// yields a price that satisfies the minimum.
+	if calculatePrice(tm.excess, k) >= tm.config.MinPrice {
+		return
+	}
+
+	minExcess := priceExcess(tm.config.MinPrice, k)
+	tm.excess = max(tm.excess, minExcess)
 }
 
 // scaleExcess returns x * newT * newScale / (oldT * oldScale) rounded up and

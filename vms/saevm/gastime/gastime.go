@@ -51,19 +51,19 @@ func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time,
 	target = clampTarget(target)
 	tm.SetRate(rateOf(target))
 
-	t := &Time{
-		Time:   tm,
-		target: target,
-		config: c,
-	}
-
 	// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
 	// meaningfully provide. We should instead take in startingPrice.
 	if c.StaticPricing {
 		startingExcess = 0
 	}
-	minExcess := priceExcess(c.MinPrice, t.excessScalingFactor())
-	t.excess = max(startingExcess, minExcess)
+
+	t := &Time{
+		Time:   tm,
+		target: target,
+		excess: startingExcess,
+		config: c,
+	}
+	t.enforceMinExcess()
 	return t, nil
 }
 
@@ -211,6 +211,7 @@ func (tm *Time) FastForwardTo(to uint64, toFrac gas.Gas) {
 
 	// -fT/R
 	quo, _, _ := intmath.MulDiv(frac.Numerator, T, R) // overflow is impossible as T/R < 1
-	minExcess := priceExcess(tm.config.MinPrice, tm.excessScalingFactor())
-	tm.excess = intmath.BoundedSubtract(tm.excess, quo, minExcess)
+	tm.excess = intmath.BoundedSubtract(tm.excess, quo, 0)
+
+	tm.enforceMinExcess()
 }
