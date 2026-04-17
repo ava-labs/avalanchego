@@ -277,7 +277,7 @@ func TestMultipleBlocks(t *testing.T) {
 			Time:       block.time,
 		}
 
-		wantLatestEndTime.FastForwardToTime(sut.hooks.BlockTime(header))
+		wantLatestEndTime.BeforeBlock(sut.hooks.BlockTime(header))
 		require.NoErrorf(t, state.StartBlock(header), "StartBlock(%d)", i)
 		require.Equalf(t, block.wantBaseFee, state.BaseFee(), "base fee after StartBlock(%d)", i)
 		require.Equalf(t, block.wantGasLimit, state.GasLimit(), "gas limit after StartBlock(%d)", i)

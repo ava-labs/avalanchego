@@ -12,6 +12,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
 
+// BeforeBlock is intended to be called before processing a block with the
+// provided time. The gastime is advanced to be no earlier than the block time.
+func (tm *Time) BeforeBlock(t time.Time) {
+	tm.FastForwardToTime(t)
+}
+
 // FastForwardToTime is equivalent to [Time.FastForwardTo] except that it
 // accepts a [time.Time].
 func (tm *Time) FastForwardToTime(t time.Time) {

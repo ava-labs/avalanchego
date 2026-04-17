@@ -162,7 +162,7 @@ func Execute(
 	header := b.Header()
 
 	gasClock := parent.ExecutedByGasTime().Clone()
-	gasClock.FastForwardToTime(hooks.BlockTime(header))
+	gasClock.BeforeBlock(hooks.BlockTime(header))
 	perTxClock := gasClock.Time.Clone()
 
 	stateDB, err := sdbo.StateDB(parent.PostExecutionStateRoot())
