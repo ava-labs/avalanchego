@@ -1,0 +1,94 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package gastime
+
+import (
+	"fmt"
+	"math"
+	"time"
+
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+)
+
+// BeforeBlock is intended to be called before processing a block with the
+// provided time. The gastime is advanced to be no earlier than the block time.
+func (tm *Time) BeforeBlock(t time.Time) {
+	tm.FastForwardToTime(t)
+}
+
+// FastForwardToTime is equivalent to [Time.FastForwardTo] except that it
+// accepts a [time.Time].
+func (tm *Time) FastForwardToTime(t time.Time) {
+	g, _, err := intmath.MulDivCeil(
+		gas.Gas(t.Nanosecond()), //#nosec G115 -- ns is in [0, time.Second)
+		tm.Rate(),
+		gas.Gas(time.Second),
+	)
+	if err != nil {
+		// [time.Time.Nanosecond] is documented as only returning values in the
+		// range [0, time.Second). So either Nanosecond returned an incorrect
+		// value, or [intmath.MulDivCeil] incorrectly returned an error.
+		// Regardless, this failure MUST be detected in tests, hence not just
+		// dropping the error.
+		panic(fmt.Sprintf("broken invariant: %v", err))
+	}
+	tm.FastForwardTo(uint64(t.Unix()), g) //#nosec G115 -- known non-negative.
+}
+
+// AfterBlock is intended to be called after processing a block, with the
+// target and gas configuration provided.
+func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, cfg GasPriceConfig) error {
+	tm.Tick(used)
+	// Although [Time.SetTarget] scales the excess by the same factor as the
+	// change in target, it rounds when necessary, which might alter the price
+	// by a negligible amount. We therefore take a price snapshot beforehand
+	// otherwise we'd call [Time.findExcessForPrice] with a different value,
+	// which makes it extremely hard to test.
+	p := tm.Price()
+	tm.SetTarget(target)
+
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("%T.Validate() after block: %w", cfg, err)
+	}
+	if cfg.equals(tm.config) {
+		return nil
+	}
+	tm.config = cfg
+	tm.excess = tm.findExcessForPrice(p)
+
+	return nil
+}
+
+// findExcessForPrice uses binary search over uint64 to find the smallest excess
+// value that produces targetPrice with the current [GasPriceConfig]. This maintains
+// price continuity under a change in [GasPriceConfig], with the following scenarios:
+//
+//   - K changes (via TargetToExcessScaling): Scale excess to maintain current price
+//   - StaticPricing is true: Set excess to 0, enabling fixed price mode
+//   - M decreases: Scale excess to maintain current price
+//   - M increases AND current price >= new M: Scale excess to maintain current price
+//   - M increases AND current price < new M: Price bumps to new M (excess becomes 0)
+func (tm *Time) findExcessForPrice(targetPrice gas.Price) gas.Gas {
+	// We return 0 in case targetPrice < minPrice because we should at least maintain the minimum price
+	// by setting the excess to 0. ( P = M * e^(0 / K) = M )
+	// Note: Even though we return 0 for excess it won't avoid accumulating excess in the long run.
+	if targetPrice <= tm.config.MinPrice || tm.config.StaticPricing {
+		return 0
+	}
+
+	k := tm.excessScalingFactor()
+
+	// The price function is monotonic non-decreasing so binary search is appropriate.
+	lo, hi := gas.Gas(0), gas.Gas(math.MaxUint64)
+	for lo < hi {
+		mid := lo + (hi-lo)/2
+		if gas.CalculatePrice(tm.config.MinPrice, mid, k) >= targetPrice {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	return lo
+}

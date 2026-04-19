@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/gasprice"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/bloombits"
@@ -259,6 +260,18 @@ func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.B
 		return nil, nil, errors.New("header not found")
 	}
 	stateDb, err := b.eth.BlockChain().StateAt(header.Root)
+	if err != nil && b.eth.BlockChain().CacheConfig().StateScheme == customrawdb.FirewoodScheme {
+		// Firewood can reconstruct historical state by walking back to a
+		// persisted revision and re-executing blocks forward, even if the
+		// state is not available in-memory or on disk.
+		//
+		// TODO: propagate the release function through the [ethapi.Backend]
+		// interface for deterministic cleanup. Currently, it is discarded
+		// because the interface does not return one. The underlying reconstructed
+		// revision will be freed by the GC when stateDb becomes unreachable,
+		// since stateDb holds the only references to it.
+		stateDb, _, err = b.eth.firewoodState(ctx, header, b.eth.BlockChain().CacheConfig().CommitInterval)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -281,6 +294,18 @@ func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockN
 			return nil, nil, errors.New("header for hash not found")
 		}
 		stateDb, err := b.eth.BlockChain().StateAt(header.Root)
+		if err != nil && b.eth.BlockChain().CacheConfig().StateScheme == customrawdb.FirewoodScheme {
+			// Firewood can reconstruct historical state by walking back to a
+			// persisted revision and re-executing blocks forward, even if the
+			// state is not available in-memory or on disk.
+			//
+			// TODO: propagate the release function through the [ethapi.Backend]
+			// interface for deterministic cleanup. Currently, it is discarded
+			// because the interface does not return one. The underlying reconstructed
+			// revision will be freed by the GC when stateDb becomes unreachable,
+			// since stateDb holds the only references to it.
+			stateDb, _, err = b.eth.firewoodState(ctx, header, b.eth.BlockChain().CacheConfig().CommitInterval)
+		}
 		if err != nil {
 			return nil, nil, err
 		}

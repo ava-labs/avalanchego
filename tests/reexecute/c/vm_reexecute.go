@@ -66,6 +66,10 @@ var (
 		"archive": `{
 			"pruning-enabled": false
 		}`,
+		"pathdb": `{
+			"state-scheme": "path",
+			"state-sync-enabled": false
+		}`,
 		"firewood": `{
 			"state-scheme": "firewood",
 			"snapshot-cache": 0,
@@ -490,7 +494,8 @@ func startCollector(tc tests.TestContext, name string, labels map[string]string,
 		}(),
 		)
 
-		r.NoError(tmpnet.CheckMetricsExist(tc.DefaultContext(), logger, networkUUID))
+		// TODO(marun) Re-enable this check as part of a PR updating the metrics links
+		// r.NoError(tmpnet.CheckMetricsExist(tc.DefaultContext(), logger, networkUUID))
 	})
 
 	sdConfigFilePath, err := tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
