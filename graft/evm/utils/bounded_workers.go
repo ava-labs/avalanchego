@@ -32,7 +32,6 @@ func (b *BoundedWorkers) startWorker(f func()) {
 	b.workerCount.Add(1)
 
 	b.outstandingWorkers.Go(func() {
-
 		if f != nil {
 			f()
 		}
