@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "threshold",
+    srcs = [
+        "keygen.go",
+        "lagrange.go",
+        "scheme.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/crypto/bls/threshold",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "@com_github_supranational_blst//bindings/go",
+    ],
+)
+
+go_test(
+    name = "threshold_test",
+    srcs = [
+        "lagrange_test.go",
+        "scheme_test.go",
+        "threshold_test.go",
+    ],
+    embed = [":threshold"],
+    deps = [
+        "//utils/crypto/bls",
+        "@com_github_stretchr_testify//require",
+    ],
+)

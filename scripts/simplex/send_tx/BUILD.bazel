@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "send_tx_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/scripts/simplex/send_tx",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethclient",
+    ],
+)
+
+go_binary(
+    name = "send_tx",
+    embed = [":send_tx_lib"],
+    visibility = ["//visibility:public"],
+)

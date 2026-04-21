@@ -106,6 +106,5 @@ go_test(
         "//vms/example/xsvm/genesis",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
-        "@org_uber_go_mock//gomock",
     ],
 )
