@@ -399,7 +399,7 @@ func testArchiveUngracefulShutdown(t *testing.T, scheme string) {
 	}
 
 	chainDataDir := t.TempDir()
-	pruningConfig := &CacheConfig{
+	config := &CacheConfig{
 		TrieCleanLimit:            256,
 		TrieDirtyLimit:            256,
 		TrieDirtyCommitTarget:     20,
@@ -412,7 +412,7 @@ func testArchiveUngracefulShutdown(t *testing.T, scheme string) {
 		ChainDataDir:              chainDataDir,
 	}
 
-	blockchain, err := createBlockChain(chainDB, pruningConfig, gspec, common.Hash{})
+	blockchain, err := createBlockChain(chainDB, config, gspec, common.Hash{})
 	if err != nil {
 		t.Fatal(err)
 	}
