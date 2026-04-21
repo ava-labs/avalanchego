@@ -126,13 +126,25 @@ func (v *VM) Initialize(
 			return fmt.Errorf("initializing post-transition VM: %w", err)
 		}
 		v.transitioned = true
-	} else {
-		chainCtx.Log.Info("initializing pre-transition VM")
-		if err := v.initChain(ctx, v.preTransitionChain, chainCtx); err != nil {
-			return fmt.Errorf("initializing pre-transition VM: %w", err)
-		}
+		return nil
 	}
-	return nil
+
+	chainCtx.Log.Info("initializing pre-transition VM")
+	if err := v.initChain(ctx, v.preTransitionChain, chainCtx); err != nil {
+		return fmt.Errorf("initializing pre-transition VM: %w", err)
+	}
+
+	// It's possible we crashed between accepting the last block and writing the
+	// transition flag. Or maybe the genesis block was the transition block.
+	lastAcceptedID, err := v.LastAccepted(ctx)
+	lastAccepted, err := v.GetBlock(ctx, lastAcceptedID)
+	if err != nil {
+		return fmt.Errorf("loading last accepted block: %w", err)
+	}
+	if time := lastAccepted.Timestamp(); time.Before(v.transitionTime) {
+		return nil
+	}
+	return v.transition(ctx, lastAccepted)
 }
 
 func (v *VM) transition(ctx context.Context, last snowman.Block) error {
