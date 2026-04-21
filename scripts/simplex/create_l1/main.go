@@ -445,4 +445,3 @@ func writeChainsJSON(outputPath string, result l1Result) {
 	}
 	fmt.Printf("\nWrote chains to %s\n", outputPath)
 }
-

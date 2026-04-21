@@ -2,24 +2,24 @@
   "simplexParameters": {
     "initialValidators": [
       {
-        "nodeID": "NodeID-33BMq1TzybzuWejy32KuucARxoKX2uYJp",
-        "publicKey": "lSv7NrLmlGSyz3GEsDpXYW5ny80FUE8+6nzX4caKHJrDNPD7/lOha7WXi4jv3dyJ"
+        "nodeID": "NodeID-EpYNmG9pzFjCFiK2DQBeMaBHK9aUp5D8C",
+        "publicKey": "spRkx66MPzS4baNDByfvxoZxo9yJg3u6R8FfXbopv0NV4K/4YuPq8NGaGKmfHfOb"
       },
       {
-        "nodeID": "NodeID-7fji92Dmdke7seH6DACKHvxPrUQ36Erp9",
-        "publicKey": "l/dAydY6jSCWW8blaOUaSGOq9sN/41oEbX1RsCVm2d24i7KYk89cWuZBCmpw2QEJ"
+        "nodeID": "NodeID-GCgZ1Gro3aSKFsNQrrByzmt5DQPES9SM4",
+        "publicKey": "pGSSaJcLC6xpEv6+9BWRtMoJhhF8ENbPTDUpFzRB99n3qh6o/pWqZFLRxY+IB+E5"
       },
       {
-        "nodeID": "NodeID-7xZHRuFEhavBvPCe7xPECJc5zBLevxfew",
-        "publicKey": "iuPz1wFX4pW0ziYUkROUbuuoT8hNCHrx9dWgP4Zl6Hr4LYeST3a/QEysQs6wYK6c"
+        "nodeID": "NodeID-HpuMtkGnxvC3zuoj4xaSvJeHGXJUwyCBK",
+        "publicKey": "j8t4dAxT0PM0uymv1HJyvsC2T71U3iOX06fHynwuQCK0viVKCAx7e0glXT+70CsO"
       },
       {
-        "nodeID": "NodeID-CyqXdoZ6frrACPxsiz8b2zbj3CjFyWvUD",
-        "publicKey": "pB5sQW/KAHIiatwpZWAjT4PVwRB8I61bmxC3KBR95CtbTI1WmtLL0wMU/lrKLvSk"
+        "nodeID": "NodeID-KQSUee2kpCxHfirq3HVexBM3K46g5zs32",
+        "publicKey": "rj7VedRt9yqNqmCPqCb6N2BSqNh/3uOg/CnLdtF+3FMvJbcu0QgdNEQ2syXcWFJR"
       },
       {
-        "nodeID": "NodeID-F3c1UswC2mijvUnAZa1e8D5Dm5oTNuQts",
-        "publicKey": "k9QGDhTzMaewtUOs3qL11T1c9g5ubqcv6kHMqhEkFEZR154W5EIS4nA8+wjvQsOe"
+        "nodeID": "NodeID-RJEfcQA5JWSzKeNHL8F9JvbatsFFFJHT",
+        "publicKey": "iRqyd2RAX2okHFKHI/rkwoTVFORMoFqmcTG5PXdeXusyNCKkkVFIMU5Oo4nSmloI"
       }
     ],
     "maxNetworkDelay": 5000000000,

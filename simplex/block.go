@@ -47,12 +47,12 @@ type Block struct {
 	blacklist simplex.Blacklist
 }
 
-func newBlock(metadata simplex.ProtocolMetadata, blacklist simplex.Blacklist, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
+func newBlock(metadata simplex.ProtocolMetadata, _ simplex.Blacklist, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
 	block := &Block{
 		metadata:     metadata,
 		vmBlock:      vmBlock,
 		blockTracker: blockTracker,
-		blacklist:    blacklist,
+		blacklist:    simplex.Blacklist{},
 	}
 	bytes, err := block.Bytes()
 	if err != nil {

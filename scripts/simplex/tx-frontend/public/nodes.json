@@ -1,22 +1,22 @@
 [
   {
-    "uri": "http://127.0.0.1:57894",
+    "uri": "http://127.0.0.1:50730",
     "address": "0xF0DB9b89d1DDB8a5e799Ef2E278AC8961e55A33b"
   },
   {
-    "uri": "http://127.0.0.1:58016",
+    "uri": "http://127.0.0.1:50745",
     "address": "0x48d563Fa888E3E8902d9D2092eaF278a80bFA876"
   },
   {
-    "uri": "http://127.0.0.1:58105",
+    "uri": "http://127.0.0.1:50773",
     "address": "0x47C3850aDe1F4Ab4eC82f73Bfd3d83E27D19d7b5"
   },
   {
-    "uri": "http://127.0.0.1:58221",
+    "uri": "http://127.0.0.1:50801",
     "address": "0x37B061b59a2222Ba291EaefaF64204067cf3Dbc0"
   },
   {
-    "uri": "http://127.0.0.1:58275",
+    "uri": "http://127.0.0.1:50829",
     "address": "0xB2912d9e47649aa11Ea34898eFC030c03E90E587"
   }
 ]

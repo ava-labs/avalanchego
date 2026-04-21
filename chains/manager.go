@@ -1788,7 +1788,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("couldn't initialize simplex VM: %w", err)
 	}
 
-	walLocation := getocation(ctx.ChainDataDir, ctx.ChainID)
+	walLocation := getChainWALLocation(ctx.ChainDataDir, ctx.ChainID)
 	chainWal := wal.New(walLocation)
 	config := &simplex.Config{
 		Ctx:                simplexCtxConfig(ctx),
