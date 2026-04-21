@@ -103,6 +103,7 @@ use_repo(
     "com_github_decred_dcrd_dcrec_secp256k1_v4",
     "com_github_fjl_gencodec",
     "com_github_go_cmd_cmd",
+    "com_github_gogo_protobuf",
     "com_github_google_btree",
     "com_github_google_go_cmp",
     "com_github_google_renameio_v2",
