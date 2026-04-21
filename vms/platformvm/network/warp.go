@@ -730,40 +730,24 @@ func (s signatureRequestVerifier) verifyValidatorSetDiff(
 
 	for _, change := range msg.Changes {
 		exp, hasKey := expectedByKey[change.UncompressedPublicKeyBytes]
-		if hasKey {
-			if exp.isAddition {
-				if change.Weight == 0 {
-					return &common.AppError{
-						Code:    ErrValidatorSetDiffMismatch,
-						Message: "message shows removal but database shows addition",
-					}
-				}
-				if change.Weight != exp.weight {
-					return &common.AppError{
-						Code:    ErrValidatorSetDiffMismatch,
-						Message: fmt.Sprintf("addition weight mismatch: message has %d, database has %d", change.Weight, exp.weight),
-					}
-				}
-			} else {
-				if change.Weight != 0 {
-					return &common.AppError{
-						Code:    ErrValidatorSetDiffMismatch,
-						Message: "message shows non-zero weight but database shows removal",
-					}
-				}
-			}
+		if !hasKey {
+			msgWeightMods[change.Weight]++
+			msgWeightModCount++
 			continue
 		}
 
-		// No public key match in additions/removals — must be a weight modification.
-		if change.Weight == 0 {
+		if exp.isAddition && change.Weight != exp.weight {
 			return &common.AppError{
 				Code:    ErrValidatorSetDiffMismatch,
-				Message: "message contains removal for unknown validator",
+				Message: fmt.Sprintf("addition weight mismatch: message has %d, database has %d", change.Weight, exp.weight),
 			}
 		}
-		msgWeightMods[change.Weight]++
-		msgWeightModCount++
+		if !exp.isAddition && change.Weight != 0 {
+			return &common.AppError{
+				Code:    ErrValidatorSetDiffMismatch,
+				Message: "message shows non-zero weight but database shows removal",
+			}
+		}
 	}
 
 	if msgWeightModCount != expectedWeightModCount {
