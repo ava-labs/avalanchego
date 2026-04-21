@@ -106,8 +106,7 @@ func (s signatureRequestVerifier) Verify(
 	case *message.ValidatorSetState:
 		return s.verifyValidatorSetState(ctx, payload)
 	case *message.ValidatorSetDiff:
-		return nil
-		// return s.verifyValidatorSetDiff(ctx, payload)
+		return s.verifyValidatorSetDiff(ctx, payload)
 	case *message.ValidatorSetMetadata:
 		return s.verifyValidatorSetMetadata(ctx, payload, justification)
 	default:
@@ -434,7 +433,7 @@ func (s signatureRequestVerifier) verifyValidatorSetState(
 	if msg.PChainTimestamp != uint64(blockTime.Unix()) {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: fmt.Sprintf("invalid block time. provided %d. expected %d", msg.PChainTimestamp, blockTime),
+			Message: fmt.Sprintf("invalid block time. provided %d. expected %d", msg.PChainTimestamp, blockTime.Unix()),
 		}
 	}
 
@@ -545,7 +544,7 @@ func (s signatureRequestVerifier) verifyValidatorSetMetadata(
 	if msg.PChainTimestamp != uint64(blockTime.Unix()) {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: fmt.Sprintf("invalid block time. provided %d. expected %d", msg.PChainTimestamp, blockTime),
+			Message: fmt.Sprintf("invalid block time. provided %d. expected %d", msg.PChainTimestamp, blockTime.Unix()),
 		}
 	}
 
@@ -610,293 +609,224 @@ func (s signatureRequestVerifier) verifyValidatorSetMetadata(
 	return nil
 }
 
-// func (s signatureRequestVerifier) verifyValidatorSetDiff(
-// 	ctx context.Context,
-// 	msg *message.ValidatorSetDiff,
-// ) *common.AppError {
-// 	s.log.Debug("verifying validator set diff",
-// 		zap.Stringer("blockchainID", msg.BlockchainID),
-// 		zap.Uint64("previousHeight", msg.PreviousHeight),
-// 		zap.Uint64("currentHeight", msg.CurrentHeight),
-// 	)
+func (s signatureRequestVerifier) verifyValidatorSetDiff(
+	ctx context.Context,
+	msg *message.ValidatorSetDiff,
+) *common.AppError {
+	s.log.Debug("verifying validator set diff",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("previousHeight", msg.PreviousHeight),
+		zap.Uint64("currentHeight", msg.CurrentHeight),
+	)
 
-// 	// Verify height progression
-// 	if msg.CurrentHeight <= msg.PreviousHeight {
-// 		return &common.AppError{
-// 			Code:    ErrValidatorSetDiffInvalidHeightProgression,
-// 			Message: fmt.Sprintf("invalid height progression: current %d <= previous %d", msg.CurrentHeight, msg.PreviousHeight),
-// 		}
-// 	}
-
-// 	// Note: We don't check previousHeight against minHeight because:
-// 	// 1. GetAggregatedValidatorDiffs reads diffs at heights (previousHeight, currentHeight]
-// 	// 2. The diff at currentHeight contains changes FROM previousHeight TO currentHeight
-// 	// 3. Block data availability is verified separately below
-// 	// If any required data is missing, the subsequent operations will fail with appropriate errors.
-
-// 	// Verify previous timestamp
-// 	previousBlockID, err := s.state.GetBlockIDAtHeight(msg.PreviousHeight)
-// 	if err != nil {
-// 		return &common.AppError{
-// 			Code:    common.ErrUndefined.Code,
-// 			Message: "failed to get previous block ID: " + err.Error(),
-// 		}
-// 	}
-// 	previousBlock, err := s.state.GetStatelessBlock(previousBlockID)
-// 	if err != nil {
-// 		return &common.AppError{
-// 			Code:    common.ErrUndefined.Code,
-// 			Message: "failed to get previous block: " + err.Error(),
-// 		}
-// 	}
-// 	previousBanffBlock, ok := previousBlock.(block.BanffBlock)
-// 	if !ok {
-// 		return &common.AppError{
-// 			Code:    common.ErrUndefined.Code,
-// 			Message: "previous block is not a Banff block",
-// 		}
-// 	}
-// 	if msg.PreviousTimestamp != uint64(previousBanffBlock.Timestamp().Unix()) {
-// 		return &common.AppError{
-// 			Code:    ErrValidatorSetDiffInvalidPreviousTimestamp,
-// 			Message: fmt.Sprintf("previous timestamp mismatch: provided %d, expected %d", msg.PreviousTimestamp, previousBanffBlock.Timestamp().Unix()),
-// 		}
-// 	}
-
-// 	// Verify current timestamp
-// 	currentBlockID, err := s.state.GetBlockIDAtHeight(msg.CurrentHeight)
-// 	if err != nil {
-// 		return &common.AppError{
-// 			Code:    common.ErrUndefined.Code,
-// 			Message: "failed to get current block ID: " + err.Error(),
-// 		}
-// 	}
-// 	currentBlock, err := s.state.GetStatelessBlock(currentBlockID)
-// 	if err != nil {
-// 		return &common.AppError{
-// 			Code:    common.ErrUndefined.Code,
-// 			Message: "failed to get current block: " + err.Error(),
-// 		}
-// 	}
-// 	currentBanffBlock, ok := currentBlock.(block.BanffBlock)
-// 	if !ok {
-// 		return &common.AppError{
-// 			Code:    common.ErrUndefined.Code,
-// 			Message: "current block is not a Banff block",
-// 		}
-// 	}
-// 	if msg.CurrentTimestamp != uint64(currentBanffBlock.Timestamp().Unix()) {
-// 		return &common.AppError{
-// 			Code:    ErrValidatorSetDiffInvalidCurrentTimestamp,
-// 			Message: fmt.Sprintf("current timestamp mismatch: provided %d, expected %d", msg.CurrentTimestamp, currentBanffBlock.Timestamp().Unix()),
-// 		}
-// 	}
-
-// 	// Get subnetID from blockchainID
-// 	subnetID, err := s.vdrsState.GetSubnetID(ctx, msg.BlockchainID)
-// 	if err != nil {
-// 		return &common.AppError{
-// 			Code:    common.ErrUndefined.Code,
-// 			Message: "failed to get subnet ID: " + err.Error(),
-// 		}
-// 	}
-
-// 	// Get aggregated diffs directly from the database
-// 	// This is more efficient than comparing full validator sets: O(d) vs O(n)
-// 	s.log.Debug("fetching aggregated diffs from database",
-// 		zap.Stringer("subnetID", subnetID),
-// 		zap.Uint64("previousHeight", msg.PreviousHeight),
-// 		zap.Uint64("currentHeight", msg.CurrentHeight),
-// 	)
-
-// 	s.stateLock.Lock()
-// 	dbDiffs, err := s.state.GetAggregatedValidatorDiffs(ctx, subnetID, msg.PreviousHeight, msg.CurrentHeight)
-// 	s.stateLock.Unlock()
-// 	if err != nil {
-// 		return &common.AppError{
-// 			Code:    common.ErrUndefined.Code,
-// 			Message: "failed to get aggregated validator diffs: " + err.Error(),
-// 		}
-// 	}
-
-// 	s.log.Debug("fetched aggregated diffs",
-// 		zap.Int("dbDiffsCount", len(dbDiffs)),
-// 		zap.Int("msgAdded", len(msg.Added)),
-// 		zap.Int("msgRemoved", len(msg.Removed)),
-// 		zap.Int("msgModified", len(msg.Modified)),
-// 	)
-
-// 	// Verify the message diffs match the database diffs
-// 	if err := s.verifyDiffsMatchDB(msg, dbDiffs); err != nil {
-// 		s.log.Debug("diff verification failed",
-// 			zap.Error(err),
-// 		)
-// 		return &common.AppError{
-// 			Code:    ErrValidatorSetDiffMismatch,
-// 			Message: "diff verification failed: " + err.Error(),
-// 		}
-// 	}
-
-// 	s.log.Info("validator set diff verified",
-// 		zap.Stringer("blockchainID", msg.BlockchainID),
-// 		zap.Uint64("previousHeight", msg.PreviousHeight),
-// 		zap.Uint64("currentHeight", msg.CurrentHeight),
-// 		zap.Int("added", len(msg.Added)),
-// 		zap.Int("removed", len(msg.Removed)),
-// 		zap.Int("modified", len(msg.Modified)),
-// 	)
-
-// 	return nil
-// }
-
-// verifyDiffsMatchDB verifies that the message diffs match the aggregated diffs
-// read directly from the P-chain consensus database. This is more efficient than
-// comparing full validator sets: O(d) instead of O(n) where d << n.
-//
-// The verification works by comparing the NET WEIGHT CHANGE for each validator:
-// - For additions: the message's CurrentWeight must equal the DB's increase amount
-// - For removals: the message's PreviousWeight must equal the DB's decrease amount
-// - For modifications: the net change (CurrentWeight - PreviousWeight) must match the DB
-// func (s signatureRequestVerifier) verifyDiffsMatchDB(
-// 	msg *message.ValidatorSetDiff,
-// 	dbDiffs map[ids.NodeID]*state.AggregatedValidatorDiff,
-// ) error {
-// 	// Build expected diffs from message to compare with DB diffs
-// 	// We convert message diffs to net weight changes for comparison
-// 	messageDiffs := make(map[ids.NodeID]struct {
-// 		isIncrease bool   // true if weight increased, false if decreased
-// 		amount     uint64 // magnitude of the change
-// 	})
-
-// 	// Process additions: weight increased from 0 to CurrentWeight
-// 	for _, added := range msg.Added {
-// 		if added.CurrentWeight == 0 {
-// 			return fmt.Errorf("addition for %s has zero current weight", added.NodeID)
-// 		}
-// 		messageDiffs[added.NodeID] = struct {
-// 			isIncrease bool
-// 			amount     uint64
-// 		}{
-// 			isIncrease: true,
-// 			amount:     added.CurrentWeight,
-// 		}
-// 	}
-
-// 	// Process removals: weight decreased from PreviousWeight to 0
-// 	for _, removed := range msg.Removed {
-// 		if removed.PreviousWeight == 0 {
-// 			return fmt.Errorf("removal for %s has zero previous weight", removed.NodeID)
-// 		}
-// 		if _, exists := messageDiffs[removed.NodeID]; exists {
-// 			return fmt.Errorf("duplicate entry for %s in message", removed.NodeID)
-// 		}
-// 		messageDiffs[removed.NodeID] = struct {
-// 			isIncrease bool
-// 			amount     uint64
-// 		}{
-// 			isIncrease: false,
-// 			amount:     removed.PreviousWeight,
-// 		}
-// 	}
-
-// 	// Process modifications: weight changed from PreviousWeight to CurrentWeight
-// 	for _, modified := range msg.Modified {
-// 		if modified.PreviousWeight == modified.CurrentWeight {
-// 			return fmt.Errorf("modification for %s has same previous and current weight", modified.NodeID)
-// 		}
-// 		if _, exists := messageDiffs[modified.NodeID]; exists {
-// 			return fmt.Errorf("duplicate entry for %s in message", modified.NodeID)
-// 		}
-
-// 		var isIncrease bool
-// 		var amount uint64
-// 		if modified.CurrentWeight > modified.PreviousWeight {
-// 			isIncrease = true
-// 			amount = modified.CurrentWeight - modified.PreviousWeight
-// 		} else {
-// 			isIncrease = false
-// 			amount = modified.PreviousWeight - modified.CurrentWeight
-// 		}
-// 		messageDiffs[modified.NodeID] = struct {
-// 			isIncrease bool
-// 			amount     uint64
-// 		}{
-// 			isIncrease: isIncrease,
-// 			amount:     amount,
-// 		}
-// 	}
-
-// 	// Verify counts match
-// 	if len(messageDiffs) != len(dbDiffs) {
-// 		return fmt.Errorf("diff count mismatch: message has %d changes, database has %d",
-// 			len(messageDiffs), len(dbDiffs))
-// 	}
-
-// 	// Verify each message diff matches the corresponding DB diff
-// 	for nodeID, msgDiff := range messageDiffs {
-// 		dbDiff, exists := dbDiffs[nodeID]
-// 		if !exists {
-// 			s.log.Debug("diff comparison failed: no DB diff",
-// 				zap.Stringer("nodeID", nodeID),
-// 				zap.Bool("msgIsIncrease", msgDiff.isIncrease),
-// 				zap.Uint64("msgAmount", msgDiff.amount),
-// 			)
-// 			return fmt.Errorf("message contains change for %s but database has no diff", nodeID)
-// 		}
-
-// 		// Convert DB diff to comparable format
-// 		// DB stores: CurrentWeight = increase amount (if !Decrease), PreviousWeight = decrease amount (if Decrease)
-// 		var dbIsIncrease bool
-// 		var dbAmount uint64
-// 		if dbDiff.CurrentWeight > 0 && dbDiff.PreviousWeight == 0 {
-// 			// Weight increased
-// 			dbIsIncrease = true
-// 			dbAmount = dbDiff.CurrentWeight
-// 		} else if dbDiff.PreviousWeight > 0 && dbDiff.CurrentWeight == 0 {
-// 			// Weight decreased
-// 			dbIsIncrease = false
-// 			dbAmount = dbDiff.PreviousWeight
-// 		} else {
-// 			s.log.Debug("invalid DB diff format",
-// 				zap.Stringer("nodeID", nodeID),
-// 				zap.Uint64("dbPreviousWeight", dbDiff.PreviousWeight),
-// 				zap.Uint64("dbCurrentWeight", dbDiff.CurrentWeight),
-// 			)
-// 			return fmt.Errorf("invalid DB diff for %s: previousWeight=%d, currentWeight=%d",
-// 				nodeID, dbDiff.PreviousWeight, dbDiff.CurrentWeight)
-// 		}
-
-// 		s.log.Debug("comparing diff",
-// 			zap.Stringer("nodeID", nodeID),
-// 			zap.Bool("msgIsIncrease", msgDiff.isIncrease),
-// 			zap.Uint64("msgAmount", msgDiff.amount),
-// 			zap.Bool("dbIsIncrease", dbIsIncrease),
-// 			zap.Uint64("dbAmount", dbAmount),
-// 		)
-
-// 		// Compare direction and magnitude
-// 		if msgDiff.isIncrease != dbIsIncrease {
-// 			return fmt.Errorf("direction mismatch for %s: message says %s, database says %s",
-// 				nodeID,
-// 				directionString(msgDiff.isIncrease),
-// 				directionString(dbIsIncrease))
-// 		}
-// 		if msgDiff.amount != dbAmount {
-// 			return fmt.Errorf("amount mismatch for %s: message has %d, database has %d",
-// 				nodeID, msgDiff.amount, dbAmount)
-// 		}
-// 	}
-
-// 	s.log.Debug("all diffs verified successfully",
-// 		zap.Int("count", len(messageDiffs)),
-// 	)
-
-// 	return nil
-// }
-
-func directionString(isIncrease bool) string {
-	if isIncrease {
-		return "increase"
+	if msg.CurrentHeight <= msg.PreviousHeight {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffInvalidHeightProgression,
+			Message: fmt.Sprintf("invalid height progression: current %d <= previous %d", msg.CurrentHeight, msg.PreviousHeight),
+		}
 	}
-	return "decrease"
+
+	if appErr := s.verifyBlockTimestamp(msg.PreviousHeight, msg.PreviousTimestamp, ErrValidatorSetDiffInvalidPreviousTimestamp, "previous"); appErr != nil {
+		return appErr
+	}
+	if appErr := s.verifyBlockTimestamp(msg.CurrentHeight, msg.CurrentTimestamp, ErrValidatorSetDiffInvalidCurrentTimestamp, "current"); appErr != nil {
+		return appErr
+	}
+
+	subnetID, err := s.vdrsState.GetSubnetID(ctx, msg.BlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get subnet ID: " + err.Error(),
+		}
+	}
+
+	s.stateLock.Lock()
+	dbDiffs, err := s.state.GetAggregatedValidatorDiffs(ctx, subnetID, msg.PreviousHeight, msg.CurrentHeight)
+	s.stateLock.Unlock()
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get aggregated validator diffs: " + err.Error(),
+		}
+	}
+
+	s.log.Debug("fetched aggregated diffs",
+		zap.Int("dbDiffsCount", len(dbDiffs)),
+		zap.Int("msgChanges", len(msg.Changes)),
+		zap.Uint32("msgNumAdded", msg.NumAdded),
+	)
+
+	if len(msg.Changes) != len(dbDiffs) {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffMismatch,
+			Message: fmt.Sprintf("diff count mismatch: message has %d changes, database has %d", len(msg.Changes), len(dbDiffs)),
+		}
+	}
+
+	// Additions and removals have PublicKey set in the DB diff, so we can
+	// verify them exactly by public key. Weight-only modifications (both
+	// PreviousWeight and CurrentWeight > 0) may not have the public key
+	// stored, so we verify those in aggregate (count + weight multiset).
+	type expectedDiff struct {
+		isAddition bool
+		weight     uint64
+	}
+	expectedByKey := make(map[[96]byte]*expectedDiff, len(dbDiffs))
+	var expectedNumAdded uint32
+
+	// expectedWeightMods tracks the multiset of CurrentWeights for
+	// weight-only modifications (keyed by weight, value is count).
+	expectedWeightMods := make(map[uint64]int)
+	var expectedWeightModCount int
+
+	for _, diff := range dbDiffs {
+		switch {
+		case diff.PreviousWeight == 0 && diff.CurrentWeight > 0:
+			// Addition
+			if len(diff.PublicKey) != 96 {
+				return &common.AppError{
+					Code:    common.ErrUndefined.Code,
+					Message: "addition diff missing public key",
+				}
+			}
+			var key [96]byte
+			copy(key[:], diff.PublicKey)
+			expectedByKey[key] = &expectedDiff{isAddition: true, weight: diff.CurrentWeight}
+			expectedNumAdded++
+
+		case diff.PreviousWeight > 0 && diff.CurrentWeight == 0:
+			// Removal
+			if len(diff.PublicKey) != 96 {
+				return &common.AppError{
+					Code:    common.ErrUndefined.Code,
+					Message: "removal diff missing public key",
+				}
+			}
+			var key [96]byte
+			copy(key[:], diff.PublicKey)
+			expectedByKey[key] = &expectedDiff{isAddition: false, weight: 0}
+
+		default:
+			// Weight-only modification: public key may not be available,
+			// so verify in aggregate rather than per key.
+			expectedWeightMods[diff.CurrentWeight]++
+			expectedWeightModCount++
+		}
+	}
+
+	if msg.NumAdded != expectedNumAdded {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffMismatch,
+			Message: fmt.Sprintf("numAdded mismatch: message has %d, expected %d", msg.NumAdded, expectedNumAdded),
+		}
+	}
+
+	// Walk message changes. Entries whose public key matches an addition or
+	// removal are verified exactly. Remaining entries are collected and
+	// compared against the weight-modification multiset.
+	var msgWeightModCount int
+	msgWeightMods := make(map[uint64]int)
+
+	for _, change := range msg.Changes {
+		exp, hasKey := expectedByKey[change.UncompressedPublicKeyBytes]
+		if hasKey {
+			if exp.isAddition {
+				if change.Weight == 0 {
+					return &common.AppError{
+						Code:    ErrValidatorSetDiffMismatch,
+						Message: "message shows removal but database shows addition",
+					}
+				}
+				if change.Weight != exp.weight {
+					return &common.AppError{
+						Code:    ErrValidatorSetDiffMismatch,
+						Message: fmt.Sprintf("addition weight mismatch: message has %d, database has %d", change.Weight, exp.weight),
+					}
+				}
+			} else {
+				if change.Weight != 0 {
+					return &common.AppError{
+						Code:    ErrValidatorSetDiffMismatch,
+						Message: "message shows non-zero weight but database shows removal",
+					}
+				}
+			}
+			continue
+		}
+
+		// No public key match in additions/removals — must be a weight modification.
+		if change.Weight == 0 {
+			return &common.AppError{
+				Code:    ErrValidatorSetDiffMismatch,
+				Message: "message contains removal for unknown validator",
+			}
+		}
+		msgWeightMods[change.Weight]++
+		msgWeightModCount++
+	}
+
+	if msgWeightModCount != expectedWeightModCount {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffMismatch,
+			Message: fmt.Sprintf("weight modification count mismatch: message has %d, database has %d", msgWeightModCount, expectedWeightModCount),
+		}
+	}
+	for weight, count := range expectedWeightMods {
+		if msgWeightMods[weight] != count {
+			return &common.AppError{
+				Code:    ErrValidatorSetDiffMismatch,
+				Message: fmt.Sprintf("weight modification multiset mismatch for weight %d: message has %d, database has %d", weight, msgWeightMods[weight], count),
+			}
+		}
+	}
+
+	s.log.Info("validator set diff verified",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("previousHeight", msg.PreviousHeight),
+		zap.Uint64("currentHeight", msg.CurrentHeight),
+		zap.Int("numChanges", len(msg.Changes)),
+		zap.Uint32("numAdded", msg.NumAdded),
+	)
+
+	return nil
+}
+
+// verifyBlockTimestamp verifies that the block at the given height is a Banff
+// block and that its timestamp matches the provided value.
+func (s signatureRequestVerifier) verifyBlockTimestamp(
+	height uint64,
+	expectedTimestamp uint64,
+	errCode int32,
+	label string,
+) *common.AppError {
+	blockID, err := s.state.GetBlockIDAtHeight(height)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("failed to get %s block ID: %s", label, err),
+		}
+	}
+	statelessBlock, err := s.state.GetStatelessBlock(blockID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("failed to get %s block: %s", label, err),
+		}
+	}
+	banffBlock, ok := statelessBlock.(block.BanffBlock)
+	if !ok {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("%s block is not a Banff block", label),
+		}
+	}
+	blockTime := uint64(banffBlock.Timestamp().Unix())
+	if expectedTimestamp != blockTime {
+		return &common.AppError{
+			Code:    errCode,
+			Message: fmt.Sprintf("%s timestamp mismatch: provided %d, expected %d", label, expectedTimestamp, blockTime),
+		}
+	}
+	return nil
 }
