@@ -11,7 +11,6 @@ go_library(
     deps = [
         "//api",
         "//database",
-        "//graft/coreth/plugin/evm/atomic",
         "//ids",
         "//network/p2p/gossip",
         "//snow",
@@ -22,10 +21,10 @@ go_library(
         "//utils/logging",
         "//utils/set",
         "//vms/components/avax",
-        "//vms/saevm/state",
-        "//vms/saevm/tx",
-        "//vms/saevm/txpool",
-        "@com_github_ava_labs_strevm//sae/rpc",
+        "//vms/corethvm/state",
+        "//vms/corethvm/tx",
+        "//vms/corethvm/txpool",
+        "//vms/saevm/sae/rpc",
         "@org_uber_go_zap//:zap",
     ],
 )

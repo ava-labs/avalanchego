@@ -32,10 +32,10 @@ go_library(
         "//vms/components/avax",
         "//vms/components/gas",
         "//vms/components/verify",
+        "//vms/saevm/hook",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//libevm",
-        "@com_github_ava_labs_strevm//hook",
         "@com_github_holiman_uint256//:uint256",
     ],
 )

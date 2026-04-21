@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "transitionvm",
+    srcs = [
+        "factory.go",
+        "requests.go",
+        "vm.go",
+        "vm_block.go",
+        "vm_consensus.go",
+        "vm_current.go",
+        "vm_http.go",
+        "vm_network.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/transitionvm",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/metrics",
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/consensus/snowman",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//snow/validators",
+        "//utils/logging",
+        "//utils/set",
+        "//version",
+        "//vms",
+        "//vms/corethvm/state",
+        "@org_uber_go_zap//:zap",
+    ],
+)

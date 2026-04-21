@@ -4,6 +4,7 @@ go_library(
     name = "state",
     srcs = [
         "bonus_blocks.go",
+        "genesis.go",
         "trie.go",
         "txs.go",
     ],
@@ -20,8 +21,8 @@ go_library(
         "//utils/set",
         "//utils/units",
         "//utils/wrappers",
+        "//vms/corethvm/tx",
         "//vms/evm/database",
-        "//vms/saevm/tx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
