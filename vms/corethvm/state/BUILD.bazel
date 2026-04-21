@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "state",
+    srcs = [
+        "bonus_blocks.go",
+        "genesis.go",
+        "trie.go",
+        "txs.go",
+    ],
+    embedsrcs = ["bonus_blocks.json"],
+    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/state",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/prefixdb",
+        "//graft/evm/triedb/hashdb",
+        "//ids",
+        "//utils",
+        "//utils/constants",
+        "//utils/set",
+        "//utils/units",
+        "//utils/wrappers",
+        "//vms/corethvm/tx",
+        "//vms/evm/database",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//triedb",
+    ],
+)

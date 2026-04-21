@@ -165,6 +165,11 @@ tasks:
     desc: Builds xsvm image
     cmd: '{{.NIX_RUN}} ./scripts/build_xsvm_image.sh'
 
+  build-subnet-evm:
+    desc: Builds subnet-evm plugin
+    dir: graft/subnet-evm
+    cmd: ./scripts/build.sh
+
   check-bazel-fmt:
     desc: Check that BUILD.bazel files are formatted with buildifier
     cmds:
@@ -409,7 +414,7 @@ tasks:
 
   test-build-image:
     # On mac, docker/podman/lima should work out-of-the-box.
-    # On linux, requires qemu (e.g. apt -y install qemu-system qemu-user-static).
+    # On linux, requires qemu (e.g. apt -y install qemu-user-static).
     desc: Runs test of cross-platform docker image build
     cmd: '{{.NIX_RUN}} bash -x scripts/tests.build_image.sh'
 
@@ -432,6 +437,25 @@ tasks:
       - task: build-race
       - task: build-xsvm
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
+
+  test-e2e-warp:
+    desc: Runs warp e2e tests (./tests/e2e/warp; requires subnet-evm plugin)
+    env:
+      E2E_TARGET: ./tests/e2e/warp
+    cmds:
+      - task: build
+      - task: build-subnet-evm
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
+
+  test-e2e-warp-ci:
+    desc: Runs warp e2e tests [serially with race detection enabled]
+    env:
+      E2E_SERIAL: 1
+      E2E_TARGET: ./tests/e2e/warp
+    cmds:
+      - task: build-race
+      - task: build-subnet-evm
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
 
   test-e2e-existing-ci:
     desc: Runs e2e tests with an existing network [serially with race detection enabled]

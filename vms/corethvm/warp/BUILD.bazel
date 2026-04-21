@@ -1,0 +1,64 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "warp",
+    srcs = [
+        "precompile_accept.go",
+        "predicates.go",
+        "storage.go",
+        "verifier.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/warp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache/lru",
+        "//database",
+        "//database/prefixdb",
+        "//graft/coreth/params",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/precompile/precompileconfig",
+        "//ids",
+        "//network/p2p/acp118",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_ava_labs_libevm//core/types",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "warp_test",
+    srcs = [
+        "main_test.go",
+        "predicates_test.go",
+        "storage_test.go",
+        "verifier_test.go",
+    ],
+    embed = [":warp"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//graft/coreth/core",
+        "//graft/coreth/params",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/precompile/precompileconfig",
+        "//ids",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//snow/snowtest",
+        "//utils",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+    ],
+)

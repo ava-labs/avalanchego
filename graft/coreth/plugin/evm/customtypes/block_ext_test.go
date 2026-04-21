@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/corethvm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
@@ -89,6 +90,8 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case *common.Hash:
 				assertDifferentPointers(t, f, fieldCp)
 			case *acp226.DelayExcess:
+				assertDifferentPointers(t, f, fieldCp)
+			case *acp176.TargetExcess:
 				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:
 				assertDifferentPointers(t, f, fieldCp)
