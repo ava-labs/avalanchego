@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package saevm
+package corethvm
 
 import (
 	"context"
@@ -37,19 +37,19 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/corethvm/api"
+	"github.com/ava-labs/avalanchego/vms/corethvm/hook"
+	"github.com/ava-labs/avalanchego/vms/corethvm/hook/acp176"
+	"github.com/ava-labs/avalanchego/vms/corethvm/state"
+	"github.com/ava-labs/avalanchego/vms/corethvm/tx"
+	"github.com/ava-labs/avalanchego/vms/corethvm/txpool"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
-	"github.com/ava-labs/avalanchego/vms/saevm/api"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
-	"github.com/ava-labs/avalanchego/vms/saevm/state"
-	"github.com/ava-labs/avalanchego/vms/saevm/tx"
-	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/corethvm/warp"
 )
 
 // SinceGenesis is a harness around an [sae.VM], providing an `Initialize`

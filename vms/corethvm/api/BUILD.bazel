@@ -6,7 +6,7 @@ go_library(
         "service.go",
         "status.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/saevm/api",
+    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/api",
     visibility = ["//visibility:public"],
     deps = [
         "//api",

@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package saevm
+package corethvm
 
 import (
 	"math/big"
@@ -27,9 +27,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/corethvm/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/avalanchego/vms/saevm/warp"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"

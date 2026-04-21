@@ -7,7 +7,7 @@ go_library(
         "points.go",
         "txs.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/saevm/hook",
+    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/hook",
     visibility = ["//visibility:public"],
     deps = [
         "//chains/atomic",

@@ -7,7 +7,7 @@ go_library(
         "tx.go",
         "txs.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/saevm/txpool",
+    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/txpool",
     visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/params",

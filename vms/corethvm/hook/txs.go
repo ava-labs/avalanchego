@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/saevm/tx"
+	"github.com/ava-labs/avalanchego/vms/corethvm/tx"
 
 	saetypes "github.com/ava-labs/strevm/types"
 )

@@ -8,7 +8,7 @@ go_library(
         "txs.go",
     ],
     embedsrcs = ["bonus_blocks.json"],
-    importpath = "github.com/ava-labs/avalanchego/vms/saevm/state",
+    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/state",
     visibility = ["//visibility:public"],
     deps = [
         "//database",

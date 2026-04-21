@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/saevm/tx"
+	"github.com/ava-labs/avalanchego/vms/corethvm/tx"
 )
 
 // WriteTxs indexes the on atomic txs, so they can be queried by txID or height.
