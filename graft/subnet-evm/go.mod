@@ -206,8 +206,8 @@ tool (
 	go.uber.org/mock/mockgen
 )
 
-replace github.com/ava-labs/avalanchego => ../../
-
-replace github.com/ava-labs/avalanchego/graft/evm => ../evm
-
-replace github.com/ava-labs/avalanchego/graft/coreth => ../coreth
+replace (
+	github.com/ava-labs/avalanchego => ../../
+	github.com/ava-labs/avalanchego/graft/coreth => ../coreth
+	github.com/ava-labs/avalanchego/graft/evm => ../evm
+)

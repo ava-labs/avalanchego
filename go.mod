@@ -94,11 +94,6 @@ require (
 )
 
 require (
-	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
-)
-
-require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1
@@ -136,9 +131,11 @@ require (
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
@@ -214,14 +211,14 @@ tool (
 	go.uber.org/mock/mockgen
 )
 
-replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
+replace (
+	github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
+	github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
+	github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
 
-replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
-
-replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
-
-// Workaround for genproto ambiguous import conflict.
-// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
-// Modern packages use split modules (genproto/googleapis/rpc, etc.).
-// Force use of newer split genproto to resolve ambiguity.
-replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1
+	// Workaround for genproto ambiguous import conflict.
+	// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
+	// Modern packages use split modules (genproto/googleapis/rpc, etc.).
+	// Force use of newer split genproto to resolve ambiguity.
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1
+)
