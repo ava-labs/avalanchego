@@ -234,6 +234,57 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 	require.ErrorIs(t, err, errSignatureVerificationFailed)
 }
 
+func TestIsQuorum(t *testing.T) {
+	configs := newNetworkConfigs(t, 4)
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
+	aggregator := SignatureAggregator{verifier: &verifier}
+
+	nodeIDs := make([]simplex.NodeID, len(configs))
+	for i, config := range configs {
+		nodeIDs[i] = config.Ctx.NodeID[:]
+	}
+	unknownNodeID := ids.GenerateTestNodeID()
+
+	tests := []struct {
+		name     string
+		nodes    []simplex.NodeID
+		expected bool
+	}{
+		{
+			name:     "below quorum",
+			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[1]},
+			expected: false,
+		},
+		{
+			name:     "exact quorum",
+			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[1], nodeIDs[2]},
+			expected: true,
+		},
+		{
+			name:     "unknown node",
+			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[1], unknownNodeID[:]},
+			expected: false,
+		},
+		{
+			name:     "duplicates still meet quorum",
+			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[0], nodeIDs[1], nodeIDs[2]},
+			expected: true,
+		},
+		{
+			name:     "duplicates do not meet quorum",
+			nodes:    []simplex.NodeID{nodeIDs[0], nodeIDs[0], nodeIDs[1]},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, aggregator.IsQuorum(tt.nodes))
+		})
+	}
+}
+
 func TestFilterNodes(t *testing.T) {
 	nodeID1 := ids.GenerateTestNodeID()
 	nodeID2 := ids.GenerateTestNodeID()

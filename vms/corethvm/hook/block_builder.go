@@ -11,10 +11,10 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/strevm/hook"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
@@ -30,8 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
-	saetypes "github.com/ava-labs/strevm/types"
 )
 
 var _ hook.BlockBuilder[*txpool.Tx] = (*blockBuilder)(nil)

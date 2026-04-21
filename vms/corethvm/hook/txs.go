@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/corethvm/tx"
 
-	saetypes "github.com/ava-labs/strevm/types"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 func ancestorUTXOIDs(header *types.Header, settledHash common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {

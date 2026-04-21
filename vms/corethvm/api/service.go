@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ava-labs/strevm/sae/rpc"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"

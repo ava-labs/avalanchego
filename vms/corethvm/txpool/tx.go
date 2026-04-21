@@ -4,7 +4,7 @@
 package txpool
 
 import (
-	"github.com/ava-labs/strevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"

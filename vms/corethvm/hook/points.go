@@ -9,11 +9,12 @@ import (
 	"slices"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
-	"github.com/ava-labs/strevm/hook"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -34,8 +35,8 @@ import (
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	saestate "github.com/ava-labs/avalanchego/vms/corethvm/state"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
-	saetypes "github.com/ava-labs/strevm/types"
 )
 
 var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
@@ -91,10 +92,7 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 		ctx:         p.ctx,
 		chainConfig: p.chainConfig,
 		now: func() time.Time {
-			return time.Unix(
-				int64(b.Time()),
-				int64(p.SubSecondBlockTime(header)),
-			)
+			return p.BlockTime(header)
 		},
 		desired: params{
 			delayExcess:  headerExtra.MinDelayExcess,
@@ -114,8 +112,8 @@ func (p *Points) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, 
 	return saetypes.ExecutionResults{HeightIndex: db}, err
 }
 
-func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, hook.GasPriceConfig) {
-	return targetExcess(h).Target(), hook.GasPriceConfig{
+func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+	return targetExcess(h).Target(), gastime.GasPriceConfig{
 		TargetToExcessScaling: acp176.TargetToExcessScaling,
 		MinPrice:              acp176.MinPrice,
 	}
@@ -135,11 +133,14 @@ func (*Points) SettledHeight(h *types.Header) uint64 {
 	return 0
 }
 
-func (*Points) SubSecondBlockTime(h *types.Header) time.Duration {
-	if ms := customtypes.GetHeaderExtra(h).TimeMilliseconds; ms != nil {
-		return time.Duration(*ms%1000) * time.Millisecond
+func (*Points) BlockTime(h *types.Header) time.Time {
+	var ns int64
+	if msp := customtypes.GetHeaderExtra(h).TimeMilliseconds; msp != nil {
+		ms := time.Duration(*msp % 1000)
+		frac := ms * time.Millisecond
+		ns = frac.Nanoseconds()
 	}
-	return 0
+	return time.Unix(int64(h.Time), ns)
 }
 
 func (p *Points) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {

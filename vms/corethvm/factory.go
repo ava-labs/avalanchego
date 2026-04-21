@@ -4,11 +4,11 @@
 package corethvm
 
 import (
+	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/strevm/adaptor"
-	"github.com/ava-labs/strevm/sae"
-	"github.com/ava-labs/strevm/saedb"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"

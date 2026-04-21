@@ -10,6 +10,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
@@ -18,10 +22,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/sae"
-	"github.com/ava-labs/strevm/saedb"
-	"github.com/ava-labs/strevm/saetest"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -44,7 +44,7 @@ import (
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	saeparams "github.com/ava-labs/strevm/params"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 type SUT struct {

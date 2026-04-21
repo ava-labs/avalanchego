@@ -8,9 +8,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/strevm/blocks"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/require"
 

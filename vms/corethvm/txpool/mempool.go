@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/strevm/blocks"
-	"github.com/ava-labs/strevm/sae/rpc"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
