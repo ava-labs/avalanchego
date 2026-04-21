@@ -87,7 +87,7 @@ go_test(
     embed = [":node"],
     deps = [
         "//ids",
-        "//snow/networking/router/routertest",
+        "//message",
         "//snow/validators",
         "//utils/constants",
         "//version",

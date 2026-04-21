@@ -199,7 +199,7 @@ type ManagerConfig struct {
 	Tracer                    trace.Tracer
 	Log                       logging.Logger
 	LogFactory                logging.Factory
-	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
+	VMManager                 *vms.Manager // Manage mappings from vm ID --> vm
 	BlockAcceptorGroup        snow.AcceptorGroup
 	TxAcceptorGroup           snow.AcceptorGroup
 	VertexAcceptorGroup       snow.AcceptorGroup
@@ -1735,9 +1735,8 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.Initializing,
 	})
-
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-	m.Log.Info("creating simplex chain!!!!!", zap.String("chain", primaryAlias))
+	m.Log.Info("creating simplex chain", zap.String("chain", primaryAlias))
 
 	messageSender, err := m.createMessageSender(ctx, sb)
 	if err != nil {
@@ -1789,12 +1788,8 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("couldn't initialize simplex VM: %w", err)
 	}
 
-	walLocation := getChainWALLocation(ctx.ChainDataDir, ctx.ChainID)
-	chainWal, err := wal.New(walLocation)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create simplex wal: %w", err)
-	}
-
+	walLocation := getocation(ctx.ChainDataDir, ctx.ChainID)
+	chainWal := wal.New(walLocation)
 	config := &simplex.Config{
 		Ctx:                simplexCtxConfig(ctx),
 		Log:                ctx.Log,
@@ -1812,16 +1807,16 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("couldn't create simplex engine: %w", err)
 	}
 
-	bootstrapper := &simplex.TODOBootstrapper{
+	bootstrapper := &simplex.NoopBootstrapper{
 		BootstrapTracker: sb,
 		Engine:           engine,
 	}
-
 	h.SetEngineManager(&handler.EngineManager{
 		DAG: nil,
 		Chain: &handler.Engine{
 			Bootstrapper: bootstrapper,
 			Consensus:    engine,
+			StateSyncer:  nil, // a nil StateSyncer, skips StateSync in favor of the Bootstrapper.
 		},
 	})
 

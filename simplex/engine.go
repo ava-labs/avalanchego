@@ -159,28 +159,12 @@ func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Conf
 		return nil, err
 	}
 
-	return &Engine{
-		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
-		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
-		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
-		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
-		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Log),
-		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Log),
-		PutHandler:                  common.NewNoOpPutHandler(config.Log),
-		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
-		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
-		AppHandler:                  config.VM,
-		Connector:                   config.VM,
-		vm:                          config.VM,
+	engine := newEngine(config, snowCtx)
+	engine.epoch = epoch
+	engine.blockDeserializer = blockDeserializer
+	engine.quorumDeserializer = qcDeserializer
 
-		epoch:              epoch,
-		consensusCtx:       snowCtx,
-		blockDeserializer:  blockDeserializer,
-		quorumDeserializer: qcDeserializer,
-		logger:             config.Log,
-		tickInterval:       getTickInterval(config.Params),
-		shutdown:           make(chan struct{}, 1),
-	}, nil
+	return engine, nil
 }
 
 func (e *Engine) Start(ctx context.Context, _ uint32) error {
@@ -316,22 +300,23 @@ func (e *Engine) Shutdown(_ context.Context) error {
 	return nil
 }
 
-var _ common.BootstrapableEngine = (*TODOBootstrapper)(nil)
+var _ common.BootstrapableEngine = (*NoopBootstrapper)(nil)
 
-type TODOBootstrapper struct {
+type NoopBootstrapper struct {
 	*Engine
 	common.BootstrapTracker
 }
 
-func (t *TODOBootstrapper) Start(ctx context.Context, _ uint32) error {
+func (t *NoopBootstrapper) Start(ctx context.Context, _ uint32) error {
+	t.Engine.logger.Info("Starting simplex no-op bootstrapper")
+
 	t.Engine.consensusCtx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.Bootstrapping,
 	})
 
 	if err := t.Engine.vm.SetState(ctx, snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
-			err)
+		return fmt.Errorf("failed to notify VM the bootstrapper is starting: %w", err)
 	}
 
 	// We must notify the tracker we have finished bootstrapping
@@ -340,17 +325,12 @@ func (t *TODOBootstrapper) Start(ctx context.Context, _ uint32) error {
 	return t.Engine.Start(ctx, 0)
 }
 
-func (*TODOBootstrapper) Clear(_ context.Context) error {
+func (*NoopBootstrapper) Clear(_ context.Context) error {
 	return nil
 }
 
-func (t *TODOBootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
-	return t.Engine.HealthCheck(ctx)
-}
-
-func nonValidatingEngine(consensusCtx *snow.ConsensusContext, config *Config) (*Engine, error) {
-	engine := &Engine{
-		nonValidator:                true,
+func newEngine(config *Config, consensusCtx *snow.ConsensusContext) *Engine {
+	return &Engine{
 		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
 		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
@@ -367,9 +347,13 @@ func nonValidatingEngine(consensusCtx *snow.ConsensusContext, config *Config) (*
 		consensusCtx: consensusCtx,
 		logger:       config.Log,
 		tickInterval: getTickInterval(config.Params),
-		shutdown:     make(chan struct{}, 1),
+		shutdown:     make(chan struct{}),
 	}
+}
 
+func nonValidatingEngine(consensusCtx *snow.ConsensusContext, config *Config) (*Engine, error) {
+	engine := newEngine(config, consensusCtx)
+	engine.nonValidator = true
 	return engine, nil
 }
 

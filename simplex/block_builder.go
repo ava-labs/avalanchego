@@ -30,8 +30,7 @@ const (
 
 // BuildBlock continuously tries to build a block until the context is cancelled. If there are no blocks to be built, it will wait for an event from the VM.
 // It returns false if the context was cancelled, otherwise it returns the built block and true.
-func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.ProtocolMetadata) (simplex.VerifiedBlock, bool) {
-	b.log.Debug("Starting block builder!!!!")
+func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.ProtocolMetadata, blacklist simplex.Blacklist) (simplex.VerifiedBlock, bool) {
 	for curWait := initBackoff; ; curWait = backoff(ctx, curWait) {
 		if ctx.Err() != nil {
 			b.log.Debug("Context cancelled, stopping block building", zap.Error(ctx.Err()))
@@ -50,7 +49,7 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 			b.log.Info("Error building block", zap.Error(err))
 			continue
 		}
-		simplexBlock, err := newBlock(metadata, vmBlock, b.blockTracker)
+		simplexBlock, err := newBlock(metadata, blacklist, vmBlock, b.blockTracker)
 		if err != nil {
 			b.log.Error("Error creating simplex block from built block", zap.Error(err))
 			return nil, false

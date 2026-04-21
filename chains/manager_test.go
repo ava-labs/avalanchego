@@ -11,18 +11,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -37,7 +31,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
-	"github.com/ava-labs/avalanchego/vms/vmsmock"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
 // startChainCreatorNoPChain is used for testing to bypass setting up the pchain
@@ -90,36 +85,6 @@ func newTimeoutManager(t *testing.T) *timeout.Manager {
 	return timeoutManager
 }
 
-// newMockVMManager returns a VM manager that always returns a mock VM with
-// only the genesis block defined.
-func newMockVMManager(t *testing.T) vms.Manager {
-	ctrl := gomock.NewController(t)
-	vm := &blocktest.VM{}
-	vm.InitializeF = func(_ context.Context, _ *snow.Context, _ database.Database, _ []byte, _ []byte, _ []byte, _ []*common.Fx, _ common.AppSender) error {
-		return nil
-	}
-
-	vm.GetBlockIDAtHeightF = func(_ context.Context, height uint64) (ids.ID, error) {
-		require.Zero(t, height)
-		return snowmantest.GenesisID, nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(t, snowmantest.GenesisID, blkID)
-		return snowmantest.Genesis, nil
-	}
-	vm.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
-
-	factory := vmsmock.NewFactory(ctrl)
-	factory.EXPECT().New(gomock.Any()).Return(vm, nil).AnyTimes()
-
-	manager := vmsmock.NewManager(ctrl)
-	manager.EXPECT().GetFactory(gomock.Any()).Return(factory, nil).AnyTimes()
-
-	return manager
-}
-
 func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 	config := map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
@@ -136,14 +101,24 @@ func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 	return subnets
 }
 
+func newTestVMManager(t *testing.T, vmID ids.ID) *vms.Manager {
+	vmManager := vms.NewManager(logging.NoLog{}, ids.NewAliaser())
+	require.NoError(t, vmManager.RegisterFactory(t.Context(), vmID, &xsvm.Factory{}))
+	return vmManager
+}
+
 func TestCreateSimplexChain(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
+	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{})
+	require.NoError(t, err)
+
 	chainParams := ChainParameters{
-		ID:       ids.GenerateTestID(),
-		SubnetID: ids.GenerateTestID(),
-		VMID:     ids.GenerateTestID(),
+		ID:          ids.GenerateTestID(),
+		SubnetID:    ids.GenerateTestID(),
+		VMID:        ids.GenerateTestID(),
+		GenesisData: genesisBytes,
 	}
-	logger := logging.NoLog{}
+	logger := logging.NewLogger("test", logging.NewWrappedCore(logging.Debug, os.Stdout, logging.Plain.ConsoleEncoder()))
 	subnets := newTestSubnets(t, chainParams.SubnetID)
 	signer, err := localsigner.New()
 	require.NoError(t, err)
@@ -181,7 +156,7 @@ func TestCreateSimplexChain(t *testing.T) {
 			LoggerName: "chain_logger",
 		}),
 
-		VMManager:  newMockVMManager(t),
+		VMManager:  newTestVMManager(t, chainParams.VMID),
 		Validators: validators,
 
 		// For handler initialization
@@ -192,6 +167,9 @@ func TestCreateSimplexChain(t *testing.T) {
 		// For health check
 		Health: healthChecker,
 
+		// Database
+		DB: memdb.New(),
+
 		// Register the chain with router and timeout manager
 		TimeoutManager: tm,
 		Router:         router,
@@ -199,7 +177,6 @@ func TestCreateSimplexChain(t *testing.T) {
 
 	chainManager, err := New(managerConfig)
 	require.NoError(t, err)
-
 	chainManager.(*manager).startChainCreatorNoPChain()
 
 	// Queue chain creation
