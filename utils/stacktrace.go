@@ -6,7 +6,12 @@ package utils
 import "runtime"
 
 func GetStacktrace(all bool) string {
-	buf := make([]byte, 1<<24)
-	n := runtime.Stack(buf, all)
-	return string(buf[:n])
+	buf := make([]byte, 1<<16)
+	for {
+		n := runtime.Stack(buf, all)
+		if n < len(buf) {
+			return string(buf[:n])
+		}
+		buf = make([]byte, len(buf)*2)
+	}
 }
