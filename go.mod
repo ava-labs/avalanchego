@@ -28,7 +28,7 @@ require (
 	github.com/ava-labs/avalanchego/graft/evm v1.14.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
 	github.com/ava-labs/libevm v1.13.15-0.20260310192938-d71b6cc8513a
-	github.com/ava-labs/strevm v0.0.0-20260402181257-eca343805711
+	github.com/ava-labs/strevm v0.0.0-20260410133722-13fb1cc9bccf
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593

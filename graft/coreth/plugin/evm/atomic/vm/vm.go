@@ -105,6 +105,11 @@ type VM struct {
 	bootstrapped avalancheutils.Atomic[bool]
 }
 
+// SetPreferenceWithContext implements [transitionvm.Chain].
+func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, _ *block.Context) error {
+	return vm.SetPreference(ctx, blkID)
+}
+
 func WrapVM(vm extension.InnerVM) *VM {
 	return &VM{InnerVM: vm}
 }
