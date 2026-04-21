@@ -1,10 +1,15 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
+
 go_library(
     name = "extension",
     srcs = ["config.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension",
-    visibility = ["//visibility:public"],
     deps = [
         "//database",
         "//database/versiondb",

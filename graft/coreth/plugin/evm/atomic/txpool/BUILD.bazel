@@ -1,6 +1,12 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
+
 go_library(
     name = "txpool",
     srcs = [
@@ -10,7 +16,6 @@ go_library(
         "txs.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool",
-    visibility = ["//visibility:public"],
     deps = [
         "//cache/lru",
         "//graft/coreth/plugin/evm/atomic",

@@ -1,2 +1,16 @@
 # gazelle:prefix github.com/ava-labs/avalanchego/graft/subnet-evm
 # gazelle:map_kind go_test graft_go_test //.bazel:defs.bzl
+# gazelle:default_visibility //graft/subnet-evm:__subpackages__,//graft/subnet-evm:external_consumers
+
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+
+package_group(
+    name = "external_consumers",
+    packages = [
+        "//vms/evm/emulate",
+    ],
+)

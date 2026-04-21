@@ -1,5 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+
 go_library(
     name = "ethclient",
     srcs = [
@@ -7,7 +13,6 @@ go_library(
         "signer.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/rpc",
         "//graft/subnet-evm/accounts/abi/bind",

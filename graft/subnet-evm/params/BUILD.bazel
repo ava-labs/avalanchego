@@ -1,6 +1,12 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+
 go_library(
     name = "params",
     srcs = [
@@ -11,7 +17,6 @@ go_library(
         "hooks_libevm.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/plugin/evm/customheader",

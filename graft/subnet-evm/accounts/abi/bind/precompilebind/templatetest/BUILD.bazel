@@ -1,5 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+
 go_library(
     name = "templatetest",
     srcs = [
@@ -7,5 +13,4 @@ go_library(
         "precompile_contract_test_template.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind/precompilebind/templatetest",
-    visibility = ["//visibility:public"],
 )

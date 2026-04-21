@@ -1,5 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+
 go_library(
     name = "antithesis_lib",
     srcs = ["main.go"],
@@ -30,5 +36,4 @@ go_library(
 go_binary(
     name = "antithesis",
     embed = [":antithesis_lib"],
-    visibility = ["//visibility:public"],
 )

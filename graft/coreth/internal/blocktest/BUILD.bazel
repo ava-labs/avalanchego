@@ -1,5 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
+
 go_library(
     name = "blocktest",
     srcs = ["test_hash.go"],

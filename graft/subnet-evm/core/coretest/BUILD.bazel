@@ -1,10 +1,15 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+
 go_library(
     name = "coretest",
     srcs = ["test_indices.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/core/coretest",
-    visibility = ["//visibility:public"],
     deps = [
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//ethdb",

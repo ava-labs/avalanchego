@@ -1,5 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
+
 go_library(
     name = "txs",
     srcs = [
@@ -7,7 +13,6 @@ go_library(
         "tx_generator.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/txs",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/cmd/simulator/metrics",
         "//graft/coreth/ethclient",

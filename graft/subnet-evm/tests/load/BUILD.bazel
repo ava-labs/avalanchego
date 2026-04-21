@@ -1,5 +1,11 @@
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+
 graft_go_test(
     name = "load_test",
     srcs = ["load_test.go"],

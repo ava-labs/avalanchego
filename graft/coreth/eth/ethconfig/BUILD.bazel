@@ -1,5 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
+
 go_library(
     name = "ethconfig",
     srcs = [
@@ -7,7 +13,6 @@ go_library(
         "gen_config.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/eth/ethconfig",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/core",
         "//graft/coreth/core/txpool/blobpool",

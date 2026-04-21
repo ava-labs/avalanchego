@@ -1,8 +1,13 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+
 go_library(
     name = "legacy",
     srcs = ["params.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy",
-    visibility = ["//visibility:public"],
 )

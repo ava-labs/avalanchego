@@ -1,6 +1,12 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
+
 go_library(
     name = "blobpool",
     srcs = [
@@ -14,7 +20,6 @@ go_library(
         "slotter.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/core/txpool/blobpool",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/core",
         "//graft/coreth/core/txpool",
