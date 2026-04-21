@@ -8,41 +8,48 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"net/http"
 	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/strevm/blocks"
 	"github.com/ava-labs/strevm/sae"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/api"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
 
 	avadb "github.com/ava-labs/avalanchego/database"
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 )
 
 // SinceGenesis is a harness around an [sae.VM], providing an `Initialize`
@@ -55,6 +62,9 @@ type SinceGenesis struct {
 	db           avadb.Database
 	mempool      *txpool.Mempool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
+
+	// TODO(alarso16): remove later
+	hooks *hook.Points
 
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
@@ -72,18 +82,7 @@ func NewSinceGenesis(c sae.Config) *SinceGenesis {
 	}
 }
 
-type Config struct {
-	// GasTarget is the target gas per second that this node will attempt to use
-	// when creating blocks. If this config is not specified, the node will
-	// default to use the parent block's target gas per second.
-	GasTarget *gas.Gas `json:"gas-target,omitempty"`
-
-	// MinDelayTarget is the minimum delay between blocks (in milliseconds) that
-	// this node will attempt to use when creating blocks. If this config is not
-	// specified, the node will default to use the parent block's target delay
-	// per second.
-	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
-}
+const warpSignatureCacheSize = 512
 
 var ethDBPrefix = []byte("ethdb")
 
@@ -104,42 +103,52 @@ func (vm *SinceGenesis) Initialize(
 	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
 	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
 
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
+	snowCtx.Log.Info("parsing genesis")
+
+	genesis, err := parseGenesis(snowCtx, genesisBytes)
+	if err != nil {
 		return fmt.Errorf("json.Unmarshal(%T): %w", genesis, err)
 	}
 
-	{
-		c := genesis.Config
-		u := snowCtx.NetworkUpgrades
+	snowCtx.Log.Info("establishing last synchronous block")
 
-		c.HomesteadBlock = big.NewInt(0)
-		c.DAOForkBlock = big.NewInt(0)
-		c.DAOForkSupport = true
-		c.EIP150Block = big.NewInt(0)
-		c.EIP155Block = big.NewInt(0)
-		c.EIP158Block = big.NewInt(0)
-		c.ByzantiumBlock = big.NewInt(0)
-		c.ConstantinopleBlock = big.NewInt(0)
-		c.PetersburgBlock = big.NewInt(0)
-		c.IstanbulBlock = big.NewInt(0)
-		c.MuirGlacierBlock = big.NewInt(0)
-		c.BerlinBlock = big.NewInt(0)
-		c.LondonBlock = big.NewInt(0)
-		c.ShanghaiTime = utils.PointerTo(uint64(u.DurangoTime.Unix()))
-		c.CancunTime = utils.PointerTo(uint64(u.EtnaTime.Unix()))
+	var lastSync *types.Block
+	lastSyncBytes, err := state.ReadLastSync(avaDB)
+	switch {
+	case err == nil:
+		lastSync = new(types.Block)
+		if err := rlp.DecodeBytes(lastSyncBytes, lastSync); err != nil {
+			return fmt.Errorf("rlp.DecodeBytes(..., %T): %v", lastSync, err)
+		}
+	case errors.Is(err, avadb.ErrNotFound):
+		lastSync = genesis.ToBlock()
+	default:
+		return err
 	}
 
-	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
+	snowCtx.Log.Info("setting up the genesis",
+		zap.Stringer("lastID", ids.ID(lastSync.Hash())),
+		zap.Uint64("lastHeight", lastSync.NumberU64()),
+	)
+
+	// TODO: Are these reasonable?
+	config, _, err := core.SetupGenesisBlock(db, tdb, genesis, lastSync.Hash(), false)
 	if err != nil {
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
-	var userConfig Config
-	if len(configBytes) > 0 {
-		if err := json.Unmarshal(configBytes, &userConfig); err != nil {
-			return fmt.Errorf("json.Unmarshal(%T): %w", userConfig, err)
-		}
+	snowCtx.Log.Info("parsing user config")
+
+	userConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return err
+	}
+
+	snowCtx.Log.Info("parsing warp message overrides")
+
+	warpMessages, err := userConfig.WarpMessages()
+	if err != nil {
+		return err
 	}
 
 	var desiredDelayExcess *acp226.DelayExcess
@@ -154,14 +163,20 @@ func (vm *SinceGenesis) Initialize(
 	}
 
 	txs := txpool.NewTxs()
+	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := hook.NewPoints(
 		snowCtx,
 		avaDB,
+		config,
 		desiredDelayExcess,
 		desiredTargetExcess,
 		txs,
+		warpStorage,
 	)
-	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
+
+	snowCtx.Log.Info("constructing the sae VM")
+
+	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, lastSync, appSender)
 	if err != nil {
 		return err
 	}
@@ -170,11 +185,16 @@ func (vm *SinceGenesis) Initialize(
 	vm.db = avaDB
 	vm.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
 	vm.onClose = append(vm.onClose, vm.mempool.Close)
+	vm.hooks = hooks
+
+	snowCtx.Log.Info("registering coreth metrics")
 
 	metrics := prometheus.NewRegistry()
 	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
 		return fmt.Errorf("failed to register metrics: %w", err)
 	}
+
+	snowCtx.Log.Info("p2p gossip")
 
 	{ // ==========  P2P Gossip  ==========
 		gossipSet, err := gossip.NewBloomSet(vm.mempool, gossip.BloomSetConfig{})
@@ -203,7 +223,7 @@ func (vm *SinceGenesis) Initialize(
 		vm.pushGossiper = pushGossiper
 
 		if err := inner.AddHandler(p2p.AtomicTxGossipHandlerID, handler); err != nil {
-			return fmt.Errorf("network.AddHandler(...): %w", err)
+			return fmt.Errorf("network.AddHandler(atomic): %w", err)
 		}
 
 		var (
@@ -223,7 +243,54 @@ func (vm *SinceGenesis) Initialize(
 		})
 	}
 
+	snowCtx.Log.Info("warp handlers")
+
+	{ // ==========  Warp Handler  ==========
+		warpVerifier := saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
+		warpHandler := acp118.NewCachedHandler(
+			lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
+			warpVerifier,
+			snowCtx.WarpSigner,
+		)
+		if err := inner.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+			return fmt.Errorf("network.AddHandler(warp): %w", err)
+		}
+	}
+
+	snowCtx.Log.Info("initialized saevm")
+
 	return nil
+}
+
+// TODO: copied from coreth
+func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
+	g := new(core.Genesis)
+	if err := json.Unmarshal(bytes, g); err != nil {
+		return nil, fmt.Errorf("parsing genesis: %w", err)
+	}
+
+	// Populate the Avalanche config extras.
+	configExtra := corethparams.GetExtra(g.Config)
+	configExtra.AvalancheContext = extras.AvalancheContext{
+		SnowCtx: ctx,
+	}
+	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
+
+	// If Durango is scheduled, schedule the Warp Precompile at the same time.
+	if configExtra.DurangoBlockTimestamp != nil {
+		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
+			Config: warpcontract.NewDefaultConfig(configExtra.DurangoBlockTimestamp),
+		})
+	}
+	if err := configExtra.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid chain config: %w", err)
+	}
+
+	// Align all the Ethereum upgrades to the Avalanche upgrades
+	if err := corethparams.SetEthUpgrades(g.Config); err != nil {
+		return nil, fmt.Errorf("setting eth upgrades: %w", err)
+	}
+	return g, nil
 }
 
 const (
@@ -353,4 +420,26 @@ func (vm *SinceGenesis) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	return vm.VM.Shutdown(ctx)
+}
+
+// blockClient adapts [sae.VM] to the [saewarp.BlockClient] interface.
+type blockClient struct {
+	vm *sae.VM
+}
+
+var _ saewarp.BlockClient = (*blockClient)(nil)
+
+func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
+	b, err := c.vm.GetBlock(ctx, blockID)
+	if err != nil {
+		return err
+	}
+	acceptedID, err := c.vm.GetBlockIDAtHeight(ctx, b.Height())
+	if err != nil {
+		return err
+	}
+	if acceptedID != blockID {
+		return avadb.ErrNotFound
+	}
+	return nil
 }

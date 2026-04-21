@@ -83,8 +83,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 	"github.com/ava-labs/avalanchego/vms/saevm"
+	"github.com/ava-labs/avalanchego/vms/transitionvm"
 
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
+	coreth "github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
@@ -1224,7 +1226,11 @@ func (n *Node) initVMs() error {
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &saevm.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Factory{
+			PreFactory:     &coreth.Factory{},
+			PostFactory:    &saevm.Factory{},
+			TransitionTime: time.Date(2026, time.April, 10, 12+5, 34, 0, 0, time.Local),
+		}),
 	)
 	if err != nil {
 		return err

@@ -115,7 +115,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			zap.Uint64("gasLimit", gasLimit),
 		)
 
-		nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
+		nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, nil)
 		require.NoError(err)
 
 		var contractAddress common.Address

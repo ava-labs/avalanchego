@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -28,8 +29,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/warp"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	saestate "github.com/ava-labs/avalanchego/vms/saevm/state"
 	ethparams "github.com/ava-labs/libevm/params"
 	saetypes "github.com/ava-labs/strevm/types"
@@ -39,15 +42,18 @@ var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
 
 type Points struct {
 	blockBuilder
-	db database.Database
+	db          database.Database
+	warpStorage *warp.Storage
 }
 
 func NewPoints(
 	ctx *snow.Context,
 	db database.Database,
+	chainConfig *ethparams.ChainConfig,
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
 	pool *txpool.Txs,
+	warpStorage *warp.Storage,
 ) *Points {
 	return &Points{
 		blockBuilder{
@@ -57,8 +63,10 @@ func NewPoints(
 				targetExcess: desiredTargetExcess,
 			},
 			potentialTxs: pool.Iter,
+			chainConfig:  chainConfig,
 		},
 		db,
+		warpStorage,
 	}
 }
 
@@ -80,7 +88,8 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 	header := b.Header()
 	headerExtra := customtypes.GetHeaderExtra(header)
 	return &blockBuilder{
-		ctx: p.ctx,
+		ctx:         p.ctx,
+		chainConfig: p.chainConfig,
 		now: func() time.Time {
 			return time.Unix(
 				int64(b.Time()),
@@ -158,7 +167,16 @@ func (*Points) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Bloc
 	return nil
 }
 
-func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
+func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
+	rules := p.chainConfig.Rules(b.Number(), corethparams.IsMergeTODO, b.Time())
+	acceptCtx := &precompileconfig.AcceptContext{
+		SnowCtx: p.ctx,
+		Warp:    p.warpStorage,
+	}
+	if err := warp.HandlePrecompileAccept(rules, acceptCtx, receipts); err != nil {
+		return fmt.Errorf("failed to handle precompile accept for block %s (%d): %w", b.Hash(), b.NumberU64(), err)
+	}
+
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
