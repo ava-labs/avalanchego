@@ -7,6 +7,11 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/rpc"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -15,10 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/saevm/tx"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/rpc"
-	"github.com/stretchr/testify/require"
 )
 
 // TestExportTx adds an atomic export and verifies that the exported UTXO is in shared memory.
@@ -90,6 +91,7 @@ func (s *SUT) issueExportTx(t *testing.T, chainID ids.ID, amount uint64) *tx.Tx 
 	state, _, err := b.StateAndHeaderByNumberOrHash(
 		s.ctx, rpc.BlockNumberOrHashWithHash(common.Hash(id), true),
 	)
+	require.NoErrorf(t, err, "%T.StateAndHeaderByNumberOrHash()", b)
 
 	var hex hexutil.Big
 	require.NoError(t, s.client.Client().CallContext(s.ctx, &hex, "eth_baseFee"), "eth_baseFee")
@@ -103,7 +105,7 @@ func (s *SUT) issueExportTx(t *testing.T, chainID ids.ID, amount uint64) *tx.Tx 
 		*params.GetRulesExtra(rules),
 		extstate.New(state),
 		s.snowCtx.AVAXAssetID,
-		1,
+		amount,
 		chainID,
 		s.atomicKey.Address(),
 		baseFee,
@@ -115,11 +117,10 @@ func (s *SUT) issueExportTx(t *testing.T, chainID ids.ID, amount uint64) *tx.Tx 
 	res := &api.JSONTxID{}
 	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	require.NoError(t, err)
-	err = s.avaxClient.Call(res, "avax.issueTx", &api.FormattedTx{
+	require.NoError(t, s.avaxClient.Call(res, "avax.issueTx", &api.FormattedTx{
 		Tx:       txStr,
 		Encoding: formatting.Hex,
-	})
-	require.NoError(t, err)
+	}))
 
 	// Copy into new Tx type for better testing.
 	newTx, err := tx.Parse(txBytes)

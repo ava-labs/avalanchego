@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var _ snowman.Block = &preBlock{}
+var _ snowman.Block = (*preBlock)(nil)
 
 type preBlock struct {
 	snowman.Block
@@ -55,7 +55,7 @@ func (p *preBlock) Reject(ctx context.Context) error {
 	defer p.v.transitionLock.RUnlock()
 
 	// If the VM transitioned with some blocks still in consensus, they are
-	// guranteed to all be rejected. However, we don't want to run into a
+	// guaranteed to all be rejected. However, we don't want to run into a
 	// situation where we call into the now-closed pre-transition VM. So we just
 	// do nothing for this block.
 	if p.v.transitioned {

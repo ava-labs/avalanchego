@@ -10,13 +10,25 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
+	"github.com/ava-labs/libevm/libevm/ethtest"
+	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/libevm/triedb"
+	"github.com/ava-labs/strevm/blocks"
+	"github.com/ava-labs/strevm/sae"
+	"github.com/ava-labs/strevm/saedb"
+	"github.com/ava-labs/strevm/saetest"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -29,20 +41,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethclient"
-	"github.com/ava-labs/libevm/libevm/ethtest"
-	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/libevm/rpc"
-	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/strevm/blocks"
+
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
+	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/strevm/params"
-	"github.com/ava-labs/strevm/sae"
-	"github.com/ava-labs/strevm/saedb"
-	"github.com/ava-labs/strevm/saetest"
-	"github.com/stretchr/testify/require"
 )
 
 type SUT struct {
@@ -50,7 +52,6 @@ type SUT struct {
 	snowCtx *snow.Context
 	vm      *SinceGenesis
 	client  *ethclient.Client
-	chainID *big.Int
 
 	// Wallet for issuing transactions
 	ethWallet     *saetest.Wallet
@@ -141,8 +142,6 @@ func newSUT(t *testing.T) *SUT {
 	t.Cleanup(rpcClient.Close)
 
 	client := ethclient.NewClient(rpcClient)
-	chainID, err := client.ChainID(ctx)
-	require.NoError(t, err)
 
 	avaxServer := httptest.NewServer(handlers[avaxHTTPExtensionPath])
 	t.Cleanup(avaxServer.Close)
@@ -159,7 +158,6 @@ func newSUT(t *testing.T) *SUT {
 		snowCtx: snowCtx,
 		vm:      vm,
 		client:  client,
-		chainID: chainID,
 		ethWallet: saetest.NewWalletWithKeyChain(
 			keychain,
 			types.LatestSigner(g.Config),
@@ -229,7 +227,7 @@ func newValidatorState(subnetID ids.ID) (*validatorstest.State, []*localsigner.L
 		GetCurrentHeightF: func(context.Context) (uint64, error) {
 			return 0, nil
 		},
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return subnetID, nil
 		},
 		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {

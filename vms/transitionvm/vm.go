@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,10 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/state"
-	"go.uber.org/zap"
 )
 
-var _ Chain = &VM{}
+var _ Chain = (*VM)(nil)
 
 type Chain interface {
 	block.ChainVM
@@ -210,7 +211,7 @@ func (v *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context)
 
 	newHandlers, err := chain.CreateHandlers(ctx)
 	if err != nil {
-		return fmt.Errorf("creating http handlers", err)
+		return fmt.Errorf("creating http handlers: %w", err)
 	}
 	v.current.httpHandlers.set(newHandlers)
 

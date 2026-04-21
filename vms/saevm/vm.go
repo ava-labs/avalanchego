@@ -14,7 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
@@ -118,7 +118,7 @@ func (vm *SinceGenesis) Initialize(
 	case err == nil:
 		lastSync = new(types.Block)
 		if err := rlp.DecodeBytes(lastSyncBytes, lastSync); err != nil {
-			return fmt.Errorf("rlp.DecodeBytes(..., %T): %v", lastSync, err)
+			return fmt.Errorf("rlp.DecodeBytes(..., %T): %w", lastSync, err)
 		}
 	case errors.Is(err, avadb.ErrNotFound):
 		lastSync = genesis.ToBlock()

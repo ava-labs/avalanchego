@@ -12,8 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ common.AppSender = &sender{}
+var _ common.AppSender = (*sender)(nil)
 
+//nolint:unused // False positive
 type request struct {
 	nodeID    ids.NodeID
 	requestID uint32

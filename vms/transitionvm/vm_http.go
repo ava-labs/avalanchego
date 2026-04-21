@@ -94,6 +94,6 @@ func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error
 
 // None of Subnet-EVM, Coreth, or SAEVM implement NewHTTPHandler, so it is left
 // unimplemented.
-func (v *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+func (*VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	return nil, nil
 }
