@@ -458,7 +458,7 @@ func testArchiveUngracefulShutdown(t *testing.T, scheme string) {
 		TriePrefetcherParallelism: 4,
 		Pruning:                   false, // archival
 		CommitInterval:            1,
-		StateHistory:              2, // avoid caching all states
+		StateHistory:              2, // Minimum allowable by Firewood
 		AcceptorQueueLimit:        64,
 		StateScheme:               scheme,
 		ChainDataDir:              chainDataDir,
@@ -488,7 +488,9 @@ func testArchiveUngracefulShutdown(t *testing.T, scheme string) {
 		}
 	}
 
-	// close the acceptor queue before accepting to simulate crashing with a full queue
+	// Close the acceptor queue prior to committing the rest of the blocks.
+	// This simulates a crash when the acceptor queue is non-empty, since those
+	// operations will not be completed.
 	blockchain.stopAcceptor()
 	for _, b := range blocks[numStates:] {
 		if err := blockchain.Accept(b); err != nil {
