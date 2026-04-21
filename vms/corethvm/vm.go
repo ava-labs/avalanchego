@@ -52,9 +52,10 @@ import (
 	saewarp "github.com/ava-labs/avalanchego/vms/corethvm/warp"
 )
 
-// SinceGenesis is a harness around an [sae.VM], providing an `Initialize`
-// method that treats the chain as being asynchronous since genesis.
-type SinceGenesis struct {
+// VM is a harness around an [sae.VM], providing an `Initialize`
+// method that supports being asynchronous since genesis or after a previously
+// accepted synchronous block.
+type VM struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
 	config  sae.Config
 
@@ -75,9 +76,9 @@ type SinceGenesis struct {
 	lastWaitForEvent utils.Atomic[time.Time]
 }
 
-// NewSinceGenesis constructs a new [SinceGenesis].
-func NewSinceGenesis(c sae.Config) *SinceGenesis {
-	return &SinceGenesis{
+// New constructs a new [VM].
+func New(c sae.Config) *VM {
+	return &VM{
 		config: c,
 	}
 }
@@ -87,7 +88,7 @@ const warpSignatureCacheSize = 512
 var ethDBPrefix = []byte("ethdb")
 
 // Initialize initializes the VM.
-func (vm *SinceGenesis) Initialize(
+func (v *VM) Initialize(
 	ctx context.Context,
 	snowCtx *snow.Context,
 	avaDB avadb.Database,
@@ -101,7 +102,7 @@ func (vm *SinceGenesis) Initialize(
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
 	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
-	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
+	tdb := triedb.NewDatabase(db, v.config.DBConfig.TrieDBConfig)
 
 	snowCtx.Log.Info("parsing genesis")
 
@@ -176,16 +177,16 @@ func (vm *SinceGenesis) Initialize(
 
 	snowCtx.Log.Info("constructing the sae VM")
 
-	inner, err := sae.NewVM(ctx, hooks, vm.config, snowCtx, config, db, lastSync, appSender)
+	inner, err := sae.NewVM(ctx, hooks, v.config, snowCtx, config, db, lastSync, appSender)
 	if err != nil {
 		return err
 	}
-	vm.VM = inner
-	vm.ctx = snowCtx
-	vm.db = avaDB
-	vm.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
-	vm.onClose = append(vm.onClose, vm.mempool.Close)
-	vm.hooks = hooks
+	v.VM = inner
+	v.ctx = snowCtx
+	v.db = avaDB
+	v.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
+	v.onClose = append(v.onClose, v.mempool.Close)
+	v.hooks = hooks
 
 	snowCtx.Log.Info("registering coreth metrics")
 
@@ -197,7 +198,7 @@ func (vm *SinceGenesis) Initialize(
 	snowCtx.Log.Info("p2p gossip")
 
 	{ // ==========  P2P Gossip  ==========
-		gossipSet, err := gossip.NewBloomSet(vm.mempool, gossip.BloomSetConfig{})
+		gossipSet, err := gossip.NewBloomSet(v.mempool, gossip.BloomSetConfig{})
 		if err != nil {
 			return fmt.Errorf("failed to create bloom set: %w", err)
 		}
@@ -205,8 +206,8 @@ func (vm *SinceGenesis) Initialize(
 		const pullGossipPeriod = time.Second
 		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 			snowCtx.NodeID,
-			vm.Network,
-			vm.ValidatorPeers,
+			v.Network,
+			v.ValidatorPeers,
 			gossipSet,
 			tx.Marshaller{},
 			gossip.SystemConfig{
@@ -220,7 +221,7 @@ func (vm *SinceGenesis) Initialize(
 		if err != nil {
 			return fmt.Errorf("failed to initialize atomic gossip system: %w", err)
 		}
-		vm.pushGossiper = pushGossiper
+		v.pushGossiper = pushGossiper
 
 		if err := inner.AddHandler(p2p.AtomicTxGossipHandlerID, handler); err != nil {
 			return fmt.Errorf("network.AddHandler(atomic): %w", err)
@@ -237,7 +238,7 @@ func (vm *SinceGenesis) Initialize(
 			const pushGossipPeriod = 100 * time.Millisecond
 			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
 		})
-		vm.onClose = append(vm.onClose, func() {
+		v.onClose = append(v.onClose, func() {
 			cancel()
 			wg.Wait()
 		})
@@ -298,13 +299,13 @@ const (
 	avaxHTTPExtensionPath = "/" + avaxServiceName
 )
 
-func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	m, err := vm.VM.CreateHandlers(ctx)
+func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	m, err := v.VM.CreateHandlers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	service := api.NewService(vm.ctx, vm.GethRPCBackends(), vm.mempool, vm.pushGossiper, vm.db)
+	service := api.NewService(v.ctx, v.GethRPCBackends(), v.mempool, v.pushGossiper, v.db)
 	handler, err := rpc.NewHandler(avaxServiceName, service)
 	if err != nil {
 		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)
@@ -314,13 +315,13 @@ func (vm *SinceGenesis) CreateHandlers(ctx context.Context) (map[string]http.Han
 	return m, nil
 }
 
-func (vm *SinceGenesis) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
-	b, err := vm.GetBlock(ctx, id)
+func (v *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
+	b, err := v.GetBlock(ctx, id)
 	if err != nil {
 		return err
 	}
-	vm.preference.Store(b)
-	return vm.VM.SetPreference(ctx, id, bCtx)
+	v.preference.Store(b)
+	return v.VM.SetPreference(ctx, id, bCtx)
 }
 
 // Prevent busy looping when the chain is more advanced than the mempool.
@@ -329,15 +330,15 @@ const waitForEventDelay = 100 * time.Millisecond
 var errNoPreference = errors.New("no preferred block")
 
 // WaitForEvent waits for the next event from the VM.
-func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error) {
+func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	// Avoid busy looping if we seem like we are ready to build a block, but are
 	// encountering an error.
 	{
 		defer func() {
-			vm.lastWaitForEvent.Set(time.Now())
+			v.lastWaitForEvent.Set(time.Now())
 		}()
 
-		sinceLastCall := time.Since(vm.lastWaitForEvent.Get())
+		sinceLastCall := time.Since(v.lastWaitForEvent.Get())
 		timeToWait := waitForEventDelay - sinceLastCall
 		select {
 		case <-ctx.Done():
@@ -348,7 +349,7 @@ func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error
 
 	// Wait until we are allowed to build a block.
 	{
-		parent := vm.preference.Load()
+		parent := v.preference.Load()
 		if parent == nil {
 			return 0, errNoPreference
 		}
@@ -370,12 +371,12 @@ func (vm *SinceGenesis) WaitForEvent(ctx context.Context) (common.Message, error
 	results := make(chan result, 2)
 	go func() {
 		defer cancel()
-		msg, err := vm.VM.WaitForEvent(ctx)
+		msg, err := v.VM.WaitForEvent(ctx)
 		results <- result{msg, err}
 	}()
 	go func() {
 		defer cancel()
-		err := vm.mempool.Txs.AwaitTxs(ctx)
+		err := v.mempool.Txs.AwaitTxs(ctx)
 		results <- result{common.PendingTxs, err}
 	}()
 
@@ -398,7 +399,7 @@ func minNextBlockTime(h *types.Header) time.Time {
 	return customtypes.BlockTime(h).Add(delay)
 }
 
-func (vm *SinceGenesis) RejectBlock(ctx context.Context, b *blocks.Block) error {
+func (v *VM) RejectBlock(ctx context.Context, b *blocks.Block) error {
 	// If the block is rejected, the transactions might get dropped from the
 	// network. If the transactions are still valid, it is a better UX to add
 	// them into our mempool.
@@ -407,19 +408,19 @@ func (vm *SinceGenesis) RejectBlock(ctx context.Context, b *blocks.Block) error 
 		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
 	for _, tx := range txs {
-		_ = vm.mempool.Add(tx)
+		_ = v.mempool.Add(tx)
 	}
-	return vm.VM.RejectBlock(ctx, b)
+	return v.VM.RejectBlock(ctx, b)
 }
 
-func (vm *SinceGenesis) Shutdown(ctx context.Context) error {
-	for _, f := range slices.Backward(vm.onClose) {
+func (v *VM) Shutdown(ctx context.Context) error {
+	for _, f := range slices.Backward(v.onClose) {
 		f()
 	}
-	if vm.VM == nil {
+	if v.VM == nil {
 		return nil
 	}
-	return vm.VM.Shutdown(ctx)
+	return v.VM.Shutdown(ctx)
 }
 
 // blockClient adapts [sae.VM] to the [saewarp.BlockClient] interface.

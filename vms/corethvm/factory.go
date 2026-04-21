@@ -21,14 +21,11 @@ type Factory struct{}
 func (*Factory) New(logger logging.Logger) (interface{}, error) {
 	mempoolConfig := legacypool.DefaultConfig
 	mempoolConfig.NoLocals = true
-	logger.Info("Creating new SAE since genesis")
-	res := adaptor.Convert(NewSinceGenesis(sae.Config{
+	logger.Info("Creating new SAE VM")
+	return adaptor.Convert(New(sae.Config{
 		MempoolConfig: mempoolConfig,
 		DBConfig: saedb.Config{
 			TrieDBConfig: triedb.HashDefaults,
 		},
-	}))
-
-	logger.Info("Successfully created new SAE since genesis")
-	return res, nil
+	})), nil
 }

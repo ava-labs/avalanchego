@@ -50,7 +50,7 @@ import (
 type SUT struct {
 	ctx     context.Context
 	snowCtx *snow.Context
-	vm      *SinceGenesis
+	vm      *VM
 	client  *ethclient.Client
 
 	// Wallet for issuing transactions
@@ -100,7 +100,7 @@ func newSUT(t *testing.T) *SUT {
 	genesisBytes, err := json.Marshal(g)
 	require.NoError(t, err)
 
-	vm := NewSinceGenesis(sae.Config{
+	vm := New(sae.Config{
 		MempoolConfig: mempoolConf,
 		DBConfig: saedb.Config{
 			TrieDBConfig: triedb.HashDefaults,
