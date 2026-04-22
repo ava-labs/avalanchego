@@ -1,0 +1,357 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f0f0f;
+  color: #e0e0e0;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: #fff;
+}
+
+h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: #fff;
+}
+
+h3 {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+  color: #ccc;
+}
+
+/* Forms */
+fieldset {
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+legend {
+  font-weight: 600;
+  color: #fff;
+  padding: 0 0.5rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  color: #aaa;
+}
+
+input[type='text'],
+input[type='number'],
+input[type='datetime-local'] {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.25rem;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+input:focus {
+  outline: none;
+  border-color: #e84142;
+}
+
+/* Buttons */
+button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+button:hover:not(:disabled) {
+  background: #252525;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #e84142;
+  border-color: #e84142;
+  color: #fff;
+  font-weight: 600;
+  margin-top: 1rem;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #d13738;
+}
+
+.btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.btn-danger {
+  color: #ff6b6b;
+  border-color: #ff6b6b33;
+}
+
+/* Wallet Connect */
+.wallet-connect {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+.wallet-connect.connected {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mode-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.tab {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: transparent;
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.tab.active {
+  background: #252525;
+  color: #e0e0e0;
+  border-color: #555;
+}
+
+.key-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.key-input-row input {
+  flex: 1;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-success {
+  background: #22c55e22;
+  color: #22c55e;
+  border: 1px solid #22c55e44;
+}
+
+.badge-pending {
+  background: #eab30822;
+  color: #eab308;
+  border: 1px solid #eab30844;
+}
+
+/* Staker Rows */
+.staker-row {
+  padding: 0.75rem;
+  border: 1px solid #252525;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.input-with-button input {
+  flex: 1;
+}
+
+.radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.radio-label input {
+  margin-top: 0;
+}
+
+/* Signing Progress */
+.signing-progress {
+  margin: 1.5rem 0;
+}
+
+.progress-bar {
+  height: 6px;
+  background: #252525;
+  border-radius: 3px;
+  margin: 0.5rem 0 1rem;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #e84142;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.signer-list {
+  list-style: none;
+}
+
+.signer-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #1a1a1a;
+  font-size: 0.85rem;
+}
+
+/* Sign Action */
+.sign-action {
+  text-align: center;
+  margin: 1.5rem 0;
+}
+
+/* Status Messages */
+.status-msg {
+  text-align: center;
+  color: #888;
+  margin: 1rem 0;
+}
+
+.party-id {
+  color: #888;
+  margin-bottom: 1.5rem;
+}
+
+/* Join URL */
+.join-url {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 1rem;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.join-url code {
+  flex: 1;
+  word-break: break-all;
+}
+
+/* Split View */
+.split-view {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #252525;
+  font-size: 0.85rem;
+}
+
+th {
+  color: #888;
+  font-weight: 600;
+}
+
+/* Complete */
+.complete-section {
+  text-align: center;
+}
+
+.complete-section h2 {
+  color: #22c55e;
+}
+
+.complete-section p {
+  margin: 0.5rem 0;
+}
+
+/* Code */
+code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.hint {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+/* Error */
+.error {
+  color: #ff6b6b;
+  margin: 0.5rem 0;
+}
+
+/* Links */
+a {
+  color: #e84142;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+section {
+  margin-top: 1.5rem;
+}

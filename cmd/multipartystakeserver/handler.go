@@ -12,6 +12,9 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 
 	"github.com/google/uuid"
 )
@@ -34,6 +37,7 @@ func NewHandler(uri string) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/parties", h.handleParties)
 	mux.HandleFunc("/api/parties/", h.handlePartyRoutes)
+	mux.HandleFunc("/api/dev/derive-address", h.deriveAddress)
 }
 
 func (h *Handler) handleParties(w http.ResponseWriter, r *http.Request) {
@@ -172,10 +176,42 @@ func (h *Handler) getParty(w http.ResponseWriter, partyID string) {
 }
 
 func (h *Handler) signValidator(w http.ResponseWriter, r *http.Request, partyID string) {
-	var partialSig PartialSignature
-	if err := json.NewDecoder(r.Body).Decode(&partialSig); err != nil {
+	var req signRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
+	}
+
+	// We need the party state to resolve dev-sign (needs unsignedTxHex + utxos)
+	// so peek at it first for the privateKeyCB58 path.
+	var partialSig PartialSignature
+	if req.PrivateKeyCB58 != "" {
+		// Dev path: server signs internally with the provided private key
+		p, err := h.store.Get(partyID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		ps, err := signWithPrivateKey(req.PrivateKeyCB58, p.PrepareOutput.UnsignedTxHex, p.PrepareOutput.UTXOs)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("dev signing failed: %v", err))
+			return
+		}
+		partialSig = *ps
+	} else if req.SignedTxHex != "" {
+		// Web path: extract credentials from Core Wallet's signed tx
+		ps, err := extractPartialSigFromSignedTx(req.SignedTxHex, req.Address)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("extracting credentials from signed tx: %v", err))
+			return
+		}
+		partialSig = *ps
+	} else {
+		// CLI path: pre-extracted credentials
+		partialSig = PartialSignature{
+			Address:     req.Address,
+			Credentials: req.Credentials,
+		}
 	}
 
 	// We need to do the state mutation and potentially trigger the
@@ -282,10 +318,41 @@ func (h *Handler) submitValidatorAndPrepareSplit(ctx context.Context, party *Par
 }
 
 func (h *Handler) signSplit(w http.ResponseWriter, r *http.Request, partyID string) {
-	var partialSig PartialSignature
-	if err := json.NewDecoder(r.Body).Decode(&partialSig); err != nil {
+	var req signRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
+	}
+
+	var partialSig PartialSignature
+	if req.PrivateKeyCB58 != "" {
+		p, err := h.store.Get(partyID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		if p.SplitOutput == nil {
+			writeError(w, http.StatusBadRequest, "split output not available yet")
+			return
+		}
+		ps, err := signWithPrivateKey(req.PrivateKeyCB58, p.SplitOutput.UnsignedTxHex, p.SplitOutput.UTXOs)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("dev signing failed: %v", err))
+			return
+		}
+		partialSig = *ps
+	} else if req.SignedTxHex != "" {
+		ps, err := extractPartialSigFromSignedTx(req.SignedTxHex, req.Address)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("extracting credentials from signed tx: %v", err))
+			return
+		}
+		partialSig = *ps
+	} else {
+		partialSig = PartialSignature{
+			Address:     req.Address,
+			Credentials: req.Credentials,
+		}
 	}
 
 	var (
@@ -353,6 +420,48 @@ func (h *Handler) signSplit(w http.ResponseWriter, r *http.Request, partyID stri
 		SplitSignaturesReceived: received,
 		SplitTxID:               party.SplitTxID,
 	})
+}
+
+// deriveAddress derives a P-chain address from a CB58-encoded private key.
+// Dev/testing only.
+func (h *Handler) deriveAddress(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req struct {
+		PrivateKeyCB58 string `json:"privateKeyCB58"`
+		NetworkID      uint32 `json:"networkID"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+		return
+	}
+
+	var privKey secp256k1.PrivateKey
+	if err := privKey.UnmarshalText([]byte(req.PrivateKeyCB58)); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid private key: %v", err))
+		return
+	}
+
+	networkID := req.NetworkID
+	if networkID == 0 {
+		networkID = constants.FujiID
+	}
+	hrp := constants.GetHRP(networkID)
+	addr := privKey.Address()
+	addrStr, err := address.Format("P", hrp, addr[:])
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("formatting address: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"address": addrStr})
 }
 
 // signaturesNeeded returns the list of staker addresses for the party config.

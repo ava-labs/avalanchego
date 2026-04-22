@@ -57,6 +57,19 @@ type CredData struct {
 	Signatures []string `json:"signatures"`
 }
 
+// signRequest is a union type that accepts either pre-extracted credentials
+// (CLI path), raw signed tx hex from Core Wallet (web path), or a private
+// key for dev/testing (the server signs internally).
+type signRequest struct {
+	// Option A: pre-extracted credentials (CLI path)
+	Address     string     `json:"address"`
+	Credentials []CredData `json:"credentials,omitempty"`
+	// Option B: raw signed tx from Core Wallet (web path)
+	SignedTxHex string `json:"signedTxHex,omitempty"`
+	// Option C: private key for dev/testing (server signs internally)
+	PrivateKeyCB58 string `json:"privateKeyCB58,omitempty"`
+}
+
 // SplitPrepareOutput is the result of preparing the unsigned BaseTx that
 // distributes the validation reward proportionally to each staker.
 type SplitPrepareOutput struct {

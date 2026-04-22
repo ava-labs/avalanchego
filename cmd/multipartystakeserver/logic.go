@@ -21,7 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	psigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -647,6 +649,138 @@ func numSigIndicesFromInput(input *avax.TransferableInput) int {
 		return len(secpIn.Input.SigIndices)
 	}
 	return 1
+}
+
+// signWithPrivateKey signs an unsigned tx using a CB58-encoded private key.
+// This is for dev/testing only — the server signs internally without a wallet.
+func signWithPrivateKey(privateKeyCB58 string, unsignedTxHex string, utxoHexes []string) (*PartialSignature, error) {
+	var privKey secp256k1.PrivateKey
+	if err := privKey.UnmarshalText([]byte(privateKeyCB58)); err != nil {
+		return nil, fmt.Errorf("parsing private key: %w", err)
+	}
+
+	unsignedBytes, err := hex.DecodeString(unsignedTxHex)
+	if err != nil {
+		return nil, fmt.Errorf("decoding unsigned tx hex: %w", err)
+	}
+
+	var utx txs.UnsignedTx
+	if _, err := txs.Codec.Unmarshal(unsignedBytes, &utx); err != nil {
+		return nil, fmt.Errorf("unmarshaling unsigned tx: %w", err)
+	}
+
+	tx := &txs.Tx{Unsigned: utx}
+	tx.SetBytes(unsignedBytes, unsignedBytes)
+
+	// Build UTXO backend from embedded UTXOs
+	utxoStore := common.NewUTXOs()
+	ctx := context.Background()
+	for i, utxoHex := range utxoHexes {
+		utxoBytes, err := hex.DecodeString(utxoHex)
+		if err != nil {
+			return nil, fmt.Errorf("decoding UTXO %d: %w", i, err)
+		}
+		var utxo avax.UTXO
+		if _, err := txs.Codec.Unmarshal(utxoBytes, &utxo); err != nil {
+			return nil, fmt.Errorf("unmarshaling UTXO %d: %w", i, err)
+		}
+		if err := utxoStore.AddUTXO(ctx, constants.PlatformChainID, constants.PlatformChainID, &utxo); err != nil {
+			return nil, fmt.Errorf("adding UTXO: %w", err)
+		}
+	}
+
+	chainUTXOs := common.NewChainUTXOs(constants.PlatformChainID, utxoStore)
+	backend := &devSignerBackend{utxos: chainUTXOs}
+
+	kc := secp256k1fx.NewKeychain(&privKey)
+	txSigner := psigner.New(kc, backend)
+
+	if err := txSigner.Sign(ctx, tx); err != nil {
+		return nil, fmt.Errorf("signing tx: %w", err)
+	}
+
+	// Extract credentials
+	creds := make([]CredData, len(tx.Creds))
+	for i, credIntf := range tx.Creds {
+		cred, ok := credIntf.(*secp256k1fx.Credential)
+		if !ok {
+			return nil, fmt.Errorf("credential %d is %T, expected *secp256k1fx.Credential", i, credIntf)
+		}
+		sigs := make([]string, len(cred.Sigs))
+		for j, sig := range cred.Sigs {
+			sigs[j] = hex.EncodeToString(sig[:])
+		}
+		creds[i] = CredData{Signatures: sigs}
+	}
+
+	// Derive the P-chain address
+	myAddr := privKey.Address()
+	// Determine network ID from the tx to get the correct HRP
+	var networkID uint32
+	switch typed := utx.(type) {
+	case *txs.AddPermissionlessValidatorTx:
+		networkID = typed.NetworkID
+	case *txs.BaseTx:
+		networkID = typed.NetworkID
+	default:
+		networkID = constants.FujiID
+	}
+	hrp := constants.GetHRP(networkID)
+	addrStr, err := address.Format("P", hrp, myAddr[:])
+	if err != nil {
+		return nil, fmt.Errorf("formatting address: %w", err)
+	}
+
+	return &PartialSignature{
+		Address:     addrStr,
+		Credentials: creds,
+	}, nil
+}
+
+// devSignerBackend implements psigner.Backend for offline dev signing.
+type devSignerBackend struct {
+	utxos common.ChainUTXOs
+}
+
+func (b *devSignerBackend) GetUTXO(ctx context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error) {
+	return b.utxos.GetUTXO(ctx, chainID, utxoID)
+}
+
+func (b *devSignerBackend) GetOwner(_ context.Context, _ ids.ID) (fx.Owner, error) {
+	return nil, fmt.Errorf("GetOwner not supported in dev signing mode")
+}
+
+// extractPartialSigFromSignedTx parses a signed transaction hex string
+// (as returned by Core Wallet's avalanche_signTransaction) and extracts
+// the credentials into a PartialSignature.
+func extractPartialSigFromSignedTx(signedTxHex string, addr string) (*PartialSignature, error) {
+	b, err := hex.DecodeString(stripHexPrefix(signedTxHex))
+	if err != nil {
+		return nil, fmt.Errorf("decoding signed tx hex: %w", err)
+	}
+
+	var tx txs.Tx
+	if _, err := txs.Codec.Unmarshal(b, &tx); err != nil {
+		return nil, fmt.Errorf("unmarshaling signed tx: %w", err)
+	}
+
+	creds := make([]CredData, len(tx.Creds))
+	for i, cred := range tx.Creds {
+		secpCred, ok := cred.(*secp256k1fx.Credential)
+		if !ok {
+			return nil, fmt.Errorf("credential %d is %T, expected *secp256k1fx.Credential", i, cred)
+		}
+		sigs := make([]string, len(secpCred.Sigs))
+		for j, sig := range secpCred.Sigs {
+			sigs[j] = hex.EncodeToString(sig[:])
+		}
+		creds[i] = CredData{Signatures: sigs}
+	}
+
+	return &PartialSignature{
+		Address:     addr,
+		Credentials: creds,
+	}, nil
 }
 
 func stripHexPrefix(s string) string {
