@@ -73,6 +73,15 @@ jobs:
         uses: ./.github/actions/run-bazel-task
         with:
           task: bazel-test-subnet-evm
+  unit-firewood-ffi:
+    needs: check-metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run firewood ffi unit tests with Bazel
+        uses: ./.github/actions/run-bazel-task
+        with:
+          task: bazel-test-firewood-ffi
   e2e:
     needs: check-metadata-linux
     runs-on: ubuntu-latest

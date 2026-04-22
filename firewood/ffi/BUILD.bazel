@@ -1,0 +1,153 @@
+# gazelle:ignore
+
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_rust//rust:defs.bzl", "rust_static_library")
+
+# Common Rust dependencies shared by both hash-mode variants.
+_RUST_FFI_DEPS = [
+    "//firewood/firewood",
+    "//firewood/metrics:firewood-metrics",
+    "//firewood/storage:firewood-storage",
+    "@firewood_crates//:env_logger",
+    "@firewood_crates//:metrics",
+    "@firewood_crates//:metrics-exporter-prometheus",
+    "@firewood_crates//:oxhttp",
+    "@firewood_crates//:parking_lot",
+] + select({
+    # tikv-jemallocator is unconditional in Cargo.toml. In Bazel, keep it
+    # scoped to the supported platforms for this repo: Linux and macOS.
+    "@platforms//os:linux": ["@firewood_crates//:tikv-jemallocator"],
+    "@platforms//os:macos": ["@firewood_crates//:tikv-jemallocator"],
+    "//conditions:default": [],
+})
+
+_RUST_FFI_DEPS_MERKLEDB = [
+    "//firewood/firewood:firewood_merkledb",
+    "//firewood/metrics:firewood-metrics",
+    "//firewood/storage:firewood-storage_merkledb",
+    "@firewood_crates//:env_logger",
+    "@firewood_crates//:metrics",
+    "@firewood_crates//:metrics-exporter-prometheus",
+    "@firewood_crates//:oxhttp",
+    "@firewood_crates//:parking_lot",
+] + select({
+    "@platforms//os:linux": ["@firewood_crates//:tikv-jemallocator"],
+    "@platforms//os:macos": ["@firewood_crates//:tikv-jemallocator"],
+    "//conditions:default": [],
+})
+
+_PLATFORM_LINKOPTS = select({
+    "@platforms//os:linux": [
+        "-lm",
+        "-ldl",
+        "-lpthread",
+    ],
+    "@platforms//os:macos": ["-lm"],
+    "//conditions:default": ["-lm"],
+})
+
+_GO_SRCS = [
+    "batch_op.go",
+    "firewood.go",
+    "firewood.h",
+    "iterator.go",
+    "keepalive.go",
+    "maybe.go",
+    "memory.go",
+    "metrics.go",
+    "proofs.go",
+    "proposal.go",
+    "revision.go",
+]
+
+_GO_DEPS = [
+    "@com_github_prometheus_client_golang//prometheus",
+    "@com_github_prometheus_client_model//go",
+    "@com_github_prometheus_common//expfmt",
+]
+
+# ── Ethhash variant (Ethereum-compatible Keccak-256 hashing) ─────────────
+#
+# Layer 1: Compile Rust FFI source into a static library.
+# Uses the committed firewood.h header rather than running cbindgen at build
+# time (see docs/bazel.md "Firewood FFI" for rationale).
+rust_static_library(
+    name = "firewood_ffi_rust",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = ["README.md"],  # lib.rs uses include_str!("../README.md")
+    crate_features = [
+        "ethhash",
+        "logger",
+    ],
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    deps = _RUST_FFI_DEPS + ["@firewood_crates//:rlp"],
+)
+
+# Layer 2: Wrap the Rust static lib with the C header and platform linkopts.
+cc_library(
+    name = "firewood_ffi",
+    hdrs = ["firewood.h"],
+    linkopts = _PLATFORM_LINKOPTS,
+    visibility = ["//visibility:public"],
+    deps = [":firewood_ffi_rust"],
+)
+
+# Layer 3: CGO-enabled Go library.
+# importpath uses the published module path that Go source files import.
+go_library(
+    name = "ffi",
+    srcs = _GO_SRCS,
+    cdeps = [":firewood_ffi"],
+    cgo = True,
+    importpath = "github.com/ava-labs/firewood-go-ethhash/ffi",
+    visibility = ["//visibility:public"],
+    deps = _GO_DEPS,
+)
+
+# ── MerkleDB variant (SHA-256 hashing, no ethhash feature) ──────────────
+#
+rust_static_library(
+    name = "firewood_ffi_rust_merkledb",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = ["README.md"],
+    crate_features = ["logger"],
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    deps = _RUST_FFI_DEPS_MERKLEDB,
+)
+
+cc_library(
+    name = "firewood_ffi_merkledb",
+    hdrs = ["firewood.h"],
+    linkopts = _PLATFORM_LINKOPTS,
+    visibility = ["//visibility:public"],
+    deps = [":firewood_ffi_rust_merkledb"],
+)
+
+go_library(
+    name = "ffi_merkledb",
+    srcs = _GO_SRCS,
+    cdeps = [":firewood_ffi_merkledb"],
+    cgo = True,
+    importpath = "github.com/ava-labs/firewood-go/ffi",
+    visibility = ["//visibility:public"],
+    deps = _GO_DEPS,
+)
+
+go_test(
+    name = "ffi_test",
+    size = "small",
+    srcs = [
+        "firewood_test.go",
+        "iterator_test.go",
+        "metrics_test.go",
+        "proofs_test.go",
+    ],
+    embed = [":ffi"],
+    deps = [
+        "@com_github_prometheus_client_model//go",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

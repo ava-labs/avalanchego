@@ -162,7 +162,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		options = append(options, ffi.WithExpensiveMetrics())
 	}
 
-	fw, err := ffi.New(path, ffi.EthereumNodeHashing, options...)
+	fw, err := ffi.New(path, ffi.EthereumNodeHashing, true, options...)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}

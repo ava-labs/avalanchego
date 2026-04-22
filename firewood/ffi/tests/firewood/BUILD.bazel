@@ -1,0 +1,15 @@
+load("//.bazel:defs.bzl", "go_test")
+
+go_test(
+    name = "firewood_test",
+    srcs = ["merkle_compatibility_test.go"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//firewood/ffi:ffi_merkledb",
+        "//ids",
+        "//x/merkledb",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
