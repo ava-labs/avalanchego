@@ -45,8 +45,9 @@ import (
 const (
 	defaultMinValidatorStake = 5 * units.MilliAvax
 
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMaxStakingDuration = 365 * 24 * time.Hour
+	defaultMinStakingDuration       = 24 * time.Hour
+	defaultHeliconMinStakingDuration = 12 * time.Hour
+	defaultMaxStakingDuration       = 365 * 24 * time.Hour
 
 	defaultTxFee = 100 * units.NanoAvax
 )
@@ -247,8 +248,9 @@ func defaultConfig(f upgradetest.Fork) *config.Internal {
 		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      500 * units.MilliAvax,
 		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
+		MinStakeDuration:        defaultMinStakingDuration,
+		HeliconMinStakeDuration: defaultHeliconMinStakingDuration,
+		MaxStakeDuration:        defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
