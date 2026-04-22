@@ -8,7 +8,7 @@ go_library(
         "peer_tracker.go",
         "waiting_handler.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/graft/coreth/network",
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/network",
     visibility = ["//visibility:public"],
     deps = [
         "//codec",
