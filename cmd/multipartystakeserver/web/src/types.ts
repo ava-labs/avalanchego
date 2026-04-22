@@ -40,6 +40,7 @@ export type PartyState =
   | 'awaiting_validator_signatures'
   | 'validator_tx_issued'
   | 'awaiting_split_signatures'
+  | 'awaiting_validation_end'
   | 'complete'
 
 export interface CreatePartyResponse {
@@ -61,6 +62,7 @@ export interface GetPartyResponse {
   splitSignaturesReceived: string[]
   splitTxID: string
   potentialReward: number
+  validatorEndTime?: number
 }
 
 export interface SignValidatorResponse {

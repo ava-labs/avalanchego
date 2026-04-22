@@ -69,6 +69,7 @@ export function JoinParty({ partyId }: Props) {
 
     const shouldPoll = (() => {
       if (party.state === 'complete') return false
+      if (party.state === 'awaiting_validation_end') return true
       if (party.state === 'awaiting_validator_signatures') {
         return party.signaturesReceived.includes(walletAddr)
       }
@@ -234,6 +235,32 @@ export function JoinParty({ partyId }: Props) {
               {party.signaturesNeeded.length - party.splitSignaturesReceived.length} more...
             </p>
           )}
+        </section>
+      )}
+
+      {/* Phase 2.5: Waiting for validation to end */}
+      {party.state === 'awaiting_validation_end' && (
+        <section>
+          {party.splitOutput && (
+            <SplitView
+              splitOutput={party.splitOutput}
+              potentialReward={party.potentialReward}
+              isTestnet={IS_TESTNET}
+            />
+          )}
+          <div className="status-msg">
+            <h3>Waiting for Validation Period to End</h3>
+            <p>
+              All signatures collected. The reward split transaction will be
+              submitted automatically once the validator's staking period ends
+              {party.validatorEndTime ? (
+                <> at {new Date(party.validatorEndTime * 1000).toLocaleString()}</>
+              ) : null}.
+            </p>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#888' }}>
+              Polling every {POLL_INTERVAL / 1000}s...
+            </p>
+          </div>
         </section>
       )}
 
