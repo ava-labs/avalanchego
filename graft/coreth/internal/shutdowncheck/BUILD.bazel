@@ -5,7 +5,6 @@ package(default_visibility = [
     "//graft/coreth:external_consumers",
 ])
 
-
 go_library(
     name = "shutdowncheck",
     srcs = ["shutdown_tracker.go"],

@@ -5,7 +5,6 @@ package(default_visibility = [
     "//graft/coreth:external_consumers",
 ])
 
-
 graft_go_test(
     name = "warp_test",
     srcs = ["warp_test.go"],

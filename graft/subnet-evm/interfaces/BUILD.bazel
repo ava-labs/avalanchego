@@ -5,7 +5,6 @@ package(default_visibility = [
     "//graft/subnet-evm:external_consumers",
 ])
 
-
 go_library(
     name = "interfaces",
     srcs = ["interfaces.go"],

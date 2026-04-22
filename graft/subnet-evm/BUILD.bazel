@@ -7,7 +7,6 @@ package(default_visibility = [
     "//graft/subnet-evm:external_consumers",
 ])
 
-
 package_group(
     name = "external_consumers",
     packages = [

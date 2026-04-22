@@ -5,7 +5,6 @@ package(default_visibility = [
     "//graft/coreth:external_consumers",
 ])
 
-
 go_library(
     name = "ap0",
     srcs = ["params.go"],

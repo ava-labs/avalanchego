@@ -5,7 +5,6 @@ package(default_visibility = [
     "//graft/subnet-evm:external_consumers",
 ])
 
-
 graft_go_test(
     name = "tempextrastest_test",
     srcs = ["tempextras_test.go"],
