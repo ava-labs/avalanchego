@@ -614,16 +614,23 @@ func (s signatureRequestVerifier) verifyValidatorSetMetadataDiff(
 	prevHeight uint64,
 	prevTimestamp uint64,
 ) *common.AppError {
-	if appErr := s.verifyBlockTimestamp(prevHeight, prevTimestamp, common.ErrUndefined.Code, "previous"); appErr != nil {
-		return appErr
+	// prevHeight == 0 means first registration (empty previous set).
+	if prevHeight > 0 {
+		if appErr := s.verifyBlockTimestamp(prevHeight, prevTimestamp, common.ErrUndefined.Code, "previous"); appErr != nil {
+			return appErr
+		}
 	}
 
 	// Get canonical validator sets at both heights, sorted by public key.
-	prevSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, prevHeight, msg.BlockchainID)
-	if err != nil {
-		return &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: "failed to get previous validator set: " + err.Error(),
+	var prevSet validators.WarpSet
+	if prevHeight > 0 {
+		var err error
+		prevSet, err = warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, prevHeight, msg.BlockchainID)
+		if err != nil {
+			return &common.AppError{
+				Code:    common.ErrUndefined.Code,
+				Message: "failed to get previous validator set: " + err.Error(),
+			}
 		}
 	}
 	currSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.BlockchainID)
