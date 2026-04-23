@@ -4,6 +4,7 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -483,13 +484,25 @@ func (s signatureRequestVerifier) verifyValidatorSetMetadata(
 	msg *message.ValidatorSetMetadata,
 	justification []byte,
 ) *common.AppError {
-	if len(justification) != 8 {
+	// Justification format:
+	//   8 bytes  — subset format (shard_size)
+	//   24 bytes — diff format   (shard_size + prev_height + prev_timestamp)
+	var shardSize, prevHeight, prevTimestamp uint64
+	isDiff := false
+	switch len(justification) {
+	case 8:
+		shardSize = binary.BigEndian.Uint64(justification[:8])
+	case 24:
+		shardSize = binary.BigEndian.Uint64(justification[:8])
+		prevHeight = binary.BigEndian.Uint64(justification[8:16])
+		prevTimestamp = binary.BigEndian.Uint64(justification[16:24])
+		isDiff = true
+	default:
 		return &common.AppError{
 			Code:    ErrValidatorSetMetadataInvalidJustification,
-			Message: fmt.Sprintf("justification must be 8 bytes encoding shard size, got %d bytes", len(justification)),
+			Message: fmt.Sprintf("justification must be 8 or 24 bytes, got %d bytes", len(justification)),
 		}
 	}
-	shardSize := binary.BigEndian.Uint64(justification)
 	if shardSize == 0 {
 		return &common.AppError{
 			Code:    ErrValidatorSetMetadataInvalidJustification,
@@ -501,6 +514,7 @@ func (s signatureRequestVerifier) verifyValidatorSetMetadata(
 		zap.Stringer("blockchainID", msg.BlockchainID),
 		zap.Uint64("pChainHeight", msg.PChainHeight),
 		zap.Uint64("shardSize", shardSize),
+		zap.Bool("isDiff", isDiff),
 		zap.Int("numShardHashes", len(msg.ShardHashes)),
 	)
 
@@ -518,36 +532,21 @@ func (s signatureRequestVerifier) verifyValidatorSetMetadata(
 		}
 	}
 
-	blockID, err := s.state.GetBlockIDAtHeight(msg.PChainHeight)
-	if err != nil {
-		return &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: "failed to get block ID at height: " + err.Error(),
-		}
-	}
-	statelessBlock, err := s.state.GetStatelessBlock(blockID)
-	if err != nil {
-		return &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: "failed to get block: " + err.Error(),
-		}
-	}
-	banffBlock, ok := statelessBlock.(block.BanffBlock)
-	if !ok {
-		return &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: "block is not a Banff block",
-		}
+	if appErr := s.verifyBlockTimestamp(msg.PChainHeight, msg.PChainTimestamp, common.ErrUndefined.Code, "current"); appErr != nil {
+		return appErr
 	}
 
-	blockTime := banffBlock.Timestamp()
-	if msg.PChainTimestamp != uint64(blockTime.Unix()) {
-		return &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: fmt.Sprintf("invalid block time. provided %d. expected %d", msg.PChainTimestamp, blockTime.Unix()),
-		}
+	if isDiff {
+		return s.verifyValidatorSetMetadataDiff(ctx, msg, shardSize, prevHeight, prevTimestamp)
 	}
+	return s.verifyValidatorSetMetadataSubset(ctx, msg, shardSize)
+}
 
+func (s signatureRequestVerifier) verifyValidatorSetMetadataSubset(
+	ctx context.Context,
+	msg *message.ValidatorSetMetadata,
+	shardSize uint64,
+) *common.AppError {
 	canonicalValidatorSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.BlockchainID)
 	if err != nil {
 		return &common.AppError{
@@ -600,12 +599,171 @@ func (s signatureRequestVerifier) verifyValidatorSetMetadata(
 		}
 	}
 
-	s.log.Info("validator set metadata verified",
+	s.log.Info("validator set metadata (subset) verified",
 		zap.Stringer("blockchainID", msg.BlockchainID),
 		zap.Uint64("pChainHeight", msg.PChainHeight),
 		zap.Int("numShards", len(msg.ShardHashes)),
 	)
+	return nil
+}
 
+func (s signatureRequestVerifier) verifyValidatorSetMetadataDiff(
+	ctx context.Context,
+	msg *message.ValidatorSetMetadata,
+	shardSize uint64,
+	prevHeight uint64,
+	prevTimestamp uint64,
+) *common.AppError {
+	if appErr := s.verifyBlockTimestamp(prevHeight, prevTimestamp, common.ErrUndefined.Code, "previous"); appErr != nil {
+		return appErr
+	}
+
+	// Get canonical validator sets at both heights, sorted by public key.
+	prevSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, prevHeight, msg.BlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get previous validator set: " + err.Error(),
+		}
+	}
+	currSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.BlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get current validator set: " + err.Error(),
+		}
+	}
+
+	// Compute the diff via sorted merge-walk (same algorithm as the relayer).
+	type vdr struct {
+		pk     [96]byte
+		weight uint64
+	}
+	oldVdrs := make([]vdr, len(prevSet.Validators))
+	for i, v := range prevSet.Validators {
+		oldVdrs[i] = vdr{pk: [96]byte(v.PublicKey.Serialize()), weight: v.Weight}
+	}
+	newVdrs := make([]vdr, len(currSet.Validators))
+	for i, v := range currSet.Validators {
+		newVdrs[i] = vdr{pk: [96]byte(v.PublicKey.Serialize()), weight: v.Weight}
+	}
+
+	var changes []message.ValidatorChange
+	oi, ni := 0, 0
+	for oi < len(oldVdrs) || ni < len(newVdrs) {
+		var cmp int
+		switch {
+		case oi >= len(oldVdrs):
+			cmp = 1
+		case ni >= len(newVdrs):
+			cmp = -1
+		default:
+			cmp = bytes.Compare(oldVdrs[oi].pk[:], newVdrs[ni].pk[:])
+		}
+		switch {
+		case cmp < 0:
+			changes = append(changes, message.ValidatorChange{
+				UncompressedPublicKeyBytes: oldVdrs[oi].pk,
+				Weight:                     0,
+			})
+			oi++
+		case cmp > 0:
+			changes = append(changes, message.ValidatorChange{
+				UncompressedPublicKeyBytes: newVdrs[ni].pk,
+				Weight:                     newVdrs[ni].weight,
+			})
+			ni++
+		default:
+			if oldVdrs[oi].weight != newVdrs[ni].weight {
+				changes = append(changes, message.ValidatorChange{
+					UncompressedPublicKeyBytes: newVdrs[ni].pk,
+					Weight:                     newVdrs[ni].weight,
+				})
+			}
+			oi++
+			ni++
+		}
+	}
+
+	// Shard the changes into ValidatorSetDiff messages, computing per-shard
+	// numAdded using the running set (mirrors relayer shardDiff logic).
+	ss := int(shardSize)
+	numChanges := len(changes)
+	numShards := (numChanges + ss - 1) / ss
+	if numShards == 0 {
+		numShards = 1
+	}
+
+	if len(msg.ShardHashes) != numShards {
+		return &common.AppError{
+			Code:    ErrValidatorSetMetadataShardCountMismatch,
+			Message: fmt.Sprintf("shard count mismatch: message has %d, expected %d (changes=%d, shardSize=%d)", len(msg.ShardHashes), numShards, numChanges, shardSize),
+		}
+	}
+
+	existingKeys := make(map[[96]byte]struct{}, len(oldVdrs))
+	for _, v := range oldVdrs {
+		existingKeys[v.pk] = struct{}{}
+	}
+
+	for i := 0; i < numShards; i++ {
+		start := i * ss
+		end := start + ss
+		if end > numChanges {
+			end = numChanges
+		}
+		shardChanges := changes[start:end]
+
+		var shardNumAdded uint32
+		for _, c := range shardChanges {
+			if c.Weight > 0 {
+				if _, exists := existingKeys[c.UncompressedPublicKeyBytes]; !exists {
+					shardNumAdded++
+				}
+			}
+		}
+
+		// Update existingKeys for the next shard.
+		for _, c := range shardChanges {
+			if c.Weight == 0 {
+				delete(existingKeys, c.UncompressedPublicKeyBytes)
+			} else {
+				existingKeys[c.UncompressedPublicKeyBytes] = struct{}{}
+			}
+		}
+
+		diff, err := message.NewValidatorSetDiff(
+			msg.BlockchainID,
+			prevHeight,
+			prevTimestamp,
+			msg.PChainHeight,
+			msg.PChainTimestamp,
+			shardChanges,
+			shardNumAdded,
+		)
+		if err != nil {
+			return &common.AppError{
+				Code:    common.ErrUndefined.Code,
+				Message: fmt.Sprintf("failed to create ValidatorSetDiff for shard %d: %s", i, err),
+			}
+		}
+
+		hash := sha256.Sum256(diff.Bytes())
+		if msg.ShardHashes[i] != ids.ID(hash) {
+			return &common.AppError{
+				Code:    ErrValidatorSetMetadataShardHashMismatch,
+				Message: fmt.Sprintf("shard %d hash mismatch: provided %q, expected %q", i, msg.ShardHashes[i], ids.ID(hash)),
+			}
+		}
+	}
+
+	s.log.Info("validator set metadata (diff) verified",
+		zap.Stringer("blockchainID", msg.BlockchainID),
+		zap.Uint64("prevHeight", prevHeight),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Int("numChanges", numChanges),
+		zap.Int("numShards", len(msg.ShardHashes)),
+	)
 	return nil
 }
 
