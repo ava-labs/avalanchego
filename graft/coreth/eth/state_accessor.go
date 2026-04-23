@@ -326,6 +326,10 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	}()
 
 	// Re-execute blocks forward from current+1 to the target block.
+	processor, ok := eth.blockchain.Processor().(*core.StateProcessor)
+	if !ok {
+		return nil, nil, errors.New("expected *core.StateProcessor for Firewood historical replay")
+	}
 	for current.Number.Uint64() < header.Number.Uint64() {
 		if err := ctx.Err(); err != nil {
 			return nil, nil, err
@@ -337,7 +341,7 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 			return nil, nil, fmt.Errorf("block %d not found", next)
 		}
 
-		_, _, _, err := eth.blockchain.Processor().Process(nextBlock, current, cache, vm.Config{})
+		_, _, _, err := processor.ProcessHistoricalReplay(nextBlock, current, cache, vm.Config{})
 		if err != nil {
 			return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
 		}

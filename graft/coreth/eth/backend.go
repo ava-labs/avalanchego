@@ -175,6 +175,7 @@ func New(
 	if networkID == 0 {
 		networkID = config.Genesis.Config.ChainID.Uint64()
 	}
+	// XXX: since the engine is a field on the Ethereum object, we can use this rather than having to do some weird interface stuff.
 	eth := &Ethereum{
 		config:            config,
 		gossiper:          gossiper,

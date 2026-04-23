@@ -61,8 +61,9 @@ type (
 	)
 
 	ConsensusCallbacks struct {
-		OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
-		OnExtraStateChange    OnExtraStateChangeType
+		OnFinalizeAndAssemble              OnFinalizeAndAssembleCallbackType
+		OnExtraStateChange                 OnExtraStateChangeType
+		OnHistoricalReplayExtraStateChange OnExtraStateChangeType
 	}
 
 	DummyEngine struct {
@@ -236,13 +237,38 @@ func (*DummyEngine) Prepare(_ consensus.ChainHeaderReader, header *types.Header)
 }
 
 func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types.Block, parent *types.Header, state *state.StateDB, receipts []*types.Receipt) error {
+	return eng.finalize(chain, block, parent, state, receipts, false)
+}
+
+func (eng *DummyEngine) FinalizeForHistoricalReplay(
+	chain consensus.ChainHeaderReader,
+	block *types.Block,
+	parent *types.Header,
+	state *state.StateDB,
+	receipts []*types.Receipt,
+) error {
+	return eng.finalize(chain, block, parent, state, receipts, true)
+}
+
+func (eng *DummyEngine) finalize(
+	chain consensus.ChainHeaderReader,
+	block *types.Block,
+	parent *types.Header,
+	state *state.StateDB,
+	receipts []*types.Receipt,
+	historicalReplay bool,
+) error {
 	// Perform extra state change while finalizing the block
 	var (
 		contribution, extDataGasUsed *big.Int
 		err                          error
 	)
-	if eng.cb.OnExtraStateChange != nil {
-		contribution, extDataGasUsed, err = eng.cb.OnExtraStateChange(block, parent, state)
+	callback := eng.cb.OnExtraStateChange
+	if historicalReplay && eng.cb.OnHistoricalReplayExtraStateChange != nil {
+		callback = eng.cb.OnHistoricalReplayExtraStateChange
+	}
+	if callback != nil {
+		contribution, extDataGasUsed, err = callback(block, parent, state)
 		if err != nil {
 			return err
 		}
