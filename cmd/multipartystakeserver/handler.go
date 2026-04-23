@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 
 	"github.com/google/uuid"
 )
@@ -66,7 +67,7 @@ func (h *Handler) handlePartyRoutes(w http.ResponseWriter, r *http.Request) {
 		// /api/parties/{partyID}
 		switch r.Method {
 		case http.MethodGet:
-			h.getParty(w, partyID)
+			h.getParty(w, r, partyID)
 		case http.MethodOptions:
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -136,11 +137,19 @@ func (h *Handler) createParty(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) getParty(w http.ResponseWriter, partyID string) {
+func (h *Handler) getParty(w http.ResponseWriter, r *http.Request, partyID string) {
 	party, err := h.store.Get(partyID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
+	}
+
+	// If waiting for validation to end, try to submit the split tx
+	if party.State == StateAwaitingValidationEnd {
+		if h.trySubmitSplitTx(r.Context(), party) {
+			// Re-read after state change
+			party, _ = h.store.Get(partyID)
+		}
 	}
 
 	needed := signaturesNeeded(party.Config)
@@ -172,6 +181,7 @@ func (h *Handler) getParty(w http.ResponseWriter, partyID string) {
 		SplitSignaturesReceived: splitSigsReceived,
 		SplitTxID:              party.SplitTxID,
 		PotentialReward:        party.PotentialReward,
+		ValidatorEndTime:       party.Config.Validator.EndTime,
 	})
 }
 
@@ -222,6 +232,8 @@ func (h *Handler) signValidator(w http.ResponseWriter, r *http.Request, partyID 
 		party        *Party
 	)
 
+	log.Printf("DEBUG signValidator: partialSig for %s has %d credentials", partialSig.Address, len(partialSig.Credentials))
+
 	err := h.store.WithLock(partyID, func(p *Party) error {
 		if p.State != StateAwaitingValidatorSigs {
 			return fmt.Errorf("party is in state %q, expected %q", p.State, StateAwaitingValidatorSigs)
@@ -237,6 +249,7 @@ func (h *Handler) signValidator(w http.ResponseWriter, r *http.Request, partyID 
 			return fmt.Errorf("address %s has already submitted a signature", partialSig.Address)
 		}
 
+		log.Printf("DEBUG signValidator: storing %d creds for %s", len(partialSig.Credentials), partialSig.Address)
 		p.ValidatorSigs[partialSig.Address] = &partialSig
 
 		if len(p.ValidatorSigs) == len(p.Config.Stakers) {
@@ -302,7 +315,7 @@ func (h *Handler) submitValidatorAndPrepareSplit(ctx context.Context, party *Par
 	log.Printf("Potential reward for %s: %d", nodeID, potentialReward)
 
 	// Prepare the split tx
-	splitOutput, err := prepareSplit(party.PrepareOutput, party.ValidatorSigs, potentialReward)
+	splitOutput, err := prepareSplit(ctx, h.uri, party.PrepareOutput, party.ValidatorSigs, potentialReward)
 	if err != nil {
 		return fmt.Errorf("preparing split tx: %w", err)
 	}
@@ -392,20 +405,12 @@ func (h *Handler) signSplit(w http.ResponseWriter, r *http.Request, partyID stri
 	}
 
 	if shouldSubmit {
-		splitTxID, err := assembleAndSubmitSplitTx(r.Context(), h.uri, party.SplitOutput, party.SplitSigs)
-		if err != nil {
-			log.Printf("ERROR: submit split tx for party %s: %v", partyID, err)
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("submit split failed: %v", err))
-			return
+		// Try to submit; if the reward UTXO doesn't exist yet (validation
+		// period hasn't ended), transition to awaiting_validation_end.
+		submitted := h.trySubmitSplitTx(r.Context(), party)
+		if !submitted {
+			log.Printf("Split tx for party %s: validator still active, waiting for validation to end", partyID)
 		}
-
-		log.Printf("Split tx issued: %s", splitTxID)
-
-		_ = h.store.WithLock(partyID, func(p *Party) error {
-			p.SplitTxID = splitTxID.String()
-			p.State = StateComplete
-			return nil
-		})
 	}
 
 	party, _ = h.store.Get(partyID)
@@ -420,6 +425,71 @@ func (h *Handler) signSplit(w http.ResponseWriter, r *http.Request, partyID stri
 		SplitSignaturesReceived: received,
 		SplitTxID:               party.SplitTxID,
 	})
+}
+
+// trySubmitSplitTx attempts to submit the fully-signed split tx. If the reward
+// UTXO doesn't exist yet (validation period hasn't ended), it transitions the
+// party to awaiting_validation_end. Returns true if the split tx was submitted.
+//
+// IMPORTANT: we check the validator's on-chain status before attempting submit.
+// Submitting the split tx before the validation period ends causes the chain to
+// drop it with "UTXO not found", and P-chain caches the dropped tx status by
+// txID — so every later retry of the same bytes returns the cached Dropped
+// status even after the reward UTXO is created. By checking first, we avoid
+// burning the tx hash.
+func (h *Handler) trySubmitSplitTx(ctx context.Context, party *Party) bool {
+	// Gate on validator being gone from the current set.
+	nodeID, err := ids.NodeIDFromString(party.Config.Validator.NodeID)
+	if err != nil {
+		log.Printf("Split tx for party %s: bad NodeID %q: %v", party.ID, party.Config.Validator.NodeID, err)
+		return false
+	}
+	pvmClient := platformvm.NewClient(h.uri)
+	validators, err := pvmClient.GetCurrentValidators(ctx, ids.Empty, []ids.NodeID{nodeID})
+	if err != nil {
+		log.Printf("Split tx for party %s: GetCurrentValidators failed: %v", party.ID, err)
+		// Transition to awaiting_validation_end; next poll will retry.
+		_ = h.store.WithLock(party.ID, func(p *Party) error {
+			if p.State == StateAwaitingSplitSigs {
+				p.State = StateAwaitingValidationEnd
+			}
+			return nil
+		})
+		return false
+	}
+	for _, v := range validators {
+		if v.NodeID == nodeID {
+			log.Printf("Split tx for party %s: validator %s still active, waiting", party.ID, nodeID)
+			_ = h.store.WithLock(party.ID, func(p *Party) error {
+				if p.State == StateAwaitingSplitSigs {
+					p.State = StateAwaitingValidationEnd
+				}
+				return nil
+			})
+			return false
+		}
+	}
+
+	splitTxID, err := assembleAndSubmitSplitTx(ctx, h.uri, party.SplitOutput, party.SplitSigs)
+	if err != nil {
+		log.Printf("Split tx submission attempt for party %s: %v", party.ID, err)
+		// Transition to awaiting_validation_end if not already
+		_ = h.store.WithLock(party.ID, func(p *Party) error {
+			if p.State == StateAwaitingSplitSigs {
+				p.State = StateAwaitingValidationEnd
+			}
+			return nil
+		})
+		return false
+	}
+
+	log.Printf("Split tx issued for party %s: %s", party.ID, splitTxID)
+	_ = h.store.WithLock(party.ID, func(p *Party) error {
+		p.SplitTxID = splitTxID.String()
+		p.State = StateComplete
+		return nil
+	})
+	return true
 }
 
 // deriveAddress derives a P-chain address from a CB58-encoded private key.

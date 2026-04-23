@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,7 +27,9 @@ import (
 	psigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	pchain "github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -362,6 +365,8 @@ func fetchPotentialReward(ctx context.Context, uri string, nodeID ids.NodeID) (u
 // prepareSplit builds the unsigned BaseTx that splits the validation reward
 // proportionally. This mirrors the logic in cmd/multipartystake/prepare_split.go.
 func prepareSplit(
+	ctx context.Context,
+	uri string,
 	prepareOutput *PrepareOutput,
 	sigs map[string]*PartialSignature,
 	rewardAmount uint64,
@@ -475,36 +480,73 @@ func prepareSplit(
 		},
 	}
 
-	outputs := make([]*avax.TransferableOutput, 0, numStakers)
-	var distributed uint64
-	for i, addr := range rewardsOwner.Addrs {
-		var amount uint64
-		if i == numStakers-1 {
-			amount = rewardAmount - distributed
-		} else {
-			amount = rewardAmount * stakerAmounts[addr] / totalStake
-		}
-		distributed += amount
+	// Fetch dynamic-fee context to compute the split tx fee.
+	pCTX, err := pchain.NewContextFromURI(ctx, uri)
+	if err != nil {
+		return nil, fmt.Errorf("fetching P-chain context: %w", err)
+	}
 
-		if amount == 0 {
-			continue
-		}
-
-		outputs = append(outputs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: addPermValTx.Ins[0].AssetID()},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amount,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addr},
+	// Build a two-pass output list: first pass uses full rewardAmount to get
+	// the tx's fee complexity; second pass redistributes (rewardAmount - fee).
+	buildOutputs := func(distributable uint64) []*avax.TransferableOutput {
+		outs := make([]*avax.TransferableOutput, 0, numStakers)
+		var distributed uint64
+		for i, addr := range rewardsOwner.Addrs {
+			var amount uint64
+			if i == numStakers-1 {
+				amount = distributable - distributed
+			} else {
+				amount = distributable * stakerAmounts[addr] / totalStake
+			}
+			distributed += amount
+			if amount == 0 {
+				continue
+			}
+			outs = append(outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: addPermValTx.Ins[0].AssetID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: amount,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addr},
+					},
 				},
-			},
-		})
+			})
+		}
+		avax.SortTransferableOutputs(outs, txs.Codec)
+		return outs
 	}
 
 	inputs := []*avax.TransferableInput{rewardInput}
 	utils.Sort(inputs)
-	avax.SortTransferableOutputs(outputs, txs.Codec)
+
+	// First pass: initial tx to compute fee complexity.
+	feeTx := &txs.BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    addPermValTx.NetworkID,
+		BlockchainID: constants.PlatformChainID,
+		Ins:          inputs,
+		Outs:         buildOutputs(rewardAmount),
+	}}
+	var feeUnsigned txs.UnsignedTx = feeTx
+	complexity, err := fee.TxComplexity(feeUnsigned)
+	if err != nil {
+		return nil, fmt.Errorf("computing split tx complexity: %w", err)
+	}
+	gasAmt, err := complexity.ToGas(pCTX.ComplexityWeights)
+	if err != nil {
+		return nil, fmt.Errorf("converting complexity to gas: %w", err)
+	}
+	txFee, err := gasAmt.Cost(pCTX.GasPrice)
+	if err != nil {
+		return nil, fmt.Errorf("computing fee cost: %w", err)
+	}
+	if rewardAmount <= txFee {
+		return nil, fmt.Errorf("reward %d too small to cover tx fee %d", rewardAmount, txFee)
+	}
+
+	// Second pass: final outputs with fee subtracted from the distributable total.
+	// The input still claims the full rewardAmount; the chain takes the delta as fee.
+	outputs := buildOutputs(rewardAmount - txFee)
 
 	splitBaseTx := &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    addPermValTx.NetworkID,
@@ -698,6 +740,8 @@ func signWithPrivateKey(privateKeyCB58 string, unsignedTxHex string, utxoHexes [
 	if err := txSigner.Sign(ctx, tx); err != nil {
 		return nil, fmt.Errorf("signing tx: %w", err)
 	}
+
+	log.Printf("DEBUG signWithPrivateKey: tx.Creds has %d entries after signing", len(tx.Creds))
 
 	// Extract credentials
 	creds := make([]CredData, len(tx.Creds))

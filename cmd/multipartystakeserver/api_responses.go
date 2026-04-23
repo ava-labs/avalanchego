@@ -24,6 +24,7 @@ type getPartyResponse struct {
 	SplitSignaturesReceived []string           `json:"splitSignaturesReceived"`
 	SplitTxID              string              `json:"splitTxID"`
 	PotentialReward        uint64              `json:"potentialReward"`
+	ValidatorEndTime       uint64              `json:"validatorEndTime,omitempty"`
 }
 
 // signValidatorResponse is returned by POST /api/parties/{partyID}/sign-validator.

@@ -93,6 +93,10 @@ const (
 	// StateAwaitingSplitSigs means the party is waiting for all stakers to
 	// submit partial signatures for the reward-split BaseTx.
 	StateAwaitingSplitSigs PartyState = "awaiting_split_signatures"
+	// StateAwaitingValidationEnd means all split signatures are collected,
+	// but the validator's staking period hasn't ended yet. The reward UTXO
+	// only materializes when the validator leaves the current set.
+	StateAwaitingValidationEnd PartyState = "awaiting_validation_end"
 	// StateComplete means the reward-split tx has been submitted; the
 	// workflow is done.
 	StateComplete PartyState = "complete"
