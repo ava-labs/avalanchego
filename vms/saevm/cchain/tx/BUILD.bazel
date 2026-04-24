@@ -11,7 +11,7 @@ go_library(
         "import.go",
         "tx.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/tx",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx",
     visibility = ["//visibility:public"],
     deps = [
         "//chains/atomic",

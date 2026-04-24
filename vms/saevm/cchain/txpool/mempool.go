@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/corethvm/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 
 	ethrpc "github.com/ava-labs/libevm/rpc"
 )

@@ -65,7 +65,7 @@ go_library(
         "//vms",
         "//vms/avm",
         "//vms/avm/config",
-        "//vms/corethvm:saevm",
+        "//vms/saevm/cchain:saevm",
         "//vms/platformvm",
         "//vms/platformvm/config",
         "//vms/platformvm/signer",

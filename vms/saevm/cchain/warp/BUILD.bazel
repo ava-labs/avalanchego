@@ -9,7 +9,7 @@ go_library(
         "storage.go",
         "verifier.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/warp",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp",
     visibility = ["//visibility:public"],
     deps = [
         "//cache/lru",

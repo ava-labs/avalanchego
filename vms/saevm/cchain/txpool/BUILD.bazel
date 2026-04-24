@@ -7,7 +7,7 @@ go_library(
         "tx.go",
         "txs.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/txpool",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool",
     visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/params",
@@ -18,7 +18,7 @@ go_library(
         "//utils/lock",
         "//utils/set",
         "//utils/setmap",
-        "//vms/corethvm/tx",
+        "//vms/saevm/cchain/tx",
         "//vms/saevm/blocks",
         "//vms/saevm/hook",
         "//vms/saevm/sae/rpc",

@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/vms/corethvm/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
 // TestExportTx adds an atomic export and verifies that the exported UTXO is in shared memory.

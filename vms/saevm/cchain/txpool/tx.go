@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/corethvm/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
 type Tx struct {

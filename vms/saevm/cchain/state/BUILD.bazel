@@ -9,7 +9,7 @@ go_library(
         "txs.go",
     ],
     embedsrcs = ["bonus_blocks.json"],
-    importpath = "github.com/ava-labs/avalanchego/vms/corethvm/state",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/state",
     visibility = ["//visibility:public"],
     deps = [
         "//database",
@@ -21,7 +21,7 @@ go_library(
         "//utils/set",
         "//utils/units",
         "//utils/wrappers",
-        "//vms/corethvm/tx",
+        "//vms/saevm/cchain/tx",
         "//vms/evm/database",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

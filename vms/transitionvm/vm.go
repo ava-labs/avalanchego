@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/corethvm/state"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 )
 
 var _ Chain = (*VM)(nil)

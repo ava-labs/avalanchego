@@ -23,9 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/corethvm/state"
-	"github.com/ava-labs/avalanchego/vms/corethvm/tx"
-	"github.com/ava-labs/avalanchego/vms/corethvm/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 )
 
 type Service struct {
