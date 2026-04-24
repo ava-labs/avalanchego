@@ -41,7 +41,7 @@ func (i *Import) InputUTXOs() set.Set[ids.ID] {
 	return set
 }
 
-func (i *Import) Burned(assetID ids.ID) (uint64, error) {
+func (i *Import) burned(assetID ids.ID) (uint64, error) {
 	var (
 		output uint64
 		err    error
@@ -180,7 +180,7 @@ func (*Import) VerifyState(ids.ID, libevm.StateReader) error {
 
 var errOverflow = errors.New("amount overflow")
 
-func (i *Import) AsOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit, map[common.Address]uint256.Int, error) {
+func (i *Import) asOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit, map[common.Address]uint256.Int, error) {
 	mint := make(map[common.Address]uint256.Int)
 	for _, out := range i.Outs {
 		if out.AssetID != avaxAssetID {

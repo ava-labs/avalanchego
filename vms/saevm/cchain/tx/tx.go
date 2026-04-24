@@ -30,10 +30,6 @@ type Unsigned interface {
 	// InputUTXOs returns the UTXOIDs of the inputs of this transaction.
 	InputUTXOs() set.Set[ids.ID]
 
-	// Burned returns the amount of assetID that is consumed but not produced by
-	// this transaction.
-	Burned(assetID ids.ID) (uint64, error)
-
 	// SanityCheck performs basic validation on the transaction.
 	SanityCheck(ctx context.Context, snowCtx *snow.Context) error
 
@@ -45,14 +41,6 @@ type Unsigned interface {
 	// provided state.
 	VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error
 
-	// AsOp returns the operation that this transaction performs on the EVM
-	// state.
-	AsOp(avaxAssetID ids.ID) (
-		burn map[common.Address]hook.AccountDebit,
-		mint map[common.Address]uint256.Int,
-		err error,
-	)
-
 	// AtomicOps returns the operations that should be applied to shared memory
 	// when this transaction is executed.
 	AtomicOps(txID ids.ID) (chainID ids.ID, requests *atomic.Requests, err error)
@@ -60,6 +48,18 @@ type Unsigned interface {
 	// TransferNonAVAX transfers the non-AVAX balances requested by this
 	// transaction.
 	TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
+
+	// burned returns the amount of assetID that is consumed but not produced by
+	// this transaction.
+	burned(assetID ids.ID) (uint64, error)
+
+	// asOp returns the operation that this transaction performs on the EVM
+	// state.
+	asOp(avaxAssetID ids.ID) (
+		burn map[common.Address]hook.AccountDebit,
+		mint map[common.Address]uint256.Int,
+		err error,
+	)
 }
 
 type Tx struct {
@@ -156,7 +156,7 @@ func (t *Tx) GasPrice(avaxAssetID ids.ID) (uint256.Int, error) {
 	if err != nil {
 		return uint256.Int{}, err
 	}
-	burned, err := t.Burned(avaxAssetID)
+	burned, err := t.burned(avaxAssetID)
 	if err != nil {
 		return uint256.Int{}, err
 	}
@@ -187,7 +187,7 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 		return hook.Op{}, fmt.Errorf("problem calculating gas price: %w", err)
 	}
 
-	burn, mint, err := t.Unsigned.AsOp(avaxAssetID)
+	burn, mint, err := t.Unsigned.asOp(avaxAssetID)
 	if err != nil {
 		return hook.Op{}, fmt.Errorf("problem converting unsigned transaction to operation: %w", err)
 	}

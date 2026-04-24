@@ -52,7 +52,7 @@ func NonceInputID(address common.Address, nonce uint64) ids.ID {
 	return id
 }
 
-func (e *Export) Burned(assetID ids.ID) (uint64, error) {
+func (e *Export) burned(assetID ids.ID) (uint64, error) {
 	var (
 		output uint64
 		err    error
@@ -170,7 +170,7 @@ func (e *Export) VerifyCredentials(_ *snow.Context, creds []verify.Verifiable) e
 var errNonceMismatch = errors.New("nonce mismatch")
 
 func (e *Export) VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error {
-	burn, _, err := e.AsOp(avaxAssetID)
+	burn, _, err := e.asOp(avaxAssetID)
 	if err != nil {
 		return fmt.Errorf("problem converting export to op: %w", err)
 	}
@@ -187,7 +187,7 @@ func (e *Export) VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) erro
 
 var errMultipleNonces = errors.New("multiple inputs for address with different nonces")
 
-func (e *Export) AsOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit, map[common.Address]uint256.Int, error) {
+func (e *Export) asOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit, map[common.Address]uint256.Int, error) {
 	burn := make(map[common.Address]hook.AccountDebit)
 	for _, in := range e.Ins {
 		debit, ok := burn[in.Address]
