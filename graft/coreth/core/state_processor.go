@@ -52,12 +52,10 @@ type StateProcessor struct {
 	engine consensus.Engine    // Consensus engine used for block rewards
 }
 
-type processingMode uint8
-
-const (
-	processingModeNormal processingMode = iota
-	processingModeHistoricalReplay
-)
+// FinalizeFunc finalizes a block after its transactions have been applied.
+// It matches the signature of consensus.Engine.Finalize and lets callers
+// substitute an alternative finalizer (e.g. for historical replay).
+type FinalizeFunc func(chain consensus.ChainHeaderReader, block *types.Block, parent *types.Header, state *state.StateDB, receipts []*types.Receipt) error
 
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consensus.Engine) *StateProcessor {
@@ -76,17 +74,14 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(block *types.Block, parent *types.Header, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
-	return p.process(block, parent, statedb, cfg, processingModeNormal)
+	return p.ProcessWithFinalize(block, parent, statedb, cfg, p.engine.Finalize)
 }
 
-// ProcessHistoricalReplay reconstructs state for accepted canonical blocks
-// during archival replay. It allows consensus engines to take a narrower
-// finalization path that avoids live validation dependencies.
-func (p *StateProcessor) ProcessHistoricalReplay(block *types.Block, parent *types.Header, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
-	return p.process(block, parent, statedb, cfg, processingModeHistoricalReplay)
-}
-
-func (p *StateProcessor) process(block *types.Block, parent *types.Header, statedb *state.StateDB, cfg vm.Config, mode processingMode) (types.Receipts, []*types.Log, uint64, error) {
+// ProcessWithFinalize is like Process, but invokes the supplied finalize
+// callback in place of the engine's default Finalize. Historical replay uses
+// this to skip live-validation dependencies while still applying the block's
+// deterministic state transitions.
+func (p *StateProcessor) ProcessWithFinalize(block *types.Block, parent *types.Header, statedb *state.StateDB, cfg vm.Config, finalize FinalizeFunc) (types.Receipts, []*types.Log, uint64, error) {
 	var (
 		receipts    types.Receipts
 		usedGas     = new(uint64)
@@ -129,12 +124,6 @@ func (p *StateProcessor) process(block *types.Block, parent *types.Header, state
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	finalize := p.engine.Finalize
-	if mode == processingModeHistoricalReplay {
-		if historicalFinalizer, ok := p.engine.(consensus.HistoricalFinalizer); ok {
-			finalize = historicalFinalizer.FinalizeForHistoricalReplay
-		}
-	}
 	if err := finalize(p.bc, block, parent, statedb, receipts); err != nil {
 		return nil, nil, 0, fmt.Errorf("engine finalization check failed: %w", err)
 	}

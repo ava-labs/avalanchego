@@ -110,20 +110,3 @@ type Engine interface {
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
 }
-
-// HistoricalFinalizer is implemented by consensus engines that support
-// finalizing accepted canonical blocks in historical replay mode.
-//
-// Historical replay is used for archival state reconstruction, not consensus
-// validation of new candidate blocks. Engines may therefore choose a narrower
-// finalization path that avoids live validation dependencies while still
-// applying deterministic state transitions.
-type HistoricalFinalizer interface {
-	FinalizeForHistoricalReplay(
-		chain ChainHeaderReader,
-		block *types.Block,
-		parent *types.Header,
-		state *state.StateDB,
-		receipts []*types.Receipt,
-	) error
-}

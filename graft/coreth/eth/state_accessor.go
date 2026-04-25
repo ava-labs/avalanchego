@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/tracers"
@@ -325,10 +326,16 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		}
 	}()
 
-	// Re-execute blocks forward from current+1 to the target block.
+	// Re-execute blocks forward from current+1 to the target block. Historical
+	// replay must skip live-validation dependencies (e.g. shared memory for
+	// atomic imports), so substitute the engine's historical-replay finalizer.
 	processor, ok := eth.blockchain.Processor().(*core.StateProcessor)
 	if !ok {
 		return nil, nil, errors.New("expected *core.StateProcessor for Firewood historical replay")
+	}
+	engine, ok := eth.engine.(*dummy.DummyEngine)
+	if !ok {
+		return nil, nil, errors.New("expected *dummy.DummyEngine for Firewood historical replay")
 	}
 	for current.Number.Uint64() < header.Number.Uint64() {
 		if err := ctx.Err(); err != nil {
@@ -341,7 +348,7 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 			return nil, nil, fmt.Errorf("block %d not found", next)
 		}
 
-		_, _, _, err := processor.ProcessHistoricalReplay(nextBlock, current, cache, vm.Config{})
+		_, _, _, err := processor.ProcessWithFinalize(nextBlock, current, cache, vm.Config{}, engine.FinalizeForHistoricalReplay)
 		if err != nil {
 			return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
 		}

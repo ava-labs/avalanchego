@@ -9,8 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"maps"
-	"math/big"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -18,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -27,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/tests"
@@ -86,9 +82,7 @@ var (
 			"state-scheme": "firewood",
 			"snapshot-cache": 0,
 			"pruning-enabled": false,
-			"state-sync-enabled": false,
-			"commit-interval": 4096,
-			"state-history": 8192
+			"state-sync-enabled": false
 		}`,
 	}
 
@@ -97,18 +91,6 @@ var (
 	configBytesArg []byte
 
 	benchmarkOutputFileArg string
-)
-
-const (
-	ethRPCEndpoint                       = "/rpc"
-	historicalBalanceQueryLimit   uint64 = 10
-	historicalBalanceQueryAccount        = "0xb3d82b1367d362de99ab59a658165aff520cbd4d"
-	// These values are intentionally hard-coded for now to exercise the
-	// Firewood archive replay path from an already persisted checkpoint instead
-	// of reconstructing from genesis.
-	assumedReexecutionStartBlock uint64 = 1
-	assumedReexecutionEndBlock   uint64 = 100000
-	firewoodPersistedCheckpoint  uint64 = 98304
 )
 
 func init() {
@@ -313,7 +295,6 @@ func benchmarkReexecuteRange(
 	start := time.Now()
 	r.NoError(executor.executeSequence(ctx, blockChan))
 	elapsed := time.Since(start)
-	r.NoError(queryHistoricalBalances(tc, vm, startBlock, endBlock))
 
 	benchmarkTool := newBenchmarkTool(benchmarkName)
 	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed) // Report the desired top-level metrics
@@ -440,70 +421,6 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecu
 		}
 	}
 	e.config.Log.Info("finished executing sequence")
-
-	return nil
-}
-
-func queryHistoricalBalances(
-	tc tests.TestContext,
-	vm block.ChainVM,
-	startBlock uint64,
-	endBlock uint64,
-) error {
-	if endBlock <= startBlock {
-		tc.Log().Info("skipping historical balance queries because no blocks were reexecuted",
-			zap.Uint64("start-block", startBlock),
-			zap.Uint64("end-block", endBlock),
-		)
-		return nil
-	}
-
-	handlers, err := vm.CreateHandlers(tc.DefaultContext())
-	if err != nil {
-		return fmt.Errorf("failed to create VM RPC handlers: %w", err)
-	}
-
-	rpcHandler, ok := handlers[ethRPCEndpoint]
-	if !ok {
-		return fmt.Errorf("VM did not expose %q handler", ethRPCEndpoint)
-	}
-
-	server := httptest.NewServer(rpcHandler)
-	defer server.Close()
-
-	client, err := ethclient.Dial(server.URL)
-	if err != nil {
-		return fmt.Errorf("failed to dial reexecution RPC server: %w", err)
-	}
-	defer client.Close()
-
-	queryStartBlock := firewoodPersistedCheckpoint + 1
-	queryEndBlock := firewoodPersistedCheckpoint + historicalBalanceQueryLimit
-	account := common.HexToAddress(historicalBalanceQueryAccount)
-	ctx := tc.DefaultContext()
-
-	tc.Log().Info("querying historical balances over reexecuted blocks",
-		zap.Uint64("assumed-reexecution-start-block", assumedReexecutionStartBlock),
-		zap.Uint64("assumed-reexecution-end-block", assumedReexecutionEndBlock),
-		zap.Uint64("persisted-checkpoint-block", firewoodPersistedCheckpoint),
-		zap.String("rpc-url", server.URL),
-		zap.String("account", account.Hex()),
-		zap.Uint64("start-block", queryStartBlock),
-		zap.Uint64("end-block", queryEndBlock),
-	)
-
-	for blockNumber := queryStartBlock; blockNumber <= queryEndBlock; blockNumber++ {
-		balance, err := client.BalanceAt(ctx, account, new(big.Int).SetUint64(blockNumber))
-		if err != nil {
-			return fmt.Errorf("failed to fetch balance for block %d: %w", blockNumber, err)
-		}
-
-		tc.Log().Info("historical balance",
-			zap.Uint64("block-number", blockNumber),
-			zap.String("account", account.Hex()),
-			zap.String("balance-wei", balance.String()),
-		)
-	}
 
 	return nil
 }

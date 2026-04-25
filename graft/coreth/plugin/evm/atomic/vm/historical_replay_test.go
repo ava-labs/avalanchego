@@ -7,19 +7,19 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	avalanchedb "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
+	avalanchedb "github.com/ava-labs/avalanchego/database"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 )
 
 // TestFirewoodHistoricalReplayAcrossAtomicImport reproduces a Firewood archive
