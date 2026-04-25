@@ -8,9 +8,17 @@ package tx
 
 import (
 	"errors"
+	"fmt"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/holiman/uint256"
+
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -27,12 +35,22 @@ type Tx struct {
 // TODO(StephenButtolph): Expand this interface to include UTXO handling,
 // verification, and state execution.
 type Unsigned interface {
-	// This function ensures that [Tx.Unsigned] can only be parsed as [Export]
-	// or [Import].
-	//
-	// TODO(StephenButtolph): Once [Unsigned] includes other unexported
-	// functions, remove this function.
-	isUnsigned()
+	// burned returns the amount of assetID that is consumed but not produced by
+	// this transaction.
+	burned(assetID ids.ID) (uint64, error)
+
+	// numSigs returns the expected number of signatures required to sign this
+	// transaction.
+	numSigs() (uint64, error)
+
+	// asOp returns the operation that this transaction performs on the EVM
+	// state.
+	asOp(avaxAssetID ids.ID) (op, error)
+}
+
+type op struct {
+	burn map[common.Address]hook.AccountDebit
+	mint map[common.Address]uint256.Int
 }
 
 // Credential is used in [Tx] to authorize an input of a transaction.
@@ -62,6 +80,82 @@ func (t *Tx) Bytes() ([]byte, error) {
 	// TODO(StephenButtolph): Optimize Bytes by caching previously calculated
 	// values.
 	return c.Marshal(codecVersion, t)
+}
+
+func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
+	gasUsed, err := gasUsed(t.Unsigned)
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("calculating gas used: %w", err)
+	}
+
+	burned, err := t.burned(avaxAssetID)
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("calculating amount burned: %w", err)
+	}
+
+	op, err := t.Unsigned.asOp(avaxAssetID)
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("converting unsigned transaction to operation: %w", err)
+	}
+
+	return hook.Op{
+		ID:        t.ID(),
+		Gas:       gas.Gas(gasUsed),
+		GasFeeCap: gasPrice(burned, gasUsed),
+		Burn:      op.burn,
+		Mint:      op.mint,
+	}, nil
+}
+
+const (
+	IntrinsicGas = ap5.AtomicTxIntrinsicGas
+	GasPerByte   = 1 // atomic.TxBytesGas
+	GasPerSig    = secp256k1fx.CostPerSignature
+)
+
+func gasUsed(t Unsigned) (uint64, error) {
+	numBytes, err := c.Size(codecVersion, &t)
+	if err != nil {
+		return 0, err
+	}
+	bytesGas, err := math.Mul(uint64(numBytes), GasPerByte)
+	if err != nil {
+		return 0, err
+	}
+	numSigs, err := t.numSigs()
+	if err != nil {
+		return 0, err
+	}
+	sigsGas, err := math.Mul(numSigs, GasPerSig)
+	if err != nil {
+		return 0, err
+	}
+	dynamicGas, err := math.Add(bytesGas, sigsGas)
+	if err != nil {
+		return 0, err
+	}
+	return math.Add(IntrinsicGas, dynamicGas)
+}
+
+const x2cRateC = 1_000_000_000
+
+// x2cRate is the conversion rate between the smallest denomination on the
+// X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain 1 aAVAX.
+var x2cRate = uint256.NewInt(x2cRateC)
+
+// gasPrice takes in the burned amount of AVAX in nAVAX and the gas used and
+// returns the price per gas in aAVAX/gas.
+//
+// The result is rounded down to the nearest aAVAX/gas.
+func gasPrice(burned, gasUsed uint64) uint256.Int {
+	var u uint256.Int
+	u.SetUint64(gasUsed)
+
+	var p uint256.Int
+	p.SetUint64(burned)
+	p.Mul(&p, x2cRate)
+	p.Div(&p, &u)
+	return p
 }
 
 // Parse deserializes a [Tx] from its canonical binary format.

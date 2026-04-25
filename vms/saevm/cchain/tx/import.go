@@ -4,10 +4,16 @@
 package tx
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/ava-labs/libevm/common"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // Import is the unsigned component of a transaction that transfers assets from
@@ -22,9 +28,6 @@ type Import struct {
 	Outs           []Output                  `serialize:"true" json:"outputs"`
 }
 
-// TODO(StephenButtolph): Remove this with its removal from the interface.
-func (*Import) isUnsigned() {}
-
 // Output specifies an account on the C-Chain whose balance of the specified
 // asset should be increased.
 //
@@ -34,4 +37,64 @@ type Output struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
+}
+
+func (i *Import) burned(assetID ids.ID) (uint64, error) {
+	var (
+		burned uint64
+		err    error
+	)
+	for _, in := range i.ImportedInputs {
+		if in.Asset.ID == assetID {
+			burned, err = math.Add(burned, in.In.Amount())
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	for _, out := range i.Outs {
+		if out.AssetID == assetID {
+			burned, err = math.Sub(burned, out.Amount)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	return burned, nil
+}
+
+func (i *Import) numSigs() (uint64, error) {
+	var n uint64
+	for _, in := range i.ImportedInputs {
+		input, ok := in.In.(*secp256k1fx.TransferInput)
+		if !ok {
+			return 0, nil
+		}
+		n += uint64(len(input.SigIndices))
+	}
+	return n, nil
+}
+
+var errOverflow = errors.New("amount overflow")
+
+func (i *Import) asOp(avaxAssetID ids.ID) (op, error) {
+	mint := make(map[common.Address]uint256.Int, len(i.Outs))
+	for _, out := range i.Outs {
+		if out.AssetID != avaxAssetID {
+			continue
+		}
+
+		var amount uint256.Int
+		amount.SetUint64(out.Amount)
+		amount.Mul(&amount, x2cRate)
+
+		total := mint[out.Address]
+		if _, overflow := total.AddOverflow(&total, &amount); overflow {
+			return op{}, fmt.Errorf("%w: for address %s", errOverflow, out.Address)
+		}
+		mint[out.Address] = total
+	}
+	return op{
+		mint: mint,
+	}, nil
 }

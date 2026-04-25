@@ -4,10 +4,16 @@
 package tx
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/ava-labs/libevm/common"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 // Export is the unsigned component of a transaction that transfers assets from
@@ -22,9 +28,6 @@ type Export struct {
 	ExportedOutputs  []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
-// TODO(StephenButtolph): Remove this with its removal from the interface.
-func (*Export) isUnsigned() {}
-
 // Input identifies an account + nonce pair on the C-Chain that authorizes the
 // asset and quantity to deduct.
 //
@@ -35,4 +38,62 @@ type Input struct {
 	Amount  uint64         `serialize:"true" json:"amount"`
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 	Nonce   uint64         `serialize:"true" json:"nonce"`
+}
+
+func (e *Export) burned(assetID ids.ID) (uint64, error) {
+	var (
+		burned uint64
+		err    error
+	)
+	for _, in := range e.Ins {
+		if in.AssetID == assetID {
+			burned, err = math.Add(burned, in.Amount)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	for _, out := range e.ExportedOutputs {
+		if out.Asset.ID == assetID {
+			burned, err = math.Sub(burned, out.Out.Amount())
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	return burned, nil
+}
+
+func (e *Export) numSigs() (uint64, error) {
+	return uint64(len(e.Ins)), nil
+}
+
+var errMultipleNonces = errors.New("multiple inputs for address with different nonces")
+
+func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
+	burn := make(map[common.Address]hook.AccountDebit, len(e.Ins))
+	for _, in := range e.Ins {
+		debit, ok := burn[in.Address]
+		if ok && debit.Nonce != in.Nonce {
+			return op{}, fmt.Errorf("%w: address %s has nonces %d and %d", errMultipleNonces, in.Address, debit.Nonce, in.Nonce)
+		}
+
+		// Only AVAX assets are transferred through the SAE ops, but SAE owns
+		// all nonce modifications.
+		if in.AssetID == avaxAssetID {
+			var amount uint256.Int
+			amount.SetUint64(in.Amount)
+			amount.Mul(&amount, x2cRate)
+			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &amount); overflow {
+				return op{}, fmt.Errorf("%w: for address %s", errOverflow, in.Address)
+			}
+		}
+
+		debit.Nonce = in.Nonce
+		debit.MinBalance = debit.Amount
+		burn[in.Address] = debit
+	}
+	return op{
+		burn: burn,
+	}, nil
 }

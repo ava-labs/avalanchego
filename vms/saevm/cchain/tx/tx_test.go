@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,19 +22,21 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // tests is defined at the package level to allow sharing between fuzz tests and
 // unit tests.
 var (
-	tests = [...]struct {
+	avaxAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
+	tests       = [...]struct {
 		name  string
 		old   *atomic.Tx
 		new   *Tx
 		json  string
-		id    ids.ID
 		bytes []byte
+		op    hook.Op
 	}{
 		{
 			name: "import", // Included in https://subnets.avax.network/c-chain/block/4
@@ -48,7 +51,7 @@ var (
 							OutputIndex: 1,
 						},
 						Asset: avax.Asset{
-							ID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+							ID: avaxAssetID,
 						},
 						In: &secp256k1fx.TransferInput{
 							Amt: 50000000,
@@ -60,7 +63,7 @@ var (
 					Outs: []atomic.EVMOutput{{
 						Address: common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"),
 						Amount:  50000000,
-						AssetID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+						AssetID: avaxAssetID,
 					}},
 				},
 				Creds: []verify.Verifiable{
@@ -82,7 +85,7 @@ var (
 							OutputIndex: 1,
 						},
 						Asset: avax.Asset{
-							ID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+							ID: avaxAssetID,
 						},
 						In: &secp256k1fx.TransferInput{
 							Amt: 50000000,
@@ -94,7 +97,7 @@ var (
 					Outs: []Output{{
 						Address: common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"),
 						Amount:  50000000,
-						AssetID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+						AssetID: avaxAssetID,
 					}},
 				},
 				Creds: []Credential{
@@ -132,8 +135,15 @@ var (
 					]
 				}]
 			}`,
-			id:    ids.FromStringOrPanic("h34BPNmYApCbW8buVWAtzu1KtjTFmyMhiRQQnAqPqwCqQsB7f"),
 			bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001c52b712aa7dce27a650bf509f799673e245edd4fa9e4e1700eb6105202fe579a0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000002faf080000000010000000000000001b8b5a87d1c05676f1f966da49151fa54dbe68c330000000002faf08021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000100000009000000013e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01"),
+			op: hook.Op{
+				ID:        ids.FromStringOrPanic("h34BPNmYApCbW8buVWAtzu1KtjTFmyMhiRQQnAqPqwCqQsB7f"),
+				Gas:       11230,
+				GasFeeCap: *uint256.NewInt(0),
+				Mint: map[common.Address]uint256.Int{
+					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): *uint256.NewInt(50_000_000 * x2cRateC),
+				},
+			},
 		},
 		{
 			name: "export", // Included in https://subnets.avax.network/c-chain/block/48
@@ -145,12 +155,12 @@ var (
 					Ins: []atomic.EVMInput{{
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
-						AssetID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+						AssetID: avaxAssetID,
 						Nonce:   0,
 					}},
 					ExportedOutputs: []*avax.TransferableOutput{{
 						Asset: avax.Asset{
-							ID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+							ID: avaxAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 1,
@@ -180,12 +190,12 @@ var (
 					Ins: []Input{{
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
-						AssetID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+						AssetID: avaxAssetID,
 						Nonce:   0,
 					}},
 					ExportedOutputs: []*avax.TransferableOutput{{
 						Asset: avax.Asset{
-							ID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+							ID: avaxAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 1,
@@ -235,8 +245,19 @@ var (
 					]
 				}]
 			}`,
-			id:    ids.FromStringOrPanic("ng7Dox1r8nctrF6zurhRPYWxkmE2juUhT7Qhpauyo8qSEu6jB"),
 			bytes: common.FromHex("0x000000000001000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001eb019ccd325ad53543a7e7e3b04828bdecf3cff600000000000f424121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000000000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500000000010000000900000001254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01"),
+			op: hook.Op{
+				ID:        ids.FromStringOrPanic("ng7Dox1r8nctrF6zurhRPYWxkmE2juUhT7Qhpauyo8qSEu6jB"),
+				Gas:       11230,
+				GasFeeCap: *uint256.NewInt(1_000_000 * x2cRateC / 11230),
+				Burn: map[common.Address]hook.AccountDebit{
+					common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"): {
+						Nonce:      0,
+						Amount:     *uint256.NewInt(1_000_001 * x2cRateC),
+						MinBalance: *uint256.NewInt(1_000_001 * x2cRateC),
+					},
+				},
+			},
 		},
 	}
 	oldSlice []*atomic.Tx
@@ -259,10 +280,10 @@ func TestID(t *testing.T) {
 				// We must parse the old tx to properly initialize the ID.
 				old, err := parseOldTx(test.bytes)
 				require.NoError(t, err, "parseOldTx()")
-				assert.Equalf(t, test.id, old.ID(), "%T.ID()", old)
+				assert.Equalf(t, test.op.ID, old.ID(), "%T.ID()", old)
 			})
 			t.Run("new", func(t *testing.T) {
-				assert.Equalf(t, test.id, test.new.ID(), "%T.ID()", test.new)
+				assert.Equalf(t, test.op.ID, test.new.ID(), "%T.ID()", test.new)
 			})
 		})
 	}
@@ -511,4 +532,14 @@ func FuzzJSONCompatibility(f *testing.F) {
 		require.NoErrorf(t, err, "json.Marshal(%T)", newTx)
 		assert.JSONEq(t, string(oldJSON), string(newJSON))
 	})
+}
+
+func TestAsOp(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := test.new.AsOp(avaxAssetID)
+			require.NoErrorf(t, err, "%T.AsOp(avaxAssetID)", test.new)
+			require.Equalf(t, test.op, got, "%T.AsOp(avaxAssetID)", test.new)
+		})
+	}
 }
