@@ -543,3 +543,28 @@ func TestAsOp(t *testing.T) {
 		})
 	}
 }
+
+func FuzzAsOp_GasFeeCap(f *testing.F) {
+	for _, test := range tests {
+		f.Add(test.bytes)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		oldTx, err := parseOldTx(data)
+		if err != nil {
+			t.Skip("invalid tx")
+		}
+
+		newTx, err := Parse(data)
+		require.NoError(t, err, "Parse()")
+
+		gasPrice, oldErr := atomic.EffectiveGasPrice(oldTx.UnsignedAtomicTx, avaxAssetID, true)
+		oldOk := oldErr == nil
+		op, newErr := newTx.AsOp(avaxAssetID)
+		newOk := newErr == nil
+		assert.Equalf(t, oldOk, newOk, "atomic.EffectiveGasPrice(%T) == %T.AsOp().GasFeeCap", oldTx, newTx)
+
+		if newOk {
+			assert.Equal(t, gasPrice, op.GasFeeCap)
+		}
+	})
+}

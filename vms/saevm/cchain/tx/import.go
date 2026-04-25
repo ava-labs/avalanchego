@@ -63,12 +63,14 @@ func (i *Import) burned(assetID ids.ID) (uint64, error) {
 	return burned, nil
 }
 
+var errUnexpectedInputType = errors.New("unexpected input type")
+
 func (i *Import) numSigs() (uint64, error) {
 	var n uint64
 	for _, in := range i.ImportedInputs {
 		input, ok := in.In.(*secp256k1fx.TransferInput)
 		if !ok {
-			return 0, nil
+			return 0, fmt.Errorf("%w: got %T ; want %T", errUnexpectedInputType, in.In, input)
 		}
 		n += uint64(len(input.SigIndices))
 	}
