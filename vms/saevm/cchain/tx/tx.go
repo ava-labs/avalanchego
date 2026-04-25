@@ -20,6 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	// Imported for [GasPerByte] comment resolution.
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 )
 
 // Tx is a signed transaction that interacts with shared memory.
@@ -108,9 +111,14 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 }
 
 const (
+	// IntrinsicGas is an initial static amount of gas that every [Tx] must pay.
 	IntrinsicGas = ap5.AtomicTxIntrinsicGas
-	GasPerByte   = 1 // atomic.TxBytesGas
-	GasPerSig    = secp256k1fx.CostPerSignature
+	// GasPerByte is an additional amount of gas that is charged per-byte of an
+	// [Unsigned] transaction.
+	GasPerByte = 1 // [atomic.TxBytesGas]
+	// GasPerSig is an additional amount of gas that is charged per-signature
+	// included in a [Tx].
+	GasPerSig = secp256k1fx.CostPerSignature
 )
 
 func gasUsed(t Unsigned) (uint64, error) {
