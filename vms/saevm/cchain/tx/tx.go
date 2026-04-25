@@ -85,6 +85,10 @@ func (t *Tx) Bytes() ([]byte, error) {
 	return c.Marshal(codecVersion, t)
 }
 
+// AsOp converts the transaction into a [hook.Op] that can be processed by SAE.
+//
+// The operation only includes state changes that impact Ethereum-native state.
+// It does not include non-AVAX balance changes or shared memory modifications.
 func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 	gasUsed, err := gasUsed(t.Unsigned)
 	if err != nil {
@@ -111,14 +115,14 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 }
 
 const (
-	// IntrinsicGas is an initial static amount of gas that every [Tx] must pay.
-	IntrinsicGas = ap5.AtomicTxIntrinsicGas
-	// GasPerByte is an additional amount of gas that is charged per-byte of an
+	// intrinsicGas is an initial static amount of gas that every [Tx] must pay.
+	intrinsicGas = ap5.AtomicTxIntrinsicGas
+	// gasPerByte is an additional amount of gas that is charged per-byte of an
 	// [Unsigned] transaction.
-	GasPerByte = 1 // [atomic.TxBytesGas]
-	// GasPerSig is an additional amount of gas that is charged per-signature
+	gasPerByte = 1 // [atomic.TxBytesGas]
+	// gasPerSig is an additional amount of gas that is charged per-signature
 	// included in a [Tx].
-	GasPerSig = secp256k1fx.CostPerSignature
+	gasPerSig = secp256k1fx.CostPerSignature
 )
 
 func gasUsed(t Unsigned) (uint64, error) {
@@ -126,7 +130,7 @@ func gasUsed(t Unsigned) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	bytesGas, err := math.Mul(uint64(numBytes), GasPerByte)
+	bytesGas, err := math.Mul(uint64(numBytes), gasPerByte)
 	if err != nil {
 		return 0, err
 	}
@@ -134,7 +138,7 @@ func gasUsed(t Unsigned) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	sigsGas, err := math.Mul(numSigs, GasPerSig)
+	sigsGas, err := math.Mul(numSigs, gasPerSig)
 	if err != nil {
 		return 0, err
 	}
@@ -142,7 +146,7 @@ func gasUsed(t Unsigned) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return math.Add(IntrinsicGas, dynamicGas)
+	return math.Add(intrinsicGas, dynamicGas)
 }
 
 const x2cRateC = 1_000_000_000
