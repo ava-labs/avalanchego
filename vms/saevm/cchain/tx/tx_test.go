@@ -535,6 +535,76 @@ var (
 			},
 		},
 		{
+			name: "export_multi_address_multi_asset", // Synthetic
+			old: &atomic.Tx{
+				UnsignedAtomicTx: &atomic.UnsignedExportTx{
+					Ins: []atomic.EVMInput{
+						{
+							Address: common.Address{1},
+							Amount:  999,
+							Nonce:   5,
+						},
+						{
+							Address: common.Address{2},
+							Amount:  1_000_000,
+							AssetID: avaxAssetID,
+							Nonce:   7,
+						},
+					},
+					ExportedOutputs: []*avax.TransferableOutput{},
+				},
+				Creds: []verify.Verifiable{},
+			},
+			new: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{
+						{
+							Address: common.Address{1},
+							Amount:  999,
+							Nonce:   5,
+						},
+						{
+							Address: common.Address{2},
+							Amount:  1_000_000,
+							AssetID: avaxAssetID,
+							Nonce:   7,
+						},
+					},
+					ExportedOutputs: []*avax.TransferableOutput{},
+				},
+				Creds: []Credential{},
+			},
+			json: `{
+				"unsignedTx":{
+					"networkID":0,
+					"blockchainID":"11111111111111111111111111111111LpoYY",
+					"destinationChain":"11111111111111111111111111111111LpoYY",
+					"inputs":[
+						{"address":"0x0100000000000000000000000000000000000000","amount":999,"assetID":"11111111111111111111111111111111LpoYY","nonce":5},
+						{"address":"0x0200000000000000000000000000000000000000","amount":1000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z","nonce":7}
+					],
+					"exportedOutputs":[]
+				},
+				"credentials":[]
+			}`,
+			bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000000000000"),
+			op: hook.Op{
+				ID:        ids.FromStringOrPanic("8P9XRKhxHeTv3t4Aj9cTV6dD5h78WVFH8nctLuCkeSavfKeEG"),
+				Gas:       12218,
+				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 12218),
+				Burn: map[common.Address]hook.AccountDebit{
+					{1}: {
+						Nonce: 5,
+					},
+					{2}: {
+						Nonce:      7,
+						Amount:     *uint256.NewInt(1_000_000 * _x2cRate),
+						MinBalance: *uint256.NewInt(1_000_000 * _x2cRate),
+					},
+				},
+			},
+		},
+		{
 			name: "import_non_avax", // Synthetic
 			old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedImportTx{
