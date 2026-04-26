@@ -13,6 +13,9 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
+	// Imported for [GasPerByte] comment resolution.
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -20,9 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	// Imported for [GasPerByte] comment resolution.
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 )
 
 // Tx is a signed transaction that interacts with shared memory.
@@ -149,11 +149,11 @@ func gasUsed(t Unsigned) (uint64, error) {
 	return math.Add(intrinsicGas, dynamicGas)
 }
 
-const x2cRateC = 1_000_000_000
+const _x2cRate = 1_000_000_000
 
 // x2cRate is the conversion rate between the smallest denomination on the
 // X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain 1 aAVAX.
-var x2cRate = uint256.NewInt(x2cRateC)
+var x2cRate = uint256.NewInt(_x2cRate)
 
 // gasPrice takes in the burned amount of AVAX in nAVAX and the gas used and
 // returns the price per gas in aAVAX/gas.

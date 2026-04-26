@@ -141,7 +141,7 @@ var (
 				Gas:       11230,
 				GasFeeCap: *uint256.NewInt(0),
 				Mint: map[common.Address]uint256.Int{
-					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): *uint256.NewInt(50_000_000 * x2cRateC),
+					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): *uint256.NewInt(50_000_000 * _x2cRate),
 				},
 			},
 		},
@@ -249,12 +249,12 @@ var (
 			op: hook.Op{
 				ID:        ids.FromStringOrPanic("ng7Dox1r8nctrF6zurhRPYWxkmE2juUhT7Qhpauyo8qSEu6jB"),
 				Gas:       11230,
-				GasFeeCap: *uint256.NewInt(1_000_000 * x2cRateC / 11230),
+				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 11230),
 				Burn: map[common.Address]hook.AccountDebit{
 					common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"): {
 						Nonce:      0,
-						Amount:     *uint256.NewInt(1_000_001 * x2cRateC),
-						MinBalance: *uint256.NewInt(1_000_001 * x2cRateC),
+						Amount:     *uint256.NewInt(1_000_001 * _x2cRate),
+						MinBalance: *uint256.NewInt(1_000_001 * _x2cRate),
 					},
 				},
 			},
@@ -544,7 +544,7 @@ func TestAsOp(t *testing.T) {
 	}
 }
 
-func FuzzAsOp_GasFeeCap(f *testing.F) {
+func FuzzAsOp(f *testing.F) {
 	for _, test := range tests {
 		f.Add(test.bytes)
 	}
