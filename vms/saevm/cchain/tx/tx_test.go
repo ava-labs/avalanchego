@@ -20,6 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -540,6 +541,70 @@ func TestAsOp(t *testing.T) {
 			got, err := test.new.AsOp(avaxAssetID)
 			require.NoErrorf(t, err, "%T.AsOp(avaxAssetID)", test.new)
 			require.Equalf(t, test.op, got, "%T.AsOp(avaxAssetID)", test.new)
+		})
+	}
+}
+
+func TestAsOp_Errors(t *testing.T) {
+	tests := []struct {
+		name string
+		tx   Unsigned
+		want error
+	}{
+		{
+			name: "export_multiple_nonces",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Nonce: 0,
+					},
+					{
+						Nonce: 1,
+					},
+				},
+			},
+			want: errMultipleNonces,
+		},
+		{
+			name: "import_burned_underflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{{
+					Asset: avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				}},
+				Outs: []Output{{
+					AssetID: avaxAssetID,
+					Amount:  2,
+				}},
+			},
+			want: math.ErrUnderflow,
+		},
+		{
+			name: "export_burned_underflow",
+			tx: &Export{
+				Ins: []Input{{
+					AssetID: avaxAssetID,
+					Amount:  1,
+				}},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: avaxAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 2,
+					},
+				}},
+			},
+			want: math.ErrUnderflow,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tx := &Tx{
+				Unsigned: test.tx,
+			}
+			_, err := tx.AsOp(avaxAssetID)
+			require.ErrorIsf(t, err, test.want, "%T.AsOp(avaxAssetID)", tx)
 		})
 	}
 }
