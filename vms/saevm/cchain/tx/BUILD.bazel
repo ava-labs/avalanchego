@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//codec",
         "//codec/linearcodec",
+        "//graft/coreth/plugin/evm/atomic",
         "//graft/coreth/plugin/evm/upgrade/ap5",
         "//ids",
         "//utils/hashing",
@@ -37,7 +38,9 @@ go_test(
         "//graft/coreth/plugin/evm/atomic",
         "//graft/coreth/plugin/evm/atomic/vm",
         "//ids",
+        "//utils/math",
         "//vms/components/avax",
+        "//vms/components/gas",
         "//vms/components/verify",
         "//vms/saevm/hook",
         "//vms/secp256k1fx",
