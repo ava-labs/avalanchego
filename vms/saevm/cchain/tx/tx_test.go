@@ -471,6 +471,71 @@ var (
 				},
 			},
 		},
+		{
+			name: "export_same_address_multi_asset", // Synthetic
+			old: &atomic.Tx{
+				UnsignedAtomicTx: &atomic.UnsignedExportTx{
+					Ins: []atomic.EVMInput{
+						{
+							Amount:  999,
+							AssetID: ids.ID{},
+							Nonce:   5,
+						},
+						{
+							Amount:  1_000_000,
+							AssetID: avaxAssetID,
+							Nonce:   5,
+						},
+					},
+					ExportedOutputs: []*avax.TransferableOutput{},
+				},
+				Creds: []verify.Verifiable{},
+			},
+			new: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{
+						{
+							Amount:  999,
+							AssetID: ids.ID{},
+							Nonce:   5,
+						},
+						{
+							Amount:  1_000_000,
+							AssetID: avaxAssetID,
+							Nonce:   5,
+						},
+					},
+					ExportedOutputs: []*avax.TransferableOutput{},
+				},
+				Creds: []Credential{},
+			},
+			json: `{
+				"unsignedTx":{
+					"networkID":0,
+					"blockchainID":"11111111111111111111111111111111LpoYY",
+					"destinationChain":"11111111111111111111111111111111LpoYY",
+					"inputs":[
+						{"address":"0x0000000000000000000000000000000000000000","amount":999,"assetID":"11111111111111111111111111111111LpoYY","nonce":5},
+						{"address":"0x0000000000000000000000000000000000000000","amount":1000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z","nonce":5}
+					],
+					"exportedOutputs":[]
+				},
+				"credentials":[]
+			}`,
+			bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000050000000000000000"),
+			op: hook.Op{
+				ID:        ids.FromStringOrPanic("29cCETWxEUN1QCuex59j46Xtr8urBRo5M7HzwBqC3qDXWd73sX"),
+				Gas:       12218,
+				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 12218),
+				Burn: map[common.Address]hook.AccountDebit{
+					common.Address{}: {
+						Nonce:      5,
+						Amount:     *uint256.NewInt(1_000_000 * _x2cRate),
+						MinBalance: *uint256.NewInt(1_000_000 * _x2cRate),
+					},
+				},
+			},
+		},
 	}
 	oldSlice []*atomic.Tx
 	newSlice []*Tx
