@@ -526,7 +526,7 @@ var (
 				Gas:       12218,
 				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 12218),
 				Burn: map[common.Address]hook.AccountDebit{
-					common.Address{}: {
+					{}: {
 						Nonce:      5,
 						Amount:     *uint256.NewInt(1_000_000 * _x2cRate),
 						MinBalance: *uint256.NewInt(1_000_000 * _x2cRate),
