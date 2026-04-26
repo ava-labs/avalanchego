@@ -130,7 +130,7 @@ func gasUsed(t Unsigned) (gas.Gas, error) {
 	if err != nil {
 		return 0, err
 	}
-	bytesGas, err := math.Mul(gas.Gas(numBytes), gasPerByte)
+	bytesGas, err := math.Mul(gas.Gas(numBytes), gasPerByte) //#nosec G115 -- Known non-negative
 	if err != nil {
 		return 0, err
 	}
