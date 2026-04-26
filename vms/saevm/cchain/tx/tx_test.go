@@ -477,9 +477,8 @@ var (
 				UnsignedAtomicTx: &atomic.UnsignedExportTx{
 					Ins: []atomic.EVMInput{
 						{
-							Amount:  999,
-							AssetID: ids.ID{},
-							Nonce:   5,
+							Amount: 999,
+							Nonce:  5,
 						},
 						{
 							Amount:  1_000_000,
@@ -495,9 +494,8 @@ var (
 				Unsigned: &Export{
 					Ins: []Input{
 						{
-							Amount:  999,
-							AssetID: ids.ID{},
-							Nonce:   5,
+							Amount: 999,
+							Nonce:  5,
 						},
 						{
 							Amount:  1_000_000,
@@ -534,6 +532,68 @@ var (
 						MinBalance: *uint256.NewInt(1_000_000 * _x2cRate),
 					},
 				},
+			},
+		},
+		{
+			name: "import_non_avax", // Synthetic
+			old: &atomic.Tx{
+				UnsignedAtomicTx: &atomic.UnsignedImportTx{
+					ImportedInputs: []*avax.TransferableInput{{
+						In: &secp256k1fx.TransferInput{
+							Amt: 999,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{},
+							},
+						},
+					}},
+					Outs: []atomic.EVMOutput{{
+						Amount: 999,
+					}},
+				},
+				Creds: []verify.Verifiable{},
+			},
+			new: &Tx{
+				Unsigned: &Import{
+					ImportedInputs: []*avax.TransferableInput{{
+						In: &secp256k1fx.TransferInput{
+							Amt: 999,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{},
+							},
+						},
+					}},
+					Outs: []Output{{
+						Amount: 999,
+					}},
+				},
+				Creds: []Credential{},
+			},
+			json: `{
+				"unsignedTx":{
+					"networkID":0,
+					"blockchainID":"11111111111111111111111111111111LpoYY",
+					"sourceChain":"11111111111111111111111111111111LpoYY",
+					"importedInputs":[{
+						"txID":"11111111111111111111111111111111LpoYY",
+						"outputIndex":0,
+						"assetID":"11111111111111111111111111111111LpoYY",
+						"fxID":"11111111111111111111111111111111LpoYY",
+						"input":{"amount":999,"signatureIndices":[]}
+					}],
+					"outputs":[{
+						"address":"0x0000000000000000000000000000000000000000",
+						"amount":999,
+						"assetID":"11111111111111111111111111111111LpoYY"
+					}]
+				},
+				"credentials":[]
+			}`,
+			bytes: common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500000000000003e70000000000000001000000000000000000000000000000000000000000000000000003e7000000000000000000000000000000000000000000000000000000000000000000000000"),
+			op: hook.Op{
+				ID:        ids.FromStringOrPanic("s4xoHkf4rPQYSwjbQo78hcSP1wSeViV1Fx2PHM4AfRiDurFkf"),
+				Gas:       10226,
+				GasFeeCap: *uint256.NewInt(0),
+				Mint:      map[common.Address]uint256.Int{},
 			},
 		},
 	}
