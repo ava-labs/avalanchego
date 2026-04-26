@@ -261,6 +261,216 @@ var (
 				},
 			},
 		},
+		{
+			name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
+			old: &atomic.Tx{
+				UnsignedAtomicTx: &atomic.UnsignedImportTx{
+					NetworkID:    1,
+					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
+					SourceChain:  ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					ImportedInputs: []*avax.TransferableInput{
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH"),
+							},
+							Asset: avax.Asset{ID: avaxAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 99000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74"),
+							},
+							Asset: avax.Asset{ID: avaxAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 399000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj"),
+							},
+							Asset: avax.Asset{ID: avaxAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 99000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+					},
+					Outs: []atomic.EVMOutput{
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  99000000,
+							AssetID: avaxAssetID,
+						},
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  99000000,
+							AssetID: avaxAssetID,
+						},
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  399000000,
+							AssetID: avaxAssetID,
+						},
+					},
+				},
+				Creds: []verify.Verifiable{
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+				},
+			},
+			new: &Tx{
+				Unsigned: &Import{
+					NetworkID:    1,
+					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
+					SourceChain:  ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					ImportedInputs: []*avax.TransferableInput{
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH"),
+							},
+							Asset: avax.Asset{ID: avaxAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 99000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74"),
+							},
+							Asset: avax.Asset{ID: avaxAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 399000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj"),
+							},
+							Asset: avax.Asset{ID: avaxAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 99000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+					},
+					Outs: []Output{
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  99000000,
+							AssetID: avaxAssetID,
+						},
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  99000000,
+							AssetID: avaxAssetID,
+						},
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  399000000,
+							AssetID: avaxAssetID,
+						},
+					},
+				},
+				Creds: []Credential{
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+				},
+			},
+			json: `{
+				"unsignedTx":{
+					"networkID":1,
+					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
+					"sourceChain":"2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
+					"importedInputs":[
+						{
+							"txID":"DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH",
+							"outputIndex":0,
+							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"input":{"amount":99000000,"signatureIndices":[0]}
+						},
+						{
+							"txID":"25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74",
+							"outputIndex":0,
+							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"input":{"amount":399000000,"signatureIndices":[0]}
+						},
+						{
+							"txID":"2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj",
+							"outputIndex":0,
+							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"input":{"amount":99000000,"signatureIndices":[0]}
+						}
+					],
+					"outputs":[
+						{"address":"0x383c293db6be7ac246f0956ad632344dc2cd1da3","amount":99000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"},
+						{"address":"0x383c293db6be7ac246f0956ad632344dc2cd1da3","amount":99000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"},
+						{"address":"0x383c293db6be7ac246f0956ad632344dc2cd1da3","amount":399000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"}
+					]
+				},
+				"credentials":[
+					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]},
+					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]},
+					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]}
+				]
+			}`,
+			bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b000000031d249d0aab138afe01e6eff9c4789018a600771d94f5396b5df7b9d05298714d0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec000000001000000008e0713e47bfc29bef4cee6e4635da1c74a3aabade68ccad6fca3e99fd827eb1c0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000017c841c00000000100000000a022a8b069a5d5e54c7e09c5c5b0f762c6751068bef15fe951a5e4b349d642200000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec0000000010000000000000003383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000017c841c021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000300000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"),
+			op: hook.Op{
+				ID:        ids.FromStringOrPanic("2Av7bXLRwxiQhbT9EcQd8KRM3Lz6VkpTqf3Y1AT5peHZ4YAohS"),
+				Gas:       13526,
+				GasFeeCap: *uint256.NewInt(0),
+				Mint: map[common.Address]uint256.Int{
+					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): *uint256.NewInt(597_000_000 * _x2cRate),
+				},
+			},
+		},
 	}
 	oldSlice []*atomic.Tx
 	newSlice []*Tx
@@ -615,23 +825,21 @@ func FuzzAsOp(f *testing.F) {
 		f.Add(test.bytes)
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
-		oldTx, err := parseOldTx(data)
+		newTx, err := Parse(data)
+		if err != nil {
+			t.Skip("invalid tx bytes")
+		}
+
+		op, err := newTx.AsOp(avaxAssetID)
 		if err != nil {
 			t.Skip("invalid tx")
 		}
 
-		newTx, err := Parse(data)
-		require.NoError(t, err, "Parse()")
+		oldTx, err := parseOldTx(data)
+		require.NoError(t, err, "parseOldTx()")
 
-		gasPrice, oldErr := atomic.EffectiveGasPrice(oldTx.UnsignedAtomicTx, avaxAssetID, true)
-		oldOk := oldErr == nil
-		op, newErr := newTx.AsOp(avaxAssetID)
-		newOk := newErr == nil
-		assert.Equalf(t, oldOk, newOk, "atomic.EffectiveGasPrice(%T) == %T.AsOp().GasFeeCap", oldTx, newTx)
-
-		if !newOk {
-			return
-		}
+		gasPrice, err := atomic.EffectiveGasPrice(oldTx.UnsignedAtomicTx, avaxAssetID, true)
+		require.NoErrorf(t, err, "atomic.EffectiveGasPrice(%T, avaxAssetID, true)", oldTx)
 		assert.Equalf(t, gasPrice, op.GasFeeCap, "atomic.EffectiveGasPrice(%T) == %T.AsOp().GasFeeCap", oldTx, newTx)
 
 		gasUsed, err := oldTx.UnsignedAtomicTx.GasUsed(true)
