@@ -90,7 +90,7 @@ func (t *Tx) Bytes() ([]byte, error) {
 // The operation only includes state changes that impact Ethereum-native state.
 // It does not include non-AVAX balance changes or shared memory modifications.
 func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
-	gasUsed, err := gasUsed(t.Unsigned)
+	gas, err := gasUsed(t.Unsigned)
 	if err != nil {
 		return hook.Op{}, fmt.Errorf("calculating gas used: %w", err)
 	}
@@ -107,8 +107,8 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 
 	return hook.Op{
 		ID:        t.ID(),
-		Gas:       gas.Gas(gasUsed),
-		GasFeeCap: gasPrice(burned, gasUsed),
+		Gas:       gas,
+		GasFeeCap: gasPrice(burned, gas),
 		Burn:      op.burn,
 		Mint:      op.mint,
 	}, nil
@@ -122,15 +122,15 @@ const (
 	gasPerByte = 1 // [atomic.TxBytesGas]
 	// gasPerSig is an additional amount of gas that is charged per-signature
 	// included in a [Tx].
-	gasPerSig = secp256k1fx.CostPerSignature
+	gasPerSig = gas.Gas(secp256k1fx.CostPerSignature)
 )
 
-func gasUsed(t Unsigned) (uint64, error) {
+func gasUsed(t Unsigned) (gas.Gas, error) {
 	numBytes, err := c.Size(codecVersion, &t)
 	if err != nil {
 		return 0, err
 	}
-	bytesGas, err := math.Mul(uint64(numBytes), gasPerByte)
+	bytesGas, err := math.Mul(gas.Gas(numBytes), gasPerByte)
 	if err != nil {
 		return 0, err
 	}
@@ -138,7 +138,7 @@ func gasUsed(t Unsigned) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	sigsGas, err := math.Mul(numSigs, gasPerSig)
+	sigsGas, err := math.Mul(gas.Gas(numSigs), gasPerSig)
 	if err != nil {
 		return 0, err
 	}
@@ -155,16 +155,16 @@ const _x2cRate = 1_000_000_000
 // X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain 1 aAVAX.
 var x2cRate = uint256.NewInt(_x2cRate)
 
-// gasPrice takes in the burned amount of AVAX in nAVAX and the gas used and
-// returns the price per gas in aAVAX/gas.
+// gasPrice takes in the cost, in nAVAX, and the gas and returns the price per
+// gas in aAVAX/gas.
 //
 // The result is rounded down to the nearest aAVAX/gas.
-func gasPrice(burned, gasUsed uint64) uint256.Int {
+func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	var u uint256.Int
-	u.SetUint64(gasUsed)
+	u.SetUint64(uint64(gas))
 
 	var p uint256.Int
-	p.SetUint64(burned)
+	p.SetUint64(cost)
 	p.Mul(&p, x2cRate)
 	p.Div(&p, &u)
 	return p
