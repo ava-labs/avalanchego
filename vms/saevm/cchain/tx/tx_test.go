@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -628,8 +629,13 @@ func FuzzAsOp(f *testing.F) {
 		newOk := newErr == nil
 		assert.Equalf(t, oldOk, newOk, "atomic.EffectiveGasPrice(%T) == %T.AsOp().GasFeeCap", oldTx, newTx)
 
-		if newOk {
-			assert.Equal(t, gasPrice, op.GasFeeCap)
+		if !newOk {
+			return
 		}
+		assert.Equalf(t, gasPrice, op.GasFeeCap, "atomic.EffectiveGasPrice(%T) == %T.AsOp().GasFeeCap", oldTx, newTx)
+
+		gasUsed, err := oldTx.UnsignedAtomicTx.GasUsed(true)
+		require.NoErrorf(t, err, "%T.GasUsed(true)", oldTx.UnsignedAtomicTx)
+		assert.Equalf(t, gas.Gas(gasUsed), op.Gas, "%T.GasUsed(true) == %T.AsOp().Gas", oldTx.UnsignedAtomicTx, newTx)
 	})
 }
