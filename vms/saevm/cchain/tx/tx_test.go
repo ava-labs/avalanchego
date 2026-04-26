@@ -541,7 +541,7 @@ func TestAsOp(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := test.new.AsOp(avaxAssetID)
 			require.NoErrorf(t, err, "%T.AsOp(avaxAssetID)", test.new)
-			require.Equalf(t, test.op, got, "%T.AsOp(avaxAssetID)", test.new)
+			assert.Equalf(t, test.op, got, "%T.AsOp(avaxAssetID)", test.new)
 		})
 	}
 }
