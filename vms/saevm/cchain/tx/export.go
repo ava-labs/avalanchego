@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -78,12 +77,10 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 			return op{}, fmt.Errorf("%w: address %s has nonces %d and %d", errMultipleNonces, in.Address, debit.Nonce, in.Nonce)
 		}
 
-		// Only AVAX assets are transferred through the SAE ops, but SAE owns
-		// all nonce modifications.
+		// Non-AVAX inputs still record the address+nonce so SAE will increment
+		// the nonce, even though no AVAX is debited.
 		if in.AssetID == avaxAssetID {
-			var amount uint256.Int
-			amount.SetUint64(in.Amount)
-			amount.Mul(&amount, x2cRate)
+			amount := scaleAVAX(in.Amount)
 			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &amount); overflow {
 				return op{}, fmt.Errorf("%w: for address %s", errOverflow, in.Address)
 			}
