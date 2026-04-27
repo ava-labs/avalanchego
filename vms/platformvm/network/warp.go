@@ -791,6 +791,20 @@ func (s signatureRequestVerifier) verifyValidatorSetDiff(
 		}
 	}
 
+	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get minimum height: " + err.Error(),
+		}
+	}
+	if msg.PreviousHeight < minHeight {
+		return &common.AppError{
+			Code:    ErrValidatorSetDiffInvalidHeightProgression,
+			Message: fmt.Sprintf("previous height %d is below minimum retained height %d", msg.PreviousHeight, minHeight),
+		}
+	}
+
 	if appErr := s.verifyBlockTimestamp(msg.PreviousHeight, msg.PreviousTimestamp, ErrValidatorSetDiffInvalidPreviousTimestamp, "previous"); appErr != nil {
 		return appErr
 	}
