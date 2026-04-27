@@ -53,13 +53,6 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-// stateSyncTargetProvider is implemented by VMs that report the target height
-// of a concurrent dynamic state sync, allowing the bootstrapper to fetch only
-// blocks above the sync target.
-type stateSyncTargetProvider interface {
-	StateSyncTargetHeight() uint64
-}
-
 // bootstrapper repeatedly performs the bootstrapping protocol.
 //
 //  1. Wait until a sufficient amount of stake is connected.
@@ -205,10 +198,7 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 
 	// During dynamic state sync, skip fetching blocks below the sync target
 	// so recent blocks are executed quickly and can drive pivots.
-	provider, _ := b.VM.(stateSyncTargetProvider)
-	if provider != nil && b.Ctx.StateSyncing.Get() {
-		b.syncTargetHeight = provider.StateSyncTargetHeight()
-	}
+	b.syncTargetHeight = b.Ctx.StateSyncTargetHeight.Get()
 	if b.syncTargetHeight > lastAcceptedHeight {
 		lastAcceptedHeight = b.syncTargetHeight
 	}

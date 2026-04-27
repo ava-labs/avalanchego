@@ -410,6 +410,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		// Engine will continue into bootstrapping and the VM will sync in the
 		// background.
 		ss.Ctx.StateSyncing.Set(true)
+		ss.Ctx.StateSyncTargetHeight.Set(preferredStateSummary.Height())
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	default:
 		ss.Ctx.Log.Warn("unhandled state summary mode, proceeding to bootstrap",

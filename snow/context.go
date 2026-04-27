@@ -97,4 +97,9 @@ type ConsensusContext struct {
 
 	// True iff this chain is currently state-syncing
 	StateSyncing utils.Atomic[bool]
+
+	// StateSyncTargetHeight is the block height being synced to during dynamic
+	// state sync. The bootstrapper uses this to skip fetching blocks below the
+	// target. Zero when no dynamic sync is active.
+	StateSyncTargetHeight utils.Atomic[uint64]
 }
