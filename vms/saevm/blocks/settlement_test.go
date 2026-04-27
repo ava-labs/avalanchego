@@ -59,7 +59,7 @@ func TestSettlementInvariants(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
 	for _, b := range []*Block{b, parent, lastSettled} {
-		tm := mustNewGasTime(t, preciseTime(b.Header(), 0), 1, 0, gastime.DefaultGasPriceConfig())
+		tm := mustNewGasTime(t, time.Unix(int64(b.Header().Time), 0), 1, 0, gastime.DefaultGasPriceConfig()) //#nosec G115 -- block time is hard-coded above.
 		b.markExecutedForTests(t, db, xdb, tm)
 	}
 
