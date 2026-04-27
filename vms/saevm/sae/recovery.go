@@ -121,7 +121,7 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		settleAt := blocks.PreciseTime(rec.hooks, settler.Header()).Add(-saeparams.Tau)
+		settleAt := rec.hooks.BlockTime(settler.Header()).Add(-saeparams.Tau)
 		tm := proxytime.Of[gas.Gas](settleAt)
 
 		for {

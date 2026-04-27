@@ -337,8 +337,8 @@ func lastToSettle(
 	now time.Time,
 	log logging.Logger,
 ) (*blocks.Block, error) {
-	bTime := blocks.PreciseTime(hooks, hdr)
-	pTime := blocks.PreciseTime(hooks, parent.Header())
+	bTime := hooks.BlockTime(hdr)
+	pTime := hooks.BlockTime(parent.Header())
 
 	// It is allowed for [hook.BlockBuilder] to further constrain the allowed
 	// block times. However, every block MUST at least satisfy these basic
