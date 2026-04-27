@@ -11,11 +11,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -24,17 +23,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/corethvm/hook/acp176"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/tx"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/txpool"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-var _ hook.BlockBuilder[*txpool.Tx] = (*blockBuilder)(nil)
+var _ saehook.BlockBuilder[*Tx] = (*blockBuilder)(nil)
 
 type params struct {
 	delayExcess  *acp226.DelayExcess
@@ -48,8 +45,7 @@ type blockBuilder struct {
 	now func() time.Time
 	// When fields in params are set, the block builder will build blocks that
 	// move the network values towards their desired values.
-	desired      params
-	potentialTxs func() iter.Seq[*txpool.Tx]
+	desired params
 }
 
 func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) {
@@ -66,7 +62,6 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 		mde = *pmde
 	}
 
-	// Enforce block building separation.
 	{
 		parentTimeMS := customtypes.HeaderTimeMilliseconds(parent)
 		if nowMS < parentTimeMS {
@@ -110,50 +105,13 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 	), nil
 }
 
-func (b *blockBuilder) PotentialEndOfBlockOps(ctx context.Context, header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
-	seq := b.potentialTxs()
-	return func(yield func(*txpool.Tx) bool) {
-		// Transactions are verified against the last executed state. We must
-		// guarantee that they don't conflict with any transactions in blocks
-		// between the block we are building and the last executed block.
-		consumedUTXOs, err := ancestorUTXOIDs(header, settledHash, source)
-		if err != nil {
-			b.ctx.Log.Error("failed to get ancestor UTXO IDs",
-				zap.Error(err),
-			)
-			return
-		}
-
-		for tx := range seq {
-			if consumedUTXOs.Overlaps(tx.Inputs) {
-				b.ctx.Log.Debug("tx consumes previously consumed UTXOs",
-					zap.Stringer("txID", tx.ID),
-				)
-				continue
-			}
-			if err := tx.Tx.SanityCheck(ctx, b.ctx); err != nil {
-				b.ctx.Log.Debug("tx failed sanity check",
-					zap.Stringer("txID", tx.ID),
-					zap.Error(err),
-				)
-				continue
-			}
-			if err := tx.Tx.VerifyCredentials(b.ctx, tx.Tx.Creds); err != nil {
-				b.ctx.Log.Debug("tx failed credential verification",
-					zap.Stringer("txID", tx.ID),
-					zap.Error(err),
-				)
-				continue
-			}
-			// We don't need to verify state here. It will be verified by the
-			// SAE builder.
-
-			if !yield(tx) {
-				return
-			}
-			consumedUTXOs.Union(tx.Inputs)
-		}
-	}
+// PotentialEndOfBlockOps returns the iterator of end-of-block transactions to
+// consider for inclusion.
+//
+// Subnet-EVM has no end-of-block ops, so this is always empty. See [Tx] for
+// the rationale.
+func (*blockBuilder) PotentialEndOfBlockOps(_ context.Context, _ *types.Header, _ common.Hash, _ saetypes.BlockSource) iter.Seq[*Tx] {
+	return func(_ func(*Tx) bool) {}
 }
 
 var errEmptyBlock = errors.New("empty block")
@@ -163,20 +121,11 @@ func (b *blockBuilder) BuildBlock(
 	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
-	poolTxs []*txpool.Tx,
+	_ []*Tx,
 	settledHeight uint64,
 ) (*types.Block, error) {
-	if len(txs) == 0 && len(poolTxs) == 0 {
+	if len(txs) == 0 {
 		return nil, errEmptyBlock
-	}
-
-	atomicTxs := make([]*tx.Tx, len(poolTxs))
-	for i, poolTx := range poolTxs {
-		atomicTxs[i] = poolTx.Tx
-	}
-	atomicTxBytes, err := tx.MarshalSlice(atomicTxs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal atomic transactions: %w", err)
 	}
 
 	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
@@ -197,7 +146,7 @@ func (b *blockBuilder) BuildBlock(
 		nil, // uncles
 		receipts,
 		trie.NewStackTrie(nil),
-		atomicTxBytes,
+		nil,  // ExtData: subnet-evm has no atomic txs
 		true, // update [customtypes.HeaderExtra.ExtDataHash]
 	), nil
 }

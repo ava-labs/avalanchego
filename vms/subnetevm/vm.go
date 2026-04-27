@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,23 +27,18 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/api"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/hook"
 	"github.com/ava-labs/avalanchego/vms/corethvm/hook/acp176"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/state"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/tx"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/txpool"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
+	"github.com/ava-labs/avalanchego/vms/subnetevm/hook"
+	"github.com/ava-labs/avalanchego/vms/subnetevm/state"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -59,10 +53,8 @@ type VM struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
 	config  sae.Config
 
-	ctx          *snow.Context
-	db           avadb.Database
-	mempool      *txpool.Mempool
-	pushGossiper *gossip.PushGossiper[*tx.Tx]
+	ctx *snow.Context
+	db  avadb.Database
 
 	// TODO(alarso16): remove later
 	hooks *hook.Points
@@ -163,7 +155,6 @@ func (v *VM) Initialize(
 		*desiredTargetExcess = acp176.DesiredTargetExcess(*userConfig.GasTarget)
 	}
 
-	txs := txpool.NewTxs()
 	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := hook.NewPoints(
 		snowCtx,
@@ -171,7 +162,6 @@ func (v *VM) Initialize(
 		config,
 		desiredDelayExcess,
 		desiredTargetExcess,
-		txs,
 		warpStorage,
 	)
 
@@ -184,64 +174,13 @@ func (v *VM) Initialize(
 	v.VM = inner
 	v.ctx = snowCtx
 	v.db = avaDB
-	v.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
-	v.onClose = append(v.onClose, v.mempool.Close)
 	v.hooks = hooks
 
-	snowCtx.Log.Info("registering coreth metrics")
+	snowCtx.Log.Info("registering subnetevm metrics")
 
 	metrics := prometheus.NewRegistry()
-	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
+	if err := snowCtx.Metrics.Register("subnetevm", metrics); err != nil {
 		return fmt.Errorf("failed to register metrics: %w", err)
-	}
-
-	snowCtx.Log.Info("p2p gossip")
-
-	{ // ==========  P2P Gossip  ==========
-		gossipSet, err := gossip.NewBloomSet(v.mempool, gossip.BloomSetConfig{})
-		if err != nil {
-			return fmt.Errorf("failed to create bloom set: %w", err)
-		}
-
-		const pullGossipPeriod = time.Second
-		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
-			snowCtx.NodeID,
-			v.Network,
-			v.ValidatorPeers,
-			gossipSet,
-			tx.Marshaller{},
-			gossip.SystemConfig{
-				Log:           snowCtx.Log,
-				Registry:      metrics,
-				Namespace:     "gossip",
-				HandlerID:     p2p.AtomicTxGossipHandlerID,
-				RequestPeriod: pullGossipPeriod,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("failed to initialize atomic gossip system: %w", err)
-		}
-		v.pushGossiper = pushGossiper
-
-		if err := inner.AddHandler(p2p.AtomicTxGossipHandlerID, handler); err != nil {
-			return fmt.Errorf("network.AddHandler(atomic): %w", err)
-		}
-
-		var (
-			gossipCtx, cancel = context.WithCancel(context.Background())
-			wg                sync.WaitGroup
-		)
-		wg.Go(func() {
-			gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, pullGossipPeriod)
-		})
-		wg.Go(func() {
-			const pushGossipPeriod = 100 * time.Millisecond
-			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
-		})
-		v.onClose = append(v.onClose, func() {
-			cancel()
-			wg.Wait()
-		})
 	}
 
 	snowCtx.Log.Info("warp handlers")
@@ -294,25 +233,8 @@ func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
 	return g, nil
 }
 
-const (
-	avaxServiceName       = "avax"
-	avaxHTTPExtensionPath = "/" + avaxServiceName
-)
-
 func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	m, err := v.VM.CreateHandlers(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	service := api.NewService(v.ctx, v.GethRPCBackends(), v.mempool, v.pushGossiper, v.db)
-	handler, err := rpc.NewHandler(avaxServiceName, service)
-	if err != nil {
-		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)
-	}
-
-	m[avaxHTTPExtensionPath] = handler
-	return m, nil
+	return v.VM.CreateHandlers(ctx)
 }
 
 func (v *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
@@ -362,26 +284,7 @@ func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 		}
 	}
 
-	// Wait until we want to build a block.
-	ctx, cancel := context.WithCancel(ctx)
-	type result struct {
-		msg common.Message
-		err error
-	}
-	results := make(chan result, 2)
-	go func() {
-		defer cancel()
-		msg, err := v.VM.WaitForEvent(ctx)
-		results <- result{msg, err}
-	}()
-	go func() {
-		defer cancel()
-		err := v.mempool.Txs.AwaitTxs(ctx)
-		results <- result{common.PendingTxs, err}
-	}()
-
-	r := <-results
-	return r.msg, r.err
+	return v.VM.WaitForEvent(ctx)
 }
 
 // minNextBlockTime calculates the minimum next block time based on the header.
@@ -397,20 +300,6 @@ func minNextBlockTime(h *types.Header) time.Time {
 	// delay excess is already verified by consensus so this can not overflow.
 	delay := time.Duration(mde.Delay()) * time.Millisecond
 	return customtypes.BlockTime(h).Add(delay)
-}
-
-func (v *VM) RejectBlock(ctx context.Context, b *blocks.Block) error {
-	// If the block is rejected, the transactions might get dropped from the
-	// network. If the transactions are still valid, it is a better UX to add
-	// them into our mempool.
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b.EthBlock()))
-	if err != nil {
-		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
-	}
-	for _, tx := range txs {
-		_ = v.mempool.Add(tx)
-	}
-	return v.VM.RejectBlock(ctx, b)
 }
 
 func (v *VM) Shutdown(ctx context.Context) error {

@@ -5,41 +5,31 @@ package hook
 
 import (
 	"fmt"
-	"iter"
-	"slices"
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
-	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/corethvm/hook/acp176"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/tx"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/txpool"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	saestate "github.com/ava-labs/avalanchego/vms/subnetevm/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
+var _ saehook.PointsG[*Tx] = (*Points)(nil)
 
 type Points struct {
 	blockBuilder
@@ -53,39 +43,23 @@ func NewPoints(
 	chainConfig *ethparams.ChainConfig,
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
-	pool *txpool.Txs,
 	warpStorage *warp.Storage,
 ) *Points {
 	return &Points{
-		blockBuilder{
+		blockBuilder: blockBuilder{
 			ctx: ctx,
 			desired: params{
 				delayExcess:  desiredDelayExcess,
 				targetExcess: desiredTargetExcess,
 			},
-			potentialTxs: pool.Iter,
-			chainConfig:  chainConfig,
+			chainConfig: chainConfig,
 		},
-		db,
-		warpStorage,
+		db:          db,
+		warpStorage: warpStorage,
 	}
 }
 
-func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.Tx], error) {
-	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
-	}
-
-	txs := make([]*txpool.Tx, len(rawTxs))
-	for i, rawTx := range rawTxs {
-		tx, err := txpool.NewTx(rawTx, p.ctx.AVAXAssetID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert tx %d for block %s (%d): %w", i, b.Hash(), b.NumberU64(), err)
-		}
-		txs[i] = tx
-	}
-
+func (p *Points) BlockRebuilderFrom(b *types.Block) (saehook.BlockBuilder[*Tx], error) {
 	header := b.Header()
 	headerExtra := customtypes.GetHeaderExtra(header)
 	return &blockBuilder{
@@ -97,9 +71,6 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 		desired: params{
 			delayExcess:  headerExtra.MinDelayExcess,
 			targetExcess: headerExtra.TargetExcess,
-		},
-		potentialTxs: func() iter.Seq[*txpool.Tx] {
-			return slices.Values(txs)
 		},
 	}, nil
 }
@@ -143,21 +114,14 @@ func (*Points) BlockTime(h *types.Header) time.Time {
 	return time.Unix(int64(h.Time), ns)
 }
 
-func (p *Points) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
-	}
-
-	ops := make([]hook.Op, len(txs))
-	for i, tx := range txs {
-		op, err := tx.AsOp(p.ctx.AVAXAssetID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert tx %d to op for block %s (%d): %w", i, b.Hash(), b.NumberU64(), err)
-		}
-		ops[i] = op
-	}
-	return ops, nil
+// EndOfBlockOps returns the operations to apply at the end of block execution
+// outside of the normal EVM transactions.
+//
+// Subnet-EVM has none: there are no atomic txs, and stateful precompiles
+// (nativeminter, rewardmanager, ...) mutate the active StateDB inline during
+// EVM execution rather than emitting deferred ops. See [Tx] for details.
+func (*Points) EndOfBlockOps(*types.Block) ([]saehook.Op, error) {
+	return nil, nil
 }
 
 func (*Points) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
@@ -168,7 +132,7 @@ func (*Points) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Bloc
 	return nil
 }
 
-func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
+func (p *Points) AfterExecutingBlock(_ *state.StateDB, b *types.Block, receipts types.Receipts) error {
 	rules := p.chainConfig.Rules(b.Number(), corethparams.IsMergeTODO, b.Time())
 	acceptCtx := &precompileconfig.AcceptContext{
 		SnowCtx: p.ctx,
@@ -177,173 +141,5 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rec
 	if err := warp.HandlePrecompileAccept(rules, acceptCtx, receipts); err != nil {
 		return fmt.Errorf("failed to handle precompile accept for block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
-
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
-	if err != nil {
-		return fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
-	}
-
-	extstatedb := extstate.New(statedb)
-	for i, tx := range txs {
-		txID, err := tx.ID()
-		if err != nil {
-			return fmt.Errorf("problem getting transaction ID %d for block %s (%d): %w", i, b.Hash(), b.NumberU64(), err)
-		}
-		if err := tx.TransferNonAVAX(p.ctx.AVAXAssetID, extstatedb); err != nil {
-			return fmt.Errorf("failed to transfer non-AVAX assets of tx %s in block %s (%d): %w", txID, b.Hash(), b.NumberU64(), err)
-		}
-	}
-
-	height := b.NumberU64()
-	bonusBlocks := saestate.BonusBlocks(p.ctx.NetworkID)
-	isBonus := bonusBlocks.Contains(height)
-	writeTxs := saestate.WriteTxs
-	if isBonus {
-		writeTxs = saestate.WriteBonusTxs
-	}
-	if err := writeTxs(p.db, height, txs); err != nil {
-		return fmt.Errorf("failed to write txs of block %s (%d) to db: %w", b.Hash(), height, err)
-	}
-
-	ops, err := atomicOpsOf(txs)
-	if err != nil {
-		return fmt.Errorf("failed to extract atomic ops of block %s (%d): %w", b.Hash(), height, err)
-	}
-
-	// TODO: Write Ops into the atomic trie.
-	/*
-		var previousRoot common.Hash
-		trieDB := saestate.NewTrieDB(p.db)
-		tr, err := trie.New(trie.TrieID(previousRoot), trieDB)
-		if err != nil {
-			return fmt.Errorf("failed to create new trie: %v", err)
-		}
-
-		for chainID, requests := range ops {
-			requestBytes, err := tx.MarshalAtomicRequests(requests)
-			if err != nil {
-				return fmt.Errorf("failed to marshal atomic requests for chain %s: %v", chainID, err)
-			}
-
-			// key is [height]+[blockchainID]
-			const keyLength = wrappers.LongLen + ids.IDLen
-			p := wrappers.Packer{Bytes: make([]byte, keyLength)}
-			p.PackLong(height)
-			p.PackFixedBytes(chainID[:])
-			if err := tr.Update(p.Bytes, requestBytes); err != nil {
-				return err
-			}
-		}
-
-		root, nodes, err := tr.Commit(false)
-		if err != nil {
-			return err
-		}
-		if nodes != nil {
-			if err := trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
-				return err
-			}
-		}
-		if err := trieDB.Reference(root, common.Hash{}); err != nil {
-			return err
-		}
-
-		// Avoid OOM in-case there are a ton of atomic ops issued between DB
-		// commits.
-		const (
-			capTrigger = 64 * units.MiB
-			capLimit   = capTrigger - ethdb.IdealBatchSize
-		)
-		if _, nodeSize, _ := trieDB.Size(); nodeSize > capTrigger {
-			if err := trieDB.Cap(capLimit); err != nil {
-				return fmt.Errorf("failed to cap atomic trie for root %s: %w", root, err)
-			}
-		}
-
-		batch := p.db.NewBatch()
-
-		const commitInterval = 4096
-		if height%commitInterval == 0 {
-			if err := trieDB.Commit(root, false); err != nil {
-				return err
-			}
-			if err := saestate.WriteCommittedRoot(batch, height, root); err != nil {
-				return err
-			}
-		}
-
-		// The following dereferences, if any, the previously inserted root.
-		// This one can be dereferenced whether it has been:
-		// - committed, in which case the dereference is a no-op
-		// - not committed, in which case the current root we are inserting contains
-		//   references to all the relevant data from the previous root.
-		if err := trieDB.Dereference(previousRoot); err != nil {
-			return err
-		}
-	*/
-
-	batch := p.db.NewBatch()
-
-	// If this is a bonus block, write [commitBatch] without applying atomic ops
-	// to shared memory.
-	if isBonus {
-		p.ctx.Log.Info("skipping shared memory application on bonus block",
-			zap.Stringer("block_hash", b.Hash()),
-			zap.Uint64("block_height", height),
-		)
-		return batch.Write()
-	}
-
-	lastAppliedHeight, err := saestate.ReadLastAppliedHeight(p.db)
-	if err != nil {
-		return fmt.Errorf("failed to read last applied height from db: %w", err)
-	}
-
-	// SAE may re-execute blocks on startup. If the atomic ops were already
-	// applied to shared memory, we MUST not re-apply them.
-	if lastAppliedHeight >= height {
-		p.ctx.Log.Info("skipping shared memory application on already applied block",
-			zap.Stringer("block_hash", b.Hash()),
-			zap.Uint64("block_height", height),
-			zap.Uint64("last_applied_height", lastAppliedHeight),
-		)
-		return batch.Write()
-	}
-
-	if err := saestate.WriteLastAppliedHeight(batch, height); err != nil {
-		return fmt.Errorf("failed to write last applied height of block %s (%d) to db: %w", b.Hash(), height, err)
-	}
-	if err := p.ctx.SharedMemory.Apply(ops, batch); err != nil {
-		return fmt.Errorf("failed to apply atomic ops of block %s (%d) to shared memory: %w", b.Hash(), height, err)
-	}
 	return nil
-}
-
-// atomicOpsOf returns the union of all atomic requests contained in txs.
-func atomicOpsOf(txs []*tx.Tx) (map[ids.ID]*atomic.Requests, error) {
-	// requests are appended in order of txID to be consistent with coreth's
-	// historical atomic trie format.
-	txs = slices.Clone(txs)
-	utils.Sort(txs)
-
-	ops := make(map[ids.ID]*atomic.Requests)
-	for _, tx := range txs {
-		txID, err := tx.ID()
-		if err != nil {
-			return nil, err
-		}
-
-		chainID, requests, err := tx.AtomicOps(txID)
-		if err != nil {
-			return nil, err
-		}
-
-		if request, ok := ops[chainID]; ok {
-			request.PutRequests = append(request.PutRequests, requests.PutRequests...)
-			request.RemoveRequests = append(request.RemoveRequests, requests.RemoveRequests...)
-		} else {
-			ops[chainID] = requests
-		}
-	}
-	return ops, nil
 }
