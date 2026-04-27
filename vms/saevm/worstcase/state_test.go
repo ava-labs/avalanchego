@@ -278,7 +278,7 @@ func TestMultipleBlocks(t *testing.T) {
 			Time:       block.time,
 		}
 
-		wantLatestEndTime.BeforeBlock(sut.hooks, header)
+		wantLatestEndTime.BeforeBlock(sut.hooks.BlockTime(header))
 		require.NoErrorf(t, state.StartBlock(header), "StartBlock(%d)", i)
 		require.Equalf(t, block.wantBaseFee, state.BaseFee(), "base fee after StartBlock(%d)", i)
 		require.Equalf(t, block.wantGasLimit, state.GasLimit(), "gas limit after StartBlock(%d)", i)
@@ -293,7 +293,8 @@ func TestMultipleBlocks(t *testing.T) {
 
 		got, err := state.FinishBlock()
 		require.NoError(t, err, "FinishBlock()")
-		require.NoError(t, wantLatestEndTime.AfterBlock(gas.Gas(state.GasUsed()), sut.hooks, header), "AfterBlock()")
+		target, c := sut.hooks.GasConfigAfter(header)
+		require.NoError(t, wantLatestEndTime.AfterBlock(gas.Gas(state.GasUsed()), target, c), "AfterBlock()")
 
 		want := &blocks.WorstCaseBounds{
 			MaxBaseFee:    block.wantBaseFee,
