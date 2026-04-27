@@ -134,30 +134,6 @@ func (tm *Time) BaseFee() *uint256.Int {
 	return uint256.NewInt(uint64(tm.Price()))
 }
 
-// SetRate is equivalent to [Time.SetTarget] after (integer) division of `r` by
-// [TargetToRate].
-func (tm *Time) SetRate(r gas.Gas) {
-	tm.SetTarget(r / TargetToRate)
-}
-
-// SetTarget changes the target gas consumption per second, clamping the
-// argument to the range [[MinTarget], [MaxTarget]]. If the [Time.Excess] were
-// to overflow as a result of this scaling then it is silently capped at
-// [math.MaxUint64].
-func (tm *Time) SetTarget(t gas.Gas) {
-	t = clampTarget(t)
-	r := rateOf(t)
-
-	x, err := tm.Scale(tm.excess, r)
-	if err != nil {
-		x = math.MaxUint64
-	}
-
-	tm.Time.SetRate(r)
-	tm.excess = x
-	tm.target = t
-}
-
 // Tick is equivalent to [proxytime.Time.Tick] except that it also updates the
 // gas excess.
 func (tm *Time) Tick(g gas.Gas) {

@@ -12,11 +12,9 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
@@ -122,82 +120,6 @@ func TestNew(t *testing.T) {
 			got.requireState(t, fmt.Sprintf("New(%v, %d, %d)", tm, tt.target, tt.excess), tt.want, ignore)
 		})
 	}
-}
-
-func TestScaling(t *testing.T) {
-	const initExcess = gas.Gas(1_234_567_890)
-	tm := mustNew(t, time.Unix(42, 0), 1.6e6, initExcess, DefaultGasPriceConfig())
-
-	// The initial price isn't important in this test; what we care about is
-	// that it's invariant under scaling of the target etc.
-	initPrice := tm.Price()
-	if initPrice == 1 {
-		t.Fatalf("Bad test setup: increase initial excess to achieve %T > 1", initPrice)
-	}
-
-	ignore := cmpopts.IgnoreFields(state{}, "UnixTime", "ConsumedThisSecond")
-
-	tm.requireState(t, "initial", state{
-		Rate:   3.2e6,
-		Target: 1.6e6,
-		Excess: initExcess,
-		Price:  initPrice,
-	}, ignore)
-
-	tm.SetTarget(3.2e6)
-	tm.requireState(t, "after SetTarget()", state{
-		Rate:   6.4e6,
-		Target: 3.2e6,
-		Excess: 2 * initExcess,
-		Price:  initPrice, // unchanged
-	}, ignore)
-
-	// SetRate is identical to setting via the target, as long as the rate is
-	// even. Although the documentation states that SetTarget is preferred, we
-	// still need to test SetRate.
-	const (
-		wantTargetViaRate = 2e6
-		wantRate          = wantTargetViaRate * TargetToRate
-	)
-	want := state{
-		Rate:   wantRate,
-		Target: wantTargetViaRate,
-		Excess: (func() gas.Gas {
-			// Scale the _initial_ excess relative to the new and _initial_
-			// rates, not the most recent rate before scaling.
-			x, _, err := intmath.MulDivCeil(initExcess, wantRate, 3.2e6)
-			require.NoErrorf(t, err, "intmath.MulDivCeil(%d, %d, %d)", initExcess, 4e6, 3.2e6)
-			return x
-		})(),
-		Price: initPrice, // unchanged
-	}
-	for roundingError := range gas.Gas(TargetToRate) {
-		r := wantRate + roundingError
-		tm.SetRate(r)
-		tm.requireState(t, fmt.Sprintf("after SetRate(%d)", r), want, ignore)
-	}
-
-	testPostClone := func(t *testing.T, cloned *Time) {
-		t.Helper()
-		want := want
-		cloned.requireState(t, "unchanged immediately after clone", want, ignore)
-
-		cloned.SetRate(cloned.Rate() * 2)
-		tm.requireState(t, "original Time unchanged by setting clone's rate", want, ignore)
-
-		want.Rate *= 2
-		want.Target *= 2
-		want.Excess *= 2
-		cloned.requireState(t, "scaling after clone and then SetRate()", want, ignore)
-	}
-
-	t.Run("clone", func(t *testing.T) {
-		testPostClone(t, tm.Clone())
-	})
-
-	t.Run("canoto_roundtrip", func(t *testing.T) {
-		testPostClone(t, tm.cloneViaCanotoRoundTrip(t))
-	})
 }
 
 func TestExcess(t *testing.T) {
@@ -402,35 +324,6 @@ func TestMinAndStaticPrice(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestTargetClamping(t *testing.T) {
-	tm := mustNew(t, time.Unix(0, 0), MaxTarget+1, 0, DefaultGasPriceConfig())
-	require.Equal(t, MaxTarget, tm.Target(), "tm.Target() clamped by constructor")
-
-	tests := []struct {
-		setTo, want gas.Gas
-	}{
-		{setTo: 0, want: MinTarget},
-		{setTo: 10, want: 10},
-		{setTo: MaxTarget + 1, want: MaxTarget},
-		{setTo: 20, want: 20},
-		{setTo: math.MaxUint64, want: MaxTarget},
-	}
-
-	for _, tt := range tests {
-		tm.SetTarget(tt.setTo)
-		assert.Equalf(t, tt.want, tm.Target(), "%T.Target() after setting to %#x", tm, tt.setTo)
-		assert.Equalf(t, tm.Target()*TargetToRate, tm.Rate(), "%T.Rate() == %d * %[1]T.Target()", tm, TargetToRate)
-	}
-}
-
-func TestNoExcessOverflow(t *testing.T) {
-	tm := mustNew(t, time.Unix(0, 0), 1, math.MaxUint64-100, DefaultGasPriceConfig())
-	tm.SetTarget(MaxTarget)
-	require.Equal(t, gas.Gas(math.MaxUint64), tm.Excess(), "Excess() after scaling")
-	tm.FastForwardTo(1, 0)
-	require.Less(t, tm.Excess(), gas.Gas(math.MaxUint64), "Excess() after capped and then fast-forwarding")
 }
 
 func TestTickExcessOverflow(t *testing.T) {
