@@ -337,6 +337,12 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	if !ok {
 		return nil, nil, errors.New("expected *dummy.DummyEngine for Firewood historical replay")
 	}
+	log.Info("firewood historical replay",
+		"target", header.Number.Uint64(),
+		"checkpoint_block", current.Number.Uint64(),
+		"blocks_to_replay", header.Number.Uint64()-current.Number.Uint64(),
+		"engine_type", fmt.Sprintf("%T", eth.engine),
+	)
 	for current.Number.Uint64() < header.Number.Uint64() {
 		if err := ctx.Err(); err != nil {
 			return nil, nil, err
@@ -361,6 +367,7 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		current = nextBlock.Header()
 	}
 
+	log.Info("firewood state ready", "target", header.Number.Uint64(), "path", "replay")
 	return cache, release, nil
 }
 
