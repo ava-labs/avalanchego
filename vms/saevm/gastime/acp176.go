@@ -72,6 +72,8 @@ func scaleExcess(oldX, newT, newScale, oldT, oldScale gas.Gas) gas.Gas {
 	newK := mulAsUint256(newT, newScale)
 	oldK := mulAsUint256(oldT, oldScale)
 
+	// Overflow can't occur, the maximum possible intermediate value is:
+	// MaxUint64^3 + MaxUint64^2.
 	var x uint256.Int
 	x.SetUint64(uint64(oldX))
 	x.Mul(&x, &newK)
