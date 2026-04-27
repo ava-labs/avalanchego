@@ -697,6 +697,11 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		log = b.Ctx.Log.Debug
 	}
 
+	lastAcceptedHeight := lastAccepted.Height()
+	if b.syncTargetHeight > lastAcceptedHeight {
+		lastAcceptedHeight = b.syncTargetHeight
+	}
+
 	numToExecute := b.tree.Len()
 	err = execute(
 		ctx,
@@ -709,7 +714,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 			numAccepted: b.numAccepted,
 		},
 		b.tree,
-		lastAccepted.Height(),
+		lastAcceptedHeight,
 	)
 	if err != nil {
 		// If a fatal error has occurred, include the last accepted block
@@ -746,6 +751,13 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 
 	// Notify the subnet that this chain is synced
 	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
+
+	// During dynamic state sync, transition to NormalOp immediately instead
+	// of waiting for other chains. The consensus engine will process new
+	// blocks while the dynamic executor defers them for pivot triggers.
+	if b.syncTargetHeight > 0 {
+		return b.onFinished(ctx, b.requestID)
+	}
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
