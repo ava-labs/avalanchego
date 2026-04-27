@@ -504,7 +504,7 @@ func TestAfterBlock(t *testing.T) {
 			},
 		},
 		{
-			name: "static_pricing_removal_maintains_excess",
+			name: "static_pricing_removal_decrease_min_price",
 			init: state{
 				Target: 1_000_000,
 				Excess: 400_649_807,
@@ -523,6 +523,28 @@ func TestAfterBlock(t *testing.T) {
 					MinPrice:              50,
 				},
 				Price: 100,
+			},
+		},
+		{
+			name: "static_pricing_removal_increase_min_price",
+			init: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              100,
+					StaticPricing:         true,
+				},
+				Price: 100,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 460_953_612,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              200,
+				},
+				Price: 200,
 			},
 		},
 
