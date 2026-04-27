@@ -81,6 +81,7 @@ type VM struct {
 	proposer.Windower
 	tree.Tree
 	mockable.Clock
+	finishedBootstrappingAt time.Time
 
 	ctx *snow.Context
 	db  *versiondb.Database
@@ -316,6 +317,11 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	}
 
 	oldState := vm.consensusState
+
+	if newState == snow.NormalOp && oldState != snow.NormalOp {
+		vm.finishedBootstrappingAt = vm.Clock.Time()
+	}
+
 	vm.consensusState = newState
 	if oldState != snow.StateSyncing {
 		return nil
@@ -450,7 +456,8 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
 
-		duration := time.Until(timeToBuild)
+		now := vm.Clock.Time()
+		duration := timeToBuild.Sub(now)
 		if duration <= 0 {
 			vm.ctx.Log.Debug("Can build a block without waiting")
 			return vm.ChainVM.WaitForEvent(ctx)

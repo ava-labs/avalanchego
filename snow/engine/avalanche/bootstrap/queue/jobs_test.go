@@ -177,7 +177,7 @@ func TestRemoveDependency(t *testing.T) {
 		case bytes.Equal(b, []byte{1}):
 			return job1, nil
 		default:
-			require.FailNow("Unknown job")
+			t.Fatal("Unknown job")
 			return nil, nil
 		}
 	}
@@ -351,7 +351,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 		case bytes.Equal(b, []byte{1}):
 			return job1, nil
 		default:
-			require.FailNow("Unknown job")
+			t.Fatal("Unknown job")
 			return nil, nil
 		}
 	}
@@ -492,7 +492,7 @@ func TestClearAll(t *testing.T) {
 		case bytes.Equal(b, []byte{1}):
 			return job1, nil
 		default:
-			require.FailNow("Unknown job")
+			t.Fatal("Unknown job")
 			return nil, nil
 		}
 	}

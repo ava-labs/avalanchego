@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "antithesis_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/tests/antithesis",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//graft/subnet-evm/accounts/abi/bind",
+        "//graft/subnet-evm/ethclient",
+        "//graft/subnet-evm/tests",
+        "//graft/subnet-evm/tests/utils",
+        "//ids",
+        "//tests",
+        "//tests/antithesis",
+        "//tests/fixture/tmpnet",
+        "//utils/logging",
+        "//utils/timer",
+        "@com_github_antithesishq_antithesis_sdk_go//assert",
+        "@com_github_antithesishq_antithesis_sdk_go//lifecycle",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_binary(
+    name = "antithesis",
+    embed = [":antithesis_lib"],
+    visibility = ["//visibility:public"],
+)

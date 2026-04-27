@@ -1,15 +1,63 @@
 # Release Notes
 
-## Pending (v1.14.2)
+## Pending (v1.14.3)
+
+- None.
+
+## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
+
+This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0). It is optional, but encouraged.
+
+The plugin version is updated to `45`; all plugins must update to be compatible.
+
+### Breaking Changes
+
+- Removed `graft/subnet-evm/compatibility.json` in favor of using a single source of truth in `version/compatibility.json`. External tools that relied on this file should now use `version/compatibility.json` from the main AvalancheGo repository.
 
 ### Config
 
-- Removed `pull-gossip-poll-size` from the X-chain and P-chain configs.
-- Removed `proposerMinBlockDelay` from subnet configs.
+- Added:
+  - `--simplex-max-network-delay`
+  - `--simplex-max-rebroadcast-wait`
+  - `--benchlist-halflife`
+  - `--benchlist-unbench-probability`
+  - `--benchlist-bench-probability`
+  - `snowParameters` in subnet configs
+  - `simplexParameters` in subnet configs
+- Deprecated:
+  - `consensusParameters` in subnet configs
+- Removed:
+  - `--benchlist-fail-threshold`
+  - `--benchlist-min-failing-duration`
+  - `pull-gossip-poll-size` from the X-chain and P-chain configs
+  - `proposerMinBlockDelay` from subnet configs
+
+### API
+
+- Added `avalanche_snowman_consensus_latencies` histogram for each chain
 
 ### Fixes
 
-- Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space.
+- Fixed potential FATAL during startup due to an incorrect initialization of remaining disk space
+- Fixed crash in `TraceCall` with `BlockOverrides`
+- Fixed snapshot generation shutdown race
+- Downgraded flaky `ERROR` log to `WARN` if recently bootstrapped
+- Updated minimum Go version from 1.24 to `v1.25.8`
+
+### Consensus
+
+- Redesigned benchlisting with predicated failure rates
+- Added health checks to ensure average block acceptance times are reasonable
+- Introduced Simplex consensus engine and parameters (experimental)
+
+### Firewood
+
+- Enabled Firewood deferred persistence for non-pruning nodes
+- Fixed Firewood metrics registration
+- Unsupported APIs now return an error when Firewood is enabled
+- Updated Firewood to v0.3.1 (from v0.0.18)
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.1...v1.14.2
 
 ## [v1.14.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.1)
 

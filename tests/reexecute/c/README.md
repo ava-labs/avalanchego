@@ -13,7 +13,8 @@ Configuring your AvalancheGo dev environment requires:
 - Prometheus Credentials
 
 ### Nix Shell
-To install Nix, refer to the AvalancheGo [flake.nix](../../../flake.nix) file for installation instructions.
+For Nix installation and repo dev shell setup, see
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#nix).
 
 To set up your shell environment, run:
 
@@ -294,7 +295,7 @@ See [Trigger Workflow Dispatch with GitHub CLI](#trigger-workflow-dispatch-with-
 
 ## Metrics
 
-The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
+The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://avalabs.grafana.net/.
 
 To export metrics for a local run, set the environment variables `METRICS_COLLECTOR_ENABLED=true`:
 
@@ -303,7 +304,7 @@ export METRICS_COLLECTOR_ENABLED=true
 ./scripts/benchmark_cchain_range.sh hashdb-101-250k
 ```
 
-You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
+You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://avalabs.grafana.net/d/ma424s6/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
 
 **NOTE: Prometheus credentials are required for collection**
 

@@ -16,11 +16,7 @@ jobs:
         working-directory: ./graft/coreth
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Set up solc
-        uses: ARR4N/setup-solc@v0.2.0
-        with:
-          versions: "0.8.30"
+      - uses: ./.github/actions/install-nix
       - name: Run all lint checks
         run: ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
@@ -58,9 +54,9 @@ jobs:
           artifact_prefix: warp
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}

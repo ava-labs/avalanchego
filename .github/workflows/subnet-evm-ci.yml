@@ -17,11 +17,7 @@ jobs:
         working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Set up solc
-        uses: ARR4N/setup-solc@v0.2.0
-        with:
-          versions: "0.8.30"
+      - uses: ./.github/actions/install-nix
       - name: Run all lint checks
         run: ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
@@ -59,11 +55,11 @@ jobs:
           artifact_prefix: warp
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e_load:
@@ -82,11 +78,11 @@ jobs:
           artifact_prefix: load
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   test_build_image:
@@ -97,23 +93,21 @@ jobs:
         working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v4
-      - name: Install qemu (required for cross-platform builds)
-        run: |
-          sudo apt update
-          sudo apt -y install qemu-system qemu-user-static
+      - name: Set up QEMU (required for cross-platform builds)
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
       - name: Check image build
         run: ./scripts/run_task.sh test-build-image
 
   test_build_antithesis_images:
     name: Build Antithesis images
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./graft/subnet-evm
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
         with:
-          go-version-file: "graft/subnet-evm/go.mod"
-      - name: Check antithesis image build
-        run: ./scripts/run_task.sh test-build-antithesis-images-ci
+          tool-cache: true
+          docker-images: true
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Check image build for subnet-evm test setup
+        shell: bash
+        run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm

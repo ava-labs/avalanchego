@@ -24,9 +24,11 @@ var (
 	_ simplex.Block             = (*Block)(nil)
 	_ simplex.VerifiedBlock     = (*Block)(nil)
 
-	errDigestNotFound       = errors.New("digest not found in block tracker")
-	errMismatchedPrevDigest = errors.New("prev digest does not match block parent")
-	errGenesisVerification  = errors.New("genesis block should not be verified")
+	errDigestNotFound         = errors.New("digest not found in block tracker")
+	errMismatchedPrevDigest   = errors.New("prev digest does not match block parent")
+	errGenesisVerification    = errors.New("genesis block should not be verified")
+	errFailedToParseMetadata  = errors.New("failed to parse protocol metadata")
+	errFailedToParseBlacklist = errors.New("failed to parse blacklist")
 )
 
 type Block struct {
@@ -39,13 +41,16 @@ type Block struct {
 	vmBlock snowman.Block
 
 	blockTracker *blockTracker
+
+	blacklist simplex.Blacklist
 }
 
-func newBlock(metadata simplex.ProtocolMetadata, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
+func newBlock(metadata simplex.ProtocolMetadata, blacklist simplex.Blacklist, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
 	block := &Block{
 		metadata:     metadata,
 		vmBlock:      vmBlock,
 		blockTracker: blockTracker,
+		blacklist:    blacklist,
 	}
 	bytes, err := block.Bytes()
 	if err != nil {
@@ -59,6 +64,7 @@ func newBlock(metadata simplex.ProtocolMetadata, vmBlock snowman.Block, blockTra
 type canotoSimplexBlock struct {
 	Metadata   []byte `canoto:"bytes,1"`
 	InnerBlock []byte `canoto:"bytes,2"`
+	Blacklist  []byte `canoto:"bytes,3"`
 
 	canotoData canotoData_canotoSimplexBlock
 }
@@ -76,9 +82,14 @@ func (b *Block) Bytes() ([]byte, error) {
 	cBlock := &canotoSimplexBlock{
 		Metadata:   b.metadata.Bytes(),
 		InnerBlock: b.vmBlock.Bytes(),
+		Blacklist:  b.blacklist.Bytes(),
 	}
 
 	return cBlock.MarshalCanoto(), nil
+}
+
+func (b *Block) Blacklist() simplex.Blacklist {
+	return b.blacklist
 }
 
 // Verify verifies the block.
@@ -132,7 +143,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 
 	md, err := simplex.ProtocolMetadataFromBytes(canotoBlock.Metadata)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
+		return nil, fmt.Errorf("%w: %w", errFailedToParseMetadata, err)
 	}
 
 	vmblock, err := d.parser.ParseBlock(ctx, canotoBlock.InnerBlock)
@@ -140,7 +151,13 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 		return nil, err
 	}
 
-	return newBlock(*md, vmblock, d.blockTracker)
+	var blacklist simplex.Blacklist
+	err = blacklist.FromBytes(canotoBlock.Blacklist)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedToParseBlacklist, err)
+	}
+
+	return newBlock(*md, blacklist, vmblock, d.blockTracker)
 }
 
 // blockTracker is used to ensure that blocks are properly rejected, if competing blocks are accepted.
@@ -154,13 +171,17 @@ type blockTracker struct {
 	tree tree.Tree
 }
 
-func newBlockTracker(latestBlock *Block) *blockTracker {
+func newBlockTracker() *blockTracker {
 	return &blockTracker{
-		tree: tree.New(),
-		simplexDigestsToBlock: map[simplex.Digest]*Block{
-			latestBlock.digest: latestBlock,
-		},
+		tree:                  tree.New(),
+		simplexDigestsToBlock: make(map[simplex.Digest]*Block),
 	}
+}
+
+// init sets the latest block in the tracker.
+// This should only be called once, with the genesis or latest block.
+func (bt *blockTracker) init(latestBlock *Block) {
+	bt.simplexDigestsToBlock[latestBlock.digest] = latestBlock
 }
 
 func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) (*Block, bool) {

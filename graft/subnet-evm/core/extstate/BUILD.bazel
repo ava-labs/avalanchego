@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "extstate",
+    srcs = [
+        "database.go",
+        "options.go",
+        "statedb.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/firewood",
+        "//graft/evm/utils",
+        "//graft/subnet-evm/params",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//triedb",
+    ],
+)

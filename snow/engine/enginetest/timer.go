@@ -22,7 +22,7 @@ type Timer struct {
 func (t *Timer) RegisterTimeout(delay time.Duration) {
 	if t.RegisterTimeoutF != nil {
 		t.RegisterTimeoutF(delay)
-	} else if t.CantRegisterTimout && t.T != nil {
-		require.FailNow(t.T, "Unexpectedly called RegisterTimeout")
+	} else if t.T != nil {
+		require.False(t.T, t.CantRegisterTimout, "Unexpectedly called RegisterTimeout")
 	}
 }

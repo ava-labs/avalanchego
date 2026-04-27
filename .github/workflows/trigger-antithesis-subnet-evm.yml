@@ -4,7 +4,7 @@ on:
   schedule:
     # When adjusting the schedule and duration of execution, make sure
     # to check the schedule of other antithesis jobs (trigger-antithesis-*).
-    # The schedules for different test setups should not overlap to avoid 
+    # The schedules for different test setups should not overlap to avoid
     # unintended resource contention.
     - cron: '0 14 * * *' # Every day at 2PM UTC
   workflow_dispatch:
@@ -29,7 +29,7 @@ jobs:
     name: Run Antithesis Subnet-EVM Test Setup
     runs-on: ubuntu-latest
     steps:
-      - uses: antithesishq/antithesis-trigger-action@6c0a27302c0a3cd97d87d40bd6704e673abed4bb #v0.9
+      - uses: antithesishq/antithesis-trigger-action@6c0a27302c0a3cd97d87d40bd6704e673abed4bb # v0.9
         with:
           notebook_name: avalanche
           tenant: avalanche
@@ -41,5 +41,5 @@ jobs:
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           # Duration is in hours
           additional_parameters: |-
-            custom.duration=${{ github.event.inputs.duration || '7.5' }}
+            custom.duration=${{ github.event.inputs.duration || '4' }}
             custom.workload=subnet-evm

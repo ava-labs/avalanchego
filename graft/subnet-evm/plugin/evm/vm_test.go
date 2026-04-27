@@ -217,7 +217,7 @@ func getConfig(scheme, otherConfig string) string {
 		if len(innerConfig) > 0 {
 			innerConfig += ", "
 		}
-		innerConfig += fmt.Sprintf(`"state-scheme": "%s", "snapshot-cache": 0, "pruning-enabled": true, "state-sync-enabled": false, "metrics-expensive-enabled": false`, customrawdb.FirewoodScheme)
+		innerConfig += fmt.Sprintf(`"state-scheme": "%s", "snapshot-cache": 0`, customrawdb.FirewoodScheme)
 	}
 
 	return fmt.Sprintf(`{%s}`, innerConfig)
@@ -3662,6 +3662,7 @@ func TestArchivalQueries(t *testing.T) {
 
 				require.NoError(blk.Accept(ctx))
 			}
+			vm.vm.blockChain.DrainAcceptorQueue()
 
 			handlers, err := vm.vm.CreateHandlers(ctx)
 			require.NoError(err)
@@ -3678,6 +3679,82 @@ func TestArchivalQueries(t *testing.T) {
 				require.Zero(nonce)
 			}
 		})
+	}
+}
+
+// TestFirewoodArchive verifies that a Firewood archive node can reconstruct
+// historical state and build new state on top of it in steady state.
+//
+// With commit-interval = 10 and state-history = 11, Firewood's effective
+// deferred persistence commit count is 10, so it persists the latest committed
+// revision every 5 commits. After accepting 21 blocks:
+//   - Blocks 5, 10, 15, and 20 have persisted revisions.
+//   - Blocks 0 through 10 have aged out of the in-memory revision window.
+//
+// Querying state at every block from 0 through 10 exercises three paths:
+//   - Genesis state (block 0): reconstructed from the genesis spec via an
+//     in-memory hash-based trie; new state is then built on top of it.
+//   - Blocks without a persisted revision: reconstructed by walking back to
+//     the nearest persisted revision (or reconstructing genesis if none
+//     exists) and re-executing forward.
+//   - Blocks with a persisted revision: served directly, with new state
+//     built on top.
+func TestFirewoodArchive(t *testing.T) {
+	require := require.New(t)
+	ctx := t.Context()
+
+	configJSON := `{
+		"state-scheme": "firewood",
+		"snapshot-cache": 0,
+		"pruning-enabled": false,
+		"state-sync-enabled": false,
+		"commit-interval": 10,
+		"state-history": 11
+	}`
+
+	const (
+		totalBlocks       = 21
+		historicalQueries = 10
+	)
+
+	tvm := newVM(t, testVMConfig{configJSON: configJSON})
+	t.Cleanup(func() {
+		require.NoError(tvm.vm.Shutdown(ctx))
+	})
+
+	for range totalBlocks {
+		nonce := tvm.vm.txPool.Nonce(testEthAddrs[0])
+		signedTx := newSignedLegacyTx(
+			t,
+			tvm.vm.chainConfig,
+			testKeys[0].ToECDSA(),
+			nonce,
+			&common.Address{},
+			big.NewInt(0),
+			21_000,
+			big.NewInt(testMinGasPrice),
+			nil,
+		)
+		blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, tvm.vm)
+		require.NoError(err)
+		require.NoError(blk.Accept(ctx))
+	}
+
+	tvm.vm.blockChain.DrainAcceptorQueue()
+
+	handlers, err := tvm.vm.CreateHandlers(ctx)
+	require.NoError(err)
+
+	server := httptest.NewServer(handlers[ethRPCEndpoint])
+	t.Cleanup(server.Close)
+
+	client, err := ethclient.Dial(server.URL)
+	require.NoError(err)
+
+	for i := 0; i <= historicalQueries; i++ {
+		nonce, err := client.NonceAt(ctx, testEthAddrs[0], big.NewInt(int64(i)))
+		require.NoErrorf(err, "failed to get nonce at block %d", i)
+		require.Equal(uint64(i), nonce)
 	}
 }
 
