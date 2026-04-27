@@ -351,10 +351,10 @@ func TestMinAndStaticPrice(t *testing.T) {
 			name:           "min=1_x=T*K",
 			minPrice:       1,
 			startingExcess: target * DefaultTargetToExcessScaling,
-			want:           2,
+			want:           2, // floor(e^1)
 		},
 		{
-			name:     "min=100",
+			name:     "min=100_x=0",
 			minPrice: 100,
 			want:     100,
 		},

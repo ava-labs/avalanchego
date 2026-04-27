@@ -296,15 +296,15 @@ func TestAfterBlock(t *testing.T) {
 				},
 				price: 7,
 			},
-			gasUsed: 1_000_000,
+			gasUsed: 3_000_000,
 			new: state{
-				target: 2_000_000,
-				excess: 5_000_000,
+				target: 2 * 1_000_000,
+				excess: 2 * (2_000_000 + 3_000_000/2),
 				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              1,
 				},
-				price: 12,
+				price: gas.Price(math.Floor(math.Exp(7. / 2.))),
 			},
 		},
 		{
@@ -439,7 +439,7 @@ func TestAfterBlock(t *testing.T) {
 			},
 		},
 		{
-			name: "static_pricing_overrides_excess",
+			name: "introducing_static_pricing_overrides_excess",
 			init: state{
 				target: 1_000_000,
 				excess: 1_000_000_000,
@@ -458,6 +458,52 @@ func TestAfterBlock(t *testing.T) {
 					StaticPricing:         true,
 				},
 				price: 1,
+			},
+		},
+		{
+			name: "static_pricing_price_decrease",
+			init: state{
+				target: 1_000_000,
+				excess: 400_649_807,
+				config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              100,
+					StaticPricing:         true,
+				},
+				price: 100,
+			},
+			new: state{
+				target: 1_000_000,
+				excess: 340_346_002,
+				config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              50,
+					StaticPricing:         true,
+				},
+				price: 50,
+			},
+		},
+		{
+			name: "static_pricing_price_increase",
+			init: state{
+				target: 1_000_000,
+				excess: 400_649_807,
+				config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              100,
+					StaticPricing:         true,
+				},
+				price: 100,
+			},
+			new: state{
+				target: 1_000_000,
+				excess: 460_953_612,
+				config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              200,
+					StaticPricing:         true,
+				},
+				price: 200,
 			},
 		},
 		{
@@ -482,29 +528,6 @@ func TestAfterBlock(t *testing.T) {
 				price: 100,
 			},
 		},
-		{
-			name: "static_pricing_price_change",
-			init: state{
-				target: 1_000_000,
-				excess: 400_649_807,
-				config: GasPriceConfig{
-					TargetToExcessScaling: 87,
-					MinPrice:              100,
-					StaticPricing:         true,
-				},
-				price: 100,
-			},
-			new: state{
-				target: 1_000_000,
-				excess: 460_953_612,
-				config: GasPriceConfig{
-					TargetToExcessScaling: 87,
-					MinPrice:              200,
-					StaticPricing:         true,
-				},
-				price: 200,
-			},
-		},
 
 		// Extreme changes:
 		{
@@ -522,14 +545,14 @@ func TestAfterBlock(t *testing.T) {
 				target: 1_000_000,
 				excess: math.MaxUint64,
 				config: GasPriceConfig{
-					TargetToExcessScaling: math.MaxUint64,
+					TargetToExcessScaling: math.MaxUint64, // Maximizing scaling causes excess to cap
 					MinPrice:              1,
 				},
 				price: 2,
 			},
 		},
 		{
-			name: "large_excess_scaling_change",
+			name: "large_excess_with_scaling_change",
 			init: state{
 				target: 1_000_000,
 				excess: 10_000_000_000_000_000_000,
@@ -550,7 +573,7 @@ func TestAfterBlock(t *testing.T) {
 			},
 		},
 		{
-			name: "high_price_scaling_causes_price_increase",
+			name: "high_price_scaling_rounding_causes_price_increase",
 			init: state{
 				target: 1_000_000,
 				excess: 1_802_924_127,
@@ -571,7 +594,7 @@ func TestAfterBlock(t *testing.T) {
 			},
 		},
 		{
-			name: "intermediate_scaling_overflow",
+			name: "scaling_old_k_overflow",
 			init: state{
 				target: 1_000_000,
 				excess: math.MaxUint64,
@@ -592,7 +615,7 @@ func TestAfterBlock(t *testing.T) {
 			},
 		},
 		{
-			name: "intermediate_scaling_overflow_rounds_up",
+			name: "scaling_old_k_overflow_rounds_up",
 			init: state{
 				target: 1_000_000,
 				excess: 1,
@@ -613,6 +636,27 @@ func TestAfterBlock(t *testing.T) {
 			},
 		},
 		{
+			name: "scaling_new_k_overflow",
+			init: state{
+				target: 1_000_000,
+				excess: 1,
+				config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				price: 1,
+			},
+			new: state{
+				target: 1_000_000,
+				excess: math.MaxUint64,
+				config: GasPriceConfig{
+					TargetToExcessScaling: math.MaxUint64,
+					MinPrice:              1,
+				},
+				price: 2,
+			},
+		},
+		{
 			name: "max_min_price",
 			init: state{
 				target: 1_000_000,
@@ -625,7 +669,7 @@ func TestAfterBlock(t *testing.T) {
 			},
 			new: state{
 				target: 1_000_000,
-				excess: 44_361_420,
+				excess: gas.Gas(math.Ceil(1_000_000 * math.Log(math.MaxUint64))),
 				config: GasPriceConfig{
 					TargetToExcessScaling: 1,
 					MinPrice:              math.MaxUint64,
@@ -725,7 +769,7 @@ func TestAfterBlock(t *testing.T) {
 func TestOscillatingMinPrice(t *testing.T) {
 	const (
 		target       gas.Gas   = 1_000_000
-		gasPerBlock  gas.Gas   = target // must be sufficiently large
+		gasPerBlock  gas.Gas   = 10_000_000 // must be sufficiently large
 		numBlocks              = 1000
 		highMinPrice gas.Price = 2
 		lowMinPrice  gas.Price = 1
@@ -782,7 +826,7 @@ func BenchmarkPriceExcess(b *testing.B) {
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
 			for b.Loop() {
-				priceExcess(bm.p, bm.k)
+				excessForPrice(bm.p, bm.k)
 			}
 		})
 	}
@@ -813,7 +857,7 @@ func FuzzPriceExcess(f *testing.F) {
 			t.Skip("div by zero is undefined")
 		}
 
-		x := priceExcess(p, k)
+		x := excessForPrice(p, k)
 		gotP := calculatePrice(x, k)
 		assert.LessOrEqual(t, gotP, p, "gotPrice <= wantPrice")
 

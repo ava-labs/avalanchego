@@ -49,13 +49,14 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error
 
 	tm.Tick(used)
 
-	tm.excess = scaleExcess(
-		tm.excess,
-		target, c.TargetToExcessScaling,
-		tm.target, tm.config.TargetToExcessScaling,
-	)
 	if c.StaticPricing {
 		tm.excess = 0
+	} else {
+		tm.excess = scaleExcess(
+			tm.excess,
+			target, c.TargetToExcessScaling,
+			tm.target, tm.config.TargetToExcessScaling,
+		)
 	}
 
 	tm.target = target
@@ -65,53 +66,51 @@ func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error
 	return nil
 }
 
-// enforceMinExcess bounds excess to be no less than priceExcess(minPrice, k).
+// scaleExcess returns oldX * newT * newScale / (oldT * oldScale) rounded up and
+// capped to [math.MaxUint64].
+func scaleExcess(oldX, newT, newScale, oldT, oldScale gas.Gas) gas.Gas {
+	newK := mulAsUint256(newT, newScale)
+	oldK := mulAsUint256(oldT, oldScale)
+
+	var x uint256.Int
+	x.SetUint64(uint64(oldX))
+	x.Mul(&x, &newK)
+	x.Add(&x, &oldK) // round up by adding oldK - 1
+	x.SubUint64(&x, 1)
+	x.Div(&x, &oldK)
+	if !x.IsUint64() {
+		return math.MaxUint64
+	}
+	return gas.Gas(x.Uint64())
+}
+
+func mulAsUint256[T ~uint64](a, b T) uint256.Int {
+	var x, y uint256.Int
+	x.SetUint64(uint64(a))
+	y.SetUint64(uint64(b))
+	x.Mul(&x, &y)
+	return x
+}
+
+// enforceMinExcess bounds excess to be no less than excessForPrice(minPrice, k).
 func (tm *Time) enforceMinExcess() {
 	k := tm.excessScalingFactor()
-	// Avoid the binary search in [priceExcess] when the current excess already
-	// yields a price that satisfies the minimum.
+	// Avoid the binary search in [excessForPrice] when the current excess
+	// already yields a price that satisfies the minimum.
 	if calculatePrice(tm.excess, k) >= tm.config.MinPrice {
 		return
 	}
 
-	minExcess := priceExcess(tm.config.MinPrice, k)
+	minExcess := excessForPrice(tm.config.MinPrice, k)
 	tm.excess = max(tm.excess, minExcess)
 }
 
-// scaleExcess returns x * newT * newScale / (oldT * oldScale) rounded up and
-// capped to [math.MaxUint64].
-func scaleExcess(x, newT, newScale, oldT, oldScale gas.Gas) gas.Gas {
-	var (
-		newK uint256.Int
-		v    uint256.Int
-	)
-	newK.SetUint64(uint64(newT))
-	v.SetUint64(uint64(newScale))
-	newK.Mul(&newK, &v)
-
-	var oldK uint256.Int
-	oldK.SetUint64(uint64(oldT))
-	v.SetUint64(uint64(oldScale))
-	oldK.Mul(&oldK, &v)
-
-	v.SetUint64(uint64(x))
-	v.Mul(&v, &newK)
-	v.Add(&v, &oldK) // round up by adding oldK - 1
-	v.SubUint64(&v, 1)
-	v.Div(&v, &oldK)
-
-	if !v.IsUint64() {
-		return math.MaxUint64
-	}
-	return gas.Gas(v.Uint64())
-}
-
-// priceExcess returns an integer approximation of ln(p) * k.
+// excessForPrice returns an integer approximation of ln(p) * k.
 //
-// If [calculatePrice] can produce p, priceExcess returns the minimum excess to
+// If [calculatePrice] can produce p, excessForPrice returns the minimum excess to
 // produce p. Otherwise, it returns the maximum excess to produce a number < p,
 // which may happen due to overflow or integer approximation.
-func priceExcess(p gas.Price, k gas.Gas) gas.Gas {
+func excessForPrice(p gas.Price, k gas.Gas) gas.Gas {
 	if p <= 1 {
 		return 0
 	}
