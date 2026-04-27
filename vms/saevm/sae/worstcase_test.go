@@ -59,9 +59,9 @@ func parseWorstCaseFlags() *worstCaseFlags {
 	set.Uint64Var(&fs.maxTxValue, name("max_tx_value"), params.Ether/1000, "Maximum tx value to send per transaction (uniform distribution)")
 	set.Uint64Var(&fs.rngSeed, name("rng_seed"), 0, "Seed for random-number generator; ignored if zero")
 
-	// Parse returns an error in practice, because the testing harness provides
-	// additional unregistered flags. [flag.ContinueOnError] allows the expected
-	// flags to be parsed anyways.
+	// Parse returns an error because the testing harness provides additional
+	// unregistered flags. [flag.ContinueOnError] allows the expected flags to
+	// be parsed anyways.
 	_ = set.Parse(os.Args[1:])
 	return fs
 }
