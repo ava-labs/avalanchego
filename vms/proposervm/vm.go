@@ -117,6 +117,10 @@ type VM struct {
 	// lastAcceptedTimestampGaugeVec reports timestamps for the last-accepted
 	// [postForkBlock] and its inner block.
 	lastAcceptedTimestampGaugeVec *prometheus.GaugeVec
+
+	// syncTargetHeight is the proposervm's last accepted height before repair
+	// rolled it back during dynamic state sync. Zero when no rollback occurred.
+	syncTargetHeight uint64
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
@@ -607,6 +611,12 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return lastAccepted, err
 }
 
+// StateSyncTargetHeight returns the proposervm's last accepted height before
+// repair rolled it back. Returns 0 if no rollback occurred.
+func (vm *VM) StateSyncTargetHeight() uint64 {
+	return vm.syncTargetHeight
+}
+
 func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	innerLastAcceptedID, err := vm.ChainVM.LastAccepted(ctx)
 	if err != nil {
@@ -651,6 +661,10 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get fork height: %w", err)
 	}
+
+	// Preserve the height before rolling back so the bootstrapper can use it
+	// as the block-fetching floor via StateSyncTargetHeight().
+	vm.syncTargetHeight = proLastAcceptedHeight
 
 	if forkHeight > innerLastAcceptedHeight {
 		// We are rolling back past the fork, so we should just forget about all

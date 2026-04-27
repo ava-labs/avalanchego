@@ -53,6 +53,13 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
+// stateSyncTargetProvider is implemented by VMs that report the target height
+// of a concurrent dynamic state sync, allowing the bootstrapper to fetch only
+// blocks above the sync target.
+type stateSyncTargetProvider interface {
+	StateSyncTargetHeight() uint64
+}
+
 // bootstrapper repeatedly performs the bootstrapping protocol.
 //
 //  1. Wait until a sufficient amount of stake is connected.
@@ -115,6 +122,10 @@ type Bootstrapper struct {
 
 	tree            *interval.Tree
 	missingBlockIDs set.Set[ids.ID]
+
+	// syncTargetHeight is non-zero during dynamic state sync and limits block
+	// fetching to heights above this value.
+	syncTargetHeight uint64
 
 	// bootstrappedOnce ensures that the [Bootstrapped] callback is only invoked
 	// once, even if bootstrapping is retried.
@@ -191,9 +202,21 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	lastAcceptedHeight := lastAccepted.Height()
+
+	// During dynamic state sync, skip fetching blocks below the sync target
+	// so recent blocks are executed quickly and can drive pivots.
+	provider, _ := b.VM.(stateSyncTargetProvider)
+	if provider != nil && b.Ctx.StateSyncing.Get() {
+		b.syncTargetHeight = provider.StateSyncTargetHeight()
+	}
+	if b.syncTargetHeight > lastAcceptedHeight {
+		lastAcceptedHeight = b.syncTargetHeight
+	}
+
 	b.Ctx.Log.Info("starting bootstrapper",
 		zap.Stringer("lastAcceptedID", lastAccepted.ID()),
 		zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+		zap.Uint64("syncTargetHeight", b.syncTargetHeight),
 	)
 
 	// Set the starting height
@@ -779,7 +802,7 @@ func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {
 	return b.startBootstrapping(ctx)
 }
 
-func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
+func (b *Bootstrapper) Notify(ctx context.Context, msg common.Message) error {
 	if msg != common.StateSyncDone {
 		b.Ctx.Log.Info("received an unexpected message from the VM",
 			zap.Stringer("msg", msg),
@@ -788,6 +811,15 @@ func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
 	}
 
 	b.Ctx.StateSyncing.Set(false)
+
+	// Re-issue SetState to refresh the rpcchainvm client-side chain.State
+	// cache, which still holds the pre-sync last accepted block. Without
+	// this, the bootstrapper would verify pre-sync blocks against post-sync
+	// state.
+	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
+		return fmt.Errorf("failed to refresh VM state after state sync: %w", err)
+	}
+
 	return nil
 }
 
