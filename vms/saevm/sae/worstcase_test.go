@@ -6,6 +6,7 @@ package sae
 import (
 	"encoding/binary"
 	"errors"
+	"flag"
 	"math"
 	"math/big"
 	"math/rand/v2"
@@ -82,6 +83,40 @@ func (*guzzler) guzzle(env vm.PrecompileEnvironment, input []byte) ([]byte, erro
 	return nil, nil
 }
 
+type worstCaseFlags struct {
+	numAccounts       uint
+	balance           uint256.Int
+	parallel          uint
+	numBlocks         uint
+	maxNewTxsPerBlock uint
+	maxGasLimit       uint64
+	maxTxValue        uint64
+	rngSeed           uint64
+}
+
+func parseWorstCaseFlags() *worstCaseFlags {
+	fs := flag.NewFlagSet("worstcase", flag.ContinueOnError)
+	f := &worstCaseFlags{}
+
+	name := func(n string) string {
+		return "worstcase.fuzz." + n
+	}
+	fs.UintVar(&f.numAccounts, name("num_eoa"), 10, "Number of EOAs to send funds between")
+	fs.TextVar(&f.balance, name("eoa_balance"), uint256.NewInt(params.Ether), "Starting balance of EOAs")
+	fs.UintVar(&f.parallel, name("parallel"), uint(runtime.GOMAXPROCS(0)), "Number of parallel tests to run; defaults to GOMAXPROCS") //#nosec G115 -- Known to be positive
+	fs.UintVar(&f.numBlocks, name("blocks"), 50, "Number of blocks to build and execute (fixed)")
+	fs.UintVar(&f.maxNewTxsPerBlock, name("max_new_txs"), 100, "Maximum number of new transactions to send before building each block (uniform distribution)")
+	fs.Uint64Var(&f.maxGasLimit, name("max_gas_limit"), 60e6, "Maximum gas limit per transaction (uniform distribution)")
+	fs.Uint64Var(&f.maxTxValue, name("max_tx_value"), params.Ether/1000, "Maximum tx value to send per transaction (uniform distribution)")
+	fs.Uint64Var(&f.rngSeed, name("rng_seed"), 0, "Seed for random-number generator; ignored if zero")
+
+	// Parse returns an error in practice, because the testing harness provides
+	// additional unregistered flags. [flag.ContinueOnError] allows the expected
+	// flags to be parsed anyways.
+	_ = fs.Parse(os.Args[1:])
+	return f
+}
+
 func TestWorstCase(t *testing.T) {
 	// TODO(alarso16): This test flakes due to a race in the legacypool. When
 	// a block executes, it sends an event to the pool, which causes an
@@ -91,17 +126,8 @@ func TestWorstCase(t *testing.T) {
 		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
 	}
 
-	const (
-		numAccounts       = 10
-		numBlocks         = 50
-		maxNewTxsPerBlock = 100
-		maxGasLimit       = 60e6
-		maxTxValue        = params.Ether / 1000
-	)
-	var (
-		balance  = uint256.NewInt(params.Ether)
-		parallel = runtime.GOMAXPROCS(0)
-	)
+	flags := parseWorstCaseFlags()
+	t.Logf("Flags: %+v", flags)
 
 	guzzle := common.Address{'g', 'u', 'z', 'z', 'l', 'e'}
 	g := &guzzler{Addr: guzzle}
@@ -117,7 +143,7 @@ func TestWorstCase(t *testing.T) {
 
 		for _, acc := range c.genesis.Alloc {
 			// Note that `acc` isn't a pointer, but `Balance` is.
-			acc.Balance.Set(balance.ToBig())
+			acc.Balance.Set(flags.balance.ToBig())
 		}
 	})
 
@@ -175,26 +201,33 @@ func TestWorstCase(t *testing.T) {
 		t.FailNow()
 	}
 
-	for range parallel {
+	for range flags.parallel {
 		t.Run("fuzz", func(t *testing.T) {
 			t.Parallel()
 
 			timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
-			ctx, sut := newSUT(t, numAccounts, sutOpt, timeOpt)
+			ctx, sut := newSUT(t, flags.numAccounts, sutOpt, timeOpt)
 
 			addrs := sut.wallet.Addresses()
 			numEOAs := len(addrs)
 			addrs = append(addrs, guzzle)
 			guzzlerIdx := numEOAs
 
-			rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Allow for reproducibility
+			var seed uint64
+			if flags.rngSeed != 0 {
+				seed = flags.rngSeed
+			} else {
+				seed = rand.Uint64() //#nosec G404 -- Not for security
+			}
+			t.Logf("RNG seed: %d", seed)
+			rng := rand.New(rand.NewPCG(0, seed)) //#nosec G404 -- Allow for reproducibility
 
-			for range numBlocks {
-				for range rng.UintN(maxNewTxsPerBlock) {
+			for range flags.numBlocks {
+				for range rng.UintN(flags.maxNewTxsPerBlock) {
 					from := rng.IntN(numEOAs)
 					to := rng.IntN(numEOAs + 1)
-					gasLim := params.TxGas + rng.Uint64N(maxGasLimit)
+					gasLim := params.TxGas + rng.Uint64N(flags.maxGasLimit)
 					var data []byte
 					if to == guzzlerIdx {
 						data = binary.BigEndian.AppendUint64(nil, rng.Uint64N(gasLim))
@@ -205,7 +238,7 @@ func TestWorstCase(t *testing.T) {
 						GasFeeCap: big.NewInt(1 + rng.Int64N(100)),
 						Gas:       gasLim,
 						Data:      data,
-						Value:     uint256.NewInt(rng.Uint64N(maxTxValue)).ToBig(),
+						Value:     uint256.NewInt(rng.Uint64N(flags.maxTxValue)).ToBig(),
 					})
 
 					if err := sut.SendTransaction(ctx, tx); err != nil {
