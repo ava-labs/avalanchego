@@ -115,7 +115,7 @@ type BlockBuilder[T Transaction] interface {
 		source saetypes.BlockSource,
 	) iter.Seq[T]
 	// BuildBlock constructs a block with the given components. The header
-	// may be modified, but all other arguments are read-only.
+	// MAY be modified, but all other arguments are read-only.
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
