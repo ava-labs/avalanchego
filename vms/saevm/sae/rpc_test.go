@@ -812,19 +812,22 @@ func TestGetReceipts(t *testing.T) {
 			GasPrice: big.NewInt(1),
 		})
 		txs = append(txs, tx1, tx2)
-		want = append(want, &types.Receipt{
-			TxHash:            tx1.Hash(),
-			Status:            types.ReceiptStatusSuccessful,
-			GasUsed:           params.TxGas,
-			EffectiveGasPrice: big.NewInt(2),
-			Logs:              []*types.Log{},
-		}, &types.Receipt{
-			TxHash:            tx2.Hash(),
-			Status:            types.ReceiptStatusSuccessful,
-			GasUsed:           params.TxGas,
-			EffectiveGasPrice: big.NewInt(1),
-			Logs:              []*types.Log{},
-		})
+		want = append(want, []*types.Receipt{
+			{
+				TxHash:            tx1.Hash(),
+				Status:            types.ReceiptStatusSuccessful,
+				GasUsed:           params.TxGas,
+				EffectiveGasPrice: big.NewInt(2),
+				Logs:              []*types.Log{},
+			},
+			{
+				TxHash:            tx2.Hash(),
+				Status:            types.ReceiptStatusSuccessful,
+				GasUsed:           params.TxGas,
+				EffectiveGasPrice: big.NewInt(1),
+				Logs:              []*types.Log{},
+			},
+		}...)
 	}
 
 	slice := func(t *testing.T, from, to int) (*blocks.Block, []*types.Receipt) {
