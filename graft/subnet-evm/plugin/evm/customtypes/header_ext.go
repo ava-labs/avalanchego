@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/subnetevm/hook/acp176"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -41,6 +42,11 @@ type HeaderExtra struct {
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
+	// TargetExcess and SettledHeight are populated by the SAE block builder
+	// for subnet-evm chains running on top of avalanchego's SAE engine. They
+	// are ignored on legacy (non-SAE) chains.
+	TargetExcess  *acp176.TargetExcess
+	SettledHeight *uint64
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.
@@ -117,6 +123,14 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		e := *h.MinDelayExcess
 		cp.MinDelayExcess = &e
 	}
+	if h.TargetExcess != nil {
+		e := *h.TargetExcess
+		cp.TargetExcess = &e
+	}
+	if h.SettledHeight != nil {
+		s := *h.SettledHeight
+		cp.SettledHeight = &s
+	}
 	SetHeaderExtra(dst, cp)
 }
 
@@ -168,12 +182,16 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.BlockGasCost = extras.BlockGasCost
 	h.TimeMilliseconds = extras.TimeMilliseconds
 	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
+	h.TargetExcess = (*uint64)(extras.TargetExcess)
+	h.SettledHeight = extras.SettledHeight
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
+	extras.TargetExcess = (*acp176.TargetExcess)(h.TargetExcess)
+	extras.SettledHeight = h.SettledHeight
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -226,6 +244,12 @@ type HeaderSerializable struct {
 	// MinDelayExcess was added by Granite and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
+
+	// TargetExcess was added by Helicon (SAE) and is ignored in legacy headers.
+	TargetExcess *uint64 `json:"targetExcess" rlp:"optional"`
+
+	// SettledHeight was added by Helicon (SAE) and is ignored in legacy headers.
+	SettledHeight *uint64 `json:"settledHeight" rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -243,6 +267,8 @@ type headerMarshaling struct {
 	ExcessBlobGas    *hexutil.Uint64
 	TimeMilliseconds *hexutil.Uint64
 	MinDelayExcess   *hexutil.Uint64
+	TargetExcess     *hexutil.Uint64
+	SettledHeight    *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its

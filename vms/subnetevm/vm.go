@@ -24,9 +24,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -34,15 +34,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/corethvm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/hook"
+	"github.com/ava-labs/avalanchego/vms/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/state"
 
 	avadb "github.com/ava-labs/avalanchego/database"
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	saewarp "github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 )
 
@@ -210,16 +210,16 @@ func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
 	}
 
 	// Populate the Avalanche config extras.
-	configExtra := corethparams.GetExtra(g.Config)
+	configExtra := subnetevmparams.GetExtra(g.Config)
 	configExtra.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
 	}
 	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
 
 	// If Durango is scheduled, schedule the Warp Precompile at the same time.
-	if configExtra.DurangoBlockTimestamp != nil {
+	if configExtra.DurangoTimestamp != nil {
 		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
-			Config: warpcontract.NewDefaultConfig(configExtra.DurangoBlockTimestamp),
+			Config: warpcontract.NewDefaultConfig(configExtra.DurangoTimestamp),
 		})
 	}
 	if err := configExtra.Verify(); err != nil {
@@ -227,7 +227,7 @@ func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
 	}
 
 	// Align all the Ethereum upgrades to the Avalanche upgrades
-	if err := corethparams.SetEthUpgrades(g.Config); err != nil {
+	if err := subnetevmparams.SetEthUpgrades(g.Config); err != nil {
 		return nil, fmt.Errorf("setting eth upgrades: %w", err)
 	}
 	return g, nil

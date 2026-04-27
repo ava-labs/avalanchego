@@ -15,16 +15,16 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/corethvm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -133,7 +133,7 @@ func (*Points) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Bloc
 }
 
 func (p *Points) AfterExecutingBlock(_ *state.StateDB, b *types.Block, receipts types.Receipts) error {
-	rules := p.chainConfig.Rules(b.Number(), corethparams.IsMergeTODO, b.Time())
+	rules := p.chainConfig.Rules(b.Number(), subnetevmparams.IsMergeTODO, b.Time())
 	acceptCtx := &precompileconfig.AcceptContext{
 		SnowCtx: p.ctx,
 		Warp:    p.warpStorage,

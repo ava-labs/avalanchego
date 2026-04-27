@@ -14,24 +14,22 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 
-	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -164,14 +162,7 @@ func assertPredicateResult(
 ) {
 	t.Helper()
 
-	rules := paramstest.ForkToChainConfig[upgradetest.Durango].Rules(
-		built.EthBlock().Number(),
-		params.IsMergeTODO,
-		built.EthBlock().Time(),
-	)
-	rulesExtra := params.GetRulesExtra(rules)
 	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(
-		rulesExtra.AvalancheRules,
 		built.EthBlock().Extra(),
 	)
 	blockResults, err := predicate.ParseBlockResults(headerPredicateResultsBytes)

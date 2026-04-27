@@ -8,8 +8,8 @@ import (
 
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 )
 
 // HandlePrecompileAccept invokes [precompileconfig.Accepter.Accept] for each log

@@ -16,17 +16,17 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/corethvm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -95,7 +95,6 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			ParentBeaconRoot: &common.Hash{},
 		},
 		&customtypes.HeaderExtra{
-			ExtDataGasUsed:   big.NewInt(0),
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: utils.PointerTo[uint64](nowMS),
 			MinDelayExcess:   &mde,
@@ -128,25 +127,21 @@ func (b *blockBuilder) BuildBlock(
 		return nil, errEmptyBlock
 	}
 
-	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
-	rulesExtra := corethparams.GetRulesExtra(rules)
+	rules := b.chainConfig.Rules(header.Number, subnetevmparams.IsMergeTODO, header.Time)
+	rulesExtra := subnetevmparams.GetRulesExtra(rules)
 	predicateBytes, err := warp.PredicateBytes(b.ctx, blockCtx, rulesExtra, txs)
 	if err != nil {
 		return nil, fmt.Errorf("generating predicates: %w", err)
 	}
-	// TODO: Do not use [customheader.SetPredicateBytesInExtra] it assumes fee
-	// information is included in [types.Header.Extra].
-	header.Extra = customheader.SetPredicateBytesInExtra(rulesExtra.AvalancheRules, header.Extra, predicateBytes)
+	header.Extra = customheader.SetPredicateBytesInExtra(header.Extra, predicateBytes)
 
 	headerExtra := customtypes.GetHeaderExtra(header)
 	headerExtra.SettledHeight = &settledHeight
-	return customtypes.NewBlockWithExtData(
+	return types.NewBlock(
 		header,
 		txs,
 		nil, // uncles
 		receipts,
 		trie.NewStackTrie(nil),
-		nil,  // ExtData: subnet-evm has no atomic txs
-		true, // update [customtypes.HeaderExtra.ExtDataHash]
 	), nil
 }
