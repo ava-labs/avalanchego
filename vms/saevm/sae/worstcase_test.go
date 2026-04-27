@@ -44,26 +44,26 @@ type worstCaseFlags struct {
 }
 
 func parseWorstCaseFlags() *worstCaseFlags {
-	fs := flag.NewFlagSet("worstcase", flag.ContinueOnError)
-	f := &worstCaseFlags{}
+	set := flag.NewFlagSet("worstcase", flag.ContinueOnError)
+	fs := &worstCaseFlags{}
 
 	name := func(n string) string {
 		return "worstcase.fuzz." + n
 	}
-	fs.UintVar(&f.numAccounts, name("num_eoa"), 10, "Number of EOAs to send funds between")
-	fs.TextVar(&f.balance, name("eoa_balance"), uint256.NewInt(params.Ether), "Starting balance of EOAs")
-	fs.UintVar(&f.parallel, name("parallel"), uint(runtime.GOMAXPROCS(0)), "Number of parallel tests to run; defaults to GOMAXPROCS") //#nosec G115 -- Known to be positive
-	fs.UintVar(&f.numBlocks, name("blocks"), 50, "Number of blocks to build and execute (fixed)")
-	fs.UintVar(&f.maxNewTxsPerBlock, name("max_new_txs"), 100, "Maximum number of new transactions to send before building each block (uniform distribution)")
-	fs.Uint64Var(&f.maxGasLimit, name("max_gas_limit"), 60e6, "Maximum gas limit per transaction (uniform distribution)")
-	fs.Uint64Var(&f.maxTxValue, name("max_tx_value"), params.Ether/1000, "Maximum tx value to send per transaction (uniform distribution)")
-	fs.Uint64Var(&f.rngSeed, name("rng_seed"), 0, "Seed for random-number generator; ignored if zero")
+	set.UintVar(&fs.numAccounts, name("num_eoa"), 10, "Number of EOAs to send funds between")
+	set.TextVar(&fs.balance, name("eoa_balance"), uint256.NewInt(params.Ether), "Starting balance of EOAs")
+	set.UintVar(&fs.parallel, name("parallel"), uint(runtime.GOMAXPROCS(0)), "Number of parallel tests to run; defaults to GOMAXPROCS") //#nosec G115 -- Known to be positive
+	set.UintVar(&fs.numBlocks, name("blocks"), 50, "Number of blocks to build and execute (fixed)")
+	set.UintVar(&fs.maxNewTxsPerBlock, name("max_new_txs"), 100, "Maximum number of new transactions to send before building each block (uniform distribution)")
+	set.Uint64Var(&fs.maxGasLimit, name("max_gas_limit"), 60e6, "Maximum gas limit per transaction (uniform distribution)")
+	set.Uint64Var(&fs.maxTxValue, name("max_tx_value"), params.Ether/1000, "Maximum tx value to send per transaction (uniform distribution)")
+	set.Uint64Var(&fs.rngSeed, name("rng_seed"), 0, "Seed for random-number generator; ignored if zero")
 
 	// Parse returns an error in practice, because the testing harness provides
 	// additional unregistered flags. [flag.ContinueOnError] allows the expected
 	// flags to be parsed anyways.
-	_ = fs.Parse(os.Args[1:])
-	return f
+	_ = set.Parse(os.Args[1:])
+	return fs
 }
 
 // A guzzler is both a [params.ChainConfigHooks] and [params.RulesHooks]. When
