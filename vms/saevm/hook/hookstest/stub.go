@@ -232,7 +232,7 @@ func (s *Stub) SettledGasTime(hdr, settler *types.Header) (*gastime.Time, error)
 
 	settled := getHeaderExtra(settler).settled
 	if settled.height != hdr.Number.Uint64() {
-		return nil, fmt.Errorf("block %d settles %d, not %d", hdr.Number.Uint64(), settled.height, hdr.Number.Uint64())
+		return nil, fmt.Errorf("block %d settles %d, not %d", settler.Number.Uint64(), settled.height, hdr.Number.Uint64())
 	}
 
 	sec := settled.seconds

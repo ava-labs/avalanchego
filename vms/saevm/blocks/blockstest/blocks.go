@@ -51,7 +51,7 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 		settledHeight: parent.NumberU64() + 1, // synchronoous
 	}
 	props = options.ApplyTo(props, opts...)
-	// hookstest appropriately handles ignores gastime.
+	// hookstest appropriately ignores gastime.
 	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settledHeight, nil)
 	require.NoError(tb, err, "hookstest.BuildBlock()")
 	return block
