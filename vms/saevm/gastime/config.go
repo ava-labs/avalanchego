@@ -5,42 +5,69 @@ package gastime
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
-//nolint:revive // struct-tag: canoto allows unexported fields
-type config struct {
-	targetToExcessScaling gas.Gas   `canoto:"uint,1"`
-	minPrice              gas.Price `canoto:"uint,2"`
-	staticPricing         bool      `canoto:"bool,3"`
+// GasPriceConfig contains gas-related parameters that can be configured via hooks.
+type GasPriceConfig struct {
+	// TargetToExcessScaling is the ratio between the gas target and the
+	// reciprocal of the excess coefficient used in price calculation
+	// (K variable in ACP-176, where K = TargetToExcessScaling * T).
+	// MUST be non-zero.
+	TargetToExcessScaling gas.Gas `canoto:"uint,1"`
+	// MinPrice is the minimum gas price / base fee (M parameter in ACP-176).
+	// MUST be non-zero.
+	MinPrice gas.Price `canoto:"uint,2"`
+	// StaticPricing is a flag indicating whether the gas price should be static
+	// at the minimum price.
+	StaticPricing bool `canoto:"bool,3"`
 
-	canotoData canotoData_config
+	canotoData canotoData_GasPriceConfig
 }
 
-var errInvalidGasPriceConfig = errors.New("invalid gas price config")
+// DefaultTargetToExcessScaling is the default ratio between gas target and the
+// reciprocal of the excess coefficient used in price calculation (K variable in ACP-176).
+const DefaultTargetToExcessScaling = 87
 
-// newConfig builds and validates an internal config from [hook.GasPriceConfig].
-func newConfig(from hook.GasPriceConfig) (config, error) {
-	if err := from.Validate(); err != nil {
-		return config{}, fmt.Errorf("%w: %w", errInvalidGasPriceConfig, err)
+// DefaultMinPrice is the default minimum gas price (base fee), i.e. the M
+// parameter in ACP-176's price calculation.
+const DefaultMinPrice gas.Price = 1
+
+// DefaultGasPriceConfig returns the default [GasPriceConfig] values.
+func DefaultGasPriceConfig() GasPriceConfig {
+	return GasPriceConfig{
+		TargetToExcessScaling: DefaultTargetToExcessScaling,
+		MinPrice:              DefaultMinPrice,
+		StaticPricing:         false,
 	}
-	c := config{
-		targetToExcessScaling: from.TargetToExcessScaling,
-		minPrice:              from.MinPrice,
-		staticPricing:         from.StaticPricing,
+}
+
+var (
+	errTargetToExcessScalingZero = errors.New("targetToExcessScaling must be non-zero")
+	errMinPriceZero              = errors.New("minPrice must be non-zero")
+)
+
+// Validate checks that the GasPriceConfig fields are valid.
+func (c *GasPriceConfig) Validate() error {
+	if c.TargetToExcessScaling == 0 {
+		return errTargetToExcessScalingZero
 	}
-	return c, nil
+	// TODO (ceyonur): Decide whether we want to allow zero min price exclusive for static pricing,
+	// to support fee-less networks.
+	// https://github.com/ava-labs/strevm/issues/266
+	if c.MinPrice == 0 {
+		return errMinPriceZero
+	}
+	return nil
 }
 
 // equal returns true if the logical fields of c and other are equal.
 // It ignores canoto internal fields.
-func (c config) equals(other config) bool {
-	return c.targetToExcessScaling == other.targetToExcessScaling &&
-		c.minPrice == other.minPrice &&
-		c.staticPricing == other.staticPricing
+func (c GasPriceConfig) equals(other GasPriceConfig) bool {
+	return c.TargetToExcessScaling == other.TargetToExcessScaling &&
+		c.MinPrice == other.MinPrice &&
+		c.StaticPricing == other.StaticPricing
 }
