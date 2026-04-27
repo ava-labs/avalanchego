@@ -51,6 +51,7 @@ type state struct {
 	UnixTime             uint64
 	ConsumedThisSecond   proxytime.FractionalSecond[gas.Gas]
 	Rate, Target, Excess gas.Gas
+	Config               GasPriceConfig
 	Price                gas.Price
 }
 
@@ -61,6 +62,7 @@ func (tm *Time) state() state {
 		Rate:               tm.Rate(),
 		Target:             tm.Target(),
 		Excess:             tm.Excess(),
+		Config:             tm.config,
 		Price:              tm.Price(),
 	}
 }
@@ -79,7 +81,7 @@ func TestNew(t *testing.T) {
 		return
 	}
 
-	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Price")
+	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Config", "Price")
 
 	tests := []struct {
 		name           string
@@ -132,7 +134,7 @@ func TestExcess(t *testing.T) {
 		return f
 	}
 
-	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Target", "Price")
+	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Target", "Config", "Price")
 
 	tm.requireState(t, "initial", state{
 		UnixTime:           42,

@@ -34,7 +34,6 @@ go_test(
     embed = [":gastime"],
     deps = [
         "//vms/components/gas",
-        "//vms/saevm/intmath",
         "//vms/saevm/proxytime",
         "@com_github_arr4n_shed//testerr",
         "@com_github_google_go_cmp//cmp",
