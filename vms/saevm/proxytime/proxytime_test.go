@@ -43,7 +43,7 @@ func (tm *Time[D]) requireEq(tb testing.TB, desc string, seconds uint64, fractio
 
 func TestTickAndCmp(t *testing.T) {
 	const rate = 500
-	tm := New(0, uint64(500))
+	tm := New(0, 0, uint64(500))
 	tm.assertEq(t, "New(0, ...)", 0, frac(0, rate))
 
 	steps := []struct {
@@ -132,7 +132,7 @@ func TestSetRate(t *testing.T) {
 		divisor     = 3
 		initRate    = uint64(1000 * divisor)
 	)
-	tm := New(initSeconds, initRate)
+	tm := New(initSeconds, 0, initRate)
 
 	const tick = uint64(100 * divisor)
 	tm.Tick(tick)
@@ -206,7 +206,7 @@ func TestSetRateRoundUpFullSecond(t *testing.T) {
 		const startUnix = 42
 
 		t.Run(fmt.Sprintf("%d_of_%d_scaled_down_to_%d", tt.tick, tt.rate, tt.newRate), func(t *testing.T) {
-			tm := New(startUnix, tt.rate)
+			tm := New(startUnix, 0, tt.rate)
 			tm.Tick(tt.tick)
 			tm.SetRate(tt.newRate)
 
@@ -216,10 +216,10 @@ func TestSetRateRoundUpFullSecond(t *testing.T) {
 }
 
 func TestAsTime(t *testing.T) {
-	stdlib := time.Date(1986, time.October, 1, 0, 0, 0, 0, time.UTC)
+	const rate = 500
+	stdlib := time.Date(1986, time.October, 1, 0, 0, 0, 1e9/rate, time.UTC)
 
-	const rate uint64 = 500
-	tm := New(uint64(stdlib.Unix()), rate) //#nosec G115 -- Known to not overflow
+	tm := New(uint64(stdlib.Unix()), 1, uint64(rate)) //#nosec G115 -- Known to not overflow
 	if got, want := tm.AsTime(), stdlib; !got.Equal(want) {
 		t.Fatalf("%T.AsTime() at construction got %v; want %v", tm, got, want)
 	}
@@ -233,18 +233,18 @@ func TestAsTime(t *testing.T) {
 func TestCanotoRoundTrip(t *testing.T) {
 	tests := []struct {
 		name                string
-		seconds, rate, tick uint64
+		seconds, rate, frac uint64
 	}{
 		{
 			name:    "non_zero_fields",
 			seconds: 42,
 			rate:    10_000,
-			tick:    1_234,
+			frac:    1_234,
 		},
 		{
 			name: "zero_seconds",
 			rate: 100,
-			tick: 1,
+			frac: 1,
 		},
 		{
 			name:    "zero_fractional_second",
@@ -255,19 +255,18 @@ func TestCanotoRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tm := New(tt.seconds, tt.rate)
-			tm.Tick(tt.tick)
+			tm := New(tt.seconds, tt.frac, tt.rate)
 
 			got := new(Time[uint64])
 			require.NoErrorf(t, got.UnmarshalCanoto(tm.MarshalCanoto()), "%T.UnmarshalCanoto(%[1]T.MarshalCanoto())", got)
-			got.assertEq(t, fmt.Sprintf("%T.UnmarshalCanoto(%[1]T.MarshalCanoto())", tm), tt.seconds, frac(tt.tick, tt.rate))
+			got.assertEq(t, fmt.Sprintf("%T.UnmarshalCanoto(%[1]T.MarshalCanoto())", tm), tt.seconds, frac(tt.frac, tt.rate))
 		})
 	}
 }
 
 func TestFastForward(t *testing.T) {
 	const rate = uint64(1000)
-	tm := New(42, rate)
+	tm := New(42, 0, rate)
 
 	steps := []struct {
 		tickBefore uint64
@@ -409,18 +408,18 @@ func TestCmpUnix(t *testing.T) {
 		want       int
 	}{
 		{
-			tm:         New[uint64](42, 1e6),
+			tm:         New[uint64](42, 0, 1e6),
 			cmpAgainst: 42,
 			want:       0,
 		},
 		{
-			tm:         New[uint64](42, 1e6),
+			tm:         New[uint64](42, 0, 1e6),
 			tick:       1,
 			cmpAgainst: 42,
 			want:       1,
 		},
 		{
-			tm:         New[uint64](41, 100),
+			tm:         New[uint64](41, 0, 1e6),
 			tick:       99,
 			cmpAgainst: 42,
 			want:       -1,
@@ -439,7 +438,7 @@ func TestCompareDifferentRates(t *testing.T) {
 	fromFrac := func(num, denom uint64) *Time[uint64] {
 		// All comparisons are targeting fractional differences so we want the
 		// Unix seconds to be equal, but the actual value is irrelevant.
-		tm := New(42, denom)
+		tm := New(42, 0, denom)
 		tm.Tick(num)
 		return tm
 	}
@@ -502,7 +501,7 @@ func FuzzFractionLessThanHertz(f *testing.F) {
 			t.Skip("zero rate")
 		}
 
-		tm := New(unix, hertz)
+		tm := New(unix, 0, hertz)
 		req := func(t *testing.T, after string) {
 			t.Helper()
 			require.Lessf(t, tm.fraction, tm.hertz, "after %s", after)

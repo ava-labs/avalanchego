@@ -9,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"math/big"
+	"math/rand"
 	"net/http/httptest"
 	"os"
 	"sync"
@@ -52,6 +53,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -977,5 +979,47 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+func TestSettledGasTime(t *testing.T) {
+	const target = 1e7
+	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, opt, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.Target = target
+	}))
+
+	const numBlocks = 100
+	r := rand.New(rand.NewSource(0))
+	bs := make([]*blocks.Block, 0, numBlocks+1)
+	bs = append(bs, sut.genesis)
+	for range numBlocks {
+		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        nil, // contract creation
+			Gas:       params.TxGasContractCreation,
+			GasFeeCap: big.NewInt(1),
+		}))
+		if r.Intn(2) == 0 {
+			vmTime.advanceToSettle(ctx, t, b)
+		}
+		bs = append(bs, b)
+	}
+	require.NoErrorf(t, bs[len(bs)-1].WaitUntilExecuted(ctx), "last block.WaitUntilExecuted()")
+
+	for i, b := range bs {
+		if i == 0 {
+			continue // genesis block has no gas time
+		}
+		settledHeight := sut.hooks.SettledHeight(b.Header())
+		settledBlock := bs[settledHeight]
+		expectedGasTime := settledBlock.ExecutedByGasTime()
+		foundGasTime, err := hook.SettledGasTime(sut.hooks, settledBlock.Header(), b.Header())
+		if foundGasTime.Excess() > 1 {
+			t.Logf("%d excess", foundGasTime.Excess())
+		}
+		require.NoErrorf(t, err, "SettledGasTime() for block %d (settled height %d)", b.Height(), settledHeight)
+		if diff := cmp.Diff(expectedGasTime, foundGasTime, gastime.CmpOpt()); diff != "" {
+			t.Errorf("SettledGasTime() for block %d (settled at height %d) diff (-want +got):\n%s", b.Height(), settledHeight, diff)
+		}
 	}
 }

@@ -5,6 +5,7 @@
 package gastime
 
 import (
+	"fmt"
 	"math"
 	"time"
 
@@ -55,6 +56,25 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceCo
 		Time:   tm,
 		target: target,
 		excess: startingExcess,
+		config: gasPriceConfig,
+	}, nil
+}
+
+func FromProxyTime(tm *proxytime.Time[gas.Gas], target, excess gas.Gas, gasPriceConfig GasPriceConfig) (*Time, error) {
+	if err := gasPriceConfig.Validate(); err != nil {
+		return nil, err
+	}
+
+	target = clampTarget(target)
+	rate := rateOf(target)
+	if tm.Rate() != rate {
+		return nil, fmt.Errorf("unexpected rate: got %d, want %d", tm.Rate(), rate)
+	}
+
+	return &Time{
+		Time:   tm,
+		target: target,
+		excess: excess,
 		config: gasPriceConfig,
 	}, nil
 }

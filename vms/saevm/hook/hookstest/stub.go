@@ -175,14 +175,7 @@ func BuildBlock(
 	e.ops = ops
 	e.settled = settled{
 		height: settledHeight,
-	}
-	// avoid requiring non-nil gastime in tests for unrelated operations
-	if settledGasTime != nil {
-		// storing [gastime.Time] as a [time.Time] aids in reconstruction.
-		tm := settledGasTime.AsTime()
-		e.settled.seconds = tm.Unix()
-		e.settled.nanos = int64(tm.Nanosecond())
-		e.settled.excess = settledGasTime.Excess()
+		tm:     settledGasTime, // already cloned
 	}
 
 	header.Extra = e.MarshalCanoto()
@@ -225,9 +218,13 @@ func (*Stub) SettledHeight(hdr *types.Header) uint64 {
 }
 
 // SettledExecutionTimeAndExcess sufficient info to recreate a [gastime.Time].
-func (*Stub) SettledExecutionTimeAndExcess(hdr *types.Header) (time.Time, gas.Gas) {
-	s := getHeaderExtra(hdr).settled
-	return time.Unix(s.seconds, s.nanos), s.excess
+func (*Stub) SettledExecutionTimeAndExcess(hdr *types.Header) (uint64, gas.Gas, gas.Gas) {
+	tm := getHeaderExtra(hdr).settled.tm
+	if tm == nil {
+		return 0, 0, 0
+	}
+	frac := tm.Fraction()
+	return tm.Unix(), frac.Numerator, tm.Excess()
 }
 
 // EndOfBlockOps return the ops included in the block by [BuildBlock].
@@ -240,14 +237,14 @@ func (*Stub) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	return hookOps, nil
 }
 
-func getHeaderExtra(hdr *types.Header) extra {
+func getHeaderExtra(hdr *types.Header) *extra {
 	var e extra
 	if err := e.UnmarshalCanoto(hdr.Extra); err != nil {
 		// This is left as a panic to avoid polluting various functions with
 		// error returns when no error is possible in production.
 		panic(err)
 	}
-	return e
+	return &e
 }
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
@@ -282,10 +279,8 @@ type extra struct {
 
 //nolint:revive // struct-tag: canoto allows unexported fields
 type settled struct {
-	height  uint64  `canoto:"uint,1"`
-	seconds int64   `canoto:"int,2"`
-	nanos   int64   `canoto:"int,3"`
-	excess  gas.Gas `canoto:"uint,4"`
+	height uint64        `canoto:"uint,1"`
+	tm     *gastime.Time `canoto:"pointer,2"`
 
 	canotoData canotoData_settled
 }

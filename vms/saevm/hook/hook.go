@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -73,7 +74,7 @@ type Points interface {
 	// return the execution time (scaled by the target) and excess after
 	// execution of the block that is settled by the provided header.
 	// See [SettledGasTime] for usage.
-	SettledExecutionTimeAndExcess(settler *types.Header) (time.Time, gas.Gas)
+	SettledExecutionTimeAndExcess(settler *types.Header) (sec uint64, frac gas.Gas, excess gas.Gas)
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
@@ -216,7 +217,8 @@ func MinimumGasConsumption(txLimit uint64) uint64 {
 // TODO(alarso16): This should be moved to the state sync logic once implemented.
 func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
 	target, cfg := h.GasConfigAfter(settled)
-	tm, excess := h.SettledExecutionTimeAndExcess(settler)
+	sec, denom, excess := h.SettledExecutionTimeAndExcess(settler)
 
-	return gastime.New(tm, target, excess, cfg)
+	pt := proxytime.New(sec, denom, gastime.SafeRateOfTarget(target))
+	return gastime.FromProxyTime(pt, target, excess, cfg)
 }
