@@ -16,11 +16,6 @@
     "schedule": {
         "include": [
             {
-                "runner": "avago-runner-m6i-4xlarge-ebs-fast",
-                "test": "hashdb-33m-33m500k",
-                "timeout-minutes": 1440
-            },
-            {
                 "runner": "avago-runner-i4i-4xlarge-local-ssd",
                 "test": "hashdb-33m-33m500k",
                 "timeout-minutes": 1440
