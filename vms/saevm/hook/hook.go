@@ -69,9 +69,11 @@ type Points interface {
 	// with as the post-execution state root. It MUST match the value passed to
 	// [BlockBuilder.BuildBlock], from which the [types.Header] will be sourced.
 	SettledHeight(*types.Header) uint64
-	// SettledGasTime recreates the [gastime.Time] after `settled` was executed,
-	// using data available in `settler`, the block that settled `settled`.
-	SettledGasTime(settled, settler *types.Header) (*gastime.Time, error)
+	// SettledExecutionTimeAndExcess allows recreation of a [gastime.Time] by
+	// return the execution time (scaled by the target) and excess after
+	// execution of the block that is settled by the provided header.
+	// See [SettledGasTime] for usage.
+	SettledExecutionTimeAndExcess(settler *types.Header) (time.Time, gas.Gas)
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
@@ -206,4 +208,15 @@ func (o *Op) ApplyTo(stateDB *state.StateDB) error {
 func MinimumGasConsumption(txLimit uint64) uint64 {
 	_ = (params.RulesHooks)(nil) // keep the import to allow [] doc links
 	return intmath.CeilDiv(txLimit, saeparams.Lambda)
+}
+
+// SettledGasTime is a helper that given a header and its settler, returns the
+// [gastime.Time] associated with the post-execution state of the header.
+//
+// TODO(alarso16): This should be moved to the state sync logic once implemented.
+func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
+	target, cfg := h.GasConfigAfter(settled)
+	tm, excess := h.SettledExecutionTimeAndExcess(settler)
+
+	return gastime.New(tm, target, excess, cfg)
 }

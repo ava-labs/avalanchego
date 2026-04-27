@@ -6,7 +6,6 @@ package hookstest
 
 import (
 	"context"
-	"fmt"
 	"iter"
 	"math/big"
 	"time"
@@ -225,22 +224,10 @@ func (*Stub) SettledHeight(hdr *types.Header) uint64 {
 	return getHeaderExtra(hdr).settled.height
 }
 
-// SettledGasTime returns the [gastime.Time] associated with the post-execution state
-// of `hdr`, provided by `settler`.
-func (s *Stub) SettledGasTime(hdr, settler *types.Header) (*gastime.Time, error) {
-	target, cfg := s.GasConfigAfter(hdr)
-
-	settled := getHeaderExtra(settler).settled
-	if settled.height != hdr.Number.Uint64() {
-		return nil, fmt.Errorf("block %d settles %d, not %d", settler.Number.Uint64(), settled.height, hdr.Number.Uint64())
-	}
-
-	sec := settled.seconds
-	nanos := settled.nanos
-	excess := settled.excess
-
-	tm := time.Unix(sec, nanos)
-	return gastime.New(tm, target, excess, cfg)
+// SettledExecutionTimeAndExcess sufficient info to recreate a [gastime.Time].
+func (*Stub) SettledExecutionTimeAndExcess(hdr *types.Header) (time.Time, gas.Gas) {
+	s := getHeaderExtra(hdr).settled
+	return time.Unix(s.seconds, s.nanos), s.excess
 }
 
 // EndOfBlockOps return the ops included in the block by [BuildBlock].
