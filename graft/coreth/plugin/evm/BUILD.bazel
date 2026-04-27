@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "evm",
     srcs = [
@@ -18,7 +23,6 @@ go_library(
         "wrapped_block.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm",
-    visibility = ["//visibility:public"],
     deps = [
         "//api",
         "//cache/lru",

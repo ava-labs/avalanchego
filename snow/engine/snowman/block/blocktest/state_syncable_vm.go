@@ -43,8 +43,8 @@ func (vm *StateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 	if vm.StateSyncEnabledF != nil {
 		return vm.StateSyncEnabledF(ctx)
 	}
-	if vm.CantStateSyncEnabled && vm.T != nil {
-		require.FailNow(vm.T, errStateSyncEnabled.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantStateSyncEnabled, errStateSyncEnabled)
 	}
 	return false, errStateSyncEnabled
 }
@@ -53,8 +53,8 @@ func (vm *StateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (bloc
 	if vm.GetOngoingSyncStateSummaryF != nil {
 		return vm.GetOngoingSyncStateSummaryF(ctx)
 	}
-	if vm.CantStateSyncGetOngoingSummary && vm.T != nil {
-		require.FailNow(vm.T, errStateSyncGetOngoingSummary.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantStateSyncGetOngoingSummary, errStateSyncGetOngoingSummary)
 	}
 	return nil, errStateSyncGetOngoingSummary
 }
@@ -63,8 +63,8 @@ func (vm *StateSyncableVM) GetLastStateSummary(ctx context.Context) (block.State
 	if vm.GetLastStateSummaryF != nil {
 		return vm.GetLastStateSummaryF(ctx)
 	}
-	if vm.CantGetLastStateSummary && vm.T != nil {
-		require.FailNow(vm.T, errGetLastStateSummary.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetLastStateSummary, errGetLastStateSummary)
 	}
 	return nil, errGetLastStateSummary
 }
@@ -73,8 +73,8 @@ func (vm *StateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes [
 	if vm.ParseStateSummaryF != nil {
 		return vm.ParseStateSummaryF(ctx, summaryBytes)
 	}
-	if vm.CantParseStateSummary && vm.T != nil {
-		require.FailNow(vm.T, errParseStateSummary.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantParseStateSummary, errParseStateSummary)
 	}
 	return nil, errParseStateSummary
 }
@@ -83,8 +83,8 @@ func (vm *StateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight ui
 	if vm.GetStateSummaryF != nil {
 		return vm.GetStateSummaryF(ctx, summaryHeight)
 	}
-	if vm.CantGetStateSummary && vm.T != nil {
-		require.FailNow(vm.T, errGetStateSummary.Error())
+	if vm.T != nil {
+		require.False(vm.T, vm.CantGetStateSummary, errGetStateSummary)
 	}
 	return nil, errGetStateSummary
 }
