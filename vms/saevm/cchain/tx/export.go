@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -93,4 +94,34 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 	return op{
 		burn: burn,
 	}, nil
+}
+
+func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *atomic.Requests, error) {
+	elems := make([]*atomic.Element, len(e.ExportedOutputs))
+	for i, out := range e.ExportedOutputs {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(i),
+			},
+			Asset: out.Asset,
+			Out:   out.Out,
+		}
+
+		utxoBytes, err := c.Marshal(codecVersion, utxo)
+		if err != nil {
+			return ids.ID{}, nil, err
+		}
+		utxoID := utxo.InputID()
+		elem := &atomic.Element{
+			Key:   utxoID[:],
+			Value: utxoBytes,
+		}
+		if out, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = out.Addresses()
+		}
+
+		elems[i] = elem
+	}
+	return e.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
 }

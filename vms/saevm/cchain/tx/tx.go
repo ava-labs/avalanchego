@@ -13,9 +13,10 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
-	// Imported for [GasPerByte] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
+	// Imported for [GasPerByte] comment resolution.
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -49,6 +50,10 @@ type Unsigned interface {
 	// asOp returns the operation that this transaction performs on the EVM
 	// state.
 	asOp(avaxAssetID ids.ID) (op, error)
+
+	// atomicRequests returns the operations that should be applied to shared
+	// memory when this transaction is executed.
+	atomicRequests(txID ids.ID) (chainID ids.ID, requests *atomic.Requests, err error)
 }
 
 type op struct {
@@ -175,6 +180,12 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	p := scaleAVAX(cost)
 	p.Div(&p, &u)
 	return p
+}
+
+// AtomicRequests returns chainID and modifications into shared memory that this
+// transaction should perform during execution.
+func (t *Tx) AtomicRequests() (ids.ID, *atomic.Requests, error) {
+	return t.Unsigned.atomicRequests(t.ID())
 }
 
 // Parse deserializes a [Tx] from its canonical binary format.

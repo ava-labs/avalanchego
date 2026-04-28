@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -96,4 +97,13 @@ func (i *Import) asOp(avaxAssetID ids.ID) (op, error) {
 	return op{
 		mint: mint,
 	}, nil
+}
+
+func (i *Import) atomicRequests(ids.ID) (ids.ID, *atomic.Requests, error) {
+	utxoIDs := make([][]byte, len(i.ImportedInputs))
+	for j, in := range i.ImportedInputs {
+		inputID := in.InputID()
+		utxoIDs[j] = inputID[:]
+	}
+	return i.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
 }
