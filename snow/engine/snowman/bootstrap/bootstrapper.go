@@ -757,13 +757,6 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	// Notify the subnet that this chain is synced
 	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
 
-	// During dynamic state sync, transition to NormalOp immediately instead
-	// of waiting for other chains. The consensus engine will process new
-	// blocks while the dynamic executor defers them for pivot triggers.
-	if b.syncTargetHeight > 0 {
-		return b.onFinished(ctx, b.requestID)
-	}
-
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
