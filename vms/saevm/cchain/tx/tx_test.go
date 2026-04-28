@@ -6,6 +6,7 @@ package tx
 import (
 	"encoding/json"
 	"errors"
+	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,12 +21,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // tests is defined at the package level to allow sharing between fuzz tests and
@@ -977,7 +980,7 @@ func TestAsOp_Errors(t *testing.T) {
 					Amount:  2,
 				}},
 			},
-			want: math.ErrUnderflow,
+			want: safemath.ErrUnderflow,
 		},
 		{
 			name: "export_burned_underflow",
@@ -993,7 +996,7 @@ func TestAsOp_Errors(t *testing.T) {
 					},
 				}},
 			},
-			want: math.ErrUnderflow,
+			want: safemath.ErrUnderflow,
 		},
 	}
 	for _, test := range tests {
@@ -1025,12 +1028,83 @@ func FuzzAsOp(f *testing.F) {
 		oldTx, err := parseOldTx(data)
 		require.NoError(t, err, "parseOldTx()")
 
-		gasPrice, err := atomic.EffectiveGasPrice(oldTx.UnsignedAtomicTx, avaxAssetID, true)
-		require.NoErrorf(t, err, "atomic.EffectiveGasPrice(%T, avaxAssetID, true)", oldTx)
-		assert.Equalf(t, gasPrice, op.GasFeeCap, "atomic.EffectiveGasPrice(%T) == %T.AsOp().GasFeeCap", oldTx, newTx)
-
 		gasUsed, err := oldTx.UnsignedAtomicTx.GasUsed(true)
 		require.NoErrorf(t, err, "%T.GasUsed(true)", oldTx.UnsignedAtomicTx)
-		assert.Equalf(t, gas.Gas(gasUsed), op.Gas, "%T.GasUsed(true) == %T.AsOp().Gas", oldTx.UnsignedAtomicTx, newTx)
+
+		gasPrice, err := atomic.EffectiveGasPrice(oldTx.UnsignedAtomicTx, avaxAssetID, true)
+		require.NoErrorf(t, err, "atomic.EffectiveGasPrice(%T, avaxAssetID, true)", oldTx)
+
+		state := newFuzzStateDB()
+		if export, ok := oldTx.UnsignedAtomicTx.(*atomic.UnsignedExportTx); ok {
+			for _, in := range export.Ins {
+				state.initialNonces[in.Address] = in.Nonce
+			}
+		}
+
+		ctx := &snow.Context{AVAXAssetID: avaxAssetID}
+		require.NoErrorf(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, state), "%T.EVMStateTransfer()", oldTx.UnsignedAtomicTx)
+
+		expected := hook.Op{
+			ID:        oldTx.ID(),
+			Gas:       gas.Gas(gasUsed),
+			GasFeeCap: gasPrice,
+			Burn:      state.op.burn,
+			Mint:      state.op.mint,
+		}
+		if diff := cmp.Diff(expected, op, cmpopts.EquateEmpty()); diff != "" {
+			t.Errorf("%T.AsOp() diff (-want +got):\n%s", newTx, diff)
+		}
 	})
+}
+
+// fuzzStateDB is an in-memory [atomic.StateDB] for [FuzzAsOp]. It constructs an
+// [op] from the mutations of [atomic.UnsignedAtomicTx.EVMStateTransfer].
+type fuzzStateDB struct {
+	initialNonces map[common.Address]uint64
+	op            op
+}
+
+func newFuzzStateDB() *fuzzStateDB {
+	return &fuzzStateDB{
+		initialNonces: make(map[common.Address]uint64),
+		op: op{
+			burn: make(map[common.Address]hook.AccountDebit),
+			mint: make(map[common.Address]uint256.Int),
+		},
+	}
+}
+
+func (s *fuzzStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
+	b := s.op.mint[addr]
+	b.Add(&b, amount)
+	s.op.mint[addr] = b
+}
+
+func (s *fuzzStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
+	d := s.op.burn[addr]
+	d.Amount.Add(&d.Amount, amount)
+	d.MinBalance = d.Amount
+	s.op.burn[addr] = d
+}
+
+func (*fuzzStateDB) GetBalance(common.Address) *uint256.Int {
+	return new(uint256.Int).Lsh(uint256.NewInt(1), 128)
+}
+
+func (*fuzzStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
+
+func (*fuzzStateDB) SubBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
+
+func (*fuzzStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int {
+	return new(big.Int).Lsh(big.NewInt(1), 128)
+}
+
+func (s *fuzzStateDB) SetNonce(addr common.Address, nonce uint64) {
+	d := s.op.burn[addr]
+	d.Nonce = nonce - 1
+	s.op.burn[addr] = d
+}
+
+func (s *fuzzStateDB) GetNonce(addr common.Address) uint64 {
+	return s.initialNonces[addr]
 }
