@@ -28,6 +28,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -88,6 +89,10 @@ func (p *StateProcessor) ProcessWithFinalize(
 	cfg vm.Config,
 	finalize FinalizeFunc,
 ) (types.Receipts, []*types.Log, uint64, error) {
+	if finalize == nil {
+		return nil, nil, 0, errors.New("missing finalize function")
+	}
+
 	var (
 		receipts    types.Receipts
 		usedGas     = new(uint64)

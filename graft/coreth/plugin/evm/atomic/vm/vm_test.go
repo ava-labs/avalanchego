@@ -1665,7 +1665,7 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	}))
 
 	// issueRegularBlock advances the chain by one block containing a single
-	// self-transfer; used to pad chain history before and after the import.
+	// transfer; used to pad chain history before and after the import.
 	issueRegularBlock := func(height int) {
 		nonce := vm.Ethereum().TxPool().Nonce(vmtest.TestEthAddrs[0])
 		tx := types.NewTransaction(
@@ -1717,7 +1717,7 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 
 	// Continue the chain past the import so the target block falls outside
 	// Firewood's in-memory state-history window and must be re-executed.
-	for height := numPreImportBlocks + 1; height <= totalBlocks; height++ {
+	for height := targetBlockHeight + 1; height <= totalBlocks; height++ {
 		issueRegularBlock(height)
 	}
 
