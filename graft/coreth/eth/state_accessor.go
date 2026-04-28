@@ -325,9 +325,7 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		}
 	}()
 
-	// Re-execute blocks forward from current+1 to the target block. Historical
-	// replay must skip live-validation dependencies (e.g. shared memory for
-	// atomic imports), so substitute the engine's historical-replay finalizer.
+	// Re-execute blocks forward from current+1 to the target block.
 	for current.Number.Uint64() < header.Number.Uint64() {
 		if err := ctx.Err(); err != nil {
 			return nil, nil, err

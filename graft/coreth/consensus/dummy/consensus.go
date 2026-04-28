@@ -241,7 +241,6 @@ func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types
 		contribution, extDataGasUsed *big.Int
 		err                          error
 	)
-
 	if eng.cb.OnExtraStateChange != nil {
 		contribution, extDataGasUsed, err = eng.cb.OnExtraStateChange(block, parent, state)
 		if err != nil {
