@@ -28,9 +28,9 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 	dummyErr := errors.New("dummy error")
 
 	type test struct {
-		name   string
-		txFunc func(*gomock.Controller) *AddAutoRenewedValidatorTx
-		err    error
+		name    string
+		txFunc  func(*gomock.Controller) *AddAutoRenewedValidatorTx
+		wantErr error
 	}
 
 	var (
@@ -73,7 +73,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *AddAutoRenewedValidatorTx {
 				return nil
 			},
-			err: ErrNilTx,
+			wantErr: ErrNilTx,
 		},
 		{
 			name: "already verified",
@@ -82,7 +82,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					BaseTx: verifiedBaseTx,
 				}
 			},
-			err: nil,
+			wantErr: nil,
 		},
 		{
 			name: "empty nodeID",
@@ -92,7 +92,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					ValidatorNodeID: ids.EmptyNodeID,
 				}
 			},
-			err: errEmptyNodeID,
+			wantErr: errEmptyNodeID,
 		},
 		{
 			name: "no provided stake",
@@ -103,7 +103,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					StakeOuts:       nil,
 				}
 			},
-			err: errNoStake,
+			wantErr: errNoStake,
 		},
 		{
 			name: "missing period",
@@ -128,7 +128,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					Owner:            configOwner,
 				}
 			},
-			err: errMissingPeriod,
+			wantErr: errMissingPeriod,
 		},
 		{
 			name: "too many shares",
@@ -150,7 +150,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares: reward.PercentDenominator + 1,
 				}
 			},
-			err: errTooManyShares,
+			wantErr: errTooManyShares,
 		},
 		{
 			name: "too many auto compound reward shares",
@@ -177,7 +177,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					Owner:                    configOwner,
 				}
 			},
-			err: errTooManyAutoCompoundRewardShares,
+			wantErr: errTooManyAutoCompoundRewardShares,
 		},
 		{
 			name: "invalid BaseTx",
@@ -203,7 +203,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					Owner:            configOwner,
 				}
 			},
-			err: avax.ErrWrongNetworkID,
+			wantErr: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "invalid validator rewards owner",
@@ -239,7 +239,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
-			err: dummyErr,
+			wantErr: dummyErr,
 		},
 		{
 			name: "invalid delegator rewards owner",
@@ -275,7 +275,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
-			err: dummyErr,
+			wantErr: dummyErr,
 		},
 		{
 			name: "wrong signer",
@@ -307,7 +307,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
-			err: errMissingSigner,
+			wantErr: errMissingSigner,
 		},
 		{
 			name: "invalid stake output",
@@ -341,7 +341,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
-			err: dummyErr,
+			wantErr: dummyErr,
 		},
 		{
 			name: "stake overflow",
@@ -382,7 +382,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
-			err: safemath.ErrOverflow,
+			wantErr: safemath.ErrOverflow,
 		},
 		{
 			name: "invalid staked asset",
@@ -423,7 +423,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
-			err: errInvalidStakedAsset,
+			wantErr: errInvalidStakedAsset,
 		},
 		{
 			name: "stake not sorted",
@@ -464,7 +464,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
-			err: errOutputsNotSorted,
+			wantErr: errOutputsNotSorted,
 		},
 		{
 			name: "weight mismatch",
@@ -505,7 +505,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares:      reward.PercentDenominator,
 				}
 			},
-			err: errValidatorWeightMismatch,
+			wantErr: errValidatorWeightMismatch,
 		},
 		{
 			name: "valid auto-renewed validator",
@@ -546,7 +546,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					Owner:                 configOwner,
 				}
 			},
-			err: nil,
+			wantErr: nil,
 		},
 	}
 
@@ -555,11 +555,11 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			tx := tt.txFunc(ctrl)
-			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(t, err, tt.err)
+			gotErr := tx.SyntacticVerify(ctx)
+			require.ErrorIs(t, gotErr, tt.wantErr)
 
 			if tx != nil {
-				require.Equal(t, tt.err == nil, tx.SyntacticallyVerified)
+				require.Equal(t, tt.wantErr == nil, tx.SyntacticallyVerified)
 			}
 		})
 	}
