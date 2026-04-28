@@ -4390,7 +4390,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		continuationPeriod,
 	)
 	require.NoError(t, err)
-	env.state.AddTx(addContVdrTx, status.Committed)
 
 	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
@@ -4410,7 +4409,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, addContVdrTx.Unsigned.(*txs.AddAutoRenewedValidatorTx).BaseTx.SyntacticallyVerified)
 	require.NoError(t, diff.Apply(env.state))
-	require.NoError(t, env.state.Commit())
 
 	validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
@@ -4421,13 +4419,21 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		PublicKey:       sk.PublicKey(),
 		SubnetID:        constants.PrimaryNetworkID,
 		Weight:          weight,
-		StartTime:       diff.GetTimestamp(),
-		EndTime:         diff.GetTimestamp().Add(continuationPeriod),
+		StartTime:       env.state.GetTimestamp(),
+		EndTime:         env.state.GetTimestamp().Add(continuationPeriod),
 		PotentialReward: wantPotentialReward,
-		NextTime:        diff.GetTimestamp().Add(continuationPeriod),
+		NextTime:        env.state.GetTimestamp().Add(continuationPeriod),
 		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
 	}
 	require.Equal(t, wantValidator, validator)
+
+	delegatorIt, err := env.state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Empty(t, iterator.ToSlice(delegatorIt))
+
+	stakerIt, err := env.state.GetCurrentStakerIterator()
+	require.NoError(t, err)
+	require.Contains(t, iterator.ToSlice(stakerIt), wantValidator)
 
 	stakingInfo, err := env.state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
@@ -4444,7 +4450,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	inputIDs := addContVdrTx.InputIDs()
 	require.NotEmpty(t, inputIDs)
 	for utxoID := range inputIDs {
-		_, err := diff.GetUTXO(utxoID)
+		_, err := env.state.GetUTXO(utxoID)
 		require.ErrorIs(t, err, database.ErrNotFound)
 	}
 
@@ -4452,7 +4458,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	require.NotEmpty(t, baseTxOutputUTXOs)
 	for _, wantUTXO := range baseTxOutputUTXOs {
 		utxoID := wantUTXO.InputID()
-		utxo, err := diff.GetUTXO(utxoID)
+		utxo, err := env.state.GetUTXO(utxoID)
 		require.NoError(t, err)
 		require.Equal(t, wantUTXO, utxo)
 	}
@@ -4464,14 +4470,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
-
-	it, err := env.state.GetCurrentStakerIterator()
-	require.NoError(t, err)
-
-	validators := iterator.ToSlice(it)
-	require.NotEmpty(t, validators)
-
-	existingNodeID := validators[0].NodeID
 
 	tests := []struct {
 		name        string
@@ -4526,7 +4524,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 		{
 			name: "duplicate validator",
 			updateTx: func(tx *txs.AddAutoRenewedValidatorTx) {
-				tx.ValidatorNodeID = existingNodeID
+				tx.ValidatorNodeID = genesistest.DefaultNodeIDs[0]
 			},
 			wantErr: ErrDuplicateValidator,
 		},
@@ -4622,7 +4620,15 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, env.state.PutCurrentValidator(vdrStaker))
-	require.NoError(t, env.state.Commit())
+
+	initialStakingInfo := state.StakingInfo{
+		DelegateeReward:          1,
+		AccruedRewards:           2,
+		AccruedDelegateeRewards:  3,
+		AutoCompoundRewardShares: 100_000,
+		Period:                   duration,
+	}
+	require.NoError(t, env.state.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
 
 	tests := []struct {
 		name                        string
@@ -4702,8 +4708,10 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			stakingInfo, err := diff.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
 			require.NoError(t, err)
 
-			require.Equal(t, tt.newAutoCompoundRewardShares, stakingInfo.AutoCompoundRewardShares)
-			require.Equal(t, tt.newPeriod, stakingInfo.Period)
+			wantStakingInfo := initialStakingInfo
+			wantStakingInfo.AutoCompoundRewardShares = tt.newAutoCompoundRewardShares
+			wantStakingInfo.Period = tt.newPeriod
+			require.Equal(t, wantStakingInfo, stakingInfo)
 
 			inputIDs := setAutoRenewedValidatorConfigTx.InputIDs()
 			require.NotEmpty(t, inputIDs)
@@ -4790,7 +4798,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, env.state.PutCurrentValidator(staker))
-	require.NoError(t, env.state.Commit())
 
 	tests := []struct {
 		name        string

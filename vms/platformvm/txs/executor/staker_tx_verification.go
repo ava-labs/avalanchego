@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -939,33 +940,14 @@ func verifyAddAutoRenewedValidatorTx(
 		)
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos: %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return fmt.Errorf("calculating fee: %w", err)
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
+	if err := verifySpend(
+		backend,
+		feeCalculator,
 		chainState,
-		ins,
-		outs,
+		tx,
 		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
 	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return err
 	}
 
 	return nil
@@ -1037,32 +1019,14 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return nil, err
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return nil, fmt.Errorf("getting utxos %w", err)
-	}
-
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return nil, fmt.Errorf("calculating fee: %w", err)
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return nil, fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
+	if err := verifySpend(
+		backend,
+		feeCalculator,
 		chainState,
-		ins,
-		outs,
+		tx,
 		baseTxCreds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
 	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return nil, err
 	}
 
 	return validator, nil
@@ -1084,5 +1048,43 @@ func verifyStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time
 			stakerTime,
 		)
 	}
+	return nil
+}
+
+func verifySpend(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	tx txs.UnsignedTx,
+	creds []verify.Verifiable,
+) error {
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("getting utxos: %w", err)
+	}
+
+	txFee, err := feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return fmt.Errorf("calculating fee: %w", err)
+	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, txFee)
+	if err != nil {
+		return fmt.Errorf("adding fee: %w", err)
+	}
+
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		ins,
+		outs,
+		creds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: producedAVAX,
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
 	return nil
 }
