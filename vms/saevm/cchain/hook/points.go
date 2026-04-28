@@ -184,13 +184,9 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rec
 	}
 
 	extstatedb := extstate.New(statedb)
-	for i, tx := range txs {
-		txID, err := tx.ID()
-		if err != nil {
-			return fmt.Errorf("problem getting transaction ID %d for block %s (%d): %w", i, b.Hash(), b.NumberU64(), err)
-		}
+	for _, tx := range txs {
 		if err := tx.TransferNonAVAX(p.ctx.AVAXAssetID, extstatedb); err != nil {
-			return fmt.Errorf("failed to transfer non-AVAX assets of tx %s in block %s (%d): %w", txID, b.Hash(), b.NumberU64(), err)
+			return fmt.Errorf("failed to transfer non-AVAX assets of tx %s in block %s (%d): %w", tx.ID(), b.Hash(), b.NumberU64(), err)
 		}
 	}
 
@@ -328,11 +324,7 @@ func atomicOpsOf(txs []*tx.Tx) (map[ids.ID]*atomic.Requests, error) {
 
 	ops := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range txs {
-		txID, err := tx.ID()
-		if err != nil {
-			return nil, err
-		}
-
+		txID := tx.ID()
 		chainID, requests, err := tx.AtomicOps(txID)
 		if err != nil {
 			return nil, err

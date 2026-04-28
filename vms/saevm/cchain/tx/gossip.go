@@ -6,12 +6,7 @@ package tx
 import "github.com/ava-labs/avalanchego/ids"
 
 func (t *Tx) GossipID() ids.ID {
-	id, err := t.ID()
-	if err != nil {
-		// TODO: FIXME
-		panic(err)
-	}
-	return id
+	return t.ID()
 }
 
 type Marshaller struct{}

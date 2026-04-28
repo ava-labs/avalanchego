@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/libevm"
-	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
@@ -25,14 +24,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// Export is the unsigned component of a transaction that transfers assets from
+// the C-Chain to either the P-Chain or the X-Chain. It modifies the C-Chain
+// state and produces UTXOs in the shared memory between the C-Chain and the
+// destination chain.
 type Export struct {
 	NetworkID        uint32                     `serialize:"true" json:"networkID"`
 	BlockchainID     ids.ID                     `serialize:"true" json:"blockchainID"`
 	DestinationChain ids.ID                     `serialize:"true" json:"destinationChain"`
-	Ins              []EVMInput                 `serialize:"true" json:"inputs"`
+	Ins              []Input                    `serialize:"true" json:"inputs"`
 	ExportedOutputs  []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
@@ -52,29 +54,56 @@ func NonceInputID(address common.Address, nonce uint64) ids.ID {
 	return id
 }
 
+// Input identifies an account + nonce pair on the C-Chain that authorizes the
+// asset and quantity to deduct.
+//
+// If the AssetID is AVAX, the amount will be scaled up to account for the EVM's
+// higher denomination.
+type Input struct {
+	Address common.Address `serialize:"true" json:"address"`
+	Amount  uint64         `serialize:"true" json:"amount"`
+	AssetID ids.ID         `serialize:"true" json:"assetID"`
+	Nonce   uint64         `serialize:"true" json:"nonce"`
+}
+
+var errZeroAmount = errors.New("zero amount")
+
+func (i Input) Compare(o Input) int {
+	if c := i.Address.Cmp(o.Address); c != 0 {
+		return c
+	}
+	return i.AssetID.Compare(o.AssetID)
+}
+
+func (i Input) Verify() error {
+	if i.Amount == 0 {
+		return errZeroAmount
+	}
+	return nil
+}
+
 func (e *Export) burned(assetID ids.ID) (uint64, error) {
 	var (
-		output uint64
+		burned uint64
 		err    error
 	)
-	for _, out := range e.ExportedOutputs {
-		if out.AssetID() == assetID {
-			output, err = math.Add(output, out.Out.Amount())
-			if err != nil {
-				return 0, err
-			}
-		}
-	}
-	var input uint64
 	for _, in := range e.Ins {
 		if in.AssetID == assetID {
-			input, err = math.Add(input, in.Amount)
+			burned, err = math.Add(burned, in.Amount)
 			if err != nil {
 				return 0, err
 			}
 		}
 	}
-	return math.Sub(input, output)
+	for _, out := range e.ExportedOutputs {
+		if out.Asset.ID == assetID {
+			burned, err = math.Sub(burned, out.Out.Amount())
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	return burned, nil
 }
 
 var errOutputsNotSorted = errors.New("outputs not sorted")
@@ -121,7 +150,7 @@ func (e *Export) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	if !utils.IsSortedAndUnique(e.Ins) {
 		return errInputsNotSortedUnique
 	}
-	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, Codec) {
+	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
 		return errOutputsNotSorted
 	}
 
@@ -135,7 +164,7 @@ var (
 	errAddressMismatch        = errors.New("address does not match signature")
 )
 
-func (e *Export) VerifyCredentials(_ *snow.Context, creds []verify.Verifiable) error {
+func (e *Export) VerifyCredentials(_ *snow.Context, creds []Credential) error {
 	if len(e.Ins) != len(creds) {
 		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
 	}
@@ -145,10 +174,7 @@ func (e *Export) VerifyCredentials(_ *snow.Context, creds []verify.Verifiable) e
 		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
 	}
 	for i, in := range e.Ins {
-		cred, ok := creds[i].(*secp256k1fx.Credential)
-		if !ok {
-			return fmt.Errorf("expected %T but got %T", &secp256k1fx.Credential{}, cred)
-		}
+		cred := creds[i].Self()
 		if err := cred.Verify(); err != nil {
 			return err
 		}
@@ -170,11 +196,11 @@ func (e *Export) VerifyCredentials(_ *snow.Context, creds []verify.Verifiable) e
 var errNonceMismatch = errors.New("nonce mismatch")
 
 func (e *Export) VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error {
-	burn, _, err := e.asOp(avaxAssetID)
+	op, err := e.asOp(avaxAssetID)
 	if err != nil {
 		return fmt.Errorf("problem converting export to op: %w", err)
 	}
-	for address, debit := range burn {
+	for address, debit := range op.burn {
 		if nonce := reader.GetNonce(address); nonce != debit.Nonce {
 			return fmt.Errorf("%w: address %s has nonce %d but needs %d", errNonceMismatch, address, nonce, debit.Nonce)
 		}
@@ -185,24 +211,26 @@ func (e *Export) VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) erro
 	return nil
 }
 
+func (e *Export) numSigs() (uint64, error) {
+	return uint64(len(e.Ins)), nil
+}
+
 var errMultipleNonces = errors.New("multiple inputs for address with different nonces")
 
-func (e *Export) asOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit, map[common.Address]uint256.Int, error) {
-	burn := make(map[common.Address]hook.AccountDebit)
+func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
+	burn := make(map[common.Address]hook.AccountDebit, len(e.Ins))
 	for _, in := range e.Ins {
 		debit, ok := burn[in.Address]
 		if ok && debit.Nonce != in.Nonce {
-			return nil, nil, fmt.Errorf("%w: address %s has nonces %d and %d", errMultipleNonces, in.Address, debit.Nonce, in.Nonce)
+			return op{}, fmt.Errorf("%w: address %s has nonces %d and %d", errMultipleNonces, in.Address, debit.Nonce, in.Nonce)
 		}
 
-		// Non-AVAX assets are transferred by the [Export.TransferMulticoin].
-		// But we must still increment the nonce here.
+		// Non-AVAX inputs still record the address+nonce so SAE will increment
+		// the nonce, even though no AVAX is debited.
 		if in.AssetID == avaxAssetID {
-			var inAmount uint256.Int
-			inAmount.SetUint64(in.Amount)
-			inAmount.Mul(&inAmount, x2cRate)
-			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &inAmount); overflow {
-				return nil, nil, fmt.Errorf("%w: for address %s", errOverflow, in.Address)
+			amount := scaleAVAX(in.Amount)
+			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &amount); overflow {
+				return op{}, fmt.Errorf("%w: for address %s", errOverflow, in.Address)
 			}
 		}
 
@@ -210,7 +238,9 @@ func (e *Export) asOp(avaxAssetID ids.ID) (map[common.Address]hook.AccountDebit,
 		debit.MinBalance = debit.Amount
 		burn[in.Address] = debit
 	}
-	return burn, nil, nil
+	return op{
+		burn: burn,
+	}, nil
 }
 
 func (e *Export) AtomicOps(txID ids.ID) (ids.ID, *atomic.Requests, error) {
@@ -225,7 +255,7 @@ func (e *Export) AtomicOps(txID ids.ID) (ids.ID, *atomic.Requests, error) {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
+		utxoBytes, err := c.Marshal(codecVersion, utxo)
 		if err != nil {
 			return ids.ID{}, nil, err
 		}

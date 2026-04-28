@@ -1,6 +1,9 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package tx defines the Avalanche-specific transaction types used on the
+// C-Chain to interact with the shared memory between the C-Chain and other
+// chains on the Primary Network.
 package tx
 
 import (
@@ -12,11 +15,14 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/holiman/uint256"
 
+	// Imported for [GasPerByte] comment resolution.
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/snow"
+
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -26,6 +32,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// Tx is a signed transaction that interacts with shared memory.
+// The [Unsigned] body can be implemented by either [Export] or [Import].
+// The [Credential] values are implemented by [secp256k1fx.Credential].
+type Tx struct {
+	Unsigned `serialize:"true" json:"unsignedTx"`
+	Creds    []Credential `serialize:"true" json:"credentials"`
+}
+
+// Unsigned is a common interface implemented by [Import] and [Export].
 type Unsigned interface {
 	// InputUTXOs returns the UTXOIDs of the inputs of this transaction.
 	InputUTXOs() set.Set[ids.ID]
@@ -53,170 +68,174 @@ type Unsigned interface {
 	// this transaction.
 	burned(assetID ids.ID) (uint64, error)
 
+	// numSigs returns the expected number of signatures required to sign this
+	// transaction.
+	numSigs() (uint64, error)
+
 	// asOp returns the operation that this transaction performs on the EVM
 	// state.
-	asOp(avaxAssetID ids.ID) (
-		burn map[common.Address]hook.AccountDebit,
-		mint map[common.Address]uint256.Int,
-		err error,
-	)
+	asOp(avaxAssetID ids.ID) (op, error)
 }
 
-type Tx struct {
-	Unsigned `serialize:"true" json:"unsignedTx"`
-	Creds    []verify.Verifiable `serialize:"true" json:"credentials"`
+type op struct {
+	burn map[common.Address]hook.AccountDebit
+	mint map[common.Address]uint256.Int
 }
 
-func Parse(b []byte) (*Tx, error) {
-	tx := &Tx{}
-	if _, err := Codec.Unmarshal(b, &tx); err != nil {
-		return nil, fmt.Errorf("%T.Unmarshal(txBytes): %w", Codec, err)
-	}
-	return tx, nil
+// Credential is used in [Tx] to authorize an input of a transaction.
+//
+// It is only implemented by [secp256k1fx.Credential]. An interface must be used
+// to correctly produce the canonical binary format during serialization.
+type Credential interface {
+	Self() *secp256k1fx.Credential
 }
 
-func (t *Tx) Bytes() ([]byte, error) {
-	return Codec.Marshal(CodecVersion, t)
-}
-
-func (t *Tx) ID() (ids.ID, error) {
+// ID returns the unique hash of the transaction.
+func (t *Tx) ID() ids.ID {
+	// TODO(StephenButtolph): Optimize ID by caching previously calculated
+	// values.
 	bytes, err := t.Bytes()
+	// This error can happen, but only with invalid transactions. To avoid
+	// polluting the interface, we represent all invalid transactions with
+	// the zero ID.
 	if err != nil {
-		return ids.ID{}, err
+		return ids.ID{}
 	}
-	return hashing.ComputeHash256Array(bytes), nil
+	return hashing.ComputeHash256Array(bytes)
+}
+
+// Bytes returns the canonical binary format of the transaction.
+func (t *Tx) Bytes() ([]byte, error) {
+	// TODO(StephenButtolph): Optimize Bytes by caching previously calculated
+	// values.
+	return c.Marshal(codecVersion, t)
 }
 
 func (t *Tx) Compare(o *Tx) int {
-	id, err := t.ID()
-	if err != nil {
-		panic(err)
-	}
-	oID, err := o.ID()
-	if err != nil {
-		panic(err)
-	}
+	id := t.ID()
+	oID := o.ID()
 	return id.Compare(oID)
 }
 
+// AsOp converts the transaction into a [hook.Op] that can be processed by SAE.
+//
+// The operation only includes state changes that impact Ethereum-native state.
+// It does not include non-AVAX balance changes or shared memory modifications.
+func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
+	gas, err := gasUsed(t.Unsigned)
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("calculating gas used: %w", err)
+	}
+
+	burned, err := t.burned(avaxAssetID)
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("calculating amount burned: %w", err)
+	}
+
+	op, err := t.Unsigned.asOp(avaxAssetID)
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("converting unsigned transaction to operation: %w", err)
+	}
+
+	return hook.Op{
+		ID:        t.ID(),
+		Gas:       gas,
+		GasFeeCap: gasPrice(burned, gas),
+		Burn:      op.burn,
+		Mint:      op.mint,
+	}, nil
+}
+
 const (
-	IntrinsicGas = ap5.AtomicTxIntrinsicGas
-	GasPerByte   = 1 // atomic.TxBytesGas
-	GasPerSig    = secp256k1fx.CostPerSignature
+	// intrinsicGas is an initial static amount of gas that every [Tx] must pay.
+	intrinsicGas = ap5.AtomicTxIntrinsicGas
+	// gasPerByte is an additional amount of gas that is charged per-byte of an
+	// [Unsigned] transaction.
+	gasPerByte = 1 // [atomic.TxBytesGas]
+	// gasPerSig is an additional amount of gas that is charged per-signature
+	// included in a [Tx].
+	gasPerSig = gas.Gas(secp256k1fx.CostPerSignature)
 )
 
-var errUnknownCredentialType = errors.New("unknown credential type")
-
-func (t *Tx) GasUsed() (uint64, error) {
-	size, err := Codec.Size(CodecVersion, &t.Unsigned)
+func gasUsed(t Unsigned) (gas.Gas, error) {
+	numBytes, err := c.Size(codecVersion, &t)
 	if err != nil {
 		return 0, err
 	}
-	bytesGas, err := math.Mul(uint64(size), GasPerByte)
+	bytesGas, err := math.Mul(gas.Gas(numBytes), gasPerByte) //#nosec G115 -- Known non-negative
 	if err != nil {
 		return 0, err
 	}
-
-	var numSigs uint64
-	for _, credIntf := range t.Creds {
-		cred, ok := credIntf.(*secp256k1fx.Credential)
-		if !ok {
-			return 0, fmt.Errorf("%w: %T", errUnknownCredentialType, credIntf)
-		}
-
-		numSigs, err = math.Add(numSigs, uint64(len(cred.Sigs)))
-		if err != nil {
-			return 0, err
-		}
-	}
-	sigsGas, err := math.Mul(numSigs, GasPerSig)
+	numSigs, err := t.numSigs()
 	if err != nil {
 		return 0, err
 	}
-
+	sigsGas, err := math.Mul(gas.Gas(numSigs), gasPerSig)
+	if err != nil {
+		return 0, err
+	}
 	dynamicGas, err := math.Add(bytesGas, sigsGas)
 	if err != nil {
 		return 0, err
 	}
-	return math.Add(IntrinsicGas, dynamicGas)
+	return math.Add(intrinsicGas, dynamicGas)
 }
 
-const x2cRateUint64 = 1_000_000_000
+const _x2cRate = 1_000_000_000
 
 // x2cRate is the conversion rate between the smallest denomination on the
 // X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain 1 aAVAX.
-var x2cRate = uint256.NewInt(x2cRateUint64)
+var x2cRate = uint256.NewInt(_x2cRate)
 
-// GasPrice returns the price per gas that the transaction is paying denominated
-// in aAVAX/gas.
+// scaleAVAX converts an amount denominated in nAVAX into the C-Chain's aAVAX
+// denomination.
+func scaleAVAX(nAVAX uint64) uint256.Int {
+	var aAVAX uint256.Int
+	aAVAX.SetUint64(nAVAX)
+	aAVAX.Mul(&aAVAX, x2cRate)
+	return aAVAX
+}
+
+// gasPrice takes in the cost, in nAVAX, and the gas and returns the price per
+// gas in aAVAX/gas.
 //
 // The result is rounded down to the nearest aAVAX/gas.
-func (t *Tx) GasPrice(avaxAssetID ids.ID) (uint256.Int, error) {
-	gasUsed, err := t.GasUsed()
-	if err != nil {
-		return uint256.Int{}, err
-	}
-	burned, err := t.burned(avaxAssetID)
-	if err != nil {
-		return uint256.Int{}, err
-	}
+func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
+	var u uint256.Int
+	u.SetUint64(uint64(gas))
 
-	var bigGasUsed uint256.Int
-	bigGasUsed.SetUint64(gasUsed)
-
-	var gasPrice uint256.Int // gasPrice = burned * x2cRate / gasUsed
-	gasPrice.SetUint64(burned)
-	gasPrice.Mul(&gasPrice, x2cRate)
-	gasPrice.Div(&gasPrice, &bigGasUsed)
-	return gasPrice, nil
+	p := scaleAVAX(cost)
+	p.Div(&p, &u)
+	return p
 }
 
-func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
-	id, err := t.ID()
-	if err != nil {
-		return hook.Op{}, fmt.Errorf("problem getting transaction ID: %w", err)
+// Parse deserializes a [Tx] from its canonical binary format.
+func Parse(b []byte) (*Tx, error) {
+	var tx Tx
+	if _, err := c.Unmarshal(b, &tx); err != nil {
+		return nil, err
 	}
-
-	gasUsed, err := t.GasUsed()
-	if err != nil {
-		return hook.Op{}, fmt.Errorf("problem calculating gas used: %w", err)
-	}
-
-	gasPrice, err := t.GasPrice(avaxAssetID)
-	if err != nil {
-		return hook.Op{}, fmt.Errorf("problem calculating gas price: %w", err)
-	}
-
-	burn, mint, err := t.Unsigned.asOp(avaxAssetID)
-	if err != nil {
-		return hook.Op{}, fmt.Errorf("problem converting unsigned transaction to operation: %w", err)
-	}
-
-	return hook.Op{
-		ID:        id,
-		Gas:       gas.Gas(gasUsed),
-		GasFeeCap: gasPrice,
-		Burn:      burn,
-		Mint:      mint,
-	}, nil
+	return &tx, nil
 }
 
+// MarshalSlice returns the canonical binary format of a slice of transactions.
 func MarshalSlice(txs []*Tx) ([]byte, error) {
 	if len(txs) == 0 {
 		return nil, nil
 	}
-	return Codec.Marshal(CodecVersion, &txs)
+	return c.Marshal(codecVersion, txs)
 }
 
 var errInefficientSlicePacking = errors.New("inefficient slice packing: empty slices should be packed as nil")
 
+// ParseSlice deserializes a slice of [Tx] from its canonical binary format.
 func ParseSlice(b []byte) ([]*Tx, error) {
 	if len(b) == 0 {
 		return nil, nil
 	}
 
 	var txs []*Tx
-	if _, err := Codec.Unmarshal(b, &txs); err != nil {
+	if _, err := c.Unmarshal(b, &txs); err != nil {
 		return nil, err
 	}
 	if len(txs) == 0 {

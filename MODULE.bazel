@@ -138,7 +138,6 @@ use_repo(
     "org_golang_x_net",
     "org_golang_x_sync",
     "org_golang_x_term",
-    "org_golang_x_text",
     "org_golang_x_time",
     "org_golang_x_tools",
     "org_gonum_v1_gonum",

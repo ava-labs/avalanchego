@@ -11,15 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const CodecVersion uint16 = 0
+const codecVersion uint16 = 0
 
-var Codec codec.Manager
+var c codec.Manager
 
-// TODO: Unexport [Codec] and [CodecVersion]. Serialization should be an
-// implementation detail of this package.
 func init() {
-	Codec = codec.NewDefaultManager()
+	c = codec.NewDefaultManager()
 
+	// Registration order impacts the typeID included in the canonical format.
+	// We skip registrations in specific locations so that UTXOs in shared
+	// memory share the same serialized format as on the P-Chain and X-Chain.
 	var (
 		lc   = linearcodec.NewDefault()
 		errs = wrappers.Errs{}
@@ -39,9 +40,7 @@ func init() {
 	lc.SkipRegistrations(1)
 	errs.Add(
 		lc.RegisterType(&secp256k1fx.Credential{}),
-		lc.RegisterType(&secp256k1fx.Input{}),
-		lc.RegisterType(&secp256k1fx.OutputOwners{}),
-		Codec.RegisterCodec(CodecVersion, lc),
+		c.RegisterCodec(codecVersion, lc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
@@ -49,5 +48,5 @@ func init() {
 }
 
 func MarshalAtomicRequests(r *atomic.Requests) ([]byte, error) {
-	return Codec.Marshal(CodecVersion, r)
+	return c.Marshal(codecVersion, r)
 }

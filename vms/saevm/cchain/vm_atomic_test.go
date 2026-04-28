@@ -67,8 +67,7 @@ func TestExportTx(t *testing.T) {
 			require.Len(t, indexedValues, 1)
 
 			// Exact UTXO should be in shared memory
-			id, err := exportTx.ID()
-			require.NoError(t, err)
+			id := exportTx.ID()
 			_, req, err := exportTx.AtomicOps(id) // codec isn't exported, can still get UTXO marshaled like this
 			require.NoError(t, err)
 			require.Len(t, req.PutRequests, 1)
