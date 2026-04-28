@@ -1074,20 +1074,21 @@ func newFuzzStateDB() *fuzzStateDB {
 	}
 }
 
-func (s *fuzzStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
-	b := s.op.mint[addr]
+func (f *fuzzStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
+	b := f.op.mint[addr]
 	b.Add(&b, amount)
-	s.op.mint[addr] = b
+	f.op.mint[addr] = b
 }
 
-func (s *fuzzStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
-	d := s.op.burn[addr]
+func (f *fuzzStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
+	d := f.op.burn[addr]
 	d.Amount.Add(&d.Amount, amount)
 	d.MinBalance = d.Amount
-	s.op.burn[addr] = d
+	f.op.burn[addr] = d
 }
 
 func (*fuzzStateDB) GetBalance(common.Address) *uint256.Int {
+	// Large enough to never underflow, but small enough to never overflow.
 	return new(uint256.Int).Lsh(uint256.NewInt(1), 128)
 }
 
@@ -1096,15 +1097,16 @@ func (*fuzzStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {
 func (*fuzzStateDB) SubBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
 
 func (*fuzzStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int {
+	// Large enough to never underflow, but small enough to never overflow.
 	return new(big.Int).Lsh(big.NewInt(1), 128)
 }
 
-func (s *fuzzStateDB) SetNonce(addr common.Address, nonce uint64) {
-	d := s.op.burn[addr]
+func (f *fuzzStateDB) SetNonce(addr common.Address, nonce uint64) {
+	d := f.op.burn[addr]
 	d.Nonce = nonce - 1
-	s.op.burn[addr] = d
+	f.op.burn[addr] = d
 }
 
-func (s *fuzzStateDB) GetNonce(addr common.Address) uint64 {
-	return s.initialNonces[addr]
+func (f *fuzzStateDB) GetNonce(addr common.Address) uint64 {
+	return f.initialNonces[addr]
 }
