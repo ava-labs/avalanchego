@@ -75,6 +75,8 @@ func TestMain(m *testing.M) {
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).Logs.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewHeads.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewPendingTransactions.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
+		// There is a race between starting the chain indexer event loop and calling Close() within libevm.
+		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core.(*ChainIndexer).eventLoop"),
 	)
 }
 
