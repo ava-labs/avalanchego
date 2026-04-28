@@ -3,6 +3,7 @@ name: Run fuzz tests
 on:
   schedule:
     - cron: "0 0 * * *" # Once a day at midnight UTC
+  workflow_dispatch:
 
 permissions:
   contents: read
