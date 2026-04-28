@@ -3,7 +3,7 @@
 # First argument is the time, in seconds, to run each fuzz test for.
 # If not provided, defaults to 1 second.
 #
-# Second argument is the directory to run fuzz tests in.
+# Remaining arguments are the directories to run fuzz tests in.
 # If not provided, defaults to the current directory.
 
 set -euo pipefail
@@ -16,7 +16,10 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
 fuzzTime=${1:-1}
-fuzzDir=${2:-.}
+fuzzDirs=("${@:2}")
+if (( ${#fuzzDirs[@]} == 0 )); then
+    fuzzDirs=(.)
+fi
 
 # Set go test timeout to fuzz time + 20 minutes to allow for compilation and setup.
 # A negative fuzz time (e.g. -1) means run until failure, so disable the timeout.
@@ -26,12 +29,12 @@ else
     timeout=$((fuzzTime + 1200))
 fi
 
-files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' "$fuzzDir")
+files=$(grep -r --include='*_test.go' --files-with-matches 'func Fuzz' "${fuzzDirs[@]}")
+
 failed=false
-for file in ${files}
+while IFS= read -r file
 do
-    funcs=$(grep -oP 'func \K(Fuzz\w*)' "$file")
-    for func in ${funcs}
+    while IFS= read -r func
     do
         echo "Fuzzing $func in $file"
         parentDir=$(dirname "$file")
@@ -39,8 +42,8 @@ do
         if ! go test -tags test -timeout="${timeout}s" "$parentDir" -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s; then
             failed=true
         fi
-    done
-done
+    done < <(grep -oP 'func \K(Fuzz\w*)' "$file")
+done <<< "$files"
 
 if $failed; then
     exit 1
