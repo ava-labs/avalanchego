@@ -158,7 +158,6 @@ var (
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
 						AssetID: avaxAssetID,
-						Nonce:   0,
 					}},
 					ExportedOutputs: []*avax.TransferableOutput{{
 						Asset: avax.Asset{
@@ -167,7 +166,6 @@ var (
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 1,
 							OutputOwners: secp256k1fx.OutputOwners{
-								Locktime:  0,
 								Threshold: 1,
 								Addrs: []ids.ShortID{
 									ids.ShortFromStringOrPanic("LanVZgBDVvtarbTXD1uU7r1nXVJyLmPUz"),
@@ -193,7 +191,6 @@ var (
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
 						AssetID: avaxAssetID,
-						Nonce:   0,
 					}},
 					ExportedOutputs: []*avax.TransferableOutput{{
 						Asset: avax.Asset{
@@ -202,7 +199,6 @@ var (
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 1,
 							OutputOwners: secp256k1fx.OutputOwners{
-								Locktime:  0,
 								Threshold: 1,
 								Addrs: []ids.ShortID{
 									ids.ShortFromStringOrPanic("LanVZgBDVvtarbTXD1uU7r1nXVJyLmPUz"),
@@ -254,7 +250,6 @@ var (
 				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 11230),
 				Burn: map[common.Address]hook.AccountDebit{
 					common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"): {
-						Nonce:      0,
 						Amount:     *uint256.NewInt(1_000_001 * _x2cRate),
 						MinBalance: *uint256.NewInt(1_000_001 * _x2cRate),
 					},
@@ -667,16 +662,16 @@ var (
 			},
 		},
 	}
-	oldSlice []*atomic.Tx
-	newSlice []*Tx
+	oldTxs []*atomic.Tx
+	newTxs []*Tx
 )
 
 func init() {
-	oldSlice = make([]*atomic.Tx, len(tests))
-	newSlice = make([]*Tx, len(tests))
+	oldTxs = make([]*atomic.Tx, len(tests))
+	newTxs = make([]*Tx, len(tests))
 	for i, test := range tests {
-		oldSlice[i] = test.old
-		newSlice[i] = test.new
+		oldTxs[i] = test.old
+		newTxs[i] = test.new
 	}
 }
 
@@ -714,8 +709,8 @@ func TestBytes(t *testing.T) {
 }
 
 func TestMarshalSlice(t *testing.T) {
-	want, err := atomic.Codec.Marshal(atomic.CodecVersion, oldSlice)
-	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldSlice)
+	want, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
+	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldTxs)
 
 	tests := []struct {
 		name string
@@ -724,7 +719,7 @@ func TestMarshalSlice(t *testing.T) {
 	}{
 		{
 			name: "mainnet",
-			txs:  newSlice,
+			txs:  newTxs,
 			want: want,
 		},
 		{
@@ -759,8 +754,8 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseSlice(t *testing.T) {
-	bytes, err := atomic.Codec.Marshal(atomic.CodecVersion, oldSlice)
-	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldSlice)
+	bytes, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
+	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldTxs)
 
 	tests := []struct {
 		name    string
@@ -771,7 +766,7 @@ func TestParseSlice(t *testing.T) {
 		{
 			name:  "mainnet",
 			bytes: bytes,
-			want:  newSlice,
+			want:  newTxs,
 		},
 		{
 			name: "empty",
@@ -849,7 +844,7 @@ func FuzzParseCompatibility(f *testing.F) {
 
 func FuzzParseSliceCompatibility(f *testing.F) {
 	{
-		b, err := MarshalSlice(newSlice)
+		b, err := MarshalSlice(newTxs)
 		require.NoError(f, err, "MarshalSlice()")
 		f.Add(b)
 	}
@@ -883,7 +878,7 @@ func FuzzParseRoundTrip(f *testing.F) {
 
 func FuzzParseSliceRoundTrip(f *testing.F) {
 	{
-		b, err := MarshalSlice(newSlice)
+		b, err := MarshalSlice(newTxs)
 		require.NoError(f, err, "MarshalSlice()")
 		f.Add(b)
 	}

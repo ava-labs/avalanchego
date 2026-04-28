@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"math/big"
 	"net/http/httptest"
 	"os"
@@ -64,9 +63,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	createWorstCaseFuzzFlags(flag.CommandLine)
-	flag.Parse()
-
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelError, true)))
 
 	goleak.VerifyTestMain(
@@ -366,6 +362,10 @@ func (s *SUT) mustSendTx(tb testing.TB, txs ...*types.Transaction) {
 
 // sendTxsAndWaitUntilPending sends all `txs` to the mempool, and waits for
 // each to be marked as pending.
+//
+// WARNING: if there is a block executing concurrently with this method,
+// the pending state of the transactions may not be accurately reflected,
+// resulting in a timeout.
 func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
@@ -373,6 +373,11 @@ func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transactio
 	s.waitUntilTxsPending(tb, txs...)
 }
 
+// waitUntilTxsPending waits until all `txs` are marked as pending in the mempool.
+//
+// WARNING: if there is a block executing concurrently with this method,
+// the pending state of the transactions may not be accurately reflected,
+// resulting in a timeout.
 func (s *SUT) waitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
