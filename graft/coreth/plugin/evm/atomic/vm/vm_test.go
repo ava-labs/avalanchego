@@ -1634,13 +1634,16 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
 
+	// state-history=11 keeps only 11 block roots in Firewood's in-memory
+	// revision window. Issuing enough blocks past the import (block
+	// numPreImportBlocks+1) evicts it, forcing the archival query to replay.
 	var (
-		recipient         = common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678")
-		importAmount      = uint64(50_000_000)
-		importBlockHeight = 16
-		targetBlockHeight = 17
-		totalBlocks       = 31
-		configJSON        = `{
+		recipient          = common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678")
+		importAmount       = uint64(50_000_000)
+		numPreImportBlocks = 16
+		targetBlockHeight  = numPreImportBlocks + 1
+		totalBlocks        = 31
+		configJSON         = `{
 			"pruning-enabled": false,
 			"commit-interval": 10,
 			"state-history": 11
@@ -1681,12 +1684,12 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 		require.NoError(err)
 
 		blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
-		require.NoErrorf(err, "failed to build regular block at height %d", height)
-		require.NoErrorf(blk.Accept(ctx), "failed to accept regular block at height %d", height)
+		require.NoError(err, "failed to build regular block at height %d", height)
+		require.NoError(blk.Accept(ctx), "failed to accept regular block at height %d", height)
 	}
 
 	// Build chain history prior to the atomic import.
-	for i := range importBlockHeight {
+	for i := range numPreImportBlocks {
 		issueRegularBlock(i + 1)
 	}
 
@@ -1714,7 +1717,7 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 
 	// Continue the chain past the import so the target block falls outside
 	// Firewood's in-memory state-history window and must be re-executed.
-	for height := importBlockHeight + 1; height <= totalBlocks; height++ {
+	for height := numPreImportBlocks + 1; height <= totalBlocks; height++ {
 		issueRegularBlock(height)
 	}
 
@@ -1735,16 +1738,20 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	client, err := ethclient.Dial(server.URL)
 	require.NoError(err)
 
-	// Querying the recipient's balance at targetBlockHeight forces Firewood to
-	// replay the import block.
-	balance, err := client.BalanceAt(ctx, recipient, new(big.Int).SetUint64(uint64(targetBlockHeight)))
+	// The recipient receives funds only in the import block, so its head
+	// balance equals the expected post-import balance.
+	headBalance, err := client.BalanceAt(ctx, recipient, nil)
+	require.NoError(err)
+	require.Positive(headBalance.Sign(), "recipient %s should have a positive balance after the import", recipient)
+
+	// Querying balance at the import block's height forces Firewood to replay
+	// the import; the archival result must match the live head balance.
+	archiveBalance, err := client.BalanceAt(ctx, recipient, new(big.Int).SetUint64(uint64(targetBlockHeight)))
 	require.NoError(err, "historical query at block %d should replay successfully", targetBlockHeight)
 
-	require.Equalf(
-		1,
-		balance.Cmp(big.NewInt(0)),
-		"recipient %s should have a positive imported balance at block %d",
-		recipient,
-		targetBlockHeight,
+	require.Zero(
+		archiveBalance.Cmp(headBalance),
+		"archival balance %s at block %d must equal live balance %s",
+		archiveBalance, targetBlockHeight, headBalance,
 	)
 }
