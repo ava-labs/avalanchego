@@ -1,0 +1,27 @@
+[
+  {
+    "name": "P-Chain",
+    "chainId": "P",
+    "rpcPath": "/ext/bc/P",
+    "vm": "platformvm",
+    "consensus": "snowman"
+  },
+  {
+    "name": "C-Chain",
+    "chainId": "C",
+    "rpcPath": "/ext/bc/C/rpc",
+    "vm": "evm",
+    "consensus": "snowman"
+  },
+  {
+    "name": "simplexl1",
+    "chainId": "Du6NZkrpGtpBxFvqz8rPdie4jhBf63EisQXa1nuiVp6LkX12T",
+    "rpcPath": "/ext/bc/Du6NZkrpGtpBxFvqz8rPdie4jhBf63EisQXa1nuiVp6LkX12T/rpc",
+    "subnetId": "NNZsBjfD8VwWoyWuxgr6LdTP2E2xHp9pJeri8icgW7Fq96pfv",
+    "vm": "subnet-evm",
+    "consensus": "simplex",
+    "conversionTx": "HgEKo2P2tCmvH6qvjGG5jKkneZuJazsCAmpWLiTyCD8th1nfE",
+    "conversionId": "2SuD4tQ39KYazRjTvM2a956ER4GSht9ETsqpYBZR5Ane46AopG",
+    "validatorCount": 5
+  }
+]

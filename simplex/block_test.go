@@ -125,6 +125,11 @@ func TestBlockSerialization(t *testing.T) {
 	}
 }
 
+func TestPrevBlacklist(t *testing.T) {
+	b := newTestBlock(t, newBlockConfig{})
+	require.True(t, b.blacklist.IsEmpty())
+}
+
 // TestVerifyPrevNotFound attempts to verify a block with a prev digest that is not valid.
 func TestVerifyPrevNotFound(t *testing.T) {
 	ctx := t.Context()

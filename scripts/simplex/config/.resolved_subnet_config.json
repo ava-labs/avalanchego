@@ -1,0 +1,28 @@
+{
+  "simplexParameters": {
+    "initialValidators": [
+      {
+        "nodeID": "NodeID-4m5BMMCbEKr6fuKmF975T9yk7vFkQ5wXT",
+        "publicKey": "rqjqeKB2iYk9kdyWZ6aESTdBQP7LDepAPhiLn5gC3OqoJLF9wzU0SkG3smlvMrlr"
+      },
+      {
+        "nodeID": "NodeID-A75Xzm7VnKSnMUavpVcfCVevBTc7jTpwW",
+        "publicKey": "jEbRMuoHFQL+3rEU/9cO6d9n24Racnhd+cLpAf4OYY5VWFSbCL8Ko+8P0QZNfLoO"
+      },
+      {
+        "nodeID": "NodeID-ENrh51L8AtYAcgatVffo7JrNEP4JtY7qi",
+        "publicKey": "lLeLl9rFjRsYWJgrX6ABBCPouDuj5O4bRaqHuchXsLWg3HUlaBJGTfrtFk+dd80t"
+      },
+      {
+        "nodeID": "NodeID-F7fBsbT8ptGANV9zC8taw5vpCCCZ7fRua",
+        "publicKey": "iwhLwoN0bWcma7iyWS5WpXWYCTfpN43NN7yQoTVCWdVGV2Ivcu3HQq/ZeDPdiIW6"
+      },
+      {
+        "nodeID": "NodeID-HBzyshYfEqtgS8T5sWbfB3ZvpDXyKH9uk",
+        "publicKey": "lm1YZVa4+htLUn7FKGUv+JM6HUMEMbBcKnAjPoXN3FuwwvCD/ux5nDOrXyW2qw8a"
+      }
+    ],
+    "maxNetworkDelay": 5000000000,
+    "maxRebroadcastWait": 5000000000
+  }
+}

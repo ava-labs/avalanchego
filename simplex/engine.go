@@ -99,6 +99,8 @@ func NewEngine(ctx context.Context, snowCtx *snow.ConsensusContext, config *Conf
 	}
 
 	bt := newBlockTracker()
+	bt.logger = config.Log
+	bt.vm = config.VM
 
 	storage, err := newStorage(ctx, config, qcDeserializer, bt)
 	if err != nil {
@@ -189,9 +191,10 @@ func (e *Engine) Start(ctx context.Context, _ uint32) error {
 	}
 
 	if err := e.epoch.Start(); err != nil {
+		e.logger.Error("Failed to start simplex epoch", zap.Error(err))
 		return fmt.Errorf("failed to start simplex epoch: %w", err)
 	}
-
+	e.logger.Info("Started simplex epoch, starting block builder ticker")
 	go e.tick()
 	return nil
 }
@@ -228,6 +231,10 @@ func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simple
 		e.logger.Debug("failed to convert p2p message to simplex message", zap.Error(err))
 		return nil
 	}
+
+	e.logger.Debug("received simplex message",
+		zap.Stringer("from", nodeID),
+	)
 
 	return e.epoch.HandleMessage(simplexMsg, nodeID[:])
 }

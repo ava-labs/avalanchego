@@ -878,16 +878,16 @@ func (h *handler) handleChanMsg(msg *message.InboundMessage) error {
 		// execution (may change during execution)
 		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
-	if h.ctx.Log.Enabled(logging.Verbo) {
-		h.ctx.Log.Verbo("forwarding chan message to consensus",
-			zap.String("messageOp", op),
-			zap.Stringer("message", body),
-		)
-	} else {
-		h.ctx.Log.Debug("forwarding chan message to consensus",
-			zap.String("messageOp", op),
-		)
-	}
+	// if h.ctx.Log.Enabled(logging.Verbo) {
+	// 	h.ctx.Log.Verbo("forwarding chan message to consensus",
+	// 		zap.String("messageOp", op),
+	// 		zap.Stringer("message", body),
+	// 	)
+	// } else {
+	// 	h.ctx.Log.Debug("forwarding chan message to consensus",
+	// 		zap.String("messageOp", op),
+	// 	)
+	// }
 	h.ctx.Lock.Lock()
 	lockAcquiredTime := h.clock.Time()
 	defer func() {
@@ -906,9 +906,10 @@ func (h *handler) handleChanMsg(msg *message.InboundMessage) error {
 		h.metrics.messageHandlingTime.With(labels).Add(float64(handlingTime))
 
 		msg.OnFinishedHandling()
-		h.ctx.Log.Debug("finished handling chan message",
-			zap.String("messageOp", op),
-		)
+		// Simplex doesn't need to handle gossip messages.
+		// h.ctx.Log.Debug("finished handling chan message",
+		// 	zap.String("messageOp", op),
+		// )
 		if lockingTime+handlingTime > syncProcessingTimeWarnLimit && isNormalOp {
 			h.ctx.Log.Warn("handling chan message took longer than expected",
 				zap.Duration("lockingTime", lockingTime),

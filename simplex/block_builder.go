@@ -37,11 +37,13 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 			return nil, false
 		}
 
+		b.log.Debug("Attempting to build block!!!")
 		err := b.waitForPendingBlock(ctx)
 		if err != nil {
 			b.log.Debug("Error waiting for incoming block", zap.Error(err))
 			continue
 		}
+		b.log.Debug("Received pending block event, building block!!!")
 		vmBlock, err := b.vm.BuildBlock(ctx)
 		if err != nil {
 			b.log.Info("Error building block", zap.Error(err))
@@ -84,6 +86,8 @@ func (b *BlockBuilder) waitForPendingBlock(ctx context.Context) error {
 		b.log.Warn("Received unexpected message", zap.Stringer("message", msg))
 	}
 }
+
+//  go run ./scripts/simplex/send_tx/ --nodes=./scripts/simplex/tx-frontend/public/nodes.json --chains=./scripts/simplex/tx-frontend/public/chains.json
 
 // backoff waits for `backoff` duration before returning the next backoff duration.
 // It doubles the backoff duration each time it is called, up to a maximum of `maxBackoff`.

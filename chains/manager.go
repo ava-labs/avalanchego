@@ -584,7 +584,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		if chainParams.ID == constants.PlatformChainID {
 			beacons = chainParams.CustomBeacons
 		}
-
+		m.Log.Debug("Creating snowmansjknsknsnjk!!!!!!")
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
@@ -1197,7 +1197,7 @@ func (m *manager) createSnowmanChain(
 	if ctx.ChainID == constants.PlatformChainID {
 		minBlockDelay = m.ProposerMinBlockDelay
 	}
-	m.Log.Info("creating proposervm wrapper",
+	m.Log.Info("creating proposervm wrapper!!!!!",
 		zap.Time("activationTime", m.Upgrades.ApricotPhase4Time),
 		zap.Uint64("minPChainHeight", m.Upgrades.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
@@ -1790,10 +1790,6 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 
 	walLocation := getChainWALLocation(ctx.ChainDataDir, ctx.ChainID)
 	chainWal := wal.New(walLocation)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create simplex wal: %w", err)
-	}
-
 	config := &simplex.Config{
 		Ctx:                simplexCtxConfig(ctx),
 		Log:                ctx.Log,

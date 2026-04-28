@@ -17,5 +17,6 @@ go_library(
         "//vms/example/xsvm/chain",
         "//vms/example/xsvm/execute",
         "//vms/example/xsvm/tx",
+        "@org_uber_go_zap//:zap",
     ],
 )

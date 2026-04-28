@@ -216,6 +216,7 @@ replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
 replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
 
 replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
+replace github.com/ava-labs/simplex => ../simplex
 
 // Workaround for genproto ambiguous import conflict.
 // cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.

@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "s",
+    srcs = [
+        "simplex.go",
+        "utils.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tests/e2e/s",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/consensus/simplex",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//utils/set",
+        "//utils/units",
+        "//vms/example/xsvm/api",
+        "//vms/example/xsvm/genesis",
+        "//vms/example/xsvm/tx",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)

@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "create_l1_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/scripts/simplex/create_l1",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api/info",
+        "//config",
+        "//genesis",
+        "//ids",
+        "//tests/fixture/tmpnet",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/units",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/warp/message",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "create_l1",
+    embed = [":create_l1_lib"],
+    visibility = ["//visibility:public"],
+)
