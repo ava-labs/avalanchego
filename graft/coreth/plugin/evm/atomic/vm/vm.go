@@ -449,9 +449,8 @@ func (vm *VM) Logger() logging.Logger { return vm.Ctx.Log }
 
 func (vm *VM) createConsensusCallbacks() dummy.ConsensusCallbacks {
 	return dummy.ConsensusCallbacks{
-		OnFinalizeAndAssemble:              vm.onFinalizeAndAssemble,
-		OnExtraStateChange:                 vm.onExtraStateChange,
-		OnHistoricalReplayExtraStateChange: vm.onHistoricalReplayExtraStateChange,
+		OnFinalizeAndAssemble: vm.onFinalizeAndAssemble,
+		OnExtraStateChange:    vm.onExtraStateChange,
 	}
 }
 
@@ -625,23 +624,6 @@ func (vm *VM) onFinalizeAndAssemble(
 }
 
 func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, statedb *state.StateDB) (*big.Int, *big.Int, error) {
-	return vm.onExtraStateChangeWithMode(block, parent, statedb, false)
-}
-
-func (vm *VM) onHistoricalReplayExtraStateChange(
-	block *types.Block,
-	parent *types.Header,
-	statedb *state.StateDB,
-) (*big.Int, *big.Int, error) {
-	return vm.onExtraStateChangeWithMode(block, parent, statedb, true)
-}
-
-func (vm *VM) onExtraStateChangeWithMode(
-	block *types.Block,
-	parent *types.Header,
-	statedb *state.StateDB,
-	historicalReplay bool,
-) (*big.Int, *big.Int, error) {
 	var (
 		batchContribution = big.NewInt(0)
 		batchGasUsed      = big.NewInt(0)
@@ -658,7 +640,7 @@ func (vm *VM) onExtraStateChangeWithMode(
 	}
 
 	// If [atomicBackend] is nil, the VM is still initializing and is reprocessing accepted blocks.
-	if vm.AtomicBackend != nil && !historicalReplay {
+	if lastAccepted := vm.LastAcceptedExtendedBlock(); lastAccepted != nil && vm.AtomicBackend != nil && lastAccepted.Height() <= block.NumberU64() {
 		if vm.AtomicBackend.IsBonus(block.NumberU64(), block.Hash()) {
 			log.Info("skipping atomic tx verification on bonus block", "block", block.Hash())
 		} else {
