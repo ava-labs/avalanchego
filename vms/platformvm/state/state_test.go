@@ -3212,20 +3212,32 @@ func TestGetPublicKeyDiffs(t *testing.T) {
 	}
 }
 
-func TestBaseCurrentStakers(t *testing.T) {
-	testCurrentStakers(t, func(t *testing.T) CurrentStakers {
-		return newTestState(t, memdb.New())
-	})
+type newCurrentStakers = func(t *testing.T) CurrentStakers
+
+func newBaseCurrentStakers(t *testing.T) CurrentStakers {
+	return newTestState(t, memdb.New())
 }
 
-func TestDiffCurrentStakers(t *testing.T) {
-	testCurrentStakers(t, func(t *testing.T) CurrentStakers {
-		s := newTestState(t, memdb.New())
-		d, err := NewDiffOn(s, true)
-		require.NoError(t, err)
+func newDiffCurrentStakers(t *testing.T) CurrentStakers {
+	s := newTestState(t, memdb.New())
+	d, err := NewDiffOn(s, true)
+	require.NoError(t, err)
+	return d
+}
 
-		return d
-	})
+func TestCurrentStakers(t *testing.T) {
+	tests := []struct {
+		name string
+		new  newCurrentStakers
+	}{
+		{"base", newBaseCurrentStakers},
+		{"diff", newDiffCurrentStakers},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testCurrentStakers(t, test.new)
+		})
+	}
 }
 
 func testCurrentStakers(t *testing.T, csF func(t *testing.T) CurrentStakers) {
