@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -18,8 +19,10 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
@@ -40,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -1618,4 +1622,129 @@ func TestWaitForEvent(t *testing.T) {
 			require.NoError(t, vm.Shutdown(t.Context()))
 		})
 	}
+}
+
+// TestFirewoodHistoricalReplayAcrossAtomicImport verifies that a Firewood
+// archival balance query forcing replay through an accepted atomic import
+// succeeds, even if the import's input UTXO has already been consumed
+// from shared memory. The test pads chain history past the import so the
+// queried block falls outside Firewood's in-memory state-history window,
+// guaranteeing that answering the query requires re-executing the import.
+func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
+	require := require.New(t)
+	ctx := t.Context()
+
+	var (
+		recipient         = common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678")
+		importAmount      = uint64(50_000_000)
+		importBlockHeight = 16
+		targetBlockHeight = 17
+		totalBlocks       = 31
+		configJSON        = `{
+			"pruning-enabled": false,
+			"commit-interval": 10,
+			"state-history": 11
+		}`
+	)
+
+	vm := newAtomicTestVM()
+	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+		ConfigJSON: configJSON,
+		Scheme:     customrawdb.FirewoodScheme,
+	})
+	t.Cleanup(func() {
+		require.NoError(vm.Shutdown(ctx))
+	})
+
+	// Seed shared memory with the UTXO that the import block will consume.
+	require.NoError(addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
+		vmtest.TestShortIDAddrs[0]: importAmount,
+	}))
+
+	// issueRegularBlock advances the chain by one block containing a single
+	// self-transfer; used to pad chain history before and after the import.
+	issueRegularBlock := func(height int) {
+		nonce := vm.Ethereum().TxPool().Nonce(vmtest.TestEthAddrs[0])
+		tx := types.NewTransaction(
+			nonce,
+			common.Address{},
+			big.NewInt(0),
+			21_000,
+			vmtest.InitialBaseFee,
+			nil,
+		)
+		signedTx, err := types.SignTx(
+			tx,
+			types.LatestSignerForChainID(vm.Ethereum().BlockChain().Config().ChainID),
+			vmtest.TestKeys[0].ToECDSA(),
+		)
+		require.NoError(err)
+
+		blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
+		require.NoErrorf(err, "failed to build regular block at height %d", height)
+		require.NoErrorf(blk.Accept(ctx), "failed to accept regular block at height %d", height)
+	}
+
+	// Build chain history prior to the atomic import.
+	for i := range importBlockHeight {
+		issueRegularBlock(i + 1)
+	}
+
+	// Issue, build, and accept the atomic import block. We capture the input
+	// UTXO ID so we can later assert it has been removed from shared memory.
+	importTx, err := vm.newImportTx(vm.Ctx.XChainID, recipient, vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
+	require.NoError(err)
+	inputUTXOs := importTx.InputUTXOs()
+	require.Len(inputUTXOs, 1)
+
+	importedInputID, ok := inputUTXOs.Pop()
+	require.True(ok)
+
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
+
+	msg, err := vm.WaitForEvent(ctx)
+	require.NoError(err)
+	require.Equal(commonEng.PendingTxs, msg)
+
+	blk, err := vm.BuildBlock(ctx)
+	require.NoError(err)
+	require.NoError(blk.Verify(ctx))
+	require.NoError(vm.SetPreference(ctx, blk.ID()))
+	require.NoError(blk.Accept(ctx))
+
+	// Continue the chain past the import so the target block falls outside
+	// Firewood's in-memory state-history window and must be re-executed.
+	for height := importBlockHeight + 1; height <= totalBlocks; height++ {
+		issueRegularBlock(height)
+	}
+
+	// Drain pending acceptors and confirm the import's UTXO has been consumed
+	// from live shared memory. Historical replay must not depend on it.
+	vm.Ethereum().BlockChain().DrainAcceptorQueue()
+	_, err = vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{importedInputID[:]})
+	require.ErrorIs(err, database.ErrNotFound)
+
+	// Stand up an in-process RPC server so we can issue an archival query.
+	handlers, err := vm.CreateHandlers(ctx)
+	require.NoError(err)
+
+	ethRPCEndpoint := "/rpc"
+	server := httptest.NewServer(handlers[ethRPCEndpoint])
+	t.Cleanup(server.Close)
+
+	client, err := ethclient.Dial(server.URL)
+	require.NoError(err)
+
+	// Querying the recipient's balance at targetBlockHeight forces Firewood to
+	// replay the import block.
+	balance, err := client.BalanceAt(ctx, recipient, new(big.Int).SetUint64(uint64(targetBlockHeight)))
+	require.NoError(err, "historical query at block %d should replay successfully", targetBlockHeight)
+
+	require.Equalf(
+		1,
+		balance.Cmp(big.NewInt(0)),
+		"recipient %s should have a positive imported balance at block %d",
+		recipient,
+		targetBlockHeight,
+	)
 }
