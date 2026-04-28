@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -50,7 +49,7 @@ type Unsigned interface {
 
 	// VerifyCredentials verifies that the transaction is authorized by the
 	// provided credentials.
-	VerifyCredentials(snowCtx *snow.Context, creds []verify.Verifiable) error
+	VerifyCredentials(snowCtx *snow.Context, creds []Credential) error
 
 	// VerifyState verifies that the transaction is valid to be issued on the
 	// provided state.
