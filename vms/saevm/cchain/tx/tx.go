@@ -49,7 +49,7 @@ type Unsigned interface {
 
 	// VerifyCredentials verifies that the transaction is authorized by the
 	// provided credentials.
-	VerifyCredentials(snowCtx *snow.Context, creds []Credential) error
+	VerifyCredentials(sm atomic.SharedMemory, creds []Credential) error
 
 	// VerifyState verifies that the transaction is valid to be issued on the
 	// provided state.

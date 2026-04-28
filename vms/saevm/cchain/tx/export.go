@@ -164,7 +164,7 @@ var (
 	errAddressMismatch        = errors.New("address does not match signature")
 )
 
-func (e *Export) VerifyCredentials(_ *snow.Context, creds []Credential) error {
+func (e *Export) VerifyCredentials(_ atomic.SharedMemory, creds []Credential) error {
 	if len(e.Ins) != len(creds) {
 		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
 	}

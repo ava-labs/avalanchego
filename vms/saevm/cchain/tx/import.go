@@ -167,7 +167,7 @@ var (
 	errVerifyTransferFailed    = errors.New("transfer verification failed")
 )
 
-func (i *Import) VerifyCredentials(snowCtx *snow.Context, creds []Credential) error {
+func (i *Import) VerifyCredentials(sm atomic.SharedMemory, creds []Credential) error {
 	if len(i.ImportedInputs) != len(creds) {
 		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
 	}
@@ -178,7 +178,7 @@ func (i *Import) VerifyCredentials(snowCtx *snow.Context, creds []Credential) er
 		utxoIDs[i] = inputID[:]
 	}
 
-	utxoBytes, err := snowCtx.SharedMemory.Get(i.SourceChain, utxoIDs)
+	utxoBytes, err := sm.Get(i.SourceChain, utxoIDs)
 	if err != nil {
 		return fmt.Errorf("%w from %s: %w", errFailedToFetchUTXOs, i.SourceChain, err)
 	}
