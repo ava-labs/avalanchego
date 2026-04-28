@@ -736,8 +736,15 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		log("waiting for the remaining chains in this subnet to finish syncing")
+	// 
+	// During dynamic state sync the inner VM is still at genesis and
+  // cannot handle NormalOp. Wait for sync to complete.
+	if !b.Config.BootstrapTracker.IsBootstrapped() || b.Ctx.StateSyncing.Get() {
+		if b.Ctx.StateSyncing.Get() {
+			log("waiting for dynamic state sync to complete")
+		} else {
+			log("waiting for the remaining chains in this subnet to finish syncing")
+		}
 		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
 		// on the latest tip.
 		b.awaitingTimeout = true
@@ -765,7 +772,7 @@ func (b *Bootstrapper) Timeout() error {
 	}
 	b.awaitingTimeout = false
 
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
+	if !b.Config.BootstrapTracker.IsBootstrapped() || b.Ctx.StateSyncing.Get() {
 		return b.restartBootstrapping(context.TODO())
 	}
 	return b.onFinished(context.TODO(), b.requestID)
