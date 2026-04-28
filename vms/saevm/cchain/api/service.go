@@ -182,11 +182,6 @@ func (s *Service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) 
 		return fmt.Errorf("problem parsing transaction: %w", err)
 	}
 
-	txID, err := tx.ID()
-	if err != nil {
-		return fmt.Errorf("problem getting transaction ID: %w", err)
-	}
-
 	err = s.mempool.Add(tx)
 	if err == nil || errors.Is(err, txpool.ErrAlreadyKnown) {
 		// If the tx was added to the mempool, or was previously included, we
@@ -195,7 +190,7 @@ func (s *Service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) 
 		s.pushGossiper.Add(tx)
 	}
 
-	r.TxID = txID
+	r.TxID = tx.ID()
 	return err
 }
 

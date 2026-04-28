@@ -15,14 +15,14 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/holiman/uint256"
 
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+
 	// Imported for [GasPerByte] comment resolution.
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/snow"
-
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"

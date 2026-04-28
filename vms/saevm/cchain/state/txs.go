@@ -41,12 +41,7 @@ func writeTxs(db database.Database, height uint64, txs []*tx.Tx, bonus bool) err
 	batch := db.NewBatch()
 	for _, tx := range txs {
 		if bonus {
-			txID, err := tx.ID()
-			if err != nil {
-				return err
-			}
-
-			has, err := hasTxByID(db, txID)
+			has, err := hasTxByID(db, tx.ID())
 			if err != nil {
 				return err
 			}
@@ -92,11 +87,6 @@ func hasTxByID(db database.KeyValueReader, txID ids.ID) (bool, error) {
 }
 
 func writeTxByID(db database.KeyValueWriter, height uint64, tx *tx.Tx) error {
-	txID, err := tx.ID()
-	if err != nil {
-		return err
-	}
-
 	txBytes, err := tx.Bytes()
 	if err != nil {
 		return err
@@ -107,6 +97,8 @@ func writeTxByID(db database.KeyValueWriter, height uint64, tx *tx.Tx) error {
 	}
 	p.PackLong(height)
 	p.PackBytes(txBytes)
+
+	txID := tx.ID()
 	return db.Put(prefixdb.PrefixKey(txIDToTxPrefix, txID[:]), p.Bytes)
 }
 
