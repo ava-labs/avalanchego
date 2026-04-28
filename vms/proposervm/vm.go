@@ -117,10 +117,6 @@ type VM struct {
 	// lastAcceptedTimestampGaugeVec reports timestamps for the last-accepted
 	// [postForkBlock] and its inner block.
 	lastAcceptedTimestampGaugeVec *prometheus.GaugeVec
-
-	// syncTargetHeight is the proposervm's last accepted height before repair
-	// rolled it back during dynamic state sync. Zero when no rollback occurred.
-	syncTargetHeight uint64
 }
 
 // New performs best when [minBlkDelay] is whole seconds. This is because block
@@ -188,7 +184,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
+	if err := vm.repairAcceptedChainByHeight(ctx, false); err != nil {
 		return fmt.Errorf("failed to repair accepted chain by height: %w", err)
 	}
 
@@ -336,7 +332,7 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	// accepted block. If state sync has completed successfully, this call is a
 	// no-op. During dynamic state sync, skip the rollback so the consensus
 	// engine can start at the sync target height.
-	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
+	if err := vm.repairAcceptedChainByHeight(ctx, true); err != nil {
 		return fmt.Errorf("failed to repair accepted chain height: %w", err)
 	}
 	return vm.setLastAcceptedMetadata(ctx)
@@ -612,13 +608,7 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return lastAccepted, err
 }
 
-// StateSyncTargetHeight returns the proposervm's last accepted height before
-// repair rolled it back. Returns 0 if no rollback occurred.
-func (vm *VM) StateSyncTargetHeight() uint64 {
-	return vm.syncTargetHeight
-}
-
-func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
+func (vm *VM) repairAcceptedChainByHeight(ctx context.Context, afterStateSyncing bool) error {
 	innerLastAcceptedID, err := vm.ChainVM.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get inner last accepted: %w", err)
@@ -651,6 +641,17 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		return nil
 	}
 
+	// During dynamic state sync the inner VM is still at genesis.
+	// Preserve the proposervm height so the bootstrapper gets the
+	// correct lastAccepted. Not applied during Initialize (crash
+	// recovery) where height 0 means a genuine rollback.
+	if afterStateSyncing && innerLastAcceptedHeight == 0 {
+		vm.ctx.Log.Info("preserving proposervm height during dynamic state sync",
+			zap.Uint64("outerHeight", proLastAcceptedHeight),
+		)
+		return nil
+	}
+
 	vm.ctx.Log.Info("repairing accepted chain by height",
 		zap.Uint64("outerHeight", proLastAcceptedHeight),
 		zap.Uint64("innerHeight", innerLastAcceptedHeight),
@@ -662,10 +663,6 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get fork height: %w", err)
 	}
-
-	// Preserve the height before rolling back so the bootstrapper can use it
-	// as the block-fetching floor via StateSyncTargetHeight().
-	vm.syncTargetHeight = proLastAcceptedHeight
 
 	if forkHeight > innerLastAcceptedHeight {
 		// We are rolling back past the fork, so we should just forget about all

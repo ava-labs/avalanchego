@@ -116,10 +116,6 @@ type Bootstrapper struct {
 	tree            *interval.Tree
 	missingBlockIDs set.Set[ids.ID]
 
-	// syncTargetHeight is non-zero during dynamic state sync and limits block
-	// fetching to heights above this value.
-	syncTargetHeight uint64
-
 	// bootstrappedOnce ensures that the [Bootstrapped] callback is only invoked
 	// once, even if bootstrapping is retried.
 	bootstrappedOnce sync.Once
@@ -195,18 +191,9 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	lastAcceptedHeight := lastAccepted.Height()
-
-	// During dynamic state sync, skip fetching blocks below the sync target
-	// so recent blocks are executed quickly and can drive pivots.
-	b.syncTargetHeight = b.Ctx.StateSyncTargetHeight.Get()
-	if b.syncTargetHeight > lastAcceptedHeight {
-		lastAcceptedHeight = b.syncTargetHeight
-	}
-
 	b.Ctx.Log.Info("starting bootstrapper",
 		zap.Stringer("lastAcceptedID", lastAccepted.ID()),
 		zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
-		zap.Uint64("syncTargetHeight", b.syncTargetHeight),
 	)
 
 	// Set the starting height
@@ -611,17 +598,12 @@ func (b *Bootstrapper) process(
 
 	numPreviouslyFetched := b.tree.Len()
 
-	lastAcceptedHeight := lastAccepted.Height()
-	if b.syncTargetHeight > lastAcceptedHeight {
-		lastAcceptedHeight = b.syncTargetHeight
-	}
-
 	batch := b.DB.NewBatch()
 	missingBlockID, foundNewMissingID, err := process(
 		batch,
 		b.tree,
 		b.missingBlockIDs,
-		lastAcceptedHeight,
+		lastAccepted.Height(),
 		blk,
 		ancestors,
 	)
@@ -702,11 +684,6 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		log = b.Ctx.Log.Debug
 	}
 
-	lastAcceptedHeight := lastAccepted.Height()
-	if b.syncTargetHeight > lastAcceptedHeight {
-		lastAcceptedHeight = b.syncTargetHeight
-	}
-
 	numToExecute := b.tree.Len()
 	err = execute(
 		ctx,
@@ -719,7 +696,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 			numAccepted: b.numAccepted,
 		},
 		b.tree,
-		lastAcceptedHeight,
+		lastAccepted.Height(),
 	)
 	if err != nil {
 		// If a fatal error has occurred, include the last accepted block
