@@ -38,6 +38,7 @@ go_test(
         "//graft/coreth/plugin/evm/atomic",
         "//graft/coreth/plugin/evm/atomic/vm",
         "//ids",
+        "//snow",
         "//utils/math",
         "//vms/components/avax",
         "//vms/components/gas",
