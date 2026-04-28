@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
 	// Imported for [GasPerByte] comment resolution.
@@ -38,6 +39,10 @@ type Tx struct {
 // TODO(StephenButtolph): Expand this interface to include UTXO handling,
 // verification, and state execution.
 type Unsigned interface {
+	// TransferNonAVAX transfers the non-AVAX balances requested by this
+	// transaction.
+	TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
+
 	// burned returns the amount of assetID that is consumed but not produced by
 	// this transaction.
 	burned(assetID ids.ID) (uint64, error)

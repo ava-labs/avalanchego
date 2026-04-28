@@ -6,10 +6,12 @@ package tx
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -124,4 +126,22 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *atomic.Requests, error) {
 		elems[i] = elem
 	}
 	return e.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
+}
+
+var errInsufficientFunds = errors.New("insufficient funds")
+
+func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+	for _, in := range e.Ins {
+		if in.AssetID == avaxAssetID {
+			continue
+		}
+
+		coinID := common.Hash(in.AssetID)
+		amount := new(big.Int).SetUint64(in.Amount)
+		if statedb.GetBalanceMultiCoin(in.Address, coinID).Cmp(amount) < 0 {
+			return errInsufficientFunds
+		}
+		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
+	}
+	return nil
 }

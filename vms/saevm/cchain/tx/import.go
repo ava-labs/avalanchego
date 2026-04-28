@@ -6,11 +6,13 @@ package tx
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -106,4 +108,17 @@ func (i *Import) atomicRequests(ids.ID) (ids.ID, *atomic.Requests, error) {
 		utxoIDs[j] = inputID[:]
 	}
 	return i.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
+}
+
+func (i *Import) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+	for _, out := range i.Outs {
+		if out.AssetID == avaxAssetID {
+			continue
+		}
+
+		coinID := common.Hash(out.AssetID)
+		amount := new(big.Int).SetUint64(out.Amount)
+		statedb.AddBalanceMultiCoin(out.Address, coinID, amount)
+	}
+	return nil
 }
