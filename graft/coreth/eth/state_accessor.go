@@ -331,11 +331,11 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	// atomic imports), so substitute the engine's historical-replay finalizer.
 	processor, ok := eth.blockchain.Processor().(*core.StateProcessor)
 	if !ok {
-		return nil, nil, errors.New("expected *core.StateProcessor for Firewood historical replay")
+		return nil, nil, fmt.Errorf("expected *core.StateProcessor for Firewood historical replay, got %T", eth.blockchain.Processor())
 	}
 	engine, ok := eth.engine.(*dummy.DummyEngine)
 	if !ok {
-		return nil, nil, errors.New("expected *dummy.DummyEngine for Firewood historical replay")
+		return nil, nil, fmt.Errorf("expected *dummy.DummyEngine for Firewood historical replay, got %T", eth.engine)
 	}
 	for current.Number.Uint64() < header.Number.Uint64() {
 		if err := ctx.Err(); err != nil {
@@ -350,7 +350,7 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 
 		_, _, _, err := processor.ProcessWithFinalize(nextBlock, current, cache, vm.Config{}, engine.FinalizeForHistoricalReplay)
 		if err != nil {
-			return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
+			return nil, nil, fmt.Errorf("failed to process block %d: %w", next, err)
 		}
 
 		root := cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))

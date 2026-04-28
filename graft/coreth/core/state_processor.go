@@ -81,7 +81,13 @@ func (p *StateProcessor) Process(block *types.Block, parent *types.Header, state
 // callback in place of the engine's default Finalize. Historical replay uses
 // this to skip live-validation dependencies while still applying the block's
 // deterministic state transitions.
-func (p *StateProcessor) ProcessWithFinalize(block *types.Block, parent *types.Header, statedb *state.StateDB, cfg vm.Config, finalize FinalizeFunc) (types.Receipts, []*types.Log, uint64, error) {
+func (p *StateProcessor) ProcessWithFinalize(
+	block *types.Block,
+	parent *types.Header,
+	statedb *state.StateDB,
+	cfg vm.Config,
+	finalize FinalizeFunc,
+) (types.Receipts, []*types.Log, uint64, error) {
 	var (
 		receipts    types.Receipts
 		usedGas     = new(uint64)

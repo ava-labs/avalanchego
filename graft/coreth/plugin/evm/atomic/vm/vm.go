@@ -628,7 +628,11 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 	return vm.onExtraStateChangeWithMode(block, parent, statedb, false)
 }
 
-func (vm *VM) onHistoricalReplayExtraStateChange(block *types.Block, parent *types.Header, statedb *state.StateDB) (*big.Int, *big.Int, error) {
+func (vm *VM) onHistoricalReplayExtraStateChange(
+	block *types.Block,
+	parent *types.Header,
+	statedb *state.StateDB,
+) (*big.Int, *big.Int, error) {
 	return vm.onExtraStateChangeWithMode(block, parent, statedb, true)
 }
 
