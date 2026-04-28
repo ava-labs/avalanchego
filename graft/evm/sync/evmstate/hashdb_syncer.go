@@ -72,6 +72,9 @@ type HashDBSyncer struct {
 	// finalizeCodeQueue is called when the main trie completes.
 	// No-op by default - set via WithFinalizeCodeQueue.
 	finalizeCodeQueue func() error
+
+	preserveSegments  bool              // keep segment markers across root changes
+	storageTrieFilter StorageTrieFilter // skip unchanged storage tries on pivot
 }
 
 // HashDBSyncerOption configures the state syncer via functional options.
@@ -92,6 +95,24 @@ func WithBatchSize(n uint) HashDBSyncerOption {
 func WithFinalizeCodeQueue(fn func() error) HashDBSyncerOption {
 	return options.Func[HashDBSyncer](func(s *HashDBSyncer) {
 		s.finalizeCodeQueue = fn
+	})
+}
+
+// WithPreserveSegments keeps segment markers across root changes so
+// unchanged storage tries resume from their prior sync position.
+func WithPreserveSegments() HashDBSyncerOption {
+	return options.Func[HashDBSyncer](func(s *HashDBSyncer) {
+		s.preserveSegments = true
+	})
+}
+
+// StorageTrieFilter returns true to skip syncing a storage trie.
+type StorageTrieFilter func(db ethdb.Database, accountHash common.Hash, storageRoot common.Hash) bool
+
+// WithStorageTrieFilter sets a filter to skip unchanged storage tries.
+func WithStorageTrieFilter(fn StorageTrieFilter) HashDBSyncerOption {
+	return options.Func[HashDBSyncer](func(s *HashDBSyncer) {
+		s.storageTrieFilter = fn
 	})
 }
 
@@ -136,7 +157,7 @@ func NewHashDBSyncer(syncClient client.Client, db ethdb.Database, root common.Ha
 	})
 
 	ss.trieQueue = NewTrieQueue(db)
-	if err := ss.trieQueue.clearIfRootDoesNotMatch(root); err != nil {
+	if err := ss.trieQueue.clearIfRootDoesNotMatch(root, ss.preserveSegments); err != nil {
 		return nil, err
 	}
 

@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/triedb"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
@@ -36,7 +38,7 @@ type hashDBPivotSession struct {
 	db               ethdb.Database
 	leafsRequestSize uint16
 	leafsRequestType message.LeafsRequestType
-	opts             []HashDBSyncerOption
+	baseOpts         []HashDBSyncerOption // excludes per-pivot incremental options
 }
 
 func (s *hashDBPivotSession) Run(ctx context.Context) error {
@@ -69,7 +71,15 @@ func (s *hashDBPivotSession) Rebuild(newRoot common.Hash, _ uint64) (types.Pivot
 	s.codeQueue.Shutdown()
 	<-snapshot.WipeSnapshot(s.db, false)
 
-	return newHashDBPivotSession(s.syncClient, s.db, newRoot, s.leafsRequestSize, s.leafsRequestType, s.opts...)
+	trieDB := triedb.NewDatabase(s.db, nil)
+	incrementalOpts := []HashDBSyncerOption{
+		WithPreserveSegments(),
+		WithStorageTrieFilter(func(_ ethdb.Database, accountHash common.Hash, storageRoot common.Hash) bool {
+			_, err := trie.New(trie.StorageTrieID(newRoot, storageRoot, accountHash), trieDB)
+			return err == nil
+		}),
+	}
+	return newHashDBPivotSession(s.syncClient, s.db, newRoot, s.leafsRequestSize, s.leafsRequestType, s.baseOpts, incrementalOpts)
 }
 
 func (*hashDBPivotSession) OnSessionComplete() error {
@@ -83,7 +93,7 @@ func (s *hashDBPivotSession) Finalize() error {
 	return s.inner.Finalize()
 }
 
-func newHashDBPivotSession(syncClient client.Client, db ethdb.Database, root common.Hash, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...HashDBSyncerOption) (*hashDBPivotSession, error) {
+func newHashDBPivotSession(syncClient client.Client, db ethdb.Database, root common.Hash, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, baseOpts []HashDBSyncerOption, extraOpts []HashDBSyncerOption) (*hashDBPivotSession, error) {
 	codeQueue, err := code.NewQueue(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create code queue: %w", err)
@@ -92,9 +102,9 @@ func newHashDBPivotSession(syncClient client.Client, db ethdb.Database, root com
 	if err != nil {
 		return nil, fmt.Errorf("failed to create code syncer: %w", err)
 	}
-	inner, err := NewHashDBSyncer(syncClient, db, root, codeQueue, leafsRequestSize, leafsRequestType,
-		append(opts, WithFinalizeCodeQueue(codeQueue.Finalize))...,
-	)
+
+	allOpts := append(append(baseOpts, extraOpts...), WithFinalizeCodeQueue(codeQueue.Finalize))
+	inner, err := NewHashDBSyncer(syncClient, db, root, codeQueue, leafsRequestSize, leafsRequestType, allOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state syncer for root %s: %w", root, err)
 	}
@@ -106,7 +116,7 @@ func newHashDBPivotSession(syncClient client.Client, db ethdb.Database, root com
 		db:               db,
 		leafsRequestSize: leafsRequestSize,
 		leafsRequestType: leafsRequestType,
-		opts:             opts,
+		baseOpts:         baseOpts,
 	}, nil
 }
 
@@ -114,7 +124,7 @@ func newHashDBPivotSession(syncClient client.Client, db ethdb.Database, root com
 // root mid-sync via UpdateTarget. The returned DynamicSyncer internally manages
 // a code queue and code syncer per session.
 func NewHashDBDynamicSyncer(syncClient client.Client, db ethdb.Database, root common.Hash, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...HashDBSyncerOption) (*types.DynamicSyncer, error) {
-	session, err := newHashDBPivotSession(syncClient, db, root, leafsRequestSize, leafsRequestType, opts...)
+	session, err := newHashDBPivotSession(syncClient, db, root, leafsRequestSize, leafsRequestType, opts, nil)
 	if err != nil {
 		return nil, err
 	}
