@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus"
@@ -268,11 +267,6 @@ func (eng *DummyEngine) finalize(
 	if historicalReplay && eng.cb.OnHistoricalReplayExtraStateChange != nil {
 		callback = eng.cb.OnHistoricalReplayExtraStateChange
 	}
-	log.Info("dummy.finalize",
-		"block", block.NumberU64(),
-		"historicalReplay", historicalReplay,
-		"hasHistoricalCallback", eng.cb.OnHistoricalReplayExtraStateChange != nil,
-	)
 	if callback != nil {
 		contribution, extDataGasUsed, err = callback(block, parent, state)
 		if err != nil {

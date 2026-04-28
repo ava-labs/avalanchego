@@ -50,7 +50,6 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
-	"github.com/ava-labs/libevm/log"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -258,9 +257,7 @@ func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.B
 		return nil, nil, errors.New("header not found")
 	}
 	stateDb, err := b.eth.BlockChain().StateAt(header.Root)
-	if err == nil {
-		log.Info("state ready", "target", header.Number.Uint64(), "path", "cache")
-	} else if b.eth.BlockChain().CacheConfig().StateScheme == customrawdb.FirewoodScheme {
+	if err != nil && b.eth.BlockChain().CacheConfig().StateScheme == customrawdb.FirewoodScheme {
 		// Firewood can reconstruct historical state by walking back to a
 		// persisted revision and re-executing blocks forward, even if the
 		// state is not available in-memory or on disk.
@@ -294,9 +291,7 @@ func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockN
 			return nil, nil, errors.New("header for hash not found")
 		}
 		stateDb, err := b.eth.BlockChain().StateAt(header.Root)
-		if err == nil {
-			log.Info("state ready", "target", header.Number.Uint64(), "path", "cache")
-		} else if b.eth.BlockChain().CacheConfig().StateScheme == customrawdb.FirewoodScheme {
+		if err != nil && b.eth.BlockChain().CacheConfig().StateScheme == customrawdb.FirewoodScheme {
 			// Firewood can reconstruct historical state by walking back to a
 			// persisted revision and re-executing blocks forward, even if the
 			// state is not available in-memory or on disk.
