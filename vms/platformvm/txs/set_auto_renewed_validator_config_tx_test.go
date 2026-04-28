@@ -4,26 +4,22 @@
 package txs
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify/verifymock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
-
-var errInvalidAuth = errors.New("invalid auth")
 
 func TestSetAutoRenewedValidatorConfigTxSyntacticVerify(t *testing.T) {
 	type test struct {
-		name   string
-		txFunc func(*gomock.Controller) *SetAutoRenewedValidatorConfigTx
-		err    error
+		name    string
+		txFunc  func() *SetAutoRenewedValidatorConfigTx
+		wantErr error
 	}
 
 	var (
@@ -55,47 +51,46 @@ func TestSetAutoRenewedValidatorConfigTxSyntacticVerify(t *testing.T) {
 	tests := []test{
 		{
 			name: "nil tx",
-			txFunc: func(*gomock.Controller) *SetAutoRenewedValidatorConfigTx {
+			txFunc: func() *SetAutoRenewedValidatorConfigTx {
 				return nil
 			},
-			err: ErrNilTx,
+			wantErr: ErrNilTx,
 		},
 		{
 			name: "already verified",
-			txFunc: func(*gomock.Controller) *SetAutoRenewedValidatorConfigTx {
+			txFunc: func() *SetAutoRenewedValidatorConfigTx {
 				return &SetAutoRenewedValidatorConfigTx{
 					BaseTx: verifiedBaseTx,
 				}
 			},
-			err: nil,
+			wantErr: nil,
 		},
 		{
 			name: "empty txID",
-			txFunc: func(*gomock.Controller) *SetAutoRenewedValidatorConfigTx {
+			txFunc: func() *SetAutoRenewedValidatorConfigTx {
 				return &SetAutoRenewedValidatorConfigTx{
 					BaseTx: validBaseTx,
 				}
 			},
-			err: errMissingTxID,
+			wantErr: errMissingTxID,
 		},
 		{
 			name: "too many restake shares",
-			txFunc: func(*gomock.Controller) *SetAutoRenewedValidatorConfigTx {
-				autoRestakeShares := uint32(2_000_000)
+			txFunc: func() *SetAutoRenewedValidatorConfigTx {
+				autoCompoundRewardShares := uint32(2_000_000)
 
 				return &SetAutoRenewedValidatorConfigTx{
 					BaseTx:                   validBaseTx,
 					TxID:                     ids.GenerateTestID(),
-					AutoCompoundRewardShares: autoRestakeShares,
+					AutoCompoundRewardShares: autoCompoundRewardShares,
 				}
 			},
-			err: errTooManyAutoCompoundRewardShares,
+			wantErr: errTooManyAutoCompoundRewardShares,
 		},
 		{
 			name: "invalid auth",
-			txFunc: func(ctrl *gomock.Controller) *SetAutoRenewedValidatorConfigTx {
-				invalidAuth := verifymock.NewVerifiable(ctrl)
-				invalidAuth.EXPECT().Verify().Return(errInvalidAuth)
+			txFunc: func() *SetAutoRenewedValidatorConfigTx {
+				var invalidAuth *secp256k1fx.Input
 
 				return &SetAutoRenewedValidatorConfigTx{
 					BaseTx:                   validBaseTx,
@@ -105,26 +100,25 @@ func TestSetAutoRenewedValidatorConfigTxSyntacticVerify(t *testing.T) {
 					Period:                   0,
 				}
 			},
-			err: errInvalidAuth,
+			wantErr: secp256k1fx.ErrNilInput,
 		},
 		{
 			name: "invalid BaseTx",
-			txFunc: func(*gomock.Controller) *SetAutoRenewedValidatorConfigTx {
-				autoRestakeShares := uint32(500_000)
+			txFunc: func() *SetAutoRenewedValidatorConfigTx {
+				autoCompoundRewardShares := uint32(500_000)
 
 				return &SetAutoRenewedValidatorConfigTx{
 					BaseTx:                   invalidBaseTx,
 					TxID:                     ids.GenerateTestID(),
-					AutoCompoundRewardShares: autoRestakeShares,
+					AutoCompoundRewardShares: autoCompoundRewardShares,
 				}
 			},
-			err: avax.ErrWrongNetworkID,
+			wantErr: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "valid tx",
-			txFunc: func(ctrl *gomock.Controller) *SetAutoRenewedValidatorConfigTx {
-				validAuth := verifymock.NewVerifiable(ctrl)
-				validAuth.EXPECT().Verify().Return(nil)
+			txFunc: func() *SetAutoRenewedValidatorConfigTx {
+				validAuth := &secp256k1fx.Input{SigIndices: []uint32{0}}
 
 				return &SetAutoRenewedValidatorConfigTx{
 					BaseTx:                   validBaseTx,
@@ -134,20 +128,17 @@ func TestSetAutoRenewedValidatorConfigTxSyntacticVerify(t *testing.T) {
 					Period:                   0,
 				}
 			},
-			err: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-
-			tx := tt.txFunc(ctrl)
-			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(t, err, tt.err)
+			tx := tt.txFunc()
+			gotErr := tx.SyntacticVerify(ctx)
+			require.ErrorIs(t, gotErr, tt.wantErr)
 
 			if tx != nil {
-				require.Equal(t, tt.err == nil, tx.SyntacticallyVerified)
+				require.Equal(t, tt.wantErr == nil, tx.SyntacticallyVerified)
 			}
 		})
 	}
