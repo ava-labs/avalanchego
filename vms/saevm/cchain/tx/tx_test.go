@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -36,12 +37,14 @@ import (
 var (
 	avaxAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
 	tests       = [...]struct {
-		name  string
-		old   *atomic.Tx
-		new   *Tx
-		json  string
-		bytes []byte
-		op    hook.Op
+		name                  string
+		old                   *atomic.Tx
+		new                   *Tx
+		json                  string
+		bytes                 []byte
+		op                    hook.Op
+		atomicRequestsChainID ids.ID
+		atomicRequests        *chainsatomic.Requests
 	}{
 		{
 			name: "import", // Included in https://subnets.avax.network/c-chain/block/4
@@ -146,6 +149,12 @@ var (
 				Gas: 11230,
 				Mint: map[common.Address]uint256.Int{
 					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): *uint256.NewInt(50_000_000 * _x2cRate),
+				},
+			},
+			atomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+			atomicRequests: &chainsatomic.Requests{
+				RemoveRequests: [][]byte{
+					common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64"),
 				},
 			},
 		},
@@ -256,6 +265,16 @@ var (
 						MinBalance: *uint256.NewInt(1_000_001 * _x2cRate),
 					},
 				},
+			},
+			atomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+			atomicRequests: &chainsatomic.Requests{
+				PutRequests: []*chainsatomic.Element{{
+					Key:   common.FromHex("0x38ebe8fc127b2eaeeb25c72a747e0ef27460fb04b5929568ed959d67ec3e4948"),
+					Value: common.FromHex("0x000067b5812292324365c6e2a479b2601cd1cd1facc2fcc8c29d58b5ed96583ea17e0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500"),
+					Traits: [][]byte{
+						ids.ShortFromStringOrPanic("LanVZgBDVvtarbTXD1uU7r1nXVJyLmPUz").Bytes(),
+					},
+				}},
 			},
 		},
 		{
@@ -466,6 +485,14 @@ var (
 					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): *uint256.NewInt(597_000_000 * _x2cRate),
 				},
 			},
+			atomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+			atomicRequests: &chainsatomic.Requests{
+				RemoveRequests: [][]byte{
+					common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05"),
+					common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630"),
+					common.FromHex("0xd71fb48751f6d5732e7ff63168ed311b40bf517b36279e326878fc3f5169a656"),
+				},
+			},
 		},
 		{
 			name: "export_same_address_multi_asset", // Synthetic
@@ -528,6 +555,9 @@ var (
 						MinBalance: *uint256.NewInt(1_000_000 * _x2cRate),
 					},
 				},
+			},
+			atomicRequests: &chainsatomic.Requests{
+				PutRequests: []*chainsatomic.Element{},
 			},
 		},
 		{
@@ -599,6 +629,9 @@ var (
 					},
 				},
 			},
+			atomicRequests: &chainsatomic.Requests{
+				PutRequests: []*chainsatomic.Element{},
+			},
 		},
 		{
 			name: "import_non_avax", // Synthetic
@@ -659,6 +692,11 @@ var (
 				ID:   ids.FromStringOrPanic("s4xoHkf4rPQYSwjbQo78hcSP1wSeViV1Fx2PHM4AfRiDurFkf"),
 				Gas:  10226,
 				Mint: map[common.Address]uint256.Int{},
+			},
+			atomicRequests: &chainsatomic.Requests{
+				RemoveRequests: [][]byte{
+					common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb"),
+				},
 			},
 		},
 	}
@@ -1109,4 +1147,38 @@ func (f *fuzzStateDB) SetNonce(addr common.Address, nonce uint64) {
 
 func (f *fuzzStateDB) GetNonce(addr common.Address) uint64 {
 	return f.initialNonces[addr]
+}
+
+func TestAtomicRequests(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			chainID, requests, err := test.new.AtomicRequests()
+			require.NoErrorf(t, err, "%T.AtomicRequests()", test.new)
+			assert.Equalf(t, test.atomicRequestsChainID, chainID, "%T.AtomicRequests().ChainID", test.new)
+			assert.Equalf(t, test.atomicRequests, requests, "%T.AtomicRequests().Requests", test.new)
+		})
+	}
+}
+
+func FuzzAtomicRequestsCompatibility(f *testing.F) {
+	for _, test := range tests {
+		f.Add(test.bytes)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		oldTx, err := parseOldTx(data)
+		if err != nil {
+			t.Skip("invalid tx bytes")
+		}
+
+		oldChainID, oldRequests, err := oldTx.UnsignedAtomicTx.AtomicOps()
+		require.NoErrorf(t, err, "%T.AtomicOps()", oldTx.UnsignedAtomicTx)
+
+		newTx, err := Parse(data)
+		require.NoError(t, err, "Parse()")
+
+		newChainID, newRequests, err := newTx.AtomicRequests()
+		require.NoErrorf(t, err, "%T.AtomicRequests()", newTx)
+		assert.Equal(t, oldChainID, newChainID, "chainID")
+		assert.Equal(t, oldRequests, newRequests, "requests")
+	})
 }
