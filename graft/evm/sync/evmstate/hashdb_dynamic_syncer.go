@@ -72,11 +72,20 @@ func (s *hashDBPivotSession) Rebuild(newRoot common.Hash, _ uint64) (types.Pivot
 	<-snapshot.WipeSnapshot(s.db, false)
 
 	trieDB := triedb.NewDatabase(s.db, nil)
+	var skipped, registered uint64
 	incrementalOpts := []HashDBSyncerOption{
 		WithPreserveSegments(),
 		WithStorageTrieFilter(func(_ ethdb.Database, accountHash common.Hash, storageRoot common.Hash) bool {
 			_, err := trie.New(trie.StorageTrieID(newRoot, storageRoot, accountHash), trieDB)
-			return err == nil
+			if err == nil {
+				skipped++
+				if skipped%100000 == 0 {
+					log.Info("storage trie filter progress", "skipped", skipped, "registered", registered)
+				}
+				return true
+			}
+			registered++
+			return false
 		}),
 	}
 	return newHashDBPivotSession(s.syncClient, s.db, newRoot, s.leafsRequestSize, s.leafsRequestType, s.baseOpts, incrementalOpts)
