@@ -59,6 +59,10 @@ type Context struct {
 	ValidatorState validators.State // interface for P-Chain validators
 	// Chain-specific directory where arbitrary data can be written
 	ChainDataDir string
+
+	// StateSyncTargetHeight is the block height being synced to during dynamic
+	// state sync. Zero when no dynamic sync is active.
+	StateSyncTargetHeight utils.Atomic[uint64]
 }
 
 // Expose gatherer interface for unit testing.
@@ -97,9 +101,4 @@ type ConsensusContext struct {
 
 	// True iff this chain is currently state-syncing
 	StateSyncing utils.Atomic[bool]
-
-	// StateSyncTargetHeight is the block height being synced to during dynamic
-	// state sync. The bootstrapper uses this to skip fetching blocks below the
-	// target. Zero when no dynamic sync is active.
-	StateSyncTargetHeight utils.Atomic[uint64]
 }
