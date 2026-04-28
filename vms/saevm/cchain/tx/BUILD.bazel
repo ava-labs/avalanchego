@@ -12,6 +12,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx",
     visibility = ["//visibility:public"],
     deps = [
+        "//chains/atomic",
         "//codec",
         "//codec/linearcodec",
         "//graft/coreth/plugin/evm/atomic",
@@ -35,6 +36,7 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":tx"],
     deps = [
+        "//chains/atomic",
         "//graft/coreth/plugin/evm/atomic",
         "//graft/coreth/plugin/evm/atomic/vm",
         "//ids",

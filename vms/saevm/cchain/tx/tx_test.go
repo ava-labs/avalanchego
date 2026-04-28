@@ -702,6 +702,13 @@ var (
 	}
 	oldTxs []*atomic.Tx
 	newTxs []*Tx
+
+	// txIgnore ignores caching/context fields populated lazily on the txs.
+	txIgnore = cmpopts.IgnoreUnexported(
+		atomic.Metadata{},
+		avax.UTXOID{},
+		secp256k1fx.OutputOwners{},
+	)
 )
 
 func init() {
@@ -780,12 +787,16 @@ func TestParse(t *testing.T) {
 				got := new(atomic.Tx)
 				_, err := atomic.Codec.Unmarshal(test.bytes, got)
 				require.NoErrorf(t, err, "%T.Unmarshal(, %T)", atomic.Codec, got)
-				assert.Equalf(t, test.old, got, "%T.Unmarshal(, %T)", atomic.Codec, got)
+				if diff := cmp.Diff(test.old, got, txIgnore); diff != "" {
+					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
+				}
 			})
 			t.Run("new", func(t *testing.T) {
 				got, err := Parse(test.bytes)
 				require.NoError(t, err, "Parse()")
-				assert.Equal(t, test.new, got, "Parse()")
+				if diff := cmp.Diff(test.new, got, txIgnore); diff != "" {
+					t.Errorf("Parse() diff (-want +got):\n%s", diff)
+				}
 			})
 		})
 	}
@@ -824,7 +835,9 @@ func TestParseSlice(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := ParseSlice(test.bytes)
 			require.ErrorIs(t, err, test.wantErr, "ParseSlice()")
-			assert.Equal(t, test.want, got, "ParseSlice()")
+			if diff := cmp.Diff(test.want, got, txIgnore); diff != "" {
+				t.Errorf("ParseSlice() diff (-want +got):\n%s", diff)
+			}
 		})
 	}
 }

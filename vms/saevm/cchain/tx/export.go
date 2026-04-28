@@ -104,7 +104,7 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *atomic.Requests, error) {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(i),
+				OutputIndex: uint32(i), //#nosec G115 -- Won't overflow
 			},
 			Asset: out.Asset,
 			Out:   out.Out,

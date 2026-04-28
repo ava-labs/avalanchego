@@ -12,11 +12,11 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	// Imported for [gasPerByte] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
-	// Imported for [GasPerByte] comment resolution.
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
