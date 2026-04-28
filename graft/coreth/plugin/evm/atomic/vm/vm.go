@@ -641,7 +641,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 
 	// If [atomicBackend] is nil, the VM is still initializing and is reprocessing accepted blocks.
 	if vm.AtomicBackend != nil {
-		// If we are reprocessing state to serve a request, we don't need to verfiy either.
+		// If we are reprocessing state to serve a request, we don't need to verify either.
 		if lastAccepted := vm.LastAcceptedExtendedBlock(); lastAccepted != nil && lastAccepted.Height() <= block.NumberU64() {
 			if vm.AtomicBackend.IsBonus(block.NumberU64(), block.Hash()) {
 				log.Info("skipping atomic tx verification on bonus block", "block", block.Hash())
