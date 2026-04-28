@@ -74,7 +74,6 @@ graft_go_test(
     name = "vm_test",
     srcs = [
         "export_tx_test.go",
-        "historical_replay_test.go",
         "import_tx_test.go",
         "syncervm_test.go",
         "tx_gossip_test.go",
@@ -84,10 +83,12 @@ graft_go_test(
     embed = [":vm"],
     deps = [
         "//chains/atomic",
+        "//database",
         "//database/memdb",
         "//graft/coreth/consensus/dummy",
         "//graft/coreth/core",
         "//graft/coreth/core/extstate",
+        "//graft/coreth/ethclient",
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
         "//graft/coreth/params/extras/extrastest",
@@ -100,7 +101,6 @@ graft_go_test(
         "//graft/coreth/plugin/evm/upgrade/ap0",
         "//graft/coreth/plugin/evm/upgrade/ap1",
         "//graft/coreth/plugin/evm/vmtest",
-        "//graft/evm/rpc",
         "//graft/evm/utils",
         "//graft/evm/utils/utilstest",
         "//ids",

@@ -17,6 +17,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/consensus",
+        "//graft/coreth/consensus/dummy",
         "//graft/coreth/core",
         "//graft/coreth/core/extstate",
         "//graft/coreth/core/txpool",
