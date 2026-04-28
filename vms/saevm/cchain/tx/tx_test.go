@@ -1010,7 +1010,7 @@ func TestAsOp_Errors(t *testing.T) {
 	}
 }
 
-func FuzzAsOp(f *testing.F) {
+func FuzzAsOpCompatibility(f *testing.F) {
 	for _, test := range tests {
 		f.Add(test.bytes)
 	}
