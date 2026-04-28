@@ -69,6 +69,7 @@ func (tm *Time) state() state {
 
 func (tm *Time) requireState(tb testing.TB, desc string, want state, opts ...cmp.Option) {
 	tb.Helper()
+	opts = append(opts, cmpopts.IgnoreTypes(canotoData_GasPriceConfig{}))
 	if diff := cmp.Diff(want, tm.state(), opts...); diff != "" {
 		tb.Fatalf("%s (-want +got):\n%s", desc, diff)
 	}

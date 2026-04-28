@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -764,11 +763,7 @@ func TestAfterBlock(t *testing.T) {
 			wantErr: errMinPriceZero,
 		},
 	}
-	opts := cmp.Options{
-		cmpopts.IgnoreTypes(canotoData_GasPriceConfig{}),
-		cmpopts.IgnoreFields(state{}, "UnixTime", "ConsumedThisSecond", "Target", "Config"),
-	}
-
+	ignore := cmpopts.IgnoreFields(state{}, "UnixTime", "ConsumedThisSecond", "Target", "Config")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tm := mustNew(t, time.Unix(0, 0), tt.init.Target, tt.init.Excess, tt.init.Config)
@@ -778,7 +773,7 @@ func TestAfterBlock(t *testing.T) {
 				t,
 				fmt.Sprintf("New(%v, %d, %d, %+v)", tm, tt.init.Target, tt.init.Excess, tt.init.Config),
 				tt.init,
-				opts,
+				ignore,
 			)
 
 			err := tm.AfterBlock(tt.gasUsed, tt.new.Target, tt.new.Config)
@@ -789,7 +784,7 @@ func TestAfterBlock(t *testing.T) {
 				t,
 				fmt.Sprintf("%v.AfterBlock(%d, %d, %+v)", tm, tt.gasUsed, tt.new.Target, tt.new.Config),
 				tt.new,
-				opts,
+				ignore,
 			)
 		})
 	}
