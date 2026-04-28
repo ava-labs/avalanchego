@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
@@ -113,6 +114,7 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 
 	go func() {
 		err := g.Wait()
+		log.Info("all syncer goroutines exited", "err", err)
 		if errors.Is(err, context.Canceled) {
 			err = contextCause(cctx, err)
 		}
@@ -227,6 +229,8 @@ func (co *Coordinator) AddBlockOperation(b EthBlockWrapper, op BlockOperationTyp
 	}
 	state := co.CurrentState()
 	if state != StateRunning && state != StateExecutingBatch {
+		log.Warn("AddBlockOperation rejected: coordinator not running",
+			"state", int32(state), "op", op.String())
 		return false
 	}
 	return co.queue.enqueue(b, op)
@@ -256,6 +260,7 @@ func (co *Coordinator) markAborted() {
 			return
 		}
 		if co.state.CompareAndSwap(int32(state), int32(StateAborted)) {
+			log.Warn("coordinator aborted", "fromState", int32(state))
 			return
 		}
 	}
@@ -297,6 +302,7 @@ func (co *Coordinator) abort(err error) {
 
 func (co *Coordinator) finish(cancel context.CancelCauseFunc, err error) {
 	if err != nil {
+		log.Error("coordinator finishing with error", "err", err)
 		co.markAborted()
 	} else {
 		for {
@@ -305,6 +311,7 @@ func (co *Coordinator) finish(cancel context.CancelCauseFunc, err error) {
 				break
 			}
 			if co.state.CompareAndSwap(int32(state), int32(StateCompleted)) {
+				log.Info("coordinator completed", "fromState", int32(state))
 				break
 			}
 		}

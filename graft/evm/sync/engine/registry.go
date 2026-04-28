@@ -97,7 +97,7 @@ func (r *SyncerRegistry) StartAsync(ctx context.Context, summary message.Syncabl
 				log.Error("failed syncing", "name", task.name, "summary", summaryBlockHashHex, "height", blockHeight, "err", err)
 				return fmt.Errorf("%s failed: %w", task.name, err)
 			}
-			log.Info("completed successfully", "name", task.name, "summary", summaryBlockHashHex, "height", blockHeight)
+			log.Info("syncer goroutine exiting", "name", task.name, "summary", summaryBlockHashHex, "height", blockHeight)
 
 			return nil
 		})
