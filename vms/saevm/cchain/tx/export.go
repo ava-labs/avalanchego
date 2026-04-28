@@ -67,7 +67,7 @@ func (e *Export) numSigs() (uint64, error) {
 	return uint64(len(e.Ins)), nil
 }
 
-var errMultipleNonces = errors.New("multiple inputs for address with different nonces")
+var errMultipleNonces = errors.New("multiple nonces for address")
 
 func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 	burn := make(map[common.Address]hook.AccountDebit, len(e.Ins))
