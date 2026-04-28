@@ -16,8 +16,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
@@ -55,9 +57,14 @@ func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, sta
 	return gas, nil
 }
 
-func (RulesExtra) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
-	// TODO: Migrate call for txallowlist precompile to here from core/state_transition.go
-	// when that is used from libevm.
+func (r RulesExtra) CanExecuteTransaction(from common.Address, _ *common.Address, state libevm.StateReader) error {
+	rules := (extras.Rules)(r)
+	if rules.IsPrecompileEnabled(txallowlist.ContractAddress) {
+		txAllowListRole := txallowlist.GetTxAllowListStatus(state, from)
+		if !txAllowListRole.IsEnabled() {
+			return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, from)
+		}
+	}
 	return nil
 }
 
