@@ -9,7 +9,7 @@ import (
 	"errors"
 	"flag"
 	"math/big"
-	"math/rand"
+	"math/rand/v2"
 	"net/http/httptest"
 	"os"
 	"sync"
@@ -990,7 +990,7 @@ func TestSettledGasTime(t *testing.T) {
 	}))
 
 	const numBlocks = 100
-	r := rand.New(rand.NewSource(0))
+	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 	bs := make([]*blocks.Block, 0, numBlocks+1)
 	bs = append(bs, sut.genesis)
 	for range numBlocks {
@@ -999,7 +999,7 @@ func TestSettledGasTime(t *testing.T) {
 			Gas:       params.TxGasContractCreation,
 			GasFeeCap: big.NewInt(1),
 		}))
-		if r.Intn(2) == 0 {
+		if rng.Int32N(2) == 0 {
 			vmTime.advanceToSettle(ctx, t, b)
 		}
 		bs = append(bs, b)
