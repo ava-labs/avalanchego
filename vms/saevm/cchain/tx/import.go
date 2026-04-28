@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/holiman/uint256"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 type Import struct {

@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
@@ -28,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"

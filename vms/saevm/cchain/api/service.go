@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -26,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
 type Service struct {

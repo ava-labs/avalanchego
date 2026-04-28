@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
@@ -22,7 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 
 	ethrpc "github.com/ava-labs/libevm/rpc"
 )

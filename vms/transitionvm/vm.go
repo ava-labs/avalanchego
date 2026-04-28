@@ -137,9 +137,12 @@ func (v *VM) Initialize(
 	// It's possible we crashed between accepting the last block and writing the
 	// transition flag. Or maybe the genesis block was the transition block.
 	lastAcceptedID, err := v.LastAccepted(ctx)
+	if err != nil {
+		return fmt.Errorf("loading last accepted ID: %w", err)
+	}
 	lastAccepted, err := v.GetBlock(ctx, lastAcceptedID)
 	if err != nil {
-		return fmt.Errorf("loading last accepted block: %w", err)
+		return fmt.Errorf("loading last accepted block %s: %w", lastAcceptedID, err)
 	}
 	if time := lastAccepted.Timestamp(); time.Before(v.transitionTime) {
 		return nil

@@ -9,8 +9,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -31,6 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -136,8 +136,8 @@ func (*Points) SettledHeight(h *types.Header) uint64 {
 func (*Points) BlockTime(h *types.Header) time.Time {
 	var ns int64
 	if msp := customtypes.GetHeaderExtra(h).TimeMilliseconds; msp != nil {
-		ms := time.Duration(*msp % 1000)
-		frac := ms * time.Millisecond
+		ms := *msp % 1000
+		frac := time.Duration(ms) * time.Millisecond
 		ns = frac.Nanoseconds()
 	}
 	return time.Unix(int64(h.Time), ns)

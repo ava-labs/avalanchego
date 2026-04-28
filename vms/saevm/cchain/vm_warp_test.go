@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/gogo/protobuf/proto"
@@ -29,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -288,7 +288,7 @@ func (s *SUT) verifyWarpMessage(t *testing.T, payloadData []byte, expected int32
 	case responseBytes = <-s.appResponse:
 	case appErr = <-s.appErr:
 	case <-t.Context().Done():
-		require.Fail(t, "waiting for app response", t.Context().Err())
+		t.Fatalf("waiting for app response: %s", t.Context().Err())
 	}
 
 	switch expected {

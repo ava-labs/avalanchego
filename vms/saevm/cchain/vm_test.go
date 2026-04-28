@@ -10,10 +10,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
@@ -41,6 +37,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
