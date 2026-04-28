@@ -21,7 +21,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/eth",
     deps = [
         "//graft/coreth/consensus",
-        "//graft/coreth/consensus/dummy",
         "//graft/coreth/core",
         "//graft/coreth/core/extstate",
         "//graft/coreth/core/txpool",

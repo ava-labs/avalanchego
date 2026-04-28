@@ -28,7 +28,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -53,11 +52,6 @@ type StateProcessor struct {
 	engine consensus.Engine    // Consensus engine used for block rewards
 }
 
-// FinalizeFunc finalizes a block after its transactions have been applied.
-// It matches the signature of consensus.Engine.Finalize and lets callers
-// substitute an alternative finalizer (e.g. for historical replay).
-type FinalizeFunc func(chain consensus.ChainHeaderReader, block *types.Block, parent *types.Header, state *state.StateDB, receipts []*types.Receipt) error
-
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consensus.Engine) *StateProcessor {
 	return &StateProcessor{
@@ -75,24 +69,6 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(block *types.Block, parent *types.Header, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
-	return p.ProcessWithFinalize(block, parent, statedb, cfg, p.engine.Finalize)
-}
-
-// ProcessWithFinalize is like Process, but invokes the supplied finalize
-// callback in place of the engine's default Finalize. Historical replay uses
-// this to skip live-validation dependencies while still applying the block's
-// deterministic state transitions.
-func (p *StateProcessor) ProcessWithFinalize(
-	block *types.Block,
-	parent *types.Header,
-	statedb *state.StateDB,
-	cfg vm.Config,
-	finalize FinalizeFunc,
-) (types.Receipts, []*types.Log, uint64, error) {
-	if finalize == nil {
-		return nil, nil, 0, errors.New("missing finalize function")
-	}
-
 	var (
 		receipts    types.Receipts
 		usedGas     = new(uint64)
@@ -135,7 +111,7 @@ func (p *StateProcessor) ProcessWithFinalize(
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	if err := finalize(p.bc, block, parent, statedb, receipts); err != nil {
+	if err := p.engine.Finalize(p.bc, block, parent, statedb, receipts); err != nil {
 		return nil, nil, 0, fmt.Errorf("engine finalization check failed: %w", err)
 	}
 
