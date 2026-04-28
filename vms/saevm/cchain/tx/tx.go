@@ -7,8 +7,6 @@
 package tx
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -71,30 +69,4 @@ func Parse(b []byte) (*Tx, error) {
 		return nil, err
 	}
 	return &tx, nil
-}
-
-// MarshalSlice returns the canonical binary format of a slice of transactions.
-func MarshalSlice(txs []*Tx) ([]byte, error) {
-	if len(txs) == 0 {
-		return nil, nil
-	}
-	return c.Marshal(codecVersion, txs)
-}
-
-var errInefficientSlicePacking = errors.New("inefficient slice packing: empty slices should be packed as nil")
-
-// ParseSlice deserializes a slice of [Tx] from its canonical binary format.
-func ParseSlice(b []byte) ([]*Tx, error) {
-	if len(b) == 0 {
-		return nil, nil
-	}
-
-	var txs []*Tx
-	if _, err := c.Unmarshal(b, &txs); err != nil {
-		return nil, err
-	}
-	if len(txs) == 0 {
-		return nil, errInefficientSlicePacking
-	}
-	return txs, nil
 }
