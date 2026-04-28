@@ -1,10 +1,14 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "corethclient",
     srcs = ["corethclient.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/ethclient/corethclient",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/ethclient",
         "//graft/evm/rpc",
