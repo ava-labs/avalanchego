@@ -86,7 +86,7 @@ func TestCommFailsWithoutCurrentNode(t *testing.T) {
 	config := newEngineConfig(t, 3)
 
 	// set the curNode to a different nodeID than the one in the config
-	vdrs := generateTestNodes(t, 3)
+	vdrs := generateTestNodes(t, 3, noKeyReuse)
 	config.Params = newSimplexChainParams(vdrs)
 
 	_, err := NewComm(config)
