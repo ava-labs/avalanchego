@@ -663,18 +663,9 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		return fmt.Errorf("failed to get fork height: %w", err)
 	}
 
+	// Preserve the height before rolling back so the bootstrapper can use it
+	// as the block-fetching floor via StateSyncTargetHeight().
 	vm.syncTargetHeight = proLastAcceptedHeight
-
-	// During dynamic state sync, the inner VM is at genesis while the
-	// proposervm is at the sync target. Keep the proposervm at the sync
-	// target so the consensus engine can start at the correct height.
-	// The inner VM will catch up when sync completes.
-	if vm.ctx.StateSyncTargetHeight.Get() > 0 {
-		vm.ctx.Log.Info("skipping proposervm rollback during dynamic state sync",
-			zap.Uint64("syncTargetHeight", proLastAcceptedHeight),
-		)
-		return nil
-	}
 
 	if forkHeight > innerLastAcceptedHeight {
 		// We are rolling back past the fork, so we should just forget about all
