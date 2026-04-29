@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 const hashDBDynamicSyncerName = "HashDB EVM State Syncer (dynamic)"
@@ -70,6 +71,9 @@ func (s *hashDBPivotSession) Rebuild(newRoot common.Hash, _ uint64) (types.Pivot
 	}
 	s.codeQueue.Shutdown()
 	<-snapshot.WipeSnapshot(s.db, false)
+	// Clear stale main trie segments from the prior interrupted session.
+	// The account trie is always re-synced from scratch.
+	customrawdb.ClearSyncSegments(s.db, newRoot)
 
 	trieDB := triedb.NewDatabase(s.db, nil)
 	var skipped, registered uint64
