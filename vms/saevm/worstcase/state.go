@@ -47,6 +47,13 @@ type State struct {
 
 	db    *state.StateDB
 	clock *gastime.Time
+	// settled is the block whose post-execution state root [State.db] is rooted
+	// at. It is captured in [NewState] and never advanced; SAE worst-case never
+	// "moves on" from the settled snapshot, it only projects nonce/balance
+	// deltas via [hook.Op] on top. State-dependent admission checks (e.g. the
+	// txallowlist precompile) MUST use rules computed from this header so that
+	// `IsPrecompileEnabled(...)` agrees with what the StateDB actually knows.
+	settled *types.Header
 	// expectedParentHash is used to sanity check that blocks are provided in
 	// order. The [types.Header] in the `curr` field is modified to reflect
 	// worst-case bounds (which will almost certainly differ from actual values
@@ -83,6 +90,7 @@ func NewState(
 		config:             config,
 		db:                 db,
 		clock:              settled.ExecutedByGasTime(),
+		settled:            settled.Header(),
 		expectedParentHash: settled.Hash(),
 	}, nil
 }
@@ -208,7 +216,15 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 		return fmt.Errorf("%w: address %v, codehash: %s", core.ErrSenderNoEOA, from.Hex(), codeHash)
 	}
 
-	if err := s.hooks.CanExecuteTransaction(from, tx.To(), s.db); err != nil {
+	// Compute rules at the LAST-SETTLED block so they correspond to the same
+	// as [State.db]. State-dependent precompile checks (e.g. the
+	// txallowlist sender check in vms/subnetevm) read storage from `s.db` and
+	// gate that read with `rules.IsPrecompileEnabled(...)`. Using rules from
+	// the block being admitted would desynchronize from the StateDB: the rules
+	// could say "precompile enabled" while the settled-block storage has none
+	// of its state populated, causing every sender to be rejected.
+	settledRules := s.config.Rules(s.settled.Number, true /*isMerge*/, s.settled.Time)
+	if err := s.hooks.CanExecuteTransaction(settledRules, from, tx.To(), s.db); err != nil {
 		return fmt.Errorf("transaction blocked by CanExecuteTransaction hook: %w", err)
 	}
 

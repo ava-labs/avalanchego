@@ -57,7 +57,37 @@ func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, sta
 	return gas, nil
 }
 
+// CanExecuteTransaction is the libevm `RulesAllowlistHooks` entry point, fired
+// from `core.StateTransition.TransitionDb` against the rules+state of the block
+// being executed. A non-nil return makes the entire block invalid at execution.
+//
+// In the SAE port (post-Helicon), an invalid block at execution time is a
+// fatal halt of the executor, but worst-case admission cannot reliably predict
+// state-dependent precompile checks. To avoid the halt, we short-circuit this hook post-Helicon and let
+// the SAE worst-case path enforce the same check via [EnforceTxAllowList]
+// against the last-settled rules+state pair (see
+// [vms/subnetevm/hook.Points.CanExecuteTransaction]).
+//
+// Pre-Helicon (synchronous chain), this stays strict because there is no
+// admission/execution gap.
 func (r RulesExtra) CanExecuteTransaction(from common.Address, _ *common.Address, state libevm.StateReader) error {
+	rules := (extras.Rules)(r)
+	if rules.IsHelicon {
+		return nil
+	}
+	return r.EnforceTxAllowList(from, state)
+}
+
+// EnforceTxAllowList performs the txallowlist sender check using the receiver's
+// rules and the provided state. It exists so SAE consumers can re-use the same
+// check from outside the libevm hook (e.g. from a SAE [hook.Points]
+// implementation against the last-settled state) without inheriting the
+// Helicon short-circuit on [RulesExtra.CanExecuteTransaction].
+//
+// The receiver's rules MUST correspond to the same block as `state` so that
+// `IsPrecompileEnabled` agrees with whether txallowlist storage is populated
+// for that block.
+func (r RulesExtra) EnforceTxAllowList(from common.Address, state libevm.StateReader) error {
 	rules := (extras.Rules)(r)
 	if rules.IsPrecompileEnabled(txallowlist.ContractAddress) {
 		txAllowListRole := txallowlist.GetTxAllowListStatus(state, from)

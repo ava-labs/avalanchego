@@ -124,8 +124,24 @@ func (*Points) EndOfBlockOps(*types.Block) ([]saehook.Op, error) {
 	return nil, nil
 }
 
-func (*Points) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
-	return nil
+// CanExecuteTransaction enforces the txallowlist sender check from SAE
+// worst-case admission, where the libevm hook is intentionally short-circuited
+// post-Helicon to avoid fatal-halt risk on stale-state divergence (see
+// [subnetevmparams.RulesExtra.CanExecuteTransaction]).
+//
+// This calls [subnetevmparams.RulesExtra.EnforceTxAllowList] directly so we
+// don't re-enter the libevm hook (which would just return nil post-Helicon).
+// `rules` is supplied by the worst-case caller and MUST correspond to the same
+// block as `state` (typically the last-settled block); see
+// [hook.Points.CanExecuteTransaction] for the contract.
+//
+// The libevm extras MUST have been registered (e.g. via
+// `evm.RegisterAllLibEVMExtras`) before this is called; otherwise
+// `GetRulesExtra` returns nil and we panic. Tests use `TestMain` for this; the
+// production plugin entrypoint will too.
+func (*Points) CanExecuteTransaction(rules ethparams.Rules, from common.Address, _ *common.Address, state libevm.StateReader) error {
+	extra := subnetevmparams.GetRulesExtra(rules)
+	return subnetevmparams.RulesExtra(*extra).EnforceTxAllowList(from, state)
 }
 
 func (*Points) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {

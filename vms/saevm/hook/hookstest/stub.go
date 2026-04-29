@@ -36,7 +36,7 @@ type Stub struct {
 	InvalidOpIDs            set.Set[ids.ID]
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
-	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
+	CanExecuteTransactionFn func(params.Rules, common.Address, *common.Address, libevm.StateReader) error
 	GasPriceConfig          gastime.GasPriceConfig
 }
 
@@ -233,9 +233,9 @@ func getHeaderExtra(hdr *types.Header) extra {
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
 // otherwise it allows all transactions.
-func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr libevm.StateReader) error {
+func (s *Stub) CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, sr libevm.StateReader) error {
 	if fn := s.CanExecuteTransactionFn; fn != nil {
-		return fn(from, to, sr)
+		return fn(rules, from, to, sr)
 	}
 	return nil
 }

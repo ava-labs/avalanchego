@@ -33,6 +33,13 @@ func NewAuth(t *testing.T, key *ecdsa.PrivateKey, chainID *big.Int) *bind.Transa
 // NewBackendWithPrecompile creates a simulated backend with the given precompile enabled
 // at genesis and funds the specified addresses with 1 ETH each. Additional options can be passed
 // to configure the backend.
+//
+// The default chain config is pinned to [params.TestGraniteChainConfig] (i.e.
+// pre-Helicon) because these simulator tests exercise the legacy synchronous
+// plugin's libevm-hook driven txallowlist enforcement, which is intentionally
+// short-circuited post-Helicon by [extras.RulesExtra.CanExecuteTransaction]
+// (see comment there). Helicon-active chains are served by the SAE port at
+// vms/subnetevm and test the same enforcement via SAE worst-case admission.
 func NewBackendWithPrecompile(
 	t *testing.T,
 	precompileCfg precompileconfig.Config,
@@ -40,7 +47,7 @@ func NewBackendWithPrecompile(
 	opts ...func(*node.Config, *ethconfig.Config),
 ) *sim.Backend {
 	t.Helper()
-	chainCfg := params.Copy(params.TestChainConfig)
+	chainCfg := params.Copy(params.TestGraniteChainConfig)
 	params.GetExtra(&chainCfg).GenesisPrecompiles = extras.Precompiles{
 		precompileCfg.Key(): precompileCfg,
 	}
