@@ -36,8 +36,8 @@ type Tx struct {
 
 // Unsigned is a common interface implemented by [Import] and [Export].
 //
-// TODO(StephenButtolph): Expand this interface to include UTXO handling,
-// verification, and state execution.
+// TODO(StephenButtolph): Expand this interface to include UTXO handling and
+// verification.
 type Unsigned interface {
 	// TransferNonAVAX transfers the non-AVAX balances requested by this
 	// transaction.

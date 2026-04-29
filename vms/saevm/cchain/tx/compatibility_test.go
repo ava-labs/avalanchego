@@ -172,14 +172,15 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 		oldSDB := NewStateDB(t)
 		newSDB := NewStateDB(t)
 
-		hugeAVAX := new(uint256.Int).Lsh(uint256.NewInt(1), 128)
-		hugeBig := new(big.Int).Lsh(big.NewInt(1), 128)
-		for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
-			if tx, ok := newTx.Unsigned.(*Export); ok {
-				for _, in := range tx.Ins {
-					if in.Nonce == math.MaxUint64 {
-						t.Skip("nonce overflow")
-					}
+		if tx, ok := newTx.Unsigned.(*Export); ok {
+			hugeAVAX := new(uint256.Int).Lsh(uint256.NewInt(1), 128)
+			hugeBig := new(big.Int).Lsh(big.NewInt(1), 128)
+			for _, in := range tx.Ins {
+				if in.Nonce == math.MaxUint64 {
+					t.Skip("nonce overflow")
+				}
+
+				for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
 					sdb.AddBalance(in.Address, hugeAVAX)
 					sdb.SetNonce(in.Address, in.Nonce)
 					sdb.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), hugeBig)
