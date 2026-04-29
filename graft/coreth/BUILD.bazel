@@ -1,2 +1,25 @@
 # gazelle:prefix github.com/ava-labs/avalanchego/graft/coreth
 # gazelle:map_kind go_test graft_go_test //.bazel:defs.bzl
+# gazelle:default_visibility //graft/coreth:__subpackages__,//graft/coreth:external_consumers
+
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
+package_group(
+    name = "external_consumers",
+    packages = [
+        "//main",
+        "//node",
+        "//tests/e2e",
+        "//tests/e2e/c",
+        "//tests/fixture/e2e",
+        "//tests/reexecute",
+        "//tests/reexecute/c",
+        "//tests/reexecute/chaos",
+        "//vms/evm/emulate",
+        "//wallet/chain/c",
+        "//wallet/subnet/primary",
+    ],
+)

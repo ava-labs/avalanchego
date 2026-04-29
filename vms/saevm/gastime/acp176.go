@@ -8,6 +8,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/holiman/uint256"
+
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
@@ -39,56 +41,102 @@ func (tm *Time) FastForwardToTime(t time.Time) {
 
 // AfterBlock is intended to be called after processing a block, with the
 // target and gas configuration provided.
-func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, cfg GasPriceConfig) error {
+func (tm *Time) AfterBlock(used gas.Gas, target gas.Gas, c GasPriceConfig) error {
+	if err := c.Validate(); err != nil {
+		return fmt.Errorf("%T.Validate() after block: %w", c, err)
+	}
+	target = clampTarget(target)
+
 	tm.Tick(used)
-	// Although [Time.SetTarget] scales the excess by the same factor as the
-	// change in target, it rounds when necessary, which might alter the price
-	// by a negligible amount. We therefore take a price snapshot beforehand
-	// otherwise we'd call [Time.findExcessForPrice] with a different value,
-	// which makes it extremely hard to test.
-	p := tm.Price()
-	tm.SetTarget(target)
 
-	if err := cfg.Validate(); err != nil {
-		return fmt.Errorf("%T.Validate() after block: %w", cfg, err)
+	if c.StaticPricing {
+		tm.excess = 0
+	} else {
+		tm.excess = scaleExcess(
+			tm.excess,
+			target, c.TargetToExcessScaling,
+			tm.target, tm.config.TargetToExcessScaling,
+		)
 	}
-	if cfg.equals(tm.config) {
-		return nil
-	}
-	tm.config = cfg
-	tm.excess = tm.findExcessForPrice(p)
 
+	tm.target = target
+	tm.Time.SetRate(rateOf(tm.target))
+	tm.config = c
+	tm.enforceMinExcess()
 	return nil
 }
 
-// findExcessForPrice uses binary search over uint64 to find the smallest excess
-// value that produces targetPrice with the current [GasPriceConfig]. This maintains
-// price continuity under a change in [GasPriceConfig], with the following scenarios:
-//
-//   - K changes (via TargetToExcessScaling): Scale excess to maintain current price
-//   - StaticPricing is true: Set excess to 0, enabling fixed price mode
-//   - M decreases: Scale excess to maintain current price
-//   - M increases AND current price >= new M: Scale excess to maintain current price
-//   - M increases AND current price < new M: Price bumps to new M (excess becomes 0)
-func (tm *Time) findExcessForPrice(targetPrice gas.Price) gas.Gas {
-	// We return 0 in case targetPrice < minPrice because we should at least maintain the minimum price
-	// by setting the excess to 0. ( P = M * e^(0 / K) = M )
-	// Note: Even though we return 0 for excess it won't avoid accumulating excess in the long run.
-	if targetPrice <= tm.config.MinPrice || tm.config.StaticPricing {
-		return 0
+// scaleExcess returns oldX * newT * newScale / (oldT * oldScale) rounded up and
+// capped to [math.MaxUint64].
+func scaleExcess(oldX, newT, newScale, oldT, oldScale gas.Gas) gas.Gas {
+	newK := mulAsUint256(newT, newScale)
+	oldK := mulAsUint256(oldT, oldScale)
+
+	// Overflow can't occur, the maximum possible intermediate value is:
+	// MaxUint64^3 + MaxUint64^2.
+	var x uint256.Int
+	x.SetUint64(uint64(oldX))
+	x.Mul(&x, &newK)
+	x.Add(&x, &oldK) // round up by adding oldK - 1
+	x.SubUint64(&x, 1)
+	x.Div(&x, &oldK)
+	if !x.IsUint64() {
+		return math.MaxUint64
+	}
+	return gas.Gas(x.Uint64())
+}
+
+func mulAsUint256[T ~uint64](a, b T) uint256.Int {
+	var x, y uint256.Int
+	x.SetUint64(uint64(a))
+	y.SetUint64(uint64(b))
+	x.Mul(&x, &y)
+	return x
+}
+
+// enforceMinExcess bounds excess to be no less than excessForPrice(minPrice, k).
+func (tm *Time) enforceMinExcess() {
+	k := tm.excessScalingFactor()
+	// Avoid the binary search in [excessForPrice] when the current excess
+	// already yields a price that satisfies the minimum.
+	if calculatePrice(tm.excess, k) >= tm.config.MinPrice {
+		return
 	}
 
-	k := tm.excessScalingFactor()
+	minExcess := excessForPrice(tm.config.MinPrice, k)
+	tm.excess = max(tm.excess, minExcess)
+}
 
-	// The price function is monotonic non-decreasing so binary search is appropriate.
-	lo, hi := gas.Gas(0), gas.Gas(math.MaxUint64)
+// excessForPrice returns an integer approximation of ln(p) * k.
+//
+// If [calculatePrice] can produce p, excessForPrice returns the minimum excess to
+// produce p. Otherwise, it returns the maximum excess to produce a number < p,
+// which may happen due to overflow or integer approximation.
+func excessForPrice(p gas.Price, k gas.Gas) gas.Gas {
+	if p <= 1 {
+		return 0
+	}
+	// Binary search for the minimum x where calculatePrice(x, k) >= p.
+	//
+	// calculatePrice(0, k) == 1 and p > 1, so lo > 0.
+	lo, hi := gas.Gas(1), gas.Gas(math.MaxUint64)
 	for lo < hi {
 		mid := lo + (hi-lo)/2
-		if gas.CalculatePrice(tm.config.MinPrice, mid, k) >= targetPrice {
+		if calculatePrice(mid, k) >= p {
 			hi = mid
 		} else {
 			lo = mid + 1
 		}
 	}
+	// If [calculatePrice] can't generate p due to integer approximation, honor
+	// the lower price expectation.
+	if calculatePrice(lo, k) > p {
+		return lo - 1
+	}
 	return lo
+}
+
+// calculatePrice returns an integer approximation of e^(x/k).
+func calculatePrice(x, k gas.Gas) gas.Price {
+	return gas.CalculatePrice(1, x, k)
 }

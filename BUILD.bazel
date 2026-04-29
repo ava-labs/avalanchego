@@ -1,4 +1,4 @@
-load("@bazel_gazelle//:def.bzl", "gazelle", "gazelle_test")
+load("@bazel_gazelle//:def.bzl", "DEFAULT_LANGUAGES", "gazelle", "gazelle_binary", "gazelle_test")
 
 exports_files(["BUILD.bazel"])
 
@@ -9,12 +9,21 @@ exports_files(["BUILD.bazel"])
 # gazelle:proto disable_global
 # gazelle:map_kind go_test go_test //.bazel:defs.bzl
 
+gazelle_binary(
+    name = "gazelle_bin",
+    languages = DEFAULT_LANGUAGES + [
+        "@bazel_gazelle//language/bazel/visibility",
+    ],
+)
+
 gazelle(
     name = "gazelle",
     command = "fix",
+    gazelle = ":gazelle_bin",
 )
 
 gazelle_test(
     name = "gazelle_test",
+    gazelle = ":gazelle_bin",
     workspace = "//:BUILD.bazel",
 )
