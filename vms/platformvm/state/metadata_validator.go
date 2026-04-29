@@ -33,7 +33,7 @@ type validatorMetadata struct {
 	PotentialDelegateeReward uint64        `v0:"true"`
 	StakerStartTime          uint64        `          v1:"true"`
 
-	// ACP-236 fields for auto-renewed validators.
+	// Auto-renewed validators.
 	// Weight is computed as: tx.Weight + AccruedRewards + AccruedDelegateeRewards
 	AccruedRewards           uint64 `v2:"true"` // the sum of validation rewards restaked from previous cycles.
 	AccruedDelegateeRewards  uint64 `v2:"true"` // the sum of delegatee rewards restaked from previous cycles.
@@ -87,7 +87,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 type StakingInfo struct {
 	DelegateeReward uint64
 
-	// ACP-236
+	// Auto-renewed validators.
 	AccruedRewards           uint64
 	AccruedDelegateeRewards  uint64
 	AutoCompoundRewardShares uint32
