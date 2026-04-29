@@ -37,6 +37,7 @@ var (
 	ErrMalformedSignatureAlgorithmIdentifier = errors.New("staking: malformed signature algorithm identifier")
 	ErrMalformedIssuer                       = errors.New("staking: malformed issuer")
 	ErrMalformedValidity                     = errors.New("staking: malformed validity")
+	ErrMalformedSubject                      = errors.New("staking: malformed subject")
 	ErrMalformedSPKI                         = errors.New("staking: malformed spki")
 	ErrMalformedPublicKeyAlgorithmIdentifier = errors.New("staking: malformed public key algorithm identifier")
 	ErrMalformedSubjectPublicKey             = errors.New("staking: malformed subject public key")
@@ -89,7 +90,7 @@ func ParseCertificate(bytes []byte) (*Certificate, error) {
 		return nil, ErrMalformedValidity
 	}
 	if !input.SkipASN1(cryptobyte_asn1.SEQUENCE) {
-		return nil, ErrMalformedIssuer
+		return nil, ErrMalformedSubject
 	}
 
 	// Read the "subject public key info" into input.
