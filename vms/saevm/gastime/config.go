@@ -63,11 +63,3 @@ func (c *GasPriceConfig) Validate() error {
 	}
 	return nil
 }
-
-// equal returns true if the logical fields of c and other are equal.
-// It ignores canoto internal fields.
-func (c GasPriceConfig) equals(other GasPriceConfig) bool {
-	return c.TargetToExcessScaling == other.TargetToExcessScaling &&
-		c.MinPrice == other.MinPrice &&
-		c.StaticPricing == other.StaticPricing
-}
