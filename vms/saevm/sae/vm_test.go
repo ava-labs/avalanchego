@@ -1010,7 +1010,7 @@ func TestSettledGasTime(t *testing.T) {
 		if i == 0 {
 			continue // genesis block has no gas time
 		}
-		settledHeight := sut.hooks.SettledHeight(b.Header())
+		settledHeight := sut.hooks.Settled(b.Header()).Height
 		settledBlock := bs[settledHeight]
 		expectedGasTime := settledBlock.ExecutedByGasTime()
 		foundGasTime, err := hook.SettledGasTime(sut.hooks, settledBlock.Header(), b.Header())

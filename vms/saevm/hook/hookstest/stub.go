@@ -148,10 +148,9 @@ func (*Stub) BuildBlock(
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settledHeight uint64,
-	settledGasTime *gastime.Time,
+	settled hook.Settled,
 ) (*types.Block, error) {
-	return BuildBlock(header, blockCtx, txs, receipts, ops, settledHeight, settledGasTime)
+	return BuildBlock(header, blockCtx, txs, receipts, ops, settled)
 }
 
 // BuildBlock encodes ops into [types.Header.Extra] and calls [types.NewBlock]
@@ -162,8 +161,7 @@ func BuildBlock(
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settledHeight uint64,
-	settledGasTime *gastime.Time,
+	settled hook.Settled,
 ) (*types.Block, error) {
 	var e extra
 	// If the header originally had fractional seconds set, we keep them in the
@@ -173,10 +171,7 @@ func BuildBlock(
 	}
 
 	e.ops = ops
-	e.settled = settled{
-		height: settledHeight,
-		tm:     settledGasTime, // already cloned
-	}
+	e.settled = settled
 
 	header.Extra = e.MarshalCanoto()
 	return types.NewBlock(header, txs, nil, receipts, saetest.TrieHasher()), nil
@@ -211,20 +206,10 @@ func (*Stub) BlockTime(hdr *types.Header) time.Time {
 	return time.Unix(int64(hdr.Time), int64(subSec)) //#nosec G115 -- Won't overflow for a few millennia
 }
 
-// SettledHeight returns the height encoded in the Header by [Stub.BuildBlock]
+// Settled returns the settled information encoded in the Header by [Stub.BuildBlock]
 // or [BuildBlock].
-func (*Stub) SettledHeight(hdr *types.Header) uint64 {
-	return getHeaderExtra(hdr).settled.height
-}
-
-// SettledExecutionTimeAndExcess sufficient info to recreate a [gastime.Time].
-func (*Stub) SettledExecutionTimeAndExcess(hdr *types.Header) (uint64, gas.Gas, gas.Gas) {
-	tm := getHeaderExtra(hdr).settled.tm
-	if tm == nil {
-		return 0, 0, 0
-	}
-	frac := tm.Fraction()
-	return tm.Unix(), frac.Numerator, tm.Excess()
+func (*Stub) Settled(hdr *types.Header) hook.Settled {
+	return getHeaderExtra(hdr).settled
 }
 
 // EndOfBlockOps return the ops included in the block by [BuildBlock].
@@ -272,17 +257,9 @@ func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) e
 type extra struct {
 	subSec  time.Duration `canoto:"int,1"` //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
 	ops     []Op          `canoto:"repeated value,2"`
-	settled settled       `canoto:"value,3"`
+	settled hook.Settled  `canoto:"value,3"`
 
 	canotoData canotoData_extra
-}
-
-//nolint:revive // struct-tag: canoto allows unexported fields
-type settled struct {
-	height uint64        `canoto:"uint,1"`
-	tm     *gastime.Time `canoto:"pointer,2"`
-
-	canotoData canotoData_settled
 }
 
 // Op is a serializable representation of [hook.Op].

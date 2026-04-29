@@ -66,15 +66,10 @@ type Points interface {
 	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
 	// component.
 	BlockTime(h *types.Header) time.Time
-	// SettledHeight returns the block height which [types.Header.Root] corresponds
-	// with as the post-execution state root. It MUST match the value passed to
-	// [BlockBuilder.BuildBlock], from which the [types.Header] will be sourced.
-	SettledHeight(*types.Header) uint64
-	// SettledExecutionTimeAndExcess allows recreation of a [gastime.Time] by
-	// return the execution time (scaled by the target) and excess after
-	// execution of the block that is settled by the provided header.
-	// See [SettledGasTime] for usage.
-	SettledExecutionTimeAndExcess(settler *types.Header) (sec uint64, frac gas.Gas, excess gas.Gas)
+	// Settled returns the extra information for the settled block of the
+	// provided header. It MUST match the value passed to
+	// [BlockBuilder.BuildBlock].
+	Settled(*types.Header) Settled
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
@@ -122,14 +117,15 @@ type BlockBuilder[T Transaction] interface {
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
+	// All fields of [SettledState] MUST be populated, otherwise state sync
+	// and recovery will not function correctly.
 	BuildBlock(
 		header *types.Header,
 		blockCtx *block.Context,
 		txs []*types.Transaction,
 		receipts []*types.Receipt,
 		endOfBlockOps []T,
-		settledHeight uint64,
-		settledGasTime *gastime.Time,
+		settledStuff Settled,
 	) (*types.Block, error)
 }
 
@@ -211,14 +207,29 @@ func MinimumGasConsumption(txLimit uint64) uint64 {
 	return intmath.CeilDiv(txLimit, saeparams.Lambda)
 }
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
+// Settled includes information about the block that is settled by a header.
+//
+//nolint:revive // struct-tag: canoto allows unexported fields
+
+type Settled struct {
+	Height       uint64  `canoto:"uint,1"`
+	GasUnix      uint64  `canoto:"uint,2"`
+	GasNumerator gas.Gas `canoto:"uint,3"`
+	Excess       gas.Gas `canoto:"uint,4"`
+
+	canotoData canotoData_Settled
+}
+
 // SettledGasTime is a helper that given a header and its settler, returns the
 // [gastime.Time] associated with the post-execution state of the header.
 //
 // TODO(alarso16): This should be moved to the state sync logic once implemented.
 func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
 	target, cfg := h.GasConfigAfter(settled)
-	sec, denom, excess := h.SettledExecutionTimeAndExcess(settler)
+	stuff := h.Settled(settled)
 
-	pt := proxytime.New(sec, denom, gastime.SafeRateOfTarget(target))
-	return gastime.FromProxyTime(pt, target, excess, cfg)
+	pt := proxytime.New(stuff.GasUnix, stuff.GasNumerator, gastime.SafeRateOfTarget(target))
+	return gastime.FromProxyTime(pt, target, stuff.Excess, cfg)
 }

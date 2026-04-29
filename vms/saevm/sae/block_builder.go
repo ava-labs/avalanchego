@@ -310,14 +310,19 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		receipts = append(receipts, b.Receipts()...)
 	}
 
+	settledGasTime := lastSettled.ExecutedByGasTime()
 	ethB, err := builder.BuildBlock(
 		hdr,
 		bCtx,
 		included,
 		receipts,
 		includedOps,
-		lastSettled.NumberU64(),
-		lastSettled.ExecutedByGasTime(),
+		hook.Settled{
+			Height:       lastSettled.NumberU64(),
+			GasUnix:      settledGasTime.Unix(),
+			GasNumerator: settledGasTime.Fraction().Numerator,
+			Excess:       settledGasTime.Excess(),
+		},
 	)
 	if err != nil {
 		return nil, err

@@ -97,7 +97,7 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 
 	// Consensus only requires post-execution state after and including the
 	// last-settled block.
-	keepFrom := rec.hooks.SettledHeight(last.Header())
+	keepFrom := rec.hooks.Settled(last.Header()).Height
 	for b := last; b.NumberU64() > after.NumberU64(); b = b.ParentBlock() {
 		if b.NumberU64() < keepFrom {
 			exec.Tracker.Untrack(b.PostExecutionStateRoot())
