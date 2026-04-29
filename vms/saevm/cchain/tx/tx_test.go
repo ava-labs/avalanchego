@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -1471,78 +1472,42 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 		f.Add(test.bytes)
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
-		oldTx, err := parseOldTx(data)
+		newTx, err := Parse(data)
 		if err != nil {
 			t.Skip("invalid tx bytes")
 		}
-		newTx, err := Parse(data)
-		require.NoError(t, err, "Parse()")
+		if _, err := newTx.AsOp(avaxAssetID); err != nil {
+			t.Skip("invalid tx")
+		}
 
-		addrs, coinIDs := referencedAccounts(oldTx)
+		oldTx, err := parseOldTx(data)
+		require.NoError(t, err, "parseOldTx()")
 
 		oldSDB := newStateDB(t)
 		newSDB := newStateDB(t)
 
-		// Pre-fund identically with a huge multi-coin balance for every
-		// (addr, coinID) so neither implementation can fail on the
-		// multi-coin branch and we exercise only the success path.
-		hugeBig := new(big.Int).Lsh(big.NewInt(1), 128)
-		prefund := func(sdb *extstate.StateDB) {
-			for addr := range addrs {
-				for coinID := range coinIDs {
-					sdb.AddBalanceMultiCoin(addr, common.Hash(coinID), hugeBig)
-				}
-			}
-		}
-		prefund(oldSDB)
-		prefund(newSDB)
-
-		// EVMStateTransfer also touches AVAX balances and nonces; pre-fund
-		// AVAX and seed nonces only on the old state so those branches don't
-		// fail. TransferNonAVAX skips both, so newSDB doesn't need them.
 		hugeAVAX := new(uint256.Int).Lsh(uint256.NewInt(1), 128)
-		for addr := range addrs {
-			oldSDB.AddBalance(addr, hugeAVAX)
-		}
-		if export, ok := oldTx.UnsignedAtomicTx.(*atomic.UnsignedExportTx); ok {
-			for _, in := range export.Ins {
-				oldSDB.SetNonce(in.Address, in.Nonce)
+		hugeBig := new(big.Int).Lsh(big.NewInt(1), 128)
+		for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
+			if tx, ok := newTx.Unsigned.(*Export); ok {
+				for _, in := range tx.Ins {
+					sdb.AddBalance(in.Address, hugeAVAX)
+					sdb.SetNonce(in.Address, in.Nonce)
+					sdb.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), hugeBig)
+				}
 			}
 		}
 
 		ctx := &snow.Context{AVAXAssetID: avaxAssetID}
-		if err := oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldSDB); err != nil {
-			// Repeated address with conflicting nonces produces ErrInvalidNonce
-			// in old, which doesn't apply to the multi-coin equivalence we are
-			// checking. Skip.
-			t.Skipf("EVMStateTransfer: %s", err)
-		}
+		require.NoError(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldSDB))
 		require.NoError(t, newTx.TransferNonAVAX(avaxAssetID, newSDB))
 
-		for addr := range addrs {
-			for coinID := range coinIDs {
-				oldBal := oldSDB.GetBalanceMultiCoin(addr, common.Hash(coinID))
-				newBal := newSDB.GetBalanceMultiCoin(addr, common.Hash(coinID))
-				require.Zerof(t, oldBal.Cmp(newBal), "addr=%s coin=%s old=%s new=%s", addr, coinID, oldBal, newBal)
-			}
+		opts := []cmp.Option{
+			cmpopts.IgnoreUnexported(extstate.StateDB{}),
+			cmputils.StateDBs(),
+		}
+		if diff := cmp.Diff(oldSDB, newSDB, opts...); diff != "" {
+			t.Errorf("%T.AsOp() diff (-want +got):\n%s", newTx, diff)
 		}
 	})
-}
-
-func referencedAccounts(tx *atomic.Tx) (map[common.Address]struct{}, map[ids.ID]struct{}) {
-	addrs := map[common.Address]struct{}{}
-	coins := map[ids.ID]struct{}{}
-	switch utx := tx.UnsignedAtomicTx.(type) {
-	case *atomic.UnsignedImportTx:
-		for _, out := range utx.Outs {
-			addrs[out.Address] = struct{}{}
-			coins[out.AssetID] = struct{}{}
-		}
-	case *atomic.UnsignedExportTx:
-		for _, in := range utx.Ins {
-			addrs[in.Address] = struct{}{}
-			coins[in.AssetID] = struct{}{}
-		}
-	}
-	return addrs, coins
 }
