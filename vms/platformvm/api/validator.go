@@ -86,7 +86,7 @@ type PermissionlessValidator struct {
 	Staked                 []UTXO                    `json:"staked,omitempty"`
 	Signer                 *signer.ProofOfPossession `json:"signer,omitempty"`
 
-	// ACP-236
+	// Auto-renewed validators.
 	// The owner who can modify auto-renewed validator config, if applicable.
 	ConfigOwner *Owner `json:"configOwner,omitempty"`
 	// The validation cycle duration in seconds, if applicable.
