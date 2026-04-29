@@ -99,8 +99,13 @@ func (d *decoder) intn(x int) int {
 	return int(d.uint64() % uint64(x)) //#nosec G115 -- Overflow is impossible.
 }
 
-// element returns a random element in s. It panics if s is empty.
-func element[T any](d *decoder, s []T) T {
+// element returns a random element biased towards values in s.
+func element[T any](d *decoder, s []T, gen func(*decoder) T) T {
+	// [decoder.bool] must be read before checking whether or not s is empty so
+	// that encoding can assume that a bool will be read.
+	if !d.bool() || len(s) == 0 {
+		return gen(d)
+	}
 	return s[d.intn(len(s))]
 }
 
@@ -117,17 +122,11 @@ func sliceOf[T any](d *decoder, gen func(*decoder) T) []T {
 }
 
 func (d *decoder) address() common.Address {
-	if !d.bool() || len(d.addresses) == 0 {
-		return common.Address(d.bytes(common.AddressLength))
-	}
-	return element(d, d.addresses)
+	return element(d, d.addresses, (*decoder).address)
 }
 
 func (d *decoder) assetID() ids.ID {
-	if !d.bool() || len(d.assetIDs) == 0 {
-		return d.id()
-	}
-	return element(d, d.assetIDs)
+	return element(d, d.assetIDs, (*decoder).id)
 }
 
 func (d *decoder) transferableInput() *avax.TransferableInput {
@@ -236,15 +235,15 @@ func (e *encoder) bool(b bool) {
 	}
 }
 
-// address always picks the raw-bytes branch in [decoder.address] so the encoded
-// value is independent of the alphabet.
+// address always picks the raw-bytes branch in [element] so the encoded value
+// is independent of the alphabet.
 func (e *encoder) address(v common.Address) {
 	e.bool(false)
 	e.bytes(v[:])
 }
 
-// assetID always picks the raw-bytes branch in [decoder.assetID] so the encoded
-// value is independent of the alphabet.
+// assetID always picks the raw-bytes branch in [element] so the encoded value
+// is independent of the alphabet.
 func (e *encoder) assetID(v ids.ID) {
 	e.bool(false)
 	e.id(v)
