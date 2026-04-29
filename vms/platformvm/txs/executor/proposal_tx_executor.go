@@ -871,8 +871,9 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 		return err
 	}
 
+	duration := time.Duration(stakingInfo.Period) * time.Second
 	potentialReward := rewards.Calculate(
-		stakingInfo.Period,
+		duration,
 		newWeight,
 		currentSupply,
 	)
@@ -884,7 +885,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 
 	e.onCommitState.SetCurrentSupply(validator.SubnetID, newCurrentSupply)
 
-	endTime := validator.EndTime.Add(stakingInfo.Period)
+	endTime := validator.EndTime.Add(duration)
 
 	// Update validator by deleting and putting back.
 	renewedValidator := *validator
