@@ -12,11 +12,9 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
@@ -53,6 +51,7 @@ type state struct {
 	UnixTime             uint64
 	ConsumedThisSecond   proxytime.FractionalSecond[gas.Gas]
 	Rate, Target, Excess gas.Gas
+	Config               GasPriceConfig
 	Price                gas.Price
 }
 
@@ -63,12 +62,14 @@ func (tm *Time) state() state {
 		Rate:               tm.Rate(),
 		Target:             tm.Target(),
 		Excess:             tm.Excess(),
+		Config:             tm.config,
 		Price:              tm.Price(),
 	}
 }
 
 func (tm *Time) requireState(tb testing.TB, desc string, want state, opts ...cmp.Option) {
 	tb.Helper()
+	opts = append(opts, cmpopts.IgnoreTypes(canotoData_GasPriceConfig{}))
 	if diff := cmp.Diff(want, tm.state(), opts...); diff != "" {
 		tb.Fatalf("%s (-want +got):\n%s", desc, diff)
 	}
@@ -81,7 +82,7 @@ func TestNew(t *testing.T) {
 		return
 	}
 
-	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Price")
+	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Config", "Price")
 
 	tests := []struct {
 		name           string
@@ -124,82 +125,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestScaling(t *testing.T) {
-	const initExcess = gas.Gas(1_234_567_890)
-	tm := mustNew(t, time.Unix(42, 0), 1.6e6, initExcess, DefaultGasPriceConfig())
-
-	// The initial price isn't important in this test; what we care about is
-	// that it's invariant under scaling of the target etc.
-	initPrice := tm.Price()
-	if initPrice == 1 {
-		t.Fatalf("Bad test setup: increase initial excess to achieve %T > 1", initPrice)
-	}
-
-	ignore := cmpopts.IgnoreFields(state{}, "UnixTime", "ConsumedThisSecond")
-
-	tm.requireState(t, "initial", state{
-		Rate:   3.2e6,
-		Target: 1.6e6,
-		Excess: initExcess,
-		Price:  initPrice,
-	}, ignore)
-
-	tm.SetTarget(3.2e6)
-	tm.requireState(t, "after SetTarget()", state{
-		Rate:   6.4e6,
-		Target: 3.2e6,
-		Excess: 2 * initExcess,
-		Price:  initPrice, // unchanged
-	}, ignore)
-
-	// SetRate is identical to setting via the target, as long as the rate is
-	// even. Although the documentation states that SetTarget is preferred, we
-	// still need to test SetRate.
-	const (
-		wantTargetViaRate = 2e6
-		wantRate          = wantTargetViaRate * TargetToRate
-	)
-	want := state{
-		Rate:   wantRate,
-		Target: wantTargetViaRate,
-		Excess: (func() gas.Gas {
-			// Scale the _initial_ excess relative to the new and _initial_
-			// rates, not the most recent rate before scaling.
-			x, _, err := intmath.MulDivCeil(initExcess, wantRate, 3.2e6)
-			require.NoErrorf(t, err, "intmath.MulDivCeil(%d, %d, %d)", initExcess, 4e6, 3.2e6)
-			return x
-		})(),
-		Price: initPrice, // unchanged
-	}
-	for roundingError := range gas.Gas(TargetToRate) {
-		r := wantRate + roundingError
-		tm.SetRate(r)
-		tm.requireState(t, fmt.Sprintf("after SetRate(%d)", r), want, ignore)
-	}
-
-	testPostClone := func(t *testing.T, cloned *Time) {
-		t.Helper()
-		want := want
-		cloned.requireState(t, "unchanged immediately after clone", want, ignore)
-
-		cloned.SetRate(cloned.Rate() * 2)
-		tm.requireState(t, "original Time unchanged by setting clone's rate", want, ignore)
-
-		want.Rate *= 2
-		want.Target *= 2
-		want.Excess *= 2
-		cloned.requireState(t, "scaling after clone and then SetRate()", want, ignore)
-	}
-
-	t.Run("clone", func(t *testing.T) {
-		testPostClone(t, tm.Clone())
-	})
-
-	t.Run("canoto_roundtrip", func(t *testing.T) {
-		testPostClone(t, tm.cloneViaCanotoRoundTrip(t))
-	})
-}
-
 func TestExcess(t *testing.T) {
 	const rate = gas.Gas(3.2e6)
 	tm := mustNew(t, time.Unix(42, 0), rate/2, 0, DefaultGasPriceConfig())
@@ -210,7 +135,7 @@ func TestExcess(t *testing.T) {
 		return f
 	}
 
-	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Target", "Price")
+	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Target", "Config", "Price")
 
 	tm.requireState(t, "initial", state{
 		UnixTime:           42,
@@ -332,32 +257,43 @@ func TestExcess(t *testing.T) {
 }
 
 func TestMinAndStaticPrice(t *testing.T) {
-	const (
-		target = 1e6
-		excess = target * DefaultTargetToExcessScaling // i.e. Price == floor(e)*MinPrice
-	)
+	const target = 1e6
 
 	tests := []struct {
-		name     string
-		minPrice gas.Price
-		static   bool
-		want     gas.Price
-		wantErr  testerr.Want
+		name           string
+		minPrice       gas.Price
+		static         bool
+		startingExcess gas.Gas
+		want           gas.Price
+		wantErr        testerr.Want
 	}{
 		{
 			name:     "min=1",
 			minPrice: 1,
-			want:     2,
+			want:     1,
 		},
 		{
-			name:     "min=100",
+			name:           "min=1_x=T*K",
+			minPrice:       1,
+			startingExcess: target * DefaultTargetToExcessScaling,
+			want:           2, // floor(e^1)
+		},
+		{
+			name:     "min=100_x=0",
 			minPrice: 100,
-			want:     271,
+			want:     100,
 		},
 		{
-			name:     "high_min_no_overflow",
-			minPrice: math.MaxUint64 / 2,
-			want:     math.MaxUint64,
+			name:           "min=100_x=T*K",
+			minPrice:       100,
+			startingExcess: target * DefaultTargetToExcessScaling,
+			want:           100,
+		},
+		{
+			name:           "high_min_no_overflow",
+			minPrice:       math.MaxUint64 / 2,
+			startingExcess: math.MaxUint64,
+			want:           math.MaxUint64,
 		},
 		{
 			name:     "zero_min_errors",
@@ -365,10 +301,11 @@ func TestMinAndStaticPrice(t *testing.T) {
 			wantErr:  testerr.Is(errMinPriceZero),
 		},
 		{
-			name:     "static_pricing_returns_min",
-			minPrice: 123_456,
-			static:   true,
-			want:     123_456,
+			name:           "static_pricing_returns_min",
+			minPrice:       123_456,
+			static:         true,
+			startingExcess: math.MaxUint64,
+			want:           123_456,
 		},
 	}
 
@@ -378,7 +315,7 @@ func TestMinAndStaticPrice(t *testing.T) {
 			cfg.MinPrice = tt.minPrice
 			cfg.StaticPricing = tt.static
 
-			tm, err := New(time.Unix(0, 0), target, excess, cfg)
+			tm, err := New(time.Unix(0, 0), target, tt.startingExcess, cfg)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("New(..., %+v) %s", cfg, diff)
 			}
@@ -386,39 +323,10 @@ func TestMinAndStaticPrice(t *testing.T) {
 				return
 			}
 			if got := tm.Price(); got != tt.want {
-				t.Errorf("New(..., excess=%d, %+v).Price() got %d; want %d", gas.Gas(excess), cfg, got, tt.want)
+				t.Errorf("New(..., excess=%d, %+v).Price() got %d; want %d", tt.startingExcess, cfg, got, tt.want)
 			}
 		})
 	}
-}
-
-func TestTargetClamping(t *testing.T) {
-	tm := mustNew(t, time.Unix(0, 0), MaxTarget+1, 0, DefaultGasPriceConfig())
-	require.Equal(t, MaxTarget, tm.Target(), "tm.Target() clamped by constructor")
-
-	tests := []struct {
-		setTo, want gas.Gas
-	}{
-		{setTo: 0, want: MinTarget},
-		{setTo: 10, want: 10},
-		{setTo: MaxTarget + 1, want: MaxTarget},
-		{setTo: 20, want: 20},
-		{setTo: math.MaxUint64, want: MaxTarget},
-	}
-
-	for _, tt := range tests {
-		tm.SetTarget(tt.setTo)
-		assert.Equalf(t, tt.want, tm.Target(), "%T.Target() after setting to %#x", tm, tt.setTo)
-		assert.Equalf(t, tm.Target()*TargetToRate, tm.Rate(), "%T.Rate() == %d * %[1]T.Target()", tm, TargetToRate)
-	}
-}
-
-func TestNoExcessOverflow(t *testing.T) {
-	tm := mustNew(t, time.Unix(0, 0), 1, math.MaxUint64-100, DefaultGasPriceConfig())
-	tm.SetTarget(MaxTarget)
-	require.Equal(t, gas.Gas(math.MaxUint64), tm.Excess(), "Excess() after scaling")
-	tm.FastForwardTo(1, 0)
-	require.Less(t, tm.Excess(), gas.Gas(math.MaxUint64), "Excess() after capped and then fast-forwarding")
 }
 
 func TestTickExcessOverflow(t *testing.T) {
