@@ -96,7 +96,7 @@ func (d *decoder) intn(x int) int {
 	if x < 1 {
 		return 0
 	}
-	return int(d.uint64() % uint64(x))
+	return int(d.uint64() % uint64(x)) //#nosec G115 -- Overflow is impossible.
 }
 
 // element returns a random element in s. It panics if s is empty.
