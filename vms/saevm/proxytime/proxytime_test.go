@@ -131,11 +131,10 @@ func TestSetRate(t *testing.T) {
 		initSeconds = 42
 		divisor     = 3
 		initRate    = uint64(1000 * divisor)
+		tick        = uint64(100 * divisor)
 	)
-	tm := New(initSeconds, 0, initRate)
 
-	const tick = uint64(100 * divisor)
-	tm.Tick(tick)
+	tm := New(initSeconds, tick, initRate)
 	tm.requireEq(t, "baseline", initSeconds, frac(tick, initRate))
 
 	steps := []struct {
@@ -206,8 +205,7 @@ func TestSetRateRoundUpFullSecond(t *testing.T) {
 		const startUnix = 42
 
 		t.Run(fmt.Sprintf("%d_of_%d_scaled_down_to_%d", tt.tick, tt.rate, tt.newRate), func(t *testing.T) {
-			tm := New(startUnix, 0, tt.rate)
-			tm.Tick(tt.tick)
+			tm := New(startUnix, tt.tick, tt.rate)
 			tm.SetRate(tt.newRate)
 
 			tm.assertEq(t, "After scaling rate down to force tick to next second", startUnix+1, frac(0, tt.newRate))
@@ -217,9 +215,9 @@ func TestSetRateRoundUpFullSecond(t *testing.T) {
 
 func TestAsTime(t *testing.T) {
 	const rate = 500
-	stdlib := time.Date(1986, time.October, 1, 0, 0, 0, 1e9/rate, time.UTC)
+	stdlib := time.Date(1986, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-	tm := New(uint64(stdlib.Unix()), 1, uint64(rate)) //#nosec G115 -- Known to not overflow
+	tm := New(uint64(stdlib.Unix()), 0, uint64(rate)) //#nosec G115 -- Known to not overflow
 	if got, want := tm.AsTime(), stdlib; !got.Equal(want) {
 		t.Fatalf("%T.AsTime() at construction got %v; want %v", tm, got, want)
 	}
@@ -413,21 +411,18 @@ func TestCmpUnix(t *testing.T) {
 			want:       0,
 		},
 		{
-			tm:         New[uint64](42, 0, 1e6),
-			tick:       1,
+			tm:         New[uint64](42, 1, 1e6),
 			cmpAgainst: 42,
 			want:       1,
 		},
 		{
-			tm:         New[uint64](41, 0, 1e6),
-			tick:       99,
+			tm:         New[uint64](41, 99, 1e6),
 			cmpAgainst: 42,
 			want:       -1,
 		},
 	}
 
 	for _, tt := range tests {
-		tt.tm.Tick(tt.tick)
 		if got := tt.tm.CompareUnix(tt.cmpAgainst); got != tt.want {
 			t.Errorf("Time{%s}.CmpUnix(%d) got %d; want %d", tt.tm.String(), tt.cmpAgainst, got, tt.want)
 		}
@@ -438,8 +433,7 @@ func TestCompareDifferentRates(t *testing.T) {
 	fromFrac := func(num, denom uint64) *Time[uint64] {
 		// All comparisons are targeting fractional differences so we want the
 		// Unix seconds to be equal, but the actual value is irrelevant.
-		tm := New(42, 0, denom)
-		tm.Tick(num)
+		tm := New(42, num, denom)
 		return tm
 	}
 

@@ -49,7 +49,6 @@ func (tm *Time[D]) Clone() *Time[D] {
 
 // New returns a new [Time], set from a Unix timestamp. The passage of `hertz`
 // units is equivalent to a tick of 1 second.
-// Undefined behavior if `frac` >= `hertz`.
 func New[D Duration](unixSeconds uint64, frac D, hertz D) *Time[D] {
 	tm := &Time[D]{
 		seconds: unixSeconds,
@@ -63,8 +62,7 @@ func New[D Duration](unixSeconds uint64, frac D, hertz D) *Time[D] {
 // non-negative.
 func Of[D Duration](t time.Time) *Time[D] {
 	const hz = time.Second / time.Nanosecond
-	tm := New(uint64(t.Unix()), D(t.Nanosecond()), D(hz)) //#nosec G115 -- Known to be non-negative
-	return tm
+	return New(uint64(t.Unix()), D(t.Nanosecond()), D(hz)) //#nosec G115 -- Known to be non-negative
 }
 
 // Unix returns tm as a Unix timestamp.
