@@ -31,7 +31,10 @@ go_library(
 
 go_test(
     name = "tx_test",
-    srcs = ["tx_test.go"],
+    srcs = [
+        "compatibility_test.go",
+        "tx_test.go",
+    ],
     data = glob(["testdata/**"]),
     embed = [":tx"],
     deps = [
@@ -44,6 +47,7 @@ go_test(
         "//vms/components/gas",
         "//vms/components/verify",
         "//vms/saevm/hook",
+        "//vms/saevm/cchain/tx/txtest",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_google_go_cmp//cmp",

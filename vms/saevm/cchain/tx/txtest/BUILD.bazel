@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "txtest",
+    srcs = ["fuzzer.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//vms/components/avax",
+        "//vms/saevm/cchain/tx",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "txtest_test",
+    srcs = ["fuzzer_test.go"],
+    embed = [":txtest"],
+    deps = [
+        "//ids",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
+)
