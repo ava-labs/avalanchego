@@ -16,14 +16,14 @@ import (
 )
 
 // fuzz seeds f with [NewTxs] and fuzzes the test.
-func fuzz(f *testing.F, test func(t *testing.T, newTx *Tx)) {
+func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
 	fuzzer := &txtest.F{
 		F: f,
 	}
 	for _, tx := range NewTxs {
 		fuzzer.Add(tx)
 	}
-	fuzzer.Fuzz(test)
+	fuzzer.Fuzz(ff)
 }
 
 func FuzzJSONCompatibility(f *testing.F) {

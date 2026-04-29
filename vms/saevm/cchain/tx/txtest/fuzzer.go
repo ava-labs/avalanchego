@@ -38,7 +38,7 @@ func (f *F) Add(tx *tx.Tx) {
 }
 
 // Fuzz works like [testing.F.Fuzz], but provides a [tx.Tx].
-func (f *F) Fuzz(test func(t *testing.T, tx *tx.Tx)) {
+func (f *F) Fuzz(ff func(t *testing.T, tx *tx.Tx)) {
 	f.F.Fuzz(func(t *testing.T, data []byte) {
 		d := decoder{
 			data:      data,
@@ -55,7 +55,7 @@ func (f *F) Fuzz(test func(t *testing.T, tx *tx.Tx)) {
 		}
 		tx, err := tx.Parse(bytes)
 		require.NoError(t, err, "Parse()")
-		test(t, tx)
+		ff(t, tx)
 	})
 }
 
