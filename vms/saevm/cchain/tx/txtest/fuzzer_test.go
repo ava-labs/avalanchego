@@ -14,20 +14,20 @@ import (
 func FuzzRoundTrip(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		f := decoder{
-			Data: data,
-			Addresses: []common.Address{
+			data: data,
+			addresses: []common.Address{
 				{1},
 			},
-			AssetIDs: []ids.ID{
+			assetIDs: []ids.ID{
 				{2},
 			},
 		}
-		want := f.Tx()
+		want := f.tx()
 
 		var e encoder
 		e.tx(want)
-		f.Data = e
-		got := f.Tx()
+		f.data = e
+		got := f.tx()
 		require.Equal(t, want, got, "decode(encode(tx)) == tx")
 	})
 }

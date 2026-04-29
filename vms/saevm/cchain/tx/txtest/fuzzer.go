@@ -33,20 +33,19 @@ type F struct {
 // Add works like [testing.F.Add], but expects a [tx.Tx].
 func (f *F) Add(tx *tx.Tx) {
 	var e encoder
-	e.unsigned(tx.Unsigned)
-	sliceTo(&e, tx.Creds, (*encoder).credential)
+	e.tx(tx)
 	f.F.Add([]byte(e))
 }
 
 // Fuzz works like [testing.F.Fuzz], but provides a [tx.Tx].
 func (f *F) Fuzz(test func(t *testing.T, tx *tx.Tx)) {
 	f.F.Fuzz(func(t *testing.T, data []byte) {
-		fuzz := decoder{
-			Data:      data,
-			Addresses: f.Addresses,
-			AssetIDs:  f.AssetIDs,
+		d := decoder{
+			data:      data,
+			addresses: f.Addresses,
+			assetIDs:  f.AssetIDs,
 		}
-		genTx := fuzz.Tx()
+		genTx := d.tx()
 
 		// genTx isn't always ideally formatted, so we round-trip through
 		// parsing before providing it to the test body.
@@ -65,240 +64,159 @@ func (f *F) Fuzz(test func(t *testing.T, tx *tx.Tx)) {
 // The byte stream is consumed as structured data is produced; once exhausted,
 // methods return the zero value of their result type.
 type decoder struct {
-	// Data is the byte stream backing the decoder.
-	Data []byte
-	// Addresses, if non-empty, biases [decoder.Address] toward this alphabet.
-	// When empty, [decoder.Address] always returns a fully random address
-	// consumed from data.
-	Addresses []common.Address
-	// AssetIDs, if non-empty, biases [decoder.AssetID] toward this alphabet.
-	// When empty, [decoder.AssetID] always returns a fully random ID consumed
-	// from data.
-	AssetIDs []ids.ID
+	// data is the byte stream backing the decoder.
+	data []byte
+	// addresses, if non-empty, biases [decoder.address] toward this alphabet.
+	addresses []common.Address
+	// assetIDs, if non-empty, biases [decoder.assetID] toward this alphabet.
+	assetIDs []ids.ID
 }
 
-// Bytes returns a slice of n random bytes.
-//
-// Once the fuzzer is exhausted, the returned bytes are zeroes.
-func (d *decoder) Bytes(n int) []byte {
+func (d *decoder) bytes(n int) []byte {
 	out := make([]byte, n)
-	copy(out, d.Data)
-	if n >= len(d.Data) {
-		d.Data = nil
+	copy(out, d.data)
+	if n >= len(d.data) {
+		d.data = nil
 	} else {
-		d.Data = d.Data[n:]
+		d.data = d.data[n:]
 	}
 	return out
 }
 
-// Bool returns a random bool.
-//
-// Once the fuzzer is exhausted, false is returned.
-func (d *decoder) Bool() bool { return d.Bytes(1)[0]&1 != 0 }
+func (d *decoder) bool() bool           { return d.bytes(1)[0]&1 != 0 }
+func (d *decoder) uint32() uint32       { return binary.BigEndian.Uint32(d.bytes(4)) }
+func (d *decoder) uint64() uint64       { return binary.BigEndian.Uint64(d.bytes(8)) }
+func (d *decoder) id() ids.ID           { return ids.ID(d.bytes(ids.IDLen)) }
+func (d *decoder) shortID() ids.ShortID { return ids.ShortID(d.bytes(ids.ShortIDLen)) }
+func (d *decoder) signature() [65]byte  { return [65]byte(d.bytes(65)) }
 
-// Uint32 returns a random uint32.
-//
-// Once the fuzzer is exhausted, 0 is returned.
-func (d *decoder) Uint32() uint32 { return binary.BigEndian.Uint32(d.Bytes(4)) }
-
-// Uint64 returns a random uint64.
-//
-// Once the fuzzer is exhausted, 0 is returned.
-func (d *decoder) Uint64() uint64 { return binary.BigEndian.Uint64(d.Bytes(8)) }
-
-// ID returns a random [ids.ID].
-//
-// Once the fuzzer is exhausted, [ids.Empty] is returned.
-func (d *decoder) ID() ids.ID { return ids.ID(d.Bytes(ids.IDLen)) }
-
-// ShortID returns a random [ids.ShortID].
-//
-// Once the fuzzer is exhausted, [ids.ShortEmpty] is returned.
-func (d *decoder) ShortID() ids.ShortID { return ids.ShortID(d.Bytes(ids.ShortIDLen)) }
-
-// Signature returns a random 65-byte array.
-//
-// Once the fuzzer is exhausted, the zero value is returned.
-func (d *decoder) Signature() [65]byte { return [65]byte(d.Bytes(65)) }
-
-// Intn returns a value in [0, x).
-//
-// Once the fuzzer is exhausted, 0 is returned.
-func (d *decoder) Intn(x int) int {
+// intn returns a value in [0, x).
+func (d *decoder) intn(x int) int {
 	if x < 1 {
 		return 0
 	}
-	return int(d.Uint64() % uint64(x))
+	return int(d.uint64() % uint64(x))
 }
 
 // element returns a random element in s. It panics if s is empty.
-//
-// Once the fuzzer is exhausted, the first entry in s is returned.
-func element[T any](f *decoder, s []T) T {
-	return s[f.Intn(len(s))]
+func element[T any](d *decoder, s []T) T {
+	return s[d.intn(len(s))]
 }
 
 // sliceOf generates a random slice of generated entries. The length is random,
 // but is typically small.
-//
-// Once the fuzzer is exhausted, an empty slice is returned.
-func sliceOf[T any](f *decoder, gen func(*decoder) T) []T {
+func sliceOf[T any](d *decoder, gen func(*decoder) T) []T {
 	var out []T
-	// Bool defaults to false once the generation has been exausted, so this
+	// [decoder.bool] returns false once the data is exhausted, so this loop
 	// will eventually terminate.
-	for f.Bool() {
-		out = append(out, gen(f))
+	for d.bool() {
+		out = append(out, gen(d))
 	}
 	return out
 }
 
-// Address returns a random [common.Address]. When [fuzzer.Addresses] is
-// non-empty, the result is biased toward that alphabet to encourage
-// repeated-address code paths.
-//
-// Once the fuzzer is exhausted, the zero address is returned.
-func (d *decoder) Address() common.Address {
-	if !d.Bool() || len(d.Addresses) == 0 {
-		return common.Address(d.Bytes(common.AddressLength))
+func (d *decoder) address() common.Address {
+	if !d.bool() || len(d.addresses) == 0 {
+		return common.Address(d.bytes(common.AddressLength))
 	}
-	return element(d, d.Addresses)
+	return element(d, d.addresses)
 }
 
-// AssetID returns a random [ids.ID]. When [fuzzer.AssetIDs] is non-empty,
-// the result is biased toward that alphabet to encourage repeated-asset code
-// paths.
-//
-// Once the fuzzer is exhausted, [ids.Empty] is returned.
-func (d *decoder) AssetID() ids.ID {
-	if !d.Bool() || len(d.AssetIDs) == 0 {
-		return d.ID()
+func (d *decoder) assetID() ids.ID {
+	if !d.bool() || len(d.assetIDs) == 0 {
+		return d.id()
 	}
-	return element(d, d.AssetIDs)
+	return element(d, d.assetIDs)
 }
 
-// TransferableInput returns a random [avax.TransferableInput].
-//
-// Once the fuzzer is exhausted, a non-nil pointer to the zero value with no
-// signature indices is returned.
-func (d *decoder) TransferableInput() *avax.TransferableInput {
+func (d *decoder) transferableInput() *avax.TransferableInput {
 	return &avax.TransferableInput{
 		UTXOID: avax.UTXOID{
-			TxID:        d.ID(),
-			OutputIndex: d.Uint32(),
+			TxID:        d.id(),
+			OutputIndex: d.uint32(),
 		},
-		Asset: avax.Asset{ID: d.AssetID()},
+		Asset: avax.Asset{ID: d.assetID()},
 		In: &secp256k1fx.TransferInput{
-			Amt: d.Uint64(),
+			Amt: d.uint64(),
 			Input: secp256k1fx.Input{
-				SigIndices: sliceOf(d, (*decoder).Uint32),
+				SigIndices: sliceOf(d, (*decoder).uint32),
 			},
 		},
 	}
 }
 
-// TransferableOutput returns a random [avax.TransferableOutput].
-//
-// Once the fuzzer is exhausted, a non-nil pointer to the zero value with no
-// owner addresses is returned.
-func (d *decoder) TransferableOutput() *avax.TransferableOutput {
+func (d *decoder) transferableOutput() *avax.TransferableOutput {
 	return &avax.TransferableOutput{
-		Asset: avax.Asset{ID: d.AssetID()},
+		Asset: avax.Asset{ID: d.assetID()},
 		Out: &secp256k1fx.TransferOutput{
-			Amt: d.Uint64(),
+			Amt: d.uint64(),
 			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  d.Uint64(),
-				Threshold: d.Uint32(),
-				Addrs:     sliceOf(d, (*decoder).ShortID),
+				Locktime:  d.uint64(),
+				Threshold: d.uint32(),
+				Addrs:     sliceOf(d, (*decoder).shortID),
 			},
 		},
 	}
 }
 
-// Input returns a random [tx.Input].
-//
-// Once the fuzzer is exhausted, the zero value is returned.
-func (d *decoder) Input() tx.Input {
+func (d *decoder) input() tx.Input {
 	return tx.Input{
-		Address: d.Address(),
-		Amount:  d.Uint64(),
-		AssetID: d.AssetID(),
-		Nonce:   d.Uint64(),
+		Address: d.address(),
+		Amount:  d.uint64(),
+		AssetID: d.assetID(),
+		Nonce:   d.uint64(),
 	}
 }
 
-// Output returns a random [tx.Output].
-//
-// Once the fuzzer is exhausted, the zero value is returned.
-func (d *decoder) Output() tx.Output {
+func (d *decoder) output() tx.Output {
 	return tx.Output{
-		Address: d.Address(),
-		Amount:  d.Uint64(),
-		AssetID: d.AssetID(),
+		Address: d.address(),
+		Amount:  d.uint64(),
+		AssetID: d.assetID(),
 	}
 }
 
-// ImportTx returns a random [*tx.Import].
-//
-// Once the fuzzer is exhausted, a non-nil pointer to the zero value with no
-// imported inputs or outputs is returned.
-func (d *decoder) ImportTx() *tx.Import {
+func (d *decoder) importTx() *tx.Import {
 	return &tx.Import{
-		NetworkID:      d.Uint32(),
-		BlockchainID:   d.ID(),
-		SourceChain:    d.ID(),
-		ImportedInputs: sliceOf(d, (*decoder).TransferableInput),
-		Outs:           sliceOf(d, (*decoder).Output),
+		NetworkID:      d.uint32(),
+		BlockchainID:   d.id(),
+		SourceChain:    d.id(),
+		ImportedInputs: sliceOf(d, (*decoder).transferableInput),
+		Outs:           sliceOf(d, (*decoder).output),
 	}
 }
 
-// ExportTx returns a random [*tx.Export].
-//
-// Once the fuzzer is exhausted, a non-nil pointer to the zero value with no
-// inputs or exported outputs is returned.
-func (d *decoder) ExportTx() *tx.Export {
+func (d *decoder) exportTx() *tx.Export {
 	return &tx.Export{
-		NetworkID:        d.Uint32(),
-		BlockchainID:     d.ID(),
-		DestinationChain: d.ID(),
-		Ins:              sliceOf(d, (*decoder).Input),
-		ExportedOutputs:  sliceOf(d, (*decoder).TransferableOutput),
+		NetworkID:        d.uint32(),
+		BlockchainID:     d.id(),
+		DestinationChain: d.id(),
+		Ins:              sliceOf(d, (*decoder).input),
+		ExportedOutputs:  sliceOf(d, (*decoder).transferableOutput),
 	}
 }
 
-// Unsigned returns a random [tx.Unsigned] — either a [*tx.Import] or a
-// [*tx.Export].
-//
-// Once the fuzzer is exhausted, an empty [*tx.Export] is returned.
-func (d *decoder) Unsigned() tx.Unsigned {
-	if d.Bool() {
-		return d.ImportTx()
-	} else {
-		return d.ExportTx()
+func (d *decoder) unsigned() tx.Unsigned {
+	if d.bool() {
+		return d.importTx()
 	}
+	return d.exportTx()
 }
 
-// Credential returns a random [tx.Credential].
-//
-// Once the fuzzer is exhausted, a [*secp256k1fx.Credential] with no
-// signatures is returned.
-func (d *decoder) Credential() tx.Credential {
+func (d *decoder) credential() tx.Credential {
 	return &secp256k1fx.Credential{
-		Sigs: sliceOf(d, (*decoder).Signature),
+		Sigs: sliceOf(d, (*decoder).signature),
 	}
 }
 
-// Tx returns a random [*tx.Tx].
-//
-// Once the fuzzer is exhausted, a non-nil pointer to a tx wrapping an empty
-// [*tx.Export] with no credentials is returned.
-func (d *decoder) Tx() *tx.Tx {
+func (d *decoder) tx() *tx.Tx {
 	return &tx.Tx{
-		Unsigned: d.Unsigned(),
-		Creds:    sliceOf(d, (*decoder).Credential),
+		Unsigned: d.unsigned(),
+		Creds:    sliceOf(d, (*decoder).credential),
 	}
 }
 
-// encoder writes a byte stream that [fuzzer] will decode into the same
+// encoder writes a byte stream that [decoder] will decode into the same
 // structure.
 type encoder []byte
 
@@ -317,14 +235,14 @@ func (e *encoder) bool(b bool) {
 	}
 }
 
-// address always picks the raw-bytes branch in [fuzzer.Address] so the encoded
+// address always picks the raw-bytes branch in [decoder.address] so the encoded
 // value is independent of the alphabet.
 func (e *encoder) address(v common.Address) {
 	e.bool(false)
 	e.bytes(v[:])
 }
 
-// assetID always picks the raw-bytes branch in [fuzzer.AssetID] so the encoded
+// assetID always picks the raw-bytes branch in [decoder.assetID] so the encoded
 // value is independent of the alphabet.
 func (e *encoder) assetID(v ids.ID) {
 	e.bool(false)
