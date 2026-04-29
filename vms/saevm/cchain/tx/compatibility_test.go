@@ -15,7 +15,7 @@ import (
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
-// fuzz seeds f with [NewTxs] and repeatedly runs the test.
+// fuzz seeds f with [NewTxs] and fuzzes the test.
 func fuzz(f *testing.F, test func(t *testing.T, newTx *Tx)) {
 	fuzzer := &txtest.F{
 		F: f,
