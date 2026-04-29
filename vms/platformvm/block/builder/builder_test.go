@@ -266,7 +266,9 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(env.state.PutCurrentValidator(staker))
-	require.NoError(env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{Period: stakePeriod}))
+	require.NoError(env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
+		Period: uint64(stakePeriod / time.Second),
+	}))
 	require.NoError(env.state.Commit())
 
 	// Advance time to the validator's end time so it should be rewarded
