@@ -87,6 +87,7 @@ func (d *decoder) bytes(n int) []byte {
 func (d *decoder) bool() bool           { return d.bytes(1)[0]&1 != 0 }
 func (d *decoder) uint32() uint32       { return binary.BigEndian.Uint32(d.bytes(4)) }
 func (d *decoder) uint64() uint64       { return binary.BigEndian.Uint64(d.bytes(8)) }
+func (d *decoder) addr() common.Address { return common.Address(d.bytes(common.AddressLength)) }
 func (d *decoder) id() ids.ID           { return ids.ID(d.bytes(ids.IDLen)) }
 func (d *decoder) shortID() ids.ShortID { return ids.ShortID(d.bytes(ids.ShortIDLen)) }
 func (d *decoder) signature() [65]byte  { return [65]byte(d.bytes(65)) }
@@ -122,7 +123,7 @@ func sliceOf[T any](d *decoder, gen func(*decoder) T) []T {
 }
 
 func (d *decoder) address() common.Address {
-	return element(d, d.addresses, (*decoder).address)
+	return element(d, d.addresses, (*decoder).addr)
 }
 
 func (d *decoder) assetID() ids.ID {
@@ -223,6 +224,7 @@ type encoder []byte
 func (e *encoder) bytes(b []byte)        { *e = append(*e, b...) }
 func (e *encoder) uint32(v uint32)       { *e = binary.BigEndian.AppendUint32(*e, v) }
 func (e *encoder) uint64(v uint64)       { *e = binary.BigEndian.AppendUint64(*e, v) }
+func (e *encoder) addr(v common.Address) { e.bytes(v[:]) }
 func (e *encoder) id(v ids.ID)           { e.bytes(v[:]) }
 func (e *encoder) shortID(v ids.ShortID) { e.bytes(v[:]) }
 func (e *encoder) signature(v [65]byte)  { e.bytes(v[:]) }
@@ -239,7 +241,7 @@ func (e *encoder) bool(b bool) {
 // is independent of the alphabet.
 func (e *encoder) address(v common.Address) {
 	e.bool(false)
-	e.bytes(v[:])
+	e.addr(v)
 }
 
 // assetID always picks the raw-bytes branch in [element] so the encoded value
