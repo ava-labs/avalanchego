@@ -189,6 +189,7 @@ func (*HashDBSyncer) ID() string {
 
 // Sync runs the single-session sync to completion.
 func (t *HashDBSyncer) Sync(ctx context.Context) error {
+	log.Info("HashDBSyncer.Sync starting", "root", t.root, "hasFilter", t.storageTrieFilter != nil, "preserveSegments", t.preserveSegments)
 	eg, egCtx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {

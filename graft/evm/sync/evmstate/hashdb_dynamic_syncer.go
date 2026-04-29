@@ -113,7 +113,10 @@ func newHashDBPivotSession(syncClient client.Client, db ethdb.Database, root com
 		return nil, fmt.Errorf("failed to create code syncer: %w", err)
 	}
 
-	allOpts := append(append(baseOpts, extraOpts...), WithFinalizeCodeQueue(codeQueue.Finalize))
+	allOpts := make([]HashDBSyncerOption, 0, len(baseOpts)+len(extraOpts)+1)
+	allOpts = append(allOpts, baseOpts...)
+	allOpts = append(allOpts, extraOpts...)
+	allOpts = append(allOpts, WithFinalizeCodeQueue(codeQueue.Finalize))
 	inner, err := NewHashDBSyncer(syncClient, db, root, codeQueue, leafsRequestSize, leafsRequestType, allOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state syncer for root %s: %w", root, err)

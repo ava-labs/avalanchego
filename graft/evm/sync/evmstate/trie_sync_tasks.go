@@ -76,7 +76,11 @@ func (m *mainTrieTask) OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, key
 
 		// check if this account has storage root that we need to fetch
 		if acc.Root != (common.Hash{}) && acc.Root != types.EmptyRootHash {
-			skip := m.sync.storageTrieFilter != nil && m.sync.storageTrieFilter(m.sync.db, accountHash, acc.Root)
+			hasFilter := m.sync.storageTrieFilter != nil
+			skip := hasFilter && m.sync.storageTrieFilter(m.sync.db, accountHash, acc.Root)
+			if i == 0 {
+				log.Info("OnLeafs first account with storage", "hasFilter", hasFilter, "skip", skip, "accountHash", accountHash, "storageRoot", acc.Root)
+			}
 			if !skip {
 				if err := m.sync.trieQueue.RegisterStorageTrie(acc.Root, accountHash); err != nil {
 					return err
