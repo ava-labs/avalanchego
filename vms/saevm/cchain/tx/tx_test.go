@@ -1478,6 +1478,13 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 		require.NoError(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldSDB))
 		require.NoError(t, newTx.TransferNonAVAX(avaxAssetID, newSDB))
 
+		// Materialize journaled writes into the trie so that
+		// [cmputils.StateDBs], which dumps the trie, reflects them.
+		for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
+			sdb.Finalise(true)
+			sdb.IntermediateRoot(true)
+		}
+
 		opts := []cmp.Option{
 			cmpopts.IgnoreUnexported(extstate.StateDB{}),
 			cmputils.StateDBs(),
