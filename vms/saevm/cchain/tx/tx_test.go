@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,18 +19,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// Imported for [parseOldTx] comment resolution.
+	// Imported for [ParseOldTx] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -39,28 +34,23 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-func TestMain(m *testing.M) {
-	customtypes.Register()
-	os.Exit(m.Run())
-}
-
-// tests is defined at the package level to allow sharing between fuzz tests and
-// unit tests.
+// Tests is defined at the package level to allow sharing between fuzz Tests and
+// unit Tests.
 var (
-	avaxAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
-	tests       = [...]struct {
-		name                  string
-		old                   *atomic.Tx
-		new                   *Tx
-		json                  string
-		bytes                 []byte
-		op                    hook.Op
-		atomicRequestsChainID ids.ID
-		atomicRequests        *chainsatomic.Requests
+	AVAXAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
+	Tests       = [...]struct {
+		Name                  string
+		Old                   *atomic.Tx
+		New                   *Tx
+		JSON                  string
+		Bytes                 []byte
+		Op                    hook.Op
+		AtomicRequestsChainID ids.ID
+		AtomicRequests        *chainsatomic.Requests
 	}{
 		{
-			name: "import", // Included in https://subnets.avax.network/c-chain/block/4
-			old: &atomic.Tx{
+			Name: "import", // Included in https://subnets.avax.network/c-chain/block/4
+			Old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    1,
 					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
@@ -71,7 +61,7 @@ var (
 							OutputIndex: 1,
 						},
 						Asset: avax.Asset{
-							ID: avaxAssetID,
+							ID: AVAXAssetID,
 						},
 						In: &secp256k1fx.TransferInput{
 							Amt: 50000000,
@@ -83,7 +73,7 @@ var (
 					Outs: []atomic.EVMOutput{{
 						Address: common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"),
 						Amount:  50000000,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					}},
 				},
 				Creds: []verify.Verifiable{
@@ -94,7 +84,7 @@ var (
 					},
 				},
 			},
-			new: &Tx{
+			New: &Tx{
 				Unsigned: &Import{
 					NetworkID:    1,
 					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
@@ -105,7 +95,7 @@ var (
 							OutputIndex: 1,
 						},
 						Asset: avax.Asset{
-							ID: avaxAssetID,
+							ID: AVAXAssetID,
 						},
 						In: &secp256k1fx.TransferInput{
 							Amt: 50000000,
@@ -117,7 +107,7 @@ var (
 					Outs: []Output{{
 						Address: common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"),
 						Amount:  50000000,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					}},
 				},
 				Creds: []Credential{
@@ -128,7 +118,7 @@ var (
 					},
 				},
 			},
-			json: `{
+			JSON: `{
 				"unsignedTx":{
 					"networkID":1,
 					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
@@ -155,24 +145,24 @@ var (
 					]
 				}]
 			}`,
-			bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001c52b712aa7dce27a650bf509f799673e245edd4fa9e4e1700eb6105202fe579a0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000002faf080000000010000000000000001b8b5a87d1c05676f1f966da49151fa54dbe68c330000000002faf08021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000100000009000000013e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01"),
-			op: hook.Op{
+			Bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001c52b712aa7dce27a650bf509f799673e245edd4fa9e4e1700eb6105202fe579a0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000002faf080000000010000000000000001b8b5a87d1c05676f1f966da49151fa54dbe68c330000000002faf08021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000100000009000000013e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01"),
+			Op: hook.Op{
 				ID:  ids.FromStringOrPanic("h34BPNmYApCbW8buVWAtzu1KtjTFmyMhiRQQnAqPqwCqQsB7f"),
 				Gas: 11230,
 				Mint: map[common.Address]uint256.Int{
 					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): *uint256.NewInt(50_000_000 * _x2cRate),
 				},
 			},
-			atomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
-			atomicRequests: &chainsatomic.Requests{
+			AtomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+			AtomicRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64"),
 				},
 			},
 		},
 		{
-			name: "export", // Included in https://subnets.avax.network/c-chain/block/48
-			old: &atomic.Tx{
+			Name: "export", // Included in https://subnets.avax.network/c-chain/block/48
+			Old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedExportTx{
 					NetworkID:        1,
 					BlockchainID:     ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
@@ -180,11 +170,11 @@ var (
 					Ins: []atomic.EVMInput{{
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					}},
 					ExportedOutputs: []*avax.TransferableOutput{{
 						Asset: avax.Asset{
-							ID: avaxAssetID,
+							ID: AVAXAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 1,
@@ -205,7 +195,7 @@ var (
 					},
 				},
 			},
-			new: &Tx{
+			New: &Tx{
 				Unsigned: &Export{
 					NetworkID:        1,
 					BlockchainID:     ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
@@ -213,11 +203,11 @@ var (
 					Ins: []Input{{
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					}},
 					ExportedOutputs: []*avax.TransferableOutput{{
 						Asset: avax.Asset{
-							ID: avaxAssetID,
+							ID: AVAXAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 1,
@@ -238,7 +228,7 @@ var (
 					},
 				},
 			},
-			json: `{
+			JSON: `{
 				"unsignedTx":{
 					"networkID":1,
 					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
@@ -266,8 +256,8 @@ var (
 					]
 				}]
 			}`,
-			bytes: common.FromHex("0x000000000001000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001eb019ccd325ad53543a7e7e3b04828bdecf3cff600000000000f424121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000000000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500000000010000000900000001254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01"),
-			op: hook.Op{
+			Bytes: common.FromHex("0x000000000001000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001eb019ccd325ad53543a7e7e3b04828bdecf3cff600000000000f424121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000000000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500000000010000000900000001254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01"),
+			Op: hook.Op{
 				ID:        ids.FromStringOrPanic("ng7Dox1r8nctrF6zurhRPYWxkmE2juUhT7Qhpauyo8qSEu6jB"),
 				Gas:       11230,
 				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 11230),
@@ -278,8 +268,8 @@ var (
 					},
 				},
 			},
-			atomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
-			atomicRequests: &chainsatomic.Requests{
+			AtomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+			AtomicRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{{
 					Key:   common.FromHex("0x38ebe8fc127b2eaeeb25c72a747e0ef27460fb04b5929568ed959d67ec3e4948"),
 					Value: common.FromHex("0x000067b5812292324365c6e2a479b2601cd1cd1facc2fcc8c29d58b5ed96583ea17e0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500"),
@@ -290,8 +280,8 @@ var (
 			},
 		},
 		{
-			name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
-			old: &atomic.Tx{
+			Name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
+			Old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    1,
 					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
@@ -301,7 +291,7 @@ var (
 							UTXOID: avax.UTXOID{
 								TxID: ids.FromStringOrPanic("DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH"),
 							},
-							Asset: avax.Asset{ID: avaxAssetID},
+							Asset: avax.Asset{ID: AVAXAssetID},
 							In: &secp256k1fx.TransferInput{
 								Amt: 99000000,
 								Input: secp256k1fx.Input{
@@ -313,7 +303,7 @@ var (
 							UTXOID: avax.UTXOID{
 								TxID: ids.FromStringOrPanic("25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74"),
 							},
-							Asset: avax.Asset{ID: avaxAssetID},
+							Asset: avax.Asset{ID: AVAXAssetID},
 							In: &secp256k1fx.TransferInput{
 								Amt: 399000000,
 								Input: secp256k1fx.Input{
@@ -325,7 +315,7 @@ var (
 							UTXOID: avax.UTXOID{
 								TxID: ids.FromStringOrPanic("2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj"),
 							},
-							Asset: avax.Asset{ID: avaxAssetID},
+							Asset: avax.Asset{ID: AVAXAssetID},
 							In: &secp256k1fx.TransferInput{
 								Amt: 99000000,
 								Input: secp256k1fx.Input{
@@ -338,17 +328,17 @@ var (
 						{
 							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 							Amount:  99000000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 						},
 						{
 							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 							Amount:  99000000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 						},
 						{
 							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 							Amount:  399000000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 						},
 					},
 				},
@@ -370,7 +360,7 @@ var (
 					},
 				},
 			},
-			new: &Tx{
+			New: &Tx{
 				Unsigned: &Import{
 					NetworkID:    1,
 					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
@@ -380,7 +370,7 @@ var (
 							UTXOID: avax.UTXOID{
 								TxID: ids.FromStringOrPanic("DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH"),
 							},
-							Asset: avax.Asset{ID: avaxAssetID},
+							Asset: avax.Asset{ID: AVAXAssetID},
 							In: &secp256k1fx.TransferInput{
 								Amt: 99000000,
 								Input: secp256k1fx.Input{
@@ -392,7 +382,7 @@ var (
 							UTXOID: avax.UTXOID{
 								TxID: ids.FromStringOrPanic("25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74"),
 							},
-							Asset: avax.Asset{ID: avaxAssetID},
+							Asset: avax.Asset{ID: AVAXAssetID},
 							In: &secp256k1fx.TransferInput{
 								Amt: 399000000,
 								Input: secp256k1fx.Input{
@@ -404,7 +394,7 @@ var (
 							UTXOID: avax.UTXOID{
 								TxID: ids.FromStringOrPanic("2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj"),
 							},
-							Asset: avax.Asset{ID: avaxAssetID},
+							Asset: avax.Asset{ID: AVAXAssetID},
 							In: &secp256k1fx.TransferInput{
 								Amt: 99000000,
 								Input: secp256k1fx.Input{
@@ -417,17 +407,17 @@ var (
 						{
 							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 							Amount:  99000000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 						},
 						{
 							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 							Amount:  99000000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 						},
 						{
 							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 							Amount:  399000000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 						},
 					},
 				},
@@ -449,7 +439,7 @@ var (
 					},
 				},
 			},
-			json: `{
+			JSON: `{
 				"unsignedTx":{
 					"networkID":1,
 					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
@@ -489,16 +479,16 @@ var (
 					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]}
 				]
 			}`,
-			bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b000000031d249d0aab138afe01e6eff9c4789018a600771d94f5396b5df7b9d05298714d0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec000000001000000008e0713e47bfc29bef4cee6e4635da1c74a3aabade68ccad6fca3e99fd827eb1c0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000017c841c00000000100000000a022a8b069a5d5e54c7e09c5c5b0f762c6751068bef15fe951a5e4b349d642200000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec0000000010000000000000003383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000017c841c021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000300000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"),
-			op: hook.Op{
+			Bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b000000031d249d0aab138afe01e6eff9c4789018a600771d94f5396b5df7b9d05298714d0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec000000001000000008e0713e47bfc29bef4cee6e4635da1c74a3aabade68ccad6fca3e99fd827eb1c0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000017c841c00000000100000000a022a8b069a5d5e54c7e09c5c5b0f762c6751068bef15fe951a5e4b349d642200000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec0000000010000000000000003383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000017c841c021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000300000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"),
+			Op: hook.Op{
 				ID:  ids.FromStringOrPanic("2Av7bXLRwxiQhbT9EcQd8KRM3Lz6VkpTqf3Y1AT5peHZ4YAohS"),
 				Gas: 13526,
 				Mint: map[common.Address]uint256.Int{
 					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): *uint256.NewInt(597_000_000 * _x2cRate),
 				},
 			},
-			atomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
-			atomicRequests: &chainsatomic.Requests{
+			AtomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+			AtomicRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05"),
 					common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630"),
@@ -507,8 +497,8 @@ var (
 			},
 		},
 		{
-			name: "export_same_address_multi_asset", // Synthetic
-			old: &atomic.Tx{
+			Name: "export_same_address_multi_asset", // Synthetic
+			Old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedExportTx{
 					Ins: []atomic.EVMInput{
 						{
@@ -517,7 +507,7 @@ var (
 						},
 						{
 							Amount:  1_000_000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 							Nonce:   5,
 						},
 					},
@@ -525,7 +515,7 @@ var (
 				},
 				Creds: []verify.Verifiable{},
 			},
-			new: &Tx{
+			New: &Tx{
 				Unsigned: &Export{
 					Ins: []Input{
 						{
@@ -534,7 +524,7 @@ var (
 						},
 						{
 							Amount:  1_000_000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 							Nonce:   5,
 						},
 					},
@@ -542,7 +532,7 @@ var (
 				},
 				Creds: []Credential{},
 			},
-			json: `{
+			JSON: `{
 				"unsignedTx":{
 					"networkID":0,
 					"blockchainID":"11111111111111111111111111111111LpoYY",
@@ -555,8 +545,8 @@ var (
 				},
 				"credentials":[]
 			}`,
-			bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000050000000000000000"),
-			op: hook.Op{
+			Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000050000000000000000"),
+			Op: hook.Op{
 				ID:        ids.FromStringOrPanic("29cCETWxEUN1QCuex59j46Xtr8urBRo5M7HzwBqC3qDXWd73sX"),
 				Gas:       12218,
 				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 12218),
@@ -568,13 +558,13 @@ var (
 					},
 				},
 			},
-			atomicRequests: &chainsatomic.Requests{
+			AtomicRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{},
 			},
 		},
 		{
-			name: "export_multi_address_multi_asset", // Synthetic
-			old: &atomic.Tx{
+			Name: "export_multi_address_multi_asset", // Synthetic
+			Old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedExportTx{
 					Ins: []atomic.EVMInput{
 						{
@@ -585,7 +575,7 @@ var (
 						{
 							Address: common.Address{2},
 							Amount:  1_000_000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 							Nonce:   7,
 						},
 					},
@@ -593,7 +583,7 @@ var (
 				},
 				Creds: []verify.Verifiable{},
 			},
-			new: &Tx{
+			New: &Tx{
 				Unsigned: &Export{
 					Ins: []Input{
 						{
@@ -604,7 +594,7 @@ var (
 						{
 							Address: common.Address{2},
 							Amount:  1_000_000,
-							AssetID: avaxAssetID,
+							AssetID: AVAXAssetID,
 							Nonce:   7,
 						},
 					},
@@ -612,7 +602,7 @@ var (
 				},
 				Creds: []Credential{},
 			},
-			json: `{
+			JSON: `{
 				"unsignedTx":{
 					"networkID":0,
 					"blockchainID":"11111111111111111111111111111111LpoYY",
@@ -625,8 +615,8 @@ var (
 				},
 				"credentials":[]
 			}`,
-			bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000000000000"),
-			op: hook.Op{
+			Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000000000000"),
+			Op: hook.Op{
 				ID:        ids.FromStringOrPanic("8P9XRKhxHeTv3t4Aj9cTV6dD5h78WVFH8nctLuCkeSavfKeEG"),
 				Gas:       12218,
 				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 12218),
@@ -641,13 +631,13 @@ var (
 					},
 				},
 			},
-			atomicRequests: &chainsatomic.Requests{
+			AtomicRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{},
 			},
 		},
 		{
-			name: "import_non_avax", // Synthetic
-			old: &atomic.Tx{
+			Name: "import_non_avax", // Synthetic
+			Old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					ImportedInputs: []*avax.TransferableInput{{
 						In: &secp256k1fx.TransferInput{
@@ -663,7 +653,7 @@ var (
 				},
 				Creds: []verify.Verifiable{},
 			},
-			new: &Tx{
+			New: &Tx{
 				Unsigned: &Import{
 					ImportedInputs: []*avax.TransferableInput{{
 						In: &secp256k1fx.TransferInput{
@@ -679,7 +669,7 @@ var (
 				},
 				Creds: []Credential{},
 			},
-			json: `{
+			JSON: `{
 				"unsignedTx":{
 					"networkID":0,
 					"blockchainID":"11111111111111111111111111111111LpoYY",
@@ -699,21 +689,21 @@ var (
 				},
 				"credentials":[]
 			}`,
-			bytes: common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500000000000003e70000000000000001000000000000000000000000000000000000000000000000000003e7000000000000000000000000000000000000000000000000000000000000000000000000"),
-			op: hook.Op{
+			Bytes: common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500000000000003e70000000000000001000000000000000000000000000000000000000000000000000003e7000000000000000000000000000000000000000000000000000000000000000000000000"),
+			Op: hook.Op{
 				ID:   ids.FromStringOrPanic("s4xoHkf4rPQYSwjbQo78hcSP1wSeViV1Fx2PHM4AfRiDurFkf"),
 				Gas:  10226,
 				Mint: map[common.Address]uint256.Int{},
 			},
-			atomicRequests: &chainsatomic.Requests{
+			AtomicRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb"),
 				},
 			},
 		},
 	}
-	oldTxs []*atomic.Tx
-	newTxs []*Tx
+	OldTxs []*atomic.Tx
+	NewTxs []*Tx
 
 	// txIgnore ignores caching/context fields populated lazily on the txs.
 	txIgnore = cmpopts.IgnoreUnexported(
@@ -724,50 +714,50 @@ var (
 )
 
 func init() {
-	oldTxs = make([]*atomic.Tx, len(tests))
-	newTxs = make([]*Tx, len(tests))
-	for i, test := range tests {
-		oldTxs[i] = test.old
-		newTxs[i] = test.new
+	OldTxs = make([]*atomic.Tx, len(Tests))
+	NewTxs = make([]*Tx, len(Tests))
+	for i, test := range Tests {
+		OldTxs[i] = test.Old
+		NewTxs[i] = test.New
 	}
 }
 
 func TestID(t *testing.T) {
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, test := range Tests {
+		t.Run(test.Name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
 				// We must parse the old tx to properly initialize the ID.
-				old, err := parseOldTx(test.bytes)
+				old, err := ParseOldTx(test.Bytes)
 				require.NoError(t, err, "parseOldTx()")
-				assert.Equalf(t, test.op.ID, old.ID(), "%T.ID()", old)
+				assert.Equalf(t, test.Op.ID, old.ID(), "%T.ID()", old)
 			})
 			t.Run("new", func(t *testing.T) {
-				assert.Equalf(t, test.op.ID, test.new.ID(), "%T.ID()", test.new)
+				assert.Equalf(t, test.Op.ID, test.New.ID(), "%T.ID()", test.New)
 			})
 		})
 	}
 }
 
 func TestBytes(t *testing.T) {
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, test := range Tests {
+		t.Run(test.Name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
-				got, err := atomic.Codec.Marshal(atomic.CodecVersion, test.old)
-				require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, test.old)
-				assert.Equalf(t, test.bytes, got, "%T.Marshal(, %T)", atomic.Codec, test.old)
+				got, err := atomic.Codec.Marshal(atomic.CodecVersion, test.Old)
+				require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, test.Old)
+				assert.Equalf(t, test.Bytes, got, "%T.Marshal(, %T)", atomic.Codec, test.Old)
 			})
 			t.Run("new", func(t *testing.T) {
-				got, err := test.new.Bytes()
-				require.NoErrorf(t, err, "%T.Bytes()", test.new)
-				assert.Equalf(t, test.bytes, got, "%T.Bytes()", test.new)
+				got, err := test.New.Bytes()
+				require.NoErrorf(t, err, "%T.Bytes()", test.New)
+				assert.Equalf(t, test.Bytes, got, "%T.Bytes()", test.New)
 			})
 		})
 	}
 }
 
 func TestMarshalSlice(t *testing.T) {
-	want, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
-	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldTxs)
+	want, err := atomic.Codec.Marshal(atomic.CodecVersion, OldTxs)
+	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, OldTxs)
 
 	tests := []struct {
 		name string
@@ -776,7 +766,7 @@ func TestMarshalSlice(t *testing.T) {
 	}{
 		{
 			name: "mainnet",
-			txs:  newTxs,
+			txs:  NewTxs,
 			want: want,
 		},
 		{
@@ -793,20 +783,20 @@ func TestMarshalSlice(t *testing.T) {
 }
 
 func TestParse(t *testing.T) {
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, test := range Tests {
+		t.Run(test.Name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
 				got := new(atomic.Tx)
-				_, err := atomic.Codec.Unmarshal(test.bytes, got)
+				_, err := atomic.Codec.Unmarshal(test.Bytes, got)
 				require.NoErrorf(t, err, "%T.Unmarshal(, %T)", atomic.Codec, got)
-				if diff := cmp.Diff(test.old, got, txIgnore); diff != "" {
+				if diff := cmp.Diff(test.Old, got, txIgnore); diff != "" {
 					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
 				}
 			})
 			t.Run("new", func(t *testing.T) {
-				got, err := Parse(test.bytes)
+				got, err := Parse(test.Bytes)
 				require.NoError(t, err, "Parse()")
-				if diff := cmp.Diff(test.new, got, txIgnore); diff != "" {
+				if diff := cmp.Diff(test.New, got, txIgnore); diff != "" {
 					t.Errorf("Parse() diff (-want +got):\n%s", diff)
 				}
 			})
@@ -815,8 +805,8 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseSlice(t *testing.T) {
-	bytes, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
-	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldTxs)
+	bytes, err := atomic.Codec.Marshal(atomic.CodecVersion, OldTxs)
+	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, OldTxs)
 
 	tests := []struct {
 		name    string
@@ -827,7 +817,7 @@ func TestParseSlice(t *testing.T) {
 		{
 			name:  "mainnet",
 			bytes: bytes,
-			want:  newTxs,
+			want:  NewTxs,
 		},
 		{
 			name: "empty",
@@ -856,10 +846,10 @@ func TestParseSlice(t *testing.T) {
 
 var errUnexpectedCredentialType = errors.New("unexpected credential type")
 
-// parseOldTx parses a transaction using coreth's old parsing logic but enforces
+// ParseOldTx parses a transaction using coreth's old parsing logic but enforces
 // additional restrictions. Coreth's parsing logic is overly permissive and
 // depends on later verification in [vm.VerifierBackend].
-func parseOldTx(b []byte) (*atomic.Tx, error) {
+func ParseOldTx(b []byte) (*atomic.Tx, error) {
 	tx, err := atomic.ExtractAtomicTx(b, atomic.Codec)
 	if err != nil {
 		return nil, err
@@ -872,10 +862,10 @@ func parseOldTx(b []byte) (*atomic.Tx, error) {
 	return tx, nil
 }
 
-// parseOldTxs parses a slice of transactions using coreth's old parsing logic
+// ParseOldTxs parses a slice of transactions using coreth's old parsing logic
 // but enforces additional restrictions. Coreth's parsing logic is overly
 // permissive and depends on later verification in [vm.VerifierBackend].
-func parseOldTxs(b []byte) ([]*atomic.Tx, error) {
+func ParseOldTxs(b []byte) ([]*atomic.Tx, error) {
 	txs, err := atomic.ExtractAtomicTxs(b, true, atomic.Codec)
 	if err != nil {
 		return nil, err
@@ -890,42 +880,9 @@ func parseOldTxs(b []byte) ([]*atomic.Tx, error) {
 	return txs, nil
 }
 
-func FuzzParseCompatibility(f *testing.F) {
-	for _, test := range tests {
-		f.Add(test.bytes)
-	}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		_, oldErr := parseOldTx(data)
-		oldOk := oldErr == nil
-
-		_, newErr := Parse(data)
-		newOk := newErr == nil
-
-		assert.Equal(t, oldOk, newOk, "Parse(b) == parseOldTx(b)")
-	})
-}
-
-func FuzzParseSliceCompatibility(f *testing.F) {
-	{
-		b, err := MarshalSlice(newTxs)
-		require.NoError(f, err, "MarshalSlice()")
-		f.Add(b)
-	}
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		_, oldErr := parseOldTxs(data)
-		oldOk := oldErr == nil
-
-		_, newErr := ParseSlice(data)
-		newOk := newErr == nil
-
-		assert.Equal(t, oldOk, newOk, "ParseSlice(b) == parseOldTxs(b)")
-	})
-}
-
 func FuzzParseRoundTrip(f *testing.F) {
-	for _, test := range tests {
-		f.Add(test.bytes)
+	for _, test := range Tests {
+		f.Add(test.Bytes)
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
 		tx, err := Parse(data)
@@ -941,7 +898,7 @@ func FuzzParseRoundTrip(f *testing.F) {
 
 func FuzzParseSliceRoundTrip(f *testing.F) {
 	{
-		b, err := MarshalSlice(newTxs)
+		b, err := MarshalSlice(NewTxs)
 		require.NoError(f, err, "MarshalSlice()")
 		f.Add(b)
 	}
@@ -961,52 +918,39 @@ func FuzzParseSliceRoundTrip(f *testing.F) {
 }
 
 func TestJSONMarshal(t *testing.T) {
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, test := range Tests {
+		t.Run(test.Name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
-				got, err := json.Marshal(test.old)
-				require.NoErrorf(t, err, "json.Marshal(%T)", test.old)
-				assert.JSONEqf(t, test.json, string(got), "json.Marshal(%T)", test.old)
+				got, err := json.Marshal(test.Old)
+				require.NoErrorf(t, err, "json.Marshal(%T)", test.Old)
+				assert.JSONEqf(t, test.JSON, string(got), "json.Marshal(%T)", test.Old)
 			})
 			t.Run("new", func(t *testing.T) {
-				got, err := json.Marshal(test.new)
-				require.NoErrorf(t, err, "json.Marshal(%T)", test.new)
-				assert.JSONEqf(t, test.json, string(got), "json.Marshal(%T)", test.new)
+				got, err := json.Marshal(test.New)
+				require.NoErrorf(t, err, "json.Marshal(%T)", test.New)
+				assert.JSONEqf(t, test.JSON, string(got), "json.Marshal(%T)", test.New)
 			})
 		})
 	}
 }
 
-func FuzzJSONCompatibility(f *testing.F) {
-	fuzzTx(f, func(t *testing.T, newTx *Tx) {
-		oldTx := toOldTx(t, newTx)
-
-		oldJSON, err := json.Marshal(oldTx)
-		require.NoErrorf(t, err, "json.Marshal(%T)", oldTx)
-
-		newJSON, err := json.Marshal(newTx)
-		require.NoErrorf(t, err, "json.Marshal(%T)", newTx)
-		assert.JSONEq(t, string(oldJSON), string(newJSON))
-	})
-}
-
-func toOldTx(tb testing.TB, newTx *Tx) *atomic.Tx {
+func ToOldTx(tb testing.TB, newTx *Tx) *atomic.Tx {
 	tb.Helper()
 
 	bytes, err := newTx.Bytes()
 	require.NoErrorf(tb, err, "%T.Bytes()", newTx)
 
-	oldTx, err := parseOldTx(bytes)
+	oldTx, err := ParseOldTx(bytes)
 	require.NoError(tb, err, "parseOldTx()")
 	return oldTx
 }
 
 func TestAsOp(t *testing.T) {
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			got, err := test.new.AsOp(avaxAssetID)
-			require.NoErrorf(t, err, "%T.AsOp(avaxAssetID)", test.new)
-			assert.Equalf(t, test.op, got, "%T.AsOp(avaxAssetID)", test.new)
+	for _, test := range Tests {
+		t.Run(test.Name, func(t *testing.T) {
+			got, err := test.New.AsOp(AVAXAssetID)
+			require.NoErrorf(t, err, "%T.AsOp(avaxAssetID)", test.New)
+			assert.Equalf(t, test.Op, got, "%T.AsOp(avaxAssetID)", test.New)
 		})
 	}
 }
@@ -1035,13 +979,13 @@ func TestAsOp_Errors(t *testing.T) {
 			name: "import_burned_underflow",
 			tx: &Import{
 				ImportedInputs: []*avax.TransferableInput{{
-					Asset: avax.Asset{ID: avaxAssetID},
+					Asset: avax.Asset{ID: AVAXAssetID},
 					In: &secp256k1fx.TransferInput{
 						Amt: 1,
 					},
 				}},
 				Outs: []Output{{
-					AssetID: avaxAssetID,
+					AssetID: AVAXAssetID,
 					Amount:  2,
 				}},
 			},
@@ -1051,11 +995,11 @@ func TestAsOp_Errors(t *testing.T) {
 			name: "export_burned_underflow",
 			tx: &Export{
 				Ins: []Input{{
-					AssetID: avaxAssetID,
+					AssetID: AVAXAssetID,
 					Amount:  1,
 				}},
 				ExportedOutputs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: avaxAssetID},
+					Asset: avax.Asset{ID: AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: 2,
 					},
@@ -1069,129 +1013,24 @@ func TestAsOp_Errors(t *testing.T) {
 			tx := &Tx{
 				Unsigned: test.tx,
 			}
-			_, err := tx.AsOp(avaxAssetID)
+			_, err := tx.AsOp(AVAXAssetID)
 			require.ErrorIsf(t, err, test.want, "%T.AsOp(avaxAssetID)", tx)
 		})
 	}
 }
 
-func FuzzAsOpCompatibility(f *testing.F) {
-	fuzzTx(f, func(t *testing.T, newTx *Tx) {
-		op, err := newTx.AsOp(avaxAssetID)
-		if err != nil {
-			t.Skip("invalid tx")
-		}
-
-		oldTx := toOldTx(t, newTx)
-		gasUsed, err := oldTx.UnsignedAtomicTx.GasUsed(true)
-		require.NoErrorf(t, err, "%T.GasUsed(true)", oldTx.UnsignedAtomicTx)
-
-		gasPrice, err := atomic.EffectiveGasPrice(oldTx.UnsignedAtomicTx, avaxAssetID, true)
-		require.NoErrorf(t, err, "atomic.EffectiveGasPrice(%T, avaxAssetID, true)", oldTx)
-
-		state := newFuzzStateDB()
-		if export, ok := oldTx.UnsignedAtomicTx.(*atomic.UnsignedExportTx); ok {
-			for _, in := range export.Ins {
-				state.initialNonces[in.Address] = in.Nonce
-			}
-		}
-
-		ctx := &snow.Context{AVAXAssetID: avaxAssetID}
-		require.NoErrorf(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, state), "%T.EVMStateTransfer()", oldTx.UnsignedAtomicTx)
-
-		expected := hook.Op{
-			ID:        oldTx.ID(),
-			Gas:       gas.Gas(gasUsed),
-			GasFeeCap: gasPrice,
-			Burn:      state.op.burn,
-			Mint:      state.op.mint,
-		}
-		if diff := cmp.Diff(expected, op, cmpopts.EquateEmpty()); diff != "" {
-			t.Errorf("%T.AsOp() diff (-want +got):\n%s", newTx, diff)
-		}
-	})
-}
-
-// fuzzStateDB is an in-memory [atomic.StateDB] for [FuzzAsOp]. It constructs an
-// [op] from the mutations of [atomic.UnsignedAtomicTx.EVMStateTransfer].
-type fuzzStateDB struct {
-	initialNonces map[common.Address]uint64
-	op            op
-}
-
-func newFuzzStateDB() *fuzzStateDB {
-	return &fuzzStateDB{
-		initialNonces: make(map[common.Address]uint64),
-		op: op{
-			burn: make(map[common.Address]hook.AccountDebit),
-			mint: make(map[common.Address]uint256.Int),
-		},
-	}
-}
-
-func (f *fuzzStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
-	b := f.op.mint[addr]
-	b.Add(&b, amount)
-	f.op.mint[addr] = b
-}
-
-func (f *fuzzStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
-	d := f.op.burn[addr]
-	d.Amount.Add(&d.Amount, amount)
-	d.MinBalance = d.Amount
-	f.op.burn[addr] = d
-}
-
-func (*fuzzStateDB) GetBalance(common.Address) *uint256.Int {
-	// Large enough to never underflow, but small enough to never overflow.
-	return new(uint256.Int).Lsh(uint256.NewInt(1), 128)
-}
-
-func (*fuzzStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
-
-func (*fuzzStateDB) SubBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
-
-func (*fuzzStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int {
-	// Large enough to never underflow, but small enough to never overflow.
-	return new(big.Int).Lsh(big.NewInt(1), 128)
-}
-
-func (f *fuzzStateDB) SetNonce(addr common.Address, nonce uint64) {
-	d := f.op.burn[addr]
-	d.Nonce = nonce - 1
-	f.op.burn[addr] = d
-}
-
-func (f *fuzzStateDB) GetNonce(addr common.Address) uint64 {
-	return f.initialNonces[addr]
-}
-
 func TestAtomicRequests(t *testing.T) {
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			chainID, requests, err := test.new.AtomicRequests()
-			require.NoErrorf(t, err, "%T.AtomicRequests()", test.new)
-			assert.Equalf(t, test.atomicRequestsChainID, chainID, "%T.AtomicRequests().ChainID", test.new)
-			assert.Equalf(t, test.atomicRequests, requests, "%T.AtomicRequests().Requests", test.new)
+	for _, test := range Tests {
+		t.Run(test.Name, func(t *testing.T) {
+			chainID, requests, err := test.New.AtomicRequests()
+			require.NoErrorf(t, err, "%T.AtomicRequests()", test.New)
+			assert.Equalf(t, test.AtomicRequestsChainID, chainID, "%T.AtomicRequests().ChainID", test.New)
+			assert.Equalf(t, test.AtomicRequests, requests, "%T.AtomicRequests().Requests", test.New)
 		})
 	}
 }
 
-func FuzzAtomicRequestsCompatibility(f *testing.F) {
-	fuzzTx(f, func(t *testing.T, newTx *Tx) {
-		oldTx := toOldTx(t, newTx)
-
-		oldChainID, oldRequests, err := oldTx.UnsignedAtomicTx.AtomicOps()
-		require.NoErrorf(t, err, "%T.AtomicOps()", oldTx.UnsignedAtomicTx)
-
-		newChainID, newRequests, err := newTx.AtomicRequests()
-		require.NoErrorf(t, err, "%T.AtomicRequests()", newTx)
-		assert.Equal(t, oldChainID, newChainID, "chainID")
-		assert.Equal(t, oldRequests, newRequests, "requests")
-	})
-}
-
-func newStateDB(t testing.TB) *extstate.StateDB {
+func NewStateDB(t testing.TB) *extstate.StateDB {
 	t.Helper()
 
 	db := state.NewDatabase(rawdb.NewMemoryDatabase())
@@ -1220,7 +1059,7 @@ func TestTransferNonAVAX(t *testing.T) {
 				Outs: []Output{{
 					Address: alice,
 					Amount:  1,
-					AssetID: avaxAssetID,
+					AssetID: AVAXAssetID,
 				}},
 			},
 		},
@@ -1248,17 +1087,17 @@ func TestTransferNonAVAX(t *testing.T) {
 					{
 						Address: alice,
 						Amount:  1,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					},
 					{
 						Address: alice,
 						Amount:  10,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					},
 					{
 						Address: bob,
 						Amount:  100,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					},
 					{
 						Address: alice,
@@ -1299,7 +1138,7 @@ func TestTransferNonAVAX(t *testing.T) {
 					{
 						Address: alice,
 						Amount:  1,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					},
 				},
 			},
@@ -1343,17 +1182,17 @@ func TestTransferNonAVAX(t *testing.T) {
 					{
 						Address: alice,
 						Amount:  1,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					},
 					{
 						Address: alice,
 						Amount:  10,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					},
 					{
 						Address: bob,
 						Amount:  100,
-						AssetID: avaxAssetID,
+						AssetID: AVAXAssetID,
 					},
 					{
 						Address: alice,
@@ -1429,7 +1268,7 @@ func TestTransferNonAVAX(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sdb := newStateDB(t)
+			sdb := NewStateDB(t)
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
 					coinID := common.Hash(assetID)
@@ -1437,7 +1276,7 @@ func TestTransferNonAVAX(t *testing.T) {
 				}
 			}
 
-			err := test.tx.TransferNonAVAX(avaxAssetID, sdb)
+			err := test.tx.TransferNonAVAX(AVAXAssetID, sdb)
 			require.ErrorIs(t, err, test.wantErr)
 			for addr, balances := range test.want {
 				for assetID, want := range balances {
@@ -1448,49 +1287,4 @@ func TestTransferNonAVAX(t *testing.T) {
 			}
 		})
 	}
-}
-
-func FuzzTransferNonAVAXCompatibility(f *testing.F) {
-	fuzzTx(f, func(t *testing.T, newTx *Tx) {
-		if _, err := newTx.AsOp(avaxAssetID); err != nil {
-			t.Skip("invalid tx")
-		}
-
-		oldSDB := newStateDB(t)
-		newSDB := newStateDB(t)
-
-		hugeAVAX := new(uint256.Int).Lsh(uint256.NewInt(1), 128)
-		hugeBig := new(big.Int).Lsh(big.NewInt(1), 128)
-		for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
-			if tx, ok := newTx.Unsigned.(*Export); ok {
-				for _, in := range tx.Ins {
-					sdb.AddBalance(in.Address, hugeAVAX)
-					sdb.SetNonce(in.Address, in.Nonce)
-					sdb.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), hugeBig)
-				}
-			}
-		}
-
-		var (
-			oldTx = toOldTx(t, newTx)
-			ctx   = &snow.Context{AVAXAssetID: avaxAssetID}
-		)
-		require.NoError(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldSDB))
-		require.NoError(t, newTx.TransferNonAVAX(avaxAssetID, newSDB))
-
-		// Materialize journaled writes into the trie so that
-		// [cmputils.StateDBs], which dumps the trie, reflects them.
-		for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
-			sdb.Finalise(true)
-			sdb.IntermediateRoot(true)
-		}
-
-		opts := []cmp.Option{
-			cmpopts.IgnoreUnexported(extstate.StateDB{}),
-			cmputils.StateDBs(),
-		}
-		if diff := cmp.Diff(oldSDB, newSDB, opts...); diff != "" {
-			t.Errorf("%T.AsOp() diff (-want +got):\n%s", newTx, diff)
-		}
-	})
 }
