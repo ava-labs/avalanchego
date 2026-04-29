@@ -544,7 +544,7 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	}
 
 	delegationRewardsOwner := uValidatorTx.DelegationRewardsOwner()
-	outIntf, err := e.backend.Fx.CreateOutput(stakingInfo.DelegateeReward, delegationRewardsOwner)
+	outIntf, err := e.backend.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
 	if err != nil {
 		return fmt.Errorf("failed to create output: %w", err)
 	}
