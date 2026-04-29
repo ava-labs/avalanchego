@@ -239,7 +239,7 @@ func (e *encoder) bool(b bool) {
 // is independent of the alphabet.
 func (e *encoder) address(v common.Address) {
 	e.bool(false)
-	e.bytes(v[:])
+	e.address(v)
 }
 
 // assetID always picks the raw-bytes branch in [element] so the encoded value
