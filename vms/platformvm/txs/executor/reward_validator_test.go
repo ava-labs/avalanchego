@@ -1051,7 +1051,7 @@ func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 		&secp256k1fx.OutputOwners{},
 		100_000,
 		400_000,
-		env.config.MinStakeDuration,
+		uint64(env.config.MinStakeDuration/time.Second),
 	)
 	require.NoError(t, err)
 	env.state.AddTx(sValidatorTx, status.Committed)
@@ -1200,7 +1200,7 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 		&secp256k1fx.OutputOwners{},
 		100_000,
 		400_000,
-		env.config.MinStakeDuration,
+		uint64(env.config.MinStakeDuration/time.Second),
 	)
 	require.NoError(t, err)
 	env.state.AddTx(sValidatorTx, status.Committed)
@@ -1228,7 +1228,7 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 		AccruedRewards:           1_000_000,
 		AccruedDelegateeRewards:  500_000,
 		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
-		Period:                   time.Duration(validatorTx.Period) * time.Second,
+		Period:                   validatorTx.Period,
 	}))
 
 	env.state.SetTimestamp(staker.EndTime)
@@ -1400,7 +1400,7 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 		&secp256k1fx.OutputOwners{},
 		100_000,
 		400_000,
-		env.config.MinStakeDuration,
+		uint64(env.config.MinStakeDuration/time.Second),
 	)
 	require.NoError(t, err)
 	env.state.AddTx(sValidatorTx, status.Committed)
@@ -1428,7 +1428,7 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 		AccruedRewards:           1_000_000,
 		AccruedDelegateeRewards:  500_000,
 		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
-		Period:                   time.Duration(validatorTx.Period) * time.Second,
+		Period:                   validatorTx.Period,
 	}))
 
 	env.state.SetTimestamp(staker.EndTime)
@@ -1630,7 +1630,7 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 		&secp256k1fx.OutputOwners{},
 		delegationShares,
 		reward.PercentDenominator, // auto compound 100%
-		env.config.MinStakeDuration,
+		uint64(env.config.MinStakeDuration/time.Second),
 	)
 	require.NoError(t, err)
 	env.state.AddTx(sValidatorTx, status.Committed)
@@ -1655,7 +1655,7 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 
 	require.NoError(t, env.state.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
 		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
-		Period:                   time.Duration(validatorTx.Period) * time.Second,
+		Period:                   validatorTx.Period,
 	}))
 
 	// Step 2: Create a delegator to this auto-renewed validator.
