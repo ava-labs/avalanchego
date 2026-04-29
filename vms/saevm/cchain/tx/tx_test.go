@@ -978,17 +978,8 @@ func TestJSONMarshal(t *testing.T) {
 }
 
 func FuzzJSONCompatibility(f *testing.F) {
-	for _, test := range tests {
-		f.Add(test.bytes)
-	}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		oldTx, err := parseOldTx(data)
-		if err != nil {
-			t.Skip("invalid tx")
-		}
-
-		newTx, err := Parse(data)
-		require.NoError(t, err, "Parse()")
+	fuzzTx(f, func(t *testing.T, newTx *Tx) {
+		oldTx := toOldTx(t, newTx)
 
 		oldJSON, err := json.Marshal(oldTx)
 		require.NoErrorf(t, err, "json.Marshal(%T)", oldTx)
@@ -997,6 +988,17 @@ func FuzzJSONCompatibility(f *testing.F) {
 		require.NoErrorf(t, err, "json.Marshal(%T)", newTx)
 		assert.JSONEq(t, string(oldJSON), string(newJSON))
 	})
+}
+
+func toOldTx(tb testing.TB, newTx *Tx) *atomic.Tx {
+	tb.Helper()
+
+	bytes, err := newTx.Bytes()
+	require.NoErrorf(tb, err, "%T.Bytes()", newTx)
+
+	oldTx, err := parseOldTx(bytes)
+	require.NoError(tb, err, "parseOldTx()")
+	return oldTx
 }
 
 func TestAsOp(t *testing.T) {
@@ -1074,23 +1076,13 @@ func TestAsOp_Errors(t *testing.T) {
 }
 
 func FuzzAsOpCompatibility(f *testing.F) {
-	for _, test := range tests {
-		f.Add(test.bytes)
-	}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		newTx, err := Parse(data)
-		if err != nil {
-			t.Skip("invalid tx bytes")
-		}
-
+	fuzzTx(f, func(t *testing.T, newTx *Tx) {
 		op, err := newTx.AsOp(avaxAssetID)
 		if err != nil {
 			t.Skip("invalid tx")
 		}
 
-		oldTx, err := parseOldTx(data)
-		require.NoError(t, err, "parseOldTx()")
-
+		oldTx := toOldTx(t, newTx)
 		gasUsed, err := oldTx.UnsignedAtomicTx.GasUsed(true)
 		require.NoErrorf(t, err, "%T.GasUsed(true)", oldTx.UnsignedAtomicTx)
 
@@ -1186,20 +1178,11 @@ func TestAtomicRequests(t *testing.T) {
 }
 
 func FuzzAtomicRequestsCompatibility(f *testing.F) {
-	for _, test := range tests {
-		f.Add(test.bytes)
-	}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		oldTx, err := parseOldTx(data)
-		if err != nil {
-			t.Skip("invalid tx bytes")
-		}
+	fuzzTx(f, func(t *testing.T, newTx *Tx) {
+		oldTx := toOldTx(t, newTx)
 
 		oldChainID, oldRequests, err := oldTx.UnsignedAtomicTx.AtomicOps()
 		require.NoErrorf(t, err, "%T.AtomicOps()", oldTx.UnsignedAtomicTx)
-
-		newTx, err := Parse(data)
-		require.NoError(t, err, "Parse()")
 
 		newChainID, newRequests, err := newTx.AtomicRequests()
 		require.NoErrorf(t, err, "%T.AtomicRequests()", newTx)
@@ -1468,20 +1451,10 @@ func TestTransferNonAVAX(t *testing.T) {
 }
 
 func FuzzTransferNonAVAXCompatibility(f *testing.F) {
-	for _, test := range tests {
-		f.Add(test.bytes)
-	}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		newTx, err := Parse(data)
-		if err != nil {
-			t.Skip("invalid tx bytes")
-		}
+	fuzzTx(f, func(t *testing.T, newTx *Tx) {
 		if _, err := newTx.AsOp(avaxAssetID); err != nil {
 			t.Skip("invalid tx")
 		}
-
-		oldTx, err := parseOldTx(data)
-		require.NoError(t, err, "parseOldTx()")
 
 		oldSDB := newStateDB(t)
 		newSDB := newStateDB(t)
@@ -1498,7 +1471,10 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 			}
 		}
 
-		ctx := &snow.Context{AVAXAssetID: avaxAssetID}
+		var (
+			oldTx = toOldTx(t, newTx)
+			ctx   = &snow.Context{AVAXAssetID: avaxAssetID}
+		)
 		require.NoError(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldSDB))
 		require.NoError(t, newTx.TransferNonAVAX(avaxAssetID, newSDB))
 
