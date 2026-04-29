@@ -304,12 +304,17 @@ func (s *Syncer[_, _]) logProgress(ctx context.Context) {
 			return
 		case <-ticker.C:
 			root := s.getTargetRoot()
-			s.workLock.Lock()
-			percentage := s.processedWork.Status(root)
-			s.workLock.Unlock()
-			s.config.Log.Info("syncing progress", zap.Float64("percent_complete", percentage), zap.Stringer("target root", root))
+			percentage := s.getProgress(root)
+			s.config.Log.Info("syncing progress", zap.String("percent complete", fmt.Sprintf("%.2f", percentage)), zap.Stringer("target root", root))
 		}
 	}
+}
+
+func (s *Syncer[_, _]) getProgress(root ids.ID) float64 {
+	s.workLock.Lock()
+	defer s.workLock.Unlock()
+
+	return s.processedWork.KeyspacePercent(root)
 }
 
 // close is called when there is a fatal error or sync is complete.
