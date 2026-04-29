@@ -15,19 +15,19 @@ import (
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
-// newFuzzF wraps f and seeds it with [NewTxs].
-func newFuzzF(f *testing.F) *txtest.F {
-	fuzzF := &txtest.F{
+// fuzz seeds f with [NewTxs] and repeatedly runs the test.
+func fuzz(f *testing.F, test func(t *testing.T, newTx *Tx)) {
+	fuzzer := &txtest.F{
 		F: f,
 	}
 	for _, tx := range NewTxs {
-		fuzzF.Add(tx)
+		fuzzer.Add(tx)
 	}
-	return fuzzF
+	fuzzer.Fuzz(test)
 }
 
 func FuzzJSONCompatibility(f *testing.F) {
-	newFuzzF(f).Fuzz(func(t *testing.T, newTx *Tx) {
+	fuzz(f, func(t *testing.T, newTx *Tx) {
 		bytes, err := newTx.Bytes()
 		require.NoErrorf(t, err, "%T.Bytes()", newTx)
 
