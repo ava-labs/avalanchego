@@ -91,7 +91,8 @@ type StakingInfo struct {
 	AccruedRewards           uint64
 	AccruedDelegateeRewards  uint64
 	AutoCompoundRewardShares uint32
-	Period                   time.Duration
+	// Period is the validation cycle duration, in seconds.
+	Period uint64
 }
 
 func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
@@ -100,7 +101,7 @@ func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
 		AccruedRewards:           vdrMetadata.AccruedRewards,
 		AccruedDelegateeRewards:  vdrMetadata.AccruedDelegateeRewards,
 		AutoCompoundRewardShares: vdrMetadata.AutoCompoundRewardShares,
-		Period:                   time.Duration(vdrMetadata.Period) * time.Second,
+		Period:                   vdrMetadata.Period,
 	}
 }
 
@@ -210,7 +211,7 @@ func (vs *validatorState) SetStakingInfo(
 	metadata.AccruedRewards = stakingInfo.AccruedRewards
 	metadata.AccruedDelegateeRewards = stakingInfo.AccruedDelegateeRewards
 	metadata.AutoCompoundRewardShares = stakingInfo.AutoCompoundRewardShares
-	metadata.Period = uint64(stakingInfo.Period / time.Second)
+	metadata.Period = stakingInfo.Period
 
 	vs.addUpdatedTxID(vdrID, subnetID, metadata.txID)
 	return nil
