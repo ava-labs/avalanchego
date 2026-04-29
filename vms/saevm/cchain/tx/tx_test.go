@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -21,6 +22,7 @@ import (
 
 	// Imported for [ParseOldTx] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
@@ -34,8 +36,13 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// Tests is defined at the package level to allow sharing between fuzz Tests and
-// unit Tests.
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	os.Exit(m.Run())
+}
+
+// Tests is defined at the package level to allow sharing between fuzz tests and
+// unit tests.
 var (
 	AVAXAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
 	Tests       = [...]struct {
@@ -844,6 +851,18 @@ func TestParseSlice(t *testing.T) {
 	}
 }
 
+// ToOldTx converts a transaction from the new format into coreth's old format.
+func ToOldTx(tb testing.TB, newTx *Tx) *atomic.Tx {
+	tb.Helper()
+
+	bytes, err := newTx.Bytes()
+	require.NoErrorf(tb, err, "%T.Bytes()", newTx)
+
+	oldTx, err := ParseOldTx(bytes)
+	require.NoError(tb, err, "ParseOldTx()")
+	return oldTx
+}
+
 var errUnexpectedCredentialType = errors.New("unexpected credential type")
 
 // ParseOldTx parses a transaction using coreth's old parsing logic but enforces
@@ -878,6 +897,39 @@ func ParseOldTxs(b []byte) ([]*atomic.Tx, error) {
 		}
 	}
 	return txs, nil
+}
+
+func FuzzParseCompatibility(f *testing.F) {
+	for _, test := range Tests {
+		f.Add(test.Bytes)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, oldErr := ParseOldTx(data)
+		oldOk := oldErr == nil
+
+		_, newErr := Parse(data)
+		newOk := newErr == nil
+
+		assert.Equal(t, oldOk, newOk, "Parse(b) == ParseOldTx(b)")
+	})
+}
+
+func FuzzParseSliceCompatibility(f *testing.F) {
+	{
+		b, err := MarshalSlice(NewTxs)
+		require.NoError(f, err, "MarshalSlice()")
+		f.Add(b)
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, oldErr := ParseOldTxs(data)
+		oldOk := oldErr == nil
+
+		_, newErr := ParseSlice(data)
+		newOk := newErr == nil
+
+		assert.Equal(t, oldOk, newOk, "ParseSlice(b) == ParseOldTxs(b)")
+	})
 }
 
 func FuzzParseRoundTrip(f *testing.F) {
@@ -932,17 +984,6 @@ func TestJSONMarshal(t *testing.T) {
 			})
 		})
 	}
-}
-
-func ToOldTx(tb testing.TB, newTx *Tx) *atomic.Tx {
-	tb.Helper()
-
-	bytes, err := newTx.Bytes()
-	require.NoErrorf(tb, err, "%T.Bytes()", newTx)
-
-	oldTx, err := ParseOldTx(bytes)
-	require.NoError(tb, err, "parseOldTx()")
-	return oldTx
 }
 
 func TestAsOp(t *testing.T) {
