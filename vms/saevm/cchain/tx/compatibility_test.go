@@ -28,12 +28,7 @@ func fuzz(f *testing.F, test func(t *testing.T, newTx *Tx)) {
 
 func FuzzJSONCompatibility(f *testing.F) {
 	fuzz(f, func(t *testing.T, newTx *Tx) {
-		bytes, err := newTx.Bytes()
-		require.NoErrorf(t, err, "%T.Bytes()", newTx)
-
-		oldTx, err := ParseOldTx(bytes)
-		require.NoError(t, err, "ParseOldTx()")
-
+		oldTx := ToOldTx(t, newTx)
 		oldJSON, err := json.Marshal(oldTx)
 		require.NoErrorf(t, err, "json.Marshal(%T)", oldTx)
 

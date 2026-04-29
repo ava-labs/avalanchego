@@ -364,6 +364,18 @@ func TestParseSlice(t *testing.T) {
 	}
 }
 
+// ToOldTx converts a transaction from the new format into coreth's old format.
+func ToOldTx(tb testing.TB, newTx *Tx) *atomic.Tx {
+	tb.Helper()
+
+	bytes, err := newTx.Bytes()
+	require.NoErrorf(tb, err, "%T.Bytes()", newTx)
+
+	oldTx, err := ParseOldTx(bytes)
+	require.NoError(tb, err, "ParseOldTx()")
+	return oldTx
+}
+
 var errUnexpectedCredentialType = errors.New("unexpected credential type")
 
 // ParseOldTx parses a transaction using coreth's old parsing logic but enforces
