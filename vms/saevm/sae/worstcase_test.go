@@ -10,6 +10,7 @@ import (
 	"math"
 	"math/big"
 	"math/rand/v2"
+	"os"
 	"runtime"
 	"testing"
 	"time"
@@ -31,7 +32,7 @@ import (
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
-var worstCaseFuzzFlags struct {
+type worstCaseFlags struct {
 	numAccounts       uint
 	balance           uint256.Int
 	parallel          uint
@@ -42,12 +43,13 @@ var worstCaseFuzzFlags struct {
 	rngSeed           uint64
 }
 
-func createWorstCaseFuzzFlags(set *flag.FlagSet) {
+func parseWorstCaseFlags() *worstCaseFlags {
+	set := flag.NewFlagSet("worstcase", flag.ContinueOnError)
+	fs := &worstCaseFlags{}
+
 	name := func(n string) string {
 		return "worstcase.fuzz." + n
 	}
-	fs := &worstCaseFuzzFlags
-
 	set.UintVar(&fs.numAccounts, name("num_eoa"), 10, "Number of EOAs to send funds between")
 	set.TextVar(&fs.balance, name("eoa_balance"), uint256.NewInt(params.Ether), "Starting balance of EOAs")
 	set.UintVar(&fs.parallel, name("parallel"), uint(runtime.GOMAXPROCS(0)), "Number of parallel tests to run; defaults to GOMAXPROCS") //#nosec G115 -- Known to be positive
@@ -56,6 +58,12 @@ func createWorstCaseFuzzFlags(set *flag.FlagSet) {
 	set.Uint64Var(&fs.maxGasLimit, name("max_gas_limit"), 60e6, "Maximum gas limit per transaction (uniform distribution)")
 	set.Uint64Var(&fs.maxTxValue, name("max_tx_value"), params.Ether/1000, "Maximum tx value to send per transaction (uniform distribution)")
 	set.Uint64Var(&fs.rngSeed, name("rng_seed"), 0, "Seed for random-number generator; ignored if zero")
+
+	// Parse returns an error because the testing harness provides additional
+	// unregistered flags. [flag.ContinueOnError] allows the expected flags to
+	// be parsed anyways.
+	_ = set.Parse(os.Args[1:])
+	return fs
 }
 
 // A guzzler is both a [params.ChainConfigHooks] and [params.RulesHooks]. When
@@ -110,7 +118,15 @@ func (*guzzler) guzzle(env vm.PrecompileEnvironment, input []byte) ([]byte, erro
 }
 
 func TestWorstCase(t *testing.T) {
-	flags := worstCaseFuzzFlags
+	// TODO(alarso16): This test flakes due to a race in the legacypool. When
+	// a block executes, it sends an event to the pool, which causes an
+	// incorrect nonce update if the pool already had a pending transaction from
+	// the same account.
+	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
+		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
+	}
+
+	flags := parseWorstCaseFlags()
 	t.Logf("Flags: %+v", flags)
 
 	guzzle := common.Address{'g', 'u', 'z', 'z', 'l', 'e'}
