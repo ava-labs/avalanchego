@@ -678,10 +678,11 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 	switch stakerTx := tx.Unsigned.(type) {
 	case txs.ValidatorTx:
 		var pop *signer.ProofOfPossession
-		if staker, ok := stakerTx.(*txs.AddPermissionlessValidatorTx); ok {
-			if s, ok := staker.Signer.(*signer.ProofOfPossession); ok {
-				pop = s
-			}
+		switch stakerTx := stakerTx.(type) {
+		case *txs.AddPermissionlessValidatorTx:
+			pop, _ = stakerTx.Signer.(*signer.ProofOfPossession)
+		case *txs.AddAutoRenewedValidatorTx:
+			pop, _ = stakerTx.Signer.(*signer.ProofOfPossession)
 		}
 
 		attr = &stakerAttributes{
