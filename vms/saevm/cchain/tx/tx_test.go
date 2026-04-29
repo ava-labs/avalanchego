@@ -500,11 +500,11 @@ func FuzzJSONCompatibility(f *testing.F) {
 		newTx, err := Parse(data)
 		require.NoError(t, err, "Parse()")
 
-		oldJSON, err := json.Marshal(oldTx)
+		want, err := json.Marshal(oldTx)
 		require.NoErrorf(t, err, "json.Marshal(%T)", oldTx)
 
-		newJSON, err := json.Marshal(newTx)
+		got, err := json.Marshal(newTx)
 		require.NoErrorf(t, err, "json.Marshal(%T)", newTx)
-		assert.JSONEq(t, string(oldJSON), string(newJSON))
+		assert.JSONEq(t, string(want), string(got))
 	})
 }
