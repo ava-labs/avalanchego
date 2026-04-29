@@ -29,11 +29,11 @@ func fuzz(f *testing.F, test func(t *testing.T, newTx *Tx)) {
 func FuzzJSONCompatibility(f *testing.F) {
 	fuzz(f, func(t *testing.T, newTx *Tx) {
 		oldTx := ToOldTx(t, newTx)
-		oldJSON, err := json.Marshal(oldTx)
+		want, err := json.Marshal(oldTx)
 		require.NoErrorf(t, err, "json.Marshal(%T)", oldTx)
 
-		newJSON, err := json.Marshal(newTx)
+		got, err := json.Marshal(newTx)
 		require.NoErrorf(t, err, "json.Marshal(%T)", newTx)
-		assert.JSONEq(t, string(oldJSON), string(newJSON))
+		assert.JSONEq(t, string(want), string(got))
 	})
 }
