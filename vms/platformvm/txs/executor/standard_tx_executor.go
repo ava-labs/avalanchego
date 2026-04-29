@@ -1386,9 +1386,9 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 		return fmt.Errorf("getting rewards calculator %w", err)
 	}
 
-	period := time.Duration(tx.Period) * time.Second
+	duration := time.Duration(tx.Period) * time.Second
 	potentialReward := rewards.Calculate(
-		period,
+		duration,
 		tx.Weight(),
 		currentSupply,
 	)
@@ -1400,7 +1400,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 	e.state.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 
 	startTime := e.state.GetTimestamp()
-	endTime := startTime.Add(period)
+	endTime := startTime.Add(duration)
 
 	staker, err := state.NewStaker(
 		e.tx.ID(),
@@ -1420,7 +1420,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 
 	stakingInfo := state.StakingInfo{
 		AutoCompoundRewardShares: tx.AutoCompoundRewardShares,
-		Period:                   period,
+		Period:                   tx.Period,
 	}
 	if err := e.state.SetStakingInfo(staker.SubnetID, staker.NodeID, stakingInfo); err != nil {
 		return fmt.Errorf("setting staking info: %w", err)
@@ -1454,7 +1454,7 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRene
 	}
 
 	stakingInfo.AutoCompoundRewardShares = tx.AutoCompoundRewardShares
-	stakingInfo.Period = time.Duration(tx.Period) * time.Second
+	stakingInfo.Period = tx.Period
 
 	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
 		return fmt.Errorf("could not set staking info: %w", err)
