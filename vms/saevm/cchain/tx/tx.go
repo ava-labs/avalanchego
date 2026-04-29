@@ -181,7 +181,7 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	return p
 }
 
-// AtomicRequests returns chainID and modifications into shared memory that this
+// AtomicRequests returns chainID and shared-memory modifications that this
 // transaction should perform during execution.
 func (t *Tx) AtomicRequests() (ids.ID, *atomic.Requests, error) {
 	return t.Unsigned.atomicRequests(t.ID())
