@@ -313,21 +313,21 @@ type Wallet interface {
 	// automatically renew at the end of each validation period without
 	// requiring a new transaction.
 	//
-	// - [validatorNodeID] is the node ID of the validator.
-	// - [weight] is the amount of nAVAX to stake.
-	// - [signer] is the BLS key for this validator.
-	// - [assetID] specifies the asset to stake.
-	// - [validationRewardsOwner] specifies the owner of all the validation
+	// - validatorNodeID is the node ID of the validator.
+	// - weight is the amount of nAVAX to stake.
+	// - signer is the BLS key for this validator.
+	// - assetID specifies the asset to stake.
+	// - validationRewardsOwner specifies the owner of all the validation
 	//   rewards this validator earns.
-	// - [delegationRewardsOwner] specifies the owner of all the rewards this
+	// - delegationRewardsOwner specifies the owner of all the rewards this
 	//   validator earns from delegations.
-	// - [configOwner] specifies the owner authorized to modify the validator's
+	// - configOwner specifies the owner authorized to modify the validator's
 	//   auto-renewal configuration.
-	// - [delegationShares] specifies the fraction (out of 1,000,000) that this
+	// - delegationShares specifies the fraction (out of 1,000,000) that this
 	//   validator will take from delegation rewards.
-	// - [autoCompoundRewardShares] specifies the fraction (out of 1,000,000)
+	// - autoCompoundRewardShares specifies the fraction (out of 1,000,000)
 	//   of rewards to automatically restake at the end of each period.
-	// - [period] is the duration of each validation cycle.
+	// - period is the duration of each validation cycle.
 	IssueAddAutoRenewedValidatorTx(
 		validatorNodeID ids.NodeID,
 		weight uint64,
@@ -346,11 +346,11 @@ type Wallet interface {
 	// transaction to modify the configuration of an existing auto-renewed
 	// validator.
 	//
-	// - [txID] is the transaction ID of the AddAutoRenewedValidatorTx that
+	// - txID is the transaction ID of the AddAutoRenewedValidatorTx that
 	//   created the validator to modify.
-	// - [autoCompoundRewardShares] specifies the new fraction (out of
+	// - autoCompoundRewardShares specifies the new fraction (out of
 	//   1,000,000) of rewards to automatically restake.
-	// - [period] is the new duration of each validation cycle. Set to 0 to
+	// - period is the new duration of each validation cycle. Set to 0 to
 	//   stop the validator at the end of the current cycle and unlock funds.
 	IssueSetAutoRenewedValidatorConfigTx(
 		txID ids.ID,

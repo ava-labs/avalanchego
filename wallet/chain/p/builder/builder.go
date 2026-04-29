@@ -357,13 +357,13 @@ type Builder interface {
 	// configuration of an existing auto-renewed validator.
 	//
 	// - txID is the transaction ID of the auto-renewed validator to modify.
-	// - autoRestakeShares specifies the new fraction (out of 1,000,000) of
+	// - autoCompoundRewardShares specifies the new fraction (out of 1,000,000) of
 	//   rewards to automatically restake.
 	// - period is the new duration of each validation cycle. Set to 0 to
 	//   trigger a graceful exit at the end of the current period.
 	NewSetAutoRenewedValidatorConfigTx(
 		txID ids.ID,
-		autoRestakeShares uint32,
+		autoCompoundRewardShares uint32,
 		period time.Duration,
 		options ...common.Option,
 	) (*txs.SetAutoRenewedValidatorConfigTx, error)

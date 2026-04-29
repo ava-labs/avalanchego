@@ -443,27 +443,11 @@ func TestExportTx(t *testing.T) {
 }
 
 func TestAddPermissionlessValidatorTx(t *testing.T) {
-	var utxosOffset uint64 = 2024
-	makeUTXO := func(amount uint64) *avax.UTXO {
-		utxosOffset++
-		return &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.Empty.Prefix(utxosOffset),
-				OutputIndex: uint32(utxosOffset),
-			},
-			Asset: avax.Asset{ID: avaxAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt:          amount,
-				OutputOwners: utxoOwner,
-			},
-		}
-	}
-
 	var (
-		utxos = []*avax.UTXO{
-			makeUTXO(1 * units.NanoAvax), // small UTXO
-			makeUTXO(9 * units.Avax),     // large UTXO
-		}
+		utxos = makeUTXOs(
+			1*units.NanoAvax, // small UTXO
+			9*units.Avax,     // large UTXO
+		)
 
 		validationRewardsOwner        = rewardsOwner
 		delegationRewardsOwner        = rewardsOwner
@@ -906,32 +890,16 @@ func TestDisableL1ValidatorTx(t *testing.T) {
 }
 
 func TestAddAutoRenewedValidatorTx(t *testing.T) {
-	var utxosOffset uint64 = 2024
-	makeUTXO := func(amount uint64) *avax.UTXO {
-		utxosOffset++
-		return &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.Empty.Prefix(utxosOffset),
-				OutputIndex: uint32(utxosOffset),
-			},
-			Asset: avax.Asset{ID: avaxAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt:          amount,
-				OutputOwners: utxoOwner,
-			},
-		}
-	}
-
 	var (
-		utxos = []*avax.UTXO{
-			makeUTXO(1 * units.NanoAvax), // small UTXO
-			makeUTXO(9 * units.Avax),     // large UTXO
-		}
+		utxos = makeUTXOs(
+			1*units.NanoAvax, // small UTXO
+			9*units.Avax,     // large UTXO
+		)
 
 		require                       = require.New(t)
-		validationRewardsOwner        = rewardsOwner
-		delegationRewardsOwner        = rewardsOwner
-		configOwner                   = rewardsOwner
+		validationRewardsOwner        = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
+		delegationRewardsOwner        = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
+		configOwner                   = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
 		delegationShares       uint32 = reward.PercentDenominator
 		autoCompoundShares     uint32 = 500_000
 		weight                        = 2 * units.Avax
@@ -940,8 +908,8 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
-		backend = wallet.NewBackend(chainUTXOs, nil)
-		builder = builder.New(set.Of(utxoAddr, rewardAddr), testContextPostEtna, backend)
+		backend   = wallet.NewBackend(chainUTXOs, nil)
+		txBuilder = builder.New(set.Of(testKeys[1].Address()), testContextPostEtna, backend)
 	)
 
 	sk, err := localsigner.New()
@@ -950,7 +918,7 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
-	utx, err := builder.NewAddAutoRenewedValidatorTx(
+	utx, err := txBuilder.NewAddAutoRenewedValidatorTx(
 		nodeID,
 		weight,
 		pop,
@@ -963,9 +931,6 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		period,
 	)
 	require.NoError(err)
-	require.Equal(nodeID, utx.ValidatorNodeID)
-	require.Equal(pop, utx.Signer)
-	require.Equal(weight, utx.Wght)
 	require.Len(utx.StakeOuts, 1)
 	require.Equal(
 		map[ids.ID]uint64{
@@ -973,12 +938,23 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		},
 		addOutputAmounts(utx.StakeOuts),
 	)
-	require.Equal(validationRewardsOwner, utx.ValidatorRewardsOwner)
-	require.Equal(delegationRewardsOwner, utx.DelegatorRewardsOwner)
-	require.Equal(configOwner, utx.Owner)
-	require.Equal(delegationShares, utx.DelegationShares)
-	require.Equal(autoCompoundShares, utx.AutoCompoundRewardShares)
-	require.Equal(uint64(period/time.Second), utx.Period)
+
+	wantTx := txs.AddAutoRenewedValidatorTx{
+		ValidatorNodeID:          nodeID,
+		Signer:                   pop,
+		Wght:                     weight,
+		ValidatorRewardsOwner:    validationRewardsOwner,
+		DelegatorRewardsOwner:    delegationRewardsOwner,
+		Owner:                    configOwner,
+		DelegationShares:         delegationShares,
+		AutoCompoundRewardShares: autoCompoundShares,
+		Period:                   uint64(period / time.Second),
+	}
+	gotTx := *utx
+	gotTx.BaseTx = txs.BaseTx{}
+	gotTx.StakeOuts = nil
+	require.Equal(wantTx, gotTx)
+
 	requireFeeIsCorrect(
 		require,
 		dynamicFeeCalculator,
@@ -1111,6 +1087,27 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 			},
 		},
 	}
+}
+
+func makeUTXOs(amounts ...uint64) []*avax.UTXO {
+	utxosOffset := uint64(2024)
+
+	utxos := make([]*avax.UTXO, len(amounts))
+	for i, amount := range amounts {
+		utxosOffset++
+		utxos[i] = &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(utxosOffset),
+				OutputIndex: uint32(utxosOffset),
+			},
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: utxoOwner,
+			},
+		}
+	}
+	return utxos
 }
 
 // requireFeeIsCorrect calculates the required fee for the unsigned transaction
