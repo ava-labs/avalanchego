@@ -12,18 +12,19 @@ import (
 var _ state.Trie = (*storageTrie)(nil)
 
 type storageTrie struct {
-	*accountTrie
+	*baseTrie
 }
 
-// `newStorageTrie` returns a wrapper around an `accountTrie` since Firewood
-// does not require a separate storage trie. All changes are managed by the account trie.
-func newStorageTrie(accountTrie *accountTrie) *storageTrie {
+// newStorageTrie returns a wrapper around a [baseTrie] since Firewood
+// does not require a separate storage trie. All changes are tracked by the base
+// trie.
+func newStorageTrie(base *baseTrie) *storageTrie {
 	return &storageTrie{
-		accountTrie: accountTrie,
+		baseTrie: base,
 	}
 }
 
-// Commit is a no-op for storage tries, as all changes are managed by the account trie.
+// Commit is a no-op for storage tries, as all changes are tracked by the base trie.
 // It always returns a nil NodeSet and zero hash.
 func (*storageTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	return common.Hash{}, nil, nil

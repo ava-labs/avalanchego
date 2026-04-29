@@ -57,6 +57,7 @@ use_repo(
     "com_connectrpc_connect",
     "com_connectrpc_grpcreflect",
     "com_github_antithesishq_antithesis_sdk_go",
+    "com_github_arr4n_shed",
     "com_github_ava_labs_avalanchego",
     "com_github_ava_labs_avalanchego_graft_coreth",
     "com_github_ava_labs_avalanchego_graft_evm",

@@ -244,11 +244,12 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 		}
 
 		config.DBOverride = firewood.TrieDBConfig{
-			DatabaseDir:       c.ChainDataDir,
-			CacheSizeBytes:    uint(c.TrieCleanLimit * 1024 * 1024),
-			RevisionsInMemory: uint(c.StateHistory), // must be at least 2
-			CacheStrategy:     ffi.CacheAllReads,
-			Archive:           !c.Pruning,
+			DatabaseDir:            c.ChainDataDir,
+			CacheSizeBytes:         uint(c.TrieCleanLimit * 1024 * 1024),
+			RevisionsInMemory:      uint(c.StateHistory), // must be at least 2
+			CacheStrategy:          ffi.CacheAllReads,
+			Archive:                !c.Pruning,
+			DeferredCommitInterval: c.CommitInterval,
 		}.BackendConstructor
 	}
 	return config
@@ -1014,7 +1015,7 @@ func (bc *BlockChain) stopWithoutSaving() {
 func (bc *BlockChain) Stop() {
 	bc.stopWithoutSaving()
 
-	// Ensure that the entirety of the state snapshot is journaled to disk.
+	// Stop snapshot generation and release resources
 	if bc.snaps != nil {
 		bc.snaps.Release()
 	}
@@ -1946,7 +1947,10 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 	if t, ok := bc.triedb.Backend().(*firewood.TrieDB); ok {
 		t.SetHashAndHeight(current.Hash(), current.NumberU64())
 	}
-	var roots []common.Hash
+
+	// Firewood requires every root to be committed, and archival nodes
+	// expect every state to always be available.
+	commitEvery := bc.CacheConfig().StateScheme == customrawdb.FirewoodScheme || !bc.CacheConfig().Pruning
 	for current.NumberU64() < origin {
 		// TODO: handle canceled context
 
@@ -1982,7 +1986,6 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		if err != nil {
 			return err
 		}
-		roots = append(roots, root)
 
 		// Write any unsaved indices to disk
 		if writeIndices {
@@ -2002,22 +2005,18 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		}, current.Hash()); err != nil {
 			return err
 		}
+
+		if commitEvery {
+			if err := triedb.Commit(root, true); err != nil {
+				return err
+			}
+		}
 	}
 
 	_, nodes, imgs := triedb.Size()
 	log.Info("Historical state regenerated", "block", current.NumberU64(), "elapsed", time.Since(start), "nodes", nodes, "preimages", imgs)
 
-	// Firewood requires processing each root individually.
-	if bc.CacheConfig().StateScheme == customrawdb.FirewoodScheme {
-		for _, root := range roots {
-			if err := triedb.Commit(root, true); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	if previousRoot != (common.Hash{}) {
+	if !commitEvery && previousRoot != (common.Hash{}) {
 		return triedb.Commit(previousRoot, true)
 	}
 	return nil
