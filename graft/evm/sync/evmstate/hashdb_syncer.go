@@ -242,6 +242,7 @@ func (t *HashDBSyncer) onMainTrieFinished() error {
 	if err != nil {
 		return err
 	}
+	log.Info("main trie finished, starting storage tries", "numStorageTries", numStorageTries, "root", t.root)
 	t.stats.setTriesRemaining(numStorageTries)
 
 	// mark the main trie done
