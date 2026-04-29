@@ -72,6 +72,7 @@ type decoder struct {
 	assetIDs []ids.ID
 }
 
+// bytes always returns a slice of length n, even if the decoder is exhausted.
 func (d *decoder) bytes(n int) []byte {
 	out := make([]byte, n)
 	copy(out, d.data)
