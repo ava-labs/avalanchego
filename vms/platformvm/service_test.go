@@ -879,6 +879,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		potentialReward          = uint64(12_345)
 		period                   = defaultMinStakingDuration
 	)
+	periodSeconds := uint64(period / time.Second)
 	weight := service.vm.MinValidatorStake
 	endTime := startTime.Add(period)
 
@@ -904,7 +905,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		DelegationShares:         reward.PercentDenominator,
 		Wght:                     weight,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
-		Period:                   uint64(period / time.Second),
+		Period:                   periodSeconds,
 	}
 	tx := &txs.Tx{Unsigned: addAutoRenewedValidatorTx}
 	require.NoError(tx.Initialize(txs.Codec))
@@ -923,7 +924,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	service.vm.state.AddTx(tx, status.Committed)
 	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
 		AutoCompoundRewardShares: autoCompoundRewardShares,
-		Period:                   period,
+		Period:                   periodSeconds,
 	}))
 	require.NoError(service.vm.state.Commit())
 	service.vm.ctx.Lock.Unlock()
@@ -948,7 +949,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	wantConfigOwnerAddr, err := service.addrManager.FormatLocalAddress(configOwner.Addrs[0])
 	require.NoError(err)
 	require.Equal(wantConfigOwnerAddr, gotValidator.ConfigOwner.Addresses[0])
-	require.Equal(avajson.Uint64(period/time.Second), *gotValidator.Period)
+	require.Equal(avajson.Uint64(periodSeconds), *gotValidator.Period)
 	require.Equal(avajson.Uint32(autoCompoundRewardShares), *gotValidator.AutoCompoundRewardShares)
 }
 

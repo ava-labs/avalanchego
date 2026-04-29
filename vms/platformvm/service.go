@@ -920,7 +920,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				if err != nil {
 					return nil, err
 				}
-				vdr.Period = utils.PointerTo(avajson.Uint64(stakingInfo.Period / time.Second))
+				vdr.Period = utils.PointerTo(avajson.Uint64(stakingInfo.Period))
 				vdr.AutoCompoundRewardShares = utils.PointerTo(avajson.Uint32(stakingInfo.AutoCompoundRewardShares))
 			}
 
