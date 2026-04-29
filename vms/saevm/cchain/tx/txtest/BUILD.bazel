@@ -3,6 +3,7 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "txtest",
+    testonly = True,
     srcs = ["fuzzer.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest",
     visibility = ["//visibility:public"],
