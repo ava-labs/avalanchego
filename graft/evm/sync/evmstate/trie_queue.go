@@ -40,15 +40,22 @@ func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash, preserveSegments b
 		return err
 	}
 
-	if persistedRoot != (common.Hash{}) && persistedRoot != root {
-		if err := customrawdb.ClearAllSyncStorageTries(t.db); err != nil {
-			return err
-		}
-		if !preserveSegments {
-			if err := customrawdb.ClearAllSyncSegments(t.db); err != nil {
-				return err
-			}
-		}
+	if persistedRoot == (common.Hash{}) || persistedRoot == root {
+		return customrawdb.WriteSyncRoot(t.db, root)
+	}
+	if err := customrawdb.ClearAllSyncStorageTries(t.db); err != nil {
+		return err
+	}
+	switch {
+	case preserveSegments:
+		// Only clear the old main trie segments. Storage trie segments
+		// are keyed by their own root and stay valid for unchanged tries.
+		err = customrawdb.ClearSyncSegments(t.db, persistedRoot)
+	default:
+		err = customrawdb.ClearAllSyncSegments(t.db)
+	}
+	if err != nil {
+		return err
 	}
 
 	return customrawdb.WriteSyncRoot(t.db, root)
