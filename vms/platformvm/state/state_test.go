@@ -4277,7 +4277,7 @@ func TestLoadCurrentValidatorsWeight(t *testing.T) {
 		AccruedRewards:           accruedRewards,
 		AccruedDelegateeRewards:  accruedDelRewards,
 		AutoCompoundRewardShares: newAutoCompoundRewardShares,
-		Period:                   time.Duration(newPeriod) * time.Second,
+		Period:                   newPeriod,
 	}))
 
 	// Commit again so the updated metadata is persisted
@@ -4299,7 +4299,7 @@ func TestLoadCurrentValidatorsWeight(t *testing.T) {
 
 	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, autoRenewedNodeID)
 	require.NoError(err)
-	require.Equal(newPeriod, uint64(gotStakingInfo.Period/time.Second))
+	require.Equal(newPeriod, gotStakingInfo.Period)
 	require.Equal(newAutoCompoundRewardShares, gotStakingInfo.AutoCompoundRewardShares)
 }
 
@@ -4374,7 +4374,7 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 		AccruedRewards:           accruedRewards,
 		AccruedDelegateeRewards:  accruedDelRewards,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
-		Period:                   time.Duration(period) * time.Second,
+		Period:                   period,
 	}))
 
 	require.NoError(state.Commit())
@@ -4394,5 +4394,5 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 	require.Equal(accruedRewards, gotStakingInfo.AccruedRewards)
 	require.Equal(accruedDelRewards, gotStakingInfo.AccruedDelegateeRewards)
 	require.Equal(autoCompoundRewardShares, gotStakingInfo.AutoCompoundRewardShares)
-	require.Equal(time.Duration(period)*time.Second, gotStakingInfo.Period)
+	require.Equal(period, gotStakingInfo.Period)
 }
