@@ -235,15 +235,15 @@ func (e *encoder) bool(b bool) {
 	}
 }
 
-// address always picks the raw-bytes branch in [decoder.address] so the encoded
-// value is independent of the alphabet.
+// address always picks the raw-bytes branch in [element] so the encoded value
+// is independent of the alphabet.
 func (e *encoder) address(v common.Address) {
 	e.bool(false)
 	e.bytes(v[:])
 }
 
-// assetID always picks the raw-bytes branch in [decoder.assetID] so the encoded
-// value is independent of the alphabet.
+// assetID always picks the raw-bytes branch in [element] so the encoded value
+// is independent of the alphabet.
 func (e *encoder) assetID(v ids.ID) {
 	e.bool(false)
 	e.id(v)
