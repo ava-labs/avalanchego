@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 
 	"github.com/ava-labs/avalanchego/database"
+	subnetevmcore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
@@ -41,6 +42,7 @@ func NewPoints(
 	ctx *snow.Context,
 	db database.Database,
 	chainConfig *ethparams.ChainConfig,
+	now func() time.Time,
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
 	warpStorage *warp.Storage,
@@ -53,6 +55,7 @@ func NewPoints(
 				targetExcess: desiredTargetExcess,
 			},
 			chainConfig: chainConfig,
+			now:         now,
 		},
 		db:          db,
 		warpStorage: warpStorage,
@@ -144,7 +147,25 @@ func (*Points) CanExecuteTransaction(rules ethparams.Rules, from common.Address,
 	return subnetevmparams.RulesExtra(*extra).EnforceTxAllowList(from, state)
 }
 
-func (*Points) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
+// BeforeExecutingBlock activates / deactivates timestamp-scheduled
+// `PrecompileUpgrades` and `StateUpgrades` for the window
+// (parent.Time, block.Time()] by delegating to [subnetevmcore.ApplyUpgrades].
+//
+// SAE's `saexec.Execute` does not call `core.StateProcessor.Process` (it loops
+// `core.ApplyTransaction` from libevm directly), so this hook is the single
+// place where upgrade activations enter the per-block flow. Mutations made to
+// `state` here are committed into the block's post-execution state root, so
+// they remain consistent with [worstcase] / [Points.CanExecuteTransaction]
+// reads against the last-settled snapshot once the block settles.
+//
+// `parent` provides `parent.Time` for the activation window; `rules` is
+// unused here (computed inside `ApplyUpgrades` from chain config + block
+// timestamp) but retained for symmetry with the interface.
+func (p *Points) BeforeExecutingBlock(_ ethparams.Rules, parent *types.Header, statedb *state.StateDB, block *types.Block) error {
+	blockContext := subnetevmcore.NewBlockContext(block.Number(), block.Time())
+	if err := subnetevmcore.ApplyUpgrades(p.chainConfig, &parent.Time, blockContext, statedb); err != nil {
+		return fmt.Errorf("applying upgrades for block %s (%d): %w", block.Hash(), block.NumberU64(), err)
+	}
 	return nil
 }
 

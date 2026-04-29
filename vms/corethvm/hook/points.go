@@ -167,7 +167,7 @@ func (*Points) CanExecuteTransaction(ethparams.Rules, common.Address, *common.Ad
 	return nil
 }
 
-func (*Points) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
+func (p *Points) BeforeExecutingBlock(ethparams.Rules, *types.Header, *state.StateDB, *types.Block) error {
 	return nil
 }
 

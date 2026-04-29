@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
@@ -42,8 +43,10 @@ import (
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	saewarp "github.com/ava-labs/avalanchego/vms/subnetevm/warp"
+
+	// Force-load precompiles to trigger registration
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // Force-load precompiles to trigger registration
 )
 
 // VM is a harness around an [sae.VM], providing an `Initialize`
@@ -85,7 +88,7 @@ func (v *VM) Initialize(
 	snowCtx *snow.Context,
 	avaDB avadb.Database,
 	genesisBytes []byte,
-	_ []byte,
+	upgradeBytes []byte,
 	configBytes []byte,
 	_ []*common.Fx,
 	appSender common.AppSender,
@@ -98,7 +101,7 @@ func (v *VM) Initialize(
 
 	snowCtx.Log.Info("parsing genesis")
 
-	genesis, err := parseGenesis(snowCtx, genesisBytes)
+	genesis, err := parseGenesis(snowCtx, genesisBytes, upgradeBytes)
 	if err != nil {
 		return fmt.Errorf("json.Unmarshal(%T): %w", genesis, err)
 	}
@@ -160,6 +163,7 @@ func (v *VM) Initialize(
 		snowCtx,
 		avaDB,
 		config,
+		v.config.Now,
 		desiredDelayExcess,
 		desiredTargetExcess,
 		warpStorage,
@@ -202,10 +206,9 @@ func (v *VM) Initialize(
 	return nil
 }
 
-// TODO: copied from coreth
-func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
+func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (*core.Genesis, error) {
 	g := new(core.Genesis)
-	if err := json.Unmarshal(bytes, g); err != nil {
+	if err := json.Unmarshal(genesisBytes, g); err != nil {
 		return nil, fmt.Errorf("parsing genesis: %w", err)
 	}
 
@@ -216,12 +219,31 @@ func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
 	}
 	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
 
-	// If Durango is scheduled, schedule the Warp Precompile at the same time.
-	if configExtra.DurangoTimestamp != nil {
-		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
-			Config: warpcontract.NewDefaultConfig(configExtra.DurangoTimestamp),
-		})
+	// Set network upgrade defaults
+	configExtra.SetDefaults(ctx.NetworkUpgrades)
+
+	// Apply upgradeBytes (if any) by unmarshalling them into [chainConfig.UpgradeConfig].
+	// Initializing the chain will verify upgradeBytes are compatible with existing values.
+	// This should be called before configExtra.Verify().
+	if len(upgradeBytes) > 0 {
+		var upgradeConfig extras.UpgradeConfig
+		if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
+			return nil, fmt.Errorf("failed to parse upgrade bytes: %w", err)
+		}
+		configExtra.UpgradeConfig = upgradeConfig
 	}
+
+	if configExtra.UpgradeConfig.NetworkUpgradeOverrides != nil {
+		overrides := configExtra.UpgradeConfig.NetworkUpgradeOverrides
+		marshaled, err := json.Marshal(overrides)
+		if err != nil {
+			log.Warn("Failed to marshal network upgrade overrides", "error", err, "overrides", overrides)
+		} else {
+			log.Info("Applying network upgrade overrides", "overrides", string(marshaled))
+		}
+		configExtra.Override(overrides)
+	}
+
 	if err := configExtra.Verify(); err != nil {
 		return nil, fmt.Errorf("invalid chain config: %w", err)
 	}

@@ -9,23 +9,30 @@ import (
 	"math/big"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/ethtest"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -57,13 +64,31 @@ type SUT struct {
 	// See [SUT.verifyWarpMessage]
 	appResponse chan []byte
 	appErr      chan *engcommon.AppError
+
+	now *time.Time
 }
 
-func newSUT(t *testing.T) *SUT {
+type (
+	sutConfig struct {
+		fork             upgradetest.Fork
+		numAccounts      uint
+		now              *time.Time
+		configureGenesis func(*core.Genesis, []common.Address)
+		configureUpgrade func([]common.Address) []byte
+	}
+	sutOption = options.Option[sutConfig]
+)
+
+func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	t.Helper()
 
+	cfg := options.ApplyTo(&sutConfig{
+		fork:        upgradetest.Durango,
+		numAccounts: 1,
+	}, opts...)
+
 	// TODO(alarso16): this will need to be parameterizable
-	const fork = upgradetest.Durango
+	fork := cfg.fork
 	upgrades := upgradetest.GetConfig(fork)
 
 	// Test will fail if any error log from libevm, or warn log from SAE, is emitted.
@@ -78,23 +103,30 @@ func newSUT(t *testing.T) *SUT {
 	mempoolConf := legacypool.DefaultConfig
 	mempoolConf.Journal = "/dev/null"
 
-	const numKeys = 1
-	keychain := saetest.NewUNSAFEKeyChain(t, numKeys)
-	g := &core.Genesis{
-		Config:     paramstest.ForkToChainConfig[fork],
-		Alloc:      saetest.MaxAllocFor(keychain.Addresses()...),
-		Timestamp:  saeparams.TauSeconds,
-		Difficulty: big.NewInt(0),
+	keychain := saetest.NewUNSAFEKeyChain(t, cfg.numAccounts)
+	genesis := newTestGenesis(cfg.fork, keychain)
+	if cfg.configureGenesis != nil {
+		cfg.configureGenesis(genesis, keychain.Addresses())
 	}
-	genesisBytes, err := json.Marshal(g)
+	genesisBytes, err := json.Marshal(genesis)
 	require.NoError(t, err)
+	var upgradeBytes []byte
+	if cfg.configureUpgrade != nil {
+		upgradeBytes = cfg.configureUpgrade(keychain.Addresses())
+	}
 
-	vm := New(sae.Config{
+	saeConfig := sae.Config{
 		MempoolConfig: mempoolConf,
 		DBConfig: saedb.Config{
 			TrieDBConfig: triedb.HashDefaults,
 		},
-	})
+	}
+	if cfg.now != nil {
+		saeConfig.Now = func() time.Time {
+			return *cfg.now
+		}
+	}
+	vm := New(saeConfig)
 
 	// allow receiving responses via [SUT.verifyWarpMessage]
 	appResponseCh := make(chan []byte, 1)
@@ -109,7 +141,7 @@ func newSUT(t *testing.T) *SUT {
 		snowCtx,
 		baseDB,
 		genesisBytes,
-		nil,
+		upgradeBytes,
 		nil,
 		nil,
 		appSender,
@@ -144,12 +176,53 @@ func newSUT(t *testing.T) *SUT {
 		client:  client,
 		ethWallet: saetest.NewWalletWithKeyChain(
 			keychain,
-			types.LatestSigner(g.Config),
+			types.LatestSigner(genesis.Config),
 		),
 		validatorKeys: validatorKeys,
 		appResponse:   appResponseCh,
 		appErr:        appErrCh,
+		now:           cfg.now,
 	}
+}
+
+func newTestGenesis(fork upgradetest.Fork, keychain *saetest.KeyChain) *core.Genesis {
+	chainConfig := subnetevmparams.Copy(paramstest.ForkToChainConfig[fork])
+	return &core.Genesis{
+		Config:     &chainConfig,
+		Alloc:      saetest.MaxAllocFor(keychain.Addresses()...),
+		Timestamp:  saeparams.TauSeconds,
+		Difficulty: big.NewInt(0),
+	}
+}
+
+func withFork(fork upgradetest.Fork) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.fork = fork
+	})
+}
+
+func withNumAccounts(numAccounts uint) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.numAccounts = numAccounts
+	})
+}
+
+func withGenesisConfig(fn func(*core.Genesis, []common.Address)) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.configureGenesis = fn
+	})
+}
+
+func withUpgradeConfig(fn func([]common.Address) []byte) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.configureUpgrade = fn
+	})
+}
+
+func withNow(now *time.Time) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.now = now
+	})
 }
 
 func (s *SUT) buildAndVerifyBlock(t *testing.T, blockCtx *block.Context) *blocks.Block {
@@ -171,6 +244,225 @@ func (s *SUT) acceptAndExecuteBlock(t *testing.T, built *blocks.Block) {
 	require.NoError(t, s.vm.SetPreference(s.ctx, built.ID(), nil))
 	require.NoError(t, s.vm.AcceptBlock(s.ctx, built))
 	require.NoError(t, built.WaitUntilExecuted(s.ctx))
+}
+
+func (s *SUT) setTime(t *testing.T, now time.Time) {
+	t.Helper()
+	require.NotNil(t, s.now)
+	*s.now = now
+}
+
+func (s *SUT) advanceTime(t *testing.T, d time.Duration) {
+	t.Helper()
+	require.NotNil(t, s.now)
+	*s.now = s.now.Add(d)
+}
+
+func (s *SUT) sendTransferTx(t *testing.T, from int, to int, value *big.Int) *types.Transaction {
+	t.Helper()
+
+	addresses := s.ethWallet.Addresses()
+	toAddress := addresses[to]
+	tx := s.ethWallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
+		To:        &toAddress,
+		Gas:       21_000,
+		GasFeeCap: big.NewInt(225 * subnetevmparams.GWei),
+		Value:     value,
+	})
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
+	return tx
+}
+
+func (s *SUT) buildAndAcceptBlock(t *testing.T) *blocks.Block {
+	t.Helper()
+
+	built := s.buildAndVerifyBlock(t, nil)
+	s.acceptAndExecuteBlock(t, built)
+	return built
+}
+
+func (s *SUT) fetchTxAllowListRole(t *testing.T, address common.Address, blockNumber rpc.BlockNumber) allowlist.Role {
+	t.Helper()
+
+	stateDB, _, err := s.vm.GethRPCBackends().StateAndHeaderByNumber(s.ctx, blockNumber)
+	require.NoError(t, err)
+	return txallowlist.GetTxAllowListStatus(stateDB, address)
+}
+
+// isPrecompileEnabledAtLatest reports whether `precompile` is active at
+// `now()` against the running VM's chain config. It walks the configured
+// `PrecompileUpgrades` (genesis + upgradeBytes) rather than reading state, so
+// it directly reflects whether the precompile is *enabled* (vs. simply having
+// no roles set in state).
+func (s *SUT) isPrecompileEnabledAtLatest(precompile common.Address) bool {
+	chainConfig := s.vm.GethRPCBackends().ChainConfig()
+	timestamp := uint64(s.now.Unix())
+	return subnetevmparams.GetExtra(chainConfig).IsPrecompileEnabled(precompile, timestamp)
+}
+
+// TestTxAllowListPrecompileUpgradesSAE exercises mid-chain `PrecompileUpgrades`
+// for the `txallowlist` precompile under SAE end-to-end through a single
+// timeline: genesis-enabled (admin only) -> disable -> re-enable (admin +
+// manager). At each step we assert all three properties of interest:
+//  1. The precompile is correctly enabled / disabled at the scheduled
+//     timestamp (via `BeforeExecutingBlock` -> `core.ApplyUpgrades`).
+//  2. The configuration is correctly applied to state (admin / manager
+//     roles observable via `txallowlist.GetTxAllowListStatus`).
+//  3. Worst-case admission correctly blocks transfers from non-enabled
+//     roles against the last-settled state, and unblocks them once the
+//     allowlist is removed.
+func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
+	const (
+		adminIdx    = 0
+		nonAdminIdx = 1
+	)
+
+	now := txAllowListTestStartTime(t)
+	disableTime := now.Add(saeparams.Tau)
+	// Re-enable after the disable activation has had time to settle, so the
+	// timeline only ever moves forward during the test.
+	reenableTime := disableTime.Add(2 * saeparams.Tau)
+
+	sut := newSUT(
+		t,
+		withFork(upgradetest.Helicon),
+		withNumAccounts(2),
+		withNow(&now),
+		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
+			subnetevmparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
+				txallowlist.ConfigKey: txallowlist.NewConfig(
+					utils.PointerTo[uint64](0),
+					[]common.Address{addresses[adminIdx]},
+					nil,
+					nil,
+				),
+			}
+		}),
+		withUpgradeConfig(func(addresses []common.Address) []byte {
+			return mustMarshalJSON(t, &extras.UpgradeConfig{
+				PrecompileUpgrades: []extras.PrecompileUpgrade{
+					{
+						Config: txallowlist.NewDisableConfig(utils.PointerTo(uint64(disableTime.Unix()))),
+					},
+					{
+						// Re-enable promotes `nonAdminIdx` to manager so we
+						// can observe the new config land in state.
+						Config: txallowlist.NewConfig(
+							utils.PointerTo(uint64(reenableTime.Unix())),
+							[]common.Address{addresses[adminIdx]},
+							nil,
+							[]common.Address{addresses[nonAdminIdx]},
+						),
+					},
+				},
+			})
+		}),
+	)
+
+	addresses := sut.ethWallet.Addresses()
+	admin := addresses[adminIdx]
+	nonAdmin := addresses[nonAdminIdx]
+	fundValue := new(big.Int).Mul(big.NewInt(subnetevmparams.Ether), big.NewInt(1000))
+
+	// Step 0: at genesis, the allowlist is enabled with `admin` as the only
+	// allow-listed sender. Latest and finalized agree (no upgrades yet).
+	// (1) Precompile is enabled per chain config at the current timestamp.
+	require.True(t, sut.isPrecompileEnabledAtLatest(txallowlist.ContractAddress), "txallowlist must be enabled at genesis")
+	// (2) Genesis config is applied to state in both latest & finalized.
+	require.Equal(t, allowlist.AdminRole, sut.fetchTxAllowListRole(t, admin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.AdminRole, sut.fetchTxAllowListRole(t, admin, rpc.FinalizedBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.FinalizedBlockNumber))
+
+	// (3) Worst-case admission blocks the non-admin sender. We submit two
+	// txs in a single block: one funds `nonAdmin` (so it can pay fees in
+	// later steps), the other is from `nonAdmin` and must be dropped.
+	fundNonAdmin := sut.sendTransferTx(t, adminIdx, nonAdminIdx, fundValue)
+	droppedTx := sut.sendTransferTx(t, nonAdminIdx, adminIdx, common.Big1)
+	block := sut.buildAndAcceptBlock(t)
+	require.Len(t, block.Transactions(), 1, "non-admin tx must be excluded while allowlist is enabled")
+	require.Equal(t, fundNonAdmin.Hash(), block.Transactions()[0].Hash())
+
+	// Step 1: advance to `disableTime` and produce the activation block.
+	sut.setTime(t, disableTime)
+	disableActivationTx := sut.sendTransferTx(t, adminIdx, nonAdminIdx, common.Big1)
+	block = sut.buildAndAcceptBlock(t)
+	require.Len(t, block.Transactions(), 1)
+	require.Equal(t, disableActivationTx.Hash(), block.Transactions()[0].Hash())
+
+	// (1) Disable upgrade fires inside `BeforeExecutingBlock`; precompile is
+	// no longer enabled per chain config at the current timestamp.
+	require.False(t, sut.isPrecompileEnabledAtLatest(txallowlist.ContractAddress), "txallowlist must be disabled after activation")
+	// (2) State diverges between latest and finalized: latest reflects the
+	// disable just applied, but finalized still observes the pre-disable
+	// admin role because settlement lags by Tau.
+	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, admin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.AdminRole, sut.fetchTxAllowListRole(t, admin, rpc.FinalizedBlockNumber),
+		"finalized state must still show admin role until disable settles")
+	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.FinalizedBlockNumber))
+
+	// (3) Worst-case admission validates against the last-settled state, so
+	// `nonAdmin` is still rejected until the activation block becomes the
+	// settled base. Advance past the settlement window and the previously-
+	// blocked tx is now admitted.
+	sut.advanceTime(t, saeparams.Tau+time.Second)
+	block = sut.buildAndAcceptBlock(t)
+	require.Len(t, block.Transactions(), 1, "previously-blocked tx must be admitted once disable settles")
+	require.Equal(t, droppedTx.Hash(), block.Transactions()[0].Hash())
+
+	// (2) After settlement, finalized catches up with latest: both observe
+	// the disabled allowlist (no roles).
+	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, admin, rpc.FinalizedBlockNumber),
+		"finalized must reflect disable once it has settled")
+	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.FinalizedBlockNumber))
+
+	// Step 2: advance to `reenableTime` and produce the re-enable activation
+	// block.
+	sut.setTime(t, reenableTime)
+	reenableActivationTx := sut.sendTransferTx(t, adminIdx, nonAdminIdx, common.Big1)
+	block = sut.buildAndAcceptBlock(t)
+	require.Len(t, block.Transactions(), 1)
+	require.Equal(t, reenableActivationTx.Hash(), block.Transactions()[0].Hash())
+
+	// (1) Re-enable upgrade fires inside `BeforeExecutingBlock`; precompile
+	// is enabled again per chain config at the current timestamp.
+	require.True(t, sut.isPrecompileEnabledAtLatest(txallowlist.ContractAddress), "txallowlist must be re-enabled after activation")
+	// (2) Latest reflects the re-enable (admin + manager promotion); the
+	// finalized snapshot is still pre-re-enable (no roles).
+	require.Equal(t, allowlist.AdminRole, sut.fetchTxAllowListRole(t, admin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.ManagerRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.LatestBlockNumber))
+	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, admin, rpc.FinalizedBlockNumber),
+		"finalized state must still reflect disabled allowlist until re-enable settles")
+	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.FinalizedBlockNumber))
+
+	// (3) `nonAdmin` is now a manager and must be admissible
+	sut.advanceTime(t, saeparams.Tau+time.Second)
+	managerTx := sut.sendTransferTx(t, nonAdminIdx, adminIdx, common.Big1)
+	block = sut.buildAndAcceptBlock(t)
+	require.Len(t, block.Transactions(), 1, "manager tx must be admitted after re-enable settles")
+	require.Equal(t, managerTx.Hash(), block.Transactions()[0].Hash())
+
+	// (2) Finalized has caught up with latest after re-enable settled.
+	require.Equal(t, allowlist.AdminRole, sut.fetchTxAllowListRole(t, admin, rpc.FinalizedBlockNumber),
+		"finalized must reflect re-enable once it has settled")
+	require.Equal(t, allowlist.ManagerRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.FinalizedBlockNumber))
+}
+
+func txAllowListTestStartTime(t *testing.T) time.Time {
+	t.Helper()
+
+	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(upgradetest.Helicon))
+	require.NotNil(t, networkUpgrades.HeliconTimestamp)
+	return time.Unix(int64(*networkUpgrades.HeliconTimestamp), 0).Add(saeparams.Tau)
+}
+
+func mustMarshalJSON(t *testing.T, v interface{}) []byte {
+	t.Helper()
+
+	bytes, err := json.Marshal(v)
+	require.NoError(t, err)
+	return bytes
 }
 
 func newSnowCtx(t *testing.T, upgrades upgrade.Config) (*snow.Context, []*localsigner.LocalSigner) {

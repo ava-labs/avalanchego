@@ -88,7 +88,11 @@ type Points interface {
 	// removal) instead of strict-as-of-parent.
 	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
 	// BeforeExecutingBlock is called immediately prior to executing the block.
-	BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error
+	// `parent` is the header of the block whose post-execution state `state`
+	// is rooted at; it provides `parent.Time` for upgrade-activation windowing
+	// and is the equivalent of what the legacy plugin's [core.StateProcessor]
+	// reads via `&parent.Time`.
+	BeforeExecutingBlock(rules params.Rules, parent *types.Header, state *state.StateDB, block *types.Block) error
 	// AfterExecutingBlock is called immediately after executing the block.
 	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 }
