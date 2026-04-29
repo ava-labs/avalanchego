@@ -63,7 +63,7 @@ type ClientPermissionlessValidator struct {
 	DelegatorWeight *uint64
 	Delegators      []ClientDelegator
 
-	// ACP-236
+	// Auto-renewed validators.
 	ConfigOwner              *ClientOwner
 	Period                   *uint64
 	AutoCompoundRewardShares *uint32
