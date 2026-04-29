@@ -7,9 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -19,7 +23,9 @@ import (
 	// Imported for [parseOldTx] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -31,6 +37,11 @@ import (
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	os.Exit(m.Run())
+}
 
 // tests is defined at the package level to allow sharing between fuzz tests and
 // unit tests.
@@ -1194,4 +1205,344 @@ func FuzzAtomicRequestsCompatibility(f *testing.F) {
 		assert.Equal(t, oldChainID, newChainID, "chainID")
 		assert.Equal(t, oldRequests, newRequests, "requests")
 	})
+}
+
+func newStateDB(t testing.TB) *extstate.StateDB {
+	t.Helper()
+
+	db := state.NewDatabase(rawdb.NewMemoryDatabase())
+	sdb, err := state.New(types.EmptyRootHash, db, nil)
+	require.NoError(t, err)
+	return extstate.New(sdb)
+}
+
+func TestTransferNonAVAX(t *testing.T) {
+	var (
+		alice = common.Address{1}
+		bob   = common.Address{2}
+		btc   = ids.ID{3}
+		eth   = ids.ID{4}
+	)
+	tests := []struct {
+		name    string
+		init    map[common.Address]map[ids.ID]uint64
+		tx      Unsigned
+		want    map[common.Address]map[ids.ID]uint64
+		wantErr error
+	}{
+		{
+			name: "import_avax",
+			tx: &Import{
+				Outs: []Output{{
+					Address: alice,
+					Amount:  1,
+					AssetID: avaxAssetID,
+				}},
+			},
+		},
+		{
+			name: "import_non_avax",
+			tx: &Import{
+				Outs: []Output{
+					{
+						Address: alice,
+						Amount:  1,
+						AssetID: btc,
+					},
+				},
+			},
+			want: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 1,
+				},
+			},
+		},
+		{
+			name: "import_many",
+			tx: &Import{
+				Outs: []Output{
+					{
+						Address: alice,
+						Amount:  1,
+						AssetID: avaxAssetID,
+					},
+					{
+						Address: alice,
+						Amount:  10,
+						AssetID: avaxAssetID,
+					},
+					{
+						Address: bob,
+						Amount:  100,
+						AssetID: avaxAssetID,
+					},
+					{
+						Address: alice,
+						Amount:  1_000,
+						AssetID: btc,
+					},
+					{
+						Address: alice,
+						Amount:  10_000,
+						AssetID: btc,
+					},
+					{
+						Address: bob,
+						Amount:  100_000,
+						AssetID: btc,
+					},
+					{
+						Address: bob,
+						Amount:  1_000_000,
+						AssetID: eth,
+					},
+				},
+			},
+			want: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 11_000,
+				},
+				bob: {
+					btc: 100_000,
+					eth: 1_000_000,
+				},
+			},
+		},
+		{
+			name: "export_avax",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: alice,
+						Amount:  1,
+						AssetID: avaxAssetID,
+					},
+				},
+			},
+		},
+		{
+			name: "export_non_avax",
+			init: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 2,
+				},
+			},
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: alice,
+						Amount:  1,
+						AssetID: btc,
+					},
+				},
+			},
+			want: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 1,
+				},
+			},
+		},
+
+		{
+			name: "export_many",
+			init: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 22_000,
+				},
+				bob: {
+					btc: 200_000,
+					eth: 2_000_000,
+				},
+			},
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: alice,
+						Amount:  1,
+						AssetID: avaxAssetID,
+					},
+					{
+						Address: alice,
+						Amount:  10,
+						AssetID: avaxAssetID,
+					},
+					{
+						Address: bob,
+						Amount:  100,
+						AssetID: avaxAssetID,
+					},
+					{
+						Address: alice,
+						Amount:  1_000,
+						AssetID: btc,
+					},
+					{
+						Address: alice,
+						Amount:  10_000,
+						AssetID: btc,
+					},
+					{
+						Address: bob,
+						Amount:  100_000,
+						AssetID: btc,
+					},
+					{
+						Address: bob,
+						Amount:  1_000_000,
+						AssetID: eth,
+					},
+				},
+			},
+			want: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 11_000,
+				},
+				bob: {
+					btc: 100_000,
+					eth: 1_000_000,
+				},
+			},
+		},
+		{
+			name: "export_non_avax_insufficient",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: alice,
+						Amount:  1,
+						AssetID: btc,
+					},
+				},
+			},
+			wantErr: errInsufficientFunds,
+		},
+		{
+			name: "export_non_avax_total_insufficient",
+			init: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 1,
+				},
+			},
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: alice,
+						Amount:  1,
+						AssetID: btc,
+					},
+					{
+						Address: alice,
+						Amount:  1,
+						AssetID: btc,
+					},
+				},
+			},
+			wantErr: errInsufficientFunds,
+		},
+	}
+	big := func(v uint64) *big.Int {
+		return new(big.Int).SetUint64(v)
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sdb := newStateDB(t)
+			for addr, balances := range test.init {
+				for assetID, amount := range balances {
+					coinID := common.Hash(assetID)
+					sdb.AddBalanceMultiCoin(addr, coinID, big(amount))
+				}
+			}
+
+			err := test.tx.TransferNonAVAX(avaxAssetID, sdb)
+			require.ErrorIs(t, err, test.wantErr)
+			for addr, balances := range test.want {
+				for assetID, want := range balances {
+					coinID := common.Hash(assetID)
+					got := sdb.GetBalanceMultiCoin(addr, coinID)
+					require.Zerof(t, got.Cmp(big(want)), "addr=%s asset=%s got=%s want=%d", addr, assetID, got, want)
+				}
+			}
+		})
+	}
+}
+
+func FuzzTransferNonAVAXCompatibility(f *testing.F) {
+	for _, test := range tests {
+		f.Add(test.bytes)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		oldTx, err := parseOldTx(data)
+		if err != nil {
+			t.Skip("invalid tx bytes")
+		}
+		newTx, err := Parse(data)
+		require.NoError(t, err, "Parse()")
+
+		addrs, coinIDs := referencedAccounts(oldTx)
+
+		oldSDB := newStateDB(t)
+		newSDB := newStateDB(t)
+
+		// Pre-fund identically with a huge multi-coin balance for every
+		// (addr, coinID) so neither implementation can fail on the
+		// multi-coin branch and we exercise only the success path.
+		hugeBig := new(big.Int).Lsh(big.NewInt(1), 128)
+		prefund := func(sdb *extstate.StateDB) {
+			for addr := range addrs {
+				for coinID := range coinIDs {
+					sdb.AddBalanceMultiCoin(addr, common.Hash(coinID), hugeBig)
+				}
+			}
+		}
+		prefund(oldSDB)
+		prefund(newSDB)
+
+		// EVMStateTransfer also touches AVAX balances and nonces; pre-fund
+		// AVAX and seed nonces only on the old state so those branches don't
+		// fail. TransferNonAVAX skips both, so newSDB doesn't need them.
+		hugeAVAX := new(uint256.Int).Lsh(uint256.NewInt(1), 128)
+		for addr := range addrs {
+			oldSDB.AddBalance(addr, hugeAVAX)
+		}
+		if export, ok := oldTx.UnsignedAtomicTx.(*atomic.UnsignedExportTx); ok {
+			for _, in := range export.Ins {
+				oldSDB.SetNonce(in.Address, in.Nonce)
+			}
+		}
+
+		ctx := &snow.Context{AVAXAssetID: avaxAssetID}
+		if err := oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldSDB); err != nil {
+			// Repeated address with conflicting nonces produces ErrInvalidNonce
+			// in old, which doesn't apply to the multi-coin equivalence we are
+			// checking. Skip.
+			t.Skipf("EVMStateTransfer: %s", err)
+		}
+		require.NoError(t, newTx.TransferNonAVAX(avaxAssetID, newSDB))
+
+		for addr := range addrs {
+			for coinID := range coinIDs {
+				oldBal := oldSDB.GetBalanceMultiCoin(addr, common.Hash(coinID))
+				newBal := newSDB.GetBalanceMultiCoin(addr, common.Hash(coinID))
+				require.Zerof(t, oldBal.Cmp(newBal), "addr=%s coin=%s old=%s new=%s", addr, coinID, oldBal, newBal)
+			}
+		}
+	})
+}
+
+func referencedAccounts(tx *atomic.Tx) (map[common.Address]struct{}, map[ids.ID]struct{}) {
+	addrs := map[common.Address]struct{}{}
+	coins := map[ids.ID]struct{}{}
+	switch utx := tx.UnsignedAtomicTx.(type) {
+	case *atomic.UnsignedImportTx:
+		for _, out := range utx.Outs {
+			addrs[out.Address] = struct{}{}
+			coins[out.AssetID] = struct{}{}
+		}
+	case *atomic.UnsignedExportTx:
+		for _, in := range utx.Ins {
+			addrs[in.Address] = struct{}{}
+			coins[in.AssetID] = struct{}{}
+		}
+	}
+	return addrs, coins
 }
