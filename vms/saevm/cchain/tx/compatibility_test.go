@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
