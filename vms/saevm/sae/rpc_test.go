@@ -534,7 +534,7 @@ func TestEthGetters(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt, withDebugAPI())
+	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withDebugAPI())
 	t.Cleanup(unblock)
 
 	t.Run("unknown_hashes", func(t *testing.T) {
@@ -948,15 +948,15 @@ func TestGetReceipts(t *testing.T) {
 			want: wantUnsettled,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //#nosec G115 -- Test values
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //#nosec G115 -- Won't overflow
 			want: wantOnDisk,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //#nosec G115 -- Test values
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //#nosec G115 -- Won't overflow
 			want: wantSettled,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //#nosec G115 -- Test values
+			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //#nosec G115 -- Won't overflow
 			want: wantUnsettled,
 		},
 		{
@@ -972,15 +972,18 @@ func TestGetReceipts(t *testing.T) {
 			want: wantSettled,
 		},
 	} {
-		tests = append(tests, rpcTest{
-			method: "eth_getBlockReceipts",
-			args:   []any{tc.id.String()},
-			want:   tc.want,
-		}, rpcTest{
-			method: "debug_getRawReceipts",
-			args:   []any{tc.id.String()},
-			want:   marshalReceipts(tc.want),
-		})
+		tests = append(tests, []rpcTest{
+			{
+				method: "eth_getBlockReceipts",
+				args:   []any{tc.id.String()},
+				want:   tc.want,
+			},
+			{
+				method: "debug_getRawReceipts",
+				args:   []any{tc.id.String()},
+				want:   marshalReceipts(tc.want),
+			},
+		}...)
 	}
 
 	for i, tx := range txs {
