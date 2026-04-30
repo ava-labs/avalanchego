@@ -11,7 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 
-const defaultCommitInterval = 4096
+const (
+	defaultCommitInterval         = 4096
+	defaultStateSyncPivotInterval = 10_000
+)
 
 func NewDefaultConfig() Config {
 	return Config{
@@ -77,7 +80,11 @@ func NewDefaultConfig() Config {
 		StateSyncMinBlocks: 300_000,
 		// the number of key/values to ask peers for per request
 		StateSyncRequestSize: 1024,
-		StateHistory:         uint64(32),
+		// Dynamic state sync is opt-in.
+		StateSyncDynamicEnabled: false,
+		// Number of blocks between dynamic sync target updates.
+		StateSyncPivotInterval: defaultStateSyncPivotInterval,
+		StateHistory:           uint64(32),
 		// Estimated block count in 24 hours with 2s block accept period
 		HistoricalProofQueryWindow: uint64(24 * time.Hour / (2 * time.Second)),
 		// Price Option Defaults

@@ -5,6 +5,7 @@ go_library(
     name = "code",
     srcs = [
         "queue.go",
+        "sessioned_queue.go",
         "syncer.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/code",
@@ -12,6 +13,7 @@ go_library(
     deps = [
         "//graft/evm/message",
         "//graft/evm/sync/client",
+        "//graft/evm/sync/session",
         "//graft/evm/sync/types",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
@@ -26,6 +28,7 @@ graft_go_test(
     name = "code_test",
     srcs = [
         "queue_test.go",
+        "sessioned_queue_test.go",
         "syncer_test.go",
     ],
     embed = [":code"],
@@ -36,13 +39,13 @@ graft_go_test(
         "//graft/evm/sync/client",
         "//graft/evm/sync/handlers",
         "//graft/evm/sync/handlers/stats",
+        "//graft/evm/sync/session",
         "//utils",
         "//utils/set",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//crypto",
-        "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//ethdb/memorydb",
         "@com_github_stretchr_testify//require",
         "@org_golang_x_sync//errgroup",

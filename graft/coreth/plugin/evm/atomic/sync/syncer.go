@@ -147,6 +147,13 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	return s.syncer.Sync(ctx)
 }
 
+func (*Syncer) UpdateTarget(message.Syncable) error {
+	// The atomic syncer does not pivot. It syncs to the initial target from
+	// the peer summary and relies on batch replay to fill the gap between
+	// its target and the coordinator's commitTarget.
+	return nil
+}
+
 // Finalize commits any pending database changes to disk.
 // This ensures that even if the sync is cancelled or fails, we preserve
 // the progress up to the last fully synced height.

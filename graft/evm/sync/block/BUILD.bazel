@@ -7,6 +7,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/block",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/message",
         "//graft/evm/sync/client",
         "//graft/evm/sync/types",
         "@com_github_ava_labs_libevm//common",

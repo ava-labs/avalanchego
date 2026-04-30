@@ -184,7 +184,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
+	if err := vm.repairAcceptedChainByHeight(ctx, false); err != nil {
 		return fmt.Errorf("failed to repair accepted chain by height: %w", err)
 	}
 
@@ -330,8 +330,9 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	// When finishing StateSyncing, if state sync has failed or was skipped,
 	// repairAcceptedChainByHeight rolls back the chain to the previously last
 	// accepted block. If state sync has completed successfully, this call is a
-	// no-op.
-	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
+	// no-op. During dynamic state sync, skip the rollback so the consensus
+	// engine can start at the sync target height.
+	if err := vm.repairAcceptedChainByHeight(ctx, true); err != nil {
 		return fmt.Errorf("failed to repair accepted chain height: %w", err)
 	}
 	return vm.setLastAcceptedMetadata(ctx)
@@ -607,7 +608,7 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return lastAccepted, err
 }
 
-func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
+func (vm *VM) repairAcceptedChainByHeight(ctx context.Context, afterStateSyncing bool) error {
 	innerLastAcceptedID, err := vm.ChainVM.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get inner last accepted: %w", err)
@@ -637,6 +638,17 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	}
 	if proLastAcceptedHeight == innerLastAcceptedHeight {
 		// There is nothing to repair - as the heights match
+		return nil
+	}
+
+	// During dynamic state sync the inner VM is still at genesis.
+	// Preserve the proposervm height so the bootstrapper gets the
+	// correct lastAccepted. Not applied during Initialize (crash
+	// recovery) where height 0 means a genuine rollback.
+	if afterStateSyncing && innerLastAcceptedHeight == 0 {
+		vm.ctx.Log.Info("preserving proposervm height during dynamic state sync",
+			zap.Uint64("outerHeight", proLastAcceptedHeight),
+		)
 		return nil
 	}
 
