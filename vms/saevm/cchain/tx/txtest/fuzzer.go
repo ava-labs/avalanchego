@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/require"
+
+	// Imported for [codec.Manager] comment resolution.
+	_ "github.com/ava-labs/avalanchego/codec"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -45,16 +47,13 @@ func (f *F) Fuzz(ff func(t *testing.T, tx *tx.Tx)) {
 			addresses: f.Addresses,
 			assetIDs:  f.AssetIDs,
 		}
-		genTx := d.tx()
+		tx := d.tx()
 
-		// genTx isn't always ideally formatted, so we round-trip through
-		// parsing before providing it to the test body.
-		bytes, err := genTx.Bytes()
-		if err != nil {
+		// It's possible for the fuzzer to generate a tx that exceeds the codec
+		// size limits.
+		if _, err := tx.Bytes(); err != nil {
 			t.Skipf("invalid tx: %s", err)
 		}
-		tx, err := tx.Parse(bytes)
-		require.NoError(t, err, "Parse()")
 		ff(t, tx)
 	})
 }
@@ -110,10 +109,12 @@ func element[T any](d *decoder, s []T, gen func(*decoder) T) T {
 	return s[d.intn(len(s))]
 }
 
-// sliceOf generates a random slice of generated entries. The length is random,
-// but is typically small.
+// sliceOf generates a random slice of generated entries. The returned value is
+// non-nil. The length is random, but is typically small.
 func sliceOf[T any](d *decoder, gen func(*decoder) T) []T {
-	var out []T
+	// The [codec.Manager] always generates non-nil slices. To avoid nil and
+	// empty comparison issues, we also always generate non-nil slices.
+	out := []T{}
 	// [decoder.bool] returns false once the data is exhausted, so this loop
 	// will eventually terminate.
 	for d.bool() {

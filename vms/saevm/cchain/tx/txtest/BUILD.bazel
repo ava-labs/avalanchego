@@ -12,12 +12,12 @@ go_library(
     srcs = ["fuzzer.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest",
     deps = [
+        "//codec",
         "//ids",
         "//vms/components/avax",
         "//vms/saevm/cchain/tx",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_stretchr_testify//require",
     ],
 )
 
