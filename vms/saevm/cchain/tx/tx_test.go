@@ -1306,16 +1306,16 @@ func TestTransferNonAVAX(t *testing.T) {
 			wantErr: errInsufficientFunds,
 		},
 	}
-	big := func(v uint64) *big.Int {
-		return new(big.Int).SetUint64(v)
-	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sdb := NewStateDB(t)
+			var (
+				sdb   = NewStateDB(t)
+				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
+			)
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
 					coinID := common.Hash(assetID)
-					sdb.AddBalanceMultiCoin(addr, coinID, big(amount))
+					sdb.AddBalanceMultiCoin(addr, coinID, toBig(amount))
 				}
 			}
 
@@ -1325,7 +1325,7 @@ func TestTransferNonAVAX(t *testing.T) {
 				for assetID, want := range balances {
 					coinID := common.Hash(assetID)
 					got := sdb.GetBalanceMultiCoin(addr, coinID)
-					if diff := cmp.Diff(big(want), got, cmputils.BigInts()); diff != "" {
+					if diff := cmp.Diff(toBig(want), got, cmputils.BigInts()); diff != "" {
 						t.Errorf("%T.GetBalanceMultiCoin(%s, %s) diff (-want +got):\n%s", sdb, addr, coinID, diff)
 					}
 				}
