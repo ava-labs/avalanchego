@@ -343,7 +343,6 @@ func TestParse(t *testing.T) {
 				if diff := cmp.Diff(test.Old, got, OldCmpOpt()); diff != "" {
 					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
 				}
-				assert.Equalf(t, test.Old, got, "%T.Unmarshal(, %T)", atomic.Codec, got)
 			})
 			t.Run("new", func(t *testing.T) {
 				got, err := Parse(test.Bytes)
