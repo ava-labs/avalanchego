@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -1726,6 +1727,12 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	vm.Ethereum().BlockChain().DrainAcceptorQueue()
 	_, err = vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{importedInputID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
+
+	// Verify that the target state requires reexecution to access.
+	targetBlock := vm.Ethereum().BlockChain().GetBlockByNumber(uint64(targetBlockHeight))
+	targetRoot := targetBlock.Root()
+	_, err = vm.Ethereum().BlockChain().StateAt(targetRoot)
+	require.ErrorIs(err, firewood.ErrNoRevisionFound)
 
 	// Stand up an in-process RPC server so we can issue an archival query.
 	handlers, err := vm.CreateHandlers(ctx)
