@@ -100,9 +100,9 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 		return hook.Op{}, fmt.Errorf("calculating amount burned: %w", err)
 	}
 
-	op, err := t.Unsigned.asOp(avaxAssetID)
+	op, err := t.asOp(avaxAssetID)
 	if err != nil {
-		return hook.Op{}, fmt.Errorf("converting unsigned transaction to operation: %w", err)
+		return hook.Op{}, fmt.Errorf("converting to operation: %w", err)
 	}
 
 	return hook.Op{
