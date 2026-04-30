@@ -14,7 +14,7 @@ import (
 
 func FuzzRoundTrip(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		f := decoder{
+		d := decoder{
 			data: data,
 			addresses: []common.Address{
 				{1},
@@ -23,12 +23,12 @@ func FuzzRoundTrip(f *testing.F) {
 				{2},
 			},
 		}
-		want := f.tx()
+		want := d.tx()
 
 		var e encoder
 		e.tx(want)
-		f.data = e
-		got := f.tx()
+		d.data = e
+		got := d.tx()
 		require.Equal(t, want, got, "decode(encode(tx)) == tx")
 	})
 }
