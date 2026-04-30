@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var _ Unsigned = (*Import)(nil)
+
 // Import is the unsigned component of a transaction that transfers assets from
 // either the P-Chain or the X-Chain to the C-Chain. It consumes UTXOs in the
 // shared memory between the C-Chain and the source chain and increases balances

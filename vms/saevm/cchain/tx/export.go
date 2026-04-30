@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
+var _ Unsigned = (*Export)(nil)
+
 // Export is the unsigned component of a transaction that transfers assets from
 // the C-Chain to either the P-Chain or the X-Chain. It modifies the C-Chain
 // state and produces UTXOs in the shared memory between the C-Chain and the
