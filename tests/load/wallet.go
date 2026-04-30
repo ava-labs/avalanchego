@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,11 +21,13 @@ var errTxExecutionFailed = errors.New("transaction accepted but failed to execut
 
 type Wallet struct {
 	privKey *ecdsa.PrivateKey
-	nonce   uint64
-	chainID *big.Int
-	signer  types.Signer
-	client  *ethclient.Client
-	metrics metrics
+	// nextNonce is the nonce that ClaimNonce will return next; reserved before
+	// signing and incremented atomically so concurrent senders never collide.
+	nextNonce atomic.Uint64
+	chainID   *big.Int
+	signer    types.Signer
+	client    *ethclient.Client
+	metrics   metrics
 }
 
 func newWallet(
@@ -34,14 +37,23 @@ func newWallet(
 	client *ethclient.Client,
 	metrics metrics,
 ) *Wallet {
-	return &Wallet{
+	w := &Wallet{
 		privKey: privKey,
-		nonce:   nonce,
 		chainID: chainID,
 		signer:  types.LatestSignerForChainID(chainID),
 		client:  client,
 		metrics: metrics,
 	}
+	w.nextNonce.Store(nonce)
+	return w
+}
+
+// ClaimNonce reserves the next sequential nonce for this Wallet. Safe for
+// concurrent callers. Each successful claim must be followed by a tx using
+// that nonce; if the tx never reaches the chain, subsequent txs will stall
+// waiting for the gap to fill.
+func (w *Wallet) ClaimNonce() uint64 {
+	return w.nextNonce.Add(1) - 1
 }
 
 func (w *Wallet) SendTx(
@@ -75,12 +87,10 @@ func (w *Wallet) SendTx(
 		ctx,
 		headers,
 		sub.Err(),
+		tx.Nonce(),
 		tx.Hash(),
 	)
 	if err != nil {
-		if errors.Is(err, errTxExecutionFailed) {
-			w.nonce++
-		}
 		return err
 	}
 
@@ -88,15 +98,14 @@ func (w *Wallet) SendTx(
 	confirmationDuration := totalDuration - issuanceDuration
 	w.metrics.accept(confirmationDuration, totalDuration)
 
-	w.nonce++
-
 	return nil
 }
 
-func (w Wallet) awaitTx(
+func (w *Wallet) awaitTx(
 	ctx context.Context,
 	headers chan *types.Header,
 	errs <-chan error,
+	txNonce uint64,
 	txHash common.Hash,
 ) error {
 	account := crypto.PubkeyToAddress(w.privKey.PublicKey)
@@ -116,7 +125,10 @@ func (w Wallet) awaitTx(
 				return err
 			}
 
-			if latestNonce == w.nonce+1 {
+			// Once the on-chain account nonce has advanced past our tx's
+			// nonce, our tx has been included in some block. Fetch the
+			// receipt to distinguish success from execution-failure.
+			if latestNonce > txNonce {
 				receipt, err := w.client.TransactionReceipt(ctx, txHash)
 				if err != nil {
 					return err

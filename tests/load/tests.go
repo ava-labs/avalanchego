@@ -238,7 +238,7 @@ func (t TransferTest) Run(tc tests.TestContext, wallet *Wallet) {
 
 	tx, err := types.SignNewTx(wallet.privKey, wallet.signer, &types.DynamicFeeTx{
 		ChainID:   wallet.chainID,
-		Nonce:     wallet.nonce,
+		Nonce:     wallet.ClaimNonce(),
 		GasTipCap: gasTipCap,
 		GasFeeCap: gasFeeCap,
 		Gas:       params.TxGas,
@@ -366,7 +366,7 @@ func executeContractTx(
 ) {
 	require := require.New(tc)
 
-	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.nonce)
+	txOpts, err := newTxOpts(wallet.privKey, wallet.chainID, maxFeeCap, wallet.ClaimNonce())
 	require.NoError(err)
 
 	tx, err := txFunc(txOpts)
