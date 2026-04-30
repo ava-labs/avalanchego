@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/tests"
@@ -73,6 +74,16 @@ func (l LoadGenerator) Run(
 		childCtx, cancel := context.WithTimeout(ctx, loadTimeout)
 		ctx = childCtx
 		defer cancel()
+	}
+
+	// Boot the shared head subscription on each wallet before any test
+	// goroutines call SendTx. The head goroutine handles all confirmations
+	// for txs issued through the wallet, so it must be live first.
+	for _, w := range l.wallets {
+		if err := w.Start(ctx); err != nil {
+			log.Error("failed to start wallet head subscription", zap.Error(err))
+			return
+		}
 	}
 
 	for i := range l.wallets {
