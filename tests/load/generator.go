@@ -31,6 +31,13 @@ type Worker struct {
 type LoadGenerator struct {
 	wallets []*Wallet
 	test    Test
+
+	// MaxInFlight is the number of concurrent SendTx calls each wallet may
+	// have pending at any time. Defaults to 1 (the historical
+	// one-tx-per-wallet behavior). Higher values pipeline issuance for a
+	// single sender by spawning N goroutines per wallet that all share the
+	// wallet's atomic nonce + shared head subscription.
+	MaxInFlight int
 }
 
 func NewLoadGenerator(
@@ -57,8 +64,9 @@ func NewLoadGenerator(
 	}
 
 	return LoadGenerator{
-		wallets: wallets,
-		test:    test,
+		wallets:     wallets,
+		test:        test,
+		MaxInFlight: 1,
 	}, nil
 }
 
@@ -86,18 +94,24 @@ func (l LoadGenerator) Run(
 		}
 	}
 
+	inFlight := l.MaxInFlight
+	if inFlight < 1 {
+		inFlight = 1
+	}
 	for i := range l.wallets {
-		eg.Go(func() error {
-			for {
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-				}
+		for j := 0; j < inFlight; j++ {
+			eg.Go(func() error {
+				for {
+					select {
+					case <-ctx.Done():
+						return nil
+					default:
+					}
 
-				execTestWithRecovery(ctx, log, l.test, l.wallets[i], testTimeout)
-			}
-		})
+					execTestWithRecovery(ctx, log, l.test, l.wallets[i], testTimeout)
+				}
+			})
+		}
 	}
 
 	_ = eg.Wait()

@@ -41,6 +41,7 @@ var (
 	loadTimeoutArg     time.Duration
 	firewoodEnabledArg bool
 	numWorkersArg      int
+	numInFlightArg     int
 )
 
 func init() {
@@ -65,6 +66,12 @@ func init() {
 		"num-workers",
 		defaultNodeCount,
 		"the number of workers to use for the load test",
+	)
+	flag.IntVar(
+		&numInFlightArg,
+		"num-inflight",
+		1,
+		"max concurrent in-flight transactions per wallet (1 = sequential, higher = pipelined)",
 	)
 
 	flag.Parse()
@@ -156,6 +163,7 @@ func main() {
 		randomTest,
 	)
 	require.NoError(err)
+	generator.MaxInFlight = numInFlightArg
 
 	generator.Run(ctx, log, loadTimeoutArg, testTimeout)
 }
