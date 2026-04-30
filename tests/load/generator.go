@@ -38,6 +38,12 @@ type LoadGenerator struct {
 	// single sender by spawning N goroutines per wallet that all share the
 	// wallet's atomic nonce + shared head subscription.
 	MaxInFlight int
+
+	// TargetTPS, if > 0, caps total transactions per second across all
+	// wallets via a single shared token-bucket limiter. 0 means unlimited
+	// (the historical behavior — issuance throttled only by confirmation
+	// latency at MaxInFlight=1, or by raw RPC throughput when pipelined).
+	TargetTPS int
 }
 
 func NewLoadGenerator(
@@ -82,6 +88,15 @@ func (l LoadGenerator) Run(
 		childCtx, cancel := context.WithTimeout(ctx, loadTimeout)
 		ctx = childCtx
 		defer cancel()
+	}
+
+	// Optionally start a shared TPS limiter and inject it into every wallet
+	// before booting their head subscriptions.
+	if limiter := newTPSLimiter(l.TargetTPS); limiter != nil {
+		go limiter.Run(ctx)
+		for _, w := range l.wallets {
+			w.limiter = limiter
+		}
 	}
 
 	// Boot the shared head subscription on each wallet before any test

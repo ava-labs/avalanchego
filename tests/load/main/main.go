@@ -42,6 +42,7 @@ var (
 	firewoodEnabledArg bool
 	numWorkersArg      int
 	numInFlightArg     int
+	targetTPSArg       int
 )
 
 func init() {
@@ -72,6 +73,12 @@ func init() {
 		"num-inflight",
 		1,
 		"max concurrent in-flight transactions per wallet (1 = sequential, higher = pipelined)",
+	)
+	flag.IntVar(
+		&targetTPSArg,
+		"target-tps",
+		0,
+		"global cap on transactions per second across all wallets (0 = unlimited)",
 	)
 
 	flag.Parse()
@@ -164,6 +171,7 @@ func main() {
 	)
 	require.NoError(err)
 	generator.MaxInFlight = numInFlightArg
+	generator.TargetTPS = targetTPSArg
 
 	generator.Run(ctx, log, loadTimeoutArg, testTimeout)
 }

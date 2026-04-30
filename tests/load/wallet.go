@@ -34,6 +34,11 @@ type Wallet struct {
 	metrics   metrics
 	account   common.Address
 
+	// limiter, if non-nil, gates SendTx so the wallet does not exceed the
+	// configured target TPS. Shared across all wallets in a LoadGenerator
+	// run so the cap is global.
+	limiter *tpsLimiter
+
 	// Shared head subscription state. Initialized by Start; mutated by the
 	// subscription goroutine and by SendTx callers.
 	mu        sync.Mutex
@@ -195,6 +200,10 @@ func (w *Wallet) SendTx(
 		}
 		w.mu.Unlock()
 	}()
+
+	if err := w.limiter.Wait(ctx); err != nil {
+		return err
+	}
 
 	startTime := time.Now()
 	if err := w.client.SendTransaction(ctx, tx); err != nil {
