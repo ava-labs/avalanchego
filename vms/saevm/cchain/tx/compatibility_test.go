@@ -101,17 +101,17 @@ func newAsOpStateDB() *asOpStateDB {
 	}
 }
 
-func (f *asOpStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
-	b := f.op.Mint[addr]
+func (s *asOpStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
+	b := s.op.Mint[addr]
 	b.Add(&b, amount)
-	f.op.Mint[addr] = b
+	s.op.Mint[addr] = b
 }
 
-func (f *asOpStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
-	d := f.op.Burn[addr]
+func (s *asOpStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
+	d := s.op.Burn[addr]
 	d.Amount.Add(&d.Amount, amount)
 	d.MinBalance = d.Amount
-	f.op.Burn[addr] = d
+	s.op.Burn[addr] = d
 }
 
 func (*asOpStateDB) GetBalance(common.Address) *uint256.Int {
@@ -128,14 +128,14 @@ func (*asOpStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int {
 	return new(big.Int).Lsh(big.NewInt(1), 128)
 }
 
-func (f *asOpStateDB) SetNonce(addr common.Address, nonce uint64) {
-	d := f.op.Burn[addr]
+func (s *asOpStateDB) SetNonce(addr common.Address, nonce uint64) {
+	d := s.op.Burn[addr]
 	d.Nonce = nonce - 1
-	f.op.Burn[addr] = d
+	s.op.Burn[addr] = d
 }
 
-func (f *asOpStateDB) GetNonce(addr common.Address) uint64 {
-	return f.initialNonces[addr]
+func (s *asOpStateDB) GetNonce(addr common.Address) uint64 {
+	return s.initialNonces[addr]
 }
 
 func FuzzAtomicRequestsCompatibility(f *testing.F) {

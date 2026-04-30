@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
-	// Imported for [gasPerByte] comment resolution.
+	// Imported for [atomic.TxBytesGas] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
