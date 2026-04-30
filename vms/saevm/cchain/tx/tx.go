@@ -165,7 +165,7 @@ func scaleAVAX(nAVAX uint64) uint256.Int {
 }
 
 // gasPrice takes in the cost, in nAVAX, and the gas and returns the price per
-// gas in aAVAX/gas.
+// gas in aAVAX/gas. It assumes gas is non-zero.
 //
 // The result is rounded down to the nearest aAVAX/gas.
 func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
