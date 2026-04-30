@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool"
@@ -1626,38 +1627,38 @@ func TestWaitForEvent(t *testing.T) {
 }
 
 // TestFirewoodHistoricalReplayAcrossAtomicImport verifies that a Firewood
-// archival balance query forcing replay through an accepted atomic import
-// succeeds, even if the import's input UTXO has already been consumed
-// from shared memory. The test pads chain history past the import so the
-// queried block falls outside Firewood's in-memory state-history window,
-// guaranteeing that answering the query requires re-executing the import.
+// archival balance query can replay through an accepted atomic import after
+// the VM is restarted and the import's input UTXO has already been consumed
+// from shared memory.
 func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
 
-	// state-history=11 keeps only 11 block roots in Firewood's in-memory
-	// revision window. Issuing enough blocks past the import (block
-	// numPreImportBlocks+1) evicts it, forcing the archival query to replay.
+	// Creating the genesis state (block 0) is a commit operation and so Firewood first persists at block 3.
+	// Placing the import at block 4 ensures that it is not persisted.
 	var (
 		recipient          = common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678")
 		importAmount       = uint64(50_000_000)
-		numPreImportBlocks = 16
+		fork               = upgradetest.Fortuna
+		numPreImportBlocks = 3
 		targetBlockHeight  = numPreImportBlocks + 1
-		totalBlocks        = 31
 		configJSON         = `{
 			"pruning-enabled": false,
-			"commit-interval": 10,
-			"state-history": 11
+			"commit-interval": 4,
+			"state-history": 5
 		}`
 	)
 
 	vm := newAtomicTestVM()
 	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+		Fork:       &fork,
 		ConfigJSON: configJSON,
 		Scheme:     customrawdb.FirewoodScheme,
 	})
 	t.Cleanup(func() {
-		require.NoError(vm.Shutdown(ctx))
+		if vm != nil {
+			require.NoError(vm.Shutdown(ctx))
+		}
 	})
 
 	// Seed shared memory with the UTXO that the import block will consume.
@@ -1716,11 +1717,9 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	require.NoError(vm.SetPreference(ctx, blk.ID()))
 	require.NoError(blk.Accept(ctx))
 
-	// Continue the chain past the import so the target block falls outside
-	// Firewood's in-memory state-history window and must be re-executed.
-	for height := targetBlockHeight + 1; height <= totalBlocks; height++ {
-		issueRegularBlock(height)
-	}
+	// Continue the chain past the import so shutdown persists the last committed revision
+	// while the target import root remains unavailable after restart.
+	issueRegularBlock(targetBlockHeight + 1)
 
 	// Drain pending acceptors and confirm the import's UTXO has been consumed
 	// from live shared memory. Historical replay must not depend on it.
@@ -1728,7 +1727,29 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	_, err = vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{importedInputID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
 
-	// Verify that the target state requires reexecution to access.
+	// Restart the VM so Firewood's in-memory revisions cannot satisfy the historical lookup.
+	require.NoError(vm.Shutdown(ctx))
+	vm = nil
+
+	vmtest.ResetMetrics(tvm.Ctx)
+	restartedVM := newAtomicTestVM()
+	restartConfigJSON, err := vmtest.OverrideSchemeConfig(customrawdb.FirewoodScheme, configJSON)
+	require.NoError(err)
+	require.NoError(restartedVM.Initialize(
+		ctx,
+		tvm.Ctx,
+		tvm.DB,
+		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork])),
+		[]byte{},
+		[]byte(restartConfigJSON),
+		[]*commonEng.Fx{},
+		tvm.AppSender,
+	))
+	require.NoError(restartedVM.SetState(ctx, snow.Bootstrapping))
+	require.NoError(restartedVM.SetState(ctx, snow.NormalOp))
+	vm = restartedVM
+
+	// Verify that the target state requires reexecution to access after restart.
 	targetBlock := vm.Ethereum().BlockChain().GetBlockByNumber(uint64(targetBlockHeight))
 	targetRoot := targetBlock.Root()
 	_, err = vm.Ethereum().BlockChain().StateAt(targetRoot)
