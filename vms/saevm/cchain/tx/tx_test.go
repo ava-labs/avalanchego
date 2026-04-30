@@ -20,13 +20,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // Tests is defined at the package level to allow sharing between fuzz tests and
@@ -982,7 +981,7 @@ func TestAsOp_Errors(t *testing.T) {
 					Amount:  2,
 				}},
 			},
-			want: safemath.ErrUnderflow,
+			want: math.ErrUnderflow,
 		},
 		{
 			name: "export_burned_underflow",
@@ -998,7 +997,7 @@ func TestAsOp_Errors(t *testing.T) {
 					},
 				}},
 			},
-			want: safemath.ErrUnderflow,
+			want: math.ErrUnderflow,
 		},
 	}
 	for _, test := range tests {
