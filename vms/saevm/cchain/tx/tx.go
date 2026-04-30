@@ -50,6 +50,7 @@ type Unsigned interface {
 	asOp(avaxAssetID ids.ID) (op, error)
 }
 
+// op contains the state changes of [hook.Op]
 type op struct {
 	burn map[common.Address]hook.AccountDebit
 	mint map[common.Address]uint256.Int
