@@ -10,6 +10,9 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	// Imported for [codec.Manager] comment resolution.
+	_ "github.com/ava-labs/avalanchego/codec"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -106,10 +109,12 @@ func element[T any](d *decoder, s []T, gen func(*decoder) T) T {
 	return s[d.intn(len(s))]
 }
 
-// sliceOf generates a random slice of generated entries. The length is random,
-// but is typically small.
+// sliceOf generates a random slice of generated entries. The returned value is
+// non-nil. The length is random, but is typically small.
 func sliceOf[T any](d *decoder, gen func(*decoder) T) []T {
-	var out []T
+	// The [codec.Manager] always generates non-nil slices. To avoid nil and
+	// empty comparison issues, we also always generate non-nil slices.
+	out := []T{}
 	// [decoder.bool] returns false once the data is exhausted, so this loop
 	// will eventually terminate.
 	for d.bool() {
