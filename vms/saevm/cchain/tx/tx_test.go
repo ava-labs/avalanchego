@@ -388,7 +388,9 @@ func TestParseSlice(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := ParseSlice(test.bytes)
 			require.ErrorIs(t, err, test.wantErr, "ParseSlice()")
-			assert.Equal(t, test.want, got, "ParseSlice()")
+			if diff := cmp.Diff(test.want, got, CmpOpt()); diff != "" {
+				t.Errorf("ParseSlice() diff (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
