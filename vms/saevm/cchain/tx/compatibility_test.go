@@ -154,6 +154,8 @@ func (*asOpStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int {
 
 func (s *asOpStateDB) SetNonce(addr common.Address, nonce uint64) {
 	d := s.op.Burn[addr]
+	// The op specifies what nonce is being consumed, not the next nonce. So we
+	// need to subtract 1.
 	d.Nonce = nonce - 1
 	s.op.Burn[addr] = d
 }
