@@ -4363,6 +4363,143 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	}
 }
 
+// TestHeliconMinStakeDurationValidator verifies that the Helicon upgrade lowers
+// the primary network validator minimum staking duration.
+func TestHeliconMinStakeDurationValidator(t *testing.T) {
+	type test struct {
+		name        string
+		fork        upgradetest.Fork
+		expectedErr error
+	}
+	tests := []test{
+		{
+			name:        "pre-Helicon 12h stake rejected",
+			fork:        upgradetest.Granite,
+			expectedErr: ErrStakeTooShort,
+		},
+		{
+			name:        "post-Helicon 12h stake accepted",
+			fork:        upgradetest.Helicon,
+			expectedErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			env := newEnvironment(t, tt.fork)
+			env.ctx.Lock.Lock()
+			defer env.ctx.Lock.Unlock()
+
+			chainTime := env.state.GetTimestamp()
+			nodeID := ids.GenerateTestNodeID()
+			sk, err := localsigner.New()
+			require.NoError(err)
+			pop, err := signer.NewProofOfPossession(sk)
+			require.NoError(err)
+
+			rewardsOwner := &secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			}
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueAddPermissionlessValidatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						End:    uint64(chainTime.Add(defaultHeliconMinStakingDuration).Unix()),
+						Wght:   env.config.MinValidatorStake,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
+				pop,
+				env.ctx.AVAXAssetID,
+				rewardsOwner,
+				rewardsOwner,
+				reward.PercentDenominator,
+			)
+			require.NoError(err)
+
+			onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(err)
+
+			feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
+			_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
+			require.ErrorIs(err, tt.expectedErr)
+		})
+	}
+}
+
+// TestHeliconMinStakeDurationDelegator verifies that the Helicon upgrade lowers
+// the primary network delegator minimum staking duration.
+func TestHeliconMinStakeDurationDelegator(t *testing.T) {
+	type test struct {
+		name        string
+		fork        upgradetest.Fork
+		expectedErr error
+	}
+	tests := []test{
+		{
+			name:        "pre-Helicon 12h delegation rejected",
+			fork:        upgradetest.Granite,
+			expectedErr: ErrStakeTooShort,
+		},
+		{
+			name:        "post-Helicon 12h delegation accepted",
+			fork:        upgradetest.Helicon,
+			expectedErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			env := newEnvironment(t, tt.fork)
+			env.ctx.Lock.Lock()
+			defer env.ctx.Lock.Unlock()
+
+			chainTime := env.state.GetTimestamp()
+
+			var primaryValidator *state.Staker
+			it, err := env.state.GetCurrentStakerIterator()
+			require.NoError(err)
+			for it.Next() {
+				staker := it.Value()
+				if staker.Priority != txs.PrimaryNetworkValidatorCurrentPriority {
+					continue
+				}
+				primaryValidator = staker
+				break
+			}
+			it.Release()
+			require.NotNil(primaryValidator)
+
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueAddPermissionlessDelegatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: primaryValidator.NodeID,
+						End:    uint64(chainTime.Add(defaultHeliconMinStakingDuration).Unix()),
+						Wght:   env.config.MinDelegatorStake,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
+				env.ctx.AVAXAssetID,
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+				},
+			)
+			require.NoError(err)
+
+			onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(err)
+
+			feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
+			_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
+			require.ErrorIs(err, tt.expectedErr)
+		})
+	}
+}
+
 func must[T any](t require.TestingT) func(T, error) T {
 	return func(val T, err error) T {
 		require.NoError(t, err)
