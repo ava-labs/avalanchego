@@ -1,12 +1,16 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
 go_library(
     name = "txtest",
     testonly = True,
     srcs = ["fuzzer.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest",
-    visibility = ["//visibility:public"],
     deps = [
         "//ids",
         "//vms/components/avax",
