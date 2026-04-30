@@ -158,7 +158,7 @@ func (m *Mempool) Add(rawTx *tx.Tx) error {
 		// which is updated in hook.Points.AfterExecutingBlock, which will be
 		// done before the event on the subscription, so we may verify against a
 		// newer state, but never an older state.
-		if err := rawTx.VerifyCredentials(m.ctx.SharedMemory, rawTx.Creds); err != nil {
+		if err := rawTx.VerifyCredentials(m.ctx.SharedMemory); err != nil {
 			return fmt.Errorf("tx failed credential verification: %w", err)
 		}
 

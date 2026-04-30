@@ -46,10 +46,6 @@ type Unsigned interface {
 	// SanityCheck performs basic validation on the transaction.
 	SanityCheck(ctx context.Context, snowCtx *snow.Context) error
 
-	// VerifyCredentials verifies that the transaction is authorized by the
-	// provided credentials.
-	VerifyCredentials(sm atomic.SharedMemory, creds []Credential) error
-
 	// VerifyState verifies that the transaction is valid to be issued on the
 	// provided state.
 	VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error
@@ -73,6 +69,10 @@ type Unsigned interface {
 	// atomicRequests returns the operations that should be applied to shared
 	// memory when this transaction is executed.
 	atomicRequests(txID ids.ID) (chainID ids.ID, requests *atomic.Requests, err error)
+
+	// verifyCredentials verifies that the transaction is authorized by the
+	// provided credentials.
+	verifyCredentials(sm atomic.SharedMemory, creds []Credential) error
 }
 
 type op struct {
@@ -211,6 +211,11 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 // transaction should perform during execution.
 func (t *Tx) AtomicRequests() (ids.ID, *atomic.Requests, error) {
 	return t.Unsigned.atomicRequests(t.ID())
+}
+
+// VerifyCredentials verifies that the transaction is properly authorized.
+func (t *Tx) VerifyCredentials(sm atomic.SharedMemory) error {
+	return t.Unsigned.verifyCredentials(sm, t.Creds)
 }
 
 // Parse deserializes a [Tx] from its canonical binary format.

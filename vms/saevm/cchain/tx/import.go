@@ -167,7 +167,7 @@ var (
 	errVerifyTransferFailed    = errors.New("transfer verification failed")
 )
 
-func (i *Import) VerifyCredentials(sm atomic.SharedMemory, creds []Credential) error {
+func (i *Import) verifyCredentials(sm atomic.SharedMemory, creds []Credential) error {
 	if len(i.ImportedInputs) != len(creds) {
 		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
 	}

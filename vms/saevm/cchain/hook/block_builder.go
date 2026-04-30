@@ -138,7 +138,7 @@ func (b *blockBuilder) PotentialEndOfBlockOps(ctx context.Context, header *types
 				)
 				continue
 			}
-			if err := tx.Tx.VerifyCredentials(b.ctx.SharedMemory, tx.Tx.Creds); err != nil {
+			if err := tx.Tx.VerifyCredentials(b.ctx.SharedMemory); err != nil {
 				b.ctx.Log.Debug("tx failed credential verification",
 					zap.Stringer("txID", tx.ID),
 					zap.Error(err),
