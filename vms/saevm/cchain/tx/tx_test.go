@@ -6,6 +6,7 @@ package tx
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,12 +21,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // Tests is defined at the package level to allow sharing between fuzz tests and
@@ -968,6 +970,54 @@ func TestAsOp_Errors(t *testing.T) {
 			want: errMultipleNonces,
 		},
 		{
+			name: "import_burned_overflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: math.MaxUint64,
+						},
+					},
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 2,
+						},
+					},
+				},
+				Outs: []Output{{
+					AssetID: AVAXAssetID,
+					Amount:  1,
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "import_burned_intermediate_overflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: math.MaxUint64,
+						},
+					},
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 1,
+						},
+					},
+				},
+				Outs: []Output{{
+					AssetID: AVAXAssetID,
+					Amount:  1,
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
 			name: "import_burned_underflow",
 			tx: &Import{
 				ImportedInputs: []*avax.TransferableInput{{
@@ -981,7 +1031,55 @@ func TestAsOp_Errors(t *testing.T) {
 					Amount:  2,
 				}},
 			},
-			want: math.ErrUnderflow,
+			want: safemath.ErrUnderflow,
+		},
+		{
+			name: "export_burned_overflow",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: common.Address{0},
+						AssetID: AVAXAssetID,
+						Amount:  math.MaxUint64,
+					},
+					{
+						Address: common.Address{1},
+						AssetID: AVAXAssetID,
+						Amount:  2,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "export_burned_intermediate_overflow",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: common.Address{0},
+						AssetID: AVAXAssetID,
+						Amount:  math.MaxUint64,
+					},
+					{
+						Address: common.Address{1},
+						AssetID: AVAXAssetID,
+						Amount:  1,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				}},
+			},
+			want: safemath.ErrOverflow,
 		},
 		{
 			name: "export_burned_underflow",
@@ -997,7 +1095,7 @@ func TestAsOp_Errors(t *testing.T) {
 					},
 				}},
 			},
-			want: math.ErrUnderflow,
+			want: safemath.ErrUnderflow,
 		},
 	}
 	for _, test := range tests {
