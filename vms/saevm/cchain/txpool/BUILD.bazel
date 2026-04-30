@@ -1,5 +1,10 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
 go_library(
     name = "txpool",
     srcs = [
@@ -8,7 +13,6 @@ go_library(
         "txs.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
@@ -31,8 +35,3 @@ go_library(
         "@org_uber_go_zap//:zap",
     ],
 )
-
-package(default_visibility = [
-    "//vms/saevm/cchain:__subpackages__",
-    "//vms/saevm/cchain:external_consumers",
-])

@@ -1,5 +1,10 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
 go_library(
     name = "api",
     srcs = [
@@ -7,7 +12,6 @@ go_library(
         "status.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/api",
-    visibility = ["//visibility:public"],
     deps = [
         "//api",
         "//database",
@@ -28,8 +32,3 @@ go_library(
         "@org_uber_go_zap//:zap",
     ],
 )
-
-package(default_visibility = [
-    "//vms/saevm/cchain:__subpackages__",
-    "//vms/saevm/cchain:external_consumers",
-])

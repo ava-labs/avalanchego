@@ -1,5 +1,10 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
 go_library(
     name = "state",
     srcs = [
@@ -10,7 +15,6 @@ go_library(
     ],
     embedsrcs = ["bonus_blocks.json"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/state",
-    visibility = ["//visibility:public"],
     deps = [
         "//database",
         "//database/prefixdb",
@@ -29,8 +33,3 @@ go_library(
         "@com_github_ava_labs_libevm//triedb",
     ],
 )
-
-package(default_visibility = [
-    "//vms/saevm/cchain:__subpackages__",
-    "//vms/saevm/cchain:external_consumers",
-])

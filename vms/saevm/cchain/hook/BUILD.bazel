@@ -1,5 +1,10 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
 go_library(
     name = "hook",
     srcs = [
@@ -8,7 +13,6 @@ go_library(
         "txs.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/hook",
-    visibility = ["//visibility:public"],
     deps = [
         "//chains/atomic",
         "//database",
@@ -43,8 +47,3 @@ go_library(
         "@org_uber_go_zap//:zap",
     ],
 )
-
-package(default_visibility = [
-    "//vms/saevm/cchain:__subpackages__",
-    "//vms/saevm/cchain:external_consumers",
-])

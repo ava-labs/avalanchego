@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
 go_library(
     name = "warp",
     srcs = [
@@ -10,7 +15,6 @@ go_library(
         "verifier.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp",
-    visibility = ["//visibility:public"],
     deps = [
         "//cache/lru",
         "//database",
@@ -62,8 +66,3 @@ go_test(
         "@com_github_stretchr_testify//require",
     ],
 )
-
-package(default_visibility = [
-    "//vms/saevm/cchain:__subpackages__",
-    "//vms/saevm/cchain:external_consumers",
-])
