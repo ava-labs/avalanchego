@@ -938,14 +938,14 @@ func TestGetReceipts(t *testing.T) {
 		{
 			ids: []rpc.BlockNumberOrHash{
 				rpc.BlockNumberOrHashWithHash(onDisk.Hash(), true),
-				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //#nosec G115 -- Test values
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //#nosec G115 -- Won't overflow
 			},
 			want: wantOnDisk,
 		},
 		{
 			ids: []rpc.BlockNumberOrHash{
 				rpc.BlockNumberOrHashWithHash(settled.Hash(), true),
-				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //#nosec G115 -- Test values
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //#nosec G115 -- Won't overflow
 				rpc.BlockNumberOrHashWithNumber(rpc.SafeBlockNumber),
 				rpc.BlockNumberOrHashWithNumber(rpc.FinalizedBlockNumber),
 			},
@@ -954,7 +954,7 @@ func TestGetReceipts(t *testing.T) {
 		{
 			ids: []rpc.BlockNumberOrHash{
 				rpc.BlockNumberOrHashWithHash(unsettled.Hash(), true),
-				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //#nosec G115 -- Test values
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //#nosec G115 -- Won't overflow
 				rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber),
 			},
 			want: wantUnsettled,
