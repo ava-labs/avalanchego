@@ -43,6 +43,7 @@ var (
 	numWorkersArg      int
 	numInFlightArg     int
 	targetTPSArg       int
+	wsURIArg           string
 )
 
 func init() {
@@ -80,6 +81,12 @@ func init() {
 		0,
 		"global cap on transactions per second across all wallets (0 = unlimited)",
 	)
+	flag.StringVar(
+		&wsURIArg,
+		"ws-uri",
+		"",
+		"if set, send all traffic to this WebSocket URI instead of bootstrapping a tmpnet network (operator is responsible for funding the generated keys on the target chain)",
+	)
 
 	flag.Parse()
 }
@@ -109,11 +116,7 @@ func main() {
 		PrimaryChainConfigs: primaryChainConfigs,
 	}
 
-	e2e.NewTestEnvironment(tc, flagVars, network)
-
 	ctx := tests.DefaultNotifyContext(0, tc.DeferCleanup)
-	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
-	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
 	metricsServer, err := tests.NewPrometheusServer(registry)
@@ -122,18 +125,30 @@ func main() {
 		require.NoError(metricsServer.Stop())
 	})
 
-	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
-		Targets: []string{metricsServer.Address()},
-		Labels:  network.GetMonitoringLabels(),
-	}, false)
-	require.NoError(err, "failed to generate monitoring config file")
+	var wsURIs []string
+	if wsURIArg != "" {
+		// External-endpoint mode: skip tmpnet bootstrap. The operator is
+		// responsible for funding `keys` on the target chain out of band.
+		wsURIs = []string{wsURIArg}
+	} else {
+		e2e.NewTestEnvironment(tc, flagVars, network)
 
-	tc.DeferCleanup(func() {
-		require.NoError(
-			os.Remove(monitoringConfigFilePath),
-			"failed †o remove monitoring config file",
-		)
-	})
+		wsURIs, err = tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
+		require.NoError(err)
+
+		monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
+			Targets: []string{metricsServer.Address()},
+			Labels:  network.GetMonitoringLabels(),
+		}, false)
+		require.NoError(err, "failed to generate monitoring config file")
+
+		tc.DeferCleanup(func() {
+			require.NoError(
+				os.Remove(monitoringConfigFilePath),
+				"failed †o remove monitoring config file",
+			)
+		})
+	}
 
 	workers := make([]load.Worker, len(keys))
 	for i := range len(keys) {
