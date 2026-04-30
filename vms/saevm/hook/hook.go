@@ -87,6 +87,12 @@ type Points interface {
 	// reads. The trade-off is strict-as-of-last-settled enforcement (a few seconds of leakage after a role
 	// removal) instead of strict-as-of-parent.
 	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
+	// RequiresTransactionAdmissionCheck reports whether
+	// [CanExecuteTransaction] could reject any tx under `rules`. MUST be a
+	// cheap, rules-only check used to skip sender recovery and state opening
+	// when no relevant precompile is active. Over-reporting (returning true)
+	// is safe; under-reporting is not.
+	RequiresTransactionAdmissionCheck(rules params.Rules) bool
 	// BeforeExecutingBlock is called immediately prior to executing the block.
 	// `parent` is the header of the block whose post-execution state `state`
 	// is rooted at; it provides `parent.Time` for upgrade-activation windowing

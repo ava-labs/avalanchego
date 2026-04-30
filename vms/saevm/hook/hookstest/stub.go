@@ -37,6 +37,7 @@ type Stub struct {
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	CanExecuteTransactionFn func(params.Rules, common.Address, *common.Address, libevm.StateReader) error
+	RequiresAdmissionCheck  func(params.Rules) bool
 	BeforeExecutingBlockFn  func(params.Rules, *types.Header, *state.StateDB, *types.Block) error
 	GasPriceConfig          gastime.GasPriceConfig
 }
@@ -239,6 +240,13 @@ func (s *Stub) CanExecuteTransaction(rules params.Rules, from common.Address, to
 		return fn(rules, from, to, sr)
 	}
 	return nil
+}
+
+func (s *Stub) RequiresTransactionAdmissionCheck(rules params.Rules) bool {
+	if fn := s.RequiresAdmissionCheck; fn != nil {
+		return fn(rules)
+	}
+	return false
 }
 
 // BeforeExecutingBlock proxies to [Stub.BeforeExecutingBlockFn] if non-nil,

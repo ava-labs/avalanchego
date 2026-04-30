@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	subnetevmcore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -145,6 +146,11 @@ func (*Points) EndOfBlockOps(*types.Block) ([]saehook.Op, error) {
 func (*Points) CanExecuteTransaction(rules ethparams.Rules, from common.Address, _ *common.Address, state libevm.StateReader) error {
 	extra := subnetevmparams.GetRulesExtra(rules)
 	return subnetevmparams.RulesExtra(*extra).EnforceTxAllowList(from, state)
+}
+
+func (*Points) RequiresTransactionAdmissionCheck(rules ethparams.Rules) bool {
+	extra := subnetevmparams.GetRulesExtra(rules)
+	return extra.IsPrecompileEnabled(txallowlist.ContractAddress)
 }
 
 // BeforeExecutingBlock activates / deactivates timestamp-scheduled

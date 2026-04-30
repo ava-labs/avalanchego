@@ -167,6 +167,10 @@ func (*Points) CanExecuteTransaction(ethparams.Rules, common.Address, *common.Ad
 	return nil
 }
 
+func (*Points) RequiresTransactionAdmissionCheck(ethparams.Rules) bool {
+	return false
+}
+
 func (p *Points) BeforeExecutingBlock(ethparams.Rules, *types.Header, *state.StateDB, *types.Block) error {
 	return nil
 }

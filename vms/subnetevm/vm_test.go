@@ -31,6 +31,7 @@ import (
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/ids"
@@ -261,16 +262,22 @@ func (s *SUT) advanceTime(t *testing.T, d time.Duration) {
 func (s *SUT) sendTransferTx(t *testing.T, from int, to int, value *big.Int) *types.Transaction {
 	t.Helper()
 
+	tx := s.signTransferTx(t, from, to, value)
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
+	return tx
+}
+
+func (s *SUT) signTransferTx(t *testing.T, from int, to int, value *big.Int) *types.Transaction {
+	t.Helper()
+
 	addresses := s.ethWallet.Addresses()
 	toAddress := addresses[to]
-	tx := s.ethWallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
+	return s.ethWallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
 		To:        &toAddress,
 		Gas:       21_000,
 		GasFeeCap: big.NewInt(225 * subnetevmparams.GWei),
 		Value:     value,
 	})
-	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
-	return tx
 }
 
 func (s *SUT) buildAndAcceptBlock(t *testing.T) *blocks.Block {
@@ -289,11 +296,6 @@ func (s *SUT) fetchTxAllowListRole(t *testing.T, address common.Address, blockNu
 	return txallowlist.GetTxAllowListStatus(stateDB, address)
 }
 
-// isPrecompileEnabledAtLatest reports whether `precompile` is active at
-// `now()` against the running VM's chain config. It walks the configured
-// `PrecompileUpgrades` (genesis + upgradeBytes) rather than reading state, so
-// it directly reflects whether the precompile is *enabled* (vs. simply having
-// no roles set in state).
 func (s *SUT) isPrecompileEnabledAtLatest(precompile common.Address) bool {
 	chainConfig := s.vm.GethRPCBackends().ChainConfig()
 	timestamp := uint64(s.now.Unix())
@@ -374,11 +376,18 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	require.Equal(t, allowlist.AdminRole, sut.fetchTxAllowListRole(t, admin, rpc.FinalizedBlockNumber))
 	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.FinalizedBlockNumber))
 
-	// (3) Worst-case admission blocks the non-admin sender. We submit two
-	// txs in a single block: one funds `nonAdmin` (so it can pay fees in
-	// later steps), the other is from `nonAdmin` and must be dropped.
+	// (3) Mempool ingress (last-executed) rejects the non-admin sender at
+	// RPC; worst-case admission (last-settled) excludes it from blocks.
+	// Fund `nonAdmin` so it can pay fees later.
 	fundNonAdmin := sut.sendTransferTx(t, adminIdx, nonAdminIdx, fundValue)
-	droppedTx := sut.sendTransferTx(t, nonAdminIdx, adminIdx, common.Big1)
+	droppedTx := sut.signTransferTx(t, nonAdminIdx, adminIdx, common.Big1)
+	// JSON-RPC stringifies the error, so the sentinel chain is lost; match
+	// on its message instead. See e.g. txallowlist/simulated_test.go.
+	require.ErrorContains(t, //nolint:forbidigo // upstream error wrapped as string
+		sut.client.SendTransaction(sut.ctx, droppedTx),
+		vmerrors.ErrSenderAddressNotAllowListed.Error(),
+		"non-admin tx must be rejected at mempool ingress while allowlist is enabled",
+	)
 	block := sut.buildAndAcceptBlock(t)
 	require.Len(t, block.Transactions(), 1, "non-admin tx must be excluded while allowlist is enabled")
 	require.Equal(t, fundNonAdmin.Hash(), block.Transactions()[0].Hash())
@@ -402,13 +411,14 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 		"finalized state must still show admin role until disable settles")
 	require.Equal(t, allowlist.NoRole, sut.fetchTxAllowListRole(t, nonAdmin, rpc.FinalizedBlockNumber))
 
-	// (3) Worst-case admission validates against the last-settled state, so
-	// `nonAdmin` is still rejected until the activation block becomes the
-	// settled base. Advance past the settlement window and the previously-
-	// blocked tx is now admitted.
+	// (3) Ingress (last-executed) accepts `droppedTx` immediately on
+	// re-submit; worst-case admission (last-settled) only includes it after
+	// the disable activation settles.
+	require.NoError(t, sut.client.SendTransaction(sut.ctx, droppedTx),
+		"previously-blocked tx must be admitted at mempool ingress once disable executes")
 	sut.advanceTime(t, saeparams.Tau+time.Second)
 	block = sut.buildAndAcceptBlock(t)
-	require.Len(t, block.Transactions(), 1, "previously-blocked tx must be admitted once disable settles")
+	require.Len(t, block.Transactions(), 1, "previously-blocked tx must be included once disable settles")
 	require.Equal(t, droppedTx.Hash(), block.Transactions()[0].Hash())
 
 	// (2) After settlement, finalized catches up with latest: both observe
