@@ -932,19 +932,6 @@ func TestGetReceipts(t *testing.T) {
 
 	var tests []rpcTest
 	for _, tc := range []struct {
-		id   rpc.BlockNumberOrHash
-		want []*types.Receipt
-	}{
-		{
-			id:   rpc.BlockNumberOrHashWithHash(onDisk.Hash(), true),
-			want: wantOnDisk,
-		},
-		{
-			id:   rpc.BlockNumberOrHashWithHash(settled.Hash(), true),
-			want: wantSettled,
-		},
-		{
-	for _, tc := range []struct {
 		ids  []rpc.BlockNumberOrHash
 		want []*types.Receipt
 	}{
