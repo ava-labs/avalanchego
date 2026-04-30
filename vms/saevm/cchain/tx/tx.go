@@ -126,6 +126,8 @@ const (
 )
 
 func gasUsed(t Unsigned) (gas.Gas, error) {
+	// We MUST provide a pointer to t so that the returned size includes the
+	// type ID.
 	numBytes, err := c.Size(codecVersion, &t)
 	if err != nil {
 		return 0, err
