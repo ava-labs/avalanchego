@@ -27,15 +27,15 @@ var (
 )
 
 const (
-	canoto__Settled__Height     = 1
-	canoto__Settled__GasSeconds = 2
-	canoto__Settled__GasFrac    = 3
-	canoto__Settled__Excess     = 4
+	canoto__Settled__Height       = 1
+	canoto__Settled__GasUnix      = 2
+	canoto__Settled__GasNumerator = 3
+	canoto__Settled__Excess       = 4
 
-	canoto__Settled__Height__tag     = "\x08" // canoto.Tag(canoto__Settled__Height, canoto.Varint)
-	canoto__Settled__GasSeconds__tag = "\x10" // canoto.Tag(canoto__Settled__GasSeconds, canoto.Varint)
-	canoto__Settled__GasFrac__tag    = "\x18" // canoto.Tag(canoto__Settled__GasFrac, canoto.Varint)
-	canoto__Settled__Excess__tag     = "\x20" // canoto.Tag(canoto__Settled__Excess, canoto.Varint)
+	canoto__Settled__Height__tag       = "\x08" // canoto.Tag(canoto__Settled__Height, canoto.Varint)
+	canoto__Settled__GasUnix__tag      = "\x10" // canoto.Tag(canoto__Settled__GasUnix, canoto.Varint)
+	canoto__Settled__GasNumerator__tag = "\x18" // canoto.Tag(canoto__Settled__GasNumerator, canoto.Varint)
+	canoto__Settled__Excess__tag       = "\x20" // canoto.Tag(canoto__Settled__Excess, canoto.Varint)
 )
 
 type canotoData_Settled struct {
@@ -55,14 +55,14 @@ func (*Settled) CanotoSpec(...reflect.Type) *canoto.Spec {
 				TypeUint:    canoto.SizeOf(zero.Height),
 			},
 			{
-				FieldNumber: canoto__Settled__GasSeconds,
-				Name:        "GasSeconds",
+				FieldNumber: canoto__Settled__GasUnix,
+				Name:        "GasUnix",
 				OneOf:       "",
 				TypeUint:    canoto.SizeOf(zero.GasUnix),
 			},
 			{
-				FieldNumber: canoto__Settled__GasFrac,
-				Name:        "GasFrac",
+				FieldNumber: canoto__Settled__GasNumerator,
+				Name:        "GasNumerator",
 				OneOf:       "",
 				TypeUint:    canoto.SizeOf(zero.GasNumerator),
 			},
@@ -121,7 +121,7 @@ func (c *Settled) UnmarshalCanotoFrom(r canoto.Reader) error {
 			if canoto.IsZero(c.Height) {
 				return canoto.ErrZeroValue
 			}
-		case canoto__Settled__GasSeconds:
+		case canoto__Settled__GasUnix:
 			if wireType != canoto.Varint {
 				return canoto.ErrUnexpectedWireType
 			}
@@ -132,7 +132,7 @@ func (c *Settled) UnmarshalCanotoFrom(r canoto.Reader) error {
 			if canoto.IsZero(c.GasUnix) {
 				return canoto.ErrZeroValue
 			}
-		case canoto__Settled__GasFrac:
+		case canoto__Settled__GasNumerator:
 			if wireType != canoto.Varint {
 				return canoto.ErrUnexpectedWireType
 			}
@@ -184,10 +184,10 @@ func (c *Settled) CalculateCanotoCache() {
 		size += uint64(len(canoto__Settled__Height__tag)) + canoto.SizeUint(c.Height)
 	}
 	if !canoto.IsZero(c.GasUnix) {
-		size += uint64(len(canoto__Settled__GasSeconds__tag)) + canoto.SizeUint(c.GasUnix)
+		size += uint64(len(canoto__Settled__GasUnix__tag)) + canoto.SizeUint(c.GasUnix)
 	}
 	if !canoto.IsZero(c.GasNumerator) {
-		size += uint64(len(canoto__Settled__GasFrac__tag)) + canoto.SizeUint(c.GasNumerator)
+		size += uint64(len(canoto__Settled__GasNumerator__tag)) + canoto.SizeUint(c.GasNumerator)
 	}
 	if !canoto.IsZero(c.Excess) {
 		size += uint64(len(canoto__Settled__Excess__tag)) + canoto.SizeUint(c.Excess)
@@ -235,11 +235,11 @@ func (c *Settled) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 		canoto.AppendUint(&w, c.Height)
 	}
 	if !canoto.IsZero(c.GasUnix) {
-		canoto.Append(&w, canoto__Settled__GasSeconds__tag)
+		canoto.Append(&w, canoto__Settled__GasUnix__tag)
 		canoto.AppendUint(&w, c.GasUnix)
 	}
 	if !canoto.IsZero(c.GasNumerator) {
-		canoto.Append(&w, canoto__Settled__GasFrac__tag)
+		canoto.Append(&w, canoto__Settled__GasNumerator__tag)
 		canoto.AppendUint(&w, c.GasNumerator)
 	}
 	if !canoto.IsZero(c.Excess) {

@@ -13,6 +13,7 @@ go_library(
         "//utils/logging",
         "//vms/components/gas",
         "//vms/saevm/blocks",
+        "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",
         "//vms/saevm/saetest",
         "//vms/saevm/types",

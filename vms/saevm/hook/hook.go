@@ -210,8 +210,6 @@ func MinimumGasConsumption(txLimit uint64) uint64 {
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
 // Settled includes information about the block that is settled by a header.
-//
-//nolint:revive // struct-tag: canoto allows unexported fields
 
 type Settled struct {
 	Height       uint64  `canoto:"uint,1"`
@@ -228,8 +226,8 @@ type Settled struct {
 // TODO(alarso16): This should be moved to the state sync logic once implemented.
 func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
 	target, cfg := h.GasConfigAfter(settled)
-	stuff := h.Settled(settled)
+	s := h.Settled(settler)
 
-	pt := proxytime.New(stuff.GasUnix, stuff.GasNumerator, gastime.SafeRateOfTarget(target))
-	return gastime.FromProxyTime(pt, target, stuff.Excess, cfg)
+	pt := proxytime.New(s.GasUnix, s.GasNumerator, gastime.SafeRateOfTarget(target))
+	return gastime.FromProxyTime(pt, target, s.Excess, cfg)
 }
