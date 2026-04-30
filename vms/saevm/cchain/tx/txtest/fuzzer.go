@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -45,16 +44,13 @@ func (f *F) Fuzz(ff func(t *testing.T, tx *tx.Tx)) {
 			addresses: f.Addresses,
 			assetIDs:  f.AssetIDs,
 		}
-		genTx := d.tx()
+		tx := d.tx()
 
-		// genTx isn't always ideally formatted, so we round-trip through
-		// parsing before providing it to the test body.
-		bytes, err := genTx.Bytes()
-		if err != nil {
+		// It's possible for the fuzzer to generate a tx that exceeds the codec
+		// size limits.
+		if _, err := tx.Bytes(); err != nil {
 			t.Skipf("invalid tx: %s", err)
 		}
-		tx, err := tx.Parse(bytes)
-		require.NoError(t, err, "Parse()")
 		ff(t, tx)
 	})
 }

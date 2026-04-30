@@ -35,6 +35,19 @@ func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
 	fuzzer.Fuzz(ff)
 }
 
+func FuzzParseRoundTrip(f *testing.F) {
+	fuzz(f, func(t *testing.T, want *Tx) {
+		bytes, err := want.Bytes()
+		require.NoErrorf(t, err, "%T.Bytes()", want)
+
+		got, err := Parse(bytes)
+		require.NoError(t, err, "Parse()")
+		if diff := cmp.Diff(want, got, CmpOpt()); diff != "" {
+			t.Errorf("Parse() diff (-want +got):\n%s", diff)
+		}
+	})
+}
+
 func FuzzJSONCompatibility(f *testing.F) {
 	fuzz(f, func(t *testing.T, newTx *Tx) {
 		oldTx := ToOldTx(t, newTx)
