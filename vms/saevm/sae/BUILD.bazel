@@ -2,6 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
 # gazelle:exclude accept_block_test.go
+# gazelle:exclude worstcase_test.go
 
 go_library(
     name = "sae",
@@ -77,7 +78,6 @@ go_test(
         "rpc_test.go",
         "tx_test.go",
         "vm_test.go",
-        "worstcase_test.go",
     ],
     embed = [":sae"],
     deps = [
@@ -104,7 +104,6 @@ go_test(
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",
-        "//vms/saevm/intmath",
         "//vms/saevm/params",
         "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
@@ -112,7 +111,6 @@ go_test(
         "//vms/saevm/saetest/escrow",
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/types",
-        "//vms/saevm/worstcase",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
@@ -146,7 +144,7 @@ go_test(
 )
 
 go_test(
-    name = "accept_block_test",
+    name = "flaky_tests",
     srcs = [
         "accept_block_test.go",
         "always_test.go",
@@ -161,9 +159,9 @@ go_test(
         "vm_test.go",
         "worstcase_test.go",
     ],
-    args = ["-test.run=TestAcceptBlock"],
+    args = ["-test.run=TestAcceptBlock|TestWorstCase"],
     embed = [":sae"],
-    env = {"SAEVM_TEST_ACCEPT_BLOCK": "1"},
+    env = {"SAEVM_TEST_FLAKY": "1"},
     flaky = True,
     deps = [
         "//database",

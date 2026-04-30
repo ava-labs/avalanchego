@@ -534,7 +534,7 @@ func TestEthGetters(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withDebugAPI())
+	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt, withDebugAPI())
 	t.Cleanup(unblock)
 
 	t.Run("unknown_hashes", func(t *testing.T) {
@@ -849,27 +849,45 @@ func TestGetReceipts(t *testing.T) {
 
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withDebugAPI())
+	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt, withDebugAPI())
 	t.Cleanup(unblock)
 
 	var (
 		txs  []*types.Transaction
 		want []*types.Receipt
 	)
-	for range 6 {
-		tx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+	// The mempool cannot be relied on to mark a transaction as pending
+	// if there is already a pending transaction with the same account.
+	// To avoid this, we use two different accounts and price the
+	// transactions such that the builder will maintain ordering.
+	for range 3 {
+		tx1 := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &zeroAddr,
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(2), // ensure this tx is first in block
+		})
+		tx2 := sut.wallet.SetNonceAndSign(t, 1, &types.LegacyTx{
 			To:       &zeroAddr,
 			Gas:      params.TxGas,
 			GasPrice: big.NewInt(1),
 		})
-		txs = append(txs, tx)
-		want = append(want, &types.Receipt{
-			TxHash:            tx.Hash(),
-			Status:            types.ReceiptStatusSuccessful,
-			GasUsed:           params.TxGas,
-			EffectiveGasPrice: big.NewInt(1),
-			Logs:              []*types.Log{},
-		})
+		txs = append(txs, tx1, tx2)
+		want = append(want, []*types.Receipt{
+			{
+				TxHash:            tx1.Hash(),
+				Status:            types.ReceiptStatusSuccessful,
+				GasUsed:           params.TxGas,
+				EffectiveGasPrice: big.NewInt(2),
+				Logs:              []*types.Log{},
+			},
+			{
+				TxHash:            tx2.Hash(),
+				Status:            types.ReceiptStatusSuccessful,
+				GasUsed:           params.TxGas,
+				EffectiveGasPrice: big.NewInt(1),
+				Logs:              []*types.Log{},
+			},
+		}...)
 	}
 
 	slice := func(t *testing.T, from, to int) (*blocks.Block, []*types.Receipt) {
@@ -894,7 +912,7 @@ func TestGetReceipts(t *testing.T) {
 	settled, wantSettled := slice(t, 2, 4)
 	vmTime.advanceToSettle(ctx, t, settled)
 	unsettled, wantUnsettled := slice(t, 4, 6)
-	require.NoError(t, unsettled.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
+	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
 
 	pending := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 		To:       &blockingPrecompile,
