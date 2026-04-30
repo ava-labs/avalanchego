@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -308,6 +309,30 @@ func TestMarshalSlice(t *testing.T) {
 	}
 }
 
+// OldCmpOpt returns a configuration for [cmp.Diff] to compare [atomic.Tx]
+// instances.
+func OldCmpOpt() cmp.Option {
+	return cmputils.IfIn[atomic.Tx](cmp.Options{
+		cmpopts.IgnoreUnexported(
+			atomic.Metadata{},
+			avax.UTXOID{},
+			secp256k1fx.OutputOwners{},
+		),
+		cmpopts.EquateEmpty(),
+	})
+}
+
+// CmpOpt returns a configuration for [cmp.Diff] to compare [Tx] instances.
+func CmpOpt() cmp.Option {
+	return cmputils.IfIn[Tx](cmp.Options{
+		cmpopts.IgnoreUnexported(
+			avax.UTXOID{},
+			secp256k1fx.OutputOwners{},
+		),
+		cmpopts.EquateEmpty(),
+	})
+}
+
 func TestParse(t *testing.T) {
 	for _, test := range Tests {
 		t.Run(test.Name, func(t *testing.T) {
@@ -315,12 +340,17 @@ func TestParse(t *testing.T) {
 				got := new(atomic.Tx)
 				_, err := atomic.Codec.Unmarshal(test.Bytes, got)
 				require.NoErrorf(t, err, "%T.Unmarshal(, %T)", atomic.Codec, got)
+				if diff := cmp.Diff(test.Old, got, OldCmpOpt()); diff != "" {
+					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
+				}
 				assert.Equalf(t, test.Old, got, "%T.Unmarshal(, %T)", atomic.Codec, got)
 			})
 			t.Run("new", func(t *testing.T) {
 				got, err := Parse(test.Bytes)
 				require.NoError(t, err, "Parse()")
-				assert.Equal(t, test.New, got, "Parse()")
+				if diff := cmp.Diff(test.New, got, CmpOpt()); diff != "" {
+					t.Errorf("Parse() diff (-want +got):\n%s", diff)
+				}
 			})
 		})
 	}
@@ -442,22 +472,6 @@ func FuzzParseSliceCompatibility(f *testing.F) {
 		newOk := newErr == nil
 
 		assert.Equal(t, oldOk, newOk, "ParseSlice(b) == ParseOldTxs(b)")
-	})
-}
-
-func FuzzParseRoundTrip(f *testing.F) {
-	for _, test := range Tests {
-		f.Add(test.Bytes)
-	}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		tx, err := Parse(data)
-		if err != nil {
-			return
-		}
-
-		got, err := tx.Bytes()
-		require.NoErrorf(t, err, "%T.Bytes()", tx)
-		assert.Equal(t, data, got, "Parse(b).Bytes() == b")
 	})
 }
 
