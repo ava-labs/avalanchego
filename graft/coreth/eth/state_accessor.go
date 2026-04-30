@@ -339,7 +339,7 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 
 		_, _, _, err := eth.blockchain.Processor().Process(nextBlock, current, cache, vm.Config{})
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to process block %d: %w", next, err)
+			return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
 		}
 
 		root := cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
