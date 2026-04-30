@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -284,6 +286,87 @@ func (s *SUT) buildAndAcceptBlock(t *testing.T) *blocks.Block {
 	return built
 }
 
+// TestStateUpgradeAppliedAtActivationSAE exercises the `StateUpgrades` arm of
+// `BeforeExecutingBlock` -> `subnetevmcore.ApplyUpgrades`.
+//
+// It schedules a single `extras.StateUpgrade` at `now + Tau` that:
+//   - bumps a known account's balance, and
+//   - writes a deterministic value to one of its storage slots.
+//
+// The deterministic clock is then advanced past activation; the next block
+// fires `BeforeExecutingBlock`, applies the upgrade, and we assert both
+// effects via `client.BalanceAt` / `client.StorageAt` at `LatestBlockNumber`.
+func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
+	const (
+		fromIdx = 0
+		toIdx   = 1
+	)
+
+	var (
+		now            = time.Unix(saeparams.TauSeconds, 0).Add(saeparams.Tau)
+		activationTime = now.Add(saeparams.Tau)
+		activationTS   = uint64(activationTime.Unix())
+
+		// `target` is intentionally NOT one of the funded keychain accounts;
+		// it starts with zero balance and empty storage, so the upgrade's
+		// effects are unambiguous (no overflow risk, no interference from
+		// the trigger tx).
+		target       = common.HexToAddress("0x00000000000000000000000000000000DeadBeef")
+		balanceBump  = big.NewInt(123_456_789)
+		storageSlot  = common.HexToHash("0x01")
+		storageValue = common.HexToHash("0xcafe")
+	)
+
+	sut := newSUT(
+		t,
+		withFork(upgradetest.Helicon),
+		withNumAccounts(2),
+		withNow(&now),
+		withUpgradeConfig(func(_ []common.Address) []byte {
+			return mustMarshalJSON(t, &extras.UpgradeConfig{
+				StateUpgrades: []extras.StateUpgrade{
+					{
+						BlockTimestamp: &activationTS,
+						StateUpgradeAccounts: map[common.Address]extras.StateUpgradeAccount{
+							target: {
+								BalanceChange: (*math.HexOrDecimal256)(balanceBump),
+								Storage:       map[common.Hash]common.Hash{storageSlot: storageValue},
+							},
+						},
+					},
+				},
+			})
+		}),
+	)
+
+	// Pre-activation: target is empty (no balance, no storage).
+	preBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
+	require.NoError(t, err)
+	require.Zero(t, preBalance.Sign(), "target balance must be 0 before activation")
+
+	preStorage, err := sut.client.StorageAt(sut.ctx, target, storageSlot, nil)
+	require.NoError(t, err)
+	require.Equal(t, common.Hash{}.Bytes(), preStorage, "storage slot must be empty before activation")
+
+	// Activation block: SAE block builders only fire on `PendingTxs`, so we
+	// piggy-back the activation on a trivial keychain-internal transfer.
+	// `BeforeExecutingBlock` runs the StateUpgrade BEFORE the tx executes,
+	// but `target` is not the tx recipient, so the upgrade's effects are
+	// observable in isolation.
+	sut.setTime(t, activationTime)
+	_ = sut.sendTransferTx(t, fromIdx, toIdx, common.Big1)
+	_ = sut.buildAndAcceptBlock(t)
+
+	// Post-activation: balance + storage reflect the StateUpgrade exactly.
+	postBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
+	require.NoError(t, err)
+	require.Zerof(t, postBalance.Cmp(balanceBump),
+		"target balance must reflect StateUpgrade balance bump (want=%s got=%s)", balanceBump, postBalance)
+
+	postStorage, err := sut.client.StorageAt(sut.ctx, target, storageSlot, nil)
+	require.NoError(t, err)
+	require.Equal(t, storageValue.Bytes(), postStorage, "storage slot must reflect the StateUpgrade")
+}
 
 func mustMarshalJSON(t *testing.T, v interface{}) []byte {
 	t.Helper()

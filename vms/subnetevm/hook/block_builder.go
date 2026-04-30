@@ -95,6 +95,10 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			ParentBeaconRoot: &common.Hash{},
 		},
 		&customtypes.HeaderExtra{
+			// BlockGasCost is preserved in the header for layout parity with
+			// legacy subnet-evm headers, but is not consumed for any
+			// decision-making in SAE (ACP-226 superseded its use). It is
+			// always stamped to zero by the SAE block builder.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: utils.PointerTo[uint64](nowMS),
 			MinDelayExcess:   &mde,
