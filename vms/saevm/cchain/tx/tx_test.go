@@ -6,6 +6,7 @@ package tx
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"math/big"
 	"os"
 	"testing"
@@ -158,7 +159,7 @@ var (
 				ID:  ids.FromStringOrPanic("h34BPNmYApCbW8buVWAtzu1KtjTFmyMhiRQQnAqPqwCqQsB7f"),
 				Gas: 11230,
 				Mint: map[common.Address]uint256.Int{
-					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): *uint256.NewInt(50_000_000 * _x2cRate),
+					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): scaleAVAX(50_000_000),
 				},
 			},
 			AtomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
@@ -271,8 +272,8 @@ var (
 				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 11230),
 				Burn: map[common.Address]hook.AccountDebit{
 					common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"): {
-						Amount:     *uint256.NewInt(1_000_001 * _x2cRate),
-						MinBalance: *uint256.NewInt(1_000_001 * _x2cRate),
+						Amount:     scaleAVAX(1_000_001),
+						MinBalance: scaleAVAX(1_000_001),
 					},
 				},
 			},
@@ -492,7 +493,7 @@ var (
 				ID:  ids.FromStringOrPanic("2Av7bXLRwxiQhbT9EcQd8KRM3Lz6VkpTqf3Y1AT5peHZ4YAohS"),
 				Gas: 13526,
 				Mint: map[common.Address]uint256.Int{
-					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): *uint256.NewInt(597_000_000 * _x2cRate),
+					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): scaleAVAX(597_000_000),
 				},
 			},
 			AtomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
@@ -561,8 +562,8 @@ var (
 				Burn: map[common.Address]hook.AccountDebit{
 					{}: {
 						Nonce:      5,
-						Amount:     *uint256.NewInt(1_000_000 * _x2cRate),
-						MinBalance: *uint256.NewInt(1_000_000 * _x2cRate),
+						Amount:     scaleAVAX(1_000_000),
+						MinBalance: scaleAVAX(1_000_000),
 					},
 				},
 			},
@@ -634,8 +635,8 @@ var (
 					},
 					{2}: {
 						Nonce:      7,
-						Amount:     *uint256.NewInt(1_000_000 * _x2cRate),
-						MinBalance: *uint256.NewInt(1_000_000 * _x2cRate),
+						Amount:     scaleAVAX(1_000_000),
+						MinBalance: scaleAVAX(1_000_000),
 					},
 				},
 			},
@@ -1019,6 +1020,54 @@ func TestAsOp_Errors(t *testing.T) {
 			want: errMultipleNonces,
 		},
 		{
+			name: "import_burned_overflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: math.MaxUint64,
+						},
+					},
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 2,
+						},
+					},
+				},
+				Outs: []Output{{
+					AssetID: AVAXAssetID,
+					Amount:  1,
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "import_burned_intermediate_overflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: math.MaxUint64,
+						},
+					},
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 1,
+						},
+					},
+				},
+				Outs: []Output{{
+					AssetID: AVAXAssetID,
+					Amount:  1,
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
 			name: "import_burned_underflow",
 			tx: &Import{
 				ImportedInputs: []*avax.TransferableInput{{
@@ -1033,6 +1082,54 @@ func TestAsOp_Errors(t *testing.T) {
 				}},
 			},
 			want: safemath.ErrUnderflow,
+		},
+		{
+			name: "export_burned_overflow",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: common.Address{0},
+						AssetID: AVAXAssetID,
+						Amount:  math.MaxUint64,
+					},
+					{
+						Address: common.Address{1},
+						AssetID: AVAXAssetID,
+						Amount:  2,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "export_burned_intermediate_overflow",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: common.Address{0},
+						AssetID: AVAXAssetID,
+						Amount:  math.MaxUint64,
+					},
+					{
+						Address: common.Address{1},
+						AssetID: AVAXAssetID,
+						Amount:  1,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				}},
+			},
+			want: safemath.ErrOverflow,
 		},
 		{
 			name: "export_burned_underflow",

@@ -11,7 +11,9 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	// Imported for [atomic.UnsignedImportTx.Burned] comment resolution.
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -20,7 +22,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
+
+var _ Unsigned = (*Import)(nil)
 
 // Import is the unsigned component of a transaction that transfers assets from
 // either the P-Chain or the X-Chain to the C-Chain. It consumes UTXOs in the
@@ -52,6 +58,12 @@ func (o Output) Compare(oo Output) int {
 	return o.AssetID.Compare(oo.AssetID)
 }
 
+// Similarly to [atomic.UnsignedImportTx.Burned], burned will error if the sum
+// of the inputs exceeds MaxUint64; even if the total amount burned could be
+// represented as a uint64.
+//
+// Because the total supply of AVAX fits in a uint64, this doesn't matter in
+// practice and allows for easier fuzzing.
 func (i *Import) burned(assetID ids.ID) (uint64, error) {
 	var (
 		burned uint64
@@ -176,13 +188,13 @@ func (i *Import) asOp(avaxAssetID ids.ID) (op, error) {
 	}, nil
 }
 
-func (i *Import) atomicRequests(ids.ID) (ids.ID, *atomic.Requests, error) {
+func (i *Import) atomicRequests(ids.ID) (ids.ID, *chainsatomic.Requests, error) {
 	utxoIDs := make([][]byte, len(i.ImportedInputs))
 	for j, in := range i.ImportedInputs {
 		inputID := in.InputID()
 		utxoIDs[j] = inputID[:]
 	}
-	return i.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
+	return i.SourceChain, &chainsatomic.Requests{RemoveRequests: utxoIDs}, nil
 }
 
 func (i *Import) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
