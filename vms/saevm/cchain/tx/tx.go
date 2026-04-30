@@ -186,7 +186,7 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 // AtomicRequests returns shared-memory modifications that this transaction
 // should perform on the peer chainID during execution.
 func (t *Tx) AtomicRequests() (ids.ID, *chainsatomic.Requests, error) {
-	return t.Unsigned.atomicRequests(t.ID())
+	return t.atomicRequests(t.ID())
 }
 
 // Parse deserializes a [Tx] from its canonical binary format.
