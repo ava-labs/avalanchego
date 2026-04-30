@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -36,10 +37,10 @@ type Tx struct {
 }
 
 // Unsigned is a common interface implemented by [Import] and [Export].
-//
-// TODO(StephenButtolph): Expand this interface to include UTXO handling and
-// verification.
 type Unsigned interface {
+	// SanityCheck performs basic validation on the transaction.
+	SanityCheck(ctx *snow.Context) error
+
 	// TransferNonAVAX transfers the non-AVAX balances requested by this
 	// transaction.
 	TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error

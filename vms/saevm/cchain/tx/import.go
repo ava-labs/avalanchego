@@ -14,6 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -42,6 +45,13 @@ type Output struct {
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 }
 
+func (o Output) Compare(oo Output) int {
+	if c := o.Address.Cmp(oo.Address); c != 0 {
+		return c
+	}
+	return o.AssetID.Compare(oo.AssetID)
+}
+
 func (i *Import) burned(assetID ids.ID) (uint64, error) {
 	var (
 		burned uint64
@@ -64,6 +74,69 @@ func (i *Import) burned(assetID ids.ID) (uint64, error) {
 		}
 	}
 	return burned, nil
+}
+
+var (
+	errWrongNetworkID         = errors.New("wrong network ID")
+	errWrongChainID           = errors.New("wrong chain ID")
+	errNoInputs               = errors.New("no inputs")
+	errNoOutputs              = errors.New("no outputs")
+	errNotSameSubnet          = errors.New("not same subnet")
+	errInvalidInput           = errors.New("invalid input")
+	errNonAVAXInput           = errors.New("input contains non-AVAX")
+	errInvalidOutput          = errors.New("invalid output")
+	errZeroAmount             = errors.New("zero amount")
+	errNonAVAXOutput          = errors.New("output contains non-AVAX")
+	errFlowCheckFailed        = errors.New("flow check failed")
+	errInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
+	errOutputsNotSortedUnique = errors.New("outputs not sorted and unique")
+)
+
+func (i *Import) SanityCheck(ctx *snow.Context) error {
+	switch {
+	case i.NetworkID != ctx.NetworkID:
+		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, ctx.NetworkID, i.NetworkID)
+	case i.BlockchainID != ctx.ChainID:
+		return fmt.Errorf("%w: expected %d, got %d", errWrongChainID, ctx.ChainID, i.BlockchainID)
+	case i.SourceChain != constants.PlatformChainID && i.SourceChain != ctx.XChainID:
+		return fmt.Errorf("%w: expected %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, i.SourceChain)
+	case len(i.ImportedInputs) == 0:
+		return errNoInputs
+	case len(i.Outs) == 0:
+		return errNoOutputs
+	}
+
+	fc := avax.NewFlowChecker()
+	for i, in := range i.ImportedInputs {
+		if err := in.Verify(); err != nil {
+			return fmt.Errorf("%w (%d): %w", errInvalidInput, i, err)
+		}
+		if assetID := in.Asset.ID; assetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, i, ctx.AVAXAssetID, assetID)
+		}
+		fc.Consume(ctx.AVAXAssetID, in.In.Amount())
+	}
+	for i, out := range i.Outs {
+		if out.Amount == 0 {
+			return fmt.Errorf("%w (%d): %w", errInvalidOutput, i, errZeroAmount)
+		}
+		if out.AssetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, i, ctx.AVAXAssetID, out.AssetID)
+		}
+		fc.Produce(ctx.AVAXAssetID, out.Amount)
+	}
+	if err := fc.Verify(); err != nil {
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
+	}
+
+	if !utils.IsSortedAndUnique(i.ImportedInputs) {
+		return errInputsNotSortedUnique
+	}
+	if !utils.IsSortedAndUnique(i.Outs) {
+		return errOutputsNotSortedUnique
+	}
+
+	return nil
 }
 
 var errUnexpectedInputType = errors.New("unexpected input type")

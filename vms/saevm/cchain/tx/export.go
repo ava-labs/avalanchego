@@ -13,6 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -42,6 +45,13 @@ type Input struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
+func (i Input) Compare(o Input) int {
+	if c := i.Address.Cmp(o.Address); c != 0 {
+		return c
+	}
+	return i.AssetID.Compare(o.AssetID)
+}
+
 func (e *Export) burned(assetID ids.ID) (uint64, error) {
 	var (
 		burned uint64
@@ -64,6 +74,55 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 		}
 	}
 	return burned, nil
+}
+
+var errOutputsNotSorted = errors.New("outputs not sorted")
+
+func (e *Export) SanityCheck(ctx *snow.Context) error {
+	switch {
+	case e.NetworkID != ctx.NetworkID:
+		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, ctx.NetworkID, e.NetworkID)
+	case e.BlockchainID != ctx.ChainID:
+		return fmt.Errorf("%w: expected %d, got %d", errWrongChainID, ctx.ChainID, e.BlockchainID)
+	case e.DestinationChain != constants.PlatformChainID && e.DestinationChain != ctx.XChainID:
+		return fmt.Errorf("%w: expected %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, e.DestinationChain)
+	case len(e.Ins) == 0:
+		return errNoInputs
+	case len(e.ExportedOutputs) == 0:
+		return errNoOutputs
+	}
+
+	fc := avax.NewFlowChecker()
+	for i, in := range e.Ins {
+		if in.Amount == 0 {
+			return fmt.Errorf("%w (%d): %w", errInvalidInput, i, errZeroAmount)
+		}
+		if in.AssetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, i, ctx.AVAXAssetID, in.AssetID)
+		}
+		fc.Consume(ctx.AVAXAssetID, in.Amount)
+	}
+	for i, out := range e.ExportedOutputs {
+		if err := out.Verify(); err != nil {
+			return fmt.Errorf("%w (%d): %w", errInvalidOutput, i, err)
+		}
+		if assetID := out.Asset.ID; assetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, i, ctx.AVAXAssetID, assetID)
+		}
+		fc.Produce(ctx.AVAXAssetID, out.Out.Amount())
+	}
+	if err := fc.Verify(); err != nil {
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
+	}
+
+	if !utils.IsSortedAndUnique(e.Ins) {
+		return errInputsNotSortedUnique
+	}
+	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
+		return errOutputsNotSorted
+	}
+
+	return nil
 }
 
 func (e *Export) numSigs() (uint64, error) {
