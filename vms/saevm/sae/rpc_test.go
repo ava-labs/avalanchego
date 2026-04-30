@@ -944,46 +944,49 @@ func TestGetReceipts(t *testing.T) {
 			want: wantSettled,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithHash(unsettled.Hash(), true),
-			want: wantUnsettled,
-		},
+	for _, tc := range []struct {
+		ids  []rpc.BlockNumberOrHash
+		want []*types.Receipt
+	}{
 		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //#nosec G115 -- Won't overflow
+			ids: []rpc.BlockNumberOrHash{
+				rpc.BlockNumberOrHashWithHash(onDisk.Hash(), true),
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //#nosec G115 -- Test values
+			},
 			want: wantOnDisk,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //#nosec G115 -- Won't overflow
+			ids: []rpc.BlockNumberOrHash{
+				rpc.BlockNumberOrHashWithHash(settled.Hash(), true),
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //#nosec G115 -- Test values
+				rpc.BlockNumberOrHashWithNumber(rpc.SafeBlockNumber),
+				rpc.BlockNumberOrHashWithNumber(rpc.FinalizedBlockNumber),
+			},
 			want: wantSettled,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //#nosec G115 -- Won't overflow
+			ids: []rpc.BlockNumberOrHash{
+				rpc.BlockNumberOrHashWithHash(unsettled.Hash(), true),
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //#nosec G115 -- Test values
+				rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber),
+			},
 			want: wantUnsettled,
-		},
-		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber),
-			want: wantUnsettled,
-		},
-		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.SafeBlockNumber),
-			want: wantSettled,
-		},
-		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.FinalizedBlockNumber),
-			want: wantSettled,
 		},
 	} {
-		tests = append(tests, []rpcTest{
-			{
-				method: "eth_getBlockReceipts",
-				args:   []any{tc.id.String()},
-				want:   tc.want,
-			},
-			{
-				method: "debug_getRawReceipts",
-				args:   []any{tc.id.String()},
-				want:   marshalReceipts(tc.want),
-			},
-		}...)
+		for _, id := range tc.ids {
+			tests = append(tests, []rpcTest{
+				{
+					method: "eth_getBlockReceipts",
+					args:   []any{id.String()},
+					want:   tc.want,
+				},
+				{
+					method: "debug_getRawReceipts",
+					args:   []any{id.String()},
+					want:   marshalReceipts(tc.want),
+				},
+			}...)
+		}
 	}
 
 	for i, tx := range txs {
