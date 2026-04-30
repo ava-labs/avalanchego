@@ -10,13 +10,19 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	// Imported for [atomic.UnsignedExportTx.Burned] comment resolution.
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
+
+var _ Unsigned = (*Export)(nil)
 
 // Export is the unsigned component of a transaction that transfers assets from
 // the C-Chain to either the P-Chain or the X-Chain. It modifies the C-Chain
@@ -42,6 +48,12 @@ type Input struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
+// Similarly to [satomic.UnsignedExportTx.Burned], burned will error if the sum
+// of the inputs exceeds MaxUint64; even if the total amount burned could be
+// represented as a uint64.
+//
+// Because the total supply of AVAX fits in a uint64, this doesn't matter in
+// practice and allows for easier fuzzing.
 func (e *Export) burned(assetID ids.ID) (uint64, error) {
 	var (
 		burned uint64
@@ -80,8 +92,7 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 			return op{}, fmt.Errorf("%w: address %s has nonces %d and %d", errMultipleNonces, in.Address, debit.Nonce, in.Nonce)
 		}
 
-		// Non-AVAX inputs still record the address+nonce so SAE will increment
-		// the nonce, even though no AVAX is debited.
+		// Even if no AVAX is debited, Non-AVAX inputs MUST increment the nonce.
 		if in.AssetID == avaxAssetID {
 			amount := scaleAVAX(in.Amount)
 			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &amount); overflow {
@@ -98,8 +109,8 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 	}, nil
 }
 
-func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *atomic.Requests, error) {
-	elems := make([]*atomic.Element, len(e.ExportedOutputs))
+func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, error) {
+	elems := make([]*chainsatomic.Element, len(e.ExportedOutputs))
 	for i, out := range e.ExportedOutputs {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
@@ -115,7 +126,7 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *atomic.Requests, error) {
 			return ids.ID{}, nil, err
 		}
 		utxoID := utxo.InputID()
-		elem := &atomic.Element{
+		elem := &chainsatomic.Element{
 			Key:   utxoID[:],
 			Value: utxoBytes,
 		}
@@ -125,7 +136,7 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *atomic.Requests, error) {
 
 		elems[i] = elem
 	}
-	return e.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
+	return e.DestinationChain, &chainsatomic.Requests{PutRequests: elems}, nil
 }
 
 var errInsufficientFunds = errors.New("insufficient funds")
