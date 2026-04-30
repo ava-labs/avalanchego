@@ -942,8 +942,8 @@ func TestAsOp(t *testing.T) {
 	for _, test := range Tests {
 		t.Run(test.Name, func(t *testing.T) {
 			got, err := test.New.AsOp(AVAXAssetID)
-			require.NoErrorf(t, err, "%T.AsOp(avaxAssetID)", test.New)
-			assert.Equalf(t, test.Op, got, "%T.AsOp(avaxAssetID)", test.New)
+			require.NoErrorf(t, err, "%T.AsOp(AVAXAssetID)", test.New)
+			assert.Equalf(t, test.Op, got, "%T.AsOp(AVAXAssetID)", test.New)
 		})
 	}
 }
@@ -1007,7 +1007,7 @@ func TestAsOp_Errors(t *testing.T) {
 				Unsigned: test.tx,
 			}
 			_, err := tx.AsOp(AVAXAssetID)
-			require.ErrorIsf(t, err, test.want, "%T.AsOp(avaxAssetID)", tx)
+			require.ErrorIsf(t, err, test.want, "%T.AsOp(AVAXAssetID)", tx)
 		})
 	}
 }
