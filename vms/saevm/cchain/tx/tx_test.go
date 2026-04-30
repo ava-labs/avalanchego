@@ -1325,7 +1325,9 @@ func TestTransferNonAVAX(t *testing.T) {
 				for assetID, want := range balances {
 					coinID := common.Hash(assetID)
 					got := sdb.GetBalanceMultiCoin(addr, coinID)
-					require.Zerof(t, got.Cmp(big(want)), "addr=%s asset=%s got=%s want=%d", addr, assetID, got, want)
+					if diff := cmp.Diff(big(want), got, cmputils.BigInts()); diff != "" {
+						t.Errorf("%T.GetBalanceMultiCoin(%s, %s) diff (-want +got):\n%s", sdb, addr, coinID, diff)
+					}
 				}
 			}
 		})
