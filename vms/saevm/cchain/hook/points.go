@@ -324,8 +324,7 @@ func atomicOpsOf(txs []*tx.Tx) (map[ids.ID]*atomic.Requests, error) {
 
 	ops := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range txs {
-		txID := tx.ID()
-		chainID, requests, err := tx.AtomicOps(txID)
+		chainID, requests, err := tx.AtomicRequests()
 		if err != nil {
 			return nil, err
 		}

@@ -8,16 +8,15 @@ package tx
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/holiman/uint256"
 
+	// Imported for [gasPerByte] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
-	// Imported for [GasPerByte] comment resolution.
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
@@ -55,10 +54,6 @@ type Unsigned interface {
 	// provided state.
 	VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error
 
-	// AtomicOps returns the operations that should be applied to shared memory
-	// when this transaction is executed.
-	AtomicOps(txID ids.ID) (chainID ids.ID, requests *atomic.Requests, err error)
-
 	// TransferNonAVAX transfers the non-AVAX balances requested by this
 	// transaction.
 	TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
@@ -74,6 +69,10 @@ type Unsigned interface {
 	// asOp returns the operation that this transaction performs on the EVM
 	// state.
 	asOp(avaxAssetID ids.ID) (op, error)
+
+	// atomicRequests returns the operations that should be applied to shared
+	// memory when this transaction is executed.
+	atomicRequests(txID ids.ID) (chainID ids.ID, requests *atomic.Requests, err error)
 }
 
 type op struct {
@@ -208,6 +207,12 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	return p
 }
 
+// AtomicRequests returns chainID and modifications into shared memory that this
+// transaction should perform during execution.
+func (t *Tx) AtomicRequests() (ids.ID, *atomic.Requests, error) {
+	return t.Unsigned.atomicRequests(t.ID())
+}
+
 // Parse deserializes a [Tx] from its canonical binary format.
 func Parse(b []byte) (*Tx, error) {
 	var tx Tx
@@ -215,30 +220,4 @@ func Parse(b []byte) (*Tx, error) {
 		return nil, err
 	}
 	return &tx, nil
-}
-
-// MarshalSlice returns the canonical binary format of a slice of transactions.
-func MarshalSlice(txs []*Tx) ([]byte, error) {
-	if len(txs) == 0 {
-		return nil, nil
-	}
-	return c.Marshal(codecVersion, txs)
-}
-
-var errInefficientSlicePacking = errors.New("inefficient slice packing: empty slices should be packed as nil")
-
-// ParseSlice deserializes a slice of [Tx] from its canonical binary format.
-func ParseSlice(b []byte) ([]*Tx, error) {
-	if len(b) == 0 {
-		return nil, nil
-	}
-
-	var txs []*Tx
-	if _, err := c.Unmarshal(b, &txs); err != nil {
-		return nil, err
-	}
-	if len(txs) == 0 {
-		return nil, errInefficientSlicePacking
-	}
-	return txs, nil
 }

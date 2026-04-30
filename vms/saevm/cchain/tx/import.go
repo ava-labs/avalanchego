@@ -241,7 +241,7 @@ func (i *Import) asOp(avaxAssetID ids.ID) (op, error) {
 	}, nil
 }
 
-func (i *Import) AtomicOps(ids.ID) (ids.ID, *atomic.Requests, error) {
+func (i *Import) atomicRequests(ids.ID) (ids.ID, *atomic.Requests, error) {
 	utxoIDs := make([][]byte, len(i.ImportedInputs))
 	for j, in := range i.ImportedInputs {
 		inputID := in.InputID()
@@ -255,8 +255,10 @@ func (i *Import) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 		if out.AssetID == avaxAssetID {
 			continue
 		}
+
+		coinID := common.Hash(out.AssetID)
 		amount := new(big.Int).SetUint64(out.Amount)
-		statedb.AddBalanceMultiCoin(out.Address, common.Hash(out.AssetID), amount)
+		statedb.AddBalanceMultiCoin(out.Address, coinID, amount)
 	}
 	return nil
 }

@@ -215,7 +215,7 @@ func (e *Export) numSigs() (uint64, error) {
 	return uint64(len(e.Ins)), nil
 }
 
-var errMultipleNonces = errors.New("multiple inputs for address with different nonces")
+var errMultipleNonces = errors.New("multiple nonces for address")
 
 func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 	burn := make(map[common.Address]hook.AccountDebit, len(e.Ins))
@@ -243,15 +243,15 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 	}, nil
 }
 
-func (e *Export) AtomicOps(txID ids.ID) (ids.ID, *atomic.Requests, error) {
+func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *atomic.Requests, error) {
 	elems := make([]*atomic.Element, len(e.ExportedOutputs))
 	for i, out := range e.ExportedOutputs {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(i),
+				OutputIndex: uint32(i), //#nosec G115 -- Won't overflow
 			},
-			Asset: avax.Asset{ID: out.AssetID()},
+			Asset: out.Asset,
 			Out:   out.Out,
 		}
 
@@ -284,9 +284,6 @@ func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 		coinID := common.Hash(in.AssetID)
 		amount := new(big.Int).SetUint64(in.Amount)
 		if statedb.GetBalanceMultiCoin(in.Address, coinID).Cmp(amount) < 0 {
-			// Non-AVAX asset transfers are only allowed during bootstrapping,
-			// which should have already verified that this error will not
-			// occur.
 			return errInsufficientFunds
 		}
 		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
