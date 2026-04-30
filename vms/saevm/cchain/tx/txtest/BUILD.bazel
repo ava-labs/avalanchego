@@ -17,7 +17,6 @@ go_library(
         "//vms/saevm/cchain/tx",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_stretchr_testify//require",
     ],
 )
 

@@ -51,6 +51,7 @@ go_test(
         "//vms/components/gas",
         "//vms/components/verify",
         "//vms/saevm/cchain/tx/txtest",
+        "//vms/saevm/cmputils",
         "//vms/saevm/hook",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
