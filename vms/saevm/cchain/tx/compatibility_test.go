@@ -227,3 +227,13 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 		}
 	})
 }
+
+func FuzzSanityCheckCompatibility(f *testing.F) {
+	ctx := MainnetContext()
+	fuzz(f, func(t *testing.T, newTx *Tx) {
+		oldTx := ToOldTx(t, newTx)
+		want := OldSanityCheck(oldTx, ctx) == nil
+		got := newTx.SanityCheck(ctx) == nil
+		assert.Equal(t, want, got, "%T.SanityCheck() == OldSanityCheck(%T)", newTx, oldTx)
+	})
+}

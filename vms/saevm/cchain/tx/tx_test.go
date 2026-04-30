@@ -4,6 +4,7 @@
 package tx
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -22,12 +23,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	// Imported for [vm.VerifierBackend] comment resolution.
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -40,6 +47,7 @@ import (
 
 func TestMain(m *testing.M) {
 	customtypes.Register()
+	params.RegisterExtras()
 	os.Exit(m.Run())
 }
 
@@ -47,6 +55,8 @@ func TestMain(m *testing.M) {
 // unit tests.
 var (
 	AVAXAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
+	CChainID    = ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
+	XChainID    = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
 	Tests       = [...]struct {
 		Name                  string
 		Old                   *atomic.Tx
@@ -61,9 +71,9 @@ var (
 			Name: "import", // Included in https://subnets.avax.network/c-chain/block/4
 			Old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedImportTx{
-					NetworkID:    1,
-					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
-					SourceChain:  ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					NetworkID:    constants.MainnetID,
+					BlockchainID: CChainID,
+					SourceChain:  XChainID,
 					ImportedInputs: []*avax.TransferableInput{{
 						UTXOID: avax.UTXOID{
 							TxID:        ids.FromStringOrPanic("2VqSFA5hxukiv1FSAB8ShjwHwmPev9ZS8VD9aUTCDRoff7T5Bi"),
@@ -95,9 +105,9 @@ var (
 			},
 			New: &Tx{
 				Unsigned: &Import{
-					NetworkID:    1,
-					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
-					SourceChain:  ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					NetworkID:    constants.MainnetID,
+					BlockchainID: CChainID,
+					SourceChain:  XChainID,
 					ImportedInputs: []*avax.TransferableInput{{
 						UTXOID: avax.UTXOID{
 							TxID:        ids.FromStringOrPanic("2VqSFA5hxukiv1FSAB8ShjwHwmPev9ZS8VD9aUTCDRoff7T5Bi"),
@@ -162,7 +172,7 @@ var (
 					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): scaleAVAX(50_000_000),
 				},
 			},
-			AtomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+			AtomicRequestsChainID: XChainID,
 			AtomicRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64"),
@@ -173,9 +183,9 @@ var (
 			Name: "export", // Included in https://subnets.avax.network/c-chain/block/48
 			Old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedExportTx{
-					NetworkID:        1,
-					BlockchainID:     ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
-					DestinationChain: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					NetworkID:        constants.MainnetID,
+					BlockchainID:     CChainID,
+					DestinationChain: XChainID,
 					Ins: []atomic.EVMInput{{
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
@@ -206,9 +216,9 @@ var (
 			},
 			New: &Tx{
 				Unsigned: &Export{
-					NetworkID:        1,
-					BlockchainID:     ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
-					DestinationChain: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					NetworkID:        constants.MainnetID,
+					BlockchainID:     CChainID,
+					DestinationChain: XChainID,
 					Ins: []Input{{
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
@@ -277,7 +287,7 @@ var (
 					},
 				},
 			},
-			AtomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+			AtomicRequestsChainID: XChainID,
 			AtomicRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{{
 					Key:   common.FromHex("0x38ebe8fc127b2eaeeb25c72a747e0ef27460fb04b5929568ed959d67ec3e4948"),
@@ -292,9 +302,9 @@ var (
 			Name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
 			Old: &atomic.Tx{
 				UnsignedAtomicTx: &atomic.UnsignedImportTx{
-					NetworkID:    1,
-					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
-					SourceChain:  ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					NetworkID:    constants.MainnetID,
+					BlockchainID: CChainID,
+					SourceChain:  XChainID,
 					ImportedInputs: []*avax.TransferableInput{
 						{
 							UTXOID: avax.UTXOID{
@@ -371,9 +381,9 @@ var (
 			},
 			New: &Tx{
 				Unsigned: &Import{
-					NetworkID:    1,
-					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
-					SourceChain:  ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					NetworkID:    constants.MainnetID,
+					BlockchainID: CChainID,
+					SourceChain:  XChainID,
 					ImportedInputs: []*avax.TransferableInput{
 						{
 							UTXOID: avax.UTXOID{
@@ -496,7 +506,7 @@ var (
 					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): scaleAVAX(597_000_000),
 				},
 			},
-			AtomicRequestsChainID: ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+			AtomicRequestsChainID: XChainID,
 			AtomicRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05"),
@@ -721,6 +731,28 @@ func init() {
 	for i, test := range Tests {
 		OldTxs[i] = test.Old
 		NewTxs[i] = test.New
+	}
+}
+
+// MainnetContext returns a [snow.Context] with mainnet values.
+func MainnetContext() *snow.Context {
+	return &snow.Context{
+		NetworkID:   constants.MainnetID,
+		SubnetID:    constants.PrimaryNetworkID,
+		ChainID:     CChainID,
+		XChainID:    XChainID,
+		CChainID:    CChainID,
+		AVAXAssetID: AVAXAssetID,
+		ValidatorState: &validatorstest.State{
+			GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+				switch chainID {
+				case constants.PlatformChainID, XChainID, CChainID:
+					return constants.PrimaryNetworkID, nil
+				default:
+					return ids.GenerateTestID(), nil
+				}
+			},
+		},
 	}
 }
 
@@ -1427,6 +1459,305 @@ func TestTransferNonAVAX(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+// OldSanityCheck runs the legacy verification path that [Tx.SanityCheck] is
+// replacing: [atomic.UnsignedAtomicTx.Verify] under [banffRules] followed by
+// the AVAX-only portion of [vm.VerifierBackend.SemanticVerify]'s flow check
+// (without the dynamic-fee produce). Coreth splits these across two phases;
+// the new SanityCheck unifies them.
+func OldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
+	rules := *extrastest.ForkToRules(upgradetest.Helicon)
+	if err := tx.UnsignedAtomicTx.Verify(ctx, rules); err != nil {
+		return err
+	}
+	fc := avax.NewFlowChecker()
+	switch tx := tx.UnsignedAtomicTx.(type) {
+	case *atomic.UnsignedImportTx:
+		for _, in := range tx.ImportedInputs {
+			fc.Consume(in.Asset.ID, in.Input().Amount())
+		}
+		for _, out := range tx.Outs {
+			fc.Produce(out.AssetID, out.Amount)
+		}
+	case *atomic.UnsignedExportTx:
+		for _, in := range tx.Ins {
+			fc.Consume(in.AssetID, in.Amount)
+		}
+		for _, out := range tx.ExportedOutputs {
+			fc.Produce(out.Asset.ID, out.Output().Amount())
+		}
+	}
+	return fc.Verify()
+}
+
+func TestSanityCheck(t *testing.T) {
+	var (
+		ctx      = MainnetContext()
+		addr0    = common.Address{1}
+		addr1    = common.Address{2}
+		nonAVAX  = ids.ID{0xff}
+		otherID  = ids.ID{0xee}
+		shortID0 = ids.ShortID{1}
+		shortID1 = ids.ShortID{2}
+	)
+
+	transferOutput := func(amt uint64, addr ids.ShortID) *secp256k1fx.TransferOutput {
+		return &secp256k1fx.TransferOutput{
+			Amt: amt,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+		}
+	}
+
+	// validImport returns a fresh, well-formed Import that passes SanityCheck
+	// against ctx. Each subtest mutates a copy via [imp].
+	validImport := func() *Import {
+		return &Import{
+			NetworkID:    ctx.NetworkID,
+			BlockchainID: ctx.ChainID,
+			SourceChain:  ctx.XChainID,
+			ImportedInputs: []*avax.TransferableInput{{
+				Asset: avax.Asset{ID: ctx.AVAXAssetID},
+				In: &secp256k1fx.TransferInput{
+					Amt:   100,
+					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				},
+			}},
+			Outs: []Output{{
+				Address: addr0,
+				Amount:  100,
+				AssetID: ctx.AVAXAssetID,
+			}},
+		}
+	}
+	validExport := func() *Export {
+		return &Export{
+			NetworkID:        ctx.NetworkID,
+			BlockchainID:     ctx.ChainID,
+			DestinationChain: ctx.XChainID,
+			Ins: []Input{{
+				Address: addr0,
+				Amount:  100,
+				AssetID: ctx.AVAXAssetID,
+			}},
+			ExportedOutputs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: ctx.AVAXAssetID},
+				Out:   transferOutput(100, shortID0),
+			}},
+		}
+	}
+
+	imp := func(mutate func(*Import)) Unsigned {
+		i := validImport()
+		mutate(i)
+		return i
+	}
+	exp := func(mutate func(*Export)) Unsigned {
+		e := validExport()
+		mutate(e)
+		return e
+	}
+
+	// Build two transferable outputs in known-unsorted order for the
+	// errOutputsNotSorted case. Sum is 100, so flow check passes against the
+	// 100 consumed by validExport's single Input.
+	out0 := &avax.TransferableOutput{
+		Asset: avax.Asset{ID: ctx.AVAXAssetID},
+		Out:   transferOutput(50, shortID0),
+	}
+	out1 := &avax.TransferableOutput{
+		Asset: avax.Asset{ID: ctx.AVAXAssetID},
+		Out:   transferOutput(50, shortID1),
+	}
+	unsortedExportOuts := []*avax.TransferableOutput{out0, out1}
+	if avax.IsSortedTransferableOutputs(unsortedExportOuts, c) {
+		unsortedExportOuts = []*avax.TransferableOutput{out1, out0}
+	}
+	require.False(t, avax.IsSortedTransferableOutputs(unsortedExportOuts, c))
+
+	tests := []struct {
+		name    string
+		tx      Unsigned
+		wantErr error
+	}{
+		// Happy paths.
+		{name: "valid_import", tx: validImport()},
+		{name: "valid_export", tx: validExport()},
+		{name: "mainnet_import", tx: Tests[0].New.Unsigned},
+		{name: "mainnet_export", tx: Tests[1].New.Unsigned},
+
+		// Import error paths.
+		{
+			name:    "import_wrong_network_id",
+			tx:      imp(func(i *Import) { i.NetworkID++ }),
+			wantErr: errWrongNetworkID,
+		},
+		{
+			name:    "import_wrong_chain_id",
+			tx:      imp(func(i *Import) { i.BlockchainID = otherID }),
+			wantErr: errWrongChainID,
+		},
+		{
+			name:    "import_wrong_source_chain",
+			tx:      imp(func(i *Import) { i.SourceChain = otherID }),
+			wantErr: errNotSameSubnet,
+		},
+		{
+			name:    "import_no_inputs",
+			tx:      imp(func(i *Import) { i.ImportedInputs = nil }),
+			wantErr: errNoInputs,
+		},
+		{
+			name:    "import_no_outputs",
+			tx:      imp(func(i *Import) { i.Outs = nil }),
+			wantErr: errNoOutputs,
+		},
+		{
+			name: "import_invalid_input",
+			tx: imp(func(i *Import) {
+				i.ImportedInputs[0].In.(*secp256k1fx.TransferInput).Amt = 0
+			}),
+			wantErr: errInvalidInput,
+		},
+		{
+			name: "import_non_avax_input",
+			tx: imp(func(i *Import) {
+				i.ImportedInputs[0].Asset.ID = nonAVAX
+			}),
+			wantErr: errNonAVAXInput,
+		},
+		{
+			name:    "import_zero_amount_output",
+			tx:      imp(func(i *Import) { i.Outs[0].Amount = 0 }),
+			wantErr: errInvalidOutput,
+		},
+		{
+			name:    "import_non_avax_output",
+			tx:      imp(func(i *Import) { i.Outs[0].AssetID = nonAVAX }),
+			wantErr: errNonAVAXOutput,
+		},
+		{
+			name:    "import_flow_check_failed",
+			tx:      imp(func(i *Import) { i.Outs[0].Amount = 200 }),
+			wantErr: errFlowCheckFailed,
+		},
+		{
+			name: "import_inputs_not_sorted_unique",
+			tx: imp(func(i *Import) {
+				i.ImportedInputs = []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{TxID: ids.ID{2}},
+						Asset:  avax.Asset{ID: ctx.AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   50,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{TxID: ids.ID{1}},
+						Asset:  avax.Asset{ID: ctx.AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   50,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+				}
+			}),
+			wantErr: errInputsNotSortedUnique,
+		},
+		{
+			name: "import_outputs_not_sorted_unique",
+			tx: imp(func(i *Import) {
+				i.Outs = []Output{
+					{Address: addr1, Amount: 50, AssetID: ctx.AVAXAssetID},
+					{Address: addr0, Amount: 50, AssetID: ctx.AVAXAssetID},
+				}
+			}),
+			wantErr: errOutputsNotSortedUnique,
+		},
+
+		// Export error paths.
+		{
+			name:    "export_wrong_network_id",
+			tx:      exp(func(e *Export) { e.NetworkID++ }),
+			wantErr: errWrongNetworkID,
+		},
+		{
+			name:    "export_wrong_chain_id",
+			tx:      exp(func(e *Export) { e.BlockchainID = otherID }),
+			wantErr: errWrongChainID,
+		},
+		{
+			name:    "export_wrong_destination_chain",
+			tx:      exp(func(e *Export) { e.DestinationChain = otherID }),
+			wantErr: errNotSameSubnet,
+		},
+		{
+			name:    "export_no_inputs",
+			tx:      exp(func(e *Export) { e.Ins = nil }),
+			wantErr: errNoInputs,
+		},
+		{
+			name:    "export_no_outputs",
+			tx:      exp(func(e *Export) { e.ExportedOutputs = nil }),
+			wantErr: errNoOutputs,
+		},
+		{
+			name:    "export_zero_amount_input",
+			tx:      exp(func(e *Export) { e.Ins[0].Amount = 0 }),
+			wantErr: errZeroAmount,
+		},
+		{
+			name:    "export_non_avax_input",
+			tx:      exp(func(e *Export) { e.Ins[0].AssetID = nonAVAX }),
+			wantErr: errNonAVAXInput,
+		},
+		{
+			name: "export_invalid_output",
+			tx: exp(func(e *Export) {
+				e.ExportedOutputs[0].Out.(*secp256k1fx.TransferOutput).Amt = 0
+			}),
+			wantErr: errInvalidOutput,
+		},
+		{
+			name: "export_non_avax_output",
+			tx: exp(func(e *Export) {
+				e.ExportedOutputs[0].Asset.ID = nonAVAX
+			}),
+			wantErr: errNonAVAXOutput,
+		},
+		{
+			name: "export_flow_check_failed",
+			tx: exp(func(e *Export) {
+				e.ExportedOutputs[0].Out.(*secp256k1fx.TransferOutput).Amt = 200
+			}),
+			wantErr: errFlowCheckFailed,
+		},
+		{
+			name: "export_inputs_not_sorted_unique",
+			tx: exp(func(e *Export) {
+				e.Ins = []Input{
+					{Address: addr1, Amount: 50, AssetID: ctx.AVAXAssetID},
+					{Address: addr0, Amount: 50, AssetID: ctx.AVAXAssetID},
+				}
+			}),
+			wantErr: errInputsNotSortedUnique,
+		},
+		{
+			name:    "export_outputs_not_sorted",
+			tx:      exp(func(e *Export) { e.ExportedOutputs = unsortedExportOuts }),
+			wantErr: errOutputsNotSorted,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.tx.SanityCheck(ctx)
+			require.ErrorIs(t, err, test.wantErr)
 		})
 	}
 }
