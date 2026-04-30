@@ -14,10 +14,9 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/holiman/uint256"
 
-	// Imported for [gasPerByte] comment resolution.
+	// Imported for [atomic.TxBytesGas] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,6 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
 
 // Tx is a signed transaction that interacts with shared memory.
@@ -68,11 +69,11 @@ type Unsigned interface {
 
 	// atomicRequests returns the operations that should be applied to shared
 	// memory when this transaction is executed.
-	atomicRequests(txID ids.ID) (chainID ids.ID, requests *atomic.Requests, err error)
+	atomicRequests(txID ids.ID) (chainID ids.ID, requests *chainsatomic.Requests, err error)
 
 	// verifyCredentials verifies that the transaction is authorized by the
 	// provided credentials.
-	verifyCredentials(sm atomic.SharedMemory, creds []Credential) error
+	verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error
 }
 
 type op struct {
@@ -207,14 +208,14 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	return p
 }
 
-// AtomicRequests returns chainID and modifications into shared memory that this
+// AtomicRequests returns chainID and shared-memory modifications that this
 // transaction should perform during execution.
-func (t *Tx) AtomicRequests() (ids.ID, *atomic.Requests, error) {
+func (t *Tx) AtomicRequests() (ids.ID, *chainsatomic.Requests, error) {
 	return t.Unsigned.atomicRequests(t.ID())
 }
 
 // VerifyCredentials verifies that the transaction is properly authorized.
-func (t *Tx) VerifyCredentials(sm atomic.SharedMemory) error {
+func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory) error {
 	return t.Unsigned.verifyCredentials(sm, t.Creds)
 }
 

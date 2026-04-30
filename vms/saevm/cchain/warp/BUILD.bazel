@@ -62,3 +62,8 @@ go_test(
         "@com_github_stretchr_testify//require",
     ],
 )
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])

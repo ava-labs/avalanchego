@@ -21,11 +21,16 @@ go_library(
         "//utils/set",
         "//utils/units",
         "//utils/wrappers",
-        "//vms/saevm/cchain/tx",
         "//vms/evm/database",
+        "//vms/saevm/cchain/tx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//triedb",
     ],
 )
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])

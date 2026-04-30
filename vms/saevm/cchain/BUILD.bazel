@@ -1,6 +1,20 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
+# gazelle:default_visibility //vms/saevm/cchain:__subpackages__,//vms/saevm/cchain:external_consumers
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
+package_group(
+    name = "external_consumers",
+    packages = [
+        "//node",
+    ],
+)
+
 go_library(
     name = "saevm",
     srcs = [
@@ -9,7 +23,6 @@ go_library(
         "vm.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain",
-    visibility = ["//visibility:public"],
     deps = [
         "//cache/lru",
         "//database",
@@ -31,6 +44,11 @@ go_library(
         "//utils/logging",
         "//vms",
         "//vms/components/gas",
+        "//vms/evm/acp226",
+        "//vms/evm/database",
+        "//vms/platformvm/warp",
+        "//vms/saevm/adaptor",
+        "//vms/saevm/blocks",
         "//vms/saevm/cchain/api",
         "//vms/saevm/cchain/hook",
         "//vms/saevm/cchain/hook/acp176",
@@ -38,11 +56,6 @@ go_library(
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/txpool",
         "//vms/saevm/cchain/warp",
-        "//vms/evm/acp226",
-        "//vms/evm/database",
-        "//vms/platformvm/warp",
-        "//vms/saevm/adaptor",
-        "//vms/saevm/blocks",
         "//vms/saevm/sae",
         "//vms/saevm/saedb",
         "@com_github_ava_labs_libevm//common/hexutil",
@@ -103,14 +116,14 @@ go_test(
 )
 
 go_test(
-    name = "corethvm_test",
+    name = "cchain_test",
     srcs = [
         "config_test.go",
         "vm_atomic_test.go",
         "vm_test.go",
         "vm_warp_test.go",
     ],
-    embed = [":corethvm"],
+    embed = [":cchain"],
     deps = [
         "//api",
         "//chains/atomic",
@@ -143,12 +156,12 @@ go_test(
         "//utils/formatting",
         "//utils/logging",
         "//utils/set",
-        "//vms/saevm/cchain/tx",
-        "//vms/saevm/cchain/warp",
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "//vms/saevm/blocks",
+        "//vms/saevm/cchain/tx",
+        "//vms/saevm/cchain/warp",
         "//vms/saevm/params",
         "//vms/saevm/sae",
         "//vms/saevm/saedb",

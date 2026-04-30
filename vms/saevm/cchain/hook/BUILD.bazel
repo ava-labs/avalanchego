@@ -24,12 +24,12 @@ go_library(
         "//utils",
         "//utils/set",
         "//vms/components/gas",
+        "//vms/evm/acp226",
         "//vms/saevm/cchain/hook/acp176",
         "//vms/saevm/cchain/state",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/txpool",
         "//vms/saevm/cchain/warp",
-        "//vms/evm/acp226",
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/types",
@@ -43,3 +43,8 @@ go_library(
         "@org_uber_go_zap//:zap",
     ],
 )
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])

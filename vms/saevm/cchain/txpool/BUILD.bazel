@@ -18,8 +18,8 @@ go_library(
         "//utils/lock",
         "//utils/set",
         "//utils/setmap",
-        "//vms/saevm/cchain/tx",
         "//vms/saevm/blocks",
+        "//vms/saevm/cchain/tx",
         "//vms/saevm/hook",
         "//vms/saevm/sae/rpc",
         "@com_github_ava_labs_libevm//core",
@@ -31,3 +31,8 @@ go_library(
         "@org_uber_go_zap//:zap",
     ],
 )
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
