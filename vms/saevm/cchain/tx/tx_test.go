@@ -679,7 +679,7 @@ func TestID(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
 				// We must parse the old tx to properly initialize the ID.
 				old, err := ParseOldTx(test.Bytes)
-				require.NoError(t, err, "parseOldTx()")
+				require.NoError(t, err, "ParseOldTx()")
 				assert.Equalf(t, test.Op.ID, old.ID(), "%T.ID()", old)
 			})
 			t.Run("new", func(t *testing.T) {
