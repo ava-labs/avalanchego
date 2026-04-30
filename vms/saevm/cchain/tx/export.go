@@ -9,6 +9,9 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	// Imported for [atomic.UnsignedExportTx.Burned] comment resolution.
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -39,6 +42,12 @@ type Input struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
+// Similarly to [atomic.UnsignedExportTx.Burned], burned will error if the sum
+// of the inputs exceeds MaxUint64; even if the total amount burned could be
+// represented as a uint64.
+//
+// Because the total supply of AVAX fits in a uint64, this doesn't matter in
+// practice and allows for easier fuzzing.
 func (e *Export) burned(assetID ids.ID) (uint64, error) {
 	var (
 		burned uint64
