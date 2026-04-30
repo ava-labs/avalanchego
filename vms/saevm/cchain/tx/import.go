@@ -44,8 +44,8 @@ type Output struct {
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 }
 
-// Similarly to [atomic.UnsignedImportTx.Burned], burned will error if the sum
-// of the inputs exceeds MaxUint64; even if the total amount burned could be
+// Like [atomic.UnsignedImportTx.Burned], burned will error if the sum of the
+// inputs exceeds MaxUint64, even if the total amount burned could be
 // represented as a uint64.
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in

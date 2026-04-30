@@ -44,8 +44,8 @@ type Input struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
-// Similarly to [atomic.UnsignedExportTx.Burned], burned will error if the sum
-// of the inputs exceeds MaxUint64; even if the total amount burned could be
+// Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
+// inputs exceeds MaxUint64, even if the total amount burned could be
 // represented as a uint64.
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
