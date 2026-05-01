@@ -139,8 +139,7 @@ func (s *asOpStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
 }
 
 func (*asOpStateDB) GetBalance(common.Address) *uint256.Int {
-	// Large enough to never underflow, but small enough to never overflow.
-	return new(uint256.Int).Lsh(uint256.NewInt(1), 128)
+	return largeUint256()
 }
 
 func (*asOpStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
@@ -148,8 +147,7 @@ func (*asOpStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {
 func (*asOpStateDB) SubBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
 
 func (*asOpStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int {
-	// Large enough to never underflow, but small enough to never overflow.
-	return new(big.Int).Lsh(big.NewInt(1), 128)
+	return largeBigInt()
 }
 
 func (s *asOpStateDB) SetNonce(addr common.Address, nonce uint64) {
@@ -188,17 +186,15 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 		newSDB := NewStateDB(t)
 
 		if tx, ok := newTx.Unsigned.(*Export); ok {
-			hugeAVAX := new(uint256.Int).Lsh(uint256.NewInt(1), 128)
-			hugeBig := new(big.Int).Lsh(big.NewInt(1), 128)
 			for _, in := range tx.Ins {
 				if in.Nonce == math.MaxUint64 {
 					t.Skip("nonce overflow")
 				}
 
 				for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
-					sdb.AddBalance(in.Address, hugeAVAX)
+					sdb.AddBalance(in.Address, largeUint256())
 					sdb.SetNonce(in.Address, in.Nonce)
-					sdb.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), hugeBig)
+					sdb.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), largeBigInt())
 				}
 			}
 		}
@@ -227,3 +223,8 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 		}
 	})
 }
+
+// largeUint256 and largeBigInt return a balance large enough to never underflow
+// but small enough to never overflow during test arithmetic.
+func largeUint256() *uint256.Int { return new(uint256.Int).Lsh(uint256.NewInt(1), 128) }
+func largeBigInt() *big.Int      { return new(big.Int).Lsh(big.NewInt(1), 128) }
