@@ -24,6 +24,12 @@ ARCH="${PACKAGING_TGZ_ARCH}"
 
 mkdir -p "${OUTPUT_DIR}"
 
+# Remove stale signatures and public key from a previous run. Tarballs
+# are overwritten by tar, but .sig files and GPG-KEY-avalanchego are
+# not — without this, an unsigned re-run after a signed run would
+# leave .sig files that no longer match the freshly built tarballs.
+rm -f "${OUTPUT_DIR}"/*.tar.gz.sig "${OUTPUT_DIR}/GPG-KEY-avalanchego"
+
 echo "=== Building tarballs for ${ARCH} (tag: ${TAG}) ==="
 
 # ── Step 1: Build binaries ────────────────────────────────────────
