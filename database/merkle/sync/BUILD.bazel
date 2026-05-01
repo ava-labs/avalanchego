@@ -24,6 +24,7 @@ go_library(
         "//utils/logging",
         "//utils/maybe",
         "//utils/set",
+        "//utils/timer",
         "//utils/units",
         "@com_github_google_btree//:btree",
         "@com_github_prometheus_client_golang//prometheus",
