@@ -182,8 +182,9 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 			t.Skip("invalid tx")
 		}
 
-		oldSDB := NewStateDB(t)
-		newSDB := NewStateDB(t)
+		oldState := NewStateDB(t)
+		newState := NewStateDB(t)
+		states := []*extstate.StateDB{oldState, newState}
 
 		if tx, ok := newTx.Unsigned.(*Export); ok {
 			for _, in := range tx.Ins {
@@ -191,10 +192,10 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 					t.Skip("nonce overflow")
 				}
 
-				for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
-					sdb.AddBalance(in.Address, largeUint256())
-					sdb.SetNonce(in.Address, in.Nonce)
-					sdb.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), largeBigInt())
+				for _, state := range states {
+					state.AddBalance(in.Address, largeUint256())
+					state.SetNonce(in.Address, in.Nonce)
+					state.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), largeBigInt())
 				}
 			}
 		}
@@ -203,22 +204,22 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 			oldTx = ToOldTx(t, newTx)
 			ctx   = &snow.Context{AVAXAssetID: AVAXAssetID}
 		)
-		require.NoError(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldSDB))
-		require.NoError(t, newTx.TransferNonAVAX(AVAXAssetID, newSDB))
-		require.NoError(t, op.ApplyTo(newSDB.StateDB))
+		require.NoError(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldState))
+		require.NoError(t, newTx.TransferNonAVAX(AVAXAssetID, newState))
+		require.NoError(t, op.ApplyTo(newState.StateDB))
 
 		// We must manually finalize the trie structures before comparison.
 		// Otherwise, comparing the state DBs wouldn't include the changes.
-		for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
-			sdb.Finalise(true)
-			sdb.IntermediateRoot(true)
+		for _, state := range states {
+			state.Finalise(true)
+			state.IntermediateRoot(true)
 		}
 
 		opts := []cmp.Option{
 			cmpopts.IgnoreUnexported(extstate.StateDB{}),
 			cmputils.StateDBs(),
 		}
-		if diff := cmp.Diff(oldSDB, newSDB, opts...); diff != "" {
+		if diff := cmp.Diff(oldState, newState, opts...); diff != "" {
 			t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", newTx, diff)
 		}
 	})
