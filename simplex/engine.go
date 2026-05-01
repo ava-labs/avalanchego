@@ -80,7 +80,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		return nil, err
 	}
 
-	bt := newBlockTracker()
+	bt := newBlockTracker(config.VM)
 
 	storage, err := newStorage(ctx, config, qcDeserializer, bt)
 	if err != nil {
