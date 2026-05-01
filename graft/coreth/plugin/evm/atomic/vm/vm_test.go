@@ -1631,7 +1631,6 @@ func TestWaitForEvent(t *testing.T) {
 // the VM is restarted and the import's input UTXO has already been consumed
 // from shared memory.
 func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
-	require := require.New(t)
 	ctx := t.Context()
 
 	// Creating the genesis state (block 0) is a commit operation and so Firewood first persists at block 3.
@@ -1657,12 +1656,12 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	})
 	t.Cleanup(func() {
 		if vm != nil {
-			require.NoError(vm.Shutdown(ctx))
+			require.NoError(t, vm.Shutdown(ctx))
 		}
 	})
 
 	// Seed shared memory with the UTXO that the import block will consume.
-	require.NoError(addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
+	require.NoError(t, addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
 		vmtest.TestShortIDAddrs[0]: importAmount,
 	}))
 
@@ -1683,11 +1682,11 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 			types.LatestSignerForChainID(vm.Ethereum().BlockChain().Config().ChainID),
 			vmtest.TestKeys[0].ToECDSA(),
 		)
-		require.NoError(err)
+		require.NoError(t, err)
 
 		blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
-		require.NoError(err, "failed to build regular block at height %d", height)
-		require.NoError(blk.Accept(ctx), "failed to accept regular block at height %d", height)
+		require.NoError(t, err, "failed to build regular block at height %d", height)
+		require.NoError(t, blk.Accept(ctx), "failed to accept regular block at height %d", height)
 	}
 
 	// Build chain history prior to the atomic import.
@@ -1698,24 +1697,24 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	// Issue, build, and accept the atomic import block. We capture the input
 	// UTXO ID so we can later assert it has been removed from shared memory.
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, recipient, vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
-	require.NoError(err)
+	require.NoError(t, err)
 	inputUTXOs := importTx.InputUTXOs()
-	require.Len(inputUTXOs, 1)
+	require.Len(t, inputUTXOs, 1)
 
 	importedInputID, ok := inputUTXOs.Pop()
-	require.True(ok)
+	require.True(t, ok)
 
-	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
+	require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
 
 	msg, err := vm.WaitForEvent(ctx)
-	require.NoError(err)
-	require.Equal(commonEng.PendingTxs, msg)
+	require.NoError(t, err)
+	require.Equal(t, commonEng.PendingTxs, msg)
 
 	blk, err := vm.BuildBlock(ctx)
-	require.NoError(err)
-	require.NoError(blk.Verify(ctx))
-	require.NoError(vm.SetPreference(ctx, blk.ID()))
-	require.NoError(blk.Accept(ctx))
+	require.NoError(t, err)
+	require.NoError(t, blk.Verify(ctx))
+	require.NoError(t, vm.SetPreference(ctx, blk.ID()))
+	require.NoError(t, blk.Accept(ctx))
 
 	// Continue the chain past the import so shutdown persists the last committed revision
 	// while the target import root remains unavailable after restart.
@@ -1725,61 +1724,66 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	// from live shared memory. Historical replay must not depend on it.
 	vm.Ethereum().BlockChain().DrainAcceptorQueue()
 	_, err = vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{importedInputID[:]})
-	require.ErrorIs(err, database.ErrNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 
 	// Restart the VM so Firewood's in-memory revisions cannot satisfy the historical lookup.
-	require.NoError(vm.Shutdown(ctx))
+	require.NoError(t, vm.Shutdown(ctx))
+	vmtest.ResetMetrics(tvm.Ctx)
 	vm = nil
 
-	vmtest.ResetMetrics(tvm.Ctx)
-	restartedVM := newAtomicTestVM()
-	restartConfigJSON, err := vmtest.OverrideSchemeConfig(customrawdb.FirewoodScheme, configJSON)
-	require.NoError(err)
-	require.NoError(restartedVM.Initialize(
-		ctx,
-		tvm.Ctx,
-		tvm.DB,
-		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork])),
-		[]byte{},
-		[]byte(restartConfigJSON),
-		[]*commonEng.Fx{},
-		tvm.AppSender,
-	))
-	require.NoError(restartedVM.SetState(ctx, snow.Bootstrapping))
-	require.NoError(restartedVM.SetState(ctx, snow.NormalOp))
-	vm = restartedVM
+	t.Run("archival query after VM restart", func(t *testing.T) {
+		ctx := t.Context()
 
-	// Verify that the target state requires reexecution to access after restart.
-	targetBlock := vm.Ethereum().BlockChain().GetBlockByNumber(uint64(targetBlockHeight))
-	targetRoot := targetBlock.Root()
-	_, err = vm.Ethereum().BlockChain().StateAt(targetRoot)
-	require.ErrorIs(err, firewood.ErrNoRevisionFound)
+		restartedVM := newAtomicTestVM()
+		restartConfigJSON, err := vmtest.OverrideSchemeConfig(customrawdb.FirewoodScheme, configJSON)
+		require.NoError(t, err)
+		require.NoError(t, restartedVM.Initialize(
+			ctx,
+			tvm.Ctx,
+			tvm.DB,
+			[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork])),
+			[]byte{},
+			[]byte(restartConfigJSON),
+			[]*commonEng.Fx{},
+			tvm.AppSender,
+		))
+		require.NoError(t, restartedVM.SetState(ctx, snow.Bootstrapping))
+		require.NoError(t, restartedVM.SetState(ctx, snow.NormalOp))
+		vm = restartedVM
 
-	// Stand up an in-process RPC server so we can issue an archival query.
-	handlers, err := vm.CreateHandlers(ctx)
-	require.NoError(err)
+		// Verify that the target state requires reexecution to access after restart.
+		targetBlock := vm.Ethereum().BlockChain().GetBlockByNumber(uint64(targetBlockHeight))
+		targetRoot := targetBlock.Root()
+		_, err = vm.Ethereum().BlockChain().StateAt(targetRoot)
+		require.ErrorIs(t, err, firewood.ErrNoRevisionFound)
 
-	ethRPCEndpoint := "/rpc"
-	server := httptest.NewServer(handlers[ethRPCEndpoint])
-	t.Cleanup(server.Close)
+		// Stand up an in-process RPC server so we can issue an archival query.
+		handlers, err := vm.CreateHandlers(ctx)
+		require.NoError(t, err)
 
-	client, err := ethclient.Dial(server.URL)
-	require.NoError(err)
+		ethRPCEndpoint := "/rpc"
+		server := httptest.NewServer(handlers[ethRPCEndpoint])
+		t.Cleanup(server.Close)
 
-	// The recipient receives funds only in the import block, so its head
-	// balance equals the expected post-import balance.
-	headBalance, err := client.BalanceAt(ctx, recipient, nil)
-	require.NoError(err)
-	require.Positive(headBalance.Sign(), "recipient %s should have a positive balance after the import", recipient)
+		client, err := ethclient.Dial(server.URL)
+		require.NoError(t, err)
 
-	// Querying balance at the import block's height forces Firewood to replay
-	// the import; the archival result must match the live head balance.
-	archiveBalance, err := client.BalanceAt(ctx, recipient, new(big.Int).SetUint64(uint64(targetBlockHeight)))
-	require.NoError(err, "historical query at block %d should replay successfully", targetBlockHeight)
+		// The recipient receives funds only in the import block, so its head
+		// balance equals the expected post-import balance.
+		headBalance, err := client.BalanceAt(ctx, recipient, nil)
+		require.NoError(t, err)
+		require.Positive(t, headBalance.Sign(), "recipient %s should have a positive balance after the import", recipient)
 
-	require.Zero(
-		archiveBalance.Cmp(headBalance),
-		"archival balance %s at block %d must equal live balance %s",
-		archiveBalance, targetBlockHeight, headBalance,
-	)
+		// Querying balance at the import block's height forces Firewood to replay
+		// the import; the archival result must match the live head balance.
+		archiveBalance, err := client.BalanceAt(ctx, recipient, new(big.Int).SetUint64(uint64(targetBlockHeight)))
+		require.NoError(t, err, "historical query at block %d should replay successfully", targetBlockHeight)
+
+		require.Zero(
+			t,
+			archiveBalance.Cmp(headBalance),
+			"archival balance %s at block %d must equal live balance %s",
+			archiveBalance, targetBlockHeight, headBalance,
+		)
+	})
 }
