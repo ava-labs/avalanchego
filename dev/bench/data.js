@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777652407996,
+  "lastUpdate": 1777661327979,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -19316,6 +19316,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_accept_ms/ggas",
             "value": 729.2715926838856,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "rodrigo",
+            "username": "RodrigoVillar",
+            "email": "77309055+RodrigoVillar@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "575402907ee12d0988c01b16d6b867c375e245e7",
+          "message": "fix: skip atomic UTXO verification during archival reexecution (#5318)\n\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>\nCo-authored-by: Jonathan Oppenheimer <jonathan.oppenheimer@avalabs.org>\nCo-authored-by: Austin Larson <78000745+alarso16@users.noreply.github.com>\nCo-authored-by: Ceyhun Onur <ceyhun.onur@avalabs.org>",
+          "timestamp": "2026-05-01T15:08:54Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/575402907ee12d0988c01b16d6b867c375e245e7"
+        },
+        "date": 1777661323497,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - mgas/s",
+            "value": 27.889368479042403,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - ms/ggas",
+            "value": 35855.95710965828,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_parse_ms/ggas",
+            "value": 75.50777532186193,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_verify_ms/ggas",
+            "value": 35719.871410950305,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
+            "value": 57.58774698784551,
             "unit": "block_accept_ms/ggas"
           }
         ]
