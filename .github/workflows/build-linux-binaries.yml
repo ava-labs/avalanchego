@@ -25,15 +25,6 @@ jobs:
 
       - uses: ./.github/actions/setup-go-for-project
 
-      - run: go version
-
-      - name: Build the avalanchego binaries
-        run: ./scripts/run_task.sh build
-
-      - name: Build subnet-evm plugin
-        working-directory: ./graft/subnet-evm
-        run: ./scripts/run_task.sh build
-
       - name: Install aws cli
         run: sudo snap install aws-cli --classic
 
@@ -45,53 +36,62 @@ jobs:
           aws-region: us-east-1
 
       - name: Import GPG key
+        env:
+          PRIVATE_KEY: ${{ secrets.RPM_GPG_PRIVATE_KEY }}
         run: |
           GPG_KEY_FILE="$(mktemp)"
           chmod 600 "${GPG_KEY_FILE}"
-          printf '%s' "${{ secrets.RPM_GPG_PRIVATE_KEY }}" > "${GPG_KEY_FILE}"
+          printf '%s' "${PRIVATE_KEY}" > "${GPG_KEY_FILE}"
           printf 'GPG_KEY_FILE=%s\n' "${GPG_KEY_FILE}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from git
         if: "${{ github.event.inputs.tag == '' }}"
-        id: get_tag_from_git
         run: |
           echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
-        id: get_tag_from_workflow
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          echo "TAG=${INPUT_TAG}" >> "$GITHUB_ENV"
         shell: bash
 
-      - name: Create tgz package structure and upload to S3
-        run: ./.github/workflows/build-tgz-pkg.sh
+      - name: Build and validate tarballs
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-tarballs
         env:
-          PKG_ROOT: /tmp/avalanchego
-          TAG: ${{ env.TAG }}
-          BUCKET: ${{ secrets.BUCKET }}
-          ARCH: "amd64"
-          RELEASE: "jammy"
+          PACKAGING_TAG: ${{ env.TAG }}
+          TGZ_ARCH: amd64
           GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
           GPG_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+
+      - name: Upload tarballs to S3
+        env:
+          BUCKET: ${{ secrets.BUCKET }}
+          ARCH: amd64
+        run: |
+          # Explicitly upload only .tar.gz and .tar.gz.sig, never GPG-KEY-avalanchego.
+          find build/tgz -maxdepth 1 \
+              \( -name '*.tar.gz' -o -name '*.tar.gz.sig' \) \
+              -exec aws s3 cp {} "s3://${BUCKET}/linux/binaries/ubuntu/jammy/${ARCH}/" \;
 
       - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v6
         with:
           name: avalanchego-amd64
           path: |
-            /tmp/avalanchego/avalanchego-linux-amd64-${{ env.TAG }}.tar.gz
-            /tmp/avalanchego/avalanchego-linux-amd64-${{ env.TAG }}.tar.gz.sig
+            build/tgz/avalanchego-linux-amd64-${{ env.TAG }}.tar.gz
+            build/tgz/avalanchego-linux-amd64-${{ env.TAG }}.tar.gz.sig
 
       - name: Save subnet-evm as Github artifact
         uses: actions/upload-artifact@v6
         with:
           name: subnet-evm-amd64
           path: |
-            /tmp/avalanchego/subnet-evm-linux-amd64-${{ env.TAG }}.tar.gz
-            /tmp/avalanchego/subnet-evm-linux-amd64-${{ env.TAG }}.tar.gz.sig
+            build/tgz/subnet-evm-linux-amd64-${{ env.TAG }}.tar.gz
+            build/tgz/subnet-evm-linux-amd64-${{ env.TAG }}.tar.gz.sig
 
       - name: Cleanup
         if: always()
@@ -100,7 +100,6 @@ jobs:
             rm -f "${GPG_KEY_FILE}"
           fi
           rm -rf ./build
-          rm -rf /tmp/avalanchego
 
   build-arm64-binaries-tarball:
     runs-on: ubuntu-22.04-arm
@@ -113,15 +112,6 @@ jobs:
 
       - uses: ./.github/actions/setup-go-for-project
 
-      - run: go version
-
-      - name: Build the avalanchego binaries
-        run: ./scripts/run_task.sh build
-
-      - name: Build subnet-evm plugin
-        working-directory: ./graft/subnet-evm
-        run: ./scripts/run_task.sh build
-
       - name: Install aws cli
         run: sudo snap install aws-cli --classic
 
@@ -133,53 +123,62 @@ jobs:
           aws-region: us-east-1
 
       - name: Import GPG key
+        env:
+          PRIVATE_KEY: ${{ secrets.RPM_GPG_PRIVATE_KEY }}
         run: |
           GPG_KEY_FILE="$(mktemp)"
           chmod 600 "${GPG_KEY_FILE}"
-          printf '%s' "${{ secrets.RPM_GPG_PRIVATE_KEY }}" > "${GPG_KEY_FILE}"
+          printf '%s' "${PRIVATE_KEY}" > "${GPG_KEY_FILE}"
           printf 'GPG_KEY_FILE=%s\n' "${GPG_KEY_FILE}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from git
         if: "${{ github.event.inputs.tag == '' }}"
-        id: get_tag_from_git
         run: |
           echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
-        id: get_tag_from_workflow
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          echo "TAG=${INPUT_TAG}" >> "$GITHUB_ENV"
         shell: bash
 
-      - name: Create tgz package structure and upload to S3
-        run: ./.github/workflows/build-tgz-pkg.sh
+      - name: Build and validate tarballs
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-tarballs
         env:
-          PKG_ROOT: /tmp/avalanchego
-          TAG: ${{ env.TAG }}
-          BUCKET: ${{ secrets.BUCKET }}
-          ARCH: "arm64"
-          RELEASE: "jammy"
+          PACKAGING_TAG: ${{ env.TAG }}
+          TGZ_ARCH: arm64
           GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
           GPG_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+
+      - name: Upload tarballs to S3
+        env:
+          BUCKET: ${{ secrets.BUCKET }}
+          ARCH: arm64
+        run: |
+          # Explicitly upload only .tar.gz and .tar.gz.sig, never GPG-KEY-avalanchego.
+          find build/tgz -maxdepth 1 \
+              \( -name '*.tar.gz' -o -name '*.tar.gz.sig' \) \
+              -exec aws s3 cp {} "s3://${BUCKET}/linux/binaries/ubuntu/jammy/${ARCH}/" \;
 
       - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v6
         with:
           name: avalanchego-arm64
           path: |
-            /tmp/avalanchego/avalanchego-linux-arm64-${{ env.TAG }}.tar.gz
-            /tmp/avalanchego/avalanchego-linux-arm64-${{ env.TAG }}.tar.gz.sig
+            build/tgz/avalanchego-linux-arm64-${{ env.TAG }}.tar.gz
+            build/tgz/avalanchego-linux-arm64-${{ env.TAG }}.tar.gz.sig
 
       - name: Save subnet-evm as Github artifact
         uses: actions/upload-artifact@v6
         with:
           name: subnet-evm-arm64
           path: |
-            /tmp/avalanchego/subnet-evm-linux-arm64-${{ env.TAG }}.tar.gz
-            /tmp/avalanchego/subnet-evm-linux-arm64-${{ env.TAG }}.tar.gz.sig
+            build/tgz/subnet-evm-linux-arm64-${{ env.TAG }}.tar.gz
+            build/tgz/subnet-evm-linux-arm64-${{ env.TAG }}.tar.gz.sig
 
       - name: Cleanup
         if: always()
@@ -188,4 +187,3 @@ jobs:
             rm -f "${GPG_KEY_FILE}"
           fi
           rm -rf ./build
-          rm -rf /tmp/avalanchego
