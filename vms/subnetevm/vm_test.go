@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/ethtest"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -32,6 +33,7 @@ import (
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -284,6 +286,180 @@ func (s *SUT) buildAndAcceptBlock(t *testing.T) *blocks.Block {
 	built := s.buildAndVerifyBlock(t, nil)
 	s.acceptAndExecuteBlock(t, built)
 	return built
+}
+
+// minimalDeployInitCode returns initcode that deploys exactly 1 byte of
+// runtime code (`0x01`), so that presence/absence of code at the deploy
+// address cleanly distinguishes a successful deploy from a reverted (or
+// never-executed) one.
+//
+//	PUSH1 1; PUSH1 0; MSTORE8  // mem[0] = 0x01
+//	PUSH1 1; PUSH1 0; RETURN   // return mem[0..1]
+var minimalDeployInitCode = []byte{
+	// mem[0] = 0x01
+	byte(vm.PUSH1), 0x01,
+	byte(vm.PUSH1), 0x00,
+	byte(vm.MSTORE8),
+	// return mem[0..1]
+	byte(vm.PUSH1), 0x01,
+	byte(vm.PUSH1), 0x00,
+	byte(vm.RETURN),
+}
+
+// signDeployTx signs (without broadcasting) a contract creation tx from
+// account `from` whose initcode deploys [minimalDeployInitCode].
+func (s *SUT) signDeployTx(t *testing.T, from int) *types.Transaction {
+	t.Helper()
+
+	return s.ethWallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
+		To:        nil, // contract creation
+		Gas:       100_000,
+		GasFeeCap: big.NewInt(225 * subnetevmparams.GWei),
+		Data:      minimalDeployInitCode,
+	})
+}
+
+// sendDeployTx is signDeployTx + broadcast.
+func (s *SUT) sendDeployTx(t *testing.T, from int) *types.Transaction {
+	t.Helper()
+
+	tx := s.signDeployTx(t, from)
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
+	return tx
+}
+
+// signCallTx signs (without broadcasting) a contract call from account `from`
+// to `to` with the given calldata and gas limit. Use this for any precompile
+// invocation (nativeminter, rewardmanager, allowlist setters, ...): the
+// per-precompile sign helper is just `signCallTx(t, from, addr, packedData,
+// gasCap)`.
+func (s *SUT) signCallTx(t *testing.T, from int, to common.Address, data []byte, gas uint64) *types.Transaction {
+	t.Helper()
+
+	return s.ethWallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
+		To:        &to,
+		Gas:       gas,
+		GasFeeCap: big.NewInt(225 * subnetevmparams.GWei),
+		Data:      data,
+	})
+}
+
+// sendCallTx is signCallTx + broadcast.
+func (s *SUT) sendCallTx(t *testing.T, from int, to common.Address, data []byte, gas uint64) *types.Transaction {
+	t.Helper()
+
+	tx := s.signCallTx(t, from, to, data, gas)
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
+	return tx
+}
+
+// fetchAllowListRole fetches the allowlist role for `address` at `blockNumber`.
+func (s *SUT) fetchAllowListRole(
+	t *testing.T,
+	precompile common.Address,
+	address common.Address,
+	blockNumber rpc.BlockNumber,
+) allowlist.Role {
+	t.Helper()
+
+	stateDB, _, err := s.vm.GethRPCBackends().StateAndHeaderByNumber(s.ctx, blockNumber)
+	require.NoError(t, err)
+	return allowlist.GetAllowListStatus(stateDB, precompile, address)
+}
+
+// isPrecompileEnabledAtLatest returns whether `precompile` is enabled per the
+// chain config at the SUT's current (latest) timestamp.
+func (s *SUT) isPrecompileEnabledAtLatest(precompile common.Address) bool {
+	chainConfig := s.vm.GethRPCBackends().ChainConfig()
+	timestamp := uint64(s.now.Unix())
+	return subnetevmparams.GetExtra(chainConfig).IsPrecompileEnabled(precompile, timestamp)
+}
+
+// requireBlockContainsTxs asserts that `block` contains exactly the supplied
+// tx hashes, ignoring order.
+func requireBlockContainsTxs(t *testing.T, block *blocks.Block, want ...common.Hash) {
+	t.Helper()
+
+	got := make(map[common.Hash]struct{}, len(block.Transactions()))
+	for _, tx := range block.Transactions() {
+		got[tx.Hash()] = struct{}{}
+	}
+	require.Lenf(t, got, len(want), "block must contain exactly %d txs, got %d", len(want), len(got))
+	for _, h := range want {
+		_, ok := got[h]
+		require.Truef(t, ok, "block must contain tx %#x", h)
+	}
+}
+
+// requireTxSucceeded fetches `tx`'s receipt and asserts a successful status
+// (status=1).
+func (s *SUT) requireTxSucceeded(t *testing.T, tx *types.Transaction) *types.Receipt {
+	t.Helper()
+
+	receipt, err := s.client.TransactionReceipt(s.ctx, tx.Hash())
+	require.NoErrorf(t, err, "TransactionReceipt(%#x)", tx.Hash())
+	require.Equalf(t, types.ReceiptStatusSuccessful, receipt.Status,
+		"tx %#x must succeed (status=1)", tx.Hash())
+	return receipt
+}
+
+// requireTxFailed fetches `tx`'s receipt and asserts a failed status
+// (status=0). Use for txs that revert inside the EVM (precompile errors,
+// frame-local CanCreateContract rejection, ...): the tx is included in the
+// block but its state changes are rolled back.
+func (s *SUT) requireTxFailed(t *testing.T, tx *types.Transaction) *types.Receipt {
+	t.Helper()
+
+	receipt, err := s.client.TransactionReceipt(s.ctx, tx.Hash())
+	require.NoErrorf(t, err, "TransactionReceipt(%#x)", tx.Hash())
+	require.Equalf(t, types.ReceiptStatusFailed, receipt.Status,
+		"tx %#x must revert (status=0)", tx.Hash())
+	return receipt
+}
+
+// requireDeploySucceeded fetches `tx`'s receipt and asserts a successful
+// contract creation (status=1; deployed code present at receipt's contract
+// address).
+func (s *SUT) requireDeploySucceeded(t *testing.T, tx *types.Transaction) {
+	t.Helper()
+	require.Nil(t, tx.To(), "test setup: tx must be a contract creation")
+
+	receipt := s.requireTxSucceeded(t, tx)
+	require.NotEqualf(t, (common.Address{}), receipt.ContractAddress,
+		"successful deploy must populate ContractAddress")
+
+	code, err := s.client.CodeAt(s.ctx, receipt.ContractAddress, nil)
+	require.NoErrorf(t, err, "CodeAt(%s)", receipt.ContractAddress)
+	require.NotEmptyf(t, code, "successful deploy at %s must leave code on chain", receipt.ContractAddress)
+}
+
+// requireDeployFailed fetches `tx`'s receipt and asserts a failed contract
+// creation (status=0; no code at the derived deploy address).
+//
+// `CanCreateContract` returns its error as `vmerr` inside the EVM, which
+// surfaces as a failed receipt rather than excluding the tx from the block.
+// See the design note on [hook.Points.CanExecuteTransaction].
+func (s *SUT) requireDeployFailed(t *testing.T, tx *types.Transaction) {
+	t.Helper()
+	require.Nil(t, tx.To(), "test setup: tx must be a contract creation")
+
+	receipt := s.requireTxFailed(t, tx)
+	// receipt.ContractAddress is still derived from (sender, nonce) even
+	// for failed deploys; assert the address has no code.
+	code, err := s.client.CodeAt(s.ctx, receipt.ContractAddress, nil)
+	require.NoErrorf(t, err, "CodeAt(%s)", receipt.ContractAddress)
+	require.Emptyf(t, code, "failed deploy must leave no code at %s", receipt.ContractAddress)
+}
+
+// allowListTestStartTime returns a deterministic start time well past the
+// Helicon activation, used by the per-precompile upgrade-timeline tests so
+// their pre-Tau windows do not dip below the activation timestamp.
+func allowListTestStartTime(t *testing.T) time.Time {
+	t.Helper()
+
+	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(upgradetest.Helicon))
+	require.NotNil(t, networkUpgrades.HeliconTimestamp)
+	return time.Unix(int64(*networkUpgrades.HeliconTimestamp), 0).Add(saeparams.Tau)
 }
 
 // TestStateUpgradeAppliedAtActivationSAE exercises the `StateUpgrades` arm of
