@@ -10,22 +10,27 @@
 #   TAG            - Git tag (e.g., "v1.14.1")
 #   GIT_COMMIT     - Full git commit hash used to build the binaries
 #
-# Optional env vars:
-#   TGZ_ARCH       - Tarball architecture ("amd64" or "arm64"), defaults to host
+# Target architecture is derived from `uname -m`. The validation
+# container is launched with --platform pinned to host arch, matching
+# the arch the tarballs were built for, so this always lines up.
 
 set -euo pipefail
 
 : "${TAG:?TAG must be set}"
 : "${GIT_COMMIT:?GIT_COMMIT must be set}"
 
-if [[ -z "${TGZ_ARCH:-}" ]]; then
-    arch=$(uname -m)
-    case "${arch}" in
-        x86_64)        TGZ_ARCH="amd64" ;;
-        arm64|aarch64) TGZ_ARCH="arm64" ;;
-        *)             TGZ_ARCH="${arch}" ;;
-    esac
-fi
+# Map uname -m to deb-style arch (aarch64 -> arm64). The script owns its
+# own arch determination — we don't accept TGZ_ARCH from env, since
+# Task v3 forwards parent shell env vars in a way that would let a
+# caller-supplied TGZ_ARCH=<other-arch> mislabel the validation lookup.
+arch=$(uname -m)
+case "${arch}" in
+    x86_64)        TGZ_ARCH="amd64" ;;
+    arm64|aarch64) TGZ_ARCH="arm64" ;;
+    *) echo "Unsupported arch: ${arch}" >&2; exit 1 ;;
+esac
+# Export so the validation container (launched below) sees it via `-e TGZ_ARCH`.
+export TGZ_ARCH
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 TGZ_DIR="${REPO_ROOT}/build/tgz"
@@ -42,7 +47,11 @@ for f in \
 done
 
 echo "=== Validating tarballs in fresh Ubuntu 22.04 container ==="
+# Pin --platform to host arch (TGZ_ARCH is always host arch here) so
+# DOCKER_DEFAULT_PLATFORM doesn't cause Docker to try a non-host
+# manifest of ubuntu:22.04 and fail to launch.
 docker run --rm \
+    --platform "linux/${TGZ_ARCH}" \
     -v "${TGZ_DIR}:/tgz:ro" \
     -e TAG \
     -e TGZ_ARCH \
