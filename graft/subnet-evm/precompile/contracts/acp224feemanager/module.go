@@ -39,12 +39,16 @@ func init() {
 	}
 }
 
-// MakeConfig is required for Marshal/Unmarshal of the precompile config.
+// MakeConfig returns a zero-valued config for JSON unmarshaling when
+// loading this precompile's config from chain config or upgrades.
 func (*configurator) MakeConfig() precompileconfig.Config {
 	return new(Config)
 }
 
-// Configure is called by the EVM once per precompile contract activation.
+// Configure performs one-time initialization when the precompile activates.
+// It seeds contract storage with the initial fee config and allowlist state.
+// This function MUST only be called once as re-running it would reset that
+// initialized state.
 func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.ConfigurationBlockContext) error {
 	config, ok := cfg.(*Config)
 	if !ok {

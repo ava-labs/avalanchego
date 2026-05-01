@@ -49,6 +49,16 @@ func TestEqual(t *testing.T) {
 			Other:    nil,
 			Expected: false,
 		},
+		"typed nil config and typed nil other": {
+			Config:   (*acp224feemanager.Config)(nil),
+			Other:    (*acp224feemanager.Config)(nil),
+			Expected: false,
+		},
+		"typed nil config and nil other": {
+			Config:   (*acp224feemanager.Config)(nil),
+			Other:    nil,
+			Expected: true,
+		},
 		"different type": {
 			Config:   acp224feemanager.NewConfig(utils.PointerTo[uint64](3), admins, enableds, nil, nil),
 			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),

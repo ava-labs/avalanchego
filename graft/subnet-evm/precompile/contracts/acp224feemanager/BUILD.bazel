@@ -47,3 +47,8 @@ graft_go_test(
         "@org_uber_go_mock//gomock",
     ],
 )
+
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
