@@ -24,7 +24,7 @@ type Config struct {
 	InitialFeeConfig *commontype.ACP224FeeConfig `json:"initialFeeConfig,omitempty"` // activated immediately on precompile enable if provided
 }
 
-// NewConfig returns a config that enables ACP224FeeManager at [blockTimestamp].
+// NewConfig returns a config that enables ACP224FeeManager at `blockTimestamp`.
 func NewConfig(blockTimestamp *uint64, admins []common.Address, enabled []common.Address, managers []common.Address, initialConfig *commontype.ACP224FeeConfig) *Config {
 	return &Config{
 		AllowListConfig: allowlist.AllowListConfig{
@@ -37,7 +37,7 @@ func NewConfig(blockTimestamp *uint64, admins []common.Address, enabled []common
 	}
 }
 
-// NewDisableConfig returns a config that disables ACP224FeeManager at [blockTimestamp].
+// NewDisableConfig returns a config that disables ACP224FeeManager at `blockTimestamp`.
 func NewDisableConfig(blockTimestamp *uint64) *Config {
 	return &Config{
 		Upgrade: precompileconfig.Upgrade{

@@ -62,7 +62,7 @@ var (
 	feeConfigLastChangedAtKey = storageSlot('l', 'c', 'a')
 )
 
-// GetACP224FeeManagerAllowListStatus returns the role of [address] for the allow list.
+// GetACP224FeeManagerAllowListStatus returns the role of `address` for the allowlist.
 func GetACP224FeeManagerAllowListStatus(stateDB contract.StateReader, contractAddr common.Address, address common.Address) allowlist.Role {
 	return allowlist.GetAllowListStatus(stateDB, contractAddr, address)
 }
@@ -122,9 +122,9 @@ func getFeeConfig(
 	accessibleState contract.AccessibleState,
 	caller common.Address,
 	self common.Address, // EVM-semantic self; see libevm.AddressContext
-	input []byte,
+	input []byte, // ignored
 	suppliedGas uint64,
-	readOnly bool,
+	readOnly bool, // ignored - method only reads
 ) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = contract.DeductGas(suppliedGas, getFeeConfigGasCost); err != nil {
 		return nil, 0, err
