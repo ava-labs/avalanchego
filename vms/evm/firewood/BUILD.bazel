@@ -12,7 +12,7 @@ go_library(
         "storage_trie.go",
         "triedb.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/graft/evm/firewood",
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/firewood",
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",

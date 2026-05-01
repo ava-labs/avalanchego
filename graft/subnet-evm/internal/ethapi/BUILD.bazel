@@ -19,7 +19,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/internal/ethapi",
     visibility = ["//graft/subnet-evm:__subpackages__"],
     deps = [
-        "//graft/evm/firewood",
         "//graft/evm/rpc",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/consensus",
@@ -28,6 +27,7 @@ go_library(
         "//graft/subnet-evm/params",
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/plugin/evm/customtypes",
+        "//vms/evm/firewood",
         "@com_github_ava_labs_libevm//accounts",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//accounts/keystore",
