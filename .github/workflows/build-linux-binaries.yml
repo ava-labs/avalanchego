@@ -63,7 +63,6 @@ jobs:
         run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-tarballs
         env:
           PACKAGING_TAG: ${{ env.TAG }}
-          TGZ_ARCH: amd64
           GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
           GPG_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
 
@@ -150,7 +149,6 @@ jobs:
         run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-tarballs
         env:
           PACKAGING_TAG: ${{ env.TAG }}
-          TGZ_ARCH: arm64
           GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
           GPG_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
 

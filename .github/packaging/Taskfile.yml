@@ -132,16 +132,11 @@ tasks:
   build-tgz-builder-docker-image:
     desc: Builds the linux tarball builder Docker image
     internal: true
-    vars:
-      TGZ_ARCH: '{{.TGZ_ARCH | default .PACKAGING_TGZ_HOST_ARCH}}'
     env:
       GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
       DOCKER_IMAGE: '{{.PACKAGING_TGZ_DOCKER_IMAGE}}'
       DOCKERFILE: 'Dockerfile.tgz'
       CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
-      # Pin the builder image to the requested target arch so a subsequent
-      # `docker run --platform linux/<arch>` matches the image manifest.
-      BUILDER_PLATFORM: 'linux/{{.TGZ_ARCH}}'
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/build-builder-image.sh'
 
@@ -155,7 +150,6 @@ tasks:
       - cmd: mkdir -p {{.PACKAGING_TGZ_OUTPUT_DIR}}
       - cmd: >-
           docker run --rm
-          --platform linux/{{.TGZ_ARCH}}
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_TGZ_OUTPUT_DIR}}:/output
           {{if .GPG_KEY_FILE}}-v {{.GPG_KEY_FILE}}:{{.GPG_KEY_FILE}}:ro{{end}}

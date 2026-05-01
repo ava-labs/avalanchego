@@ -43,7 +43,6 @@ done
 
 echo "=== Validating tarballs in fresh Ubuntu 22.04 container ==="
 docker run --rm \
-    --platform "linux/${TGZ_ARCH}" \
     -v "${TGZ_DIR}:/tgz:ro" \
     -e TAG \
     -e TGZ_ARCH \
