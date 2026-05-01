@@ -34,12 +34,15 @@ type newBlockConfig struct {
 	prev *Block
 	// If round is 0, it will be set to one higher than the prev's round
 	round uint64
+	// genesis nodes
+	numNodes uint64
 }
 
 func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
 		vm := newTestVM()
 		block := &Block{
+			blacklist: simplex.NewBlacklist(uint16(config.numNodes)),
 			vmBlock: &wrappedBlock{
 				Block: snowmantest.Genesis,
 				vm:    vm,

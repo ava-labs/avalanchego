@@ -33,6 +33,7 @@ const (
 	initialRetryWait            = 10 * time.Millisecond
 	maxRetryWait                = time.Second
 	retryWaitFactor             = 1.5 // Larger --> timeout grows more quickly
+	logInterval                 = time.Minute
 )
 
 var (
@@ -259,6 +260,8 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 		s.workLock.Unlock()
 	}()
 
+	go s.logProgress(ctx)
+
 	// Keep doing work until we're closed, done or [ctx] is canceled.
 	s.workLock.Lock()
 	for {
@@ -287,6 +290,31 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 			go s.doWork(ctx, work)
 		}
 	}
+}
+
+func (s *Syncer[_, _]) logProgress(ctx context.Context) {
+	ticker := time.NewTicker(logInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.doneChan:
+			return
+		case <-ticker.C:
+			root := s.getTargetRoot()
+			percentage := s.getProgress(root)
+			s.config.Log.Info("syncing progress", zap.String("percent complete", fmt.Sprintf("%.2f", percentage)), zap.Stringer("target root", root))
+		}
+	}
+}
+
+func (s *Syncer[_, _]) getProgress(root ids.ID) float64 {
+	s.workLock.Lock()
+	defer s.workLock.Unlock()
+
+	return s.processedWork.KeyspacePercent(root)
 }
 
 // close is called when there is a fatal error or sync is complete.

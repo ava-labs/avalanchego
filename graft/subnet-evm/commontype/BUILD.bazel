@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
 go_library(
     name = "commontype",
     srcs = [
@@ -9,7 +14,6 @@ go_library(
         "test_fee_config.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/utils",
         "@com_github_ava_labs_libevm//common",

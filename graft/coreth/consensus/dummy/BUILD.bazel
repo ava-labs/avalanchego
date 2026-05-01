@@ -1,10 +1,14 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "dummy",
     srcs = ["consensus.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/consensus",
         "//graft/coreth/params",
