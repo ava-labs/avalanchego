@@ -212,7 +212,7 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 		require.NoError(t, op.ApplyTo(newSDB.StateDB))
 
 		// We must manually finalize the trie structures before comparison.
-		// Otherwise, comparing the state DBs would trivially pass.
+		// Otherwise, comparing the state DBs wouldn't include the changes.
 		for _, sdb := range []*extstate.StateDB{oldSDB, newSDB} {
 			sdb.Finalise(true)
 			sdb.IntermediateRoot(true)
@@ -223,7 +223,7 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 			cmputils.StateDBs(),
 		}
 		if diff := cmp.Diff(oldSDB, newSDB, opts...); diff != "" {
-			t.Errorf("%T.AsOp() diff (-want +got):\n%s", newTx, diff)
+			t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", newTx, diff)
 		}
 	})
 }

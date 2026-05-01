@@ -1196,22 +1196,16 @@ func TestTransferNonAVAX(t *testing.T) {
 		{
 			name: "import_avax",
 			tx: &Import{
-				Outs: []Output{{
-					Address: alice,
-					Amount:  1,
-					AssetID: AVAXAssetID,
-				}},
+				Outs: []Output{
+					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
+				},
 			},
 		},
 		{
 			name: "import_non_avax",
 			tx: &Import{
 				Outs: []Output{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
+					{Address: alice, Amount: 1, AssetID: btc},
 				},
 			},
 			want: map[common.Address]map[ids.ID]uint64{
@@ -1224,41 +1218,13 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "import_many",
 			tx: &Import{
 				Outs: []Output{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: alice,
-						Amount:  10,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: bob,
-						Amount:  100,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: alice,
-						Amount:  1_000,
-						AssetID: btc,
-					},
-					{
-						Address: alice,
-						Amount:  10_000,
-						AssetID: btc,
-					},
-					{
-						Address: bob,
-						Amount:  100_000,
-						AssetID: btc,
-					},
-					{
-						Address: bob,
-						Amount:  1_000_000,
-						AssetID: eth,
-					},
+					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 10, AssetID: AVAXAssetID},
+					{Address: bob, Amount: 100, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 1_000, AssetID: btc},
+					{Address: alice, Amount: 10_000, AssetID: btc},
+					{Address: bob, Amount: 100_000, AssetID: btc},
+					{Address: bob, Amount: 1_000_000, AssetID: eth},
 				},
 			},
 			want: map[common.Address]map[ids.ID]uint64{
@@ -1275,11 +1241,7 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "export_avax",
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: AVAXAssetID,
-					},
+					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
 				},
 			},
 		},
@@ -1292,11 +1254,7 @@ func TestTransferNonAVAX(t *testing.T) {
 			},
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
+					{Address: alice, Amount: 1, AssetID: btc},
 				},
 			},
 			want: map[common.Address]map[ids.ID]uint64{
@@ -1305,7 +1263,6 @@ func TestTransferNonAVAX(t *testing.T) {
 				},
 			},
 		},
-
 		{
 			name: "export_many",
 			init: map[common.Address]map[ids.ID]uint64{
@@ -1319,41 +1276,13 @@ func TestTransferNonAVAX(t *testing.T) {
 			},
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: alice,
-						Amount:  10,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: bob,
-						Amount:  100,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: alice,
-						Amount:  1_000,
-						AssetID: btc,
-					},
-					{
-						Address: alice,
-						Amount:  10_000,
-						AssetID: btc,
-					},
-					{
-						Address: bob,
-						Amount:  100_000,
-						AssetID: btc,
-					},
-					{
-						Address: bob,
-						Amount:  1_000_000,
-						AssetID: eth,
-					},
+					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 10, AssetID: AVAXAssetID},
+					{Address: bob, Amount: 100, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 1_000, AssetID: btc},
+					{Address: alice, Amount: 10_000, AssetID: btc},
+					{Address: bob, Amount: 100_000, AssetID: btc},
+					{Address: bob, Amount: 1_000_000, AssetID: eth},
 				},
 			},
 			want: map[common.Address]map[ids.ID]uint64{
@@ -1370,11 +1299,7 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "export_non_avax_insufficient",
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
+					{Address: alice, Amount: 1, AssetID: btc},
 				},
 			},
 			wantErr: errInsufficientFunds,
@@ -1388,16 +1313,8 @@ func TestTransferNonAVAX(t *testing.T) {
 			},
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
+					{Address: alice, Amount: 1, AssetID: btc},
+					{Address: alice, Amount: 1, AssetID: btc},
 				},
 			},
 			wantErr: errInsufficientFunds,
