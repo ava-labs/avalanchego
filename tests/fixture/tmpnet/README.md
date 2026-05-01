@@ -19,6 +19,7 @@ orchestrate the same temporary networks without the use of an rpc daemon.
   - [Enabling errors with stack traces](#enabling-errors-with-stack-traces)
     - [Ensuring stack trace support](#ensuring-stack-trace-support)
 - [Networking configuration](#networking-configuration)
+- [Topology](#topology)
 - [Configuration on disk](#configuration-on-disk)
   - [Common networking configuration](#common-networking-configuration)
   - [Genesis](#genesis)
@@ -81,6 +82,7 @@ the following non-test files:
 | network.go                  | Network        | Orchestrates and configures temporary networks                         |
 | network_config.go           | Network        | Reads and writes network configuration                                 |
 | network_test.go             |                | Simple test round-tripping Network serialization                       |
+| topology_runtime.go         | Topology       | Applies optional kube-backed network topology via Chaos Mesh           |
 | node.go                     | Node           | Orchestrates and configures nodes                                      |
 | node_config.go              | Node           | Reads and writes node configuration                                    |
 | process_runtime.go          | ProcessRuntime | Orchestrates node processes                                            |
@@ -223,6 +225,96 @@ by reading the `[base-data-dir]/process.json` file written by
 avalanchego on node start. The use of dynamic ports supports testing
 with many temporary networks without having to manually select compatible
 port ranges.
+
+## Topology
+[Top](#table-of-contents)
+
+tmpnet networks may optionally define a `Topology` describing a
+persistent distributed layout for the network. This is intended for
+cases where a test wants nodes to run with non-uniform connectivity
+characteristics rather than the default colocated behavior.
+
+A topology consists of:
+
+- `Topology.Mode`: whether topology is required or best-effort when the
+  environment can't realize it
+- `Topology.Locations`: named groups of nodes identified by node ID
+- `Topology.Connectivity`: directional connections between locations
+- `Connection.Latency`: the persistent latency to apply for that
+  connection
+
+The current implementation is kube-specific. When every node in a
+network uses the kube runtime, tmpnet realizes topology connections by
+creating Chaos Mesh `NetworkChaos` resources once the node pods exist
+and before tmpnet waits for the network to become healthy, then removing
+those resources again when the network stops.
+
+`Topology.Mode` controls behavior when topology is configured but the
+runtime can't realize it:
+
+- `required` (the default): fail if topology can't be applied
+- `best-effort`: emit a warning and continue when the runtime is not
+  kube-backed
+
+When kube is selected and topology application actually fails (for
+example because Chaos Mesh or RBAC is unavailable), tmpnet still treats
+that as an error.
+
+Each connection is directional. To model symmetric latency between two
+locations, define one connection in each direction.
+
+For kube-backed networks, tmpnet assigns pods in each configured
+location the label `tmpnet.avax.network/location=<location>` and targets
+Chaos Mesh rules by that label together with `network_uuid`.
+
+Each directed connection is validated before realization:
+
+- `From` and `To` must refer to defined locations
+- `Latency` must be set
+- duplicate directed connections are rejected, even if the duplicate
+  specifies the same latency
+
+Each realized `NetworkChaos` resource has a deterministic tmpnet-owned
+name derived from the network UUID and directed connection, while the
+resource labels retain the human-meaningful `network_uuid`,
+`topology_from_location`, and `topology_to_location` values.
+
+Example:
+
+```go
+nodes := tmpnet.NewNodesOrPanic(2)
+network := &tmpnet.Network{
+    Nodes: nodes,
+    Topology: &tmpnet.Topology{
+        Mode: tmpnet.TopologyModeRequired,
+        Locations: []tmpnet.Location{
+            {Name: "chicago", NodeIDs: []ids.NodeID{nodes[0].NodeID}},
+            {Name: "new-york", NodeIDs: []ids.NodeID{nodes[1].NodeID}},
+        },
+        Connectivity: []tmpnet.Connection{
+            {From: "chicago", To: "new-york", Latency: "10ms"},
+            {From: "new-york", To: "chicago", Latency: "10ms"},
+        },
+    },
+}
+```
+
+This example requests 10ms of added one-way latency in each direction
+between the two nodes. In a kube environment, that should produce an
+approximate 20ms RTT increase on top of the baseline network latency.
+
+Requirements and caveats:
+
+- topology is currently only realized for kube-backed networks
+- `required` mode fails when topology can't be realized; `best-effort`
+  mode warns and continues when the runtime is not kube-backed
+- Chaos Mesh must be installed in the target cluster
+- the tmpnet service account must have RBAC permissions for
+  `chaos-mesh.org` `networkchaos` resources
+- the current implementation focuses on persistent latency; additional
+  network conditions may be added separately in the future
+- topology support is currently implemented against the Chaos Mesh 2.7.2
+  API surface used by tmpnet's kind workflow
 
 ## Configuration on disk
 [Top](#table-of-contents)

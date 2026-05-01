@@ -366,6 +366,8 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		zap.String("namespace", namespace),
 		zap.String("statefulSet", statefulSetName),
 	)
+	labels := p.node.getKubeLabels()
+
 	statefulSet := NewNodeStatefulSet(
 		statefulSetName,
 		false, // generateName
@@ -376,7 +378,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		fmt.Sprintf("%dGi", runtimeConfig.VolumeSizeGB),
 		volumeMountPath,
 		flags,
-		p.node.getMonitoringLabels(),
+		labels,
 	)
 
 	if runtimeConfig.UseExclusiveScheduling {

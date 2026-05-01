@@ -159,6 +159,7 @@ type serializedNetworkConfig struct {
 	PrimaryChainConfigs  map[string]ConfigMap    `json:"primaryChainConfigs,omitempty"`
 	DefaultFlags         FlagsMap                `json:"defaultFlags,omitempty"`
 	DefaultRuntimeConfig NodeRuntimeConfig       `json:"defaultRuntimeConfig,omitempty"`
+	Topology             *Topology               `json:"topology,omitempty"`
 	PreFundedKeys        []*secp256k1.PrivateKey `json:"preFundedKeys,omitempty"`
 }
 
@@ -171,6 +172,7 @@ func (n *Network) writeNetworkConfig() error {
 		PrimaryChainConfigs:  n.PrimaryChainConfigs,
 		DefaultFlags:         n.DefaultFlags,
 		DefaultRuntimeConfig: n.DefaultRuntimeConfig,
+		Topology:             n.Topology,
 		PreFundedKeys:        n.PreFundedKeys,
 	}
 	bytes, err := DefaultJSONMarshal(config)

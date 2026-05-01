@@ -28,7 +28,7 @@ func NewKubeconfigFlagVars() *KubeconfigVars {
 // internal method enabling configuration of the doc prefix
 func newKubeconfigFlagVars(docPrefix string) *KubeconfigVars {
 	v := &KubeconfigVars{}
-	v.register(flag.StringVar, docPrefix)
+	v.registerStdlib(flag.CommandLine, docPrefix)
 	return v
 }
 
@@ -40,31 +40,75 @@ func NewKubeconfigFlagSetVars(flagSet *pflag.FlagSet) *KubeconfigVars {
 // internal method enabling configuration of the doc prefix
 func newKubeconfigFlagSetVars(flagSet *pflag.FlagSet, docPrefix string) *KubeconfigVars {
 	v := &KubeconfigVars{}
-	v.register(flagSet.StringVar, docPrefix)
+	v.registerPFlag(flagSet, docPrefix)
 	return v
 }
 
-func (v *KubeconfigVars) register(stringVar varFunc[string], docPrefix string) {
+func defaultKubeconfigPath() string {
 	// the default kubeConfig path is set to empty to allow for the use of a projected
 	// token when running in-cluster
-	var defaultKubeConfigPath string
-	if !tmpnet.IsRunningInCluster() {
-		defaultKubeConfigPath = os.ExpandEnv("$HOME/.kube/config")
+	if tmpnet.IsRunningInCluster() {
+		return ""
 	}
+	return tmpnet.GetEnvWithDefault(KubeconfigPathEnvVar, os.ExpandEnv("$HOME/.kube/config"))
+}
 
-	stringVar(
-		&v.Path,
-		"kubeconfig",
-		tmpnet.GetEnvWithDefault(KubeconfigPathEnvVar, defaultKubeConfigPath),
-		docPrefix+fmt.Sprintf(
-			"The path to a kubernetes configuration file for the target cluster. Also possible to configure via the %s env variable.",
-			KubeconfigPathEnvVar,
-		),
-	)
-	stringVar(
-		&v.Context,
-		"kubeconfig-context",
-		"",
-		docPrefix+"The optional kubeconfig context to use",
-	)
+func (v *KubeconfigVars) registerStdlib(flagSet *flag.FlagSet, docPrefix string) {
+	defaultPath := defaultKubeconfigPath()
+	if existing := flagSet.Lookup("kubeconfig"); existing != nil {
+		v.Path = existing.Value.String()
+		if v.Path == "" {
+			v.Path = defaultPath
+		}
+	} else {
+		flagSet.StringVar(
+			&v.Path,
+			"kubeconfig",
+			defaultPath,
+			docPrefix+fmt.Sprintf(
+				"The path to a kubernetes configuration file for the target cluster. Also possible to configure via the %s env variable.",
+				KubeconfigPathEnvVar,
+			),
+		)
+	}
+	if existing := flagSet.Lookup("kubeconfig-context"); existing != nil {
+		v.Context = existing.Value.String()
+	} else {
+		flagSet.StringVar(
+			&v.Context,
+			"kubeconfig-context",
+			"",
+			docPrefix+"The optional kubeconfig context to use",
+		)
+	}
+}
+
+func (v *KubeconfigVars) registerPFlag(flagSet *pflag.FlagSet, docPrefix string) {
+	defaultPath := defaultKubeconfigPath()
+	if existing := flagSet.Lookup("kubeconfig"); existing != nil {
+		v.Path = existing.Value.String()
+		if v.Path == "" {
+			v.Path = defaultPath
+		}
+	} else {
+		flagSet.StringVar(
+			&v.Path,
+			"kubeconfig",
+			defaultPath,
+			docPrefix+fmt.Sprintf(
+				"The path to a kubernetes configuration file for the target cluster. Also possible to configure via the %s env variable.",
+				KubeconfigPathEnvVar,
+			),
+		)
+	}
+	if existing := flagSet.Lookup("kubeconfig-context"); existing != nil {
+		v.Context = existing.Value.String()
+	} else {
+		flagSet.StringVar(
+			&v.Context,
+			"kubeconfig-context",
+			"",
+			docPrefix+"The optional kubeconfig context to use",
+		)
+	}
 }

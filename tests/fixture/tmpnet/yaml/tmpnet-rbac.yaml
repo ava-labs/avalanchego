@@ -51,3 +51,25 @@ subjects:
   - kind: ServiceAccount
     name: tmpnet
     namespace: tmpnet
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tmpnet-chaos-mesh
+rules:
+  - apiGroups: ["chaos-mesh.org"]
+    resources: ["networkchaos"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tmpnet-chaos-mesh
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tmpnet-chaos-mesh
+subjects:
+  - kind: ServiceAccount
+    name: tmpnet
+    namespace: tmpnet
