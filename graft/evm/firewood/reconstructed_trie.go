@@ -24,16 +24,24 @@ var (
 // Like [accountTrie], it accumulates BatchOps from writes. Unlike [accountTrie],
 // Hash() chains Reconstruct() calls instead of creating proposals.
 //
+// If computeRootOnHash is true, Hash and Commit apply pending writes and then
+// compute the updated reconstructed root. Otherwise, they apply pending writes
+// but return the previously cached root, avoiding the expensive root computation
+// when the caller only needs Hash as a state-flush point and validates the final
+// root separately.
+//
 // Not concurrent-safe (matching Reconstructed's guarantees).
 type reconstructedAccountTrie struct {
 	baseTrie
-	recon *ffi.Reconstructed
+	recon             *ffi.Reconstructed
+	computeRootOnHash bool
 }
 
 // newReconstructedAccountTrie creates a new reconstructed account trie.
 // The caller retains ownership of the [ffi.Reconstructed] handle and must ensure
 // it outlives the trie.
-func newReconstructedAccountTrie(recon *ffi.Reconstructed) (*reconstructedAccountTrie, error) {
+// computeRootOnHash controls whether Hash and Commit update the cached root.
+func newReconstructedAccountTrie(recon *ffi.Reconstructed, computeRootOnHash bool) (*reconstructedAccountTrie, error) {
 	if recon == nil {
 		return nil, errNilReconstructed
 	}
@@ -43,12 +51,15 @@ func newReconstructedAccountTrie(recon *ffi.Reconstructed) (*reconstructedAccoun
 			root:      common.Hash(recon.Root()),
 			dirtyKeys: make(map[string][]byte),
 		},
-		recon: recon,
+		recon:             recon,
+		computeRootOnHash: computeRootOnHash,
 	}, nil
 }
 
 // Hash returns the current hash of the reconstructed trie.
-// This will chain Reconstruct() with the accumulated ops to compute the new root.
+// This will chain Reconstruct() with the accumulated ops. If computeRootOnHash
+// is false, it applies the ops but returns the cached root without computing the
+// reconstructed root.
 // If there are no changes since the last call, the cached root is returned.
 // On error, the zero hash is returned.
 func (r *reconstructedAccountTrie) Hash() common.Hash {
@@ -66,7 +77,9 @@ func (r *reconstructedAccountTrie) hash() (common.Hash, error) {
 		if err := r.recon.Reconstruct(r.updateOps); err != nil {
 			return common.Hash{}, err
 		}
-		r.root = common.Hash(r.recon.Root())
+		if r.computeRootOnHash {
+			r.root = common.Hash(r.recon.Root())
+		}
 		// Unlike accountTrie, updateOps must be cleared because Reconstruct()
 		// is incremental (mutates in place), whereas createProposals() replays
 		// all ops from the parent root each time.

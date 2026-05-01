@@ -63,7 +63,7 @@ func TestReconstructedRevisions(t *testing.T) {
 		r.NoError(recon.Drop())
 	})
 
-	reconDB, err := NewReconstructedStateAccessor(db, recon)
+	reconDB, err := NewReconstructedStateAccessor(db, recon, true /* computeRootOnHash */)
 	r.NoError(err)
 
 	var (
@@ -107,4 +107,70 @@ func TestReconstructedRevisions(t *testing.T) {
 		r.NoError(reconTrie.UpdateAccount(addr, &types.StateAccount{Balance: balance}))
 		r.Equal(normalRoot, reconTrie.Hash(), "reconstructed root mismatch for R%d", i+2)
 	}
+}
+
+// TestReconstructedRevisionHashing verifies computeRootOnHash=false only
+// flushes writes, and computeRootOnHash=true computes roots again.
+func TestReconstructedRevisionHashing(t *testing.T) {
+	r := require.New(t)
+
+	db := newTestDatabase(t)
+	trie, err := db.OpenTrie(types.EmptyRootHash)
+	r.NoError(err)
+
+	// Start by committing an initial revision to build reconstructed revisions from.
+	addr := common.HexToAddress("1234")
+	r.NoError(trie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(100)}))
+
+	initialRoot := trie.Hash()
+	committedRoot, _, err := trie.Commit(true)
+	r.NoError(err)
+	r.Equal(initialRoot, committedRoot)
+	r.NoError(db.TrieDB().Update(
+		initialRoot,
+		types.EmptyRootHash,
+		0,
+		nil,
+		nil,
+		stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1})),
+	)
+	r.NoError(db.TrieDB().Commit(initialRoot, true))
+
+	tdb := db.TrieDB().Backend().(*TrieDB)
+	rev, err := tdb.Firewood.LatestRevision()
+	r.NoError(err)
+	recon, err := rev.Reconstruct(nil)
+	r.NoError(err)
+	r.NoError(rev.Drop())
+	t.Cleanup(func() {
+		r.NoError(recon.Drop())
+	})
+
+	// First, use the reconstructed view with computeRootOnHash=false so that Hash
+	// flushes pending writes but returns the cached root.
+	replayAccessor, err := NewReconstructedStateAccessor(db, recon, false /* computeRootOnHash */)
+	r.NoError(err)
+	replayTrie, err := replayAccessor.OpenTrie(initialRoot)
+	r.NoError(err)
+	r.NoError(replayTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(200)}))
+
+	// Verify that Hash did not force a hash update, but that the underlying reconstructed revision did change.
+	r.Equal(initialRoot, replayTrie.Hash())
+	replayedRoot := common.Hash(recon.Root())
+	r.NotEqual(initialRoot, replayedRoot)
+
+	// Use the same reconstructed revision through a new accessor with normal
+	// root computation enabled.
+	hashedAccessor, err := NewReconstructedStateAccessor(db, recon, true /* computeRootOnHash */)
+	r.NoError(err)
+
+	// Update the reconstructed revision to force a hash update.
+	hashedTrie, err := hashedAccessor.OpenTrie(replayedRoot)
+	r.NoError(err)
+	r.NoError(hashedTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(300)}))
+
+	// Verify that Hash returns the currentRoot of the trie.
+	currentRoot := hashedTrie.Hash()
+	r.NotEqual(replayedRoot, currentRoot)
+	r.Equal(currentRoot, common.Hash(recon.Root()))
 }
