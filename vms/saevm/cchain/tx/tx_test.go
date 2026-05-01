@@ -1335,11 +1335,12 @@ func TestTransferNonAVAX(t *testing.T) {
 
 			err := test.tx.TransferNonAVAX(AVAXAssetID, state)
 			require.ErrorIs(t, err, test.wantErr)
-			for addr, balances := range test.want {
-				for assetID, want := range balances {
-					coinID := common.Hash(assetID)
+			for _, addr := range []common.Address{alice, bob} {
+				for _, asset := range []ids.ID{AVAXAssetID, btc, eth} {
+					want := toBig(test.want[addr][asset])
+					coinID := common.Hash(asset)
 					got := state.GetBalanceMultiCoin(addr, coinID)
-					if diff := cmp.Diff(toBig(want), got, cmputils.BigInts()); diff != "" {
+					if diff := cmp.Diff(want, got, cmputils.BigInts()); diff != "" {
 						t.Errorf("%T.GetBalanceMultiCoin(%s, %s) diff (-want +got):\n%s", state, addr, coinID, diff)
 					}
 				}
