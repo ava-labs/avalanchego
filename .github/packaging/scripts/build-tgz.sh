@@ -80,11 +80,23 @@ echo "  subnet-evm:  ${SUBNET_EVM_BINARY}"
 
 # ── Step 2: GPG setup ─────────────────────────────────────────────
 
-# When GPG_KEY_FILE is set and non-empty, import the key into a temp
-# GNUPGHOME and define a sign_archive() helper. Otherwise, define a
-# no-op stub.
+# Tri-state behavior:
+#   - GPG_KEY_FILE unset             → unsigned build (local dev OK)
+#   - GPG_KEY_FILE set but empty     → CI signing secret missing/blank,
+#                                       fail closed (no silent unsigned
+#                                       release artifacts)
+#   - GPG_KEY_FILE set and non-empty → sign each archive
 
-if [[ -n "${GPG_KEY_FILE:-}" && -s "${GPG_KEY_FILE}" ]]; then
+if [[ -z "${GPG_KEY_FILE:-}" ]]; then
+    echo "No GPG key provided, skipping tarball signing."
+    sign_archive() { :; }
+    GPG_SIGNING_ENABLED=false
+elif [[ ! -s "${GPG_KEY_FILE}" ]]; then
+    echo "ERROR: GPG_KEY_FILE is set (${GPG_KEY_FILE}) but the file is empty." >&2
+    echo "       Refusing to produce unsigned release artifacts." >&2
+    echo "       Verify that the GPG signing secret (e.g. RPM_GPG_PRIVATE_KEY) is configured." >&2
+    exit 1
+else
     GNUPGHOME=$(mktemp -d)
     export GNUPGHOME
     trap 'gpgconf --kill gpg-agent 2>/dev/null || true; rm -rf "${GNUPGHOME}"' EXIT
@@ -104,10 +116,6 @@ if [[ -n "${GPG_KEY_FILE:-}" && -s "${GPG_KEY_FILE}" ]]; then
     }
 
     GPG_SIGNING_ENABLED=true
-else
-    echo "No GPG key provided, skipping tarball signing."
-    sign_archive() { :; }
-    GPG_SIGNING_ENABLED=false
 fi
 
 # ── Step 3: Stage and tar each binary ─────────────────────────────
