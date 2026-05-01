@@ -111,9 +111,9 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 		return hook.Op{}, fmt.Errorf("calculating amount burned: %w", err)
 	}
 
-	op, err := t.Unsigned.asOp(avaxAssetID)
+	op, err := t.asOp(avaxAssetID)
 	if err != nil {
-		return hook.Op{}, fmt.Errorf("converting unsigned transaction to operation: %w", err)
+		return hook.Op{}, fmt.Errorf("converting to operation: %w", err)
 	}
 
 	return hook.Op{
@@ -188,10 +188,10 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	return p
 }
 
-// AtomicRequests returns chainID and shared-memory modifications that this
-// transaction should perform during execution.
+// AtomicRequests returns shared-memory modifications that this transaction
+// should perform on the peer chainID during execution.
 func (t *Tx) AtomicRequests() (ids.ID, *chainsatomic.Requests, error) {
-	return t.Unsigned.atomicRequests(t.ID())
+	return t.atomicRequests(t.ID())
 }
 
 // Parse deserializes a [Tx] from its canonical binary format.
