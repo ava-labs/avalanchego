@@ -37,6 +37,9 @@ type Tx struct {
 }
 
 // Unsigned is a common interface implemented by [Import] and [Export].
+//
+// TODO(StephenButtolph): Expand this interface to include UTXO handling and
+// verification.
 type Unsigned interface {
 	// SanityCheck performs basic validation on the transaction.
 	SanityCheck(ctx *snow.Context) error
