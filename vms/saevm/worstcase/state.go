@@ -162,6 +162,13 @@ func safeMaxBlockSize(clock *gastime.Time) gas.Gas {
 	return min(clock.Rate(), maxSafeRate) * maxGasSecondsPerBlock
 }
 
+// StateDB returns the underlying [state.StateDB] rooted at the settled
+// block captured in [NewState]. It is intended for hook
+// consumers that need to read settled-as-of-build-time state.
+func (s *State) StateDB() *state.StateDB {
+	return s.db
+}
+
 // GasLimit returns the available gas limit for the current block.
 func (s *State) GasLimit() uint64 {
 	return uint64(s.maxBlockSize)
@@ -219,10 +226,7 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 	// Compute rules at the LAST-SETTLED block so they correspond to the same
 	// as [State.db]. State-dependent precompile checks (e.g. the
 	// txallowlist sender check in vms/subnetevm) read storage from `s.db` and
-	// gate that read with `rules.IsPrecompileEnabled(...)`. Using rules from
-	// the block being admitted would desynchronize from the StateDB: the rules
-	// could say "precompile enabled" while the settled-block storage has none
-	// of its state populated, causing every sender to be rejected.
+	// gate that read with `rules.IsPrecompileEnabled(...)`.
 	settledRules := s.config.Rules(s.settled.Number, true /*isMerge*/, s.settled.Time)
 	if err := s.hooks.CanExecuteTransaction(settledRules, from, tx.To(), s.db); err != nil {
 		return fmt.Errorf("transaction blocked by CanExecuteTransaction hook: %w", err)

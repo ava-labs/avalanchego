@@ -39,6 +39,7 @@ type Points struct {
 	warpStorage *warp.Storage
 }
 
+// NewPoints constructs a new [Points] for use as a [saehook.PointsG].
 func NewPoints(
 	ctx *snow.Context,
 	db database.Database,
@@ -47,6 +48,7 @@ func NewPoints(
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
 	warpStorage *warp.Storage,
+	configuredCoinbase common.Address,
 ) *Points {
 	return &Points{
 		blockBuilder: blockBuilder{
@@ -57,6 +59,7 @@ func NewPoints(
 			},
 			chainConfig: chainConfig,
 			now:         now,
+			coinbase:    configuredCoinbase,
 		},
 		db:          db,
 		warpStorage: warpStorage,
@@ -76,6 +79,7 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (saehook.BlockBuilder[*Tx], 
 			delayExcess:  headerExtra.MinDelayExcess,
 			targetExcess: headerExtra.TargetExcess,
 		},
+		coinbase: header.Coinbase, // override with received block's Coinbase
 	}, nil
 }
 

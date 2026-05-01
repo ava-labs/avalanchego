@@ -71,7 +71,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 		nonAdminIdx = 1
 	)
 
-	now := allowListTestStartTime(t)
+	now := postHeliconStartTime(t)
 	disableTime := now.Add(saeparams.Tau)
 	reenableTime := disableTime.Add(2 * saeparams.Tau)
 

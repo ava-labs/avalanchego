@@ -41,7 +41,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 		nonAdminIdx = 1
 	)
 
-	now := allowListTestStartTime(t)
+	now := postHeliconStartTime(t)
 	disableTime := now.Add(saeparams.Tau)
 	// Re-enable after the disable activation has had time to settle, so the
 	// timeline only ever moves forward during the test.

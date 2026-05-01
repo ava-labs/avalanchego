@@ -76,6 +76,10 @@ type (
 		now              *time.Time
 		configureGenesis func(*core.Genesis, []common.Address)
 		configureUpgrade func([]common.Address) []byte
+		// feeRecipient, if non-nil, is passed through
+		// `Config.FeeRecipient` (as a hex string) to the VM. When nil, the
+		// VM's default (zero address => effective burn) applies.
+		feeRecipient *common.Address
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -116,6 +120,11 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		upgradeBytes = cfg.configureUpgrade(keychain.Addresses())
 	}
 
+	var configBytes []byte
+	if cfg.feeRecipient != nil {
+		configBytes = mustMarshalJSON(t, &Config{FeeRecipient: cfg.feeRecipient.Hex()})
+	}
+
 	saeConfig := sae.Config{
 		MempoolConfig: mempoolConf,
 		DBConfig: saedb.Config{
@@ -143,7 +152,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		baseDB,
 		genesisBytes,
 		upgradeBytes,
-		nil,
+		configBytes,
 		nil,
 		appSender,
 	))
@@ -223,6 +232,19 @@ func withUpgradeConfig(fn func([]common.Address) []byte) sutOption {
 func withNow(now *time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.now = now
+	})
+}
+
+// withFeeRecipient sets the validator's preferred fee recipient on the VM
+// (`Config.FeeRecipient`). Required for any test that exercises a path
+// where fees end up at a configurable address — i.e. the
+// `AllowFeeRecipients=true` arms (genesis-flag or rewardmanager
+// `allowFeeRecipients()`). The address is serialised to hex; the VM's
+// [Config.ParsedFeeRecipient] handles the round-trip back to
+// [common.Address].
+func withFeeRecipient(addr common.Address) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.feeRecipient = &addr
 	})
 }
 
@@ -451,10 +473,12 @@ func (s *SUT) requireDeployFailed(t *testing.T, tx *types.Transaction) {
 	require.Emptyf(t, code, "failed deploy must leave no code at %s", receipt.ContractAddress)
 }
 
-// allowListTestStartTime returns a deterministic start time well past the
-// Helicon activation, used by the per-precompile upgrade-timeline tests so
-// their pre-Tau windows do not dip below the activation timestamp.
-func allowListTestStartTime(t *testing.T) time.Time {
+// postHeliconStartTime returns a deterministic clock anchor at
+// `HeliconTimestamp + Tau`, suitable for tests that need (a) Helicon and
+// all preceding upgrades to be active in the worst-case state and (b) at
+// least one settlement window of headroom for subsequent
+// `sut.advanceTime` arithmetic.
+func postHeliconStartTime(t *testing.T) time.Time {
 	t.Helper()
 
 	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(upgradetest.Helicon))

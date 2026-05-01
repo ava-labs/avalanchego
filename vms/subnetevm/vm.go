@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	libevmcommon "github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
@@ -25,9 +26,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -35,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/hook"
@@ -167,6 +171,7 @@ func (v *VM) Initialize(
 		desiredDelayExcess,
 		desiredTargetExcess,
 		warpStorage,
+		nodeFeeRecipient(userConfig, config, snowCtx.Log),
 	)
 
 	snowCtx.Log.Info("constructing the sae VM")
@@ -204,6 +209,46 @@ func (v *VM) Initialize(
 	snowCtx.Log.Info("initialized saevm")
 
 	return nil
+}
+
+// nodeFeeRecipient resolves the local node's preferred fee recipient
+// for inclusion in `header.Coinbase` when the chain allows custom fee
+// recipients. Empty / unset `Config.FeeRecipient` defaults to
+// [constants.BlackholeAddr] (explicit burn). If the operator left it
+// unset on a chain where fee routing CAN go to a custom address
+// (genesis-flag `AllowFeeRecipients=true` or rewardmanager precompile
+// configured anywhere in the chain config -- not necessarily activated),
+// log a warning so they don't silently burn their fees.
+func nodeFeeRecipient(userConfig Config, chainConfig *subnetevmparams.ChainConfig, log logging.Logger) libevmcommon.Address {
+	if userConfig.FeeRecipient != "" {
+		return libevmcommon.HexToAddress(userConfig.FeeRecipient)
+	}
+	if reason, custom := chainAllowsCustomFeeRecipient(chainConfig); custom {
+		log.Warn("FeeRecipient is not configured but the chain allows custom fee recipients; this node will burn its block-proposer fees. Set Config.FeeRecipient to claim them.",
+			zap.String("reason", reason),
+		)
+	}
+	return constants.BlackholeAddr
+}
+
+// chainAllowsCustomFeeRecipient reports whether the chain config (genesis
+// + upgrades) permits a node to stamp a custom fee recipient
+// into `header.Coinbase`. Returns a short human-readable reason when it
+// does (for log fields).
+func chainAllowsCustomFeeRecipient(chainConfig *subnetevmparams.ChainConfig) (reason string, custom bool) {
+	configExtra := subnetevmparams.GetExtra(chainConfig)
+	if configExtra.AllowFeeRecipients {
+		return "AllowFeeRecipients=true", true
+	}
+	if _, ok := configExtra.GenesisPrecompiles[rewardmanager.ConfigKey]; ok {
+		return "rewardmanager precompile configured at genesis", true
+	}
+	for _, upgrade := range configExtra.PrecompileUpgrades {
+		if upgrade.Key() == rewardmanager.ConfigKey {
+			return "rewardmanager precompile scheduled in PrecompileUpgrades", true
+		}
+	}
+	return "", false
 }
 
 func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (*core.Genesis, error) {

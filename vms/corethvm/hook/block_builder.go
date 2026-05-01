@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
@@ -160,11 +161,12 @@ var errEmptyBlock = errors.New("empty block")
 
 func (b *blockBuilder) BuildBlock(
 	header *types.Header,
+	_ libevm.StateReader,
 	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	poolTxs []*txpool.Tx,
-	settledHeight uint64,
+	settled *types.Header,
 ) (*types.Block, error) {
 	if len(txs) == 0 && len(poolTxs) == 0 {
 		return nil, errEmptyBlock
@@ -189,6 +191,7 @@ func (b *blockBuilder) BuildBlock(
 	// information is included in [types.Header.Extra].
 	header.Extra = customheader.SetPredicateBytesInExtra(rulesExtra.AvalancheRules, header.Extra, predicateBytes)
 
+	settledHeight := settled.Number.Uint64()
 	headerExtra := customtypes.GetHeaderExtra(header)
 	headerExtra.SettledHeight = &settledHeight
 	return customtypes.NewBlockWithExtData(

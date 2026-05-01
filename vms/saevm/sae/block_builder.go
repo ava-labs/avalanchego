@@ -312,11 +312,12 @@ func (b *blockBuilderG[T]) buildWithTxs(
 
 	ethB, err := builder.BuildBlock(
 		hdr,
+		state.StateDB(),
 		bCtx,
 		included,
 		receipts,
 		includedOps,
-		lastSettled.NumberU64(),
+		lastSettled.Header(),
 	)
 	if err != nil {
 		return nil, err
