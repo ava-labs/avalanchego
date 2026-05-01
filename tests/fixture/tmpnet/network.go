@@ -101,6 +101,35 @@ func init() {
 // for round-tripping through JSON back to golang structs.
 type ConfigMap map[string]any
 
+type TopologyMode string
+
+const (
+	TopologyModeRequired   TopologyMode = "required"
+	TopologyModeBestEffort TopologyMode = "best-effort"
+)
+
+// Topology describes the intended distributed layout of a network.
+type Topology struct {
+	// Mode controls how tmpnet responds when topology is configured but can't be
+	// applied. The zero value is treated as required.
+	Mode         TopologyMode `json:"mode,omitempty"`
+	Locations    []Location   `json:"locations,omitempty"`
+	Connectivity []Connection `json:"connectivity,omitempty"`
+}
+
+// Location groups nodes by geographic or topological location.
+type Location struct {
+	Name    string       `json:"name,omitempty"`
+	NodeIDs []ids.NodeID `json:"nodeIDs,omitempty"`
+}
+
+// Connection describes persistent connectivity characteristics between locations.
+type Connection struct {
+	From    string `json:"from,omitempty"`
+	To      string `json:"to,omitempty"`
+	Latency string `json:"latency,omitempty"`
+}
+
 // Collects the configuration for running a temporary avalanchego network
 type Network struct {
 	// Uniquely identifies the temporary network for metrics
@@ -146,6 +175,10 @@ type Network struct {
 
 	// Subnets that have been enabled on the network
 	Subnets []*Subnet
+
+	// Optional distributed topology metadata. Kube-backed networks may realize
+	// this via Chaos Mesh; other runtimes may ignore it.
+	Topology *Topology
 
 	log logging.Logger
 }
@@ -428,7 +461,10 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	if len(n.Subnets) == 0 {
 		// Without the need to coordinate subnet configuration,
 		// starting all nodes at once is the simplest option.
-		return n.StartNodes(ctx, log, n.Nodes...)
+		if err := n.StartNodes(ctx, log, n.Nodes...); err != nil {
+			return err
+		}
+		return n.ApplyTopology(ctx)
 	}
 
 	// The node that will be used to create subnets and bootstrap the network
@@ -488,7 +524,10 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	}
 
 	log.Info("starting remaining nodes")
-	return n.StartNodes(ctx, log, n.Nodes[1:]...)
+	if err := n.StartNodes(ctx, log, n.Nodes[1:]...); err != nil {
+		return stacktrace.Wrap(err)
+	}
+	return n.ApplyTopology(ctx)
 }
 
 // Starts the provided node after configuring it for the network.
@@ -518,6 +557,10 @@ func (n *Network) Stop(ctx context.Context) error {
 	}
 
 	var errs []error
+
+	if err := n.RemoveTopology(ctx); err != nil {
+		errs = append(errs, stacktrace.Errorf("failed to remove topology: %w", err))
+	}
 
 	// Initiate stop on all nodes
 	for _, node := range n.Nodes {

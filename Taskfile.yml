@@ -501,6 +501,11 @@ tasks:
       - task: generate-load-contract-bindings
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.load.kube.kind.sh {{.CLI_ARGS}}'
 
+  test-topology-kube-kind:
+    desc: Runs the tmpnet topology end-to-end test against a kind cluster
+    cmds:
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.topology.kube.kind.sh {{.CLI_ARGS}}'
+
   test-robustness:
     desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.
     cmds:
