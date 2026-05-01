@@ -143,18 +143,17 @@ tasks:
   build-tarballs:
     desc: Builds linux tarballs for avalanchego and subnet-evm in a container
     vars:
-      TGZ_ARCH: '{{.TGZ_ARCH | default .PACKAGING_TGZ_HOST_ARCH}}'
       TGZ_TAG: '{{.PACKAGING_TAG}}'
     deps: [build-tgz-builder-docker-image]
     cmds:
       - cmd: mkdir -p {{.PACKAGING_TGZ_OUTPUT_DIR}}
       - cmd: >-
           docker run --rm
+          --platform linux/{{.PACKAGING_TGZ_HOST_ARCH}}
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_TGZ_OUTPUT_DIR}}:/output
           {{if .GPG_KEY_FILE}}-v {{.GPG_KEY_FILE}}:{{.GPG_KEY_FILE}}:ro{{end}}
           -e PACKAGING_TAG={{.TGZ_TAG}}
-          -e PACKAGING_TGZ_ARCH={{.TGZ_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
           {{if .GPG_KEY_FILE}}-e GPG_KEY_FILE={{.GPG_KEY_FILE}}{{end}}
@@ -164,12 +163,11 @@ tasks:
 
   validate-tarballs:
     desc: Validates tarballs by verifying signatures and smoke testing in a fresh container
-    env:
-      TAG: '{{.PACKAGING_TAG}}'
-      GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
-      TGZ_ARCH: '{{.TGZ_ARCH | default .PACKAGING_TGZ_HOST_ARCH}}'
     cmds:
-      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-tgz.sh'
+      - cmd: >-
+          TAG={{.PACKAGING_TAG}}
+          GIT_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          {{.REPO_ROOT}}/.github/packaging/scripts/validate-tgz.sh
 
   test-build-tarballs:
     desc: Builds and validates linux tarballs end-to-end

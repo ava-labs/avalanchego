@@ -55,6 +55,12 @@ if [[ "${build_driver}" == "docker-container" ]]; then
     build_flags+=(--load)
 fi
 
+# Pin the build to the host arch we resolved goarch / GO_CHECKSUM for.
+# Without this, DOCKER_DEFAULT_PLATFORM (commonly set on Apple Silicon)
+# could make Docker's TARGETARCH diverge from the checksum we computed,
+# causing the Dockerfile's Go SHA256 verification to fail.
+build_flags+=(--platform "linux/${goarch}")
+
 docker build "${build_flags[@]}" \
     --build-arg GO_VERSION="${GO_VERSION}" \
     --build-arg GO_CHECKSUM="${checksum}" \

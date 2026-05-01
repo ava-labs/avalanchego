@@ -4,23 +4,34 @@
 #
 # Required env vars:
 #   PACKAGING_TAG       - Git tag (e.g., "v1.14.1")
-#   PACKAGING_TGZ_ARCH  - Target architecture ("amd64" or "arm64")
 #   OUTPUT_DIR          - Directory for the output tarballs (bind-mounted from host)
 #
 # Optional env vars:
 #   GPG_KEY_FILE          - Path to GPG private key for signing
 #   GPG_PASSPHRASE        - Passphrase for the GPG key
 #   AVALANCHEGO_COMMIT    - Git commit hash (auto-detected if not set)
+#
+# Target architecture is derived from `uname -m` inside the container.
+# The container runs at the platform pinned by the docker run --platform
+# flag (host arch), so the produced filenames always match the binaries.
 
 set -euo pipefail
 
 : "${PACKAGING_TAG:?PACKAGING_TAG must be set}"
-: "${PACKAGING_TGZ_ARCH:?PACKAGING_TGZ_ARCH must be set}"
 : "${OUTPUT_DIR:?OUTPUT_DIR must be set}"
 
 REPO_ROOT="/build"
 TAG="${PACKAGING_TAG}"
-ARCH="${PACKAGING_TGZ_ARCH}"
+
+# Map uname -m to deb-style arch (aarch64 -> arm64). Computed inside the
+# container, so it reflects the actual platform the binaries are built
+# for, regardless of any caller-supplied env vars.
+host_arch=$(uname -m)
+case "${host_arch}" in
+    x86_64)        ARCH="amd64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *) echo "Unsupported arch: ${host_arch}" >&2; exit 1 ;;
+esac
 
 mkdir -p "${OUTPUT_DIR}"
 
