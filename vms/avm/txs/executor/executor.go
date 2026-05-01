@@ -132,8 +132,8 @@ func (e *Executor) ExportTx(tx *txs.ExportTx) error {
 			Key:   utxoID[:],
 			Value: utxoBytes,
 		}
-		if out, ok := utxo.Out.(avax.Addressable); ok {
-			elem.Traits = out.Addresses()
+		if o, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = o.Addresses()
 		}
 
 		elems[i] = elem
