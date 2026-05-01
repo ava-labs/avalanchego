@@ -51,11 +51,12 @@ type Input struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
-func (i Input) Compare(o Input) int {
-	if c := i.Address.Cmp(o.Address); c != 0 {
+// Compare orders [Input] values by [Input.Address] and [Input.AssetID].
+func (i Input) Compare(other Input) int {
+	if c := i.Address.Cmp(other.Address); c != 0 {
 		return c
 	}
-	return i.AssetID.Compare(o.AssetID)
+	return i.AssetID.Compare(other.AssetID)
 }
 
 // Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the

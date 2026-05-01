@@ -51,11 +51,12 @@ type Output struct {
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 }
 
-func (o Output) Compare(oo Output) int {
-	if c := o.Address.Cmp(oo.Address); c != 0 {
+// Compare orders [Output] values by [Output.Address] and [Output.AssetID].
+func (o Output) Compare(other Output) int {
+	if c := o.Address.Cmp(other.Address); c != 0 {
 		return c
 	}
-	return o.AssetID.Compare(oo.AssetID)
+	return o.AssetID.Compare(other.AssetID)
 }
 
 // Like [atomic.UnsignedImportTx.Burned], burned will error if the sum of the
