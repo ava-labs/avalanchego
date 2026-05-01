@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Build the RPM builder Docker image with Go checksum verification.
+# Build a packaging builder Docker image with Go checksum verification.
 #
 # Fetches the SHA256 checksum for the Go tarball from go.dev release
 # metadata and passes it to the Docker build for integrity verification.
