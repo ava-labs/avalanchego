@@ -58,8 +58,8 @@ func (i Input) Compare(o Input) int {
 	return i.AssetID.Compare(o.AssetID)
 }
 
-// Similarly to [satomic.UnsignedExportTx.Burned], burned will error if the sum
-// of the inputs exceeds MaxUint64; even if the total amount burned could be
+// Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
+// inputs exceeds MaxUint64, even if the total amount burned could be
 // represented as a uint64.
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
@@ -208,8 +208,8 @@ func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 
 		coinID := common.Hash(in.AssetID)
 		amount := new(big.Int).SetUint64(in.Amount)
-		if statedb.GetBalanceMultiCoin(in.Address, coinID).Cmp(amount) < 0 {
-			return errInsufficientFunds
+		if balance := statedb.GetBalanceMultiCoin(in.Address, coinID); balance.Cmp(amount) < 0 {
+			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, coinID, balance, amount)
 		}
 		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
 	}

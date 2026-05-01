@@ -1202,7 +1202,7 @@ func TestAtomicRequests(t *testing.T) {
 	}
 }
 
-func NewStateDB(t testing.TB) *extstate.StateDB {
+func NewEmptyStateDB(t testing.TB) *extstate.StateDB {
 	t.Helper()
 
 	db := state.NewDatabase(rawdb.NewMemoryDatabase())
@@ -1228,22 +1228,16 @@ func TestTransferNonAVAX(t *testing.T) {
 		{
 			name: "import_avax",
 			tx: &Import{
-				Outs: []Output{{
-					Address: alice,
-					Amount:  1,
-					AssetID: AVAXAssetID,
-				}},
+				Outs: []Output{
+					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
+				},
 			},
 		},
 		{
 			name: "import_non_avax",
 			tx: &Import{
 				Outs: []Output{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
+					{Address: alice, Amount: 1, AssetID: btc},
 				},
 			},
 			want: map[common.Address]map[ids.ID]uint64{
@@ -1256,41 +1250,13 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "import_many",
 			tx: &Import{
 				Outs: []Output{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: alice,
-						Amount:  10,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: bob,
-						Amount:  100,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: alice,
-						Amount:  1_000,
-						AssetID: btc,
-					},
-					{
-						Address: alice,
-						Amount:  10_000,
-						AssetID: btc,
-					},
-					{
-						Address: bob,
-						Amount:  100_000,
-						AssetID: btc,
-					},
-					{
-						Address: bob,
-						Amount:  1_000_000,
-						AssetID: eth,
-					},
+					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 10, AssetID: AVAXAssetID},
+					{Address: bob, Amount: 100, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 1_000, AssetID: btc},
+					{Address: alice, Amount: 10_000, AssetID: btc},
+					{Address: bob, Amount: 100_000, AssetID: btc},
+					{Address: bob, Amount: 1_000_000, AssetID: eth},
 				},
 			},
 			want: map[common.Address]map[ids.ID]uint64{
@@ -1307,11 +1273,7 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "export_avax",
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: AVAXAssetID,
-					},
+					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
 				},
 			},
 		},
@@ -1324,11 +1286,7 @@ func TestTransferNonAVAX(t *testing.T) {
 			},
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
+					{Address: alice, Amount: 1, AssetID: btc},
 				},
 			},
 			want: map[common.Address]map[ids.ID]uint64{
@@ -1337,7 +1295,6 @@ func TestTransferNonAVAX(t *testing.T) {
 				},
 			},
 		},
-
 		{
 			name: "export_many",
 			init: map[common.Address]map[ids.ID]uint64{
@@ -1351,41 +1308,13 @@ func TestTransferNonAVAX(t *testing.T) {
 			},
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: alice,
-						Amount:  10,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: bob,
-						Amount:  100,
-						AssetID: AVAXAssetID,
-					},
-					{
-						Address: alice,
-						Amount:  1_000,
-						AssetID: btc,
-					},
-					{
-						Address: alice,
-						Amount:  10_000,
-						AssetID: btc,
-					},
-					{
-						Address: bob,
-						Amount:  100_000,
-						AssetID: btc,
-					},
-					{
-						Address: bob,
-						Amount:  1_000_000,
-						AssetID: eth,
-					},
+					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 10, AssetID: AVAXAssetID},
+					{Address: bob, Amount: 100, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 1_000, AssetID: btc},
+					{Address: alice, Amount: 10_000, AssetID: btc},
+					{Address: bob, Amount: 100_000, AssetID: btc},
+					{Address: bob, Amount: 1_000_000, AssetID: eth},
 				},
 			},
 			want: map[common.Address]map[ids.ID]uint64{
@@ -1402,11 +1331,7 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "export_non_avax_insufficient",
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
+					{Address: alice, Amount: 1, AssetID: btc},
 				},
 			},
 			wantErr: errInsufficientFunds,
@@ -1420,16 +1345,8 @@ func TestTransferNonAVAX(t *testing.T) {
 			},
 			tx: &Export{
 				Ins: []Input{
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
-					{
-						Address: alice,
-						Amount:  1,
-						AssetID: btc,
-					},
+					{Address: alice, Amount: 1, AssetID: btc},
+					{Address: alice, Amount: 1, AssetID: btc},
 				},
 			},
 			wantErr: errInsufficientFunds,
@@ -1438,24 +1355,24 @@ func TestTransferNonAVAX(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				sdb   = NewStateDB(t)
+				state = NewEmptyStateDB(t)
 				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
 			)
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
 					coinID := common.Hash(assetID)
-					sdb.AddBalanceMultiCoin(addr, coinID, toBig(amount))
+					state.AddBalanceMultiCoin(addr, coinID, toBig(amount))
 				}
 			}
 
-			err := test.tx.TransferNonAVAX(AVAXAssetID, sdb)
+			err := test.tx.TransferNonAVAX(AVAXAssetID, state)
 			require.ErrorIs(t, err, test.wantErr)
 			for addr, balances := range test.want {
 				for assetID, want := range balances {
 					coinID := common.Hash(assetID)
-					got := sdb.GetBalanceMultiCoin(addr, coinID)
+					got := state.GetBalanceMultiCoin(addr, coinID)
 					if diff := cmp.Diff(toBig(want), got, cmputils.BigInts()); diff != "" {
-						t.Errorf("%T.GetBalanceMultiCoin(%s, %s) diff (-want +got):\n%s", sdb, addr, coinID, diff)
+						t.Errorf("%T.GetBalanceMultiCoin(%s, %s) diff (-want +got):\n%s", state, addr, coinID, diff)
 					}
 				}
 			}
