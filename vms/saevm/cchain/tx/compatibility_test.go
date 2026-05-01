@@ -182,8 +182,8 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 			t.Skip("invalid tx")
 		}
 
-		oldState := NewStateDB(t)
-		newState := NewStateDB(t)
+		oldState := NewEmptyStateDB(t)
+		newState := NewEmptyStateDB(t)
 		states := []*extstate.StateDB{oldState, newState}
 
 		if tx, ok := newTx.Unsigned.(*Export); ok {

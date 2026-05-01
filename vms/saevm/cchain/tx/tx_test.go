@@ -1170,7 +1170,7 @@ func TestAtomicRequests(t *testing.T) {
 	}
 }
 
-func NewStateDB(t testing.TB) *extstate.StateDB {
+func NewEmptyStateDB(t testing.TB) *extstate.StateDB {
 	t.Helper()
 
 	db := state.NewDatabase(rawdb.NewMemoryDatabase())
@@ -1323,7 +1323,7 @@ func TestTransferNonAVAX(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				sdb   = NewStateDB(t)
+				sdb   = NewEmptyStateDB(t)
 				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
 			)
 			for addr, balances := range test.init {
