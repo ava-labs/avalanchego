@@ -98,7 +98,10 @@ jobs:
           if [[ -n "${GPG_KEY_FILE:-}" ]]; then
             rm -f "${GPG_KEY_FILE}"
           fi
-          rm -rf ./build
+          # build/plugins/ is created as root by the containerized
+          # subnet-evm build, so plain rm -rf would fail to recurse
+          # into it as the unprivileged runner user on linux runners.
+          sudo rm -rf ./build
 
   build-arm64-binaries-tarball:
     runs-on: ubuntu-22.04-arm
@@ -184,4 +187,7 @@ jobs:
           if [[ -n "${GPG_KEY_FILE:-}" ]]; then
             rm -f "${GPG_KEY_FILE}"
           fi
-          rm -rf ./build
+          # build/plugins/ is created as root by the containerized
+          # subnet-evm build, so plain rm -rf would fail to recurse
+          # into it as the unprivileged runner user on linux runners.
+          sudo rm -rf ./build
