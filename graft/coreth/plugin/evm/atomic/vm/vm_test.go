@@ -1734,10 +1734,14 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 	t.Run("archival query after VM restart", func(t *testing.T) {
 		ctx := t.Context()
 
-		restartedVM := newAtomicTestVM()
+		vm := newAtomicTestVM()
+		t.Cleanup(func() {
+			require.NoError(t, vm.Shutdown(ctx))
+		})
+
 		restartConfigJSON, err := vmtest.OverrideSchemeConfig(customrawdb.FirewoodScheme, configJSON)
 		require.NoError(t, err)
-		require.NoError(t, restartedVM.Initialize(
+		require.NoError(t, vm.Initialize(
 			ctx,
 			tvm.Ctx,
 			tvm.DB,
@@ -1747,9 +1751,8 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 			[]*commonEng.Fx{},
 			tvm.AppSender,
 		))
-		require.NoError(t, restartedVM.SetState(ctx, snow.Bootstrapping))
-		require.NoError(t, restartedVM.SetState(ctx, snow.NormalOp))
-		vm = restartedVM
+		require.NoError(t, vm.SetState(ctx, snow.Bootstrapping))
+		require.NoError(t, vm.SetState(ctx, snow.NormalOp))
 
 		// Verify that the target state requires reexecution to access after restart.
 		targetBlock := vm.Ethereum().BlockChain().GetBlockByNumber(uint64(targetBlockHeight))
