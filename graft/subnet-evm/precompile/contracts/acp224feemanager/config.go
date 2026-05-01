@@ -25,7 +25,7 @@ type Config struct {
 }
 
 // NewConfig returns a config that enables ACP224FeeManager at [blockTimestamp].
-func NewConfig(blockTimestamp *uint64, admins []common.Address, enableds []common.Address, managers []common.Address, initialConfig *commontype.ACP224FeeConfig) *Config {
+func NewConfig(blockTimestamp *uint64, admins []common.Address, enabled []common.Address, managers []common.Address, initialConfig *commontype.ACP224FeeConfig) *Config {
 	return &Config{
 		AllowListConfig: allowlist.AllowListConfig{
 			AdminAddresses:   admins,
