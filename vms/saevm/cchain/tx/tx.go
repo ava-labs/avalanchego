@@ -41,9 +41,9 @@ type Tx struct {
 // TODO(StephenButtolph): Expand this interface to include UTXO handling and
 // verification.
 type Unsigned interface {
-	// SanityCheck verifies the transaction's structural invariants against the
-	// chain's context and that the transaction does not mint more funds than it
-	// consumes.
+	// SanityCheck verifies that the transaction's structural invariants hold
+	// against the chain's context and that it does not produce more funds
+	// than it consumes.
 	//
 	// It does not verify signatures, whether UTXOs exist, or whether the
 	// transaction performs a valid EVM state transition.

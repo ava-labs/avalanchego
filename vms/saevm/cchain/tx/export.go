@@ -130,9 +130,9 @@ func (e *Export) SanityCheck(ctx *snow.Context) error {
 	if !utils.IsSortedAndUnique(e.Ins) {
 		return errInputsNotSortedUnique
 	}
-	// Outputs aren't enforced to be unique in Export transactions to align with
-	// [atomic.UnsignedExportTx.Verify]. This is safe since UTXOs are identified
-	// by their index in the outputs slice.
+	// Like [atomic.UnsignedExportTx.Verify], outputs aren't enforced to be
+	// unique. This is safe because each output's UTXO is keyed by txID and
+	// outputIndex, so duplicate outputs still produce distinct UTXOs.
 	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
 		return errOutputsNotSorted
 	}
