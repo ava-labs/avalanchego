@@ -29,7 +29,7 @@ func NewConfig(blockTimestamp *uint64, admins []common.Address, enabled []common
 	return &Config{
 		AllowListConfig: allowlist.AllowListConfig{
 			AdminAddresses:   admins,
-			EnabledAddresses: enableds,
+			EnabledAddresses: enabled,
 			ManagerAddresses: managers,
 		},
 		Upgrade:          precompileconfig.Upgrade{BlockTimestamp: blockTimestamp},
