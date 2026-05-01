@@ -12,7 +12,7 @@ import (
 
 const MinTargetGasACP224 uint64 = 1_000_000
 
-// DefaultACP224FeeConfig returns a copy of the default ACP-224 fee
+// DefaultACP224FeeConfig returns a default ACP-224 fee
 // config.
 //
 // The default values are:
