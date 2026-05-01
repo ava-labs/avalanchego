@@ -1323,24 +1323,24 @@ func TestTransferNonAVAX(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				sdb   = NewEmptyStateDB(t)
+				state = NewEmptyStateDB(t)
 				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
 			)
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
 					coinID := common.Hash(assetID)
-					sdb.AddBalanceMultiCoin(addr, coinID, toBig(amount))
+					state.AddBalanceMultiCoin(addr, coinID, toBig(amount))
 				}
 			}
 
-			err := test.tx.TransferNonAVAX(AVAXAssetID, sdb)
+			err := test.tx.TransferNonAVAX(AVAXAssetID, state)
 			require.ErrorIs(t, err, test.wantErr)
 			for addr, balances := range test.want {
 				for assetID, want := range balances {
 					coinID := common.Hash(assetID)
-					got := sdb.GetBalanceMultiCoin(addr, coinID)
+					got := state.GetBalanceMultiCoin(addr, coinID)
 					if diff := cmp.Diff(toBig(want), got, cmputils.BigInts()); diff != "" {
-						t.Errorf("%T.GetBalanceMultiCoin(%s, %s) diff (-want +got):\n%s", sdb, addr, coinID, diff)
+						t.Errorf("%T.GetBalanceMultiCoin(%s, %s) diff (-want +got):\n%s", state, addr, coinID, diff)
 					}
 				}
 			}
