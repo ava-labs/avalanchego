@@ -188,6 +188,9 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 
 		if tx, ok := newTx.Unsigned.(*Export); ok {
 			for _, in := range tx.Ins {
+				// Coreth silently overflows the nonce, whereas SAE will leave
+				// the nonce unmodified. This difference doesn't matter on live
+				// networks.
 				if in.Nonce == math.MaxUint64 {
 					t.Skip("nonce overflow")
 				}
