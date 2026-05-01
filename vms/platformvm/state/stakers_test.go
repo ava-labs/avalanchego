@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
@@ -415,6 +417,73 @@ func TestDiffStakersDelegator(t *testing.T) {
 	require.Empty(
 		iterator.ToSlice(delegatorIterator),
 	)
+}
+
+func TestDiffStakersDelegatorCancelOut(t *testing.T) {
+	delegator := newTestStaker()
+
+	verify := func(t *testing.T, diff *diffStakers, parent iterator.Iterator[*Staker], want []*Staker) {
+		t.Helper()
+
+		delegatorIterator := diff.GetDelegatorIterator(parent, delegator.SubnetID, delegator.NodeID)
+		defer delegatorIterator.Release()
+		require.Equal(t, want, iterator.ToSlice(delegatorIterator))
+	}
+
+	t.Run("delete then put same persisted delegator", func(t *testing.T) {
+		diff := &diffStakers{}
+		diff.DeleteDelegator(delegator)
+		diff.PutDelegator(delegator)
+
+		verify(t, diff, iterator.FromSlice(delegator), []*Staker{delegator})
+
+		stakerIterator := diff.GetStakerIterator(iterator.FromSlice(delegator))
+		defer stakerIterator.Release()
+		require.Equal(t, []*Staker{delegator}, iterator.ToSlice(stakerIterator))
+	})
+
+	t.Run("put then delete same delegator", func(t *testing.T) {
+		diff := &diffStakers{}
+		diff.PutDelegator(delegator)
+		diff.DeleteDelegator(delegator)
+
+		verify(t, diff, iterator.Empty[*Staker]{}, nil)
+
+		stakerIterator := diff.GetStakerIterator(iterator.Empty[*Staker]{})
+		defer stakerIterator.Release()
+		require.Empty(t, iterator.ToSlice(stakerIterator))
+	})
+}
+
+func TestBaseStakersDelegatorCancelOutPersistence(t *testing.T) {
+	delegator := newTestStaker()
+
+	list := linkeddb.NewDefault(memdb.New())
+	v := newBaseStakers()
+
+	writeDiff := func(t *testing.T) {
+		t.Helper()
+		diff := v.validatorDiffs[delegator.SubnetID][delegator.NodeID]
+		require.NotNil(t, diff)
+		require.NoError(t, writeCurrentDelegatorDiff(list, diff, CodecVersion1))
+	}
+
+	// Persist the delegator.
+	v.PutDelegator(delegator)
+	writeDiff(t)
+
+	has, err := list.Has(delegator.TxID[:])
+	require.NoError(t, err)
+	require.True(t, has)
+
+	// Delete then re-add. The cancel-out must keep the DB entry.
+	v.DeleteDelegator(delegator)
+	v.PutDelegator(delegator)
+	writeDiff(t)
+
+	has, err = list.Has(delegator.TxID[:])
+	require.NoError(t, err)
+	require.True(t, has)
 }
 
 func newTestStaker() *Staker {
