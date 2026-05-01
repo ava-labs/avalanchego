@@ -35,13 +35,6 @@ var (
 	cachedCompressedPK []byte
 )
 
-type keyReuseOption bool
-
-const (
-	noKeyReuse keyReuseOption = false
-	reuseKeys  keyReuseOption = true
-)
-
 func init() {
 	cachedBLSKey, cachedBLSKeyErr = localsigner.New()
 	if cachedBLSKeyErr == nil {
@@ -122,7 +115,8 @@ func newConfigsForQC(t testing.TB) []*Config {
 	require.Positive(t, numNodes)
 
 	chainID := ids.GenerateTestID()
-	testNodes := generateTestNodes(t, uint64(numNodes), reuseKeys)
+	testNodes := generateTestNodes(t, uint64(numNodes))
+	reuseCachedBLSKey(t, testNodes)
 	chainParameters := newSimplexChainParams(testNodes)
 
 	configs := make([]*Config, 0, numNodes)
@@ -144,20 +138,18 @@ func newConfigsForQC(t testing.TB) []*Config {
 // initialized with a common chainID and a set of validators each having
 // a freshly generated BLS key.
 func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
-	return newNetworkConfigsWithKeyReuse(t, numNodes, noKeyReuse)
+	require.Positive(t, numNodes)
+	return newNetworkConfigsWithNodes(t, generateTestNodes(t, numNodes))
 }
 
-// newNetworkConfigsWithKeyReuse is like newNetworkConfigs but allows the
-// caller to opt into reusing a single cached BLS key across all validators
-// (intended for fuzz tests where BLS key generation dominates setup cost).
-func newNetworkConfigsWithKeyReuse(t *testing.T, numNodes uint64, reuseKeys keyReuseOption) []*Config {
-	require.Positive(t, numNodes)
-
+// newNetworkConfigsWithNodes is like newNetworkConfigs but builds Configs from
+// a pre-built slice of testNodes, letting callers customize the validator set
+// (e.g. fuzz tests that share a cached BLS key via reuseCachedBLSKey).
+func newNetworkConfigsWithNodes(t *testing.T, testNodes []*testNode) []*Config {
 	chainID := ids.GenerateTestID()
 
-	testNodes := generateTestNodes(t, numNodes, reuseKeys)
 	chainParameters := newSimplexChainParams(testNodes)
-	configs := make([]*Config, 0, numNodes)
+	configs := make([]*Config, 0, len(testNodes))
 
 	for _, node := range testNodes {
 		ctrl := gomock.NewController(t)
@@ -202,33 +194,31 @@ func newSimplexChainParams(nodes []*testNode) *simplexparams.Parameters {
 	return params
 }
 
-func generateTestNodes(t testing.TB, num uint64, reuseKeys keyReuseOption) []*testNode {
+func generateTestNodes(t testing.TB, num uint64) []*testNode {
 	nodes := make([]*testNode, num)
 	for i := uint64(0); i < num; i++ {
-		var ls *localsigner.LocalSigner
-		var err error
-		var pk []byte
+		ls, err := localsigner.New()
+		require.NoError(t, err)
 
-		if reuseKeys {
-			ls, err = cachedBLSKey, cachedBLSKeyErr
-			require.NoError(t, err)
-			pk = cachedCompressedPK
-		} else {
-			ls, err = localsigner.New()
-			require.NoError(t, err)
-			pk = ls.PublicKey().Compress()
-		}
-
-		nodeID := ids.GenerateTestNodeID()
 		nodes[i] = &testNode{
 			ValidatorInfo: simplexparams.ValidatorInfo{
-				NodeID:    nodeID,
-				PublicKey: pk,
+				NodeID:    ids.GenerateTestNodeID(),
+				PublicKey: ls.PublicKey().Compress(),
 			},
 			signFunc: ls.Sign,
 		}
 	}
 	return nodes
+}
+
+// reuseCachedBLSKey rewrites every node to share the package's cached BLS key.
+// Intended for fuzz tests where BLS key generation dominates per-iteration setup.
+func reuseCachedBLSKey(t testing.TB, nodes []*testNode) {
+	require.NoError(t, cachedBLSKeyErr)
+	for _, n := range nodes {
+		n.PublicKey = cachedCompressedPK
+		n.signFunc = cachedBLSKey.Sign
+	}
 }
 
 // newTestFinalization creates a new finalization over the BlockHeader, by collecting a

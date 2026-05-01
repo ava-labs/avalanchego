@@ -860,7 +860,9 @@ func FuzzSimplexEmptyNotarizations(f *testing.F) {
 }
 
 func setupEngineForFuzz(t *testing.T) (*Engine, []*Config) {
-	configs := createSimplexEngineConfig(t, reuseKeys)
+	nodes := generateTestNodes(t, 4)
+	reuseCachedBLSKey(t, nodes)
+	configs := createSimplexEngineConfig(t, nodes)
 
 	signer := BLSSigner{
 		chainID:   configs[0].Ctx.ChainID,
@@ -885,7 +887,7 @@ func setupEngineForFuzz(t *testing.T) (*Engine, []*Config) {
 }
 
 func setupEngine(t *testing.T) (*Engine, []*Config) {
-	configs := createSimplexEngineConfig(t, noKeyReuse)
+	configs := createSimplexEngineConfig(t, generateTestNodes(t, 4))
 
 	engine, err := NewEngine(t.Context(), configs[0])
 	require.NoError(t, err)
@@ -901,13 +903,8 @@ func setupEngine(t *testing.T) (*Engine, []*Config) {
 	return engine, configs
 }
 
-func createSimplexEngineConfig(t *testing.T, reuseKeys keyReuseOption) []*Config {
-	if reuseKeys {
-		// We can only reuse the key if it was successfully cached.
-		require.NoError(t, cachedBLSKeyErr)
-	}
-
-	configs := newNetworkConfigsWithKeyReuse(t, 4, reuseKeys)
+func createSimplexEngineConfig(t *testing.T, nodes []*testNode) []*Config {
+	configs := newNetworkConfigsWithNodes(t, nodes)
 
 	config := configs[0]
 	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
