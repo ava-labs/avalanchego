@@ -107,7 +107,7 @@ func (e *Export) SanityCheck(ctx *snow.Context) error {
 	fc := avax.NewFlowChecker()
 	for i, in := range e.Ins {
 		if in.Amount == 0 {
-			return fmt.Errorf("%w (%d): %w", errInvalidInput, i, errZeroAmount)
+			return fmt.Errorf("%w (%d): zero amount", errInvalidInput, i)
 		}
 		if in.AssetID != ctx.AVAXAssetID {
 			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, i, ctx.AVAXAssetID, in.AssetID)
@@ -130,6 +130,9 @@ func (e *Export) SanityCheck(ctx *snow.Context) error {
 	if !utils.IsSortedAndUnique(e.Ins) {
 		return errInputsNotSortedUnique
 	}
+	// Outputs aren't enforced to be unique in Export transactions to align with
+	// [atomic.UnsignedExportTx.Verify]. This is safe since UTXOs are identified
+	// by their index in the outputs slice.
 	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
 		return errOutputsNotSorted
 	}

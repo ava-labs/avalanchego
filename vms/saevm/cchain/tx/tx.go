@@ -41,7 +41,12 @@ type Tx struct {
 // TODO(StephenButtolph): Expand this interface to include UTXO handling and
 // verification.
 type Unsigned interface {
-	// SanityCheck performs basic validation on the transaction.
+	// SanityCheck verifies the transaction's structural invariants against the
+	// chain's context and that the transaction does not mint more funds than it
+	// consumes.
+	//
+	// It does not verify signatures, whether UTXOs exist, or whether the
+	// transaction performs a valid EVM state transition.
 	SanityCheck(ctx *snow.Context) error
 
 	// TransferNonAVAX transfers the non-AVAX balances requested by this

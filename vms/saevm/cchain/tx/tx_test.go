@@ -1627,7 +1627,7 @@ func TestSanityCheck(t *testing.T) {
 		{
 			name:    "export_zero_amount_input",
 			tx:      exp(func(e *Export) { e.Ins[0].Amount = 0 }),
-			wantErr: errZeroAmount,
+			wantErr: errInvalidInput,
 		},
 		{
 			name:    "export_non_avax_input",

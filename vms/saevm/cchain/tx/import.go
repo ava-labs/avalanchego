@@ -97,7 +97,6 @@ var (
 	errInvalidInput           = errors.New("invalid input")
 	errNonAVAXInput           = errors.New("input contains non-AVAX")
 	errInvalidOutput          = errors.New("invalid output")
-	errZeroAmount             = errors.New("zero amount")
 	errNonAVAXOutput          = errors.New("output contains non-AVAX")
 	errFlowCheckFailed        = errors.New("flow check failed")
 	errInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
@@ -119,21 +118,21 @@ func (i *Import) SanityCheck(ctx *snow.Context) error {
 	}
 
 	fc := avax.NewFlowChecker()
-	for i, in := range i.ImportedInputs {
+	for j, in := range i.ImportedInputs {
 		if err := in.Verify(); err != nil {
-			return fmt.Errorf("%w (%d): %w", errInvalidInput, i, err)
+			return fmt.Errorf("%w (%d): %w", errInvalidInput, j, err)
 		}
 		if assetID := in.Asset.ID; assetID != ctx.AVAXAssetID {
-			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, i, ctx.AVAXAssetID, assetID)
+			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, j, ctx.AVAXAssetID, assetID)
 		}
 		fc.Consume(ctx.AVAXAssetID, in.In.Amount())
 	}
-	for i, out := range i.Outs {
+	for j, out := range i.Outs {
 		if out.Amount == 0 {
-			return fmt.Errorf("%w (%d): %w", errInvalidOutput, i, errZeroAmount)
+			return fmt.Errorf("%w (%d): zero amount", errInvalidOutput, j)
 		}
 		if out.AssetID != ctx.AVAXAssetID {
-			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, i, ctx.AVAXAssetID, out.AssetID)
+			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, j, ctx.AVAXAssetID, out.AssetID)
 		}
 		fc.Produce(ctx.AVAXAssetID, out.Amount)
 	}
