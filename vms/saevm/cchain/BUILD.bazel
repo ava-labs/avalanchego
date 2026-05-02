@@ -103,7 +103,7 @@ go_test(
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
-        "//vms/saevm/warp",
+        "//vms/saevm/cchain/warp",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/txpool/legacypool",
         "@com_github_ava_labs_libevm//core/types",
