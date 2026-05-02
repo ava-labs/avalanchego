@@ -59,7 +59,7 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 	} else {
 		now = time.Now()
 	}
-	nowMS := uint64(now.UnixMilli())
+	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 
 	mde := acp226.InitialDelayExcess
 	if pmde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pmde != nil {
@@ -94,7 +94,7 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			Coinbase:         constants.BlackholeAddr,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
-			Time:             uint64(now.Unix()),
+			Time:             uint64(now.Unix()), //#nosec G115 -- Known non-negative
 			BlobGasUsed:      utils.PointerTo[uint64](0),
 			ExcessBlobGas:    utils.PointerTo[uint64](0),
 			ParentBeaconRoot: &common.Hash{},

@@ -60,7 +60,9 @@ func DesiredTargetExcess(desired gas.Gas) TargetExcess {
 	// This could be solved directly by calculating D * ln(desired / P)
 	// using floating point math. However, it introduces inaccuracies. So, we
 	// use a binary search to find the closest integer solution.
-	return TargetExcess(sort.Search(int(maxTargetExcess), func(targetExcessGuess int) bool {
+	//
+	//#nosec G115 -- [sort.Search] provides and returns non-negative values
+	return TargetExcess(sort.Search(maxTargetExcess, func(targetExcessGuess int) bool {
 		return TargetExcess(targetExcessGuess).Target() >= desired
 	}))
 }

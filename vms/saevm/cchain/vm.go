@@ -394,8 +394,7 @@ func minNextBlockTime(h *types.Header) time.Time {
 	}
 
 	mde := *e.MinDelayExcess
-	// delay excess is already verified by consensus so this can not overflow.
-	delay := time.Duration(mde.Delay()) * time.Millisecond
+	delay := time.Duration(mde.Delay()) * time.Millisecond //#nosec G115 -- delay excess is already verified by consensus
 	return customtypes.BlockTime(h).Add(delay)
 }
 

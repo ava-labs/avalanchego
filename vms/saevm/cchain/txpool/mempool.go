@@ -165,7 +165,7 @@ func (m *Mempool) Add(rawTx *tx.Tx) error {
 		// TODO: Using the rpc backend is gross. We should make something easier
 		// to use for this.
 		// TODO: Is it okay for us to be opening so many state dbs?
-		state, _, err := m.backends.StateAndHeaderByNumber(ctx, ethrpc.BlockNumber(m.height))
+		state, _, err := m.backends.StateAndHeaderByNumber(ctx, ethrpc.BlockNumber(m.height)) //#nosec G115 -- block height won't overflow
 		if err != nil {
 			return fmt.Errorf("problem getting latest state: %w", err)
 		}

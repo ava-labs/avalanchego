@@ -137,10 +137,10 @@ func (*Points) BlockTime(h *types.Header) time.Time {
 	var ns int64
 	if msp := customtypes.GetHeaderExtra(h).TimeMilliseconds; msp != nil {
 		ms := *msp % 1000
-		frac := time.Duration(ms) * time.Millisecond
+		frac := time.Duration(ms) * time.Millisecond //#nosec G115 -- ms is bounded to [0, 1000)
 		ns = frac.Nanoseconds()
 	}
-	return time.Unix(int64(h.Time), ns)
+	return time.Unix(int64(h.Time), ns) //#nosec G115 -- Won't overflow for a few millennia
 }
 
 func (p *Points) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
