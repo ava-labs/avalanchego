@@ -53,7 +53,7 @@ type Unsigned interface {
 
 	// atomicRequests returns the operations that should be applied to shared
 	// memory when this transaction is executed.
-	atomicRequests(txID ids.ID) (chainID ids.ID, requests *chainsatomic.Requests, err error)
+	atomicRequests(txID ids.ID) (chainID ids.ID, r *chainsatomic.Requests, err error)
 }
 
 // op contains the state changes of [hook.Op]
