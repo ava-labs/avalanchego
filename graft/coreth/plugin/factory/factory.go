@@ -22,7 +22,7 @@ var (
 
 type Factory struct{}
 
-func (*Factory) New(logging.Logger) (interface{}, error) {
+func (*Factory) New(logging.Logger) (any, error) {
 	return atomicvm.WrapVM(&evm.VM{}), nil
 }
 

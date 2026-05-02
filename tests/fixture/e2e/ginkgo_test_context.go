@@ -77,7 +77,7 @@ func NewTestContext() *GinkgoTestContext {
 	}
 }
 
-func (*GinkgoTestContext) Errorf(format string, args ...interface{}) {
+func (*GinkgoTestContext) Errorf(format string, args ...any) {
 	ginkgo.GinkgoT().Errorf(format, args...)
 }
 

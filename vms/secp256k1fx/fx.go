@@ -40,7 +40,7 @@ type Fx struct {
 	recoverCache *secp256k1.RecoverCache
 }
 
-func (fx *Fx) Initialize(vmIntf interface{}) error {
+func (fx *Fx) Initialize(vmIntf any) error {
 	if err := fx.InitializeVM(vmIntf); err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	)
 }
 
-func (fx *Fx) InitializeVM(vmIntf interface{}) error {
+func (fx *Fx) InitializeVM(vmIntf any) error {
 	vm, ok := vmIntf.(VM)
 	if !ok {
 		return ErrWrongVMType
@@ -78,7 +78,7 @@ func (fx *Fx) Bootstrapped() error {
 }
 
 // VerifyPermission returns nil iff [credIntf] proves that [controlGroup] assents to [txIntf]
-func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) error {
+func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf any) error {
 	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
 		return ErrWrongTxType
@@ -101,7 +101,7 @@ func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) 
 	return fx.VerifyCredentials(tx, in, cred, owner)
 }
 
-func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
+func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf any, utxosIntf []any) error {
 	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
 		return ErrWrongTxType
@@ -134,7 +134,7 @@ func (fx *Fx) verifyOperation(tx UnsignedTx, op *MintOperation, cred *Credential
 	return fx.VerifyCredentials(tx, &op.MintInput, cred, &utxo.OutputOwners)
 }
 
-func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) error {
+func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf any) error {
 	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
 		return ErrWrongTxType
@@ -208,7 +208,7 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 
 // CreateOutput creates a new output with the provided control group worth
 // the specified amount
-func (*Fx) CreateOutput(amount uint64, ownerIntf interface{}) (interface{}, error) {
+func (*Fx) CreateOutput(amount uint64, ownerIntf any) (any, error) {
 	owner, ok := ownerIntf.(*OutputOwners)
 	if !ok {
 		return nil, ErrWrongOwnerType

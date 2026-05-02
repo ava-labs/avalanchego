@@ -229,7 +229,7 @@ func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetVal
 	sk, err := localsigner.New()
 	require.NoError(b, err)
 	pk := sk.PublicKey()
-	for i := 0; i < size; i++ {
+	for i := range size {
 		id := ids.GenerateTestNodeID()
 		set[id] = &validators.GetValidatorOutput{
 			NodeID:    id,

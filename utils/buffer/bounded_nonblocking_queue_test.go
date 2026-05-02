@@ -39,7 +39,7 @@ func TestBoundedQueue(t *testing.T) {
 	require.Zero(b.Len())
 
 	// Fill the queue
-	for i := 0; i < maxSize; i++ {
+	for i := range maxSize {
 		b.Push(i)
 		require.Equal(i+1, b.Len())
 		got, ok := b.Peek()
@@ -55,7 +55,7 @@ func TestBoundedQueue(t *testing.T) {
 	// Queue is [0, 1, 2]
 
 	// Empty the queue
-	for i := 0; i < maxSize; i++ {
+	for i := range maxSize {
 		got, ok := b.Pop()
 		require.True(ok)
 		require.Equal(i, got)
@@ -75,7 +75,7 @@ func TestBoundedQueue(t *testing.T) {
 	require.Empty(b.List())
 
 	// Fill the queue again
-	for i := 0; i < maxSize; i++ {
+	for i := range maxSize {
 		b.Push(i)
 		require.Equal(i+1, b.Len())
 	}
@@ -120,7 +120,7 @@ func TestBoundedQueue(t *testing.T) {
 	}
 
 	// Empty the queue
-	for i := 0; i < maxSize; i++ {
+	for i := range maxSize {
 		got, ok := b.Pop()
 		require.True(ok)
 		require.Equal(i+3, got)

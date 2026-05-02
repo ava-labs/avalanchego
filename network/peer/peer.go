@@ -195,7 +195,7 @@ type peer struct {
 	lastSent, lastReceived int64
 
 	// lastPingSent is the milliseconds since 1970-01-01 UTC when the last ping was sent
-	lastPingSent int64
+	lastPingSent atomic.Int64
 
 	// getPeerListChan signals that we should attempt to send a GetPeerList to
 	// this peer
@@ -622,7 +622,7 @@ func (p *peer) writeMessage(writer io.Writer, msg *message.OutboundMessage) {
 	}
 
 	if msg.Op == message.PingOp {
-		atomic.StoreInt64(&p.lastPingSent, p.Clock.Time().UnixMilli())
+		p.lastPingSent.Store(p.Clock.Time().UnixMilli())
 	}
 
 	// Write the message
@@ -832,7 +832,7 @@ func (p *peer) getUptime() uint32 {
 }
 
 func (p *peer) handlePong(*p2p.Pong) {
-	pingSent := atomic.SwapInt64(&p.lastPingSent, 0)
+	pingSent := p.lastPingSent.Swap(0)
 	if pingSent == 0 {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),

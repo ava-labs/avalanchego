@@ -168,7 +168,7 @@ func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	return mux, nil
 }
 
-func (*VM) HealthCheck(context.Context) (interface{}, error) {
+func (*VM) HealthCheck(context.Context) (any, error) {
 	return http.StatusOK, nil
 }
 

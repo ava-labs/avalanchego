@@ -285,7 +285,7 @@ func (t *trieToSync) createSegments(ctx context.Context, numSegments int) error 
 
 	segmentStep := 0x10000 / numSegments
 
-	for i := 0; i < numSegments; i++ {
+	for i := range numSegments {
 		start := uint16(i * segmentStep)
 		end := uint16(i*segmentStep + (segmentStep - 1))
 

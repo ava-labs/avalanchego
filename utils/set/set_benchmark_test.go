@@ -13,7 +13,7 @@ func BenchmarkSetList(b *testing.B) {
 	for size := range sizes {
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			set := Set[int]{}
-			for i := 0; i < size; i++ {
+			for i := range size {
 				set.Add(i)
 			}
 			b.ResetTimer()
@@ -29,7 +29,7 @@ func BenchmarkSetClear(b *testing.B) {
 		b.Run(strconv.Itoa(numElts), func(b *testing.B) {
 			set := NewSet[int](numElts)
 			for n := 0; n < b.N; n++ {
-				for i := 0; i < numElts; i++ {
+				for i := range numElts {
 					set.Add(i)
 				}
 				set.Clear()

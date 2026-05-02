@@ -27,11 +27,11 @@ var (
 type TestClient struct {
 	codec          codec.Manager
 	leafsHandler   handlers.LeafRequestHandler
-	leavesReceived int32
+	leavesReceived atomic.Int32
 	codesHandler   *handlers.CodeRequestHandler
-	codeReceived   int32
+	codeReceived   atomic.Int32
 	blocksHandler  *handlers.BlockRequestHandler
-	blocksReceived int32
+	blocksReceived atomic.Int32
 	// GetLeafsIntercept is called on every GetLeafs request if set to a non-nil callback.
 	// The returned response will be returned by TestClient to the caller.
 	GetLeafsIntercept func(req message.LeafsRequest, res message.LeafsResponse) (message.LeafsResponse, error)
@@ -80,12 +80,12 @@ func (ml *TestClient) GetLeafs(ctx context.Context, request message.LeafsRequest
 		leafsResponse, err = ml.GetLeafsIntercept(request, leafsResponse)
 	}
 	// Increment the number of leaves received by the test client
-	atomic.AddInt32(&ml.leavesReceived, int32(numLeaves))
+	ml.leavesReceived.Add(int32(numLeaves))
 	return leafsResponse, err
 }
 
 func (ml *TestClient) LeavesReceived() int32 {
-	return atomic.LoadInt32(&ml.leavesReceived)
+	return ml.leavesReceived.Load()
 }
 
 func (ml *TestClient) GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error) {
@@ -107,13 +107,13 @@ func (ml *TestClient) GetCode(ctx context.Context, hashes []common.Hash) ([][]by
 		code, err = ml.GetCodeIntercept(hashes, code)
 	}
 	if err == nil {
-		atomic.AddInt32(&ml.codeReceived, int32(lenCode))
+		ml.codeReceived.Add(int32(lenCode))
 	}
 	return code, err
 }
 
 func (ml *TestClient) CodeReceived() int32 {
-	return atomic.LoadInt32(&ml.codeReceived)
+	return ml.codeReceived.Load()
 }
 
 func (ml *TestClient) GetBlocks(ctx context.Context, blockHash common.Hash, height uint64, numParents uint16) ([]*types.Block, error) {
@@ -144,12 +144,12 @@ func (ml *TestClient) GetBlocks(ctx context.Context, blockHash common.Hash, heig
 	if ml.GetBlocksIntercept != nil {
 		blocks, err = ml.GetBlocksIntercept(request, blocks)
 	}
-	atomic.AddInt32(&ml.blocksReceived, int32(numBlocks))
+	ml.blocksReceived.Add(int32(numBlocks))
 	return blocks, err
 }
 
 func (ml *TestClient) BlocksReceived() int32 {
-	return atomic.LoadInt32(&ml.blocksReceived)
+	return ml.blocksReceived.Load()
 }
 
 type testBlockParser struct{}

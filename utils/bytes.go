@@ -51,7 +51,7 @@ func NewBytesPool() *BytesPool {
 		// uint is used here to avoid overflowing int during the shift
 		size := uint(1)<<i - 1
 		p[i] = sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				// Sync pool needs to return pointer-like values to avoid memory
 				// allocations.
 				b := make([]byte, size)

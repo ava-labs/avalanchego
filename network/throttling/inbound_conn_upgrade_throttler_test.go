@@ -30,7 +30,7 @@ func TestNoInboundConnUpgradeThrottler(t *testing.T) {
 			},
 		)
 		// throttler should allow all
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			require.True(throttler.ShouldUpgrade(host1))
 		}
 	}
@@ -42,7 +42,7 @@ func TestNoInboundConnUpgradeThrottler(t *testing.T) {
 			},
 		)
 		// throttler should allow all
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			require.True(throttler.ShouldUpgrade(host1))
 		}
 	}

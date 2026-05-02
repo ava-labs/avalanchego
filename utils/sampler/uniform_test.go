@@ -82,9 +82,9 @@ func TestUniformLazilySample(t *testing.T) {
 
 	s.Initialize(3)
 
-	for j := 0; j < 2; j++ {
+	for range 2 {
 		sampled := map[uint64]bool{}
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			val, hasNext := s.Next()
 			require.True(hasNext)
 			require.False(sampled[val])

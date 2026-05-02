@@ -63,10 +63,7 @@ func (test PredicateTest) RunBenchmark(b *testing.B) {
 		test.Run(b)
 	}
 	b.StopTimer()
-	elapsed := uint64(time.Since(start))
-	if elapsed < 1 {
-		elapsed = 1
-	}
+	elapsed := max(uint64(time.Since(start)), 1)
 
 	gasUsed := test.Gas * uint64(b.N)
 	b.ReportMetric(float64(test.Gas), "gas/op")

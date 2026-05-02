@@ -24,7 +24,7 @@ var (
 
 type Fx struct{ secp256k1fx.Fx }
 
-func (fx *Fx) Initialize(vmIntf interface{}) error {
+func (fx *Fx) Initialize(vmIntf any) error {
 	if err := fx.InitializeVM(vmIntf); err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	)
 }
 
-func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
+func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf any, utxosIntf []any) error {
 	tx, ok := txIntf.(secp256k1fx.UnsignedTx)
 	switch {
 	case !ok:
@@ -66,7 +66,7 @@ func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []
 	}
 }
 
-func (fx *Fx) VerifyMintOperation(tx secp256k1fx.UnsignedTx, op *MintOperation, cred *Credential, utxoIntf interface{}) error {
+func (fx *Fx) VerifyMintOperation(tx secp256k1fx.UnsignedTx, op *MintOperation, cred *Credential, utxoIntf any) error {
 	out, ok := utxoIntf.(*MintOutput)
 	if !ok {
 		return errWrongUTXOType
@@ -84,7 +84,7 @@ func (fx *Fx) VerifyMintOperation(tx secp256k1fx.UnsignedTx, op *MintOperation, 
 	}
 }
 
-func (fx *Fx) VerifyTransferOperation(tx secp256k1fx.UnsignedTx, op *TransferOperation, cred *Credential, utxoIntf interface{}) error {
+func (fx *Fx) VerifyTransferOperation(tx secp256k1fx.UnsignedTx, op *TransferOperation, cred *Credential, utxoIntf any) error {
 	out, ok := utxoIntf.(*TransferOutput)
 	if !ok {
 		return errWrongUTXOType
@@ -104,6 +104,6 @@ func (fx *Fx) VerifyTransferOperation(tx secp256k1fx.UnsignedTx, op *TransferOpe
 	}
 }
 
-func (*Fx) VerifyTransfer(_, _, _, _ interface{}) error {
+func (*Fx) VerifyTransfer(_, _, _, _ any) error {
 	return errCantTransfer
 }

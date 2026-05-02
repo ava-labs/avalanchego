@@ -213,7 +213,7 @@ func (c Config) EthAPIs() []string {
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
-	var v interface{}
+	var v any
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}

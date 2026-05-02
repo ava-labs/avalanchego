@@ -34,7 +34,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 
 	validatorIDs := make([]ids.NodeID, 0, numValidators)
 	validatorSet := validators.NewManager()
-	for i := 0; i < numValidators; i++ {
+	for range numValidators {
 		nodeID := ids.GenerateTestNodeID()
 
 		require.NoError(validatorSet.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
@@ -62,7 +62,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	wg.Wait()
 
 	// we should have a weight of numValidators now
-	require.Equal(int64(numValidators), b.numConns)
+	require.Equal(int64(numValidators), b.numConns.Load())
 
 	// disconnect numValidators validators
 	wg.Add(numValidators)
@@ -75,5 +75,5 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	wg.Wait()
 
 	// we should a weight of zero now
-	require.Zero(b.numConns)
+	require.Zero(b.numConns.Load())
 }

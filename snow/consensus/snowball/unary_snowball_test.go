@@ -53,7 +53,7 @@ func TestUnarySnowball(t *testing.T) {
 	require.Equal(expected, binarySnowball.String())
 
 	binarySnowball.RecordUnsuccessfulPoll()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		require.Zero(binarySnowball.Preference())
 		require.False(binarySnowball.Finalized())
 		binarySnowball.RecordPoll(alphaConfidence, 1)

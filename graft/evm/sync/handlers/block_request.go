@@ -63,10 +63,7 @@ func (b *BlockRequestHandler) OnBlockRequest(ctx context.Context, nodeID ids.Nod
 	b.stats.IncBlockRequest()
 
 	// override given Parents limit if it is greater than parentLimit
-	parents := blockRequest.Parents
-	if parents > parentLimit {
-		parents = parentLimit
-	}
+	parents := min(blockRequest.Parents, parentLimit)
 	blocks := make([][]byte, 0, parents)
 	totalBytes := 0
 

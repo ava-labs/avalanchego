@@ -29,7 +29,7 @@ func (cr *Credential) MarshalJSON() ([]byte, error) {
 		}
 		signatures[i] = sigStr
 	}
-	jsonFieldMap := map[string]interface{}{
+	jsonFieldMap := map[string]any{
 		"signatures": signatures,
 	}
 	return json.Marshal(jsonFieldMap)

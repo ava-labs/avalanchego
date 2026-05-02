@@ -77,7 +77,7 @@ func (c *hierarchyCodec) NextGroup() {
 
 // RegisterType is used to register types that may be unmarshaled into an interface
 // [val] is a value of the type being registered
-func (c *hierarchyCodec) RegisterType(val interface{}) error {
+func (c *hierarchyCodec) RegisterType(val any) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

@@ -164,7 +164,7 @@ func (db *Database) Compact(_, _ []byte) error {
 	return nil
 }
 
-func (db *Database) HealthCheck(context.Context) (interface{}, error) {
+func (db *Database) HealthCheck(context.Context) (any, error) {
 	if db.isClosed() {
 		return nil, database.ErrClosed
 	}

@@ -94,7 +94,7 @@ func apiOwnerToClientOwner(rewardOwner *api.Owner) (*ClientOwner, error) {
 	}, err
 }
 
-func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]ClientPermissionlessValidator, error) {
+func getClientPermissionlessValidators(validatorsSliceIntf []any) ([]ClientPermissionlessValidator, error) {
 	clientValidators := make([]ClientPermissionlessValidator, len(validatorsSliceIntf))
 	for i, validatorMapIntf := range validatorsSliceIntf {
 		validatorMapJSON, err := json.Marshal(validatorMapIntf)

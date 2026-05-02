@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -141,9 +142,9 @@ func TestGetBlocks(t *testing.T) {
 	// and returns a slice of byte slices with those blocks encoded in reverse order
 	encodeBlockSlice := func(blocks []*types.Block) [][]byte {
 		blockBytes := make([][]byte, 0, len(blocks))
-		for i := len(blocks) - 1; i >= 0; i-- {
+		for _, v := range slices.Backward(blocks) {
 			buf := new(bytes.Buffer)
-			require.NoError(t, blocks[i].EncodeRLP(buf))
+			require.NoError(t, v.EncodeRLP(buf))
 			blockBytes = append(blockBytes, buf.Bytes())
 		}
 

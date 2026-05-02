@@ -250,13 +250,11 @@ func TestAppRequestOnShutdown(t *testing.T) {
 	)
 	sender := testAppSender{
 		sendAppRequestFn: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
-			wg.Add(1)
-			go func() {
+			wg.Go(func() {
 				called = true
 				// shutdown the network here to ensure any outstanding requests are handled as failed
 				net.Shutdown()
-				wg.Done()
-			}() // this is on a goroutine to avoid a deadlock since calling Shutdown takes the lock.
+			}) // this is on a goroutine to avoid a deadlock since calling Shutdown takes the lock.
 			return nil
 		},
 	}
@@ -600,7 +598,7 @@ func TestNetworkRouting(t *testing.T) {
 	require.ErrorIs(err, p2p.ErrUnrequestedResponse)
 }
 
-func buildCodec(t *testing.T, types ...interface{}) codec.Manager {
+func buildCodec(t *testing.T, types ...any) codec.Manager {
 	codecManager := codec.NewDefaultManager()
 	c := linearcodec.NewDefault()
 	for _, typ := range types {
@@ -612,7 +610,7 @@ func buildCodec(t *testing.T, types ...interface{}) codec.Manager {
 
 // marshalStruct is a helper method used to marshal an object as `interface{}`
 // so that the codec is able to include the TypeID in the resulting bytes
-func marshalStruct(codec codec.Manager, obj interface{}) ([]byte, error) {
+func marshalStruct(codec codec.Manager, obj any) ([]byte, error) {
 	return codec.Marshal(codecVersion, &obj)
 }
 

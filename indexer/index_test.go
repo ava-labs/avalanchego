@@ -115,7 +115,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	require.NoError(err)
 
 	// Insert [MaxFetchedByRange] + 1 containers
-	for i := uint64(0); i < MaxFetchedByRange+1; i++ {
+	for range uint64(MaxFetchedByRange + 1) {
 		require.NoError(idx.Accept(ctx, ids.GenerateTestID(), utils.RandomBytes(32)))
 	}
 

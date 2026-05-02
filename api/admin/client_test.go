@@ -35,19 +35,19 @@ var (
 )
 
 type mockClient struct {
-	response interface{}
+	response any
 	err      error
 }
 
 // NewMockClient returns a mock client for testing
-func NewMockClient(response interface{}, err error) rpc.EndpointRequester {
+func NewMockClient(response any, err error) rpc.EndpointRequester {
 	return &mockClient{
 		response: response,
 		err:      err,
 	}
 }
 
-func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, reply interface{}, _ ...rpc.Option) error {
+func (mc *mockClient) SendRequest(_ context.Context, _ string, _ any, reply any, _ ...rpc.Option) error {
 	if mc.err != nil {
 		return mc.err
 	}
@@ -65,8 +65,8 @@ func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, re
 	case *LoggerLevelReply:
 		response := mc.response.(*LoggerLevelReply)
 		*p = *response
-	case *interface{}:
-		response := mc.response.(*interface{})
+	case *any:
+		response := mc.response.(*any)
 		*p = *response
 	default:
 		panic("illegal type")
@@ -323,9 +323,9 @@ func TestGetConfig(t *testing.T) {
 		name             string
 		serviceErr       error
 		clientErr        error
-		expectedResponse interface{}
+		expectedResponse any
 	}
-	var resp interface{} = "response"
+	var resp any = "response"
 	tests := []test{
 		{
 			name:             "Happy path",

@@ -18,7 +18,7 @@ var errTest = errors.New("non-nil error")
 
 type testFactory struct{}
 
-func (testFactory) New(logging.Logger) (interface{}, error) { return nil, nil }
+func (testFactory) New(logging.Logger) (any, error) { return nil, nil }
 
 type getVMsTest struct {
 	info      *Info

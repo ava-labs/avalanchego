@@ -83,7 +83,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	require.NoError(err)
 
 	// Create 1000 UTXOs each on addr0, addr1, and addr2.
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		txID := ids.GenerateTestID()
 		assetID := ids.GenerateTestID()
 		utxo0 := &UTXO{

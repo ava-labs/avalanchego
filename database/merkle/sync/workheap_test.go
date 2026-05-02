@@ -193,7 +193,7 @@ func TestWorkHeapMergeInsertRandom(t *testing.T) {
 	t.Logf("seed: %d", seed)
 
 	// Create start and end bounds
-	for i := 0; i < numRanges; i++ {
+	for range numRanges {
 		bound := make([]byte, 32)
 		_, _ = rand.Read(bound)
 		bounds = append(bounds, bound)

@@ -65,6 +65,6 @@ func (e *engine) Context() *snow.ConsensusContext {
 	return e.ctx
 }
 
-func (*engine) HealthCheck(context.Context) (interface{}, error) {
+func (*engine) HealthCheck(context.Context) (any, error) {
 	return nil, nil
 }

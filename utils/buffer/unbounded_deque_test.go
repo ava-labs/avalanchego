@@ -653,7 +653,7 @@ func FuzzUnboundedSliceDeque(f *testing.F) {
 				require.Equal(n, list[i])
 			}
 
-			for i := 0; i < len(input); i++ {
+			for i := range input {
 				_, _ = b.PopLeft()
 				list = b.List()
 				if i == len(input)-1 {

@@ -187,7 +187,7 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	cache := newOnEvictCache(maxSize, size, onEviction)
 
 	// Fill the cache
-	for i := 0; i < maxSize; i++ {
+	for i := range maxSize {
 		require.NoError(cache.Put(i, i))
 		require.Equal(i+1, cache.fifo.Len())
 	}

@@ -2164,7 +2164,7 @@ func TestIPTracker_BloomGrows(t *testing.T) {
 
 			tracker := newTestIPTracker(t, false)
 			initialMaxBloomCount := tracker.maxBloomCount
-			for i := 0; i < 2048; i++ {
+			for range 2048 {
 				test.add(tracker)
 			}
 			requireMetricsConsistent(t, tracker)

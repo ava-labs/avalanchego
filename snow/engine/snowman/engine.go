@@ -527,7 +527,7 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 	return e.executeDeferredWork(ctx)
 }
 
-func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
+func (e *Engine) HealthCheck(ctx context.Context) (any, error) {
 	e.Ctx.Lock.Lock()
 	defer e.Ctx.Lock.Unlock()
 
@@ -541,7 +541,7 @@ func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
 
 	consensusIntf, consensusErr := e.Consensus.HealthCheck(ctx)
 	vmIntf, vmErr := e.VM.HealthCheck(ctx)
-	intf := map[string]interface{}{
+	intf := map[string]any{
 		"consensus": consensusIntf,
 		"vm":        vmIntf,
 	}

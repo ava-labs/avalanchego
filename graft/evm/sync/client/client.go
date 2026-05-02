@@ -100,13 +100,13 @@ type Client interface {
 // Validates response in context of the request
 // Ensures the returned interface matches the expected response type of the request
 // Returns the number of elements in the response (specific to the response type, used in metrics)
-type parseResponseFn func(codec codec.Manager, request message.Request, response []byte) (interface{}, int, error)
+type parseResponseFn func(codec codec.Manager, request message.Request, response []byte) (any, int, error)
 
 type client struct {
 	network          Network
 	codec            codec.Manager
 	stateSyncNodes   []ids.NodeID
-	stateSyncNodeIdx uint32
+	stateSyncNodeIdx atomic.Uint32
 	stats            stats.ClientSyncerStats
 	blockParser      EthBlockParser
 }
@@ -164,7 +164,7 @@ func (c *client) GetLeafs(ctx context.Context, req message.LeafsRequest) (messag
 // - first and last key in the response is not within the requested start and end range
 // - response keys are not in increasing order
 // - proof validation failed
-func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byte) (interface{}, int, error) {
+func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byte) (any, int, error) {
 	var leafsResponse message.LeafsResponse
 	if _, err := codec.Unmarshal(data, &leafsResponse); err != nil {
 		return nil, 0, err
@@ -240,7 +240,7 @@ func (c *client) GetBlocks(ctx context.Context, hash common.Hash, height uint64,
 // assumes req is of type message.BlockRequest
 // returns types.Blocks as interface{}
 // returns a non-nil error if the request should be retried
-func (c *client) parseBlocks(codec codec.Manager, req message.Request, data []byte) (interface{}, int, error) {
+func (c *client) parseBlocks(codec codec.Manager, req message.Request, data []byte) (any, int, error) {
 	var response message.BlockResponse
 	if _, err := codec.Unmarshal(data, &response); err != nil {
 		return nil, 0, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
@@ -290,7 +290,7 @@ func (c *client) GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, e
 // parseCode validates given object as a code object
 // assumes req is of type message.CodeRequest
 // returns a non-nil error if the request should be retried
-func parseCode(codec codec.Manager, req message.Request, data []byte) (interface{}, int, error) {
+func parseCode(codec codec.Manager, req message.Request, data []byte) (any, int, error) {
 	var response message.CodeResponse
 	if _, err := codec.Unmarshal(data, &response); err != nil {
 		return nil, 0, err
@@ -322,7 +322,7 @@ func parseCode(codec codec.Manager, req message.Request, data []byte) (interface
 // Retries if there is a network error or if the [parseResponseFn] returns an error indicating an invalid response.
 // Returns the parsed interface returned from [parseFn].
 // Thread safe
-func (c *client) get(ctx context.Context, request message.Request, parseFn parseResponseFn) (interface{}, error) {
+func (c *client) get(ctx context.Context, request message.Request, parseFn parseResponseFn) (any, error) {
 	// marshal the request into requestBytes
 	requestBytes, err := message.RequestToBytes(c.codec, request)
 	if err != nil {
@@ -334,7 +334,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		return nil, err
 	}
 	var (
-		responseIntf interface{}
+		responseIntf any
 		numElements  int
 		lastErr      error
 	)
@@ -361,7 +361,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		} else {
 			// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
 			// we do this every attempt to ensure we get a different node each time if possible.
-			nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
+			nodeIdx := c.stateSyncNodeIdx.Add(1)
 			nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
 
 			response, err = c.network.SendSyncedAppRequest(ctx, nodeID, requestBytes)

@@ -34,23 +34,23 @@ func TestNoIngressConnAlertHealthCheck(t *testing.T) {
 		getValidatorResult     bool
 		ingressConnCountResult int
 		expectedErr            error
-		expectedResult         interface{}
+		expectedResult         any
 	}{
 		{
 			name:           "not a validator of a primary network",
-			expectedResult: map[string]interface{}{"ingressConnectionCount": 0, "primaryNetworkValidator": false},
+			expectedResult: map[string]any{"ingressConnectionCount": 0, "primaryNetworkValidator": false},
 		},
 		{
 			name:               "a validator of the primary network",
 			getValidatorResult: true,
-			expectedResult: map[string]interface{}{
+			expectedResult: map[string]any{
 				"ingressConnectionCount": 0, "primaryNetworkValidator": true,
 			},
 			expectedErr: ErrNoIngressConnections,
 		},
 		{
 			name:                   "a validator with ingress connections",
-			expectedResult:         map[string]interface{}{"ingressConnectionCount": 42, "primaryNetworkValidator": true},
+			expectedResult:         map[string]any{"ingressConnectionCount": 42, "primaryNetworkValidator": true},
 			expectedErr:            nil,
 			ingressConnCountResult: 42,
 			getValidatorResult:     true,

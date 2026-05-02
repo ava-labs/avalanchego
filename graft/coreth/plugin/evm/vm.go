@@ -776,11 +776,9 @@ func (vm *VM) initBlockBuilding() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize gossip eth tx pool: %w", err)
 	}
-	vm.shutdownWg.Add(1)
-	go func() {
+	vm.shutdownWg.Go(func() {
 		ethTxPool.Subscribe(ctx)
-		vm.shutdownWg.Done()
-	}()
+	})
 
 	handler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
 		vm.ctx.NodeID,
@@ -822,16 +820,12 @@ func (vm *VM) initBlockBuilding() error {
 		return fmt.Errorf("failed to add eth tx gossip handler: %w", err)
 	}
 
-	vm.shutdownWg.Add(1)
-	go func() {
+	vm.shutdownWg.Go(func() {
 		avalanchegossip.Every(ctx, vm.ctx.Log, pushGossiper, vm.config.PushGossipFrequency.Duration)
-		vm.shutdownWg.Done()
-	}()
-	vm.shutdownWg.Add(1)
-	go func() {
+	})
+	vm.shutdownWg.Go(func() {
 		avalanchegossip.Every(ctx, vm.ctx.Log, pullGossiper, vm.config.PullGossipFrequency.Duration)
-		vm.shutdownWg.Done()
-	}()
+	})
 
 	return nil
 }
@@ -1105,15 +1099,13 @@ func (vm *VM) startContinuousProfiler() {
 	)
 	defer vm.profiler.Shutdown()
 
-	vm.shutdownWg.Add(1)
-	go func() {
-		defer vm.shutdownWg.Done()
+	vm.shutdownWg.Go(func() {
 		log.Info("Dispatching continuous profiler", "dir", vm.config.ContinuousProfilerDir, "freq", vm.config.ContinuousProfilerFrequency, "maxFiles", vm.config.ContinuousProfilerMaxFiles)
 		err := vm.profiler.Dispatch()
 		if err != nil {
 			log.Error("continuous profiler failed", "err", err)
 		}
-	}()
+	})
 	// Wait for shutdownChan to be closed
 	<-vm.shutdownChan
 }

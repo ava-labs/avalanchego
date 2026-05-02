@@ -157,7 +157,7 @@ func TestMintOperationOuts(t *testing.T) {
 
 func TestMintOperationState(t *testing.T) {
 	require := require.New(t)
-	intf := interface{}(&MintOperation{})
+	intf := any(&MintOperation{})
 	_, ok := intf.(verify.State)
 	require.False(ok)
 }

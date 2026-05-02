@@ -34,7 +34,7 @@ func TestTransferOperationOuts(t *testing.T) {
 }
 
 func TestTransferOperationState(t *testing.T) {
-	intf := interface{}(&TransferOperation{})
+	intf := any(&TransferOperation{})
 	_, ok := intf.(verify.State)
 	require.False(t, ok)
 }

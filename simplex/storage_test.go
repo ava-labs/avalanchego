@@ -278,7 +278,7 @@ func TestStorageIndexSuccess(t *testing.T) {
 	finalizations = append(finalizations, simplex.Finalization{})
 
 	prev := genesis
-	for i := 0; i < numBlocks; i++ {
+	for range numBlocks {
 		child := newTestBlock(t, newBlockConfig{prev: prev})
 		_, err := child.Verify(ctx)
 		require.NoError(t, err)

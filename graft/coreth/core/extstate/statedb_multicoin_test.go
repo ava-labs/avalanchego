@@ -101,7 +101,7 @@ func TestMultiCoinSnapshot(t *testing.T) {
 	assertBalances(t, wrappedStateDB, 10, 10, 0)
 
 	// Add more layers than the cap and ensure the balances and layers are correct
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		statedb, err = state.New(root, db, snapTree)
 		require.NoErrorf(t, err, "creating statedb %d", i)
 

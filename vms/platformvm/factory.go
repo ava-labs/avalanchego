@@ -17,6 +17,6 @@ type Factory struct {
 }
 
 // New returns a new instance of the Platform Chain
-func (f *Factory) New(logging.Logger) (interface{}, error) {
+func (f *Factory) New(logging.Logger) (any, error) {
 	return &VM{Internal: f.Internal}, nil
 }

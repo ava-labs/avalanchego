@@ -2018,7 +2018,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 
 	numUTXOs := 10
 	// Put a bunch of UTXOs
-	for i := 0; i < numUTXOs; i++ {
+	for range numUTXOs {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),
@@ -2305,7 +2305,7 @@ func TestServiceGetBlock(t *testing.T) {
 
 	type test struct {
 		name                        string
-		serviceAndExpectedBlockFunc func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{})
+		serviceAndExpectedBlockFunc func(t *testing.T, ctrl *gomock.Controller) (*Service, any)
 		encoding                    formatting.Encoding
 		expectedErr                 error
 	}
@@ -2313,7 +2313,7 @@ func TestServiceGetBlock(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceAndExpectedBlockFunc: func(*testing.T, *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(*testing.T, *gomock.Controller) (*Service, any) {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{
@@ -2327,7 +2327,7 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "block not found",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
 				return &Service{
@@ -2344,7 +2344,7 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "JSON format",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				block := block.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
 				block.EXPECT().Txs().Return(nil)
@@ -2365,7 +2365,7 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "hex format",
-			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -2389,7 +2389,7 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "hexc format",
-			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -2413,7 +2413,7 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "hexnc format",
-			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -2471,7 +2471,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 	type test struct {
 		name                        string
-		serviceAndExpectedBlockFunc func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{})
+		serviceAndExpectedBlockFunc func(t *testing.T, ctrl *gomock.Controller) (*Service, any)
 		encoding                    formatting.Encoding
 		expectedErr                 error
 	}
@@ -2479,7 +2479,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceAndExpectedBlockFunc: func(*testing.T, *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(*testing.T, *gomock.Controller) (*Service, any) {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{
@@ -2493,7 +2493,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "block height not found",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(ids.Empty, database.ErrNotFound)
 
@@ -2513,7 +2513,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "block not found",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
@@ -2534,7 +2534,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "JSON format",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				block := block.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
 				block.EXPECT().Txs().Return(nil)
@@ -2559,7 +2559,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "hex format",
-			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -2587,7 +2587,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "hexc format",
-			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -2615,7 +2615,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "hexnc format",
-			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, any) {
 				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)

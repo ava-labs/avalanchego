@@ -791,12 +791,12 @@ func (b *Bootstrapper) Notify(_ context.Context, msg common.Message) error {
 	return nil
 }
 
-func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+func (b *Bootstrapper) HealthCheck(ctx context.Context) (any, error) {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
 
 	vmIntf, vmErr := b.VM.HealthCheck(ctx)
-	intf := map[string]interface{}{
+	intf := map[string]any{
 		"consensus": struct{}{},
 		"vm":        vmIntf,
 	}

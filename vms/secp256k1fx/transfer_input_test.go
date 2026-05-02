@@ -111,7 +111,7 @@ func TestTransferInputSerialize(t *testing.T) {
 
 func TestTransferInputNotState(t *testing.T) {
 	require := require.New(t)
-	intf := interface{}(&TransferInput{})
+	intf := any(&TransferInput{})
 	_, ok := intf.(verify.State)
 	require.False(ok)
 }

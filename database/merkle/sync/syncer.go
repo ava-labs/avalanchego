@@ -138,7 +138,7 @@ type Syncer[R any, C any] struct {
 	syncing   bool
 	closeOnce sync.Once
 
-	stateSyncNodeIdx uint32
+	stateSyncNodeIdx atomic.Uint32
 	metrics          SyncMetrics
 }
 
@@ -498,7 +498,7 @@ func (s *Syncer[_, _]) sendRequest(
 	// Get the next nodeID to query using the [nodeIdx] offset.
 	// If we're out of nodes, loop back to 0.
 	// We do this try to query a different node each time if possible.
-	nodeIdx := atomic.AddUint32(&s.stateSyncNodeIdx, 1)
+	nodeIdx := s.stateSyncNodeIdx.Add(1)
 	nodeID := s.config.StateSyncNodes[nodeIdx%uint32(len(s.config.StateSyncNodes))]
 	return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse)
 }

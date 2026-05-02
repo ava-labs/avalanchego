@@ -26,7 +26,7 @@ func NewNetwork(factory Factory, params Parameters, numColors int, rngSource sam
 		rngSource: rngSource,
 		factory:   factory,
 	}
-	for i := 0; i < numColors; i++ {
+	for i := range numColors {
 		n.colors = append(n.colors, ids.Empty.Prefix(uint64(i)))
 	}
 	return n

@@ -77,7 +77,7 @@ func (t *testNetwork) processTest() ([]byte, error) {
 
 func (t *testNetwork) testResponse(times uint8, callback func(), response []byte) {
 	t.response = make([][]byte, times)
-	for i := uint8(0); i < times; i++ {
+	for i := range times {
 		t.response[i] = response
 	}
 	t.callback = callback

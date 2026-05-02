@@ -30,7 +30,7 @@ func (s Status) MarshalJSON() ([]byte, error) {
 	if err := s.Valid(); err != nil {
 		return nil, err
 	}
-	return []byte(fmt.Sprintf("%q", s)), nil
+	return fmt.Appendf(nil, "%q", s), nil
 }
 
 // UnmarshalJSON ...

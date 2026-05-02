@@ -117,8 +117,8 @@ func (c *Client) GetLoggerLevel(
 	return res.LoggerLevels, err
 }
 
-func (c *Client) GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error) {
-	var res interface{}
+func (c *Client) GetConfig(ctx context.Context, options ...rpc.Option) (any, error) {
+	var res any
 	err := c.Requester.SendRequest(ctx, "admin.getConfig", struct{}{}, &res, options...)
 	return res, err
 }
