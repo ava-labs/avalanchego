@@ -21,6 +21,7 @@ go_library(
         "process_runtime.go",
         "start_kind_cluster.go",
         "subnet.go",
+        "topology_runtime.go",
         "utils.go",
     ],
     embedsrcs = [
@@ -60,6 +61,8 @@ go_library(
         "//wallet/subnet/primary/common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//params",
+        "@com_github_chaos_mesh_chaos_mesh_api//v1alpha1",
+        "@com_github_go_logr_logr//:logr",
         "@com_github_google_uuid//:uuid",
         "@com_github_prometheus_client_golang//api",
         "@com_github_prometheus_client_golang//api/prometheus/v1:prometheus",
@@ -72,6 +75,7 @@ go_library(
         "@io_k8s_apimachinery//pkg/api/resource",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/apis/meta/v1/unstructured",
+        "@io_k8s_apimachinery//pkg/runtime",
         "@io_k8s_apimachinery//pkg/runtime/schema",
         "@io_k8s_apimachinery//pkg/runtime/serializer/yaml",
         "@io_k8s_apimachinery//pkg/types",
@@ -84,6 +88,8 @@ go_library(
         "@io_k8s_client_go//tools/clientcmd/api",
         "@io_k8s_client_go//tools/portforward",
         "@io_k8s_client_go//transport/spdy",
+        "@io_k8s_sigs_controller_runtime//pkg/client",
+        "@io_k8s_sigs_controller_runtime//pkg/log",
         "@io_k8s_utils//ptr",
         "@org_uber_go_zap//:zap",
     ],
@@ -91,10 +97,17 @@ go_library(
 
 go_test(
     name = "tmpnet_test",
-    srcs = ["network_test.go"],
+    srcs = [
+        "network_test.go",
+        "topology_runtime_test.go",
+    ],
     embed = [":tmpnet"],
     deps = [
+        "//ids",
         "//utils/logging",
+        "@com_github_chaos_mesh_chaos_mesh_api//v1alpha1",
         "@com_github_stretchr_testify//require",
+        "@io_k8s_api//core/v1:core",
+        "@org_uber_go_zap//:zap",
     ],
 )

@@ -464,6 +464,15 @@ func (n *Node) getMonitoringLabels() map[string]string {
 	return labels
 }
 
+func (n *Node) getKubeLabels() map[string]string {
+	labels := n.getMonitoringLabels()
+	location, ok := n.network.topologyLocationForNode(n)
+	if ok {
+		labels[topologyLocationLabelKey] = location
+	}
+	return labels
+}
+
 func (n *Node) IsRunning() bool {
 	return len(n.URI) > 0
 }
