@@ -15,6 +15,7 @@ package_group(
         "//tests/e2e",
         "//tests/e2e/c",
         "//tests/fixture/e2e",
+        "//tests/fixture/subnet",
         "//tests/reexecute",
         "//tests/reexecute/c",
         "//tests/reexecute/chaos",
