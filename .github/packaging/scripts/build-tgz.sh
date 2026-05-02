@@ -35,11 +35,13 @@ esac
 
 mkdir -p "${OUTPUT_DIR}"
 
-# Remove stale signatures and public key from a previous run. Tarballs
-# are overwritten by tar, but .sig files and GPG-KEY-avalanchego are
-# not — without this, an unsigned re-run after a signed run would
-# leave .sig files that no longer match the freshly built tarballs.
-rm -f "${OUTPUT_DIR}"/*.tar.gz.sig "${OUTPUT_DIR}/GPG-KEY-avalanchego"
+# Remove stale tarballs, signatures, and the exported public key from
+# any previous run. Tar would overwrite same-tag tarballs, but on
+# persistent runners or after a failed cleanup, build/tgz can carry
+# over tarballs from a different tag — and the workflow's S3 upload
+# step matches *.tar.gz with a wildcard, so stale archives would be
+# republished alongside the current release.
+rm -f "${OUTPUT_DIR}"/*.tar.gz "${OUTPUT_DIR}"/*.tar.gz.sig "${OUTPUT_DIR}/GPG-KEY-avalanchego"
 
 echo "=== Building tarballs for ${ARCH} (tag: ${TAG}) ==="
 
