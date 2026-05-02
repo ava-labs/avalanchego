@@ -110,9 +110,6 @@ go_test(
         "@com_github_ava_labs_libevm//ethclient",
         "@com_github_ava_labs_libevm//rpc",
         "@com_github_ava_labs_libevm//triedb",
-        "@com_github_ava_labs_strevm//blocks",
-        "@com_github_ava_labs_strevm//sae",
-        "@com_github_ava_labs_strevm//saedb",
         "@com_github_stretchr_testify//require",
     ],
 )
