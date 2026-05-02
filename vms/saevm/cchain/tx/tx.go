@@ -7,7 +7,6 @@
 package tx
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
@@ -44,8 +43,13 @@ type Unsigned interface {
 	// InputUTXOs returns the UTXOIDs of the inputs of this transaction.
 	InputUTXOs() set.Set[ids.ID]
 
-	// SanityCheck performs basic validation on the transaction.
-	SanityCheck(ctx context.Context, snowCtx *snow.Context) error
+	// SanityCheck verifies that the transaction's structural invariants hold
+	// against the chain's context and that it does not produce more funds
+	// than it consumes.
+	//
+	// It does not verify signatures, whether UTXOs exist, or whether the
+	// transaction performs a valid EVM state transition.
+	SanityCheck(ctx *snow.Context) error
 
 	// VerifyState verifies that the transaction is valid to be issued on the
 	// provided state.
@@ -69,7 +73,7 @@ type Unsigned interface {
 
 	// atomicRequests returns the operations that should be applied to shared
 	// memory when this transaction is executed.
-	atomicRequests(txID ids.ID) (chainID ids.ID, requests *chainsatomic.Requests, err error)
+	atomicRequests(txID ids.ID) (chainID ids.ID, r *chainsatomic.Requests, err error)
 
 	// verifyCredentials verifies that the transaction is authorized by the
 	// provided credentials.
@@ -132,9 +136,9 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 		return hook.Op{}, fmt.Errorf("calculating amount burned: %w", err)
 	}
 
-	op, err := t.Unsigned.asOp(avaxAssetID)
+	op, err := t.asOp(avaxAssetID)
 	if err != nil {
-		return hook.Op{}, fmt.Errorf("converting unsigned transaction to operation: %w", err)
+		return hook.Op{}, fmt.Errorf("converting to operation: %w", err)
 	}
 
 	return hook.Op{
@@ -158,6 +162,8 @@ const (
 )
 
 func gasUsed(t Unsigned) (gas.Gas, error) {
+	// We MUST provide a pointer to t so that the returned size includes the
+	// type ID.
 	numBytes, err := c.Size(codecVersion, &t)
 	if err != nil {
 		return 0, err
@@ -197,7 +203,7 @@ func scaleAVAX(nAVAX uint64) uint256.Int {
 }
 
 // gasPrice takes in the cost, in nAVAX, and the gas and returns the price per
-// gas in aAVAX/gas.
+// gas in aAVAX/gas. It assumes gas is non-zero.
 //
 // The result is rounded down to the nearest aAVAX/gas.
 func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
@@ -209,10 +215,10 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	return p
 }
 
-// AtomicRequests returns chainID and shared-memory modifications that this
-// transaction should perform during execution.
-func (t *Tx) AtomicRequests() (ids.ID, *chainsatomic.Requests, error) {
-	return t.Unsigned.atomicRequests(t.ID())
+// AtomicRequests returns shared-memory modifications that this transaction
+// should perform on the peer chainID during execution.
+func (t *Tx) AtomicRequests() (chainID ids.ID, r *chainsatomic.Requests, err error) {
+	return t.atomicRequests(t.ID())
 }
 
 // VerifyCredentials verifies that the transaction is properly authorized.

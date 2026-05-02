@@ -131,7 +131,7 @@ func (b *blockBuilder) PotentialEndOfBlockOps(ctx context.Context, header *types
 				)
 				continue
 			}
-			if err := tx.Tx.SanityCheck(ctx, b.ctx); err != nil {
+			if err := tx.Tx.SanityCheck(b.ctx); err != nil {
 				b.ctx.Log.Debug("tx failed sanity check",
 					zap.Stringer("txID", tx.ID),
 					zap.Error(err),

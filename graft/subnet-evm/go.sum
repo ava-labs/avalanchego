@@ -28,8 +28,8 @@ github.com/antithesishq/antithesis-sdk-go v0.3.8/go.mod h1:IUpT2DPAKh6i/YhSbt6Gl
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1 h1:2LXaw0vQ/nSjSKyNil2NoNXXuH+nFSSrlUUBl1x6Jcg=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1/go.mod h1:0Z60sYkUFvvOlOc0XHGbP+271EjP5KjaaOA0EQxCCSA=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.4.0 h1:7OzfDVz9/lKyr9EfHZnNEvXevlW6utComzePoT4vaMQ=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.4.0/go.mod h1:MoUHYlFrwaflfLpHt8nmQUHoLy2CCHaFNH/n7vazUuI=
 github.com/ava-labs/libevm v1.13.15-0.20260310192938-d71b6cc8513a h1:rPtNc8GdAxiCxSdL+kaM42Lfuoxi034X4Fe20lR2auI=
 github.com/ava-labs/libevm v1.13.15-0.20260310192938-d71b6cc8513a/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=

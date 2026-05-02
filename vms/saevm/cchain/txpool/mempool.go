@@ -136,7 +136,7 @@ func (m *Mempool) advanceHeight(height uint64, inputs set.Set[ids.ID]) {
 func (m *Mempool) Add(rawTx *tx.Tx) error {
 	ctx := context.TODO()
 
-	if err := rawTx.SanityCheck(ctx, m.ctx); err != nil {
+	if err := rawTx.SanityCheck(m.ctx); err != nil {
 		return fmt.Errorf("tx failed sanity check: %w", err)
 	}
 

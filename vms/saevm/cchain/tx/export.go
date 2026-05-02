@@ -4,7 +4,6 @@
 package tx
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,19 +11,25 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/libevm"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	// Imported for [atomic.UnsignedExportTx.Burned] comment resolution.
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
+
+var _ Unsigned = (*Export)(nil)
 
 // Export is the unsigned component of a transaction that transfers assets from
 // the C-Chain to either the P-Chain or the X-Chain. It modifies the C-Chain
@@ -66,22 +71,20 @@ type Input struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
-var errZeroAmount = errors.New("zero amount")
-
-func (i Input) Compare(o Input) int {
-	if c := i.Address.Cmp(o.Address); c != 0 {
+// Compare orders [Input] values by [Input.Address] and [Input.AssetID].
+func (i Input) Compare(other Input) int {
+	if c := i.Address.Cmp(other.Address); c != 0 {
 		return c
 	}
-	return i.AssetID.Compare(o.AssetID)
+	return i.AssetID.Compare(other.AssetID)
 }
 
-func (i Input) Verify() error {
-	if i.Amount == 0 {
-		return errZeroAmount
-	}
-	return nil
-}
-
+// Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
+// inputs exceeds MaxUint64, even if the total amount burned could be
+// represented as a uint64.
+//
+// Because the total supply of AVAX fits in a uint64, this doesn't matter in
+// practice and allows for easier fuzzing.
 func (e *Export) burned(assetID ids.ID) (uint64, error) {
 	var (
 		burned uint64
@@ -108,40 +111,38 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 
 var errOutputsNotSorted = errors.New("outputs not sorted")
 
-func (e *Export) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
+func (e *Export) SanityCheck(ctx *snow.Context) error {
 	switch {
-	case e.NetworkID != snowCtx.NetworkID:
-		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, snowCtx.NetworkID, e.NetworkID)
-	case e.BlockchainID != snowCtx.ChainID:
-		return fmt.Errorf("%w: expected %d, got %d", errWrongChainID, snowCtx.ChainID, e.BlockchainID)
+	case e.NetworkID != ctx.NetworkID:
+		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, ctx.NetworkID, e.NetworkID)
+	case e.BlockchainID != ctx.ChainID:
+		return fmt.Errorf("%w: expected %d, got %d", errWrongChainID, ctx.ChainID, e.BlockchainID)
+	case e.DestinationChain != constants.PlatformChainID && e.DestinationChain != ctx.XChainID:
+		return fmt.Errorf("%w: expected %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, e.DestinationChain)
 	case len(e.Ins) == 0:
 		return errNoInputs
 	case len(e.ExportedOutputs) == 0:
 		return errNoOutputs
 	}
 
-	if err := verify.SameSubnet(ctx, snowCtx, e.DestinationChain); err != nil {
-		return fmt.Errorf("%w: %w", errNotSameSubnet, err)
-	}
-
 	fc := avax.NewFlowChecker()
 	for i, in := range e.Ins {
-		if err := in.Verify(); err != nil {
-			return fmt.Errorf("%w (%d): %w", errInvalidInput, i, err)
+		if in.Amount == 0 {
+			return fmt.Errorf("%w (%d): zero amount", errInvalidInput, i)
 		}
-		if in.AssetID != snowCtx.AVAXAssetID {
-			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, i, snowCtx.AVAXAssetID, in.AssetID)
+		if in.AssetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, i, ctx.AVAXAssetID, in.AssetID)
 		}
-		fc.Consume(snowCtx.AVAXAssetID, in.Amount)
+		fc.Consume(ctx.AVAXAssetID, in.Amount)
 	}
 	for i, out := range e.ExportedOutputs {
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("%w (%d): %w", errInvalidOutput, i, err)
 		}
-		if assetID := out.AssetID(); assetID != snowCtx.AVAXAssetID {
-			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, i, snowCtx.AVAXAssetID, assetID)
+		if assetID := out.Asset.ID; assetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, i, ctx.AVAXAssetID, assetID)
 		}
-		fc.Produce(snowCtx.AVAXAssetID, out.Out.Amount())
+		fc.Produce(ctx.AVAXAssetID, out.Out.Amount())
 	}
 	if err := fc.Verify(); err != nil {
 		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
@@ -150,6 +151,9 @@ func (e *Export) SanityCheck(ctx context.Context, snowCtx *snow.Context) error {
 	if !utils.IsSortedAndUnique(e.Ins) {
 		return errInputsNotSortedUnique
 	}
+	// Like [atomic.UnsignedExportTx.Verify], outputs aren't enforced to be
+	// unique. This is safe because each output's UTXO is keyed by txID and
+	// outputIndex, so duplicate outputs still produce distinct UTXOs.
 	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
 		return errOutputsNotSorted
 	}
@@ -164,7 +168,7 @@ var (
 	errAddressMismatch        = errors.New("address does not match signature")
 )
 
-func (e *Export) verifyCredentials(_ atomic.SharedMemory, creds []Credential) error {
+func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credential) error {
 	if len(e.Ins) != len(creds) {
 		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
 	}
@@ -225,8 +229,7 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 			return op{}, fmt.Errorf("%w: address %s has nonces %d and %d", errMultipleNonces, in.Address, debit.Nonce, in.Nonce)
 		}
 
-		// Non-AVAX inputs still record the address+nonce so SAE will increment
-		// the nonce, even though no AVAX is debited.
+		// Even if no AVAX is debited, non-AVAX inputs MUST increment the nonce.
 		if in.AssetID == avaxAssetID {
 			amount := scaleAVAX(in.Amount)
 			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &amount); overflow {
@@ -243,8 +246,8 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 	}, nil
 }
 
-func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *atomic.Requests, error) {
-	elems := make([]*atomic.Element, len(e.ExportedOutputs))
+func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, error) {
+	elems := make([]*chainsatomic.Element, len(e.ExportedOutputs))
 	for i, out := range e.ExportedOutputs {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
@@ -260,17 +263,17 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *atomic.Requests, error) {
 			return ids.ID{}, nil, err
 		}
 		utxoID := utxo.InputID()
-		elem := &atomic.Element{
+		elem := &chainsatomic.Element{
 			Key:   utxoID[:],
 			Value: utxoBytes,
 		}
-		if out, ok := utxo.Out.(avax.Addressable); ok {
-			elem.Traits = out.Addresses()
+		if o, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = o.Addresses()
 		}
 
 		elems[i] = elem
 	}
-	return e.DestinationChain, &atomic.Requests{PutRequests: elems}, nil
+	return e.DestinationChain, &chainsatomic.Requests{PutRequests: elems}, nil
 }
 
 var errInsufficientFunds = errors.New("insufficient funds")
@@ -283,8 +286,8 @@ func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 
 		coinID := common.Hash(in.AssetID)
 		amount := new(big.Int).SetUint64(in.Amount)
-		if statedb.GetBalanceMultiCoin(in.Address, coinID).Cmp(amount) < 0 {
-			return errInsufficientFunds
+		if balance := statedb.GetBalanceMultiCoin(in.Address, coinID); balance.Cmp(amount) < 0 {
+			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, coinID, balance, amount)
 		}
 		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
 	}
