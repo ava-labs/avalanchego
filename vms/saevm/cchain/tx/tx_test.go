@@ -762,9 +762,8 @@ func TestParse(t *testing.T) {
 	for _, test := range Tests {
 		t.Run(test.Name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
-				got := new(atomic.Tx)
-				_, err := atomic.Codec.Unmarshal(test.Bytes, got)
-				require.NoErrorf(t, err, "%T.Unmarshal(, %T)", atomic.Codec, got)
+				got, err := ParseOldTx(test.Bytes)
+				require.NoError(t, err, "ParseOldTx()")
 				if diff := cmp.Diff(test.Old, got, OldCmpOpt()); diff != "" {
 					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
 				}
