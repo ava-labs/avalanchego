@@ -71,7 +71,7 @@ go_library(
         "//vms/platformvm/signer",
         "//vms/registry",
         "//vms/rpcchainvm/runtime",
-        "//vms/saevm/cchain:saevm",
+        "//vms/saevm/cchain",
         "//vms/transitionvm",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_prometheus_client_golang//prometheus/collectors",

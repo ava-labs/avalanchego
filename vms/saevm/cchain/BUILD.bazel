@@ -18,7 +18,7 @@ package_group(
 )
 
 go_library(
-    name = "saevm",
+    name = "cchain",
     srcs = [
         "config.go",
         "factory.go",
@@ -68,49 +68,6 @@ go_library(
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_prometheus_client_golang//prometheus",
         "@org_uber_go_zap//:zap",
-    ],
-)
-
-go_test(
-    name = "saevm_test",
-    srcs = [
-        "config_test.go",
-        "vm_warp_test.go",
-    ],
-    embed = [":saevm"],
-    deps = [
-        "//database/memdb",
-        "//graft/coreth/params",
-        "//graft/coreth/params/paramstest",
-        "//graft/coreth/plugin/evm",
-        "//graft/coreth/plugin/evm/customheader",
-        "//graft/coreth/plugin/evm/vmtest",
-        "//graft/coreth/precompile/contracts/warp",
-        "//ids",
-        "//snow",
-        "//snow/engine/common",
-        "//snow/engine/enginetest",
-        "//snow/engine/snowman/block",
-        "//snow/snowtest",
-        "//snow/validators",
-        "//snow/validators/validatorstest",
-        "//upgrade/upgradetest",
-        "//utils",
-        "//utils/crypto/bls",
-        "//utils/crypto/bls/signer/localsigner",
-        "//utils/crypto/secp256k1",
-        "//utils/set",
-        "//vms/evm/predicate",
-        "//vms/platformvm/warp",
-        "//vms/platformvm/warp/payload",
-        "//vms/saevm/cchain/warp",
-        "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//core/txpool/legacypool",
-        "@com_github_ava_labs_libevm//core/types",
-        "@com_github_ava_labs_libevm//ethclient",
-        "@com_github_ava_labs_libevm//rpc",
-        "@com_github_ava_labs_libevm//triedb",
-        "@com_github_stretchr_testify//require",
     ],
 )
 
