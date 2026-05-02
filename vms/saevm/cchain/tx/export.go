@@ -128,8 +128,8 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 			Key:   utxoID[:],
 			Value: utxoBytes,
 		}
-		if out, ok := utxo.Out.(avax.Addressable); ok {
-			elem.Traits = out.Addresses()
+		if o, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = o.Addresses()
 		}
 
 		elems[i] = elem
