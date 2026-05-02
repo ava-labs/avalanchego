@@ -119,7 +119,7 @@ func (i *Import) SanityCheck(ctx *snow.Context) error {
 	case i.NetworkID != ctx.NetworkID:
 		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, ctx.NetworkID, i.NetworkID)
 	case i.BlockchainID != ctx.ChainID:
-		return fmt.Errorf("%w: expected %d, got %d", errWrongChainID, ctx.ChainID, i.BlockchainID)
+		return fmt.Errorf("%w: expected %s, got %s", errWrongChainID, ctx.ChainID, i.BlockchainID)
 	case i.SourceChain != constants.PlatformChainID && i.SourceChain != ctx.XChainID:
 		return fmt.Errorf("%w: expected %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, i.SourceChain)
 	case len(i.ImportedInputs) == 0:

@@ -116,7 +116,7 @@ func (e *Export) SanityCheck(ctx *snow.Context) error {
 	case e.NetworkID != ctx.NetworkID:
 		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, ctx.NetworkID, e.NetworkID)
 	case e.BlockchainID != ctx.ChainID:
-		return fmt.Errorf("%w: expected %d, got %d", errWrongChainID, ctx.ChainID, e.BlockchainID)
+		return fmt.Errorf("%w: expected %s, got %s", errWrongChainID, ctx.ChainID, e.BlockchainID)
 	case e.DestinationChain != constants.PlatformChainID && e.DestinationChain != ctx.XChainID:
 		return fmt.Errorf("%w: expected %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, e.DestinationChain)
 	case len(e.Ins) == 0:
