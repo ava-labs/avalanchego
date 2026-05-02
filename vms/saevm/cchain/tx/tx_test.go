@@ -6,11 +6,13 @@ package tx
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,19 +24,23 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // Tests is defined at the package level to allow sharing between fuzz tests and
 // unit tests.
 var (
-	Tests = [...]struct {
+	AVAXAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
+	Tests       = [...]struct {
 		Name  string
 		Old   *atomic.Tx
 		New   *Tx
 		JSON  string
-		ID    ids.ID
 		Bytes []byte
+		Op    hook.Op
 	}{
 		{
 			Name: "import", // Included in https://subnets.avax.network/c-chain/block/4
@@ -49,7 +55,7 @@ var (
 							OutputIndex: 1,
 						},
 						Asset: avax.Asset{
-							ID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+							ID: AVAXAssetID,
 						},
 						In: &secp256k1fx.TransferInput{
 							Amt: 50000000,
@@ -61,7 +67,7 @@ var (
 					Outs: []atomic.EVMOutput{{
 						Address: common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"),
 						Amount:  50000000,
-						AssetID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+						AssetID: AVAXAssetID,
 					}},
 				},
 				Creds: []verify.Verifiable{
@@ -83,7 +89,7 @@ var (
 							OutputIndex: 1,
 						},
 						Asset: avax.Asset{
-							ID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+							ID: AVAXAssetID,
 						},
 						In: &secp256k1fx.TransferInput{
 							Amt: 50000000,
@@ -95,7 +101,7 @@ var (
 					Outs: []Output{{
 						Address: common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"),
 						Amount:  50000000,
-						AssetID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+						AssetID: AVAXAssetID,
 					}},
 				},
 				Creds: []Credential{
@@ -133,8 +139,14 @@ var (
 					]
 				}]
 			}`,
-			ID:    ids.FromStringOrPanic("h34BPNmYApCbW8buVWAtzu1KtjTFmyMhiRQQnAqPqwCqQsB7f"),
 			Bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001c52b712aa7dce27a650bf509f799673e245edd4fa9e4e1700eb6105202fe579a0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000002faf080000000010000000000000001b8b5a87d1c05676f1f966da49151fa54dbe68c330000000002faf08021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000100000009000000013e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01"),
+			Op: hook.Op{
+				ID:  ids.FromStringOrPanic("h34BPNmYApCbW8buVWAtzu1KtjTFmyMhiRQQnAqPqwCqQsB7f"),
+				Gas: 11230,
+				Mint: map[common.Address]uint256.Int{
+					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): scaleAVAX(50_000_000),
+				},
+			},
 		},
 		{
 			Name: "export", // Included in https://subnets.avax.network/c-chain/block/48
@@ -146,11 +158,11 @@ var (
 					Ins: []atomic.EVMInput{{
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
-						AssetID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+						AssetID: AVAXAssetID,
 					}},
 					ExportedOutputs: []*avax.TransferableOutput{{
 						Asset: avax.Asset{
-							ID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+							ID: AVAXAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 1,
@@ -179,11 +191,11 @@ var (
 					Ins: []Input{{
 						Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 						Amount:  1000001,
-						AssetID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+						AssetID: AVAXAssetID,
 					}},
 					ExportedOutputs: []*avax.TransferableOutput{{
 						Asset: avax.Asset{
-							ID: ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"),
+							ID: AVAXAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 1,
@@ -232,8 +244,421 @@ var (
 					]
 				}]
 			}`,
-			ID:    ids.FromStringOrPanic("ng7Dox1r8nctrF6zurhRPYWxkmE2juUhT7Qhpauyo8qSEu6jB"),
 			Bytes: common.FromHex("0x000000000001000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001eb019ccd325ad53543a7e7e3b04828bdecf3cff600000000000f424121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000000000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500000000010000000900000001254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01"),
+			Op: hook.Op{
+				ID:        ids.FromStringOrPanic("ng7Dox1r8nctrF6zurhRPYWxkmE2juUhT7Qhpauyo8qSEu6jB"),
+				Gas:       11230,
+				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 11230),
+				Burn: map[common.Address]hook.AccountDebit{
+					common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"): {
+						Amount:     scaleAVAX(1_000_001),
+						MinBalance: scaleAVAX(1_000_001),
+					},
+				},
+			},
+		},
+		{
+			Name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
+			Old: &atomic.Tx{
+				UnsignedAtomicTx: &atomic.UnsignedImportTx{
+					NetworkID:    1,
+					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
+					SourceChain:  ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					ImportedInputs: []*avax.TransferableInput{
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH"),
+							},
+							Asset: avax.Asset{ID: AVAXAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 99000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74"),
+							},
+							Asset: avax.Asset{ID: AVAXAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 399000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj"),
+							},
+							Asset: avax.Asset{ID: AVAXAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 99000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+					},
+					Outs: []atomic.EVMOutput{
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  99000000,
+							AssetID: AVAXAssetID,
+						},
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  99000000,
+							AssetID: AVAXAssetID,
+						},
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  399000000,
+							AssetID: AVAXAssetID,
+						},
+					},
+				},
+				Creds: []verify.Verifiable{
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+				},
+			},
+			New: &Tx{
+				Unsigned: &Import{
+					NetworkID:    1,
+					BlockchainID: ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5"),
+					SourceChain:  ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM"),
+					ImportedInputs: []*avax.TransferableInput{
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH"),
+							},
+							Asset: avax.Asset{ID: AVAXAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 99000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74"),
+							},
+							Asset: avax.Asset{ID: AVAXAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 399000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+						{
+							UTXOID: avax.UTXOID{
+								TxID: ids.FromStringOrPanic("2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj"),
+							},
+							Asset: avax.Asset{ID: AVAXAssetID},
+							In: &secp256k1fx.TransferInput{
+								Amt: 99000000,
+								Input: secp256k1fx.Input{
+									SigIndices: []uint32{0},
+								},
+							},
+						},
+					},
+					Outs: []Output{
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  99000000,
+							AssetID: AVAXAssetID,
+						},
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  99000000,
+							AssetID: AVAXAssetID,
+						},
+						{
+							Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
+							Amount:  399000000,
+							AssetID: AVAXAssetID,
+						},
+					},
+				},
+				Creds: []Credential{
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+					&secp256k1fx.Credential{
+						Sigs: [][65]byte{
+							[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+						},
+					},
+				},
+			},
+			JSON: `{
+				"unsignedTx":{
+					"networkID":1,
+					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
+					"sourceChain":"2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
+					"importedInputs":[
+						{
+							"txID":"DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH",
+							"outputIndex":0,
+							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"input":{"amount":99000000,"signatureIndices":[0]}
+						},
+						{
+							"txID":"25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74",
+							"outputIndex":0,
+							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"input":{"amount":399000000,"signatureIndices":[0]}
+						},
+						{
+							"txID":"2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj",
+							"outputIndex":0,
+							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"input":{"amount":99000000,"signatureIndices":[0]}
+						}
+					],
+					"outputs":[
+						{"address":"0x383c293db6be7ac246f0956ad632344dc2cd1da3","amount":99000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"},
+						{"address":"0x383c293db6be7ac246f0956ad632344dc2cd1da3","amount":99000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"},
+						{"address":"0x383c293db6be7ac246f0956ad632344dc2cd1da3","amount":399000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"}
+					]
+				},
+				"credentials":[
+					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]},
+					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]},
+					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]}
+				]
+			}`,
+			Bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b000000031d249d0aab138afe01e6eff9c4789018a600771d94f5396b5df7b9d05298714d0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec000000001000000008e0713e47bfc29bef4cee6e4635da1c74a3aabade68ccad6fca3e99fd827eb1c0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000017c841c00000000100000000a022a8b069a5d5e54c7e09c5c5b0f762c6751068bef15fe951a5e4b349d642200000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec0000000010000000000000003383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000017c841c021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000300000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"),
+			Op: hook.Op{
+				ID:  ids.FromStringOrPanic("2Av7bXLRwxiQhbT9EcQd8KRM3Lz6VkpTqf3Y1AT5peHZ4YAohS"),
+				Gas: 13526,
+				Mint: map[common.Address]uint256.Int{
+					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): scaleAVAX(597_000_000),
+				},
+			},
+		},
+		{
+			Name: "export_same_address_multi_asset", // Synthetic
+			Old: &atomic.Tx{
+				UnsignedAtomicTx: &atomic.UnsignedExportTx{
+					Ins: []atomic.EVMInput{
+						{
+							Amount: 999,
+							Nonce:  5,
+						},
+						{
+							Amount:  1_000_000,
+							AssetID: AVAXAssetID,
+							Nonce:   5,
+						},
+					},
+					ExportedOutputs: []*avax.TransferableOutput{},
+				},
+				Creds: []verify.Verifiable{},
+			},
+			New: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{
+						{
+							Amount: 999,
+							Nonce:  5,
+						},
+						{
+							Amount:  1_000_000,
+							AssetID: AVAXAssetID,
+							Nonce:   5,
+						},
+					},
+					ExportedOutputs: []*avax.TransferableOutput{},
+				},
+				Creds: []Credential{},
+			},
+			JSON: `{
+				"unsignedTx":{
+					"networkID":0,
+					"blockchainID":"11111111111111111111111111111111LpoYY",
+					"destinationChain":"11111111111111111111111111111111LpoYY",
+					"inputs":[
+						{"address":"0x0000000000000000000000000000000000000000","amount":999,"assetID":"11111111111111111111111111111111LpoYY","nonce":5},
+						{"address":"0x0000000000000000000000000000000000000000","amount":1000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z","nonce":5}
+					],
+					"exportedOutputs":[]
+				},
+				"credentials":[]
+			}`,
+			Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000050000000000000000"),
+			Op: hook.Op{
+				ID:        ids.FromStringOrPanic("29cCETWxEUN1QCuex59j46Xtr8urBRo5M7HzwBqC3qDXWd73sX"),
+				Gas:       12218,
+				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 12218),
+				Burn: map[common.Address]hook.AccountDebit{
+					{}: {
+						Nonce:      5,
+						Amount:     scaleAVAX(1_000_000),
+						MinBalance: scaleAVAX(1_000_000),
+					},
+				},
+			},
+		},
+		{
+			Name: "export_multi_address_multi_asset", // Synthetic
+			Old: &atomic.Tx{
+				UnsignedAtomicTx: &atomic.UnsignedExportTx{
+					Ins: []atomic.EVMInput{
+						{
+							Address: common.Address{1},
+							Amount:  999,
+							Nonce:   5,
+						},
+						{
+							Address: common.Address{2},
+							Amount:  1_000_000,
+							AssetID: AVAXAssetID,
+							Nonce:   7,
+						},
+					},
+					ExportedOutputs: []*avax.TransferableOutput{},
+				},
+				Creds: []verify.Verifiable{},
+			},
+			New: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{
+						{
+							Address: common.Address{1},
+							Amount:  999,
+							Nonce:   5,
+						},
+						{
+							Address: common.Address{2},
+							Amount:  1_000_000,
+							AssetID: AVAXAssetID,
+							Nonce:   7,
+						},
+					},
+					ExportedOutputs: []*avax.TransferableOutput{},
+				},
+				Creds: []Credential{},
+			},
+			JSON: `{
+				"unsignedTx":{
+					"networkID":0,
+					"blockchainID":"11111111111111111111111111111111LpoYY",
+					"destinationChain":"11111111111111111111111111111111LpoYY",
+					"inputs":[
+						{"address":"0x0100000000000000000000000000000000000000","amount":999,"assetID":"11111111111111111111111111111111LpoYY","nonce":5},
+						{"address":"0x0200000000000000000000000000000000000000","amount":1000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z","nonce":7}
+					],
+					"exportedOutputs":[]
+				},
+				"credentials":[]
+			}`,
+			Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000000000000"),
+			Op: hook.Op{
+				ID:        ids.FromStringOrPanic("8P9XRKhxHeTv3t4Aj9cTV6dD5h78WVFH8nctLuCkeSavfKeEG"),
+				Gas:       12218,
+				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 12218),
+				Burn: map[common.Address]hook.AccountDebit{
+					{1}: {
+						Nonce: 5,
+					},
+					{2}: {
+						Nonce:      7,
+						Amount:     scaleAVAX(1_000_000),
+						MinBalance: scaleAVAX(1_000_000),
+					},
+				},
+			},
+		},
+		{
+			Name: "import_non_avax", // Synthetic
+			Old: &atomic.Tx{
+				UnsignedAtomicTx: &atomic.UnsignedImportTx{
+					ImportedInputs: []*avax.TransferableInput{{
+						In: &secp256k1fx.TransferInput{
+							Amt: 999,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{},
+							},
+						},
+					}},
+					Outs: []atomic.EVMOutput{{
+						Amount: 999,
+					}},
+				},
+				Creds: []verify.Verifiable{},
+			},
+			New: &Tx{
+				Unsigned: &Import{
+					ImportedInputs: []*avax.TransferableInput{{
+						In: &secp256k1fx.TransferInput{
+							Amt: 999,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{},
+							},
+						},
+					}},
+					Outs: []Output{{
+						Amount: 999,
+					}},
+				},
+				Creds: []Credential{},
+			},
+			JSON: `{
+				"unsignedTx":{
+					"networkID":0,
+					"blockchainID":"11111111111111111111111111111111LpoYY",
+					"sourceChain":"11111111111111111111111111111111LpoYY",
+					"importedInputs":[{
+						"txID":"11111111111111111111111111111111LpoYY",
+						"outputIndex":0,
+						"assetID":"11111111111111111111111111111111LpoYY",
+						"fxID":"11111111111111111111111111111111LpoYY",
+						"input":{"amount":999,"signatureIndices":[]}
+					}],
+					"outputs":[{
+						"address":"0x0000000000000000000000000000000000000000",
+						"amount":999,
+						"assetID":"11111111111111111111111111111111LpoYY"
+					}]
+				},
+				"credentials":[]
+			}`,
+			Bytes: common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500000000000003e70000000000000001000000000000000000000000000000000000000000000000000003e7000000000000000000000000000000000000000000000000000000000000000000000000"),
+			Op: hook.Op{
+				ID:   ids.FromStringOrPanic("s4xoHkf4rPQYSwjbQo78hcSP1wSeViV1Fx2PHM4AfRiDurFkf"),
+				Gas:  10226,
+				Mint: map[common.Address]uint256.Int{},
+			},
 		},
 	}
 	OldTxs []*atomic.Tx
@@ -256,10 +681,10 @@ func TestID(t *testing.T) {
 				// We must parse the old tx to properly initialize the ID.
 				old, err := ParseOldTx(test.Bytes)
 				require.NoError(t, err, "ParseOldTx()")
-				assert.Equalf(t, test.ID, old.ID(), "%T.ID()", old)
+				assert.Equalf(t, test.Op.ID, old.ID(), "%T.ID()", old)
 			})
 			t.Run("new", func(t *testing.T) {
-				assert.Equalf(t, test.ID, test.New.ID(), "%T.ID()", test.New)
+				assert.Equalf(t, test.Op.ID, test.New.ID(), "%T.ID()", test.New)
 			})
 		})
 	}
@@ -337,9 +762,8 @@ func TestParse(t *testing.T) {
 	for _, test := range Tests {
 		t.Run(test.Name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
-				got := new(atomic.Tx)
-				_, err := atomic.Codec.Unmarshal(test.Bytes, got)
-				require.NoErrorf(t, err, "%T.Unmarshal(, %T)", atomic.Codec, got)
+				got, err := ParseOldTx(test.Bytes)
+				require.NoError(t, err, "ParseOldTx()")
 				if diff := cmp.Diff(test.Old, got, OldCmpOpt()); diff != "" {
 					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
 				}
@@ -510,6 +934,176 @@ func TestJSONMarshal(t *testing.T) {
 				require.NoErrorf(t, err, "json.Marshal(%T)", test.New)
 				assert.JSONEqf(t, test.JSON, string(got), "json.Marshal(%T)", test.New)
 			})
+		})
+	}
+}
+
+func TestAsOp(t *testing.T) {
+	for _, test := range Tests {
+		t.Run(test.Name, func(t *testing.T) {
+			got, err := test.New.AsOp(AVAXAssetID)
+			require.NoErrorf(t, err, "%T.AsOp(AVAXAssetID)", test.New)
+			assert.Equalf(t, test.Op, got, "%T.AsOp(AVAXAssetID)", test.New)
+		})
+	}
+}
+
+func TestAsOp_Errors(t *testing.T) {
+	tests := []struct {
+		name string
+		tx   Unsigned
+		want error
+	}{
+		{
+			name: "export_multiple_nonces",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Nonce: 0,
+					},
+					{
+						Nonce: 1,
+					},
+				},
+			},
+			want: errMultipleNonces,
+		},
+		{
+			name: "import_burned_overflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: math.MaxUint64,
+						},
+					},
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 2,
+						},
+					},
+				},
+				Outs: []Output{{
+					AssetID: AVAXAssetID,
+					Amount:  1,
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "import_burned_intermediate_overflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: math.MaxUint64,
+						},
+					},
+					{
+						Asset: avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 1,
+						},
+					},
+				},
+				Outs: []Output{{
+					AssetID: AVAXAssetID,
+					Amount:  1,
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "import_burned_underflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{{
+					Asset: avax.Asset{ID: AVAXAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				}},
+				Outs: []Output{{
+					AssetID: AVAXAssetID,
+					Amount:  2,
+				}},
+			},
+			want: safemath.ErrUnderflow,
+		},
+		{
+			name: "export_burned_overflow",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: common.Address{0},
+						AssetID: AVAXAssetID,
+						Amount:  math.MaxUint64,
+					},
+					{
+						Address: common.Address{1},
+						AssetID: AVAXAssetID,
+						Amount:  2,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "export_burned_intermediate_overflow",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: common.Address{0},
+						AssetID: AVAXAssetID,
+						Amount:  math.MaxUint64,
+					},
+					{
+						Address: common.Address{1},
+						AssetID: AVAXAssetID,
+						Amount:  1,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "export_burned_underflow",
+			tx: &Export{
+				Ins: []Input{{
+					AssetID: AVAXAssetID,
+					Amount:  1,
+				}},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 2,
+					},
+				}},
+			},
+			want: safemath.ErrUnderflow,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tx := &Tx{
+				Unsigned: test.tx,
+			}
+			_, err := tx.AsOp(AVAXAssetID)
+			require.ErrorIsf(t, err, test.want, "%T.AsOp(AVAXAssetID)", tx)
 		})
 	}
 }
