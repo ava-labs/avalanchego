@@ -1380,16 +1380,14 @@ func TestTransferNonAVAX(t *testing.T) {
 	}
 }
 
-// OldSanityCheck runs the legacy verification path that [Tx.SanityCheck] is
-// replacing: [atomic.UnsignedAtomicTx.Verify] under [banffRules] followed by
-// the AVAX-only portion of [vm.VerifierBackend.SemanticVerify]'s flow check
-// (without the dynamic-fee produce). Coreth splits these across two phases;
-// the new SanityCheck unifies them.
+// OldSanityCheck behaves like [Tx.SanityCheck] for the legacy [atomic.Tx].
 func OldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
 	rules := *extrastest.ForkToRules(upgradetest.Helicon)
 	if err := tx.UnsignedAtomicTx.Verify(ctx, rules); err != nil {
 		return err
 	}
+	// We can't call [vm.VerifierBackend.SemanticVerify] here because that
+	// additionally performs signature verification.
 	fc := avax.NewFlowChecker()
 	switch tx := tx.UnsignedAtomicTx.(type) {
 	case *atomic.UnsignedImportTx:
@@ -1412,103 +1410,66 @@ func OldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
 
 func TestSanityCheck(t *testing.T) {
 	var (
-		ctx      = MainnetContext()
-		addr0    = common.Address{1}
-		addr1    = common.Address{2}
-		nonAVAX  = ids.ID{0xff}
-		otherID  = ids.ID{0xee}
-		shortID0 = ids.ShortID{1}
-		shortID1 = ids.ShortID{2}
+		ctx     = MainnetContext()
+		nonAVAX = ids.ID{1}
+
+		validImport = func() *Import {
+			return &Import{
+				NetworkID:    ctx.NetworkID,
+				BlockchainID: ctx.ChainID,
+				SourceChain:  ctx.XChainID,
+				ImportedInputs: []*avax.TransferableInput{{
+					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 100,
+					},
+				}},
+				Outs: []Output{{
+					Amount:  100,
+					AssetID: ctx.AVAXAssetID,
+				}},
+			}
+		}
+		imp = func(mutate func(*Import)) Unsigned {
+			i := validImport()
+			mutate(i)
+			return i
+		}
+
+		validExport = func() *Export {
+			return &Export{
+				NetworkID:        ctx.NetworkID,
+				BlockchainID:     ctx.ChainID,
+				DestinationChain: ctx.XChainID,
+				Ins: []Input{{
+					Amount:  100,
+					AssetID: ctx.AVAXAssetID,
+				}},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: ctx.AVAXAssetID},
+					Out:   &secp256k1fx.TransferOutput{Amt: 100},
+				}},
+			}
+		}
+		exp = func(mutate func(*Export)) Unsigned {
+			e := validExport()
+			mutate(e)
+			return e
+		}
 	)
-
-	transferOutput := func(amt uint64, addr ids.ShortID) *secp256k1fx.TransferOutput {
-		return &secp256k1fx.TransferOutput{
-			Amt: amt,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addr},
-			},
-		}
-	}
-
-	// validImport returns a fresh, well-formed Import that passes SanityCheck
-	// against ctx. Each subtest mutates a copy via [imp].
-	validImport := func() *Import {
-		return &Import{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
-			SourceChain:  ctx.XChainID,
-			ImportedInputs: []*avax.TransferableInput{{
-				Asset: avax.Asset{ID: ctx.AVAXAssetID},
-				In: &secp256k1fx.TransferInput{
-					Amt:   100,
-					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-				},
-			}},
-			Outs: []Output{{
-				Address: addr0,
-				Amount:  100,
-				AssetID: ctx.AVAXAssetID,
-			}},
-		}
-	}
-	validExport := func() *Export {
-		return &Export{
-			NetworkID:        ctx.NetworkID,
-			BlockchainID:     ctx.ChainID,
-			DestinationChain: ctx.XChainID,
-			Ins: []Input{{
-				Address: addr0,
-				Amount:  100,
-				AssetID: ctx.AVAXAssetID,
-			}},
-			ExportedOutputs: []*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: ctx.AVAXAssetID},
-				Out:   transferOutput(100, shortID0),
-			}},
-		}
-	}
-
-	imp := func(mutate func(*Import)) Unsigned {
-		i := validImport()
-		mutate(i)
-		return i
-	}
-	exp := func(mutate func(*Export)) Unsigned {
-		e := validExport()
-		mutate(e)
-		return e
-	}
-
-	// Build two transferable outputs in known-unsorted order for the
-	// errOutputsNotSorted case. Sum is 100, so flow check passes against the
-	// 100 consumed by validExport's single Input.
-	out0 := &avax.TransferableOutput{
-		Asset: avax.Asset{ID: ctx.AVAXAssetID},
-		Out:   transferOutput(50, shortID0),
-	}
-	out1 := &avax.TransferableOutput{
-		Asset: avax.Asset{ID: ctx.AVAXAssetID},
-		Out:   transferOutput(50, shortID1),
-	}
-	unsortedExportOuts := []*avax.TransferableOutput{out0, out1}
-	if avax.IsSortedTransferableOutputs(unsortedExportOuts, c) {
-		unsortedExportOuts = []*avax.TransferableOutput{out1, out0}
-	}
-	require.False(t, avax.IsSortedTransferableOutputs(unsortedExportOuts, c))
-
 	tests := []struct {
 		name    string
 		tx      Unsigned
 		wantErr error
 	}{
-		// Happy paths.
-		{name: "valid_import", tx: validImport()},
-		{name: "valid_export", tx: validExport()},
-		{name: "mainnet_import", tx: Tests[0].New.Unsigned},
-		{name: "mainnet_export", tx: Tests[1].New.Unsigned},
-
-		// Import error paths.
+		{
+			name: "import_valid",
+			tx:   validImport(),
+		},
+		{
+			name: "import_mainnet",
+			tx:   Tests[0].New.Unsigned,
+		},
 		{
 			name:    "import_wrong_network_id",
 			tx:      imp(func(i *Import) { i.NetworkID++ }),
@@ -1516,12 +1477,12 @@ func TestSanityCheck(t *testing.T) {
 		},
 		{
 			name:    "import_wrong_chain_id",
-			tx:      imp(func(i *Import) { i.BlockchainID = otherID }),
+			tx:      imp(func(i *Import) { i.BlockchainID = XChainID }),
 			wantErr: errWrongChainID,
 		},
 		{
 			name:    "import_wrong_source_chain",
-			tx:      imp(func(i *Import) { i.SourceChain = otherID }),
+			tx:      imp(func(i *Import) { i.SourceChain = CChainID }),
 			wantErr: errNotSameSubnet,
 		},
 		{
@@ -1535,17 +1496,13 @@ func TestSanityCheck(t *testing.T) {
 			wantErr: errNoOutputs,
 		},
 		{
-			name: "import_invalid_input",
-			tx: imp(func(i *Import) {
-				i.ImportedInputs[0].In.(*secp256k1fx.TransferInput).Amt = 0
-			}),
+			name:    "import_invalid_input",
+			tx:      imp(func(i *Import) { i.ImportedInputs[0].In.(*secp256k1fx.TransferInput).Amt = 0 }),
 			wantErr: errInvalidInput,
 		},
 		{
-			name: "import_non_avax_input",
-			tx: imp(func(i *Import) {
-				i.ImportedInputs[0].Asset.ID = nonAVAX
-			}),
+			name:    "import_non_avax_input",
+			tx:      imp(func(i *Import) { i.ImportedInputs[0].Asset.ID = nonAVAX }),
 			wantErr: errNonAVAXInput,
 		},
 		{
@@ -1571,16 +1528,14 @@ func TestSanityCheck(t *testing.T) {
 						UTXOID: avax.UTXOID{TxID: ids.ID{2}},
 						Asset:  avax.Asset{ID: ctx.AVAXAssetID},
 						In: &secp256k1fx.TransferInput{
-							Amt:   50,
-							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+							Amt: 50,
 						},
 					},
 					{
 						UTXOID: avax.UTXOID{TxID: ids.ID{1}},
 						Asset:  avax.Asset{ID: ctx.AVAXAssetID},
 						In: &secp256k1fx.TransferInput{
-							Amt:   50,
-							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+							Amt: 50,
 						},
 					},
 				}
@@ -1591,14 +1546,20 @@ func TestSanityCheck(t *testing.T) {
 			name: "import_outputs_not_sorted_unique",
 			tx: imp(func(i *Import) {
 				i.Outs = []Output{
-					{Address: addr1, Amount: 50, AssetID: ctx.AVAXAssetID},
-					{Address: addr0, Amount: 50, AssetID: ctx.AVAXAssetID},
+					{Amount: 50, AssetID: ctx.AVAXAssetID},
+					{Amount: 50, AssetID: ctx.AVAXAssetID},
 				}
 			}),
 			wantErr: errOutputsNotSortedUnique,
 		},
-
-		// Export error paths.
+		{
+			name: "export_valid",
+			tx:   validExport(),
+		},
+		{
+			name: "export_mainnet",
+			tx:   Tests[1].New.Unsigned,
+		},
 		{
 			name:    "export_wrong_network_id",
 			tx:      exp(func(e *Export) { e.NetworkID++ }),
@@ -1606,12 +1567,12 @@ func TestSanityCheck(t *testing.T) {
 		},
 		{
 			name:    "export_wrong_chain_id",
-			tx:      exp(func(e *Export) { e.BlockchainID = otherID }),
+			tx:      exp(func(e *Export) { e.BlockchainID = XChainID }),
 			wantErr: errWrongChainID,
 		},
 		{
 			name:    "export_wrong_destination_chain",
-			tx:      exp(func(e *Export) { e.DestinationChain = otherID }),
+			tx:      exp(func(e *Export) { e.DestinationChain = CChainID }),
 			wantErr: errNotSameSubnet,
 		},
 		{
@@ -1635,46 +1596,51 @@ func TestSanityCheck(t *testing.T) {
 			wantErr: errNonAVAXInput,
 		},
 		{
-			name: "export_invalid_output",
-			tx: exp(func(e *Export) {
-				e.ExportedOutputs[0].Out.(*secp256k1fx.TransferOutput).Amt = 0
-			}),
+			name:    "export_invalid_output",
+			tx:      exp(func(e *Export) { e.ExportedOutputs[0].Out.(*secp256k1fx.TransferOutput).Amt = 0 }),
 			wantErr: errInvalidOutput,
 		},
 		{
-			name: "export_non_avax_output",
-			tx: exp(func(e *Export) {
-				e.ExportedOutputs[0].Asset.ID = nonAVAX
-			}),
+			name:    "export_non_avax_output",
+			tx:      exp(func(e *Export) { e.ExportedOutputs[0].Asset.ID = nonAVAX }),
 			wantErr: errNonAVAXOutput,
 		},
 		{
-			name: "export_flow_check_failed",
-			tx: exp(func(e *Export) {
-				e.ExportedOutputs[0].Out.(*secp256k1fx.TransferOutput).Amt = 200
-			}),
+			name:    "export_flow_check_failed",
+			tx:      exp(func(e *Export) { e.ExportedOutputs[0].Out.(*secp256k1fx.TransferOutput).Amt = 200 }),
 			wantErr: errFlowCheckFailed,
 		},
 		{
 			name: "export_inputs_not_sorted_unique",
 			tx: exp(func(e *Export) {
 				e.Ins = []Input{
-					{Address: addr1, Amount: 50, AssetID: ctx.AVAXAssetID},
-					{Address: addr0, Amount: 50, AssetID: ctx.AVAXAssetID},
+					{Amount: 50, AssetID: ctx.AVAXAssetID},
+					{Amount: 50, AssetID: ctx.AVAXAssetID},
 				}
 			}),
 			wantErr: errInputsNotSortedUnique,
 		},
 		{
-			name:    "export_outputs_not_sorted",
-			tx:      exp(func(e *Export) { e.ExportedOutputs = unsortedExportOuts }),
+			name: "export_outputs_not_sorted",
+			tx: exp(func(e *Export) {
+				e.ExportedOutputs = []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Out:   &secp256k1fx.TransferOutput{Amt: 75},
+					},
+					{
+						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Out:   &secp256k1fx.TransferOutput{Amt: 25},
+					},
+				}
+			}),
 			wantErr: errOutputsNotSorted,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := test.tx.SanityCheck(ctx)
-			require.ErrorIs(t, err, test.wantErr)
+			require.ErrorIsf(t, err, test.wantErr, "%T.SanityCheck()", test.tx)
 		})
 	}
 }
