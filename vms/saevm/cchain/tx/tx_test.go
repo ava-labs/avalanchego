@@ -844,9 +844,8 @@ func TestParse(t *testing.T) {
 	for _, test := range Tests {
 		t.Run(test.Name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
-				got := new(atomic.Tx)
-				_, err := atomic.Codec.Unmarshal(test.Bytes, got)
-				require.NoErrorf(t, err, "%T.Unmarshal(, %T)", atomic.Codec, got)
+				got, err := ParseOldTx(test.Bytes)
+				require.NoError(t, err, "ParseOldTx()")
 				if diff := cmp.Diff(test.Old, got, OldCmpOpt()); diff != "" {
 					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
 				}
@@ -1367,11 +1366,12 @@ func TestTransferNonAVAX(t *testing.T) {
 
 			err := test.tx.TransferNonAVAX(AVAXAssetID, state)
 			require.ErrorIs(t, err, test.wantErr)
-			for addr, balances := range test.want {
-				for assetID, want := range balances {
-					coinID := common.Hash(assetID)
+			for _, addr := range []common.Address{alice, bob} {
+				for _, asset := range []ids.ID{AVAXAssetID, btc, eth} {
+					want := toBig(test.want[addr][asset])
+					coinID := common.Hash(asset)
 					got := state.GetBalanceMultiCoin(addr, coinID)
-					if diff := cmp.Diff(toBig(want), got, cmputils.BigInts()); diff != "" {
+					if diff := cmp.Diff(want, got, cmputils.BigInts()); diff != "" {
 						t.Errorf("%T.GetBalanceMultiCoin(%s, %s) diff (-want +got):\n%s", state, addr, coinID, diff)
 					}
 				}

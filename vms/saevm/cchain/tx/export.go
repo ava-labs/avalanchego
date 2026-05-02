@@ -155,7 +155,7 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 			return op{}, fmt.Errorf("%w: address %s has nonces %d and %d", errMultipleNonces, in.Address, debit.Nonce, in.Nonce)
 		}
 
-		// Even if no AVAX is debited, Non-AVAX inputs MUST increment the nonce.
+		// Even if no AVAX is debited, non-AVAX inputs MUST increment the nonce.
 		if in.AssetID == avaxAssetID {
 			amount := scaleAVAX(in.Amount)
 			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &amount); overflow {
@@ -193,8 +193,8 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 			Key:   utxoID[:],
 			Value: utxoBytes,
 		}
-		if out, ok := utxo.Out.(avax.Addressable); ok {
-			elem.Traits = out.Addresses()
+		if o, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = o.Addresses()
 		}
 
 		elems[i] = elem

@@ -211,8 +211,8 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 		require.NoError(t, newTx.TransferNonAVAX(AVAXAssetID, newState))
 		require.NoError(t, op.ApplyTo(newState.StateDB))
 
-		// We must manually finalize the trie structures before comparison.
-		// Otherwise, comparing the state DBs wouldn't include the changes.
+		// Finalize the trie structures so that the state DB comparison includes
+		// the changes.
 		for _, state := range states {
 			state.Finalise(true)
 			state.IntermediateRoot(true)
