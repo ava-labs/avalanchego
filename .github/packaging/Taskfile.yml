@@ -156,8 +156,8 @@ tasks:
           -e PACKAGING_TAG={{.TGZ_TAG}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
-          {{if .GPG_KEY_FILE}}-e GPG_KEY_FILE={{.GPG_KEY_FILE}}{{end}}
-          {{if .GPG_PASSPHRASE}}-e GPG_PASSPHRASE={{.GPG_PASSPHRASE}}{{end}}
+          {{if .GPG_KEY_FILE}}-e GPG_KEY_FILE{{end}}
+          {{if .GPG_PASSPHRASE}}-e GPG_PASSPHRASE{{end}}
           {{.PACKAGING_TGZ_DOCKER_IMAGE}}
           .github/packaging/scripts/build-tgz.sh
 
