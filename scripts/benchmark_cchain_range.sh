@@ -151,6 +151,12 @@ if [[ -n "$TEST_NAME" ]]; then
             END_BLOCK="${END_BLOCK:-69100000}"
             CONFIG="${CONFIG:-archive}"
             ;;
+        pathdb-33m-33m500k)
+            BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-30m-40m-ldb}"
+            CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-pathdb-full-33m}"
+            START_BLOCK="${START_BLOCK:-33000001}"
+            END_BLOCK="${END_BLOCK:-33500000}"
+            ;;
         firewood-101-250k)
             BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-1m-ldb}"
             CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-firewood-100}"
