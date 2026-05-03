@@ -22,9 +22,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// Imported for [vm.VerifierBackend] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
+	// Imported for [vm.VerifierBackend] comment resolution.
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
@@ -35,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -1705,6 +1707,230 @@ func TestSanityCheck(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := test.tx.SanityCheck(ctx)
 			require.ErrorIsf(t, err, test.wantErr, "%T.SanityCheck()", test.tx)
+		})
+	}
+}
+
+func TestVerifyCredentials(t *testing.T) {
+	// All values in [TestVerifyCredentials] derive from these two key seeds.
+	// Signatures are also hardcoded in the vector table: secp256k1 signatures use
+	// RFC 6979 deterministic nonces so signing the same canonical bytes with the
+	// same key always produces the same output. To regenerate the table after
+	// changing a tx body, sign [SignedBytes] of the new tx with one of these keys.
+	var (
+		verifyKey, _   = secp256k1.ToPrivateKey(common.FromHex("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"))
+		verifyOther, _ = secp256k1.ToPrivateKey(common.FromHex("0x9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f1234"))
+	)
+
+	var (
+		verifyKeyEth   = verifyKey.EthAddress()
+		verifyOtherEth = verifyOther.EthAddress()
+		verifyKeyShort = verifyKey.Address()
+
+		avaxImportInput = func(txID byte, assetID ids.ID) []*avax.TransferableInput {
+			return []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{TxID: ids.ID{txID}},
+				Asset:  avax.Asset{ID: assetID},
+				In: &secp256k1fx.TransferInput{
+					Amt:   100,
+					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				},
+			}}
+		}
+		sig = func(hex string) []Credential {
+			return []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
+				[65]byte(common.FromHex(hex)),
+			}}}
+		}
+		emptySig = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
+
+		// marshalUTXO marshals a UTXO into the shared-memory element format
+		// expected by the C-Chain reader: keyed by InputID(), valued by codec.
+		marshalUTXO = func(utxo *avax.UTXO) *chainsatomic.Element {
+			b, err := c.Marshal(codecVersion, utxo)
+			require.NoError(t, err)
+			key := utxo.InputID()
+			return &chainsatomic.Element{
+				Key:   key[:],
+				Value: b,
+			}
+		}
+		avaxOut = &secp256k1fx.TransferOutput{
+			Amt: 100,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{verifyKeyShort},
+			},
+		}
+	)
+
+	tests := []struct {
+		name string
+		tx   *Tx
+		// utxos are seeded under XChainID → CChainID, keyed by Element.Key.
+		utxos   []*chainsatomic.Element
+		wantErr error
+	}{
+		{
+			name: "import_valid",
+			tx: &Tx{
+				Unsigned: &Import{
+					SourceChain:    XChainID,
+					ImportedInputs: avaxImportInput(1, AVAXAssetID),
+				},
+				Creds: sig("0x393d75eaa2d49672b14b5445aa6c357cc894e47172c5f80c6ae135991496722a07a76b05832ec365b37bdccbfcb589e2c217383ce4660cc1a61a45421b5623ec00"),
+			},
+			utxos: []*chainsatomic.Element{marshalUTXO(&avax.UTXO{
+				UTXOID: avax.UTXOID{TxID: ids.ID{1}},
+				Asset:  avax.Asset{ID: AVAXAssetID},
+				Out:    avaxOut,
+			})},
+		},
+		{
+			name: "import_wrong_num_credentials",
+			tx: &Tx{
+				Unsigned: &Import{
+					SourceChain:    XChainID,
+					ImportedInputs: avaxImportInput(1, AVAXAssetID),
+				},
+				Creds: nil,
+			},
+			wantErr: errIncorrectNumCredentials,
+		},
+		{
+			name: "import_missing_utxo",
+			tx: &Tx{
+				Unsigned: &Import{
+					SourceChain:    XChainID,
+					ImportedInputs: avaxImportInput(2, AVAXAssetID),
+				},
+				Creds: emptySig,
+			},
+			wantErr: errFetchingUTXOs,
+		},
+		{
+			name: "import_unmarshalling_utxo",
+			tx: &Tx{
+				Unsigned: &Import{
+					SourceChain:    XChainID,
+					ImportedInputs: avaxImportInput(3, AVAXAssetID),
+				},
+				Creds: emptySig,
+			},
+			utxos: []*chainsatomic.Element{{
+				// avaxImportInput(3, _).UTXOID.InputID()
+				Key:   common.FromHex("0x8b1e3561260659cbcb002c8306248f4afeaad6b86d6e17b3f898419495d44e15"),
+				Value: []byte{0xff, 0xff, 0xff},
+			}},
+			wantErr: errUnmarshallingUTXO,
+		},
+		{
+			// Input claims a non-AVAX asset, but the UTXO at that key has AVAX.
+			name: "import_mismatched_asset_ids",
+			tx: &Tx{
+				Unsigned: &Import{
+					SourceChain:    XChainID,
+					ImportedInputs: avaxImportInput(4, ids.ID{0xab}),
+				},
+				Creds: sig("0xd7dda50d06e1fd6fa226b456036d2a1d1dc6b3f8f6653b0c5955dd5ada6ce7084f17f00fbd51c67914448983fb98d0e8f14e720afa5d818153a3569c26d761fd01"),
+			},
+			utxos: []*chainsatomic.Element{marshalUTXO(&avax.UTXO{
+				UTXOID: avax.UTXOID{TxID: ids.ID{4}},
+				Asset:  avax.Asset{ID: AVAXAssetID},
+				Out:    avaxOut,
+			})},
+			wantErr: errMismatchedAssetIDs,
+		},
+		{
+			// Signed by verifyOther; UTXO is owned by verifyKey.
+			name: "import_wrong_signer",
+			tx: &Tx{
+				Unsigned: &Import{
+					SourceChain:    XChainID,
+					ImportedInputs: avaxImportInput(5, AVAXAssetID),
+				},
+				Creds: sig("0x64c1e81d9b807b110c5a66d06a5c61eaffc72d908c69e650c49665f6a38b7bcf6a72abc65d6cb29cd9319d88892063a9431bd2ccadd186f034dc671d595a9e3701"),
+			},
+			utxos: []*chainsatomic.Element{marshalUTXO(&avax.UTXO{
+				UTXOID: avax.UTXOID{TxID: ids.ID{5}},
+				Asset:  avax.Asset{ID: AVAXAssetID},
+				Out:    avaxOut,
+			})},
+			wantErr: errVerifyingTransfer,
+		},
+		{
+			name: "export_valid",
+			tx: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
+				},
+				Creds: sig("0xfe088f91a447b6ebd89a18405e07a50869eaeee869ab924a0ec1174e94d293764e56260eca1d6d26a77f33aa8a99f4b4917f7598bc680b87b01f6c9a750e293d00"),
+			},
+		},
+		{
+			name: "export_wrong_num_credentials",
+			tx: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
+				},
+				Creds: nil,
+			},
+			wantErr: errIncorrectNumCredentials,
+		},
+		{
+			name: "export_zero_signatures",
+			tx: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
+				},
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: nil}},
+			},
+			wantErr: errIncorrectNumSignatures,
+		},
+		{
+			name: "export_two_signatures",
+			tx: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
+				},
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}, {}}}},
+			},
+			wantErr: errIncorrectNumSignatures,
+		},
+		{
+			// 65 zero bytes is structurally well-formed but unrecoverable.
+			name: "export_invalid_signature",
+			tx: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
+				},
+				Creds: emptySig,
+			},
+			wantErr: secp256k1.ErrInvalidSig,
+		},
+		{
+			// Signature is from verifyKey, but Input.Address is verifyOther's.
+			name: "export_address_mismatch",
+			tx: &Tx{
+				Unsigned: &Export{
+					Ins: []Input{{Address: verifyOtherEth, Amount: 100, AssetID: AVAXAssetID}},
+				},
+				Creds: sig("0xfe088f91a447b6ebd89a18405e07a50869eaeee869ab924a0ec1174e94d293764e56260eca1d6d26a77f33aa8a99f4b4917f7598bc680b87b01f6c9a750e293d00"),
+			},
+			wantErr: errAddressMismatch,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			memory := chainsatomic.NewMemory(memdb.New())
+			xMemory := memory.NewSharedMemory(XChainID)
+			require.NoError(t, xMemory.Apply(map[ids.ID]*chainsatomic.Requests{
+				CChainID: {PutRequests: test.utxos},
+			}))
+
+			cMemory := memory.NewSharedMemory(CChainID)
+			err := test.tx.VerifyCredentials(cMemory)
+			assert.ErrorIsf(t, err, test.wantErr, "%T.VerifyCredentials()", test.tx)
 		})
 	}
 }
