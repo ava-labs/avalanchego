@@ -30,7 +30,7 @@ set -euo pipefail
 #     END_BLOCK: The ending block height (inclusive).
 #
 #   Optional (reexecution tests):
-#     CONFIG: VM config preset (default, archive, firewood, firewood-archive).
+#     CONFIG: VM config preset (default, archive, pathdb, firewood, firewood-archive).
 #     LABELS: Comma-separated key=value pairs for metric labels.
 #     BENCHMARK_OUTPUT_FILE: If set, benchmark output is also written to this file.
 #     METRICS_SERVER_ENABLED: If set, enables the metrics server.
@@ -72,6 +72,7 @@ Available tests:
   hashdb-69m-69m100k                - Blocks 69m-69.1m with hashdb
   hashdb-archive-69m-69m100k        - Blocks 69m-69.1m with hashdb archive
   hashdb-archive-ssc-69m-69m100k    - Blocks 69m-69.1m with hashdb archive from a statesynced checkpoint
+  pathdb-33m-33m500k                - Blocks 33m-33.5m with pathdb
   firewood-101-250k                 - Blocks 101-250k with firewood
   firewood-archive-101-250k         - Blocks 101-250k with firewood archive
   firewood-33m-33m500k              - Blocks 33m-33.5m with firewood
