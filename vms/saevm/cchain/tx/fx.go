@@ -36,9 +36,11 @@ func (fxVM) Logger() logging.Logger {
 	return logging.NoLog{}
 }
 
+var _ secp256k1fx.UnsignedTx = (*fxTx)(nil)
+
 type fxTx []byte
 
-func toFxTx(u Unsigned) (secp256k1fx.UnsignedTx, error) {
+func toFxTx(u Unsigned) (fxTx, error) {
 	b, err := c.Marshal(codecVersion, &u)
 	if err != nil {
 		return nil, err
