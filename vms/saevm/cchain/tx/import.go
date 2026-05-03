@@ -197,6 +197,7 @@ func (i *Import) atomicRequests(ids.ID) (ids.ID, *chainsatomic.Requests, error) 
 	return i.SourceChain, &chainsatomic.Requests{RemoveRequests: utxoIDs}, nil
 }
 
+// TransferNonAVAX adds the non-AVAX balances to the statedb.
 func (i *Import) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
 	for _, out := range i.Outs {
 		if out.AssetID == avaxAssetID {

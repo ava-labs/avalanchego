@@ -204,6 +204,7 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 
 var errInsufficientFunds = errors.New("insufficient funds")
 
+// TransferNonAVAX subtracts the non-AVAX balances from the statedb.
 func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
 	for _, in := range e.Ins {
 		if in.AssetID == avaxAssetID {
