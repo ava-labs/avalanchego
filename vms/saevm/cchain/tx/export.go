@@ -18,7 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
@@ -57,6 +60,26 @@ func (i Input) Compare(other Input) int {
 		return c
 	}
 	return i.AssetID.Compare(other.AssetID)
+}
+
+// InputIDs returns the Account+Nonce pairs consumed by this transaction.
+func (e *Export) InputIDs() set.Set[ids.ID] {
+	s := set.NewSet[ids.ID](len(e.Ins))
+	for _, in := range e.Ins {
+		s.Add(AccountInputID(in.Address, in.Nonce))
+	}
+	return s
+}
+
+// AccountInputID returns the Account+Nonce pair as a unique [ids.ID].
+//
+// It is safe to assume that the returned ID never conflicts with a UTXO ID.
+func AccountInputID(address common.Address, nonce uint64) ids.ID {
+	var id ids.ID
+	packer := wrappers.Packer{Bytes: id[:]} // 32 bytes long
+	packer.PackLong(nonce)                  // add 8 bytes
+	packer.PackBytes(address.Bytes())       // add 24 bytes
+	return id
 }
 
 // Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
@@ -144,6 +167,42 @@ func (e *Export) SanityCheck(ctx *snow.Context) error {
 		return errOutputsNotSorted
 	}
 
+	return nil
+}
+
+var (
+	sigCache = secp256k1.NewRecoverCache(1024)
+
+	errIncorrectNumSignatures = errors.New("incorrect number of signatures")
+	errAddressMismatch        = errors.New("signature does not match address")
+)
+
+func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credential) error {
+	if len(e.Ins) != len(creds) {
+		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
+	}
+
+	fxTx, err := toFxTx(e)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
+	}
+	for i, in := range e.Ins {
+		cred := creds[i].Self()
+		if err := cred.Verify(); err != nil {
+			return err
+		}
+		if len(cred.Sigs) != 1 {
+			return fmt.Errorf("%w: expected 1, got %d", errIncorrectNumSignatures, len(cred.Sigs))
+		}
+
+		pk, err := sigCache.RecoverPublicKey(fxTx.Bytes(), cred.Sigs[0][:])
+		if err != nil {
+			return err
+		}
+		if in.Address != pk.EthAddress() {
+			return fmt.Errorf("%w: expected %s, got %s", errAddressMismatch, in.Address, pk.EthAddress())
+		}
+	}
 	return nil
 }
 

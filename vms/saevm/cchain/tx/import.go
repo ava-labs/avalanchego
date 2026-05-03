@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -57,6 +58,15 @@ func (o Output) Compare(other Output) int {
 		return c
 	}
 	return o.AssetID.Compare(other.AssetID)
+}
+
+// InputIDs returns the UTXOIDs consumed by this transaction.
+func (i *Import) InputIDs() set.Set[ids.ID] {
+	s := set.NewSet[ids.ID](len(i.ImportedInputs))
+	for _, in := range i.ImportedInputs {
+		s.Add(in.InputID())
+	}
+	return s
 }
 
 // Like [atomic.UnsignedImportTx.Burned], burned will error if the sum of the
@@ -153,6 +163,50 @@ func (i *Import) SanityCheck(ctx *snow.Context) error {
 		return errOutputsNotSortedUnique
 	}
 
+	return nil
+}
+
+var (
+	errIncorrectNumCredentials = errors.New("incorrect number of credentials")
+	errFetchingUTXOs           = errors.New("fetching UTXOs")
+	errConvertingToFxTx        = errors.New("converting to fx transaction")
+	errUnmarshallingUTXO       = errors.New("unmarshalling UTXO")
+	errMismatchedAssetIDs      = errors.New("mismatched asset IDs")
+	errVerifyingTransfer       = errors.New("verifying transfer")
+)
+
+func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error {
+	if len(i.ImportedInputs) != len(creds) {
+		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
+	}
+
+	utxoIDs := make([][]byte, len(i.ImportedInputs))
+	for i, in := range i.ImportedInputs {
+		inputID := in.UTXOID.InputID()
+		utxoIDs[i] = inputID[:]
+	}
+
+	utxoBytes, err := sm.Get(i.SourceChain, utxoIDs)
+	if err != nil {
+		return fmt.Errorf("%w from %s: %w", errFetchingUTXOs, i.SourceChain, err)
+	}
+
+	fxTx, err := toFxTx(i)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
+	}
+	for i, in := range i.ImportedInputs {
+		utxo := &avax.UTXO{}
+		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
+			return fmt.Errorf("%w: %w", errUnmarshallingUTXO, err)
+		}
+		if inAssetID, utxoAssetID := in.AssetID(), utxo.AssetID(); utxoAssetID != inAssetID {
+			return fmt.Errorf("%w: input asset ID %s does not match UTXO asset ID %s", errMismatchedAssetIDs, inAssetID, utxoAssetID)
+		}
+		if err := fx.VerifyTransfer(fxTx, in.In, creds[i], utxo.Out); err != nil {
+			return fmt.Errorf("%w: %w", errVerifyingTransfer, err)
+		}
+	}
 	return nil
 }
 
