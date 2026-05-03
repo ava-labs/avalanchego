@@ -91,6 +91,12 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 
 var errOutputsNotSorted = errors.New("outputs not sorted")
 
+// SanityCheck verifies that the transaction's structural invariants hold
+// against the chain's context and that it does not produce more funds than it
+// consumes.
+//
+// It does not verify signatures or whether the transaction performs a valid EVM
+// state transition.
 func (e *Export) SanityCheck(ctx *snow.Context) error {
 	switch {
 	case e.NetworkID != ctx.NetworkID:

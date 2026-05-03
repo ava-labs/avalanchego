@@ -104,6 +104,11 @@ var (
 	errOutputsNotSortedUnique = errors.New("outputs not sorted and unique")
 )
 
+// SanityCheck verifies that the transaction's structural invariants hold
+// against the chain's context and that it does not produce more funds than it
+// consumes.
+//
+// It does not verify signatures or whether UTXOs exist.
 func (i *Import) SanityCheck(ctx *snow.Context) error {
 	switch {
 	case i.NetworkID != ctx.NetworkID:
