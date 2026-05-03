@@ -40,8 +40,11 @@ type Tx struct {
 
 // Unsigned is a common interface implemented by [Import] and [Export].
 type Unsigned interface {
-	// InputUTXOs returns the UTXOIDs of the inputs of this transaction.
-	InputUTXOs() set.Set[ids.ID]
+	// InputIDs returns the one-time-use inputs consumed by this transaction.
+	//
+	// [Import] transactions return consumed UTXOIDs.
+	// [Export] transactions return Account+Nonce pairs.
+	InputIDs() set.Set[ids.ID]
 
 	// SanityCheck verifies that the transaction's structural invariants hold
 	// against the chain's context and that it does not produce more funds

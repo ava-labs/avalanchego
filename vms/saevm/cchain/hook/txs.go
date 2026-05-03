@@ -32,7 +32,7 @@ func ancestorUTXOIDs(header *types.Header, settledHash common.Hash, source saety
 		}
 
 		for _, tx := range txs {
-			consumedUTXOs.Union(tx.InputUTXOs())
+			consumedUTXOs.Union(tx.InputIDs())
 		}
 		header = parent.Header()
 	}

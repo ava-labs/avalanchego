@@ -118,7 +118,7 @@ func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) 
 		return nil, fmt.Errorf("parsing atomic txs: %w", err)
 	}
 	for _, tx := range atomicTxs {
-		inputs.Union(tx.InputUTXOs())
+		inputs.Union(tx.InputIDs())
 	}
 	return inputs, nil
 }

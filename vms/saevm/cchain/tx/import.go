@@ -69,6 +69,15 @@ func (o Output) Compare(other Output) int {
 	return o.AssetID.Compare(other.AssetID)
 }
 
+// InputIDs returns the UTXOIDs consumed by this transaction.
+func (i *Import) InputIDs() set.Set[ids.ID] {
+	s := set.NewSet[ids.ID](len(i.ImportedInputs))
+	for _, in := range i.ImportedInputs {
+		s.Add(in.InputID())
+	}
+	return s
+}
+
 // Like [atomic.UnsignedImportTx.Burned], burned will error if the sum of the
 // inputs exceeds MaxUint64, even if the total amount burned could be
 // represented as a uint64.
@@ -114,6 +123,11 @@ var (
 	errOutputsNotSortedUnique = errors.New("outputs not sorted and unique")
 )
 
+// SanityCheck verifies that the transaction's structural invariants hold
+// against the chain's context and that it does not produce more funds than it
+// consumes.
+//
+// It does not verify signatures or whether UTXOs exist.
 func (i *Import) SanityCheck(ctx *snow.Context) error {
 	switch {
 	case i.NetworkID != ctx.NetworkID:
@@ -163,16 +177,21 @@ func (i *Import) SanityCheck(ctx *snow.Context) error {
 
 var (
 	errIncorrectNumCredentials = errors.New("incorrect number of credentials")
-	errFailedToFetchUTXOs      = errors.New("failed to fetch UTXOs")
+	errFetchingUTXOs           = errors.New("fetching UTXOs")
 	errConvertingToFxTx        = errors.New("converting to fx transaction")
-	errFailedToUnmarshalUTXO   = errors.New("failed to unmarshal UTXO")
+	errUnmarshallingUTXO       = errors.New("unmarshalling UTXO")
 	errMismatchedAssetIDs      = errors.New("mismatched asset IDs")
-	errVerifyTransferFailed    = errors.New("transfer verification failed")
+	errVerifyingTransfer       = errors.New("verifying transfer")
 )
 
 func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error {
 	if len(i.ImportedInputs) != len(creds) {
 		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
+	}
+
+	fxTx, err := toFxTx(i)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
 	}
 
 	utxoIDs := make([][]byte, len(i.ImportedInputs))
@@ -183,23 +202,19 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 
 	utxoBytes, err := sm.Get(i.SourceChain, utxoIDs)
 	if err != nil {
-		return fmt.Errorf("%w from %s: %w", errFailedToFetchUTXOs, i.SourceChain, err)
+		return fmt.Errorf("%w from %s: %w", errFetchingUTXOs, i.SourceChain, err)
 	}
 
-	fxTx, err := toFxTx(i)
-	if err != nil {
-		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
-	}
 	for i, in := range i.ImportedInputs {
 		utxo := &avax.UTXO{}
 		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
-			return fmt.Errorf("%w: %w", errFailedToUnmarshalUTXO, err)
+			return fmt.Errorf("%w: %w", errUnmarshallingUTXO, err)
 		}
 		if inAssetID, utxoAssetID := in.AssetID(), utxo.AssetID(); utxoAssetID != inAssetID {
 			return fmt.Errorf("%w: input asset ID %s does not match UTXO asset ID %s", errMismatchedAssetIDs, inAssetID, utxoAssetID)
 		}
 		if err := fx.VerifyTransfer(fxTx, in.In, creds[i], utxo.Out); err != nil {
-			return fmt.Errorf("%w: %w", errVerifyTransferFailed, err)
+			return fmt.Errorf("%w: %w", errVerifyingTransfer, err)
 		}
 	}
 	return nil
@@ -255,6 +270,7 @@ func (i *Import) atomicRequests(ids.ID) (ids.ID, *chainsatomic.Requests, error) 
 	return i.SourceChain, &chainsatomic.Requests{RemoveRequests: utxoIDs}, nil
 }
 
+// TransferNonAVAX adds the non-AVAX balances to the statedb.
 func (i *Import) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
 	for _, out := range i.Outs {
 		if out.AssetID == avaxAssetID {

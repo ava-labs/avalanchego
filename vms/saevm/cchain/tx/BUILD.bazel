@@ -55,6 +55,7 @@ go_test(
     embed = [":tx"],
     deps = [
         "//chains/atomic",
+        "//database/memdb",
         "//graft/coreth/core/extstate",
         "//graft/coreth/params",
         "//graft/coreth/params/extras/extrastest",
@@ -66,7 +67,9 @@ go_test(
         "//snow/validators/validatorstest",
         "//upgrade/upgradetest",
         "//utils/constants",
+        "//utils/crypto/secp256k1",
         "//utils/math",
+        "//utils/set",
         "//vms/components/avax",
         "//vms/components/gas",
         "//vms/components/verify",

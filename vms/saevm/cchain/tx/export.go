@@ -79,6 +79,26 @@ func (i Input) Compare(other Input) int {
 	return i.AssetID.Compare(other.AssetID)
 }
 
+// InputIDs returns the Account+Nonce pairs consumed by this transaction.
+func (e *Export) InputIDs() set.Set[ids.ID] {
+	s := set.NewSet[ids.ID](len(e.Ins))
+	for _, in := range e.Ins {
+		s.Add(AccountInputID(in.Address, in.Nonce))
+	}
+	return s
+}
+
+// AccountInputID returns the Account+Nonce pair as a unique [ids.ID].
+//
+// It is safe to assume that the returned ID never conflicts with a UTXO ID.
+func AccountInputID(address common.Address, nonce uint64) ids.ID {
+	var id ids.ID
+	packer := wrappers.Packer{Bytes: id[:]} // 32 bytes long
+	packer.PackLong(nonce)                  // add 8 bytes
+	packer.PackBytes(address.Bytes())       // add 24 bytes
+	return id
+}
+
 // Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
 // inputs exceeds MaxUint64, even if the total amount burned could be
 // represented as a uint64.
@@ -111,6 +131,12 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 
 var errOutputsNotSorted = errors.New("outputs not sorted")
 
+// SanityCheck verifies that the transaction's structural invariants hold
+// against the chain's context and that it does not produce more funds than it
+// consumes.
+//
+// It does not verify signatures or whether the transaction performs a valid EVM
+// state transition.
 func (e *Export) SanityCheck(ctx *snow.Context) error {
 	switch {
 	case e.NetworkID != ctx.NetworkID:
@@ -165,7 +191,7 @@ var (
 	sigCache = secp256k1.NewRecoverCache(1024)
 
 	errIncorrectNumSignatures = errors.New("incorrect number of signatures")
-	errAddressMismatch        = errors.New("address does not match signature")
+	errAddressMismatch        = errors.New("signature does not match address")
 )
 
 func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credential) error {
@@ -179,9 +205,6 @@ func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credenti
 	}
 	for i, in := range e.Ins {
 		cred := creds[i].Self()
-		if err := cred.Verify(); err != nil {
-			return err
-		}
 		if len(cred.Sigs) != 1 {
 			return fmt.Errorf("%w: expected 1, got %d", errIncorrectNumSignatures, len(cred.Sigs))
 		}
@@ -278,6 +301,7 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 
 var errInsufficientFunds = errors.New("insufficient funds")
 
+// TransferNonAVAX subtracts the non-AVAX balances from the statedb.
 func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
 	for _, in := range e.Ins {
 		if in.AssetID == avaxAssetID {

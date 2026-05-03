@@ -28,7 +28,7 @@ func NewTx(tx *tx.Tx, avaxAssetID ids.ID) (*Tx, error) {
 	return &Tx{
 		ID:       op.ID,
 		Tx:       tx,
-		Inputs:   tx.InputUTXOs(),
+		Inputs:   tx.InputIDs(),
 		GasPrice: op.GasFeeCap,
 		Op:       op,
 	}, nil
