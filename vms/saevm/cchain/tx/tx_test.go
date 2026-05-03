@@ -1712,55 +1712,90 @@ func TestSanityCheck(t *testing.T) {
 }
 
 func TestVerifyCredentials(t *testing.T) {
-	// All values in [TestVerifyCredentials] derive from these two key seeds.
-	// Signatures are also hardcoded in the vector table: secp256k1 signatures use
-	// RFC 6979 deterministic nonces so signing the same canonical bytes with the
-	// same key always produces the same output. To regenerate the table after
-	// changing a tx body, sign [SignedBytes] of the new tx with one of these keys.
-	var (
-		verifyKey, _   = secp256k1.ToPrivateKey(common.FromHex("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"))
-		verifyOther, _ = secp256k1.ToPrivateKey(common.FromHex("0x9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f1234"))
-	)
-
+	// Signatures are hardcoded: secp256k1 uses RFC 6979 deterministic nonces, so
+	// signing the same canonical bytes with the same key always produces the
+	// same output. To regenerate after changing a valid* helper below, sign
+	// [SignedBytes] of the produced Unsigned with the corresponding key.
+	verifyKey, err := secp256k1.ToPrivateKey(common.FromHex("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"))
+	require.NoError(t, err)
+	verifyOther, err := secp256k1.ToPrivateKey(common.FromHex("0x9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f1234"))
+	require.NoError(t, err)
 	var (
 		verifyKeyEth   = verifyKey.EthAddress()
 		verifyOtherEth = verifyOther.EthAddress()
 		verifyKeyShort = verifyKey.Address()
 
-		avaxImportInput = func(txID byte, assetID ids.ID) []*avax.TransferableInput {
-			return []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{TxID: ids.ID{txID}},
-				Asset:  avax.Asset{ID: assetID},
-				In: &secp256k1fx.TransferInput{
-					Amt:   100,
-					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+		// validImportTx returns a freshly-allocated import Tx with one
+		// AVAX-denominated input authorized by verifyKey, signed by verifyKey.
+		validImportTx = func() *Tx {
+			return &Tx{
+				Unsigned: &Import{
+					SourceChain: XChainID,
+					ImportedInputs: []*avax.TransferableInput{{
+						UTXOID: avax.UTXOID{TxID: ids.ID{1}},
+						Asset:  avax.Asset{ID: AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   100,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					}},
 				},
-			}}
-		}
-		sig = func(hex string) []Credential {
-			return []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
-				[65]byte(common.FromHex(hex)),
-			}}}
-		}
-		emptySig = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
-
-		// marshalUTXO marshals a UTXO into the shared-memory element format
-		// expected by the C-Chain reader: keyed by InputID(), valued by codec.
-		marshalUTXO = func(utxo *avax.UTXO) *chainsatomic.Element {
-			b, err := c.Marshal(codecVersion, utxo)
-			require.NoError(t, err)
-			key := utxo.InputID()
-			return &chainsatomic.Element{
-				Key:   key[:],
-				Value: b,
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
+					[65]byte(common.FromHex("0x393d75eaa2d49672b14b5445aa6c357cc894e47172c5f80c6ae135991496722a07a76b05832ec365b37bdccbfcb589e2c217383ce4660cc1a61a45421b5623ec00")),
+				}}},
 			}
 		}
-		avaxOut = &secp256k1fx.TransferOutput{
-			Amt: 100,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{verifyKeyShort},
-			},
+		// validImportUTXOs returns the freshly-allocated shared-memory element
+		// that authorizes [validImportTx]'s input.
+		validImportUTXOs = func() []*chainsatomic.Element {
+			b, err := c.Marshal(codecVersion, &avax.UTXO{
+				UTXOID: avax.UTXOID{TxID: ids.ID{1}},
+				Asset:  avax.Asset{ID: AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 100,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{verifyKeyShort},
+					},
+				},
+			})
+			require.NoError(t, err)
+			key := (&avax.UTXOID{TxID: ids.ID{1}}).InputID()
+			return []*chainsatomic.Element{{
+				Key:   key[:],
+				Value: b,
+			}}
+		}
+
+		// validExportTx returns a freshly-allocated export Tx with one input
+		// owned by verifyKey, signed by verifyKey. It needs no shared memory.
+		validExportTx = func() *Tx {
+			return &Tx{
+				Unsigned: &Export{
+					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
+				},
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
+					[65]byte(common.FromHex("0xfe088f91a447b6ebd89a18405e07a50869eaeee869ab924a0ec1174e94d293764e56260eca1d6d26a77f33aa8a99f4b4917f7598bc680b87b01f6c9a750e293d00")),
+				}}},
+			}
+		}
+
+		// imp / exp build fresh valid txs and apply a mutation in place.
+		imp = func(mutate func(*Tx)) *Tx {
+			tx := validImportTx()
+			mutate(tx)
+			return tx
+		}
+		exp = func(mutate func(*Tx)) *Tx {
+			tx := validExportTx()
+			mutate(tx)
+			return tx
+		}
+		// utxos applies a mutation to a fresh copy of [validImportUTXOs].
+		utxos = func(mutate func([]*chainsatomic.Element)) []*chainsatomic.Element {
+			u := validImportUTXOs()
+			mutate(u)
+			return u
 		}
 	)
 
@@ -1772,151 +1807,86 @@ func TestVerifyCredentials(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "import_valid",
-			tx: &Tx{
-				Unsigned: &Import{
-					SourceChain:    XChainID,
-					ImportedInputs: avaxImportInput(1, AVAXAssetID),
-				},
-				Creds: sig("0x393d75eaa2d49672b14b5445aa6c357cc894e47172c5f80c6ae135991496722a07a76b05832ec365b37bdccbfcb589e2c217383ce4660cc1a61a45421b5623ec00"),
-			},
-			utxos: []*chainsatomic.Element{marshalUTXO(&avax.UTXO{
-				UTXOID: avax.UTXOID{TxID: ids.ID{1}},
-				Asset:  avax.Asset{ID: AVAXAssetID},
-				Out:    avaxOut,
-			})},
+			name:  "import_valid",
+			tx:    validImportTx(),
+			utxos: validImportUTXOs(),
 		},
 		{
-			name: "import_wrong_num_credentials",
-			tx: &Tx{
-				Unsigned: &Import{
-					SourceChain:    XChainID,
-					ImportedInputs: avaxImportInput(1, AVAXAssetID),
-				},
-				Creds: nil,
-			},
+			name:    "import_wrong_num_credentials",
+			tx:      imp(func(tx *Tx) { tx.Creds = nil }),
+			utxos:   validImportUTXOs(),
 			wantErr: errIncorrectNumCredentials,
 		},
 		{
-			name: "import_missing_utxo",
-			tx: &Tx{
-				Unsigned: &Import{
-					SourceChain:    XChainID,
-					ImportedInputs: avaxImportInput(2, AVAXAssetID),
-				},
-				Creds: emptySig,
-			},
+			name:    "import_missing_utxo",
+			tx:      validImportTx(),
 			wantErr: errFetchingUTXOs,
 		},
 		{
 			name: "import_unmarshalling_utxo",
-			tx: &Tx{
-				Unsigned: &Import{
-					SourceChain:    XChainID,
-					ImportedInputs: avaxImportInput(3, AVAXAssetID),
-				},
-				Creds: emptySig,
-			},
-			utxos: []*chainsatomic.Element{{
-				// avaxImportInput(3, _).UTXOID.InputID()
-				Key:   common.FromHex("0x8b1e3561260659cbcb002c8306248f4afeaad6b86d6e17b3f898419495d44e15"),
-				Value: []byte{0xff, 0xff, 0xff},
-			}},
+			tx:   validImportTx(),
+			utxos: utxos(func(u []*chainsatomic.Element) {
+				u[0].Value = []byte{0xff, 0xff, 0xff}
+			}),
 			wantErr: errUnmarshallingUTXO,
 		},
 		{
 			// Input claims a non-AVAX asset, but the UTXO at that key has AVAX.
 			name: "import_mismatched_asset_ids",
-			tx: &Tx{
-				Unsigned: &Import{
-					SourceChain:    XChainID,
-					ImportedInputs: avaxImportInput(4, ids.ID{0xab}),
-				},
-				Creds: sig("0xd7dda50d06e1fd6fa226b456036d2a1d1dc6b3f8f6653b0c5955dd5ada6ce7084f17f00fbd51c67914448983fb98d0e8f14e720afa5d818153a3569c26d761fd01"),
-			},
-			utxos: []*chainsatomic.Element{marshalUTXO(&avax.UTXO{
-				UTXOID: avax.UTXOID{TxID: ids.ID{4}},
-				Asset:  avax.Asset{ID: AVAXAssetID},
-				Out:    avaxOut,
-			})},
+			tx: imp(func(tx *Tx) {
+				tx.Unsigned.(*Import).ImportedInputs[0].Asset.ID = ids.ID{0xab}
+			}),
+			utxos:   validImportUTXOs(),
 			wantErr: errMismatchedAssetIDs,
 		},
 		{
 			// Signed by verifyOther; UTXO is owned by verifyKey.
 			name: "import_wrong_signer",
-			tx: &Tx{
-				Unsigned: &Import{
-					SourceChain:    XChainID,
-					ImportedInputs: avaxImportInput(5, AVAXAssetID),
-				},
-				Creds: sig("0x64c1e81d9b807b110c5a66d06a5c61eaffc72d908c69e650c49665f6a38b7bcf6a72abc65d6cb29cd9319d88892063a9431bd2ccadd186f034dc671d595a9e3701"),
-			},
-			utxos: []*chainsatomic.Element{marshalUTXO(&avax.UTXO{
-				UTXOID: avax.UTXOID{TxID: ids.ID{5}},
-				Asset:  avax.Asset{ID: AVAXAssetID},
-				Out:    avaxOut,
-			})},
+			tx: imp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
+					[65]byte(common.FromHex("0x3b42ba9f4653f9181090b64cda757f13bf471f4d89911f4c71a107931c8f5af6082282ed6e9d2969873142a5e3675b7169bce5cf28438730d04e7432b7349e8801")),
+				}}}
+			}),
+			utxos:   validImportUTXOs(),
 			wantErr: errVerifyingTransfer,
 		},
 		{
 			name: "export_valid",
-			tx: &Tx{
-				Unsigned: &Export{
-					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
-				},
-				Creds: sig("0xfe088f91a447b6ebd89a18405e07a50869eaeee869ab924a0ec1174e94d293764e56260eca1d6d26a77f33aa8a99f4b4917f7598bc680b87b01f6c9a750e293d00"),
-			},
+			tx:   validExportTx(),
 		},
 		{
-			name: "export_wrong_num_credentials",
-			tx: &Tx{
-				Unsigned: &Export{
-					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
-				},
-				Creds: nil,
-			},
+			name:    "export_wrong_num_credentials",
+			tx:      exp(func(tx *Tx) { tx.Creds = nil }),
 			wantErr: errIncorrectNumCredentials,
 		},
 		{
 			name: "export_zero_signatures",
-			tx: &Tx{
-				Unsigned: &Export{
-					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
-				},
-				Creds: []Credential{&secp256k1fx.Credential{Sigs: nil}},
-			},
+			tx: exp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: nil}}
+			}),
 			wantErr: errIncorrectNumSignatures,
 		},
 		{
 			name: "export_two_signatures",
-			tx: &Tx{
-				Unsigned: &Export{
-					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
-				},
-				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}, {}}}},
-			},
+			tx: exp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}, {}}}}
+			}),
 			wantErr: errIncorrectNumSignatures,
 		},
 		{
 			// 65 zero bytes is structurally well-formed but unrecoverable.
 			name: "export_invalid_signature",
-			tx: &Tx{
-				Unsigned: &Export{
-					Ins: []Input{{Address: verifyKeyEth, Amount: 100, AssetID: AVAXAssetID}},
-				},
-				Creds: emptySig,
-			},
+			tx: exp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
+			}),
 			wantErr: secp256k1.ErrInvalidSig,
 		},
 		{
 			// Signature is from verifyKey, but Input.Address is verifyOther's.
 			name: "export_address_mismatch",
-			tx: &Tx{
-				Unsigned: &Export{
-					Ins: []Input{{Address: verifyOtherEth, Amount: 100, AssetID: AVAXAssetID}},
-				},
-				Creds: sig("0xfe088f91a447b6ebd89a18405e07a50869eaeee869ab924a0ec1174e94d293764e56260eca1d6d26a77f33aa8a99f4b4917f7598bc680b87b01f6c9a750e293d00"),
-			},
+			tx: exp(func(tx *Tx) {
+				tx.Unsigned.(*Export).Ins[0].Address = verifyOtherEth
+			}),
 			wantErr: errAddressMismatch,
 		},
 	}
