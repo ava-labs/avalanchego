@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -66,6 +67,7 @@ var (
 		Op                    hook.Op
 		AtomicRequestsChainID ids.ID
 		AtomicRequests        *chainsatomic.Requests
+		InputIDs              set.Set[ids.ID]
 	}{
 		{
 			Name: "import", // Included in https://subnets.avax.network/c-chain/block/4
@@ -178,6 +180,9 @@ var (
 					common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64"),
 				},
 			},
+			InputIDs: set.Of(
+				ids.ID(common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64")),
+			),
 		},
 		{
 			Name: "export", // Included in https://subnets.avax.network/c-chain/block/48
@@ -297,6 +302,9 @@ var (
 					},
 				}},
 			},
+			InputIDs: set.Of(
+				ids.ID(common.FromHex("0x000000000000000000000014eb019ccd325ad53543a7e7e3b04828bdecf3cff6")),
+			),
 		},
 		{
 			Name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
@@ -514,6 +522,11 @@ var (
 					common.FromHex("0xd71fb48751f6d5732e7ff63168ed311b40bf517b36279e326878fc3f5169a656"),
 				},
 			},
+			InputIDs: set.Of(
+				ids.ID(common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05")),
+				ids.ID(common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630")),
+				ids.ID(common.FromHex("0xd71fb48751f6d5732e7ff63168ed311b40bf517b36279e326878fc3f5169a656")),
+			),
 		},
 		{
 			Name: "export_same_address_multi_asset", // Synthetic
@@ -580,6 +593,9 @@ var (
 			AtomicRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{},
 			},
+			InputIDs: set.Of(
+				ids.ID(common.FromHex("0x0000000000000005000000140000000000000000000000000000000000000000")),
+			),
 		},
 		{
 			Name: "export_multi_address_multi_asset", // Synthetic
@@ -653,6 +669,10 @@ var (
 			AtomicRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{},
 			},
+			InputIDs: set.Of(
+				ids.ID(common.FromHex("0x0000000000000005000000140100000000000000000000000000000000000000")),
+				ids.ID(common.FromHex("0x0000000000000007000000140200000000000000000000000000000000000000")),
+			),
 		},
 		{
 			Name: "import_non_avax", // Synthetic
@@ -719,6 +739,9 @@ var (
 					common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb"),
 				},
 			},
+			InputIDs: set.Of(
+				ids.ID(common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb")),
+			),
 		},
 	}
 	OldTxs []*atomic.Tx
@@ -1197,6 +1220,47 @@ func TestAtomicRequests(t *testing.T) {
 			require.NoErrorf(t, err, "%T.AtomicRequests()", test.New)
 			assert.Equalf(t, test.AtomicRequestsChainID, chainID, "%T.AtomicRequests().ChainID", test.New)
 			assert.Equalf(t, test.AtomicRequests, requests, "%T.AtomicRequests().Requests", test.New)
+		})
+	}
+}
+
+func TestInputIDs(t *testing.T) {
+	for _, test := range Tests {
+		t.Run(test.Name, func(t *testing.T) {
+			got := test.New.InputIDs()
+			assert.Equalf(t, test.InputIDs, got, "%T.InputIDs()", test.New)
+		})
+	}
+}
+
+func TestAccountInputID(t *testing.T) {
+	tests := []struct {
+		name    string
+		address common.Address
+		nonce   uint64
+		want    ids.ID
+	}{
+		{
+			name: "zero_address_zero_nonce",
+			want: ids.ID(common.FromHex("0x0000000000000000000000140000000000000000000000000000000000000000")),
+		},
+		{
+			name:    "non_zero_address_nonce_one",
+			address: common.HexToAddress("0x0102030405060708090a0b0c0d0e0f1011121314"),
+			nonce:   1,
+			want:    ids.ID(common.FromHex("0x0000000000000001000000140102030405060708090a0b0c0d0e0f1011121314")),
+		},
+		{
+			name:    "non_zero_address_max_nonce",
+			address: common.HexToAddress("0x0102030405060708090a0b0c0d0e0f1011121314"),
+			nonce:   math.MaxUint64,
+			want:    ids.ID(common.FromHex("0xffffffffffffffff000000140102030405060708090a0b0c0d0e0f1011121314")),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := AccountInputID(test.address, test.nonce)
+			assert.Equalf(t, test.want, got, "AccountInputID(%s, %d)", test.address, test.nonce)
 		})
 	}
 }
