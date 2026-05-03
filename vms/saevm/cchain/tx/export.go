@@ -188,9 +188,6 @@ func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credenti
 	}
 	for i, in := range e.Ins {
 		cred := creds[i].Self()
-		if err := cred.Verify(); err != nil {
-			return err
-		}
 		if len(cred.Sigs) != 1 {
 			return fmt.Errorf("%w: expected 1, got %d", errIncorrectNumSignatures, len(cred.Sigs))
 		}

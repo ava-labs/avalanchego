@@ -180,6 +180,11 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
 	}
 
+	fxTx, err := toFxTx(i)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
+	}
+
 	utxoIDs := make([][]byte, len(i.ImportedInputs))
 	for i, in := range i.ImportedInputs {
 		inputID := in.UTXOID.InputID()
@@ -191,10 +196,6 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 		return fmt.Errorf("%w from %s: %w", errFetchingUTXOs, i.SourceChain, err)
 	}
 
-	fxTx, err := toFxTx(i)
-	if err != nil {
-		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
-	}
 	for i, in := range i.ImportedInputs {
 		utxo := &avax.UTXO{}
 		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
