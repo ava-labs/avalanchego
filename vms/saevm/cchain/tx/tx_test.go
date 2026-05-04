@@ -27,10 +27,9 @@ import (
 	// Imported for [vm.VerifierBackend] comment resolution.
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
@@ -49,8 +48,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	customtypes.Register()
-	params.RegisterExtras()
+	evm.RegisterAllLibEVMExtras()
 	os.Exit(m.Run())
 }
 
