@@ -545,7 +545,27 @@ var (
 							Nonce:   5,
 						},
 					},
-					ExportedOutputs: []*avax.TransferableOutput{},
+					ExportedOutputs: []*avax.TransferableOutput{
+						{
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 100,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 1,
+									Addrs:     []ids.ShortID{{0xaa}},
+								},
+							},
+						},
+						{
+							Asset: avax.Asset{ID: AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 100_000,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 1,
+									Addrs:     []ids.ShortID{{0xaa}},
+								},
+							},
+						},
+					},
 				},
 				Creds: []verify.Verifiable{},
 			},
@@ -562,7 +582,27 @@ var (
 							Nonce:   5,
 						},
 					},
-					ExportedOutputs: []*avax.TransferableOutput{},
+					ExportedOutputs: []*avax.TransferableOutput{
+						{
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 100,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 1,
+									Addrs:     []ids.ShortID{{0xaa}},
+								},
+							},
+						},
+						{
+							Asset: avax.Asset{ID: AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 100_000,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 1,
+									Addrs:     []ids.ShortID{{0xaa}},
+								},
+							},
+						},
+					},
 				},
 				Creds: []Credential{},
 			},
@@ -575,15 +615,36 @@ var (
 						{"address":"0x0000000000000000000000000000000000000000","amount":999,"assetID":"11111111111111111111111111111111LpoYY","nonce":5},
 						{"address":"0x0000000000000000000000000000000000000000","amount":1000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z","nonce":5}
 					],
-					"exportedOutputs":[]
+					"exportedOutputs":[
+						{
+							"assetID":"11111111111111111111111111111111LpoYY",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"output":{
+								"addresses":["GVsscSys19nXbNEJi5g1Z1y8UawXee8gj"],
+								"amount":100,
+								"locktime":0,
+								"threshold":1
+							}
+						},
+						{
+							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"output":{
+								"addresses":["GVsscSys19nXbNEJi5g1Z1y8UawXee8gj"],
+								"amount":100000,
+								"locktime":0,
+								"threshold":1
+							}
+						}
+					]
 				},
 				"credentials":[]
 			}`,
-			Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000050000000000000000"),
+			Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000000000000500000002000000000000000000000000000000000000000000000000000000000000000000000007000000000000006400000000000000000000000100000001aa0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000700000000000186a000000000000000000000000100000001aa0000000000000000000000000000000000000000000000"),
 			Op: hook.Op{
-				ID:        ids.FromStringOrPanic("29cCETWxEUN1QCuex59j46Xtr8urBRo5M7HzwBqC3qDXWd73sX"),
-				Gas:       12218,
-				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 12218),
+				ID:        ids.FromStringOrPanic("dLYGLJkvGarYPHnfRqK8zH9nu6dj6Ajf1Wjtm8X7fxr5jvvL7"),
+				Gas:       12378,
+				GasFeeCap: *uint256.NewInt(900_000 * _x2cRate / 12378),
 				Burn: map[common.Address]hook.AccountDebit{
 					{}: {
 						Nonce:      5,
@@ -593,7 +654,22 @@ var (
 				},
 			},
 			AtomicRequests: &chainsatomic.Requests{
-				PutRequests: []*chainsatomic.Element{},
+				PutRequests: []*chainsatomic.Element{
+					{
+						Key:   common.FromHex("0x82c024362a71c075ac15e5e000dd66380907e3ea6af121d3d78478bb07848b75"),
+						Value: common.FromHex("0x00005281e076436407df7c97e5abaff7f63e11bd8bc9ce03c787f12ee0e21fe68dca00000000000000000000000000000000000000000000000000000000000000000000000000000007000000000000006400000000000000000000000100000001aa00000000000000000000000000000000000000"),
+						Traits: [][]byte{
+							ids.ShortID{0xaa}.Bytes(),
+						},
+					},
+					{
+						Key:   common.FromHex("0x836913bdcf743940c51675ac186dc415cbb5f2a7309916f4a48bda3df5334245"),
+						Value: common.FromHex("0x00005281e076436407df7c97e5abaff7f63e11bd8bc9ce03c787f12ee0e21fe68dca0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000700000000000186a000000000000000000000000100000001aa00000000000000000000000000000000000000"),
+						Traits: [][]byte{
+							ids.ShortID{0xaa}.Bytes(),
+						},
+					},
+				},
 			},
 			InputIDs: set.Of(
 				ids.ID(common.FromHex("0x0000000000000005000000140000000000000000000000000000000000000000")),
@@ -616,7 +692,27 @@ var (
 							Nonce:   7,
 						},
 					},
-					ExportedOutputs: []*avax.TransferableOutput{},
+					ExportedOutputs: []*avax.TransferableOutput{
+						{
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 500,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 2,
+									Addrs:     []ids.ShortID{{0xbb}, {0xcc}},
+								},
+							},
+						},
+						{
+							Asset: avax.Asset{ID: AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 500_000,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 2,
+									Addrs:     []ids.ShortID{{0xbb}, {0xcc}},
+								},
+							},
+						},
+					},
 				},
 				Creds: []verify.Verifiable{},
 			},
@@ -635,7 +731,27 @@ var (
 							Nonce:   7,
 						},
 					},
-					ExportedOutputs: []*avax.TransferableOutput{},
+					ExportedOutputs: []*avax.TransferableOutput{
+						{
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 500,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 2,
+									Addrs:     []ids.ShortID{{0xbb}, {0xcc}},
+								},
+							},
+						},
+						{
+							Asset: avax.Asset{ID: AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 500_000,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 2,
+									Addrs:     []ids.ShortID{{0xbb}, {0xcc}},
+								},
+							},
+						},
+					},
 				},
 				Creds: []Credential{},
 			},
@@ -648,15 +764,36 @@ var (
 						{"address":"0x0100000000000000000000000000000000000000","amount":999,"assetID":"11111111111111111111111111111111LpoYY","nonce":5},
 						{"address":"0x0200000000000000000000000000000000000000","amount":1000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z","nonce":7}
 					],
-					"exportedOutputs":[]
+					"exportedOutputs":[
+						{
+							"assetID":"11111111111111111111111111111111LpoYY",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"output":{
+								"addresses":["J3mMsbNx1AfUrQMSHBwWcDfYRYY1i7rGE","Kber8jn31BYS7SUZrJD1fRMxNW8MvZnhY"],
+								"amount":500,
+								"locktime":0,
+								"threshold":2
+							}
+						},
+						{
+							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+							"fxID":"11111111111111111111111111111111LpoYY",
+							"output":{
+								"addresses":["J3mMsbNx1AfUrQMSHBwWcDfYRYY1i7rGE","Kber8jn31BYS7SUZrJD1fRMxNW8MvZnhY"],
+								"amount":500000,
+								"locktime":0,
+								"threshold":2
+							}
+						}
+					]
 				},
 				"credentials":[]
 			}`,
-			Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000000000000"),
+			Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000200000000000000000000000000000000000000000000000000000000000000000000000700000000000001f400000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000007a12000000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000000000000"),
 			Op: hook.Op{
-				ID:        ids.FromStringOrPanic("8P9XRKhxHeTv3t4Aj9cTV6dD5h78WVFH8nctLuCkeSavfKeEG"),
-				Gas:       12218,
-				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 12218),
+				ID:        ids.FromStringOrPanic("2cfgJ1XjwjNVvF4ZoW86Sc77z7TDMyGB33edRioEfuLkyKkkob"),
+				Gas:       12418,
+				GasFeeCap: *uint256.NewInt(500_000 * _x2cRate / 12418),
 				Burn: map[common.Address]hook.AccountDebit{
 					{1}: {
 						Nonce: 5,
@@ -669,7 +806,24 @@ var (
 				},
 			},
 			AtomicRequests: &chainsatomic.Requests{
-				PutRequests: []*chainsatomic.Element{},
+				PutRequests: []*chainsatomic.Element{
+					{
+						Key:   common.FromHex("0x150b950ce35ef7c512b1dec725164c8ee170728976ca0c9c1202eb60cafe9230"),
+						Value: common.FromHex("0x0000d4ae9ab4d296ced15beba7686a2216bcfdf4a7f1bcc502b3e5c0c79a4601b2ef0000000000000000000000000000000000000000000000000000000000000000000000000000000700000000000001f400000000000000000000000200000002bb00000000000000000000000000000000000000cc00000000000000000000000000000000000000"),
+						Traits: [][]byte{
+							ids.ShortID{0xbb}.Bytes(),
+							ids.ShortID{0xcc}.Bytes(),
+						},
+					},
+					{
+						Key:   common.FromHex("0x3080252925d9e3e399292cfecc8f95bb03da84645f44b8d0da82dc472e1f41d2"),
+						Value: common.FromHex("0x0000d4ae9ab4d296ced15beba7686a2216bcfdf4a7f1bcc502b3e5c0c79a4601b2ef0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000007a12000000000000000000000000200000002bb00000000000000000000000000000000000000cc00000000000000000000000000000000000000"),
+						Traits: [][]byte{
+							ids.ShortID{0xbb}.Bytes(),
+							ids.ShortID{0xcc}.Bytes(),
+						},
+					},
+				},
 			},
 			InputIDs: set.Of(
 				ids.ID(common.FromHex("0x0000000000000005000000140100000000000000000000000000000000000000")),
