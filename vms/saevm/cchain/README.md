@@ -15,7 +15,14 @@ flowchart TB
 
     subgraph cchainvm["cchain VM"]
         direction TB
-        sae["SAE VM<br/><i>EVM execution, settlement,<br/>EVM mempool, block lifecycle</i>"]
+
+        subgraph saevm["SAE VM"]
+            direction TB
+            sae_lifecycle["block lifecycle<br/><i>building, verification, acceptance</i>"]
+            sae_mempool["EVM mempool"]
+            sae_exec["execution &amp; settlement"]
+        end
+
         p2pcomp["p2p network<br/><i>shared by SAE VM and cchain;<br/>dispatches by handler ID</i>"]
         rpcapi["custom RPC API<br/><i>/avax service</i>"]
         txpool["Import/Export txpool"]
@@ -23,17 +30,17 @@ flowchart TB
         hook["hook.Points<br/><i>cchain's plug-in to SAE</i>"]
     end
 
-    consensus --> sae
+    consensus --> sae_lifecycle
     p2pin --> p2pcomp
     httpd --> rpcapi
 
-    p2pcomp -->|"SAE EVM tx gossip"| sae
+    p2pcomp -->|"SAE EVM tx gossip"| sae_mempool
     p2pcomp -->|"cchain Import/Export gossip"| txpool
     p2pcomp -->|"ACP-118 signature handler"| warp
 
     rpcapi --> txpool
 
-    sae -.->|"calls during<br/>block building"| hook
+    sae_lifecycle -.->|"calls during<br/>block building"| hook
     hook --> txpool
 ```
 
