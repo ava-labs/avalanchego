@@ -217,6 +217,7 @@ func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTra
 		metadata:     genesisMetadata,
 		blockTracker: blockTracker,
 		vmBlock:      snowmanGenesis,
+		blacklist:    simplex.NewBlacklist(uint16(len(config.Params.InitialValidators))),
 	}
 
 	// set the digest

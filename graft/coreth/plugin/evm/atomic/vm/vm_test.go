@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -18,9 +19,12 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool"
@@ -29,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -40,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -1618,4 +1624,169 @@ func TestWaitForEvent(t *testing.T) {
 			require.NoError(t, vm.Shutdown(t.Context()))
 		})
 	}
+}
+
+// TestFirewoodHistoricalReplayAcrossAtomicImport verifies that a Firewood
+// archival balance query can replay through an accepted atomic import after
+// the VM is restarted and the import's input UTXO has already been consumed
+// from shared memory.
+func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
+	ctx := t.Context()
+
+	// Creating the genesis state (block 0) is a commit operation and so Firewood first persists at block 3.
+	// Placing the import at block 4 ensures that it is not persisted.
+	var (
+		recipient          = common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678")
+		importAmount       = uint64(50_000_000)
+		fork               = upgradetest.Fortuna
+		numPreImportBlocks = 3
+		targetBlockHeight  = numPreImportBlocks + 1
+		configJSON         = `{
+			"pruning-enabled": false,
+			"commit-interval": 4,
+			"state-history": 5
+		}`
+	)
+
+	vm := newAtomicTestVM()
+	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+		Fork:       &fork,
+		ConfigJSON: configJSON,
+		Scheme:     customrawdb.FirewoodScheme,
+	})
+	t.Cleanup(func() {
+		if vm != nil {
+			require.NoError(t, vm.Shutdown(ctx))
+		}
+	})
+
+	// Seed shared memory with the UTXO that the import block will consume.
+	require.NoError(t, addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
+		vmtest.TestShortIDAddrs[0]: importAmount,
+	}))
+
+	// issueRegularBlock advances the chain by one block containing a single
+	// transfer; used to pad chain history before and after the import.
+	issueRegularBlock := func(height int) {
+		nonce := vm.Ethereum().TxPool().Nonce(vmtest.TestEthAddrs[0])
+		tx := types.NewTransaction(
+			nonce,
+			common.Address{},
+			big.NewInt(0),
+			21_000,
+			vmtest.InitialBaseFee,
+			nil,
+		)
+		signedTx, err := types.SignTx(
+			tx,
+			types.LatestSignerForChainID(vm.Ethereum().BlockChain().Config().ChainID),
+			vmtest.TestKeys[0].ToECDSA(),
+		)
+		require.NoError(t, err)
+
+		blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
+		require.NoError(t, err, "failed to build regular block at height %d", height)
+		require.NoError(t, blk.Accept(ctx), "failed to accept regular block at height %d", height)
+	}
+
+	// Build chain history prior to the atomic import.
+	for i := range numPreImportBlocks {
+		issueRegularBlock(i + 1)
+	}
+
+	// Issue, build, and accept the atomic import block. We capture the input
+	// UTXO ID so we can later assert it has been removed from shared memory.
+	importTx, err := vm.newImportTx(vm.Ctx.XChainID, recipient, vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
+	require.NoError(t, err)
+	inputUTXOs := importTx.InputUTXOs()
+	require.Len(t, inputUTXOs, 1)
+
+	importedInputID, ok := inputUTXOs.Pop()
+	require.True(t, ok)
+
+	require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
+
+	msg, err := vm.WaitForEvent(ctx)
+	require.NoError(t, err)
+	require.Equal(t, commonEng.PendingTxs, msg)
+
+	blk, err := vm.BuildBlock(ctx)
+	require.NoError(t, err)
+	require.NoError(t, blk.Verify(ctx))
+	require.NoError(t, vm.SetPreference(ctx, blk.ID()))
+	require.NoError(t, blk.Accept(ctx))
+
+	// Continue the chain past the import so shutdown persists the last committed revision
+	// while the target import root remains unavailable after restart.
+	issueRegularBlock(targetBlockHeight + 1)
+
+	// Drain pending acceptors and confirm the import's UTXO has been consumed
+	// from live shared memory. Historical replay must not depend on it.
+	vm.Ethereum().BlockChain().DrainAcceptorQueue()
+	_, err = vm.Ctx.SharedMemory.Get(vm.Ctx.XChainID, [][]byte{importedInputID[:]})
+	require.ErrorIs(t, err, database.ErrNotFound)
+
+	// Restart the VM so Firewood's in-memory revisions cannot satisfy the historical lookup.
+	require.NoError(t, vm.Shutdown(ctx))
+	vmtest.ResetMetrics(tvm.Ctx)
+	vm = nil
+
+	t.Run("archival query after VM restart", func(t *testing.T) {
+		ctx := t.Context()
+
+		vm := newAtomicTestVM()
+		t.Cleanup(func() {
+			require.NoError(t, vm.Shutdown(ctx))
+		})
+
+		restartConfigJSON, err := vmtest.OverrideSchemeConfig(customrawdb.FirewoodScheme, configJSON)
+		require.NoError(t, err)
+		require.NoError(t, vm.Initialize(
+			ctx,
+			tvm.Ctx,
+			tvm.DB,
+			[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork])),
+			[]byte{},
+			[]byte(restartConfigJSON),
+			[]*commonEng.Fx{},
+			tvm.AppSender,
+		))
+		require.NoError(t, vm.SetState(ctx, snow.Bootstrapping))
+		require.NoError(t, vm.SetState(ctx, snow.NormalOp))
+
+		// Verify that the target state requires reexecution to access after restart.
+		targetBlock := vm.Ethereum().BlockChain().GetBlockByNumber(uint64(targetBlockHeight))
+		targetRoot := targetBlock.Root()
+		_, err = vm.Ethereum().BlockChain().StateAt(targetRoot)
+		require.ErrorIs(t, err, firewood.ErrNoRevisionFound)
+
+		// Stand up an in-process RPC server so we can issue an archival query.
+		handlers, err := vm.CreateHandlers(ctx)
+		require.NoError(t, err)
+
+		ethRPCEndpoint := "/rpc"
+		server := httptest.NewServer(handlers[ethRPCEndpoint])
+		t.Cleanup(server.Close)
+
+		client, err := ethclient.Dial(server.URL)
+		require.NoError(t, err)
+
+		// The recipient receives funds only in the import block, so its head
+		// balance equals the expected post-import balance.
+		headBalance, err := client.BalanceAt(ctx, recipient, nil)
+		require.NoError(t, err)
+		require.Positive(t, headBalance.Sign(), "recipient %s should have a positive balance after the import", recipient)
+
+		// Querying balance at the import block's height forces Firewood to replay
+		// the import; the archival result must match the live head balance.
+		archiveBalance, err := client.BalanceAt(ctx, recipient, new(big.Int).SetUint64(uint64(targetBlockHeight)))
+		require.NoError(t, err, "historical query at block %d should replay successfully", targetBlockHeight)
+
+		require.Zero(
+			t,
+			archiveBalance.Cmp(headBalance),
+			"archival balance %s at block %d must equal live balance %s",
+			archiveBalance, targetBlockHeight, headBalance,
+		)
+	})
 }
