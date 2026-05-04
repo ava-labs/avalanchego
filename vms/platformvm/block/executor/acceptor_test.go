@@ -10,7 +10,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/chains/atomic/atomicmock"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -78,10 +79,8 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 
 func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	s := statetest.New(t, statetest.Config{})
-	sharedMemory := atomicmock.NewSharedMemory(ctrl)
+	s, sharedMemory := newAcceptorStateAndSharedMemory(t)
 	manager := validators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
 
 	parentID := ids.GenerateTestID()
@@ -144,8 +143,6 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	}
 	acceptor.backend.blkIDToState[childID] = childState
 
-	sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1)
-
 	require.NoError(acceptor.ApricotAtomicBlock(blk))
 
 	_, _, height, err := s.GetCurrentValidators(t.Context(), constants.PrimaryNetworkID)
@@ -156,10 +153,8 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 
 func TestAcceptorVisitStandardBlock(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	s := statetest.New(t, statetest.Config{})
-	sharedMemory := atomicmock.NewSharedMemory(ctrl)
+	s, sharedMemory := newAcceptorStateAndSharedMemory(t)
 	manager := validators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
 
 	parentID := ids.GenerateTestID()
@@ -231,8 +226,6 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	}
 	acceptor.backend.blkIDToState[childID] = childState
 
-	sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1)
-
 	require.NoError(acceptor.BanffStandardBlock(blk))
 	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
@@ -247,8 +240,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := statetest.New(t, statetest.Config{})
-	sharedMemory := atomicmock.NewSharedMemory(ctrl)
+	s, sharedMemory := newAcceptorStateAndSharedMemory(t)
 	manager := validators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
 
 	parentID := ids.GenerateTestID()
@@ -337,8 +329,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 		parentStatelessBlk.EXPECT().Bytes().Return([]byte{}).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-
-		sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1),
 	)
 
 	require.NoError(acceptor.ApricotCommitBlock(blk))
@@ -355,8 +345,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := statetest.New(t, statetest.Config{})
-	sharedMemory := atomicmock.NewSharedMemory(ctrl)
+	s, sharedMemory := newAcceptorStateAndSharedMemory(t)
 	manager := validators.NewManager(config.Internal{}, s, metrics.Noop, new(mockable.Clock))
 
 	parentID := ids.GenerateTestID()
@@ -446,8 +435,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		// Block commit dependencies
 		parentStatelessBlk.EXPECT().Bytes().Return([]byte{}).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
-
-		sharedMemory.EXPECT().Apply(atomicRequests, gomock.Any()).Return(nil).Times(1),
 	)
 
 	require.NoError(acceptor.ApricotAbortBlock(blk))
@@ -458,4 +445,14 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require.NoError(err)
 	require.Equal(blk.Height(), height)
 	require.Equal(blk.ID(), s.GetLastAccepted())
+}
+
+func newAcceptorStateAndSharedMemory(t testing.TB) (*state.State, atomic.SharedMemory) {
+	baseDB := memdb.New()
+	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{1}, baseDB))
+	state := statetest.New(t, statetest.Config{
+		DB: prefixdb.New([]byte{0}, baseDB),
+	})
+
+	return state, atomicMemory.NewSharedMemory(constants.PlatformChainID)
 }

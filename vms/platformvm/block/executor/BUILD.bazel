@@ -65,7 +65,6 @@ go_test(
     deps = [
         "//chains",
         "//chains/atomic",
-        "//chains/atomic/atomicmock",
         "//codec",
         "//codec/linearcodec",
         "//database",

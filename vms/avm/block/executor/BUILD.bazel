@@ -35,7 +35,8 @@ go_test(
     embed = [":executor"],
     deps = [
         "//chains/atomic",
-        "//chains/atomic/atomicmock",
+        "//database",
+        "//database/memdb",
         "//ids",
         "//snow",
         "//upgrade/upgradetest",

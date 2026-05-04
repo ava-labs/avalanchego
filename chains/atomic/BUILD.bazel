@@ -31,7 +31,6 @@ go_test(
     name = "atomic_test",
     srcs = [
         "memory_test.go",
-        "mocks_generate_test.go",
         "shared_memory_test.go",
     ],
     embed = [":atomic"],

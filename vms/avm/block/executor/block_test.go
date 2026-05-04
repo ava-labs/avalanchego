@@ -13,7 +13,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/chains/atomic/atomicmock"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -591,6 +592,10 @@ func TestBlockAccept(t *testing.T) {
 		blockFunc   func(*gomock.Controller) *Block
 		expectedErr error
 	}
+	newSharedMemory := func() (atomic.SharedMemory, database.Batch) {
+		baseDB := memdb.New()
+		return atomic.NewMemory(baseDB).NewSharedMemory(ids.GenerateTestID()), baseDB.NewBatch()
+	}
 	tests := []test{
 		{
 			name: "block not found",
@@ -660,13 +665,13 @@ func TestBlockAccept(t *testing.T) {
 				require.NoError(t, err)
 
 				mockManagerState := statemock.NewState(ctrl)
-				// Note the returned batch is nil but not used
-				// because we mock the call to shared memory
-				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
-				mockManagerState.EXPECT().Abort()
+				baseDB := memdb.New()
+				batch := baseDB.NewBatch()
+				sharedMemory := atomic.NewMemory(baseDB).NewSharedMemory(ids.GenerateTestID())
+				require.NoError(t, baseDB.Close())
 
-				mockSharedMemory := atomicmock.NewSharedMemory(ctrl)
-				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(errTest)
+				mockManagerState.EXPECT().CommitBatch().Return(batch, nil)
+				mockManagerState.EXPECT().Abort()
 
 				mockOnAcceptState := statemock.NewDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
@@ -676,7 +681,7 @@ func TestBlockAccept(t *testing.T) {
 					manager: &manager{
 						state:   mockManagerState,
 						mempool: mempool,
-						backend: defaultTestBackend(false, mockSharedMemory),
+						backend: defaultTestBackend(false, sharedMemory),
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
 								onAcceptState: mockOnAcceptState,
@@ -685,7 +690,7 @@ func TestBlockAccept(t *testing.T) {
 					},
 				}
 			},
-			expectedErr: errTest,
+			expectedErr: database.ErrClosed,
 		},
 		{
 			name: "failed to apply metrics",
@@ -698,14 +703,11 @@ func TestBlockAccept(t *testing.T) {
 				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 
-				mockManagerState := statemock.NewState(ctrl)
-				// Note the returned batch is nil but not used
-				// because we mock the call to shared memory
-				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
-				mockManagerState.EXPECT().Abort()
+				sharedMemory, batch := newSharedMemory()
 
-				mockSharedMemory := atomicmock.NewSharedMemory(ctrl)
-				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
+				mockManagerState := statemock.NewState(ctrl)
+				mockManagerState.EXPECT().CommitBatch().Return(batch, nil)
+				mockManagerState.EXPECT().Abort()
 
 				mockOnAcceptState := statemock.NewDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
@@ -719,7 +721,7 @@ func TestBlockAccept(t *testing.T) {
 						state:   mockManagerState,
 						mempool: mempool,
 						metrics: metrics,
-						backend: defaultTestBackend(false, mockSharedMemory),
+						backend: defaultTestBackend(false, sharedMemory),
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
 								onAcceptState: mockOnAcceptState,
@@ -743,15 +745,12 @@ func TestBlockAccept(t *testing.T) {
 				mempool, err := mempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 
+				sharedMemory, batch := newSharedMemory()
+
 				mockManagerState := statemock.NewState(ctrl)
-				// Note the returned batch is nil but not used
-				// because we mock the call to shared memory
-				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
+				mockManagerState.EXPECT().CommitBatch().Return(batch, nil)
 				mockManagerState.EXPECT().Abort()
 				mockManagerState.EXPECT().Checksum().Return(ids.Empty)
-
-				mockSharedMemory := atomicmock.NewSharedMemory(ctrl)
-				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
 
 				mockOnAcceptState := statemock.NewDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
@@ -765,7 +764,7 @@ func TestBlockAccept(t *testing.T) {
 						state:   mockManagerState,
 						mempool: mempool,
 						metrics: metrics,
-						backend: defaultTestBackend(false, mockSharedMemory),
+						backend: defaultTestBackend(false, sharedMemory),
 						blkIDToState: map[ids.ID]*blockState{
 							blockID: {
 								onAcceptState: mockOnAcceptState,
