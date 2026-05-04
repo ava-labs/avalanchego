@@ -22,9 +22,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	// Imported for [vm.VerifierBackend] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
-	// Imported for [vm.VerifierBackend] comment resolution.
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
@@ -1969,7 +1969,7 @@ func TestSanityCheck(t *testing.T) {
 
 func TestVerifyCredentials(t *testing.T) {
 	sk, err := secp256k1.ToPrivateKey(common.FromHex("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"))
-	require.NoError(t, err)
+	require.NoError(t, err, "secp256k1.ToPrivateKey()")
 	var (
 		ethAddress  = sk.EthAddress()
 		avaxAddress = sk.Address()
@@ -2003,7 +2003,7 @@ func TestVerifyCredentials(t *testing.T) {
 		validUTXOs = func(t *testing.T) []*chainsatomic.Element {
 			t.Helper()
 
-			b, err := c.Marshal(codecVersion, &avax.UTXO{
+			utxo := &avax.UTXO{
 				UTXOID: validUTXOID,
 				Asset:  avax.Asset{ID: AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
@@ -2013,8 +2013,9 @@ func TestVerifyCredentials(t *testing.T) {
 						Addrs:     []ids.ShortID{avaxAddress},
 					},
 				},
-			})
-			require.NoError(t, err)
+			}
+			b, err := c.Marshal(codecVersion, utxo)
+			require.NoError(t, err, "%T.Marshal(%T)", c, utxo)
 			return []*chainsatomic.Element{{
 				Key:   validInputID[:],
 				Value: b,
@@ -2041,9 +2042,8 @@ func TestVerifyCredentials(t *testing.T) {
 	)
 
 	tests := []struct {
-		name string
-		tx   *Tx
-		// utxos are seeded under XChainID → CChainID, keyed by Element.Key.
+		name    string
+		tx      *Tx
 		utxos   []*chainsatomic.Element
 		wantErr error
 	}{
