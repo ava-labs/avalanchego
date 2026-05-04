@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -53,10 +54,13 @@ type Tx struct {
 }
 
 // Unsigned is a common interface implemented by [Import] and [Export].
-//
-// TODO(StephenButtolph): Expand this interface to include UTXO handling and
-// verification.
 type Unsigned interface {
+	// InputIDs returns the one-time-use inputs consumed by this transaction.
+	//
+	// [Import] transactions return consumed UTXOIDs.
+	// [Export] transactions return Account+Nonce pairs.
+	InputIDs() set.Set[ids.ID]
+
 	// SanityCheck verifies that the transaction's structural invariants hold
 	// against the chain's context and that it does not produce more funds
 	// than it consumes.
@@ -86,6 +90,10 @@ type Unsigned interface {
 	// atomicRequests returns the operations that should be applied to shared
 	// memory when this transaction is executed.
 	atomicRequests(txID ids.ID) (chainID ids.ID, r *chainsatomic.Requests, err error)
+
+	// verifyCredentials verifies that the transaction is authorized by the
+	// provided credentials.
+	verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error
 }
 
 // op contains the state changes of [hook.Op]
@@ -221,6 +229,11 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 // should perform on the peer chainID during execution.
 func (t *Tx) AtomicRequests() (chainID ids.ID, r *chainsatomic.Requests, err error) {
 	return t.atomicRequests(t.ID())
+}
+
+// VerifyCredentials verifies that the transaction is properly authorized.
+func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory) error {
+	return t.Unsigned.verifyCredentials(sm, t.Creds)
 }
 
 // Parse deserializes a [Tx] from its canonical binary format.
