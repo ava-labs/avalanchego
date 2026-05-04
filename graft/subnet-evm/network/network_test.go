@@ -344,14 +344,15 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	require.Len(t, net.(*network).outstandingRequestHandlers, 1)
 	cancel()
 	require.ErrorIs(t, <-errChan, context.Canceled)
-	// Should still be able to process a response after cancelling.
-	require.Len(t, net.(*network).outstandingRequestHandlers, 1) // context cancellation SendAppRequestAny failure doesn't clear
+	// Cancellation eagerly clears the handler and frees the slot.
+	// Late responses are dropped silently.
+	require.Empty(t, net.(*network).outstandingRequestHandlers)
 	require.NoError(t, net.AppResponse(
 		t.Context(),
 		sentAppRequestInfo.nodeID,
 		sentAppRequestInfo.requestID,
 		[]byte{}))
-	require.Empty(t, net.(*network).outstandingRequestHandlers) // Received response
+	require.Empty(t, net.(*network).outstandingRequestHandlers)
 }
 
 func TestRequestMinVersion(t *testing.T) {

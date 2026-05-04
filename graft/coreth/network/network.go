@@ -258,6 +258,9 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 
 	requestID := n.nextRequestID()
 	n.outstandingRequestHandlers[requestID] = responseHandler
+	if w, ok := responseHandler.(*waitingResponseHandler); ok {
+		w.requestID = requestID
+	}
 
 	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
@@ -346,10 +349,16 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 func (n *network) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	log.Debug("received AppResponse from peer", "nodeID", nodeID, "requestID", requestID)
 
-	handler, exists := n.markRequestFulfilled(requestID)
-	if !exists {
+	if !IsNetworkRequest(requestID) {
 		log.Debug("forwarding AppResponse to SDK network", "nodeID", nodeID, "requestID", requestID, "responseLen", len(response))
 		return n.sdkNetwork.AppResponse(ctx, nodeID, requestID, response)
+	}
+
+	handler, exists := n.markRequestFulfilled(requestID)
+	if !exists {
+		// Caller abandoned the request. Slot already freed.
+		log.Debug("dropping late response for abandoned request", "nodeID", nodeID, "requestID", requestID, "responseLen", len(response))
+		return nil
 	}
 
 	// We must release the slot
@@ -367,10 +376,16 @@ func (n *network) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID 
 func (n *network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
 	log.Debug("received AppRequestFailed from peer", "nodeID", nodeID, "requestID", requestID)
 
-	handler, exists := n.markRequestFulfilled(requestID)
-	if !exists {
+	if !IsNetworkRequest(requestID) {
 		log.Debug("forwarding AppRequestFailed to SDK network", "nodeID", nodeID, "requestID", requestID)
 		return n.sdkNetwork.AppRequestFailed(ctx, nodeID, requestID, appErr)
+	}
+
+	handler, exists := n.markRequestFulfilled(requestID)
+	if !exists {
+		// Caller abandoned the request. Slot already freed.
+		log.Debug("dropping late failure for abandoned request", "nodeID", nodeID, "requestID", requestID)
+		return nil
 	}
 
 	// We must release the slot
@@ -414,6 +429,14 @@ func (n *network) markRequestFulfilled(requestID uint32) (message.ResponseHandle
 	delete(n.outstandingRequestHandlers, requestID)
 
 	return handler, true
+}
+
+// abandonRequest unregisters the handler for requestID and releases the
+// active-request slot. No-op if the request already completed.
+func (n *network) abandonRequest(requestID uint32) {
+	if _, ok := n.markRequestFulfilled(requestID); ok {
+		n.activeAppRequests.Release(1)
+	}
 }
 
 // AppGossip is called by avalanchego -> VM when there is an incoming AppGossip
@@ -507,6 +530,9 @@ func (n *network) SendSyncedAppRequestAny(ctx context.Context, minVersion *versi
 		return nil, nodeID, err
 	}
 	response, err := waitingHandler.WaitForResult(ctx)
+	if err != nil {
+		n.abandonRequest(waitingHandler.requestID)
+	}
 	return response, nodeID, err
 }
 
@@ -517,7 +543,11 @@ func (n *network) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, r
 	if err := n.SendAppRequest(ctx, nodeID, request, waitingHandler); err != nil {
 		return nil, err
 	}
-	return waitingHandler.WaitForResult(ctx)
+	response, err := waitingHandler.WaitForResult(ctx)
+	if err != nil {
+		n.abandonRequest(waitingHandler.requestID)
+	}
+	return response, err
 }
 
 // P2PNetwork returns the p2p network

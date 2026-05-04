@@ -73,7 +73,9 @@ func (s *hashDBPivotSession) Rebuild(newRoot common.Hash, _ uint64) (types.Pivot
 	<-snapshot.WipeSnapshot(s.db, false)
 	// Clear stale main trie segments from the prior interrupted session.
 	// The account trie is always re-synced from scratch.
-	customrawdb.ClearSyncSegments(s.db, newRoot)
+	if err := customrawdb.ClearSyncSegments(s.db, newRoot); err != nil {
+		return nil, fmt.Errorf("failed to clear sync segments for new root %s: %w", newRoot, err)
+	}
 
 	trieDB := triedb.NewDatabase(s.db, nil)
 	var skipped, registered uint64
