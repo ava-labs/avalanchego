@@ -11,14 +11,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var _ ValidatorTx = (*AddAutoRenewedValidatorTx)(nil)
@@ -168,7 +167,7 @@ func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 			return errInvalidStakedAsset
 		}
 
-		newWeight, err := safemath.Add(totalStakeWeight, out.Output().Amount())
+		newWeight, err := math.Add(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}
