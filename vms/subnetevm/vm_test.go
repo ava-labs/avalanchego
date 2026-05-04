@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/ethtest"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/log"
@@ -55,12 +54,13 @@ import (
 )
 
 type SUT struct {
-	ctx       context.Context
-	snowCtx   *snow.Context
-	vm        *VM
-	ethClient *ethclient.Client
+	ctx     context.Context
+	snowCtx *snow.Context
+	vm      *VM
 
-	client client.Client
+	// client serves both the standard Ethereum surface (via the embedded
+	// `*ethclient.Client`) and the subnet-evm-specific methods.
+	client *client.Client
 
 	// Wallet for issuing transactions
 	ethWallet     *saetest.Wallet
@@ -184,28 +184,20 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 
 	handlers, err := vm.CreateHandlers(ctx)
 	require.NoError(t, err)
-	server := httptest.NewServer(handlers["/ws"])
-	t.Cleanup(server.Close)
 
-	// Mount every non-`/ws` handler returned by `CreateHandlers` on a
-	// single shared mux so typed JSON-RPC clients can target a single
-	// base URL (matching how AvalancheGo serves these in production).
-	// `/ws` stays on its own server because the eth client dials it as
-	// a websocket.
+	// Mount every handler returned by `CreateHandlers` on a single shared
+	// mux so typed JSON-RPC clients can target a single base URL (matching
+	// how AvalancheGo serves these in production).
 	apiMux := http.NewServeMux()
 	for path, handler := range handlers {
-		if path == "/ws" {
-			continue
-		}
 		apiMux.Handle(path, handler)
 	}
 	apiServer := httptest.NewServer(apiMux)
 	t.Cleanup(apiServer.Close)
 
-	uri := server.Listener.Addr().String()
-	rpcClient, err := rpc.Dial("ws://" + uri)
+	c, err := client.NewClientWithURL(apiServer.URL)
 	require.NoError(t, err)
-	t.Cleanup(rpcClient.Close)
+	t.Cleanup(c.Close)
 
 	// TODO(alarso16): delete this - it should be on the VM
 	lastID, err := vm.LastAccepted(ctx)
@@ -213,11 +205,10 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	require.NoError(t, vm.SetPreference(ctx, lastID, nil))
 
 	return &SUT{
-		ctx:       ctx,
-		snowCtx:   snowCtx,
-		vm:        vm,
-		ethClient: ethclient.NewClient(rpcClient),
-		client:    client.NewClientWithURL(apiServer.URL),
+		ctx:     ctx,
+		snowCtx: snowCtx,
+		vm:      vm,
+		client:  c,
 		ethWallet: saetest.NewWalletWithKeyChain(
 			keychain,
 			types.LatestSigner(genesis.Config),
@@ -360,7 +351,7 @@ func (s *SUT) sendTransferTx(t *testing.T, from int, to int, value *big.Int) *ty
 	t.Helper()
 
 	tx := s.signTransferTx(t, from, to, value)
-	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
 	return tx
 }
 
@@ -421,7 +412,7 @@ func (s *SUT) sendDeployTx(t *testing.T, from int) *types.Transaction {
 	t.Helper()
 
 	tx := s.signDeployTx(t, from)
-	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
 	return tx
 }
 
@@ -446,7 +437,7 @@ func (s *SUT) sendCallTx(t *testing.T, from int, to common.Address, data []byte,
 	t.Helper()
 
 	tx := s.signCallTx(t, from, to, data, gas)
-	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
 	return tx
 }
 
@@ -492,7 +483,7 @@ func requireBlockContainsTxs(t *testing.T, block *blocks.Block, want ...common.H
 func (s *SUT) requireTxSucceeded(t *testing.T, tx *types.Transaction) *types.Receipt {
 	t.Helper()
 
-	receipt, err := s.ethClient.TransactionReceipt(s.ctx, tx.Hash())
+	receipt, err := s.client.TransactionReceipt(s.ctx, tx.Hash())
 	require.NoErrorf(t, err, "TransactionReceipt(%#x)", tx.Hash())
 	require.Equalf(t, types.ReceiptStatusSuccessful, receipt.Status,
 		"tx %#x must succeed (status=1)", tx.Hash())
@@ -506,7 +497,7 @@ func (s *SUT) requireTxSucceeded(t *testing.T, tx *types.Transaction) *types.Rec
 func (s *SUT) requireTxFailed(t *testing.T, tx *types.Transaction) *types.Receipt {
 	t.Helper()
 
-	receipt, err := s.ethClient.TransactionReceipt(s.ctx, tx.Hash())
+	receipt, err := s.client.TransactionReceipt(s.ctx, tx.Hash())
 	require.NoErrorf(t, err, "TransactionReceipt(%#x)", tx.Hash())
 	require.Equalf(t, types.ReceiptStatusFailed, receipt.Status,
 		"tx %#x must revert (status=0)", tx.Hash())
@@ -524,7 +515,7 @@ func (s *SUT) requireDeploySucceeded(t *testing.T, tx *types.Transaction) {
 	require.NotEqualf(t, (common.Address{}), receipt.ContractAddress,
 		"successful deploy must populate ContractAddress")
 
-	code, err := s.ethClient.CodeAt(s.ctx, receipt.ContractAddress, nil)
+	code, err := s.client.CodeAt(s.ctx, receipt.ContractAddress, nil)
 	require.NoErrorf(t, err, "CodeAt(%s)", receipt.ContractAddress)
 	require.NotEmptyf(t, code, "successful deploy at %s must leave code on chain", receipt.ContractAddress)
 }
@@ -542,7 +533,7 @@ func (s *SUT) requireDeployFailed(t *testing.T, tx *types.Transaction) {
 	receipt := s.requireTxFailed(t, tx)
 	// receipt.ContractAddress is still derived from (sender, nonce) even
 	// for failed deploys; assert the address has no code.
-	code, err := s.ethClient.CodeAt(s.ctx, receipt.ContractAddress, nil)
+	code, err := s.client.CodeAt(s.ctx, receipt.ContractAddress, nil)
 	require.NoErrorf(t, err, "CodeAt(%s)", receipt.ContractAddress)
 	require.Emptyf(t, code, "failed deploy must leave no code at %s", receipt.ContractAddress)
 }
@@ -614,11 +605,11 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	)
 
 	// Pre-activation: target is empty (no balance, no storage).
-	preBalance, err := sut.ethClient.BalanceAt(sut.ctx, target, nil)
+	preBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	require.Zero(t, preBalance.Sign(), "target balance must be 0 before activation")
 
-	preStorage, err := sut.ethClient.StorageAt(sut.ctx, target, storageSlot, nil)
+	preStorage, err := sut.client.StorageAt(sut.ctx, target, storageSlot, nil)
 	require.NoError(t, err)
 	require.Equal(t, common.Hash{}.Bytes(), preStorage, "storage slot must be empty before activation")
 
@@ -632,12 +623,12 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	_ = sut.buildAndAcceptBlock(t)
 
 	// Post-activation: balance + storage reflect the StateUpgrade exactly.
-	postBalance, err := sut.ethClient.BalanceAt(sut.ctx, target, nil)
+	postBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	require.Zerof(t, postBalance.Cmp(balanceBump),
 		"target balance must reflect StateUpgrade balance bump (want=%s got=%s)", balanceBump, postBalance)
 
-	postStorage, err := sut.ethClient.StorageAt(sut.ctx, target, storageSlot, nil)
+	postStorage, err := sut.client.StorageAt(sut.ctx, target, storageSlot, nil)
 	require.NoError(t, err)
 	require.Equal(t, storageValue.Bytes(), postStorage, "storage slot must reflect the StateUpgrade")
 }

@@ -337,6 +337,11 @@ const (
 )
 
 func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	ethExtras := subnetevmapi.NewEthExtrasAPI(v.VM.GethRPCBackends())
+	if err := v.VM.RPCServer().RegisterName("eth", ethExtras); err != nil {
+		return nil, fmt.Errorf("RPCServer.RegisterName(\"eth\", *EthExtrasAPI): %w", err)
+	}
+
 	m, err := v.VM.CreateHandlers(ctx)
 	if err != nil {
 		return nil, err

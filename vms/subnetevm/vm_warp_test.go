@@ -242,7 +242,7 @@ func (s *SUT) sendWarpTx(
 		AccessList: accessList,
 	})
 
-	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
 	return tx
 }
 

@@ -138,7 +138,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	// returns ErrCannotMint, producing a status=failed receipt with no
 	// balance change. The admin's call succeeds and credits `target` by
 	// exactly `mintAmount`.
-	preBalance, err := sut.ethClient.BalanceAt(sut.ctx, target, nil)
+	preBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	require.Zero(t, preBalance.Sign(), "target balance must be 0 before any mint")
 
@@ -149,7 +149,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	sut.requireTxSucceeded(t, adminMint)
 	sut.requireTxFailed(t, nonAdminMint)
 
-	postBalance, err := sut.ethClient.BalanceAt(sut.ctx, target, nil)
+	postBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	require.Zerof(t, postBalance.Cmp(mintAmount),
 		"target balance must reflect exactly one successful mint (want=%s got=%s)", mintAmount, postBalance)
@@ -173,7 +173,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, postDisableMint.Hash(), block.Transactions()[0].Hash())
 
-	postDisableBalance, err := sut.ethClient.BalanceAt(sut.ctx, target, nil)
+	postDisableBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	require.Zerof(t, postDisableBalance.Cmp(mintAmount),
 		"target balance must be unchanged after the precompile was disabled (want=%s got=%s)", mintAmount, postDisableBalance)
@@ -212,7 +212,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	sut.requireTxSucceeded(t, managerMint)
 
 	// Manager mint credited `target` by another `mintAmount`.
-	postReenableBalance, err := sut.ethClient.BalanceAt(sut.ctx, target, nil)
+	postReenableBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	want := new(big.Int).Mul(mintAmount, big.NewInt(2))
 	require.Zerof(t, postReenableBalance.Cmp(want),

@@ -65,7 +65,7 @@ func sendTippedTransferTxTo(t *testing.T, sut *SUT, from int, to common.Address,
 	t.Helper()
 
 	tx := signTippedTransferTxTo(t, sut, from, to, value)
-	require.NoError(t, sut.ethClient.SendTransaction(sut.ctx, tx))
+	require.NoError(t, sut.client.SendTransaction(sut.ctx, tx))
 	return tx
 }
 
@@ -81,7 +81,7 @@ func sendRewardManagerTx(t *testing.T, sut *SUT, from int, calldata []byte) *typ
 
 func balanceOf(t *testing.T, sut *SUT, addr common.Address) *big.Int {
 	t.Helper()
-	bal, err := sut.ethClient.BalanceAt(sut.ctx, addr, nil)
+	bal, err := sut.client.BalanceAt(sut.ctx, addr, nil)
 	require.NoError(t, err)
 	return bal
 }
