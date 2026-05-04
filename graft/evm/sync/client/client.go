@@ -32,6 +32,9 @@ import (
 const (
 	failedRequestSleepInterval = 10 * time.Millisecond
 
+	// requestTimeout caps how long to wait for one peer before retrying another.
+	requestTimeout = 30 * time.Second
+
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
@@ -356,16 +359,18 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			nodeID   ids.NodeID
 			start    = time.Now()
 		)
+		reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 		if len(c.stateSyncNodes) == 0 {
-			response, nodeID, err = c.network.SendSyncedAppRequestAny(ctx, StateSyncVersion, requestBytes)
+			response, nodeID, err = c.network.SendSyncedAppRequestAny(reqCtx, StateSyncVersion, requestBytes)
 		} else {
 			// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
 			// we do this every attempt to ensure we get a different node each time if possible.
 			nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
 			nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
 
-			response, err = c.network.SendSyncedAppRequest(ctx, nodeID, requestBytes)
+			response, err = c.network.SendSyncedAppRequest(reqCtx, nodeID, requestBytes)
 		}
+		cancel()
 		metric.UpdateRequestLatency(time.Since(start))
 
 		if err != nil {
