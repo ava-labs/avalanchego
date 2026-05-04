@@ -10,7 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var _ UnsignedTx = (*RewardValidatorTx)(nil)
+var (
+	_ UnsignedTx = (*RewardValidatorTx)(nil)
+	_ RewardTx   = (*RewardValidatorTx)(nil)
+)
 
 // RewardValidatorTx is a transaction that represents a proposal to
 // remove a validator that is currently validating from the validator set.
@@ -27,6 +30,10 @@ type RewardValidatorTx struct {
 	TxID ids.ID `serialize:"true" json:"txID"`
 
 	unsignedBytes []byte // Unsigned byte representation of this data
+}
+
+func (tx *RewardValidatorTx) StakerTxID() ids.ID {
+	return tx.TxID
 }
 
 func (tx *RewardValidatorTx) SetBytes(unsignedBytes []byte) {
