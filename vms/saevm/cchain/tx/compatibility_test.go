@@ -5,6 +5,7 @@ package tx_test
 
 import (
 	"encoding/json"
+	"math"
 	"math/big"
 	"testing"
 
@@ -15,7 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
@@ -24,10 +27,17 @@ import (
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
-// fuzz seeds f with [NewTxs] and fuzzes the test.
+// fuzz seeds f with [NewTxs], specifies simple alphabets used to bias the
+// fuzzer, and fuzzes the test.
 func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
 	fuzzer := &txtest.F{
 		F: f,
+		Addresses: []common.Address{
+			{1},
+		},
+		AssetIDs: []ids.ID{
+			AVAXAssetID,
+		},
 	}
 	for _, tx := range NewTxs {
 		fuzzer.Add(tx)
@@ -128,8 +138,7 @@ func (s *asOpStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
 }
 
 func (*asOpStateDB) GetBalance(common.Address) *uint256.Int {
-	// Large enough to never underflow, but small enough to never overflow.
-	return new(uint256.Int).Lsh(uint256.NewInt(1), 128)
+	return largeUint256()
 }
 
 func (*asOpStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
@@ -137,8 +146,7 @@ func (*asOpStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {
 func (*asOpStateDB) SubBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
 
 func (*asOpStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int {
-	// Large enough to never underflow, but small enough to never overflow.
-	return new(big.Int).Lsh(big.NewInt(1), 128)
+	return largeBigInt()
 }
 
 func (s *asOpStateDB) SetNonce(addr common.Address, nonce uint64) {
@@ -165,3 +173,50 @@ func FuzzAtomicRequestsCompatibility(f *testing.F) {
 		assert.Equal(t, wantRequests, gotRequests, "requests")
 	})
 }
+
+func FuzzTransferNonAVAXCompatibility(f *testing.F) {
+	fuzz(f, func(t *testing.T, newTx *Tx) {
+		op, err := newTx.AsOp(AVAXAssetID)
+		if err != nil {
+			t.Skip("invalid tx")
+		}
+
+		oldState := NewEmptyStateDB(t)
+		newState := NewEmptyStateDB(t)
+		states := []*extstate.StateDB{oldState, newState}
+
+		if tx, ok := newTx.Unsigned.(*Export); ok {
+			for _, in := range tx.Ins {
+				// Coreth silently overflows the nonce, whereas SAE will leave
+				// the nonce unmodified. This difference doesn't matter on live
+				// networks.
+				if in.Nonce == math.MaxUint64 {
+					t.Skip("nonce overflow")
+				}
+
+				for _, state := range states {
+					state.AddBalance(in.Address, largeUint256())
+					state.SetNonce(in.Address, in.Nonce)
+					state.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), largeBigInt())
+				}
+			}
+		}
+
+		var (
+			oldTx = ToOldTx(t, newTx)
+			ctx   = &snow.Context{AVAXAssetID: AVAXAssetID}
+		)
+		require.NoErrorf(t, oldTx.EVMStateTransfer(ctx, oldState), "%T.EVMStateTransfer()", oldTx)
+		require.NoErrorf(t, newTx.TransferNonAVAX(AVAXAssetID, newState), "%T.TransferNonAVAX()", newTx)
+		require.NoErrorf(t, op.ApplyTo(newState.StateDB), "%T.ApplyTo(%T)", op, newState.StateDB)
+
+		if diff := CompareStateDBs(oldState, newState); diff != "" {
+			t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", newTx, diff)
+		}
+	})
+}
+
+// largeUint256 and largeBigInt return a balance large enough to never underflow
+// but small enough to never overflow during test arithmetic.
+func largeUint256() *uint256.Int { return new(uint256.Int).Lsh(uint256.NewInt(1), 128) }
+func largeBigInt() *big.Int      { return new(big.Int).Lsh(big.NewInt(1), 128) }

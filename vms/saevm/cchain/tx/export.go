@@ -6,12 +6,14 @@ package tx
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 
 	// Imported for [atomic.UnsignedExportTx.Burned] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -135,4 +137,23 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 		elems[i] = elem
 	}
 	return e.DestinationChain, &chainsatomic.Requests{PutRequests: elems}, nil
+}
+
+var errInsufficientFunds = errors.New("insufficient funds")
+
+// TransferNonAVAX subtracts the non-AVAX balances from the statedb.
+func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+	for _, in := range e.Ins {
+		if in.AssetID == avaxAssetID {
+			continue
+		}
+
+		coinID := common.Hash(in.AssetID)
+		amount := new(big.Int).SetUint64(in.Amount)
+		if balance := statedb.GetBalanceMultiCoin(in.Address, coinID); balance.Cmp(amount) < 0 {
+			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, coinID, balance, amount)
+		}
+		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
+	}
+	return nil
 }

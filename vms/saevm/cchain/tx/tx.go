@@ -15,6 +15,7 @@ import (
 	// Imported for [atomic.TxBytesGas] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -36,9 +37,15 @@ type Tx struct {
 
 // Unsigned is a common interface implemented by [Import] and [Export].
 //
-// TODO(StephenButtolph): Expand this interface to include UTXO handling,
-// verification, and state execution.
+// TODO(StephenButtolph): Expand this interface to include UTXO handling and
+// verification.
 type Unsigned interface {
+	// TransferNonAVAX transfers the non-AVAX balances requested by this
+	// transaction.
+	//
+	// Non-AVAX transfers were only allowed prior to the Banff upgrade.
+	TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
+
 	// burned returns the amount of assetID that is consumed but not produced by
 	// this transaction.
 	burned(assetID ids.ID) (uint64, error)
@@ -47,8 +54,8 @@ type Unsigned interface {
 	// transaction.
 	numSigs() (uint64, error)
 
-	// asOp returns the operation that this transaction performs on the EVM
-	// state.
+	// asOp returns the operation that this transaction performs on the
+	// EVM-native state. Ops do not include any non-AVAX balance changes.
 	asOp(avaxAssetID ids.ID) (op, error)
 
 	// atomicRequests returns the operations that should be applied to shared
