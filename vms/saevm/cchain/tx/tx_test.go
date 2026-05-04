@@ -1332,6 +1332,21 @@ func NewEmptyStateDB(t testing.TB) *extstate.StateDB {
 	return extstate.New(sdb)
 }
 
+func CompareStateDBs(want, got *extstate.StateDB) string {
+	// Finalize the trie structures so that the state DB comparison includes
+	// any changes.
+	for _, v := range []*extstate.StateDB{want, got} {
+		v.Finalise(true)
+		v.IntermediateRoot(true)
+	}
+
+	opts := []cmp.Option{
+		cmpopts.IgnoreUnexported(extstate.StateDB{}),
+		cmputils.StateDBs(),
+	}
+	return cmp.Diff(want, got, opts...)
+}
+
 func TestTransferNonAVAX(t *testing.T) {
 	var (
 		alice = common.Address{1}
@@ -1461,13 +1476,18 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "export_non_avax_total_insufficient",
 			init: map[common.Address]map[ids.ID]uint64{
 				alice: {
-					btc: 1,
+					btc: 2,
 				},
 			},
 			tx: &Export{
 				Ins: []Input{
 					{Address: alice, Amount: 1, AssetID: btc},
-					{Address: alice, Amount: 1, AssetID: btc},
+					{Address: alice, Amount: 2, AssetID: btc},
+				},
+			},
+			want: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 1,
 				},
 			},
 			wantErr: errInsufficientFunds,
@@ -1476,27 +1496,28 @@ func TestTransferNonAVAX(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				state = NewEmptyStateDB(t)
+				want  = NewEmptyStateDB(t)
 				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
 			)
-			for addr, balances := range test.init {
+			for addr, balances := range test.want {
 				for assetID, amount := range balances {
 					coinID := common.Hash(assetID)
-					state.AddBalanceMultiCoin(addr, coinID, toBig(amount))
+					want.AddBalanceMultiCoin(addr, coinID, toBig(amount))
 				}
 			}
 
-			err := test.tx.TransferNonAVAX(AVAXAssetID, state)
-			require.ErrorIs(t, err, test.wantErr)
-			for _, addr := range []common.Address{alice, bob} {
-				for _, asset := range []ids.ID{AVAXAssetID, btc, eth} {
-					want := toBig(test.want[addr][asset])
-					coinID := common.Hash(asset)
-					got := state.GetBalanceMultiCoin(addr, coinID)
-					if diff := cmp.Diff(want, got, cmputils.BigInts()); diff != "" {
-						t.Errorf("%T.GetBalanceMultiCoin(%s, %s) diff (-want +got):\n%s", state, addr, coinID, diff)
-					}
+			got := NewEmptyStateDB(t)
+			for addr, balances := range test.init {
+				for assetID, amount := range balances {
+					coinID := common.Hash(assetID)
+					got.AddBalanceMultiCoin(addr, coinID, toBig(amount))
 				}
+			}
+
+			err := test.tx.TransferNonAVAX(AVAXAssetID, got)
+			require.ErrorIs(t, err, test.wantErr)
+			if diff := CompareStateDBs(want, got); diff != "" {
+				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", test.tx, diff)
 			}
 		})
 	}
