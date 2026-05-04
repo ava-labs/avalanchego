@@ -107,7 +107,7 @@ func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) 
 		if err != nil {
 			return nil, fmt.Errorf("getting sender of tx %s (%d): %w", t.Hash(), i, err)
 		}
-		inputs.Add(tx.NonceInputID(sender, t.Nonce()))
+		inputs.Add(tx.AccountInputID(sender, t.Nonce()))
 	}
 
 	atomicTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))

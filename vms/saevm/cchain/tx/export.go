@@ -43,22 +43,6 @@ type Export struct {
 	ExportedOutputs  []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
-func (e *Export) InputUTXOs() set.Set[ids.ID] {
-	set := set.NewSet[ids.ID](len(e.Ins))
-	for _, in := range e.Ins {
-		set.Add(NonceInputID(in.Address, in.Nonce))
-	}
-	return set
-}
-
-func NonceInputID(address common.Address, nonce uint64) ids.ID {
-	var id ids.ID
-	packer := wrappers.Packer{Bytes: id[:]} // 32 bytes long
-	packer.PackLong(nonce)                  // add 8 bytes
-	packer.PackBytes(address.Bytes())       // add 24 bytes
-	return id
-}
-
 // Input identifies an account + nonce pair on the C-Chain that authorizes the
 // asset and quantity to deduct.
 //

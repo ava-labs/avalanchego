@@ -42,14 +42,6 @@ type Import struct {
 	Outs           []Output                  `serialize:"true" json:"outputs"`
 }
 
-func (i *Import) InputUTXOs() set.Set[ids.ID] {
-	set := set.NewSet[ids.ID](len(i.ImportedInputs))
-	for _, in := range i.ImportedInputs {
-		set.Add(in.InputID())
-	}
-	return set
-}
-
 // Output specifies an account on the C-Chain whose balance of the specified
 // asset should be increased.
 //
