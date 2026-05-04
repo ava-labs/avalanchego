@@ -19,16 +19,14 @@ flowchart TB
     saevm["SAE VM"]
 
     subgraph cchain["CChain VM"]
-        direction LR
+        direction TB
         cc_rpc["/avax"]
         cc_pool[("Import/Export<br/>txpool")]
         cc_hook["hook.Points"]
         cc_warp_store[("warp storage")]
     end
 
-    consensus --> saevm
-    p2pin --> saevm
-    httpd --> saevm
+    avago --> saevm
     httpd --> cc_rpc
     p2pin --> cc_pool
     p2pin --> cc_warp_store
