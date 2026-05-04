@@ -16,12 +16,7 @@ flowchart TB
         consensus <--> p2pin
     end
 
-    subgraph saevm["SAE VM"]
-        direction TB
-        sae_block["block lifecycle"]
-        sae_mempool["EVM mempool"]
-        sae_rpc["EVM JSON-RPC<br/><i>eth_*, web3_*, &hellip;</i>"]
-    end
+    saevm["SAE VM"]
 
     subgraph cchain["CChain VM"]
         direction TB
@@ -31,20 +26,20 @@ flowchart TB
         cc_hook["hook.Points"]
     end
 
-    consensus --> sae_block
-    p2pin --> sae_mempool
+    consensus --> saevm
+    p2pin --> saevm
     p2pin --> cc_iegossip
     p2pin --> cc_warp
-    httpd --> sae_rpc
+    httpd --> saevm
     httpd --> cc_rpc
 
-    sae_block -.->|"during block building"| cc_hook
+    saevm -.->|"during block building"| cc_hook
 ```
 
 The three services and their integration points:
 
 - **AvalancheGo** — the host node. Drives consensus, multiplexes inbound p2p messages by handler ID, and serves HTTP/JSON-RPC.
-- **SAE VM** — the generic streaming-asynchronous EVM service ([saevm](../)). Exposes a block lifecycle (entered by consensus), an EVM mempool (fed by the p2p EVM-tx gossip handler), and standard EVM JSON-RPC. It owns the execution-and-settlement pipeline from [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution) internally.
+- **SAE VM** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). AvalancheGo drives it via consensus, p2p messages, and `eth_*` JSON-RPC; SAE in turn calls into `hook.Points` during block building.
 - **CChain VM** — the C-Chain-specific service (this package). Exposes the `/avax` JSON-RPC API ([api](api/)), two p2p handlers (Import/Export transaction gossip and ACP-118 warp signatures, see [warp](warp/)), and `hook.Points` ([hook](hook/)) — the seam the SAE VM calls into for chain-specific block-building behavior.
 
 The only cross-service call between the two VM services is SAE VM → CChain VM, through `hook.Points`. Everything else fans in from AvalancheGo. Internal state behind these integration points — the Import/Export [txpool](txpool/) and warp message [storage](warp/) — is detailed in [the next section](#how-transactions-enter-the-mempool).
