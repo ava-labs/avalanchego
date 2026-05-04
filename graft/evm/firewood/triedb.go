@@ -417,6 +417,73 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	return nil
 }
 
+// DumpProposal returns a textual dump of the tracked Firewood proposal for root.
+// This is intended for debugging and forensic analysis.
+func (t *TrieDB) DumpProposal(root common.Hash) (string, error) {
+	t.proposals.Lock()
+
+	proposals, ok := t.proposals.byStateRoot[root]
+	if ok && len(proposals) > 0 {
+		for _, p := range proposals {
+			if p.handle != nil {
+				dump, err := p.handle.Dump()
+				t.proposals.Unlock()
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("# source=byStateRoot root=%s\n%s", root.Hex(), dump), nil
+			}
+		}
+	}
+
+	for key, p := range t.possible {
+		if key.root != root || p == nil || p.handle == nil {
+			continue
+		}
+		dump, err := p.handle.Dump()
+		t.proposals.Unlock()
+		if err != nil {
+			return "", fmt.Errorf("dumping possible proposal for root %s (parent block %s): %w", root.Hex(), key.parentBlockHash.Hex(), err)
+		}
+		return fmt.Sprintf("# source=possible parent_block=%s\n%s", key.parentBlockHash.Hex(), dump), nil
+	}
+
+	if t.proposals.tree != nil && t.proposals.tree.handle != nil {
+		treeRoot := t.proposals.tree.root
+		dump, err := t.proposals.tree.handle.Dump()
+		t.proposals.Unlock()
+		if err != nil {
+			return "", fmt.Errorf("dumping current tree proposal while root %s was missing: %w", root.Hex(), err)
+		}
+		return fmt.Sprintf("# source=tree requested_root=%s current_tree_root=%s\n%s", root.Hex(), treeRoot.Hex(), dump), nil
+	}
+
+	t.proposals.Unlock()
+
+	// The remaining lookups use only Firewood FFI (no proposals state),
+	// so we don't need to hold the proposals lock.
+	revision, err := t.Firewood.Revision(ffi.Hash(root))
+	if err == nil {
+		defer func() {
+			if err := revision.Drop(); err != nil {
+				log.Debug("failed to drop revision after dump", "root", root.Hex(), "err", err)
+			}
+		}()
+		dump, err := revision.Dump()
+		if err != nil {
+			return "", fmt.Errorf("dumping persisted revision for root %s: %w", root.Hex(), err)
+		}
+		return fmt.Sprintf("# source=revision root=%s\n%s", root.Hex(), dump), nil
+	}
+
+	dump, dumpErr := t.Firewood.Dump()
+	if dumpErr == nil {
+		return fmt.Sprintf("# source=database requested_root=%s current_root=%s\n%s", root.Hex(), common.Hash(t.Firewood.Root()).Hex(), dump), nil
+	}
+
+	return "", fmt.Errorf("%w for root %s (no active handle in byStateRoot/possible/tree; revision_err=%v; database_dump_err=%v)", errNoProposalFound, root.Hex(), err, dumpErr)
+}
+
 func (ps *proposals) findProposalToCommitWhenLocked(root common.Hash) (*proposal, error) {
 	var candidate *proposal
 

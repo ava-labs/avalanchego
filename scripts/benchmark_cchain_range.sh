@@ -285,7 +285,7 @@ if [[ -n "${CHAOS_MODE:-}" ]]; then
         --max-wait-time="${MAX_WAIT_TIME}" \
         --config="${CONFIG}"
 else
-    go run github.com/ava-labs/avalanchego/tests/reexecute/c \
+    go run ./tests/reexecute/c \
         --block-dir="${BLOCK_DIR}" \
         --current-state-dir="${CURRENT_STATE_DIR}" \
         ${RUNNER_TYPE:+--runner="${RUNNER_TYPE}"} \

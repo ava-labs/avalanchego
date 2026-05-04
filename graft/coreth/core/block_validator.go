@@ -30,15 +30,22 @@ package core
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/log"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
 )
+
+const dumpOnBlockHeightEnvVar = "DUMP_ON_BLOCK_HEIGHT"
 
 // BlockValidator is responsible for validating block headers, uncles and
 // processed state.
@@ -48,16 +55,34 @@ type BlockValidator struct {
 	config *params.ChainConfig // Chain configuration options
 	bc     *BlockChain         // Canonical block chain
 	engine consensus.Engine    // Consensus engine used for validating
+
+	dumpOnBlockHeight maybe.Maybe[uint64]
 }
 
 // NewBlockValidator returns a new block validator which is safe for re-use
 func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine) *BlockValidator {
 	validator := &BlockValidator{
-		config: config,
-		engine: engine,
-		bc:     blockchain,
+		config:            config,
+		engine:            engine,
+		bc:                blockchain,
+		dumpOnBlockHeight: parseDumpOnBlockHeight(),
 	}
 	return validator
+}
+
+func parseDumpOnBlockHeight() maybe.Maybe[uint64] {
+	dumpHeightStr, ok := os.LookupEnv(dumpOnBlockHeightEnvVar)
+	if !ok {
+		return maybe.Nothing[uint64]()
+	}
+
+	dumpHeight, err := strconv.ParseUint(dumpHeightStr, 10, 64)
+	if err != nil {
+		log.Warn("invalid "+dumpOnBlockHeightEnvVar, "value", dumpHeightStr, "err", err)
+		return maybe.Nothing[uint64]()
+	}
+
+	return maybe.Some(dumpHeight)
 }
 
 // ValidateBody validates the given block's uncles and verifies the block
@@ -136,9 +161,30 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.StateD
 	if receiptSha != header.ReceiptHash {
 		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash, receiptSha)
 	}
+
+	root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number))
+	if v.dumpOnBlockHeight.HasValue() && block.NumberU64() == v.dumpOnBlockHeight.Value() {
+		dumpHeight := v.dumpOnBlockHeight.Value()
+		backend := statedb.Database().TrieDB().Backend()
+		if tdb, ok := backend.(*firewood.TrieDB); ok {
+			proposalDump, err := tdb.DumpProposal(root)
+			if err != nil {
+				log.Warn("failed to dump firewood proposal",
+					"env", dumpOnBlockHeightEnvVar, "height", dumpHeight,
+					"block", block.NumberU64(), "hash", block.Hash(),
+					"root", root.Hex(), "err", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "BEGIN %s=%d block=%d hash=%s remote_root=%s local_root=%s\n%s\nEND %s\n", dumpOnBlockHeightEnvVar, dumpHeight, block.NumberU64(), block.Hash(), header.Root.Hex(), root.Hex(), proposalDump, dumpOnBlockHeightEnvVar)
+			}
+		} else {
+			log.Warn(dumpOnBlockHeightEnvVar+" set but trie backend is not firewood",
+				"height", dumpHeight, "backend", fmt.Sprintf("%T", backend))
+		}
+	}
+
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
-	if root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number)); header.Root != root {
+	if header.Root != root {
 		return fmt.Errorf("invalid merkle root (remote: %x local: %x) dberr: %w", header.Root, root, statedb.Error())
 	}
 	return nil
