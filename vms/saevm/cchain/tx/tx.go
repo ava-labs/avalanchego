@@ -54,8 +54,8 @@ type Unsigned interface {
 	// transaction.
 	numSigs() (uint64, error)
 
-	// asOp returns the operation that this transaction performs on the EVM
-	// state.
+	// asOp returns the operation that this transaction performs on the
+	// EVM-native state. Ops do not include any non-AVAX balance changes.
 	asOp(avaxAssetID ids.ID) (op, error)
 
 	// atomicRequests returns the operations that should be applied to shared
