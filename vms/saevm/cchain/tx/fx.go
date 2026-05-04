@@ -41,6 +41,8 @@ var _ secp256k1fx.UnsignedTx = (*fxTx)(nil)
 type fxTx []byte
 
 func toFxTx(u Unsigned) (fxTx, error) {
+	// We MUST provide a pointer to u so that the returned slice is prefixed
+	// with type ID.
 	b, err := c.Marshal(codecVersion, &u)
 	if err != nil {
 		return nil, err
