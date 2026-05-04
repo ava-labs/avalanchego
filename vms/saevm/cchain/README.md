@@ -19,38 +19,34 @@ flowchart TB
     saevm["SAE VM"]
 
     subgraph cchain["CChain VM"]
-        direction TB
+        direction LR
         cc_rpc["/avax"]
-        cc_iegossip["Import/Export<br/>gossip handler"]
-        cc_warp["warp signature<br/>handler"]
         cc_pool[("Import/Export<br/>txpool")]
-        cc_warp_store[("warp storage")]
         cc_hook["hook.Points"]
+        cc_warp_store[("warp storage")]
     end
 
     consensus --> saevm
     p2pin --> saevm
-    p2pin --> cc_iegossip
-    p2pin --> cc_warp
     httpd --> saevm
     httpd --> cc_rpc
+    p2pin --> cc_pool
+    p2pin --> cc_warp_store
 
-    saevm -.->|"during block building"| cc_hook
+    saevm -.-> cc_hook
 
     cc_rpc --> cc_pool
-    cc_iegossip --> cc_pool
-    cc_pool --> cc_hook
+    cc_hook --> cc_pool
     cc_hook --> cc_warp_store
-    cc_warp_store --> cc_warp
 ```
 
 The three services and their integration points:
 
 - **AvalancheGo** — the host node. Drives consensus, multiplexes inbound p2p messages by handler ID, and serves HTTP/JSON-RPC.
-- **SAE VM** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). AvalancheGo drives it via consensus, p2p messages, and `eth_*` JSON-RPC; SAE in turn calls into `hook.Points` during block building.
-- **CChain VM** — the C-Chain-specific service (this package). Exposes the `/avax` JSON-RPC API ([api](api/)), two p2p handlers (Import/Export transaction gossip and ACP-118 warp signatures, see [warp](warp/)), and `hook.Points` ([hook](hook/)) — the seam the SAE VM calls into for chain-specific block-building behavior.
+- **SAE VM** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). AvalancheGo drives it via consensus, p2p messages, and `eth_*` JSON-RPC; SAE in turn calls into `hook.Points` for chain-specific behavior.
+- **CChain VM** — the C-Chain-specific service (this package). Exposes the `/avax` JSON-RPC API ([api](api/)) and `hook.Points` ([hook](hook/)), the seam the SAE VM calls into. AvalancheGo's p2p also delivers Import/Export gossip into the [txpool](txpool/) and reads ACP-118 signature data from warp [storage](warp/).
 
-The only cross-service call between the two VM services is SAE VM → CChain VM, through `hook.Points`. From there, `hook.Points` reaches the rest of the CChain VM through two stores: the Import/Export [txpool](txpool/) — written by `/avax` and the gossip handler, read by `hook.Points` to pull tx candidates during block building — and warp [storage](warp/), where `hook.Points` persists messages emitted during execution and the warp signature handler answers peer requests from. The txpool flow is detailed further in [the next section](#how-transactions-enter-the-mempool).
+The only cross-service call between the two VM services is SAE VM → CChain VM, through `hook.Points`. `hook.Points` then reaches the rest of the CChain VM through two stores: the Import/Export [txpool](txpool/) (also written by `/avax` and AvalancheGo's p2p Import/Export gossip; read by `hook.Points` for tx candidates) and warp message [storage](warp/) (written by `hook.Points` for messages emitted during execution; read by AvalancheGo's p2p to answer signature requests). The txpool flow is detailed further in [the next section](#how-transactions-enter-the-mempool).
 
 ## What `cchain` adds
 
