@@ -1724,6 +1724,10 @@ func TestSanityCheck(t *testing.T) {
 			tx:   validImport(),
 		},
 		{
+			name: "import_valid_pchain",
+			tx:   imp(func(i *Import) { i.SourceChain = constants.PlatformChainID }),
+		},
+		{
 			name: "import_mainnet",
 			tx:   Tests[0].New.Unsigned,
 		},
@@ -1778,7 +1782,29 @@ func TestSanityCheck(t *testing.T) {
 			wantErr: errFlowCheckFailed,
 		},
 		{
-			name: "import_inputs_not_sorted_unique",
+			name: "import_inputs_not_unique",
+			tx: imp(func(i *Import) {
+				i.ImportedInputs = []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{TxID: ids.ID{1}},
+						Asset:  avax.Asset{ID: ctx.AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 50,
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{TxID: ids.ID{1}},
+						Asset:  avax.Asset{ID: ctx.AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 50,
+						},
+					},
+				}
+			}),
+			wantErr: errInputsNotSortedUnique,
+		},
+		{
+			name: "import_inputs_not_sorted",
 			tx: imp(func(i *Import) {
 				i.ImportedInputs = []*avax.TransferableInput{
 					{
@@ -1800,7 +1826,7 @@ func TestSanityCheck(t *testing.T) {
 			wantErr: errInputsNotSortedUnique,
 		},
 		{
-			name: "import_outputs_not_sorted_unique",
+			name: "import_outputs_not_unique",
 			tx: imp(func(i *Import) {
 				i.Outs = []Output{
 					{Amount: 50, AssetID: ctx.AVAXAssetID},
@@ -1810,8 +1836,37 @@ func TestSanityCheck(t *testing.T) {
 			wantErr: errOutputsNotSortedUnique,
 		},
 		{
+			name: "import_outputs_not_sorted",
+			tx: imp(func(i *Import) {
+				i.Outs = []Output{
+					{Address: common.Address{2}, Amount: 50, AssetID: ctx.AVAXAssetID},
+					{Address: common.Address{1}, Amount: 50, AssetID: ctx.AVAXAssetID},
+				}
+			}),
+			wantErr: errOutputsNotSortedUnique,
+		},
+		{
 			name: "export_valid",
 			tx:   validExport(),
+		},
+		{
+			name: "export_valid_pchain",
+			tx:   exp(func(e *Export) { e.DestinationChain = constants.PlatformChainID }),
+		},
+		{
+			name: "export_valid_outputs_not_unique",
+			tx: exp(func(e *Export) {
+				e.ExportedOutputs = []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Out:   &secp256k1fx.TransferOutput{Amt: 50},
+					},
+					{
+						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						Out:   &secp256k1fx.TransferOutput{Amt: 50},
+					},
+				}
+			}),
 		},
 		{
 			name: "export_mainnet",
@@ -1868,11 +1923,21 @@ func TestSanityCheck(t *testing.T) {
 			wantErr: errFlowCheckFailed,
 		},
 		{
-			name: "export_inputs_not_sorted_unique",
+			name: "export_inputs_not_unique",
 			tx: exp(func(e *Export) {
 				e.Ins = []Input{
 					{Amount: 50, AssetID: ctx.AVAXAssetID},
 					{Amount: 50, AssetID: ctx.AVAXAssetID},
+				}
+			}),
+			wantErr: errInputsNotSortedUnique,
+		},
+		{
+			name: "export_inputs_not_sorted",
+			tx: exp(func(e *Export) {
+				e.Ins = []Input{
+					{Address: common.Address{2}, Amount: 50, AssetID: ctx.AVAXAssetID},
+					{Address: common.Address{1}, Amount: 50, AssetID: ctx.AVAXAssetID},
 				}
 			}),
 			wantErr: errInputsNotSortedUnique,

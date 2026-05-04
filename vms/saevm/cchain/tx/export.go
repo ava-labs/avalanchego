@@ -118,17 +118,14 @@ var errOutputsNotSorted = errors.New("outputs not sorted")
 // SanityCheck verifies that the transaction's structural invariants hold
 // against the chain's context and that it does not produce more funds than it
 // consumes.
-//
-// It does not verify signatures or whether the transaction performs a valid EVM
-// state transition.
 func (e *Export) SanityCheck(ctx *snow.Context) error {
 	switch {
 	case e.NetworkID != ctx.NetworkID:
-		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, ctx.NetworkID, e.NetworkID)
+		return fmt.Errorf("%w: want %d, got %d", errWrongNetworkID, ctx.NetworkID, e.NetworkID)
 	case e.BlockchainID != ctx.ChainID:
-		return fmt.Errorf("%w: expected %s, got %s", errWrongChainID, ctx.ChainID, e.BlockchainID)
+		return fmt.Errorf("%w: want %s, got %s", errWrongChainID, ctx.ChainID, e.BlockchainID)
 	case e.DestinationChain != constants.PlatformChainID && e.DestinationChain != ctx.XChainID:
-		return fmt.Errorf("%w: expected %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, e.DestinationChain)
+		return fmt.Errorf("%w: want %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, e.DestinationChain)
 	case len(e.Ins) == 0:
 		return errNoInputs
 	case len(e.ExportedOutputs) == 0:
@@ -141,7 +138,7 @@ func (e *Export) SanityCheck(ctx *snow.Context) error {
 			return fmt.Errorf("%w (%d): zero amount", errInvalidInput, i)
 		}
 		if in.AssetID != ctx.AVAXAssetID {
-			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, i, ctx.AVAXAssetID, in.AssetID)
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXInput, i, ctx.AVAXAssetID, in.AssetID)
 		}
 		fc.Consume(ctx.AVAXAssetID, in.Amount)
 	}
@@ -150,7 +147,7 @@ func (e *Export) SanityCheck(ctx *snow.Context) error {
 			return fmt.Errorf("%w (%d): %w", errInvalidOutput, i, err)
 		}
 		if assetID := out.Asset.ID; assetID != ctx.AVAXAssetID {
-			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, i, ctx.AVAXAssetID, assetID)
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXOutput, i, ctx.AVAXAssetID, assetID)
 		}
 		fc.Produce(ctx.AVAXAssetID, out.Out.Amount())
 	}
@@ -188,11 +185,11 @@ func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credenti
 		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
 	}
 	for i, in := range e.Ins {
+		// TODO(StephenButtolph): Parallelize signature verification.
 		cred := creds[i].Self()
 		if len(cred.Sigs) != 1 {
 			return fmt.Errorf("%w: expected 1, got %d", errIncorrectNumSignatures, len(cred.Sigs))
 		}
-
 		pk, err := sigCache.RecoverPublicKey(fxTx.Bytes(), cred.Sigs[0][:])
 		if err != nil {
 			return err

@@ -7,6 +7,7 @@
 package tx
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
@@ -28,6 +29,21 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
+)
+
+var (
+	errWrongNetworkID        = errors.New("wrong network ID")
+	errWrongChainID          = errors.New("wrong chain ID")
+	errNoInputs              = errors.New("no inputs")
+	errNoOutputs             = errors.New("no outputs")
+	errNotSameSubnet         = errors.New("not same subnet")
+	errInvalidInput          = errors.New("invalid input")
+	errNonAVAXInput          = errors.New("input contains non-AVAX")
+	errInvalidOutput         = errors.New("invalid output")
+	errNonAVAXOutput         = errors.New("output contains non-AVAX")
+	errFlowCheckFailed       = errors.New("flow check failed")
+	errInputsNotSortedUnique = errors.New("inputs not sorted and unique")
+	errOverflow              = errors.New("amount overflow")
 )
 
 // Tx is a signed transaction that interacts with shared memory.

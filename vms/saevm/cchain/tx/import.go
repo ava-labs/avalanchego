@@ -100,34 +100,19 @@ func (i *Import) burned(assetID ids.ID) (uint64, error) {
 	return burned, nil
 }
 
-var (
-	errWrongNetworkID         = errors.New("wrong network ID")
-	errWrongChainID           = errors.New("wrong chain ID")
-	errNoInputs               = errors.New("no inputs")
-	errNoOutputs              = errors.New("no outputs")
-	errNotSameSubnet          = errors.New("not same subnet")
-	errInvalidInput           = errors.New("invalid input")
-	errNonAVAXInput           = errors.New("input contains non-AVAX")
-	errInvalidOutput          = errors.New("invalid output")
-	errNonAVAXOutput          = errors.New("output contains non-AVAX")
-	errFlowCheckFailed        = errors.New("flow check failed")
-	errInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
-	errOutputsNotSortedUnique = errors.New("outputs not sorted and unique")
-)
+var errOutputsNotSortedUnique = errors.New("outputs not sorted and unique")
 
 // SanityCheck verifies that the transaction's structural invariants hold
 // against the chain's context and that it does not produce more funds than it
 // consumes.
-//
-// It does not verify signatures or whether UTXOs exist.
 func (i *Import) SanityCheck(ctx *snow.Context) error {
 	switch {
 	case i.NetworkID != ctx.NetworkID:
-		return fmt.Errorf("%w: expected %d, got %d", errWrongNetworkID, ctx.NetworkID, i.NetworkID)
+		return fmt.Errorf("%w: want %d, got %d", errWrongNetworkID, ctx.NetworkID, i.NetworkID)
 	case i.BlockchainID != ctx.ChainID:
-		return fmt.Errorf("%w: expected %s, got %s", errWrongChainID, ctx.ChainID, i.BlockchainID)
+		return fmt.Errorf("%w: want %s, got %s", errWrongChainID, ctx.ChainID, i.BlockchainID)
 	case i.SourceChain != constants.PlatformChainID && i.SourceChain != ctx.XChainID:
-		return fmt.Errorf("%w: expected %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, i.SourceChain)
+		return fmt.Errorf("%w: want %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, i.SourceChain)
 	case len(i.ImportedInputs) == 0:
 		return errNoInputs
 	case len(i.Outs) == 0:
@@ -140,7 +125,7 @@ func (i *Import) SanityCheck(ctx *snow.Context) error {
 			return fmt.Errorf("%w (%d): %w", errInvalidInput, j, err)
 		}
 		if assetID := in.Asset.ID; assetID != ctx.AVAXAssetID {
-			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXInput, j, ctx.AVAXAssetID, assetID)
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXInput, j, ctx.AVAXAssetID, assetID)
 		}
 		fc.Consume(ctx.AVAXAssetID, in.In.Amount())
 	}
@@ -149,7 +134,7 @@ func (i *Import) SanityCheck(ctx *snow.Context) error {
 			return fmt.Errorf("%w (%d): zero amount", errInvalidOutput, j)
 		}
 		if out.AssetID != ctx.AVAXAssetID {
-			return fmt.Errorf("%w (%d): expected %s, got %s", errNonAVAXOutput, j, ctx.AVAXAssetID, out.AssetID)
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXOutput, j, ctx.AVAXAssetID, out.AssetID)
 		}
 		fc.Produce(ctx.AVAXAssetID, out.Amount)
 	}
@@ -198,6 +183,8 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 	}
 
 	for i, in := range i.ImportedInputs {
+		// TODO(StephenButtolph): Parallelize transfer verification, which
+		// includes signature verification.
 		utxo := &avax.UTXO{}
 		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
 			return fmt.Errorf("%w: %w", errUnmarshallingUTXO, err)
@@ -229,8 +216,6 @@ func (i *Import) numSigs() (uint64, error) {
 	}
 	return n, nil
 }
-
-var errOverflow = errors.New("amount overflow")
 
 func (i *Import) asOp(avaxAssetID ids.ID) (op, error) {
 	mint := make(map[common.Address]uint256.Int, len(i.Outs))
