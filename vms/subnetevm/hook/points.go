@@ -161,14 +161,20 @@ func (*Points) RequiresTransactionAdmissionCheck(rules ethparams.Rules) bool {
 //
 // SAE's `saexec.Execute` does not call `core.StateProcessor.Process` (it loops
 // `core.ApplyTransaction` from libevm directly), so this hook is the single
-// place where upgrade activations enter the per-block flow. Mutations made to
-// `state` here are committed into the block's post-execution state root, so
-// they remain consistent with [worstcase] / [Points.CanExecuteTransaction]
-// reads against the last-settled snapshot once the block settles.
+// place where upgrade activations enter the per-block flow. Mutations made
+// here are committed into the block's post-execution state root.
 //
-// `parent` provides `parent.Time` for the activation window; `rules` is
-// unused here (computed inside `ApplyUpgrades` from chain config + block
-// timestamp) but retained for symmetry with the interface.
+// Uses `parent.Time` and `statedb` rooted at `parent.PostExecutionStateRoot()`
+// -- NOT the lagged `settled.Time` / lastSettled state used by
+// [blockBuilder.resolveCoinbase] and [Points.CanExecuteTransaction]:
+// `ApplyUpgrades` requires a contiguous (parentTimestamp, blockTimestamp]
+// activation window, and the live `statedb` must carry parent's full
+// post-exec mutations into the upcoming `core.ApplyTransaction` loop. The
+// build/admit-time worst-case path tolerates the Tau lag; this
+// post-Tau execution path doesn't and shouldn't.
+//
+// `rules` is unused (recomputed inside `ApplyUpgrades`) but retained for
+// interface symmetry.
 func (p *Points) BeforeExecutingBlock(_ ethparams.Rules, parent *types.Header, statedb *state.StateDB, block *types.Block) error {
 	blockContext := subnetevmcore.NewBlockContext(block.Number(), block.Time())
 	if err := subnetevmcore.ApplyUpgrades(p.chainConfig, &parent.Time, blockContext, statedb); err != nil {
