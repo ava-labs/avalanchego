@@ -24,17 +24,9 @@ func init() {
 
 type fxVM struct{}
 
-func (fxVM) CodecRegistry() codec.Registry {
-	return linearcodec.NewDefault()
-}
-
-func (fxVM) Clock() *mockable.Clock {
-	return &mockable.Clock{}
-}
-
-func (fxVM) Logger() logging.Logger {
-	return logging.NoLog{}
-}
+func (fxVM) CodecRegistry() codec.Registry { return linearcodec.NewDefault() }
+func (fxVM) Clock() *mockable.Clock        { return &mockable.Clock{} }
+func (fxVM) Logger() logging.Logger        { return logging.NoLog{} }
 
 var _ secp256k1fx.UnsignedTx = (*fxTx)(nil)
 
