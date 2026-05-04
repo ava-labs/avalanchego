@@ -25,7 +25,7 @@ flowchart TB
 
     subgraph cchain["CChain VM"]
         direction TB
-        cc_rpc["/avax RPC API"]
+        cc_rpc["/avax"]
         cc_iegossip["Import/Export<br/>gossip handler"]
         cc_warp["warp signature<br/>handler"]
         cc_hook["hook.Points"]
