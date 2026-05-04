@@ -65,7 +65,7 @@ func sendTippedTransferTxTo(t *testing.T, sut *SUT, from int, to common.Address,
 	t.Helper()
 
 	tx := signTippedTransferTxTo(t, sut, from, to, value)
-	require.NoError(t, sut.client.SendTransaction(sut.ctx, tx))
+	require.NoError(t, sut.ethClient.SendTransaction(sut.ctx, tx))
 	return tx
 }
 
@@ -81,7 +81,7 @@ func sendRewardManagerTx(t *testing.T, sut *SUT, from int, calldata []byte) *typ
 
 func balanceOf(t *testing.T, sut *SUT, addr common.Address) *big.Int {
 	t.Helper()
-	bal, err := sut.client.BalanceAt(sut.ctx, addr, nil)
+	bal, err := sut.ethClient.BalanceAt(sut.ctx, addr, nil)
 	require.NoError(t, err)
 	return bal
 }
@@ -108,7 +108,7 @@ func TestRewardManagerDefaultBurnSAE(t *testing.T) {
 		t,
 		withFork(upgradetest.Helicon),
 		withNumAccounts(1),
-		withNow(&now),
+		withNow(now),
 	)
 
 	preBurn := balanceOf(t, sut, constants.BlackholeAddr)
@@ -137,7 +137,7 @@ func TestRewardManagerGenesisAllowFeeRecipientsSAE(t *testing.T) {
 		t,
 		withFork(upgradetest.Helicon),
 		withNumAccounts(1),
-		withNow(&now),
+		withNow(now),
 		withFeeRecipient(validator),
 		withGenesisConfig(func(genesis *core.Genesis, _ []common.Address) {
 			subnetevmparams.GetExtra(genesis.Config).AllowFeeRecipients = true
@@ -192,7 +192,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 		t,
 		withFork(upgradetest.Helicon),
 		withNumAccounts(2),
-		withNow(&now),
+		withNow(now),
 		withFeeRecipient(validator),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			subnetevmparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
@@ -340,7 +340,7 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 			opts := append([]sutOption{
 				withFork(upgradetest.Helicon),
 				withNumAccounts(1),
-				withNow(&now),
+				withNow(now),
 			}, test.opts...)
 			sut := newSUT(t, opts...)
 

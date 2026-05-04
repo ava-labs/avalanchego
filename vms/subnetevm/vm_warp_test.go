@@ -89,7 +89,7 @@ func TestSendWarpMessage(t *testing.T) {
 	addressedPayload, err := payload.NewAddressedCall(sut.ethWallet.Addresses()[0].Bytes(), payloadData)
 	require.NoError(t, err)
 	unsignedMessage := sut.newUnsignedWarpMessage(t, addressedPayload.Bytes())
-	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), int32(warp.TypeErrCode))
+	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), int32(warp.VerifyErrCode))
 
 	blockHashPayload, err := payload.NewHash(built.ID())
 	require.NoError(t, err)
@@ -242,7 +242,7 @@ func (s *SUT) sendWarpTx(
 		AccessList: accessList,
 	})
 
-	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
 	return tx
 }
 

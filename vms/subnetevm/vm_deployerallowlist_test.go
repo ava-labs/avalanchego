@@ -54,7 +54,7 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 		t,
 		withFork(upgradetest.Helicon),
 		withNumAccounts(2),
-		withNow(&now),
+		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			subnetevmparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				deployerallowlist.ConfigKey: deployerallowlist.NewConfig(

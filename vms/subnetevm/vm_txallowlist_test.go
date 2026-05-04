@@ -51,7 +51,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 		t,
 		withFork(upgradetest.Helicon),
 		withNumAccounts(2),
-		withNow(&now),
+		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			subnetevmparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				txallowlist.ConfigKey: txallowlist.NewConfig(
@@ -106,7 +106,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// JSON-RPC stringifies the error, so the sentinel chain is lost; match
 	// on its message instead. See e.g. txallowlist/simulated_test.go.
 	require.ErrorContains(t, //nolint:forbidigo // upstream error wrapped as string
-		sut.client.SendTransaction(sut.ctx, droppedTx),
+		sut.ethClient.SendTransaction(sut.ctx, droppedTx),
 		vmerrors.ErrSenderAddressNotAllowListed.Error(),
 		"non-admin tx must be rejected at mempool ingress while allowlist is enabled",
 	)
@@ -136,7 +136,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// (3) Ingress (last-executed) accepts `droppedTx` immediately on
 	// re-submit; worst-case admission (last-settled) only includes it after
 	// the disable activation settles.
-	require.NoError(t, sut.client.SendTransaction(sut.ctx, droppedTx),
+	require.NoError(t, sut.ethClient.SendTransaction(sut.ctx, droppedTx),
 		"previously-blocked tx must be admitted at mempool ingress once disable executes")
 	sut.advanceTime(t, saeparams.Tau+time.Second)
 	block = sut.buildAndAcceptBlock(t)
