@@ -10,9 +10,10 @@ It's most useful to think of the C-Chain as three peer services that integrate w
 flowchart TB
     subgraph avago["AvalancheGo"]
         direction TB
-        consensus["consensus<br/><i>Snowman engine</i>"]
-        p2pin["p2p networking<br/><i>handler-ID dispatch</i>"]
-        httpd["HTTP / JSON-RPC<br/>server"]
+        consensus["Consensus"]
+        p2pin["P2P Network"]
+        httpd["API Server"]
+        consensus <--> p2pin
     end
 
     subgraph saevm["SAE VM"]
