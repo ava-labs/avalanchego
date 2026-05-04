@@ -195,8 +195,8 @@ func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credenti
 		if err != nil {
 			return err
 		}
-		if in.Address != pk.EthAddress() {
-			return fmt.Errorf("%w: expected %s, got %s", errAddressMismatch, in.Address, pk.EthAddress())
+		if addr := pk.EthAddress(); in.Address != addr {
+			return fmt.Errorf("%w: expected %s, got %s", errAddressMismatch, in.Address, addr)
 		}
 	}
 	return nil

@@ -186,12 +186,12 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 		// includes signature verification. This is non-trivial, because
 		// transactions frequently contain duplicate signatures, which are
 		// currently being cached.
-		utxo := &avax.UTXO{}
+		utxo := new(avax.UTXO)
 		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
 			return fmt.Errorf("%w: %w", errUnmarshallingUTXO, err)
 		}
-		if inAssetID, utxoAssetID := in.AssetID(), utxo.AssetID(); utxoAssetID != inAssetID {
-			return fmt.Errorf("%w: input asset ID %s does not match UTXO asset ID %s", errMismatchedAssetIDs, inAssetID, utxoAssetID)
+		if utxo.Asset.ID != in.Asset.ID {
+			return fmt.Errorf("%w: input asset %s does not match UTXO asset %s", errMismatchedAssetIDs, in.Asset.ID, utxo.Asset.ID)
 		}
 		if err := fx.VerifyTransfer(fxTx, in.In, creds[i], utxo.Out); err != nil {
 			return fmt.Errorf("%w: %w", errVerifyingTransfer, err)
