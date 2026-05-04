@@ -216,6 +216,16 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 	})
 }
 
+func FuzzSanityCheckCompatibility(f *testing.F) {
+	ctx := MainnetContext()
+	fuzz(f, func(t *testing.T, newTx *Tx) {
+		oldTx := ToOldTx(t, newTx)
+		want := OldSanityCheck(oldTx, ctx) == nil
+		got := newTx.SanityCheck(ctx) == nil
+		assert.Equal(t, want, got, "%T.SanityCheck() == OldSanityCheck(%T)", newTx, oldTx)
+	})
+}
+
 // largeUint256 and largeBigInt return a balance large enough to never underflow
 // but small enough to never overflow during test arithmetic.
 func largeUint256() *uint256.Int { return new(uint256.Int).Lsh(uint256.NewInt(1), 128) }
