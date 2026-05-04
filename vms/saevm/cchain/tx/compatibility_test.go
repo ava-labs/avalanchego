@@ -152,3 +152,16 @@ func (s *asOpStateDB) SetNonce(addr common.Address, nonce uint64) {
 func (s *asOpStateDB) GetNonce(addr common.Address) uint64 {
 	return s.initialNonces[addr]
 }
+
+func FuzzAtomicRequestsCompatibility(f *testing.F) {
+	fuzz(f, func(t *testing.T, newTx *Tx) {
+		oldTx := ToOldTx(t, newTx)
+		wantChainID, wantRequests, err := oldTx.UnsignedAtomicTx.AtomicOps()
+		require.NoErrorf(t, err, "%T.AtomicOps()", oldTx.UnsignedAtomicTx)
+
+		gotChainID, gotRequests, err := newTx.AtomicRequests()
+		require.NoErrorf(t, err, "%T.AtomicRequests()", newTx)
+		assert.Equal(t, wantChainID, gotChainID, "chainID")
+		assert.Equal(t, wantRequests, gotRequests, "requests")
+	})
+}

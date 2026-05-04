@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
 
 var _ Unsigned = (*Export)(nil)
@@ -103,4 +105,34 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 	return op{
 		burn: burn,
 	}, nil
+}
+
+func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, error) {
+	elems := make([]*chainsatomic.Element, len(e.ExportedOutputs))
+	for i, out := range e.ExportedOutputs {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(i), //#nosec G115 -- Won't overflow
+			},
+			Asset: out.Asset,
+			Out:   out.Out,
+		}
+
+		utxoBytes, err := c.Marshal(codecVersion, utxo)
+		if err != nil {
+			return ids.ID{}, nil, err
+		}
+		utxoID := utxo.InputID()
+		elem := &chainsatomic.Element{
+			Key:   utxoID[:],
+			Value: utxoBytes,
+		}
+		if o, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = o.Addresses()
+		}
+
+		elems[i] = elem
+	}
+	return e.DestinationChain, &chainsatomic.Requests{PutRequests: elems}, nil
 }

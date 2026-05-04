@@ -22,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
 
 // Tx is a signed transaction that interacts with shared memory.
@@ -48,6 +50,10 @@ type Unsigned interface {
 	// asOp returns the operation that this transaction performs on the EVM
 	// state.
 	asOp(avaxAssetID ids.ID) (op, error)
+
+	// atomicRequests returns the operations that should be applied to shared
+	// memory when this transaction is executed.
+	atomicRequests(txID ids.ID) (chainID ids.ID, r *chainsatomic.Requests, err error)
 }
 
 // op contains the state changes of [hook.Op]
@@ -177,6 +183,12 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	p := scaleAVAX(cost)
 	p.Div(&p, &u)
 	return p
+}
+
+// AtomicRequests returns shared-memory modifications that this transaction
+// should perform on the peer chainID during execution.
+func (t *Tx) AtomicRequests() (chainID ids.ID, r *chainsatomic.Requests, err error) {
+	return t.atomicRequests(t.ID())
 }
 
 // Parse deserializes a [Tx] from its canonical binary format.

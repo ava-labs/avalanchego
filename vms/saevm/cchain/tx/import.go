@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
 
 var _ Unsigned = (*Import)(nil)
@@ -109,4 +111,13 @@ func (i *Import) asOp(avaxAssetID ids.ID) (op, error) {
 	return op{
 		mint: mint,
 	}, nil
+}
+
+func (i *Import) atomicRequests(ids.ID) (ids.ID, *chainsatomic.Requests, error) {
+	utxoIDs := make([][]byte, len(i.ImportedInputs))
+	for j, in := range i.ImportedInputs {
+		inputID := in.InputID()
+		utxoIDs[j] = inputID[:]
+	}
+	return i.SourceChain, &chainsatomic.Requests{RemoveRequests: utxoIDs}, nil
 }
