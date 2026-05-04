@@ -23,6 +23,8 @@ flowchart TB
         cc_rpc["/avax"]
         cc_iegossip["Import/Export<br/>gossip handler"]
         cc_warp["warp signature<br/>handler"]
+        cc_pool[("Import/Export<br/>txpool")]
+        cc_warp_store[("warp storage")]
         cc_hook["hook.Points"]
     end
 
@@ -34,6 +36,12 @@ flowchart TB
     httpd --> cc_rpc
 
     saevm -.->|"during block building"| cc_hook
+
+    cc_rpc --> cc_pool
+    cc_iegossip --> cc_pool
+    cc_pool --> cc_hook
+    cc_hook --> cc_warp_store
+    cc_warp_store --> cc_warp
 ```
 
 The three services and their integration points:
@@ -42,7 +50,7 @@ The three services and their integration points:
 - **SAE VM** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). AvalancheGo drives it via consensus, p2p messages, and `eth_*` JSON-RPC; SAE in turn calls into `hook.Points` during block building.
 - **CChain VM** — the C-Chain-specific service (this package). Exposes the `/avax` JSON-RPC API ([api](api/)), two p2p handlers (Import/Export transaction gossip and ACP-118 warp signatures, see [warp](warp/)), and `hook.Points` ([hook](hook/)) — the seam the SAE VM calls into for chain-specific block-building behavior.
 
-The only cross-service call between the two VM services is SAE VM → CChain VM, through `hook.Points`. Everything else fans in from AvalancheGo. Internal state behind these integration points — the Import/Export [txpool](txpool/) and warp message [storage](warp/) — is detailed in [the next section](#how-transactions-enter-the-mempool).
+The only cross-service call between the two VM services is SAE VM → CChain VM, through `hook.Points`. From there, `hook.Points` reaches the rest of the CChain VM through two stores: the Import/Export [txpool](txpool/) — written by `/avax` and the gossip handler, read by `hook.Points` to pull tx candidates during block building — and warp [storage](warp/), where `hook.Points` persists messages emitted during execution and the warp signature handler answers peer requests from. The txpool flow is detailed further in [the next section](#how-transactions-enter-the-mempool).
 
 ## What `cchain` adds
 
