@@ -47,9 +47,7 @@ func init() {
 	if err != nil {
 		panic("failed to generate cached BLS key: " + err.Error())
 	}
-	if err == nil {
-		cachedCompressedPK = cachedBLSKey.PublicKey().Compress()
-	}
+	cachedCompressedPK = cachedBLSKey.PublicKey().Compress()
 }
 
 type testNodeConfig struct {

@@ -870,11 +870,12 @@ func setupEngineForFuzz(t *testing.T) (*Engine, []*Config) {
 
 	verifier := createVerifierForFuzz(configs[0])
 
-	engine, err := newEngineWithSignerVerifier(t.Context(), configs[0], signer, verifier)
+	ctx := t.Context()
+	engine, err := newEngineWithSignerVerifier(ctx, configs[0], signer, verifier)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		require.NoError(t, engine.Shutdown(t.Context()))
+		require.NoError(t, engine.Shutdown(ctx))
 	})
 
 	// We start the epoch directly instead of calling engine.Start because we want to avoid starting the engine's internal ticker.
@@ -902,11 +903,6 @@ func setupEngine(t *testing.T) (*Engine, []*Config) {
 }
 
 func createSimplexEngineConfig(t *testing.T, reuseKeys keyReuseOption) []*Config {
-	if reuseKeys {
-		// We can only reuse the key if it was successfully cached.
-		require.NotNil(t, cachedBLSKey)
-	}
-
 	configs := newNetworkConfigsWithKeyReuse(t, 4, reuseKeys)
 
 	config := configs[0]
