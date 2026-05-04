@@ -183,7 +183,9 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 
 	for i, in := range i.ImportedInputs {
 		// TODO(StephenButtolph): Parallelize transfer verification, which
-		// includes signature verification.
+		// includes signature verification. This is non-trivial, because
+		// transactions frequently contain duplicate signatures, which are
+		// currently being cached.
 		utxo := &avax.UTXO{}
 		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
 			return fmt.Errorf("%w: %w", errUnmarshallingUTXO, err)

@@ -184,7 +184,9 @@ func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credenti
 		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
 	}
 	for i, in := range e.Ins {
-		// TODO(StephenButtolph): Parallelize signature verification.
+		// TODO(StephenButtolph): Parallelize signature verification. This is
+		// non-trivial, because transactions frequently contain duplicate
+		// signatures, which are currently being cached.
 		cred := creds[i].Self()
 		if len(cred.Sigs) != 1 {
 			return fmt.Errorf("%w: expected 1, got %d", errIncorrectNumSignatures, len(cred.Sigs))
