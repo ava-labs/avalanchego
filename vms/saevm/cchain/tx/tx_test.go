@@ -1536,7 +1536,7 @@ func TestTransferNonAVAX(t *testing.T) {
 
 // OldSanityCheck behaves like [Tx.SanityCheck] for the legacy [atomic.Tx].
 func OldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
-	rules := *extrastest.ForkToRules(upgradetest.Helicon)
+	rules := *extrastest.ForkToRules(upgradetest.Latest)
 	if err := tx.UnsignedAtomicTx.Verify(ctx, rules); err != nil {
 		return err
 	}
