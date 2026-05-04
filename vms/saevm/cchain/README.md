@@ -2,35 +2,51 @@
 
 `cchain` is the C-Chain VM. It is a thin chain-specific harness wrapped around [saevm](../), the generic streaming-asynchronous EVM framework that implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). `saevm` does the heavy lifting — block execution, settlement, gas accounting, EVM gossip, and the Snowman adaptor. `cchain` adds what makes the chain *the C-Chain*: Import/Export transactions for moving assets between Primary Network chains, warp signatures, dynamic gas targeting, minimum-delay block production, and the migration boundary from the chain's historical synchronous era.
 
-## Where `cchain` sits
+## Architecture
 
 ```mermaid
 flowchart TB
-    node["AvalancheGo node<br/>(Snowman consensus engine)"]
-
-    subgraph saevm_grp["saevm"]
-        adaptor["adaptor<br/><i>generic VM &harr; Snowman</i>"]
-        sae["inner saevm VM<br/><i>execution, gossip, p2p</i>"]
-        hooks["hook<br/><i>extension points</i>"]
+    subgraph avago["AvalancheGo"]
+        direction TB
+        consensus["consensus<br/><i>Snowman engine</i>"]
+        p2pin["p2p networking"]
+        httpd["HTTP / JSON-RPC<br/>server"]
     end
 
-    subgraph cchain_grp["cchain (this package)"]
-        cvm["cchain VM harness"]
-        chook["cchain hook<br/><i>fills extension points</i>"]
-        cextras["txpool &middot; api &middot; warp &middot; tx &middot; state"]
+    subgraph cchainvm["cchain VM"]
+        direction TB
+        sae["SAE VM<br/><i>EVM execution, settlement,<br/>EVM mempool, block lifecycle</i>"]
+        p2pcomp["p2p network<br/><i>shared by SAE VM and cchain;<br/>dispatches by handler ID</i>"]
+        rpcapi["custom RPC API<br/><i>/avax service</i>"]
+        txpool["Import/Export txpool"]
+        warp["warp storage"]
+        hook["hook.Points<br/><i>cchain's plug-in to SAE</i>"]
     end
 
-    libevm["libevm + ethdb"]
+    consensus --> sae
+    p2pin --> p2pcomp
+    httpd --> rpcapi
 
-    node --> adaptor
-    adaptor --> cvm
-    cvm --> sae
-    cvm --- cextras
-    chook -. implements .-> hooks
-    sae --> libevm
+    p2pcomp -->|"SAE EVM tx gossip"| sae
+    p2pcomp -->|"cchain Import/Export gossip"| txpool
+    p2pcomp -->|"ACP-118 signature handler"| warp
+
+    rpcapi --> txpool
+
+    sae -.->|"calls during<br/>block building"| hook
+    hook --> txpool
 ```
 
-`cchain` wraps an inner saevm VM. Block execution, settlement, persistence, gas accounting, and the EVM transaction gossip plumbing all run inside saevm. saevm exposes a hook surface — a set of extension points where chain-specific logic can be injected — and `cchain` fills those slots. Outside the hook seam, `cchain` adds two things: a custom mempool and JSON-RPC service for Import/Export transactions, and a warp signature-request handler. Both share saevm's network and lifecycle.
+AvalancheGo connects to the `cchain` VM from three places: consensus drives the SAE VM, the p2p subsystem delivers peer messages to the shared p2p network component, and the HTTP server routes JSON-RPC calls to the custom RPC API.
+
+The components inside the `cchain` VM:
+
+- **SAE VM** — EVM execution, settlement, the standard EVM mempool, and block-lifecycle events. `cchain` plugs into its block-building loop through `hook.Points`.
+- **p2p network** — the AvalancheGo peer-to-peer network instance. Lifecycle-owned by the SAE VM, but available to `cchain`. Dispatches inbound messages by handler ID across three handlers — SAE's own EVM-tx gossip plus `cchain`'s Import/Export gossip and ACP-118 warp signature handler — so peer accounting, throttling, and metrics are shared.
+- **custom RPC API** — the `/avax` service. Submission, status, and UTXO lookup for Import/Export transactions. See [api](api/).
+- **Import/Export txpool** — the chain-specific mempool. Detailed in [the next section](#how-transactions-enter-the-mempool).
+- **warp storage** — the on-disk store of ACP-118 warp messages emitted by this chain. The signature handler reads from it to answer peers; `hook.Points` writes to it during block execution. See [warp](warp/).
+- **`hook.Points`** — `cchain`'s plug-in to the SAE VM. Implements saevm's hook interface so SAE calls into `cchain`-specific logic for header construction, end-of-block operations, gas/timing, and warp-message handling. See [hook](hook/).
 
 ## What `cchain` adds
 
@@ -50,38 +66,6 @@ A configurable lower bound on the time between consecutive blocks, derived from 
 
 ### Synchronous-to-asynchronous migration
 The C-Chain executed synchronously for years before streaming-asynchronous execution was introduced. `cchain` records the boundary block at which the chain switched modes, so a node bootstrapping from genesis correctly replays the synchronous era and then hands off to saevm's asynchronous pipeline for everything after. See [state](state/) and [hook](hook/).
-
-## Components of the `cchain` VM
-
-The `cchain` VM is a composition of four major components:
-
-```mermaid
-flowchart TB
-    subgraph cchain_vm["cchain VM"]
-        direction TB
-        sae["sae VM<br/><i>EVM execution, settlement,<br/>EVM mempool, block lifecycle</i>"]
-        net["p2p network<br/><i>peer + validator-peer sets,<br/>handler-ID dispatch<br/>(lifecycle-owned by sae)</i>"]
-        pool["Import/Export tx pool<br/><i>mempool over a shared store</i>"]
-        apis["custom JSON-RPC<br/><i>/avax: submit, status, UTXO lookup</i>"]
-
-        apis ==>|submit| pool
-        pool ==>|register gossip handler| net
-        sae ==>|read tx candidates<br/>via cchain hook| pool
-    end
-```
-
-- **sae VM** — EVM execution, settlement, the EVM transaction mempool, and block-lifecycle events. `cchain` delegates everything outside its chain-specific extras to it, and plugs into its block-building loop through saevm's hook interface (see [hook](hook/)).
-- **p2p network** — the AvalancheGo peer-to-peer network. Lifecycle-owned by sae, but available to `cchain`, which registers handlers on it for Import/Export transaction gossip and ACP-118 warp signature requests. The network is the same instance saevm uses for its own EVM-tx gossip, so peer accounting, throttling, and metrics are shared across all handlers.
-- **Import/Export tx pool** — the chain-specific mempool. Receives transactions from RPC submissions, peer gossip, and rejected blocks; sae's block builder reads candidates from it via the `cchain` hook. Detailed in the next section.
-- **custom JSON-RPC** — the `/avax` service for Import/Export submission, status queries, and UTXO lookup. See [api](api/).
-
-The handlers co-resident on the shared network:
-
-| Handler ID | Registered by | Purpose |
-| --- | --- | --- |
-| EVM transaction gossip | saevm | Gossip of standard EVM transactions for the saevm mempool |
-| Import/Export gossip | `cchain` | Gossip of Import/Export transactions for the [txpool](txpool/) |
-| Warp signature requests | `cchain` | ACP-118 signature requests against [warp](warp/) storage |
 
 ## How transactions enter the mempool
 
