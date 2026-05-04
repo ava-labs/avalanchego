@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -207,22 +206,11 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 			oldTx = ToOldTx(t, newTx)
 			ctx   = &snow.Context{AVAXAssetID: AVAXAssetID}
 		)
-		require.NoError(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldState))
-		require.NoError(t, newTx.TransferNonAVAX(AVAXAssetID, newState))
-		require.NoError(t, op.ApplyTo(newState.StateDB))
+		require.NoErrorf(t, oldTx.EVMStateTransfer(ctx, oldState), "%T.EVMStateTransfer()", oldTx)
+		require.NoErrorf(t, newTx.TransferNonAVAX(AVAXAssetID, newState), "%T.TransferNonAVAX()", newTx)
+		require.NoErrorf(t, op.ApplyTo(newState.StateDB), "%T.ApplyTo(%T)", op, newState.StateDB)
 
-		// Finalize the trie structures so that the state DB comparison includes
-		// the changes.
-		for _, state := range states {
-			state.Finalise(true)
-			state.IntermediateRoot(true)
-		}
-
-		opts := []cmp.Option{
-			cmpopts.IgnoreUnexported(extstate.StateDB{}),
-			cmputils.StateDBs(),
-		}
-		if diff := cmp.Diff(oldState, newState, opts...); diff != "" {
+		if diff := CompareStateDBs(oldState, newState); diff != "" {
 			t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", newTx, diff)
 		}
 	})
