@@ -176,7 +176,7 @@ func TestVerify(t *testing.T) {
 		prev: genesis,
 	})
 	preferenceSet := false
-	b.vmBlock.(*wrappedBlock).vm.SetPreferenceF = func(ctx context.Context, i ids.ID) error {
+	b.vmBlock.(*wrappedBlock).vm.SetPreferenceF = func(_ context.Context, _ ids.ID) error {
 		preferenceSet = true
 		return nil
 	}
