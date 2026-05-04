@@ -51,45 +51,37 @@ A configurable lower bound on the time between consecutive blocks, derived from 
 ### Synchronous-to-asynchronous migration
 The C-Chain executed synchronously for years before streaming-asynchronous execution was introduced. `cchain` records the boundary block at which the chain switched modes, so a node bootstrapping from genesis correctly replays the synchronous era and then hands off to saevm's asynchronous pipeline for everything after. See [state](state/) and [hook](hook/).
 
-## How `cchain` shares the network with saevm
+## Components of the `cchain` VM
 
-`cchain` does not create its own peer-to-peer network. saevm builds one — an AvalancheGo p2p Network, plus a peer set and a validator-only peer set — during construction of the inner VM. `cchain` embeds the inner VM and reaches through it: it asks saevm to register two handlers, each keyed by a stable handler ID.
+The `cchain` VM is a composition of four major components:
 
-| Handler ID | Owner of the registered handler | Purpose |
+```mermaid
+flowchart TB
+    subgraph cchain_vm["cchain VM"]
+        direction TB
+        sae["sae VM<br/><i>EVM execution, settlement,<br/>EVM mempool, block lifecycle</i>"]
+        net["p2p network<br/><i>peer + validator-peer sets,<br/>handler-ID dispatch<br/>(lifecycle-owned by sae)</i>"]
+        pool["Import/Export tx pool<br/><i>mempool over a shared store</i>"]
+        apis["custom JSON-RPC<br/><i>/avax: submit, status, UTXO lookup</i>"]
+
+        apis ==>|submit| pool
+        pool ==>|register gossip handler| net
+        sae ==>|read tx candidates<br/>via cchain hook| pool
+    end
+```
+
+- **sae VM** — EVM execution, settlement, the EVM transaction mempool, and block-lifecycle events. `cchain` delegates everything outside its chain-specific extras to it, and plugs into its block-building loop through saevm's hook interface (see [hook](hook/)).
+- **p2p network** — the AvalancheGo peer-to-peer network. Lifecycle-owned by sae, but available to `cchain`, which registers handlers on it for Import/Export transaction gossip and ACP-118 warp signature requests. The network is the same instance saevm uses for its own EVM-tx gossip, so peer accounting, throttling, and metrics are shared across all handlers.
+- **Import/Export tx pool** — the chain-specific mempool. Receives transactions from RPC submissions, peer gossip, and rejected blocks; sae's block builder reads candidates from it via the `cchain` hook. Detailed in the next section.
+- **custom JSON-RPC** — the `/avax` service for Import/Export submission, status queries, and UTXO lookup. See [api](api/).
+
+The handlers co-resident on the shared network:
+
+| Handler ID | Registered by | Purpose |
 | --- | --- | --- |
 | EVM transaction gossip | saevm | Gossip of standard EVM transactions for the saevm mempool |
 | Import/Export gossip | `cchain` | Gossip of Import/Export transactions for the [txpool](txpool/) |
 | Warp signature requests | `cchain` | ACP-118 signature requests against [warp](warp/) storage |
-
-Inbound peer messages flow through one shared dispatch path. AvalancheGo's chain router delivers an app message to the VM, the VM forwards it into saevm's p2p Network, and the Network looks up the handler by ID:
-
-```mermaid
-sequenceDiagram
-    participant Peer
-    participant Router as AvalancheGo router
-    participant Net as saevm p2p Network<br/>(owned by the inner saevm VM)
-    participant Disp as Handler dispatch<br/>(by handler ID)
-    participant Gossip as cchain gossip handler
-    participant Pool as cchain mempool
-    participant Warp as cchain warp handler
-    participant Storage as warp storage
-
-    Peer->>Router: AppGossip / AppRequest
-    Router->>Net: forward to chain VM
-    Net->>Disp: route by handler ID
-
-    alt Import/Export tx gossip
-        Disp->>Gossip: deliver gossip payload
-        Gossip->>Gossip: unmarshal via cchain's marshaller
-        Gossip->>Pool: add to mempool (write-side path)
-    else Warp signature request
-        Disp->>Warp: deliver signature request
-        Warp->>Storage: look up message
-        Warp-->>Peer: BLS signature
-    end
-```
-
-The two `cchain` handlers are co-resident on the same Network instance saevm uses for its own EVM-tx gossip, so peer accounting, throttling, and metrics are shared. saevm owns the Network's lifecycle; the `cchain` handlers register on it during initialization and are unregistered implicitly when saevm shuts the Network down.
 
 ## How transactions enter the mempool
 
