@@ -1383,6 +1383,24 @@ func TestTransferNonAVAX(t *testing.T) {
 			},
 		},
 		{
+			name: "import_non_avax_adds",
+			init: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 1,
+				},
+			},
+			tx: &Import{
+				Outs: []Output{
+					{Address: alice, Amount: 1, AssetID: btc},
+				},
+			},
+			want: map[common.Address]map[ids.ID]uint64{
+				alice: {
+					btc: 2,
+				},
+			},
+		},
+		{
 			name: "import_many",
 			tx: &Import{
 				Outs: []Output{

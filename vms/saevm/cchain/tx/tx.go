@@ -42,6 +42,8 @@ type Tx struct {
 type Unsigned interface {
 	// TransferNonAVAX transfers the non-AVAX balances requested by this
 	// transaction.
+	//
+	// Non-AVAX transfers were only allowed prior to the Banff upgrade.
 	TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
 
 	// burned returns the amount of assetID that is consumed but not produced by

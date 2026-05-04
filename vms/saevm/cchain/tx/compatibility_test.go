@@ -206,9 +206,9 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 			oldTx = ToOldTx(t, newTx)
 			ctx   = &snow.Context{AVAXAssetID: AVAXAssetID}
 		)
-		require.NoError(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, oldState))
-		require.NoError(t, newTx.TransferNonAVAX(AVAXAssetID, newState))
-		require.NoError(t, op.ApplyTo(newState.StateDB))
+		require.NoErrorf(t, oldTx.EVMStateTransfer(ctx, oldState), "%T.EVMStateTransfer()", oldTx)
+		require.NoErrorf(t, newTx.TransferNonAVAX(AVAXAssetID, newState), "%T.TransferNonAVAX()", newTx)
+		require.NoErrorf(t, op.ApplyTo(newState.StateDB), "%T.ApplyTo(%T)", op, newState.StateDB)
 
 		if diff := CompareStateDBs(oldState, newState); diff != "" {
 			t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", newTx, diff)
