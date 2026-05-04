@@ -46,9 +46,9 @@ go_test(
     deps = [
         "//chains/atomic",
         "//graft/coreth/core/extstate",
+        "//graft/coreth/plugin/evm",
         "//graft/coreth/plugin/evm/atomic",
         "//graft/coreth/plugin/evm/atomic/vm",
-        "//graft/coreth/plugin/evm/customtypes",
         "//ids",
         "//snow",
         "//utils/math",
