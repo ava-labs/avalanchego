@@ -25,8 +25,8 @@ import (
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -39,7 +39,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	customtypes.Register()
+	evm.RegisterAllLibEVMExtras()
 	os.Exit(m.Run())
 }
 
