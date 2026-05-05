@@ -37,7 +37,6 @@ flowchart TB
     apiserver --> avax
 
     execution --> hook
-    p2pn --> warp
 
 
     hook --> txpool
@@ -45,6 +44,7 @@ flowchart TB
     p2pn --> txpool
 
     hook --> warp
+    p2pn --> warp
     avax --> txpool
 ```
 
