@@ -47,7 +47,7 @@ func (s *Set) Add(peer *Peer) {
 	}
 }
 
-// GetByID attempts to fetch a [Peer] whose [Peer.ID] is equal to `nodeID`.
+// GetByID attempts to fetch a [Peer] whose [Peer.ID] is equal to nodeID.
 // If no such peer exists in the set, then [false] will be returned.
 func (s *Set) GetByID(nodeID ids.NodeID) (*Peer, bool) {
 	index, ok := s.peersMap[nodeID]
@@ -57,8 +57,8 @@ func (s *Set) GetByID(nodeID ids.NodeID) (*Peer, bool) {
 	return s.peersSlice[index], true
 }
 
-// GetByIndex attempts to fetch a [Peer] who has been allocated `index`.
-// If `index` < 0 or `index` >= [Set.Len], then false will be returned.
+// GetByIndex attempts to fetch a [Peer] who has been allocated index.
+// If index < 0 or index >= [Set.Len], then false will be returned.
 func (s *Set) GetByIndex(index int) (*Peer, bool) {
 	if index < 0 || index >= len(s.peersSlice) {
 		return nil, false
@@ -66,7 +66,7 @@ func (s *Set) GetByIndex(index int) (*Peer, bool) {
 	return s.peersSlice[index], true
 }
 
-// Remove any [Peer] whose [Peer.ID] is equal to `nodeID` from the set.
+// Remove any [Peer] whose [Peer.ID] is equal to nodeID from the set.
 func (s *Set) Remove(nodeID ids.NodeID) {
 	index, ok := s.peersMap[nodeID]
 	if !ok {
@@ -90,9 +90,9 @@ func (s *Set) Len() int {
 	return len(s.peersSlice)
 }
 
-// Sample attempts to return a random slice of peers with length `n`. The
+// Sample attempts to return a random slice of peers with length n. The
 // slice will not include any duplicates. Only peers that cause the
-// `precondition` to return true will be returned in the slice.
+// precondition to return true will be returned in the slice.
 func (s *Set) Sample(n int, precondition func(*Peer) bool) []*Peer {
 	if n <= 0 {
 		return nil

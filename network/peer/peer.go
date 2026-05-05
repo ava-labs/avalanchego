@@ -267,7 +267,7 @@ func (p *Peer) ObservedUptime() uint32 {
 	return p.observedUptime.Get()
 }
 
-// Send attempts to send `msg` to the peer. The peer takes ownership of `msg`
+// Send attempts to send msg to the peer. The peer takes ownership of msg
 // for reference counting. This returns false if the message is guaranteed not
 // to be delivered to the peer.
 func (p *Peer) Send(ctx context.Context, msg *message.OutboundMessage) bool {
