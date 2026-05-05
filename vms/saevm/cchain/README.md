@@ -96,23 +96,13 @@ The C-Chain participates in cross-subnet warp messaging on both sides — sendin
 
 `cchain` persists this chain's warp messages, serves signature requests against that store, and verifies warp predicates during block execution. See [warp](warp/).
 
-### Dynamic gas target (ACP-176)
+### Validator-voted gas target (ACP-176)
 
-// TODO:(@Claude): This is not how this works. The majority of ACP-176 has been moved into SAE directly. The only remaining component is for setting the target gas-per-second, which is in this package. However, this is not done based on observed usage. The validators vote directly whether to increase, decrease, or keep the gas target the same. The validators decide on a sustainable throughput rate. It is not automatically discovered via an econmomic mechansism.
+Most of [ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176) — the gas accounting and excess tracker — sits inside SAE. What `cchain` adds is the *target* itself: a target gas-per-second that validators vote on directly. Each block, validators choose to raise, lower, or hold the target. Throughput is set by validator agreement on a sustainable rate, not auto-discovered from observed usage. See [hook/acp176](hook/acp176/).
 
-The target gas-per-second is not a fixed parameter. It follows an excess tracker that adjusts up or down based on observed usage, letting the network discover a sustainable throughput rate from the bottom up. See [hook/acp176](hook/acp176/).
+### Validator-voted minimum block delay (ACP-226)
 
-### Minimum block delay (ACP-226)
-
-// TODO:(@Claude): We should expand on what configurable means here. Similarly to the target gas-per-second, this is a value which validators can vote on increasing, decreasing, or keeping the same.
-
-A configurable lower bound on the time between consecutive blocks, derived from the parent header. The bound prevents accelerated block production beyond what the network has agreed to. See [hook](hook/).
-
-### Synchronous-to-asynchronous migration
-
-// TODO:(@Claude): This is really pretty wrong. Currently the PoC doesn't support this transaition much at all. It assumes that the cchain VM is started on top of a state which has already performed the synchronous execution. In the future, we will delete transitionvm, along with all of the legacy coreth implementation. At that point, SAE will support executing synchronous blocks (during bootstrapping). But the coreth wrapper will really not deal with that much.
-
-The C-Chain executed synchronously for years before streaming-asynchronous execution was introduced. `cchain` records the boundary block at which the chain switched modes, so a node bootstrapping from genesis correctly replays the synchronous era and then hands off to saevm's asynchronous pipeline for everything after. See [state](state/) and [hook](hook/).
+A lower bound on the time between consecutive blocks, derived from the parent header. Like the gas target, this is validator-voted: each block, validators raise, lower, or hold the bound. The mechanism prevents block production faster than the network has agreed to. See [hook](hook/).
 
 ## How transactions enter the Txpool
 
