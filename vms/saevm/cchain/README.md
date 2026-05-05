@@ -58,6 +58,8 @@ flowchart TB
 
 ## What `cchain` adds
 
+`cchain` carries each of the features below by extending the standard Ethereum block format — adding custom fields to both the block header and the block body.
+
 ### Export and Import transactions
 
 The Primary Network is the set of three chains — P, X, and C — that exchange assets through pair-wise shared stores. Each pair of chains has its own store, readable and writable by both chains in the pair.
@@ -111,7 +113,7 @@ User RPC submission is the only path that registers transactions with the local 
 - **User RPC submission.** The `/avax` JSON-RPC endpoint receives a transaction and forwards it to the mempool, also enqueuing it on the push-gossiper.
 - **Inbound push gossip.** A peer pushes a transaction over the Import/Export gossip protocol; the transaction is routed to the same add path.
 - **Inbound pull gossip.** Periodically, `cchain` sends a bloom filter representing the current state of the mempool to a peer. The peer returns transactions not referenced in the bloom filter; those transactions are forwarded to the same add path.
-- **Block rejection.** When the consensus engine rejects a block this node had previously verified, `cchain` submits each included transaction to the mempool. The point is to keep otherwise-valid transactions from being dropped by an unlucky conflict.
+- **Block rejection.** When the consensus engine rejects a block this node had previously verified, `cchain` extracts the transactions from the block and submits each to the mempool. The point is to keep otherwise-valid transactions from being dropped by an unlucky conflict.
 
 ### Warp messaging
 
@@ -125,7 +127,7 @@ The C-Chain participates in cross-subnet Warp messaging on both sides — sendin
 
 ### Validator-voted parameters
 
-Three chain parameters are settled by validator vote on each block: validators choose to raise, lower, or hold each value.
+Three chain parameters are settled by validator vote on each block. The block builder casts the vote: when building a block they can move each parameter toward their ideal value. Because block production is stake-weighted, this yields a stake-weighted voting mechanism over the long run.
 
 - **Gas target per second** ([ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176)) — the throughput target. The rest of ACP-176 (gas accounting and excess tracker) lives in SAE; `cchain` contributes only the target value. See [hook/acp176](hook/acp176/).
 - **Minimum block delay** ([ACP-226](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226)) — a lower bound on the time between consecutive blocks. Prevents block production faster than the network can maintain. See [hook](hook/).
