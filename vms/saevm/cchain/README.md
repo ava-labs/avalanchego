@@ -90,9 +90,9 @@ flowchart TB
     X((X-Chain))
     C((C-Chain))
 
-    PX[("PX")]
-    CP[("CP")]
-    CX[("CX")]
+    PX[("P&X Database")]
+    CP[("C&P Database")]
+    CX[("C&X Database")]
 
     P --> PX
     X --> PX
@@ -128,9 +128,7 @@ flowchart LR
 
 The four entry paths in detail:
 
-User RPC submission is the only path that registers transactions with the local push-gossiper for proactive propagation; the other three sources reach the mempool without enqueuing for outbound gossip.
-
-- **User RPC submission.** The `/avax` JSON-RPC endpoint receives a transaction and forwards it to the mempool, also enqueuing it on the push-gossiper.
+- **User RPC submission.** The `/avax` JSON-RPC endpoint receives a transaction and forwards it to the mempool, also enqueuing it on the push-gossiper. This is the only path that registers transactions with the push-gossiper.
 - **Inbound push gossip.** A peer pushes a transaction over the transaction gossip protocol; the transaction is routed to the same add path.
 - **Inbound pull gossip.** Periodically, `cchain` sends a bloom filter representing the current state of the mempool to a peer. The peer returns transactions not referenced in the bloom filter; those transactions are forwarded to the same add path.
 - **Block rejection.** When the consensus engine rejects a block this node had previously verified, `cchain` extracts the transactions from the block and submits each to the mempool. The point is to keep otherwise-valid transactions from being dropped by an unlucky conflict.
