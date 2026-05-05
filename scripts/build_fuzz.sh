@@ -29,10 +29,13 @@ else
     timeout=$((fuzzTime + 1200))
 fi
 
-files=$(grep -r --include='*_test.go' --files-with-matches 'func Fuzz' "${fuzzDirs[@]}" || true)
-if [[ -z "$files" ]]; then
+grepStatus=0
+files=$(grep -r --include='*_test.go' --files-with-matches 'func Fuzz' "${fuzzDirs[@]}") || grepStatus=$?
+if (( grepStatus == 1 )); then
     echo "No fuzz tests found in: ${fuzzDirs[*]}"
     exit 0
+elif (( grepStatus != 0 )); then
+    exit "$grepStatus"
 fi
 
 failed=false

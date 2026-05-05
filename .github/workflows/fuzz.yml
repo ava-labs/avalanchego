@@ -15,31 +15,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - shard: database
-            targets: ./database
-          - shard: codec
-            targets: ./codec
-          - shard: utils
-            targets: ./utils
-          - shard: archivedb
-            targets: ./x/archivedb
-          - shard: merkledb
-            targets: ./x/merkledb
-          - shard: platformvm
-            targets: ./vms/platformvm
-          - shard: evm
-            targets: ./vms/evm
-          - shard: saevm
-            targets: ./vms/saevm
-          - shard: simplex
-            targets: ./simplex
-          - shard: graft
-            targets: ./graft
+        shard:
+          - database
+          - codec
+          - utils
+          - x/archivedb
+          - x/merkledb
+          - vms/platformvm
+          - vms/evm
+          - vms/saevm
+          - simplex
+          - graft
     steps:
       - name: Git checkout
         uses: actions/checkout@v4
       - name: Set up Go
         uses: ./.github/actions/setup-go-for-project
       - name: Run fuzz tests
-        run: ./scripts/run_task.sh test-fuzz-long -- ${{ matrix.targets }}
+        run: ./scripts/run_task.sh test-fuzz-long -- ./${{ matrix.shard }}
