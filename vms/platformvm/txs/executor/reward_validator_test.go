@@ -14,11 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -886,4 +888,59 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	newSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(err)
 	require.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
+}
+
+func TestRewardValidatorStakerType(t *testing.T) {
+	var (
+		env           = newEnvironment(t, upgradetest.Fortuna)
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+		wallet        = newWallet(t, env, walletConfig{})
+	)
+
+	addAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		ids.GenerateTestNodeID(),
+		env.config.MinValidatorStake,
+		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		reward.PercentDenominator,
+		reward.PercentDenominator,
+		uint64(env.config.MinStakeDuration/time.Second),
+	)
+	require.NoError(t, err)
+	env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
+
+	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+
+	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
+	duration := time.Duration(validatorTx.Period) * time.Second
+	vdrStaker, err := state.NewStaker(
+		addAutoRenewedValidatorTx.ID(),
+		validatorTx,
+		startTime,
+		startTime.Add(duration),
+		validatorTx.Weight(),
+		uint64(1000000),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, env.state.PutCurrentValidator(vdrStaker))
+	require.NoError(t, env.state.Commit())
+
+	require.NoError(t, env.state.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
+		Period: validatorTx.Period,
+	}))
+
+	env.state.SetTimestamp(vdrStaker.EndTime)
+
+	err = ProposalTx(
+		&env.backend,
+		feeCalculator,
+		must[*txs.Tx](t)(newRewardValidatorTx(t, addAutoRenewedValidatorTx.ID())),
+		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
+		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
+	)
+	require.ErrorIs(t, err, errShouldUseRewardAutoRenewedValidator)
 }
