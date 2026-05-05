@@ -456,6 +456,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	// The iterator should have the 1 delegator we put in [d]
 	require.True(gotCurrentDelegatorIter.Next())
 	require.Equal(gotCurrentDelegatorIter.Value(), currentDelegator)
+	gotCurrentDelegatorIter.Release()
 
 	// Delete the current delegator
 	d.DeleteCurrentDelegator(currentDelegator)
@@ -464,6 +465,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	// The iterator should have no elements.
 	gotCurrentDelegatorIter, err = d.GetCurrentDelegatorIterator(currentDelegator.SubnetID, currentDelegator.NodeID)
 	require.NoError(err)
+	defer gotCurrentDelegatorIter.Release()
 	require.False(gotCurrentDelegatorIter.Next())
 }
 
@@ -490,6 +492,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	// The iterator should have the 1 delegator we put in [d]
 	require.True(gotPendingDelegatorIter.Next())
 	require.Equal(gotPendingDelegatorIter.Value(), pendingDelegator)
+	gotPendingDelegatorIter.Release()
 
 	// Delete the pending delegator
 	d.DeletePendingDelegator(pendingDelegator)
@@ -498,6 +501,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	// The iterator should have no elements.
 	gotPendingDelegatorIter, err = d.GetPendingDelegatorIterator(pendingDelegator.SubnetID, pendingDelegator.NodeID)
 	require.NoError(err)
+	defer gotPendingDelegatorIter.Release()
 	require.False(gotPendingDelegatorIter.Next())
 }
 
