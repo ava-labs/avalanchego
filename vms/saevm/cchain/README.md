@@ -97,12 +97,11 @@ flowchart LR
     rej["Block rejection"]
     mempool[("Mempool")]
 
+    rpc --> pushgossip
     rpc --> mempool
     push --> mempool
     pull --> mempool
     rej --> mempool
-    pushgossip -. "stops gossiping<br/>once removed" .-> mempool
-    rpc --> pushgossip
 ```
 
 The four entry paths in detail:
