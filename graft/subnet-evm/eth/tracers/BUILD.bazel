@@ -15,12 +15,12 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers",
     deps = [
-        "//graft/evm/firewood",
         "//graft/evm/rpc",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/internal/ethapi",
         "//graft/subnet-evm/params",
+        "//vms/evm/firewood",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core/state",
