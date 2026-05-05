@@ -13,7 +13,7 @@ flowchart TB
         consensus["Consensus"]
         network["Network"]
         apiserver["API Server"]
-        consensus <--> network
+        network <--> consensus
     end
 
     subgraph sae["SAE"]
