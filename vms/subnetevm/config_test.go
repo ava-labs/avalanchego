@@ -128,6 +128,12 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
+
+	t.Run("log_level_and_format", func(t *testing.T) {
+		c, err := ParseConfig([]byte(`{"log-level":"debug","log-json-format":true}`))
+		require.NoError(t, err)
+		require.Equal(t, "debug", c.LogLevel)
+	})
 }
 
 // TestConfig_Converters spot-checks the SAE-config-shape outputs of

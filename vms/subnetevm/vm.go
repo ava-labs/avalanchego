@@ -53,6 +53,7 @@ import (
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
 	saewarp "github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 
 	// Force-load precompiles to trigger registration
@@ -117,6 +118,30 @@ func (v *VM) Initialize(
 	userConfig, err := ParseConfig(configBytes)
 	if err != nil {
 		return err
+	}
+
+	if userConfig.LogLevel != "" {
+		alias, aliasErr := snowCtx.BCLookup.PrimaryAlias(snowCtx.ChainID)
+		if aliasErr != nil {
+			alias = snowCtx.ChainID.String()
+		}
+		// TODO(ceyonur): Add JSON format support
+		if _, err := subnetevmlog.InitLogger(alias, userConfig.LogLevel, false, snowCtx.Log); err != nil {
+			return fmt.Errorf("initializing libevm logger: %w", err)
+		}
+		// Also change the SAE/avalanchego-side logger so `vms/saevm`
+		// Go code (executor, block builder, gasprice, ...) follows the
+		// same threshold. Levels that libevm accepts but avalanchego
+		// does not (e.g. "crit") are tolerated: we leave snowCtx.Log
+		// at its avalanchego-configured level rather than fail.
+		if avaLevel, levelErr := logging.ToLevel(userConfig.LogLevel); levelErr == nil {
+			snowCtx.Log.SetLevel(avaLevel)
+		} else {
+			snowCtx.Log.Warn("could not map config log-level to avalanchego level; SAE-side logger left at avalanchego-configured level",
+				zap.String("logLevel", userConfig.LogLevel),
+				zap.Error(levelErr),
+			)
+		}
 	}
 
 	saeConfig := sae.Config{

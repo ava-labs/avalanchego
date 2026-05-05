@@ -85,6 +85,21 @@ type Config struct {
 	// on-chain event ie. block or AddressedCall) that the node should
 	// be willing to sign.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
+
+	// LogLevel mirrors the legacy `log-level` flag. Accepted values are
+	// the strings parseable by [graft/evm/log.LvlFromString] (trace,
+	// debug, info, warn, error, crit). The default is the empty string,
+	// which leaves the process-global libevm logger untouched.
+	//   1. reinitializes the libevm global logger to write through
+	//      `snowCtx.Log` at this level (libevm-internal logs: EVM
+	//      execution, txpool, libevm RPC, ...);
+	//   2. calls `snowCtx.Log.SetLevel` so SAE/avalanchego-side Go code
+	//      under `vms/saevm` and `vms/subnetevm` (executor, block
+	//      builder, gasprice, ...) follows the same threshold,
+	//      overriding whatever avalanchego configured for the chain.
+	// Values libevm accepts but avalanchego does not (e.g. "crit") are
+	// tolerated for (1) and skipped for (2) with a warning log.
+	LogLevel string `json:"log-level"`
 }
 
 // Duration is a JSON-friendly wrapper around [time.Duration] that
