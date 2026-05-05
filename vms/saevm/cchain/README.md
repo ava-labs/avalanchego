@@ -61,11 +61,10 @@ flowchart TB
 The Primary Network is the set of three chains (P, X, and C) that transfer assets through pair-wise shared stores: each pair of chains shares its own store that both chains can read and write.
 
 ```mermaid
-%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
 flowchart TB
-    P((P))
-    X((X))
-    C((C))
+    P((P-Chain))
+    X((X-Chain))
+    C((C-Chain))
 
     PX[("PX")]
     CP[("CP")]
