@@ -1,6 +1,6 @@
 # C-Chain VM (`cchain`)
 
-`cchain` is the C-Chain VM. It is a thin chain-specific harness around [saevm](../), the generic EVM framework that implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). `saevm` does the heavy lifting — block execution, settlement, gas accounting, and EVM gossip. `cchain` adds what makes the chain *the C-Chain*: Transactions for moving assets between Primary Network chains, Warp messaging, validator voting of chain parameters, and minimum block delay enforcement.
+`cchain` is the C-Chain VM. It is a thin chain-specific harness around [saevm](../), the generic EVM framework that implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). `saevm` does the heavy lifting — block execution, settlement, gas accounting, and EVM gossip. `cchain` adds what makes the chain *the C-Chain*: Transactions for moving assets between Primary Network chains, Warp messaging, and validator-voted chain parameters.
 
 ## Architecture
 
@@ -58,7 +58,7 @@ flowchart TB
 
 ## What `cchain` adds
 
-`cchain` layers four chain-specific behaviors on top of SAE: Import/Export transactions for cross-chain transfers, Warp messaging, and two chain parameters that validators vote on each block.
+`cchain` layers three chain-specific behaviors on top of SAE: Import/Export transactions for cross-chain transfers, Warp messaging, and chain parameters that validators vote on each block.
 
 ### Export and Import transactions
 
@@ -98,13 +98,13 @@ The C-Chain participates in cross-subnet Warp messaging on both sides — sendin
 
 `cchain` persists this chain's Warp messages, serves signature requests against that store, and verifies Warp predicates during block execution. See [warp](warp/).
 
-### Validator-voted gas target (ACP-176)
+### Validator-voted parameters
 
-Most of [ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176) — the gas accounting and excess tracker — sits inside SAE. What `cchain` adds is the *target* itself: a target gas-per-second that validators vote on directly. Each block, validators choose to raise, lower, or hold the target. Throughput is set by validator agreement on a sustainable rate, not auto-discovered from observed usage. See [hook/acp176](hook/acp176/).
+Three chain parameters are settled by validator vote on each block: validators choose to raise, lower, or hold each value, with no auto-adjustment from observed usage or economic mechanism.
 
-### Validator-voted minimum block delay (ACP-226)
-
-A lower bound on the time between consecutive blocks, derived from the parent header. Like the gas target, this is validator-voted: each block, validators raise, lower, or hold the bound. The mechanism prevents block production faster than the network has agreed to. See [hook](hook/).
+- **Gas target per second** ([ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176)) — the throughput target. The rest of ACP-176 (gas accounting and excess tracker) lives in SAE; `cchain` contributes only the target value. See [hook/acp176](hook/acp176/).
+- **Minimum block delay** ([ACP-226](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226)) — a lower bound on the time between consecutive blocks, derived from the parent header. Prevents block production faster than the network has agreed to. See [hook](hook/).
+- **Minimum gas price** ([ACP-283](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/283)) — a floor on the gas price for transactions to be included in a block. See [hook](hook/).
 
 ## How transactions enter the Txpool
 
