@@ -45,10 +45,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	require.NoError(tc, err)
 	subnets := SubnetEVMSubnetsOrPanic(keys, nodes...)
 
-	upgradeToActivate := upgradetest.Latest
-	if !flagVars.ActivateLatest() {
-		upgradeToActivate--
-	}
+	upgradeToActivate := upgradetest.Helicon
 	upgrades := upgradetest.GetConfig(upgradeToActivate)
 	upgrades.GraniteEpochDuration = 4 * time.Second
 	tc.Log().Info("setting upgrades",
