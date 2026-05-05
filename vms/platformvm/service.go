@@ -82,6 +82,8 @@ type stakerAttributes struct {
 	validationRewardsOwner fx.Owner
 	delegationRewardsOwner fx.Owner
 	proofOfPossession      *signer.ProofOfPossession
+
+	autoRenewedValidatorConfigOwner fx.Owner
 }
 
 // GetHeight returns the height of the last accepted block
@@ -676,10 +678,11 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 	switch stakerTx := tx.Unsigned.(type) {
 	case txs.ValidatorTx:
 		var pop *signer.ProofOfPossession
-		if staker, ok := stakerTx.(*txs.AddPermissionlessValidatorTx); ok {
-			if s, ok := staker.Signer.(*signer.ProofOfPossession); ok {
-				pop = s
-			}
+		switch stakerTx := stakerTx.(type) {
+		case *txs.AddPermissionlessValidatorTx:
+			pop, _ = stakerTx.Signer.(*signer.ProofOfPossession)
+		case *txs.AddAutoRenewedValidatorTx:
+			pop, _ = stakerTx.Signer.(*signer.ProofOfPossession)
 		}
 
 		attr = &stakerAttributes{
@@ -687,6 +690,10 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 			validationRewardsOwner: stakerTx.ValidationRewardsOwner(),
 			delegationRewardsOwner: stakerTx.DelegationRewardsOwner(),
 			proofOfPossession:      pop,
+		}
+
+		if addAutoRenewedValidatorTx, ok := stakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
+			attr.autoRenewedValidatorConfigOwner = addAutoRenewedValidatorTx.Owner
 		}
 
 	case txs.DelegatorTx:
@@ -903,6 +910,20 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				DelegationFee:          delegationFee,
 				Signer:                 attr.proofOfPossession,
 			}
+
+			if attr.autoRenewedValidatorConfigOwner != nil {
+				configOwner, ok := attr.autoRenewedValidatorConfigOwner.(*secp256k1fx.OutputOwners)
+				if !ok {
+					return nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", attr.autoRenewedValidatorConfigOwner)
+				}
+				vdr.ConfigOwner, err = s.getAPIOwner(configOwner)
+				if err != nil {
+					return nil, err
+				}
+				vdr.Period = utils.PointerTo(avajson.Uint64(stakingInfo.Period))
+				vdr.AutoCompoundRewardShares = utils.PointerTo(avajson.Uint32(stakingInfo.AutoCompoundRewardShares))
+			}
+
 			validators = append(validators, vdr)
 
 		case txs.PrimaryNetworkDelegatorCurrentPriority, txs.SubnetPermissionlessDelegatorCurrentPriority:
