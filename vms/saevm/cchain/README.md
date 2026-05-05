@@ -24,9 +24,10 @@ flowchart TB
 
     subgraph cchain["C-Chain"]
         direction LR
-        hook["hook.Points"]
-        warp["warp"]
-        txpool["txpool"]
+        hook["Hooks"]
+        warp["Warp"]
+        db["Database"]
+        txpool["Txpool"]
         avax["/avax"]
     end
 
@@ -43,6 +44,10 @@ flowchart TB
     hook --> txpool
     p2pn --> txpool
     avax --> txpool
+
+    hook --> db
+    warp --> db
+    txpool --> db
 ```
 
 - **AvalancheGo** — the host node. Three subsystems hand off to the chain VMs: the network delivers peer messages, consensus drives blocks, and the API server serves JSON-RPC.
