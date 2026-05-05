@@ -58,6 +58,10 @@ flowchart TB
 
 ## What `cchain` adds
 
+`cchain` layers four chain-specific behaviors on top of SAE: Import/Export transactions for cross-chain transfers, warp messaging, and two chain parameters that validators vote on each block.
+
+### Export and Import transactions
+
 The Primary Network is the set of three chains (P, X, and C) that transfer assets through pair-wise shared stores: each pair of chains shares its own store that both chains can read and write.
 
 ```mermaid
@@ -77,8 +81,6 @@ flowchart TB
     X --> CX
     C --> CX
 ```
-
-### Export and Import transactions
 
 A cross-chain transfer happens in two steps. An **Export** transaction on the source chain burns the asset there and writes a corresponding entry into the shared store between the source and destination chains. The destination chain later picks up that entry with an **Import** transaction, consuming it and crediting the recipient account.
 
