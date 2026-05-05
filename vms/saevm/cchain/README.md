@@ -13,7 +13,6 @@ flowchart TB
         consensus["Consensus"]
         network["Network"]
         apiserver["API Server"]
-        network <--> consensus
     end
 
     subgraph sae["SAE"]
@@ -31,13 +30,12 @@ flowchart TB
         avax["/avax"]
     end
 
+    network <--> consensus
     network --> p2pn
     consensus --> execution
     apiserver --> apis_sae
     apiserver --> avax
-
     execution --> hook
-
 
     hook --> warp
     p2pn --> warp
