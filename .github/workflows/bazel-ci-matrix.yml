@@ -42,5 +42,5 @@ jobs:
     uses: ./.github/workflows/bazel-ci.yml
     with:
       platform_name: ${{ matrix.platform }}
-      runner: ${{ matrix.platform == 'linux-amd64' && 'ubuntu-latest' || matrix.platform == 'linux-arm64' && 'custom-arm64-noble' || 'macos-26' }}
+      runner: ${{ matrix.platform == 'linux-amd64' && 'ubuntu-24.04' || matrix.platform == 'linux-arm64' && 'ubuntu-24.04-arm' || 'macos-26' }}
     secrets: inherit
