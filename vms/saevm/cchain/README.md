@@ -6,7 +6,7 @@
 
 The C-Chain is composed of three major components:
 
-1. **AvalancheGo** — host infrastructure: networking, consensus, validator-set management, and the external API surface.
+1. **AvalancheGo** — networking, consensus, validator-set management, and the external API surface.
 2. **SAE** — the generic, Turing-complete EVM implementation.
 3. **C-Chain** (this package) — the wrapper that adds C-Chain-specific behavior.
 
