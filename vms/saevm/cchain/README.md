@@ -26,7 +26,7 @@ flowchart TB
         direction LR
         hook["Hooks"]
         warp["Warp"]
-        db["Database"]
+        db[("Database")]
         txpool[("Txpool")]
         avax["/avax"]
     end
