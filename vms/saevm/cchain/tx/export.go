@@ -9,7 +9,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/libevm"
 
 	// Imported for [atomic.UnsignedExportTx.Burned] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
@@ -199,24 +198,6 @@ func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credenti
 		}
 		if addr := pk.EthAddress(); in.Address != addr {
 			return fmt.Errorf("%w (%d): expected %s, got %s", errAddressMismatch, i, in.Address, addr)
-		}
-	}
-	return nil
-}
-
-var errNonceMismatch = errors.New("nonce mismatch")
-
-func (e *Export) VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error {
-	op, err := e.asOp(avaxAssetID)
-	if err != nil {
-		return fmt.Errorf("problem converting export to op: %w", err)
-	}
-	for address, debit := range op.burn {
-		if nonce := reader.GetNonce(address); nonce != debit.Nonce {
-			return fmt.Errorf("%w: address %s has nonce %d but needs %d", errNonceMismatch, address, nonce, debit.Nonce)
-		}
-		if balance := reader.GetBalance(address); balance.Lt(&debit.MinBalance) {
-			return fmt.Errorf("%w: address %s has balance %s but needs %s", errInsufficientFunds, address, balance.String(), debit.MinBalance.String())
 		}
 	}
 	return nil

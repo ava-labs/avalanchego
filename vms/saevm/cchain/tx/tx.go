@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/libevm"
 	"github.com/holiman/uint256"
 
 	// Imported for [atomic.TxBytesGas] comment resolution.
@@ -71,10 +70,6 @@ type Unsigned interface {
 	// It does not verify signatures, whether UTXOs exist, or whether the
 	// transaction performs a valid EVM state transition.
 	SanityCheck(ctx *snow.Context) error
-
-	// VerifyState verifies that the transaction is valid to be issued on the
-	// provided state.
-	VerifyState(avaxAssetID ids.ID, reader libevm.StateReader) error
 
 	// TransferNonAVAX transfers the non-AVAX balances requested by this
 	// transaction.

@@ -9,7 +9,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/libevm"
 	"github.com/holiman/uint256"
 
 	// Imported for [atomic.UnsignedImportTx.Burned] comment resolution.
@@ -196,10 +195,6 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 			return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, err)
 		}
 	}
-	return nil
-}
-
-func (*Import) VerifyState(ids.ID, libevm.StateReader) error {
 	return nil
 }
 

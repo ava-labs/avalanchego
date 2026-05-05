@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 )
 
@@ -171,7 +172,7 @@ func (m *Mempool) Add(rawTx *tx.Tx) error {
 	if err := rawTx.VerifyCredentials(m.ctx.SharedMemory); err != nil {
 		return fmt.Errorf("tx failed credential verification: %w", err)
 	}
-	if err := rawTx.VerifyState(m.ctx.AVAXAssetID, m.state); err != nil {
+	if err := verifyOp(m.state, tx.Op); err != nil {
 		return fmt.Errorf("tx failed state verification: %w", err)
 	}
 
@@ -203,6 +204,25 @@ func (m *Mempool) Add(rawTx *tx.Tx) error {
 	m.utxos.Put(tx.ID, tx.Inputs)
 	m.txs.Push(tx.ID, tx)
 	m.cond.Broadcast()
+	return nil
+}
+
+var (
+	errNonceMismatch     = errors.New("nonce mismatch")
+	errInsufficientFunds = errors.New("insufficient funds")
+)
+
+// TODO(StephenButtolph): Is there a way to deduplicate this logic? It is very
+// similar to the behavior that we perform during worstcase verification.
+func verifyOp(state *state.StateDB, op hook.Op) error {
+	for address, debit := range op.Burn {
+		if nonce := state.GetNonce(address); nonce != debit.Nonce {
+			return fmt.Errorf("%w: address %s has nonce %d but needs %d", errNonceMismatch, address, nonce, debit.Nonce)
+		}
+		if balance := state.GetBalance(address); balance.Lt(&debit.MinBalance) {
+			return fmt.Errorf("%w: address %s has balance %s but needs %s", errInsufficientFunds, address, balance.String(), debit.MinBalance.String())
+		}
+	}
 	return nil
 }
 
