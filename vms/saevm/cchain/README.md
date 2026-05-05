@@ -10,8 +10,8 @@ The C-Chain is implemented as three layered services. AvalancheGo provides the h
 flowchart TB
     subgraph avago["AvalancheGo"]
         direction LR
-        network["Network"]
         consensus["Consensus"]
+        network["Network"]
         apiserver["API Server"]
         consensus <--> network
     end
