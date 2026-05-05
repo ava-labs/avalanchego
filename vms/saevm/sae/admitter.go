@@ -47,7 +47,6 @@ type admitter struct {
 // reject any tx under those rules.
 type admissionHead struct {
 	hash      common.Hash
-	header    *types.Header
 	stateRoot common.Hash
 	rules     params.Rules
 	check     bool // indicates whether the chain's hooks could possibly reject any tx under those rules
@@ -124,7 +123,6 @@ func (a *admitter) makeHead(last *blocks.Block) *admissionHead {
 	rules := a.config.Rules(header.Number, true /*isMerge*/, header.Time)
 	return &admissionHead{
 		hash:      last.Hash(),
-		header:    header,
 		stateRoot: last.PostExecutionStateRoot(),
 		rules:     rules,
 		check:     a.hooks.RequiresTransactionAdmissionCheck(rules),

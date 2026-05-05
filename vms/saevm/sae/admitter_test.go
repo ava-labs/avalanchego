@@ -46,9 +46,7 @@ func withCanExecuteTransaction(fn func(params.Rules, common.Address, *common.Add
 // [withCanExecuteTransaction]) to drive admission decisions.
 type admitterFixture struct {
 	admit  *admitter
-	hooks  *hookstest.Stub
 	wallet *saetest.Wallet
-	exec   *saexec.Executor
 }
 
 // newAdmitterFixture builds an [admitterFixture] funded with `keys`. Callers
@@ -79,9 +77,7 @@ func newAdmitterFixture(t *testing.T, keys *saetest.KeyChain, opts ...admitterOp
 
 	return &admitterFixture{
 		admit:  newAdmitter(exec, hooks, config),
-		hooks:  hooks,
 		wallet: wallet,
-		exec:   exec,
 	}
 }
 
@@ -103,8 +99,6 @@ func TestAdmit(t *testing.T) {
 	addrs := keys.Addresses()
 
 	blockedErr := errors.New("not allow-listed")
-
-	type hit struct{ from, to common.Address }
 
 	tests := []struct {
 		name                   string

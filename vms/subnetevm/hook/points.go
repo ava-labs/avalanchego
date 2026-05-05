@@ -7,26 +7,25 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
 
-	"github.com/ava-labs/avalanchego/database"
-	subnetevmcore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
+	subnetevmcore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -35,14 +34,12 @@ var _ saehook.PointsG[*Tx] = (*Points)(nil)
 
 type Points struct {
 	blockBuilder
-	db          database.Database
 	warpStorage *warp.Storage
 }
 
 // NewPoints constructs a new [Points] for use as a [saehook.PointsG].
 func NewPoints(
 	ctx *snow.Context,
-	db database.Database,
 	chainConfig *ethparams.ChainConfig,
 	now func() time.Time,
 	desiredDelayExcess *acp226.DelayExcess,
@@ -61,7 +58,6 @@ func NewPoints(
 			now:         now,
 			coinbase:    configuredCoinbase,
 		},
-		db:          db,
 		warpStorage: warpStorage,
 	}
 }
@@ -115,11 +111,11 @@ func (*Points) SettledHeight(h *types.Header) uint64 {
 func (*Points) BlockTime(h *types.Header) time.Time {
 	var ns int64
 	if msp := customtypes.GetHeaderExtra(h).TimeMilliseconds; msp != nil {
-		ms := time.Duration(*msp % 1000)
-		frac := ms * time.Millisecond
+		ms := *msp % 1000
+		frac := time.Duration(ms) * time.Millisecond //#nosec G115 -- ms is bounded to [0, 1000)
 		ns = frac.Nanoseconds()
 	}
-	return time.Unix(int64(h.Time), ns)
+	return time.Unix(int64(h.Time), ns) //#nosec G115 -- Won't overflow for a few millennia
 }
 
 // EndOfBlockOps returns the operations to apply at the end of block execution

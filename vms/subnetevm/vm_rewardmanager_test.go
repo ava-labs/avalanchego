@@ -14,16 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
-	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 // blockBuildAdvance must exceed ACP-226's minDelay (~2s at initial delay excess).
@@ -366,8 +367,7 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 			require.NoError(t, err)
 
 			err = sut.vm.VerifyBlock(sut.ctx, nil, forged)
-			require.Error(t, err, "VerifyBlock MUST reject a block with a forged Coinbase")
-			require.Contains(t, err.Error(), "hash mismatch",
+			require.ErrorIs(t, err, sae.ErrHashMismatch,
 				"forged Coinbase must trip SAE's rebuild-and-compare hash check")
 		})
 	}

@@ -481,7 +481,7 @@ func TestAddToPool(t *testing.T) {
 
 			require.Len(t, errs, len(tt.wantErrs))
 			for i, want := range tt.wantErrs {
-				assert.ErrorIsf(t, errs[i], want, "errs[%d]", i)
+				require.ErrorIsf(t, errs[i], want, "errs[%d]", i)
 			}
 
 			require.Len(t, tt.wantInPool, len(txs), "test setup: wantInPool must align with txs")

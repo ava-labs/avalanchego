@@ -7,11 +7,12 @@ import (
 	"context"
 
 	"github.com/ava-labs/libevm/common"
-	libevmparams "github.com/ava-labs/libevm/params"
 
-	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
+
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	libevmparams "github.com/ava-labs/libevm/params"
 )
 
 // EthExtrasAPI serves the subnet-evm-specifi`eth_*` JSON-RPC

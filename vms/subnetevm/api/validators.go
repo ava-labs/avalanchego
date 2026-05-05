@@ -10,8 +10,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // UptimeSource is the slice of `*uptimetracker.UptimeTracker` consumed

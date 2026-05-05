@@ -171,7 +171,7 @@ func (*Points) RequiresTransactionAdmissionCheck(ethparams.Rules) bool {
 	return false
 }
 
-func (p *Points) BeforeExecutingBlock(ethparams.Rules, *types.Header, *state.StateDB, *types.Block) error {
+func (*Points) BeforeExecutingBlock(ethparams.Rules, *types.Header, *state.StateDB, *types.Block) error {
 	return nil
 }
 

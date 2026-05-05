@@ -17,13 +17,14 @@ import (
 
 	"go.uber.org/zap"
 
-	avadb "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
+
+	avadb "github.com/ava-labs/avalanchego/database"
+	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // syncFrequency is the period between background calls to

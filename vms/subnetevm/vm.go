@@ -14,9 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	libevmcommon "github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
@@ -24,6 +21,9 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+
+	// Force-load precompiles to trigger registration
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // Force-load precompiles to trigger registration
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -45,7 +45,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
-	subnetevmapi "github.com/ava-labs/avalanchego/vms/subnetevm/api"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/hook"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/state"
@@ -54,10 +55,9 @@ import (
 	avadb "github.com/ava-labs/avalanchego/database"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
+	subnetevmapi "github.com/ava-labs/avalanchego/vms/subnetevm/api"
 	saewarp "github.com/ava-labs/avalanchego/vms/subnetevm/warp"
-
-	// Force-load precompiles to trigger registration
-	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // Force-load precompiles to trigger registration
+	libevmcommon "github.com/ava-labs/libevm/common"
 )
 
 // VM is a harness around an [sae.VM], providing an `Initialize`
@@ -67,10 +67,6 @@ type VM struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
 
 	ctx *snow.Context
-	db  avadb.Database
-
-	// TODO(alarso16): remove later
-	hooks *hook.Points
 
 	// toClose are closed in reverse order during [VM.Shutdown]. If a
 	// resource depends on another resource, it MUST be added AFTER the
@@ -212,7 +208,6 @@ func (v *VM) Initialize(
 	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := hook.NewPoints(
 		snowCtx,
-		avaDB,
 		config,
 		saeConfig.Now,
 		desiredDelayExcess,
@@ -229,8 +224,6 @@ func (v *VM) Initialize(
 	}
 	v.VM = inner
 	v.ctx = snowCtx
-	v.db = avaDB
-	v.hooks = hooks
 
 	snowCtx.Log.Info("registering the validators manager")
 

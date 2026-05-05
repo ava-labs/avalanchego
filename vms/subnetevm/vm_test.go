@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core"
@@ -26,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
@@ -43,8 +40,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/subnetevm/api/client"
 
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
@@ -221,7 +221,7 @@ func newTestGenesis(fork upgradetest.Fork, keychain *saetest.KeyChain) *core.Gen
 	}
 }
 
-func withFork(fork upgradetest.Fork) sutOption {
+func withFork(fork upgradetest.Fork) sutOption { //nolint:unparam // Helicon and Latest currently both equal 15 but caller-controlled by design
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.fork = fork
 	})

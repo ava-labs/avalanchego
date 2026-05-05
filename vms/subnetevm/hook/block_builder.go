@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"time"
 
-	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
@@ -29,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/subnetevm/warp"
 
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	saehook "github.com/ava-labs/avalanchego/vms/saevm/hook"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )

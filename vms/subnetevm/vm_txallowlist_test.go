@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 
-	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 

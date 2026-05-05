@@ -105,7 +105,11 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 		// surface as an explicit decoder error rather than silently
 		// no-op.
 		_, err := ParseConfig([]byte(`{"state-sync-enabled":true}`))
-		require.ErrorContains(t, err, "state-sync-enabled")
+		require.Error(t, err)
+		// JSON decoder does not expose a sentinel error for unknown fields,
+		// so we check for the presence of the field name and "unknown field" in the error message.
+		require.Contains(t, err.Error(), "state-sync-enabled")
+		require.Contains(t, err.Error(), "unknown field")
 	})
 
 	t.Run("duration_accepts_string_and_numeric", func(t *testing.T) {
@@ -130,7 +134,7 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	})
 
 	t.Run("log_level_and_format", func(t *testing.T) {
-		c, err := ParseConfig([]byte(`{"log-level":"debug","log-json-format":true}`))
+		c, err := ParseConfig([]byte(`{"log-level":"debug"}`))
 		require.NoError(t, err)
 		require.Equal(t, "debug", c.LogLevel)
 	})

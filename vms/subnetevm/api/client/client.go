@@ -9,11 +9,12 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/ethclient"
-	libevmrpc "github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+
 	subnetevmapi "github.com/ava-labs/avalanchego/vms/subnetevm/api"
+	libevmrpc "github.com/ava-labs/libevm/rpc"
 )
 
 // Client talks to a `vms/subnetevm` chain. The standard Ethereum surface is
