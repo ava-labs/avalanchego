@@ -13,19 +13,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-func TestACP224FeeConfigVerify(t *testing.T) {
+func TestGasPriceConfigVerify(t *testing.T) {
 	tests := []struct {
 		name   string
-		config ACP224FeeConfig
+		config GasPriceConfig
 		want   error
 	}{
 		{
 			name:   "valid config",
-			config: DefaultACP224FeeConfig(),
+			config: DefaultGasPriceConfig(),
 		},
 		{
 			name: "valid with validatorTargetGas",
-			config: ACP224FeeConfig{
+			config: GasPriceConfig{
 				ValidatorTargetGas: true,
 				MinGasPrice:        1,
 				TimeToDouble:       60,
@@ -33,15 +33,15 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 		},
 		{
 			name: "valid with staticPricing",
-			config: ACP224FeeConfig{
-				TargetGas:     MinTargetGasACP224,
+			config: GasPriceConfig{
+				TargetGas:     MinTargetGas,
 				StaticPricing: true,
 				MinGasPrice:   1,
 			},
 		},
 		{
 			name: "valid with both validatorTargetGas and staticPricing",
-			config: ACP224FeeConfig{
+			config: GasPriceConfig{
 				ValidatorTargetGas: true,
 				StaticPricing:      true,
 				MinGasPrice:        1,
@@ -49,17 +49,17 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 		},
 		{
 			name: "minGasPrice zero",
-			config: ACP224FeeConfig{
-				TargetGas:    MinTargetGasACP224,
+			config: GasPriceConfig{
+				TargetGas:    MinTargetGas,
 				TimeToDouble: 60,
 			},
 			want: ErrMinGasPriceTooLow,
 		},
 		{
 			name: "targetGas must be zero when validatorTargetGas is true",
-			config: ACP224FeeConfig{
+			config: GasPriceConfig{
 				ValidatorTargetGas: true,
-				TargetGas:          MinTargetGasACP224,
+				TargetGas:          MinTargetGas,
 				MinGasPrice:        1,
 				TimeToDouble:       60,
 			},
@@ -67,25 +67,25 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 		},
 		{
 			name: "targetGas below minimum",
-			config: ACP224FeeConfig{
-				TargetGas:    MinTargetGasACP224 - 1,
+			config: GasPriceConfig{
+				TargetGas:    MinTargetGas - 1,
 				MinGasPrice:  1,
 				TimeToDouble: 60,
 			},
-			want: errTargetGasTooLowACP224,
+			want: errTargetGasBelowMin,
 		},
 		{
 			name: "targetGas at minimum boundary",
-			config: ACP224FeeConfig{
-				TargetGas:    MinTargetGasACP224,
+			config: GasPriceConfig{
+				TargetGas:    MinTargetGas,
 				MinGasPrice:  1,
 				TimeToDouble: 1,
 			},
 		},
 		{
 			name: "timeToDouble must be zero when staticPricing is true",
-			config: ACP224FeeConfig{
-				TargetGas:     MinTargetGasACP224,
+			config: GasPriceConfig{
+				TargetGas:     MinTargetGas,
 				StaticPricing: true,
 				MinGasPrice:   1,
 				TimeToDouble:  60,
@@ -94,8 +94,8 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 		},
 		{
 			name: "timeToDouble must be positive when staticPricing is false",
-			config: ACP224FeeConfig{
-				TargetGas:   MinTargetGasACP224,
+			config: GasPriceConfig{
+				TargetGas:   MinTargetGas,
 				MinGasPrice: 1,
 			},
 			want: errTimeToDoubleTooLow,
@@ -110,22 +110,22 @@ func TestACP224FeeConfigVerify(t *testing.T) {
 	}
 }
 
-// TestACP224FeeConfigPackFormat asserts exact packed bytes for known configs.
+// TestGasPriceConfigPackFormat asserts exact packed bytes for known configs.
 // This catches backward-incompatible format changes that round-trip tests miss.
-func TestACP224FeeConfigPackFormat(t *testing.T) {
+func TestGasPriceConfigPackFormat(t *testing.T) {
 	tests := []struct {
 		name   string
-		config ACP224FeeConfig
+		config GasPriceConfig
 		want   common.Hash
 	}{
 		{
 			name:   "default config",
-			config: DefaultACP224FeeConfig(),
+			config: DefaultGasPriceConfig(),
 			want:   common.HexToHash("0x0000000000000f4240000000000000000001000000000000003c000000000000"),
 		},
 		{
 			name: "all flags true and max uint64",
-			config: ACP224FeeConfig{
+			config: GasPriceConfig{
 				ValidatorTargetGas: true,
 				TargetGas:          math.MaxUint64,
 				StaticPricing:      true,
@@ -136,7 +136,7 @@ func TestACP224FeeConfigPackFormat(t *testing.T) {
 		},
 		{
 			name: "validatorTargetGas mode",
-			config: ACP224FeeConfig{
+			config: GasPriceConfig{
 				ValidatorTargetGas: true,
 				MinGasPrice:        1,
 				TimeToDouble:       60,
@@ -152,41 +152,41 @@ func TestACP224FeeConfigPackFormat(t *testing.T) {
 	}
 }
 
-func FuzzACP224FeeConfigPacking(f *testing.F) {
+func FuzzGasPriceConfigPacking(f *testing.F) {
 	f.Add(false, false, uint64(0), uint64(0), uint64(0))
 	f.Add(true, true, uint64(math.MaxUint64), uint64(math.MaxUint64), uint64(math.MaxUint64))
-	f.Add(false, false, MinTargetGasACP224, uint64(1), uint64(60))
+	f.Add(false, false, MinTargetGas, uint64(1), uint64(60))
 	f.Add(true, false, uint64(0), uint64(1), uint64(60))
-	f.Add(false, true, MinTargetGasACP224, uint64(1), uint64(0))
+	f.Add(false, true, MinTargetGas, uint64(1), uint64(0))
 	f.Add(true, true, uint64(0), uint64(1), uint64(0))
 
 	f.Fuzz(func(t *testing.T, validator, static bool, target, minGas, double uint64) {
-		in := &ACP224FeeConfig{validator, target, static, minGas, double}
-		got := new(ACP224FeeConfig)
+		in := &GasPriceConfig{validator, target, static, minGas, double}
+		got := new(GasPriceConfig)
 		got.UnpackFrom(in.Pack())
 		require.Equalf(t, *in, *got, "%T.UnpackFrom(%[1]T.Pack()) round trip", in)
 		require.Truef(t, got.Equal(in), "%T.Equal([packed original])", got)
 	})
 }
 
-func TestACP224FeeConfigEqual(t *testing.T) {
+func TestGasPriceConfigEqual(t *testing.T) {
 	tests := []struct {
 		name string
-		a    *ACP224FeeConfig
-		b    *ACP224FeeConfig
+		a    *GasPriceConfig
+		b    *GasPriceConfig
 		want bool
 	}{
 		{
 			name: "both equal",
-			a:    utils.PointerTo(DefaultACP224FeeConfig()),
-			b:    utils.PointerTo(DefaultACP224FeeConfig()),
+			a:    utils.PointerTo(DefaultGasPriceConfig()),
+			b:    utils.PointerTo(DefaultGasPriceConfig()),
 			want: true,
 		},
 		{
 			name: "different targetGas",
-			a:    utils.PointerTo(DefaultACP224FeeConfig()),
-			b: func() *ACP224FeeConfig {
-				c := DefaultACP224FeeConfig()
+			a:    utils.PointerTo(DefaultGasPriceConfig()),
+			b: func() *GasPriceConfig {
+				c := DefaultGasPriceConfig()
 				c.TargetGas++
 				return &c
 			}(),
@@ -194,14 +194,14 @@ func TestACP224FeeConfigEqual(t *testing.T) {
 		},
 		{
 			name: "other nil",
-			a:    utils.PointerTo(DefaultACP224FeeConfig()),
+			a:    utils.PointerTo(DefaultGasPriceConfig()),
 			b:    nil,
 			want: false,
 		},
 		{
 			name: "receiver nil",
 			a:    nil,
-			b:    utils.PointerTo(DefaultACP224FeeConfig()),
+			b:    utils.PointerTo(DefaultGasPriceConfig()),
 			want: false,
 		},
 		{

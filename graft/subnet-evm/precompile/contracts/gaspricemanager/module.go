@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package acp224feemanager
+package gaspricemanager
 
 import (
 	"fmt"
@@ -17,14 +17,14 @@ import (
 var _ contract.Configurator = (*configurator)(nil)
 
 // ConfigKey must be unique across all precompiles.
-const ConfigKey = "acp224FeeManagerConfig"
+const ConfigKey = "gasPriceManagerConfig"
 
 var ContractAddress = common.HexToAddress("0x0200000000000000000000000000000000000006")
 
 var Module = modules.Module{
 	ConfigKey:    ConfigKey,
 	Address:      ContractAddress,
-	Contract:     acp224FeeManagerPrecompile,
+	Contract:     gasPriceManagerPrecompile,
 	Configurator: &configurator{},
 }
 
@@ -46,7 +46,7 @@ func (*configurator) MakeConfig() precompileconfig.Config {
 }
 
 // Configure performs one-time initialization when the precompile activates.
-// It seeds contract storage with the initial fee config and allowlist state.
+// It seeds contract storage with the initial gas price config and allowlist state.
 // This function MUST only be called once as re-running it would reset that
 // initialized state.
 func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.ConfigurationBlockContext) error {
@@ -54,12 +54,12 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 	if !ok {
 		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
 	}
-	initialFeeConfig := commontype.DefaultACP224FeeConfig()
-	if config.InitialFeeConfig != nil {
-		initialFeeConfig = *config.InitialFeeConfig
+	initialGasPriceConfig := commontype.DefaultGasPriceConfig()
+	if config.InitialGasPriceConfig != nil {
+		initialGasPriceConfig = *config.InitialGasPriceConfig
 	}
-	if err := StoreFeeConfig(state, ContractAddress, initialFeeConfig, blockContext.Number()); err != nil {
-		return fmt.Errorf("cannot configure initial fee config: %w", err)
+	if err := StoreGasPriceConfig(state, ContractAddress, initialGasPriceConfig, blockContext.Number()); err != nil {
+		return fmt.Errorf("cannot configure initial gas price config: %w", err)
 	}
 	return config.AllowListConfig.Configure(chainConfig, ContractAddress, state, blockContext)
 }

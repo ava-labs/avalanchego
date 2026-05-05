@@ -37,8 +37,8 @@
           }
         ],
         "indexed": false,
-        "internalType": "struct IACP224FeeManager.FeeConfig",
-        "name": "oldFeeConfig",
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
+        "name": "oldGasPriceConfig",
         "type": "tuple"
       },
       {
@@ -70,12 +70,12 @@
           }
         ],
         "indexed": false,
-        "internalType": "struct IACP224FeeManager.FeeConfig",
-        "name": "newFeeConfig",
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
+        "name": "newGasPriceConfig",
         "type": "tuple"
       }
     ],
-    "name": "FeeConfigUpdated",
+    "name": "GasPriceConfigUpdated",
     "type": "event"
   },
   {
@@ -111,7 +111,7 @@
   },
   {
     "inputs": [],
-    "name": "getFeeConfig",
+    "name": "getGasPriceConfig",
     "outputs": [
       {
         "components": [
@@ -141,7 +141,7 @@
             "type": "uint64"
           }
         ],
-        "internalType": "struct IACP224FeeManager.FeeConfig",
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
         "name": "config",
         "type": "tuple"
       }
@@ -151,7 +151,7 @@
   },
   {
     "inputs": [],
-    "name": "getFeeConfigLastChangedAt",
+    "name": "getGasPriceConfigLastChangedAt",
     "outputs": [
       {
         "internalType": "uint256",
@@ -237,12 +237,12 @@
             "type": "uint64"
           }
         ],
-        "internalType": "struct IACP224FeeManager.FeeConfig",
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
         "name": "config",
         "type": "tuple"
       }
     ],
-    "name": "setFeeConfig",
+    "name": "setGasPriceConfig",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

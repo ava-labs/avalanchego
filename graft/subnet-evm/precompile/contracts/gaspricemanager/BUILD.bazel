@@ -2,15 +2,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
 go_library(
-    name = "acp224feemanager",
+    name = "gaspricemanager",
     srcs = [
         "config.go",
         "contract.go",
         "event.go",
         "module.go",
     ],
-    embedsrcs = ["IACP224FeeManager.abi"],
-    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager",
+    embedsrcs = ["IGasPriceManager.abi"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager",
     visibility = ["//visibility:public"],
     deps = [
         "//graft/subnet-evm/commontype",
@@ -26,12 +26,12 @@ go_library(
 )
 
 graft_go_test(
-    name = "acp224feemanager_test",
+    name = "gaspricemanager_test",
     srcs = [
         "config_test.go",
         "contract_test.go",
     ],
-    embed = [":acp224feemanager"],
+    embed = [":gaspricemanager"],
     deps = [
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core/extstate",

@@ -9,8 +9,8 @@ package(default_visibility = [
 go_library(
     name = "commontype",
     srcs = [
-        "acp224_fee_config.go",
         "fee_config.go",
+        "gas_price_config.go",
         "test_fee_config.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype",
@@ -23,8 +23,8 @@ go_library(
 graft_go_test(
     name = "commontype_test",
     srcs = [
-        "acp224_fee_config_test.go",
         "fee_config_test.go",
+        "gas_price_config_test.go",
     ],
     data = glob(["testdata/**"]),
     embed = [":commontype"],

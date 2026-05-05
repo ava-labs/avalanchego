@@ -10,17 +10,17 @@ import (
 	"github.com/ava-labs/libevm/common"
 )
 
-const MinTargetGasACP224 uint64 = 1_000_000
+const MinTargetGas uint64 = 1_000_000
 
-// DefaultACP224FeeConfig returns a default ACP-224 fee
-// config.
+// DefaultGasPriceConfig returns a default gas price config for the dynamic
+// gas limit mechanism.
 //
 // The default values are:
 //   - TargetGas: 1_000_000
 //   - MinGasPrice: 1
 //   - TimeToDouble: 60
-func DefaultACP224FeeConfig() ACP224FeeConfig {
-	return ACP224FeeConfig{
+func DefaultGasPriceConfig() GasPriceConfig {
+	return GasPriceConfig{
 		TargetGas:    1_000_000,
 		MinGasPrice:  1,
 		TimeToDouble: 60,
@@ -31,14 +31,15 @@ var (
 	ErrMinGasPriceTooLow = errors.New("minGasPrice must be greater than 0")
 
 	errTargetGasMustBeZero    = errors.New("targetGas must be 0 when validatorTargetGas is true")
-	errTargetGasTooLowACP224  = errors.New("targetGas must be at least MinTargetGasACP224")
+	errTargetGasBelowMin      = errors.New("targetGas must be at least MinTargetGas")
 	errTimeToDoubleTooLow     = errors.New("timeToDouble must be greater than 0")
 	errTimeToDoubleMustBeZero = errors.New("timeToDouble must be 0 when staticPricing is true")
 )
 
-// ACP224FeeConfig specifies the parameters for the ACP-224 dynamic gas limit mechanism.
-// See [ACP224FeeConfig.Verify] for validation constraints between fields.
-type ACP224FeeConfig struct {
+// GasPriceConfig specifies the parameters for the dynamic gas limit and
+// gas price mechanism.
+// See [GasPriceConfig.Verify] for validation constraints between fields.
+type GasPriceConfig struct {
 	ValidatorTargetGas bool   `json:"validatorTargetGas"` // when true, validators control targetGas via node preferences
 	TargetGas          uint64 `json:"targetGas"`          // target gas consumption per second
 	StaticPricing      bool   `json:"staticPricing"`      // when true, gas price is always minGasPrice
@@ -47,14 +48,14 @@ type ACP224FeeConfig struct {
 }
 
 // Verify returns an error if the config violates any field constraints.
-func (a *ACP224FeeConfig) Verify() error {
+func (a *GasPriceConfig) Verify() error {
 	switch {
 	case a.MinGasPrice == 0:
 		return ErrMinGasPriceTooLow
 	case a.ValidatorTargetGas && a.TargetGas != 0:
 		return errTargetGasMustBeZero
-	case !a.ValidatorTargetGas && a.TargetGas < MinTargetGasACP224:
-		return errTargetGasTooLowACP224
+	case !a.ValidatorTargetGas && a.TargetGas < MinTargetGas:
+		return errTargetGasBelowMin
 	case a.StaticPricing && a.TimeToDouble != 0:
 		return errTimeToDoubleMustBeZero
 	case !a.StaticPricing && a.TimeToDouble == 0:
@@ -64,7 +65,7 @@ func (a *ACP224FeeConfig) Verify() error {
 	}
 }
 
-// Pack encodes the fee config into a single common.Hash (32 bytes).
+// Pack encodes the gas price config into a single common.Hash (32 bytes).
 //
 // Layout (26 bytes used, 6 bytes padding):
 //
@@ -73,7 +74,7 @@ func (a *ACP224FeeConfig) Verify() error {
 //	h[9]     StaticPricing      (bool)
 //	h[10:18] MinGasPrice        (uint64)
 //	h[18:26] TimeToDouble       (uint64)
-func (a *ACP224FeeConfig) Pack() common.Hash {
+func (a *GasPriceConfig) Pack() common.Hash {
 	var h common.Hash
 	put := binary.BigEndian.PutUint64
 
@@ -89,9 +90,9 @@ func (a *ACP224FeeConfig) Pack() common.Hash {
 	return h
 }
 
-// UnpackFrom decodes a packed common.Hash into the fee config fields.
-// See [ACP224FeeConfig.Pack] for the byte layout.
-func (a *ACP224FeeConfig) UnpackFrom(h common.Hash) {
+// UnpackFrom decodes a packed common.Hash into the gas price config fields.
+// See [GasPriceConfig.Pack] for the byte layout.
+func (a *GasPriceConfig) UnpackFrom(h common.Hash) {
 	u64 := binary.BigEndian.Uint64
 
 	a.ValidatorTargetGas = h[0] != 0
@@ -102,7 +103,7 @@ func (a *ACP224FeeConfig) UnpackFrom(h common.Hash) {
 }
 
 // Equal returns true if both configs are nil or have identical field values.
-func (a *ACP224FeeConfig) Equal(other *ACP224FeeConfig) bool {
+func (a *GasPriceConfig) Equal(other *GasPriceConfig) bool {
 	if a == nil || other == nil {
 		return a == other
 	}
