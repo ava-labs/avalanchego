@@ -1,10 +1,13 @@
 # C-Chain VM (`cchain`)
 
-`cchain` is the C-Chain VM. It is a thin chain-specific harness wrapped around [saevm](../), the generic streaming-asynchronous EVM framework that implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). `saevm` does the heavy lifting — block execution, settlement, gas accounting, EVM gossip, and the Snowman adaptor. `cchain` adds what makes the chain *the C-Chain*: Import/Export transactions for moving assets between Primary Network chains, warp signatures, dynamic gas targeting, minimum-delay block production, and the migration boundary from the chain's historical synchronous era.
+`cchain` is the C-Chain VM. It is a thin chain-specific harness around [saevm](../), the generic EVM framework that implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). `saevm` does the heavy lifting — block execution, settlement, gas accounting, and EVM gossip. `cchain` adds what makes the chain *the C-Chain*: Transactions for moving assets between Primary Network chains, warp messaging, validator voting of chain parameters, and minimum block delay enforcement.
 
 ## Architecture
 
-The C-Chain is implemented as three layered services. AvalancheGo provides the host infrastructure; SAE is a generic streaming-async EVM that AvalancheGo drives through; the C-Chain plugs in at SAE's integration points (and, for `/avax`, attaches directly to AvalancheGo).
+The C-Chain is comprised of three major components.
+1. AvalancheGo which provides the host infrastructure: networking, consensus, validator set management, and exposes an API for external access.
+2. SAE is the generic EVM implementation that provides Turing complete smart contract behavior.
+3. The C-chain wrapper, this package, to support C-Chain specific behavior.
 
 ```mermaid
 flowchart TB
@@ -50,29 +53,47 @@ flowchart TB
     txpool --> db
 ```
 
-- **AvalancheGo** — the host node. Three subsystems hand off to the chain VMs: the network delivers peer messages, consensus drives blocks, and the API server serves JSON-RPC.
-- **SAE** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). Three integration points receive AvalancheGo's traffic: a p2p handler-ID dispatcher, a block-building and execution pipeline, and an `eth_*` JSON-RPC server. The first two fan out into the C-Chain layer; the JSON-RPC server terminates inside SAE.
-- **C-Chain** — the C-Chain-specific service (this package). [Hooks](hook/) plug into SAE's execution pipeline for chain-specific behavior. SAE's p2p dispatcher delivers Import/Export gossip into the [Txpool](txpool/) and ACP-118 signature requests against the [Warp](warp/) message store. The [/avax](api/) endpoints attach directly to AvalancheGo's API server, bypassing SAE, and submit user-issued transactions into the same Txpool. Hooks, Warp, and Txpool all persist their state to a shared AvalancheGo Database.
-
-Inside the C-Chain, Hooks read the Txpool for transaction candidates during block building and write Warp for messages emitted during execution. The Txpool's flow from arrival to inclusion is detailed in [the next section](#how-transactions-enter-the-txpool).
-
 ## What `cchain` adds
 
-The Primary Network is the set of three chains (P, X, and C) that exchange assets through a per-chain shared key-value store. Each chain has a slot, and chains hand assets to each other by writing to the recipient's slot.
+The Primary Network is the set of three chains (P, X, and C) that transfer assets through a pair-wise shared key-value store.
+
+// TODO(@Claude): Make a mermaid diagram where there the 3 chains as circles. Where each circles are connected to each other via a pair-wise defined shared database.
 
 ### Import / Export transactions
-Transfers between the C-Chain and the other Primary Network chains, via that shared store. **Import** transactions consume entries another chain wrote into the C-Chain's slot and credit the matching C-Chain accounts; **Export** transactions burn C-Chain balances and write the matching entries into the destination chain's slot. `cchain` defines the transaction types and validation rules, runs a dedicated mempool keyed on consumed inputs, and operates a bloom-filter gossip system for them. See [tx](tx/) and [txpool](txpool/).
+
+// TODO(@Claude): Introduce Export transactions first, since a transfer has to always start with an Export first.
+
+
+// TODO(@Claude): Drop the term "slot", it is confusing since "slot" means something specific for EVM chains - and this isn't the correct meaning.
+
+Transfers between the C-Chain and the other Primary Network chains, via that shared store. **Import** transactions consume entries another chain wrote into the C-Chain's slot and credit the matching C-Chain accounts; **Export** transactions burn C-Chain balances and write the matching entries into the destination chain's slot.
+
+// TODO(@Claude): Expand on the mempool invariants slightly. Specifically, the mempool doesn't support dependent transactions, but guarantees that the mempool state is always valid against a recently executed state and, if blocks stop being issued, the mempool transactions are eventually guaranteed to be valid against the last accepted block.
+
+`cchain` defines the transaction types and validation rules, runs a dedicated mempool keyed on consumed inputs, and operates a bloom-filter gossip system for them. See [tx](tx/) and [txpool](txpool/).
 
 ### Warp signature service
+
+// TODO(@Claude): the C-chain wrapper does more than just signing warp messages. It supports both sending and recieving warp messages. ACP-118 defines the standard p2p protocol for sending (signing) warp messages, but the C-chain also encodes warp messages into transaction access lists and includes a custom precompile to interact with warp messages (both sending and receiving).
+
 Cross-subnet signed messages following [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118). When the chain emits a warp message, `cchain` stores it; when peers ask this node to sign a message they have, `cchain` verifies the request against the stored set and (for accepted messages) returns a BLS signature. See [warp](warp/).
 
 ### Dynamic gas target (ACP-176)
+
+// TODO:(@Claude): This is not how this works. The majority of ACP-176 has been moved into SAE directly. The only remaining component is for setting the target gas-per-second, which is in this package. However, this is not done based on observed usage. The validators vote directly whether to increase, decrease, or keep the gas target the same. The validators decide on a sustainable throughput rate. It is not automatically discovered via an econmomic mechansism.
+
 The target gas-per-second is not a fixed parameter. It follows an excess tracker that adjusts up or down based on observed usage, letting the network discover a sustainable throughput rate from the bottom up. See [hook/acp176](hook/acp176/).
 
 ### Minimum block delay (ACP-226)
+
+// TODO:(@Claude): We should expand on what configurable means here. Similarly to the target gas-per-second, this is a value which validators can vote on increasing, decreasing, or keeping the same.
+
 A configurable lower bound on the time between consecutive blocks, derived from the parent header. The bound prevents accelerated block production beyond what the network has agreed to. See [hook](hook/).
 
 ### Synchronous-to-asynchronous migration
+
+// TODO:(@Claude): This is really pretty wrong. Currently the PoC doesn't support this transaition much at all. It assumes that the cchain VM is started on top of a state which has already performed the synchronous execution. In the future, we will delete transitionvm, along with all of the legacy coreth implementation. At that point, SAE will support executing synchronous blocks (during bootstrapping). But the coreth wrapper will really not deal with that much.
+
 The C-Chain executed synchronously for years before streaming-asynchronous execution was introduced. `cchain` records the boundary block at which the chain switched modes, so a node bootstrapping from genesis correctly replays the synchronous era and then hands off to saevm's asynchronous pipeline for everything after. See [state](state/) and [hook](hook/).
 
 ## How transactions enter the Txpool
