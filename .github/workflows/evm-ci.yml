@@ -8,6 +8,23 @@ on:
     types: [checks_requested]
 
 jobs:
+  evm-shared-required:
+    if: ${{ always() }}
+    needs:
+      - lint_test
+      - unit_test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS_JSON" | jq -e '
+            to_entries
+            | all(.value.result == "success")
+          ' >/dev/null
+
   lint_test:
     name: Lint
     runs-on: ubuntu-latest

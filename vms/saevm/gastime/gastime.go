@@ -43,8 +43,8 @@ type Time struct {
 // New returns a new [Time], derived from a [time.Time]. The consumption of
 // `target` * [TargetToRate] units of [gas.Gas] is equivalent to a tick of 1
 // second.
-func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceConfig) (*Time, error) {
-	if err := gasPriceConfig.Validate(); err != nil {
+func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time, error) {
+	if err := c.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -52,12 +52,20 @@ func New(at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceCo
 	target = clampTarget(target)
 	tm.SetRate(rateOf(target))
 
-	return &Time{
+	// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
+	// meaningfully provide. We should instead take in startingPrice.
+	if c.StaticPricing {
+		startingExcess = 0
+	}
+
+	t := &Time{
 		Time:   tm,
 		target: target,
 		excess: startingExcess,
-		config: gasPriceConfig,
-	}, nil
+		config: c,
+	}
+	t.enforceMinExcess()
+	return t, nil
 }
 
 func FromProxyTime(tm *proxytime.Time[gas.Gas], target, excess gas.Gas, gasPriceConfig GasPriceConfig) (*Time, error) {
@@ -123,19 +131,19 @@ func (tm *Time) Excess() gas.Gas {
 }
 
 // Price returns the price of a unit of gas, i.e. the "base fee", determined by
-// [gas.CalculatePrice]. However, when [GasPriceConfig.StaticPricing] is
-// true, Price always returns [GasPriceConfig.MinPrice].
+// [gas.CalculatePrice].
 func (tm *Time) Price() gas.Price {
-	if tm.config.StaticPricing {
-		return tm.config.MinPrice
-	}
-	// TODO (ceyonur): Consider omitting `MinPrice` in favor of `MinExcess`.
-	// https://github.com/ava-labs/strevm/issues/267
-	return gas.CalculatePrice(tm.config.MinPrice, tm.excess, tm.excessScalingFactor())
+	p := calculatePrice(tm.excess, tm.excessScalingFactor())
+	// When minPrice can't be represented by e^(x/k), p may be too low.
+	return max(tm.config.MinPrice, p)
 }
 
 // excessScalingFactor returns the K variable of ACP-103/176, i.e.
 // [GasPriceConfig.TargetToExcessScaling] * T, capped at [math.MaxUint64].
+//
+// TODO(StephenButtolph): Rather than capping this at MaxUint64, we should move
+// the evaluation of T * K into the exponential calculation. This would allow us
+// to never round any values during calculation of extreme inputs.
 func (tm *Time) excessScalingFactor() gas.Gas {
 	return intmath.BoundedMultiply(tm.config.TargetToExcessScaling, tm.target, math.MaxUint64)
 }
@@ -146,34 +154,15 @@ func (tm *Time) BaseFee() *uint256.Int {
 	return uint256.NewInt(uint64(tm.Price()))
 }
 
-// SetRate is equivalent to [Time.SetTarget] after (integer) division of `r` by
-// [TargetToRate].
-func (tm *Time) SetRate(r gas.Gas) {
-	tm.SetTarget(r / TargetToRate)
-}
-
-// SetTarget changes the target gas consumption per second, clamping the
-// argument to the range [[MinTarget], [MaxTarget]]. If the [Time.Excess] were
-// to overflow as a result of this scaling then it is silently capped at
-// [math.MaxUint64].
-func (tm *Time) SetTarget(t gas.Gas) {
-	t = clampTarget(t)
-	r := rateOf(t)
-
-	x, err := tm.Scale(tm.excess, r)
-	if err != nil {
-		x = math.MaxUint64
-	}
-
-	tm.Time.SetRate(r)
-	tm.excess = x
-	tm.target = t
-}
-
 // Tick is equivalent to [proxytime.Time.Tick] except that it also updates the
 // gas excess.
 func (tm *Time) Tick(g gas.Gas) {
 	tm.Time.Tick(g)
+
+	// static pricing keeps excess at its minimum
+	if tm.config.StaticPricing {
+		return
+	}
 
 	R, T := tm.Rate(), tm.Target()         //nolint:revive // unexported-naming: mathematical convention
 	quo, _, _ := intmath.MulDiv(g, R-T, R) // overflow is impossible as (R-T)/R < 1
@@ -219,4 +208,6 @@ func (tm *Time) FastForwardTo(to uint64, toFrac gas.Gas) {
 	// -fT/R
 	quo, _, _ := intmath.MulDiv(frac.Numerator, T, R) // overflow is impossible as T/R < 1
 	tm.excess = intmath.BoundedSubtract(tm.excess, quo, 0)
+
+	tm.enforceMinExcess()
 }
