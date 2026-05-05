@@ -4,22 +4,22 @@
 
 ## Architecture
 
-The C-Chain is implemented as three layered services. AvalancheGo provides the host infrastructure; the SAE VM is a generic streaming-async EVM that mediates between AvalancheGo and the chain-specific layer; the C-Chain plugs C-Chain-specific behavior into the SAE VM's integration points.
+The C-Chain is implemented as three layered services. AvalancheGo provides the host infrastructure; SAE is a generic streaming-async EVM that AvalancheGo drives through; the C-Chain plugs in at SAE's integration points (and, for `/avax`, attaches directly to AvalancheGo).
 
 ```mermaid
 flowchart TB
     subgraph avago["AvalancheGo"]
         direction LR
-        consensus["Consensus"]
         network["Network"]
-        apis_avago["APIs"]
+        consensus["Consensus"]
+        apiserver["API Server"]
         consensus <--> network
     end
 
-    subgraph saevm["SAE VM"]
+    subgraph sae["SAE"]
         direction LR
-        sae["SAE"]
         p2pn["P2P Network"]
+        execution["Execution"]
         apis_sae["APIs"]
     end
 
@@ -27,28 +27,29 @@ flowchart TB
         direction LR
         hook["hook Points"]
         warp["warp"]
-        pool["pool"]
+        txpool["txpool"]
         avax["/avax"]
     end
 
-    consensus --> sae
     network --> p2pn
-    apis_avago --> apis_sae
+    consensus --> execution
+    apiserver --> apis_sae
+    apiserver --> avax
 
-    sae --> hook
+    execution --> hook
     p2pn --> warp
-    p2pn --> pool
-    apis_sae --> avax
+    p2pn --> txpool
 
     hook --> warp
-    hook --> pool
+    hook --> txpool
+    avax --> txpool
 ```
 
-- **AvalancheGo** — the host node. Three subsystems hand off to the chain VMs: consensus drives blocks, the network delivers peer messages, and the API server serves JSON-RPC.
-- **SAE VM** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). It exposes three matching integration points for AvalancheGo to drive: a block lifecycle (SAE), a p2p handler-ID dispatcher, and an `eth_*` JSON-RPC server. Each integration point can in turn fan out to the C-Chain layer.
-- **C-Chain** — the C-Chain-specific service (this package). It plugs into each SAE VM integration point: [hook Points](hook/) hooks into the block lifecycle for chain-specific behavior; the p2p dispatcher delivers Import/Export gossip into the [pool](txpool/) and serves ACP-118 signature requests against [warp](warp/) storage; the API server hosts the [/avax](api/) endpoints.
+- **AvalancheGo** — the host node. Three subsystems hand off to the chain VMs: the network delivers peer messages, consensus drives blocks, and the API server serves JSON-RPC.
+- **SAE** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). Three integration points receive AvalancheGo's traffic: a p2p handler-ID dispatcher, a block-building and execution pipeline, and an `eth_*` JSON-RPC server. The first two fan out into the C-Chain layer; the JSON-RPC server terminates inside SAE.
+- **C-Chain** — the C-Chain-specific service (this package). [hook Points](hook/) plugs into SAE's execution pipeline for chain-specific behavior. SAE's p2p dispatcher routes Import/Export gossip into the [txpool](txpool/) and ACP-118 signature requests at [warp](warp/) storage. The [/avax](api/) endpoints attach directly to AvalancheGo's API server, bypassing SAE, and submit user-issued transactions into the same txpool.
 
-Inside the C-Chain, hook Points reads the pool for transaction candidates during block building and writes warp storage for messages emitted during execution. The pool's flow from arrival to inclusion is detailed in [the next section](#how-transactions-enter-the-mempool).
+Inside the C-Chain, hook Points reads the txpool for transaction candidates during block building and writes warp storage for messages emitted during execution. The txpool's flow from arrival to inclusion is detailed in [the next section](#how-transactions-enter-the-mempool).
 
 ## What `cchain` adds
 
