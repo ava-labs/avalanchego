@@ -162,7 +162,7 @@ tasks:
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_DEB_OUTPUT_DIR}}:/output
           {{if .DEB_GPG_KEY_FILE}}-v {{.DEB_GPG_KEY_FILE}}:{{.DEB_GPG_KEY_FILE}}:ro{{end}}
-          -e FORMAT=DEB
+          -e PKG_FORMAT=DEB
           -e PACKAGE=avalanchego
           -e VERSION={{trimPrefix "v" .DEB_TAG}}
           -e TAG={{.DEB_TAG}}
@@ -187,7 +187,7 @@ tasks:
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_DEB_OUTPUT_DIR}}:/output
           {{if .DEB_GPG_KEY_FILE}}-v {{.DEB_GPG_KEY_FILE}}:{{.DEB_GPG_KEY_FILE}}:ro{{end}}
-          -e FORMAT=DEB
+          -e PKG_FORMAT=DEB
           -e PACKAGE=subnet-evm
           -e VERSION={{trimPrefix "v" .DEB_TAG}}
           -e TAG={{.DEB_TAG}}
