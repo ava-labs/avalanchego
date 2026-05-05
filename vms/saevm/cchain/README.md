@@ -142,7 +142,7 @@ The C-Chain participates in cross-subnet Warp messaging on both sides — sendin
 - A custom precompile that lets EVM contracts emit and consume Warp messages.
 - Incoming Warp messages encoded into the access-list, so the hook implementation can verify them prior to EVM execution.
 - Predicate verification results encoded into the block header's `extraData`, so a bootstrapping node doesn't need to re-verify historical Warp messages.
-- The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
+- The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
 
 `cchain` persists this chain's Warp messages, serves signature requests against that store, and verifies Warp predicates during block verification.
 
@@ -150,6 +150,6 @@ The C-Chain participates in cross-subnet Warp messaging on both sides — sendin
 
 Three chain parameters are settled by validator vote on each block. The block builder casts the vote: when building a block they can move each parameter toward their ideal value. Because block production is stake-weighted, this yields a stake-weighted voting mechanism over the long run.
 
-- **Gas target per second** ([ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176)) — the throughput target. The rest of ACP-176 (gas accounting and excess tracker) lives in SAE; `cchain` contributes only the target value.
-- **Minimum block delay** ([ACP-226](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226)) — a lower bound on the time between consecutive blocks. Prevents block production faster than the network can maintain.
-- **Minimum gas price** ([ACP-283](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/283)) — a floor on the gas price for transactions to be included in a block.
+- **Gas target per second** ([ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates)) — the throughput target. The rest of ACP-176 (gas accounting and excess tracker) lives in SAE; `cchain` contributes only the target value.
+- **Minimum block delay** ([ACP-226](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226-dynamic-minimum-block-times)) — a lower bound on the time between consecutive blocks. Prevents block production faster than the network can maintain.
+- **Minimum gas price** ([ACP-283](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/283-dynamic-minimum-gas-price)) — a floor on the gas price for transactions to be included in a block.
