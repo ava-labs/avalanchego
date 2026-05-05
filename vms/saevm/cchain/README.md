@@ -113,7 +113,7 @@ Cross-chain transactions reach the mempool from four independent sources. Each t
 ```mermaid
 flowchart LR
     rpc["/avax"]
-    pushgossip["Output push gossiper"]
+    pushgossip["Outbound push gossiper"]
     push["Inbound push gossip"]
     pull["Inbound pull gossip"]
     rej["Block rejection"]
