@@ -98,11 +98,11 @@ flowchart LR
     mempool[("Mempool")]
 
     rpc --> mempool
-    rpc --> pushgossip
     push --> mempool
     pull --> mempool
     rej --> mempool
     pushgossip -. "stops gossiping<br/>once removed" .-> mempool
+    rpc --> pushgossip
 ```
 
 The four entry paths in detail:
