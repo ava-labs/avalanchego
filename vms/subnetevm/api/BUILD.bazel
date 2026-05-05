@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "api",
+    srcs = [
+        "eth_extras.go",
+        "validators.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/subnetevm/api",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/params/extras",
+        "//ids",
+        "//network/p2p",
+        "//snow/validators",
+        "//utils/set",
+        "//vms/saevm/sae/rpc",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)

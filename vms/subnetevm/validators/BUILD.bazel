@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "validators",
+    srcs = ["manager.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/subnetevm/validators",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/prefixdb",
+        "//ids",
+        "//snow/validators",
+        "//utils/logging",
+        "//utils/timer/mockable",
+        "//vms/evm/uptimetracker",
+        "@org_uber_go_zap//:zap",
+    ],
+)

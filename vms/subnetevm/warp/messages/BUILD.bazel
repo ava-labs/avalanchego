@@ -12,7 +12,7 @@ go_library(
         "payload.go",
         "validator_uptime.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages",
+    importpath = "github.com/ava-labs/avalanchego/vms/subnetevm/warp/messages",
     deps = [
         "//codec",
         "//codec/linearcodec",

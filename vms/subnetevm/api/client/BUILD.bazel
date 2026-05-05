@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "client",
+    srcs = ["client.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/subnetevm/api/client",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/rpc",
+        "//vms/subnetevm/api",
+        "@com_github_ava_labs_libevm//ethclient",
+        "@com_github_ava_labs_libevm//rpc",
+    ],
+)

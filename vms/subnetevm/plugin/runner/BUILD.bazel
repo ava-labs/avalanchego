@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "runner",
+    srcs = [
+        "keys.go",
+        "params.go",
+        "runner.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/subnetevm/plugin/runner",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/logging",
+        "//utils/ulimit",
+        "//vms/rpcchainvm",
+        "//vms/saevm/adaptor",
+        "//vms/subnetevm",
+        "@com_github_spf13_pflag//:pflag",
+        "@com_github_spf13_viper//:viper",
+    ],
+)

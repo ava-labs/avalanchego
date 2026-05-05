@@ -18,6 +18,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes",
     deps = [
         "//vms/evm/acp226",
+        "//vms/subnetevm/hook/acp176",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core/types",
@@ -41,6 +42,7 @@ graft_go_test(
         "//graft/subnet-evm/params",
         "//utils",
         "//vms/evm/acp226",
+        "//vms/subnetevm/hook/acp176",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
