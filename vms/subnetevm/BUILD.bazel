@@ -114,6 +114,7 @@ go_test(
         "//vms/platformvm/warp/payload",
         "//vms/saevm/blocks",
         "//vms/saevm/params",
+        "//vms/saevm/sae",
         "//vms/saevm/saetest",
         "//vms/subnetevm/api",
         "//vms/subnetevm/api/client",
