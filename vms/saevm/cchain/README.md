@@ -25,7 +25,7 @@ flowchart TB
 
     subgraph cchain["C-Chain"]
         direction LR
-        hook["hook Points"]
+        hook["hook.Points"]
         warp["warp"]
         txpool["txpool"]
         avax["/avax"]
@@ -39,12 +39,11 @@ flowchart TB
     execution --> hook
 
 
-    hook --> txpool
-
-    p2pn --> txpool
-
     hook --> warp
     p2pn --> warp
+
+    hook --> txpool
+    p2pn --> txpool
     avax --> txpool
 ```
 
