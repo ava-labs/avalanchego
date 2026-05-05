@@ -6,16 +6,23 @@ package tx
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 
 	// Imported for [atomic.UnsignedExportTx.Burned] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
 
 var _ Unsigned = (*Export)(nil)
@@ -42,6 +49,14 @@ type Input struct {
 	Amount  uint64         `serialize:"true" json:"amount"`
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 	Nonce   uint64         `serialize:"true" json:"nonce"`
+}
+
+// Compare orders [Input] values by [Input.Address] and [Input.AssetID].
+func (i Input) Compare(other Input) int {
+	if c := i.Address.Cmp(other.Address); c != 0 {
+		return c
+	}
+	return i.AssetID.Compare(other.AssetID)
 }
 
 // Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
@@ -74,6 +89,61 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 	return burned, nil
 }
 
+var errOutputsNotSorted = errors.New("outputs not sorted")
+
+// SanityCheck verifies that the transaction's structural invariants hold
+// against the chain's context and that it does not produce more funds than it
+// consumes.
+func (e *Export) SanityCheck(ctx *snow.Context) error {
+	switch {
+	case e.NetworkID != ctx.NetworkID:
+		return fmt.Errorf("%w: want %d, got %d", errWrongNetworkID, ctx.NetworkID, e.NetworkID)
+	case e.BlockchainID != ctx.ChainID:
+		return fmt.Errorf("%w: want %s, got %s", errWrongChainID, ctx.ChainID, e.BlockchainID)
+	case e.DestinationChain != constants.PlatformChainID && e.DestinationChain != ctx.XChainID:
+		return fmt.Errorf("%w: want %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, e.DestinationChain)
+	case len(e.Ins) == 0:
+		return errNoInputs
+	case len(e.ExportedOutputs) == 0:
+		return errNoOutputs
+	}
+
+	fc := avax.NewFlowChecker()
+	for i, in := range e.Ins {
+		if in.Amount == 0 {
+			return fmt.Errorf("%w (%d): zero amount", errInvalidInput, i)
+		}
+		if in.AssetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXInput, i, ctx.AVAXAssetID, in.AssetID)
+		}
+		fc.Consume(ctx.AVAXAssetID, in.Amount)
+	}
+	for i, out := range e.ExportedOutputs {
+		if err := out.Verify(); err != nil {
+			return fmt.Errorf("%w (%d): %w", errInvalidOutput, i, err)
+		}
+		if assetID := out.Asset.ID; assetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXOutput, i, ctx.AVAXAssetID, assetID)
+		}
+		fc.Produce(ctx.AVAXAssetID, out.Out.Amount())
+	}
+	if err := fc.Verify(); err != nil {
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
+	}
+
+	if !utils.IsSortedAndUnique(e.Ins) {
+		return errInputsNotSortedUnique
+	}
+	// Like [atomic.UnsignedExportTx.Verify], outputs aren't enforced to be
+	// unique. This is safe because each output's UTXO is keyed by txID and
+	// outputIndex, so duplicate outputs still produce distinct UTXOs.
+	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
+		return errOutputsNotSorted
+	}
+
+	return nil
+}
+
 func (e *Export) numSigs() (uint64, error) {
 	return uint64(len(e.Ins)), nil
 }
@@ -103,4 +173,53 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 	return op{
 		burn: burn,
 	}, nil
+}
+
+func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, error) {
+	elems := make([]*chainsatomic.Element, len(e.ExportedOutputs))
+	for i, out := range e.ExportedOutputs {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(i), //#nosec G115 -- Won't overflow
+			},
+			Asset: out.Asset,
+			Out:   out.Out,
+		}
+
+		utxoBytes, err := c.Marshal(codecVersion, utxo)
+		if err != nil {
+			return ids.ID{}, nil, err
+		}
+		utxoID := utxo.InputID()
+		elem := &chainsatomic.Element{
+			Key:   utxoID[:],
+			Value: utxoBytes,
+		}
+		if o, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = o.Addresses()
+		}
+
+		elems[i] = elem
+	}
+	return e.DestinationChain, &chainsatomic.Requests{PutRequests: elems}, nil
+}
+
+var errInsufficientFunds = errors.New("insufficient funds")
+
+// TransferNonAVAX subtracts the non-AVAX balances from the statedb.
+func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+	for _, in := range e.Ins {
+		if in.AssetID == avaxAssetID {
+			continue
+		}
+
+		coinID := common.Hash(in.AssetID)
+		amount := new(big.Int).SetUint64(in.Amount)
+		if balance := statedb.GetBalanceMultiCoin(in.Address, coinID); balance.Cmp(amount) < 0 {
+			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, coinID, balance, amount)
+		}
+		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
+	}
+	return nil
 }

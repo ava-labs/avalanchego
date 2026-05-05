@@ -29,6 +29,37 @@ import (
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
+var (
+	cachedBLSKey       *localsigner.LocalSigner
+	cachedCompressedPK []byte
+)
+
+type keyReuseOption bool
+
+const (
+	noKeyReuse keyReuseOption = false
+	reuseKeys  keyReuseOption = true
+)
+
+func init() {
+	var err error
+	cachedBLSKey, err = localsigner.New()
+	if err != nil {
+		panic("failed to generate cached BLS key: " + err.Error())
+	}
+	cachedCompressedPK = cachedBLSKey.PublicKey().Compress()
+}
+
+type testNodeConfig struct {
+	reuseKeys keyReuseOption
+}
+
+type testNodeConfigOption func(*testNodeConfig)
+
+func testNodeConfigWithKeyReuse(cfg *testNodeConfig) {
+	cfg.reuseKeys = reuseKeys
+}
+
 type newBlockConfig struct {
 	// If prev is nil, newBlock will create the genesis block
 	prev *Block
@@ -97,14 +128,50 @@ type testNode struct {
 	signFunc SignFunc
 }
 
-// newNetworkConfigs creates a slice of Configs for testing purposes.
-// they are initialized with a common chainID and a set of validators.
+// newConfigsForQC builds a minimal set of configs sufficient for building a QC
+// (signers + validator membership). It avoids the heavier per-config setup
+// (mocks, WAL, message creator) so it can be called from f.Fuzz outer scope.
+func newConfigsForQC(t testing.TB) []*Config {
+	numNodes := 4
+	require.Positive(t, numNodes)
+
+	chainID := ids.GenerateTestID()
+	testNodes := generateTestNodes(t, uint64(numNodes), testNodeConfigWithKeyReuse)
+	chainParameters := newSimplexChainParams(testNodes)
+
+	configs := make([]*Config, 0, numNodes)
+	for _, node := range testNodes {
+		configs = append(configs, &Config{
+			Ctx: SimplexChainContext{
+				NodeID:    node.NodeID,
+				ChainID:   chainID,
+				NetworkID: constants.UnitTestID,
+			},
+			SignBLS: node.signFunc,
+			Params:  chainParameters,
+		})
+	}
+	return configs
+}
+
+// newNetworkConfigs creates a slice of Configs for testing purposes,
+// initialized with a common chainID and a set of validators each having
+// a freshly generated BLS key.
 func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
+	return newNetworkConfigsWithKeyReuse(t, numNodes, noKeyReuse)
+}
+
+// newNetworkConfigsWithKeyReuse is like newNetworkConfigs but allows the
+// caller to opt into reusing a single cached BLS key across all validators
+// (intended for fuzz tests where BLS key generation dominates setup cost).
+func newNetworkConfigsWithKeyReuse(t *testing.T, numNodes uint64, reuseKeys keyReuseOption) []*Config {
 	require.Positive(t, numNodes)
 
 	chainID := ids.GenerateTestID()
 
-	testNodes := generateTestNodes(t, numNodes)
+	testNodes := generateTestNodes(t, numNodes, func(cfg *testNodeConfig) {
+		cfg.reuseKeys = reuseKeys
+	})
 	chainParameters := newSimplexChainParams(testNodes)
 	configs := make([]*Config, 0, numNodes)
 
@@ -151,17 +218,33 @@ func newSimplexChainParams(nodes []*testNode) *simplexparams.Parameters {
 	return params
 }
 
-func generateTestNodes(t *testing.T, num uint64) []*testNode {
+func generateTestNodes(t testing.TB, num uint64, opts ...testNodeConfigOption) []*testNode {
+	var cfg testNodeConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	nodes := make([]*testNode, num)
 	for i := uint64(0); i < num; i++ {
-		ls, err := localsigner.New()
-		require.NoError(t, err)
+		var ls *localsigner.LocalSigner
+		var err error
+		var pk []byte
+
+		if cfg.reuseKeys {
+			ls = cachedBLSKey
+			require.NotNil(t, ls, "cached BLS key is not available")
+			pk = cachedCompressedPK
+		} else {
+			ls, err = localsigner.New()
+			require.NoError(t, err)
+			pk = ls.PublicKey().Compress()
+		}
 
 		nodeID := ids.GenerateTestNodeID()
 		nodes[i] = &testNode{
 			ValidatorInfo: simplexparams.ValidatorInfo{
 				NodeID:    nodeID,
-				PublicKey: ls.PublicKey().Compress(),
+				PublicKey: pk,
 			},
 			signFunc: ls.Sign,
 		}
