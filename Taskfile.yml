@@ -493,11 +493,12 @@ tasks:
       FUZZTIME: '{{.FUZZTIME| default "10"}}'
     cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} ./utils/cb58'
 
+  # To run only selected directories, pass them after --.
   test-fuzz-long:
     desc: Runs each fuzz test for 180 seconds
     vars:
       FUZZTIME: '{{.FUZZTIME| default "180"}}'
-    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}}'
+    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} {{.CLI_ARGS}}'
 
   test-fuzz-merkledb:
     desc: Runs each merkledb fuzz test for 15 minutes
