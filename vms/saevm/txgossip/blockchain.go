@@ -44,7 +44,8 @@ func NewBlockChain(exec *saexec.Executor, blocks saetypes.BlockSource) BlockChai
 
 type blockchain struct {
 	*saexec.Executor // exposes SubscribeChainHeadEvent()
-	blocks           saetypes.BlockSource
+
+	blocks saetypes.BlockSource
 }
 
 func (bc *blockchain) Config() *params.ChainConfig {

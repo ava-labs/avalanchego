@@ -38,6 +38,7 @@ type OutboundMsgThrottler interface {
 
 type outboundMsgThrottler struct {
 	commonMsgThrottler
+
 	metrics outboundMsgThrottlerMetrics
 }
 

@@ -73,7 +73,6 @@ type Bootstrapper struct {
 	Config
 
 	*metrics
-	TimeoutRegistrar common.TimeoutRegistrar
 	// list of NoOpsHandler for messages dropped by bootstrapper
 	common.StateSummaryFrontierHandler
 	common.AcceptedStateSummaryHandler
@@ -82,6 +81,8 @@ type Bootstrapper struct {
 	common.ChitsHandler
 	common.AppHandler
 	common.SimplexHandler
+
+	TimeoutRegistrar common.TimeoutRegistrar
 
 	requestID uint32 // Tracks the last requestID that was used in a request
 

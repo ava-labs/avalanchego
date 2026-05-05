@@ -95,6 +95,7 @@ func TestLoadVMsReloadFails(t *testing.T) {
 // failingAliaser wraps an Aliaser and returns an error from Aliases.
 type failingAliaser struct {
 	ids.Aliaser
+
 	err error
 }
 

@@ -18,6 +18,7 @@ var _ router.ExternalHandler = (*beaconManager)(nil)
 
 type beaconManager struct {
 	router.ExternalHandler
+
 	beacons                     validators.Manager
 	requiredConns               int64
 	numConns                    int64

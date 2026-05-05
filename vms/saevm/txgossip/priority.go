@@ -15,6 +15,7 @@ import (
 // A LazyTransaction couples a [txpool.LazyTransaction] with its sender.
 type LazyTransaction struct {
 	*txpool.LazyTransaction
+
 	Sender common.Address
 }
 

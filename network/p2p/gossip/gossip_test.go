@@ -668,6 +668,7 @@ func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
 
 type testHistogram struct {
 	prometheus.Histogram
+
 	observedVal float64
 	observed    bool
 }

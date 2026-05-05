@@ -40,12 +40,12 @@ func (b *Block) SetInterimExecutionTime(t *proxytime.Time[gas.Gas]) {
 
 //nolint:revive // struct-tag: canoto allows unexported fields
 type executionResults struct {
+	ephemeralExecutionResults // not for canotofication
+
 	byGas         gastime.Time `canoto:"value,1"`
 	baseFee       uint256.Int  `canoto:"fixed repeated uint,2"`
 	receiptRoot   common.Hash  `canoto:"fixed bytes,3"`
 	stateRootPost common.Hash  `canoto:"fixed bytes,4"`
-
-	ephemeralExecutionResults // not for canotofication
 
 	canotoData canotoData_executionResults
 }

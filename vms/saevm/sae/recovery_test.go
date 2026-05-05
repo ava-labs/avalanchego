@@ -111,12 +111,13 @@ func TestRecoverFromDatabase(t *testing.T) {
 				})
 
 				for _, sys := range []struct {
+					*SUT
+
 					name string
 					ctx  context.Context //nolint:containedctx // Ephemeral so not in contravention of https://go.dev/blog/context-and-structs
-					*SUT
 				}{
-					{"source", srcCtx, src},
-					{"recovered", sutCtx, sut},
+					{SUT: src, name: "source", ctx: srcCtx},
+					{SUT: sut, name: "recovered", ctx: sutCtx},
 				} {
 					t.Run(sys.name, func(t *testing.T) {
 						b := sys.runConsensusLoop(t, tx)

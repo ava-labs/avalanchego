@@ -89,17 +89,12 @@ func New(chain Chain, config Config) (*Provider, error) {
 	override := bloomOverrider{chain}
 
 	back := &backend{
-		chain,
-		config,
-		// An empty account manager provides graceful errors for signing RPCs
-		// (e.g. eth_sign) instead of nil-pointer panics. No actual account
-		// functionality is expected.
-		accounts.NewManager(&accounts.Config{}),
-		price,
-		chain.Mempool(),
-		chainIdx,
-		override,
-		newBloomIndexer(
+		Chain:          chain,
+		Estimator:      price,
+		Set:            chain.Mempool(),
+		chainIndexer:   chainIdx,
+		bloomOverrider: override,
+		bloomIndexer: newBloomIndexer(
 			// TODO(alarso16): if we are state syncing, we need to provide the
 			// first block available to the indexer via
 			// [core.ChainIndexer.AddCheckpoint].
@@ -108,6 +103,11 @@ func New(chain Chain, config Config) (*Provider, error) {
 			override,
 			config.BlocksPerBloomSection,
 		),
+		config: config,
+		// An empty account manager provides graceful errors for signing RPCs
+		// (e.g. eth_sign) instead of nil-pointer panics. No actual account
+		// functionality is expected.
+		accountManager: accounts.NewManager(&accounts.Config{}),
 	}
 
 	filter := filters.NewFilterAPI(

@@ -73,7 +73,8 @@ func parseWorstCaseFlags() *worstCaseFlags {
 // it to be included in a chain's genesis.
 type guzzler struct {
 	params.NOOPHooks `json:"-"`
-	Addr             common.Address `json:"guzzlerAddress"`
+
+	Addr common.Address `json:"guzzlerAddress"`
 }
 
 func (*guzzler) register(tb testing.TB) params.ExtraPayloads[*guzzler, *guzzler] {

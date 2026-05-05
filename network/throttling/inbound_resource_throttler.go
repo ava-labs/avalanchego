@@ -49,6 +49,7 @@ type SystemThrottlerConfig struct {
 
 type systemThrottler struct {
 	SystemThrottlerConfig
+
 	metrics *systemThrottlerMetrics
 	// Tells us the target utilization of each node.
 	targeter tracker.Targeter

@@ -63,6 +63,7 @@ func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, 
 
 type blockChainAPI struct {
 	*ethapi.BlockChainAPI
+
 	b *backend
 }
 
@@ -100,8 +101,9 @@ func (b *backend) GetLogs(ctx context.Context, blockHash common.Hash, number uin
 }
 
 type immediateReceipts struct {
-	recent func(context.Context, common.Hash) (*saexec.Receipt, bool, error)
 	*ethapi.TransactionAPI
+
+	recent func(context.Context, common.Hash) (*saexec.Receipt, bool, error)
 }
 
 func (ir immediateReceipts) GetTransactionReceipt(ctx context.Context, h common.Hash) (map[string]any, error) {

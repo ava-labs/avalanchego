@@ -76,6 +76,7 @@ const (
 
 type VM struct {
 	extension.InnerVM
+
 	Ctx *snow.Context
 
 	// TODO: unexport these fields

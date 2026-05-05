@@ -26,6 +26,7 @@ var (
 // linearizeOnInitializeVM.
 type initializeOnLinearizeVM struct {
 	vertex.DAGVM
+
 	vmToInitialize common.VM
 	vmToLinearize  *linearizeOnInitializeVM
 
@@ -70,6 +71,7 @@ func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID i
 // call to Linearize.
 type linearizeOnInitializeVM struct {
 	vertex.LinearizableVMWithEngine
+
 	stopVertexID ids.ID
 }
 

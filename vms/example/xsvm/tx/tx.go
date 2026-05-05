@@ -12,7 +12,8 @@ import (
 var secpCache = secp256k1.NewRecoverCache(2048)
 
 type Tx struct {
-	Unsigned  `serialize:"true" json:"unsigned"`
+	Unsigned `serialize:"true" json:"unsigned"`
+
 	Signature [secp256k1.SignatureLen]byte `serialize:"true" json:"signature"`
 }
 

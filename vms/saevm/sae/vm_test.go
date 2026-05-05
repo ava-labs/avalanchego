@@ -88,6 +88,7 @@ func TestMain(m *testing.M) {
 type SUT struct {
 	block.ChainVM
 	*ethclient.Client
+
 	rpcClient *rpc.Client
 
 	rawVM   *VM

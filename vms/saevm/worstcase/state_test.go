@@ -37,6 +37,7 @@ import (
 
 type SUT struct {
 	*State
+
 	genesis    *blocks.Block
 	hooks      *hookstest.Stub
 	config     *params.ChainConfig

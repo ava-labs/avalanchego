@@ -17,6 +17,7 @@ var _ state.Database = (*reconstructedStateAccessor)(nil)
 // and OpenStorageTrie to return reconstructed tries backed by an [ffi.Reconstructed].
 type reconstructedStateAccessor struct {
 	state.Database
+
 	recon *ffi.Reconstructed
 }
 

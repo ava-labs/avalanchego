@@ -76,6 +76,7 @@ var (
 // in binary-alphabetical order.
 type Database struct {
 	*leveldb.DB
+
 	// metrics is only initialized and used when [MetricUpdateFrequency] is >= 0
 	// in the config
 	metrics   metrics
@@ -371,6 +372,7 @@ func (db *Database) HealthCheck(context.Context) (interface{}, error) {
 // batch is a wrapper around a levelDB batch to contain sizes.
 type batch struct {
 	leveldb.Batch
+
 	db   *Database
 	size int
 }
@@ -440,9 +442,9 @@ func (r *replayer) Delete(key []byte) {
 }
 
 type iter struct {
-	db *Database
 	iterator.Iterator
 
+	db       *Database
 	key, val []byte
 	err      error
 }

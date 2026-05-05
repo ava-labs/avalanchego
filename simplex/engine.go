@@ -45,6 +45,7 @@ type Engine struct {
 	// Handler that passes application messages to the VM
 	common.AppHandler
 	validators.Connector
+
 	vm block.ChainVM
 
 	epoch              *simplex.Epoch

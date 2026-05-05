@@ -15,6 +15,7 @@ import (
 
 type Config struct {
 	common.AllGetsServer
+	common.Haltable
 
 	Ctx     *snow.ConsensusContext
 	Beacons validators.Manager
@@ -41,6 +42,4 @@ type Config struct {
 	NonVerifyingParse block.ParseFunc
 
 	Bootstrapped func()
-
-	common.Haltable
 }

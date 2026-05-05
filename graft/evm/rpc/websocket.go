@@ -294,6 +294,7 @@ func wsClientHeaders(endpoint, origin string) (string, http.Header, error) {
 
 type websocketCodec struct {
 	*jsonCodec
+
 	conn *websocket.Conn
 	info PeerInfo
 

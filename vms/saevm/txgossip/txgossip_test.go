@@ -59,6 +59,7 @@ func TestMain(m *testing.M) {
 // SUT is the system under test, primarily the [Set].
 type SUT struct {
 	*Set
+
 	chain  *blockstest.ChainBuilder
 	wallet *saetest.Wallet
 	exec   *saexec.Executor

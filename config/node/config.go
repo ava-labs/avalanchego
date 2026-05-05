@@ -33,8 +33,9 @@ type APIIndexerConfig struct {
 type HTTPConfig struct {
 	server.HTTPConfig
 	APIConfig `json:"apiConfig"`
-	HTTPHost  string `json:"httpHost"`
-	HTTPPort  uint16 `json:"httpPort"`
+
+	HTTPHost string `json:"httpHost"`
+	HTTPPort uint16 `json:"httpPort"`
 
 	HTTPSEnabled bool   `json:"httpsEnabled"`
 	HTTPSKey     []byte `json:"-"`
@@ -72,13 +73,14 @@ type IPConfig struct {
 
 type StakingConfig struct {
 	genesis.StakingConfig
+	StakingSignerConfig `json:"stakingSingerConfig"`
+
 	SybilProtectionEnabled        bool            `json:"sybilProtectionEnabled"`
 	PartialSyncPrimaryNetwork     bool            `json:"partialSyncPrimaryNetwork"`
 	StakingTLSCert                tls.Certificate `json:"-"`
 	SybilProtectionDisabledWeight uint64          `json:"sybilProtectionDisabledWeight"`
 	StakingTLSKeyPath             string          `json:"stakingTLSKeyPath"`
 	StakingTLSCertPath            string          `json:"stakingTLSCertPath"`
-	StakingSignerConfig           `json:"stakingSingerConfig"`
 }
 
 type StakingSignerConfig struct {

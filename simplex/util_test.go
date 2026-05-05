@@ -125,6 +125,7 @@ func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 
 type testNode struct {
 	simplexparams.ValidatorInfo
+
 	signFunc SignFunc
 }
 
@@ -296,11 +297,13 @@ func newTestVM() *wrappedVM {
 // wrappedBlock wraps a test block in a VM so that on Accept, it is stored in the VM's block store.
 type wrappedBlock struct {
 	*snowmantest.Block
+
 	vm *wrappedVM
 }
 
 type wrappedVM struct {
 	*blocktest.VM
+
 	blocks map[ids.ID]*snowmantest.Block
 }
 

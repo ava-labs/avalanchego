@@ -49,6 +49,7 @@ func NewHandler[T Gossipable](
 
 type Handler[T Gossipable] struct {
 	p2p.Handler
+
 	marshaller         Marshaller[T]
 	log                logging.Logger
 	set                HandlerSet[T]

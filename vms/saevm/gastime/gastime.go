@@ -32,9 +32,10 @@ import (
 //nolint:tagliatelle,revive // tagliatelle: can't handle embedded field; struct-tag: canoto allows unexported fields
 type Time struct {
 	*proxytime.Time[gas.Gas] `canoto:"pointer,1"`
-	target                   gas.Gas        `canoto:"uint,2"`
-	excess                   gas.Gas        `canoto:"uint,3"`
-	config                   GasPriceConfig `canoto:"value,4"`
+
+	target gas.Gas        `canoto:"uint,2"`
+	excess gas.Gas        `canoto:"uint,3"`
+	config GasPriceConfig `canoto:"value,4"`
 
 	canotoData canotoData_Time `canoto:"nocopy"`
 }

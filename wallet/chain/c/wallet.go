@@ -79,6 +79,7 @@ func NewWallet(
 
 type wallet struct {
 	Backend
+
 	builder    Builder
 	signer     Signer
 	avaxClient *client.Client

@@ -18,15 +18,16 @@ import (
 // logger is the common wrapper around [LogRecorder] and [tbLogger] handlers,
 // plumbing all levels into the handler.
 type logger struct {
+	// Some methods will panic, in which case they need to be implemented. This
+	// is better than embedding a [logging.NoLog], which could silently drop
+	// important entries.
+	logging.Logger
+
 	level   logging.Level
 	handler interface {
 		log(logging.Level, string, ...zap.Field)
 	}
 	with []zap.Field
-	// Some methods will panic, in which case they need to be implemented. This
-	// is better than embedding a [logging.NoLog], which could silently drop
-	// important entries.
-	logging.Logger
 }
 
 var _ logging.Logger = (*logger)(nil)
@@ -67,6 +68,7 @@ func NewLogRecorder(level logging.Level) *LogRecorder {
 // entries for inspection.
 type LogRecorder struct {
 	*logger
+
 	Records []*LogRecord
 }
 
@@ -124,6 +126,7 @@ func NewTBLogger(tb testing.TB, level logging.Level) *TBLogger {
 // TBLogger is a [logging.Logger] that propagates logs to [testing.TB].
 type TBLogger struct {
 	*logger
+
 	tb      testing.TB
 	onError []context.CancelFunc
 }

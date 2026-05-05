@@ -122,6 +122,7 @@ func (net *networkedSUTs) sutByID(tb testing.TB, id ids.NodeID) *SUT {
 // instance.
 type node struct {
 	*SUT
+
 	tb    testing.TB
 	peers struct {
 		all, validators, nonValidators map[ids.NodeID]*SUT

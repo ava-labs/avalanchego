@@ -19,6 +19,7 @@ var (
 // accounts will be returned in consensus (FullRLP) format for compatibility with trie data.
 type AccountIterator struct {
 	snapshot.AccountIterator
+
 	err error
 	val []byte
 }
