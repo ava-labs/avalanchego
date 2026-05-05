@@ -32,7 +32,7 @@ flowchart TB
         hook["Hooks"]
         warp["Warp"]
         db[("Database")]
-        txpool[("Txpool")]
+        mempool[("Mempool")]
         avax["/avax"]
     end
 
@@ -47,13 +47,13 @@ flowchart TB
     hook --> warp
     p2pn --> warp
 
-    hook --> txpool
-    p2pn --> txpool
-    avax --> txpool
+    hook --> mempool
+    p2pn --> mempool
+    avax --> mempool
 
     hook --> db
     warp --> db
-    txpool --> db
+    mempool --> db
 ```
 
 Hooks are the seam through which SAE calls into C-Chain–specific code. SAE invokes them at the relevant points of a block's lifecycle:
@@ -106,7 +106,7 @@ A cross-chain transfer happens in two steps. An **Export** transaction on the so
 
 `cchain` defines both transaction types, their validation rules, and runs a dedicated mempool that gossips them in a bandwidth-optimized way using bloom filters.
 
-#### How transactions enter the Txpool
+#### How transactions enter the mempool
 
 Cross-chain transactions reach the mempool from four independent sources. Each transaction passes the same checks — signature, state validity, and conflict resolution — before being added.
 
