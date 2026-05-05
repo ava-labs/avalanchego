@@ -17,8 +17,6 @@ go_library(
     deps = [
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/params",
-        "//graft/subnet-evm/plugin/evm/vmerrors",
-        "//graft/subnet-evm/precompile/contracts/txallowlist",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
