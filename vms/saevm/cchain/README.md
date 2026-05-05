@@ -4,10 +4,11 @@
 
 ## Architecture
 
-The C-Chain is comprised of three major components.
-1. AvalancheGo which provides the host infrastructure: networking, consensus, validator set management, and exposes an API for external access.
-2. SAE is the generic EVM implementation that provides Turing complete smart contract behavior.
-3. The C-chain wrapper, this package, to support C-Chain specific behavior.
+The C-Chain is composed of three major components:
+
+1. **AvalancheGo** — host infrastructure: networking, consensus, validator-set management, and the external API surface.
+2. **SAE** — the generic, Turing-complete EVM implementation.
+3. **C-Chain** (this package) — the wrapper that adds C-Chain-specific behavior.
 
 ```mermaid
 flowchart TB
@@ -22,7 +23,8 @@ flowchart TB
         direction LR
         execution["Execution"]
         p2pn["P2P Network"]
-        apis_sae["APIs"]
+        rpc["/rpc"]
+        ws["/ws"]
     end
 
     subgraph cchain["C-Chain"]
@@ -37,7 +39,8 @@ flowchart TB
     network <--> consensus
     network --> p2pn
     consensus --> execution
-    apiserver --> apis_sae
+    apiserver --> rpc
+    apiserver --> ws
     apiserver --> avax
     execution --> hook
 
@@ -55,28 +58,43 @@ flowchart TB
 
 ## What `cchain` adds
 
-The Primary Network is the set of three chains (P, X, and C) that transfer assets through a pair-wise shared key-value store.
+The Primary Network is the set of three chains (P, X, and C) that transfer assets through pair-wise shared stores: each pair of chains shares its own store that both chains can read and write.
 
-// TODO(@Claude): Make a mermaid diagram where there the 3 chains as circles. Where each circles are connected to each other via a pair-wise defined shared database.
+```mermaid
+flowchart LR
+    P((P-Chain))
+    X((X-Chain))
+    C((C-Chain))
 
-### Import / Export transactions
+    px[("P ↔ X")]
+    pc[("P ↔ C")]
+    xc[("X ↔ C")]
 
-// TODO(@Claude): Introduce Export transactions first, since a transfer has to always start with an Export first.
+    P --- px
+    X --- px
+    P --- pc
+    C --- pc
+    X --- xc
+    C --- xc
+```
 
+### Export and Import transactions
 
-// TODO(@Claude): Drop the term "slot", it is confusing since "slot" means something specific for EVM chains - and this isn't the correct meaning.
+A cross-chain transfer happens in two steps. An **Export** transaction on the source chain burns the asset there and writes a corresponding entry into the shared store between the source and destination chains. The destination chain later picks up that entry with an **Import** transaction, consuming it and crediting the recipient account.
 
-Transfers between the C-Chain and the other Primary Network chains, via that shared store. **Import** transactions consume entries another chain wrote into the C-Chain's slot and credit the matching C-Chain accounts; **Export** transactions burn C-Chain balances and write the matching entries into the destination chain's slot.
+`cchain` defines both transaction types and their validation rules, runs a dedicated mempool keyed on the entries each transaction consumes, and operates a bloom-filter gossip system for them. See [tx](tx/) and [txpool](txpool/).
 
-// TODO(@Claude): Expand on the mempool invariants slightly. Specifically, the mempool doesn't support dependent transactions, but guarantees that the mempool state is always valid against a recently executed state and, if blocks stop being issued, the mempool transactions are eventually guaranteed to be valid against the last accepted block.
+The mempool does not support dependent transactions: every transaction it holds must be valid on its own against the current chain state. Two invariants follow. First, the mempool is always valid against a recently-executed state, so anything it offers up for block building can be applied directly. Second, if block production stalls, all mempool transactions are eventually guaranteed to be valid against the last accepted block.
 
-`cchain` defines the transaction types and validation rules, runs a dedicated mempool keyed on consumed inputs, and operates a bloom-filter gossip system for them. See [tx](tx/) and [txpool](txpool/).
+### Warp messaging
 
-### Warp signature service
+The C-Chain participates in cross-subnet warp messaging on both sides — sending messages to other chains and receiving messages from them. Three pieces are involved:
 
-// TODO(@Claude): the C-chain wrapper does more than just signing warp messages. It supports both sending and recieving warp messages. ACP-118 defines the standard p2p protocol for sending (signing) warp messages, but the C-chain also encodes warp messages into transaction access lists and includes a custom precompile to interact with warp messages (both sending and receiving).
+- A custom precompile that lets EVM contracts emit and consume warp messages.
+- An encoding that places warp message payloads into transaction access lists, so the message rides alongside the transaction that produced or accepted it.
+- The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
 
-Cross-subnet signed messages following [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118). When the chain emits a warp message, `cchain` stores it; when peers ask this node to sign a message they have, `cchain` verifies the request against the stored set and (for accepted messages) returns a BLS signature. See [warp](warp/).
+`cchain` persists this chain's warp messages, serves signature requests against that store, and verifies warp predicates during block execution. See [warp](warp/).
 
 ### Dynamic gas target (ACP-176)
 
