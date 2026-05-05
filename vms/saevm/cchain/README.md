@@ -94,7 +94,7 @@ A cross-chain transfer happens in two steps. An **Export** transaction on the so
 
 #### How transactions enter the Txpool
 
-Import/Export transactions reach the mempool from four independent sources. They all converge on the same gate, where signature, against-state, and conflict-resolution checks happen before insertion.
+Import/Export transactions reach the mempool from four independent sources. Each transaction passes the same checks — signature, state validity, and conflict resolution — before being added.
 
 ```mermaid
 flowchart LR
