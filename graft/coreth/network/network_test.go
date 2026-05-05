@@ -495,6 +495,24 @@ func TestNetworkAppRequestAfterShutdown(t *testing.T) {
 	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, nil))
 }
 
+// SendSyncedAppRequestAny must not block when called after Shutdown.
+func TestNetworkSyncedAppRequestAfterShutdown(t *testing.T) {
+	codecManager := buildCodec(t, TestMessage{})
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(ctx, testAppSender{}, codecManager, 16, prometheus.NewRegistry())
+	require.NoError(t, err)
+
+	require.NoError(t, net.Connected(t.Context(), ids.GenerateTestNodeID(), defaultPeerVersion))
+	net.Shutdown()
+
+	requestBytes, err := message.RequestToBytes(codecManager, TestMessage{Message: "hello"})
+	require.NoError(t, err)
+
+	response, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
+	require.ErrorIs(t, err, errRequestFailed)
+	require.Nil(t, response)
+}
+
 func TestNetworkRouting(t *testing.T) {
 	require := require.New(t)
 	sender := &testAppSender{

@@ -49,8 +49,7 @@ var (
 
 // SyncedNetworkClient defines ability to send request / response through the Network
 type SyncedNetworkClient interface {
-	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
-	// node version greater than or equal to minVersion.
+	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 	// the request should be retried.
 	SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
@@ -71,10 +70,8 @@ type Network interface {
 
 	SyncedNetworkClient
 
-	// SendAppRequestAny sends request to an arbitrary peer with a
-	// node version greater than or equal to minVersion.
-	// Returns the ID of the chosen peer, and an error if the request could not
-	// be sent to a peer with the desired [minVersion].
+	// SendAppRequestAny sends request to an arbitrary peer.
+	// Returns the ID of the chosen peer, and an error if no peer is available.
 	SendAppRequestAny(ctx context.Context, minVersion *version.Application, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
 
 	// SendAppRequest sends message to given nodeID, notifying handler when there's a response or timeout
@@ -186,14 +183,11 @@ func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
 }
 
 // SendAppRequestAny synchronously sends request to an arbitrary peer.
-// The minVersion argument is currently unused. It is retained on the public
-// interface for callers that still pass StateSyncVersion. After the rest of
-// the sync-network migration lands, the argument will be removed.
 // Returns the ID of the chosen peer, and an error if no peer is available.
 //
-// TODO: add minVersion support to network/p2p.PeerTracker (per-peer version
-// storage and a SelectPeerV(minVersion) selector). Once that lands, pass
-// StateSyncVersion through to peer selection here and drop this argument.
+// TODO(powerslider): Add per-peer version filtering to [p2p.PeerTracker]
+// via a new SelectPeerVersion method. Once available, pass StateSyncVersion
+// through to peer selection here and remove the minVersion parameter.
 func (n *network) SendAppRequestAny(ctx context.Context, _ *version.Application, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
 	// If the context was cancelled, we can skip sending this request.
 	if err := ctx.Err(); err != nil {
@@ -247,6 +241,12 @@ func (n *network) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if n.closed.Get() {
 		n.activeAppRequests.Release(1)
+		// Unblock any synchronous waiter on this handler. Without this, a request
+		// issued after Shutdown would never receive a response or failure signal,
+		// leaving the caller blocked until its context times out.
+		if responseHandler != nil {
+			_ = responseHandler.OnFailure()
+		}
 		return nil
 	}
 
@@ -437,7 +437,7 @@ func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 		return nil
 	}
 
-	// p2p.PeerTracker filters out self via ignoredNodes set at construction.
+	// [p2p.PeerTracker] filters out self via the ignoredNodes set passed at construction.
 	n.peers.Connected(nodeID, nodeVersion)
 
 	return n.sdkNetwork.Connected(ctx, nodeID, nodeVersion)
@@ -459,7 +459,7 @@ func (n *network) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	return n.sdkNetwork.Disconnected(ctx, nodeID)
 }
 
-// Shutdown disconnects all peers
+// Shutdown marks the network as closed and fails all outstanding requests.
 func (n *network) Shutdown() {
 	n.lock.Lock()
 	defer n.lock.Unlock()
@@ -495,8 +495,7 @@ func (n *network) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	}
 }
 
-// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
-// node version greater than or equal to minVersion.
+// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 // Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 // the request should be retried.
 func (n *network) SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
