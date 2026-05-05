@@ -1,6 +1,6 @@
 # C-Chain VM (`cchain`)
 
-`cchain` is the C-Chain VM. It is a thin chain-specific harness around [saevm](../), the generic EVM framework that implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). `saevm` does the heavy lifting — block execution, settlement, gas accounting, and EVM gossip. `cchain` adds what makes the chain *the C-Chain*: Transactions for moving assets between Primary Network chains, warp messaging, validator voting of chain parameters, and minimum block delay enforcement.
+`cchain` is the C-Chain VM. It is a thin chain-specific harness around [saevm](../), the generic EVM framework that implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). `saevm` does the heavy lifting — block execution, settlement, gas accounting, and EVM gossip. `cchain` adds what makes the chain *the C-Chain*: Transactions for moving assets between Primary Network chains, Warp messaging, validator voting of chain parameters, and minimum block delay enforcement.
 
 ## Architecture
 
@@ -58,7 +58,7 @@ flowchart TB
 
 ## What `cchain` adds
 
-`cchain` layers four chain-specific behaviors on top of SAE: Import/Export transactions for cross-chain transfers, warp messaging, and two chain parameters that validators vote on each block.
+`cchain` layers four chain-specific behaviors on top of SAE: Import/Export transactions for cross-chain transfers, Warp messaging, and two chain parameters that validators vote on each block.
 
 ### Export and Import transactions
 
@@ -90,13 +90,13 @@ The mempool does not support dependent transactions: every transaction it holds 
 
 ### Warp messaging
 
-The C-Chain participates in cross-subnet warp messaging on both sides — sending messages to other chains and receiving messages from them. Three pieces are involved:
+The C-Chain participates in cross-subnet Warp messaging on both sides — sending messages to other chains and receiving messages from them. Three pieces are involved:
 
-- A custom precompile that lets EVM contracts emit and consume warp messages.
-- An encoding that places warp message payloads into transaction access lists, so the message rides alongside the transaction that produced or accepted it.
+- A custom precompile that lets EVM contracts emit and consume Warp messages.
+- An encoding that places Warp message payloads into transaction access lists, so the message rides alongside the transaction that produced or accepted it.
 - The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
 
-`cchain` persists this chain's warp messages, serves signature requests against that store, and verifies warp predicates during block execution. See [warp](warp/).
+`cchain` persists this chain's Warp messages, serves signature requests against that store, and verifies Warp predicates during block execution. See [warp](warp/).
 
 ### Validator-voted gas target (ACP-176)
 
@@ -174,7 +174,7 @@ The `cchain` VM struct holds the inner saevm VM, a mempool, a push-gossiper hand
 flowchart TB
     subgraph shared["shared instances"]
         txsstore["shared tx store"]
-        warpstore["warp storage"]
+        warpstore["Warp storage"]
         hookpoints["cchain hook"]
     end
 
@@ -211,9 +211,9 @@ flowchart TB
     cvm -. holds .-> pushg
 ```
 
-Solid arrows are *creates*; dashed arrows are *holds a reference to*. The shared boxes — store, warp storage, hook — each have one creator and two holders. The store is created before the hook and the mempool, and is then handed to both. The warp storage is created before the hook and the warp signature verifier, and is handed to both. The hook is created before the inner saevm VM, and is held by both the inner VM (which calls into it during block execution) and the `cchain` VM struct.
+Solid arrows are *creates*; dashed arrows are *holds a reference to*. The shared boxes — store, Warp storage, hook — each have one creator and two holders. The store is created before the hook and the mempool, and is then handed to both. The Warp storage is created before the hook and the Warp signature verifier, and is handed to both. The hook is created before the inner saevm VM, and is held by both the inner VM (which calls into it during block execution) and the `cchain` VM struct.
 
-Once everything is built, gossip is wired: a bloom-set wrapper, a push gossiper, a pull gossiper, and a network handler are all produced together and the handler is registered on the inner VM's Network under the Import/Export handler ID. A separate warp signature handler is registered under the warp handler ID. Two long-running goroutines drive periodic push and pull gossip; their cancel function and a wait group are added to the cleanup list.
+Once everything is built, gossip is wired: a bloom-set wrapper, a push gossiper, a pull gossiper, and a network handler are all produced together and the handler is registered on the inner VM's Network under the Import/Export handler ID. A separate Warp signature handler is registered under the Warp handler ID. Two long-running goroutines drive periodic push and pull gossip; their cancel function and a wait group are added to the cleanup list.
 
 ### Shutdown
 
@@ -222,7 +222,7 @@ Shutdown unwinds in reverse order. `cchain` runs its cleanup callbacks last-in-f
 - The gossip goroutines pull from peers via the inner VM's Network. If saevm tore the Network down first, those goroutines would be reading dead state.
 - The mempool subscribes to chain-head events from the inner VM's RPC backend. The subscription must be unsubscribed before the inner VM finishes its own shutdown.
 
-The hook, the warp storage, and the shared tx store carry no goroutines or external subscriptions of their own. They live and die with the process and need no explicit cleanup; releasing the references is enough.
+The hook, the Warp storage, and the shared tx store carry no goroutines or external subscriptions of their own. They live and die with the process and need no explicit cleanup; releasing the references is enough.
 
 ## Subpackages at a glance
 
@@ -232,4 +232,4 @@ The hook, the warp storage, and the shared tx store carry no goroutines or exter
 - [state/](state/) — genesis parsing, the synchronous-boundary pointer, and state-trie helpers
 - [tx/](tx/) — Import / Export transaction types and their gossip marshaller
 - [txpool/](txpool/) — the shared store, the mempool that wraps it, and conflict tracking
-- [warp/](warp/) — warp message storage, the ACP-118 verifier, and predicate handling
+- [warp/](warp/) — Warp message storage, the ACP-118 verifier, and predicate handling
