@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
@@ -23,7 +24,12 @@ var (
 
 type Upgrader interface {
 	// Must be thread safe
-	Upgrade(net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error)
+	Upgrade(ctx context.Context, conn net.Conn) (
+		ids.NodeID,
+		net.Conn,
+		*staking.Certificate,
+		error,
+	)
 }
 
 type tlsServerUpgrader struct {
@@ -38,8 +44,11 @@ func NewTLSServerUpgrader(config *tls.Config, invalidCerts prometheus.Counter) U
 	}
 }
 
-func (t *tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	return connToIDAndCert(tls.Server(conn, t.config), t.invalidCerts)
+func (t *tlsServerUpgrader) Upgrade(
+	ctx context.Context,
+	conn net.Conn,
+) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+	return connToIDAndCert(ctx, tls.Server(conn, t.config), t.invalidCerts)
 }
 
 type tlsClientUpgrader struct {
@@ -54,12 +63,19 @@ func NewTLSClientUpgrader(config *tls.Config, invalidCerts prometheus.Counter) U
 	}
 }
 
-func (t *tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	return connToIDAndCert(tls.Client(conn, t.config), t.invalidCerts)
+func (t *tlsClientUpgrader) Upgrade(
+	ctx context.Context,
+	conn net.Conn,
+) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+	return connToIDAndCert(ctx, tls.Client(conn, t.config), t.invalidCerts)
 }
 
-func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	if err := conn.Handshake(); err != nil {
+func connToIDAndCert(
+	ctx context.Context,
+	conn *tls.Conn,
+	invalidCerts prometheus.Counter,
+) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+	if err := conn.HandshakeContext(ctx); err != nil {
 		return ids.EmptyNodeID, nil, nil, err
 	}
 
