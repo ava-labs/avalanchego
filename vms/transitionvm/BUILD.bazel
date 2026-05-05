@@ -27,7 +27,7 @@ go_library(
         "//utils/set",
         "//version",
         "//vms",
-        "//vms/corethvm/state",
+        "//vms/saevm/cchain/state",
         "@org_uber_go_zap//:zap",
     ],
 )

@@ -10,7 +10,6 @@ go_library(
     srcs = ["state_test_util.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/tests",
     deps = [
-        "//graft/coreth/core/extstate",
         "//graft/evm/core/state/snapshot",
         "//graft/evm/firewood",
         "//graft/evm/triedb/hashdb",

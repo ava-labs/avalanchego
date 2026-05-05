@@ -1,32 +1,51 @@
-name: Bazel Tests
+name: Bazel Jobs
 
+# Reusable Bazel CI workflow for one platform. This workflow is called by
+# bazel-ci-matrix.yml with a platform name and runner.
 on:
-  push:
-    tags:
-      - "*"
-    branches:
-      - master
-      - dev
-  pull_request:
-  merge_group:
-    types: [checks_requested]
+  workflow_call:
+    inputs:
+      platform_name:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
 
 permissions:
   contents: read
 
-# Cancel ongoing workflow runs if a new one is started
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
+  # Aggregate the per-platform Bazel checks into one stable required job.
+  # GitHub Actions job graphs are static, so Bazel still runs inside each
+  # declared job.
+  bazel-required:
+    if: ${{ always() }}
+    needs:
+      - check-metadata
+      - unit-main
+      - unit-coreth
+      - unit-subnet-evm
+      - e2e
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS_JSON" | jq -e '
+            to_entries
+            | all(.value.result == "success")
+          ' >/dev/null
+
   # Check Bazel metadata first so stale generated files fail with one
   # actionable error instead of cascading into multiple Bazel build/test
   # failures. This is especially important when PRs are tested against
   # the current base branch and the metadata included in the PR is stale
   # relative to it.
-  check-metadata-linux:
-    runs-on: ubuntu-latest
+  check-metadata:
+    runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
       - name: Check Bazel metadata
@@ -34,29 +53,21 @@ jobs:
         with:
           prune_runner_disk: 'false'
           task: bazel-check-metadata
-  # Not a dependency of other jobs but intended to ensure that
-  # developers on macos are able to maintain bazel metadata.
-  check-metadata-darwin:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check Bazel metadata
-        uses: ./.github/actions/run-bazel-task
-        with:
-          prune_runner_disk: 'false'
-          task: bazel-check-metadata
+
   unit-main:
-    needs: check-metadata-linux
-    runs-on: ubuntu-latest
+    needs: check-metadata
+    runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
       - name: Run unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
+          prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
           task: bazel-test-main
+
   unit-coreth:
-    needs: check-metadata-linux
-    runs-on: ubuntu-latest
+    needs: check-metadata
+    runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
       - name: Run coreth unit tests with Bazel
@@ -64,25 +75,28 @@ jobs:
         with:
           prune_runner_disk: 'false'
           task: bazel-test-coreth
+
   unit-subnet-evm:
-    needs: check-metadata-linux
-    runs-on: ubuntu-latest
+    needs: check-metadata
+    runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
       - name: Run subnet-evm unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
+          prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
           task: bazel-test-subnet-evm
+
   e2e:
-    needs: check-metadata-linux
-    runs-on: ubuntu-latest
+    needs: check-metadata
+    runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
       - name: Run e2e tests with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh bazel-test-e2e-ci
-          artifact_prefix: e2e-bazel
+          artifact_prefix: e2e-bazel-${{ inputs.platform_name }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}

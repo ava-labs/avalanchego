@@ -42,3 +42,7 @@ func (cr *Credential) Verify() error {
 
 	return nil
 }
+
+func (cr *Credential) Self() *Credential {
+	return cr
+}

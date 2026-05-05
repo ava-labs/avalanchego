@@ -20,6 +20,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  tests-required:
+    if: ${{ always() }}
+    needs:
+      - Unit
+      - Fuzz
+      - e2e
+      - e2e_post_latest
+      - e2e_kube
+      - e2e_existing_network
+      - Upgrade
+      - Lint
+      - tausecondslint
+      - links-lint
+      - check_generated_protobuf
+      - check_mockgen
+      - check_canotogen
+      - check_contract_bindings
+      - check_go_mod_tidy
+      - test_build_image
+      - test_build_antithesis_avalanchego_images
+      - test_build_antithesis_xsvm_images
+      - e2e_bootstrap_monitor
+      - load
+      - load_kube_kind
+      - robustness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS_JSON" | jq -e '
+            to_entries
+            | all(.value.result == "success")
+          ' >/dev/null
+
   Unit:
     runs-on: ${{ matrix.os }}
     strategy:
