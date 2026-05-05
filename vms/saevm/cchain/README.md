@@ -18,8 +18,8 @@ flowchart TB
 
     subgraph sae["SAE"]
         direction LR
-        p2pn["P2P Network"]
         execution["Execution"]
+        p2pn["P2P Network"]
         apis_sae["APIs"]
     end
 
