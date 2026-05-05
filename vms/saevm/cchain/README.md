@@ -27,7 +27,7 @@ flowchart TB
         hook["Hooks"]
         warp["Warp"]
         db["Database"]
-        txpool["Txpool"]
+        txpool[("Txpool")]
         avax["/avax"]
     end
 
