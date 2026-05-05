@@ -43,16 +43,17 @@ test:norace --@io_bazel_rules_go//go/config:race=false
 build --action_env=CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
 build --action_env=CGO_ENABLED=1
 
-# macOS: Keep Bazel's C toolchain autoconfiguration and compile actions on the
-# same developer root. GitHub macOS runners default to Xcode app SDK paths,
-# which can diverge from the builtin include allowlist detected under nix.
-# Pinning to CLT avoids absolute Xcode SDK paths leaking into depfiles.
+# macOS: Use the default CommandLineTools location (also used by GitHub Actions
+# runners for CI). Hosts with a different active Apple toolchain can either rely on
+# direnv to create `.bazelrc.local` with appropriate values or run `task
+# bazel-configure-local` to generate the file manually.
 build:macos --repo_env=DEVELOPER_DIR=/Library/Developer/CommandLineTools
 build:macos --repo_env=SYSTEMROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 build:macos --action_env=DEVELOPER_DIR=/Library/Developer/CommandLineTools
 build:macos --action_env=SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 build:macos --action_env=CC=
 build:macos --action_env=CXX=
+try-import %workspace%/.bazelrc.local
 
 # Cache for faster builds
 build --disk_cache=~/.cache/bazel-disk-cache
