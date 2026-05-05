@@ -39,11 +39,11 @@ var (
 // ACP224FeeConfig specifies the parameters for the ACP-224 dynamic gas limit mechanism.
 // See [ACP224FeeConfig.Verify] for validation constraints between fields.
 type ACP224FeeConfig struct {
-	ValidatorTargetGas bool   `json:"validatorTargetGas"`           // when true, validators control targetGas via node preferences
-	TargetGas          uint64 `json:"targetGas"`                    // target gas consumption per second
-	StaticPricing      bool   `json:"staticPricing"`                // when true, gas price is always minGasPrice
-	MinGasPrice        uint64 `json:"minGasPrice"`                  // minimum gas price in wei
-	TimeToDouble       uint64 `json:"timeToDouble"`                 // seconds for gas price to double at max capacity
+	ValidatorTargetGas bool   `json:"validatorTargetGas"` // when true, validators control targetGas via node preferences
+	TargetGas          uint64 `json:"targetGas"`          // target gas consumption per second
+	StaticPricing      bool   `json:"staticPricing"`      // when true, gas price is always minGasPrice
+	MinGasPrice        uint64 `json:"minGasPrice"`        // minimum gas price in wei
+	TimeToDouble       uint64 `json:"timeToDouble"`       // seconds for gas price to double at max capacity
 }
 
 // Verify returns an error if the config violates any field constraints.
