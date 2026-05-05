@@ -6,7 +6,7 @@
 
 The C-Chain is composed of three major components:
 
-1. **AvalancheGo** — networking, consensus, validator-set management, and the external API surface.
+1. **AvalancheGo** — [networking](../../../network), [consensus](../../../snow), validator-set management, and the external API surface.
 2. **SAE** — the generic EVM implementation.
 3. **C-Chain** (this package) — the wrapper that adds C-Chain-specific behavior.
 
@@ -82,7 +82,7 @@ The standard `extraData` field carries Warp predicate verification results — s
 
 ### Cross-chain transactions
 
-The Primary Network is the set of three chains — P, X, and C — that exchange assets through pair-wise shared stores. Each pair of chains has its own store, readable and writable by both chains in the pair.
+The Primary Network is the set of three chains — P, X, and C — that exchange assets through pair-wise [shared stores](../../../chains/atomic). Each pair of chains has its own store, readable and writable by both chains in the pair.
 
 ```mermaid
 flowchart TB
@@ -135,11 +135,11 @@ The four entry paths in detail:
 
 ### Warp messaging
 
-The C-Chain participates in cross-subnet Warp messaging on both sides — sending messages to other chains and receiving messages from them. Four pieces are involved:
+The C-Chain participates in cross-subnet [Warp messaging](../../platformvm/warp) on both sides — sending messages to other chains and receiving messages from them. Four pieces are involved:
 
 - A custom precompile that lets EVM contracts emit and consume Warp messages.
 - Incoming Warp messages encoded in the access-list, so the hook implementation can verify them prior to EVM execution.
-- Predicate verification results encoded into the block header's `extraData`, so a bootstrapping node doesn't need to re-verify historical Warp messages.
+- [Predicate verification](../../evm/predicate) results encoded into the block header's `extraData`, so a bootstrapping node doesn't need to re-verify historical Warp messages.
 - The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
 
 `cchain` persists this chain's Warp messages, serves signature requests against that store, and verifies Warp predicates during block verification.
