@@ -1,0 +1,46 @@
+name: Bazel
+
+# Top-level Bazel CI entrypoint. This workflow defines the platform matrix
+# once and invokes bazel-ci.yml once per platform.
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bz-define-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      platforms: ${{ steps.set-platforms.outputs.platforms }}
+    steps:
+      - name: Define platform matrix
+        id: set-platforms
+        shell: bash
+        run: |
+          echo 'platforms=["linux-amd64","linux-arm64","darwin-arm64"]' >> "$GITHUB_OUTPUT"
+  matrix:
+    needs: bz-define-matrix
+    name: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.bz-define-matrix.outputs.platforms) }}
+    uses: ./.github/workflows/bazel-ci.yml
+    with:
+      platform_name: ${{ matrix.platform }}
+      runner: ${{ matrix.platform == 'linux-amd64' && 'ubuntu-24.04' || matrix.platform == 'linux-arm64' && 'ubuntu-24.04-arm' || 'macos-26' }}
+    secrets: inherit
