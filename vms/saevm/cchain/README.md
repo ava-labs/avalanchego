@@ -4,49 +4,51 @@
 
 ## Architecture
 
-It's most useful to think of the C-Chain as three peer services that integrate with each other, rather than as a single VM. The implementation embeds the SAE VM inside the CChain VM, but the conceptual model is independent services.
+The C-Chain is implemented as three layered services. AvalancheGo provides the host infrastructure; the SAE VM is a generic streaming-async EVM that mediates between AvalancheGo and the chain-specific layer; the C-Chain plugs C-Chain-specific behavior into the SAE VM's integration points.
 
 ```mermaid
 flowchart TB
     subgraph avago["AvalancheGo"]
-        direction TB
-        consensus["Consensus"]
-        p2pin["P2P Network"]
-        httpd["API Server"]
-        consensus <--> p2pin
-    end
-
-    saevm["SAE VM"]
-
-    subgraph cchain["CChain VM"]
         direction LR
-        cc_rpc["/avax"]
-        cc_hook["hook.Points"]
-        cc_pool[("Import/Export<br/>txpool")]
-        cc_warp_store[("warp storage")]
+        consensus["Consensus"]
+        network["Network"]
+        apis_avago["APIs"]
+        consensus <--> network
     end
 
-    consensus --> saevm
-    p2pin --> saevm
-    httpd --> saevm
-    httpd --> cc_rpc
-    p2pin --> cc_pool
-    p2pin --> cc_warp_store
+    subgraph saevm["SAE VM"]
+        direction LR
+        sae["SAE"]
+        p2pn["P2P Network"]
+        apis_sae["APIs"]
+    end
 
-    saevm -.-> cc_hook
+    subgraph cchain["C-Chain"]
+        direction LR
+        hook["hook Points"]
+        warp["warp"]
+        pool["pool"]
+        avax["/avax"]
+    end
 
-    cc_rpc --> cc_pool
-    cc_hook --> cc_pool
-    cc_hook --> cc_warp_store
+    consensus --> sae
+    network --> p2pn
+    apis_avago --> apis_sae
+
+    sae --> hook
+    p2pn --> warp
+    p2pn --> pool
+    apis_sae --> avax
+
+    hook --> warp
+    hook --> pool
 ```
 
-The three services and their integration points:
+- **AvalancheGo** — the host node. Three subsystems hand off to the chain VMs: consensus drives blocks, the network delivers peer messages, and the API server serves JSON-RPC.
+- **SAE VM** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). It exposes three matching integration points for AvalancheGo to drive: a block lifecycle (SAE), a p2p handler-ID dispatcher, and an `eth_*` JSON-RPC server. Each integration point can in turn fan out to the C-Chain layer.
+- **C-Chain** — the C-Chain-specific service (this package). It plugs into each SAE VM integration point: [hook Points](hook/) hooks into the block lifecycle for chain-specific behavior; the p2p dispatcher delivers Import/Export gossip into the [pool](txpool/) and serves ACP-118 signature requests against [warp](warp/) storage; the API server hosts the [/avax](api/) endpoints.
 
-- **AvalancheGo** — the host node. Drives consensus, multiplexes inbound p2p messages by handler ID, and serves HTTP/JSON-RPC.
-- **SAE VM** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). AvalancheGo drives it via consensus, p2p messages, and `eth_*` JSON-RPC; SAE in turn calls into `hook.Points` for chain-specific behavior.
-- **CChain VM** — the C-Chain-specific service (this package). Exposes the `/avax` JSON-RPC API ([api](api/)) and `hook.Points` ([hook](hook/)), the seam the SAE VM calls into. AvalancheGo's p2p also delivers Import/Export gossip into the [txpool](txpool/) and reads ACP-118 signature data from warp [storage](warp/).
-
-The only cross-service call between the two VM services is SAE VM → CChain VM, through `hook.Points`. `hook.Points` then reaches the rest of the CChain VM through two stores: the Import/Export [txpool](txpool/) (also written by `/avax` and AvalancheGo's p2p Import/Export gossip; read by `hook.Points` for tx candidates) and warp message [storage](warp/) (written by `hook.Points` for messages emitted during execution; read by AvalancheGo's p2p to answer signature requests). The txpool flow is detailed further in [the next section](#how-transactions-enter-the-mempool).
+Inside the C-Chain, hook Points reads the pool for transaction candidates during block building and writes warp storage for messages emitted during execution. The pool's flow from arrival to inclusion is detailed in [the next section](#how-transactions-enter-the-mempool).
 
 ## What `cchain` adds
 
