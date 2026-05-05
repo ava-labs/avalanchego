@@ -152,12 +152,10 @@ func (i *Import) SanityCheck(ctx *snow.Context) error {
 }
 
 var (
-	errIncorrectNumCredentials = errors.New("incorrect number of credentials")
-	errFetchingUTXOs           = errors.New("fetching UTXOs")
-	errConvertingToFxTx        = errors.New("converting to fx transaction")
-	errUnmarshallingUTXO       = errors.New("unmarshalling UTXO")
-	errMismatchedAssetIDs      = errors.New("mismatched asset IDs")
-	errVerifyingTransfer       = errors.New("verifying transfer")
+	errFetchingUTXOs      = errors.New("fetching UTXOs")
+	errUnmarshallingUTXO  = errors.New("unmarshalling UTXO")
+	errMismatchedAssetIDs = errors.New("mismatched asset IDs")
+	errVerifyingTransfer  = errors.New("verifying transfer")
 )
 
 func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error {
@@ -171,9 +169,9 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 	}
 
 	utxoIDs := make([][]byte, len(i.ImportedInputs))
-	for i, in := range i.ImportedInputs {
+	for j, in := range i.ImportedInputs {
 		inputID := in.UTXOID.InputID()
-		utxoIDs[i] = inputID[:]
+		utxoIDs[j] = inputID[:]
 	}
 
 	utxoBytes, err := sm.Get(i.SourceChain, utxoIDs)
@@ -181,20 +179,20 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 		return fmt.Errorf("%w from %s: %w", errFetchingUTXOs, i.SourceChain, err)
 	}
 
-	for i, in := range i.ImportedInputs {
+	for j, in := range i.ImportedInputs {
 		// TODO(StephenButtolph): Parallelize transfer verification, which
 		// includes signature verification. This is non-trivial, because
 		// transactions frequently contain duplicate signatures, which are
 		// currently being cached.
 		utxo := new(avax.UTXO)
-		if _, err := c.Unmarshal(utxoBytes[i], utxo); err != nil {
-			return fmt.Errorf("%w: %w", errUnmarshallingUTXO, err)
+		if _, err := c.Unmarshal(utxoBytes[j], utxo); err != nil {
+			return fmt.Errorf("%w (%d): %w", errUnmarshallingUTXO, j, err)
 		}
 		if utxo.Asset.ID != in.Asset.ID {
-			return fmt.Errorf("%w: input asset %s does not match UTXO asset %s", errMismatchedAssetIDs, in.Asset.ID, utxo.Asset.ID)
+			return fmt.Errorf("%w (%d): input asset %s does not match UTXO asset %s", errMismatchedAssetIDs, j, in.Asset.ID, utxo.Asset.ID)
 		}
-		if err := fx.VerifyTransfer(fxTx, in.In, creds[i], utxo.Out); err != nil {
-			return fmt.Errorf("%w: %w", errVerifyingTransfer, err)
+		if err := fx.VerifyTransfer(fxTx, in.In, creds[j], utxo.Out); err != nil {
+			return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, err)
 		}
 	}
 	return nil

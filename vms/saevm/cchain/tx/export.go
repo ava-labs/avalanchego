@@ -171,6 +171,7 @@ var (
 	sigCache = secp256k1.NewRecoverCache(1024)
 
 	errIncorrectNumSignatures = errors.New("incorrect number of signatures")
+	errRecoveringPublicKey    = errors.New("recovering public key")
 	errAddressMismatch        = errors.New("signature does not match address")
 )
 
@@ -189,14 +190,14 @@ func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credenti
 		// signatures, which are currently being cached.
 		cred := creds[i].Self()
 		if len(cred.Sigs) != 1 {
-			return fmt.Errorf("%w: expected 1, got %d", errIncorrectNumSignatures, len(cred.Sigs))
+			return fmt.Errorf("%w (%d): expected 1, got %d", errIncorrectNumSignatures, i, len(cred.Sigs))
 		}
 		pk, err := sigCache.RecoverPublicKey(fxTx.Bytes(), cred.Sigs[0][:])
 		if err != nil {
-			return err
+			return fmt.Errorf("%w (%d): %w", errRecoveringPublicKey, i, err)
 		}
 		if addr := pk.EthAddress(); in.Address != addr {
-			return fmt.Errorf("%w: expected %s, got %s", errAddressMismatch, in.Address, addr)
+			return fmt.Errorf("%w (%d): expected %s, got %s", errAddressMismatch, i, in.Address, addr)
 		}
 	}
 	return nil

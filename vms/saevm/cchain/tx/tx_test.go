@@ -2123,7 +2123,7 @@ func TestVerifyCredentials(t *testing.T) {
 			tx: exp(func(tx *Tx) {
 				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
 			}),
-			wantErr: secp256k1.ErrInvalidSig,
+			wantErr: errRecoveringPublicKey,
 		},
 		{
 			name: "export_address_mismatch",
