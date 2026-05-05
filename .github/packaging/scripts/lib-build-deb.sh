@@ -2,7 +2,7 @@
 
 # DEB-specific build functions for build-package.sh.
 #
-# Sourced (not executed) by build-package.sh when FORMAT=DEB.
+# Sourced (not executed) by build-package.sh when PKG_FORMAT=DEB.
 # Provides hooks called at specific points in the build flow.
 
 # Configure gpg-agent for non-interactive dpkg-sig signing.
