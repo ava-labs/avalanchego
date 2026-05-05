@@ -48,18 +48,6 @@ flowchart TB
     hook --> db
     warp --> db
     txpool --> db
-
-    classDef avagoNode stroke:#64748B,stroke-width:2px
-    classDef saeNode stroke:#3B82F6,stroke-width:2px
-    classDef cchainNode stroke:#DC2626,stroke-width:2px
-
-    class consensus,network,apiserver avagoNode
-    class execution,p2pn,apis_sae saeNode
-    class hook,warp,db,txpool,avax cchainNode
-
-    style avago stroke:#64748B,stroke-width:2px
-    style sae stroke:#3B82F6,stroke-width:2px
-    style cchain stroke:#DC2626,stroke-width:2px
 ```
 
 - **AvalancheGo** — the host node. Three subsystems hand off to the chain VMs: the network delivers peer messages, consensus drives blocks, and the API server serves JSON-RPC.
