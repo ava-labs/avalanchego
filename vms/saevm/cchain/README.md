@@ -140,7 +140,7 @@ User RPC submission is the only path that registers transactions with the local 
 The C-Chain participates in cross-subnet Warp messaging on both sides — sending messages to other chains and receiving messages from them. Four pieces are involved:
 
 - A custom precompile that lets EVM contracts emit and consume Warp messages.
-- Incoming Warp messages encoded into the access-list, so the hook implementation can verify them prior to EVM execution.
+- Incoming Warp messages encoded in the access-list, so the hook implementation can verify them prior to EVM execution.
 - Predicate verification results encoded into the block header's `extraData`, so a bootstrapping node doesn't need to re-verify historical Warp messages.
 - The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
 
