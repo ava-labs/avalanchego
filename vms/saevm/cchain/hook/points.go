@@ -160,11 +160,18 @@ func (p *Points) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	return ops, nil
 }
 
-func (*Points) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
+// CanExecuteTransaction is a no-op for coreth: the C-Chain has no
+// txallowlist-style admission precompile, so worst-case admission has nothing
+// to enforce. The signature is satisfied to match [hook.Points].
+func (*Points) CanExecuteTransaction(ethparams.Rules, common.Address, *common.Address, libevm.StateReader) error {
 	return nil
 }
 
-func (*Points) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
+func (*Points) RequiresTransactionAdmissionCheck(ethparams.Rules) bool {
+	return false
+}
+
+func (*Points) BeforeExecutingBlock(ethparams.Rules, *types.Header, *state.StateDB, *types.Block) error {
 	return nil
 }
 

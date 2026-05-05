@@ -75,10 +75,30 @@ type Points interface {
 	// execution.
 	EndOfBlockOps(*types.Block) ([]Op, error)
 	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
-	// so that consumers can use a single concrete type for both SAE and libevm hooks.
-	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
+	// so that consumers can share the same check between the SAE worst-case
+	// admission path and the libevm hook fired during actual EVM execution.
+	//
+	// Unlike the libevm hook (which is keyed by [params.Rules] via its
+	// receiver), [Points] is one long-lived value per VM, so the rules for the
+	// block being checked MUST be passed explicitly. SAE worst-case calls this
+	// with rules computed from the LAST-SETTLED block. Implementations MUST
+	// treat the rules and state as a consistent pair, e.g. when
+	// gating with `rules.IsPrecompileEnabled(...)` against contract storage
+	// reads. The trade-off is strict-as-of-last-settled enforcement (a few seconds of leakage after a role
+	// removal) instead of strict-as-of-parent.
+	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
+	// RequiresTransactionAdmissionCheck reports whether
+	// [CanExecuteTransaction] could reject any tx under `rules`. MUST be a
+	// cheap, rules-only check used to skip sender recovery and state opening
+	// when no relevant precompile is active. Over-reporting (returning true)
+	// is safe; under-reporting is not.
+	RequiresTransactionAdmissionCheck(rules params.Rules) bool
 	// BeforeExecutingBlock is called immediately prior to executing the block.
-	BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error
+	// `parent` is the header of the block whose post-execution state `state`
+	// is rooted at; it provides `parent.Time` for upgrade-activation windowing
+	// and is the equivalent of what the legacy plugin's [core.StateProcessor]
+	// reads via `&parent.Time`.
+	BeforeExecutingBlock(rules params.Rules, parent *types.Header, state *state.StateDB, block *types.Block) error
 	// AfterExecutingBlock is called immediately after executing the block.
 	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 }
@@ -115,13 +135,18 @@ type BlockBuilder[T Transaction] interface {
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
+	//
+	// `worstcaseState` is SAE's worst-case [state.StateDB] (read-only),
+	// rooted at `settled`'s post-execution state. `settled` is the
+	// last-settled block at build time and is deterministic across nodes (see [blocks.LastToSettleAt]).
 	BuildBlock(
 		header *types.Header,
+		worstcaseState libevm.StateReader,
 		blockCtx *block.Context,
 		txs []*types.Transaction,
 		receipts []*types.Receipt,
 		endOfBlockOps []T,
-		settledHeight uint64,
+		settled *types.Header,
 	) (*types.Block, error)
 }
 

@@ -7,6 +7,7 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "sae",
     srcs = [
+        "admitter.go",
         "always.go",
         "block_builder.go",
         "blocks.go",
@@ -58,6 +59,7 @@ go_library(
         "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//rpc",
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_prometheus_client_golang//prometheus",
@@ -68,6 +70,7 @@ go_library(
 go_test(
     name = "sae_test",
     srcs = [
+        "admitter_test.go",
         "always_test.go",
         "networked_test.go",
         "recovery_test.go",
@@ -109,6 +112,7 @@ go_test(
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
         "//vms/saevm/saetest/escrow",
+        "//vms/saevm/saexec",
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/types",
         "@com_github_arr4n_shed//testerr",

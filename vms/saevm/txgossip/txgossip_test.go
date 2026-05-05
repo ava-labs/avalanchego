@@ -91,7 +91,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())
 	pool := newTxPool(t, bc)
-	set, err := NewSet(pool, gossip.BloomSetConfig{})
+	set, err := NewSet(pool, nil /*admitter*/, gossip.BloomSetConfig{})
 	require.NoError(t, err, "NewSet()")
 	t.Cleanup(func() {
 		assert.NoErrorf(t, pool.Close(), "%T.Close()", pool)
@@ -376,6 +376,121 @@ func TestAPIBackendSendTxSignatureMatch(_ *testing.T) {
 	fn := b.SendTx //nolint:ineffassign,staticcheck
 	fn = (*Set)(nil).SendTx
 	_ = fn
+}
+
+// stubAdmitter implements [Admitter] by returning the per-call error
+// provided at construction; index `i` returns `errs[i]`. A nil entry admits
+// the tx. Calls past `len(errs)` panic, which protects against silent
+// over-counting.
+type stubAdmitter struct {
+	errs []error
+	n    int
+}
+
+func (s *stubAdmitter) Admit(*types.Transaction) error {
+	defer func() { s.n++ }()
+	return s.errs[s.n]
+}
+
+// signTx signs a trivial value transfer originating from `account`.
+func signTx(t *testing.T, s SUT, account int) *types.Transaction {
+	t.Helper()
+	return s.wallet.SetNonceAndSign(t, account, &types.DynamicFeeTx{
+		To:        &common.Address{},
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+}
+
+// TestAddToPool exercises [txSet.addToPool]. It drives the method directly
+// (instead of going through [Set.Add] / [Set.SendTx], which only carry one
+// tx at a time) so we can observe the index-aligned `[]error` it returns
+// against an input slice that mixes admitter-rejected and pool-accepted /
+// pool-rejected transactions.
+//
+// Each row supplies:
+//   - the [Admitter] to install (nil clears the fixture's admitter);
+//   - a builder for the input txs (handles e.g. duplicates naturally);
+//   - per-position expectations for the result slice and pool membership.
+func TestAddToPool(t *testing.T) {
+	rejectAt0 := errors.New("rejected at index 0")
+	rejectAt2 := errors.New("rejected at index 2")
+
+	tests := []struct {
+		name string
+		// admitter is installed on the fixture's [txSet]. Use `nil` to
+		// exercise the no-admitter pass-through path.
+		admitter Admitter
+		// numTxs requests `numTxs` distinct value-transfer txs, one per
+		// account (so each is independently nonce-0). Ignored when `txs`
+		// is non-nil.
+		numTxs int
+		// txs is an optional override for non-uniform inputs (e.g.
+		// duplicates). When set, `numTxs` is ignored.
+		txs func(t *testing.T, s SUT) []*types.Transaction
+		// wantErrs is index-aligned with the input txs. Entries are
+		// matched via [errors.Is]; nil means "no error".
+		wantErrs []error
+		// wantInPool is index-aligned with the input txs; true means the
+		// pool must contain the tx after [txSet.addToPool] returns.
+		wantInPool []bool
+	}{
+		{
+			name:       "no_admitter_passes_through_to_pool",
+			admitter:   nil,
+			numTxs:     1,
+			wantErrs:   []error{nil},
+			wantInPool: []bool{true},
+		},
+		{
+			name:       "errors_indexed_by_input_position",
+			admitter:   &stubAdmitter{errs: []error{rejectAt0, nil, rejectAt2, nil}},
+			numTxs:     4,
+			wantErrs:   []error{rejectAt0, nil, rejectAt2, nil},
+			wantInPool: []bool{false, true, false, true},
+		},
+		{
+			name:     "pool_error_propagated_at_original_position",
+			admitter: &stubAdmitter{errs: []error{nil, nil}},
+			txs: func(t *testing.T, s SUT) []*types.Transaction {
+				tx := signTx(t, s, 0)
+				return []*types.Transaction{tx, tx} // dup → [txpool.ErrAlreadyKnown] on insert #2
+			},
+			wantErrs:   []error{nil, txpool.ErrAlreadyKnown},
+			wantInPool: []bool{true, true}, // both indices map to the same pooled tx hash
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sut := newSUT(t, 1)
+			set := sut.Set.set
+			set.admitter = tt.admitter
+
+			var txs []*types.Transaction
+			switch {
+			case tt.txs != nil:
+				txs = tt.txs(t, sut)
+			default:
+				txs = make([]*types.Transaction, tt.numTxs)
+				for i := range tt.numTxs {
+					txs[i] = signTx(t, sut, 0)
+				}
+			}
+			errs := set.addToPool(true, txs...)
+
+			require.Len(t, errs, len(tt.wantErrs))
+			for i, want := range tt.wantErrs {
+				require.ErrorIsf(t, errs[i], want, "errs[%d]", i)
+			}
+
+			require.Len(t, tt.wantInPool, len(txs), "test setup: wantInPool must align with txs")
+			for i, want := range tt.wantInPool {
+				assert.Equalf(t, want, set.pool.Has(txs[i].Hash()),
+					"%T.Has(txs[%d]=%#x)", set.pool, i, txs[i].Hash())
+			}
+		})
+	}
 }
 
 func FuzzEffectiveGasTip(f *testing.F) {

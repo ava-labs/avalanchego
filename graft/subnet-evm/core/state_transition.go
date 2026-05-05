@@ -33,8 +33,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	cmath "github.com/ava-labs/libevm/common/math"
@@ -358,11 +356,9 @@ func (st *StateTransition) preCheck() error {
 		}
 
 		// Check that the sender is on the tx allow list if enabled
-		if params.GetExtra(st.evm.ChainConfig()).IsPrecompileEnabled(txallowlist.ContractAddress, st.evm.Context.Time) {
-			txAllowListRole := txallowlist.GetTxAllowListStatus(st.state, msg.From)
-			if !txAllowListRole.IsEnabled() {
-				return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, msg.From)
-			}
+		rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, params.IsMergeTODO, st.evm.Context.Time)
+		if err := rules.Hooks().CanExecuteTransaction(msg.From, msg.To, st.state); err != nil {
+			return err
 		}
 	}
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)

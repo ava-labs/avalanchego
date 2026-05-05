@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "state",
+    srcs = ["genesis.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/subnetevm/state",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/prefixdb",
+    ],
+)

@@ -36,7 +36,9 @@ type Stub struct {
 	InvalidOpIDs            set.Set[ids.ID]
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
-	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
+	CanExecuteTransactionFn func(params.Rules, common.Address, *common.Address, libevm.StateReader) error
+	RequiresAdmissionCheck  func(params.Rules) bool
+	BeforeExecutingBlockFn  func(params.Rules, *types.Header, *state.StateDB, *types.Block) error
 	GasPriceConfig          gastime.GasPriceConfig
 }
 
@@ -144,13 +146,14 @@ func (s *Stub) PotentialEndOfBlockOps(ctx context.Context, header *types.Header,
 // BuildBlock calls [BuildBlock] with its arguments.
 func (*Stub) BuildBlock(
 	header *types.Header,
+	_ libevm.StateReader,
 	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settledHeight uint64,
+	settled *types.Header,
 ) (*types.Block, error) {
-	return BuildBlock(header, blockCtx, txs, receipts, ops, settledHeight)
+	return BuildBlock(header, blockCtx, txs, receipts, ops, settled)
 }
 
 // BuildBlock encodes ops into [types.Header.Extra] and calls [types.NewBlock]
@@ -161,7 +164,7 @@ func BuildBlock(
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settledHeight uint64,
+	settled *types.Header,
 ) (*types.Block, error) {
 	var e extra
 	// If the header originally had fractional seconds set, we keep them in the
@@ -171,7 +174,7 @@ func BuildBlock(
 	}
 
 	e.ops = ops
-	e.settledHeight = settledHeight
+	e.settledHeight = settled.Number.Uint64()
 	header.Extra = e.MarshalCanoto()
 	return types.NewBlock(header, txs, nil, receipts, saetest.TrieHasher()), nil
 }
@@ -233,15 +236,26 @@ func getHeaderExtra(hdr *types.Header) extra {
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
 // otherwise it allows all transactions.
-func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr libevm.StateReader) error {
+func (s *Stub) CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, sr libevm.StateReader) error {
 	if fn := s.CanExecuteTransactionFn; fn != nil {
-		return fn(from, to, sr)
+		return fn(rules, from, to, sr)
 	}
 	return nil
 }
 
-// BeforeExecutingBlock is a no-op that always returns nil.
-func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+func (s *Stub) RequiresTransactionAdmissionCheck(rules params.Rules) bool {
+	if fn := s.RequiresAdmissionCheck; fn != nil {
+		return fn(rules)
+	}
+	return false
+}
+
+// BeforeExecutingBlock proxies to [Stub.BeforeExecutingBlockFn] if non-nil,
+// otherwise it is a no-op that always returns nil.
+func (s *Stub) BeforeExecutingBlock(rules params.Rules, parent *types.Header, sdb *state.StateDB, block *types.Block) error {
+	if fn := s.BeforeExecutingBlockFn; fn != nil {
+		return fn(rules, parent, sdb, block)
+	}
 	return nil
 }
 

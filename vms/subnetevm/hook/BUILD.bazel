@@ -1,0 +1,59 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "hook",
+    srcs = [
+        "block_builder.go",
+        "points.go",
+        "tx.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/subnetevm/hook",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/constants",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customheader",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//graft/subnet-evm/precompile/contracts/rewardmanager",
+        "//graft/subnet-evm/precompile/contracts/txallowlist",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "//snow",
+        "//snow/engine/snowman/block",
+        "//utils",
+        "//vms/components/gas",
+        "//vms/evm/acp226",
+        "//vms/saevm/gastime",
+        "//vms/saevm/hook",
+        "//vms/saevm/types",
+        "//vms/subnetevm/hook/acp176",
+        "//vms/subnetevm/warp",
+        "//x/blockdb",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//trie",
+    ],
+)
+
+go_test(
+    name = "hook_test",
+    srcs = ["block_builder_test.go"],
+    embed = [":hook"],
+    deps = [
+        "//graft/evm/constants",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/params/paramstest",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//upgrade/upgradetest",
+        "//utils",
+        "//vms/evm/acp226",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+    ],
+)

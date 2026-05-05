@@ -1941,9 +1941,16 @@ func TestVerifyManagerConfig(t *testing.T) {
 // Test that the tx allow list allows whitelisted transactions and blocks non-whitelisted addresses
 // and the allowlist is removed after the precompile is disabled.
 func TestTxAllowListDisablePrecompile(t *testing.T) {
+	// Pin to pre-Helicon: the legacy synchronous plugin's libevm txallowlist
+	// hook is intentionally short-circuited post-Helicon (see
+	// extras.RulesExtra.CanExecuteTransaction). Helicon-active chains are
+	// served by the SAE port at vms/subnetevm and exercise the same check
+	// via SAE worst-case admission.
+	graniteFork := upgradetest.Granite
+
 	// Setup chain params
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[graniteFork]))))
 	enableAllowListTimestamp := upgrade.InitiallyActiveTime // enable at initially active time
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.TimeToNewUint64(enableAllowListTimestamp), testEthAddrs[0:1], nil, nil),
@@ -1968,6 +1975,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	`, disableAllowListTimestamp.Unix())
 
 	tvm := newVM(t, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 		upgradeJSON: upgradeConfig,
 	})

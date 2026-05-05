@@ -152,6 +152,10 @@ tasks:
     desc: Builds subnet-evm plugin
     cmd: '{{.NIX_RUN}} ./graft/subnet-evm/scripts/build.sh'
 
+  build-subnet-evm-sae:
+    desc: Builds subnet-evm SAE plugin (vms/subnetevm) and symlinks it to the SubnetEVMID plugin path (replaces the legacy graft/subnet-evm plugin)
+    cmd: '{{.NIX_RUN}} ./scripts/build_subnet_evm_sae.sh'
+
   build-subnet-evm-image:
     desc: Builds docker image for subnet-evm
     dir: graft/subnet-evm
@@ -168,11 +172,6 @@ tasks:
   build-xsvm-image:
     desc: Builds xsvm image
     cmd: '{{.NIX_RUN}} ./scripts/build_xsvm_image.sh'
-
-  build-subnet-evm:
-    desc: Builds subnet-evm plugin
-    dir: graft/subnet-evm
-    cmd: ./scripts/build.sh
 
   check-bazel-fmt:
     desc: Check that BUILD.bazel files are formatted with buildifier
@@ -459,6 +458,25 @@ tasks:
     cmds:
       - task: build-race
       - task: build-subnet-evm
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
+
+  test-e2e-warp-sae:
+    desc: Runs warp e2e tests against the new SAE-based subnet-evm plugin (vms/subnetevm)
+    env:
+      E2E_TARGET: ./tests/e2e/warp
+    cmds:
+      - task: build
+      - task: build-subnet-evm-sae
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
+
+  test-e2e-warp-sae-ci:
+    desc: Runs warp e2e tests against the new SAE-based subnet-evm plugin [serially with race detection enabled]
+    env:
+      E2E_SERIAL: 1
+      E2E_TARGET: ./tests/e2e/warp
+    cmds:
+      - task: build-race
+      - task: build-subnet-evm-sae
       - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
 
   test-e2e-existing-ci:
