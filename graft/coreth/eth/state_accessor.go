@@ -34,7 +34,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/tracers"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -84,7 +83,7 @@ func (eth *Ethereum) hashState(ctx context.Context, block *types.Block, reexec u
 			// the internal junks created by tracing will be persisted into the disk.
 			// TODO(rjl493456442), clean cache is disabled to prevent memory leak,
 			// please re-enable it for better performance.
-			database = extstate.NewDatabaseWithConfig(eth.chainDb, triedb.HashDefaults)
+			database = state.NewDatabaseWithConfig(eth.chainDb, triedb.HashDefaults)
 			if statedb, err = state.New(block.Root(), database, nil); err == nil {
 				log.Info("Found disk backend for state trie", "root", block.Root(), "number", block.Number())
 				return statedb, noopReleaser, nil
@@ -102,7 +101,7 @@ func (eth *Ethereum) hashState(ctx context.Context, block *types.Block, reexec u
 		// TODO(rjl493456442), clean cache is disabled to prevent memory leak,
 		// please re-enable it for better performance.
 		tdb = triedb.NewDatabase(eth.chainDb, triedb.HashDefaults)
-		database = extstate.NewDatabaseWithNodeDB(eth.chainDb, tdb)
+		database = state.NewDatabaseWithNodeDB(eth.chainDb, tdb)
 
 		// If we didn't check the live database, do check state over ephemeral database,
 		// otherwise we would rewind past a persisted block (specific corner case is
@@ -361,7 +360,7 @@ func (eth *Ethereum) inMemoryGenesisDB() (state.Database, error) {
 	if _, err := eth.config.Genesis.Commit(db, tdb); err != nil {
 		return nil, err
 	}
-	return extstate.NewDatabaseWithNodeDB(db, tdb), nil
+	return state.NewDatabaseWithNodeDB(db, tdb), nil
 }
 
 // stateAtBlock retrieves the state database associated with a certain block.
