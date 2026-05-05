@@ -23,7 +23,7 @@ jobs:
             runner: ubuntu-22.04
             rpm_arch: x86_64
           - arch: arm64
-            runner: custom-arm64-jammy
+            runner: ubuntu-22.04-arm
             rpm_arch: aarch64
     runs-on: ${{ matrix.runner }}
     permissions:

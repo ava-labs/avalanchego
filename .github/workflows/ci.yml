@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, ubuntu-22.04, ubuntu-24.04, custom-arm64-jammy, custom-arm64-noble]
+        os: [macos-14, ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -84,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, custom-arm64-noble]
+        os: [ubuntu-latest, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@v4
       - name: Run e2e tests
