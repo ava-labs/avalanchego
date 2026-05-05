@@ -2590,6 +2590,93 @@ func TestSetUptimeAndSetStakingInfoBothPersist(t *testing.T) {
 	require.Equal(t, wantDelegateeReward2, stakingInfo.DelegateeReward)
 }
 
+func TestValidatorMetadataPersistsPreHelicon(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	upgradeConfig := upgradetest.GetConfig(upgradetest.Granite)
+
+	state, err := New(
+		db,
+		genesistest.NewBytes(t, genesistest.Config{}),
+		prometheus.NewRegistry(),
+		validators.NewManager(),
+		upgradeConfig,
+		&config.Default,
+		&snow.Context{
+			NetworkID: constants.UnitTestID,
+			NodeID:    ids.GenerateTestNodeID(),
+			Log:       logging.NoLog{},
+		},
+		metrics.Noop,
+		reward.NewCalculator(reward.Config{
+			MaxConsumptionRate: .12 * reward.PercentDenominator,
+			MinConsumptionRate: .1 * reward.PercentDenominator,
+			MintingPeriod:      365 * 24 * time.Hour,
+			SupplyCap:          720 * units.MegaAvax,
+		}),
+	)
+	require.NoError(err)
+
+	var (
+		subnetID          = constants.PrimaryNetworkID
+		nodeID            = ids.GenerateTestNodeID()
+		startTime         = genesistest.DefaultValidatorStartTime
+		endTime           = startTime.Add(24 * time.Hour)
+		weight            = uint64(2_000)
+		potentialReward   = uint64(500)
+		wantStakingInfo   = StakingInfo{DelegateeReward: 100_000}
+		wantValidator, tx = createStakerAndTx(
+			t,
+			subnetID,
+			nodeID,
+			startTime,
+			endTime,
+			weight,
+			potentialReward,
+		)
+	)
+	state.AddTx(tx, status.Committed)
+
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+	require.NoError(diff.PutCurrentValidator(wantValidator))
+	require.NoError(diff.SetStakingInfo(subnetID, nodeID, wantStakingInfo))
+	require.NoError(diff.Apply(state))
+
+	require.NoError(state.Commit())
+
+	reloadedState, err := New(
+		db,
+		genesistest.NewBytes(t, genesistest.Config{}),
+		prometheus.NewRegistry(),
+		validators.NewManager(),
+		upgradeConfig,
+		&config.Default,
+		&snow.Context{
+			NetworkID: constants.UnitTestID,
+			NodeID:    ids.GenerateTestNodeID(),
+			Log:       logging.NoLog{},
+		},
+		metrics.Noop,
+		reward.NewCalculator(reward.Config{
+			MaxConsumptionRate: .12 * reward.PercentDenominator,
+			MinConsumptionRate: .1 * reward.PercentDenominator,
+			MintingPeriod:      365 * 24 * time.Hour,
+			SupplyCap:          720 * units.MegaAvax,
+		}),
+	)
+	require.NoError(err)
+
+	gotValidator, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+	require.True(wantValidator.Equals(gotValidator))
+
+	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(wantStakingInfo, gotStakingInfo)
+}
+
 func TestDiffValidatorReplacement(t *testing.T) {
 	tests := []struct {
 		name              string
