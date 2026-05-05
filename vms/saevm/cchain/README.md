@@ -62,7 +62,7 @@ flowchart TB
 
 ### Export and Import transactions
 
-The Primary Network is the set of three chains (P, X, and C) that transfer assets through pair-wise shared stores: each pair of chains shares its own store that both chains can read and write.
+The Primary Network is the set of three chains — P, X, and C — that exchange assets through pair-wise shared stores. Each pair of chains has its own store, readable and writable by both chains in the pair.
 
 ```mermaid
 flowchart TB
@@ -88,27 +88,9 @@ A cross-chain transfer happens in two steps. An **Export** transaction on the so
 
 The mempool does not support dependent transactions: every transaction it holds must be valid on its own against the current chain state. Two invariants follow. First, the mempool is always valid against a recently-executed state, so anything it offers up for block building can be applied directly. Second, if block production stalls, all mempool transactions are eventually guaranteed to be valid against the last accepted block.
 
-### Warp messaging
+#### How transactions enter the Txpool
 
-The C-Chain participates in cross-subnet Warp messaging on both sides — sending messages to other chains and receiving messages from them. Three pieces are involved:
-
-- A custom precompile that lets EVM contracts emit and consume Warp messages.
-- An encoding that places Warp message payloads into transaction access lists, so the message rides alongside the transaction that produced or accepted it.
-- The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
-
-`cchain` persists this chain's Warp messages, serves signature requests against that store, and verifies Warp predicates during block execution. See [warp](warp/).
-
-### Validator-voted parameters
-
-Three chain parameters are settled by validator vote on each block: validators choose to raise, lower, or hold each value, with no auto-adjustment from observed usage or economic mechanism.
-
-- **Gas target per second** ([ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176)) — the throughput target. The rest of ACP-176 (gas accounting and excess tracker) lives in SAE; `cchain` contributes only the target value. See [hook/acp176](hook/acp176/).
-- **Minimum block delay** ([ACP-226](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226)) — a lower bound on the time between consecutive blocks, derived from the parent header. Prevents block production faster than the network has agreed to. See [hook](hook/).
-- **Minimum gas price** ([ACP-283](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/283)) — a floor on the gas price for transactions to be included in a block. See [hook](hook/).
-
-## How transactions enter the Txpool
-
-Import/Export transactions can reach the Txpool from four independent sources, but every source ends at the same call into the mempool's add path. The mempool is the single write-side gate: signature checks, against-state checks, and conflict resolution all happen there.
+Import/Export transactions reach the Txpool from four independent sources. They all converge on the same write-side gate, where signature, against-state, and conflict-resolution checks happen before insertion.
 
 ```mermaid
 flowchart LR
@@ -142,93 +124,38 @@ The four entry paths in detail:
 - **Inbound pull gossip.** A periodic goroutine inside `cchain` pulls digests from peers; transactions returned in response flow into the same bloom-set wrapper and the same add path.
 - **Block rejection.** When the consensus engine rejects a block this node had previously verified, `cchain` extracts the Import/Export transactions embedded in the block's extension data and re-submits each one to the mempool. The point is to keep otherwise-valid transactions from being dropped by an unlucky reorg.
 
-### Write side versus read side — the shared tx store
+### Warp messaging
 
-The user-facing mempool wraps a smaller heap-sorted store. The store is shared.
+The C-Chain participates in cross-subnet Warp messaging on both sides — sending messages to other chains and receiving messages from them. Three pieces are involved:
 
-```mermaid
-flowchart LR
-    subgraph cchain_pkg["cchain"]
-        write["mempool (write side)<br/><i>signature + state verification,<br/>height tracking, conflict eviction</i>"]
-        store["shared tx store<br/><i>min-heap by gas price,<br/>conflict map, condition var</i>"]
-        hookimpl["cchain hook (read side)<br/><i>iterates store for block-building candidates</i>"]
-    end
-    subgraph saevm_pkg["saevm"]
-        bb["block builder"]
-    end
+- A custom precompile that lets EVM contracts emit and consume Warp messages.
+- An encoding that places Warp message payloads into transaction access lists, so the message rides alongside the transaction that produced or accepted it.
+- The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
 
-    write -->|all four entry paths<br/>insert/evict| store
-    hookimpl -->|gas-price-ordered iteration| store
-    bb -->|asks hook for end-of-block candidates| hookimpl
-```
+`cchain` persists this chain's Warp messages, serves signature requests against that store, and verifies Warp predicates during block execution. See [warp](warp/).
 
-The store is purely mechanical — sorting, deduplication by ID, conflict tracking by consumed input, and a condition variable that signals waiters when something is added. The mempool layered on top adds the policy: it tracks the latest accepted height, drops conflicts when a new block lands, and runs sanity, signature, shared-state, and current-state checks before any insert.
+### Validator-voted parameters
 
-Block building goes the other way. saevm's block builder asks the `cchain` hook for end-of-block candidates; the hook iterates the same store in decreasing gas-price order. Construction of the hook receives the store directly — the hook never goes through the mempool — so reads are cheap and never contend with the mempool's verification logic.
+Three chain parameters are settled by validator vote on each block: validators choose to raise, lower, or hold each value.
 
-## Ownership and lifecycle
+- **Gas target per second** ([ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176)) — the throughput target. The rest of ACP-176 (gas accounting and excess tracker) lives in SAE; `cchain` contributes only the target value. See [hook/acp176](hook/acp176/).
+- **Minimum block delay** ([ACP-226](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226)) — a lower bound on the time between consecutive blocks. Prevents block production faster than the network has agreed to. See [hook](hook/).
+- **Minimum gas price** ([ACP-283](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/283)) — a floor on the gas price for transactions to be included in a block. See [hook](hook/).
 
-The `cchain` VM struct holds the inner saevm VM, a mempool, a push-gossiper handle, a hook reference, and a list of cleanup callbacks. Its construction order matters because several components are shared by reference between consumers, and shared things must exist before either consumer is built.
-
-```mermaid
-flowchart TB
-    subgraph shared["shared instances"]
-        txsstore["shared tx store"]
-        warpstore["Warp storage"]
-        hookpoints["cchain hook"]
-    end
-
-    subgraph cchainvm["cchain VM struct"]
-        cvm["VM"]
-        mempool["mempool"]
-        pushg["push gossiper handle"]
-        onclose["onClose cleanup list"]
-    end
-
-    subgraph saeinternals["saevm internals"]
-        innersae["inner saevm VM"]
-        net["p2p Network"]
-        peers["peer / validator-peer sets"]
-    end
-
-    cvm ==>|creates| txsstore
-    cvm ==>|creates| warpstore
-    cvm ==>|creates| hookpoints
-    cvm ==>|creates| innersae
-    cvm ==>|creates| mempool
-
-    hookpoints -. holds .-> txsstore
-    hookpoints -. holds .-> warpstore
-    mempool -. wraps .-> txsstore
-    innersae -. holds .-> hookpoints
-    innersae ==>|creates and owns| net
-    innersae ==>|creates and owns| peers
-
-    cvm -. registers handlers on .-> net
-    cvm -. holds .-> innersae
-    cvm -. holds .-> hookpoints
-    cvm -. holds .-> mempool
-    cvm -. holds .-> pushg
-```
-
-Solid arrows are *creates*; dashed arrows are *holds a reference to*. The shared boxes — store, Warp storage, hook — each have one creator and two holders. The store is created before the hook and the mempool, and is then handed to both. The Warp storage is created before the hook and the Warp signature verifier, and is handed to both. The hook is created before the inner saevm VM, and is held by both the inner VM (which calls into it during block execution) and the `cchain` VM struct.
-
-Once everything is built, gossip is wired: a bloom-set wrapper, a push gossiper, a pull gossiper, and a network handler are all produced together and the handler is registered on the inner VM's Network under the Import/Export handler ID. A separate Warp signature handler is registered under the Warp handler ID. Two long-running goroutines drive periodic push and pull gossip; their cancel function and a wait group are added to the cleanup list.
-
-### Shutdown
+## Shutdown
 
 Shutdown unwinds in reverse order. `cchain` runs its cleanup callbacks last-in-first-out, then asks the inner saevm VM to shut down. The order matters because the resources `cchain` cleans up hold references *into* the inner VM:
 
 - The gossip goroutines pull from peers via the inner VM's Network. If saevm tore the Network down first, those goroutines would be reading dead state.
 - The mempool subscribes to chain-head events from the inner VM's RPC backend. The subscription must be unsubscribed before the inner VM finishes its own shutdown.
 
-The hook, the Warp storage, and the shared tx store carry no goroutines or external subscriptions of their own. They live and die with the process and need no explicit cleanup; releasing the references is enough.
+The hook, the Warp storage, and the shared tx store carry no goroutines or external subscriptions of their own; releasing the references is enough.
 
 ## Subpackages at a glance
 
 - [api/](api/) — `avax_*` JSON-RPC service for Import/Export submission, status, and UTXO lookup
 - [hook/](hook/) — implementation of saevm's hook surface; orchestrates header construction, end-of-block operations, and per-block timing
-- [hook/acp176/](hook/acp176/) — dynamic gas-target excess tracker
+- [hook/acp176/](hook/acp176/) — validator-voted gas-per-second target
 - [state/](state/) — genesis parsing, the synchronous-boundary pointer, and state-trie helpers
 - [tx/](tx/) — Import / Export transaction types and their gossip marshaller
 - [txpool/](txpool/) — the shared store, the mempool that wraps it, and conflict tracking
