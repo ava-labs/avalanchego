@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -33,11 +34,7 @@ const (
 )
 
 var (
-	defaultPeerVersion = &version.Application{
-		Major: 1,
-		Minor: 0,
-		Patch: 0,
-	}
+	defaultPeerVersion = client.StateSyncVersion
 
 	_ message.Request = (*HelloRequest)(nil)
 	_                 = (*HelloResponse)(nil)
@@ -109,7 +106,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 				return fmt.Errorf("failed to encode request: %w", err)
 			}
 
-			responseBytes, _, err := net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
+			responseBytes, _, err := net.SendSyncedAppRequestAny(ctx, requestBytes)
 			if err != nil {
 				return fmt.Errorf("failed to send synced app request: %w", err)
 			}
@@ -273,7 +270,7 @@ func TestAppRequestOnShutdown(t *testing.T) {
 
 	requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 	require.NoError(t, err)
-	responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
+	responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), requestBytes)
 	require.ErrorIs(t, err, errRequestFailed)
 	require.Nil(t, responseBytes)
 	require.True(t, called)
@@ -324,7 +321,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	// cancel context prior to sending
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
+	_, _, err = net.SendSyncedAppRequestAny(ctx, requestBytes)
 	require.ErrorIs(t, err, context.Canceled)
 	// require we didn't send anything
 	select {
@@ -338,7 +335,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	ctx, cancel = context.WithCancel(t.Context())
 	errChan := make(chan error, 1)
 	go func() {
-		_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
+		_, _, err = net.SendSyncedAppRequestAny(ctx, requestBytes)
 		errChan <- err
 	}()
 	// Wait until we've "sent" the app request over the network
@@ -508,7 +505,7 @@ func TestNetworkSyncedAppRequestAfterShutdown(t *testing.T) {
 	requestBytes, err := message.RequestToBytes(codecManager, TestMessage{Message: "hello"})
 	require.NoError(t, err)
 
-	response, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
+	response, _, err := net.SendSyncedAppRequestAny(t.Context(), requestBytes)
 	require.ErrorIs(t, err, errRequestFailed)
 	require.Nil(t, response)
 }

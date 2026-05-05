@@ -57,11 +57,10 @@ var _ Client = (*client)(nil)
 type Network interface {
 	p2p.NodeSampler
 
-	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
-	// node version greater than or equal to minVersion.
+	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 	// the request should be retried.
-	SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
+	SendSyncedAppRequestAny(ctx context.Context, request []byte) ([]byte, ids.NodeID, error)
 
 	// SendSyncedAppRequest synchronously sends request to the selected nodeID
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
@@ -357,7 +356,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			start    = time.Now()
 		)
 		if len(c.stateSyncNodes) == 0 {
-			response, nodeID, err = c.network.SendSyncedAppRequestAny(ctx, StateSyncVersion, requestBytes)
+			response, nodeID, err = c.network.SendSyncedAppRequestAny(ctx, requestBytes)
 		} else {
 			// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
 			// we do this every attempt to ensure we get a different node each time if possible.

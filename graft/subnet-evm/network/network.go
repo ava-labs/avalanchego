@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -52,7 +53,7 @@ type SyncedNetworkClient interface {
 	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 	// the request should be retried.
-	SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
+	SendSyncedAppRequestAny(ctx context.Context, request []byte) ([]byte, ids.NodeID, error)
 
 	// SendSyncedAppRequest synchronously sends request to the selected nodeID
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
@@ -72,7 +73,7 @@ type Network interface {
 
 	// SendAppRequestAny sends request to an arbitrary peer.
 	// Returns the ID of the chosen peer, and an error if no peer is available.
-	SendAppRequestAny(ctx context.Context, minVersion *version.Application, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
+	SendAppRequestAny(ctx context.Context, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
 
 	// SendAppRequest sends message to given nodeID, notifying handler when there's a response or timeout
 	SendAppRequest(ctx context.Context, nodeID ids.NodeID, message []byte, handler message.ResponseHandler) error
@@ -118,6 +119,9 @@ type network struct {
 	p2pValidators *p2p.Validators
 }
 
+// NewNetwork constructs a sync-dedicated Network. The peer tracker filters
+// out peers below [client.StateSyncVersion]. Do not wire this Network as a
+// [p2p.NodeSampler] for non-sync flows or that filter will silently apply.
 func NewNetwork(
 	ctx *snow.Context,
 	appSender common.AppSender,
@@ -146,7 +150,7 @@ func NewNetwork(
 		"sync_peer_tracker",
 		registerer,
 		set.Of(ctx.NodeID),
-		nil,
+		client.StateSyncVersion,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create peer tracker: %w", err)
@@ -184,11 +188,7 @@ func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
 
 // SendAppRequestAny synchronously sends request to an arbitrary peer.
 // Returns the ID of the chosen peer, and an error if no peer is available.
-//
-// TODO(powerslider): Add per-peer version filtering to [p2p.PeerTracker]
-// via a new SelectPeerVersion method. Once available, pass StateSyncVersion
-// through to peer selection here and remove the minVersion parameter.
-func (n *network) SendAppRequestAny(ctx context.Context, _ *version.Application, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
+func (n *network) SendAppRequestAny(ctx context.Context, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
 	// If the context was cancelled, we can skip sending this request.
 	if err := ctx.Err(); err != nil {
 		return ids.EmptyNodeID, err
@@ -241,9 +241,7 @@ func (n *network) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if n.closed.Get() {
 		n.activeAppRequests.Release(1)
-		// Unblock any synchronous waiter on this handler. Without this, a request
-		// issued after Shutdown would never receive a response or failure signal,
-		// leaving the caller blocked until its context times out.
+		// Unblock synchronous waiters; otherwise they block until ctx expiry.
 		if responseHandler != nil {
 			_ = responseHandler.OnFailure()
 		}
@@ -498,9 +496,9 @@ func (n *network) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 // SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 // Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 // the request should be retried.
-func (n *network) SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (n *network) SendSyncedAppRequestAny(ctx context.Context, request []byte) ([]byte, ids.NodeID, error) {
 	waitingHandler := newWaitingResponseHandler()
-	nodeID, err := n.SendAppRequestAny(ctx, minVersion, request, waitingHandler)
+	nodeID, err := n.SendAppRequestAny(ctx, request, waitingHandler)
 	if err != nil {
 		return nil, nodeID, err
 	}
