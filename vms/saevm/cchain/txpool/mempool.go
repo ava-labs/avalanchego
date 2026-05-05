@@ -4,12 +4,12 @@
 package txpool
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/log"
@@ -22,9 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
-
-	ethrpc "github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 )
 
 const maxSize = 4096
@@ -38,55 +36,81 @@ var (
 type Mempool struct {
 	*Txs
 
-	ctx      *snow.Context
-	backends rpc.GethBackends
-	sub      event.Subscription
+	ctx *snow.Context
+	sub event.Subscription
 
-	// heightLock is ordered before [Txs.lock]. Trying to grab heightLock with
+	// stateLock is ordered before [Txs.lock]. Trying to grab stateLock with
 	// [Txs.lock] held will result in a deadlock.
-	heightLock sync.RWMutex
-	height     uint64
+	stateLock sync.RWMutex
+	state     *state.StateDB
 }
 
 func New(
 	txs *Txs,
 	ctx *snow.Context,
-	backends rpc.GethBackends,
-) *Mempool {
-	c := make(chan core.ChainHeadEvent, 16)
-	sub := backends.SubscribeChainHeadEvent(c)
+	vm *sae.VM,
+) (*Mempool, error) {
+	// c is unbuffered to guarantee that the mempool never holds a reference to
+	// state older than the last-settled state. SAE does not guarantee that such
+	// a state exists on disk anymore.
+	//
+	// TODO:(StephenButtolph): If this is identified as a performance issue, we
+	// can likely make this channel buffered, as it seems highly unlikely for
+	// this goroutine not to be able to keep up with the last executed state.
+	c := make(chan core.ChainHeadEvent)
+	sub := vm.SubscribeChainHeadEvent(c)
+
+	state, err := vm.LastExecutedState()
+	if err != nil {
+		sub.Unsubscribe()
+		return nil, fmt.Errorf("getting last executed state: %w", err)
+	}
 
 	// height must be populated after [rpc.GethBackends.SubscribeChainHeadEvent]
 	// is called, to ensure we do not miss an update.
 	m := &Mempool{
-		Txs:      txs,
-		ctx:      ctx,
-		backends: backends,
-		sub:      sub,
-		height:   backends.CurrentBlock().Number.Uint64(),
+		Txs:   txs,
+		ctx:   ctx,
+		sub:   sub,
+		state: state,
 	}
 
-	chainConfig := backends.ChainConfig()
+	chainConfig := vm.GethRPCBackends().ChainConfig()
 	go func() {
 		defer sub.Unsubscribe()
 		for {
 			select {
 			case e := <-c:
 				b := e.Block
-				height := b.NumberU64()
 				inputs, err := inputUTXOs(b, chainConfig)
 				if err != nil {
 					ctx.Log.Error("unable to get inputs from block",
 						zap.Stringer("blockHash", b.Hash()),
-						zap.Uint64("blockNumber", height),
+						zap.Uint64("blockNumber", b.NumberU64()),
 						zap.Error(err),
 					)
 					continue
 				}
-				m.advanceHeight(height, inputs)
+
+				state, err := vm.LastExecutedState()
+				if err != nil {
+					ctx.Log.Error("unable to get latest executed state",
+						zap.Error(err),
+					)
+					continue
+				}
+
+				m.stateLock.Lock()
+				m.lock.Lock()
+
+				m.removeConflicts(inputs)
+				m.state = state
+
+				m.lock.Unlock()
+				m.stateLock.Unlock()
 			case err := <-sub.Err():
 				if err != nil {
-					ctx.Log.Warn("mempool subscription failed",
+					ctx.Log.Error("mempool subscription failed",
 						zap.Error(err),
 					)
 				}
@@ -94,7 +118,7 @@ func New(
 			}
 		}
 	}()
-	return m
+	return m, nil
 }
 
 func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) {
@@ -123,19 +147,7 @@ func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) 
 	return inputs, nil
 }
 
-func (m *Mempool) advanceHeight(height uint64, inputs set.Set[ids.ID]) {
-	m.heightLock.Lock()
-	defer m.heightLock.Unlock()
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.removeConflicts(inputs)
-	m.height = height
-}
-
 func (m *Mempool) Add(rawTx *tx.Tx) error {
-	ctx := context.TODO()
-
 	if err := rawTx.SanityCheck(m.ctx); err != nil {
 		return fmt.Errorf("tx failed sanity check: %w", err)
 	}
@@ -145,33 +157,22 @@ func (m *Mempool) Add(rawTx *tx.Tx) error {
 		return err
 	}
 
-	m.heightLock.RLock()
-	defer m.heightLock.RUnlock()
-
 	// We must verify the tx against a state that is at least as high as the
 	// last block processed by the mempool subscription.
 	//
 	// If we verify the tx against an older state, then we may allow a tx into
 	// the mempool which would never be evicted.
-	{
-		// [tx.Tx.VerifyCredentials] reads from [snow.Context.SharedMemory]
-		// which is updated in hook.Points.AfterExecutingBlock, which will be
-		// done before the event on the subscription, so we may verify against a
-		// newer state, but never an older state.
-		if err := rawTx.VerifyCredentials(m.ctx.SharedMemory); err != nil {
-			return fmt.Errorf("tx failed credential verification: %w", err)
-		}
+	m.stateLock.RLock()
+	defer m.stateLock.RUnlock()
 
-		// TODO: Using the rpc backend is gross. We should make something easier
-		// to use for this.
-		// TODO: Is it okay for us to be opening so many state dbs?
-		state, _, err := m.backends.StateAndHeaderByNumber(ctx, ethrpc.BlockNumber(m.height)) //#nosec G115 -- block height won't overflow
-		if err != nil {
-			return fmt.Errorf("problem getting latest state: %w", err)
-		}
-		if err := rawTx.VerifyState(m.ctx.AVAXAssetID, state); err != nil {
-			return fmt.Errorf("tx failed state verification: %w", err)
-		}
+	// [snow.Context.SharedMemory] is updated in AfterExecutingBlock, which will
+	// be done before the event on the subscription, so we may verify against a
+	// newer state, but never an older state.
+	if err := rawTx.VerifyCredentials(m.ctx.SharedMemory); err != nil {
+		return fmt.Errorf("tx failed credential verification: %w", err)
+	}
+	if err := rawTx.VerifyState(m.ctx.AVAXAssetID, m.state); err != nil {
+		return fmt.Errorf("tx failed state verification: %w", err)
 	}
 
 	m.lock.Lock()

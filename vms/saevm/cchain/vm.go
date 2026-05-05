@@ -184,15 +184,19 @@ func (v *VM) Initialize(
 	v.VM = inner
 	v.ctx = snowCtx
 	v.db = avaDB
-	v.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
-	v.onClose = append(v.onClose, v.mempool.Close)
 	v.hooks = hooks
+
+	v.mempool, err = txpool.New(txs, snowCtx, inner)
+	if err != nil {
+		return fmt.Errorf("creating txpool: %w", err)
+	}
+	v.onClose = append(v.onClose, v.mempool.Close)
 
 	snowCtx.Log.Info("registering coreth metrics")
 
 	metrics := prometheus.NewRegistry()
 	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
-		return fmt.Errorf("failed to register metrics: %w", err)
+		return fmt.Errorf("registering metrics: %w", err)
 	}
 
 	snowCtx.Log.Info("p2p gossip")
