@@ -1088,3 +1088,47 @@ func verifySpend(
 
 	return nil
 }
+
+func verifyRewardTx(chainState state.Chain, sTx *txs.Tx, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
+	if len(sTx.Creds) != 0 {
+		return nil, nil, errWrongNumberOfCredentials
+	}
+
+	currentStakerIterator, err := chainState.GetCurrentStakerIterator()
+	if err != nil {
+		return nil, nil, err
+	}
+	if !currentStakerIterator.Next() {
+		return nil, nil, fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
+	}
+	stakerToReward := currentStakerIterator.Value()
+	currentStakerIterator.Release()
+
+	if stakerToReward.TxID != tx.StakerTxID() {
+		return nil, nil, fmt.Errorf(
+			"%w: %s != %s",
+			ErrRemoveWrongStaker,
+			stakerToReward.TxID,
+			tx.StakerTxID(),
+		)
+	}
+
+	// Verify that the chain's timestamp is the validator's end time
+	currentChainTime := chainState.GetTimestamp()
+	if !stakerToReward.EndTime.Equal(currentChainTime) {
+		return nil, nil, fmt.Errorf(
+			"%w: TxID = %s with %s < %s",
+			ErrRemoveStakerTooEarly,
+			tx.StakerTxID(),
+			currentChainTime,
+			stakerToReward.EndTime,
+		)
+	}
+
+	stakerTx, _, err := chainState.GetTx(stakerToReward.TxID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get next removed staker tx: %w", err)
+	}
+
+	return stakerTx, stakerToReward, nil
+}
