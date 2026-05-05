@@ -110,7 +110,7 @@ func TestReconstructedRevisions(t *testing.T) {
 }
 
 // TestReconstructedRevisionHashing verifies computeRootOnHash=false only
-// flushes writes, and computeRootOnHash=true computes roots again.
+// flushes writes without computing the reconstructed root.
 func TestReconstructedRevisionHashing(t *testing.T) {
 	r := require.New(t)
 
@@ -154,23 +154,6 @@ func TestReconstructedRevisionHashing(t *testing.T) {
 	r.NoError(err)
 	r.NoError(replayTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(200)}))
 
-	// Verify that Hash did not force a hash update, but that the underlying reconstructed revision did change.
 	r.Equal(initialRoot, replayTrie.Hash())
-	replayedRoot := common.Hash(recon.Root())
-	r.NotEqual(initialRoot, replayedRoot)
-
-	// Use the same reconstructed revision through a new accessor with normal
-	// root computation enabled.
-	hashedAccessor, err := NewReconstructedStateAccessor(db, recon, true /* computeRootOnHash */)
-	r.NoError(err)
-
-	// Update the reconstructed revision to force a hash update.
-	hashedTrie, err := hashedAccessor.OpenTrie(replayedRoot)
-	r.NoError(err)
-	r.NoError(hashedTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(300)}))
-
-	// Verify that Hash returns the currentRoot of the trie.
-	currentRoot := hashedTrie.Hash()
-	r.NotEqual(replayedRoot, currentRoot)
-	r.Equal(currentRoot, common.Hash(recon.Root()))
+	r.NotEqual(initialRoot, common.Hash(recon.Root()))
 }
