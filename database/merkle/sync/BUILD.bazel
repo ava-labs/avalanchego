@@ -21,6 +21,7 @@ go_library(
         "//utils/constants",
         "//utils/hashing",
         "//utils/heap",
+        "//utils/lock",
         "//utils/logging",
         "//utils/maybe",
         "//utils/set",
