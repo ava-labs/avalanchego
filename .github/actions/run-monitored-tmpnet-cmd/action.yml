@@ -75,9 +75,9 @@ runs:
     - name: Run command
       shell: bash
       # --impure ensures the env vars are accessible to the command
-      run: nix develop --impure --command bash -x ${{ inputs.run }}
       working-directory: ${{ inputs.working_directory }}
       env:
+        RUN_CMD: ${{ inputs.run }}
         # Always collect metrics locally even when nodes are running in kube to enable collection from the test workload
         TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus_username != '' }}
         # Skip local log collection when nodes are running in kube since collection will occur in-cluster.
@@ -98,6 +98,7 @@ runs:
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
+      run: nix develop --impure --command bash -x $RUN_CMD
     - name: Upload tmpnet data
       if: always() && (inputs.runtime == 'process')
       uses: ./.github/actions/upload-tmpnet-artifact

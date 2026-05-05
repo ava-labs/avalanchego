@@ -51,8 +51,10 @@ jobs:
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
         id: get_tag_from_workflow
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          echo "TAG=${INPUT_TAG}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Create tgz package structure and upload to S3
@@ -121,8 +123,10 @@ jobs:
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
         id: get_tag_from_workflow
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          echo "TAG=${INPUT_TAG}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Create tgz package structure and upload to S3

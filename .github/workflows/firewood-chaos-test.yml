@@ -48,21 +48,33 @@ jobs:
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TEST: ${{ github.event.inputs.test }}
+          INPUT_START_BLOCK: ${{ github.event.inputs.start-block }}
+          INPUT_END_BLOCK: ${{ github.event.inputs.end-block }}
+          INPUT_BLOCK_DIR_SRC: ${{ github.event.inputs.block-dir-src }}
+          INPUT_CURRENT_STATE_DIR_SRC: ${{ github.event.inputs.current-state-dir-src }}
+          INPUT_CONFIG: ${{ github.event.inputs.config }}
+          INPUT_MIN_WAIT_TIME: ${{ github.event.inputs.min-wait-time }}
+          INPUT_MAX_WAIT_TIME: ${{ github.event.inputs.max-wait-time }}
+          INPUT_RUNNER: ${{ github.event.inputs.runner }}
+          INPUT_TIMEOUT_MINUTES: ${{ github.event.inputs.timeout-minutes }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
               printf '{ "include": [{ "test": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "min-wait-time": "%s", "max-wait-time": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
-                "${{ github.event.inputs.test }}" \
-                "${{ github.event.inputs.start-block }}" \
-                "${{ github.event.inputs.end-block }}" \
-                "${{ github.event.inputs.block-dir-src }}" \
-                "${{ github.event.inputs.current-state-dir-src }}" \
-                "${{ github.event.inputs.config }}" \
-                "${{ github.event.inputs.min-wait-time }}" \
-                "${{ github.event.inputs.max-wait-time }}" \
-                "${{ github.event.inputs.runner }}" \
-                "${{ github.event.inputs.timeout-minutes }}"
+                "$INPUT_TEST" \
+                "$INPUT_START_BLOCK" \
+                "$INPUT_END_BLOCK" \
+                "$INPUT_BLOCK_DIR_SRC" \
+                "$INPUT_CURRENT_STATE_DIR_SRC" \
+                "$INPUT_CONFIG" \
+                "$INPUT_MIN_WAIT_TIME" \
+                "$INPUT_MAX_WAIT_TIME" \
+                "$INPUT_RUNNER" \
+                "$INPUT_TIMEOUT_MINUTES"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
@@ -96,8 +108,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run chaos test with Firewood
         shell: nix develop --impure --command bash -x {0}
-        run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ matrix.test || '' }}"
+        run: ./scripts/run_task.sh test-cchain-reexecution -- "${MATRIX_TEST:-}"
         env:
+          MATRIX_TEST: ${{ matrix.test }}
           CHAOS_MODE: '1'
           START_BLOCK: ${{ matrix.start-block }}
           END_BLOCK: ${{ matrix.end-block }}

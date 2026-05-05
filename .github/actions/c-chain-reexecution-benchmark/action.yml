@@ -131,8 +131,9 @@ runs:
       run: echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.json" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
-      run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ inputs.test || '' }}"
+      run: ./scripts/run_task.sh test-cchain-reexecution -- "${BENCHMARK_TEST:-}"
       env:
+        BENCHMARK_TEST: ${{ inputs.test }}
         # Test configuration overrides
         BLOCK_DIR_SRC: ${{ inputs.block-dir-src }}
         CURRENT_STATE_DIR_SRC: ${{ inputs.current-state-dir-src }}
