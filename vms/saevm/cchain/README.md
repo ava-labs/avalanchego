@@ -58,8 +58,6 @@ flowchart TB
 
 ## What `cchain` adds
 
-`cchain` layers three chain-specific behaviors on top of SAE: Import/Export transactions for cross-chain transfers, Warp messaging, and chain parameters that validators vote on each block.
-
 ### Export and Import transactions
 
 The Primary Network is the set of three chains — P, X, and C — that exchange assets through pair-wise shared stores. Each pair of chains has its own store, readable and writable by both chains in the pair.
@@ -82,54 +80,46 @@ flowchart TB
     C --> CX
 ```
 
-A cross-chain transfer happens in two steps. An **Export** transaction on the source chain burns the asset there and writes a corresponding entry into the shared store between the source and destination chains. The destination chain later picks up that entry with an **Import** transaction, consuming it and crediting the recipient account.
+A cross-chain transfer happens in two steps. An **Export** transaction on the source chain burns the asset and writes a UTXO into the shared store between the source and destination chains. The UTXO specifies who is allowed to consume it. An **Import** transaction, issued by that party on the destination chain, consumes the UTXO and credits funds to addresses of the Import issuer's choice.
 
-`cchain` defines both transaction types and their validation rules, runs a dedicated mempool keyed on the entries each transaction consumes, and operates a bloom-filter gossip system for them. See [tx](tx/) and [txpool](txpool/).
-
-The mempool does not support dependent transactions: every transaction it holds must be valid on its own against the current chain state. Two invariants follow. First, the mempool is always valid against a recently-executed state, so anything it offers up for block building can be applied directly. Second, if block production stalls, all mempool transactions are eventually guaranteed to be valid against the last accepted block.
+`cchain` defines both transaction types, their validation rules, and runs a dedicated mempool that gossips them in a bandwidth-optimized way using bloom filters. See [tx](tx/) and [txpool](txpool/).
 
 #### How transactions enter the Txpool
 
-Import/Export transactions reach the Txpool from four independent sources. They all converge on the same write-side gate, where signature, against-state, and conflict-resolution checks happen before insertion.
+Import/Export transactions reach the mempool from four independent sources. They all converge on the same gate, where signature, against-state, and conflict-resolution checks happen before insertion.
 
 ```mermaid
 flowchart LR
-    rpc["User RPC<br/>(/avax submit endpoint)"]
-    push["Inbound push gossip<br/>(peer-initiated)"]
-    pull["Inbound pull gossip<br/>(periodic, this node pulls)"]
-    rej["Block rejection<br/>(consensus rejects a block we built/verified)"]
+    rpc["/avax"]
+    pushgossip["Push gossiper"]
+    push["Inbound push gossip"]
+    pull["Inbound pull gossip"]
+    rej["Block rejection"]
+    mempool[("Mempool")]
 
-    subgraph cchain_write["cchain mempool (write side)"]
-        add(("mempool add"))
-    end
-
-    subgraph downstream["downstream"]
-        out["push gossiper queue<br/>(outbound propagation)"]
-        store["shared tx store<br/>(read by hook for block building)"]
-    end
-
-    rpc -->|decode bytes| add
-    rpc -. on success / already known .-> out
-    push -->|via bloom set + cchain marshaller| add
-    pull -->|via bloom set + cchain marshaller| add
-    rej -->|extract embedded txs from rejected block| add
-
-    add -->|verify, dedup, evict, insert| store
+    rpc --> mempool
+    rpc --> pushgossip
+    push --> mempool
+    pull --> mempool
+    rej --> mempool
+    pushgossip -. "stops gossiping<br/>once removed" .-> mempool
 ```
 
 The four entry paths in detail:
 
-- **User RPC submission.** The HTTP `/avax` endpoint decodes a transaction from request bytes and submits it. On a successful add (or on "already known"), the same call also enqueues the transaction onto the local push-gossiper so this node will propagate it.
-- **Inbound push gossip.** A peer pushes a transaction over the Import/Export gossip protocol. saevm's network dispatches it to `cchain`'s registered gossip handler, the gossip system unmarshals using `cchain`'s gossip marshaller, and a bloom-set wrapper around the mempool routes the decoded transaction to the same add path.
-- **Inbound pull gossip.** A periodic goroutine inside `cchain` pulls digests from peers; transactions returned in response flow into the same bloom-set wrapper and the same add path.
-- **Block rejection.** When the consensus engine rejects a block this node had previously verified, `cchain` extracts the Import/Export transactions embedded in the block's extension data and re-submits each one to the mempool. The point is to keep otherwise-valid transactions from being dropped by an unlucky reorg.
+User RPC submission is the only path that registers transactions with the local push-gossiper for proactive propagation; the other three sources reach the mempool without enqueuing for outbound gossip.
+
+- **User RPC submission.** The `/avax` JSON-RPC endpoint receives a transaction and forwards it to the mempool, also enqueuing it on the push-gossiper.
+- **Inbound push gossip.** A peer pushes a transaction over the Import/Export gossip protocol; the transaction is routed to the same add path.
+- **Inbound pull gossip.** Periodically, `cchain` sends a bloom filter representing the current state of the mempool to a peer. The peer returns transactions not referenced in the bloom filter; those transactions are forwarded to the same add path.
+- **Block rejection.** When the consensus engine rejects a block this node had previously verified, `cchain` submits each included transaction to the mempool. The point is to keep otherwise-valid transactions from being dropped by an unlucky conflict.
 
 ### Warp messaging
 
 The C-Chain participates in cross-subnet Warp messaging on both sides — sending messages to other chains and receiving messages from them. Three pieces are involved:
 
 - A custom precompile that lets EVM contracts emit and consume Warp messages.
-- An encoding that places Warp message payloads into transaction access lists, so the message rides alongside the transaction that produced or accepted it.
+- Incoming Warp messages encoded into the access-list, so the hook implementation can verify them prior to EVM execution.
 - The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
 
 `cchain` persists this chain's Warp messages, serves signature requests against that store, and verifies Warp predicates during block execution. See [warp](warp/).
@@ -139,24 +129,15 @@ The C-Chain participates in cross-subnet Warp messaging on both sides — sendin
 Three chain parameters are settled by validator vote on each block: validators choose to raise, lower, or hold each value.
 
 - **Gas target per second** ([ACP-176](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/176)) — the throughput target. The rest of ACP-176 (gas accounting and excess tracker) lives in SAE; `cchain` contributes only the target value. See [hook/acp176](hook/acp176/).
-- **Minimum block delay** ([ACP-226](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226)) — a lower bound on the time between consecutive blocks. Prevents block production faster than the network has agreed to. See [hook](hook/).
+- **Minimum block delay** ([ACP-226](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/226)) — a lower bound on the time between consecutive blocks. Prevents block production faster than the network can maintain. See [hook](hook/).
 - **Minimum gas price** ([ACP-283](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/283)) — a floor on the gas price for transactions to be included in a block. See [hook](hook/).
-
-## Shutdown
-
-Shutdown unwinds in reverse order. `cchain` runs its cleanup callbacks last-in-first-out, then asks the inner saevm VM to shut down. The order matters because the resources `cchain` cleans up hold references *into* the inner VM:
-
-- The gossip goroutines pull from peers via the inner VM's Network. If saevm tore the Network down first, those goroutines would be reading dead state.
-- The mempool subscribes to chain-head events from the inner VM's RPC backend. The subscription must be unsubscribed before the inner VM finishes its own shutdown.
-
-The hook, the Warp storage, and the shared tx store carry no goroutines or external subscriptions of their own; releasing the references is enough.
 
 ## Subpackages at a glance
 
-- [api/](api/) — `avax_*` JSON-RPC service for Import/Export submission, status, and UTXO lookup
-- [hook/](hook/) — implementation of saevm's hook surface; orchestrates header construction, end-of-block operations, and per-block timing
+- [api/](api/) — `avax_*` JSON-RPC service for Import/Export submission and UTXO lookup
+- [hook/](hook/) — implementation of saevm's hook surface; orchestrates header construction and end-of-block operations
 - [hook/acp176/](hook/acp176/) — validator-voted gas-per-second target
 - [state/](state/) — genesis parsing, the synchronous-boundary pointer, and state-trie helpers
-- [tx/](tx/) — Import / Export transaction types and their gossip marshaller
-- [txpool/](txpool/) — the shared store, the mempool that wraps it, and conflict tracking
+- [tx/](tx/) — Import / Export transaction types
+- [txpool/](txpool/) — the mempool and conflict tracking
 - [warp/](warp/) — Warp message storage, the ACP-118 verifier, and predicate handling
