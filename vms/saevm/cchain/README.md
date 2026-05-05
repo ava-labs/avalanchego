@@ -56,6 +56,12 @@ flowchart TB
     txpool --> db
 ```
 
+Hooks are the seam through which SAE calls into C-Chain–specific code. SAE invokes them at the relevant points of a block's lifecycle:
+
+- **Build** — construct custom header fields and embed Import/Export transactions into the block body.
+- **Verify** — enforce validation rules on header fields, embedded transactions, and Warp predicates.
+- **Execute** — apply Import/Export state effects.
+
 ## What `cchain` adds
 
 `cchain` carries each of the features below by extending the standard Ethereum block format — adding custom fields to both the block header and the block body.
@@ -123,7 +129,7 @@ The C-Chain participates in cross-subnet Warp messaging on both sides — sendin
 - Incoming Warp messages encoded into the access-list, so the hook implementation can verify them prior to EVM execution.
 - The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
 
-`cchain` persists this chain's Warp messages, serves signature requests against that store, and verifies Warp predicates during block execution. See [warp](warp/).
+`cchain` persists this chain's Warp messages, serves signature requests against that store, and verifies Warp predicates during block verification. See [warp](warp/).
 
 ### Validator-voted parameters
 
