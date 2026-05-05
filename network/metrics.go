@@ -147,7 +147,7 @@ func newMetrics(
 	return m, err
 }
 
-func (m *metrics) markConnected(peer peer.Peer) {
+func (m *metrics) markConnected(peer *peer.Peer) {
 	m.numPeers.Inc()
 	m.connected.Inc()
 
@@ -166,7 +166,7 @@ func (m *metrics) markConnected(peer peer.Peer) {
 	m.peerConnectedStartTimesSum += now
 }
 
-func (m *metrics) markDisconnected(peer peer.Peer) {
+func (m *metrics) markDisconnected(peer *peer.Peer) {
 	m.numPeers.Dec()
 	m.disconnected.Inc()
 

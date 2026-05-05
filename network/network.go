@@ -150,8 +150,8 @@ type network struct {
 	// to connect to the peer. An entry is deleted from this set once we have
 	// finished the handshake.
 	trackedIPs      map[ids.NodeID]*trackedIP
-	connectingPeers peer.Set
-	connectedPeers  peer.Set
+	connectingPeers *peer.Set
+	connectedPeers  *peer.Set
 	closing         bool
 
 	startupTime time.Time
@@ -339,7 +339,7 @@ func (n *network) Send(
 	// send to peers and update metrics
 	//
 	// Note: It is guaranteed that namedPeers and sampledPeers are disjoint.
-	for _, peers := range [][]peer.Peer{namedPeers, sampledPeers} {
+	for _, peers := range [][]*peer.Peer{namedPeers, sampledPeers} {
 		for _, peer := range peers {
 			if peer.Send(n.onCloseCtx, msg) {
 				sentTo.Add(peer.ID())
@@ -760,8 +760,8 @@ func (n *network) getPeers(
 	nodeIDs set.Set[ids.NodeID],
 	subnetID ids.ID,
 	allower subnets.Allower,
-) []peer.Peer {
-	peers := make([]peer.Peer, 0, nodeIDs.Len())
+) []*peer.Peer {
+	peers := make([]*peer.Peer, 0, nodeIDs.Len())
 
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
@@ -791,7 +791,7 @@ func (n *network) samplePeers(
 	config common.SendConfig,
 	subnetID ids.ID,
 	allower subnets.Allower,
-) []peer.Peer {
+) []*peer.Peer {
 	// As an optimization, if there are fewer validators than
 	// [numValidatorsToSample], only attempt to sample [numValidatorsToSample]
 	// validators to potentially avoid iterating over the entire peer set.
@@ -802,7 +802,7 @@ func (n *network) samplePeers(
 
 	return n.connectedPeers.Sample(
 		numValidatorsToSample+config.NonValidators+config.Peers,
-		func(p peer.Peer) bool {
+		func(p *peer.Peer) bool {
 			// Only return peers that are tracking [subnetID]
 			if trackedSubnets := p.TrackedSubnets(); !trackedSubnets.Contains(subnetID) {
 				return false
@@ -859,7 +859,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	n.metrics.disconnected.Inc()
 }
 
-func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
+func (n *network) disconnectedFromConnected(peer *peer.Peer, nodeID ids.NodeID) {
 	n.ipTracker.Disconnected(nodeID)
 	n.router.Disconnected(nodeID)
 

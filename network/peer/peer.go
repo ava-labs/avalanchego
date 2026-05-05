@@ -47,82 +47,11 @@ const (
 	malformedMessageLog      = "malformed message"
 )
 
-var (
-	errClosed = errors.New("closed")
-
-	_ Peer = (*peer)(nil)
-)
+var errClosed = errors.New("closed")
 
 // Peer encapsulates all of the functionality required to send and receive
 // messages with a remote peer.
-type Peer interface {
-	// ID returns the nodeID of the remote peer.
-	ID() ids.NodeID
-
-	// Cert returns the certificate that the remote peer is using to
-	// authenticate their messages.
-	Cert() *staking.Certificate
-
-	// LastSent returns the last time a message was sent to the peer.
-	LastSent() time.Time
-
-	// LastReceived returns the last time a message was received from the peer.
-	LastReceived() time.Time
-
-	// Ready returns true if the peer has finished the p2p handshake and is
-	// ready to send and receive messages.
-	Ready() bool
-
-	// AwaitReady will block until the peer has finished the p2p handshake. If
-	// the context is cancelled or the peer starts closing, then an error will
-	// be returned.
-	AwaitReady(ctx context.Context) error
-
-	// Info returns a description of the state of this peer. It should only be
-	// called after [Ready] returns true.
-	Info() Info
-
-	// IP returns the claimed IP and signature provided by this peer during the
-	// handshake. It should only be called after [Ready] returns true.
-	IP() *SignedIP
-
-	// Version returns the claimed node version this peer is running. It should
-	// only be called after [Ready] returns true.
-	Version() *version.Application
-
-	// TrackedSubnets returns the subnets this peer is running. It should only
-	// be called after [Ready] returns true.
-	TrackedSubnets() set.Set[ids.ID]
-
-	// ObservedUptime returns the local node's primary network uptime according to the
-	// peer. The value ranges from [0, 100]. It should only be called after
-	// [Ready] returns true.
-	ObservedUptime() uint32
-
-	// Send attempts to send [msg] to the peer. The peer takes ownership of
-	// [msg] for reference counting. This returns false if the message is
-	// guaranteed not to be delivered to the peer.
-	Send(ctx context.Context, msg *message.OutboundMessage) bool
-
-	// StartSendGetPeerList attempts to send a GetPeerList message to this peer
-	// on this peer's gossip routine. It is not guaranteed that a GetPeerList
-	// will be sent.
-	StartSendGetPeerList()
-
-	// StartClose will begin shutting down the peer. It will not block.
-	StartClose()
-
-	// Closed returns true once the peer has been fully shutdown. It is
-	// guaranteed that no more messages will be received by this peer once this
-	// returns true.
-	Closed() bool
-
-	// AwaitClosed will block until the peer has been fully shutdown. If the
-	// context is cancelled, then an error will be returned.
-	AwaitClosed(ctx context.Context) error
-}
-
-type peer struct {
+type Peer struct {
 	*Config
 
 	// the connection object that is used to read/write messages from
@@ -217,9 +146,9 @@ func Start(
 	id ids.NodeID,
 	messageQueue MessageQueue,
 	isIngress bool,
-) Peer {
+) *Peer {
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
-	p := &peer{
+	p := &Peer{
 		isIngress:          isIngress,
 		Config:             config,
 		conn:               conn,
@@ -245,33 +174,43 @@ func Start(
 	return p
 }
 
-func (p *peer) ID() ids.NodeID {
+// ID returns the [ids.NodeID] of the remote peer.
+func (p *Peer) ID() ids.NodeID {
 	return p.id
 }
 
-func (p *peer) Cert() *staking.Certificate {
+// Cert returns the certificate that the remote peer is using to
+// authenticate their messages.
+func (p *Peer) Cert() *staking.Certificate {
 	return p.cert
 }
 
-func (p *peer) LastSent() time.Time {
+// LastSent returns the last time a message was sent to the peer.
+func (p *Peer) LastSent() time.Time {
 	return time.Unix(
 		atomic.LoadInt64(&p.lastSent),
 		0,
 	)
 }
 
-func (p *peer) LastReceived() time.Time {
+// LastReceived returns the last time a message was received from the peer.
+func (p *Peer) LastReceived() time.Time {
 	return time.Unix(
 		atomic.LoadInt64(&p.lastReceived),
 		0,
 	)
 }
 
-func (p *peer) Ready() bool {
+// Ready returns true if the peer has finished the p2p handshake and is
+// ready to send and receive messages.
+func (p *Peer) Ready() bool {
 	return p.finishedHandshake.Get()
 }
 
-func (p *peer) AwaitReady(ctx context.Context) error {
+// AwaitReady will block until the peer has finished the p2p handshake. If
+// the context is cancelled or the peer starts closing, then an error will
+// be returned.
+func (p *Peer) AwaitReady(ctx context.Context) error {
 	select {
 	case <-p.onFinishHandshake:
 		return nil
@@ -282,7 +221,9 @@ func (p *peer) AwaitReady(ctx context.Context) error {
 	}
 }
 
-func (p *peer) Info() Info {
+// Info returns a description of the state of this peer. It should only be
+// called after [Peer.Ready] returns true.
+func (p *Peer) Info() Info {
 	primaryUptime := p.ObservedUptime()
 
 	ip, _ := ips.ParseAddrPort(p.conn.RemoteAddr().String())
@@ -301,34 +242,50 @@ func (p *peer) Info() Info {
 	}
 }
 
-func (p *peer) IP() *SignedIP {
+// IP returns the claimed IP and signature provided by this peer during the
+// handshake. It should only be called after [Peer.Ready] returns true.
+func (p *Peer) IP() *SignedIP {
 	return p.ip
 }
 
-func (p *peer) Version() *version.Application {
+// Version returns the claimed node version this peer is running. It should
+// only be called after [Peer.Ready] returns true.
+func (p *Peer) Version() *version.Application {
 	return p.version
 }
 
-func (p *peer) TrackedSubnets() set.Set[ids.ID] {
+// TrackedSubnets returns the subnets this peer is running. It should only
+// be called after [Peer.Ready] returns true.
+func (p *Peer) TrackedSubnets() set.Set[ids.ID] {
 	return p.trackedSubnets
 }
 
-func (p *peer) ObservedUptime() uint32 {
+// ObservedUptime returns the local node's primary network uptime according to
+// the peer. The value ranges from [0, 100]. It should only be called after
+// [Peer.Ready] returns true.
+func (p *Peer) ObservedUptime() uint32 {
 	return p.observedUptime.Get()
 }
 
-func (p *peer) Send(ctx context.Context, msg *message.OutboundMessage) bool {
+// Send attempts to send `msg` to the peer. The peer takes ownership of `msg`
+// for reference counting. This returns false if the message is guaranteed not
+// to be delivered to the peer.
+func (p *Peer) Send(ctx context.Context, msg *message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
 }
 
-func (p *peer) StartSendGetPeerList() {
+// StartSendGetPeerList attempts to send a GetPeerList message to this peer
+// on this peer's gossip routine. It is not guaranteed that a GetPeerList
+// will be sent.
+func (p *Peer) StartSendGetPeerList() {
 	select {
 	case p.getPeerListChan <- struct{}{}:
 	default:
 	}
 }
 
-func (p *peer) StartClose() {
+// StartClose will begin shutting down the peer. It will not block.
+func (p *Peer) StartClose() {
 	p.startClosingOnce.Do(func() {
 		if err := p.conn.Close(); err != nil {
 			p.Log.Debug("failed to close connection",
@@ -342,7 +299,10 @@ func (p *peer) StartClose() {
 	})
 }
 
-func (p *peer) Closed() bool {
+// Closed returns true once the peer has been fully shutdown. It is
+// guaranteed that no more messages will be received by this peer once this
+// returns true.
+func (p *Peer) Closed() bool {
 	select {
 	case _, ok := <-p.onClosed:
 		return !ok
@@ -351,7 +311,9 @@ func (p *peer) Closed() bool {
 	}
 }
 
-func (p *peer) AwaitClosed(ctx context.Context) error {
+// AwaitClosed will block until the peer has been fully shutdown. If the
+// context is cancelled, then an error will be returned.
+func (p *Peer) AwaitClosed(ctx context.Context) error {
 	select {
 	case <-p.onClosed:
 		return nil
@@ -362,7 +324,7 @@ func (p *peer) AwaitClosed(ctx context.Context) error {
 
 // close should be called at the end of each goroutine that has been spun up.
 // When the last goroutine is exiting, the peer will be marked as closed.
-func (p *peer) close() {
+func (p *Peer) close() {
 	if atomic.AddInt64(&p.numExecuting, -1) != 0 {
 		return
 	}
@@ -377,7 +339,7 @@ func (p *peer) close() {
 
 // Read and handle messages from this peer.
 // When this method returns, the connection is closed.
-func (p *peer) readMessages() {
+func (p *Peer) readMessages() {
 	// Track this node with the inbound message throttler.
 	p.InboundMsgThrottler.AddNode(p.id)
 	defer func() {
@@ -507,7 +469,7 @@ func (p *peer) readMessages() {
 	}
 }
 
-func (p *peer) writeMessages() {
+func (p *Peer) writeMessages() {
 	defer func() {
 		p.StartClose()
 		p.close()
@@ -594,7 +556,7 @@ func (p *peer) writeMessages() {
 	}
 }
 
-func (p *peer) writeMessage(writer io.Writer, msg *message.OutboundMessage) {
+func (p *Peer) writeMessage(writer io.Writer, msg *message.OutboundMessage) {
 	msgBytes := msg.Bytes
 	p.Log.Verbo("sending message",
 		zap.Stringer("op", msg.Op),
@@ -640,7 +602,7 @@ func (p *peer) writeMessage(writer io.Writer, msg *message.OutboundMessage) {
 	p.Metrics.Sent(msg)
 }
 
-func (p *peer) sendNetworkMessages() {
+func (p *Peer) sendNetworkMessages() {
 	sendPingsTicker := time.NewTicker(p.PingFrequency)
 	defer func() {
 		sendPingsTicker.Stop()
@@ -713,7 +675,7 @@ func (p *peer) sendNetworkMessages() {
 // It is called when sending a Ping message to account for validator set
 // changes. It's called when sending a Ping rather than in a validator set
 // callback to avoid signature verification on the P-chain accept path.
-func (p *peer) shouldDisconnect() bool {
+func (p *Peer) shouldDisconnect() bool {
 	if !p.VersionCompatibility.Compatible(p.version) {
 		p.Log.Debug(disconnectingLog,
 			zap.String("reason", "version not compatible"),
@@ -750,7 +712,7 @@ func (p *peer) shouldDisconnect() bool {
 	return false
 }
 
-func (p *peer) handle(msg *message.InboundMessage) {
+func (p *Peer) handle(msg *message.InboundMessage) {
 	switch m := msg.Message.(type) { // Network-related message types
 	case *p2p.Ping:
 		p.handlePing(m)
@@ -787,7 +749,7 @@ func (p *peer) handle(msg *message.InboundMessage) {
 	p.Router.HandleInbound(context.Background(), msg)
 }
 
-func (p *peer) handlePing(msg *p2p.Ping) {
+func (p *Peer) handlePing(msg *p2p.Ping) {
 	if msg.Uptime > 100 {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
@@ -814,7 +776,7 @@ func (p *peer) handlePing(msg *p2p.Ping) {
 	p.Send(p.onClosingCtx, pongMessage)
 }
 
-func (p *peer) getUptime() uint32 {
+func (p *Peer) getUptime() uint32 {
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
 		p.id,
 	)
@@ -831,7 +793,7 @@ func (p *peer) getUptime() uint32 {
 	return primaryUptimePercent
 }
 
-func (p *peer) handlePong(*p2p.Pong) {
+func (p *Peer) handlePong(*p2p.Pong) {
 	pingSent := atomic.SwapInt64(&p.lastPingSent, 0)
 	if pingSent == 0 {
 		p.Log.Debug(malformedMessageLog,
@@ -849,7 +811,7 @@ func (p *peer) handlePong(*p2p.Pong) {
 	p.Metrics.RTTSum.Add(float64(elapsed))
 }
 
-func (p *peer) handleHandshake(msg *p2p.Handshake) {
+func (p *Peer) handleHandshake(msg *p2p.Handshake) {
 	if p.gotHandshake.Get() {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
@@ -1103,7 +1065,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	}
 }
 
-func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
+func (p *Peer) handleGetPeerList(msg *p2p.GetPeerList) {
 	if !p.finishedHandshake.Get() {
 		p.Log.Debug(malformedMessageLog,
 			zap.Stringer("nodeID", p.id),
@@ -1161,7 +1123,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 	p.Send(p.onClosingCtx, peerListMsg)
 }
 
-func (p *peer) handlePeerList(msg *p2p.PeerList) {
+func (p *Peer) handlePeerList(msg *p2p.PeerList) {
 	if !p.finishedHandshake.Get() {
 		if !p.gotHandshake.Get() {
 			return
@@ -1232,17 +1194,17 @@ func (p *peer) handlePeerList(msg *p2p.PeerList) {
 	}
 }
 
-func (p *peer) nextTimeout() time.Time {
+func (p *Peer) nextTimeout() time.Time {
 	return p.Clock.Time().Add(p.PongTimeout)
 }
 
-func (p *peer) storeLastSent(time time.Time) {
+func (p *Peer) storeLastSent(time time.Time) {
 	unixTime := time.Unix()
 	atomic.StoreInt64(&p.Config.LastSent, unixTime)
 	atomic.StoreInt64(&p.lastSent, unixTime)
 }
 
-func (p *peer) storeLastReceived(time time.Time) {
+func (p *Peer) storeLastReceived(time time.Time) {
 	unixTime := time.Unix()
 	atomic.StoreInt64(&p.Config.LastReceived, unixTime)
 	atomic.StoreInt64(&p.lastReceived, unixTime)
