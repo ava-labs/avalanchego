@@ -7,6 +7,7 @@
 package tx
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
@@ -15,8 +16,10 @@ import (
 	// Imported for [atomic.TxBytesGas] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -24,6 +27,21 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
+)
+
+var (
+	errWrongNetworkID        = errors.New("wrong network ID")
+	errWrongChainID          = errors.New("wrong chain ID")
+	errNoInputs              = errors.New("no inputs")
+	errNoOutputs             = errors.New("no outputs")
+	errNotSameSubnet         = errors.New("not same subnet")
+	errInvalidInput          = errors.New("invalid input")
+	errNonAVAXInput          = errors.New("input contains non-AVAX")
+	errInvalidOutput         = errors.New("invalid output")
+	errNonAVAXOutput         = errors.New("output contains non-AVAX")
+	errFlowCheckFailed       = errors.New("flow check failed")
+	errInputsNotSortedUnique = errors.New("inputs not sorted and unique")
+	errOverflow              = errors.New("amount overflow")
 )
 
 // Tx is a signed transaction that interacts with shared memory.
@@ -36,9 +54,23 @@ type Tx struct {
 
 // Unsigned is a common interface implemented by [Import] and [Export].
 //
-// TODO(StephenButtolph): Expand this interface to include UTXO handling,
-// verification, and state execution.
+// TODO(StephenButtolph): Expand this interface to include UTXO handling and
+// verification.
 type Unsigned interface {
+	// SanityCheck verifies that the transaction's structural invariants hold
+	// against the chain's context and that it does not produce more funds
+	// than it consumes.
+	//
+	// It does not verify signatures, whether UTXOs exist, or whether the
+	// transaction performs a valid EVM state transition.
+	SanityCheck(ctx *snow.Context) error
+
+	// TransferNonAVAX transfers the non-AVAX balances requested by this
+	// transaction.
+	//
+	// Non-AVAX transfers were only allowed prior to the Banff upgrade.
+	TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
+
 	// burned returns the amount of assetID that is consumed but not produced by
 	// this transaction.
 	burned(assetID ids.ID) (uint64, error)
@@ -47,8 +79,8 @@ type Unsigned interface {
 	// transaction.
 	numSigs() (uint64, error)
 
-	// asOp returns the operation that this transaction performs on the EVM
-	// state.
+	// asOp returns the operation that this transaction performs on the
+	// EVM-native state. Ops do not include any non-AVAX balance changes.
 	asOp(avaxAssetID ids.ID) (op, error)
 
 	// atomicRequests returns the operations that should be applied to shared
