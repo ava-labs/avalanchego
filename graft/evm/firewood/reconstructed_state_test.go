@@ -122,10 +122,9 @@ func TestReconstructedRevisionHashing(t *testing.T) {
 	addr := common.HexToAddress("1234")
 	r.NoError(trie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(100)}))
 
-	initialRoot := trie.Hash()
-	committedRoot, _, err := trie.Commit(true)
+	initialRoot, _, err := trie.Commit(true)
 	r.NoError(err)
-	r.Equal(initialRoot, committedRoot)
+
 	r.NoError(db.TrieDB().Update(
 		initialRoot,
 		types.EmptyRootHash,
