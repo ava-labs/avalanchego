@@ -52,9 +52,9 @@ flowchart TB
 
 - **AvalancheGo** — the host node. Three subsystems hand off to the chain VMs: the network delivers peer messages, consensus drives blocks, and the API server serves JSON-RPC.
 - **SAE** — the generic streaming-asynchronous EVM service ([saevm](../)) implementing [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution). Three integration points receive AvalancheGo's traffic: a p2p handler-ID dispatcher, a block-building and execution pipeline, and an `eth_*` JSON-RPC server. The first two fan out into the C-Chain layer; the JSON-RPC server terminates inside SAE.
-- **C-Chain** — the C-Chain-specific service (this package). [hook Points](hook/) plugs into SAE's execution pipeline for chain-specific behavior. SAE's p2p dispatcher routes Import/Export gossip into the [txpool](txpool/) and ACP-118 signature requests at [warp](warp/) storage. The [/avax](api/) endpoints attach directly to AvalancheGo's API server, bypassing SAE, and submit user-issued transactions into the same txpool.
+- **C-Chain** — the C-Chain-specific service (this package). [Hooks](hook/) plug into SAE's execution pipeline for chain-specific behavior. SAE's p2p dispatcher delivers Import/Export gossip into the [Txpool](txpool/) and ACP-118 signature requests against the [Warp](warp/) message store. The [/avax](api/) endpoints attach directly to AvalancheGo's API server, bypassing SAE, and submit user-issued transactions into the same Txpool. Hooks, Warp, and Txpool all persist their state to a shared AvalancheGo Database.
 
-Inside the C-Chain, hook Points reads the txpool for transaction candidates during block building and writes warp storage for messages emitted during execution. The txpool's flow from arrival to inclusion is detailed in [the next section](#how-transactions-enter-the-mempool).
+Inside the C-Chain, Hooks read the Txpool for transaction candidates during block building and write Warp for messages emitted during execution. The Txpool's flow from arrival to inclusion is detailed in [the next section](#how-transactions-enter-the-txpool).
 
 ## What `cchain` adds
 
@@ -75,9 +75,9 @@ A configurable lower bound on the time between consecutive blocks, derived from 
 ### Synchronous-to-asynchronous migration
 The C-Chain executed synchronously for years before streaming-asynchronous execution was introduced. `cchain` records the boundary block at which the chain switched modes, so a node bootstrapping from genesis correctly replays the synchronous era and then hands off to saevm's asynchronous pipeline for everything after. See [state](state/) and [hook](hook/).
 
-## How transactions enter the mempool
+## How transactions enter the Txpool
 
-Import/Export transactions can reach the mempool from four independent sources, but every source ends at the same call into the mempool's add path. The mempool is the single write-side gate: signature checks, against-state checks, and conflict resolution all happen there.
+Import/Export transactions can reach the Txpool from four independent sources, but every source ends at the same call into the mempool's add path. The mempool is the single write-side gate: signature checks, against-state checks, and conflict resolution all happen there.
 
 ```mermaid
 flowchart LR
