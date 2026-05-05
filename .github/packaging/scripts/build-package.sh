@@ -19,6 +19,13 @@ PACKAGING_DIR="${REPO_ROOT}/.github/packaging"
 # shellcheck disable=SC1091
 source "${PACKAGING_DIR}/scripts/lib-build-common.sh"
 
+# Source format-specific extensions if available (e.g., lib-build-deb.sh)
+fmt_extensions="${PACKAGING_DIR}/scripts/lib-build-${pkg_format_lower}.sh"
+if [[ -f "${fmt_extensions}" ]]; then
+    # shellcheck disable=SC1090
+    source "${fmt_extensions}"
+fi
+
 # Well-known paths referenced by nfpm configs
 export NFPM_CHANGELOG="${REPO_ROOT}/build/nfpm-changelog.yml"
 export NFPM_SIGNING_KEY="${REPO_ROOT}/build/gpg/signing-key.asc"
@@ -40,6 +47,11 @@ GPG_PUBLIC_KEY="${OUTPUT_DIR}/GPG-KEY-avalanchego"
 nfpm_passphrase_var="NFPM_${PKG_FORMAT}_PASSPHRASE"
 export "${nfpm_passphrase_var}=${GPG_KEY_PASSPHRASE:-}"
 
+# DEB needs gpg-agent configured before GPG setup
+if [[ "${PKG_FORMAT}" == "DEB" ]] && type -t setup_deb_gpg_agent &>/dev/null; then
+    setup_deb_gpg_agent
+fi
+
 # Ephemeral keys use a known throwaway passphrase so local and CI builds
 # exercise passphrase handling without release credentials.
 if [[ -z "${GPG_KEY_FILE}" ]]; then
@@ -47,6 +59,18 @@ if [[ -z "${GPG_KEY_FILE}" ]]; then
 fi
 
 setup_gpg "${GPG_KEY_FILE}" "${GPG_PUBLIC_KEY}" "${PKG_FORMAT}"
+
+# Format-specific post-GPG handling
+case "${PKG_FORMAT}" in
+    RPM)
+        ;;
+    DEB)
+        # Cache passphrase in gpg-agent for dpkg-sig
+        if type -t cache_deb_gpg_passphrase &>/dev/null; then
+            cache_deb_gpg_passphrase "${GPG_KEY_FILE}"
+        fi
+        ;;
+esac
 
 # ── Package with nfpm ─────────────────────────────────────────────
 
@@ -60,5 +84,10 @@ run_nfpm_package \
     "${REPO_ROOT}/build/${PACKAGE}-${pkg_format_lower}-resolved.yml" \
     "${pkg_format_lower}" \
     "${PKG_PATH}"
+
+# DEB post-build signing (dpkg-sig)
+if [[ "${PKG_FORMAT}" == "DEB" ]] && type -t sign_deb_package &>/dev/null; then
+    sign_deb_package "${PKG_PATH}" "${PKG_FILENAME}"
+fi
 
 echo "${PKG_FORMAT} built: ${PKG_PATH}"
