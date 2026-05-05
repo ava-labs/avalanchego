@@ -16,12 +16,35 @@ permissions:
   contents: read
 
 jobs:
+  # Aggregate the per-platform Bazel checks into one stable required job.
+  # GitHub Actions job graphs are static, so Bazel still runs inside each
+  # declared job.
+  bazel-required:
+    if: ${{ always() }}
+    needs:
+      - check-metadata
+      - unit-main
+      - unit-coreth
+      - unit-subnet-evm
+      - e2e
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS_JSON" | jq -e '
+            to_entries
+            | all(.value.result == "success")
+          ' >/dev/null
+
   # Check Bazel metadata first so stale generated files fail with one
   # actionable error instead of cascading into multiple Bazel build/test
   # failures. This is especially important when PRs are tested against
   # the current base branch and the metadata included in the PR is stale
   # relative to it.
-  bz-check-metadata:
+  check-metadata:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -31,8 +54,8 @@ jobs:
           prune_runner_disk: 'false'
           task: bazel-check-metadata
 
-  bz-unit-main:
-    needs: bz-check-metadata
+  unit-main:
+    needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -42,8 +65,8 @@ jobs:
           prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
           task: bazel-test-main
 
-  bz-unit-coreth:
-    needs: bz-check-metadata
+  unit-coreth:
+    needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -53,8 +76,8 @@ jobs:
           prune_runner_disk: 'false'
           task: bazel-test-coreth
 
-  bz-unit-subnet-evm:
-    needs: bz-check-metadata
+  unit-subnet-evm:
+    needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -64,8 +87,8 @@ jobs:
           prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
           task: bazel-test-subnet-evm
 
-  bz-e2e:
-    needs: bz-check-metadata
+  e2e:
+    needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
