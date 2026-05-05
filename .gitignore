@@ -1,6 +1,9 @@
 # Bazel symlinks
 /bazel-*
 
+# Local bazel overrides
+/.bazelrc.local
+
 *.log
 *~
 .DS_Store
