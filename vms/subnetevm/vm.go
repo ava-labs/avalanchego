@@ -64,7 +64,6 @@ import (
 // accepted synchronous block.
 type VM struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
-	config  sae.Config
 
 	ctx *snow.Context
 	db  avadb.Database
@@ -93,16 +92,9 @@ var _ io.Closer = (*closerFunc)(nil)
 
 func (f closerFunc) Close() error { return f() }
 
-// New constructs a new [VM]. The returned `*VM` owns the
-// `mockable.Clock` used by both the SAE block builder (via
-// `sae.Config.Now`) and the validator uptime tracker, so tests need
-// only call `vm.clock.Set(t)` to drive both forward in lock-step.
-func New(c sae.Config) *VM {
-	v := &VM{config: c}
-	if v.config.Now == nil {
-		v.config.Now = v.clock.Time
-	}
-	return v
+// New constructs a new [VM].
+func New() *VM {
+	return &VM{}
 }
 
 const warpSignatureCacheSize = 512
@@ -120,11 +112,25 @@ func (v *VM) Initialize(
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
+	snowCtx.Log.Info("parsing user config")
+
+	userConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return err
+	}
+
+	saeConfig := sae.Config{
+		MempoolConfig: userConfig.toMempoolConfig(),
+		DBConfig:      userConfig.toDBConfig(),
+		RPCConfig:     userConfig.toRPCConfig(),
+		Now:           v.clock.Time,
+	}
+
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
 	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
-	tdb := triedb.NewDatabase(db, v.config.DBConfig.TrieDBConfig)
+	tdb := triedb.NewDatabase(db, saeConfig.DBConfig.TrieDBConfig)
 
 	snowCtx.Log.Info("parsing genesis")
 
@@ -160,13 +166,6 @@ func (v *VM) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
-	snowCtx.Log.Info("parsing user config")
-
-	userConfig, err := ParseConfig(configBytes)
-	if err != nil {
-		return err
-	}
-
 	snowCtx.Log.Info("parsing warp message overrides")
 
 	warpMessages, err := userConfig.WarpMessages()
@@ -190,7 +189,7 @@ func (v *VM) Initialize(
 		snowCtx,
 		avaDB,
 		config,
-		v.config.Now,
+		saeConfig.Now,
 		desiredDelayExcess,
 		desiredTargetExcess,
 		warpStorage,
@@ -199,7 +198,7 @@ func (v *VM) Initialize(
 
 	snowCtx.Log.Info("constructing the sae VM")
 
-	inner, err := sae.NewVM(ctx, hooks, v.config, snowCtx, config, db, lastSync, appSender)
+	inner, err := sae.NewVM(ctx, hooks, saeConfig, snowCtx, config, db, lastSync, appSender)
 	if err != nil {
 		return err
 	}

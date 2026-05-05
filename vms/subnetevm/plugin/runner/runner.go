@@ -8,15 +8,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/triedb"
-
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/subnetevm"
 )
 
@@ -38,16 +33,7 @@ func Run(versionStr string) {
 		os.Exit(1)
 	}
 
-	mempoolConfig := legacypool.DefaultConfig
-	mempoolConfig.NoLocals = true
-	vm := adaptor.Convert(subnetevm.New(sae.Config{
-		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			TrieDBConfig: triedb.HashDefaults,
-		},
-	}))
-
-	if err := rpcchainvm.Serve(context.Background(), vm); err != nil {
+	if err := rpcchainvm.Serve(context.Background(), adaptor.Convert(subnetevm.New())); err != nil {
 		fmt.Printf("failed to serve rpc chain vm: %s\n", err)
 		os.Exit(1)
 	}

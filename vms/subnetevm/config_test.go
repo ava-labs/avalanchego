@@ -4,7 +4,9 @@
 package subnetevm
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -66,6 +68,100 @@ func TestParseConfig_FeeRecipient(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestParseConfig_DefaultsAndOverrides asserts that ParseConfig
+// pre-populates from DefaultConfig (legacy-compatible defaults) and
+// that operator overrides via flat legacy-shaped JSON keys take
+// effect.
+func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
+	defaults := DefaultConfig()
+
+	t.Run("nil_bytes_yields_defaults", func(t *testing.T) {
+		c, err := ParseConfig(nil)
+		require.NoError(t, err)
+		require.Equal(t, defaults, c)
+	})
+
+	t.Run("empty_object_yields_defaults", func(t *testing.T) {
+		c, err := ParseConfig([]byte(`{}`))
+		require.NoError(t, err)
+		require.Equal(t, defaults, c)
+	})
+
+	t.Run("partial_override_keeps_other_defaults", func(t *testing.T) {
+		c, err := ParseConfig([]byte(`{"tx-pool-price-limit":42,"rpc-gas-cap":1234}`))
+		require.NoError(t, err)
+		require.Equal(t, uint64(42), c.TxPoolPriceLimit)
+		require.Equal(t, uint64(1234), c.RPCGasCap)
+		require.Equal(t, defaults.TxPoolPriceBump, c.TxPoolPriceBump)
+		require.Equal(t, defaults.RPCTxFeeCap, c.RPCTxFeeCap)
+		require.Equal(t, defaults.TxPoolLifetime, c.TxPoolLifetime)
+	})
+
+	t.Run("unknown_field_rejected", func(t *testing.T) {
+		// Any legacy key that has no SAE counterpart (here
+		// `state-sync-enabled`, but stands in for ~60 others) must
+		// surface as an explicit decoder error rather than silently
+		// no-op.
+		_, err := ParseConfig([]byte(`{"state-sync-enabled":true}`))
+		require.ErrorContains(t, err, "state-sync-enabled")
+	})
+
+	t.Run("duration_accepts_string_and_numeric", func(t *testing.T) {
+		t.Run("string", func(t *testing.T) {
+			c, err := ParseConfig([]byte(`{"tx-pool-lifetime":"30m"}`))
+			require.NoError(t, err)
+			require.Equal(t, 30*time.Minute, c.TxPoolLifetime.Duration)
+		})
+		t.Run("numeric_nanoseconds", func(t *testing.T) {
+			c, err := ParseConfig([]byte(`{"tx-pool-lifetime":900000000000}`))
+			require.NoError(t, err)
+			require.Equal(t, 15*time.Minute, c.TxPoolLifetime.Duration)
+		})
+	})
+
+	t.Run("marshal_roundtrip", func(t *testing.T) {
+		out, err := json.Marshal(defaults)
+		require.NoError(t, err)
+		c, err := ParseConfig(out)
+		require.NoError(t, err)
+		require.Equal(t, defaults, c)
+	})
+}
+
+// TestConfig_Converters spot-checks the SAE-config-shape outputs of
+// the converter methods so the Initialize-time wiring keeps matching
+// what operators wrote.
+func TestConfig_Converters(t *testing.T) {
+	c := DefaultConfig()
+	c.RPCGasCap = 1
+	c.RPCTxFeeCap = 2
+	c.LocalTxsEnabled = true
+	c.TxPoolPriceLimit = 3
+	c.TxPoolLifetime = Duration{42 * time.Second}
+	c.PruningEnabled = false
+	c.CommitInterval = 8192
+
+	mp := c.toMempoolConfig()
+	require.False(t, mp.NoLocals, "LocalTxsEnabled=true => NoLocals=false")
+	require.Equal(t, uint64(3), mp.PriceLimit)
+	require.Equal(t, 42*time.Second, mp.Lifetime)
+
+	rp := c.toRPCConfig()
+	require.Equal(t, uint64(1), rp.GasCap)
+	require.InDelta(t, 2.0, rp.TxFeeCap, 0)
+
+	db := c.toDBConfig()
+	require.NotNil(t, db.TrieDBConfig, "saedb.Config.TrieDBConfig must default to triedb.HashDefaults")
+	require.True(t, db.Archival, "PruningEnabled=false => Archival=true")
+	require.Equal(t, uint64(8192), db.TrieCommitInterval)
+
+	// Defaults round-trip through the converter to the legacy-equivalent
+	// SAE state: pruning on (Archival=false), commit interval 4096.
+	d := DefaultConfig().toDBConfig()
+	require.False(t, d.Archival)
+	require.Equal(t, uint64(4096), d.TrieCommitInterval)
 }
 
 func TestConfig_WarpMessages(t *testing.T) {

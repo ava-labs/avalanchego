@@ -13,20 +13,16 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/ethtest"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rpc"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -121,9 +117,6 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		cfg.configureValidatorState(snowCtx.ValidatorState.(*validatorstest.State))
 	}
 
-	mempoolConf := legacypool.DefaultConfig
-	mempoolConf.Journal = "/dev/null"
-
 	keychain := saetest.NewUNSAFEKeyChain(t, cfg.numAccounts)
 	genesis := newTestGenesis(cfg.fork, keychain)
 	if cfg.configureGenesis != nil {
@@ -136,24 +129,23 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		upgradeBytes = cfg.configureUpgrade(keychain.Addresses())
 	}
 
-	var configBytes []byte
+	// Build per-chain config bytes from [DefaultConfig], with optional
+	// test overrides layered on top. The legacypool journal is
+	// inherently disabled because `LocalTxsEnabled=false` by default
+	// (yields `NoLocals=true`), so no journal-path override is needed.
+	chainConfig := DefaultConfig()
 	if cfg.feeRecipient != nil {
-		configBytes = mustMarshalJSON(t, &Config{FeeRecipient: cfg.feeRecipient.Hex()})
+		chainConfig.FeeRecipient = cfg.feeRecipient.Hex()
 	}
+	configBytes := mustMarshalJSON(t, &chainConfig)
 
-	saeConfig := sae.Config{
-		MempoolConfig: mempoolConf,
-		DBConfig: saedb.Config{
-			TrieDBConfig: triedb.HashDefaults,
-		},
-	}
-	vm := New(saeConfig)
+	vm := New()
 
 	// Pin the VM's mockable clock BEFORE `Initialize` so that
-	// `sae.Config.Now` (defaulted to `vm.clock.Time` in `New`) and the
-	// validator uptime tracker both observe a deterministic instant
-	// from their very first read. Subsequent test-side advances via
-	// `sut.setTime`/`advanceTime` flow through the same clock.
+	// `sae.Config.Now` (wired to `vm.clock.Time` inside `Initialize`)
+	// and the validator uptime tracker both observe a deterministic
+	// instant from their very first read. Subsequent test-side advances
+	// via `sut.setTime`/`advanceTime` flow through the same clock.
 	if cfg.clockTime != nil {
 		vm.clock.Set(*cfg.clockTime)
 	}
