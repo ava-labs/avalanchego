@@ -4,10 +4,8 @@
 package blockdb
 
 import (
-	"bytes"
 	"math"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -39,7 +37,7 @@ func TestPutGet(t *testing.T) {
 		{
 			name:  "nil block",
 			block: nil,
-			want:  nil,
+			want:  []byte{},
 		},
 	}
 	for _, tt := range tests {
@@ -49,7 +47,7 @@ func TestPutGet(t *testing.T) {
 
 			got, err := db.Get(0)
 			require.NoError(t, err)
-			require.True(t, bytes.Equal(tt.want, got))
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -310,7 +308,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 
 			err := store.Put(tt.height, tt.block)
 			if tt.wantErrMsg != "" {
-				require.True(t, strings.HasPrefix(err.Error(), tt.wantErrMsg), "expected error message to start with %s, got %s", tt.wantErrMsg, err.Error())
+				require.Contains(t, err.Error(), tt.wantErrMsg)
 			} else {
 				require.ErrorIs(t, err, tt.wantErr)
 			}
