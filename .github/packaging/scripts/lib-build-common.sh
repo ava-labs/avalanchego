@@ -5,6 +5,9 @@
 # Sourced (not executed) by build-package.sh.
 # All functions expect REPO_ROOT to be set by the caller.
 
+readonly PACKAGER_NAME="Ava Labs"
+readonly PACKAGER_EMAIL="security@avalabs.org"
+
 # Initialize the build environment inside the container.
 # Marks the bind-mounted source tree as git-safe, sources project
 # scripts (constants.sh, git_commit.sh), and disables Go VCS stamping.
@@ -18,7 +21,7 @@ init_build_env() {
     # shellcheck disable=SC1091
     source "${REPO_ROOT}/scripts/git_commit.sh"
 
-    # shellcheck disable=SC2154
+    # shellcheck disable=SC2154  # git_commit is set by git_commit.sh sourced above
     echo "Git commit: ${git_commit}"
 
     # Disable Go's automatic VCS stamping — the commit hash is passed
@@ -45,13 +48,12 @@ build_binary() {
             resolve_subnet_evm_vm_id
             echo "Subnet-EVM VM ID: ${SUBNET_EVM_VM_ID}"
 
-            SUBNET_EVM_BINARY="${REPO_ROOT}/build/subnet-evm"
-            (cd "${REPO_ROOT}/graft/subnet-evm" && ./scripts/build.sh "${SUBNET_EVM_BINARY}")
-            BINARY_PATH="${SUBNET_EVM_BINARY}"
+            BINARY_PATH="${REPO_ROOT}/build/subnet-evm"
+            (cd "${REPO_ROOT}/graft/subnet-evm" && ./scripts/build.sh "${BINARY_PATH}")
             ;;
         *)
             echo "Unknown package: ${package}" >&2
-            exit 1
+            return 1
             ;;
     esac
 
@@ -67,7 +69,7 @@ resolve_subnet_evm_vm_id() {
     )
     if [[ -z "${SUBNET_EVM_VM_ID}" ]]; then
         echo "ERROR: could not resolve SUBNET_EVM_VM_ID" >&2
-        exit 1
+        return 1
     fi
     export SUBNET_EVM_VM_ID
 }
@@ -83,7 +85,7 @@ generate_changelog() {
 ---
 - semver: ${version}
   date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-  packager: Ava Labs <security@avalabs.org>
+  packager: ${PACKAGER_NAME} <${PACKAGER_EMAIL}>
   changes:
     - note: "See https://github.com/ava-labs/avalanchego/releases/tag/v${version}"
 EOF
@@ -118,14 +120,14 @@ Key-Length: 4096
 Subkey-Type: RSA
 Subkey-Length: 4096
 Name-Real: AvalancheGo ${key_label} Signing (ephemeral)
-Name-Email: security@avalabs.org
+Name-Email: ${PACKAGER_EMAIL}
 Expire-Date: 1d
 %commit
 GPGEOF
-        gpg --batch --armor --export-secret-keys "security@avalabs.org" > "${NFPM_SIGNING_KEY}"
+        gpg --batch --armor --export-secret-keys "${PACKAGER_EMAIL}" > "${NFPM_SIGNING_KEY}"
     fi
 
-    gpg --batch --armor --export "security@avalabs.org" > "${public_key_out}"
+    gpg --batch --armor --export "${PACKAGER_EMAIL}" > "${public_key_out}"
     echo "GPG public key exported to: ${public_key_out}"
 }
 
