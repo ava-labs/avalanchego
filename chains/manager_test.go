@@ -4,6 +4,7 @@
 package chains
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -197,7 +198,6 @@ func TestCreateSimplexChain(t *testing.T) {
 
 	chainManager, err := New(managerConfig)
 	require.NoError(t, err)
-	defer chainManager.Shutdown()
 
 	// Create the chain synchronously rather than going through the chain
 	// creator goroutine, which is gated on the P-chain being bootstrapped.
@@ -211,4 +211,14 @@ func TestCreateSimplexChain(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return chainManager.IsBootstrapped(id)
 	}, time.Minute, time.Millisecond*100)
+
+	// Capture the handler before Shutdown clears the router's handler map,
+	// since chainManager.Shutdown swallows per-chain shutdown timeouts.
+	chain := chainManager.(*manager).chains[id]
+	chainManager.Shutdown()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	_, err = chain.AwaitStopped(ctx)
+	require.NoError(t, err)
 }
