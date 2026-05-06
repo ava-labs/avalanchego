@@ -20,7 +20,10 @@ env:
 jobs:
   # This workflow contains a single job called "build"
   build-mac:
-    # The type of runner that the job will run on
+    # Build release artifacts on the oldest macOS version still receiving Apple
+    # security updates to maximize the chance that shipped binaries remain usable
+    # on older supported macOS versions. CI validation can track newer macOS
+    # releases independently.
     runs-on: macos-14
     permissions:
       id-token: write
