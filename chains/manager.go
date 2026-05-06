@@ -1739,6 +1739,22 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 	m.Log.Info("creating simplex chain", zap.String("chain", primaryAlias))
 
+	// Wrap the VM in meter/tracing VMs if enabled
+	if m.MeterVMEnabled {
+		meterchainvmReg, err := metrics.MakeAndRegister(
+			m.meterChainVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		vm = metervm.NewBlockVM(vm, meterchainvmReg)
+	}
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, primaryAlias, m.Tracer)
+	}
+
 	messageSender, err := m.createMessageSender(ctx, sb)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create simplex message sender: %w", err)
