@@ -1,0 +1,6 @@
+go test fuzz v1
+bool(false)
+bool(true)
+uint64(1000099)
+uint64(1)
+uint64(0)
