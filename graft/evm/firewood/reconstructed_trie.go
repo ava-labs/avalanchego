@@ -56,10 +56,11 @@ func newReconstructedAccountTrie(recon *ffi.Reconstructed, computeRootOnHash boo
 	}, nil
 }
 
-// Hash returns the current hash of the reconstructed trie.
-// This will chain Reconstruct() with the accumulated ops. If computeRootOnHash
-// is false, it applies the ops but returns the cached root without computing the
-// reconstructed root.
+// Hash applies the accumulated ops to the reconstructed trie and returns a root.
+// If computeRootOnHash is true, the cached root is refreshed from the
+// reconstructed trie after applying the ops. If computeRootOnHash is false, the
+// ops are applied but the cached root is returned unchanged, avoiding root
+// computation until the caller validates the final root separately.
 // If there are no changes since the last call, the cached root is returned.
 // On error, the zero hash is returned.
 func (r *reconstructedAccountTrie) Hash() common.Hash {
@@ -90,9 +91,12 @@ func (r *reconstructedAccountTrie) hash() (common.Hash, error) {
 	return r.root, nil
 }
 
-// Commit returns the new root hash of the trie and an empty [trienode.NodeSet].
-// No persistence occurs; reconstructed views exist only in memory and are not
-// committed to the Firewood database.
+// Commit applies the accumulated ops to the reconstructed trie and returns a
+// root with an empty [trienode.NodeSet]. If computeRootOnHash is true, the
+// cached root is refreshed from the reconstructed trie after applying the ops.
+// If computeRootOnHash is false, the ops are applied but the cached root is
+// returned unchanged. No persistence occurs; reconstructed views exist only in
+// memory and are not committed to the Firewood database.
 func (r *reconstructedAccountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	hash, err := r.hash()
 	if err != nil {
