@@ -9,6 +9,7 @@ import (
 	"errors"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 func TestMain(m *testing.M) {
@@ -180,6 +183,42 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 
 	gotRoot := clientDB.Root()
 	require.Equal(t, wantRoot, ids.ID(gotRoot))
+}
+
+func Test_Firewood_Sync_BusyContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	r := rand.New(rand.NewSource(1))
+	clientDB, _ := generateDB(t, r, 0)
+	defer func() {
+		require.NoError(t, clientDB.Close(t.Context()))
+	}()
+
+	// Ensure the single thread doing work is blocked.
+	ch := make(chan struct{})
+	defer close(ch)
+	blockingHandler := p2p.TestHandler{
+		AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
+			cancel()
+			<-ch
+			return nil, nil
+		},
+	}
+
+	syncer, err := New(
+		Config{
+			SimultaneousWorkLimit: 1,
+		},
+		clientDB,
+		ids.ID{1}, // Use a non-trivial root so the syncer actually issues range proof requests.
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, blockingHandler),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, blockingHandler),
+	)
+	require.NoError(t, err)
+
+	err = syncer.Sync(ctx)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 // generateDB creates a new Firewood database with up to [numKeys] random key/value pairs.

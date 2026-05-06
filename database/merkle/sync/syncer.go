@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync/protoutils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -116,7 +117,7 @@ type Syncer[R any, C any] struct {
 	// - An item is added to [processedWork].
 	// - Close() is called.
 	// [workLock] is its inner lock.
-	unprocessedWorkCond sync.Cond
+	unprocessedWorkCond lock.Cond
 	// [workLock] must be held while accessing [processedWork].
 	processedWork *workHeap
 
@@ -190,7 +191,7 @@ func NewSyncer[R any, C any](
 		processedWork:   newWorkHeap(),
 		metrics:         metrics,
 	}
-	s.unprocessedWorkCond.L = &s.workLock
+	s.unprocessedWorkCond = *lock.NewCond(&s.workLock)
 
 	return s, nil
 }
@@ -273,17 +274,15 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 		case s.processingWorkItems >= s.config.SimultaneousWorkLimit:
 			// We're already processing the maximum number of work items.
 			// Wait until one of them finishes.
-			s.unprocessedWorkCond.Wait()
+			_ = s.unprocessedWorkCond.Wait(ctx)
 		case s.unprocessedWork.Len() == 0:
 			if s.processingWorkItems == 0 {
 				// There's no work to do, and there are no work items being processed
 				// which could cause work to be added, so we're done.
 				return // [s.workLock] released by defer.
 			}
-			// There's no work to do.
-			// Note that if [ctx] is canceled, [s.close] will be called,
-			// which will signal [s.unprocessedWorkCond], unblocking this goroutine.
-			s.unprocessedWorkCond.Wait()
+			// There's no work to do, but the current work items could produce work.
+			_ = s.unprocessedWorkCond.Wait(ctx)
 		default:
 			s.processingWorkItems++
 			work := s.unprocessedWork.GetWork()
