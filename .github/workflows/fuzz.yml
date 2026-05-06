@@ -5,6 +5,9 @@ on:
     - cron: "0 0 * * *" # Once a day at midnight UTC
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 
@@ -28,7 +31,7 @@ jobs:
           - graft
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Go
         uses: ./.github/actions/setup-go-for-project
       - name: Run fuzz tests

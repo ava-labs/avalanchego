@@ -2,11 +2,14 @@ name: Mark stale issues and pull requests
 on:
   schedule:
     - cron: '0 0 * * 0' # Run every day at midnight UTC on Sunday
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@v10
         with:
           # Overall configuration
           operations-per-run: 100

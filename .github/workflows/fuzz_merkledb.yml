@@ -6,6 +6,9 @@ on:
     # Run every 6 hours
     - cron: "0 0,6,12,18 * * *"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 
@@ -14,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Go
         uses: ./.github/actions/setup-go-for-project
       - name: Run merkledb fuzz tests

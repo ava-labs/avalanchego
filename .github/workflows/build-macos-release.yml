@@ -13,6 +13,9 @@ on:
     tags:
       - "*"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -26,7 +29,7 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
@@ -68,7 +71,7 @@ jobs:
           sudo installer -pkg AWSCLIV2.pkg -target /
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
           role-session-name: githubrolesession
@@ -85,13 +88,13 @@ jobs:
           BUCKET: ${{ secrets.BUCKET }}
 
       - name: Save avalanchego as Github artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: avalanchego-macos
           path: avalanchego-macos-${{ env.TAG }}.zip
 
       - name: Save subnet-evm as Github artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: subnet-evm-macos
           path: subnet-evm-macos-${{ env.TAG }}.zip
