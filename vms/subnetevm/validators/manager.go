@@ -28,7 +28,7 @@ import (
 )
 
 // syncFrequency is the period between background calls to
-// `*uptimetracker.UptimeTracker.Sync`. Mirrors `graft/subnet-evm/plugin/evm`.
+// `*uptimetracker.UptimeTracker.Sync`.
 const syncFrequency = 1 * time.Minute
 
 // dbPrefix scopes the on-disk state used by the underlying
@@ -119,7 +119,7 @@ func (m *Manager) Disconnect(nodeID ids.NodeID) error {
 // The goroutine is cancelled by [Manager.Shutdown].
 //
 // Subsequent calls are no-ops (the underlying `sync.Once` only fires
-// once), matching the legacy `graft/subnet-evm/plugin/evm` behaviour.
+// once).
 func (m *Manager) Dispatch() error {
 	var firstSyncErr error
 	m.once.Do(func() {

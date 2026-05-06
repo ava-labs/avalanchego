@@ -47,14 +47,11 @@ type UptimeSource interface {
 // Two payload types are accepted:
 //
 //   - `*payload.Hash`: signed iff the referenced block has been
-//     accepted (`BlockClient.IsAccepted`). Mirrors
-//     `graft/subnet-evm/warp::verifyBlockMessage`.
+//     accepted (`BlockClient.IsAccepted`).
 //   - `*payload.AddressedCall` carrying a known
 //     `messages.ValidatorUptime`: signed iff the source address is
 //     empty and the locally-tracked uptime for the validation ID is at
-//     least the message's claimed `TotalUptime`. Mirrors
-//     `graft/subnet-evm/warp::verifyOffchainAddressedCall` +
-//     `verifyUptimeMessage`.
+//     least the message's claimed `TotalUptime`.
 //
 // `uptime` may be nil, in which case `*payload.AddressedCall`
 // containing a `*messages.ValidatorUptime` returns `VerifyErrCode`

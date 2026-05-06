@@ -107,8 +107,6 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 		_, err := ParseConfig([]byte(`{"state-sync-enabled":true}`))
 		// JSON decoder does not expose a sentinel error for unknown fields,
 		// so we check for the presence of the field name and "unknown field" in the error message.
-
-		require.NotNil(t, err)
 		require.Contains(t, err.Error(), "state-sync-enabled")
 		require.Contains(t, err.Error(), "unknown field")
 	})
