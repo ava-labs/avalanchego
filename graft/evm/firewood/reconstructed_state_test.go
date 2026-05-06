@@ -112,20 +112,18 @@ func TestReconstructedRevisions(t *testing.T) {
 // TestReconstructedRevisionHashing verifies computeRootOnHash=false only
 // flushes writes without computing the reconstructed root.
 func TestReconstructedRevisionHashing(t *testing.T) {
-	r := require.New(t)
-
 	db := newTestDatabase(t)
 	trie, err := db.OpenTrie(types.EmptyRootHash)
-	r.NoError(err)
+	require.NoError(t, err)
 
 	// Start by committing an initial revision to build reconstructed revisions from.
 	addr := common.HexToAddress("1234")
-	r.NoError(trie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(100)}))
+	require.NoError(t, trie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(100)}))
 
 	initialRoot, _, err := trie.Commit(true)
-	r.NoError(err)
+	require.NoError(t, err)
 
-	r.NoError(db.TrieDB().Update(
+	require.NoError(t, db.TrieDB().Update(
 		initialRoot,
 		types.EmptyRootHash,
 		0,
@@ -133,26 +131,26 @@ func TestReconstructedRevisionHashing(t *testing.T) {
 		nil,
 		stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1})),
 	)
-	r.NoError(db.TrieDB().Commit(initialRoot, true))
+	require.NoError(t, db.TrieDB().Commit(initialRoot, true))
 
 	tdb := db.TrieDB().Backend().(*TrieDB)
 	rev, err := tdb.Firewood.LatestRevision()
-	r.NoError(err)
+	require.NoError(t, err)
 	recon, err := rev.Reconstruct(nil)
-	r.NoError(err)
-	r.NoError(rev.Drop())
+	require.NoError(t, err)
+	require.NoError(t, rev.Drop())
 	t.Cleanup(func() {
-		r.NoError(recon.Drop())
+		require.NoError(t, recon.Drop())
 	})
 
 	// First, use the reconstructed view with computeRootOnHash=false so that Hash
 	// flushes pending writes but returns the cached root.
 	replayAccessor, err := NewReconstructedStateAccessor(db, recon, false /* computeRootOnHash */)
-	r.NoError(err)
+	require.NoError(t, err)
 	replayTrie, err := replayAccessor.OpenTrie(initialRoot)
-	r.NoError(err)
-	r.NoError(replayTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(200)}))
+	require.NoError(t, err)
+	require.NoError(t, replayTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(200)}))
 
-	r.Equal(initialRoot, replayTrie.Hash())
-	r.NotEqual(initialRoot, common.Hash(recon.Root()))
+	require.Equal(t, initialRoot, replayTrie.Hash())
+	require.NotEqual(t, initialRoot, common.Hash(recon.Root()))
 }
