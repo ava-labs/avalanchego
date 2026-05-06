@@ -16,6 +16,7 @@ go_library(
     deps = [
         "//codec",
         "//graft/evm/message",
+        "//graft/evm/sync/client",
         "//ids",
         "//network/p2p",
         "//snow",
@@ -41,6 +42,7 @@ graft_go_test(
         "//codec",
         "//codec/linearcodec",
         "//graft/evm/message",
+        "//graft/evm/sync/client",
         "//ids",
         "//network/p2p",
         "//snow/engine/common",
