@@ -5,18 +5,26 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
+	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
@@ -40,13 +48,21 @@ import (
 	xtxs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	ptxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
-const NumKeys = 5
+const (
+	NumKeys              = 5
+	initialCChainFunding = 100 * units.Avax
+	cChainTransferAmount = 10_000 // wei
+)
 
 // TODO(marun) Extract the common elements of test execution for reuse across test setups
 
 func main() {
+	// Required for coreth ethclient block deserialization.
+	evm.RegisterAllLibEVMExtras()
+
 	// TODO(marun) Support choosing the log format
 	tc := antithesis.NewInstrumentedTestContext(tests.NewDefaultLogger(""))
 	defer tc.RecoverAndExit()
@@ -70,11 +86,12 @@ func main() {
 	)
 
 	genesisWorkload := &workload{
-		id:     0,
-		log:    tests.NewDefaultLogger(fmt.Sprintf("worker %d", 0)),
-		wallet: wallet,
-		addrs:  set.Of(genesis.EWOQKey.Address()),
-		uris:   c.URIs,
+		id:        0,
+		log:       tests.NewDefaultLogger("worker 0"),
+		wallet:    wallet,
+		addrs:     set.Of(genesis.EWOQKey.Address()),
+		uris:      c.URIs,
+		cChainKey: genesis.EWOQKey.ToECDSA(),
 	}
 
 	workloads := make([]*workload, NumKeys)
@@ -125,11 +142,12 @@ func main() {
 		)
 
 		workloads[i] = &workload{
-			id:     i,
-			log:    tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
-			wallet: wallet,
-			addrs:  set.Of(addr),
-			uris:   c.URIs,
+			id:        i,
+			log:       tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
+			wallet:    wallet,
+			addrs:     set.Of(addr),
+			uris:      c.URIs,
+			cChainKey: newFundedCChainKey(ctx, tc, i, genesisWorkload),
 		}
 	}
 
@@ -150,6 +168,10 @@ type workload struct {
 	wallet *primary.Wallet
 	addrs  set.Set[ids.ShortID]
 	uris   []string
+
+	cChainKey     *ecdsa.PrivateKey
+	cChainID      *big.Int
+	cChainClients map[string]*ethclient.Client
 }
 
 // newTestContext returns a test context that ensures that log output and assertions are
@@ -162,6 +184,32 @@ func (w *workload) newTestContext(ctx context.Context) *tests.SimpleTestContext 
 			"worker": w.id,
 		},
 	)
+}
+
+func (w *workload) cChainClient(uri string) (*ethclient.Client, error) {
+	if w.cChainClients == nil {
+		w.cChainClients = make(map[string]*ethclient.Client)
+	}
+	if client, ok := w.cChainClients[uri]; ok {
+		return client, nil
+	}
+	client, err := ethclient.Dial(cChainRPCURI(uri))
+	if err != nil {
+		return nil, err
+	}
+	w.cChainClients[uri] = client
+	return client, nil
+}
+
+func (w *workload) fetchCChainID(ctx context.Context, client *ethclient.Client) (*big.Int, error) {
+	if w.cChainID == nil {
+		chainID, err := client.ChainID(ctx)
+		if err != nil {
+			return nil, err
+		}
+		w.cChainID = chainID
+	}
+	return w.cChainID, nil
 }
 
 func (w *workload) run(ctx context.Context) {
@@ -204,7 +252,7 @@ func (w *workload) executeTest(ctx context.Context) {
 
 	// Ensure this value matches the number of tests + 1 to offset
 	// 0-based + 1 for sleep case in the switch statement for flowID
-	testCount := int64(6)
+	testCount := int64(7)
 
 	val, err := rand.Int(rand.Reader, big.NewInt(testCount))
 	require.NoError(err, "failed to read randomness")
@@ -228,6 +276,9 @@ func (w *workload) executeTest(ctx context.Context) {
 		w.log.Info("executing issuePToXTransfer")
 		w.issuePToXTransfer(ctx)
 	case 5:
+		w.log.Info("executing issueCChainTransfer")
+		w.issueCChainTransfer(ctx)
+	case 6:
 		w.log.Info("sleeping")
 	}
 
@@ -832,4 +883,168 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 	w.log.Info("confirmed all P-chain UTXOs consumed by tx are not present on all nodes",
 		zap.Stringer("txID", txID),
 	)
+}
+
+func newFundedCChainKey(ctx context.Context, tc *tests.SimpleTestContext, i int, funder *workload) *ecdsa.PrivateKey {
+	require := require.New(tc)
+
+	key, err := crypto.ToECDSA(crypto.Keccak256([]byte("C-Chain worker"), []byte(strconv.Itoa(i))))
+	require.NoError(err, "failed to generate C-Chain key")
+
+	require.NoError(
+		funder.fundCChainAddress(ctx, crypto.PubkeyToAddress(key.PublicKey), initialCChainFunding),
+		"failed to fund C-Chain worker",
+	)
+	return key
+}
+
+func cChainRPCURI(nodeURI string) string {
+	return nodeURI + "/ext/bc/C/rpc"
+}
+
+func (w *workload) issueCChainTransfer(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
+
+	uri := w.uris[w.id%len(w.uris)]
+	client, err := w.cChainClient(uri)
+	if err != nil {
+		w.log.Warn("failed to dial C-Chain RPC", zap.String("uri", uri), zap.Error(err))
+		return
+	}
+
+	tx, err := w.sendCChainTx(ctx, client, crypto.PubkeyToAddress(w.cChainKey.PublicKey), big.NewInt(cChainTransferAmount))
+	if err != nil {
+		w.log.Warn("failed to send C-Chain transfer", zap.Error(err))
+		return
+	}
+
+	startTime := time.Now()
+	w.log.Info("issued C-Chain transfer",
+		zap.Stringer("txID", tx.Hash()),
+		zap.Uint64("nonce", tx.Nonce()),
+	)
+
+	if err := w.confirmCChainTx(ctx, tx); err != nil {
+		w.log.Warn("failed to confirm C-Chain transaction",
+			zap.Stringer("txID", tx.Hash()),
+			zap.Error(err),
+		)
+		return
+	}
+
+	w.log.Info("accepted C-Chain transaction",
+		zap.Stringer("txID", tx.Hash()),
+		zap.Duration("duration", time.Since(startTime)),
+	)
+}
+
+func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) error {
+	txHash := tx.Hash()
+	for _, uri := range w.uris {
+		client, err := w.cChainClient(uri)
+		if err != nil {
+			return fmt.Errorf("failed to dial C-Chain RPC on %s: %w", uri, err)
+		}
+
+		receipt, err := bind.WaitMined(ctx, client, tx)
+		if err != nil {
+			return fmt.Errorf("failed to get receipt for tx %s on %s: %w", txHash, uri, err)
+		}
+
+		if receipt.Status != types.ReceiptStatusSuccessful {
+			assert.Unreachable("C-Chain transaction failed", map[string]any{
+				"worker": w.id,
+				"uri":    uri,
+				"txID":   txHash,
+				"status": receipt.Status,
+			})
+			return fmt.Errorf("tx %s failed on %s with status %d", txHash, uri, receipt.Status)
+		}
+
+		w.log.Info("confirmed C-Chain transaction",
+			zap.Stringer("txID", txHash),
+			zap.String("uri", uri),
+		)
+	}
+
+	w.log.Info("confirmed C-Chain transaction on all nodes",
+		zap.Stringer("txID", txHash),
+	)
+	assert.Reachable("confirmed C-Chain transaction on all nodes", map[string]any{
+		"worker": w.id,
+		"txID":   txHash,
+	})
+	return nil
+}
+
+func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, to ethcommon.Address, value *big.Int) (*types.Transaction, error) {
+	senderAddr := crypto.PubkeyToAddress(w.cChainKey.PublicKey)
+
+	chainID, err := w.fetchCChainID(ctx, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch C-Chain chain ID: %w", err)
+	}
+	acceptedNonce, err := client.AcceptedNonceAt(ctx, senderAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch accepted nonce: %w", err)
+	}
+	gasTipCap, err := client.SuggestGasTipCap(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch suggested gas tip: %w", err)
+	}
+	estimatedBaseFee, err := client.EstimateBaseFee(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch estimated base fee: %w", err)
+	}
+	gasFeeCap := new(big.Int).Add(
+		gasTipCap,
+		new(big.Int).Mul(estimatedBaseFee, big.NewInt(2)),
+	)
+
+	signer := types.LatestSignerForChainID(chainID)
+	tx, err := types.SignNewTx(w.cChainKey, signer, &types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     acceptedNonce,
+		GasTipCap: gasTipCap,
+		GasFeeCap: gasFeeCap,
+		Gas:       params.TxGas,
+		To:        &to,
+		Value:     value,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	if err := client.SendTransaction(ctx, tx); err != nil {
+		return nil, fmt.Errorf("failed to send transaction: %w", err)
+	}
+	return tx, nil
+}
+
+func (w *workload) fundCChainAddress(ctx context.Context, recipientAddr ethcommon.Address, amount uint64) error {
+	uri := w.uris[0]
+	client, err := w.cChainClient(uri)
+	if err != nil {
+		return fmt.Errorf("failed to dial C-Chain RPC: %w", err)
+	}
+
+	tx, err := w.sendCChainTx(ctx, client, recipientAddr, new(big.Int).SetUint64(amount))
+	if err != nil {
+		return fmt.Errorf("failed to send funding tx: %w", err)
+	}
+
+	w.log.Info("sent C-Chain funding transaction",
+		zap.Stringer("txID", tx.Hash()),
+		zap.Uint64("nonce", tx.Nonce()),
+	)
+
+	if err := w.confirmCChainTx(ctx, tx); err != nil {
+		return fmt.Errorf("failed to confirm funding tx: %w", err)
+	}
+	w.log.Info("confirmed C-Chain funding transaction",
+		zap.Stringer("txID", tx.Hash()),
+	)
+	return nil
 }
