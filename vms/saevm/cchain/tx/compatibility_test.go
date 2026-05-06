@@ -39,8 +39,8 @@ func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
 			AVAXAssetID,
 		},
 	}
-	for _, tx := range AllGolden {
-		fuzzer.Add(tx.New)
+	for _, tx := range NewTxs {
+		fuzzer.Add(tx)
 	}
 	fuzzer.Fuzz(ff)
 }
