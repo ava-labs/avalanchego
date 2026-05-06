@@ -233,6 +233,10 @@ tasks:
       - cmd: '{{.NIX_RUN}} ./scripts/check_require_directives_round_trip.sh'
       - task: check-clean-branch
 
+  collect-kind-diagnostics:
+    desc: Collects runner, Docker, kind, and Kubernetes diagnostics. Optional arg is output dir.
+    cmd: '{{.NIX_RUN}} ./scripts/collect_kind_diagnostics.sh {{.CLI_ARGS}}'
+
   create-kind-cluster:
     desc: Creates the default kind cluster
     cmd: '{{.NIX_RUN}} bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}'

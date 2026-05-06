@@ -72,6 +72,10 @@ func StartKindCluster(
 	startLogsCollector bool,
 	installChaosMesh bool,
 ) error {
+	if _, ok := ctx.Deadline(); !ok {
+		return stacktrace.New("unable to start kind cluster with a context without a deadline")
+	}
+
 	configContext := KindKubeconfigContext
 
 	clusterRunning, err := isKindClusterRunning(log, configPath, configContext)
@@ -89,12 +93,13 @@ func StartKindCluster(
 			zap.String("kubeconfigContext", configContext),
 		)
 
-		startCtx, cancel := context.WithTimeout(ctx, DefaultNetworkTimeout)
-		defer cancel()
-		cmd := exec.CommandContext(startCtx, "bash", "-x", "kind-with-registry.sh")
+		cmd := exec.CommandContext(ctx, "bash", "-x", "kind-with-registry.sh")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				err = errors.Join(err, fmt.Errorf("start-kind-cluster context ended: %w", ctxErr))
+			}
 			return stacktrace.Errorf("failed to run kind-with-registry.sh: %w", err)
 		}
 	}
