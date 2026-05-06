@@ -45,6 +45,10 @@ tasks:
     desc: Clean Bazel cache (full expunge)
     cmd: '{{.NIX_RUN}} bazelisk clean --expunge'
 
+  bazel-configure-local:
+    desc: Generate .bazelrc.local, if necessary, with appropriate values for the local host
+    cmd: '{{.NIX_RUN}} ./scripts/generate_bazelrc_local.sh'
+
   bazel-fmt:
     desc: Format BUILD.bazel files with buildifier
     cmd: '{{.NIX_RUN}} buildifier -r .'
@@ -409,7 +413,7 @@ tasks:
 
   test-build-image:
     # On mac, docker/podman/lima should work out-of-the-box.
-    # On linux, requires qemu (e.g. apt -y install qemu-system qemu-user-static).
+    # On linux, requires qemu (e.g. apt -y install qemu-user-static).
     desc: Runs test of cross-platform docker image build
     cmd: '{{.NIX_RUN}} bash -x scripts/tests.build_image.sh'
 
@@ -465,11 +469,12 @@ tasks:
       FUZZTIME: '{{.FUZZTIME| default "10"}}'
     cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} ./utils/cb58'
 
+  # To run only selected directories, pass them after --.
   test-fuzz-long:
     desc: Runs each fuzz test for 180 seconds
     vars:
       FUZZTIME: '{{.FUZZTIME| default "180"}}'
-    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}}'
+    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} {{.CLI_ARGS}}'
 
   test-fuzz-merkledb:
     desc: Runs each merkledb fuzz test for 15 minutes

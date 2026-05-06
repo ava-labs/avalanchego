@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"math/big"
 	"net/http/httptest"
 	"os"
@@ -64,17 +63,21 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	createWorstCaseFuzzFlags(flag.CommandLine)
-	flag.Parse()
-
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelError, true)))
 
 	goleak.VerifyTestMain(
 		m,
 		goleak.IgnoreCurrent(),
+		// ChainIndexer.Close() may check if the event loop is active before it is marked as active.
+		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core.(*ChainIndexer).eventLoop"),
+		// diskLayer.Release() doesn't properly stop generation.
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/state/snapshot.(*diskLayer).generate"),
 		// TxPool.Close() doesn't wait for its loop() method to signal termination.
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/txpool.(*TxPool).loop.func2"),
+		// Not all filters subscriptions can be closed after the TxPool is closed.
+		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).Logs.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
+		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewHeads.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
+		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewPendingTransactions.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
 	)
 }
 
@@ -362,6 +365,10 @@ func (s *SUT) mustSendTx(tb testing.TB, txs ...*types.Transaction) {
 
 // sendTxsAndWaitUntilPending sends all `txs` to the mempool, and waits for
 // each to be marked as pending.
+//
+// WARNING: if there is a block executing concurrently with this method,
+// the pending state of the transactions may not be accurately reflected,
+// resulting in a timeout.
 func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
@@ -369,6 +376,11 @@ func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transactio
 	s.waitUntilTxsPending(tb, txs...)
 }
 
+// waitUntilTxsPending waits until all `txs` are marked as pending in the mempool.
+//
+// WARNING: if there is a block executing concurrently with this method,
+// the pending state of the transactions may not be accurately reflected,
+// resulting in a timeout.
 func (s *SUT) waitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 

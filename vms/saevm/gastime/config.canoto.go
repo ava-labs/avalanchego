@@ -27,40 +27,40 @@ var (
 )
 
 const (
-	canoto__config__targetToExcessScaling = 1
-	canoto__config__minPrice              = 2
-	canoto__config__staticPricing         = 3
+	canoto__GasPriceConfig__TargetToExcessScaling = 1
+	canoto__GasPriceConfig__MinPrice              = 2
+	canoto__GasPriceConfig__StaticPricing         = 3
 
-	canoto__config__targetToExcessScaling__tag = "\x08" // canoto.Tag(canoto__config__targetToExcessScaling, canoto.Varint)
-	canoto__config__minPrice__tag              = "\x10" // canoto.Tag(canoto__config__minPrice, canoto.Varint)
-	canoto__config__staticPricing__tag         = "\x18" // canoto.Tag(canoto__config__staticPricing, canoto.Varint)
+	canoto__GasPriceConfig__TargetToExcessScaling__tag = "\x08" // canoto.Tag(canoto__GasPriceConfig__TargetToExcessScaling, canoto.Varint)
+	canoto__GasPriceConfig__MinPrice__tag              = "\x10" // canoto.Tag(canoto__GasPriceConfig__MinPrice, canoto.Varint)
+	canoto__GasPriceConfig__StaticPricing__tag         = "\x18" // canoto.Tag(canoto__GasPriceConfig__StaticPricing, canoto.Varint)
 )
 
-type canotoData_config struct {
+type canotoData_GasPriceConfig struct {
 	size uint64
 }
 
 // CanotoSpec returns the specification of this canoto message.
-func (*config) CanotoSpec(...reflect.Type) *canoto.Spec {
-	var zero config
+func (*GasPriceConfig) CanotoSpec(...reflect.Type) *canoto.Spec {
+	var zero GasPriceConfig
 	s := &canoto.Spec{
-		Name: "config",
+		Name: "GasPriceConfig",
 		Fields: []canoto.FieldType{
 			{
-				FieldNumber: canoto__config__targetToExcessScaling,
-				Name:        "targetToExcessScaling",
+				FieldNumber: canoto__GasPriceConfig__TargetToExcessScaling,
+				Name:        "TargetToExcessScaling",
 				OneOf:       "",
-				TypeUint:    canoto.SizeOf(zero.targetToExcessScaling),
+				TypeUint:    canoto.SizeOf(zero.TargetToExcessScaling),
 			},
 			{
-				FieldNumber: canoto__config__minPrice,
-				Name:        "minPrice",
+				FieldNumber: canoto__GasPriceConfig__MinPrice,
+				Name:        "MinPrice",
 				OneOf:       "",
-				TypeUint:    canoto.SizeOf(zero.minPrice),
+				TypeUint:    canoto.SizeOf(zero.MinPrice),
 			},
 			{
-				FieldNumber: canoto__config__staticPricing,
-				Name:        "staticPricing",
+				FieldNumber: canoto__GasPriceConfig__StaticPricing,
+				Name:        "StaticPricing",
 				OneOf:       "",
 				TypeBool:    true,
 			},
@@ -73,7 +73,7 @@ func (*config) CanotoSpec(...reflect.Type) *canoto.Spec {
 // UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
 //
 // During parsing, the canoto cache is saved.
-func (c *config) UnmarshalCanoto(bytes []byte) error {
+func (c *GasPriceConfig) UnmarshalCanoto(bytes []byte) error {
 	r := canoto.Reader{
 		B: bytes,
 	}
@@ -86,9 +86,9 @@ func (c *config) UnmarshalCanoto(bytes []byte) error {
 // During parsing, the canoto cache is saved.
 //
 // This function enables configuration of reader options.
-func (c *config) UnmarshalCanotoFrom(r canoto.Reader) error {
+func (c *GasPriceConfig) UnmarshalCanotoFrom(r canoto.Reader) error {
 	// Zero the struct before unmarshaling.
-	*c = config{}
+	*c = GasPriceConfig{}
 	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
 
 	var minField uint32
@@ -102,37 +102,37 @@ func (c *config) UnmarshalCanotoFrom(r canoto.Reader) error {
 		}
 
 		switch field {
-		case canoto__config__targetToExcessScaling:
+		case canoto__GasPriceConfig__TargetToExcessScaling:
 			if wireType != canoto.Varint {
 				return canoto.ErrUnexpectedWireType
 			}
 
-			if err := canoto.ReadUint(&r, &c.targetToExcessScaling); err != nil {
+			if err := canoto.ReadUint(&r, &c.TargetToExcessScaling); err != nil {
 				return err
 			}
-			if canoto.IsZero(c.targetToExcessScaling) {
+			if canoto.IsZero(c.TargetToExcessScaling) {
 				return canoto.ErrZeroValue
 			}
-		case canoto__config__minPrice:
+		case canoto__GasPriceConfig__MinPrice:
 			if wireType != canoto.Varint {
 				return canoto.ErrUnexpectedWireType
 			}
 
-			if err := canoto.ReadUint(&r, &c.minPrice); err != nil {
+			if err := canoto.ReadUint(&r, &c.MinPrice); err != nil {
 				return err
 			}
-			if canoto.IsZero(c.minPrice) {
+			if canoto.IsZero(c.MinPrice) {
 				return canoto.ErrZeroValue
 			}
-		case canoto__config__staticPricing:
+		case canoto__GasPriceConfig__StaticPricing:
 			if wireType != canoto.Varint {
 				return canoto.ErrUnexpectedWireType
 			}
 
-			if err := canoto.ReadBool(&r, &c.staticPricing); err != nil {
+			if err := canoto.ReadBool(&r, &c.StaticPricing); err != nil {
 				return err
 			}
-			if canoto.IsZero(c.staticPricing) {
+			if canoto.IsZero(c.StaticPricing) {
 				return canoto.ErrZeroValue
 			}
 		default:
@@ -151,7 +151,7 @@ func (c *config) UnmarshalCanotoFrom(r canoto.Reader) error {
 // 1. All OneOfs are specified at most once.
 // 2. All strings are valid utf-8.
 // 3. All custom fields are ValidCanoto.
-func (c *config) ValidCanoto() bool {
+func (c *GasPriceConfig) ValidCanoto() bool {
 	return true
 }
 
@@ -159,16 +159,16 @@ func (c *config) ValidCanoto() bool {
 // values in the struct.
 //
 // It is not safe to copy this struct concurrently.
-func (c *config) CalculateCanotoCache() {
+func (c *GasPriceConfig) CalculateCanotoCache() {
 	var size uint64
-	if !canoto.IsZero(c.targetToExcessScaling) {
-		size += uint64(len(canoto__config__targetToExcessScaling__tag)) + canoto.SizeUint(c.targetToExcessScaling)
+	if !canoto.IsZero(c.TargetToExcessScaling) {
+		size += uint64(len(canoto__GasPriceConfig__TargetToExcessScaling__tag)) + canoto.SizeUint(c.TargetToExcessScaling)
 	}
-	if !canoto.IsZero(c.minPrice) {
-		size += uint64(len(canoto__config__minPrice__tag)) + canoto.SizeUint(c.minPrice)
+	if !canoto.IsZero(c.MinPrice) {
+		size += uint64(len(canoto__GasPriceConfig__MinPrice__tag)) + canoto.SizeUint(c.MinPrice)
 	}
-	if !canoto.IsZero(c.staticPricing) {
-		size += uint64(len(canoto__config__staticPricing__tag)) + canoto.SizeBool
+	if !canoto.IsZero(c.StaticPricing) {
+		size += uint64(len(canoto__GasPriceConfig__StaticPricing__tag)) + canoto.SizeBool
 	}
 	atomic.StoreUint64(&c.canotoData.size, size)
 }
@@ -180,7 +180,7 @@ func (c *config) CalculateCanotoCache() {
 //
 // If the struct has been modified since the last call to CalculateCanotoCache,
 // the returned size may be incorrect.
-func (c *config) CachedCanotoSize() uint64 {
+func (c *GasPriceConfig) CachedCanotoSize() uint64 {
 	return atomic.LoadUint64(&c.canotoData.size)
 }
 
@@ -189,7 +189,7 @@ func (c *config) CachedCanotoSize() uint64 {
 // It is assumed that this struct is ValidCanoto.
 //
 // It is not safe to copy this struct concurrently.
-func (c *config) MarshalCanoto() []byte {
+func (c *GasPriceConfig) MarshalCanoto() []byte {
 	c.CalculateCanotoCache()
 	w := canoto.Writer{
 		B: make([]byte, 0, c.CachedCanotoSize()),
@@ -207,17 +207,17 @@ func (c *config) MarshalCanoto() []byte {
 // It is assumed that this struct is ValidCanoto.
 //
 // It is not safe to copy this struct concurrently.
-func (c *config) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
-	if !canoto.IsZero(c.targetToExcessScaling) {
-		canoto.Append(&w, canoto__config__targetToExcessScaling__tag)
-		canoto.AppendUint(&w, c.targetToExcessScaling)
+func (c *GasPriceConfig) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if !canoto.IsZero(c.TargetToExcessScaling) {
+		canoto.Append(&w, canoto__GasPriceConfig__TargetToExcessScaling__tag)
+		canoto.AppendUint(&w, c.TargetToExcessScaling)
 	}
-	if !canoto.IsZero(c.minPrice) {
-		canoto.Append(&w, canoto__config__minPrice__tag)
-		canoto.AppendUint(&w, c.minPrice)
+	if !canoto.IsZero(c.MinPrice) {
+		canoto.Append(&w, canoto__GasPriceConfig__MinPrice__tag)
+		canoto.AppendUint(&w, c.MinPrice)
 	}
-	if !canoto.IsZero(c.staticPricing) {
-		canoto.Append(&w, canoto__config__staticPricing__tag)
+	if !canoto.IsZero(c.StaticPricing) {
+		canoto.Append(&w, canoto__GasPriceConfig__StaticPricing__tag)
 		canoto.AppendBool(&w, true)
 	}
 	return w

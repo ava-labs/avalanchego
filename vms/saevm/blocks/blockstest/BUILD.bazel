@@ -3,6 +3,7 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "blockstest",
+    testonly = True,
     srcs = [
         "blocks.go",
         "chain.go",

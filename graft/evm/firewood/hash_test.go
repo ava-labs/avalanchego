@@ -144,7 +144,7 @@ func (fs *fuzzState) commit() {
 
 		// HashDB/PathDB only allows updating the triedb if there have been changes.
 		if _, ok := tr.ethDatabase.TrieDB().Backend().(*TrieDB); ok {
-			triedbopt := stateconf.WithTrieDBUpdatePayload(common.Hash{byte(int64(fs.blockNumber - 1))}, common.Hash{byte(int64(fs.blockNumber))})
+			triedbopt := blockNumToUpdatePayload(fs.blockNumber)
 			fs.require.NoError(tr.ethDatabase.TrieDB().Update(updatedRoot, tr.lastRoot, fs.blockNumber, mergedNodeSet, nil, triedbopt), "failed to update triedb in %s", tr.name)
 			tr.lastRoot = updatedRoot
 		} else if updatedRoot != tr.lastRoot {
@@ -167,6 +167,12 @@ func (fs *fuzzState) commit() {
 			tr.name, expectedRoot.Hex(), tr.lastRoot.Hex(), i,
 		)
 	}
+}
+
+func blockNumToUpdatePayload(blockNum uint64) stateconf.TrieDBUpdateOption {
+	parentHash := common.BytesToHash(binary.BigEndian.AppendUint64(nil, blockNum))
+	childHash := common.BytesToHash(binary.BigEndian.AppendUint64(nil, blockNum+1)) // add to avoid underflow
+	return stateconf.WithTrieDBUpdatePayload(parentHash, childHash)
 }
 
 // createAccount generates a new, unique account and adds it to both tries and the tracked
