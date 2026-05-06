@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
 
-	libevmcore "github.com/ava-labs/libevm/core"
+	ethcore "github.com/ava-labs/libevm/core"
 )
 
 var (
@@ -264,7 +264,7 @@ func (b *wrappedBlock) verifyIntrinsicGas() error {
 	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
 	var totalIntrinsicGasCost uint64
 	for _, tx := range b.ethBlock.Transactions() {
-		intrinsicGas, err := libevmcore.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, rules)
+		intrinsicGas, err := ethcore.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, rules)
 		if err != nil {
 			return fmt.Errorf("failed to calculate intrinsic gas: %w for tx %s", err, tx.Hash())
 		}

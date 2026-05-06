@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
 	cmath "github.com/ava-labs/libevm/common/math"
-	libevmcore "github.com/ava-labs/libevm/core"
+	ethcore "github.com/ava-labs/libevm/core"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -83,7 +83,7 @@ func accessListGasWithPredicates(rules extras.Rules, accessList libevm.AccessLis
 			accessTupleGas := ethparams.TxAccessListAddressGas + uint64(len(accessTuple.StorageKeys))*ethparams.TxAccessListStorageKeyGas
 			totalGas, overflow := cmath.SafeAdd(gas, accessTupleGas)
 			if overflow {
-				return 0, true, libevmcore.ErrGasUintOverflow
+				return 0, true, ethcore.ErrGasUintOverflow
 			}
 			gas = totalGas
 		} else {
@@ -93,7 +93,7 @@ func accessListGasWithPredicates(rules extras.Rules, accessList libevm.AccessLis
 			}
 			totalGas, overflow := cmath.SafeAdd(gas, predicateGas)
 			if overflow {
-				return 0, true, libevmcore.ErrGasUintOverflow
+				return 0, true, ethcore.ErrGasUintOverflow
 			}
 			gas = totalGas
 		}

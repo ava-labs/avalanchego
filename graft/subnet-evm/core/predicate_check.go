@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
-	libevmcore "github.com/ava-labs/libevm/core"
+	ethcore "github.com/ava-labs/libevm/core"
 )
 
 var ErrMissingPredicateContext = errors.New("missing predicate context")
@@ -53,7 +53,7 @@ func CheckTxPredicates(
 	// Check that the transaction can cover its IntrinsicGas, including the gas
 	// required by the predicate, before verifying the predicate.
 	accessList := tx.AccessList()
-	intrinsicGas, err := libevmcore.IntrinsicGas(tx.Data(), accessList, tx.To() == nil, rules)
+	intrinsicGas, err := ethcore.IntrinsicGas(tx.Data(), accessList, tx.To() == nil, rules)
 	if err != nil {
 		return nil, err
 	}
