@@ -241,8 +241,6 @@ func UnpackSetGasPriceConfigInput(input []byte) (commontype.GasPriceConfig, erro
 	return *config, nil
 }
 
-// helpers
-
 // storageSlot returns a storage key with the "gasprm" namespace prefix
 // left-aligned in the hash. This avoids collisions with AllowList role
 // storage, which right-aligns 20-byte addresses via BytesToHash and

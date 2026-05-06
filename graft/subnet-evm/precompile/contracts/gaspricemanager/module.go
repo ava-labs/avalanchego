@@ -31,11 +31,8 @@ var Module = modules.Module{
 type configurator struct{}
 
 func init() {
-	// TODO(JonathanOppenheimer): Register the precompile module when ready.
-	if false {
-		if err := modules.RegisterModule(Module); err != nil {
-			panic(err)
-		}
+	if err := modules.RegisterModule(Module); err != nil {
+		panic(err)
 	}
 }
 
