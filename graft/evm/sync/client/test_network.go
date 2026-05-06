@@ -89,4 +89,6 @@ func (t *testNetwork) testResponses(callback func(), responses ...[]byte) {
 	t.numCalls = 0
 }
 
-func (*testNetwork) TrackBandwidth(ids.NodeID, float64) {}
+func (*testNetwork) RegisterResponse(ids.NodeID, float64) {}
+
+func (*testNetwork) RegisterFailure(ids.NodeID) {}

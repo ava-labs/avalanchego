@@ -59,9 +59,12 @@ type SyncedNetworkClient interface {
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
 	SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// TrackBandwidth should be called for each valid request with the bandwidth
-	// (length of response divided by request time), and with 0 if the response is invalid.
-	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
+	// RegisterResponse records a successful response from nodeID with the
+	// observed bandwidth (response bytes divided by request time).
+	RegisterResponse(nodeID ids.NodeID, bandwidth float64)
+
+	// RegisterFailure records a failed response from nodeID.
+	RegisterFailure(nodeID ids.NodeID)
 }
 
 type Network interface {
@@ -119,9 +122,11 @@ type network struct {
 	p2pValidators *p2p.Validators
 }
 
-// NewNetwork constructs a sync-dedicated Network. The peer tracker filters
-// out peers below [client.StateSyncVersion]. Do not wire this Network as a
-// [p2p.NodeSampler] for non-sync flows or that filter will silently apply.
+// NewNetwork constructs a [Network] uniting the legacy synchronous message
+// handling with the new [p2p.Network]. The peer tracker filters out peers
+// below [client.StateSyncVersion], so [Network.Sample] is only accurate for
+// state-sync consumers. Do not wire this Network as a [p2p.NodeSampler] for
+// non-sync flows.
 func NewNetwork(
 	ctx *snow.Context,
 	appSender common.AppSender,
@@ -232,11 +237,11 @@ func (n *network) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 	return n.sendAppRequest(ctx, nodeID, request, responseHandler)
 }
 
-// sendAppRequest sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingRequestHandlers]
+// sendAppRequest sends request message bytes to specified nodeID and adds responseHandler to outstandingRequestHandlers
 // so that it can be invoked when the network receives either a response or failure message.
-// Assumes [nodeID] is never the local node since the peer tracker is configured with the local node in its ignoredNodes set.
+// Assumes nodeID is never the local node since the peer tracker is configured with the local node in its ignoredNodes set.
 // Releases active requests semaphore if there was an error in sending the request
-// Returns an error if [appSender] is unable to make the request.
+// Returns an error if appSender is unable to make the request.
 // Assumes write lock is held
 func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if n.closed.Get() {
@@ -436,7 +441,10 @@ func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 	}
 
 	// [p2p.PeerTracker] filters out self via the ignoredNodes set passed at construction.
-	n.peers.Connected(nodeID, nodeVersion)
+	// Skip when nodeVersion is unknown to avoid the tracker's nil deref.
+	if nodeVersion != nil {
+		n.peers.Connected(nodeID, nodeVersion)
+	}
 
 	return n.sdkNetwork.Connected(ctx, nodeID, nodeVersion)
 }
@@ -485,12 +493,12 @@ func (n *network) Size() uint32 {
 	return uint32(n.peers.Size())
 }
 
-func (n *network) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
-	if bandwidth > 0 {
-		n.peers.RegisterResponse(nodeID, bandwidth)
-	} else {
-		n.peers.RegisterFailure(nodeID)
-	}
+func (n *network) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {
+	n.peers.RegisterResponse(nodeID, bandwidth)
+}
+
+func (n *network) RegisterFailure(nodeID ids.NodeID) {
+	n.peers.RegisterFailure(nodeID)
 }
 
 // SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.

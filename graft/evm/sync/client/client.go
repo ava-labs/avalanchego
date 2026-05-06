@@ -52,8 +52,10 @@ var (
 )
 var _ Client = (*client)(nil)
 
-// Network defines the interface for sending sync requests over the network.
-// This interface is implemented by the network layer in coreth and subnet-evm.
+// Network is a transitional facade for the state-sync client over the
+// underlying p2p primitives, implemented by the graft coreth and subnet-evm
+// network packages. New consumers should hold a [p2p.PeerTracker] and
+// construct [p2p.Client]s directly rather than extending this interface.
 type Network interface {
 	p2p.NodeSampler
 
@@ -66,9 +68,12 @@ type Network interface {
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
 	SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// TrackBandwidth should be called after receiving a response from a peer to
-	// track performance. This is used to prioritize peers that are more responsive.
-	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
+	// RegisterResponse records a successful response from nodeID with the
+	// observed bandwidth. Used to prioritize more responsive peers.
+	RegisterResponse(nodeID ids.NodeID, bandwidth float64)
+
+	// RegisterFailure records a failed response from nodeID.
+	RegisterFailure(nodeID ids.NodeID)
 
 	// P2PNetwork returns the unabstracted [p2p.Network].
 	P2PNetwork() *p2p.Network
@@ -375,7 +380,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			logCtx = append(logCtx, "attempt", attempt, "request", request, "err", err)
 			log.Debug("request failed, retrying", logCtx...)
 			metric.IncFailed()
-			c.network.TrackBandwidth(nodeID, 0)
+			c.network.RegisterFailure(nodeID)
 			time.Sleep(failedRequestSleepInterval)
 			continue
 		} else {
@@ -383,14 +388,14 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			if err != nil {
 				lastErr = err
 				log.Debug("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
-				c.network.TrackBandwidth(nodeID, 0)
+				c.network.RegisterFailure(nodeID)
 				metric.IncFailed()
 				metric.IncInvalidResponse()
 				continue
 			}
 
 			bandwidth := float64(len(response)) / (time.Since(start).Seconds() + epsilon)
-			c.network.TrackBandwidth(nodeID, bandwidth)
+			c.network.RegisterResponse(nodeID, bandwidth)
 			metric.IncSucceeded()
 			metric.IncReceived(int64(numElements))
 			return responseIntf, nil
