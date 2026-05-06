@@ -169,8 +169,9 @@ func TestCreateSimplexChain(t *testing.T) {
 		// Logging
 		Log: logger,
 		LogFactory: logging.NewFactory(logging.Config{
-			LogLevel:   logging.Debug,
-			LoggerName: "chain_logger",
+			LogLevel:     logging.Debug,
+			DisplayLevel: logging.Debug,
+			LoggerName:   "chain_logger",
 		}),
 
 		VMManager:  newTestVMManager(t, chainParams.VMID),
@@ -189,6 +190,9 @@ func TestCreateSimplexChain(t *testing.T) {
 		// Register the chain with router and timeout manager
 		TimeoutManager: tm,
 		Router:         router,
+
+		FrontierPollFrequency:   constants.DefaultFrontierPollFrequency,
+		ConsensusAppConcurrency: constants.DefaultConsensusAppConcurrency,
 	}
 
 	chainManager, err := New(managerConfig)
