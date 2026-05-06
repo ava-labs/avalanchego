@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+go_library(
+    name = "bindings",
+    srcs = [
+        "compile.go",
+        "gen_gaspricemanagertest_binding.go",
+        "gen_igaspricemanager_binding.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager/gaspricemanagertest/bindings",
+    deps = [
+        "//graft/subnet-evm/accounts/abi/bind",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//accounts/abi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//event",
+    ],
+)

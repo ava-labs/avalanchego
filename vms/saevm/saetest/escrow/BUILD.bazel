@@ -2,6 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "escrow",
+    testonly = True,
     srcs = ["escrow.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow",
     visibility = ["//visibility:public"],

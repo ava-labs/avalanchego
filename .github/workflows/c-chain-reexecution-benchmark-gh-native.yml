@@ -40,13 +40,16 @@ on:
   # schedule:
   #   - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   define-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
@@ -92,7 +95,7 @@ jobs:
       contents: write
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Nix is required before calling polyrepo.
       # c-chain-reexecution-benchmark's Nix install will be skipped; installation is idempotent.
       - name: Install Nix

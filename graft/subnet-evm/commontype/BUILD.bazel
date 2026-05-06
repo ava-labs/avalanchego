@@ -1,15 +1,19 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
 go_library(
     name = "commontype",
     srcs = [
-        "acp224_fee_config.go",
         "fee_config.go",
+        "gas_price_config.go",
         "test_fee_config.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/evm/utils",
         "@com_github_ava_labs_libevm//common",
@@ -19,8 +23,8 @@ go_library(
 graft_go_test(
     name = "commontype_test",
     srcs = [
-        "acp224_fee_config_test.go",
         "fee_config_test.go",
+        "gas_price_config_test.go",
     ],
     data = glob(["testdata/**"]),
     embed = [":commontype"],
