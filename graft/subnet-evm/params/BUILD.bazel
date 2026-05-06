@@ -29,6 +29,8 @@ go_library(
         "//utils/set",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/legacy",

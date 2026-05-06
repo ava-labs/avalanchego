@@ -24,6 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
+	cmath "github.com/ava-labs/libevm/common/math"
+	ethcore "github.com/ava-labs/libevm/core"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -66,9 +68,49 @@ func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
-// AccessListGas uses the default calculation.
-func (RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
-	return (ethparams.NOOPHooks{}).AccessListGas(accessList)
+// AccessListGas computes the intrinsic gas for an access list.
+// When predicaters exist, it calculates gas per-tuple, delegating to predicate
+// contracts for addresses that have them. Otherwise, it returns override=false
+// to use the default calculation.
+func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
+	rules := extras.Rules(r)
+	if !rules.PredicatersExist() {
+		return 0, false, nil
+	}
+	return accessListGasWithPredicates(rules, accessList)
+}
+
+// accessListGasWithPredicates calculates access list gas when predicaters exist.
+// It handles both standard access tuples and predicate-based gas calculation.
+func accessListGasWithPredicates(rules extras.Rules, accessList libevm.AccessList) (uint64, bool, error) {
+	var gas uint64
+	for _, accessTuple := range accessList {
+		address := accessTuple.Address
+		predicaterContract, ok := rules.Predicaters[address]
+		if !ok {
+			// Previous access list gas calculation does not use safemath because an overflow would not be possible with
+			// the size of access lists that could be included in a block and standard access list gas costs.
+			// Therefore, we only check for overflow when adding to [totalGas], which could include the sum of values
+			// returned by a predicate.
+			accessTupleGas := ethparams.TxAccessListAddressGas + uint64(len(accessTuple.StorageKeys))*ethparams.TxAccessListStorageKeyGas
+			totalGas, overflow := cmath.SafeAdd(gas, accessTupleGas)
+			if overflow {
+				return 0, true, ethcore.ErrGasUintOverflow
+			}
+			gas = totalGas
+		} else {
+			predicateGas, err := predicaterContract.PredicateGas(predicate.Predicate(accessTuple.StorageKeys), rules)
+			if err != nil {
+				return 0, true, err
+			}
+			totalGas, overflow := cmath.SafeAdd(gas, predicateGas)
+			if overflow {
+				return 0, true, ethcore.ErrGasUintOverflow
+			}
+			gas = totalGas
+		}
+	}
+	return gas, true, nil
 }
 
 var PrecompiledContractsGranite = map[common.Address]vm.PrecompiledContract{
