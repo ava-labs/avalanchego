@@ -1,5 +1,5 @@
 name: avalanchego
-arch: "${RPM_ARCH}"
+arch: "${PACKAGE_ARCH}"
 version: "${VERSION}"
 maintainer: "Ava Labs <security@avalabs.org>"
 description: "AvalancheGo node — the official Avalanche protocol implementation"
@@ -13,9 +13,8 @@ contents:
     expand: true
     file_info:
       mode: 0755
-# changelog and key_file paths are set to well-known locations by build-rpm.sh
-changelog: "/build/build/nfpm-changelog.yml"
+changelog: "${NFPM_CHANGELOG}"
 rpm:
   compression: zstd
   signature:
-    key_file: "/build/build/gpg/signing-key.asc"
+    key_file: "${NFPM_SIGNING_KEY}"
