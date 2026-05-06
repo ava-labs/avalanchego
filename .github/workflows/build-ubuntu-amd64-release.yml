@@ -10,6 +10,9 @@ on:
     tags:
       - "*"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-jammy-amd64-package:
     runs-on: ubuntu-22.04
@@ -18,7 +21,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
@@ -29,7 +32,7 @@ jobs:
         run: sudo snap install aws-cli --classic
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
           role-session-name: githubrolesession
@@ -59,7 +62,7 @@ jobs:
           RELEASE: "jammy"
 
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jammy
           path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
@@ -76,7 +79,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
@@ -101,7 +104,7 @@ jobs:
         shell: bash
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
           role-session-name: githubrolesession
@@ -117,7 +120,7 @@ jobs:
           RELEASE: "noble"
 
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: noble
           path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
