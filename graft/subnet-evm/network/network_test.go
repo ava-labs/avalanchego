@@ -489,6 +489,23 @@ func TestNetworkAppRequestAfterShutdown(t *testing.T) {
 	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, nil))
 }
 
+// Peers connecting below client.StateSyncVersion are silently dropped by the
+// tracker, so SendSyncedAppRequestAny finds no usable peer.
+func TestConnectBelowStateSyncVersionFiltered(t *testing.T) {
+	codecManager := buildCodec(t, TestMessage{})
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(ctx, testAppSender{}, codecManager, 1, prometheus.NewRegistry())
+	require.NoError(t, err)
+
+	require.NoError(t, net.Connected(t.Context(), ids.GenerateTestNodeID(), &version.Application{}))
+
+	requestBytes, err := message.RequestToBytes(codecManager, TestMessage{Message: "hi"})
+	require.NoError(t, err)
+
+	_, _, err = net.SendSyncedAppRequestAny(t.Context(), requestBytes)
+	require.ErrorIs(t, err, errNoPeersFound)
+}
+
 // SendSyncedAppRequestAny must not block when called after Shutdown.
 func TestNetworkSyncedAppRequestAfterShutdown(t *testing.T) {
 	codecManager := buildCodec(t, TestMessage{})
