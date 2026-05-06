@@ -5,6 +5,8 @@ package node
 
 import (
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"net/netip"
 	"time"
 
@@ -23,6 +25,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+)
+
+var (
+	errInvalidUptimeRequirement    = errors.New("uptime requirement must be in the range [0, 1]")
+	errMinValidatorStakeAboveMax   = errors.New("minimum validator stake can't be greater than maximum validator stake")
+	errInvalidDelegationFee        = errors.New("delegation fee must be in the range [0, 1,000,000]")
+	errInvalidMinStakeDuration     = errors.New("min stake duration must be > 0")
+	errMinStakeDurationAboveMax    = errors.New("max stake duration can't be less than min stake duration")
+	errStakeMaxConsumptionTooLarge = fmt.Errorf("max stake consumption must be less than or equal to %d", reward.PercentDenominator)
+	errStakeMaxConsumptionBelowMin = errors.New("stake max consumption can't be less than min stake consumption")
+	errStakeMintingPeriodBelowMin  = errors.New("stake minting period can't be less than max stake duration")
 )
 
 type APIIndexerConfig struct {
@@ -79,6 +93,28 @@ type StakingConfig struct {
 	StakingTLSKeyPath             string          `json:"stakingTLSKeyPath"`
 	StakingTLSCertPath            string          `json:"stakingTLSCertPath"`
 	StakingSignerConfig           `json:"stakingSingerConfig"`
+}
+
+func (c *StakingConfig) Verify() error {
+	switch {
+	case c.UptimeRequirement < 0 || c.UptimeRequirement > 1:
+		return errInvalidUptimeRequirement
+	case c.MinValidatorStake > c.MaxValidatorStake:
+		return errMinValidatorStakeAboveMax
+	case c.MinDelegationFee > 1_000_000:
+		return errInvalidDelegationFee
+	case c.MinStakeDuration <= 0:
+		return errInvalidMinStakeDuration
+	case c.MaxStakeDuration < c.MinStakeDuration:
+		return errMinStakeDurationAboveMax
+	case c.RewardConfig.MaxConsumptionRate > reward.PercentDenominator:
+		return errStakeMaxConsumptionTooLarge
+	case c.RewardConfig.MaxConsumptionRate < c.RewardConfig.MinConsumptionRate:
+		return errStakeMaxConsumptionBelowMin
+	case c.RewardConfig.MintingPeriod < c.MaxStakeDuration:
+		return errStakeMintingPeriodBelowMin
+	}
+	return nil
 }
 
 type StakingSignerConfig struct {
