@@ -8,6 +8,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   subnet-evm-required:
     if: ${{ always() }}
@@ -37,7 +40,7 @@ jobs:
       run:
         working-directory: ./graft/subnet-evm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Run all lint checks
         run: ./scripts/run_task.sh lint-all-ci
@@ -55,7 +58,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-22.04, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - run: ./scripts/run_task.sh build-test
       - run: ./scripts/run_task.sh coverage
@@ -65,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Run Warp E2E Tests
@@ -88,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Run E2E Load Tests
@@ -113,9 +116,9 @@ jobs:
       run:
         working-directory: ./graft/subnet-evm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up QEMU (required for cross-platform builds)
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Check image build
         run: ./scripts/run_task.sh test-build-image
 
@@ -127,7 +130,7 @@ jobs:
         with:
           tool-cache: true
           docker-images: true
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for subnet-evm test setup
         shell: bash
