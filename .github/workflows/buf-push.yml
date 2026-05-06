@@ -10,12 +10,15 @@ on:
     paths:
       - "proto/**"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: bufbuild/buf-action@dfda68eacb65895184c76b9ae522b977636a2c47 # v1.1.4
+      - uses: actions/checkout@v5
+      - uses: bufbuild/buf-action@fd21066df7214747548607aaa45548ba2b9bc1ff # v1.4.0
         with:
           input: "proto"
           # Breaking changes are managed by the rpcchainvm protocol version.
