@@ -1,0 +1,20 @@
+name: avalanchego
+arch: "${PACKAGE_ARCH}"
+version: "${VERSION}"
+maintainer: "Ava Labs <security@avalabs.org>"
+description: "AvalancheGo node — the official Avalanche protocol implementation"
+homepage: "https://github.com/ava-labs/avalanchego"
+license: "BSD-3-Clause"
+depends:
+  - "libc6 (>= 2.34)"
+contents:
+  - src: "${AVALANCHEGO_BINARY}"
+    dst: /usr/local/bin/avalanchego
+    expand: true
+    file_info:
+      mode: 0755
+changelog: "${NFPM_CHANGELOG}"
+deb:
+  compression: gzip
+# DEB signing is performed post-build with dpkg-sig (not nfpm inline)
+# because nfpm's Go openpgp signatures are incompatible with dpkg-sig --verify.
