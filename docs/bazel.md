@@ -70,7 +70,7 @@ go_sdk.from_file(go_mod = "//:go.mod")
 | Tool | Version | Pin Mechanism | Rationale |
 |------|---------|---------------|-----------|
 | Bazel | 8.0.1 | `.bazelversion` + bazelisk | Current LTS with native bzlmod support |
-| Go | 1.25.7 | `go.mod` via go_sdk.from_file | Single source of truth |
+| Go | 1.25.9 | `go.mod` via go_sdk.from_file | Single source of truth |
 | rules_go | 0.57.0 | `MODULE.bazel` | Go 1.25+ support (compiles `pack` from source) |
 | gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.57.0 |
 
