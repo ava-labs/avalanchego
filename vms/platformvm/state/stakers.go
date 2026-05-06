@@ -16,7 +16,10 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
+var (
+	ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
+	errUnexpectedStaker          = errors.New("unexpected staker")
+)
 
 // StakerAdditionAfterDeletionLegality specifies whether a staker can be added after being deleted in the same diff.
 // Pre Helicon it is forbidden, and post Helicon it is allowed.
@@ -33,45 +36,57 @@ type Stakers interface {
 }
 
 type CurrentStakers interface {
-	// GetCurrentValidator returns the [staker] describing the validator on
-	// [subnetID] with [nodeID]. If the validator does not exist,
-	// [database.ErrNotFound] is returned.
+	// GetCurrentValidator returns the Staker describing the validator on subnetID with nodeID.
+	// [database.ErrNotFound] is returned if the validator is not in the validator set.
 	GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
 
-	// PutCurrentValidator adds the [staker] describing a validator to the
-	// staker set.
+	// PutCurrentValidator adds the Staker to the validator set.
 	//
-	// Invariant: [staker] is not currently a CurrentValidator
+	// This returns an error if staker is already in the validator set.
 	PutCurrentValidator(staker *Staker) error
 
-	// DeleteCurrentValidator removes the [staker] describing a validator from
-	// the staker set.
+	// DeleteCurrentValidator removes the Staker from the validator set.
 	//
-	// Invariant: [staker] is currently a CurrentValidator
-	DeleteCurrentValidator(staker *Staker)
+	// This returns an error if staker is not already in the validator set or if there are delegators
+	// for staker still present.
+	DeleteCurrentValidator(staker *Staker) error
 
-	// SetStakingInfo updates the mutable staking info for [nodeID] on [subnetID].
+	// SetStakingInfo updates the mutable staking info for nodeID on subnetID.
+	//
+	// This returns an error if the validator is not in the validator set.
+	// TODO should support sets in the same block that a validator is added.
 	SetStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo StakingInfo) error
 
-	// GetStakingInfo returns the mutable staking info for [nodeID] on [subnetID].
+	// GetStakingInfo returns the mutable staking info for nodeID on subnetID.
+	//
+	// This returns an error if the validator is not in the validator set.
+	// TODO should support gets in the same block that a validator is added.
 	GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, error)
 
 	// GetCurrentDelegatorIterator returns the delegators associated with the
-	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
-	// removal from current staker set.
+	// validator on subnetID with nodeID. Delegators are sorted by their
+	// removal from current staker set (i.e. Staker.NextTime).
+	//
+	// This returns an empty iterator if the validator is not in the validator set.
 	GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error)
 
-	// PutCurrentDelegator adds the [staker] describing a delegator to the
+	// PutCurrentDelegator adds the staker describing a delegator to the
 	// staker set.
 	//
-	// Invariant: [staker] is not currently a CurrentDelegator
-	PutCurrentDelegator(staker *Staker)
+	// This returns an error if the validator is not in the validator set.
+	//
+	// Invariant: staker is not currently a CurrentDelegator
+	// TODO error if the delegator is already present
+	PutCurrentDelegator(staker *Staker) error
 
-	// DeleteCurrentDelegator removes the [staker] describing a delegator from
+	// DeleteCurrentDelegator removes the staker describing a delegator from
 	// the staker set.
 	//
-	// Invariant: [staker] is currently a CurrentDelegator
-	DeleteCurrentDelegator(staker *Staker)
+	// This returns an error if the validator is not in the validator set.
+	//
+	// Invariant: staker is currently a CurrentDelegator
+	// TODO error if the delegator was not present
+	DeleteCurrentDelegator(staker *Staker) error
 
 	// GetCurrentStakerIterator returns stakers in order of their removal from
 	// the current staker set.
