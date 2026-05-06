@@ -143,13 +143,13 @@ func LastHeightWithExecutionRootCommitted(db ethdb.Database, c Config, hooks hoo
 		if num <= lastSynchronous {
 			return lastSynchronous
 		}
-		return hooks.SettledHeight(
+		return hooks.Settled(
 			rawdb.ReadHeader(
 				db,
 				rawdb.ReadCanonicalHash(db, num),
 				num,
 			),
-		)
+		).Height
 	}
 }
 

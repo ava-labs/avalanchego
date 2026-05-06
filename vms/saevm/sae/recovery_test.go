@@ -202,7 +202,7 @@ func TestRecoverSimple(t *testing.T) {
 				lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
 				require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
 
-				for i := sut.hooks.SettledHeight(lastOnDisk.Header()) + 1; i < lastSettled; i++ {
+				for i := sut.hooks.Settled(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
 					ethB, err := canonicalBlock(sut.rawVM.db, i)
 					require.NoErrorf(t, err, "canonicalBlock(%d)", i)
 					b, err := blocks.New(ethB, nil, nil, sut.logger)
