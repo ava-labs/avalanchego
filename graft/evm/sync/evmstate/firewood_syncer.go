@@ -29,6 +29,8 @@ type FirewoodSyncer struct {
 	s         *merklesync.Syncer[*syncer.RangeProof, struct{}]
 	cancel    context.CancelFunc
 	codeQueue *code.Queue
+	db        *ffi.Database
+	target    common.Hash
 	// finalizeOnce is initialized in the constructor to make Finalize idempotent.
 	finalizeOnce func() error
 }
@@ -49,6 +51,8 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 		s:         s,
 		cancel:    func() {}, // overwritten in Sync
 		codeQueue: codeQueue,
+		db:        db,
+		target:    target,
 	}
 	f.finalizeOnce = sync.OnceValue(f.finish)
 	return f, nil
@@ -75,6 +79,15 @@ func (f *FirewoodSyncer) finish() error {
 	if err := f.codeQueue.Finalize(); err != nil {
 		return fmt.Errorf("finalizing code queue: %w", err)
 	}
+
+	// Firewood cannot yet resume a previous sync.
+	// TODO(alarso16): If this syncer is done but others are not, and the work is canceled, this is unrecoverable.
+	if common.Hash(f.db.Root()) != f.target {
+		if _, err := f.db.Update([]ffi.BatchOp{ffi.PrefixDelete([]byte{})}); err != nil {
+			return fmt.Errorf("deleting invalid state: %w", err)
+		}
+	}
+
 	return nil
 }
 

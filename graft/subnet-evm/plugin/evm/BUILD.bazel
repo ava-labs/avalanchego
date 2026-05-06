@@ -225,6 +225,7 @@ graft_go_test(
         "@com_github_ava_labs_libevm//trie",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
         "@org_uber_go_mock//gomock",
