@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -27,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -644,6 +646,171 @@ func TestFailedToCalculateExpectedProposerLogLevel(t *testing.T) {
 			_, err = proVM.BuildBlock(ctx)
 			require.ErrorIs(err, validators.ErrUnfinalizedHeight)
 			require.True(logged, "expected log entry was not emitted")
+		})
+	}
+}
+
+func TestBuildBlockErrClosedLogsWarn(t *testing.T) {
+	testCases := []struct {
+		name            string
+		setupMock       func(*validatorstest.State)
+		expectedMessage string
+	}{
+		{
+			name: "GetMinimumHeight returns ErrClosed",
+			setupMock: func(valState *validatorstest.State) {
+				valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
+					return 0, database.ErrClosed
+				}
+			},
+			expectedMessage: "unexpected build block failure",
+		},
+		{
+			name: "ExpectedProposer returns ErrClosed",
+			setupMock: func(valState *validatorstest.State) {
+				valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+					return nil, database.ErrClosed
+				}
+			},
+			expectedMessage: "unexpected build block failure",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+			t.Cleanup(func() {
+				require.NoError(t, proVM.Shutdown(ctx))
+			})
+
+			coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
+			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+				return coreParentBlk, nil
+			}
+			coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+				switch {
+				case bytes.Equal(b, coreParentBlk.Bytes()):
+					return coreParentBlk, nil
+				case bytes.Equal(b, snowmantest.GenesisBytes):
+					return snowmantest.Genesis, nil
+				default:
+					return nil, errUnknownBlock
+				}
+			}
+
+			parentBlk, err := proVM.BuildBlock(ctx)
+			require.NoError(t, err)
+			require.NoError(t, parentBlk.Verify(ctx))
+			require.NoError(t, parentBlk.Accept(ctx))
+			require.NoError(t, proVM.SetPreference(ctx, parentBlk.ID()))
+
+			test.setupMock(valState)
+
+			coreChildBlk := snowmantest.BuildChild(coreParentBlk)
+			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+				return coreChildBlk, nil
+			}
+
+			var logged bool
+			loggingCore := logging.NewWrappedCore(logging.Warn, logging.Discard, logging.Plain.ConsoleEncoder())
+			proVM.ctx.Log = logging.NewLogger("", loggingCore).WithOptions(zap.Hooks(func(e zapcore.Entry) error {
+				require.False(t, logged, "expected exactly one log entry")
+				logged = true
+				require.Equal(t, zapcore.Level(logging.Warn), e.Level)
+				require.Equal(t, test.expectedMessage, e.Message)
+				return nil
+			}))
+
+			_, err = proVM.BuildBlock(ctx)
+			require.ErrorIs(t, err, database.ErrClosed)
+			require.True(t, logged, "expected log entry was not emitted")
+		})
+	}
+}
+
+func TestVerifyBlockErrClosedLogsWarn(t *testing.T) {
+	testCases := []struct {
+		name            string
+		setupMock       func(*validatorstest.State)
+		expectedMessage string
+	}{
+		{
+			name: "GetCurrentHeight returns ErrClosed",
+			setupMock: func(valState *validatorstest.State) {
+				valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
+					return 0, database.ErrClosed
+				}
+			},
+			expectedMessage: "block verification failed",
+		},
+		{
+			name: "ExpectedProposer returns ErrClosed",
+			setupMock: func(valState *validatorstest.State) {
+				valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+					return nil, database.ErrClosed
+				}
+			},
+			expectedMessage: "unexpected block verification failure",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+			t.Cleanup(func() {
+				require.NoError(t, proVM.Shutdown(ctx))
+			})
+
+			coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
+			coreChildBlk := snowmantest.BuildChild(coreParentBlk)
+			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+				return coreParentBlk, nil
+			}
+			coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+				switch {
+				case bytes.Equal(b, coreParentBlk.Bytes()):
+					return coreParentBlk, nil
+				case bytes.Equal(b, coreChildBlk.Bytes()):
+					return coreChildBlk, nil
+				case bytes.Equal(b, snowmantest.GenesisBytes):
+					return snowmantest.Genesis, nil
+				default:
+					return nil, errUnknownBlock
+				}
+			}
+
+			parentBlk, err := proVM.BuildBlock(ctx)
+			require.NoError(t, err)
+			require.NoError(t, parentBlk.Verify(ctx))
+			require.NoError(t, parentBlk.Accept(ctx))
+			require.NoError(t, proVM.SetPreference(ctx, parentBlk.ID()))
+
+			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+				return coreChildBlk, nil
+			}
+
+			childBlk, err := proVM.BuildBlock(ctx)
+			require.NoError(t, err)
+
+			test.setupMock(valState)
+
+			var logged bool
+			loggingCore := logging.NewWrappedCore(logging.Warn, logging.Discard, logging.Plain.ConsoleEncoder())
+			proVM.ctx.Log = logging.NewLogger("", loggingCore).WithOptions(zap.Hooks(func(e zapcore.Entry) error {
+				require.False(t, logged, "expected exactly one log entry")
+				logged = true
+				require.Equal(t, zapcore.Level(logging.Warn), e.Level)
+				require.Equal(t, test.expectedMessage, e.Message)
+				return nil
+			}))
+
+			err = childBlk.Verify(ctx)
+			require.ErrorIs(t, err, database.ErrClosed)
+			require.True(t, logged, "expected log entry was not emitted")
 		})
 	}
 }
