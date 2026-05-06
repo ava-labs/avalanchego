@@ -9,6 +9,7 @@ go_library(
     name = "bindings",
     srcs = [
         "compile.go",
+        "gen_gaspricemanagertest_binding.go",
         "gen_igaspricemanager_binding.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager/gaspricemanagertest/bindings",
