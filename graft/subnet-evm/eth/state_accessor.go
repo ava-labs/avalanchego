@@ -248,6 +248,7 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	var (
 		cache   *state.StateDB
 		release tracers.StateReleaseFunc
+		recon   *ffi.Reconstructed
 	)
 
 	// Genesis state is not in Firewood; reconstruct it from the genesis
@@ -293,7 +294,7 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		}
 
 		// Create initial Reconstructed from the base revision.
-		recon, err := rev.Reconstruct(nil)
+		recon, err = rev.Reconstruct(nil)
 		if err := rev.Drop(); err != nil {
 			log.Warn("Failed to drop revision", "root", baseRoot.Hex(), "err", err)
 		}
@@ -303,9 +304,12 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 
 		// Create a single accessor for the entire re-execution; the underlying
 		// Reconstructed is mutated in place so the accessor remains valid.
+		// Root hashing is deferred until after replay, when the target root is
+		// validated once against the requested header.
 		accessor, err := firewood.NewReconstructedStateAccessor(
 			eth.blockchain.StateCache(),
 			recon,
+			false, /* computeRootOnHash */
 		)
 		if err != nil {
 			return nil, nil, err
@@ -324,6 +328,8 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		}
 	}()
 
+	replayRoot := current.Root
+
 	// Re-execute blocks forward from current+1 to the target block.
 	for current.Number.Uint64() < header.Number.Uint64() {
 		if err := ctx.Err(); err != nil {
@@ -341,12 +347,41 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 			return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
 		}
 
-		root := cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
-		if root != nextBlock.Root() {
-			return nil, nil, fmt.Errorf("state root mismatch at block %d: got %s, want %s", next, root.Hex(), nextBlock.Root().Hex())
+		replayRoot = cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
+		current = nextBlock.Header()
+	}
+
+	// If using a reconstructed revision, compute the root hash here as root computation
+	// was deferred during block reexecution.
+	if recon != nil {
+		replayRoot = common.Hash(recon.Root())
+	}
+
+	if replayRoot != header.Root {
+		return nil, nil, fmt.Errorf(
+			"state root mismatch at block %d: got %s, want %s",
+			header.Number.Uint64(),
+			replayRoot.Hex(),
+			header.Root.Hex(),
+		)
+	}
+
+	// Before returning, reopen a clean StateDB against the same reconstructed view,
+	// now with normal root computation enabled.
+	if recon != nil {
+		returnAccessor, err := firewood.NewReconstructedStateAccessor(
+			eth.blockchain.StateCache(),
+			recon,
+			true, /* computeRootOnHash */
+		)
+		if err != nil {
+			return nil, nil, err
 		}
 
-		current = nextBlock.Header()
+		cache, err = state.New(header.Root, returnAccessor, nil)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return cache, release, nil
