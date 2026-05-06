@@ -169,12 +169,15 @@ type blockTracker struct {
 
 	// handles block acceptance and rejection of inner blocks
 	tree tree.Tree
+
+	vm block.ChainVM
 }
 
-func newBlockTracker() *blockTracker {
+func newBlockTracker(vm block.ChainVM) *blockTracker {
 	return &blockTracker{
 		tree:                  tree.New(),
 		simplexDigestsToBlock: make(map[simplex.Digest]*Block),
+		vm:                    vm,
 	}
 }
 
@@ -206,6 +209,10 @@ func (bt *blockTracker) verifyAndTrackBlock(ctx context.Context, block *Block) e
 
 	if err := block.vmBlock.Verify(ctx); err != nil {
 		return fmt.Errorf("failed to verify block: %w", err)
+	}
+
+	if err := bt.vm.SetPreference(ctx, block.vmBlock.ID()); err != nil {
+		return fmt.Errorf("failed to set preference: %w", err)
 	}
 
 	// track the block

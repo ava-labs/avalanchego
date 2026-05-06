@@ -109,7 +109,7 @@ func TestBlockSerialization(t *testing.T) {
 			testVM.ParseBlockF = tt.parseFunc
 			deserializer := &blockDeserializer{
 				parser:       testVM,
-				blockTracker: func() *blockTracker { bt := newBlockTracker(); bt.init(genesisBlock); return bt }(),
+				blockTracker: func() *blockTracker { bt := newBlockTracker(testVM); bt.init(genesisBlock); return bt }(),
 			}
 
 			// Deserialize the block
@@ -175,6 +175,11 @@ func TestVerify(t *testing.T) {
 	b := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
+	preferenceSet := false
+	b.vmBlock.(*wrappedBlock).vm.SetPreferenceF = func(_ context.Context, _ ids.ID) error {
+		preferenceSet = true
+		return nil
+	}
 
 	verifiedBlock, err := b.Verify(ctx)
 	require.NoError(t, err)
@@ -182,6 +187,7 @@ func TestVerify(t *testing.T) {
 	// Ensure the verified block matches the original block
 	vBlockBytes, err := verifiedBlock.Bytes()
 	require.NoError(t, err)
+	require.True(t, preferenceSet)
 
 	blockBytes, err := b.Bytes()
 	require.NoError(t, err)
