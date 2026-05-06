@@ -7,7 +7,27 @@ on:
   merge_group:
     types: [checks_requested]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
+  evm-shared-required:
+    if: ${{ always() }}
+    needs:
+      - lint_test
+      - unit_test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS_JSON" | jq -e '
+            to_entries
+            | all(.value.result == "success")
+          ' >/dev/null
+
   lint_test:
     name: Lint
     runs-on: ubuntu-latest
@@ -15,7 +35,7 @@ jobs:
       run:
         working-directory: ./graft/evm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Run all lint checks
         run: ../../scripts/run_task.sh lint-all-ci
@@ -33,7 +53,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-22.04, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - run: ../../scripts/run_task.sh build-test
       - run: ../../scripts/run_task.sh coverage
