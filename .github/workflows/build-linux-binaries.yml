@@ -82,7 +82,7 @@ jobs:
           rm -rf /tmp/avalanchego
 
   build-arm64-binaries-tarball:
-    runs-on: custom-arm64-jammy
+    runs-on: ubuntu-22.04-arm
     permissions:
       id-token: write
       contents: read
