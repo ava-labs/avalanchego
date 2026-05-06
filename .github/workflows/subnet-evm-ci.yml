@@ -21,7 +21,7 @@ jobs:
       - e2e_load
       - test_build_image
       - test_build_antithesis_images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Fail unless all needed jobs succeeded
         shell: bash
@@ -35,7 +35,7 @@ jobs:
 
   lint_test:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: ./graft/subnet-evm
@@ -56,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-22.04, ubuntu-latest]
+        os: [macos-26, ubuntu-22.04, ubuntu-24.04]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
@@ -65,7 +65,7 @@ jobs:
 
   e2e_warp:
     name: e2e warp tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
         uses: actions/checkout@v5
@@ -88,7 +88,7 @@ jobs:
 
   e2e_load:
     name: e2e load tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
         uses: actions/checkout@v5
@@ -111,7 +111,7 @@ jobs:
 
   test_build_image:
     name: Image build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: ./graft/subnet-evm
@@ -124,7 +124,7 @@ jobs:
 
   test_build_antithesis_images:
     name: Build Antithesis images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
         with:

@@ -16,7 +16,7 @@ jobs:
     needs:
       - lint_test
       - unit_test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Fail unless all needed jobs succeeded
         shell: bash
@@ -30,7 +30,7 @@ jobs:
 
   lint_test:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: ./graft/evm
@@ -51,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-22.04, ubuntu-latest]
+        os: [macos-26, ubuntu-22.04, ubuntu-24.04]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
