@@ -21,9 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	// Imported for [vm.VerifierBackend] comment resolution.
-	"github.com/ava-labs/avalanchego/database/memdb"
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
@@ -46,6 +46,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 )
 
 func TestMain(m *testing.M) {
@@ -101,8 +102,8 @@ var (
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
 					},
 				},
 			},
@@ -135,8 +136,8 @@ var (
 			},
 			Creds: []Credential{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
 					},
 				},
 			},
@@ -174,8 +175,8 @@ var (
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
 					},
 				},
 			},
@@ -207,8 +208,8 @@ var (
 			},
 			Creds: []Credential{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
 					},
 				},
 			},
@@ -282,18 +283,18 @@ var (
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 			},
@@ -361,18 +362,18 @@ var (
 			},
 			Creds: []Credential{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 			},
@@ -1332,10 +1333,13 @@ func TestTransferNonAVAX(t *testing.T) {
 				}
 			}
 
-			err := test.tx.TransferNonAVAX(avaxAssetID, got)
+			tx := &Tx{
+				Unsigned: test.tx,
+			}
+			err := tx.TransferNonAVAX(avaxAssetID, got)
 			require.ErrorIs(t, err, test.wantErr)
 			if diff := compareStateDBs(want, got); diff != "" {
-				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", test.tx, diff)
+				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", tx, diff)
 			}
 		})
 	}
@@ -1701,8 +1705,11 @@ func TestSanityCheck(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.tx.SanityCheck(ctx)
-			require.ErrorIsf(t, err, test.wantErr, "%T.SanityCheck()", test.tx)
+			tx := &Tx{
+				Unsigned: test.tx,
+			}
+			err := tx.SanityCheck(ctx)
+			require.ErrorIsf(t, err, test.wantErr, "%T.SanityCheck()", tx)
 		})
 	}
 }
@@ -1756,20 +1763,21 @@ func TestVerifyCredentials(t *testing.T) {
 		validInputID = validUTXOID.InputID()
 
 		validImportTx = func() *Tx {
+			tx := &Import{
+				SourceChain: xChainID,
+				ImportedInputs: []*avax.TransferableInput{{
+					UTXOID: validUTXOID,
+					Asset:  avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   100,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}},
+			}
 			return &Tx{
-				Unsigned: &Import{
-					SourceChain: xChainID,
-					ImportedInputs: []*avax.TransferableInput{{
-						UTXOID: validUTXOID,
-						Asset:  avax.Asset{ID: avaxAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt:   100,
-							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-						},
-					}},
-				},
-				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
-					[65]byte(common.FromHex("0x393d75eaa2d49672b14b5445aa6c357cc894e47172c5f80c6ae135991496722a07a76b05832ec365b37bdccbfcb589e2c217383ce4660cc1a61a45421b5623ec00")),
+				Unsigned: tx,
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{
+					txtest.Sign(t, tx, sk),
 				}}},
 			}
 		}
@@ -1799,14 +1807,15 @@ func TestVerifyCredentials(t *testing.T) {
 		}(t)
 
 		validExportTx = func() *Tx {
-			return &Tx{
-				Unsigned: &Export{
-					Ins: []Input{
-						{Address: ethAddress, Amount: 100, AssetID: avaxAssetID},
-					},
+			tx := &Export{
+				Ins: []Input{
+					{Address: ethAddress, Amount: 100, AssetID: avaxAssetID},
 				},
-				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
-					[65]byte(common.FromHex("0xfe088f91a447b6ebd89a18405e07a50869eaeee869ab924a0ec1174e94d293764e56260eca1d6d26a77f33aa8a99f4b4917f7598bc680b87b01f6c9a750e293d00")),
+			}
+			return &Tx{
+				Unsigned: tx,
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{
+					txtest.Sign(t, tx, sk),
 				}}},
 			}
 		}
@@ -1866,7 +1875,7 @@ func TestVerifyCredentials(t *testing.T) {
 		{
 			name: "import_invalid_signature",
 			tx: imp(func(tx *Tx) {
-				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{{}}}}
 			}),
 			utxos:   validUTXOs,
 			wantErr: ErrVerifyingTransfer,
@@ -1897,7 +1906,7 @@ func TestVerifyCredentials(t *testing.T) {
 		{
 			name: "export_invalid_signature",
 			tx: exp(func(tx *Tx) {
-				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{{}}}}
 			}),
 			wantErr: ErrRecoveringPublicKey,
 		},

@@ -62,8 +62,7 @@ func (i Input) Compare(other Input) int {
 	return i.AssetID.Compare(other.AssetID)
 }
 
-// InputIDs returns the Account+Nonce pairs consumed by this transaction.
-func (e *Export) InputIDs() set.Set[ids.ID] {
+func (e *Export) inputIDs() set.Set[ids.ID] {
 	s := set.NewSet[ids.ID](len(e.Ins))
 	for _, in := range e.Ins {
 		s.Add(AccountInputID(in.Address, in.Nonce))
@@ -114,10 +113,7 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 
 var errOutputsNotSorted = errors.New("outputs not sorted")
 
-// SanityCheck verifies that the transaction's structural invariants hold
-// against the chain's context and that it does not produce more funds than it
-// consumes.
-func (e *Export) SanityCheck(ctx *snow.Context) error {
+func (e *Export) sanityCheck(ctx *snow.Context) error {
 	switch {
 	case e.NetworkID != ctx.NetworkID:
 		return fmt.Errorf("%w: want %d, got %d", errWrongNetworkID, ctx.NetworkID, e.NetworkID)
@@ -177,7 +173,7 @@ var (
 
 func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credential) error {
 	if len(e.Ins) != len(creds) {
-		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
+		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
 	}
 
 	fxTx, err := toFxTx(e)
@@ -190,14 +186,14 @@ func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credenti
 		// signatures, which are currently being cached.
 		cred := creds[i].Self()
 		if len(cred.Sigs) != 1 {
-			return fmt.Errorf("%w (%d): expected 1, got %d", errIncorrectNumSignatures, i, len(cred.Sigs))
+			return fmt.Errorf("%w (%d): want 1, got %d", errIncorrectNumSignatures, i, len(cred.Sigs))
 		}
 		pk, err := sigCache.RecoverPublicKey(fxTx.Bytes(), cred.Sigs[0][:])
 		if err != nil {
 			return fmt.Errorf("%w (%d): %w", errRecoveringPublicKey, i, err)
 		}
 		if addr := pk.EthAddress(); in.Address != addr {
-			return fmt.Errorf("%w (%d): expected %s, got %s", errAddressMismatch, i, in.Address, addr)
+			return fmt.Errorf("%w (%d): want %s, got %s", errAddressMismatch, i, in.Address, addr)
 		}
 	}
 	return nil
@@ -266,8 +262,8 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 
 var errInsufficientFunds = errors.New("insufficient funds")
 
-// TransferNonAVAX subtracts the non-AVAX balances from the statedb.
-func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+// transferNonAVAX subtracts the non-AVAX balances from the statedb.
+func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
 	for _, in := range e.Ins {
 		if in.AssetID == avaxAssetID {
 			continue

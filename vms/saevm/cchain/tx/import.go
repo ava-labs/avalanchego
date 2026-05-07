@@ -60,8 +60,7 @@ func (o Output) Compare(other Output) int {
 	return o.AssetID.Compare(other.AssetID)
 }
 
-// InputIDs returns the UTXOIDs consumed by this transaction.
-func (i *Import) InputIDs() set.Set[ids.ID] {
+func (i *Import) inputIDs() set.Set[ids.ID] {
 	s := set.NewSet[ids.ID](len(i.ImportedInputs))
 	for _, in := range i.ImportedInputs {
 		s.Add(in.InputID())
@@ -101,10 +100,7 @@ func (i *Import) burned(assetID ids.ID) (uint64, error) {
 
 var errOutputsNotSortedUnique = errors.New("outputs not sorted and unique")
 
-// SanityCheck verifies that the transaction's structural invariants hold
-// against the chain's context and that it does not produce more funds than it
-// consumes.
-func (i *Import) SanityCheck(ctx *snow.Context) error {
+func (i *Import) sanityCheck(ctx *snow.Context) error {
 	switch {
 	case i.NetworkID != ctx.NetworkID:
 		return fmt.Errorf("%w: want %d, got %d", errWrongNetworkID, ctx.NetworkID, i.NetworkID)
@@ -160,7 +156,7 @@ var (
 
 func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error {
 	if len(i.ImportedInputs) != len(creds) {
-		return fmt.Errorf("%w: expected %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
+		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
 	}
 
 	fxTx, err := toFxTx(i)
@@ -170,7 +166,7 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 
 	utxoIDs := make([][]byte, len(i.ImportedInputs))
 	for j, in := range i.ImportedInputs {
-		inputID := in.UTXOID.InputID()
+		inputID := in.InputID()
 		utxoIDs[j] = inputID[:]
 	}
 
@@ -242,8 +238,8 @@ func (i *Import) atomicRequests(ids.ID) (ids.ID, *chainsatomic.Requests, error) 
 	return i.SourceChain, &chainsatomic.Requests{RemoveRequests: utxoIDs}, nil
 }
 
-// TransferNonAVAX adds the non-AVAX balances to the statedb.
-func (i *Import) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+// transferNonAVAX adds the non-AVAX balances to the statedb.
+func (i *Import) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
 	for _, out := range i.Outs {
 		if out.AssetID == avaxAssetID {
 			continue

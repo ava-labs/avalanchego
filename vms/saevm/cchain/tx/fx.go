@@ -22,10 +22,12 @@ func init() {
 	}
 }
 
-type fxVM struct{}
+type fxVM struct {
+	clock mockable.Clock
+}
 
 func (fxVM) CodecRegistry() codec.Registry { return linearcodec.NewDefault() }
-func (fxVM) Clock() *mockable.Clock        { return &mockable.Clock{} }
+func (f fxVM) Clock() *mockable.Clock      { return &f.clock }
 func (fxVM) Logger() logging.Logger        { return logging.NoLog{} }
 
 var _ secp256k1fx.UnsignedTx = (*fxTx)(nil)
@@ -33,13 +35,8 @@ var _ secp256k1fx.UnsignedTx = (*fxTx)(nil)
 type fxTx []byte
 
 func toFxTx(u Unsigned) (fxTx, error) {
-	// We MUST provide a pointer to u so that the returned slice is prefixed
-	// with the type ID.
-	b, err := c.Marshal(codecVersion, &u)
-	if err != nil {
-		return nil, err
-	}
-	return fxTx(b), nil
+	b, err := UnsignedBytes(u)
+	return fxTx(b), err
 }
 
 func (f fxTx) Bytes() []byte { return f }
