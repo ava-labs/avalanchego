@@ -63,7 +63,7 @@ func TestReconstructedRevisions(t *testing.T) {
 		r.NoError(recon.Drop())
 	})
 
-	reconDB, err := NewReconstructedStateAccessor(db, recon)
+	reconDB, err := NewReconstructedStateAccessor(db, recon, true /* computeRootOnHash */)
 	r.NoError(err)
 
 	var (
@@ -107,4 +107,50 @@ func TestReconstructedRevisions(t *testing.T) {
 		r.NoError(reconTrie.UpdateAccount(addr, &types.StateAccount{Balance: balance}))
 		r.Equal(normalRoot, reconTrie.Hash(), "reconstructed root mismatch for R%d", i+2)
 	}
+}
+
+// TestReconstructedRevisionHashing verifies computeRootOnHash=false only
+// flushes writes without computing the reconstructed root.
+func TestReconstructedRevisionHashing(t *testing.T) {
+	db := newTestDatabase(t)
+	trie, err := db.OpenTrie(types.EmptyRootHash)
+	require.NoError(t, err)
+
+	// Start by committing an initial revision to build reconstructed revisions from.
+	addr := common.HexToAddress("1234")
+	require.NoError(t, trie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(100)}))
+
+	initialRoot, _, err := trie.Commit(true)
+	require.NoError(t, err)
+
+	require.NoError(t, db.TrieDB().Update(
+		initialRoot,
+		types.EmptyRootHash,
+		0,
+		nil,
+		nil,
+		stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1})),
+	)
+	require.NoError(t, db.TrieDB().Commit(initialRoot, true))
+
+	tdb := db.TrieDB().Backend().(*TrieDB)
+	rev, err := tdb.Firewood.LatestRevision()
+	require.NoError(t, err)
+	recon, err := rev.Reconstruct(nil)
+	require.NoError(t, err)
+	require.NoError(t, rev.Drop())
+	t.Cleanup(func() {
+		require.NoError(t, recon.Drop())
+	})
+
+	// First, use the reconstructed view with computeRootOnHash=false so that Hash
+	// flushes pending writes but returns the cached root.
+	replayAccessor, err := NewReconstructedStateAccessor(db, recon, false /* computeRootOnHash */)
+	require.NoError(t, err)
+	replayTrie, err := replayAccessor.OpenTrie(initialRoot)
+	require.NoError(t, err)
+	require.NoError(t, replayTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(200)}))
+
+	require.Equal(t, initialRoot, replayTrie.Hash())
+	require.NotEqual(t, initialRoot, common.Hash(recon.Root()))
 }

@@ -44,7 +44,7 @@ var (
 	errInputsNotSortedUnique   = errors.New("inputs not sorted and unique")
 	errOverflow                = errors.New("amount overflow")
 	errIncorrectNumCredentials = errors.New("incorrect number of credentials")
-	errConvertingToFxTx        = errors.New("converting to fx transaction")
+	errConvertingToFxTx        = errors.New("converting to fxTx")
 )
 
 // Tx is a signed transaction that interacts with shared memory.

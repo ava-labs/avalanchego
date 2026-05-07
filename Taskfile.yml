@@ -476,12 +476,6 @@ tasks:
       FUZZTIME: '{{.FUZZTIME| default "180"}}'
     cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} {{.CLI_ARGS}}'
 
-  test-fuzz-merkledb:
-    desc: Runs each merkledb fuzz test for 15 minutes
-    vars:
-      FUZZTIME: '{{.FUZZTIME| default "900"}}'
-    cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZTIME}} ./x/merkledb'
-
   test-load:
     desc: Runs load tests
     cmds:
