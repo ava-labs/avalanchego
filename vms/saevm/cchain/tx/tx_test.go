@@ -583,12 +583,12 @@ var (
 
 func TestAsOp(t *testing.T) {
 	tests := []struct {
-		tx golden
-		op hook.Op
+		tx   golden
+		want hook.Op
 	}{
 		{
 			tx: importGolden,
-			op: hook.Op{
+			want: hook.Op{
 				ID:  importGolden.id,
 				Gas: 11230,
 				Mint: map[common.Address]uint256.Int{
@@ -598,7 +598,7 @@ func TestAsOp(t *testing.T) {
 		},
 		{
 			tx: exportGolden,
-			op: hook.Op{
+			want: hook.Op{
 				ID:        exportGolden.id,
 				Gas:       11230,
 				GasFeeCap: *uint256.NewInt(1_000_000 * X2CRate / 11230),
@@ -612,7 +612,7 @@ func TestAsOp(t *testing.T) {
 		},
 		{
 			tx: importMultiInputGolden,
-			op: hook.Op{
+			want: hook.Op{
 				ID:  importMultiInputGolden.id,
 				Gas: 13526,
 				Mint: map[common.Address]uint256.Int{
@@ -622,7 +622,7 @@ func TestAsOp(t *testing.T) {
 		},
 		{
 			tx: exportSameAddressMultiAssetGolden,
-			op: hook.Op{
+			want: hook.Op{
 				ID:        exportSameAddressMultiAssetGolden.id,
 				Gas:       12378,
 				GasFeeCap: *uint256.NewInt(900_000 * X2CRate / 12378),
@@ -637,7 +637,7 @@ func TestAsOp(t *testing.T) {
 		},
 		{
 			tx: exportMultiAddressMultiAssetGolden,
-			op: hook.Op{
+			want: hook.Op{
 				ID:        exportMultiAddressMultiAssetGolden.id,
 				Gas:       12418,
 				GasFeeCap: *uint256.NewInt(500_000 * X2CRate / 12418),
@@ -655,7 +655,7 @@ func TestAsOp(t *testing.T) {
 		},
 		{
 			tx: importNonAVAXGolden,
-			op: hook.Op{
+			want: hook.Op{
 				ID:   importNonAVAXGolden.id,
 				Gas:  10226,
 				Mint: map[common.Address]uint256.Int{},
@@ -667,7 +667,7 @@ func TestAsOp(t *testing.T) {
 			tx := test.tx.new
 			got, err := tx.AsOp(avaxAssetID)
 			require.NoErrorf(t, err, "%T.AsOp(AVAXAssetID)", tx)
-			assert.Equalf(t, test.op, got, "%T.AsOp(AVAXAssetID)", tx)
+			assert.Equalf(t, test.want, got, "%T.AsOp(AVAXAssetID)", tx)
 		})
 	}
 }
@@ -920,23 +920,23 @@ func FuzzAsOpCompatibility(f *testing.F) {
 
 func TestAtomicRequests(t *testing.T) {
 	tests := []struct {
-		tx       golden
-		chainID  ids.ID
-		requests *chainsatomic.Requests
+		tx           golden
+		wantChainID  ids.ID
+		wantRequests *chainsatomic.Requests
 	}{
 		{
-			tx:      importGolden,
-			chainID: xChainID,
-			requests: &chainsatomic.Requests{
+			tx:          importGolden,
+			wantChainID: xChainID,
+			wantRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64"),
 				},
 			},
 		},
 		{
-			tx:      exportGolden,
-			chainID: xChainID,
-			requests: &chainsatomic.Requests{
+			tx:          exportGolden,
+			wantChainID: xChainID,
+			wantRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{{
 					Key:   common.FromHex("0x38ebe8fc127b2eaeeb25c72a747e0ef27460fb04b5929568ed959d67ec3e4948"),
 					Value: common.FromHex("0x000067b5812292324365c6e2a479b2601cd1cd1facc2fcc8c29d58b5ed96583ea17e0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500"),
@@ -947,9 +947,9 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx:      importMultiInputGolden,
-			chainID: xChainID,
-			requests: &chainsatomic.Requests{
+			tx:          importMultiInputGolden,
+			wantChainID: xChainID,
+			wantRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05"),
 					common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630"),
@@ -959,7 +959,7 @@ func TestAtomicRequests(t *testing.T) {
 		},
 		{
 			tx: exportSameAddressMultiAssetGolden,
-			requests: &chainsatomic.Requests{
+			wantRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{
 					{
 						Key:   common.FromHex("0x82c024362a71c075ac15e5e000dd66380907e3ea6af121d3d78478bb07848b75"),
@@ -980,7 +980,7 @@ func TestAtomicRequests(t *testing.T) {
 		},
 		{
 			tx: exportMultiAddressMultiAssetGolden,
-			requests: &chainsatomic.Requests{
+			wantRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{
 					{
 						Key:   common.FromHex("0x150b950ce35ef7c512b1dec725164c8ee170728976ca0c9c1202eb60cafe9230"),
@@ -1003,7 +1003,7 @@ func TestAtomicRequests(t *testing.T) {
 		},
 		{
 			tx: importNonAVAXGolden,
-			requests: &chainsatomic.Requests{
+			wantRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb"),
 				},
@@ -1013,10 +1013,10 @@ func TestAtomicRequests(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.tx.name, func(t *testing.T) {
 			tx := test.tx.new
-			chainID, requests, err := tx.AtomicRequests()
+			gotChainID, gotRequests, err := tx.AtomicRequests()
 			require.NoErrorf(t, err, "%T.AtomicRequests()", tx)
-			assert.Equalf(t, test.chainID, chainID, "%T.AtomicRequests().ChainID", tx)
-			assert.Equalf(t, test.requests, requests, "%T.AtomicRequests().Requests", tx)
+			assert.Equalf(t, test.wantChainID, gotChainID, "%T.AtomicRequests().ChainID", tx)
+			assert.Equalf(t, test.wantRequests, gotRequests, "%T.AtomicRequests().Requests", tx)
 		})
 	}
 }
