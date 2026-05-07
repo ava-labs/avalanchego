@@ -67,14 +67,10 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
 
       - name: Upload tarballs to S3
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml upload-tarballs
         env:
           BUCKET: ${{ secrets.BUCKET }}
-          ARCH: amd64
-        run: |
-          # Explicitly upload only .tar.gz and .tar.gz.sig, never GPG-KEY-avalanchego.
-          find build/tgz -maxdepth 1 \
-              \( -name '*.tar.gz' -o -name '*.tar.gz.sig' \) \
-              -exec aws s3 cp {} "s3://${BUCKET}/linux/binaries/ubuntu/jammy/${ARCH}/" \;
+          TGZ_ARCH: amd64
 
       - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v6
@@ -156,14 +152,10 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
 
       - name: Upload tarballs to S3
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml upload-tarballs
         env:
           BUCKET: ${{ secrets.BUCKET }}
-          ARCH: arm64
-        run: |
-          # Explicitly upload only .tar.gz and .tar.gz.sig, never GPG-KEY-avalanchego.
-          find build/tgz -maxdepth 1 \
-              \( -name '*.tar.gz' -o -name '*.tar.gz.sig' \) \
-              -exec aws s3 cp {} "s3://${BUCKET}/linux/binaries/ubuntu/jammy/${ARCH}/" \;
+          TGZ_ARCH: arm64
 
       - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v6
