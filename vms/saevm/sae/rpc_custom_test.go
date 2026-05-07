@@ -136,30 +136,7 @@ func TestCallDetailed(t *testing.T) {
 		}
 	}))
 
-	deploy := &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CreationCode(),
-	}
-
-	escrowAddr := crypto.CreateAddress(sut.wallet.Addresses()[0], 0)
-	recv := common.Address{'r', 'e', 'c', 'v'}
-	const depositVal = 42
-	deposit := &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(recv),
-		Value:    big.NewInt(depositVal),
-	}
-
-	sign := sut.wallet.SetNonceAndSign
-	b := sut.runConsensusLoop(t, sign(t, 0, deploy), sign(t, 0, deposit))
-	require.Len(t, b.Transactions(), 2, "tx count")
-	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	for _, r := range b.Receipts() {
-		require.Equalf(t, types.ReceiptStatusSuccessful, r.Status, "%T.Status", r)
-	}
+	_, escrowAddr, recv, _ := sut.deployEscrow(ctx, t, big.NewInt(escrowDepositVal))
 
 	const revertWith = 12345
 	revertAsPanic := slices.Concat(
@@ -186,7 +163,7 @@ func TestCallDetailed(t *testing.T) {
 			},
 			want: saerpc.DetailedExecutionResult{
 				UsedGas:    23675,
-				ReturnData: uint256.NewInt(depositVal).PaddedBytes(32),
+				ReturnData: uint256.NewInt(escrowDepositVal).PaddedBytes(32),
 			},
 		},
 		{

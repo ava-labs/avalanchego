@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
-	ethereum "github.com/ava-labs/libevm"
 )
 
 // TestStateQueryOnNonCanonicalBlock verifies that state-dependent RPC calls
@@ -93,30 +92,15 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 func TestDebugTrace(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
-	escrowAddr := crypto.CreateAddress(sut.wallet.Addresses()[0], 0)
-	recv := common.Address{'r', 'e', 'c', 'v'}
-	const depositVal = 42
-
-	sign := sut.wallet.SetNonceAndSign
-	deployTx := sign(t, 0, &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CreationCode(),
-	})
-	depositTx := sign(t, 0, &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(recv),
-		Value:    big.NewInt(depositVal),
-	})
-
-	b := sut.runConsensusLoop(t, deployTx, depositTx)
-	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	require.Lenf(t, b.Receipts(), 2, "%T.Receipts()", b)
-	for _, r := range b.Receipts() {
-		require.Equalf(t, types.ReceiptStatusSuccessful, r.Status, "%T.Status", r)
-	}
+	b, _, recv, _ := sut.deployEscrow(ctx, t, big.NewInt(escrowDepositVal))
+	// deployEscrow includes the deploy tx at index 0 and the deposit tx at
+	// index 1.
+	const (
+		deployTxIdx  = 0
+		depositTxIdx = 1
+	)
+	deployTxHash := b.Transactions()[deployTxIdx].Hash()
+	depositTxHash := b.Transactions()[depositTxIdx].Hash()
 
 	// Specifying the entire trace would be excessive and uninformative so we
 	// select a precise location of an event associated with the deposit()
@@ -138,23 +122,23 @@ func TestDebugTrace(t *testing.T) {
 		Error  string                  `json:"error"`
 	}{
 		{
-			TxHash: deployTx.Hash(),
+			TxHash: deployTxHash,
 			Result: &logger.ExecutionResult{
-				Gas:         b.Receipts()[0].GasUsed,
+				Gas:         b.Receipts()[deployTxIdx].GasUsed,
 				ReturnValue: common.Bytes2Hex(escrow.ByteCode()),
 				StructLogs:  []logger.StructLogRes{},
 			},
 		},
 		{
-			TxHash: depositTx.Hash(),
+			TxHash: depositTxHash,
 			Result: &logger.ExecutionResult{
-				Gas: b.Receipts()[1].GasUsed,
+				Gas: b.Receipts()[depositTxIdx].GasUsed,
 				StructLogs: []logger.StructLogRes{{
 					Pc:    logPC,
 					Op:    vm.LOG1.String(),
 					Depth: 1,
 					Stack: utils.PointerTo([]string{
-						escrow.DepositEvent(recv, uint256.NewInt(depositVal)).Topics[0].String(),
+						escrow.DepositEvent(recv, uint256.NewInt(escrowDepositVal)).Topics[0].String(),
 						"0x40", "0x80", // arbitrary memory locations selected by Solidity
 					}),
 				}},
@@ -204,30 +188,7 @@ func TestStatefulRPCs(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, 1, opt)
 
-	deploy := &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CreationCode(),
-	}
-
-	escrowAddr := crypto.CreateAddress(sut.wallet.Addresses()[0], 0)
-	recv := common.Address{'r', 'e', 'c', 'v'}
-	const val = 42
-	deposit := &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(recv),
-		Value:    big.NewInt(val),
-	}
-
-	sign := sut.wallet.SetNonceAndSign
-	b := sut.runConsensusLoop(t, sign(t, 0, deploy), sign(t, 0, deposit))
-	require.Len(t, b.Transactions(), 2, "tx count")
-	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	for _, r := range b.Receipts() {
-		require.Equalf(t, types.ReceiptStatusSuccessful, r.Status, "%T.Status", r)
-	}
+	b, escrowAddr, recv, callMsg := sut.deployEscrow(ctx, t, big.NewInt(escrowDepositVal))
 
 	vmTime.advanceToSettle(ctx, t, b)
 	for range 2 {
@@ -245,16 +206,11 @@ func TestStatefulRPCs(t *testing.T) {
 	)
 	storageKeyHex := storageKey.Hex()
 
-	callMsg := ethereum.CallMsg{
-		From: sut.wallet.Addresses()[0],
-		To:   &escrowAddr,
-		Data: escrow.CallDataForBalance(recv),
-	}
-
 	gc := gethclient.New(sut.rpcClient)
 
-	wantBig := big.NewInt(val)
-	wantBytes := uint256.NewInt(val).PaddedBytes(32)
+	wantBalance := big.NewInt(escrowDepositVal)
+	wantStorageValue := big.NewInt(escrowDepositVal)
+	wantStorageBytes := uint256.NewInt(escrowDepositVal).PaddedBytes(32)
 	wantCode := escrow.ByteCode()
 
 	tests := []struct {
@@ -277,13 +233,13 @@ func TestStatefulRPCs(t *testing.T) {
 			t.Run("eth_call", func(t *testing.T) {
 				got, err := sut.CallContract(ctx, callMsg, blockNum)
 				require.NoError(t, err, "CallContract()")
-				assert.Equal(t, wantBytes, got, "CallContract() result")
+				assert.Equal(t, wantStorageBytes, got, "CallContract() result")
 			})
 
 			t.Run("eth_getBalance", func(t *testing.T) {
 				got, err := sut.BalanceAt(ctx, escrowAddr, blockNum)
 				require.NoError(t, err, "BalanceAt()")
-				require.Zero(t, wantBig.Cmp(got), "BalanceAt(): want %d, got %s", val, got)
+				require.Zero(t, wantBalance.Cmp(got), "BalanceAt(): want %d, got %s", escrowDepositVal, got)
 			})
 
 			t.Run("eth_getCode", func(t *testing.T) {
@@ -295,7 +251,7 @@ func TestStatefulRPCs(t *testing.T) {
 			t.Run("eth_getStorageAt", func(t *testing.T) {
 				got, err := sut.StorageAt(ctx, escrowAddr, storageKey, blockNum)
 				require.NoError(t, err, "StorageAt()")
-				assert.Equal(t, wantBytes, got, "StorageAt() result")
+				assert.Equal(t, wantStorageBytes, got, "StorageAt() result")
 			})
 
 			t.Run("eth_getProof", func(t *testing.T) {
@@ -304,17 +260,24 @@ func TestStatefulRPCs(t *testing.T) {
 				require.NotNil(t, got, "GetProof() result")
 
 				assert.NotEmpty(t, got.AccountProof, "GetProof() accountProof")
-				require.Zero(t, wantBig.Cmp(got.Balance), "GetProof() balance: want %d, got %s", val, got.Balance)
+				require.Zero(t, wantBalance.Cmp(got.Balance), "GetProof() balance: want %d, got %s", escrowDepositVal, got.Balance)
 
 				require.Len(t, got.StorageProof, 1, "GetProof() storageProof length")
 				assert.NotEmpty(t, got.StorageProof[0].Proof, "GetProof() storageProof[0].Proof")
-				require.Zero(t, wantBig.Cmp(got.StorageProof[0].Value), "GetProof() storageProof[0].Value: want %d, got %s", val, got.StorageProof[0].Value)
+				require.Zero(t, wantStorageValue.Cmp(got.StorageProof[0].Value), "GetProof() storageProof[0].Value: want %d, got %s", escrowDepositVal, got.StorageProof[0].Value)
 			})
 		})
 	}
+}
 
-	// eth_estimateGas and eth_createAccessList don't accept a block number
-	// parameter via ethclient/gethclient, so they always run against latest.
+// TestStatefulRPCsLatestOnly tests stateful RPC methods that don't accept a
+// block number parameter via ethclient/gethclient and so always run against
+// the latest block: eth_estimateGas and eth_createAccessList.
+func TestStatefulRPCsLatestOnly(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	_, _, _, callMsg := sut.deployEscrow(ctx, t, nil)
+
 	t.Run("eth_estimateGas", func(t *testing.T) {
 		got, err := sut.EstimateGas(ctx, callMsg)
 		require.NoError(t, err, "EstimateGas()")
@@ -322,6 +285,7 @@ func TestStatefulRPCs(t *testing.T) {
 	})
 
 	t.Run("eth_createAccessList", func(t *testing.T) {
+		gc := gethclient.New(sut.rpcClient)
 		al, gas, errMsg, err := gc.CreateAccessList(ctx, callMsg)
 		require.NoError(t, err, "CreateAccessList()")
 		assert.Empty(t, errMsg, "CreateAccessList() error message")
