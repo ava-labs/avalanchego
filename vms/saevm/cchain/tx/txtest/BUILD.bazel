@@ -9,15 +9,21 @@ package(default_visibility = [
 go_library(
     name = "txtest",
     testonly = True,
-    srcs = ["fuzzer.go"],
+    srcs = [
+        "cmp.go",
+        "fuzzer.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest",
     deps = [
         "//codec",
         "//ids",
         "//vms/components/avax",
         "//vms/saevm/cchain/tx",
+        "//vms/saevm/cmputils",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
     ],
 )
 

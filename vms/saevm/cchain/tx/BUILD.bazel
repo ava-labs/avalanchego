@@ -41,7 +41,7 @@ go_library(
 go_test(
     name = "tx_test",
     srcs = [
-        "compatibility_test.go",
+        "identifiers_test.go",
         "tx_test.go",
     ],
     data = glob(["testdata/**"]),
