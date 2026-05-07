@@ -41,6 +41,7 @@ go_library(
 go_test(
     name = "tx_test",
     srcs = [
+        "codec_test.go",
         "identifiers_test.go",
         "tx_test.go",
     ],
