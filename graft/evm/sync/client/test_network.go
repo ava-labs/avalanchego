@@ -7,8 +7,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Network = (*testNetwork)(nil)
@@ -22,6 +26,15 @@ type testNetwork struct {
 	callback       func() // callback is called prior to processing each test call
 	requestErr     []error
 	nodesRequested []ids.NodeID
+}
+
+// PeerTracker returns a new empty peer tracker.
+func (*testNetwork) PeerTracker() *p2p.PeerTracker {
+	pt, err := p2p.NewPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry(), set.Set[ids.NodeID]{}, nil)
+	if err != nil {
+		panic(err)
+	}
+	return pt
 }
 
 func (*testNetwork) P2PNetwork() *p2p.Network {
@@ -88,7 +101,3 @@ func (t *testNetwork) testResponses(callback func(), responses ...[]byte) {
 	t.callback = callback
 	t.numCalls = 0
 }
-
-func (*testNetwork) RegisterResponse(ids.NodeID, float64) {}
-
-func (*testNetwork) RegisterFailure(ids.NodeID) {}

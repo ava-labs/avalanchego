@@ -58,12 +58,7 @@ type SyncedNetworkClient interface {
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
 	SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// RegisterResponse records a successful response from nodeID with the
-	// observed bandwidth (response bytes divided by request time).
-	RegisterResponse(nodeID ids.NodeID, bandwidth float64)
-
-	// RegisterFailure records a failed response from nodeID.
-	RegisterFailure(nodeID ids.NodeID)
+	PeerTracker() *p2p.PeerTracker
 }
 
 type Network interface {
@@ -166,6 +161,11 @@ func NewNetwork(
 		peers:                      peers,
 		p2pValidators:              p2pValidators,
 	}, nil
+}
+
+// PeerTracker returns the bandwidth-tracked peer list for use during state sync.
+func (n *network) PeerTracker() *p2p.PeerTracker {
+	return n.peers
 }
 
 // Sample returns a random sample of connected peers.

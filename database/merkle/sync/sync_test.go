@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/set"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -316,6 +317,43 @@ func Test_Sync_BusyContextCancellation(t *testing.T) {
 
 	err = syncer.Sync(ctx)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// Test_Sync_WithPeerTracker ensures that the peer tracker is used for sampling if provided.
+func Test_Sync_WithPeerTracker(t *testing.T) {
+	targetRoot := ids.GenerateTestID()
+	clientDB := &db{id: ids.Empty}
+
+	var observedNodeID ids.NodeID
+	response := marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot})
+	handler := p2p.TestHandler{
+		AppRequestF: func(_ context.Context, nodeID ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
+			observedNodeID = nodeID
+			return response, nil
+		},
+	}
+
+	knownNodeID := ids.GenerateTestNodeID()
+	pt, err := p2p.NewPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry(), set.Set[ids.NodeID]{}, nil)
+	require.NoError(t, err)
+	pt.Connected(knownNodeID, nil)
+
+	syncer, err := NewSyncer(
+		clientDB,
+		Config[*proofDouble, *proofDouble]{
+			TargetRoot:            targetRoot,
+			RangeProofMarshaler:   marshaler{},
+			ChangeProofMarshaler:  marshaler{},
+			ProofClient:           p2ptest.NewSelfClient(t, t.Context(), knownNodeID, handler),
+			PeerTracker:           pt,
+			Log:                   logging.NoLog{},
+			SimultaneousWorkLimit: 1,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+	require.NoErrorf(t, syncer.Sync(t.Context()), "%T.Sync()", syncer)
+	require.Equal(t, knownNodeID, observedNodeID, "peer tracker must drive node selection")
 }
 
 func Test_Midpoint(t *testing.T) {
