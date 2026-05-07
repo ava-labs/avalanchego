@@ -14,6 +14,9 @@ on:
       - ".github/packaging/**"
       - ".github/workflows/build-rpm-release.yml"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-rpm:
     strategy:
@@ -23,14 +26,14 @@ jobs:
             runner: ubuntu-22.04
             rpm_arch: x86_64
           - arch: arm64
-            runner: custom-arm64-jammy
+            runner: ubuntu-22.04-arm
             rpm_arch: aarch64
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
@@ -39,7 +42,7 @@ jobs:
       # workflow branch so that packaging:test-build-rpms is available.
       - name: Overlay packaging scripts from workflow branch
         if: github.event.inputs.tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: .packaging-overlay
           sparse-checkout: .github/packaging
@@ -82,7 +85,7 @@ jobs:
 
       - name: Upload RPMs as artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: rpms-${{ matrix.rpm_arch }}
           path: |

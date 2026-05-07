@@ -18,7 +18,6 @@ go_library(
         "//graft/evm/firewood",
         "//graft/evm/triedb/hashdb",
         "//graft/evm/triedb/pathdb",
-        "//graft/subnet-evm/core/extstate",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

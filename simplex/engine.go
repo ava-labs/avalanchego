@@ -57,7 +57,8 @@ type Engine struct {
 	shutdownOnce sync.Once
 }
 
-// The VM must be initialized before creating the engine
+// NewEngine creates a new simplex engine. The VM must be initialized before
+// calling this function.
 func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	if config.Params == nil {
 		return nil, errNilSimplexParameters
@@ -66,6 +67,14 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	signer, verifier, err := NewBLSAuth(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create BLS auth: %w", err)
+	}
+
+	return newEngineWithSignerVerifier(ctx, config, signer, verifier)
+}
+
+func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLSSigner, verifier BLSVerifier) (*Engine, error) {
+	if config.Params == nil {
+		return nil, errNilSimplexParameters
 	}
 
 	qcDeserializer := &QCDeserializer{
@@ -80,7 +89,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		return nil, err
 	}
 
-	bt := newBlockTracker()
+	bt := newBlockTracker(config.VM)
 
 	storage, err := newStorage(ctx, config, qcDeserializer, bt)
 	if err != nil {

@@ -19,10 +19,10 @@ github.com/ajg/form v1.5.1/go.mod h1:uL1WgH+h2mgNtvBq0339dVnzXdBETtL2LeUXaIv25UY
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156 h1:eMwmnE/GDgah4HI848JfFxHt+iPb26b4zyfspmqY0/8=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1 h1:2LXaw0vQ/nSjSKyNil2NoNXXuH+nFSSrlUUBl1x6Jcg=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1/go.mod h1:0Z60sYkUFvvOlOc0XHGbP+271EjP5KjaaOA0EQxCCSA=
-github.com/ava-labs/libevm v1.13.15-0.20260310192938-d71b6cc8513a h1:rPtNc8GdAxiCxSdL+kaM42Lfuoxi034X4Fe20lR2auI=
-github.com/ava-labs/libevm v1.13.15-0.20260310192938-d71b6cc8513a/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.4.0 h1:7OzfDVz9/lKyr9EfHZnNEvXevlW6utComzePoT4vaMQ=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.4.0/go.mod h1:MoUHYlFrwaflfLpHt8nmQUHoLy2CCHaFNH/n7vazUuI=
+github.com/ava-labs/libevm v1.13.15-0.20260430210457-c891ff86e981 h1:rbQ7kUImcDc33u1zj1+cyU7P8BboQq2wmBWNa5OR5Us=
+github.com/ava-labs/libevm v1.13.15-0.20260430210457-c891ff86e981/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=

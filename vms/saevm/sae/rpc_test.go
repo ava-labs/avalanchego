@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/hookstest"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -533,7 +534,7 @@ func TestEthGetters(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt)
+	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withDebugAPI())
 	t.Cleanup(unblock)
 
 	t.Run("unknown_hashes", func(t *testing.T) {
@@ -606,6 +607,65 @@ func TestEthGetters(t *testing.T) {
 			want:   hexutil.Uint64(executed.Height()),
 		})
 	})
+}
+
+func TestMempoolTxGetters(t *testing.T) {
+	ctx, sut := newSUT(t, 1, withDebugAPI())
+
+	// These RPC methods use GetPoolTransaction, which returns any transaction
+	// accepted into the pool regardless of pending/queued status. A
+	// transaction only needs to have been accepted by the pool (i.e.
+	// mustSendTx succeeds) to be returned.
+	pendingTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	// Skip nonce 1 to create a gap so queuedTx (nonce 2) is accepted into
+	// the pool but not marked as pending.
+	sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	queuedTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.mustSendTx(t, pendingTx, queuedTx)
+	sut.waitUntilTxsPending(t, pendingTx)
+
+	for _, tt := range []struct {
+		name string
+		tx   *types.Transaction
+	}{
+		{"pending", pendingTx},
+		{"queued", queuedTx},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			marshaled, err := tt.tx.MarshalBinary()
+			require.NoErrorf(t, err, "%T.MarshalBinary()", tt.tx)
+
+			sut.testRPC(ctx, t, []rpcTest{
+				{
+					method: "eth_getTransactionByHash",
+					args:   []any{tt.tx.Hash()},
+					want:   tt.tx,
+				},
+				{
+					method: "eth_getRawTransactionByHash",
+					args:   []any{tt.tx.Hash()},
+					want:   hexutil.Bytes(marshaled),
+				},
+				{
+					method: "debug_getRawTransaction",
+					args:   []any{tt.tx.Hash()},
+					want:   hexutil.Bytes(marshaled),
+				},
+			}...)
+		})
+	}
 }
 
 func TestGetLogs(t *testing.T) {
@@ -789,7 +849,7 @@ func TestGetReceipts(t *testing.T) {
 
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt)
+	ctx, sut := newSUT(t, 2, timeOpt, precompileOpt, withDebugAPI())
 	t.Cleanup(unblock)
 
 	var (
@@ -860,33 +920,60 @@ func TestGetReceipts(t *testing.T) {
 		GasPrice: big.NewInt(1),
 	}))
 
+	marshalReceipts := func(rs []*types.Receipt) []hexutil.Bytes {
+		raw := make([]hexutil.Bytes, len(rs))
+		for i, r := range rs {
+			buf, err := r.MarshalBinary()
+			require.NoErrorf(t, err, "receipts[%d].MarshalBinary()", i)
+			raw[i] = buf
+		}
+		return raw
+	}
+
 	var tests []rpcTest
 	for _, tc := range []struct {
-		id   rpc.BlockNumberOrHash
+		ids  []rpc.BlockNumberOrHash
 		want []*types.Receipt
 	}{
 		{
-			id:   rpc.BlockNumberOrHashWithHash(onDisk.Hash(), true),
+			ids: []rpc.BlockNumberOrHash{
+				rpc.BlockNumberOrHashWithHash(onDisk.Hash(), true),
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //#nosec G115 -- Won't overflow
+			},
 			want: wantOnDisk,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithHash(settled.Hash(), true),
+			ids: []rpc.BlockNumberOrHash{
+				rpc.BlockNumberOrHashWithHash(settled.Hash(), true),
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //#nosec G115 -- Won't overflow
+				rpc.BlockNumberOrHashWithNumber(rpc.SafeBlockNumber),
+				rpc.BlockNumberOrHashWithNumber(rpc.FinalizedBlockNumber),
+			},
 			want: wantSettled,
 		},
 		{
-			id:   rpc.BlockNumberOrHashWithHash(unsettled.Hash(), true),
-			want: wantUnsettled,
-		},
-		{
-			id:   rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber),
+			ids: []rpc.BlockNumberOrHash{
+				rpc.BlockNumberOrHashWithHash(unsettled.Hash(), true),
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //#nosec G115 -- Won't overflow
+				rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber),
+			},
 			want: wantUnsettled,
 		},
 	} {
-		tests = append(tests, rpcTest{
-			method: "eth_getBlockReceipts",
-			args:   []any{tc.id.String()},
-			want:   tc.want,
-		})
+		for _, id := range tc.ids {
+			tests = append(tests, []rpcTest{
+				{
+					method: "eth_getBlockReceipts",
+					args:   []any{id.String()},
+					want:   tc.want,
+				},
+				{
+					method: "debug_getRawReceipts",
+					args:   []any{id.String()},
+					want:   marshalReceipts(tc.want),
+				},
+			}...)
+		}
 	}
 
 	for i, tx := range txs {
@@ -912,9 +999,19 @@ func TestGetReceipts(t *testing.T) {
 			want:   ([]*types.Receipt)(nil),
 		},
 		{
+			method: "debug_getRawReceipts",
+			args:   []any{common.Hash{}},
+			want:   []hexutil.Bytes{},
+		},
+		{
 			method: "eth_getBlockReceipts",
 			args:   []any{genesis.Hash()},
 			want:   []*types.Receipt{},
+		},
+		{
+			method: "debug_getRawReceipts",
+			args:   []any{genesis.Hash()},
+			want:   []hexutil.Bytes{},
 		},
 		{
 			method: "eth_getBlockReceipts",
@@ -922,9 +1019,19 @@ func TestGetReceipts(t *testing.T) {
 			want:   ([]*types.Receipt)(nil),
 		},
 		{
+			method: "debug_getRawReceipts",
+			args:   []any{pending.Hash()},
+			want:   []hexutil.Bytes{},
+		},
+		{
 			method: "eth_getBlockReceipts",
 			args:   []any{hexutil.Uint64(pending.Height())},
 			want:   ([]*types.Receipt)(nil),
+		},
+		{
+			method: "debug_getRawReceipts",
+			args:   []any{hexutil.Uint64(pending.Height())},
+			want:   []hexutil.Bytes{},
 		},
 	}...)
 
@@ -1175,6 +1282,11 @@ func TestDebugRPCs(t *testing.T) {
 			method:  "debug_dbAncients",
 			wantErr: testerr.Contains("not supported"),
 		},
+		{
+			method:  "debug_printBlock",
+			args:    []any{uint64(1)}, // SUT only has genesis, so block 1 doesn't exist.
+			wantErr: testerr.Contains("not found"),
+		},
 	}...)
 
 	// The profiling debug namespace is handled entirely by upstream code
@@ -1205,57 +1317,16 @@ func TestDebugRPCs(t *testing.T) {
 	})
 }
 
-func TestDebugGetRawTransaction(t *testing.T) {
-	ctx, sut := newSUT(t, 1, withDebugAPI())
-
-	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-		To:        &common.Address{},
-		Gas:       params.TxGas,
-		GasFeeCap: big.NewInt(1),
-	})
-	b := sut.runConsensusLoop(t, tx)
-	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-
-	marshaled, err := tx.MarshalBinary()
-	require.NoErrorf(t, err, "%T.MarshalBinary()", tx)
-
-	// Mempool tx: send without building a block, then query.
-	mempoolTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-		To:        &common.Address{},
-		Gas:       params.TxGas,
-		GasFeeCap: big.NewInt(1),
-	})
-	sut.sendTxsAndWaitUntilPending(t, mempoolTx)
-
-	mempoolMarshaled, err := mempoolTx.MarshalBinary()
-	require.NoErrorf(t, err, "%T.MarshalBinary()", mempoolTx)
-
-	t.Logf("Tx in block: %#x", tx.Hash())
-	t.Logf("Tx in mempool: %#x", mempoolTx.Hash())
-
-	sut.testRPC(ctx, t, []rpcTest{
-		{
-			method: "debug_getRawTransaction",
-			args:   []any{tx.Hash()},
-			want:   hexutil.Bytes(marshaled),
-		},
-		{
-			method: "debug_getRawTransaction",
-			args:   []any{common.Hash{}},
-			want:   hexutil.Bytes(nil),
-		},
-		{
-			method: "debug_getRawTransaction",
-			args:   []any{mempoolTx.Hash()},
-			want:   hexutil.Bytes(mempoolMarshaled),
-		},
-	}...)
-}
-
 func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block) {
 	t.Helper()
 
 	testRPCGetter(ctx, t, "eth_getBlockByHash", s.BlockByHash, want.Hash(), want)
+
+	wantBlockRLP, err := rlp.EncodeToBytes(want)
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want)
+	wantHeaderRLP, err := rlp.EncodeToBytes(want.Header())
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want.Header())
+
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getBlockByHash",
@@ -1276,6 +1347,16 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 			method: "eth_getUncleCountByBlockHash",
 			args:   []any{want.Hash()},
 			want:   hexutil.Uint(0), // SAE never has uncles (no reorgs)
+		},
+		{
+			method: "debug_getRawBlock",
+			args:   []any{want.Hash()},
+			want:   hexutil.Bytes(wantBlockRLP),
+		},
+		{
+			method: "debug_getRawHeader",
+			args:   []any{want.Hash()},
+			want:   hexutil.Bytes(wantHeaderRLP),
 		},
 	}...)
 
@@ -1302,6 +1383,11 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 			},
 			{
 				method: "eth_getRawTransactionByHash",
+				args:   []any{wantTx.Hash()},
+				want:   hexutil.Bytes(marshaled),
+			},
+			{
+				method: "debug_getRawTransaction",
 				args:   []any{wantTx.Hash()},
 				want:   hexutil.Bytes(marshaled),
 			},
@@ -1362,6 +1448,21 @@ func (s *SUT) testGetByUnknownHash(ctx context.Context, t *testing.T) {
 			args:   []any{common.Hash{}},
 			want:   hexutil.Bytes(nil),
 		},
+		{
+			method: "debug_getRawTransaction",
+			args:   []any{common.Hash{}},
+			want:   hexutil.Bytes(nil),
+		},
+		{
+			method:  "debug_getRawBlock",
+			args:    []any{common.Hash{}},
+			wantErr: testerr.Contains("not found"),
+		},
+		{
+			method:  "debug_getRawHeader",
+			args:    []any{common.Hash{}},
+			wantErr: testerr.Contains("not found"),
+		},
 	}...)
 }
 
@@ -1371,6 +1472,11 @@ func (s *SUT) testGetByUnknownHash(ctx context.Context, t *testing.T) {
 func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Block, n rpc.BlockNumber) {
 	t.Helper()
 	testRPCGetter(ctx, t, "eth_getBlockByNumber", s.BlockByNumber, big.NewInt(n.Int64()), want)
+
+	wantBlockRLP, err := rlp.EncodeToBytes(want)
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want)
+	wantHeaderRLP, err := rlp.EncodeToBytes(want.Header())
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", want.Header())
 
 	s.testRPC(ctx, t, []rpcTest{
 		{
@@ -1392,6 +1498,16 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 			method: "eth_getUncleCountByBlockNumber",
 			args:   []any{n},
 			want:   hexutil.Uint(0), // SAE never has uncles (no reorgs)
+		},
+		{
+			method: "debug_getRawBlock",
+			args:   []any{n},
+			want:   hexutil.Bytes(wantBlockRLP),
+		},
+		{
+			method: "debug_getRawHeader",
+			args:   []any{n},
+			want:   hexutil.Bytes(wantHeaderRLP),
 		},
 	}...)
 
@@ -1457,6 +1573,16 @@ func (s *SUT) testGetByUnknownNumber(ctx context.Context, t *testing.T) {
 		{
 			method: "eth_getRawTransactionByBlockNumberAndIndex",
 			args:   []any{n, hexutil.Uint(0)},
+			want:   hexutil.Bytes(nil),
+		},
+		{
+			method: "debug_getRawBlock",
+			args:   []any{n},
+			want:   hexutil.Bytes(nil),
+		},
+		{
+			method: "debug_getRawHeader",
+			args:   []any{n},
 			want:   hexutil.Bytes(nil),
 		},
 	}...)

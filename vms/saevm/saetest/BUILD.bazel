@@ -3,6 +3,7 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "saetest",
+    testonly = True,
     srcs = [
         "heightdb.go",
         "logging.go",

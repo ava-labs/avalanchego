@@ -9,7 +9,6 @@ package(default_visibility = [
 go_library(
     name = "extstate",
     srcs = [
-        "database.go",
         "options.go",
         "statedb.go",
     ],
@@ -17,16 +16,13 @@ go_library(
     deps = [
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
-        "//graft/evm/firewood",
         "//graft/evm/utils",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
-        "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/stateconf",
-        "@com_github_ava_labs_libevm//triedb",
         "@com_github_holiman_uint256//:uint256",
     ],
 )
