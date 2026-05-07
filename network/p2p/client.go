@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -21,15 +22,66 @@ var (
 	ErrNoPeers        = errors.New("no peers")
 )
 
-// AppResponseCallback is called upon receiving an AppResponse for an AppRequest
-// issued by Client.
-// Callers should check [err] to see whether the AppRequest failed or not.
-type AppResponseCallback func(
-	ctx context.Context,
-	nodeID ids.NodeID,
-	responseBytes []byte,
-	err error,
+type (
+	// AppResponseCallback is called upon receiving an AppResponse for an AppRequest
+	// issued by [Client].
+	// Callers should check err to see whether the AppRequest failed or not.
+	AppResponseCallback func(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		responseBytes []byte,
+		err error,
+	)
+	// AppResponseCallbackWitherror is called upon receiving an AppResponse for an AppRequest
+	// issued by [ClientTracker].
+	// Callers should check err to see whether the AppRequest failed or not.
+	// An error is returned if the respons is invalid.
+	AppResponseCallbackWithError func(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		responseBytes []byte,
+		err error,
+	) error
 )
+
+func (cb AppResponseCallbackWithError) toAppResponseCallback(pt *PeerTracker) AppResponseCallback {
+	t := time.Now()
+	return func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) {
+		dur := time.Since(t)
+		if err := cb(ctx, nodeID, responseBytes, appErr); err != nil || appErr != nil {
+			pt.RegisterFailure(nodeID)
+		} else {
+			const epsilon = 1e-9
+			bandwidth := float64(len(responseBytes)) / (dur.Seconds() + epsilon)
+			pt.RegisterResponse(nodeID, bandwidth)
+		}
+	}
+}
+
+type ClientTracker struct {
+	*Client
+	pt *PeerTracker
+}
+
+func (ct *ClientTracker) AppRequest(
+	ctx context.Context,
+	nodeIDs set.Set[ids.NodeID],
+	appRequestBytes []byte,
+	onResponse AppResponseCallbackWithError,
+) error {
+	for nodeID, _ := range nodeIDs {
+		ct.pt.RegisterRequest(nodeID)
+	}
+	return ct.Client.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse.toAppResponseCallback(ct.pt))
+}
+
+func (ct *ClientTracker) AppRequestAny(
+	ctx context.Context,
+	appRequestBytes []byte,
+	onResponse AppResponseCallbackWithError,
+) error {
+	return ct.Client.AppRequestAny(ctx, appRequestBytes, onResponse.toAppResponseCallback(ct.pt))
+}
 
 type Client struct {
 	handlerIDStr  string

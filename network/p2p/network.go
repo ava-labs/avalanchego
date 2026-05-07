@@ -135,6 +135,13 @@ func (n *Network) NewClient(handlerID uint64, nodeSampler NodeSampler) *Client {
 	}
 }
 
+func (n *Network) NewClientWithTracking(handlerID uint64, pt *PeerTracker) *ClientTracker {
+	return &ClientTracker{
+		c:  n.NewClient(handlerID, pt.toNodeSampler()),
+		pt: pt,
+	}
+}
+
 // AddHandler reserves an identifier for an application protocol
 func (n *Network) AddHandler(handlerID uint64, handler Handler) error {
 	return n.router.addHandler(handlerID, handler)

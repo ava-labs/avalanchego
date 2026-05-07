@@ -4,6 +4,7 @@
 package p2p
 
 import (
+	"context"
 	"errors"
 	"math"
 	"math/rand"
@@ -314,4 +315,20 @@ func (p *PeerTracker) Size() int {
 	defer p.lock.RUnlock()
 
 	return p.untrackedPeers.Len() + p.trackedPeers.Len()
+}
+
+func (p *PeerTracker) toNodeSampler() NodeSampler {
+	return nodeSampler{pt: p}
+}
+
+type nodeSampler struct {
+	pt *PeerTracker
+}
+
+func (n nodeSampler) Sample(context.Context, int) []ids.NodeID {
+	p, ok := n.pt.SelectPeer()
+	if !ok {
+		return nil
+	}
+	return []ids.NodeID{p}
 }
