@@ -14,8 +14,15 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-x86_64-binaries-tarball:
-    runs-on: ubuntu-22.04
+  build-tarball:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       id-token: write
       contents: read
@@ -70,108 +77,23 @@ jobs:
         run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml upload-tarballs
         env:
           BUCKET: ${{ secrets.BUCKET }}
-          TGZ_ARCH: amd64
+          TGZ_ARCH: ${{ matrix.arch }}
 
       - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v6
         with:
-          name: avalanchego-amd64
+          name: avalanchego-${{ matrix.arch }}
           path: |
-            build/tgz/avalanchego-linux-amd64-${{ env.TAG }}.tar.gz
-            build/tgz/avalanchego-linux-amd64-${{ env.TAG }}.tar.gz.sig
+            build/tgz/avalanchego-linux-${{ matrix.arch }}-${{ env.TAG }}.tar.gz
+            build/tgz/avalanchego-linux-${{ matrix.arch }}-${{ env.TAG }}.tar.gz.sig
 
       - name: Save subnet-evm as Github artifact
         uses: actions/upload-artifact@v6
         with:
-          name: subnet-evm-amd64
+          name: subnet-evm-${{ matrix.arch }}
           path: |
-            build/tgz/subnet-evm-linux-amd64-${{ env.TAG }}.tar.gz
-            build/tgz/subnet-evm-linux-amd64-${{ env.TAG }}.tar.gz.sig
-
-      - name: Cleanup
-        if: always()
-        run: |
-          if [[ -n "${GPG_KEY_FILE:-}" ]]; then
-            rm -f "${GPG_KEY_FILE}"
-          fi
-          # build/plugins/ is created as root by the containerized
-          # subnet-evm build, so plain rm -rf would fail to recurse
-          # into it as the unprivileged runner user on linux runners.
-          sudo rm -rf ./build
-
-  build-arm64-binaries-tarball:
-    runs-on: ubuntu-22.04-arm
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: ./.github/actions/setup-go-for-project
-
-      - name: Install aws cli
-        run: sudo snap install aws-cli --classic
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
-          role-session-name: githubrolesession
-          aws-region: us-east-1
-
-      - name: Import GPG key
-        env:
-          PRIVATE_KEY: ${{ secrets.RPM_GPG_PRIVATE_KEY }}
-        run: |
-          GPG_KEY_FILE="$(mktemp)"
-          chmod 600 "${GPG_KEY_FILE}"
-          printf '%s' "${PRIVATE_KEY}" > "${GPG_KEY_FILE}"
-          printf 'GPG_KEY_FILE=%s\n' "${GPG_KEY_FILE}" >> "$GITHUB_ENV"
-        shell: bash
-
-      - name: Try to get tag from git
-        if: "${{ github.event.inputs.tag == '' }}"
-        run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
-        shell: bash
-
-      - name: Try to get tag from workflow dispatch
-        if: "${{ github.event.inputs.tag != '' }}"
-        env:
-          INPUT_TAG: ${{ github.event.inputs.tag }}
-        run: |
-          echo "TAG=${INPUT_TAG}" >> "$GITHUB_ENV"
-        shell: bash
-
-      - name: Build and validate tarballs
-        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-tarballs
-        env:
-          PACKAGING_TAG: ${{ env.TAG }}
-          GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
-          GPG_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
-
-      - name: Upload tarballs to S3
-        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml upload-tarballs
-        env:
-          BUCKET: ${{ secrets.BUCKET }}
-          TGZ_ARCH: arm64
-
-      - name: Save avalanchego as Github artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: avalanchego-arm64
-          path: |
-            build/tgz/avalanchego-linux-arm64-${{ env.TAG }}.tar.gz
-            build/tgz/avalanchego-linux-arm64-${{ env.TAG }}.tar.gz.sig
-
-      - name: Save subnet-evm as Github artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: subnet-evm-arm64
-          path: |
-            build/tgz/subnet-evm-linux-arm64-${{ env.TAG }}.tar.gz
-            build/tgz/subnet-evm-linux-arm64-${{ env.TAG }}.tar.gz.sig
+            build/tgz/subnet-evm-linux-${{ matrix.arch }}-${{ env.TAG }}.tar.gz
+            build/tgz/subnet-evm-linux-${{ matrix.arch }}-${{ env.TAG }}.tar.gz.sig
 
       - name: Cleanup
         if: always()
