@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	// Imported for [vm.VerifierBackend] comment resolution.
+	"github.com/ava-labs/avalanchego/database/memdb"
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
@@ -32,6 +33,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -583,83 +586,47 @@ var (
 
 func TestInputIDs(t *testing.T) {
 	tests := []struct {
-		tx golden
-		op hook.Op
+		tx   golden
+		want set.Set[ids.ID]
 	}{
 		{
 			tx: importGolden,
-			op: hook.Op{
-				ID:  importGolden.id,
-				Gas: 11230,
-				Mint: map[common.Address]uint256.Int{
-					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): ScaleAVAX(50_000_000),
-				},
-			},
+			want: set.Of(
+				ids.ID(common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64")),
+			),
 		},
 		{
 			tx: exportGolden,
-			op: hook.Op{
-				ID:        exportGolden.id,
-				Gas:       11230,
-				GasFeeCap: *uint256.NewInt(1_000_000 * X2CRate / 11230),
-				Burn: map[common.Address]hook.AccountDebit{
-					common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"): {
-						Amount:     ScaleAVAX(1_000_001),
-						MinBalance: ScaleAVAX(1_000_001),
-					},
-				},
-			},
+			want: set.Of(
+				ids.ID(common.FromHex("0x000000000000000000000014eb019ccd325ad53543a7e7e3b04828bdecf3cff6")),
+			),
 		},
 		{
 			tx: importMultiInputGolden,
-			op: hook.Op{
-				ID:  importMultiInputGolden.id,
-				Gas: 13526,
-				Mint: map[common.Address]uint256.Int{
-					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): ScaleAVAX(597_000_000),
-				},
-			},
+			want: set.Of(
+				ids.ID(common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05")),
+				ids.ID(common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630")),
+				ids.ID(common.FromHex("0xd71fb48751f6d5732e7ff63168ed311b40bf517b36279e326878fc3f5169a656")),
+			),
 		},
 		{
 			tx: exportSameAddressMultiAssetGolden,
-			op: hook.Op{
-				ID:        exportSameAddressMultiAssetGolden.id,
-				Gas:       12378,
-				GasFeeCap: *uint256.NewInt(900_000 * X2CRate / 12378),
-				Burn: map[common.Address]hook.AccountDebit{
-					{}: {
-						Nonce:      5,
-						Amount:     ScaleAVAX(1_000_000),
-						MinBalance: ScaleAVAX(1_000_000),
-					},
-				},
-			},
+			want: set.Of(
+				ids.ID(common.FromHex("0x0000000000000005000000140000000000000000000000000000000000000000")),
+			),
 		},
 		{
 			tx: exportMultiAddressMultiAssetGolden,
-			op: hook.Op{
-				ID:        exportMultiAddressMultiAssetGolden.id,
-				Gas:       12418,
-				GasFeeCap: *uint256.NewInt(500_000 * X2CRate / 12418),
-				Burn: map[common.Address]hook.AccountDebit{
-					{1}: {
-						Nonce: 5,
-					},
-					{2}: {
-						Nonce:      7,
-						Amount:     ScaleAVAX(1_000_000),
-						MinBalance: ScaleAVAX(1_000_000),
-					},
-				},
-			},
+			want: set.Of(
+				ids.ID(common.FromHex("0x0000000000000005000000140100000000000000000000000000000000000000")),
+				ids.ID(common.FromHex("0x0000000000000007000000140200000000000000000000000000000000000000")),
+			),
 		},
 		{
 			tx: importNonAVAXGolden,
-			op: hook.Op{
-				ID:   importNonAVAXGolden.id,
-				Gas:  10226,
-				Mint: map[common.Address]uint256.Int{},
-			},
+			want: set.Of(
+				ids.ID(common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb")),
+			),
 		},
 	}
 	for _, test := range tests {
@@ -667,6 +634,38 @@ func TestInputIDs(t *testing.T) {
 			tx := test.tx.new
 			got := tx.InputIDs()
 			assert.Equalf(t, test.want, got, "%T.InputIDs()", tx)
+		})
+	}
+}
+
+func TestAccountInputID(t *testing.T) {
+	tests := []struct {
+		name    string
+		address common.Address
+		nonce   uint64
+		want    ids.ID
+	}{
+		{
+			name: "zero_address_zero_nonce",
+			want: ids.ID(common.FromHex("0x0000000000000000000000140000000000000000000000000000000000000000")),
+		},
+		{
+			name:    "non_zero_address_nonce_one",
+			address: common.HexToAddress("0x0102030405060708090a0b0c0d0e0f1011121314"),
+			nonce:   1,
+			want:    ids.ID(common.FromHex("0x0000000000000001000000140102030405060708090a0b0c0d0e0f1011121314")),
+		},
+		{
+			name:    "non_zero_address_max_nonce",
+			address: common.HexToAddress("0x0102030405060708090a0b0c0d0e0f1011121314"),
+			nonce:   math.MaxUint64,
+			want:    ids.ID(common.FromHex("0xffffffffffffffff000000140102030405060708090a0b0c0d0e0f1011121314")),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := AccountInputID(test.address, test.nonce)
+			assert.Equalf(t, test.want, got, "AccountInputID(%s, %d)", test.address, test.nonce)
 		})
 	}
 }
@@ -1744,4 +1743,183 @@ func FuzzSanityCheckCompatibility(f *testing.F) {
 		got := newTx.SanityCheck(ctx) == nil
 		assert.Equal(t, want, got, "%T.SanityCheck() == OldSanityCheck(%T)", newTx, oldTx)
 	})
+}
+
+func TestVerifyCredentials(t *testing.T) {
+	sk, err := secp256k1.ToPrivateKey(common.FromHex("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"))
+	require.NoError(t, err, "secp256k1.ToPrivateKey()")
+	var (
+		ethAddress  = sk.EthAddress()
+		avaxAddress = sk.Address()
+
+		validUTXOID  = avax.UTXOID{TxID: ids.ID{1}}
+		validInputID = validUTXOID.InputID()
+
+		validImportTx = func() *Tx {
+			return &Tx{
+				Unsigned: &Import{
+					SourceChain: xChainID,
+					ImportedInputs: []*avax.TransferableInput{{
+						UTXOID: validUTXOID,
+						Asset:  avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   100,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					}},
+				},
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
+					[65]byte(common.FromHex("0x393d75eaa2d49672b14b5445aa6c357cc894e47172c5f80c6ae135991496722a07a76b05832ec365b37bdccbfcb589e2c217383ce4660cc1a61a45421b5623ec00")),
+				}}},
+			}
+		}
+		imp = func(mutate func(*Tx)) *Tx {
+			tx := validImportTx()
+			mutate(tx)
+			return tx
+		}
+		validUTXOs = func(t *testing.T) []*chainsatomic.Element {
+			t.Helper()
+
+			utxo := &avax.UTXO{
+				UTXOID: validUTXOID,
+				Asset:  avax.Asset{ID: avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 100,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{avaxAddress},
+					},
+				},
+			}
+			return []*chainsatomic.Element{{
+				Key:   validInputID[:],
+				Value: MarshalUTXO(t, utxo),
+			}}
+		}(t)
+
+		validExportTx = func() *Tx {
+			return &Tx{
+				Unsigned: &Export{
+					Ins: []Input{
+						{Address: ethAddress, Amount: 100, AssetID: avaxAssetID},
+					},
+				},
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
+					[65]byte(common.FromHex("0xfe088f91a447b6ebd89a18405e07a50869eaeee869ab924a0ec1174e94d293764e56260eca1d6d26a77f33aa8a99f4b4917f7598bc680b87b01f6c9a750e293d00")),
+				}}},
+			}
+		}
+		exp = func(mutate func(*Tx)) *Tx {
+			tx := validExportTx()
+			mutate(tx)
+			return tx
+		}
+	)
+
+	tests := []struct {
+		name    string
+		tx      *Tx
+		utxos   []*chainsatomic.Element
+		wantErr error
+	}{
+		{
+			name:  "import_valid",
+			tx:    validImportTx(),
+			utxos: validUTXOs,
+		},
+		{
+			name:    "import_wrong_num_credentials",
+			tx:      imp(func(tx *Tx) { tx.Creds = nil }),
+			utxos:   validUTXOs,
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name: "import_unserializable",
+			tx: imp(func(tx *Tx) {
+				tx.Unsigned.(*Import).ImportedInputs = make([]*avax.TransferableInput, 1)
+			}),
+			wantErr: ErrConvertingToFxTx,
+		},
+		{
+			name:    "import_missing_utxo",
+			tx:      validImportTx(),
+			wantErr: ErrFetchingUTXOs,
+		},
+		{
+			name: "import_unmarshalling_utxo",
+			tx:   validImportTx(),
+			utxos: []*chainsatomic.Element{{
+				Key:   validInputID[:],
+				Value: []byte{0xff, 0xff, 0xff},
+			}},
+			wantErr: ErrUnmarshallingUTXO,
+		},
+		{
+			name: "import_mismatched_asset_ids",
+			tx: imp(func(tx *Tx) {
+				tx.Unsigned.(*Import).ImportedInputs[0].Asset.ID[0]++
+			}),
+			utxos:   validUTXOs,
+			wantErr: ErrMismatchedAssetIDs,
+		},
+		{
+			name: "import_invalid_signature",
+			tx: imp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
+			}),
+			utxos:   validUTXOs,
+			wantErr: ErrVerifyingTransfer,
+		},
+		{
+			name: "export_valid",
+			tx:   validExportTx(),
+		},
+		{
+			name:    "export_no_credential",
+			tx:      exp(func(tx *Tx) { tx.Creds = nil }),
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name: "export_unserializable",
+			tx: exp(func(tx *Tx) {
+				tx.Unsigned.(*Export).ExportedOutputs = make([]*avax.TransferableOutput, 1)
+			}),
+			wantErr: ErrConvertingToFxTx,
+		},
+		{
+			name: "export_no_signature",
+			tx: exp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: nil}}
+			}),
+			wantErr: ErrIncorrectNumSignatures,
+		},
+		{
+			name: "export_invalid_signature",
+			tx: exp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
+			}),
+			wantErr: ErrRecoveringPublicKey,
+		},
+		{
+			name: "export_address_mismatch",
+			tx: exp(func(tx *Tx) {
+				tx.Unsigned.(*Export).Ins[0].Address = common.Address{}
+			}),
+			wantErr: ErrAddressMismatch,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			memory := chainsatomic.NewMemory(memdb.New())
+			xMemory := memory.NewSharedMemory(xChainID)
+			require.NoError(t, xMemory.Apply(map[ids.ID]*chainsatomic.Requests{
+				cChainID: {PutRequests: test.utxos},
+			}))
+
+			cMemory := memory.NewSharedMemory(cChainID)
+			err := test.tx.VerifyCredentials(cMemory)
+			assert.ErrorIsf(t, err, test.wantErr, "%T.VerifyCredentials()", test.tx)
+		})
+	}
 }
