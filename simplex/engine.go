@@ -89,7 +89,7 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 		return nil, err
 	}
 
-	bt := newBlockTracker()
+	bt := newBlockTracker(config.VM)
 
 	storage, err := newStorage(ctx, config, qcDeserializer, bt)
 	if err != nil {
