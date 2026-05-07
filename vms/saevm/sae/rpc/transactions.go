@@ -19,6 +19,8 @@ func (b *backend) GetTransaction(ctx context.Context, txHash common.Hash) (exist
 	return true, tx, blockHash, blockNumber, index, nil
 }
 
+// GetPoolTransaction returns a transaction from the mempool regardless of its
+// status (pending or queued).
 func (b *backend) GetPoolTransaction(txHash common.Hash) *types.Transaction {
 	return b.Set.Pool.Get(txHash)
 }

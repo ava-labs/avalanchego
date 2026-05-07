@@ -124,14 +124,12 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 			// - debug_dbAncient
 			// - debug_dbAncients
 			// - debug_dbGet
-			// - debug_getRawTransaction
-			// - debug_printBlock
-			// - debug_setHead          (no-op, logs info)
-			//
-			// TODO: implement once BlockByNumberOrHash and GetReceipts exist:
 			// - debug_getRawBlock
 			// - debug_getRawHeader
 			// - debug_getRawReceipts
+			// - debug_getRawTransaction
+			// - debug_printBlock
+			// - debug_setHead          (no-op, logs info)
 			"debug", ethapi.NewDebugAPI(b),
 		})
 	}

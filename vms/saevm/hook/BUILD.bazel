@@ -10,6 +10,7 @@ go_library(
         "//ids",
         "//snow/engine/snowman/block",
         "//vms/components/gas",
+        "//vms/saevm/gastime",
         "//vms/saevm/intmath",
         "//vms/saevm/params",
         "//vms/saevm/types",

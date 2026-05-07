@@ -159,9 +159,10 @@ func Execute(
 	log.Debug("Executing block")
 
 	parent := b.ParentBlock()
+	header := b.Header()
 
 	gasClock := parent.ExecutedByGasTime().Clone()
-	gasClock.BeforeBlock(hooks, b.Header())
+	gasClock.BeforeBlock(hooks.BlockTime(header))
 	perTxClock := gasClock.Time.Clone()
 
 	stateDB, err := sdbo.StateDB(parent.PostExecutionStateRoot())
@@ -176,7 +177,6 @@ func Execute(
 
 	baseFee := gasClock.BaseFee()
 	b.CheckBaseFeeBound(baseFee)
-	header := types.CopyHeader(b.Header())
 	header.BaseFee = baseFee.ToBig()
 
 	signer := b.Signer(config)
@@ -253,7 +253,8 @@ func Execute(
 	}
 
 	endTime := time.Now()
-	if err := gasClock.AfterBlock(blockGasConsumed, hooks, b.Header()); err != nil {
+	target, gasCfg := hooks.GasConfigAfter(b.Header())
+	if err := gasClock.AfterBlock(blockGasConsumed, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
 	}
 

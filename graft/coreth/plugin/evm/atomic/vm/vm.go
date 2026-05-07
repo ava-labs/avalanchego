@@ -641,21 +641,24 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 
 	// If [atomicBackend] is nil, the VM is still initializing and is reprocessing accepted blocks.
 	if vm.AtomicBackend != nil {
-		if vm.AtomicBackend.IsBonus(block.NumberU64(), block.Hash()) {
-			log.Info("skipping atomic tx verification on bonus block", "block", block.Hash())
-		} else {
-			// Verify [txs] do not conflict with themselves or ancestor blocks.
-			if err := vm.verifyTxs(txs, block.ParentHash(), block.BaseFee(), block.NumberU64(), rulesExtra); err != nil {
+		// Only verify and insert when processing at the chain tip; skip during historical replay.
+		if lastAccepted := vm.LastAcceptedExtendedBlock(); lastAccepted != nil && block.NumberU64() > lastAccepted.Height() {
+			if vm.AtomicBackend.IsBonus(block.NumberU64(), block.Hash()) {
+				log.Info("skipping atomic tx verification on bonus block", "block", block.Hash())
+			} else {
+				// Verify [txs] do not conflict with themselves or ancestor blocks.
+				if err := vm.verifyTxs(txs, block.ParentHash(), block.BaseFee(), block.NumberU64(), rulesExtra); err != nil {
+					return nil, nil, err
+				}
+			}
+			// Update the atomic backend with [txs] from this block.
+			//
+			// Note: The atomic trie canonically contains the duplicate operations
+			// from any bonus blocks.
+			_, err := vm.AtomicBackend.InsertTxs(block.Hash(), block.NumberU64(), block.ParentHash(), txs)
+			if err != nil {
 				return nil, nil, err
 			}
-		}
-		// Update the atomic backend with [txs] from this block.
-		//
-		// Note: The atomic trie canonically contains the duplicate operations
-		// from any bonus blocks.
-		_, err := vm.AtomicBackend.InsertTxs(block.Hash(), block.NumberU64(), block.ParentHash(), txs)
-		if err != nil {
-			return nil, nil, err
 		}
 	}
 

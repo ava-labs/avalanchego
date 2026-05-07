@@ -54,6 +54,11 @@ func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
+// AccessListGas uses the default calculation.
+func (RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
+	return (ethparams.NOOPHooks{}).AccessListGas(accessList)
+}
+
 var PrecompiledContractsApricotPhase2 = map[common.Address]vm.PrecompiledContract{
 	nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.NativeAssetBalance{GasCost: AssetBalanceApricot}),
