@@ -1,7 +1,6 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package txtest provides test helpers for using [tx.Tx].
 package txtest
 
 import (
