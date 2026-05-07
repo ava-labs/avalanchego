@@ -1786,25 +1786,21 @@ func TestVerifyCredentials(t *testing.T) {
 			mutate(tx)
 			return tx
 		}
-		validUTXOs = func(t *testing.T) []*chainsatomic.Element {
-			t.Helper()
-
-			utxo := &avax.UTXO{
-				UTXOID: validUTXOID,
-				Asset:  avax.Asset{ID: avaxAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 100,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{avaxAddress},
-					},
+		validUTXO = &avax.UTXO{
+			UTXOID: validUTXOID,
+			Asset:  avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 100,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{avaxAddress},
 				},
-			}
-			return []*chainsatomic.Element{{
-				Key:   validInputID[:],
-				Value: MarshalUTXO(t, utxo),
-			}}
-		}(t)
+			},
+		}
+		validUTXOs = []*chainsatomic.Element{{
+			Key:   validInputID[:],
+			Value: MarshalUTXO(t, validUTXO),
+		}}
 
 		validExportTx = func() *Tx {
 			tx := &Export{
