@@ -1759,7 +1759,7 @@ func TestVerifyCredentials(t *testing.T) {
 		ethAddress  = sk.EthAddress()
 		avaxAddress = sk.Address()
 
-		validUTXOID  = avax.UTXOID{TxID: ids.ID{1}}
+		validUTXOID  = avax.UTXOID{}
 		validInputID = validUTXOID.InputID()
 
 		validImportTx = func() *Tx {
