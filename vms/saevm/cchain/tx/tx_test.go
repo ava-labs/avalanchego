@@ -1759,8 +1759,23 @@ func TestVerifyCredentials(t *testing.T) {
 		ethAddress  = sk.EthAddress()
 		avaxAddress = sk.Address()
 
-		validUTXOID  = avax.UTXOID{}
+		validUTXOID = avax.UTXOID{}
+		validUTXO   = &avax.UTXO{
+			UTXOID: validUTXOID,
+			Asset:  avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 100,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{avaxAddress},
+				},
+			},
+		}
 		validInputID = validUTXOID.InputID()
+		validUTXOs   = []*chainsatomic.Element{{
+			Key:   validInputID[:],
+			Value: MarshalUTXO(t, validUTXO),
+		}}
 
 		validImportTx = func() *Tx {
 			tx := &Import{
@@ -1786,21 +1801,6 @@ func TestVerifyCredentials(t *testing.T) {
 			mutate(tx)
 			return tx
 		}
-		validUTXO = &avax.UTXO{
-			UTXOID: validUTXOID,
-			Asset:  avax.Asset{ID: avaxAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: 100,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{avaxAddress},
-				},
-			},
-		}
-		validUTXOs = []*chainsatomic.Element{{
-			Key:   validInputID[:],
-			Value: MarshalUTXO(t, validUTXO),
-		}}
 
 		validExportTx = func() *Tx {
 			tx := &Export{
