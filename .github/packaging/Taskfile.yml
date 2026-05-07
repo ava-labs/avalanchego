@@ -1,6 +1,8 @@
-# RPM packaging tasks for avalanchego and subnet-evm.
+# Packaging tasks for avalanchego and subnet-evm.
 #
-# Builds RPMs inside a Rocky Linux 9 container (glibc 2.34) with GPG signing.
+# - RPMs build inside a Rocky Linux 9 container (glibc 2.34) with GPG signing.
+# - Linux tarballs build inside an Ubuntu 22.04 container (glibc 2.35) with
+#   detached GPG signatures and validate in a fresh ubuntu:22.04 container.
 # PACKAGING_TAG defaults to v0.0.0 for local testing; set for release builds.
 
 version: '3'
@@ -30,6 +32,18 @@ vars:
     sh: echo "${PACKAGING_TAG:-v0.0.0}"
   PACKAGING_DOCKER_IMAGE: avalanchego-rpm-builder
   PACKAGING_OUTPUT_DIR: '{{.REPO_ROOT}}/build/rpm'
+
+  # Map uname -m to deb/tarball arch names (aarch64 -> arm64).
+  PACKAGING_TGZ_HOST_ARCH:
+    sh: |
+      arch=$(uname -m)
+      case "${arch}" in
+        x86_64)        echo "amd64" ;;
+        arm64|aarch64) echo "arm64" ;;
+        *)             echo "${arch}" ;;
+      esac
+  PACKAGING_TGZ_DOCKER_IMAGE: avalanchego-tgz-builder
+  PACKAGING_TGZ_OUTPUT_DIR: '{{.REPO_ROOT}}/build/tgz'
 
 tasks:
   default:
@@ -114,3 +128,54 @@ tasks:
       GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-rpm.sh'
+
+  build-tgz-builder-docker-image:
+    desc: Builds the linux tarball builder Docker image
+    internal: true
+    env:
+      GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
+      DOCKER_IMAGE: '{{.PACKAGING_TGZ_DOCKER_IMAGE}}'
+      DOCKERFILE: 'Dockerfile.tgz'
+      CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/build-builder-image.sh'
+
+  build-tarballs:
+    desc: Builds linux tarballs for avalanchego and subnet-evm in a container
+    vars:
+      TGZ_TAG: '{{.PACKAGING_TAG}}'
+    deps: [build-tgz-builder-docker-image]
+    cmds:
+      - cmd: mkdir -p {{.PACKAGING_TGZ_OUTPUT_DIR}}
+      - cmd: >-
+          docker run --rm
+          --platform linux/{{.PACKAGING_TGZ_HOST_ARCH}}
+          -v {{.REPO_ROOT}}:/build
+          -v {{.PACKAGING_TGZ_OUTPUT_DIR}}:/output
+          {{if .GPG_KEY_FILE}}-v {{.GPG_KEY_FILE}}:{{.GPG_KEY_FILE}}:ro{{end}}
+          -e PACKAGING_TAG={{.TGZ_TAG}}
+          -e OUTPUT_DIR=/output
+          -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          {{if .GPG_KEY_FILE}}-e GPG_KEY_FILE{{end}}
+          {{if .GPG_PASSPHRASE}}-e GPG_PASSPHRASE{{end}}
+          {{.PACKAGING_TGZ_DOCKER_IMAGE}}
+          .github/packaging/scripts/build-tgz.sh
+
+  validate-tarballs:
+    desc: Validates tarballs by verifying signatures and smoke testing in a fresh container
+    cmds:
+      - cmd: >-
+          TAG={{.PACKAGING_TAG}}
+          GIT_COMMIT={{.PACKAGING_GIT_COMMIT}}
+          {{.REPO_ROOT}}/.github/packaging/scripts/validate-tgz.sh
+
+  test-build-tarballs:
+    desc: Builds and validates linux tarballs end-to-end
+    cmds:
+      - task: build-tarballs
+      - task: validate-tarballs
+
+  upload-tarballs:
+    desc: Uploads built tarballs and signatures to S3 (requires BUCKET, TGZ_ARCH, AWS creds)
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/upload-tgz.sh'

@@ -1,0 +1,41 @@
+# Build container for linux tarball packaging of avalanchego and subnet-evm.
+#
+# Based on Ubuntu 22.04 (glibc 2.35) to match the jammy target users
+# already consume. Source tree is bind-mounted at runtime, not COPY'd.
+#
+# Usage (via build-builder-image.sh, which fetches GO_CHECKSUM automatically):
+#   DOCKERFILE=Dockerfile.tgz .github/packaging/scripts/build-builder-image.sh
+#   docker run --rm -v .:/build -v ./build/tgz:/output avalanchego-tgz-builder ...
+
+FROM ubuntu:22.04
+
+ARG GO_VERSION=INVALID
+ARG GO_CHECKSUM=INVALID
+ARG TARGETARCH
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies
+# - gcc, libc6-dev: required for cgo (CGO_ENABLED=1 in scripts/constants.sh)
+# - gnupg2: GPG signing of tarballs
+# - git: version detection in build scripts
+# - ca-certificates, curl: Go download
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        gcc \
+        git \
+        gnupg2 \
+        libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Go (with SHA256 verification)
+RUN curl -fsSL -o /tmp/go.tar.gz \
+        "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" \
+    && echo "${GO_CHECKSUM}  /tmp/go.tar.gz" | sha256sum -c - \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+WORKDIR /build
