@@ -113,11 +113,12 @@ func (c *Client) do(ctx context.Context, client *p2p.Client, req, resp proto.Mes
 			c.peers.RegisterFailure(nodeID)
 			return fmt.Errorf("%w: %w", errHandlerFailed, r.err)
 		}
-		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
-		c.peers.RegisterResponse(nodeID, bandwidth)
 		if err := proto.Unmarshal(r.bytes, resp); err != nil {
+			c.peers.RegisterFailure(nodeID)
 			return fmt.Errorf("%w: %w", errUnmarshalResponse, err)
 		}
+		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
+		c.peers.RegisterResponse(nodeID, bandwidth)
 		return nil
 	}
 }
