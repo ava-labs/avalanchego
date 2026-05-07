@@ -3,7 +3,7 @@
 
 // simulated_test.go validates the gas price manager precompile by routing
 // calls through a deployed Solidity wrapper contract (GasPriceManagerTest.sol),
-// which acts as contract as an integration test with the EVM interpreter:
+// which acts as an integration test with the EVM interpreter:
 //
 //	Go abi.Pack() -> wrapper (solc-compiled) -> ABI re-encoding -> precompile -> Go abi.Unpack()
 //
@@ -19,6 +19,7 @@
 package gaspricemanager_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -78,7 +79,7 @@ func TestMain(m *testing.M) {
 	core.RegisterExtras()
 	customtypes.Register()
 	params.RegisterExtras()
-	m.Run()
+	os.Exit(m.Run())
 }
 
 func toBindingsGasPriceConfig(c commontype.GasPriceConfig) bindings.IGasPriceManagerGasPriceConfig {
