@@ -52,7 +52,7 @@ type Config struct {
 	ChainManager chains.Manager
 	HTTPServer   server.PathAdderWithReadLock
 	VMRegistry   registry.VMRegistry
-	VMManager    vms.Manager
+	VMManager    *vms.Manager
 }
 
 // Admin is the API service for node admin management

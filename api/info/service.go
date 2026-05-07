@@ -73,7 +73,7 @@ type Info struct {
 	myIP         *utils.Atomic[netip.AddrPort]
 	networking   network.Network
 	chainManager chains.Manager
-	vmManager    vms.Manager
+	vmManager    *vms.Manager
 	benchlist    benchlist.Manager
 }
 
@@ -82,7 +82,7 @@ type Parameters struct {
 	NodeID    ids.NodeID
 	NodePOP   *signer.ProofOfPossession
 	NetworkID uint32
-	VMManager vms.Manager
+	VMManager *vms.Manager
 	Upgrades  upgrade.Config
 
 	TxFee            uint64
@@ -94,7 +94,7 @@ func NewService(
 	log logging.Logger,
 	validators validators.Manager,
 	chainManager chains.Manager,
-	vmManager vms.Manager,
+	vmManager *vms.Manager,
 	myIP *utils.Atomic[netip.AddrPort],
 	network network.Network,
 	benchlist benchlist.Manager,

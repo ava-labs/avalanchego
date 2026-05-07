@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "warp",
     srcs = [
@@ -11,7 +16,6 @@ go_library(
         "verifier_stats.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/warp",
-    visibility = ["//visibility:public"],
     deps = [
         "//cache",
         "//cache/lru",

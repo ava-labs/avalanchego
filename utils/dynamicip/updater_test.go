@@ -84,12 +84,12 @@ func TestNewUpdater(t *testing.T) {
 	select {
 	case <-updater.rootCtx.Done():
 	case <-ctx.Done():
-		require.FailNow("timeout waiting for root context cancellation")
+		t.Fatal("timeout waiting for root context cancellation")
 	}
 	select {
 	case _, open := <-updater.doneChan:
 		require.False(open)
 	case <-ctx.Done():
-		require.FailNow("timeout waiting for doneChan to close")
+		t.Fatal("timeout waiting for doneChan to close")
 	}
 }

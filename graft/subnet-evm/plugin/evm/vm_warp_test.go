@@ -177,7 +177,7 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 		require.Len(acceptedLogs, 1, "unexpected length of accepted logs")
 		require.Equal(acceptedLogs[0], receipts[0].Logs[0])
 	case <-time.After(time.Second):
-		require.Fail("Failed to read accepted logs from subscription")
+		t.Fatal("Failed to read accepted logs from subscription")
 	}
 
 	// Verify the produced message signature is valid

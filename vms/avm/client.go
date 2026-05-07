@@ -218,13 +218,7 @@ func (c *Client) GetTxFee(ctx context.Context, options ...rpc.Option) (uint64, u
 	return uint64(res.TxFee), uint64(res.CreateAssetTxFee), err
 }
 
-func AwaitTxAccepted(
-	c *Client,
-	ctx context.Context,
-	txID ids.ID,
-	freq time.Duration,
-	options ...rpc.Option,
-) error {
+func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) error {
 	ticker := time.NewTicker(freq)
 	defer ticker.Stop()
 

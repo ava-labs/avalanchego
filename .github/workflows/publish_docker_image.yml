@@ -9,16 +9,16 @@ on:
       - master
       - dev
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   publish_docker_image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Install qemu (required for cross-platform builds)
-        run: |
-          sudo apt update
-          sudo apt -y install qemu-system qemu-user-static
-          sudo systemctl restart docker
+      - uses: actions/checkout@v5
+      - name: Set up QEMU (required for cross-platform builds)
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Create multiplatform docker builder
         run: docker buildx create --use
       - name: Build and publish images to DockerHub

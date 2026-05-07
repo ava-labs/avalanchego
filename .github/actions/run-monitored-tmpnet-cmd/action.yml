@@ -109,7 +109,7 @@ runs:
       run: kind export logs /tmp/kind-logs
     - name: Upload kind logs
       if: always() && (inputs.runtime == 'kube')
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ${{ inputs.artifact_prefix }}-kind-logs
         path: /tmp/kind-logs

@@ -14,10 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ router.Router = (*beaconManager)(nil)
+var _ router.ExternalHandler = (*beaconManager)(nil)
 
 type beaconManager struct {
-	router.Router
+	router.ExternalHandler
 	beacons                     validators.Manager
 	requiredConns               int64
 	numConns                    int64
@@ -34,12 +34,12 @@ func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Applic
 			close(b.onSufficientlyConnected)
 		})
 	}
-	b.Router.Connected(nodeID, nodeVersion, subnetID)
+	b.ExternalHandler.Connected(nodeID, nodeVersion, subnetID)
 }
 
 func (b *beaconManager) Disconnected(nodeID ids.NodeID) {
 	if _, isBeacon := b.beacons.GetValidator(constants.PrimaryNetworkID, nodeID); isBeacon {
 		atomic.AddInt64(&b.numConns, -1)
 	}
-	b.Router.Disconnected(nodeID)
+	b.ExternalHandler.Disconnected(nodeID)
 }

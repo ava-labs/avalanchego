@@ -46,8 +46,8 @@ func (s *StateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) 
 	if s.AcceptF != nil {
 		return s.AcceptF(ctx)
 	}
-	if s.CantAccept && s.T != nil {
-		require.FailNow(s.T, errAccept.Error())
+	if s.T != nil {
+		require.False(s.T, s.CantAccept, errAccept)
 	}
 	return block.StateSyncSkipped, errAccept
 }

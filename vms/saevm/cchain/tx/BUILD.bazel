@@ -1,0 +1,79 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
+go_library(
+    name = "tx",
+    srcs = [
+        "codec.go",
+        "export.go",
+        "import.go",
+        "tx.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx",
+    deps = [
+        "//chains/atomic",
+        "//codec",
+        "//codec/linearcodec",
+        "//graft/coreth/core/extstate",
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/upgrade/ap5",
+        "//ids",
+        "//snow",
+        "//utils",
+        "//utils/constants",
+        "//utils/hashing",
+        "//utils/math",
+        "//utils/wrappers",
+        "//vms/components/avax",
+        "//vms/components/gas",
+        "//vms/saevm/hook",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+go_test(
+    name = "tx_test",
+    srcs = [
+        "compatibility_test.go",
+        "tx_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":tx"],
+    deps = [
+        "//chains/atomic",
+        "//graft/coreth/core/extstate",
+        "//graft/coreth/params/extras/extrastest",
+        "//graft/coreth/plugin/evm",
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/atomic/vm",
+        "//ids",
+        "//snow",
+        "//snow/validators/validatorstest",
+        "//upgrade/upgradetest",
+        "//utils/constants",
+        "//utils/math",
+        "//vms/components/avax",
+        "//vms/components/gas",
+        "//vms/components/verify",
+        "//vms/saevm/cchain/tx/txtest",
+        "//vms/saevm/cmputils",
+        "//vms/saevm/hook",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

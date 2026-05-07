@@ -76,7 +76,7 @@ func TestInboundMsgByteThrottlerCancelContext(t *testing.T) {
 	}()
 	select {
 	case <-vdr2Done:
-		require.FailNow("should block on acquiring any more bytes")
+		t.Fatal("should block on acquiring any more bytes")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -95,7 +95,7 @@ func TestInboundMsgByteThrottlerCancelContext(t *testing.T) {
 	select {
 	case <-vdr2Done:
 	case <-time.After(50 * time.Millisecond):
-		require.FailNow("channel should signal because ctx was cancelled")
+		t.Fatal("channel should signal because ctx was cancelled")
 	}
 
 	require.NotContains(throttler.nodeToWaitingMsgID, vdr2ID)
@@ -186,7 +186,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	}()
 	select {
 	case <-vdr1Done:
-		require.FailNow("should block on acquiring any more bytes")
+		t.Fatal("should block on acquiring any more bytes")
 	case <-time.After(50 * time.Millisecond):
 	}
 	throttler.lock.Lock()
@@ -204,7 +204,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	}()
 	select {
 	case <-vdr2Done:
-		require.FailNow("should block on acquiring any more bytes")
+		t.Fatal("should block on acquiring any more bytes")
 	case <-time.After(50 * time.Millisecond):
 	}
 	throttler.lock.Lock()
@@ -224,7 +224,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	}()
 	select {
 	case <-nonVdrDone:
-		require.FailNow("should block on acquiring any more bytes")
+		t.Fatal("should block on acquiring any more bytes")
 	case <-time.After(50 * time.Millisecond):
 	}
 	throttler.lock.Lock()
@@ -270,7 +270,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	}()
 	select {
 	case <-nonVdrDone:
-		require.FailNow("should block on acquiring any more bytes")
+		t.Fatal("should block on acquiring any more bytes")
 	case <-time.After(50 * time.Millisecond):
 	}
 	throttler.lock.Lock()
@@ -346,7 +346,7 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	}()
 	select {
 	case <-nonVdrDone:
-		require.FailNow("should block on acquiring any more bytes")
+		t.Fatal("should block on acquiring any more bytes")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -399,7 +399,7 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 	}()
 	select {
 	case <-doneVdr:
-		require.FailNow("should block on acquiring any more bytes")
+		t.Fatal("should block on acquiring any more bytes")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -411,7 +411,7 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 	}()
 	select {
 	case <-done:
-		require.FailNow("should block on acquiring any more bytes")
+		t.Fatal("should block on acquiring any more bytes")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -430,7 +430,7 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 
 	select {
 	case <-doneVdr:
-		require.FailNow("should still be blocking")
+		t.Fatal("should still be blocking")
 	case <-time.After(50 * time.Millisecond):
 	}
 

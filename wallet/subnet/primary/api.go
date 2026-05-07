@@ -41,6 +41,7 @@ const (
 var (
 	_ UTXOClient = (*platformvm.Client)(nil)
 	_ UTXOClient = (*avm.Client)(nil)
+	_ UTXOClient = (*client.Client)(nil)
 )
 
 type UTXOClient interface {
@@ -60,7 +61,7 @@ type AVAXState struct {
 	PCTX    *pbuilder.Context
 	XClient *avm.Client
 	XCTX    *xbuilder.Context
-	CClient client.Client
+	CClient *client.Client
 	CCTX    *c.Context
 	UTXOs   walletcommon.UTXOs
 }

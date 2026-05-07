@@ -326,7 +326,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	// require we didn't send anything
 	select {
 	case <-sentAppRequest:
-		require.FailNow(t, "should not have sent request")
+		t.Fatal("should not have sent request")
 	default:
 	}
 

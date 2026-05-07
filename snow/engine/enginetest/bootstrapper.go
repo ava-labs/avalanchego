@@ -36,8 +36,8 @@ func (b *Bootstrapper) Clear(ctx context.Context) error {
 	if b.ClearF != nil {
 		return b.ClearF(ctx)
 	}
-	if b.CantClear && b.T != nil {
-		require.FailNow(b.T, errClear.Error())
+	if b.T != nil {
+		require.False(b.T, b.CantClear, errClear)
 	}
 	return errClear
 }

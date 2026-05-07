@@ -48,8 +48,8 @@ func (j *TestJob) ID() ids.ID {
 	if j.IDF != nil {
 		return j.IDF()
 	}
-	if j.CantID && j.T != nil {
-		require.FailNow(j.T, "Unexpectedly called ID")
+	if j.T != nil {
+		require.False(j.T, j.CantID, "unexpectedly called ID")
 	}
 	return ids.Empty
 }
@@ -58,8 +58,8 @@ func (j *TestJob) MissingDependencies(ctx context.Context) (set.Set[ids.ID], err
 	if j.MissingDependenciesF != nil {
 		return j.MissingDependenciesF(ctx)
 	}
-	if j.CantMissingDependencies && j.T != nil {
-		require.FailNow(j.T, "Unexpectedly called MissingDependencies")
+	if j.T != nil {
+		require.False(j.T, j.CantMissingDependencies, "unexpectedly called MissingDependencies")
 	}
 	return set.Set[ids.ID]{}, nil
 }
@@ -68,8 +68,8 @@ func (j *TestJob) Execute(ctx context.Context) error {
 	if j.ExecuteF != nil {
 		return j.ExecuteF(ctx)
 	}
-	if j.CantExecute && j.T != nil {
-		require.FailNow(j.T, errExecute.Error())
+	if j.T != nil {
+		require.False(j.T, j.CantExecute, "unexpectedly called Execute")
 	}
 	return errExecute
 }
@@ -78,8 +78,8 @@ func (j *TestJob) Bytes() []byte {
 	if j.BytesF != nil {
 		return j.BytesF()
 	}
-	if j.CantBytes && j.T != nil {
-		require.FailNow(j.T, "Unexpectedly called Bytes")
+	if j.T != nil {
+		require.False(j.T, j.CantBytes, "unexpectedly called Bytes")
 	}
 	return nil
 }
@@ -88,8 +88,8 @@ func (j *TestJob) HasMissingDependencies(ctx context.Context) (bool, error) {
 	if j.HasMissingDependenciesF != nil {
 		return j.HasMissingDependenciesF(ctx)
 	}
-	if j.CantHasMissingDependencies && j.T != nil {
-		require.FailNow(j.T, errHasMissingDependencies.Error())
+	if j.T != nil {
+		require.False(j.T, j.CantHasMissingDependencies, "unexpectedly called HasMissingDependencies")
 	}
 	return false, errHasMissingDependencies
 }

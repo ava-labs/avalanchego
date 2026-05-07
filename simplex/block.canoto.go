@@ -29,9 +29,11 @@ var (
 const (
 	canoto__canotoSimplexBlock__Metadata   = 1
 	canoto__canotoSimplexBlock__InnerBlock = 2
+	canoto__canotoSimplexBlock__Blacklist  = 3
 
 	canoto__canotoSimplexBlock__Metadata__tag   = "\x0a" // canoto.Tag(canoto__canotoSimplexBlock__Metadata, canoto.Len)
 	canoto__canotoSimplexBlock__InnerBlock__tag = "\x12" // canoto.Tag(canoto__canotoSimplexBlock__InnerBlock, canoto.Len)
+	canoto__canotoSimplexBlock__Blacklist__tag  = "\x1a" // canoto.Tag(canoto__canotoSimplexBlock__Blacklist, canoto.Len)
 )
 
 type canotoData_canotoSimplexBlock struct {
@@ -52,6 +54,12 @@ func (*canotoSimplexBlock) CanotoSpec(...reflect.Type) *canoto.Spec {
 			{
 				FieldNumber: canoto__canotoSimplexBlock__InnerBlock,
 				Name:        "InnerBlock",
+				OneOf:       "",
+				TypeBytes:   true,
+			},
+			{
+				FieldNumber: canoto__canotoSimplexBlock__Blacklist,
+				Name:        "Blacklist",
 				OneOf:       "",
 				TypeBytes:   true,
 			},
@@ -115,6 +123,17 @@ func (c *canotoSimplexBlock) UnmarshalCanotoFrom(r canoto.Reader) error {
 			if len(c.InnerBlock) == 0 {
 				return canoto.ErrZeroValue
 			}
+		case canoto__canotoSimplexBlock__Blacklist:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadBytes(&r, &c.Blacklist); err != nil {
+				return err
+			}
+			if len(c.Blacklist) == 0 {
+				return canoto.ErrZeroValue
+			}
 		default:
 			return canoto.ErrUnknownField
 		}
@@ -146,6 +165,9 @@ func (c *canotoSimplexBlock) CalculateCanotoCache() {
 	}
 	if len(c.InnerBlock) != 0 {
 		size += uint64(len(canoto__canotoSimplexBlock__InnerBlock__tag)) + canoto.SizeBytes(c.InnerBlock)
+	}
+	if len(c.Blacklist) != 0 {
+		size += uint64(len(canoto__canotoSimplexBlock__Blacklist__tag)) + canoto.SizeBytes(c.Blacklist)
 	}
 	atomic.StoreUint64(&c.canotoData.size, size)
 }
@@ -192,6 +214,10 @@ func (c *canotoSimplexBlock) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 	if len(c.InnerBlock) != 0 {
 		canoto.Append(&w, canoto__canotoSimplexBlock__InnerBlock__tag)
 		canoto.AppendBytes(&w, c.InnerBlock)
+	}
+	if len(c.Blacklist) != 0 {
+		canoto.Append(&w, canoto__canotoSimplexBlock__Blacklist__tag)
+		canoto.AppendBytes(&w, c.Blacklist)
 	}
 	return w
 }

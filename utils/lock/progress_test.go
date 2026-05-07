@@ -25,7 +25,7 @@ func TestProgressSubscriptionInitialProgressUnblocksWaiterImmediately(t *testing
 	select {
 	case <-done:
 	case <-time.After(time.Minute):
-		require.Fail(t, "WaitForProgress should have returned immediately")
+		t.Fatal("WaitForProgress should have returned immediately")
 	}
 }
 
@@ -45,7 +45,7 @@ func TestProgressSubscriptionWaiterBlocksUntilProgressAdvances(t *testing.T) {
 	// The goroutine should be blocked since progress is 0.
 	select {
 	case <-done:
-		require.Fail(t, "WaitForProgress should not have returned yet")
+		t.Fatal("WaitForProgress should not have returned yet")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -54,7 +54,7 @@ func TestProgressSubscriptionWaiterBlocksUntilProgressAdvances(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(time.Minute):
-		require.Fail(t, "WaitForProgress should have returned after SetProgress")
+		t.Fatal("WaitForProgress should have returned after SetProgress")
 	}
 
 	wg.Wait()
@@ -79,7 +79,7 @@ func TestProgressSubscriptionContextCancellationUnblocksWaiter(t *testing.T) {
 	// The goroutine should be blocked.
 	select {
 	case <-done:
-		require.Fail(t, "WaitForProgress should not have returned yet")
+		t.Fatal("WaitForProgress should not have returned yet")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -88,7 +88,7 @@ func TestProgressSubscriptionContextCancellationUnblocksWaiter(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(time.Minute):
-		require.Fail(t, "WaitForProgress should have returned after context cancellation")
+		t.Fatal("WaitForProgress should have returned after context cancellation")
 	}
 
 	wg.Wait()
@@ -124,7 +124,7 @@ func TestProgressSubscriptionMultipleWaitersUnblockedBySingleSetProgress(t *test
 		select {
 		case <-done[i]:
 		case <-time.After(time.Minute):
-			require.Fail(t, "waiter should have been unblocked")
+			t.Fatal("waiter should have been unblocked")
 		}
 	}
 
@@ -143,7 +143,7 @@ func TestProgressSubscriptionEqualProgressBlocks(t *testing.T) {
 	// Waiting for exactly the current progress should block (condition is pos >= progress).
 	select {
 	case <-done:
-		require.Fail(t, "WaitForProgress should block when pos == progress")
+		t.Fatal("WaitForProgress should block when pos == progress")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -152,6 +152,6 @@ func TestProgressSubscriptionEqualProgressBlocks(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(time.Minute):
-		require.Fail(t, "WaitForProgress should have returned after progress exceeded pos")
+		t.Fatal("WaitForProgress should have returned after progress exceeded pos")
 	}
 }

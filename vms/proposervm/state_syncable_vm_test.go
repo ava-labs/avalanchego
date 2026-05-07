@@ -662,7 +662,7 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 		case bytes.Equal(b, innerBlk2.BytesV):
 			return innerBlk2, nil
 		default:
-			require.FailNow("unexpected parse block")
+			t.Fatal("unexpected parse block")
 			// Unreachable, but required to satisfy the compiler
 			// since we use FailNow instead of panic
 			return nil, nil

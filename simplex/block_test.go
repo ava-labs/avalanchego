@@ -36,6 +36,12 @@ func TestBlockSerialization(t *testing.T) {
 			Seq:     1,
 			Prev:    genesisBlock.digest,
 		},
+		blacklist: simplex.Blacklist{
+			NodeCount: 3,
+			SuspectedNodes: []simplex.SuspectedNode{
+				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 11},
+			},
+		},
 	}
 
 	// Serialize the block
@@ -75,6 +81,21 @@ func TestBlockSerialization(t *testing.T) {
 				return nil, nil
 			},
 		},
+		{
+			name: "invalid blacklist",
+			blockBytes: func() []byte {
+				cBlock := &canotoSimplexBlock{
+					Metadata:   b.metadata.Bytes(),
+					InnerBlock: testBlock.BytesV,
+					Blacklist:  []byte("invalid blacklist"),
+				}
+				return cBlock.MarshalCanoto()
+			}(),
+			expectedError: errFailedToParseBlacklist,
+			parseFunc: func(_ context.Context, _ []byte) (snowman.Block, error) {
+				return testBlock, nil
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -88,7 +109,7 @@ func TestBlockSerialization(t *testing.T) {
 			testVM.ParseBlockF = tt.parseFunc
 			deserializer := &blockDeserializer{
 				parser:       testVM,
-				blockTracker: func() *blockTracker { bt := newBlockTracker(); bt.init(genesisBlock); return bt }(),
+				blockTracker: func() *blockTracker { bt := newBlockTracker(testVM); bt.init(genesisBlock); return bt }(),
 			}
 
 			// Deserialize the block
@@ -154,6 +175,11 @@ func TestVerify(t *testing.T) {
 	b := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
+	preferenceSet := false
+	b.vmBlock.(*wrappedBlock).vm.SetPreferenceF = func(_ context.Context, _ ids.ID) error {
+		preferenceSet = true
+		return nil
+	}
 
 	verifiedBlock, err := b.Verify(ctx)
 	require.NoError(t, err)
@@ -161,6 +187,7 @@ func TestVerify(t *testing.T) {
 	// Ensure the verified block matches the original block
 	vBlockBytes, err := verifiedBlock.Bytes()
 	require.NoError(t, err)
+	require.True(t, preferenceSet)
 
 	blockBytes, err := b.Bytes()
 	require.NoError(t, err)

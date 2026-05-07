@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "eth",
     srcs = [
@@ -14,11 +19,9 @@ go_library(
         "state_accessor.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/eth",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/consensus",
         "//graft/coreth/core",
-        "//graft/coreth/core/extstate",
         "//graft/coreth/core/txpool",
         "//graft/coreth/core/txpool/legacypool",
         "//graft/coreth/eth/ethconfig",
@@ -65,7 +68,6 @@ graft_go_test(
     ],
     embed = [":eth"],
     deps = [
-        "//graft/coreth/core/extstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

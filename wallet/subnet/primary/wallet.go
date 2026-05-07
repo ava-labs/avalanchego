@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -97,7 +96,7 @@ func MakeWallet(
 		return nil, err
 	}
 
-	owners, err := platformvm.GetOwners(avaxState.PClient, ctx, config.SubnetIDs, config.ValidationIDs)
+	owners, err := avaxState.PClient.GetOwners(ctx, config.SubnetIDs, config.ValidationIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +147,7 @@ func MakePWallet(
 		return nil, err
 	}
 
-	owners, err := platformvm.GetOwners(client, ctx, config.SubnetIDs, config.ValidationIDs)
+	owners, err := client.GetOwners(ctx, config.SubnetIDs, config.ValidationIDs)
 	if err != nil {
 		return nil, err
 	}

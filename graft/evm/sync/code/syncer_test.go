@@ -58,7 +58,6 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest, c codec.Manager) {
 
 	codeQueue, err := NewQueue(
 		clientDB,
-		make(chan struct{}),
 		WithCapacity(test.queueCapacity),
 	)
 	require.NoError(t, err)
