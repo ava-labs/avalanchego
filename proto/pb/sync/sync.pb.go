@@ -160,7 +160,7 @@ func (x *GetLeafsRequest) GetNodeType() NodeType {
 	return NodeType_NODE_TYPE_UNSPECIFIED
 }
 
-// LeafsResponse intentionally omits the legacy `More` field; that is set
+// LeafsResponse intentionally omits the legacy `More` field which is set
 // client-side after range-proof verification, never on the wire.
 type LeafsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -223,9 +223,8 @@ func (x *LeafsResponse) GetProofVals() [][]byte {
 }
 
 type GetCodeRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Keccak256 hashes of the contract bytecode being requested.
-	Hashes        [][]byte `protobuf:"bytes,1,rep,name=hashes,proto3" json:"hashes,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hashes        [][]byte               `protobuf:"bytes,1,rep,name=hashes,proto3" json:"hashes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -268,10 +267,8 @@ func (x *GetCodeRequest) GetHashes() [][]byte {
 }
 
 type CodeResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Contract bytecode in the same order as the requested hashes. A peer that
-	// does not have a particular code hash returns an empty entry.
-	Data          [][]byte `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          [][]byte               `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -314,11 +311,10 @@ func (x *CodeResponse) GetData() [][]byte {
 }
 
 type GetBlockRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Hash   []byte                 `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
-	Height uint64                 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
-	// uint16 in legacy graft; uint32 is the smallest proto integer type.
-	Parents       uint32 `protobuf:"varint,3,opt,name=parents,proto3" json:"parents,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hash          []byte                 `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
+	Height        uint64                 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
+	Parents       uint32                 `protobuf:"varint,3,opt,name=parents,proto3" json:"parents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -376,7 +372,7 @@ func (x *GetBlockRequest) GetParents() uint32 {
 
 type BlockResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// RLP-encoded blocks, top-down.
+	// RLP-encoded blocks
 	Blocks        [][]byte `protobuf:"bytes,1,rep,name=blocks,proto3" json:"blocks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

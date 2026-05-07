@@ -17,10 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func newTestPeerTracker(t *testing.T, peers ...ids.NodeID) *p2p.PeerTracker {

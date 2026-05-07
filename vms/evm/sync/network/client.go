@@ -13,8 +13,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const epsilon = 1e-6
