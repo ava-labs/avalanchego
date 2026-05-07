@@ -587,23 +587,23 @@ var (
 
 func TestInputIDs(t *testing.T) {
 	tests := []struct {
-		tx   golden
+		tx   txData
 		want set.Set[ids.ID]
 	}{
 		{
-			tx: importGolden,
+			tx: importTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64")),
 			),
 		},
 		{
-			tx: exportGolden,
+			tx: exportTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x000000000000000000000014eb019ccd325ad53543a7e7e3b04828bdecf3cff6")),
 			),
 		},
 		{
-			tx: importMultiInputGolden,
+			tx: importMultiInputTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05")),
 				ids.ID(common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630")),
@@ -611,20 +611,20 @@ func TestInputIDs(t *testing.T) {
 			),
 		},
 		{
-			tx: exportSameAddressMultiAssetGolden,
+			tx: exportSameAddressMultiAssetTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x0000000000000005000000140000000000000000000000000000000000000000")),
 			),
 		},
 		{
-			tx: exportMultiAddressMultiAssetGolden,
+			tx: exportMultiAddressMultiAssetTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x0000000000000005000000140100000000000000000000000000000000000000")),
 				ids.ID(common.FromHex("0x0000000000000007000000140200000000000000000000000000000000000000")),
 			),
 		},
 		{
-			tx: importNonAVAXGolden,
+			tx: importNonAVAXTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb")),
 			),
