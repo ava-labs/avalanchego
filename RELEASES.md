@@ -2,7 +2,12 @@
 
 ## Pending (v1.14.3)
 
-- None.
+### Metrics
+
+- Consolidated the coreth and subnet-evm sync peer trackers onto the shared `p2p.PeerTracker`. The following gauges are renamed. They were previously registered through libevm's metrics registry (exported under the `eth` prefix) and are now registered as native prometheus gauges on the `sdk` registry under the `sync_peer_tracker` namespace:
+  - `eth_net_tracked_peers` -> `sdk_sync_peer_tracker_num_tracked_peers`
+  - `eth_net_responsive_peers` -> `sdk_sync_peer_tracker_num_responsive_peers`
+  - `eth_net_average_bandwidth` -> `sdk_sync_peer_tracker_average_bandwidth`
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
