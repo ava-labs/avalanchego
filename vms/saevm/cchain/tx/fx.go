@@ -11,12 +11,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// fx exposes [secp256k1fx.Fx.VerifyTransfer] for verification of UTXO transfers
+// from shared memory into the C-Chain.
 var fx secp256k1fx.Fx
 
 func init() {
 	if err := fx.Initialize(fxVM{}); err != nil {
 		panic(err)
 	}
+	// Mark the fx as bootstrapped so that it actually verifies signatures.
 	if err := fx.Bootstrapped(); err != nil {
 		panic(err)
 	}

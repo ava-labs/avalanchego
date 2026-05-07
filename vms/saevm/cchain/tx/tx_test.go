@@ -1337,7 +1337,7 @@ func TestTransferNonAVAX(t *testing.T) {
 				Unsigned: test.tx,
 			}
 			err := tx.TransferNonAVAX(avaxAssetID, got)
-			require.ErrorIs(t, err, test.wantErr)
+			require.ErrorIsf(t, err, test.wantErr, "%T.TransferNonAVAX()", tx)
 			if diff := compareStateDBs(want, got); diff != "" {
 				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", tx, diff)
 			}
