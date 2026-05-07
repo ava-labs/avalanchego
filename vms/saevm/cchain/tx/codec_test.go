@@ -27,17 +27,17 @@ import (
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
-var allGolden = [...]golden{
-	importGolden,
-	exportGolden,
-	importMultiInputGolden,
-	exportSameAddressMultiAssetGolden,
-	exportMultiAddressMultiAssetGolden,
-	importNonAVAXGolden,
+var allTxs = [...]txData{
+	importTx,
+	exportTx,
+	importMultiInputTx,
+	exportSameAddressMultiAssetTx,
+	exportMultiAddressMultiAssetTx,
+	importNonAVAXTx,
 }
 
 func TestID(t *testing.T) {
-	for _, tx := range allGolden {
+	for _, tx := range allTxs {
 		t.Run(tx.name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
 				// We must parse the old tx to properly initialize the ID.
@@ -53,7 +53,7 @@ func TestID(t *testing.T) {
 }
 
 func TestBytes(t *testing.T) {
-	for _, tx := range allGolden {
+	for _, tx := range allTxs {
 		t.Run(tx.name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
 				got, err := atomic.Codec.Marshal(atomic.CodecVersion, tx.old)
@@ -101,7 +101,7 @@ func oldCmpOpt() cmp.Option {
 }
 
 func TestParse(t *testing.T) {
-	for _, tx := range allGolden {
+	for _, tx := range allTxs {
 		t.Run(tx.name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
 				got, err := parseOldTx(tx.bytes)
@@ -133,7 +133,7 @@ func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
 			avaxAssetID,
 		},
 	}
-	for _, tx := range allGolden {
+	for _, tx := range allTxs {
 		fuzzer.Add(tx.new)
 	}
 	fuzzer.Fuzz(ff)
@@ -153,7 +153,7 @@ func FuzzParseRoundTrip(f *testing.F) {
 }
 
 func FuzzParseCompatibility(f *testing.F) {
-	for _, tx := range allGolden {
+	for _, tx := range allTxs {
 		f.Add(tx.bytes)
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -168,9 +168,9 @@ func FuzzParseCompatibility(f *testing.F) {
 }
 
 func TestMarshalSlice(t *testing.T) {
-	oldTxs := make([]*atomic.Tx, len(allGolden))
-	newTxs := make([]*Tx, len(allGolden))
-	for i, tx := range allGolden {
+	oldTxs := make([]*atomic.Tx, len(allTxs))
+	newTxs := make([]*Tx, len(allTxs))
+	for i, tx := range allTxs {
 		oldTxs[i] = tx.old
 		newTxs[i] = tx.new
 	}
@@ -202,9 +202,9 @@ func TestMarshalSlice(t *testing.T) {
 }
 
 func TestParseSlice(t *testing.T) {
-	oldTxs := make([]*atomic.Tx, len(allGolden))
-	newTxs := make([]*Tx, len(allGolden))
-	for i, tx := range allGolden {
+	oldTxs := make([]*atomic.Tx, len(allTxs))
+	newTxs := make([]*Tx, len(allTxs))
+	for i, tx := range allTxs {
 		oldTxs[i] = tx.old
 		newTxs[i] = tx.new
 	}
@@ -250,8 +250,8 @@ func TestParseSlice(t *testing.T) {
 
 func FuzzParseSliceRoundTrip(f *testing.F) {
 	{
-		newTxs := make([]*Tx, len(allGolden))
-		for i, tx := range allGolden {
+		newTxs := make([]*Tx, len(allTxs))
+		for i, tx := range allTxs {
 			newTxs[i] = tx.new
 		}
 		b, err := MarshalSlice(newTxs)
@@ -293,8 +293,8 @@ func parseOldTxs(b []byte) ([]*atomic.Tx, error) {
 
 func FuzzParseSliceCompatibility(f *testing.F) {
 	{
-		newTxs := make([]*Tx, len(allGolden))
-		for i, tx := range allGolden {
+		newTxs := make([]*Tx, len(allTxs))
+		for i, tx := range allTxs {
 			newTxs[i] = tx.new
 		}
 		b, err := MarshalSlice(newTxs)
@@ -315,11 +315,11 @@ func FuzzParseSliceCompatibility(f *testing.F) {
 
 func TestJSONMarshal(t *testing.T) {
 	tests := []struct {
-		tx   golden
+		tx   txData
 		want string
 	}{
 		{
-			tx: importGolden,
+			tx: importTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":1,
@@ -349,7 +349,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: exportGolden,
+			tx: exportTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":1,
@@ -380,7 +380,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: importMultiInputGolden,
+			tx: importMultiInputTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":1,
@@ -423,7 +423,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: exportSameAddressMultiAssetGolden,
+			tx: exportSameAddressMultiAssetTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":0,
@@ -460,7 +460,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: exportMultiAddressMultiAssetGolden,
+			tx: exportMultiAddressMultiAssetTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":0,
@@ -497,7 +497,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: importNonAVAXGolden,
+			tx: importNonAVAXTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":0,
