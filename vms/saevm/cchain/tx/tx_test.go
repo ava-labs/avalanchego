@@ -1922,12 +1922,13 @@ func TestVerifyCredentials(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			memory := chainsatomic.NewMemory(memdb.New())
 			xMemory := memory.NewSharedMemory(xChainID)
-			require.NoError(t, xMemory.Apply(map[ids.ID]*chainsatomic.Requests{
+			err := xMemory.Apply(map[ids.ID]*chainsatomic.Requests{
 				cChainID: {PutRequests: test.utxos},
-			}))
+			})
+			require.NoErrorf(t, err, "%T.Apply()", xMemory)
 
 			cMemory := memory.NewSharedMemory(cChainID)
-			err := test.tx.VerifyCredentials(cMemory)
+			err = test.tx.VerifyCredentials(cMemory)
 			assert.ErrorIsf(t, err, test.wantErr, "%T.VerifyCredentials()", test.tx)
 		})
 	}
