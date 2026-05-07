@@ -316,11 +316,11 @@ func FuzzParseSliceCompatibility(f *testing.F) {
 func TestJSONMarshal(t *testing.T) {
 	tests := []struct {
 		tx   golden
-		json string
+		want string
 	}{
 		{
 			tx: importGolden,
-			json: `{
+			want: `{
 				"unsignedTx":{
 					"networkID":1,
 					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
@@ -350,7 +350,7 @@ func TestJSONMarshal(t *testing.T) {
 		},
 		{
 			tx: exportGolden,
-			json: `{
+			want: `{
 				"unsignedTx":{
 					"networkID":1,
 					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
@@ -381,7 +381,7 @@ func TestJSONMarshal(t *testing.T) {
 		},
 		{
 			tx: importMultiInputGolden,
-			json: `{
+			want: `{
 				"unsignedTx":{
 					"networkID":1,
 					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
@@ -424,7 +424,7 @@ func TestJSONMarshal(t *testing.T) {
 		},
 		{
 			tx: exportSameAddressMultiAssetGolden,
-			json: `{
+			want: `{
 				"unsignedTx":{
 					"networkID":0,
 					"blockchainID":"11111111111111111111111111111111LpoYY",
@@ -461,7 +461,7 @@ func TestJSONMarshal(t *testing.T) {
 		},
 		{
 			tx: exportMultiAddressMultiAssetGolden,
-			json: `{
+			want: `{
 				"unsignedTx":{
 					"networkID":0,
 					"blockchainID":"11111111111111111111111111111111LpoYY",
@@ -498,7 +498,7 @@ func TestJSONMarshal(t *testing.T) {
 		},
 		{
 			tx: importNonAVAXGolden,
-			json: `{
+			want: `{
 				"unsignedTx":{
 					"networkID":0,
 					"blockchainID":"11111111111111111111111111111111LpoYY",
@@ -526,13 +526,13 @@ func TestJSONMarshal(t *testing.T) {
 				tx := test.tx.old
 				got, err := json.Marshal(tx)
 				require.NoErrorf(t, err, "json.Marshal(%T)", tx)
-				assert.JSONEqf(t, test.json, string(got), "json.Marshal(%T)", tx)
+				assert.JSONEqf(t, test.want, string(got), "json.Marshal(%T)", tx)
 			})
 			t.Run("new", func(t *testing.T) {
 				tx := test.tx.new
 				got, err := json.Marshal(tx)
 				require.NoErrorf(t, err, "json.Marshal(%T)", tx)
-				assert.JSONEqf(t, test.json, string(got), "json.Marshal(%T)", tx)
+				assert.JSONEqf(t, test.want, string(got), "json.Marshal(%T)", tx)
 			})
 		})
 	}
