@@ -54,7 +54,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-type golden struct {
+type txData struct {
 	name  string
 	old   *atomic.Tx
 	new   *Tx
@@ -72,7 +72,7 @@ var (
 // Golden transactions are defined at the package level to allow sharing between
 // various fuzz tests and unit tests.
 var (
-	importGolden = golden{
+	importTx = txData{
 		name: "import", // Included in https://subnets.avax.network/c-chain/block/4
 		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedImportTx{
@@ -146,7 +146,7 @@ var (
 		bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001c52b712aa7dce27a650bf509f799673e245edd4fa9e4e1700eb6105202fe579a0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000002faf080000000010000000000000001b8b5a87d1c05676f1f966da49151fa54dbe68c330000000002faf08021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000100000009000000013e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01"),
 	}
 
-	exportGolden = golden{
+	exportTx = txData{
 		name: "export", // Included in https://subnets.avax.network/c-chain/block/48
 		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedExportTx{
@@ -218,7 +218,7 @@ var (
 		bytes: common.FromHex("0x000000000001000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001eb019ccd325ad53543a7e7e3b04828bdecf3cff600000000000f424121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000000000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500000000010000000900000001254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01"),
 	}
 
-	importMultiInputGolden = golden{
+	importMultiInputTx = txData{
 		name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
 		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedImportTx{
@@ -382,7 +382,7 @@ var (
 		bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b000000031d249d0aab138afe01e6eff9c4789018a600771d94f5396b5df7b9d05298714d0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec000000001000000008e0713e47bfc29bef4cee6e4635da1c74a3aabade68ccad6fca3e99fd827eb1c0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000017c841c00000000100000000a022a8b069a5d5e54c7e09c5c5b0f762c6751068bef15fe951a5e4b349d642200000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec0000000010000000000000003383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000017c841c021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000300000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"),
 	}
 
-	exportSameAddressMultiAssetGolden = golden{
+	exportSameAddressMultiAssetTx = txData{
 		name: "export_same_address_multi_asset", // Synthetic
 		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedExportTx{
@@ -462,7 +462,7 @@ var (
 		bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000000000000500000002000000000000000000000000000000000000000000000000000000000000000000000007000000000000006400000000000000000000000100000001aa0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000700000000000186a000000000000000000000000100000001aa0000000000000000000000000000000000000000000000"),
 	}
 
-	exportMultiAddressMultiAssetGolden = golden{
+	exportMultiAddressMultiAssetTx = txData{
 		name: "export_multi_address_multi_asset", // Synthetic
 		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedExportTx{
@@ -546,7 +546,7 @@ var (
 		bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000200000000000000000000000000000000000000000000000000000000000000000000000700000000000001f400000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000007a12000000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000000000000"),
 	}
 
-	importNonAVAXGolden = golden{
+	importNonAVAXTx = txData{
 		name: "import_non_avax", // Synthetic
 		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedImportTx{
@@ -673,13 +673,13 @@ func TestAccountInputID(t *testing.T) {
 
 func TestAsOp(t *testing.T) {
 	tests := []struct {
-		tx   golden
+		tx   txData
 		want hook.Op
 	}{
 		{
-			tx: importGolden,
+			tx: importTx,
 			want: hook.Op{
-				ID:  importGolden.id,
+				ID:  importTx.id,
 				Gas: 11230,
 				Mint: map[common.Address]uint256.Int{
 					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): ScaleAVAX(50_000_000),
@@ -687,9 +687,9 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: exportGolden,
+			tx: exportTx,
 			want: hook.Op{
-				ID:        exportGolden.id,
+				ID:        exportTx.id,
 				Gas:       11230,
 				GasFeeCap: *uint256.NewInt(1_000_000 * X2CRate / 11230),
 				Burn: map[common.Address]hook.AccountDebit{
@@ -701,9 +701,9 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: importMultiInputGolden,
+			tx: importMultiInputTx,
 			want: hook.Op{
-				ID:  importMultiInputGolden.id,
+				ID:  importMultiInputTx.id,
 				Gas: 13526,
 				Mint: map[common.Address]uint256.Int{
 					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): ScaleAVAX(597_000_000),
@@ -711,9 +711,9 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: exportSameAddressMultiAssetGolden,
+			tx: exportSameAddressMultiAssetTx,
 			want: hook.Op{
-				ID:        exportSameAddressMultiAssetGolden.id,
+				ID:        exportSameAddressMultiAssetTx.id,
 				Gas:       12378,
 				GasFeeCap: *uint256.NewInt(900_000 * X2CRate / 12378),
 				Burn: map[common.Address]hook.AccountDebit{
@@ -726,9 +726,9 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: exportMultiAddressMultiAssetGolden,
+			tx: exportMultiAddressMultiAssetTx,
 			want: hook.Op{
-				ID:        exportMultiAddressMultiAssetGolden.id,
+				ID:        exportMultiAddressMultiAssetTx.id,
 				Gas:       12418,
 				GasFeeCap: *uint256.NewInt(500_000 * X2CRate / 12418),
 				Burn: map[common.Address]hook.AccountDebit{
@@ -744,9 +744,9 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: importNonAVAXGolden,
+			tx: importNonAVAXTx,
 			want: hook.Op{
-				ID:   importNonAVAXGolden.id,
+				ID:   importNonAVAXTx.id,
 				Gas:  10226,
 				Mint: map[common.Address]uint256.Int{},
 			},
@@ -1010,12 +1010,12 @@ func FuzzAsOpCompatibility(f *testing.F) {
 
 func TestAtomicRequests(t *testing.T) {
 	tests := []struct {
-		tx           golden
+		tx           txData
 		wantChainID  ids.ID
 		wantRequests *chainsatomic.Requests
 	}{
 		{
-			tx:          importGolden,
+			tx:          importTx,
 			wantChainID: xChainID,
 			wantRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
@@ -1024,7 +1024,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx:          exportGolden,
+			tx:          exportTx,
 			wantChainID: xChainID,
 			wantRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{{
@@ -1037,7 +1037,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx:          importMultiInputGolden,
+			tx:          importMultiInputTx,
 			wantChainID: xChainID,
 			wantRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
@@ -1048,7 +1048,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx: exportSameAddressMultiAssetGolden,
+			tx: exportSameAddressMultiAssetTx,
 			wantRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{
 					{
@@ -1069,7 +1069,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx: exportMultiAddressMultiAssetGolden,
+			tx: exportMultiAddressMultiAssetTx,
 			wantRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{
 					{
@@ -1092,7 +1092,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx: importNonAVAXGolden,
+			tx: importNonAVAXTx,
 			wantRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb"),
@@ -1473,7 +1473,7 @@ func TestSanityCheck(t *testing.T) {
 		},
 		{
 			name: "import_mainnet",
-			tx:   importGolden.new.Unsigned,
+			tx:   importTx.new.Unsigned,
 		},
 		{
 			name:    "import_wrong_network_id",
@@ -1614,7 +1614,7 @@ func TestSanityCheck(t *testing.T) {
 		},
 		{
 			name: "export_mainnet",
-			tx:   exportGolden.new.Unsigned,
+			tx:   exportTx.new.Unsigned,
 		},
 		{
 			name:    "export_wrong_network_id",
