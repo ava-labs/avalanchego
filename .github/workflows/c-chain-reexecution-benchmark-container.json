@@ -39,6 +39,11 @@
                 "runner": "avago-runner-i4i-16xlarge-local-ssd",
                 "test": "hashdb-archive-69m-69m100k",
                 "timeout-minutes": 1440
+            },
+            {
+                "runner": "avago-runner-i4i-4xlarge-local-ssd",
+                "test": "pathdb-33m-33m500k",
+                "timeout-minutes": 1440
             }
         ]
     }
