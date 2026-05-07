@@ -500,6 +500,12 @@ tasks:
       - task: generate-load-contract-bindings
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.load.kube.kind.sh {{.CLI_ARGS}}'
 
+  test-msync-e2e:
+    desc: Runs standalone merkle sync bootstrap validation
+    cmds:
+      - task: build
+      - cmd: '{{.NIX_RUN}} go run ./tests/msync/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}'
+
   test-robustness:
     desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.
     cmds:
