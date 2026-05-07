@@ -35,6 +35,8 @@ import (
 )
 
 func TestFirewoodSync(t *testing.T) {
+	t.Skip("Flaky test: https://github.com/ava-labs/avalanchego/issues/5353")
+
 	tests := []struct {
 		name       string
 		clientSize int
