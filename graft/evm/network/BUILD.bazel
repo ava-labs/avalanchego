@@ -41,6 +41,7 @@ graft_go_test(
         "//codec",
         "//codec/linearcodec",
         "//graft/evm/message",
+        "//graft/evm/network/networktest",
         "//ids",
         "//network/p2p",
         "//snow/engine/common",
