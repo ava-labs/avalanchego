@@ -195,7 +195,7 @@ func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) (*Block, bool) {
 	return block, exists
 }
 
-// verifyAndTrackBlock verifies the block and tracks it in the block tracker.
+// verifyAndTrackBlock verifies the block, sets it as the VM's preference, and tracks it in the block tracker.
 // If the block is already verified, it does nothing.
 func (bt *blockTracker) verifyAndTrackBlock(ctx context.Context, block *Block) error {
 	bt.lock.Lock()
