@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -33,11 +34,7 @@ const (
 )
 
 var (
-	defaultPeerVersion = &version.Application{
-		Major: 1,
-		Minor: 0,
-		Patch: 0,
-	}
+	defaultPeerVersion = client.StateSyncVersion
 
 	_ message.Request = (*HelloRequest)(nil)
 	_                 = (*HelloResponse)(nil)
@@ -109,7 +106,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 				return fmt.Errorf("failed to encode request: %w", err)
 			}
 
-			responseBytes, _, err := net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
+			responseBytes, _, err := net.SendSyncedAppRequestAny(ctx, requestBytes)
 			if err != nil {
 				return fmt.Errorf("failed to send synced app request: %w", err)
 			}
@@ -273,7 +270,7 @@ func TestAppRequestOnShutdown(t *testing.T) {
 
 	requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 	require.NoError(t, err)
-	responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
+	responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), requestBytes)
 	require.ErrorIs(t, err, errRequestFailed)
 	require.Nil(t, responseBytes)
 	require.True(t, called)
@@ -324,7 +321,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	// cancel context prior to sending
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
+	_, _, err = net.SendSyncedAppRequestAny(ctx, requestBytes)
 	require.ErrorIs(t, err, context.Canceled)
 	// require we didn't send anything
 	select {
@@ -338,7 +335,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	ctx, cancel = context.WithCancel(t.Context())
 	errChan := make(chan error, 1)
 	go func() {
-		_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
+		_, _, err = net.SendSyncedAppRequestAny(ctx, requestBytes)
 		errChan <- err
 	}()
 	// Wait until we've "sent" the app request over the network
@@ -355,79 +352,6 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 		sentAppRequestInfo.requestID,
 		[]byte{}))
 	require.Empty(t, net.(*network).outstandingRequestHandlers) // Received response
-}
-
-func TestRequestMinVersion(t *testing.T) {
-	const responseMessage = "this is a response"
-	var (
-		callNum      atomic.Uint32
-		nodeID       = ids.GenerateTestNodeID()
-		codecManager = buildCodec(t, TestMessage{})
-		net          Network
-	)
-	eg, ctx := errgroup.WithContext(t.Context())
-	sender := testAppSender{
-		sendAppRequestFn: func(_ context.Context, nodes set.Set[ids.NodeID], reqID uint32, _ []byte) error {
-			callNum.Add(1)
-			require.Equal(t, set.Of(nodeID), nodes)
-
-			eg.Go(func() error {
-				time.Sleep(200 * time.Millisecond)
-				responseBytes, err := codecManager.Marshal(codecVersion, TestMessage{Message: responseMessage})
-				if err != nil {
-					return err
-				}
-				return net.AppResponse(ctx, nodeID, reqID, responseBytes)
-			})
-			return nil
-		},
-	}
-
-	// passing nil as codec works because the net.AppRequest is never called
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	net, err := NewNetwork(snowCtx, sender, codecManager, 1, prometheus.NewRegistry())
-	require.NoError(t, err)
-	requestMessage := TestMessage{Message: "this is a request"}
-	requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
-	require.NoError(t, err)
-	require.NoError(t,
-		net.Connected(
-			t.Context(),
-			nodeID,
-			&version.Application{
-				Name:  version.Client,
-				Major: 1,
-				Minor: 7,
-				Patch: 1,
-			},
-		),
-	)
-
-	// ensure version does not match
-	responseBytes, _, err := net.SendSyncedAppRequestAny(
-		t.Context(),
-		&version.Application{
-			Name:  version.Client,
-			Major: 2,
-			Minor: 0,
-			Patch: 0,
-		},
-		requestBytes,
-	)
-	require.ErrorIs(t, err, errNoPeersFound)
-	require.Nil(t, responseBytes)
-
-	// ensure version matches and the request goes through
-	responseBytes, _, err = net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
-	require.NoError(t, err)
-
-	var response TestMessage
-	_, err = codecManager.Unmarshal(responseBytes, &response)
-	require.NoError(t, err)
-	require.Equal(t, responseMessage, response.Message)
-
-	require.NoError(t, eg.Wait())
-	require.Equal(t, uint32(1), callNum.Load())
 }
 
 func TestOnRequestHonoursDeadline(t *testing.T) {
@@ -566,6 +490,41 @@ func TestNetworkAppRequestAfterShutdown(t *testing.T) {
 
 	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, nil))
 	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, nil))
+}
+
+// Peers connecting below client.StateSyncVersion are silently dropped by the
+// tracker, so SendSyncedAppRequestAny finds no usable peer.
+func TestConnectBelowStateSyncVersionFiltered(t *testing.T) {
+	codecManager := buildCodec(t, TestMessage{})
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(ctx, testAppSender{}, codecManager, 1, prometheus.NewRegistry())
+	require.NoError(t, err)
+
+	require.NoError(t, net.Connected(t.Context(), ids.GenerateTestNodeID(), &version.Application{}))
+
+	requestBytes, err := message.RequestToBytes(codecManager, TestMessage{Message: "hi"})
+	require.NoError(t, err)
+
+	_, _, err = net.SendSyncedAppRequestAny(t.Context(), requestBytes)
+	require.ErrorIs(t, err, errNoPeersFound)
+}
+
+// SendSyncedAppRequestAny must not block when called after Shutdown.
+func TestNetworkSyncedAppRequestAfterShutdown(t *testing.T) {
+	codecManager := buildCodec(t, TestMessage{})
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	net, err := NewNetwork(ctx, testAppSender{}, codecManager, 16, prometheus.NewRegistry())
+	require.NoError(t, err)
+
+	require.NoError(t, net.Connected(t.Context(), ids.GenerateTestNodeID(), defaultPeerVersion))
+	net.Shutdown()
+
+	requestBytes, err := message.RequestToBytes(codecManager, TestMessage{Message: "hello"})
+	require.NoError(t, err)
+
+	response, _, err := net.SendSyncedAppRequestAny(t.Context(), requestBytes)
+	require.ErrorIs(t, err, errRequestFailed)
+	require.Nil(t, response)
 }
 
 func TestNetworkRouting(t *testing.T) {
