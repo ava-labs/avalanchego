@@ -11,6 +11,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 
@@ -20,14 +23,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  tests-required:
+    if: ${{ always() }}
+    needs:
+      - Unit
+      - Fuzz
+      - e2e
+      - e2e_post_latest
+      - e2e_kube
+      - e2e_existing_network
+      - Upgrade
+      - Lint
+      - tausecondslint
+      - links-lint
+      - check_generated_protobuf
+      - check_mockgen
+      - check_canotogen
+      - check_contract_bindings
+      - check_go_mod_tidy
+      - test_build_image
+      - test_build_antithesis_avalanchego_images
+      - test_build_antithesis_xsvm_images
+      - e2e_bootstrap_monitor
+      - load
+      - load_kube_kind
+      - robustness
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS_JSON" | jq -e '
+            to_entries
+            | all(.value.result == "success")
+          ' >/dev/null
+
   Unit:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, ubuntu-22.04, ubuntu-24.04, custom-arm64-jammy, custom-arm64-noble]
+        os: [macos-26, ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm, ubuntu-24.04-arm]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: test-unit
         shell: bash
@@ -35,9 +75,9 @@ jobs:
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
   Fuzz:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: test-fuzz
         shell: bash
@@ -47,9 +87,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, custom-arm64-noble]
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -65,9 +105,9 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_post_latest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -83,9 +123,9 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_kube:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-e2e-kube-ci
@@ -101,9 +141,9 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_existing_network:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -118,9 +158,9 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Upgrade:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -135,17 +175,17 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Runs all lint checks
         shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh lint-all-ci
   tausecondslint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Check for TauSeconds misuse with time.Add()
         run: |
           if grep -rn '\.Add([^)]*TauSeconds' --include='*.go' .; then
@@ -155,95 +195,95 @@ jobs:
           fi
   links-lint:
     name: Markdown Links Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
         with:
           fail_level: any
   check_generated_protobuf:
     name: Up-to-date protobuf
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
       - uses: ./.github/actions/install-nix
       - shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh check-generate-protobuf
   check_mockgen:
     name: Up-to-date mocks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-generate-mocks
   check_canotogen:
     name: Up-to-date canoto
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-generate-canoto
   check_contract_bindings:
     name: Up-to-date contract bindings
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - shell: nix develop --command bash -x {0}
         run: task check-generate-load-contract-bindings
   check_go_mod_tidy:
     name: Up-to-date go.mod and go.sum
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-go-mod-tidy
   test_build_image:
     name: Image build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up QEMU (required for cross-platform builds)
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Check image build
         shell: bash
         run: ./scripts/run_task.sh test-build-image
   test_build_antithesis_avalanchego_images:
     name: Build Antithesis avalanchego images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for avalanchego test setup
         shell: bash
         run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
   test_build_antithesis_xsvm_images:
     name: Build Antithesis xsvm images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for xsvm test setup
         shell: bash
         run: ./scripts/run_task.sh test-build-antithesis-images-xsvm
   e2e_bootstrap_monitor:
     name: Run bootstrap monitor e2e tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Run e2e tests
         shell: bash
         run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
   load:
     name: Run process-based load test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-load -- --load-timeout=30s
@@ -258,9 +298,9 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   load_kube_kind:
     name: Run load test on kind cluster
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-load-kube-kind -- --load-timeout=30s
@@ -275,9 +315,9 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   robustness:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
       - name: Deploy kind with chaos mesh

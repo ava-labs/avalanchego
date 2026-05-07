@@ -22,7 +22,6 @@ go_library(
     deps = [
         "//graft/coreth/consensus",
         "//graft/coreth/core",
-        "//graft/coreth/core/extstate",
         "//graft/coreth/core/txpool",
         "//graft/coreth/core/txpool/legacypool",
         "//graft/coreth/eth/ethconfig",
@@ -69,7 +68,6 @@ graft_go_test(
     ],
     embed = [":eth"],
     deps = [
-        "//graft/coreth/core/extstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

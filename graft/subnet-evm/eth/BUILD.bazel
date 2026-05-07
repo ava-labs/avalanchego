@@ -26,7 +26,6 @@ go_library(
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/core",
-        "//graft/subnet-evm/core/extstate",
         "//graft/subnet-evm/core/txpool",
         "//graft/subnet-evm/core/txpool/legacypool",
         "//graft/subnet-evm/eth/ethconfig",
@@ -70,7 +69,6 @@ graft_go_test(
     ],
     embed = [":eth"],
     deps = [
-        "//graft/subnet-evm/core/extstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

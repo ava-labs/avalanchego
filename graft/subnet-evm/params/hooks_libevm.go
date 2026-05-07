@@ -66,6 +66,11 @@ func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
+// AccessListGas uses the default calculation.
+func (RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
+	return (ethparams.NOOPHooks{}).AccessListGas(accessList)
+}
+
 var PrecompiledContractsGranite = map[common.Address]vm.PrecompiledContract{
 	P256VerifyAddress: &vm.P256Verify{},
 }
