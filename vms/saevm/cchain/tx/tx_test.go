@@ -23,6 +23,7 @@ import (
 	// Imported for [vm.VerifierBackend] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
@@ -32,9 +33,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -98,8 +102,8 @@ var (
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
 					},
 				},
 			},
@@ -132,8 +136,8 @@ var (
 			},
 			Creds: []Credential{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
 					},
 				},
 			},
@@ -171,8 +175,8 @@ var (
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
 					},
 				},
 			},
@@ -204,8 +208,8 @@ var (
 			},
 			Creds: []Credential{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
 					},
 				},
 			},
@@ -279,18 +283,18 @@ var (
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 			},
@@ -358,18 +362,18 @@ var (
 			},
 			Creds: []Credential{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 			},
@@ -580,6 +584,92 @@ var (
 		bytes: common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500000000000003e70000000000000001000000000000000000000000000000000000000000000000000003e7000000000000000000000000000000000000000000000000000000000000000000000000"),
 	}
 )
+
+func TestInputIDs(t *testing.T) {
+	tests := []struct {
+		tx   txData
+		want set.Set[ids.ID]
+	}{
+		{
+			tx: importTx,
+			want: set.Of(
+				ids.ID(common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64")),
+			),
+		},
+		{
+			tx: exportTx,
+			want: set.Of(
+				ids.ID(common.FromHex("0x000000000000000000000014eb019ccd325ad53543a7e7e3b04828bdecf3cff6")),
+			),
+		},
+		{
+			tx: importMultiInputTx,
+			want: set.Of(
+				ids.ID(common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05")),
+				ids.ID(common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630")),
+				ids.ID(common.FromHex("0xd71fb48751f6d5732e7ff63168ed311b40bf517b36279e326878fc3f5169a656")),
+			),
+		},
+		{
+			tx: exportSameAddressMultiAssetTx,
+			want: set.Of(
+				ids.ID(common.FromHex("0x0000000000000005000000140000000000000000000000000000000000000000")),
+			),
+		},
+		{
+			tx: exportMultiAddressMultiAssetTx,
+			want: set.Of(
+				ids.ID(common.FromHex("0x0000000000000005000000140100000000000000000000000000000000000000")),
+				ids.ID(common.FromHex("0x0000000000000007000000140200000000000000000000000000000000000000")),
+			),
+		},
+		{
+			tx: importNonAVAXTx,
+			want: set.Of(
+				ids.ID(common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb")),
+			),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.tx.name, func(t *testing.T) {
+			tx := test.tx.new
+			got := tx.InputIDs()
+			assert.Equalf(t, test.want, got, "%T.InputIDs()", tx)
+		})
+	}
+}
+
+func TestAccountInputID(t *testing.T) {
+	tests := []struct {
+		name    string
+		address common.Address
+		nonce   uint64
+		want    ids.ID
+	}{
+		{
+			name: "zero_address_zero_nonce",
+			want: ids.ID(common.FromHex("0x0000000000000000000000140000000000000000000000000000000000000000")),
+		},
+		{
+			name:    "non_zero_address_nonce_one",
+			address: common.HexToAddress("0x0102030405060708090a0b0c0d0e0f1011121314"),
+			nonce:   1,
+			want:    ids.ID(common.FromHex("0x0000000000000001000000140102030405060708090a0b0c0d0e0f1011121314")),
+		},
+		{
+			name:    "non_zero_address_max_nonce",
+			address: common.HexToAddress("0x0102030405060708090a0b0c0d0e0f1011121314"),
+			nonce:   math.MaxUint64,
+			want:    ids.ID(common.FromHex("0xffffffffffffffff000000140102030405060708090a0b0c0d0e0f1011121314")),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := AccountInputID(test.address, test.nonce)
+			assert.Equalf(t, test.want, got, "AccountInputID(%s, %d)", test.address, test.nonce)
+		})
+	}
+}
 
 func TestAsOp(t *testing.T) {
 	tests := []struct {
@@ -1243,10 +1333,13 @@ func TestTransferNonAVAX(t *testing.T) {
 				}
 			}
 
-			err := test.tx.TransferNonAVAX(avaxAssetID, got)
-			require.ErrorIs(t, err, test.wantErr)
+			tx := &Tx{
+				Unsigned: test.tx,
+			}
+			err := tx.TransferNonAVAX(avaxAssetID, got)
+			require.ErrorIsf(t, err, test.wantErr, "%T.TransferNonAVAX()", tx)
 			if diff := compareStateDBs(want, got); diff != "" {
-				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", test.tx, diff)
+				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", tx, diff)
 			}
 		})
 	}
@@ -1612,8 +1705,11 @@ func TestSanityCheck(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.tx.SanityCheck(ctx)
-			require.ErrorIsf(t, err, test.wantErr, "%T.SanityCheck()", test.tx)
+			tx := &Tx{
+				Unsigned: test.tx,
+			}
+			err := tx.SanityCheck(ctx)
+			require.ErrorIsf(t, err, test.wantErr, "%T.SanityCheck()", tx)
 		})
 	}
 }
@@ -1654,4 +1750,191 @@ func FuzzSanityCheckCompatibility(f *testing.F) {
 		got := newTx.SanityCheck(ctx) == nil
 		assert.Equal(t, want, got, "%T.SanityCheck() == OldSanityCheck(%T)", newTx, oldTx)
 	})
+}
+
+func TestVerifyCredentials(t *testing.T) {
+	sk, err := secp256k1.ToPrivateKey(common.FromHex("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"))
+	require.NoError(t, err, "secp256k1.ToPrivateKey()")
+	var (
+		ethAddress  = sk.EthAddress()
+		avaxAddress = sk.Address()
+
+		validUTXOID = avax.UTXOID{}
+		validUTXO   = &avax.UTXO{
+			UTXOID: validUTXOID,
+			Asset:  avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 100,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{avaxAddress},
+				},
+			},
+		}
+		validInputID = validUTXOID.InputID()
+		validUTXOs   = []*chainsatomic.Element{{
+			Key:   validInputID[:],
+			Value: MarshalUTXO(t, validUTXO),
+		}}
+
+		validImportTx = func() *Tx {
+			tx := &Import{
+				SourceChain: xChainID,
+				ImportedInputs: []*avax.TransferableInput{{
+					UTXOID: validUTXOID,
+					Asset:  avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   100,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}},
+			}
+			return &Tx{
+				Unsigned: tx,
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{
+					txtest.Sign(t, tx, sk),
+				}}},
+			}
+		}
+		imp = func(mutate func(*Tx)) *Tx {
+			tx := validImportTx()
+			mutate(tx)
+			return tx
+		}
+
+		validExportTx = func() *Tx {
+			tx := &Export{
+				Ins: []Input{
+					{Address: ethAddress, Amount: 100, AssetID: avaxAssetID},
+				},
+			}
+			return &Tx{
+				Unsigned: tx,
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{
+					txtest.Sign(t, tx, sk),
+				}}},
+			}
+		}
+		exp = func(mutate func(*Tx)) *Tx {
+			tx := validExportTx()
+			mutate(tx)
+			return tx
+		}
+	)
+
+	tests := []struct {
+		name    string
+		tx      *Tx
+		utxos   []*chainsatomic.Element
+		wantErr error
+	}{
+		{
+			name:  "import_valid",
+			tx:    validImportTx(),
+			utxos: validUTXOs,
+		},
+		{
+			name:    "import_not_enough_credentials",
+			tx:      imp(func(tx *Tx) { tx.Creds = nil }),
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name:    "import_too_many_credentials",
+			tx:      imp(func(tx *Tx) { tx.Creds = append(tx.Creds, &secp256k1fx.Credential{}) }),
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name: "import_unserializable",
+			tx: imp(func(tx *Tx) {
+				tx.Unsigned.(*Import).ImportedInputs = make([]*avax.TransferableInput, 1)
+			}),
+			wantErr: ErrConvertingToFxTx,
+		},
+		{
+			name:    "import_missing_utxo",
+			tx:      validImportTx(),
+			wantErr: ErrFetchingUTXOs,
+		},
+		{
+			name: "import_unmarshalling_utxo",
+			tx:   validImportTx(),
+			utxos: []*chainsatomic.Element{{
+				Key:   validInputID[:],
+				Value: []byte{0xff, 0xff, 0xff},
+			}},
+			wantErr: ErrUnmarshallingUTXO,
+		},
+		{
+			name: "import_mismatched_asset_ids",
+			tx: imp(func(tx *Tx) {
+				tx.Unsigned.(*Import).ImportedInputs[0].Asset.ID[0]++
+			}),
+			utxos:   validUTXOs,
+			wantErr: ErrMismatchedAssetIDs,
+		},
+		{
+			name: "import_invalid_signature",
+			tx: imp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{{}}}}
+			}),
+			utxos:   validUTXOs,
+			wantErr: ErrVerifyingTransfer,
+		},
+		{
+			name: "export_valid",
+			tx:   validExportTx(),
+		},
+		{
+			name:    "export_not_enough_credential",
+			tx:      exp(func(tx *Tx) { tx.Creds = nil }),
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name:    "export_too_many_credential",
+			tx:      exp(func(tx *Tx) { tx.Creds = append(tx.Creds, &secp256k1fx.Credential{}) }),
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name: "export_unserializable",
+			tx: exp(func(tx *Tx) {
+				tx.Unsigned.(*Export).ExportedOutputs = make([]*avax.TransferableOutput, 1)
+			}),
+			wantErr: ErrConvertingToFxTx,
+		},
+		{
+			name: "export_no_signature",
+			tx: exp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: nil}}
+			}),
+			wantErr: ErrIncorrectNumSignatures,
+		},
+		{
+			name: "export_invalid_signature",
+			tx: exp(func(tx *Tx) {
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{{}}}}
+			}),
+			wantErr: ErrRecoveringPublicKey,
+		},
+		{
+			name: "export_address_mismatch",
+			tx: exp(func(tx *Tx) {
+				tx.Unsigned.(*Export).Ins[0].Address = common.Address{}
+			}),
+			wantErr: ErrAddressMismatch,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			memory := chainsatomic.NewMemory(memdb.New())
+			xMemory := memory.NewSharedMemory(xChainID)
+			err := xMemory.Apply(map[ids.ID]*chainsatomic.Requests{
+				cChainID: {PutRequests: test.utxos},
+			})
+			require.NoErrorf(t, err, "%T.Apply()", xMemory)
+
+			cMemory := memory.NewSharedMemory(cChainID)
+			err = test.tx.VerifyCredentials(cMemory)
+			assert.ErrorIsf(t, err, test.wantErr, "%T.VerifyCredentials()", test.tx)
+		})
+	}
 }
