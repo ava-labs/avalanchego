@@ -127,7 +127,7 @@ func (t *Tx) Bytes() ([]byte, error) {
 
 // InputIDs returns the one-time-use inputs consumed by this transaction.
 //
-// [Import] transactions return consumed UTXOIDs.
+// [Import] transactions return consumed UTXO IDs.
 // [Export] transactions return Account+Nonce pairs.
 func (t *Tx) InputIDs() set.Set[ids.ID] {
 	return t.Unsigned.inputIDs()

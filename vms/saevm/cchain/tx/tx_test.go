@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -46,7 +47,6 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 )
 
 func TestMain(m *testing.M) {

@@ -6,8 +6,9 @@ package tx
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 // These identifiers are all exported for usage by tx_test.go, which is compiled

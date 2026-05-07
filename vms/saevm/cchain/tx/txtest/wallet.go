@@ -7,13 +7,14 @@ package txtest
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/stretchr/testify/require"
 
 	// Imported for [secp256k1fx.Credential] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
 // Signature can be used within a [secp256k1fx.Credential] to authorize a
