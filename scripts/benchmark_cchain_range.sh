@@ -156,6 +156,7 @@ if [[ -n "$TEST_NAME" ]]; then
             CURRENT_STATE_DIR_SRC="${CURRENT_STATE_DIR_SRC:-cchain-current-state-pathdb-full-33m}"
             START_BLOCK="${START_BLOCK:-33000001}"
             END_BLOCK="${END_BLOCK:-33500000}"
+            CONFIG="${CONFIG:-pathdb}"
             ;;
         firewood-101-250k)
             BLOCK_DIR_SRC="${BLOCK_DIR_SRC:-cchain-mainnet-blocks-1m-ldb}"
