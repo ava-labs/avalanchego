@@ -4,6 +4,63 @@ package sync;
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
+// EVM state-sync request/response types.
+//
+// State sync lets a bootstrapping node rebuild its EVM state by fetching the
+// trie directly from peers instead of replaying every historical block. Each
+// request type asks for one slice of that state (a leaf range, contract code
+// for a set of hashes, or a batch of blocks) and is served by a dedicated
+// p2p handler ID (EVMLeafsRequestHandlerID, EVMCodeRequestHandlerID,
+// EVMBlockRequestHandlerID in network/p2p/handler.go).
+
+// NodeType selects which trie a leaf-range request walks.
+//   - STATE_TRIE is the EVM account and storage trie: account balances,
+//     nonces, storage slots, and code hashes.
+//   - ATOMIC_TRIE is the C-Chain atomic operations trie used for cross-chain
+//     transfers between the C-Chain and the X-/P-Chains via shared memory.
+enum NodeType {
+  NODE_TYPE_UNSPECIFIED = 0;
+  NODE_TYPE_STATE_TRIE = 1;
+  NODE_TYPE_ATOMIC_TRIE = 2;
+}
+
+message GetLeafsRequest {
+  bytes root_hash = 1;
+  // Empty for account trie, non-empty for storage trie.
+  bytes account_hash = 2;
+  bytes start_key = 3;
+  bytes end_key = 4;
+  uint32 key_limit = 5;
+  NodeType node_type = 6;
+}
+
+// LeafsResponse intentionally omits the legacy `More` field which is set
+// client-side after range-proof verification, never on the wire.
+message LeafsResponse {
+  repeated bytes keys = 1;
+  repeated bytes values = 2;
+  repeated bytes proof_vals = 3;
+}
+
+message GetCodeRequest {
+  repeated bytes hashes = 1;
+}
+
+message CodeResponse {
+  repeated bytes data = 1;
+}
+
+message GetBlockRequest {
+  bytes hash = 1;
+  uint64 height = 2;
+  uint32 parents = 3;
+}
+
+message BlockResponse {
+  // RLP-encoded blocks
+  repeated bytes blocks = 1;
+}
+
 message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;

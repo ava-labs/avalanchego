@@ -28,6 +28,9 @@ const (
 	SignatureRequestHandlerID
 	FirewoodRangeProofHandlerID
 	FirewoodChangeProofHandlerID
+	EVMLeafsRequestHandlerID
+	EVMCodeRequestHandlerID
+	EVMBlockRequestHandlerID
 )
 
 var (

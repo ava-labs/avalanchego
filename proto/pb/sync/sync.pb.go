@@ -21,6 +21,404 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// NodeType selects which trie a leaf-range request walks.
+//   - STATE_TRIE is the EVM account and storage trie: account balances,
+//     nonces, storage slots, and code hashes.
+//   - ATOMIC_TRIE is the C-Chain atomic operations trie used for cross-chain
+//     transfers between the C-Chain and the X-/P-Chains via shared memory.
+type NodeType int32
+
+const (
+	NodeType_NODE_TYPE_UNSPECIFIED NodeType = 0
+	NodeType_NODE_TYPE_STATE_TRIE  NodeType = 1
+	NodeType_NODE_TYPE_ATOMIC_TRIE NodeType = 2
+)
+
+// Enum value maps for NodeType.
+var (
+	NodeType_name = map[int32]string{
+		0: "NODE_TYPE_UNSPECIFIED",
+		1: "NODE_TYPE_STATE_TRIE",
+		2: "NODE_TYPE_ATOMIC_TRIE",
+	}
+	NodeType_value = map[string]int32{
+		"NODE_TYPE_UNSPECIFIED": 0,
+		"NODE_TYPE_STATE_TRIE":  1,
+		"NODE_TYPE_ATOMIC_TRIE": 2,
+	}
+)
+
+func (x NodeType) Enum() *NodeType {
+	p := new(NodeType)
+	*p = x
+	return p
+}
+
+func (x NodeType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NodeType) Descriptor() protoreflect.EnumDescriptor {
+	return file_sync_sync_proto_enumTypes[0].Descriptor()
+}
+
+func (NodeType) Type() protoreflect.EnumType {
+	return &file_sync_sync_proto_enumTypes[0]
+}
+
+func (x NodeType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NodeType.Descriptor instead.
+func (NodeType) EnumDescriptor() ([]byte, []int) {
+	return file_sync_sync_proto_rawDescGZIP(), []int{0}
+}
+
+type GetLeafsRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	RootHash []byte                 `protobuf:"bytes,1,opt,name=root_hash,json=rootHash,proto3" json:"root_hash,omitempty"`
+	// Empty for account trie, non-empty for storage trie.
+	AccountHash   []byte   `protobuf:"bytes,2,opt,name=account_hash,json=accountHash,proto3" json:"account_hash,omitempty"`
+	StartKey      []byte   `protobuf:"bytes,3,opt,name=start_key,json=startKey,proto3" json:"start_key,omitempty"`
+	EndKey        []byte   `protobuf:"bytes,4,opt,name=end_key,json=endKey,proto3" json:"end_key,omitempty"`
+	KeyLimit      uint32   `protobuf:"varint,5,opt,name=key_limit,json=keyLimit,proto3" json:"key_limit,omitempty"`
+	NodeType      NodeType `protobuf:"varint,6,opt,name=node_type,json=nodeType,proto3,enum=sync.NodeType" json:"node_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetLeafsRequest) Reset() {
+	*x = GetLeafsRequest{}
+	mi := &file_sync_sync_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetLeafsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLeafsRequest) ProtoMessage() {}
+
+func (x *GetLeafsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_sync_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLeafsRequest.ProtoReflect.Descriptor instead.
+func (*GetLeafsRequest) Descriptor() ([]byte, []int) {
+	return file_sync_sync_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *GetLeafsRequest) GetRootHash() []byte {
+	if x != nil {
+		return x.RootHash
+	}
+	return nil
+}
+
+func (x *GetLeafsRequest) GetAccountHash() []byte {
+	if x != nil {
+		return x.AccountHash
+	}
+	return nil
+}
+
+func (x *GetLeafsRequest) GetStartKey() []byte {
+	if x != nil {
+		return x.StartKey
+	}
+	return nil
+}
+
+func (x *GetLeafsRequest) GetEndKey() []byte {
+	if x != nil {
+		return x.EndKey
+	}
+	return nil
+}
+
+func (x *GetLeafsRequest) GetKeyLimit() uint32 {
+	if x != nil {
+		return x.KeyLimit
+	}
+	return 0
+}
+
+func (x *GetLeafsRequest) GetNodeType() NodeType {
+	if x != nil {
+		return x.NodeType
+	}
+	return NodeType_NODE_TYPE_UNSPECIFIED
+}
+
+// LeafsResponse intentionally omits the legacy `More` field; that is set
+// client-side after range-proof verification, never on the wire.
+type LeafsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Keys          [][]byte               `protobuf:"bytes,1,rep,name=keys,proto3" json:"keys,omitempty"`
+	Values        [][]byte               `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty"`
+	ProofVals     [][]byte               `protobuf:"bytes,3,rep,name=proof_vals,json=proofVals,proto3" json:"proof_vals,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LeafsResponse) Reset() {
+	*x = LeafsResponse{}
+	mi := &file_sync_sync_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LeafsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LeafsResponse) ProtoMessage() {}
+
+func (x *LeafsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_sync_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LeafsResponse.ProtoReflect.Descriptor instead.
+func (*LeafsResponse) Descriptor() ([]byte, []int) {
+	return file_sync_sync_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *LeafsResponse) GetKeys() [][]byte {
+	if x != nil {
+		return x.Keys
+	}
+	return nil
+}
+
+func (x *LeafsResponse) GetValues() [][]byte {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+func (x *LeafsResponse) GetProofVals() [][]byte {
+	if x != nil {
+		return x.ProofVals
+	}
+	return nil
+}
+
+type GetCodeRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Keccak256 hashes of the contract bytecode being requested.
+	Hashes        [][]byte `protobuf:"bytes,1,rep,name=hashes,proto3" json:"hashes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCodeRequest) Reset() {
+	*x = GetCodeRequest{}
+	mi := &file_sync_sync_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCodeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCodeRequest) ProtoMessage() {}
+
+func (x *GetCodeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_sync_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCodeRequest.ProtoReflect.Descriptor instead.
+func (*GetCodeRequest) Descriptor() ([]byte, []int) {
+	return file_sync_sync_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetCodeRequest) GetHashes() [][]byte {
+	if x != nil {
+		return x.Hashes
+	}
+	return nil
+}
+
+type CodeResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Contract bytecode in the same order as the requested hashes. A peer that
+	// does not have a particular code hash returns an empty entry.
+	Data          [][]byte `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CodeResponse) Reset() {
+	*x = CodeResponse{}
+	mi := &file_sync_sync_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeResponse) ProtoMessage() {}
+
+func (x *CodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_sync_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeResponse.ProtoReflect.Descriptor instead.
+func (*CodeResponse) Descriptor() ([]byte, []int) {
+	return file_sync_sync_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CodeResponse) GetData() [][]byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type GetBlockRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Hash   []byte                 `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
+	Height uint64                 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
+	// uint16 in legacy graft; uint32 is the smallest proto integer type.
+	Parents       uint32 `protobuf:"varint,3,opt,name=parents,proto3" json:"parents,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBlockRequest) Reset() {
+	*x = GetBlockRequest{}
+	mi := &file_sync_sync_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBlockRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlockRequest) ProtoMessage() {}
+
+func (x *GetBlockRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_sync_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlockRequest.ProtoReflect.Descriptor instead.
+func (*GetBlockRequest) Descriptor() ([]byte, []int) {
+	return file_sync_sync_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetBlockRequest) GetHash() []byte {
+	if x != nil {
+		return x.Hash
+	}
+	return nil
+}
+
+func (x *GetBlockRequest) GetHeight() uint64 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *GetBlockRequest) GetParents() uint32 {
+	if x != nil {
+		return x.Parents
+	}
+	return 0
+}
+
+type BlockResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// RLP-encoded blocks, top-down.
+	Blocks        [][]byte `protobuf:"bytes,1,rep,name=blocks,proto3" json:"blocks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockResponse) Reset() {
+	*x = BlockResponse{}
+	mi := &file_sync_sync_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockResponse) ProtoMessage() {}
+
+func (x *BlockResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sync_sync_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockResponse.ProtoReflect.Descriptor instead.
+func (*BlockResponse) Descriptor() ([]byte, []int) {
+	return file_sync_sync_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *BlockResponse) GetBlocks() [][]byte {
+	if x != nil {
+		return x.Blocks
+	}
+	return nil
+}
+
 type GetChangeProofRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StartRootHash []byte                 `protobuf:"bytes,1,opt,name=start_root_hash,json=startRootHash,proto3" json:"start_root_hash,omitempty"`
@@ -35,7 +433,7 @@ type GetChangeProofRequest struct {
 
 func (x *GetChangeProofRequest) Reset() {
 	*x = GetChangeProofRequest{}
-	mi := &file_sync_sync_proto_msgTypes[0]
+	mi := &file_sync_sync_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +445,7 @@ func (x *GetChangeProofRequest) String() string {
 func (*GetChangeProofRequest) ProtoMessage() {}
 
 func (x *GetChangeProofRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[0]
+	mi := &file_sync_sync_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,7 +458,7 @@ func (x *GetChangeProofRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChangeProofRequest.ProtoReflect.Descriptor instead.
 func (*GetChangeProofRequest) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{0}
+	return file_sync_sync_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetChangeProofRequest) GetStartRootHash() []byte {
@@ -118,7 +516,7 @@ type GetChangeProofResponse struct {
 
 func (x *GetChangeProofResponse) Reset() {
 	*x = GetChangeProofResponse{}
-	mi := &file_sync_sync_proto_msgTypes[1]
+	mi := &file_sync_sync_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -130,7 +528,7 @@ func (x *GetChangeProofResponse) String() string {
 func (*GetChangeProofResponse) ProtoMessage() {}
 
 func (x *GetChangeProofResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[1]
+	mi := &file_sync_sync_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -143,7 +541,7 @@ func (x *GetChangeProofResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChangeProofResponse.ProtoReflect.Descriptor instead.
 func (*GetChangeProofResponse) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{1}
+	return file_sync_sync_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetChangeProofResponse) GetResponse() isGetChangeProofResponse_Response {
@@ -201,7 +599,7 @@ type GetRangeProofRequest struct {
 
 func (x *GetRangeProofRequest) Reset() {
 	*x = GetRangeProofRequest{}
-	mi := &file_sync_sync_proto_msgTypes[2]
+	mi := &file_sync_sync_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -213,7 +611,7 @@ func (x *GetRangeProofRequest) String() string {
 func (*GetRangeProofRequest) ProtoMessage() {}
 
 func (x *GetRangeProofRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[2]
+	mi := &file_sync_sync_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -226,7 +624,7 @@ func (x *GetRangeProofRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRangeProofRequest.ProtoReflect.Descriptor instead.
 func (*GetRangeProofRequest) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{2}
+	return file_sync_sync_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetRangeProofRequest) GetRootHash() []byte {
@@ -275,7 +673,7 @@ type ChangeProof struct {
 
 func (x *ChangeProof) Reset() {
 	*x = ChangeProof{}
-	mi := &file_sync_sync_proto_msgTypes[3]
+	mi := &file_sync_sync_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -287,7 +685,7 @@ func (x *ChangeProof) String() string {
 func (*ChangeProof) ProtoMessage() {}
 
 func (x *ChangeProof) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[3]
+	mi := &file_sync_sync_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -300,7 +698,7 @@ func (x *ChangeProof) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeProof.ProtoReflect.Descriptor instead.
 func (*ChangeProof) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{3}
+	return file_sync_sync_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ChangeProof) GetStartProof() []*ProofNode {
@@ -335,7 +733,7 @@ type RangeProof struct {
 
 func (x *RangeProof) Reset() {
 	*x = RangeProof{}
-	mi := &file_sync_sync_proto_msgTypes[4]
+	mi := &file_sync_sync_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -347,7 +745,7 @@ func (x *RangeProof) String() string {
 func (*RangeProof) ProtoMessage() {}
 
 func (x *RangeProof) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[4]
+	mi := &file_sync_sync_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -360,7 +758,7 @@ func (x *RangeProof) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RangeProof.ProtoReflect.Descriptor instead.
 func (*RangeProof) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{4}
+	return file_sync_sync_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RangeProof) GetStartProof() []*ProofNode {
@@ -395,7 +793,7 @@ type ProofNode struct {
 
 func (x *ProofNode) Reset() {
 	*x = ProofNode{}
-	mi := &file_sync_sync_proto_msgTypes[5]
+	mi := &file_sync_sync_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -407,7 +805,7 @@ func (x *ProofNode) String() string {
 func (*ProofNode) ProtoMessage() {}
 
 func (x *ProofNode) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[5]
+	mi := &file_sync_sync_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -420,7 +818,7 @@ func (x *ProofNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProofNode.ProtoReflect.Descriptor instead.
 func (*ProofNode) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{5}
+	return file_sync_sync_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ProofNode) GetKey() *Key {
@@ -454,7 +852,7 @@ type KeyChange struct {
 
 func (x *KeyChange) Reset() {
 	*x = KeyChange{}
-	mi := &file_sync_sync_proto_msgTypes[6]
+	mi := &file_sync_sync_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -466,7 +864,7 @@ func (x *KeyChange) String() string {
 func (*KeyChange) ProtoMessage() {}
 
 func (x *KeyChange) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[6]
+	mi := &file_sync_sync_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -479,7 +877,7 @@ func (x *KeyChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyChange.ProtoReflect.Descriptor instead.
 func (*KeyChange) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{6}
+	return file_sync_sync_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *KeyChange) GetKey() []byte {
@@ -506,7 +904,7 @@ type Key struct {
 
 func (x *Key) Reset() {
 	*x = Key{}
-	mi := &file_sync_sync_proto_msgTypes[7]
+	mi := &file_sync_sync_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -518,7 +916,7 @@ func (x *Key) String() string {
 func (*Key) ProtoMessage() {}
 
 func (x *Key) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[7]
+	mi := &file_sync_sync_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -531,7 +929,7 @@ func (x *Key) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Key.ProtoReflect.Descriptor instead.
 func (*Key) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{7}
+	return file_sync_sync_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Key) GetLength() uint64 {
@@ -558,7 +956,7 @@ type MaybeBytes struct {
 
 func (x *MaybeBytes) Reset() {
 	*x = MaybeBytes{}
-	mi := &file_sync_sync_proto_msgTypes[8]
+	mi := &file_sync_sync_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +968,7 @@ func (x *MaybeBytes) String() string {
 func (*MaybeBytes) ProtoMessage() {}
 
 func (x *MaybeBytes) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[8]
+	mi := &file_sync_sync_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +981,7 @@ func (x *MaybeBytes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MaybeBytes.ProtoReflect.Descriptor instead.
 func (*MaybeBytes) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{8}
+	return file_sync_sync_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *MaybeBytes) GetValue() []byte {
@@ -603,7 +1001,7 @@ type KeyValue struct {
 
 func (x *KeyValue) Reset() {
 	*x = KeyValue{}
-	mi := &file_sync_sync_proto_msgTypes[9]
+	mi := &file_sync_sync_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -615,7 +1013,7 @@ func (x *KeyValue) String() string {
 func (*KeyValue) ProtoMessage() {}
 
 func (x *KeyValue) ProtoReflect() protoreflect.Message {
-	mi := &file_sync_sync_proto_msgTypes[9]
+	mi := &file_sync_sync_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -628,7 +1026,7 @@ func (x *KeyValue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyValue.ProtoReflect.Descriptor instead.
 func (*KeyValue) Descriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{9}
+	return file_sync_sync_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *KeyValue) GetKey() []byte {
@@ -649,7 +1047,29 @@ var File_sync_sync_proto protoreflect.FileDescriptor
 
 const file_sync_sync_proto_rawDesc = "" +
 	"\n" +
-	"\x0fsync/sync.proto\x12\x04sync\"\xfb\x01\n" +
+	"\x0fsync/sync.proto\x12\x04sync\"\xd1\x01\n" +
+	"\x0fGetLeafsRequest\x12\x1b\n" +
+	"\troot_hash\x18\x01 \x01(\fR\brootHash\x12!\n" +
+	"\faccount_hash\x18\x02 \x01(\fR\vaccountHash\x12\x1b\n" +
+	"\tstart_key\x18\x03 \x01(\fR\bstartKey\x12\x17\n" +
+	"\aend_key\x18\x04 \x01(\fR\x06endKey\x12\x1b\n" +
+	"\tkey_limit\x18\x05 \x01(\rR\bkeyLimit\x12+\n" +
+	"\tnode_type\x18\x06 \x01(\x0e2\x0e.sync.NodeTypeR\bnodeType\"Z\n" +
+	"\rLeafsResponse\x12\x12\n" +
+	"\x04keys\x18\x01 \x03(\fR\x04keys\x12\x16\n" +
+	"\x06values\x18\x02 \x03(\fR\x06values\x12\x1d\n" +
+	"\n" +
+	"proof_vals\x18\x03 \x03(\fR\tproofVals\"(\n" +
+	"\x0eGetCodeRequest\x12\x16\n" +
+	"\x06hashes\x18\x01 \x03(\fR\x06hashes\"\"\n" +
+	"\fCodeResponse\x12\x12\n" +
+	"\x04data\x18\x01 \x03(\fR\x04data\"W\n" +
+	"\x0fGetBlockRequest\x12\x12\n" +
+	"\x04hash\x18\x01 \x01(\fR\x04hash\x12\x16\n" +
+	"\x06height\x18\x02 \x01(\x04R\x06height\x12\x18\n" +
+	"\aparents\x18\x03 \x01(\rR\aparents\"'\n" +
+	"\rBlockResponse\x12\x16\n" +
+	"\x06blocks\x18\x01 \x03(\fR\x06blocks\"\xfb\x01\n" +
 	"\x15GetChangeProofRequest\x12&\n" +
 	"\x0fstart_root_hash\x18\x01 \x01(\fR\rstartRootHash\x12\"\n" +
 	"\rend_root_hash\x18\x02 \x01(\fR\vendRootHash\x12-\n" +
@@ -702,7 +1122,11 @@ const file_sync_sync_proto_rawDesc = "" +
 	"\x05value\x18\x01 \x01(\fR\x05value\"2\n" +
 	"\bKeyValue\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\fR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05valueB/Z-github.com/ava-labs/avalanchego/proto/pb/syncb\x06proto3"
+	"\x05value\x18\x02 \x01(\fR\x05value*Z\n" +
+	"\bNodeType\x12\x19\n" +
+	"\x15NODE_TYPE_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14NODE_TYPE_STATE_TRIE\x10\x01\x12\x19\n" +
+	"\x15NODE_TYPE_ATOMIC_TRIE\x10\x02B/Z-github.com/ava-labs/avalanchego/proto/pb/syncb\x06proto3"
 
 var (
 	file_sync_sync_proto_rawDescOnce sync.Once
@@ -716,40 +1140,49 @@ func file_sync_sync_proto_rawDescGZIP() []byte {
 	return file_sync_sync_proto_rawDescData
 }
 
-var file_sync_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_sync_sync_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_sync_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_sync_sync_proto_goTypes = []any{
-	(*GetChangeProofRequest)(nil),  // 0: sync.GetChangeProofRequest
-	(*GetChangeProofResponse)(nil), // 1: sync.GetChangeProofResponse
-	(*GetRangeProofRequest)(nil),   // 2: sync.GetRangeProofRequest
-	(*ChangeProof)(nil),            // 3: sync.ChangeProof
-	(*RangeProof)(nil),             // 4: sync.RangeProof
-	(*ProofNode)(nil),              // 5: sync.ProofNode
-	(*KeyChange)(nil),              // 6: sync.KeyChange
-	(*Key)(nil),                    // 7: sync.Key
-	(*MaybeBytes)(nil),             // 8: sync.MaybeBytes
-	(*KeyValue)(nil),               // 9: sync.KeyValue
-	nil,                            // 10: sync.ProofNode.ChildrenEntry
+	(NodeType)(0),                  // 0: sync.NodeType
+	(*GetLeafsRequest)(nil),        // 1: sync.GetLeafsRequest
+	(*LeafsResponse)(nil),          // 2: sync.LeafsResponse
+	(*GetCodeRequest)(nil),         // 3: sync.GetCodeRequest
+	(*CodeResponse)(nil),           // 4: sync.CodeResponse
+	(*GetBlockRequest)(nil),        // 5: sync.GetBlockRequest
+	(*BlockResponse)(nil),          // 6: sync.BlockResponse
+	(*GetChangeProofRequest)(nil),  // 7: sync.GetChangeProofRequest
+	(*GetChangeProofResponse)(nil), // 8: sync.GetChangeProofResponse
+	(*GetRangeProofRequest)(nil),   // 9: sync.GetRangeProofRequest
+	(*ChangeProof)(nil),            // 10: sync.ChangeProof
+	(*RangeProof)(nil),             // 11: sync.RangeProof
+	(*ProofNode)(nil),              // 12: sync.ProofNode
+	(*KeyChange)(nil),              // 13: sync.KeyChange
+	(*Key)(nil),                    // 14: sync.Key
+	(*MaybeBytes)(nil),             // 15: sync.MaybeBytes
+	(*KeyValue)(nil),               // 16: sync.KeyValue
+	nil,                            // 17: sync.ProofNode.ChildrenEntry
 }
 var file_sync_sync_proto_depIdxs = []int32{
-	8,  // 0: sync.GetChangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	8,  // 1: sync.GetChangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	8,  // 2: sync.GetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	8,  // 3: sync.GetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	5,  // 4: sync.ChangeProof.start_proof:type_name -> sync.ProofNode
-	5,  // 5: sync.ChangeProof.end_proof:type_name -> sync.ProofNode
-	6,  // 6: sync.ChangeProof.key_changes:type_name -> sync.KeyChange
-	5,  // 7: sync.RangeProof.start_proof:type_name -> sync.ProofNode
-	5,  // 8: sync.RangeProof.end_proof:type_name -> sync.ProofNode
-	9,  // 9: sync.RangeProof.key_values:type_name -> sync.KeyValue
-	7,  // 10: sync.ProofNode.key:type_name -> sync.Key
-	8,  // 11: sync.ProofNode.value_or_hash:type_name -> sync.MaybeBytes
-	10, // 12: sync.ProofNode.children:type_name -> sync.ProofNode.ChildrenEntry
-	8,  // 13: sync.KeyChange.value:type_name -> sync.MaybeBytes
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	0,  // 0: sync.GetLeafsRequest.node_type:type_name -> sync.NodeType
+	15, // 1: sync.GetChangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	15, // 2: sync.GetChangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	15, // 3: sync.GetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	15, // 4: sync.GetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	12, // 5: sync.ChangeProof.start_proof:type_name -> sync.ProofNode
+	12, // 6: sync.ChangeProof.end_proof:type_name -> sync.ProofNode
+	13, // 7: sync.ChangeProof.key_changes:type_name -> sync.KeyChange
+	12, // 8: sync.RangeProof.start_proof:type_name -> sync.ProofNode
+	12, // 9: sync.RangeProof.end_proof:type_name -> sync.ProofNode
+	16, // 10: sync.RangeProof.key_values:type_name -> sync.KeyValue
+	14, // 11: sync.ProofNode.key:type_name -> sync.Key
+	15, // 12: sync.ProofNode.value_or_hash:type_name -> sync.MaybeBytes
+	17, // 13: sync.ProofNode.children:type_name -> sync.ProofNode.ChildrenEntry
+	15, // 14: sync.KeyChange.value:type_name -> sync.MaybeBytes
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_sync_sync_proto_init() }
@@ -757,7 +1190,7 @@ func file_sync_sync_proto_init() {
 	if File_sync_sync_proto != nil {
 		return
 	}
-	file_sync_sync_proto_msgTypes[1].OneofWrappers = []any{
+	file_sync_sync_proto_msgTypes[7].OneofWrappers = []any{
 		(*GetChangeProofResponse_ChangeProof)(nil),
 		(*GetChangeProofResponse_RangeProof)(nil),
 	}
@@ -766,13 +1199,14 @@ func file_sync_sync_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sync_sync_proto_rawDesc), len(file_sync_sync_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   11,
+			NumEnums:      1,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_sync_sync_proto_goTypes,
 		DependencyIndexes: file_sync_sync_proto_depIdxs,
+		EnumInfos:         file_sync_sync_proto_enumTypes,
 		MessageInfos:      file_sync_sync_proto_msgTypes,
 	}.Build()
 	File_sync_sync_proto = out.File
