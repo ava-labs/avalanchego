@@ -6,6 +6,7 @@ package code
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -159,6 +160,120 @@ func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
 			codeByteSlices:    [][]byte{codeBytes},
 		}, c)
 	})
+}
+
+// TestCodeSyncerCleansMarkerWhenCodeOnDiskAndInFlightHeld is a deterministic
+// regression test for an orphan code-to-fetch marker. When the code is
+// already on disk, the worker must delete the marker even if inFlight is
+// already held by another worker.
+func TestCodeSyncerCleansMarkerWhenCodeOnDiskAndInFlightHeld(t *testing.T) {
+	t.Parallel()
+
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
+		codeBytes := utils.RandomBytes(100)
+		codeHash := crypto.Keccak256Hash(codeBytes)
+
+		clientDB := rawdb.NewMemoryDatabase()
+		rawdb.WriteCode(clientDB, codeHash, codeBytes)
+		require.NoError(t, customrawdb.WriteCodeToFetch(clientDB, codeHash))
+
+		serverDB := memorydb.New()
+		rawdb.WriteCode(serverDB, codeHash, codeBytes)
+		handler := handlers.NewCodeRequestHandler(serverDB, c, handlerstats.NewNoopHandlerStats())
+		mockClient := client.NewTestClient(c, nil, handler, nil)
+
+		ch := make(chan common.Hash, 1)
+		codeSyncer, err := NewSyncer(mockClient, clientDB, ch)
+		require.NoError(t, err)
+
+		// Pretend another worker is already processing this hash.
+		codeSyncer.inFlight.Store(codeHash, struct{}{})
+
+		ch <- codeHash
+		close(ch)
+
+		require.NoError(t, codeSyncer.Sync(t.Context()))
+
+		it := customrawdb.NewCodeToFetchIterator(clientDB)
+		defer it.Release()
+		require.False(t, it.Next(), "stale code-to-fetch marker remained after sync")
+		require.NoError(t, it.Error())
+	})
+}
+
+// TestCodeSyncerDuplicateAddCodeNoMarkerLeak stresses the same invariant
+// end-to-end: many producers hammer AddCode for one hash, and after sync
+// no code-to-fetch markers may remain. Two variants:
+//
+//   - "code-already-on-disk": code is pre-written, so each dequeue only
+//     needs to delete the marker.
+//   - "code-fetched-during-sync": the disk starts empty, the first dequeue
+//     fetches the code from the network and later duplicates only delete.
+func TestCodeSyncerDuplicateAddCodeNoMarkerLeak(t *testing.T) {
+	tests := []struct {
+		name         string
+		preWriteCode bool
+	}{
+		{name: "code-already-on-disk", preWriteCode: true},
+		{name: "code-fetched-during-sync", preWriteCode: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
+				codeBytes := utils.RandomBytes(100)
+				codeHash := crypto.Keccak256Hash(codeBytes)
+
+				clientDB := rawdb.NewMemoryDatabase()
+				if tt.preWriteCode {
+					rawdb.WriteCode(clientDB, codeHash, codeBytes)
+				}
+
+				serverDB := memorydb.New()
+				rawdb.WriteCode(serverDB, codeHash, codeBytes)
+				handler := handlers.NewCodeRequestHandler(serverDB, c, handlerstats.NewNoopHandlerStats())
+				mockClient := client.NewTestClient(c, nil, handler, nil)
+
+				codeQueue, err := NewQueue(clientDB)
+				require.NoError(t, err)
+
+				codeSyncer, err := NewSyncer(mockClient, clientDB, codeQueue.CodeHashes())
+				require.NoError(t, err)
+
+				// Tight-loop AddCode from many producers maximises the chance of
+				// landing inside a worker's marker-cleanup window.
+				const (
+					numProducers = 8
+					iterations   = 50_000
+				)
+				var wg sync.WaitGroup
+				wg.Add(numProducers)
+				for range numProducers {
+					go func() {
+						defer wg.Done()
+						for range iterations {
+							if err := codeQueue.AddCode(t.Context(), []common.Hash{codeHash}); err != nil {
+								return
+							}
+						}
+					}()
+				}
+				go func() {
+					wg.Wait()
+					_ = codeQueue.Finalize()
+				}()
+
+				require.NoError(t, codeSyncer.Sync(t.Context()))
+				require.Equal(t, codeBytes, rawdb.ReadCode(clientDB, codeHash))
+
+				it := customrawdb.NewCodeToFetchIterator(clientDB)
+				defer it.Release()
+				require.False(t, it.Next(), "stale code-to-fetch marker remained after sync")
+				require.NoError(t, it.Error())
+			})
+		})
+	}
 }
 
 func TestCodeSyncerAddsMoreInProgressThanQueueSize(t *testing.T) {

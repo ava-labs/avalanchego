@@ -38,8 +38,8 @@ type Syncer struct {
 	numWorkers       int
 	codeHashesPerReq int // best-effort target size - final batch may be smaller
 
-	// inFlight tracks code hashes currently being processed to dedupe work
-	// across workers and across repeated queue submissions.
+	// inFlight ensures only one worker fetches each hash. The slow path
+	// skips it so it can always clean up markers that AddCode just rewrote.
 	inFlight sync.Map // key: common.Hash, value: struct{}
 }
 
@@ -133,26 +133,21 @@ func (c *Syncer) work(ctx context.Context) error {
 				return nil
 			}
 
-			// Deduplicate in-flight code hashes across workers first to avoid
-			// racing repeated HasCode() checks for the same hash.
-			if _, loaded := c.inFlight.LoadOrStore(codeHash, struct{}{}); loaded {
-				continue
-			}
-
-			// After acquiring responsibility for this hash, re-check whether the code
-			// is already present locally. If so, clean up and release responsibility.
+			// Slow path: code already on disk. Idempotent and ungated, so any
+			// concurrent AddCode rewrite is re-cleaned on its next dequeue.
 			if rawdb.HasCode(c.db, codeHash) {
-				// Best-effort cleanup of stale marker.
 				batch := c.db.NewBatch()
 				if err := customrawdb.DeleteCodeToFetch(batch, codeHash); err != nil {
 					return fmt.Errorf("failed to delete stale code marker: %w", err)
 				}
-
 				if err := batch.Write(); err != nil {
 					return fmt.Errorf("failed to write batch for stale code marker: %w", err)
 				}
-				// Release in-flight ownership since no network fetch is needed.
-				c.inFlight.Delete(codeHash)
+				continue
+			}
+
+			// Fast path: dedupe concurrent network fetches for the same hash.
+			if _, loaded := c.inFlight.LoadOrStore(codeHash, struct{}{}); loaded {
 				continue
 			}
 
