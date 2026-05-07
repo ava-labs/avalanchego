@@ -1838,9 +1838,13 @@ func TestVerifyCredentials(t *testing.T) {
 			utxos: validUTXOs,
 		},
 		{
-			name:    "import_wrong_num_credentials",
+			name:    "import_not_enough_credentials",
 			tx:      imp(func(tx *Tx) { tx.Creds = nil }),
-			utxos:   validUTXOs,
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name:    "import_too_many_credentials",
+			tx:      imp(func(tx *Tx) { tx.Creds = append(tx.Creds, &secp256k1fx.Credential{}) }),
 			wantErr: ErrIncorrectNumCredentials,
 		},
 		{
@@ -1885,8 +1889,13 @@ func TestVerifyCredentials(t *testing.T) {
 			tx:   validExportTx(),
 		},
 		{
-			name:    "export_no_credential",
+			name:    "export_not_enough_credential",
 			tx:      exp(func(tx *Tx) { tx.Creds = nil }),
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name:    "export_too_many_credential",
+			tx:      exp(func(tx *Tx) { tx.Creds = append(tx.Creds, &secp256k1fx.Credential{}) }),
 			wantErr: ErrIncorrectNumCredentials,
 		},
 		{
