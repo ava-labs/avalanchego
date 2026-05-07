@@ -11,6 +11,7 @@ const X2CRate = _x2cRate
 var (
 	ScaleAVAX = scaleAVAX
 
+	// tx errors:
 	ErrWrongNetworkID        = errWrongNetworkID
 	ErrWrongChainID          = errWrongChainID
 	ErrNoInputs              = errNoInputs
@@ -24,12 +25,15 @@ var (
 	ErrInputsNotSortedUnique = errInputsNotSortedUnique
 	ErrOverflow              = errOverflow
 
+	// codec errors:
 	ErrInefficientSlicePacking = errInefficientSlicePacking
 
+	// export errors:
 	ErrOutputsNotSorted  = errOutputsNotSorted
 	ErrMultipleNonces    = errMultipleNonces
 	ErrInsufficientFunds = errInsufficientFunds
 
+	// import errors:
 	ErrOutputsNotSortedUnique = errOutputsNotSortedUnique
 	ErrUnexpectedInputType    = errUnexpectedInputType
 )
