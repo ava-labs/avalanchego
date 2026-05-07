@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "spam-c-chain_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/spam-c-chain",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//genesis",
+        "//wallet/subnet/primary",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethclient",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)
+
+go_binary(
+    name = "spam-c-chain",
+    embed = [":spam-c-chain_lib"],
+    visibility = ["//visibility:public"],
+)

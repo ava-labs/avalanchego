@@ -133,6 +133,12 @@ func (t *Tx) Bytes() ([]byte, error) {
 	return c.Marshal(codecVersion, t)
 }
 
+func (t *Tx) Compare(o *Tx) int {
+	id := t.ID()
+	oID := o.ID()
+	return id.Compare(oID)
+}
+
 // AsOp converts the transaction into a [hook.Op] that can be processed by SAE.
 //
 // The operation only includes state changes that impact Ethereum-native state.

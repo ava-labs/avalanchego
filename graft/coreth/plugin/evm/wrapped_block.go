@@ -346,6 +346,14 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 		return err
 	}
 
+	headerExtra := customtypes.GetHeaderExtra(header)
+	if headerExtra.TargetExcess != nil {
+		return fmt.Errorf("unexpected TargetExcess in header extra: %d", *headerExtra.TargetExcess)
+	}
+	if headerExtra.SettledHeight != nil {
+		return fmt.Errorf("unexpected SettledHeight in header extra: %d", *headerExtra.SettledHeight)
+	}
+
 	// If the VM is not marked as bootstrapped the other chains may also be
 	// bootstrapping and not have populated the required indices. Since
 	// bootstrapping only verifies blocks that have been canonically accepted by
