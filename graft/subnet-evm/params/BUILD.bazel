@@ -17,6 +17,7 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params",
     deps = [
+        "//graft/evm/precompileconfig",
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/plugin/evm/customheader",
         "//graft/subnet-evm/precompile/contract",
@@ -29,8 +30,6 @@ go_library(
         "//utils/set",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//common/math",
-        "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/legacy",
