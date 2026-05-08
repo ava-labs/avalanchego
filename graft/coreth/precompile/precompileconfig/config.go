@@ -7,9 +7,10 @@ package precompileconfig
 import (
 	"github.com/ava-labs/libevm/common"
 
-	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+
+	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 )
 
 // StatefulPrecompileConfig defines the interface for a stateful precompile to
