@@ -1,12 +1,10 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package tx
+package tx_test
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"math"
 	"math/big"
 	"os"
@@ -38,13 +36,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+
+	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
 func TestMain(m *testing.M) {
@@ -52,35 +54,38 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// golden specifies a transaction in various formats. It enables testing
-// transformations between the included formats.
-type golden struct {
-	Name  string
-	Old   *atomic.Tx
-	New   *Tx
-	Bytes []byte
-	ID    ids.ID
+type txData struct {
+	name  string
+	old   *atomic.Tx
+	new   *Tx
+	id    ids.ID
+	bytes []byte
 }
 
+// These are the mainnet values.
 var (
-	AVAXAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
-	CChainID    = ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
-	XChainID    = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
+	avaxAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
+	cChainID    = ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
+	xChainID    = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
+)
 
-	importGolden = golden{
-		Name: "import", // Included in https://subnets.avax.network/c-chain/block/4
-		Old: &atomic.Tx{
+// Golden transactions are defined at the package level to allow sharing between
+// various fuzz tests and unit tests.
+var (
+	importTx = txData{
+		name: "import", // Included in https://subnets.avax.network/c-chain/block/4
+		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedImportTx{
 				NetworkID:    constants.MainnetID,
-				BlockchainID: CChainID,
-				SourceChain:  XChainID,
+				BlockchainID: cChainID,
+				SourceChain:  xChainID,
 				ImportedInputs: []*avax.TransferableInput{{
 					UTXOID: avax.UTXOID{
 						TxID:        ids.FromStringOrPanic("2VqSFA5hxukiv1FSAB8ShjwHwmPev9ZS8VD9aUTCDRoff7T5Bi"),
 						OutputIndex: 1,
 					},
 					Asset: avax.Asset{
-						ID: AVAXAssetID,
+						ID: avaxAssetID,
 					},
 					In: &secp256k1fx.TransferInput{
 						Amt: 50000000,
@@ -92,29 +97,29 @@ var (
 				Outs: []atomic.EVMOutput{{
 					Address: common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"),
 					Amount:  50000000,
-					AssetID: AVAXAssetID,
+					AssetID: avaxAssetID,
 				}},
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
 					},
 				},
 			},
 		},
-		New: &Tx{
+		new: &Tx{
 			Unsigned: &Import{
 				NetworkID:    constants.MainnetID,
-				BlockchainID: CChainID,
-				SourceChain:  XChainID,
+				BlockchainID: cChainID,
+				SourceChain:  xChainID,
 				ImportedInputs: []*avax.TransferableInput{{
 					UTXOID: avax.UTXOID{
 						TxID:        ids.FromStringOrPanic("2VqSFA5hxukiv1FSAB8ShjwHwmPev9ZS8VD9aUTCDRoff7T5Bi"),
 						OutputIndex: 1,
 					},
 					Asset: avax.Asset{
-						ID: AVAXAssetID,
+						ID: avaxAssetID,
 					},
 					In: &secp256k1fx.TransferInput{
 						Amt: 50000000,
@@ -126,36 +131,36 @@ var (
 				Outs: []Output{{
 					Address: common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"),
 					Amount:  50000000,
-					AssetID: AVAXAssetID,
+					AssetID: avaxAssetID,
 				}},
 			},
 			Creds: []Credential{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
 					},
 				},
 			},
 		},
-		Bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001c52b712aa7dce27a650bf509f799673e245edd4fa9e4e1700eb6105202fe579a0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000002faf080000000010000000000000001b8b5a87d1c05676f1f966da49151fa54dbe68c330000000002faf08021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000100000009000000013e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01"),
-		ID:    ids.FromStringOrPanic("h34BPNmYApCbW8buVWAtzu1KtjTFmyMhiRQQnAqPqwCqQsB7f"),
+		id:    ids.FromStringOrPanic("h34BPNmYApCbW8buVWAtzu1KtjTFmyMhiRQQnAqPqwCqQsB7f"),
+		bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001c52b712aa7dce27a650bf509f799673e245edd4fa9e4e1700eb6105202fe579a0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000002faf080000000010000000000000001b8b5a87d1c05676f1f966da49151fa54dbe68c330000000002faf08021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000100000009000000013e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01"),
 	}
 
-	exportGolden = golden{
-		Name: "export", // Included in https://subnets.avax.network/c-chain/block/48
-		Old: &atomic.Tx{
+	exportTx = txData{
+		name: "export", // Included in https://subnets.avax.network/c-chain/block/48
+		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedExportTx{
 				NetworkID:        constants.MainnetID,
-				BlockchainID:     CChainID,
-				DestinationChain: XChainID,
+				BlockchainID:     cChainID,
+				DestinationChain: xChainID,
 				Ins: []atomic.EVMInput{{
 					Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 					Amount:  1000001,
-					AssetID: AVAXAssetID,
+					AssetID: avaxAssetID,
 				}},
 				ExportedOutputs: []*avax.TransferableOutput{{
 					Asset: avax.Asset{
-						ID: AVAXAssetID,
+						ID: avaxAssetID,
 					},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: 1,
@@ -170,25 +175,25 @@ var (
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
 					},
 				},
 			},
 		},
-		New: &Tx{
+		new: &Tx{
 			Unsigned: &Export{
 				NetworkID:        constants.MainnetID,
-				BlockchainID:     CChainID,
-				DestinationChain: XChainID,
+				BlockchainID:     cChainID,
+				DestinationChain: xChainID,
 				Ins: []Input{{
 					Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
 					Amount:  1000001,
-					AssetID: AVAXAssetID,
+					AssetID: avaxAssetID,
 				}},
 				ExportedOutputs: []*avax.TransferableOutput{{
 					Asset: avax.Asset{
-						ID: AVAXAssetID,
+						ID: avaxAssetID,
 					},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: 1,
@@ -203,29 +208,29 @@ var (
 			},
 			Creds: []Credential{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
 					},
 				},
 			},
 		},
-		Bytes: common.FromHex("0x000000000001000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001eb019ccd325ad53543a7e7e3b04828bdecf3cff600000000000f424121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000000000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500000000010000000900000001254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01"),
-		ID:    ids.FromStringOrPanic("ng7Dox1r8nctrF6zurhRPYWxkmE2juUhT7Qhpauyo8qSEu6jB"),
+		id:    ids.FromStringOrPanic("ng7Dox1r8nctrF6zurhRPYWxkmE2juUhT7Qhpauyo8qSEu6jB"),
+		bytes: common.FromHex("0x000000000001000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001eb019ccd325ad53543a7e7e3b04828bdecf3cff600000000000f424121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000000000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500000000010000000900000001254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01"),
 	}
 
-	importMultiInputGolden = golden{
-		Name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
-		Old: &atomic.Tx{
+	importMultiInputTx = txData{
+		name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
+		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedImportTx{
 				NetworkID:    constants.MainnetID,
-				BlockchainID: CChainID,
-				SourceChain:  XChainID,
+				BlockchainID: cChainID,
+				SourceChain:  xChainID,
 				ImportedInputs: []*avax.TransferableInput{
 					{
 						UTXOID: avax.UTXOID{
 							TxID: ids.FromStringOrPanic("DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH"),
 						},
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						In: &secp256k1fx.TransferInput{
 							Amt: 99000000,
 							Input: secp256k1fx.Input{
@@ -237,7 +242,7 @@ var (
 						UTXOID: avax.UTXOID{
 							TxID: ids.FromStringOrPanic("25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74"),
 						},
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						In: &secp256k1fx.TransferInput{
 							Amt: 399000000,
 							Input: secp256k1fx.Input{
@@ -249,7 +254,7 @@ var (
 						UTXOID: avax.UTXOID{
 							TxID: ids.FromStringOrPanic("2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj"),
 						},
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						In: &secp256k1fx.TransferInput{
 							Amt: 99000000,
 							Input: secp256k1fx.Input{
@@ -262,49 +267,49 @@ var (
 					{
 						Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 						Amount:  99000000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 					},
 					{
 						Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 						Amount:  99000000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 					},
 					{
 						Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 						Amount:  399000000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 					},
 				},
 			},
 			Creds: []verify.Verifiable{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 			},
 		},
-		New: &Tx{
+		new: &Tx{
 			Unsigned: &Import{
 				NetworkID:    constants.MainnetID,
-				BlockchainID: CChainID,
-				SourceChain:  XChainID,
+				BlockchainID: cChainID,
+				SourceChain:  xChainID,
 				ImportedInputs: []*avax.TransferableInput{
 					{
 						UTXOID: avax.UTXOID{
 							TxID: ids.FromStringOrPanic("DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH"),
 						},
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						In: &secp256k1fx.TransferInput{
 							Amt: 99000000,
 							Input: secp256k1fx.Input{
@@ -316,7 +321,7 @@ var (
 						UTXOID: avax.UTXOID{
 							TxID: ids.FromStringOrPanic("25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74"),
 						},
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						In: &secp256k1fx.TransferInput{
 							Amt: 399000000,
 							Input: secp256k1fx.Input{
@@ -328,7 +333,7 @@ var (
 						UTXOID: avax.UTXOID{
 							TxID: ids.FromStringOrPanic("2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj"),
 						},
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						In: &secp256k1fx.TransferInput{
 							Amt: 99000000,
 							Input: secp256k1fx.Input{
@@ -341,45 +346,45 @@ var (
 					{
 						Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 						Amount:  99000000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 					},
 					{
 						Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 						Amount:  99000000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 					},
 					{
 						Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
 						Amount:  399000000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 					},
 				},
 			},
 			Creds: []Credential{
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 				&secp256k1fx.Credential{
-					Sigs: [][65]byte{
-						[65]byte(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
+					Sigs: []txtest.Signature{
+						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
 					},
 				},
 			},
 		},
-		Bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b000000031d249d0aab138afe01e6eff9c4789018a600771d94f5396b5df7b9d05298714d0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec000000001000000008e0713e47bfc29bef4cee6e4635da1c74a3aabade68ccad6fca3e99fd827eb1c0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000017c841c00000000100000000a022a8b069a5d5e54c7e09c5c5b0f762c6751068bef15fe951a5e4b349d642200000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec0000000010000000000000003383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000017c841c021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000300000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"),
-		ID:    ids.FromStringOrPanic("2Av7bXLRwxiQhbT9EcQd8KRM3Lz6VkpTqf3Y1AT5peHZ4YAohS"),
+		id:    ids.FromStringOrPanic("2Av7bXLRwxiQhbT9EcQd8KRM3Lz6VkpTqf3Y1AT5peHZ4YAohS"),
+		bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b000000031d249d0aab138afe01e6eff9c4789018a600771d94f5396b5df7b9d05298714d0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec000000001000000008e0713e47bfc29bef4cee6e4635da1c74a3aabade68ccad6fca3e99fd827eb1c0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000017c841c00000000100000000a022a8b069a5d5e54c7e09c5c5b0f762c6751068bef15fe951a5e4b349d642200000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec0000000010000000000000003383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000017c841c021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000300000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"),
 	}
 
-	exportSameAddressMultiAssetGolden = golden{
-		Name: "export_same_address_multi_asset", // Synthetic
-		Old: &atomic.Tx{
+	exportSameAddressMultiAssetTx = txData{
+		name: "export_same_address_multi_asset", // Synthetic
+		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedExportTx{
 				Ins: []atomic.EVMInput{
 					{
@@ -388,7 +393,7 @@ var (
 					},
 					{
 						Amount:  1_000_000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 						Nonce:   5,
 					},
 				},
@@ -403,7 +408,7 @@ var (
 						},
 					},
 					{
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 100_000,
 							OutputOwners: secp256k1fx.OutputOwners{
@@ -416,7 +421,7 @@ var (
 			},
 			Creds: []verify.Verifiable{},
 		},
-		New: &Tx{
+		new: &Tx{
 			Unsigned: &Export{
 				Ins: []Input{
 					{
@@ -425,7 +430,7 @@ var (
 					},
 					{
 						Amount:  1_000_000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 						Nonce:   5,
 					},
 				},
@@ -440,7 +445,7 @@ var (
 						},
 					},
 					{
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 100_000,
 							OutputOwners: secp256k1fx.OutputOwners{
@@ -453,13 +458,13 @@ var (
 			},
 			Creds: []Credential{},
 		},
-		Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000000000000500000002000000000000000000000000000000000000000000000000000000000000000000000007000000000000006400000000000000000000000100000001aa0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000700000000000186a000000000000000000000000100000001aa0000000000000000000000000000000000000000000000"),
-		ID:    ids.FromStringOrPanic("dLYGLJkvGarYPHnfRqK8zH9nu6dj6Ajf1Wjtm8X7fxr5jvvL7"),
+		id:    ids.FromStringOrPanic("dLYGLJkvGarYPHnfRqK8zH9nu6dj6Ajf1Wjtm8X7fxr5jvvL7"),
+		bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000000000000500000002000000000000000000000000000000000000000000000000000000000000000000000007000000000000006400000000000000000000000100000001aa0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000700000000000186a000000000000000000000000100000001aa0000000000000000000000000000000000000000000000"),
 	}
 
-	exportMultiAddressMultiAssetGolden = golden{
-		Name: "export_multi_address_multi_asset", // Synthetic
-		Old: &atomic.Tx{
+	exportMultiAddressMultiAssetTx = txData{
+		name: "export_multi_address_multi_asset", // Synthetic
+		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedExportTx{
 				Ins: []atomic.EVMInput{
 					{
@@ -470,7 +475,7 @@ var (
 					{
 						Address: common.Address{2},
 						Amount:  1_000_000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 						Nonce:   7,
 					},
 				},
@@ -485,7 +490,7 @@ var (
 						},
 					},
 					{
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 500_000,
 							OutputOwners: secp256k1fx.OutputOwners{
@@ -498,7 +503,7 @@ var (
 			},
 			Creds: []verify.Verifiable{},
 		},
-		New: &Tx{
+		new: &Tx{
 			Unsigned: &Export{
 				Ins: []Input{
 					{
@@ -509,7 +514,7 @@ var (
 					{
 						Address: common.Address{2},
 						Amount:  1_000_000,
-						AssetID: AVAXAssetID,
+						AssetID: avaxAssetID,
 						Nonce:   7,
 					},
 				},
@@ -524,7 +529,7 @@ var (
 						},
 					},
 					{
-						Asset: avax.Asset{ID: AVAXAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 500_000,
 							OutputOwners: secp256k1fx.OutputOwners{
@@ -537,13 +542,13 @@ var (
 			},
 			Creds: []Credential{},
 		},
-		Bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000200000000000000000000000000000000000000000000000000000000000000000000000700000000000001f400000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000007a12000000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000000000000"),
-		ID:    ids.FromStringOrPanic("2cfgJ1XjwjNVvF4ZoW86Sc77z7TDMyGB33edRioEfuLkyKkkob"),
+		id:    ids.FromStringOrPanic("2cfgJ1XjwjNVvF4ZoW86Sc77z7TDMyGB33edRioEfuLkyKkkob"),
+		bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000200000000000000000000000000000000000000000000000000000000000000000000000700000000000001f400000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000007a12000000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000000000000"),
 	}
 
-	importNonAVAXGolden = golden{
-		Name: "import_non_avax", // Synthetic
-		Old: &atomic.Tx{
+	importNonAVAXTx = txData{
+		name: "import_non_avax", // Synthetic
+		old: &atomic.Tx{
 			UnsignedAtomicTx: &atomic.UnsignedImportTx{
 				ImportedInputs: []*avax.TransferableInput{{
 					In: &secp256k1fx.TransferInput{
@@ -559,7 +564,7 @@ var (
 			},
 			Creds: []verify.Verifiable{},
 		},
-		New: &Tx{
+		new: &Tx{
 			Unsigned: &Import{
 				ImportedInputs: []*avax.TransferableInput{{
 					In: &secp256k1fx.TransferInput{
@@ -575,907 +580,30 @@ var (
 			},
 			Creds: []Credential{},
 		},
-		Bytes: common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500000000000003e70000000000000001000000000000000000000000000000000000000000000000000003e7000000000000000000000000000000000000000000000000000000000000000000000000"),
-		ID:    ids.FromStringOrPanic("s4xoHkf4rPQYSwjbQo78hcSP1wSeViV1Fx2PHM4AfRiDurFkf"),
-	}
-
-	// AllGolden is defined at the package level to allow sharing between fuzz
-	// tests and unit tests.
-	AllGolden = [...]golden{
-		importGolden,
-		exportGolden,
-		importMultiInputGolden,
-		exportSameAddressMultiAssetGolden,
-		exportMultiAddressMultiAssetGolden,
-		importNonAVAXGolden,
+		id:    ids.FromStringOrPanic("s4xoHkf4rPQYSwjbQo78hcSP1wSeViV1Fx2PHM4AfRiDurFkf"),
+		bytes: common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500000000000003e70000000000000001000000000000000000000000000000000000000000000000000003e7000000000000000000000000000000000000000000000000000000000000000000000000"),
 	}
 )
 
-// MainnetContext returns a [snow.Context] with mainnet values.
-func MainnetContext() *snow.Context {
-	return &snow.Context{
-		NetworkID:   constants.MainnetID,
-		SubnetID:    constants.PrimaryNetworkID,
-		ChainID:     CChainID,
-		XChainID:    XChainID,
-		CChainID:    CChainID,
-		AVAXAssetID: AVAXAssetID,
-		ValidatorState: &validatorstest.State{
-			GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-				switch chainID {
-				case constants.PlatformChainID, XChainID, CChainID:
-					return constants.PrimaryNetworkID, nil
-				default:
-					return ids.GenerateTestID(), nil
-				}
-			},
-		},
-	}
-}
-
-func TestID(t *testing.T) {
-	for _, tx := range AllGolden {
-		t.Run(tx.Name, func(t *testing.T) {
-			t.Run("old", func(t *testing.T) {
-				// We must parse the old tx to properly initialize the ID.
-				old, err := ParseOldTx(tx.Bytes)
-				require.NoError(t, err, "ParseOldTx()")
-				assert.Equalf(t, tx.ID, old.ID(), "%T.ID()", old)
-			})
-			t.Run("new", func(t *testing.T) {
-				assert.Equalf(t, tx.ID, tx.New.ID(), "%T.ID()", tx.New)
-			})
-		})
-	}
-}
-
-func TestBytes(t *testing.T) {
-	for _, tx := range AllGolden {
-		t.Run(tx.Name, func(t *testing.T) {
-			t.Run("old", func(t *testing.T) {
-				got, err := atomic.Codec.Marshal(atomic.CodecVersion, tx.Old)
-				require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, tx.Old)
-				assert.Equalf(t, tx.Bytes, got, "%T.Marshal(, %T)", atomic.Codec, tx.Old)
-			})
-			t.Run("new", func(t *testing.T) {
-				got, err := tx.New.Bytes()
-				require.NoErrorf(t, err, "%T.Bytes()", tx.New)
-				assert.Equalf(t, tx.Bytes, got, "%T.Bytes()", tx.New)
-			})
-		})
-	}
-}
-
-func TestMarshalSlice(t *testing.T) {
-	oldTxs := make([]*atomic.Tx, len(AllGolden))
-	newTxs := make([]*Tx, len(AllGolden))
-	for i, tx := range AllGolden {
-		oldTxs[i] = tx.Old
-		newTxs[i] = tx.New
-	}
-
-	want, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
-	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldTxs)
-
-	tests := []struct {
-		name string
-		txs  []*Tx
-		want []byte
-	}{
-		{
-			name: "mainnet",
-			txs:  newTxs,
-			want: want,
-		},
-		{
-			name: "empty",
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			got, err := MarshalSlice(test.txs)
-			require.NoErrorf(t, err, "MarshalSlice(%T)", test.txs)
-			assert.Equalf(t, test.want, got, "MarshalSlice(%T)", test.txs)
-		})
-	}
-}
-
-// OldCmpOpt returns a configuration for [cmp.Diff] to compare [atomic.Tx]
-// instances.
-func OldCmpOpt() cmp.Option {
-	return cmputils.IfIn[atomic.Tx](cmp.Options{
-		cmpopts.IgnoreUnexported(
-			atomic.Metadata{},
-			avax.UTXOID{},
-			secp256k1fx.OutputOwners{},
-		),
-		cmpopts.EquateEmpty(),
-	})
-}
-
-// CmpOpt returns a configuration for [cmp.Diff] to compare [Tx] instances.
-func CmpOpt() cmp.Option {
-	return cmputils.IfIn[Tx](cmp.Options{
-		cmpopts.IgnoreUnexported(
-			avax.UTXOID{},
-			secp256k1fx.OutputOwners{},
-		),
-		cmpopts.EquateEmpty(),
-	})
-}
-
-func TestParse(t *testing.T) {
-	for _, tx := range AllGolden {
-		t.Run(tx.Name, func(t *testing.T) {
-			t.Run("old", func(t *testing.T) {
-				got, err := ParseOldTx(tx.Bytes)
-				require.NoError(t, err, "ParseOldTx()")
-				if diff := cmp.Diff(tx.Old, got, OldCmpOpt()); diff != "" {
-					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
-				}
-			})
-			t.Run("new", func(t *testing.T) {
-				got, err := Parse(tx.Bytes)
-				require.NoError(t, err, "Parse()")
-				if diff := cmp.Diff(tx.New, got, CmpOpt()); diff != "" {
-					t.Errorf("Parse() diff (-want +got):\n%s", diff)
-				}
-			})
-		})
-	}
-}
-
-func TestParseSlice(t *testing.T) {
-	oldTxs := make([]*atomic.Tx, len(AllGolden))
-	newTxs := make([]*Tx, len(AllGolden))
-	for i, tx := range AllGolden {
-		oldTxs[i] = tx.Old
-		newTxs[i] = tx.New
-	}
-
-	bytes, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
-	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldTxs)
-
-	tests := []struct {
-		name    string
-		bytes   []byte
-		want    []*Tx
-		wantErr error
-	}{
-		{
-			name:  "mainnet",
-			bytes: bytes,
-			want:  newTxs,
-		},
-		{
-			name: "empty",
-		},
-		{
-			name: "inefficient",
-			bytes: []byte{
-				// codecVersion:
-				0x00, 0x00,
-				// len(txs):
-				0x00, 0x00, 0x00, 0x00,
-			},
-			wantErr: errInefficientSlicePacking,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			got, err := ParseSlice(test.bytes)
-			require.ErrorIs(t, err, test.wantErr, "ParseSlice()")
-			if diff := cmp.Diff(test.want, got, CmpOpt()); diff != "" {
-				t.Errorf("ParseSlice() diff (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-// ToOldTx converts a transaction from the new format into coreth's old format.
-func ToOldTx(tb testing.TB, newTx *Tx) *atomic.Tx {
-	tb.Helper()
-
-	bytes, err := newTx.Bytes()
-	require.NoErrorf(tb, err, "%T.Bytes()", newTx)
-
-	oldTx, err := ParseOldTx(bytes)
-	require.NoError(tb, err, "ParseOldTx()")
-	return oldTx
-}
-
-var errUnexpectedCredentialType = errors.New("unexpected credential type")
-
-// ParseOldTx parses a transaction using coreth's old parsing logic but enforces
-// additional restrictions. Coreth's parsing logic is overly permissive and
-// depends on later verification in [vm.VerifierBackend].
-func ParseOldTx(b []byte) (*atomic.Tx, error) {
-	tx, err := atomic.ExtractAtomicTx(b, atomic.Codec)
-	if err != nil {
-		return nil, err
-	}
-	for _, cred := range tx.Creds {
-		if _, ok := cred.(*secp256k1fx.Credential); !ok {
-			return nil, errUnexpectedCredentialType
-		}
-	}
-	return tx, nil
-}
-
-// ParseOldTxs parses a slice of transactions using coreth's old parsing logic
-// but enforces additional restrictions. Coreth's parsing logic is overly
-// permissive and depends on later verification in [vm.VerifierBackend].
-func ParseOldTxs(b []byte) ([]*atomic.Tx, error) {
-	txs, err := atomic.ExtractAtomicTxs(b, true, atomic.Codec)
-	if err != nil {
-		return nil, err
-	}
-	for _, tx := range txs {
-		for _, cred := range tx.Creds {
-			if _, ok := cred.(*secp256k1fx.Credential); !ok {
-				return nil, errUnexpectedCredentialType
-			}
-		}
-	}
-	return txs, nil
-}
-
-func FuzzParseCompatibility(f *testing.F) {
-	for _, tx := range AllGolden {
-		f.Add(tx.Bytes)
-	}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		_, oldErr := ParseOldTx(data)
-		oldOk := oldErr == nil
-
-		_, newErr := Parse(data)
-		newOk := newErr == nil
-
-		assert.Equal(t, oldOk, newOk, "Parse(b) == ParseOldTx(b)")
-	})
-}
-
-func FuzzParseSliceCompatibility(f *testing.F) {
-	{
-		newTxs := make([]*Tx, len(AllGolden))
-		for i, tx := range AllGolden {
-			newTxs[i] = tx.New
-		}
-		b, err := MarshalSlice(newTxs)
-		require.NoError(f, err, "MarshalSlice()")
-		f.Add(b)
-	}
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		_, oldErr := ParseOldTxs(data)
-		oldOk := oldErr == nil
-
-		_, newErr := ParseSlice(data)
-		newOk := newErr == nil
-
-		assert.Equal(t, oldOk, newOk, "ParseSlice(b) == ParseOldTxs(b)")
-	})
-}
-
-func FuzzParseSliceRoundTrip(f *testing.F) {
-	{
-		newTxs := make([]*Tx, len(AllGolden))
-		for i, tx := range AllGolden {
-			newTxs[i] = tx.New
-		}
-		b, err := MarshalSlice(newTxs)
-		require.NoError(f, err, "MarshalSlice()")
-		f.Add(b)
-	}
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		txs, err := ParseSlice(data)
-		if err != nil {
-			return
-		}
-
-		got, err := MarshalSlice(txs)
-		require.NoError(t, err, "MarshalSlice()")
-		if diff := cmp.Diff(data, got, cmpopts.EquateEmpty()); diff != "" {
-			t.Errorf("MarshalSlice(ParseSlice()) diff (-want +got):\n%s", diff)
-		}
-	})
-}
-
-func TestJSONMarshal(t *testing.T) {
-	tests := []struct {
-		tx   golden
-		want string
-	}{
-		{
-			tx: importGolden,
-			want: `{
-				"unsignedTx":{
-					"networkID":1,
-					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
-					"sourceChain":"2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
-					"importedInputs":[{
-						"txID":"2VqSFA5hxukiv1FSAB8ShjwHwmPev9ZS8VD9aUTCDRoff7T5Bi",
-						"outputIndex":1,
-						"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-						"fxID":"11111111111111111111111111111111LpoYY",
-						"input":{
-							"amount":50000000,
-							"signatureIndices":[0]
-						}
-					}],
-					"outputs":[{
-						"address":"0xb8b5a87d1c05676f1f966da49151fa54dbe68c33",
-						"amount":50000000,
-						"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"
-					}]
-				},
-				"credentials":[{
-					"signatures":[
-						"0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01"
-					]
-				}]
-			}`,
-		},
-		{
-			tx: exportGolden,
-			want: `{
-				"unsignedTx":{
-					"networkID":1,
-					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
-					"destinationChain":"2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
-					"inputs":[{
-						"address":"0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6",
-						"amount":1000001,
-						"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-						"nonce":0
-					}],
-					"exportedOutputs":[{
-						"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-						"fxID":"11111111111111111111111111111111LpoYY",
-						"output":{
-							"addresses":["LanVZgBDVvtarbTXD1uU7r1nXVJyLmPUz"],
-							"amount":1,
-							"locktime":0,
-							"threshold":1
-						}
-					}]
-				},
-				"credentials":[{
-					"signatures":[
-						"0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01"
-					]
-				}]
-			}`,
-		},
-		{
-			tx: importMultiInputGolden,
-			want: `{
-				"unsignedTx":{
-					"networkID":1,
-					"blockchainID":"2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5",
-					"sourceChain":"2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM",
-					"importedInputs":[
-						{
-							"txID":"DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH",
-							"outputIndex":0,
-							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-							"fxID":"11111111111111111111111111111111LpoYY",
-							"input":{"amount":99000000,"signatureIndices":[0]}
-						},
-						{
-							"txID":"25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74",
-							"outputIndex":0,
-							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-							"fxID":"11111111111111111111111111111111LpoYY",
-							"input":{"amount":399000000,"signatureIndices":[0]}
-						},
-						{
-							"txID":"2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj",
-							"outputIndex":0,
-							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-							"fxID":"11111111111111111111111111111111LpoYY",
-							"input":{"amount":99000000,"signatureIndices":[0]}
-						}
-					],
-					"outputs":[
-						{"address":"0x383c293db6be7ac246f0956ad632344dc2cd1da3","amount":99000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"},
-						{"address":"0x383c293db6be7ac246f0956ad632344dc2cd1da3","amount":99000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"},
-						{"address":"0x383c293db6be7ac246f0956ad632344dc2cd1da3","amount":399000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"}
-					]
-				},
-				"credentials":[
-					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]},
-					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]},
-					{"signatures":["0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"]}
-				]
-			}`,
-		},
-		{
-			tx: exportSameAddressMultiAssetGolden,
-			want: `{
-				"unsignedTx":{
-					"networkID":0,
-					"blockchainID":"11111111111111111111111111111111LpoYY",
-					"destinationChain":"11111111111111111111111111111111LpoYY",
-					"inputs":[
-						{"address":"0x0000000000000000000000000000000000000000","amount":999,"assetID":"11111111111111111111111111111111LpoYY","nonce":5},
-						{"address":"0x0000000000000000000000000000000000000000","amount":1000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z","nonce":5}
-					],
-					"exportedOutputs":[
-						{
-							"assetID":"11111111111111111111111111111111LpoYY",
-							"fxID":"11111111111111111111111111111111LpoYY",
-							"output":{
-								"addresses":["GVsscSys19nXbNEJi5g1Z1y8UawXee8gj"],
-								"amount":100,
-								"locktime":0,
-								"threshold":1
-							}
-						},
-						{
-							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-							"fxID":"11111111111111111111111111111111LpoYY",
-							"output":{
-								"addresses":["GVsscSys19nXbNEJi5g1Z1y8UawXee8gj"],
-								"amount":100000,
-								"locktime":0,
-								"threshold":1
-							}
-						}
-					]
-				},
-				"credentials":[]
-			}`,
-		},
-		{
-			tx: exportMultiAddressMultiAssetGolden,
-			want: `{
-				"unsignedTx":{
-					"networkID":0,
-					"blockchainID":"11111111111111111111111111111111LpoYY",
-					"destinationChain":"11111111111111111111111111111111LpoYY",
-					"inputs":[
-						{"address":"0x0100000000000000000000000000000000000000","amount":999,"assetID":"11111111111111111111111111111111LpoYY","nonce":5},
-						{"address":"0x0200000000000000000000000000000000000000","amount":1000000,"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z","nonce":7}
-					],
-					"exportedOutputs":[
-						{
-							"assetID":"11111111111111111111111111111111LpoYY",
-							"fxID":"11111111111111111111111111111111LpoYY",
-							"output":{
-								"addresses":["J3mMsbNx1AfUrQMSHBwWcDfYRYY1i7rGE","Kber8jn31BYS7SUZrJD1fRMxNW8MvZnhY"],
-								"amount":500,
-								"locktime":0,
-								"threshold":2
-							}
-						},
-						{
-							"assetID":"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-							"fxID":"11111111111111111111111111111111LpoYY",
-							"output":{
-								"addresses":["J3mMsbNx1AfUrQMSHBwWcDfYRYY1i7rGE","Kber8jn31BYS7SUZrJD1fRMxNW8MvZnhY"],
-								"amount":500000,
-								"locktime":0,
-								"threshold":2
-							}
-						}
-					]
-				},
-				"credentials":[]
-			}`,
-		},
-		{
-			tx: importNonAVAXGolden,
-			want: `{
-				"unsignedTx":{
-					"networkID":0,
-					"blockchainID":"11111111111111111111111111111111LpoYY",
-					"sourceChain":"11111111111111111111111111111111LpoYY",
-					"importedInputs":[{
-						"txID":"11111111111111111111111111111111LpoYY",
-						"outputIndex":0,
-						"assetID":"11111111111111111111111111111111LpoYY",
-						"fxID":"11111111111111111111111111111111LpoYY",
-						"input":{"amount":999,"signatureIndices":[]}
-					}],
-					"outputs":[{
-						"address":"0x0000000000000000000000000000000000000000",
-						"amount":999,
-						"assetID":"11111111111111111111111111111111LpoYY"
-					}]
-				},
-				"credentials":[]
-			}`,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.tx.Name, func(t *testing.T) {
-			t.Run("old", func(t *testing.T) {
-				got, err := json.Marshal(test.tx.Old)
-				require.NoErrorf(t, err, "json.Marshal(%T)", test.tx.Old)
-				assert.JSONEqf(t, test.want, string(got), "json.Marshal(%T)", test.tx.Old)
-			})
-			t.Run("new", func(t *testing.T) {
-				got, err := json.Marshal(test.tx.New)
-				require.NoErrorf(t, err, "json.Marshal(%T)", test.tx.New)
-				assert.JSONEqf(t, test.want, string(got), "json.Marshal(%T)", test.tx.New)
-			})
-		})
-	}
-}
-
-func TestAsOp(t *testing.T) {
-	tests := []struct {
-		tx   golden
-		want hook.Op
-	}{
-		{
-			tx: importGolden,
-			want: hook.Op{
-				ID:  importGolden.ID,
-				Gas: 11230,
-				Mint: map[common.Address]uint256.Int{
-					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): scaleAVAX(50_000_000),
-				},
-			},
-		},
-		{
-			tx: exportGolden,
-			want: hook.Op{
-				ID:        exportGolden.ID,
-				Gas:       11230,
-				GasFeeCap: *uint256.NewInt(1_000_000 * _x2cRate / 11230),
-				Burn: map[common.Address]hook.AccountDebit{
-					common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"): {
-						Amount:     scaleAVAX(1_000_001),
-						MinBalance: scaleAVAX(1_000_001),
-					},
-				},
-			},
-		},
-		{
-			tx: importMultiInputGolden,
-			want: hook.Op{
-				ID:  importMultiInputGolden.ID,
-				Gas: 13526,
-				Mint: map[common.Address]uint256.Int{
-					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): scaleAVAX(597_000_000),
-				},
-			},
-		},
-		{
-			tx: exportSameAddressMultiAssetGolden,
-			want: hook.Op{
-				ID:        exportSameAddressMultiAssetGolden.ID,
-				Gas:       12378,
-				GasFeeCap: *uint256.NewInt(900_000 * _x2cRate / 12378),
-				Burn: map[common.Address]hook.AccountDebit{
-					{}: {
-						Nonce:      5,
-						Amount:     scaleAVAX(1_000_000),
-						MinBalance: scaleAVAX(1_000_000),
-					},
-				},
-			},
-		},
-		{
-			tx: exportMultiAddressMultiAssetGolden,
-			want: hook.Op{
-				ID:        exportMultiAddressMultiAssetGolden.ID,
-				Gas:       12418,
-				GasFeeCap: *uint256.NewInt(500_000 * _x2cRate / 12418),
-				Burn: map[common.Address]hook.AccountDebit{
-					{1}: {
-						Nonce: 5,
-					},
-					{2}: {
-						Nonce:      7,
-						Amount:     scaleAVAX(1_000_000),
-						MinBalance: scaleAVAX(1_000_000),
-					},
-				},
-			},
-		},
-		{
-			tx: importNonAVAXGolden,
-			want: hook.Op{
-				ID:   importNonAVAXGolden.ID,
-				Gas:  10226,
-				Mint: map[common.Address]uint256.Int{},
-			},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.tx.Name, func(t *testing.T) {
-			got, err := test.tx.New.AsOp(AVAXAssetID)
-			require.NoErrorf(t, err, "%T.AsOp(AVAXAssetID)", test.tx.New)
-			assert.Equalf(t, test.want, got, "%T.AsOp(AVAXAssetID)", test.tx.New)
-		})
-	}
-}
-
-func TestAsOp_Errors(t *testing.T) {
-	tests := []struct {
-		name string
-		tx   Unsigned
-		want error
-	}{
-		{
-			name: "export_multiple_nonces",
-			tx: &Export{
-				Ins: []Input{
-					{
-						Nonce: 0,
-					},
-					{
-						Nonce: 1,
-					},
-				},
-			},
-			want: errMultipleNonces,
-		},
-		{
-			name: "import_burned_overflow",
-			tx: &Import{
-				ImportedInputs: []*avax.TransferableInput{
-					{
-						Asset: avax.Asset{ID: AVAXAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt: math.MaxUint64,
-						},
-					},
-					{
-						Asset: avax.Asset{ID: AVAXAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt: 2,
-						},
-					},
-				},
-				Outs: []Output{{
-					AssetID: AVAXAssetID,
-					Amount:  1,
-				}},
-			},
-			want: safemath.ErrOverflow,
-		},
-		{
-			name: "import_burned_intermediate_overflow",
-			tx: &Import{
-				ImportedInputs: []*avax.TransferableInput{
-					{
-						Asset: avax.Asset{ID: AVAXAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt: math.MaxUint64,
-						},
-					},
-					{
-						Asset: avax.Asset{ID: AVAXAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt: 1,
-						},
-					},
-				},
-				Outs: []Output{{
-					AssetID: AVAXAssetID,
-					Amount:  1,
-				}},
-			},
-			want: safemath.ErrOverflow,
-		},
-		{
-			name: "import_burned_underflow",
-			tx: &Import{
-				ImportedInputs: []*avax.TransferableInput{{
-					Asset: avax.Asset{ID: AVAXAssetID},
-					In: &secp256k1fx.TransferInput{
-						Amt: 1,
-					},
-				}},
-				Outs: []Output{{
-					AssetID: AVAXAssetID,
-					Amount:  2,
-				}},
-			},
-			want: safemath.ErrUnderflow,
-		},
-		{
-			name: "export_burned_overflow",
-			tx: &Export{
-				Ins: []Input{
-					{
-						Address: common.Address{0},
-						AssetID: AVAXAssetID,
-						Amount:  math.MaxUint64,
-					},
-					{
-						Address: common.Address{1},
-						AssetID: AVAXAssetID,
-						Amount:  2,
-					},
-				},
-				ExportedOutputs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: AVAXAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
-				}},
-			},
-			want: safemath.ErrOverflow,
-		},
-		{
-			name: "export_burned_intermediate_overflow",
-			tx: &Export{
-				Ins: []Input{
-					{
-						Address: common.Address{0},
-						AssetID: AVAXAssetID,
-						Amount:  math.MaxUint64,
-					},
-					{
-						Address: common.Address{1},
-						AssetID: AVAXAssetID,
-						Amount:  1,
-					},
-				},
-				ExportedOutputs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: AVAXAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
-				}},
-			},
-			want: safemath.ErrOverflow,
-		},
-		{
-			name: "export_burned_underflow",
-			tx: &Export{
-				Ins: []Input{{
-					AssetID: AVAXAssetID,
-					Amount:  1,
-				}},
-				ExportedOutputs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: AVAXAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 2,
-					},
-				}},
-			},
-			want: safemath.ErrUnderflow,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			tx := &Tx{
-				Unsigned: test.tx,
-			}
-			_, err := tx.AsOp(AVAXAssetID)
-			require.ErrorIsf(t, err, test.want, "%T.AsOp(AVAXAssetID)", tx)
-		})
-	}
-}
-
-func TestAtomicRequests(t *testing.T) {
-	tests := []struct {
-		tx           golden
-		wantChainID  ids.ID
-		wantRequests *chainsatomic.Requests
-	}{
-		{
-			tx:          importGolden,
-			wantChainID: XChainID,
-			wantRequests: &chainsatomic.Requests{
-				RemoveRequests: [][]byte{
-					common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64"),
-				},
-			},
-		},
-		{
-			tx:          exportGolden,
-			wantChainID: XChainID,
-			wantRequests: &chainsatomic.Requests{
-				PutRequests: []*chainsatomic.Element{{
-					Key:   common.FromHex("0x38ebe8fc127b2eaeeb25c72a747e0ef27460fb04b5929568ed959d67ec3e4948"),
-					Value: common.FromHex("0x000067b5812292324365c6e2a479b2601cd1cd1facc2fcc8c29d58b5ed96583ea17e0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500"),
-					Traits: [][]byte{
-						ids.ShortFromStringOrPanic("LanVZgBDVvtarbTXD1uU7r1nXVJyLmPUz").Bytes(),
-					},
-				}},
-			},
-		},
-		{
-			tx:          importMultiInputGolden,
-			wantChainID: XChainID,
-			wantRequests: &chainsatomic.Requests{
-				RemoveRequests: [][]byte{
-					common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05"),
-					common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630"),
-					common.FromHex("0xd71fb48751f6d5732e7ff63168ed311b40bf517b36279e326878fc3f5169a656"),
-				},
-			},
-		},
-		{
-			tx: exportSameAddressMultiAssetGolden,
-			wantRequests: &chainsatomic.Requests{
-				PutRequests: []*chainsatomic.Element{
-					{
-						Key:   common.FromHex("0x82c024362a71c075ac15e5e000dd66380907e3ea6af121d3d78478bb07848b75"),
-						Value: common.FromHex("0x00005281e076436407df7c97e5abaff7f63e11bd8bc9ce03c787f12ee0e21fe68dca00000000000000000000000000000000000000000000000000000000000000000000000000000007000000000000006400000000000000000000000100000001aa00000000000000000000000000000000000000"),
-						Traits: [][]byte{
-							ids.ShortID{0xaa}.Bytes(),
-						},
-					},
-					{
-						Key:   common.FromHex("0x836913bdcf743940c51675ac186dc415cbb5f2a7309916f4a48bda3df5334245"),
-						Value: common.FromHex("0x00005281e076436407df7c97e5abaff7f63e11bd8bc9ce03c787f12ee0e21fe68dca0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000700000000000186a000000000000000000000000100000001aa00000000000000000000000000000000000000"),
-						Traits: [][]byte{
-							ids.ShortID{0xaa}.Bytes(),
-						},
-					},
-				},
-			},
-		},
-		{
-			tx: exportMultiAddressMultiAssetGolden,
-			wantRequests: &chainsatomic.Requests{
-				PutRequests: []*chainsatomic.Element{
-					{
-						Key:   common.FromHex("0x150b950ce35ef7c512b1dec725164c8ee170728976ca0c9c1202eb60cafe9230"),
-						Value: common.FromHex("0x0000d4ae9ab4d296ced15beba7686a2216bcfdf4a7f1bcc502b3e5c0c79a4601b2ef0000000000000000000000000000000000000000000000000000000000000000000000000000000700000000000001f400000000000000000000000200000002bb00000000000000000000000000000000000000cc00000000000000000000000000000000000000"),
-						Traits: [][]byte{
-							ids.ShortID{0xbb}.Bytes(),
-							ids.ShortID{0xcc}.Bytes(),
-						},
-					},
-					{
-						Key:   common.FromHex("0x3080252925d9e3e399292cfecc8f95bb03da84645f44b8d0da82dc472e1f41d2"),
-						Value: common.FromHex("0x0000d4ae9ab4d296ced15beba7686a2216bcfdf4a7f1bcc502b3e5c0c79a4601b2ef0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000007a12000000000000000000000000200000002bb00000000000000000000000000000000000000cc00000000000000000000000000000000000000"),
-						Traits: [][]byte{
-							ids.ShortID{0xbb}.Bytes(),
-							ids.ShortID{0xcc}.Bytes(),
-						},
-					},
-				},
-			},
-		},
-		{
-			tx: importNonAVAXGolden,
-			wantRequests: &chainsatomic.Requests{
-				RemoveRequests: [][]byte{
-					common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb"),
-				},
-			},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.tx.Name, func(t *testing.T) {
-			chainID, requests, err := test.tx.New.AtomicRequests()
-			require.NoErrorf(t, err, "%T.AtomicRequests()", test.tx.New)
-			assert.Equalf(t, test.wantChainID, chainID, "%T.AtomicRequests().ChainID", test.tx.New)
-			assert.Equalf(t, test.wantRequests, requests, "%T.AtomicRequests().Requests", test.tx.New)
-		})
-	}
-}
-
 func TestInputIDs(t *testing.T) {
 	tests := []struct {
-		tx   golden
+		tx   txData
 		want set.Set[ids.ID]
 	}{
 		{
-			tx: importGolden,
+			tx: importTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64")),
 			),
 		},
 		{
-			tx: exportGolden,
+			tx: exportTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x000000000000000000000014eb019ccd325ad53543a7e7e3b04828bdecf3cff6")),
 			),
 		},
 		{
-			tx: importMultiInputGolden,
+			tx: importMultiInputTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05")),
 				ids.ID(common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630")),
@@ -1483,29 +611,30 @@ func TestInputIDs(t *testing.T) {
 			),
 		},
 		{
-			tx: exportSameAddressMultiAssetGolden,
+			tx: exportSameAddressMultiAssetTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x0000000000000005000000140000000000000000000000000000000000000000")),
 			),
 		},
 		{
-			tx: exportMultiAddressMultiAssetGolden,
+			tx: exportMultiAddressMultiAssetTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x0000000000000005000000140100000000000000000000000000000000000000")),
 				ids.ID(common.FromHex("0x0000000000000007000000140200000000000000000000000000000000000000")),
 			),
 		},
 		{
-			tx: importNonAVAXGolden,
+			tx: importNonAVAXTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb")),
 			),
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.tx.Name, func(t *testing.T) {
-			got := test.tx.New.InputIDs()
-			assert.Equalf(t, test.want, got, "%T.InputIDs()", test.tx.New)
+		t.Run(test.tx.name, func(t *testing.T) {
+			tx := test.tx.new
+			got := tx.InputIDs()
+			assert.Equalf(t, test.want, got, "%T.InputIDs()", tx)
 		})
 	}
 }
@@ -1542,7 +671,460 @@ func TestAccountInputID(t *testing.T) {
 	}
 }
 
-func NewEmptyStateDB(t testing.TB) *extstate.StateDB {
+func TestAsOp(t *testing.T) {
+	tests := []struct {
+		tx   txData
+		want hook.Op
+	}{
+		{
+			tx: importTx,
+			want: hook.Op{
+				ID:  importTx.id,
+				Gas: 11230,
+				Mint: map[common.Address]uint256.Int{
+					common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"): ScaleAVAX(50_000_000),
+				},
+			},
+		},
+		{
+			tx: exportTx,
+			want: hook.Op{
+				ID:        exportTx.id,
+				Gas:       11230,
+				GasFeeCap: *uint256.NewInt(1_000_000 * X2CRate / 11230),
+				Burn: map[common.Address]hook.AccountDebit{
+					common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"): {
+						Amount:     ScaleAVAX(1_000_001),
+						MinBalance: ScaleAVAX(1_000_001),
+					},
+				},
+			},
+		},
+		{
+			tx: importMultiInputTx,
+			want: hook.Op{
+				ID:  importMultiInputTx.id,
+				Gas: 13526,
+				Mint: map[common.Address]uint256.Int{
+					common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"): ScaleAVAX(597_000_000),
+				},
+			},
+		},
+		{
+			tx: exportSameAddressMultiAssetTx,
+			want: hook.Op{
+				ID:        exportSameAddressMultiAssetTx.id,
+				Gas:       12378,
+				GasFeeCap: *uint256.NewInt(900_000 * X2CRate / 12378),
+				Burn: map[common.Address]hook.AccountDebit{
+					{}: {
+						Nonce:      5,
+						Amount:     ScaleAVAX(1_000_000),
+						MinBalance: ScaleAVAX(1_000_000),
+					},
+				},
+			},
+		},
+		{
+			tx: exportMultiAddressMultiAssetTx,
+			want: hook.Op{
+				ID:        exportMultiAddressMultiAssetTx.id,
+				Gas:       12418,
+				GasFeeCap: *uint256.NewInt(500_000 * X2CRate / 12418),
+				Burn: map[common.Address]hook.AccountDebit{
+					{1}: {
+						Nonce: 5,
+					},
+					{2}: {
+						Nonce:      7,
+						Amount:     ScaleAVAX(1_000_000),
+						MinBalance: ScaleAVAX(1_000_000),
+					},
+				},
+			},
+		},
+		{
+			tx: importNonAVAXTx,
+			want: hook.Op{
+				ID:   importNonAVAXTx.id,
+				Gas:  10226,
+				Mint: map[common.Address]uint256.Int{},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.tx.name, func(t *testing.T) {
+			tx := test.tx.new
+			got, err := tx.AsOp(avaxAssetID)
+			require.NoErrorf(t, err, "%T.AsOp(AVAXAssetID)", tx)
+			assert.Equalf(t, test.want, got, "%T.AsOp(AVAXAssetID)", tx)
+		})
+	}
+}
+
+func TestAsOp_Errors(t *testing.T) {
+	tests := []struct {
+		name string
+		tx   Unsigned
+		want error
+	}{
+		{
+			name: "export_multiple_nonces",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Nonce: 0,
+					},
+					{
+						Nonce: 1,
+					},
+				},
+			},
+			want: ErrMultipleNonces,
+		},
+		{
+			name: "import_burned_overflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: math.MaxUint64,
+						},
+					},
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 2,
+						},
+					},
+				},
+				Outs: []Output{{
+					AssetID: avaxAssetID,
+					Amount:  1,
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "import_burned_intermediate_overflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: math.MaxUint64,
+						},
+					},
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt: 1,
+						},
+					},
+				},
+				Outs: []Output{{
+					AssetID: avaxAssetID,
+					Amount:  1,
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "import_burned_underflow",
+			tx: &Import{
+				ImportedInputs: []*avax.TransferableInput{{
+					Asset: avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+					},
+				}},
+				Outs: []Output{{
+					AssetID: avaxAssetID,
+					Amount:  2,
+				}},
+			},
+			want: safemath.ErrUnderflow,
+		},
+		{
+			name: "export_burned_overflow",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: common.Address{0},
+						AssetID: avaxAssetID,
+						Amount:  math.MaxUint64,
+					},
+					{
+						Address: common.Address{1},
+						AssetID: avaxAssetID,
+						Amount:  2,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: avaxAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "export_burned_intermediate_overflow",
+			tx: &Export{
+				Ins: []Input{
+					{
+						Address: common.Address{0},
+						AssetID: avaxAssetID,
+						Amount:  math.MaxUint64,
+					},
+					{
+						Address: common.Address{1},
+						AssetID: avaxAssetID,
+						Amount:  1,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: avaxAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				}},
+			},
+			want: safemath.ErrOverflow,
+		},
+		{
+			name: "export_burned_underflow",
+			tx: &Export{
+				Ins: []Input{{
+					AssetID: avaxAssetID,
+					Amount:  1,
+				}},
+				ExportedOutputs: []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: avaxAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 2,
+					},
+				}},
+			},
+			want: safemath.ErrUnderflow,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tx := &Tx{
+				Unsigned: test.tx,
+			}
+			_, err := tx.AsOp(avaxAssetID)
+			require.ErrorIsf(t, err, test.want, "%T.AsOp(AVAXAssetID)", tx)
+		})
+	}
+}
+
+// asOpStateDB is an in-memory [atomic.StateDB] for [FuzzAsOpCompatibility]. It
+// constructs a [hook.Op] from [atomic.UnsignedAtomicTx.EVMStateTransfer].
+type asOpStateDB struct {
+	initialNonces map[common.Address]uint64
+	op            hook.Op
+}
+
+func newAsOpStateDB() *asOpStateDB {
+	return &asOpStateDB{
+		initialNonces: make(map[common.Address]uint64),
+		op: hook.Op{
+			Burn: make(map[common.Address]hook.AccountDebit),
+			Mint: make(map[common.Address]uint256.Int),
+		},
+	}
+}
+
+func (s *asOpStateDB) SetNonce(addr common.Address, nonce uint64) {
+	d := s.op.Burn[addr]
+	// The op specifies what nonce is being consumed, not the next nonce. So we
+	// need to subtract 1.
+	d.Nonce = nonce - 1
+	s.op.Burn[addr] = d
+}
+
+func (s *asOpStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
+	d := s.op.Burn[addr]
+	d.Amount.Add(&d.Amount, amount)
+	d.MinBalance = d.Amount
+	s.op.Burn[addr] = d
+}
+
+func (s *asOpStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
+	b := s.op.Mint[addr]
+	b.Add(&b, amount)
+	s.op.Mint[addr] = b
+}
+
+// largeUint256 and largeBigInt return a balance large enough to never underflow
+// but small enough to never overflow during test arithmetic.
+func largeUint256() *uint256.Int { return new(uint256.Int).Lsh(uint256.NewInt(1), 128) }
+func largeBigInt() *big.Int      { return new(big.Int).Lsh(big.NewInt(1), 128) }
+
+func (s *asOpStateDB) GetNonce(addr common.Address) uint64                     { return s.initialNonces[addr] }
+func (*asOpStateDB) GetBalance(common.Address) *uint256.Int                    { return largeUint256() }
+func (*asOpStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
+func (*asOpStateDB) SubBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
+func (*asOpStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int  { return largeBigInt() }
+
+func FuzzAsOpCompatibility(f *testing.F) {
+	fuzz(f, func(t *testing.T, newTx *Tx) {
+		got, err := newTx.AsOp(avaxAssetID)
+		if err != nil {
+			t.Skip("invalid tx")
+		}
+
+		oldTx := toOldTx(t, newTx)
+		gasUsed, err := oldTx.UnsignedAtomicTx.GasUsed(true)
+		require.NoErrorf(t, err, "%T.GasUsed(true)", oldTx.UnsignedAtomicTx)
+
+		gasPrice, err := atomic.EffectiveGasPrice(oldTx.UnsignedAtomicTx, avaxAssetID, true)
+		require.NoErrorf(t, err, "atomic.EffectiveGasPrice(%T, avaxAssetID, true)", oldTx)
+
+		state := newAsOpStateDB()
+		if export, ok := oldTx.UnsignedAtomicTx.(*atomic.UnsignedExportTx); ok {
+			for _, in := range export.Ins {
+				state.initialNonces[in.Address] = in.Nonce
+			}
+		}
+
+		ctx := &snow.Context{AVAXAssetID: avaxAssetID}
+		require.NoErrorf(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, state), "%T.EVMStateTransfer()", oldTx.UnsignedAtomicTx)
+
+		want := hook.Op{
+			ID:        oldTx.ID(),
+			Gas:       gas.Gas(gasUsed),
+			GasFeeCap: gasPrice,
+			Burn:      state.op.Burn,
+			Mint:      state.op.Mint,
+		}
+		if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
+			t.Errorf("%T.AsOp() diff (-want +got):\n%s", newTx, diff)
+		}
+	})
+}
+
+func TestAtomicRequests(t *testing.T) {
+	tests := []struct {
+		tx           txData
+		wantChainID  ids.ID
+		wantRequests *chainsatomic.Requests
+	}{
+		{
+			tx:          importTx,
+			wantChainID: xChainID,
+			wantRequests: &chainsatomic.Requests{
+				RemoveRequests: [][]byte{
+					common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64"),
+				},
+			},
+		},
+		{
+			tx:          exportTx,
+			wantChainID: xChainID,
+			wantRequests: &chainsatomic.Requests{
+				PutRequests: []*chainsatomic.Element{{
+					Key:   common.FromHex("0x38ebe8fc127b2eaeeb25c72a747e0ef27460fb04b5929568ed959d67ec3e4948"),
+					Value: common.FromHex("0x000067b5812292324365c6e2a479b2601cd1cd1facc2fcc8c29d58b5ed96583ea17e0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500"),
+					Traits: [][]byte{
+						ids.ShortFromStringOrPanic("LanVZgBDVvtarbTXD1uU7r1nXVJyLmPUz").Bytes(),
+					},
+				}},
+			},
+		},
+		{
+			tx:          importMultiInputTx,
+			wantChainID: xChainID,
+			wantRequests: &chainsatomic.Requests{
+				RemoveRequests: [][]byte{
+					common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05"),
+					common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630"),
+					common.FromHex("0xd71fb48751f6d5732e7ff63168ed311b40bf517b36279e326878fc3f5169a656"),
+				},
+			},
+		},
+		{
+			tx: exportSameAddressMultiAssetTx,
+			wantRequests: &chainsatomic.Requests{
+				PutRequests: []*chainsatomic.Element{
+					{
+						Key:   common.FromHex("0x82c024362a71c075ac15e5e000dd66380907e3ea6af121d3d78478bb07848b75"),
+						Value: common.FromHex("0x00005281e076436407df7c97e5abaff7f63e11bd8bc9ce03c787f12ee0e21fe68dca00000000000000000000000000000000000000000000000000000000000000000000000000000007000000000000006400000000000000000000000100000001aa00000000000000000000000000000000000000"),
+						Traits: [][]byte{
+							ids.ShortID{0xaa}.Bytes(),
+						},
+					},
+					{
+						Key:   common.FromHex("0x836913bdcf743940c51675ac186dc415cbb5f2a7309916f4a48bda3df5334245"),
+						Value: common.FromHex("0x00005281e076436407df7c97e5abaff7f63e11bd8bc9ce03c787f12ee0e21fe68dca0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000700000000000186a000000000000000000000000100000001aa00000000000000000000000000000000000000"),
+						Traits: [][]byte{
+							ids.ShortID{0xaa}.Bytes(),
+						},
+					},
+				},
+			},
+		},
+		{
+			tx: exportMultiAddressMultiAssetTx,
+			wantRequests: &chainsatomic.Requests{
+				PutRequests: []*chainsatomic.Element{
+					{
+						Key:   common.FromHex("0x150b950ce35ef7c512b1dec725164c8ee170728976ca0c9c1202eb60cafe9230"),
+						Value: common.FromHex("0x0000d4ae9ab4d296ced15beba7686a2216bcfdf4a7f1bcc502b3e5c0c79a4601b2ef0000000000000000000000000000000000000000000000000000000000000000000000000000000700000000000001f400000000000000000000000200000002bb00000000000000000000000000000000000000cc00000000000000000000000000000000000000"),
+						Traits: [][]byte{
+							ids.ShortID{0xbb}.Bytes(),
+							ids.ShortID{0xcc}.Bytes(),
+						},
+					},
+					{
+						Key:   common.FromHex("0x3080252925d9e3e399292cfecc8f95bb03da84645f44b8d0da82dc472e1f41d2"),
+						Value: common.FromHex("0x0000d4ae9ab4d296ced15beba7686a2216bcfdf4a7f1bcc502b3e5c0c79a4601b2ef0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000007a12000000000000000000000000200000002bb00000000000000000000000000000000000000cc00000000000000000000000000000000000000"),
+						Traits: [][]byte{
+							ids.ShortID{0xbb}.Bytes(),
+							ids.ShortID{0xcc}.Bytes(),
+						},
+					},
+				},
+			},
+		},
+		{
+			tx: importNonAVAXTx,
+			wantRequests: &chainsatomic.Requests{
+				RemoveRequests: [][]byte{
+					common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb"),
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.tx.name, func(t *testing.T) {
+			tx := test.tx.new
+			gotChainID, gotRequests, err := tx.AtomicRequests()
+			require.NoErrorf(t, err, "%T.AtomicRequests()", tx)
+			assert.Equalf(t, test.wantChainID, gotChainID, "%T.AtomicRequests().ChainID", tx)
+			assert.Equalf(t, test.wantRequests, gotRequests, "%T.AtomicRequests().Requests", tx)
+		})
+	}
+}
+
+func FuzzAtomicRequestsCompatibility(f *testing.F) {
+	fuzz(f, func(t *testing.T, newTx *Tx) {
+		oldTx := toOldTx(t, newTx)
+		wantChainID, wantRequests, err := oldTx.UnsignedAtomicTx.AtomicOps()
+		require.NoErrorf(t, err, "%T.AtomicOps()", oldTx.UnsignedAtomicTx)
+
+		gotChainID, gotRequests, err := newTx.AtomicRequests()
+		require.NoErrorf(t, err, "%T.AtomicRequests()", newTx)
+		assert.Equal(t, wantChainID, gotChainID, "chainID")
+		assert.Equal(t, wantRequests, gotRequests, "requests")
+	})
+}
+
+func newEmptyStateDB(t testing.TB) *extstate.StateDB {
 	t.Helper()
 
 	db := state.NewDatabase(rawdb.NewMemoryDatabase())
@@ -1551,7 +1133,7 @@ func NewEmptyStateDB(t testing.TB) *extstate.StateDB {
 	return extstate.New(sdb)
 }
 
-func CompareStateDBs(want, got *extstate.StateDB) string {
+func compareStateDBs(want, got *extstate.StateDB) string {
 	// Finalize the trie structures so that the state DB comparison includes
 	// any changes.
 	for _, v := range []*extstate.StateDB{want, got} {
@@ -1584,7 +1166,7 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "import_avax",
 			tx: &Import{
 				Outs: []Output{
-					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 1, AssetID: avaxAssetID},
 				},
 			},
 		},
@@ -1623,9 +1205,9 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "import_many",
 			tx: &Import{
 				Outs: []Output{
-					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
-					{Address: alice, Amount: 10, AssetID: AVAXAssetID},
-					{Address: bob, Amount: 100, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 1, AssetID: avaxAssetID},
+					{Address: alice, Amount: 10, AssetID: avaxAssetID},
+					{Address: bob, Amount: 100, AssetID: avaxAssetID},
 					{Address: alice, Amount: 1_000, AssetID: btc},
 					{Address: alice, Amount: 10_000, AssetID: btc},
 					{Address: bob, Amount: 100_000, AssetID: btc},
@@ -1646,7 +1228,7 @@ func TestTransferNonAVAX(t *testing.T) {
 			name: "export_avax",
 			tx: &Export{
 				Ins: []Input{
-					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 1, AssetID: avaxAssetID},
 				},
 			},
 		},
@@ -1681,9 +1263,9 @@ func TestTransferNonAVAX(t *testing.T) {
 			},
 			tx: &Export{
 				Ins: []Input{
-					{Address: alice, Amount: 1, AssetID: AVAXAssetID},
-					{Address: alice, Amount: 10, AssetID: AVAXAssetID},
-					{Address: bob, Amount: 100, AssetID: AVAXAssetID},
+					{Address: alice, Amount: 1, AssetID: avaxAssetID},
+					{Address: alice, Amount: 10, AssetID: avaxAssetID},
+					{Address: bob, Amount: 100, AssetID: avaxAssetID},
 					{Address: alice, Amount: 1_000, AssetID: btc},
 					{Address: alice, Amount: 10_000, AssetID: btc},
 					{Address: bob, Amount: 100_000, AssetID: btc},
@@ -1707,7 +1289,7 @@ func TestTransferNonAVAX(t *testing.T) {
 					{Address: alice, Amount: 1, AssetID: btc},
 				},
 			},
-			wantErr: errInsufficientFunds,
+			wantErr: ErrInsufficientFunds,
 		},
 		{
 			name: "export_non_avax_total_insufficient",
@@ -1727,13 +1309,13 @@ func TestTransferNonAVAX(t *testing.T) {
 					btc: 1,
 				},
 			},
-			wantErr: errInsufficientFunds,
+			wantErr: ErrInsufficientFunds,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				want  = NewEmptyStateDB(t)
+				want  = newEmptyStateDB(t)
 				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
 			)
 			for addr, balances := range test.want {
@@ -1743,7 +1325,7 @@ func TestTransferNonAVAX(t *testing.T) {
 				}
 			}
 
-			got := NewEmptyStateDB(t)
+			got := newEmptyStateDB(t)
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
 					coinID := common.Hash(assetID)
@@ -1751,46 +1333,85 @@ func TestTransferNonAVAX(t *testing.T) {
 				}
 			}
 
-			err := test.tx.TransferNonAVAX(AVAXAssetID, got)
-			require.ErrorIs(t, err, test.wantErr)
-			if diff := CompareStateDBs(want, got); diff != "" {
-				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", test.tx, diff)
+			tx := &Tx{
+				Unsigned: test.tx,
+			}
+			err := tx.TransferNonAVAX(avaxAssetID, got)
+			require.ErrorIsf(t, err, test.wantErr, "%T.TransferNonAVAX()", tx)
+			if diff := compareStateDBs(want, got); diff != "" {
+				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", tx, diff)
 			}
 		})
 	}
 }
 
-// OldSanityCheck behaves like [Tx.SanityCheck] for the legacy [atomic.Tx].
-func OldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
-	rules := *extrastest.ForkToRules(upgradetest.Latest)
-	if err := tx.UnsignedAtomicTx.Verify(ctx, rules); err != nil {
-		return err
+func FuzzTransferNonAVAXCompatibility(f *testing.F) {
+	fuzz(f, func(t *testing.T, newTx *Tx) {
+		op, err := newTx.AsOp(avaxAssetID)
+		if err != nil {
+			t.Skip("invalid tx")
+		}
+
+		oldState := newEmptyStateDB(t)
+		newState := newEmptyStateDB(t)
+		states := []*extstate.StateDB{oldState, newState}
+
+		if tx, ok := newTx.Unsigned.(*Export); ok {
+			for _, in := range tx.Ins {
+				// Coreth silently overflows the nonce, whereas SAE will leave
+				// the nonce unmodified. This difference doesn't matter on live
+				// networks.
+				if in.Nonce == math.MaxUint64 {
+					t.Skip("nonce overflow")
+				}
+
+				for _, state := range states {
+					state.AddBalance(in.Address, largeUint256())
+					state.SetNonce(in.Address, in.Nonce)
+					state.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), largeBigInt())
+				}
+			}
+		}
+
+		var (
+			oldTx = toOldTx(t, newTx)
+			ctx   = &snow.Context{AVAXAssetID: avaxAssetID}
+		)
+		require.NoErrorf(t, oldTx.EVMStateTransfer(ctx, oldState), "%T.EVMStateTransfer()", oldTx)
+		require.NoErrorf(t, newTx.TransferNonAVAX(avaxAssetID, newState), "%T.TransferNonAVAX()", newTx)
+		require.NoErrorf(t, op.ApplyTo(newState.StateDB), "%T.ApplyTo(%T)", op, newState.StateDB)
+
+		if diff := compareStateDBs(oldState, newState); diff != "" {
+			t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", newTx, diff)
+		}
+	})
+}
+
+// mainnetContext returns a [snow.Context] with mainnet values.
+func mainnetContext() *snow.Context {
+	return &snow.Context{
+		NetworkID:   constants.MainnetID,
+		SubnetID:    constants.PrimaryNetworkID,
+		ChainID:     cChainID,
+		XChainID:    xChainID,
+		CChainID:    cChainID,
+		AVAXAssetID: avaxAssetID,
+		ValidatorState: &validatorstest.State{
+			GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+				switch chainID {
+				case constants.PlatformChainID, xChainID, cChainID:
+					return constants.PrimaryNetworkID, nil
+				default:
+					return ids.GenerateTestID(), nil
+				}
+			},
+		},
 	}
-	// We can't call [vm.VerifierBackend.SemanticVerify] here because that
-	// additionally performs signature verification.
-	fc := avax.NewFlowChecker()
-	switch tx := tx.UnsignedAtomicTx.(type) {
-	case *atomic.UnsignedImportTx:
-		for _, in := range tx.ImportedInputs {
-			fc.Consume(in.Asset.ID, in.Input().Amount())
-		}
-		for _, out := range tx.Outs {
-			fc.Produce(out.AssetID, out.Amount)
-		}
-	case *atomic.UnsignedExportTx:
-		for _, in := range tx.Ins {
-			fc.Consume(in.AssetID, in.Amount)
-		}
-		for _, out := range tx.ExportedOutputs {
-			fc.Produce(out.Asset.ID, out.Output().Amount())
-		}
-	}
-	return fc.Verify()
 }
 
 func TestSanityCheck(t *testing.T) {
 	var (
-		ctx     = MainnetContext()
+		ctx     = mainnetContext()
 		nonAVAX = ids.ID{1}
 
 		validImport = func() *Import {
@@ -1852,57 +1473,57 @@ func TestSanityCheck(t *testing.T) {
 		},
 		{
 			name: "import_mainnet",
-			tx:   importGolden.New.Unsigned,
+			tx:   importTx.new.Unsigned,
 		},
 		{
 			name:    "import_wrong_network_id",
 			tx:      imp(func(i *Import) { i.NetworkID++ }),
-			wantErr: errWrongNetworkID,
+			wantErr: ErrWrongNetworkID,
 		},
 		{
 			name:    "import_wrong_chain_id",
-			tx:      imp(func(i *Import) { i.BlockchainID = XChainID }),
-			wantErr: errWrongChainID,
+			tx:      imp(func(i *Import) { i.BlockchainID = xChainID }),
+			wantErr: ErrWrongChainID,
 		},
 		{
 			name:    "import_wrong_source_chain",
-			tx:      imp(func(i *Import) { i.SourceChain = CChainID }),
-			wantErr: errNotSameSubnet,
+			tx:      imp(func(i *Import) { i.SourceChain = cChainID }),
+			wantErr: ErrNotSameSubnet,
 		},
 		{
 			name:    "import_no_inputs",
 			tx:      imp(func(i *Import) { i.ImportedInputs = nil }),
-			wantErr: errNoInputs,
+			wantErr: ErrNoInputs,
 		},
 		{
 			name:    "import_no_outputs",
 			tx:      imp(func(i *Import) { i.Outs = nil }),
-			wantErr: errNoOutputs,
+			wantErr: ErrNoOutputs,
 		},
 		{
 			name:    "import_invalid_input",
 			tx:      imp(func(i *Import) { i.ImportedInputs[0].In.(*secp256k1fx.TransferInput).Amt = 0 }),
-			wantErr: errInvalidInput,
+			wantErr: ErrInvalidInput,
 		},
 		{
 			name:    "import_non_avax_input",
 			tx:      imp(func(i *Import) { i.ImportedInputs[0].Asset.ID = nonAVAX }),
-			wantErr: errNonAVAXInput,
+			wantErr: ErrNonAVAXInput,
 		},
 		{
 			name:    "import_zero_amount_output",
 			tx:      imp(func(i *Import) { i.Outs[0].Amount = 0 }),
-			wantErr: errInvalidOutput,
+			wantErr: ErrInvalidOutput,
 		},
 		{
 			name:    "import_non_avax_output",
 			tx:      imp(func(i *Import) { i.Outs[0].AssetID = nonAVAX }),
-			wantErr: errNonAVAXOutput,
+			wantErr: ErrNonAVAXOutput,
 		},
 		{
 			name:    "import_flow_check_failed",
 			tx:      imp(func(i *Import) { i.Outs[0].Amount = 200 }),
-			wantErr: errFlowCheckFailed,
+			wantErr: ErrFlowCheckFailed,
 		},
 		{
 			name: "import_inputs_not_unique",
@@ -1924,7 +1545,7 @@ func TestSanityCheck(t *testing.T) {
 					},
 				}
 			}),
-			wantErr: errInputsNotSortedUnique,
+			wantErr: ErrInputsNotSortedUnique,
 		},
 		{
 			name: "import_inputs_not_sorted",
@@ -1946,7 +1567,7 @@ func TestSanityCheck(t *testing.T) {
 					},
 				}
 			}),
-			wantErr: errInputsNotSortedUnique,
+			wantErr: ErrInputsNotSortedUnique,
 		},
 		{
 			name: "import_outputs_not_unique",
@@ -1956,7 +1577,7 @@ func TestSanityCheck(t *testing.T) {
 					{Amount: 50, AssetID: ctx.AVAXAssetID},
 				}
 			}),
-			wantErr: errOutputsNotSortedUnique,
+			wantErr: ErrOutputsNotSortedUnique,
 		},
 		{
 			name: "import_outputs_not_sorted",
@@ -1966,7 +1587,7 @@ func TestSanityCheck(t *testing.T) {
 					{Address: common.Address{1}, Amount: 50, AssetID: ctx.AVAXAssetID},
 				}
 			}),
-			wantErr: errOutputsNotSortedUnique,
+			wantErr: ErrOutputsNotSortedUnique,
 		},
 		{
 			name: "export_valid",
@@ -1993,57 +1614,57 @@ func TestSanityCheck(t *testing.T) {
 		},
 		{
 			name: "export_mainnet",
-			tx:   exportGolden.New.Unsigned,
+			tx:   exportTx.new.Unsigned,
 		},
 		{
 			name:    "export_wrong_network_id",
 			tx:      exp(func(e *Export) { e.NetworkID++ }),
-			wantErr: errWrongNetworkID,
+			wantErr: ErrWrongNetworkID,
 		},
 		{
 			name:    "export_wrong_chain_id",
-			tx:      exp(func(e *Export) { e.BlockchainID = XChainID }),
-			wantErr: errWrongChainID,
+			tx:      exp(func(e *Export) { e.BlockchainID = xChainID }),
+			wantErr: ErrWrongChainID,
 		},
 		{
 			name:    "export_wrong_destination_chain",
-			tx:      exp(func(e *Export) { e.DestinationChain = CChainID }),
-			wantErr: errNotSameSubnet,
+			tx:      exp(func(e *Export) { e.DestinationChain = cChainID }),
+			wantErr: ErrNotSameSubnet,
 		},
 		{
 			name:    "export_no_inputs",
 			tx:      exp(func(e *Export) { e.Ins = nil }),
-			wantErr: errNoInputs,
+			wantErr: ErrNoInputs,
 		},
 		{
 			name:    "export_no_outputs",
 			tx:      exp(func(e *Export) { e.ExportedOutputs = nil }),
-			wantErr: errNoOutputs,
+			wantErr: ErrNoOutputs,
 		},
 		{
 			name:    "export_zero_amount_input",
 			tx:      exp(func(e *Export) { e.Ins[0].Amount = 0 }),
-			wantErr: errInvalidInput,
+			wantErr: ErrInvalidInput,
 		},
 		{
 			name:    "export_non_avax_input",
 			tx:      exp(func(e *Export) { e.Ins[0].AssetID = nonAVAX }),
-			wantErr: errNonAVAXInput,
+			wantErr: ErrNonAVAXInput,
 		},
 		{
 			name:    "export_invalid_output",
 			tx:      exp(func(e *Export) { e.ExportedOutputs[0].Out.(*secp256k1fx.TransferOutput).Amt = 0 }),
-			wantErr: errInvalidOutput,
+			wantErr: ErrInvalidOutput,
 		},
 		{
 			name:    "export_non_avax_output",
 			tx:      exp(func(e *Export) { e.ExportedOutputs[0].Asset.ID = nonAVAX }),
-			wantErr: errNonAVAXOutput,
+			wantErr: ErrNonAVAXOutput,
 		},
 		{
 			name:    "export_flow_check_failed",
 			tx:      exp(func(e *Export) { e.ExportedOutputs[0].Out.(*secp256k1fx.TransferOutput).Amt = 200 }),
-			wantErr: errFlowCheckFailed,
+			wantErr: ErrFlowCheckFailed,
 		},
 		{
 			name: "export_inputs_not_unique",
@@ -2053,7 +1674,7 @@ func TestSanityCheck(t *testing.T) {
 					{Amount: 50, AssetID: ctx.AVAXAssetID},
 				}
 			}),
-			wantErr: errInputsNotSortedUnique,
+			wantErr: ErrInputsNotSortedUnique,
 		},
 		{
 			name: "export_inputs_not_sorted",
@@ -2063,7 +1684,7 @@ func TestSanityCheck(t *testing.T) {
 					{Address: common.Address{1}, Amount: 50, AssetID: ctx.AVAXAssetID},
 				}
 			}),
-			wantErr: errInputsNotSortedUnique,
+			wantErr: ErrInputsNotSortedUnique,
 		},
 		{
 			name: "export_outputs_not_sorted",
@@ -2079,15 +1700,56 @@ func TestSanityCheck(t *testing.T) {
 					},
 				}
 			}),
-			wantErr: errOutputsNotSorted,
+			wantErr: ErrOutputsNotSorted,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.tx.SanityCheck(ctx)
-			require.ErrorIsf(t, err, test.wantErr, "%T.SanityCheck()", test.tx)
+			tx := &Tx{
+				Unsigned: test.tx,
+			}
+			err := tx.SanityCheck(ctx)
+			require.ErrorIsf(t, err, test.wantErr, "%T.SanityCheck()", tx)
 		})
 	}
+}
+
+// oldSanityCheck behaves like [Tx.SanityCheck] for the legacy [atomic.Tx].
+func oldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
+	rules := *extrastest.ForkToRules(upgradetest.Latest)
+	if err := tx.UnsignedAtomicTx.Verify(ctx, rules); err != nil {
+		return err
+	}
+	// We can't call [vm.VerifierBackend.SemanticVerify] here because that
+	// additionally performs signature verification.
+	fc := avax.NewFlowChecker()
+	switch tx := tx.UnsignedAtomicTx.(type) {
+	case *atomic.UnsignedImportTx:
+		for _, in := range tx.ImportedInputs {
+			fc.Consume(in.Asset.ID, in.Input().Amount())
+		}
+		for _, out := range tx.Outs {
+			fc.Produce(out.AssetID, out.Amount)
+		}
+	case *atomic.UnsignedExportTx:
+		for _, in := range tx.Ins {
+			fc.Consume(in.AssetID, in.Amount)
+		}
+		for _, out := range tx.ExportedOutputs {
+			fc.Produce(out.Asset.ID, out.Output().Amount())
+		}
+	}
+	return fc.Verify()
+}
+
+func FuzzSanityCheckCompatibility(f *testing.F) {
+	ctx := mainnetContext()
+	fuzz(f, func(t *testing.T, newTx *Tx) {
+		oldTx := toOldTx(t, newTx)
+		want := oldSanityCheck(oldTx, ctx) == nil
+		got := newTx.SanityCheck(ctx) == nil
+		assert.Equal(t, want, got, "%T.SanityCheck() == OldSanityCheck(%T)", newTx, oldTx)
+	})
 }
 
 func TestVerifyCredentials(t *testing.T) {
@@ -2097,24 +1759,40 @@ func TestVerifyCredentials(t *testing.T) {
 		ethAddress  = sk.EthAddress()
 		avaxAddress = sk.Address()
 
-		validUTXOID  = avax.UTXOID{TxID: ids.ID{1}}
+		validUTXOID = avax.UTXOID{}
+		validUTXO   = &avax.UTXO{
+			UTXOID: validUTXOID,
+			Asset:  avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: 100,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{avaxAddress},
+				},
+			},
+		}
 		validInputID = validUTXOID.InputID()
+		validUTXOs   = []*chainsatomic.Element{{
+			Key:   validInputID[:],
+			Value: MarshalUTXO(t, validUTXO),
+		}}
 
 		validImportTx = func() *Tx {
+			tx := &Import{
+				SourceChain: xChainID,
+				ImportedInputs: []*avax.TransferableInput{{
+					UTXOID: validUTXOID,
+					Asset:  avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   100,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}},
+			}
 			return &Tx{
-				Unsigned: &Import{
-					SourceChain: XChainID,
-					ImportedInputs: []*avax.TransferableInput{{
-						UTXOID: validUTXOID,
-						Asset:  avax.Asset{ID: AVAXAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt:   100,
-							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-						},
-					}},
-				},
-				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
-					[65]byte(common.FromHex("0x393d75eaa2d49672b14b5445aa6c357cc894e47172c5f80c6ae135991496722a07a76b05832ec365b37bdccbfcb589e2c217383ce4660cc1a61a45421b5623ec00")),
+				Unsigned: tx,
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{
+					txtest.Sign(t, tx, sk),
 				}}},
 			}
 		}
@@ -2123,37 +1801,17 @@ func TestVerifyCredentials(t *testing.T) {
 			mutate(tx)
 			return tx
 		}
-		validUTXOs = func(t *testing.T) []*chainsatomic.Element {
-			t.Helper()
-
-			utxo := &avax.UTXO{
-				UTXOID: validUTXOID,
-				Asset:  avax.Asset{ID: AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 100,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{avaxAddress},
-					},
-				},
-			}
-			b, err := c.Marshal(codecVersion, utxo)
-			require.NoError(t, err, "%T.Marshal(%T)", c, utxo)
-			return []*chainsatomic.Element{{
-				Key:   validInputID[:],
-				Value: b,
-			}}
-		}(t)
 
 		validExportTx = func() *Tx {
-			return &Tx{
-				Unsigned: &Export{
-					Ins: []Input{
-						{Address: ethAddress, Amount: 100, AssetID: AVAXAssetID},
-					},
+			tx := &Export{
+				Ins: []Input{
+					{Address: ethAddress, Amount: 100, AssetID: avaxAssetID},
 				},
-				Creds: []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{
-					[65]byte(common.FromHex("0xfe088f91a447b6ebd89a18405e07a50869eaeee869ab924a0ec1174e94d293764e56260eca1d6d26a77f33aa8a99f4b4917f7598bc680b87b01f6c9a750e293d00")),
+			}
+			return &Tx{
+				Unsigned: tx,
+				Creds: []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{
+					txtest.Sign(t, tx, sk),
 				}}},
 			}
 		}
@@ -2176,22 +1834,26 @@ func TestVerifyCredentials(t *testing.T) {
 			utxos: validUTXOs,
 		},
 		{
-			name:    "import_wrong_num_credentials",
+			name:    "import_not_enough_credentials",
 			tx:      imp(func(tx *Tx) { tx.Creds = nil }),
-			utxos:   validUTXOs,
-			wantErr: errIncorrectNumCredentials,
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name:    "import_too_many_credentials",
+			tx:      imp(func(tx *Tx) { tx.Creds = append(tx.Creds, &secp256k1fx.Credential{}) }),
+			wantErr: ErrIncorrectNumCredentials,
 		},
 		{
 			name: "import_unserializable",
 			tx: imp(func(tx *Tx) {
 				tx.Unsigned.(*Import).ImportedInputs = make([]*avax.TransferableInput, 1)
 			}),
-			wantErr: errConvertingToFxTx,
+			wantErr: ErrConvertingToFxTx,
 		},
 		{
 			name:    "import_missing_utxo",
 			tx:      validImportTx(),
-			wantErr: errFetchingUTXOs,
+			wantErr: ErrFetchingUTXOs,
 		},
 		{
 			name: "import_unmarshalling_utxo",
@@ -2200,7 +1862,7 @@ func TestVerifyCredentials(t *testing.T) {
 				Key:   validInputID[:],
 				Value: []byte{0xff, 0xff, 0xff},
 			}},
-			wantErr: errUnmarshallingUTXO,
+			wantErr: ErrUnmarshallingUTXO,
 		},
 		{
 			name: "import_mismatched_asset_ids",
@@ -2208,64 +1870,70 @@ func TestVerifyCredentials(t *testing.T) {
 				tx.Unsigned.(*Import).ImportedInputs[0].Asset.ID[0]++
 			}),
 			utxos:   validUTXOs,
-			wantErr: errMismatchedAssetIDs,
+			wantErr: ErrMismatchedAssetIDs,
 		},
 		{
 			name: "import_invalid_signature",
 			tx: imp(func(tx *Tx) {
-				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{{}}}}
 			}),
 			utxos:   validUTXOs,
-			wantErr: errVerifyingTransfer,
+			wantErr: ErrVerifyingTransfer,
 		},
 		{
 			name: "export_valid",
 			tx:   validExportTx(),
 		},
 		{
-			name:    "export_no_credential",
+			name:    "export_not_enough_credential",
 			tx:      exp(func(tx *Tx) { tx.Creds = nil }),
-			wantErr: errIncorrectNumCredentials,
+			wantErr: ErrIncorrectNumCredentials,
+		},
+		{
+			name:    "export_too_many_credential",
+			tx:      exp(func(tx *Tx) { tx.Creds = append(tx.Creds, &secp256k1fx.Credential{}) }),
+			wantErr: ErrIncorrectNumCredentials,
 		},
 		{
 			name: "export_unserializable",
 			tx: exp(func(tx *Tx) {
 				tx.Unsigned.(*Export).ExportedOutputs = make([]*avax.TransferableOutput, 1)
 			}),
-			wantErr: errConvertingToFxTx,
+			wantErr: ErrConvertingToFxTx,
 		},
 		{
 			name: "export_no_signature",
 			tx: exp(func(tx *Tx) {
 				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: nil}}
 			}),
-			wantErr: errIncorrectNumSignatures,
+			wantErr: ErrIncorrectNumSignatures,
 		},
 		{
 			name: "export_invalid_signature",
 			tx: exp(func(tx *Tx) {
-				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: [][65]byte{{}}}}
+				tx.Creds = []Credential{&secp256k1fx.Credential{Sigs: []txtest.Signature{{}}}}
 			}),
-			wantErr: errRecoveringPublicKey,
+			wantErr: ErrRecoveringPublicKey,
 		},
 		{
 			name: "export_address_mismatch",
 			tx: exp(func(tx *Tx) {
 				tx.Unsigned.(*Export).Ins[0].Address = common.Address{}
 			}),
-			wantErr: errAddressMismatch,
+			wantErr: ErrAddressMismatch,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			memory := chainsatomic.NewMemory(memdb.New())
-			xMemory := memory.NewSharedMemory(XChainID)
-			require.NoError(t, xMemory.Apply(map[ids.ID]*chainsatomic.Requests{
-				CChainID: {PutRequests: test.utxos},
-			}))
+			xMemory := memory.NewSharedMemory(xChainID)
+			err := xMemory.Apply(map[ids.ID]*chainsatomic.Requests{
+				cChainID: {PutRequests: test.utxos},
+			})
+			require.NoErrorf(t, err, "%T.Apply()", xMemory)
 
-			cMemory := memory.NewSharedMemory(CChainID)
-			err := test.tx.VerifyCredentials(cMemory)
+			cMemory := memory.NewSharedMemory(cChainID)
+			err = test.tx.VerifyCredentials(cMemory)
 			assert.ErrorIsf(t, err, test.wantErr, "%T.VerifyCredentials()", test.tx)
 		})
 	}

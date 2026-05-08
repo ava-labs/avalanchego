@@ -2,7 +2,7 @@
     "pull_request": {
         "include": [
             {
-                "runner": "ubuntu-latest",
+                "runner": "ubuntu-24.04",
                 "test": "hashdb-101-250k",
                 "timeout-minutes": 30
             },
@@ -38,6 +38,11 @@
             {
                 "runner": "avago-runner-i4i-16xlarge-local-ssd",
                 "test": "hashdb-archive-69m-69m100k",
+                "timeout-minutes": 1440
+            },
+            {
+                "runner": "avago-runner-i4i-4xlarge-local-ssd",
+                "test": "pathdb-33m-33m500k",
                 "timeout-minutes": 1440
             }
         ]

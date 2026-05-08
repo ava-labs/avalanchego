@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/hook/acp176"
@@ -320,7 +319,9 @@ func atomicOpsOf(txs []*tx.Tx) (map[ids.ID]*atomic.Requests, error) {
 	// requests are appended in order of txID to be consistent with coreth's
 	// historical atomic trie format.
 	txs = slices.Clone(txs)
-	utils.Sort(txs)
+	slices.SortFunc(txs, func(a, b *tx.Tx) int {
+		return a.ID().Compare(b.ID())
+	})
 
 	ops := make(map[ids.ID]*atomic.Requests)
 	for _, tx := range txs {

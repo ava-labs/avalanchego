@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
@@ -36,7 +35,9 @@ func writeTxs(db database.Database, height uint64, txs []*tx.Tx, bonus bool) err
 	// txs are stored in order of txID to ensure consistency with txs
 	// indexed from the txID index during a prior database migration.
 	txs = slices.Clone(txs)
-	utils.Sort(txs)
+	slices.SortFunc(txs, func(a, b *tx.Tx) int {
+		return a.ID().Compare(b.ID())
+	})
 
 	batch := db.NewBatch()
 	for _, tx := range txs {
