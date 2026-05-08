@@ -23,6 +23,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/sae",
     visibility = ["//visibility:public"],
     deps = [
+        "//api/metrics",
         "//database",
         "//ids",
         "//network/p2p",

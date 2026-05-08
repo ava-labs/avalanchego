@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -125,11 +126,15 @@ func NewVM[T hook.Transaction](
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "sae")
+	if err != nil {
+		return nil, err
+	}
 	vm := &VM{
 		hooks:          hooks,
 		config:         cfg,
 		snowCtx:        snowCtx,
-		metricRegistry: prometheus.NewRegistry(),
+		metricRegistry: reg,
 		db:             db,
 	}
 	defer func() {
@@ -138,14 +143,10 @@ func NewVM[T hook.Transaction](
 		}
 	}()
 
-	if err := snowCtx.Metrics.Register("sae", vm.metricRegistry); err != nil {
-		return nil, err
-	}
-	metrics, err := saemetrics.New(vm.metricRegistry)
+	vm.metrics, err = saemetrics.New(vm.metricRegistry)
 	if err != nil {
 		return nil, fmt.Errorf("new metrics: %w", err)
 	}
-	vm.metrics = metrics
 
 	xdb, err := hooks.ExecutionResultsDB(
 		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
