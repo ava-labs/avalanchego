@@ -6,7 +6,6 @@ package code
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -15,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
@@ -238,33 +238,38 @@ func TestCodeSyncerDuplicateAddCodeNoMarkerLeak(t *testing.T) {
 				codeQueue, err := NewQueue(clientDB)
 				require.NoError(t, err)
 
-				codeSyncer, err := NewSyncer(mockClient, clientDB, codeQueue.CodeHashes())
-				require.NoError(t, err)
-
-				// Tight-loop AddCode from many producers maximises the chance of
-				// landing inside a worker's marker-cleanup window.
 				const (
+					numWorkers   = 8
 					numProducers = 8
 					iterations   = 50_000
 				)
-				var wg sync.WaitGroup
-				wg.Add(numProducers)
-				for range numProducers {
-					go func() {
-						defer wg.Done()
-						for range iterations {
-							if err := codeQueue.AddCode(t.Context(), []common.Hash{codeHash}); err != nil {
-								return
-							}
-						}
-					}()
-				}
+				codeSyncer, err := NewSyncer(mockClient, clientDB, codeQueue.CodeHashes(), WithNumWorkers(numWorkers))
+				require.NoError(t, err)
+
+				// Run the syncer in a goroutine so the main test can drive
+				// producers and Finalize from the foreground.
+				syncErrCh := make(chan error, 1)
 				go func() {
-					wg.Wait()
-					_ = codeQueue.Finalize()
+					syncErrCh <- codeSyncer.Sync(t.Context())
 				}()
 
-				require.NoError(t, codeSyncer.Sync(t.Context()))
+				// Tight-loop AddCode from many producers maximises the chance
+				// of landing inside a worker's marker-cleanup window.
+				var producers errgroup.Group
+				for range numProducers {
+					producers.Go(func() error {
+						for range iterations {
+							if err := codeQueue.AddCode(t.Context(), []common.Hash{codeHash}); err != nil {
+								return err
+							}
+						}
+						return nil
+					})
+				}
+				require.NoError(t, producers.Wait())
+				require.NoError(t, codeQueue.Finalize())
+				require.NoError(t, <-syncErrCh)
+
 				require.Equal(t, codeBytes, rawdb.ReadCode(clientDB, codeHash))
 
 				it := customrawdb.NewCodeToFetchIterator(clientDB)
