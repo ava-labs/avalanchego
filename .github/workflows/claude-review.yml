@@ -12,7 +12,7 @@ jobs:
       github.event.label.name == 'ai-review' &&
       contains(fromJSON('["MEMBER", "COLLABORATOR", "OWNER", "CONTRIBUTOR"]'), github.event.pull_request.author_association) &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write # Required for Claude to post PR comments and inline review feedback
