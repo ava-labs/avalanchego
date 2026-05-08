@@ -473,14 +473,14 @@ func (s *SUT) deployEscrow(ctx context.Context, tb testing.TB, depositVal *big.I
 
 	sign := s.wallet.SetNonceAndSign
 
-	deployBlock = s.runAndWaitForSuccess(ctx, tb, sign(tb, 0, &types.LegacyTx{
+	deployBlock = s.runConsensusLoop(ctx, tb, sign(tb, 0, &types.LegacyTx{
 		Gas:      1e6,
 		GasPrice: big.NewInt(1),
 		Data:     escrow.CreationCode(),
 	}))
 
 	if depositVal != nil {
-		depositBlock = s.runAndWaitForSuccess(ctx, tb, sign(tb, 0, &types.LegacyTx{
+		depositBlock = s.runConsensusLoop(ctx, tb, sign(tb, 0, &types.LegacyTx{
 			To:       &escrowAddr,
 			Gas:      1e6,
 			GasPrice: big.NewInt(1),
@@ -488,6 +488,8 @@ func (s *SUT) deployEscrow(ctx context.Context, tb testing.TB, depositVal *big.I
 			Value:    depositVal,
 		}))
 	}
+	last := s.lastAcceptedBlock()
+	require.NoErrorf(t, last.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", last)
 
 	callMsg = ethereum.CallMsg{
 		From: s.wallet.Addresses()[0],
