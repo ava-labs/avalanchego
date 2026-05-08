@@ -100,9 +100,12 @@ func Fuzz_SHA256_HashNode(f *testing.F) {
 					compressedKeyBytes := make([]byte, compressedKeyLen)
 					_, _ = r.Read(compressedKeyBytes)
 
+					var id ids.ID
+					_, _ = r.Read(id[:])
+
 					children[byte(i)] = &child{
 						compressedKey: ToKey(compressedKeyBytes),
-						id:            ids.GenerateTestID(),
+						id:            id,
 						hasValue:      r.Intn(2) == 1,
 					}
 				}
