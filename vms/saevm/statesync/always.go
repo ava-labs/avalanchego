@@ -1,6 +1,3 @@
-// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
 package statesync
 
 import (
@@ -12,20 +9,22 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 )
 
-var _ adaptor.SyncableVM[*blocks.Block, *summary] = (*SinceGenesis[hook.Transaction])(nil)
+var _ adaptor.SyncableVM[*blocks.Block, *Summary] = (*SinceGenesis[hook.Transaction])(nil)
 
 // SinceGenesis is a harness around a [VM], providing an `Initialize` method
 // that treats the chain as being asynchronous since genesis.
 type SinceGenesis[T hook.Transaction] struct {
 	*VM[T] // created by [SinceGenesis.Initialize]
+
+	hooks  hook.PointsG[T]
+	config sae.Config
 }
 
 // Initialize implements [adaptor.SyncableVM].
-//
-//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func (*SinceGenesis[T]) Initialize(
+func (s *SinceGenesis[T]) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
 	avaDB database.Database,
@@ -38,12 +37,10 @@ func (*SinceGenesis[T]) Initialize(
 	panic("unimplemented")
 }
 
-// Shutdown implements [adaptor.SyncableVM].
-func (*SinceGenesis[T]) Shutdown(ctx context.Context) error {
-	panic("unimplemented")
-}
-
-// StateSyncEnabled implements [adaptor.SyncableVM].
-func (*SinceGenesis[T]) StateSyncEnabled(context.Context) (bool, error) {
-	panic("unimplemented")
+// Shutdown TODO.
+func (s *SinceGenesis[T]) Shutdown(ctx context.Context) error {
+	if s.VM == nil {
+		return nil
+	}
+	return s.VM.Shutdown(ctx)
 }
