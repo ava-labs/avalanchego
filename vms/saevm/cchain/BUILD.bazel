@@ -84,6 +84,7 @@ go_library(
         "//vms/saevm/cchain/warp",
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
+        "//vms/saevm/network",
         "//vms/saevm/sae",
         "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
