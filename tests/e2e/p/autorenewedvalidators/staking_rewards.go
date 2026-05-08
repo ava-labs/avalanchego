@@ -118,7 +118,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 				configOwner,
 				delegationShares,
 				autoCompoundedRewardShares,
-				stakingPeriod,
+				uint64(stakingPeriod.Seconds()),
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
@@ -272,7 +272,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			_, err := pWallet.IssueSetAutoRenewedValidatorConfigTx(
 				validatorTxID,
 				updatedAutoCompoundedRewardShares,
-				stakingPeriod,
+				uint64(stakingPeriod.Seconds()),
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
