@@ -462,7 +462,7 @@ func TestAdd(t *testing.T) {
 	}
 }
 
-func TesUpdateEvictsConflicts(t *testing.T) {
+func TestUpdateEvictsConflicts(t *testing.T) {
 	var (
 		sk     = newKey(t)
 		initTx = newExport(t, sk)

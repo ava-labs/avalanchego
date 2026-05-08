@@ -59,7 +59,7 @@ type Txpool struct {
 	state     libevm.StateReader
 }
 
-// New constructs a [Txpool] that enables adding transactions to [Pending].
+// New constructs a [Txpool] that wraps the provided [Pending].
 //
 // maxSize is the maximum number of transactions the pool will hold; once
 // reached, [Txpool.Add] evicts the lowest-fee transaction in favor of a
@@ -250,8 +250,8 @@ func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) 
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
-	for _, tx := range txs {
-		inputs.Union(tx.InputIDs())
+	for _, t := range txs {
+		inputs.Union(t.InputIDs())
 	}
 	return inputs, nil
 }
