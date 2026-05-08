@@ -92,15 +92,10 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 func TestDebugTrace(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
-	b, _, recv, _ := sut.deployEscrow(ctx, t, big.NewInt(escrowDepositVal))
-	// deployEscrow includes the deploy tx at index 0 and the deposit tx at
-	// index 1.
-	const (
-		deployTxIdx  = 0
-		depositTxIdx = 1
-	)
-	deployTxHash := b.Transactions()[deployTxIdx].Hash()
-	depositTxHash := b.Transactions()[depositTxIdx].Hash()
+	const escrowDepositVal = 42
+	deployBlock, depositBlock, _, recv, _ := sut.deployEscrow(ctx, t, big.NewInt(escrowDepositVal))
+	deployTxHash := deployBlock.Transactions()[0].Hash()
+	depositTxHash := depositBlock.Transactions()[0].Hash()
 
 	// Specifying the entire trace would be excessive and uninformative so we
 	// select a precise location of an event associated with the deposit()
@@ -124,7 +119,7 @@ func TestDebugTrace(t *testing.T) {
 		{
 			TxHash: deployTxHash,
 			Result: &logger.ExecutionResult{
-				Gas:         b.Receipts()[deployTxIdx].GasUsed,
+				Gas:         deployBlock.Receipts()[0].GasUsed,
 				ReturnValue: common.Bytes2Hex(escrow.ByteCode()),
 				StructLogs:  []logger.StructLogRes{},
 			},
@@ -132,7 +127,7 @@ func TestDebugTrace(t *testing.T) {
 		{
 			TxHash: depositTxHash,
 			Result: &logger.ExecutionResult{
-				Gas: b.Receipts()[depositTxIdx].GasUsed,
+				Gas: depositBlock.Receipts()[0].GasUsed,
 				StructLogs: []logger.StructLogRes{{
 					Pc:    logPC,
 					Op:    vm.LOG1.String(),
@@ -145,24 +140,37 @@ func TestDebugTrace(t *testing.T) {
 			},
 		},
 	}
+	wantDeploy, wantDeposit := want[:1], want[1:]
 
 	tests := []rpcTest{
 		{
 			method:       "debug_traceBlockByNumber",
-			args:         []any{hexutil.Uint64(b.NumberU64())},
-			want:         want,
+			args:         []any{hexutil.Uint64(deployBlock.NumberU64())},
+			want:         wantDeploy,
+			extraCmpOpts: ignore,
+		},
+		{
+			method:       "debug_traceBlockByNumber",
+			args:         []any{hexutil.Uint64(depositBlock.NumberU64())},
+			want:         wantDeposit,
 			extraCmpOpts: ignore,
 		},
 		{
 			method:       "debug_traceBlockByNumber",
 			args:         []any{rpc.LatestBlockNumber},
-			want:         want,
+			want:         wantDeposit,
 			extraCmpOpts: ignore,
 		},
 		{
 			method:       "debug_traceBlockByHash",
-			args:         []any{b.Hash()},
-			want:         want,
+			args:         []any{deployBlock.Hash()},
+			want:         wantDeploy,
+			extraCmpOpts: ignore,
+		},
+		{
+			method:       "debug_traceBlockByHash",
+			args:         []any{depositBlock.Hash()},
+			want:         wantDeposit,
 			extraCmpOpts: ignore,
 		},
 		{
@@ -188,7 +196,8 @@ func TestStatefulRPCs(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, 1, opt)
 
-	b, escrowAddr, recv, callMsg := sut.deployEscrow(ctx, t, big.NewInt(escrowDepositVal))
+	const escrowDepositVal = 42
+	_, b, escrowAddr, recv, callMsg := sut.deployEscrow(ctx, t, big.NewInt(escrowDepositVal))
 
 	vmTime.advanceToSettle(ctx, t, b)
 	for range 2 {
@@ -239,7 +248,7 @@ func TestStatefulRPCs(t *testing.T) {
 			t.Run("eth_getBalance", func(t *testing.T) {
 				got, err := sut.BalanceAt(ctx, escrowAddr, blockNum)
 				require.NoError(t, err, "BalanceAt()")
-				require.Zero(t, wantBalance.Cmp(got), "BalanceAt(): want %d, got %s", escrowDepositVal, got)
+				require.Zero(t, wantBalance.Cmp(got), "BalanceAt(): want %d, got %s", wantBalance, got)
 			})
 
 			t.Run("eth_getCode", func(t *testing.T) {
@@ -260,11 +269,11 @@ func TestStatefulRPCs(t *testing.T) {
 				require.NotNil(t, got, "GetProof() result")
 
 				assert.NotEmpty(t, got.AccountProof, "GetProof() accountProof")
-				require.Zero(t, wantBalance.Cmp(got.Balance), "GetProof() balance: want %d, got %s", escrowDepositVal, got.Balance)
+				require.Zero(t, wantBalance.Cmp(got.Balance), "GetProof() balance: want %d, got %s", wantBalance, got.Balance)
 
 				require.Len(t, got.StorageProof, 1, "GetProof() storageProof length")
 				assert.NotEmpty(t, got.StorageProof[0].Proof, "GetProof() storageProof[0].Proof")
-				require.Zero(t, wantStorageValue.Cmp(got.StorageProof[0].Value), "GetProof() storageProof[0].Value: want %d, got %s", escrowDepositVal, got.StorageProof[0].Value)
+				require.Zero(t, wantStorageValue.Cmp(got.StorageProof[0].Value), "GetProof() storageProof[0].Value: want %d, got %s", wantStorageValue, got.StorageProof[0].Value)
 			})
 		})
 	}
@@ -276,7 +285,7 @@ func TestStatefulRPCs(t *testing.T) {
 func TestStatefulRPCsLatestOnly(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
-	_, _, _, callMsg := sut.deployEscrow(ctx, t, nil)
+	_, _, _, _, callMsg := sut.deployEscrow(ctx, t, nil)
 
 	t.Run("eth_estimateGas", func(t *testing.T) {
 		got, err := sut.EstimateGas(ctx, callMsg)
