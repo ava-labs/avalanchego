@@ -16,7 +16,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write # Required for Claude to post PR comments and inline review feedback
-      id-token: write # Required for OIDC authentication with Anthropic's API
     steps:
       - name: Checkout trusted prompt from master
         uses: actions/checkout@v5
