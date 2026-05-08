@@ -564,3 +564,73 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 		})
 	}
 }
+
+type testOwner struct {
+	secp256k1fx.OutputOwners
+	initCtxCalled bool
+}
+
+func (o *testOwner) InitCtx(*snow.Context) {
+	o.initCtxCalled = true
+}
+
+type testTransferableOut struct {
+	secp256k1fx.TransferOutput
+	initCtxCalled bool
+}
+
+func (o *testTransferableOut) InitCtx(*snow.Context) {
+	o.initCtxCalled = true
+}
+
+func TestAddAutoRenewedValidatorTxInitCtx(t *testing.T) {
+	require := require.New(t)
+
+	ctx := &snow.Context{
+		NetworkID:   1,
+		ChainID:     ids.GenerateTestID(),
+		AVAXAssetID: ids.GenerateTestID(),
+	}
+
+	baseIn := &avax.TransferableInput{
+		Asset: avax.Asset{ID: ids.GenerateTestID()},
+	}
+	baseOut := &avax.TransferableOutput{
+		Asset: avax.Asset{ID: ids.GenerateTestID()},
+		Out:   &secp256k1fx.TransferOutput{Amt: 1},
+	}
+	stakeInnerOut := &testTransferableOut{
+		TransferOutput: secp256k1fx.TransferOutput{Amt: 1},
+	}
+	stakeOut := &avax.TransferableOutput{
+		Asset: avax.Asset{ID: ids.GenerateTestID()},
+		Out:   stakeInnerOut,
+	}
+
+	validatorRewardsOwner := &testOwner{}
+	delegatorRewardsOwner := &testOwner{}
+	owner := &testOwner{}
+
+	tx := &AddAutoRenewedValidatorTx{
+		BaseTx: BaseTx{
+			BaseTx: avax.BaseTx{
+				Ins:  []*avax.TransferableInput{baseIn},
+				Outs: []*avax.TransferableOutput{baseOut},
+			},
+		},
+		StakeOuts:             []*avax.TransferableOutput{stakeOut},
+		ValidatorRewardsOwner: validatorRewardsOwner,
+		DelegatorRewardsOwner: delegatorRewardsOwner,
+		Owner:                 owner,
+	}
+
+	tx.InitCtx(ctx)
+
+	require.Equal(secp256k1fx.ID, baseIn.FxID)
+	require.Equal(secp256k1fx.ID, baseOut.FxID)
+	require.Equal(secp256k1fx.ID, stakeOut.FxID)
+	require.True(stakeInnerOut.initCtxCalled)
+	require.True(validatorRewardsOwner.initCtxCalled)
+	require.True(delegatorRewardsOwner.initCtxCalled)
+	require.True(owner.initCtxCalled)
+}
