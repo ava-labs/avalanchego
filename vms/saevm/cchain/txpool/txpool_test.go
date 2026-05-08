@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
@@ -238,11 +239,7 @@ func withCredentials(creds []tx.Credential) exportOption {
 	})
 }
 
-func newExport(
-	tb testing.TB,
-	sk *secp256k1.PrivateKey,
-	opts ...exportOption,
-) *tx.Tx {
+func newExport(tb testing.TB, sk *secp256k1.PrivateKey, opts ...exportOption) *tx.Tx {
 	tb.Helper()
 
 	props := options.ApplyTo(&exportProperties{
@@ -292,16 +289,14 @@ func newKey(tb testing.TB) *secp256k1.PrivateKey {
 	return sk
 }
 
-// newEth returns an Ethereum transaction signed by key with the provided nonce.
-func newEth(tb testing.TB, key *secp256k1.PrivateKey, nonce uint64) *types.Transaction {
+// newEth returns an Ethereum transaction with nonce 0 signed by key.
+func newEth(tb testing.TB, key *secp256k1.PrivateKey) *types.Transaction {
 	tb.Helper()
 
 	signer := types.MakeSigner(saetest.ChainConfig(), blockHeight, 0)
 	tx, err := types.SignNewTx(key.ToECDSA(), signer, &types.LegacyTx{
-		Nonce:    nonce,
-		Gas:      21_000,
-		GasPrice: big.NewInt(1),
-		To:       &common.Address{},
+		Gas: params.TxGas,
+		To:  &common.Address{},
 	})
 	require.NoError(tb, err)
 	return tx
@@ -481,14 +476,14 @@ func TesUpdateEvictsConflicts(t *testing.T) {
 			name: "no_conflicts_leave_pool_unchanged",
 			block: newBlock(
 				t,
-				withEthTxs(newEth(t, newKey(t), 0)),
+				withEthTxs(newEth(t, newKey(t))),
 				withAvaxTxs(newExport(t, newKey(t))),
 			),
 			wantPool: []*tx.Tx{initTx},
 		},
 		{
 			name:  "eth_tx_conflict_evicts_tx",
-			block: newBlock(t, withEthTxs(newEth(t, sk, 0))),
+			block: newBlock(t, withEthTxs(newEth(t, sk))),
 		},
 		{
 			name:  "avax_tx_conflict_evicts_tx",
