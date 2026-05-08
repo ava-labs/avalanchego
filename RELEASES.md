@@ -2,7 +2,9 @@
 
 ## Pending (v1.14.3)
 
-- None.
+### API
+
+- Added `sae_last_executed_height` and `sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
