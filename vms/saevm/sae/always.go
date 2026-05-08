@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 )
 
 var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis[hook.Transaction])(nil)
@@ -25,6 +26,7 @@ var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis[hook.Transaction])(nil)
 // that treats the chain as being asynchronous since genesis.
 type SinceGenesis[T hook.Transaction] struct {
 	*VM // created by [SinceGenesis.Initialize]
+	*network.Network
 
 	hooks  hook.PointsG[T]
 	config Config
@@ -63,7 +65,11 @@ func (vm *SinceGenesis[_]) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
 	}
 
-	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
+	vm.Network, err = network.New(snowCtx, appSender)
+	if err != nil {
+		return fmt.Errorf("network.New(...): %v", err)
+	}
+	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), vm.Network)
 	if err != nil {
 		return err
 	}

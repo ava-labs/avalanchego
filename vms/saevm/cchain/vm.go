@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
@@ -34,15 +33,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
 )
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
 	*sae.VM // created by [VM.Initialize]
+	*network.Network
 
 	// gossip frequencies are configurable to speed up testing.
 	pullGossipPeriod time.Duration
@@ -125,7 +127,11 @@ func (vm *VM) Initialize(
 			TrieDBConfig: trieDBConfig,
 		},
 	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
+	vm.Network, err = network.New(snowCtx, appSender)
+	if err != nil {
+		return fmt.Errorf("creating SAE network: %w", err)
+	}
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
@@ -141,9 +147,9 @@ func (vm *VM) Initialize(
 		return nil
 	})
 
-	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "cchain")
+	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "cchain")
 	if err != nil {
-		return fmt.Errorf("making metrics: %w", err)
+		return fmt.Errorf("registering cchain metrics: %w", err)
 	}
 	bloomMetrics, err := bloom.NewMetrics("gossip_bloom", reg)
 	if err != nil {
@@ -160,8 +166,8 @@ func (vm *VM) Initialize(
 	}
 	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		snowCtx.NodeID,
-		vm.Network,
-		vm.ValidatorPeers,
+		vm.Network.Network,
+		vm.Network.ValidatorPeers,
 		vm.gossipSet,
 		gossipMarshaller{},
 		gossip.SystemConfig{
@@ -177,7 +183,7 @@ func (vm *VM) Initialize(
 	}
 	vm.pushGossiper = pushGossiper
 
-	if err := vm.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
+	if err := vm.Network.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
 		return fmt.Errorf("registering cross-chain tx gossip handler: %w", err)
 	}
 

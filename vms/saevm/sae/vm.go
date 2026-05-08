@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -33,12 +34,12 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 
-	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -47,10 +48,7 @@ import (
 // which needs to be provided by a harness. In all cases, the harness MUST
 // provide a last-synchronous block, which MAY be the genesis.
 type VM struct {
-	*p2p.Network
-	Peers          *p2p.Peers
-	ValidatorPeers *p2p.Validators
-
+	network *network.Network
 	hooks   hook.Points
 	config  Config
 	snowCtx *snow.Context
@@ -115,12 +113,11 @@ func NewVM[T hook.Transaction](
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
 	lastSynchronous *types.Block,
-	sender snowcommon.AppSender,
+	network *network.Network,
 ) (_ *VM, retErr error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-
 	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
@@ -130,6 +127,7 @@ func NewVM[T hook.Transaction](
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
 	vm := &VM{
+		network: network,
 		hooks:   hooks,
 		config:  cfg,
 		snowCtx: snowCtx,
@@ -243,16 +241,11 @@ func NewVM[T hook.Transaction](
 	}
 
 	{ // ==========  P2P Gossip  ==========
-		network, peers, validatorPeers, err := newNetwork(snowCtx, sender, reg)
-		if err != nil {
-			return nil, fmt.Errorf("newNetwork(...): %v", err)
-		}
-
 		const pullGossipPeriod = time.Second
 		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 			snowCtx.NodeID,
-			network,
-			validatorPeers,
+			network.Network,
+			network.ValidatorPeers,
 			vm.mempool,
 			txgossip.Marshaller{},
 			gossip.SystemConfig{
@@ -284,9 +277,6 @@ func NewVM[T hook.Transaction](
 			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
 		}()
 
-		vm.Network = network
-		vm.Peers = peers
-		vm.ValidatorPeers = validatorPeers
 		vm.mempool.RegisterPushGossiper(pushGossiper)
 		vm.toClose = append(vm.toClose, closerFunc(func() error {
 			cancel()
