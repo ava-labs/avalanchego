@@ -31,6 +31,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -47,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saehookstest "github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	saemetrics "github.com/ava-labs/avalanchego/vms/saevm/metrics"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
 
@@ -70,6 +73,7 @@ type SUT struct {
 	wallet      *saetest.Wallet
 	logger      *saetest.TBLogger
 	db          ethdb.Database
+	metrics     *saemetrics.Metrics
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
 	// explicitly close the [Executor] without worrying about the cleanup calling it again.
@@ -117,7 +121,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		Archival:           sutCfg.archival,
 		TrieCommitInterval: sutCfg.commitInterval,
 	}
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, nil)
+	metrics := newTestMetrics(tb)
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, metrics)
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -131,6 +136,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		wallet:      wallet,
 		logger:      logger,
 		db:          db,
+		metrics:     metrics,
 		closeOnce:   closeOnce,
 	}
 }
@@ -141,6 +147,14 @@ func (s *SUT) Close() error {
 
 func defaultHooks() *saehookstest.Stub {
 	return saehookstest.NewStub(1e6)
+}
+
+func newTestMetrics(tb testing.TB) *saemetrics.Metrics {
+	tb.Helper()
+
+	metrics, err := saemetrics.New(prometheus.NewRegistry())
+	require.NoError(tb, err, "metrics.New()")
+	return metrics
 }
 
 func withHooks(h *saehookstest.Stub) sutOption {
@@ -169,6 +183,15 @@ func TestExecutionSynchronisation(t *testing.T) {
 	for _, b := range chain.AllBlocks() {
 		assert.Truef(t, b.Executed(), "%T[%d].Executed()", b, b.NumberU64())
 	}
+}
+
+func TestExecutionMetrics(t *testing.T) {
+	ctx, sut := newSUT(t)
+	b := sut.chain.NewBlock(t, nil)
+
+	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
+	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+	require.Equal(t, float64(b.Height()), testutil.ToFloat64(sut.metrics.LastExecutedHeight), "last executed height")
 }
 
 func TestReceiptPropagation(t *testing.T) {
@@ -1036,7 +1059,7 @@ func TestArchivalStoresAll(t *testing.T) {
 	t.Run("recover", func(t *testing.T) {
 		// Restart the chain to remove the TrieDB cache.
 		src := blocks.Source(chain.GetBlock)
-		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log, nil)
+		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log, newTestMetrics(t))
 		require.NoError(t, err, "New()")
 		t.Cleanup(func() {
 			require.NoErrorf(t, e.Close(), "%T.Close()", e)

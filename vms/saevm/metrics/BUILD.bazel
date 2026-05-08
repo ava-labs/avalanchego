@@ -6,10 +6,7 @@ go_library(
     srcs = ["metrics.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/metrics",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vms/saevm/blocks",
-        "@com_github_prometheus_client_golang//prometheus",
-    ],
+    deps = ["@com_github_prometheus_client_golang//prometheus"],
 )
 
 go_test(
@@ -17,9 +14,6 @@ go_test(
     srcs = ["metrics_test.go"],
     embed = [":metrics"],
     deps = [
-        "//vms/saevm/blocks",
-        "//vms/saevm/blocks/blockstest",
-        "@com_github_ava_labs_libevm//core/types",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_prometheus_client_golang//prometheus/testutil",
         "@com_github_stretchr_testify//require",

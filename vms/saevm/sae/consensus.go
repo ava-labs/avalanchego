@@ -75,7 +75,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		if err := s.MarkSettled(&vm.last.settled); err != nil {
 			return err
 		}
-		vm.metrics.MarkBlockSettled(s)
+		vm.metrics.MarkBlockSettled(s.Height())
 	}
 
 	// I(s ∈ S) above, before I(b ∈ A) before X(b ∈ A)

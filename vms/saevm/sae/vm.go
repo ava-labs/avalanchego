@@ -209,8 +209,8 @@ func NewVM[T hook.Transaction](
 		vm.last.settled.Store(lastSettled)
 		vm.last.accepted.Store(head)
 		vm.preference.Store(head)
-		vm.metrics.MarkBlockExecuted(head)
-		vm.metrics.MarkBlockSettled(lastSettled)
+		vm.metrics.MarkBlockExecuted(head.Height())
+		vm.metrics.MarkBlockSettled(lastSettled.Height())
 	}
 
 	{ // ==========  Mempool  ==========

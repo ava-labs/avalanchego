@@ -32,6 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -913,6 +914,20 @@ func TestGossip(t *testing.T) {
 	api.mustSendTx(t, tx)
 	requireReceiveTx(t, n.allValidators(), tx.Hash())
 	requireNotReceiveTx(t, nonValidators[1:], tx.Hash())
+}
+
+func TestSettlementMetric(t *testing.T) {
+	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, opt)
+	metrics := sut.rawVM.metrics
+
+	executed := sut.runConsensusLoop(t)
+	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
+
+	vmTime.advanceToSettle(ctx, t, executed)
+	settledBy := sut.runConsensusLoop(t)
+	require.NoErrorf(t, settledBy.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", settledBy)
+	require.Equal(t, float64(executed.Height()), testutil.ToFloat64(metrics.LastSettledHeight), "last settled height")
 }
 
 func TestBlockSources(t *testing.T) {

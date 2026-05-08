@@ -43,6 +43,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+
+	saemetrics "github.com/ava-labs/avalanchego/vms/saevm/metrics"
 )
 
 func TestMain(m *testing.M) {
@@ -83,7 +85,9 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, saedb.Config{}, hookstest.NewStub(1e6), logger, nil)
+	metrics, err := saemetrics.New(prometheus.NewRegistry())
+	require.NoError(t, err, "metrics.New()")
+	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, saedb.Config{}, hookstest.NewStub(1e6), logger, metrics)
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)

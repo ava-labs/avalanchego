@@ -44,6 +44,7 @@ go_test(
         "//vms/saevm/blocks/blockstest",
         "//vms/saevm/cmputils",
         "//vms/saevm/hook/hookstest",
+        "//vms/saevm/metrics",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
         "//vms/saevm/saexec",
