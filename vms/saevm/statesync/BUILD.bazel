@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "statesync",
+    srcs = [
+        "always.go",
+        "client.go",
+        "server.go",
+        "summary.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/statesync",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//vms/saevm/adaptor",
+        "//vms/saevm/blocks",
+        "//vms/saevm/hook",
+        "//vms/saevm/sae",
+    ],
+)
