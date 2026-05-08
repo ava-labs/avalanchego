@@ -477,8 +477,38 @@ This is especially useful for pull requests tested against a moving base
 branch, where the metadata included in the PR may be stale relative to
 the current merge target.
 
+The GitHub Actions Bazel workflow also defines a single aggregate job,
+`bazel-required`, that depends on the other jobs in the workflow via
+`needs`.  Branch protection can require that one workflow-level job
+instead of tracking each underlying Bazel job separately. This reduces
+required-check maintenance to the workflow level.
+
 If `check-metadata` fails in CI, rebase or merge the target branch, run
 `task bazel-generate-metadata`, commit the resulting changes, and rerun CI.
+
+### Apple CommandLineTools
+
+On macOS, `.bazelrc` defaults to using the Apple CommandLineTools
+installed under `/Library/Developer/CommandLineTools`. This is the
+default location for the tools installed without Xcode, and the
+location used by GitHub Actions runners.
+
+For most usage, these defaults should be sufficient. If a machine uses
+Xcode or a non-default Apple developer toolchain location, the
+defaults can be overridden via `.bazelrc.local` which is optionally
+imported by `.bazelrc`. `.bazelrc.local` is intended to be generated
+via `task bazel-configure-local`, which runs
+`./scripts/generate_bazelrc_local.sh` under the repo's standard task
+entrypoint. The script uses `xcode-select -p` and `xcrun --sdk macosx
+--show-sdk-path` to determine the host's active Apple developer
+directory and macOS SDK and writes those values to `.bazelrc.local`.
+The script can also be run directly and is invoked automatically by
+direnv.
+
+When invoked by direnv, generation is best-effort: failures are shown
+as warnings during shell entry but do not prevent entering the repo.
+When run directly, the script exits non-zero on discovery failures so
+manual setup problems remain actionable.
 
 ## Adding a New Go Module
 

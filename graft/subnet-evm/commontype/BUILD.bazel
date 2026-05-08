@@ -10,6 +10,7 @@ go_library(
     name = "commontype",
     srcs = [
         "fee_config.go",
+        "gas_price_config.go",
         "test_fee_config.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype",
@@ -21,7 +22,15 @@ go_library(
 
 graft_go_test(
     name = "commontype_test",
-    srcs = ["fee_config_test.go"],
+    srcs = [
+        "fee_config_test.go",
+        "gas_price_config_test.go",
+    ],
+    data = glob(["testdata/**"]),
     embed = [":commontype"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "//utils",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
 )

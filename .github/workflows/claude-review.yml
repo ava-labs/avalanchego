@@ -3,20 +3,22 @@ on:
   pull_request_target:
     types: [labeled]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   review:
     if: >-
       github.event.label.name == 'ai-review' &&
       contains(fromJSON('["MEMBER", "COLLABORATOR", "OWNER", "CONTRIBUTOR"]'), github.event.pull_request.author_association) &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write # Required for Claude to post PR comments and inline review feedback
-      id-token: write # Required for OIDC authentication with Anthropic's API
     steps:
       - name: Checkout trusted prompt from master
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: master
           sparse-checkout: agents/pr-review.md
@@ -31,12 +33,13 @@ jobs:
             cat trusted-prompt/agents/pr-review.md
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 1
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}

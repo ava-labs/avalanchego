@@ -84,8 +84,6 @@ func newFuzzState(t *testing.T) *fuzzState {
 			DBOverride: fwCfg.BackendConstructor,
 		},
 	)
-	fwTDB := firewoodState.TrieDB().Backend().(*TrieDB)
-	firewoodState = NewStateAccessor(firewoodState, fwTDB)
 	fwTr, err := firewoodState.OpenTrie(ethRoot)
 	r.NoError(err)
 	t.Cleanup(func() {

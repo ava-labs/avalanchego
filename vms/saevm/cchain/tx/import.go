@@ -6,6 +6,7 @@ package tx
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
@@ -13,8 +14,13 @@ import (
 	// Imported for [atomic.UnsignedImportTx.Burned] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -44,6 +50,22 @@ type Output struct {
 	Address common.Address `serialize:"true" json:"address"`
 	Amount  uint64         `serialize:"true" json:"amount"`
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
+}
+
+// Compare orders [Output] values by [Output.Address] and [Output.AssetID].
+func (o Output) Compare(other Output) int {
+	if c := o.Address.Cmp(other.Address); c != 0 {
+		return c
+	}
+	return o.AssetID.Compare(other.AssetID)
+}
+
+func (i *Import) inputIDs() set.Set[ids.ID] {
+	s := set.NewSet[ids.ID](len(i.ImportedInputs))
+	for _, in := range i.ImportedInputs {
+		s.Add(in.InputID())
+	}
+	return s
 }
 
 // Like [atomic.UnsignedImportTx.Burned], burned will error if the sum of the
@@ -76,6 +98,102 @@ func (i *Import) burned(assetID ids.ID) (uint64, error) {
 	return burned, nil
 }
 
+var errOutputsNotSortedUnique = errors.New("outputs not sorted and unique")
+
+func (i *Import) sanityCheck(ctx *snow.Context) error {
+	switch {
+	case i.NetworkID != ctx.NetworkID:
+		return fmt.Errorf("%w: want %d, got %d", errWrongNetworkID, ctx.NetworkID, i.NetworkID)
+	case i.BlockchainID != ctx.ChainID:
+		return fmt.Errorf("%w: want %s, got %s", errWrongChainID, ctx.ChainID, i.BlockchainID)
+	case i.SourceChain != constants.PlatformChainID && i.SourceChain != ctx.XChainID:
+		return fmt.Errorf("%w: want %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, i.SourceChain)
+	case len(i.ImportedInputs) == 0:
+		return errNoInputs
+	case len(i.Outs) == 0:
+		return errNoOutputs
+	}
+
+	fc := avax.NewFlowChecker()
+	for j, in := range i.ImportedInputs {
+		if err := in.Verify(); err != nil {
+			return fmt.Errorf("%w (%d): %w", errInvalidInput, j, err)
+		}
+		if assetID := in.Asset.ID; assetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXInput, j, ctx.AVAXAssetID, assetID)
+		}
+		fc.Consume(ctx.AVAXAssetID, in.In.Amount())
+	}
+	for j, out := range i.Outs {
+		if out.Amount == 0 {
+			return fmt.Errorf("%w (%d): zero amount", errInvalidOutput, j)
+		}
+		if out.AssetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXOutput, j, ctx.AVAXAssetID, out.AssetID)
+		}
+		fc.Produce(ctx.AVAXAssetID, out.Amount)
+	}
+	if err := fc.Verify(); err != nil {
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
+	}
+
+	if !utils.IsSortedAndUnique(i.ImportedInputs) {
+		return errInputsNotSortedUnique
+	}
+	if !utils.IsSortedAndUnique(i.Outs) {
+		return errOutputsNotSortedUnique
+	}
+
+	return nil
+}
+
+var (
+	errFetchingUTXOs      = errors.New("fetching UTXOs")
+	errUnmarshallingUTXO  = errors.New("unmarshalling UTXO")
+	errMismatchedAssetIDs = errors.New("mismatched asset IDs")
+	errVerifyingTransfer  = errors.New("verifying transfer")
+)
+
+func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error {
+	if len(i.ImportedInputs) != len(creds) {
+		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
+	}
+
+	fxTx, err := toFxTx(i)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
+	}
+
+	utxoIDs := make([][]byte, len(i.ImportedInputs))
+	for j, in := range i.ImportedInputs {
+		inputID := in.InputID()
+		utxoIDs[j] = inputID[:]
+	}
+
+	utxoBytes, err := sm.Get(i.SourceChain, utxoIDs)
+	if err != nil {
+		return fmt.Errorf("%w from %s: %w", errFetchingUTXOs, i.SourceChain, err)
+	}
+
+	for j, in := range i.ImportedInputs {
+		// TODO(StephenButtolph): Parallelize transfer verification, which
+		// includes signature verification. This is non-trivial, because
+		// transactions frequently contain duplicate signatures, which are
+		// currently being cached.
+		utxo := new(avax.UTXO)
+		if _, err := c.Unmarshal(utxoBytes[j], utxo); err != nil {
+			return fmt.Errorf("%w (%d): %w", errUnmarshallingUTXO, j, err)
+		}
+		if utxo.Asset.ID != in.Asset.ID {
+			return fmt.Errorf("%w (%d): input asset %s does not match UTXO asset %s", errMismatchedAssetIDs, j, in.Asset.ID, utxo.Asset.ID)
+		}
+		if err := fx.VerifyTransfer(fxTx, in.In, creds[j], utxo.Out); err != nil {
+			return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, err)
+		}
+	}
+	return nil
+}
+
 var errUnexpectedInputType = errors.New("unexpected input type")
 
 func (i *Import) numSigs() (uint64, error) {
@@ -89,8 +207,6 @@ func (i *Import) numSigs() (uint64, error) {
 	}
 	return n, nil
 }
-
-var errOverflow = errors.New("amount overflow")
 
 func (i *Import) asOp(avaxAssetID ids.ID) (op, error) {
 	mint := make(map[common.Address]uint256.Int, len(i.Outs))
@@ -120,4 +236,18 @@ func (i *Import) atomicRequests(ids.ID) (ids.ID, *chainsatomic.Requests, error) 
 		utxoIDs[j] = inputID[:]
 	}
 	return i.SourceChain, &chainsatomic.Requests{RemoveRequests: utxoIDs}, nil
+}
+
+// transferNonAVAX adds the non-AVAX balances to the statedb.
+func (i *Import) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+	for _, out := range i.Outs {
+		if out.AssetID == avaxAssetID {
+			continue
+		}
+
+		coinID := common.Hash(out.AssetID)
+		amount := new(big.Int).SetUint64(out.Amount)
+		statedb.AddBalanceMultiCoin(out.Address, coinID, amount)
+	}
+	return nil
 }

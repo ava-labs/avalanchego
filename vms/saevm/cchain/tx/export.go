@@ -6,14 +6,22 @@ package tx
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 
 	// Imported for [atomic.UnsignedExportTx.Burned] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
@@ -46,6 +54,33 @@ type Input struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
+// Compare orders [Input] values by [Input.Address] and [Input.AssetID].
+func (i Input) Compare(other Input) int {
+	if c := i.Address.Cmp(other.Address); c != 0 {
+		return c
+	}
+	return i.AssetID.Compare(other.AssetID)
+}
+
+func (e *Export) inputIDs() set.Set[ids.ID] {
+	s := set.NewSet[ids.ID](len(e.Ins))
+	for _, in := range e.Ins {
+		s.Add(AccountInputID(in.Address, in.Nonce))
+	}
+	return s
+}
+
+// AccountInputID returns the Account+Nonce pair as a unique [ids.ID].
+//
+// It is safe to assume that the returned ID never conflicts with a UTXO ID.
+func AccountInputID(address common.Address, nonce uint64) ids.ID {
+	var id ids.ID
+	packer := wrappers.Packer{Bytes: id[:]} // 32 bytes long
+	packer.PackLong(nonce)                  // add 8 bytes
+	packer.PackBytes(address.Bytes())       // add 24 bytes
+	return id
+}
+
 // Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
 // inputs exceeds MaxUint64, even if the total amount burned could be
 // represented as a uint64.
@@ -74,6 +109,94 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 		}
 	}
 	return burned, nil
+}
+
+var errOutputsNotSorted = errors.New("outputs not sorted")
+
+func (e *Export) sanityCheck(ctx *snow.Context) error {
+	switch {
+	case e.NetworkID != ctx.NetworkID:
+		return fmt.Errorf("%w: want %d, got %d", errWrongNetworkID, ctx.NetworkID, e.NetworkID)
+	case e.BlockchainID != ctx.ChainID:
+		return fmt.Errorf("%w: want %s, got %s", errWrongChainID, ctx.ChainID, e.BlockchainID)
+	case e.DestinationChain != constants.PlatformChainID && e.DestinationChain != ctx.XChainID:
+		return fmt.Errorf("%w: want %s or %s, got %s", errNotSameSubnet, constants.PlatformChainID, ctx.XChainID, e.DestinationChain)
+	case len(e.Ins) == 0:
+		return errNoInputs
+	case len(e.ExportedOutputs) == 0:
+		return errNoOutputs
+	}
+
+	fc := avax.NewFlowChecker()
+	for i, in := range e.Ins {
+		if in.Amount == 0 {
+			return fmt.Errorf("%w (%d): zero amount", errInvalidInput, i)
+		}
+		if in.AssetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXInput, i, ctx.AVAXAssetID, in.AssetID)
+		}
+		fc.Consume(ctx.AVAXAssetID, in.Amount)
+	}
+	for i, out := range e.ExportedOutputs {
+		if err := out.Verify(); err != nil {
+			return fmt.Errorf("%w (%d): %w", errInvalidOutput, i, err)
+		}
+		if assetID := out.Asset.ID; assetID != ctx.AVAXAssetID {
+			return fmt.Errorf("%w (%d): want %s, got %s", errNonAVAXOutput, i, ctx.AVAXAssetID, assetID)
+		}
+		fc.Produce(ctx.AVAXAssetID, out.Out.Amount())
+	}
+	if err := fc.Verify(); err != nil {
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
+	}
+
+	if !utils.IsSortedAndUnique(e.Ins) {
+		return errInputsNotSortedUnique
+	}
+	// Like [atomic.UnsignedExportTx.Verify], outputs aren't enforced to be
+	// unique. This is safe because each output's UTXO is keyed by txID and
+	// outputIndex, so duplicate outputs still produce distinct UTXOs.
+	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
+		return errOutputsNotSorted
+	}
+
+	return nil
+}
+
+var (
+	sigCache = secp256k1.NewRecoverCache(1024)
+
+	errIncorrectNumSignatures = errors.New("incorrect number of signatures")
+	errRecoveringPublicKey    = errors.New("recovering public key")
+	errAddressMismatch        = errors.New("signature does not match address")
+)
+
+func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credential) error {
+	if len(e.Ins) != len(creds) {
+		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
+	}
+
+	fxTx, err := toFxTx(e)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
+	}
+	for i, in := range e.Ins {
+		// TODO(StephenButtolph): Parallelize signature verification. This is
+		// non-trivial, because transactions frequently contain duplicate
+		// signatures, which are currently being cached.
+		cred := creds[i].Self()
+		if len(cred.Sigs) != 1 {
+			return fmt.Errorf("%w (%d): want 1, got %d", errIncorrectNumSignatures, i, len(cred.Sigs))
+		}
+		pk, err := sigCache.RecoverPublicKey(fxTx.Bytes(), cred.Sigs[0][:])
+		if err != nil {
+			return fmt.Errorf("%w (%d): %w", errRecoveringPublicKey, i, err)
+		}
+		if addr := pk.EthAddress(); in.Address != addr {
+			return fmt.Errorf("%w (%d): want %s, got %s", errAddressMismatch, i, in.Address, addr)
+		}
+	}
+	return nil
 }
 
 func (e *Export) numSigs() (uint64, error) {
@@ -135,4 +258,23 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 		elems[i] = elem
 	}
 	return e.DestinationChain, &chainsatomic.Requests{PutRequests: elems}, nil
+}
+
+var errInsufficientFunds = errors.New("insufficient funds")
+
+// transferNonAVAX subtracts the non-AVAX balances from the statedb.
+func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+	for _, in := range e.Ins {
+		if in.AssetID == avaxAssetID {
+			continue
+		}
+
+		coinID := common.Hash(in.AssetID)
+		amount := new(big.Int).SetUint64(in.Amount)
+		if balance := statedb.GetBalanceMultiCoin(in.Address, coinID); balance.Cmp(amount) < 0 {
+			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, coinID, balance, amount)
+		}
+		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
+	}
+	return nil
 }
