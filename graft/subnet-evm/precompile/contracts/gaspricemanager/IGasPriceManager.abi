@@ -16,9 +16,9 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "targetGas",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
             "internalType": "bool",
@@ -26,19 +26,19 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "minGasPrice",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "timeToDouble",
-            "type": "uint256"
+            "type": "uint64"
           }
         ],
         "indexed": false,
-        "internalType": "struct IACP224FeeManager.FeeConfig",
-        "name": "oldFeeConfig",
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
+        "name": "oldGasPriceConfig",
         "type": "tuple"
       },
       {
@@ -49,9 +49,9 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "targetGas",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
             "internalType": "bool",
@@ -59,23 +59,23 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "minGasPrice",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "timeToDouble",
-            "type": "uint256"
+            "type": "uint64"
           }
         ],
         "indexed": false,
-        "internalType": "struct IACP224FeeManager.FeeConfig",
-        "name": "newFeeConfig",
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
+        "name": "newGasPriceConfig",
         "type": "tuple"
       }
     ],
-    "name": "FeeConfigUpdated",
+    "name": "GasPriceConfigUpdated",
     "type": "event"
   },
   {
@@ -111,7 +111,7 @@
   },
   {
     "inputs": [],
-    "name": "getFeeConfig",
+    "name": "getGasPriceConfig",
     "outputs": [
       {
         "components": [
@@ -121,9 +121,9 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "targetGas",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
             "internalType": "bool",
@@ -131,17 +131,17 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "minGasPrice",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "timeToDouble",
-            "type": "uint256"
+            "type": "uint64"
           }
         ],
-        "internalType": "struct IACP224FeeManager.FeeConfig",
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
         "name": "config",
         "type": "tuple"
       }
@@ -151,7 +151,7 @@
   },
   {
     "inputs": [],
-    "name": "getFeeConfigLastChangedAt",
+    "name": "getGasPriceConfigLastChangedAt",
     "outputs": [
       {
         "internalType": "uint256",
@@ -217,9 +217,9 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "targetGas",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
             "internalType": "bool",
@@ -227,22 +227,22 @@
             "type": "bool"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "minGasPrice",
-            "type": "uint256"
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
+            "internalType": "uint64",
             "name": "timeToDouble",
-            "type": "uint256"
+            "type": "uint64"
           }
         ],
-        "internalType": "struct IACP224FeeManager.FeeConfig",
+        "internalType": "struct IGasPriceManager.GasPriceConfig",
         "name": "config",
         "type": "tuple"
       }
     ],
-    "name": "setFeeConfig",
+    "name": "setGasPriceConfig",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
