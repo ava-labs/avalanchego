@@ -40,6 +40,7 @@ go_library(
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
         "//vms/saevm/hook",
+        "//vms/saevm/metrics",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
         "//vms/saevm/sae/rpc",

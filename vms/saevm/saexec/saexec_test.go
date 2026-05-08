@@ -117,7 +117,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		Archival:           sutCfg.archival,
 		TrieCommitInterval: sutCfg.commitInterval,
 	}
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger)
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, nil)
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -1036,7 +1036,7 @@ func TestArchivalStoresAll(t *testing.T) {
 	t.Run("recover", func(t *testing.T) {
 		// Restart the chain to remove the TrieDB cache.
 		src := blocks.Source(chain.GetBlock)
-		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log)
+		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log, nil)
 		require.NoError(t, err, "New()")
 		t.Cleanup(func() {
 			require.NoErrorf(t, e.Close(), "%T.Close()", e)

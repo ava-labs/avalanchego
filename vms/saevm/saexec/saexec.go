@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
+	saemetrics "github.com/ava-labs/avalanchego/vms/saevm/metrics"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -49,6 +50,7 @@ type Executor struct {
 	chainConfig  *params.ChainConfig
 	db           ethdb.Database
 	xdb          saetypes.ExecutionResults
+	metrics      *saemetrics.Metrics
 }
 
 // New constructs and starts a new [Executor]. Call [Executor.Close] to release
@@ -66,6 +68,7 @@ func New(
 	saedbConfig saedb.Config,
 	hooks hook.Points,
 	log logging.Logger,
+	metrics *saemetrics.Metrics,
 ) (*Executor, error) {
 	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), log)
 	if err != nil {
@@ -90,6 +93,7 @@ func New(
 		chainConfig: chainConfig,
 		db:          db,
 		xdb:         xdb,
+		metrics:     metrics,
 		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)

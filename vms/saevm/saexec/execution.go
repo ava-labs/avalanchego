@@ -301,6 +301,9 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
+	if e.metrics != nil {
+		e.metrics.MarkBlockExecuted(b)
+	}
 	e.sendPostExecutionEvents(b.EthBlock(), r.Receipts) // (3)
 	return nil
 }
