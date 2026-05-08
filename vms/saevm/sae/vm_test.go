@@ -447,19 +447,6 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 	return s.runConsensusLoopOnPreference(tb, s.lastAcceptedBlock(tb), txs...)
 }
 
-// runAndWaitForSuccess is equivalent to [SUT.runConsensusLoop] but additionally
-// waits for the block to execute and asserts that all of its receipts indicate
-// success.
-func (s *SUT) runAndWaitForSuccess(ctx context.Context, tb testing.TB, txs ...*types.Transaction) *blocks.Block {
-	tb.Helper()
-	b := s.runConsensusLoop(tb, txs...)
-	require.NoErrorf(tb, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	for i, r := range b.Receipts() {
-		require.Equalf(tb, types.ReceiptStatusSuccessful, r.Status, "%T.Receipts()[%d].Status", b, i)
-	}
-	return b
-}
-
 // deployEscrow signs and runs a deploy tx for the escrow contract from
 // s.wallet[0], in its own consensus block. If depositVal is non-nil, a tx
 // depositing that value to balances[recv] is run in a subsequent block;
@@ -474,14 +461,14 @@ func (s *SUT) deployEscrow(tb testing.TB, depositVal *big.Int) (
 
 	sign := s.wallet.SetNonceAndSign
 
-	deployBlock = s.runConsensusLoop(ctx, tb, sign(tb, 0, &types.LegacyTx{
+	deployBlock = s.runConsensusLoop(tb, sign(tb, 0, &types.LegacyTx{
 		Gas:      1e6,
 		GasPrice: big.NewInt(1),
 		Data:     escrow.CreationCode(),
 	}))
 
 	if depositVal != nil {
-		depositBlock = s.runConsensusLoop(ctx, tb, sign(tb, 0, &types.LegacyTx{
+		depositBlock = s.runConsensusLoop(tb, sign(tb, 0, &types.LegacyTx{
 			To:       &escrowAddr,
 			Gas:      1e6,
 			GasPrice: big.NewInt(1),
@@ -489,8 +476,8 @@ func (s *SUT) deployEscrow(tb testing.TB, depositVal *big.Int) (
 			Value:    depositVal,
 		}))
 	}
-	last := s.lastAcceptedBlock()
-	require.NoErrorf(t, last.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", last)
+	last := s.lastAcceptedBlock(tb)
+	require.NoErrorf(tb, last.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", last)
 
 	callMsg = ethereum.CallMsg{
 		From: s.wallet.Addresses()[0],
