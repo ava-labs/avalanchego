@@ -7,9 +7,8 @@ package precompileconfig
 import (
 	"github.com/ava-labs/libevm/common"
 
+	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -33,11 +32,7 @@ type Config interface {
 
 // PredicateContext is the context passed in to the Predicater interface to verify
 // a precompile predicate within a specific ProposerVM wrapper.
-type PredicateContext struct {
-	SnowCtx *snow.Context
-	// ProposerVMBlockCtx defines the ProposerVM context the predicate is verified within
-	ProposerVMBlockCtx *block.Context
-}
+type PredicateContext = evmprecompileconfig.PredicateContext
 
 // Predicater is an optional interface for StatefulPrecompileContracts to implement.
 // If implemented, the predicate will be called for each predicate included in the
@@ -48,10 +43,10 @@ type PredicateContext struct {
 // block execution, which can be accessed via the StateDB during execution.
 // The bitset is stored in the block, so that historical blocks can be re-verified
 // without calling VerifyPredicate.
-type Predicater interface {
-	PredicateGas(pred predicate.Predicate, rules Rules) (uint64, error)
-	VerifyPredicate(predicateContext *PredicateContext, pred predicate.Predicate) error
-}
+type Predicater = evmprecompileconfig.Predicater
+
+// Rules defines the interface that provides information about the current rules of the chain.
+type Rules = evmprecompileconfig.Rules
 
 type WarpMessageWriter interface {
 	AddMessage(unsignedMessage *warp.UnsignedMessage) error
@@ -78,9 +73,4 @@ type Accepter interface {
 type ChainConfig interface {
 	// IsDurango returns true if the time is after Durango.
 	IsDurango(time uint64) bool
-}
-
-// Rules defines the interface that provides information about the current rules of the chain.
-type Rules interface {
-	IsGraniteActivated() bool
 }
