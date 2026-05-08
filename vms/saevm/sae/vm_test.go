@@ -464,10 +464,11 @@ func (s *SUT) runAndWaitForSuccess(ctx context.Context, tb testing.TB, txs ...*t
 // s.wallet[0], in its own consensus block. If depositVal is non-nil, a tx
 // depositing that value to balances[recv] is run in a subsequent block;
 // otherwise depositBlock is nil.
-func (s *SUT) deployEscrow(ctx context.Context, tb testing.TB, depositVal *big.Int) (
+func (s *SUT) deployEscrow(tb testing.TB, depositVal *big.Int) (
 	deployBlock, depositBlock *blocks.Block, escrowAddr, recv common.Address, callMsg ethereum.CallMsg,
 ) {
 	tb.Helper()
+	ctx := s.context(tb)
 	escrowAddr = crypto.CreateAddress(s.wallet.Addresses()[0], 0)
 	recv = common.Address{'r', 'e', 'c', 'v'}
 
