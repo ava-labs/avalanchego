@@ -43,7 +43,7 @@ env:
 
 jobs:
   define-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
     steps:
@@ -82,7 +82,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
     timeout-minutes: ${{ matrix.timeout-minutes || 60 }}
-    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
+    runs-on: ${{ matrix.runner || 'ubuntu-24.04' }}
     permissions:
       id-token: write
       contents: read

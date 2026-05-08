@@ -30,7 +30,7 @@ env:
 jobs:
   antithesis_xsvm:
     name: Run Antithesis XSVM Test Setup
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: antithesishq/antithesis-trigger-action@b7d0c9d1d9316bd4de73a44144c56636ea3a64ba # v0.8
         with:
