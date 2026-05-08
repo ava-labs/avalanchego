@@ -16,7 +16,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write # Required for Claude to post PR comments and inline review feedback
-      id-token: write # Required for OIDC authentication with Anthropic's API
     steps:
       - name: Checkout trusted prompt from master
         uses: actions/checkout@v5
@@ -40,6 +39,7 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
