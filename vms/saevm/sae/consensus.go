@@ -9,8 +9,8 @@ import (
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/libevm"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -146,6 +146,6 @@ func (vm *VM) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subsc
 }
 
 // LastExecutedState returns the last executed state of the chain.
-func (vm *VM) LastExecutedState() (*state.StateDB, error) {
+func (vm *VM) LastExecutedState() (libevm.StateReader, error) {
 	return vm.exec.StateDB(vm.exec.LastExecuted().PostExecutionStateRoot())
 }

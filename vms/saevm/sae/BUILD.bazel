@@ -56,6 +56,7 @@ go_library(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//triedb",

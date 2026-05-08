@@ -9,6 +9,7 @@ go_library(
     name = "hook",
     srcs = [
         "block_builder.go",
+        "cchain_tx.go",
         "points.go",
         "txs.go",
     ],

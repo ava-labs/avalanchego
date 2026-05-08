@@ -61,7 +61,7 @@ type VM struct {
 
 	ctx          *snow.Context
 	db           avadb.Database
-	mempool      *txpool.Mempool
+	mempool      *txpool.Txpool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
 
 	// TODO(alarso16): remove later
@@ -163,7 +163,7 @@ func (v *VM) Initialize(
 		*desiredTargetExcess = acp176.DesiredTargetExcess(*userConfig.GasTarget)
 	}
 
-	txs := txpool.NewTxs()
+	pendingTxs := txpool.NewPending()
 	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := hook.NewPoints(
 		snowCtx,
@@ -171,7 +171,7 @@ func (v *VM) Initialize(
 		config,
 		desiredDelayExcess,
 		desiredTargetExcess,
-		txs,
+		pendingTxs,
 		warpStorage,
 	)
 
@@ -186,7 +186,7 @@ func (v *VM) Initialize(
 	v.db = avaDB
 	v.hooks = hooks
 
-	v.mempool, err = txpool.New(txs, snowCtx, inner)
+	v.mempool, err = txpool.New(snowCtx, config, pendingTxs, inner, 1024)
 	if err != nil {
 		return fmt.Errorf("creating txpool: %w", err)
 	}
@@ -380,7 +380,7 @@ func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	}()
 	go func() {
 		defer cancel()
-		err := v.mempool.Txs.AwaitTxs(ctx)
+		err := v.mempool.AwaitTxs(ctx)
 		results <- result{common.PendingTxs, err}
 	}()
 

@@ -31,7 +31,7 @@ import (
 type Service struct {
 	ctx          *snow.Context
 	backend      rpc.GethBackends
-	mempool      *txpool.Mempool
+	mempool      *txpool.Txpool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
 	db           database.KeyValueReader
 }
@@ -39,7 +39,7 @@ type Service struct {
 func NewService(
 	ctx *snow.Context,
 	backend rpc.GethBackends,
-	mempool *txpool.Mempool,
+	mempool *txpool.Txpool,
 	pushGossiper *gossip.PushGossiper[*tx.Tx],
 	db database.KeyValueReader,
 ) *Service {

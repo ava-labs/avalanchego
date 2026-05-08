@@ -38,7 +38,7 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-var _ hook.PointsG[*txpool.Tx] = (*Points)(nil)
+var _ hook.PointsG[*cchainTx] = (*Points)(nil)
 
 type Points struct {
 	blockBuilder
@@ -52,9 +52,26 @@ func NewPoints(
 	chainConfig *ethparams.ChainConfig,
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
-	pool *txpool.Txs,
+	pool *txpool.Pending,
 	warpStorage *warp.Storage,
 ) *Points {
+	potentialTxs := func() iter.Seq[*cchainTx] {
+		return func(yield func(*cchainTx) bool) {
+			for rawTx := range pool.Iter() {
+				wrapped, err := newCChainTx(rawTx, ctx.AVAXAssetID)
+				if err != nil {
+					ctx.Log.Warn("failed to wrap pool tx",
+						zap.Stringer("txID", rawTx.ID()),
+						zap.Error(err),
+					)
+					continue
+				}
+				if !yield(wrapped) {
+					return
+				}
+			}
+		}
+	}
 	return &Points{
 		blockBuilder{
 			ctx: ctx,
@@ -62,7 +79,7 @@ func NewPoints(
 				delayExcess:  desiredDelayExcess,
 				targetExcess: desiredTargetExcess,
 			},
-			potentialTxs: pool.Iter,
+			potentialTxs: potentialTxs,
 			chainConfig:  chainConfig,
 		},
 		db,
@@ -70,15 +87,15 @@ func NewPoints(
 	}
 }
 
-func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.Tx], error) {
+func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*cchainTx], error) {
 	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract txs of block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
 
-	txs := make([]*txpool.Tx, len(rawTxs))
+	txs := make([]*cchainTx, len(rawTxs))
 	for i, rawTx := range rawTxs {
-		tx, err := txpool.NewTx(rawTx, p.ctx.AVAXAssetID)
+		tx, err := newCChainTx(rawTx, p.ctx.AVAXAssetID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert tx %d for block %s (%d): %w", i, b.Hash(), b.NumberU64(), err)
 		}
@@ -97,7 +114,7 @@ func (p *Points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*txpool.T
 			delayExcess:  headerExtra.MinDelayExcess,
 			targetExcess: headerExtra.TargetExcess,
 		},
-		potentialTxs: func() iter.Seq[*txpool.Tx] {
+		potentialTxs: func() iter.Seq[*cchainTx] {
 			return slices.Values(txs)
 		},
 	}, nil
