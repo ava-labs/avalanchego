@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -47,9 +48,7 @@ import (
 // which needs to be provided by a harness. In all cases, the harness MUST
 // provide a last-synchronous block, which MAY be the genesis.
 type VM struct {
-	*p2p.Network
-	Peers          *p2p.Peers
-	ValidatorPeers *p2p.Validators
+	Network
 
 	hooks   hook.Points
 	config  Config
@@ -115,7 +114,8 @@ func NewVM[T hook.Transaction](
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
 	lastSynchronous *types.Block,
-	sender snowcommon.AppSender,
+	metrics *prometheus.Registry,
+	networking Network,
 ) (_ *VM, retErr error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
@@ -130,6 +130,7 @@ func NewVM[T hook.Transaction](
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
 	vm := &VM{
+		Network: networking,
 		hooks:   hooks,
 		config:  cfg,
 		snowCtx: snowCtx,
@@ -243,16 +244,11 @@ func NewVM[T hook.Transaction](
 	}
 
 	{ // ==========  P2P Gossip  ==========
-		network, peers, validatorPeers, err := newNetwork(snowCtx, sender, reg)
-		if err != nil {
-			return nil, fmt.Errorf("newNetwork(...): %v", err)
-		}
-
 		const pullGossipPeriod = time.Second
 		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 			snowCtx.NodeID,
-			network,
-			validatorPeers,
+			vm.Network.Network,
+			vm.Network.ValidatorPeers,
 			vm.mempool,
 			txgossip.Marshaller{},
 			gossip.SystemConfig{
@@ -265,7 +261,7 @@ func NewVM[T hook.Transaction](
 		if err != nil {
 			return nil, fmt.Errorf("gossip.NewSystem(...): %v", err)
 		}
-		if err := network.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
+		if err := vm.Network.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
 			return nil, fmt.Errorf("network.AddHandler(...): %v", err)
 		}
 
@@ -284,9 +280,6 @@ func NewVM[T hook.Transaction](
 			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
 		}()
 
-		vm.Network = network
-		vm.Peers = peers
-		vm.ValidatorPeers = validatorPeers
 		vm.mempool.RegisterPushGossiper(pushGossiper)
 		vm.toClose = append(vm.toClose, closerFunc(func() error {
 			cancel()

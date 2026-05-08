@@ -20,8 +20,8 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
@@ -125,7 +125,12 @@ func (vm *VM) Initialize(
 			TrieDBConfig: trieDBConfig,
 		},
 	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
+	reg := prometheus.NewRegistry()
+	network, err := sae.NewNetwork(snowCtx, appSender, reg)
+	if err != nil {
+		return fmt.Errorf("creating SAE network: %w", err)
+	}
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), reg, network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
@@ -141,10 +146,6 @@ func (vm *VM) Initialize(
 		return nil
 	})
 
-	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "cchain")
-	if err != nil {
-		return fmt.Errorf("making metrics: %w", err)
-	}
 	bloomMetrics, err := bloom.NewMetrics("gossip_bloom", reg)
 	if err != nil {
 		return fmt.Errorf("creating gossip bloom metrics: %w", err)
@@ -160,8 +161,8 @@ func (vm *VM) Initialize(
 	}
 	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		snowCtx.NodeID,
-		vm.Network,
-		vm.ValidatorPeers,
+		network.Network,
+		network.ValidatorPeers,
 		vm.gossipSet,
 		gossipMarshaller{},
 		gossip.SystemConfig{

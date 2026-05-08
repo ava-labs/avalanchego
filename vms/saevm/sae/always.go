@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
@@ -63,7 +64,12 @@ func (vm *SinceGenesis[_]) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
 	}
 
-	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
+	metrics := prometheus.NewRegistry()
+	n, err := NewNetwork(snowCtx, appSender, metrics)
+	if err != nil {
+		return fmt.Errorf("newNetwork(...): %v", err)
+	}
+	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), metrics, n)
 	if err != nil {
 		return err
 	}
