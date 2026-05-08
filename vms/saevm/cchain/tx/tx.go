@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -30,46 +31,39 @@ import (
 )
 
 var (
-	errWrongNetworkID        = errors.New("wrong network ID")
-	errWrongChainID          = errors.New("wrong chain ID")
-	errNoInputs              = errors.New("no inputs")
-	errNoOutputs             = errors.New("no outputs")
-	errNotSameSubnet         = errors.New("not same subnet")
-	errInvalidInput          = errors.New("invalid input")
-	errNonAVAXInput          = errors.New("input contains non-AVAX")
-	errInvalidOutput         = errors.New("invalid output")
-	errNonAVAXOutput         = errors.New("output contains non-AVAX")
-	errFlowCheckFailed       = errors.New("flow check failed")
-	errInputsNotSortedUnique = errors.New("inputs not sorted and unique")
-	errOverflow              = errors.New("amount overflow")
+	errWrongNetworkID          = errors.New("wrong network ID")
+	errWrongChainID            = errors.New("wrong chain ID")
+	errNoInputs                = errors.New("no inputs")
+	errNoOutputs               = errors.New("no outputs")
+	errNotSameSubnet           = errors.New("not same subnet")
+	errInvalidInput            = errors.New("invalid input")
+	errNonAVAXInput            = errors.New("input contains non-AVAX")
+	errInvalidOutput           = errors.New("invalid output")
+	errNonAVAXOutput           = errors.New("output contains non-AVAX")
+	errFlowCheckFailed         = errors.New("flow check failed")
+	errInputsNotSortedUnique   = errors.New("inputs not sorted and unique")
+	errOverflow                = errors.New("amount overflow")
+	errIncorrectNumCredentials = errors.New("incorrect number of credentials")
+	errConvertingToFxTx        = errors.New("converting to fxTx")
 )
 
 // Tx is a signed transaction that interacts with shared memory.
 // The [Unsigned] body can be implemented by either [Export] or [Import].
 // The [Credential] values are implemented by [secp256k1fx.Credential].
 type Tx struct {
-	Unsigned `serialize:"true" json:"unsignedTx"`
+	Unsigned Unsigned     `serialize:"true" json:"unsignedTx"`
 	Creds    []Credential `serialize:"true" json:"credentials"`
 }
 
 // Unsigned is a common interface implemented by [Import] and [Export].
-//
-// TODO(StephenButtolph): Expand this interface to include UTXO handling and
-// verification.
 type Unsigned interface {
-	// SanityCheck verifies that the transaction's structural invariants hold
+	// sanityCheck verifies that the transaction's structural invariants hold
 	// against the chain's context and that it does not produce more funds
 	// than it consumes.
-	//
-	// It does not verify signatures, whether UTXOs exist, or whether the
-	// transaction performs a valid EVM state transition.
-	SanityCheck(ctx *snow.Context) error
+	sanityCheck(ctx *snow.Context) error
 
-	// TransferNonAVAX transfers the non-AVAX balances requested by this
-	// transaction.
-	//
-	// Non-AVAX transfers were only allowed prior to the Banff upgrade.
-	TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
+	// inputIDs returns the one-time-use inputs consumed by this transaction.
+	inputIDs() set.Set[ids.ID]
 
 	// burned returns the amount of assetID that is consumed but not produced by
 	// this transaction.
@@ -83,9 +77,17 @@ type Unsigned interface {
 	// EVM-native state. Ops do not include any non-AVAX balance changes.
 	asOp(avaxAssetID ids.ID) (op, error)
 
+	// verifyCredentials verifies that the transaction is authorized by the
+	// provided credentials.
+	verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error
+
 	// atomicRequests returns the operations that should be applied to shared
 	// memory when this transaction is executed.
 	atomicRequests(txID ids.ID) (chainID ids.ID, r *chainsatomic.Requests, err error)
+
+	// transferNonAVAX transfers the non-AVAX balances requested by this
+	// transaction.
+	transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
 }
 
 // op contains the state changes of [hook.Op]
@@ -123,6 +125,14 @@ func (t *Tx) Bytes() ([]byte, error) {
 	return c.Marshal(codecVersion, t)
 }
 
+// InputIDs returns the one-time-use inputs consumed by this transaction.
+//
+// [Import] transactions return consumed UTXO IDs.
+// [Export] transactions return Account+Nonce pairs.
+func (t *Tx) InputIDs() set.Set[ids.ID] {
+	return t.Unsigned.inputIDs()
+}
+
 // AsOp converts the transaction into a [hook.Op] that can be processed by SAE.
 //
 // The operation only includes state changes that impact Ethereum-native state.
@@ -133,12 +143,12 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 		return hook.Op{}, fmt.Errorf("calculating gas used: %w", err)
 	}
 
-	burned, err := t.burned(avaxAssetID)
+	burned, err := t.Unsigned.burned(avaxAssetID)
 	if err != nil {
 		return hook.Op{}, fmt.Errorf("calculating amount burned: %w", err)
 	}
 
-	op, err := t.asOp(avaxAssetID)
+	op, err := t.Unsigned.asOp(avaxAssetID)
 	if err != nil {
 		return hook.Op{}, fmt.Errorf("converting to operation: %w", err)
 	}
@@ -217,10 +227,33 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	return p
 }
 
+// SanityCheck verifies that the transaction's structural invariants hold
+// against the chain's context and that it does not produce more funds than it
+// consumes.
+//
+// It does not verify signatures, whether UTXOs exist, or whether the
+// transaction performs a valid EVM state transition.
+func (t *Tx) SanityCheck(ctx *snow.Context) error {
+	return t.Unsigned.sanityCheck(ctx)
+}
+
+// VerifyCredentials verifies that the transaction is properly authorized.
+func (t *Tx) VerifyCredentials(sm chainsatomic.SharedMemory) error {
+	return t.Unsigned.verifyCredentials(sm, t.Creds)
+}
+
 // AtomicRequests returns shared-memory modifications that this transaction
 // should perform on the peer chainID during execution.
 func (t *Tx) AtomicRequests() (chainID ids.ID, r *chainsatomic.Requests, err error) {
-	return t.atomicRequests(t.ID())
+	return t.Unsigned.atomicRequests(t.ID())
+}
+
+// TransferNonAVAX transfers the non-AVAX balances requested by this
+// transaction.
+//
+// Non-AVAX transfers were only allowed prior to the Banff upgrade.
+func (t *Tx) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+	return t.Unsigned.transferNonAVAX(avaxAssetID, statedb)
 }
 
 // Parse deserializes a [Tx] from its canonical binary format.
@@ -230,4 +263,12 @@ func Parse(b []byte) (*Tx, error) {
 		return nil, err
 	}
 	return &tx, nil
+}
+
+// UnsignedBytes serializes an [Unsigned] to the canonical binary format that
+// should be used to sign a [Tx].
+func UnsignedBytes(u Unsigned) ([]byte, error) {
+	// We MUST provide a pointer to an interface so that the returned slice is
+	// prefixed with the type ID.
+	return c.Marshal(codecVersion, &u)
 }
