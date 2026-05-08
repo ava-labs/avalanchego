@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
@@ -111,7 +112,12 @@ func (vm *VM) Initialize(
 			TrieDBConfig: trieDBConfig,
 		},
 	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
+	reg := prometheus.NewRegistry()
+	network, err := sae.NewNetwork(snowCtx, appSender, reg)
+	if err != nil {
+		return fmt.Errorf("creating SAE network: %w", err)
+	}
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), reg, network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}

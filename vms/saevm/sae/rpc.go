@@ -41,7 +41,7 @@ func (c chain) Hooks() hook.Points             { return c.hooks }
 func (c chain) DB() ethdb.Database             { return c.db }
 func (c chain) XDB() saetypes.ExecutionResults { return c.xdb }
 func (c chain) Mempool() *txgossip.Set         { return c.mempool }
-func (c chain) Peers() *p2p.Peers              { return c.VM.Peers }
+func (c chain) Peers() *p2p.Peers              { return c.VM.peers }
 func (c chain) LastAccepted() *blocks.Block    { return c.last.accepted.Load() }
 func (c chain) LastSettled() *blocks.Block     { return c.last.settled.Load() }
 

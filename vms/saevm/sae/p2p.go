@@ -11,19 +11,26 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-// newNetwork creates the P2P network with a registered validator set.
-func newNetwork(
+var (
+	_ validators.Connector = (*Network)(nil)
+	_ common.AppHandler    = (*Network)(nil)
+)
+
+type Network struct {
+	*p2p.Network
+	peers          *p2p.Peers
+	validatorPeers *p2p.Validators
+}
+
+// NewNetwork creates the P2P network with a registered validator set.
+func NewNetwork(
 	snowCtx *snow.Context,
 	sender common.AppSender,
 	reg *prometheus.Registry,
-) (
-	*p2p.Network,
-	*p2p.Peers,
-	*p2p.Validators,
-	error,
-) {
+) (Network, error) {
 	peers := &p2p.Peers{}
 	const maxValidatorSetStaleness = time.Minute
 	validatorPeers := p2p.NewValidators(
@@ -42,7 +49,11 @@ func newNetwork(
 		validatorPeers,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return Network{}, err
 	}
-	return network, peers, validatorPeers, nil
+	return Network{
+		Network:        network,
+		peers:          peers,
+		validatorPeers: validatorPeers,
+	}, nil
 }
