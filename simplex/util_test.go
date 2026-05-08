@@ -86,7 +86,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 		digest := computeDigest(bytes)
 		block.digest = digest
 
-		bt := newBlockTracker()
+		bt := newBlockTracker(vm)
 		bt.init(block)
 		block.blockTracker = bt
 		return block
