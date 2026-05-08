@@ -61,7 +61,6 @@ import (
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
-	ethereum "github.com/ava-labs/libevm"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
 
@@ -452,7 +451,7 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 // depositing that value to balances[recv] is run in a subsequent block;
 // otherwise depositBlock is nil.
 func (s *SUT) deployEscrow(tb testing.TB, depositVal *big.Int) (
-	deployBlock, depositBlock *blocks.Block, escrowAddr, recv common.Address, callMsg ethereum.CallMsg,
+	deployBlock, depositBlock *blocks.Block, escrowAddr, recv common.Address,
 ) {
 	tb.Helper()
 	ctx := s.context(tb)
@@ -479,12 +478,7 @@ func (s *SUT) deployEscrow(tb testing.TB, depositVal *big.Int) (
 	last := s.lastAcceptedBlock(tb)
 	require.NoErrorf(tb, last.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", last)
 
-	callMsg = ethereum.CallMsg{
-		From: s.wallet.Addresses()[0],
-		To:   &escrowAddr,
-		Data: escrow.CallDataForBalance(recv),
-	}
-	return deployBlock, depositBlock, escrowAddr, recv, callMsg
+	return deployBlock, depositBlock, escrowAddr, recv
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {

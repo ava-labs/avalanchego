@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	ethereum "github.com/ava-labs/libevm"
 )
 
 // TestStateQueryOnNonCanonicalBlock verifies that state-dependent RPC calls
@@ -93,7 +94,7 @@ func TestDebugTrace(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
 	const escrowDepositVal = 42
-	deployBlock, depositBlock, _, recv, _ := sut.deployEscrow(t, big.NewInt(escrowDepositVal))
+	deployBlock, depositBlock, _, recv := sut.deployEscrow(t, big.NewInt(escrowDepositVal))
 	deployTxHash := deployBlock.Transactions()[0].Hash()
 	depositTxHash := depositBlock.Transactions()[0].Hash()
 
@@ -197,7 +198,12 @@ func TestStatefulRPCs(t *testing.T) {
 	ctx, sut := newSUT(t, 1, opt)
 
 	const escrowDepositVal = 42
-	_, b, escrowAddr, recv, callMsg := sut.deployEscrow(t, big.NewInt(escrowDepositVal))
+	_, b, escrowAddr, recv := sut.deployEscrow(t, big.NewInt(escrowDepositVal))
+	callMsg := ethereum.CallMsg{
+		From: sut.wallet.Addresses()[0],
+		To:   &escrowAddr,
+		Data: escrow.CallDataForBalance(recv),
+	}
 
 	vmTime.advanceToSettle(ctx, t, b)
 	for range 2 {
@@ -285,7 +291,12 @@ func TestStatefulRPCs(t *testing.T) {
 func TestStatefulRPCsLatestOnly(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
-	_, _, _, _, callMsg := sut.deployEscrow(t, nil)
+	_, _, escrowAddr, recv := sut.deployEscrow(t, nil)
+	callMsg := ethereum.CallMsg{
+		From: sut.wallet.Addresses()[0],
+		To:   &escrowAddr,
+		Data: escrow.CallDataForBalance(recv),
+	}
 
 	t.Run("eth_estimateGas", func(t *testing.T) {
 		got, err := sut.EstimateGas(ctx, callMsg)

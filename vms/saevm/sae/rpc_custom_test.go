@@ -137,7 +137,7 @@ func TestCallDetailed(t *testing.T) {
 	}))
 
 	const escrowDepositVal = 42
-	_, _, escrowAddr, recv, _ := sut.deployEscrow(t, big.NewInt(escrowDepositVal))
+	_, _, escrowAddr, recv := sut.deployEscrow(t, big.NewInt(escrowDepositVal))
 
 	const revertWith = 12345
 	revertAsPanic := slices.Concat(
