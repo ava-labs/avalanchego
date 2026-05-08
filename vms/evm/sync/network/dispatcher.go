@@ -20,8 +20,6 @@ import (
 
 const epsilon = 1e-6
 
-// Sentinels exposed for errors.Is. errMarshalRequest stays private as a
-// programming bug rather than a runtime category.
 var (
 	ErrNoPeers           = errors.New("no peers available")
 	ErrSendRequest       = errors.New("send request")
