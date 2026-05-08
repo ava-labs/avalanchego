@@ -3,7 +3,10 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "network",
-    srcs = ["client.go"],
+    srcs = [
+        "clients.go",
+        "dispatcher.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/network",
     visibility = ["//visibility:public"],
     deps = [
@@ -17,7 +20,10 @@ go_library(
 
 go_test(
     name = "network_test",
-    srcs = ["client_test.go"],
+    srcs = [
+        "clients_test.go",
+        "dispatcher_test.go",
+    ],
     embed = [":network"],
     deps = [
         "//ids",
