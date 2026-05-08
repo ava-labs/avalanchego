@@ -38,6 +38,8 @@ const (
 var (
 	errTopologyRequiresKubeRuntime          = errors.New("topology requires kube runtime for all nodes")
 	errTopologyDuplicateConnection          = errors.New("duplicate topology connection")
+	errTopologyDuplicateLocation            = errors.New("duplicate topology location")
+	errTopologyUnknownNodeReference         = errors.New("topology location references unknown node")
 	errTopologyNodeAssignedMultipleLocation = errors.New("topology node assigned to multiple locations")
 
 	topologyClientLoggerOnce sync.Once
@@ -301,12 +303,12 @@ func (n *Network) topologyLocationNames() (map[string]struct{}, error) {
 			return nil, stacktrace.New("topology location missing name")
 		}
 		if _, exists := locations[location.Name]; exists {
-			return nil, stacktrace.Errorf("duplicate topology location %q", location.Name)
+			return nil, stacktrace.Errorf("%w: %q", errTopologyDuplicateLocation, location.Name)
 		}
 		locations[location.Name] = struct{}{}
 		for _, nodeID := range location.NodeIDs {
 			if _, ok := byID[nodeID.String()]; !ok {
-				return nil, stacktrace.Errorf("topology location %q references unknown node %s", location.Name, nodeID)
+				return nil, stacktrace.Errorf("%w: %q references %s", errTopologyUnknownNodeReference, location.Name, nodeID)
 			}
 			if existingLocation, exists := assignedNodeLocations[nodeID.String()]; exists {
 				return nil, stacktrace.Errorf("%w: %s assigned to multiple locations: %q and %q", errTopologyNodeAssignedMultipleLocation, nodeID, existingLocation, location.Name)

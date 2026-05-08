@@ -2,10 +2,11 @@
 
 This package implements a simple orchestrator for the avalanchego
 nodes of a temporary network. Configuration is stored on disk, and
-nodes run as independent processes whose process details are also
-written to disk. Using the filesystem to store configuration and
-process details allows for the `tmpnetctl` cli and e2e test fixture to
-orchestrate the same temporary networks without the use of an rpc daemon.
+nodes may run across supported runtimes such as local processes or kube.
+When process-backed nodes are used, their process details are also
+written to disk. Using the filesystem to store configuration and runtime
+state allows the `tmpnetctl` cli and e2e test fixture to orchestrate the
+same temporary networks without the use of an rpc daemon.
 
 ## Table of Contents
 
@@ -79,10 +80,10 @@ the following non-test files:
 | local_network.go            |                | Defines configuration for the default local network                    |
 | monitor_kube.go             |                | Enables collection of logs and metrics from kube pods                  |
 | monitor_processes.go        |                | Enables collection of logs and metrics from local processes            |
-| network.go                  | Network        | Orchestrates and configures temporary networks                         |
+| network.go                  | Network, Topology, Location, Connection | Orchestrates and configures temporary networks, including topology declarations |
 | network_config.go           | Network        | Reads and writes network configuration                                 |
 | network_test.go             |                | Simple test round-tripping Network serialization                       |
-| topology_runtime.go         | Topology       | Applies optional kube-backed network topology via Chaos Mesh           |
+| topology_runtime.go         |                | Validates and realizes optional kube-backed network topology via Chaos Mesh |
 | node.go                     | Node           | Orchestrates and configures nodes                                      |
 | node_config.go              | Node           | Reads and writes node configuration                                    |
 | process_runtime.go          | ProcessRuntime | Orchestrates node processes                                            |
@@ -234,6 +235,10 @@ persistent distributed layout for the network. This is intended for
 cases where a test wants nodes to run with non-uniform connectivity
 characteristics rather than the default colocated behavior.
 
+For deeper feature context, including design rationale, alternatives,
+validation strategy, and maintenance notes, see
+[`topology.md`](./topology.md).
+
 A topology consists of:
 
 - `Topology.Mode`: whether topology is required or best-effort when the
@@ -245,9 +250,9 @@ A topology consists of:
 
 The current implementation is kube-specific. When every node in a
 network uses the kube runtime, tmpnet realizes topology connections by
-creating Chaos Mesh `NetworkChaos` resources once the node pods exist
-and before tmpnet waits for the network to become healthy, then removing
-those resources again when the network stops.
+creating Chaos Mesh `NetworkChaos` resources after the relevant node pods
+have already reached their initial healthy state, then removing those
+resources again when the network stops.
 
 `Topology.Mode` controls behavior when topology is configured but the
 runtime can't realize it:
@@ -267,8 +272,10 @@ For kube-backed networks, tmpnet assigns pods in each configured
 location the label `tmpnet.avax.network/location=<location>` and targets
 Chaos Mesh rules by that label together with `network_uuid`.
 
-Each directed connection is validated before realization:
+Topology is validated before realization:
 
+- each location must have a unique name
+- each location may only reference node IDs present in the network
 - `From` and `To` must refer to defined locations
 - `Latency` must be set
 - duplicate directed connections are rejected, even if the duplicate
@@ -355,10 +362,10 @@ HOME
 [Top](#table-of-contents)
 
 Network configuration such as default flags (e.g. `--log-level=`),
-runtime defaults (e.g. avalanchego path) and pre-funded private keys
-are stored at `[network-dir]/config.json`. A default for a given flag
-will only be applied to a node if that node does not itself set a
-value for that flag.
+runtime defaults (e.g. avalanchego path), pre-funded private keys, and
+optional network-level topology are stored at `[network-dir]/config.json`.
+A default for a given flag will only be applied to a node if that node
+does not itself set a value for that flag.
 
 ### Genesis
 [Top](#table-of-contents)

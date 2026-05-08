@@ -136,6 +136,48 @@ func TestTopologyDuplicateNodeMembershipFails(t *testing.T) {
 	require.ErrorIs(err, errTopologyNodeAssignedMultipleLocation)
 }
 
+func TestTopologyDuplicateLocationNameFails(t *testing.T) {
+	require := require.New(t)
+
+	network := NewDefaultNetwork("test")
+	network.Nodes = NewNodesOrPanic(2)
+	network.DefaultRuntimeConfig.Kube = &KubeRuntimeConfig{Namespace: "tmpnet", IngressHost: "localhost"}
+	require.NoError(network.EnsureDefaultConfig(t.Context(), logging.NoLog{}))
+	for _, node := range network.Nodes {
+		require.NoError(network.EnsureNodeConfig(node))
+	}
+	firstNodeID := network.Nodes[0].NodeID
+	secondNodeID := network.Nodes[1].NodeID
+	network.Topology = &Topology{
+		Locations: []Location{
+			{Name: "a", NodeIDs: []ids.NodeID{firstNodeID}},
+			{Name: "a", NodeIDs: []ids.NodeID{secondNodeID}},
+		},
+	}
+
+	_, err := network.topologyLocationNames()
+	require.ErrorIs(err, errTopologyDuplicateLocation)
+}
+
+func TestTopologyLocationUnknownNodeFails(t *testing.T) {
+	require := require.New(t)
+
+	network := NewDefaultNetwork("test")
+	network.Nodes = NewNodesOrPanic(1)
+	network.DefaultRuntimeConfig.Kube = &KubeRuntimeConfig{Namespace: "tmpnet", IngressHost: "localhost"}
+	require.NoError(network.EnsureDefaultConfig(t.Context(), logging.NoLog{}))
+	for _, node := range network.Nodes {
+		require.NoError(network.EnsureNodeConfig(node))
+	}
+	unknownNodeID := ids.GenerateTestNodeID()
+	network.Topology = &Topology{
+		Locations: []Location{{Name: "a", NodeIDs: []ids.NodeID{unknownNodeID}}},
+	}
+
+	_, err := network.topologyLocationNames()
+	require.ErrorIs(err, errTopologyUnknownNodeReference)
+}
+
 func TestTopologyModeDefaultsToRequired(t *testing.T) {
 	require := require.New(t)
 

@@ -58,6 +58,8 @@ Current support is intentionally narrow:
 - unsupported runtimes can either fail (`required`) or warn and continue
   (`best-effort`)
 - topology is treated as fixed for the lifetime of a network
+- topology is persisted as part of the network-level config on disk
+- topology declarations are validated before realization
 
 Current non-goals:
 
@@ -88,6 +90,14 @@ A location groups nodes by a human-meaningful name. A connection specifies:
 - `To`
 - `Latency`
 
+Before realization, tmpnet validates that:
+
+- location names are unique
+- referenced node IDs exist in the network
+- connection endpoints refer to defined locations
+- connection latency is set
+- directed connections are not duplicated
+
 Example:
 
 ```go
@@ -115,12 +125,12 @@ two locations.
 
 For kube-backed networks, tmpnet currently:
 
-1. starts the relevant node pods
-2. applies topology before the final healthy wait completes
+1. starts the relevant node pods and waits for initial node health
+2. applies topology after that initial healthy state is reached
 3. removes topology resources during `Network.Stop`
 
-In other words, topology is treated as part of the network's steady-state
-execution environment, not as a separate post-start test step.
+In other words, topology is currently part of the network's steady-state
+execution environment, but not yet part of the initial readiness check.
 
 ### Runtime and cluster requirements
 
@@ -215,15 +225,17 @@ continuing would hide a misconfigured test environment.
 
 #### Why topology is integrated into network lifecycle
 
-Topology is not implemented as an ad hoc post-start helper. The intent is for
-the network to *be* in that topology while it becomes ready for use.
+Topology is not implemented as an ad hoc post-start helper that lives entirely
+outside tmpnet lifecycle. Tmpnet owns both application and teardown of the
+realized topology resources.
 
-In the current implementation, kube resources are applied after node pods exist
-and before the final healthy wait completes. Removal happens during
+In the current implementation, kube resources are applied after node pods have
+already reached their initial healthy state. Removal happens during
 `Network.Stop`.
 
 That reflects the current model: topology is part of the network's intended
-steady-state execution environment.
+steady-state execution environment, even though readiness is not yet proven
+under topology during bootstrap.
 
 ### Alternatives considered
 
@@ -306,6 +318,10 @@ intended behavior".
 This validation is also wired into a dedicated topology-oriented path in CI so
 that kube realization is exercised separately from the focused unit tests.
 
+Current focused tests cover topology validation rules such as duplicate
+connections and duplicate node membership. They should also remain the place to
+extend coverage for other topology declaration errors.
+
 #### Runtime vs admin kube contexts in e2e
 
 The end-to-end path distinguishes:
@@ -335,6 +351,9 @@ Preserve these invariants unless the design is being reconsidered deliberately:
 
 The current design should be reconsidered if any of these become true:
 
+- bootstrap/readiness should be proven under topology rather than only after an
+  initial healthy state without topology
+
 - tmpnet gains an explicit destroy/delete lifecycle distinct from `Stop`
 - non-kube runtimes need real topology support rather than a warning/fail split
 - topology mutation after startup becomes a real product requirement
@@ -360,14 +379,14 @@ Durable questions worth revisiting:
 
 Relevant code and tests:
 
-- `tests/fixture/tmpnet/network.go`
-- `tests/fixture/tmpnet/node.go`
-- `tests/fixture/tmpnet/topology_runtime.go`
-- `tests/fixture/tmpnet/topology_runtime_test.go`
-- `tests/fixture/tmpnet/e2e/e2e_test.go`
-- `tests/fixture/tmpnet/flags/kubeconfig.go`
-- `scripts/tests.topology.kube.kind.sh`
+- [`network.go`](./network.go)
+- [`node.go`](./node.go)
+- [`topology_runtime.go`](./topology_runtime.go)
+- [`topology_runtime_test.go`](./topology_runtime_test.go)
+- [`e2e/e2e_test.go`](./e2e/e2e_test.go)
+- [`flags/kubeconfig.go`](./flags/kubeconfig.go)
+- [`../../scripts/tests.topology.kube.kind.sh`](../../scripts/tests.topology.kube.kind.sh)
 
 Related package documentation:
 
-- `tests/fixture/tmpnet/README.md`
+- [`README.md`](./README.md)
