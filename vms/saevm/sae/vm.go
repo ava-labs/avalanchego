@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
@@ -47,10 +48,7 @@ import (
 // canonical on disk with its post-execution state committed before [NewVM] is
 // called.
 type VM struct {
-	*p2p.Network
-	Peers          *p2p.Peers
-	ValidatorPeers *p2p.Validators
-
+	network *network.Network
 	hooks   hook.Points
 	config  Config
 	snowCtx *snow.Context
@@ -113,12 +111,11 @@ func NewVM[T hook.Transaction](
 	snowCtx *snow.Context,
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
-	sender snowcommon.AppSender,
+	network *network.Network,
 ) (_ *VM, retErr error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-
 	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
@@ -128,6 +125,7 @@ func NewVM[T hook.Transaction](
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
 	vm := &VM{
+		network: network,
 		hooks:   hooks,
 		config:  cfg,
 		snowCtx: snowCtx,
@@ -226,16 +224,11 @@ func NewVM[T hook.Transaction](
 	}
 
 	{ // ==========  P2P Gossip  ==========
-		network, peers, validatorPeers, err := newNetwork(snowCtx, sender, reg)
-		if err != nil {
-			return nil, fmt.Errorf("newNetwork(...): %v", err)
-		}
-
 		const pullGossipPeriod = time.Second
 		handler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 			snowCtx.NodeID,
-			network,
-			validatorPeers,
+			network.Network,
+			network.ValidatorPeers,
 			vm.mempool,
 			txgossip.Marshaller{},
 			gossip.SystemConfig{
@@ -267,9 +260,6 @@ func NewVM[T hook.Transaction](
 			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
 		}()
 
-		vm.Network = network
-		vm.Peers = peers
-		vm.ValidatorPeers = validatorPeers
 		vm.mempool.RegisterPushGossiper(pushGossiper)
 		vm.toClose = append(vm.toClose, closerFunc(func() error {
 			cancel()
