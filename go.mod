@@ -14,9 +14,9 @@ module github.com/ava-labs/avalanchego
 //   - docs/bazel.md
 //   - nix/go/default.nix (update version and sha256 for supported arches)
 //
-// - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
+// - If updating between minor versions (e.g. 1.25.x -> 1.26.x):
 //   - Consider updating the version of golangci-lint (see tools/external/go.mod)
-go 1.25.8
+go 1.25.10
 
 require (
 	connectrpc.com/connect v1.18.1
