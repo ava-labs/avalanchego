@@ -114,7 +114,7 @@ var _ = e2e.DescribePChain("[Auto Renewed Validators] [Reward Eligibility]", fun
 				configOwner,
 				delegationShares,
 				autoCompoundRewardShares,
-				stakingPeriod,
+				uint64(stakingPeriod.Seconds()),
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
