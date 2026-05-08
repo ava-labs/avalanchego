@@ -84,7 +84,7 @@ func TestDispatcher_FailurePaths(t *testing.T) {
 		{
 			name:    "no peer to send to",
 			handler: p2p.NoOpHandler{},
-			wantErr: ErrNoPeers,
+			wantErr: errNoPeers,
 		},
 		{
 			name:  "handler returns AppError",
@@ -94,13 +94,13 @@ func TestDispatcher_FailurePaths(t *testing.T) {
 					return nil, &common.AppError{Code: 42, Message: "boom"}
 				},
 			},
-			wantErr: ErrHandlerFailed,
+			wantErr: errHandlerFailed,
 		},
 		{
 			name:    "response bytes are not valid proto",
 			peers:   []ids.NodeID{nodeID},
 			handler: echoHandler([]byte{0xff, 0xff, 0xff}),
-			wantErr: ErrUnmarshalResponse,
+			wantErr: errUnmarshalResponse,
 		},
 	}
 
