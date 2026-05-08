@@ -13,6 +13,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
@@ -191,7 +192,12 @@ func TestExecutionMetrics(t *testing.T) {
 
 	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
 	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	require.Equal(t, float64(b.Height()), testutil.ToFloat64(sut.metrics.LastExecutedHeight), "last executed height")
+	// [Executor.afterExecution] updates [Metrics.LastExecutedHeight] after
+	// [blocks.Block.MarkExecuted] returns, so the gauge can lag behind
+	// [blocks.Block.WaitUntilExecuted] unblocking.
+	require.Eventually(t, func() bool {
+		return testutil.ToFloat64(sut.metrics.LastExecutedHeight) == float64(b.Height())
+	}, time.Second, 10*time.Millisecond, "last executed height")
 }
 
 func TestReceiptPropagation(t *testing.T) {
