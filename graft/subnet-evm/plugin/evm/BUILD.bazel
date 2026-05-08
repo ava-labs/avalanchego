@@ -145,7 +145,6 @@ graft_go_test(
         "//graft/evm/constants",
         "//graft/evm/firewood",
         "//graft/evm/rpc",
-        "//graft/evm/sync/client",
         "//graft/evm/sync/engine",
         "//graft/evm/sync/synctest",
         "//graft/evm/utils",

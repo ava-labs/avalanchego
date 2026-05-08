@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
@@ -41,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -227,7 +227,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	require.NoError(t, syncReEnabledVM.Connected(
 		t.Context(),
 		vmSetup.serverVM.ctx.NodeID,
-		client.StateSyncVersion,
+		version.Current,
 	))
 
 	enabled, err = syncReEnabledVM.StateSyncEnabled(t.Context())
@@ -374,7 +374,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		syncerVM.vm.Connected(
 			t.Context(),
 			serverVM.vm.ctx.NodeID,
-			client.StateSyncVersion,
+			version.Current,
 		),
 	)
 

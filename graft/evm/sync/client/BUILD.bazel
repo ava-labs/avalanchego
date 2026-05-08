@@ -17,7 +17,6 @@ go_library(
         "//graft/evm/sync/handlers",
         "//ids",
         "//network/p2p",
-        "//version",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",

@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -34,7 +33,7 @@ const (
 )
 
 var (
-	defaultPeerVersion = client.StateSyncVersion
+	defaultPeerVersion = version.Current
 
 	_ message.Request = (*HelloRequest)(nil)
 	_                 = (*HelloResponse)(nil)
@@ -488,25 +487,8 @@ func TestNetworkAppRequestAfterShutdown(t *testing.T) {
 	require.NoError(err)
 	net.Shutdown()
 
-	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, nil))
-	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, nil))
-}
-
-// Peers connecting below client.StateSyncVersion are silently dropped by the
-// tracker, so SendSyncedAppRequestAny finds no usable peer.
-func TestConnectBelowStateSyncVersionFiltered(t *testing.T) {
-	codecManager := buildCodec(t, TestMessage{})
-	ctx := snowtest.Context(t, snowtest.CChainID)
-	net, err := NewNetwork(ctx, testAppSender{}, codecManager, 1, prometheus.NewRegistry())
-	require.NoError(t, err)
-
-	require.NoError(t, net.Connected(t.Context(), ids.GenerateTestNodeID(), &version.Application{}))
-
-	requestBytes, err := message.RequestToBytes(codecManager, TestMessage{Message: "hi"})
-	require.NoError(t, err)
-
-	_, _, err = net.SendSyncedAppRequestAny(t.Context(), requestBytes)
-	require.ErrorIs(t, err, errNoPeersFound)
+	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, newWaitingResponseHandler()))
+	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, newWaitingResponseHandler()))
 }
 
 // SendSyncedAppRequestAny must not block when called after Shutdown.

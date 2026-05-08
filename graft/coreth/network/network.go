@@ -17,7 +17,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -123,10 +122,7 @@ type network struct {
 }
 
 // NewNetwork constructs a [Network] uniting the legacy synchronous message
-// handling with the new [p2p.Network]. The peer tracker filters out peers
-// below [client.StateSyncVersion], so [Network.Sample] is only accurate for
-// state-sync consumers. Do not wire this Network as a [p2p.NodeSampler] for
-// non-sync flows.
+// handling with the new [p2p.Network].
 func NewNetwork(
 	ctx *snow.Context,
 	appSender common.AppSender,
@@ -155,7 +151,7 @@ func NewNetwork(
 		"sync_peer_tracker",
 		registerer,
 		set.Of(ctx.NodeID),
-		client.StateSyncVersion,
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create peer tracker: %w", err)
@@ -246,11 +242,8 @@ func (n *network) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if n.closed.Get() {
 		n.activeAppRequests.Release(1)
-		// Unblock synchronous waiters, otherwise they block until ctx expiry.
-		if responseHandler != nil {
-			_ = responseHandler.OnFailure()
-		}
-		return nil
+		// Unblock synchronous waiters.
+		return responseHandler.OnFailure()
 	}
 
 	// If the context was cancelled, we can skip sending this request.
@@ -441,10 +434,7 @@ func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 	}
 
 	// [p2p.PeerTracker] filters out self via the ignoredNodes set passed at construction.
-	// Skip when nodeVersion is unknown to avoid the tracker's nil deref.
-	if nodeVersion != nil {
-		n.peers.Connected(nodeID, nodeVersion)
-	}
+	n.peers.Connected(nodeID, nodeVersion)
 
 	return n.sdkNetwork.Connected(ctx, nodeID, nodeVersion)
 }

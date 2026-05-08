@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client/stats"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/version"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -36,11 +35,6 @@ const (
 )
 
 var (
-	StateSyncVersion = &version.Application{
-		Major: 1,
-		Minor: 7,
-		Patch: 13,
-	}
 	errEmptyResponse          = errors.New("empty response")
 	errTooManyBlocks          = errors.New("response contains more blocks than requested")
 	errHashMismatch           = errors.New("hash does not match expected value")
