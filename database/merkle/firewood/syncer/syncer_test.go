@@ -151,7 +151,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	}()
 	wantRoot := fillDB(t, r, serverDB, serverKeys)
 
-	var syncer *sync.Syncer[*RangeProof, struct{}]
+	var syncer *sync.Syncer[*RangeProof, *ChangeProof]
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
 
