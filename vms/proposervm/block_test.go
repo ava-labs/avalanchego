@@ -9,6 +9,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -650,167 +652,42 @@ func TestFailedToCalculateExpectedProposerLogLevel(t *testing.T) {
 	}
 }
 
-func TestBuildBlockErrClosedLogsWarn(t *testing.T) {
-	testCases := []struct {
-		name            string
-		setupMock       func(*validatorstest.State)
-		expectedMessage string
+func TestLogUnexpectedPChainError(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       error
+		wantLevel logging.Level
 	}{
 		{
-			name: "GetMinimumHeight returns ErrClosed",
-			setupMock: func(valState *validatorstest.State) {
-				valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
-					return 0, database.ErrClosed
-				}
-			},
-			expectedMessage: "unexpected build block failure",
+			name:      "ErrClosed logs at Warn",
+			err:       database.ErrClosed,
+			wantLevel: logging.Warn,
 		},
 		{
-			name: "ExpectedProposer returns ErrClosed",
-			setupMock: func(valState *validatorstest.State) {
-				valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-					return nil, database.ErrClosed
-				}
-			},
-			expectedMessage: "unexpected build block failure",
+			name:      "wrapped ErrClosed logs at Warn",
+			err:       fmt.Errorf("getting height: %w", database.ErrClosed),
+			wantLevel: logging.Warn,
+		},
+		{
+			name:      "unrelated error logs at Error",
+			err:       errors.New("boom"),
+			wantLevel: logging.Error,
 		},
 	}
-
-	for _, test := range testCases {
+	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
+			l, logs := newObservedLogger()
+			logUnexpectedPChainError(l, test.err, "msg")
 
-			coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
-			t.Cleanup(func() {
-				require.NoError(t, proVM.Shutdown(ctx))
-			})
-
-			coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
-			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-				return coreParentBlk, nil
-			}
-			coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-				switch {
-				case bytes.Equal(b, coreParentBlk.Bytes()):
-					return coreParentBlk, nil
-				case bytes.Equal(b, snowmantest.GenesisBytes):
-					return snowmantest.Genesis, nil
-				default:
-					return nil, errUnknownBlock
-				}
-			}
-
-			parentBlk, err := proVM.BuildBlock(ctx)
-			require.NoError(t, err)
-			require.NoError(t, parentBlk.Verify(ctx))
-			require.NoError(t, parentBlk.Accept(ctx))
-			require.NoError(t, proVM.SetPreference(ctx, parentBlk.ID()))
-
-			test.setupMock(valState)
-
-			coreChildBlk := snowmantest.BuildChild(coreParentBlk)
-			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-				return coreChildBlk, nil
-			}
-
-			var logged bool
-			loggingCore := logging.NewWrappedCore(logging.Warn, logging.Discard, logging.Plain.ConsoleEncoder())
-			proVM.ctx.Log = logging.NewLogger("", loggingCore).WithOptions(zap.Hooks(func(e zapcore.Entry) error {
-				require.False(t, logged, "expected exactly one log entry")
-				logged = true
-				require.Equal(t, zapcore.Level(logging.Warn), e.Level)
-				require.Equal(t, test.expectedMessage, e.Message)
-				return nil
-			}))
-
-			_, err = proVM.BuildBlock(ctx)
-			require.ErrorIs(t, err, database.ErrClosed)
-			require.True(t, logged, "expected log entry was not emitted")
+			require.Equal(t, 1, logs.Len())
+			entry := logs.All()[0]
+			require.Equal(t, zapcore.Level(test.wantLevel), entry.Level)
+			require.Equal(t, "msg", entry.Message)
 		})
 	}
 }
 
-func TestVerifyBlockErrClosedLogsWarn(t *testing.T) {
-	testCases := []struct {
-		name            string
-		setupMock       func(*validatorstest.State)
-		expectedMessage string
-	}{
-		{
-			name: "GetCurrentHeight returns ErrClosed",
-			setupMock: func(valState *validatorstest.State) {
-				valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
-					return 0, database.ErrClosed
-				}
-			},
-			expectedMessage: "block verification failed",
-		},
-		{
-			name: "ExpectedProposer returns ErrClosed",
-			setupMock: func(valState *validatorstest.State) {
-				valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-					return nil, database.ErrClosed
-				}
-			},
-			expectedMessage: "unexpected block verification failure",
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := t.Context()
-
-			coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
-			t.Cleanup(func() {
-				require.NoError(t, proVM.Shutdown(ctx))
-			})
-
-			coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
-			coreChildBlk := snowmantest.BuildChild(coreParentBlk)
-			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-				return coreParentBlk, nil
-			}
-			coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-				switch {
-				case bytes.Equal(b, coreParentBlk.Bytes()):
-					return coreParentBlk, nil
-				case bytes.Equal(b, coreChildBlk.Bytes()):
-					return coreChildBlk, nil
-				case bytes.Equal(b, snowmantest.GenesisBytes):
-					return snowmantest.Genesis, nil
-				default:
-					return nil, errUnknownBlock
-				}
-			}
-
-			parentBlk, err := proVM.BuildBlock(ctx)
-			require.NoError(t, err)
-			require.NoError(t, parentBlk.Verify(ctx))
-			require.NoError(t, parentBlk.Accept(ctx))
-			require.NoError(t, proVM.SetPreference(ctx, parentBlk.ID()))
-
-			coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-				return coreChildBlk, nil
-			}
-
-			childBlk, err := proVM.BuildBlock(ctx)
-			require.NoError(t, err)
-
-			test.setupMock(valState)
-
-			var logged bool
-			loggingCore := logging.NewWrappedCore(logging.Warn, logging.Discard, logging.Plain.ConsoleEncoder())
-			proVM.ctx.Log = logging.NewLogger("", loggingCore).WithOptions(zap.Hooks(func(e zapcore.Entry) error {
-				require.False(t, logged, "expected exactly one log entry")
-				logged = true
-				require.Equal(t, zapcore.Level(logging.Warn), e.Level)
-				require.Equal(t, test.expectedMessage, e.Message)
-				return nil
-			}))
-
-			err = childBlk.Verify(ctx)
-			require.ErrorIs(t, err, database.ErrClosed)
-			require.True(t, logged, "expected log entry was not emitted")
-		})
-	}
+func newObservedLogger() (logging.Logger, *observer.ObservedLogs) {
+	core, logs := observer.New(zapcore.Level(logging.Verbo))
+	return logging.NewLogger("", logging.WrappedCore{Core: core}), logs
 }
