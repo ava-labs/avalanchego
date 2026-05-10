@@ -312,7 +312,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		case coreBlk.ID():
 			return coreBlk, nil
 		default:
-			require.FailNow("attempt to get unknown block")
+			t.Fatal("attempt to get unknown block")
 			return nil, nil
 		}
 	}
@@ -337,7 +337,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		case secondCoreBlk.ID():
 			return secondCoreBlk, nil
 		default:
-			require.FailNow("attempt to get unknown block")
+			t.Fatal("attempt to get unknown block")
 			return nil, nil
 		}
 	}

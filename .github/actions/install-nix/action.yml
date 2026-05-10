@@ -10,20 +10,20 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
+    - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
       with:
         github_access_token: ${{ inputs.github_token }}
     - run: nix develop --command echo "dependencies installed"
       shell: bash
     # Cache Go modules (architecture-independent)
-    - uses: actions/cache@v4
+    - uses: actions/cache@v5
       id: go-mod-cache
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
         restore-keys: ${{ runner.os }}-go-mod-
     # Cache Go build cache (architecture-specific)
-    - uses: actions/cache@v4
+    - uses: actions/cache@v5
       with:
         path: ~/.cache/go-build
         key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}

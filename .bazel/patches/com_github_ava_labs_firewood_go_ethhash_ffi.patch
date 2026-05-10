@@ -2,7 +2,7 @@ diff --git a/BUILD.bazel b/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/BUILD.bazel
-@@ -0,0 +1,59 @@
+@@ -0,0 +1,60 @@
 +# gazelle:ignore
 +load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 +
@@ -44,6 +44,7 @@ new file mode 100644
 +        "@com_github_prometheus_client_golang//prometheus",
 +        "@com_github_prometheus_client_model//go",
 +        "@com_github_prometheus_common//expfmt",
++        "@org_golang_google_protobuf//proto",
 +    ],
 +)
 +

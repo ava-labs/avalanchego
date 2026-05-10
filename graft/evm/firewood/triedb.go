@@ -41,6 +41,8 @@ var (
 	proposeOnProposeCount  = metrics.GetOrRegisterCounter("firewood/triedb/propose/proposal/count", nil)
 	explicitlyDroppedCount = metrics.GetOrRegisterCounter("firewood/triedb/drop/count", nil)
 
+	ErrNoRevisionFound = errors.New("no revision found")
+
 	errNoProposalFound         = errors.New("no proposal found")
 	errUnexpectedProposalFound = errors.New("unexpected proposal found")
 )
@@ -145,15 +147,9 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	}
 	path := filepath.Join(config.DatabaseDir, firewoodDir)
 
-	commitCount := uint64(1)
-	// Persist every N revisions only if not an archival node. Archive nodes must
-	// persist every commit so that all roots are recorded in RootStore and remain
-	// queryable after eviction from memory.
-	if !config.Archive {
-		// The Firewood constructor will check that commitCount is nonzero.
-		minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
-		commitCount = min(config.DeferredCommitInterval, minDeferredPersistenceCommitCount)
-	}
+	// The Firewood constructor will check that commitCount is nonzero.
+	minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
+	commitCount := min(config.DeferredCommitInterval, minDeferredPersistenceCommitCount)
 
 	options := []ffi.Option{
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
@@ -279,10 +275,7 @@ func (t *TrieDB) Close() error {
 	t.possible = nil
 
 	// encourage finalizers to run before we wait, otherwise the database won't close properly.
-	// N.B.: this is wrapped in a user-defined function as a workaround for
-	// https://github.com/golang/go/issues/78059.
-	// See https://github.com/ava-labs/firewood/issues/1679 for full details.
-	go func() { runtime.GC() }()
+	go runtime.GC()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -592,7 +585,7 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, ops []ffi.BatchOp) (com
 func (t *TrieDB) Reader(root common.Hash) (database.Reader, error) {
 	revision, err := t.Firewood.Revision(ffi.Hash(root))
 	if err != nil {
-		return nil, fmt.Errorf("retrieve revision at root %s: %w", root.Hex(), err)
+		return nil, fmt.Errorf("%w: expected root %s, got %w", ErrNoRevisionFound, root.Hex(), err)
 	}
 	return &reader{revision: revision}, nil
 }

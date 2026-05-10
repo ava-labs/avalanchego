@@ -27,7 +27,6 @@ go_library(
         "//utils/crypto/secp256k1",
         "//utils/logging",
         "//utils/math",
-        "//utils/rpc",
         "//utils/set",
         "//vms/avm",
         "//vms/components/avax",

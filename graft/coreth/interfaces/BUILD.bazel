@@ -1,10 +1,14 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "interfaces",
     srcs = ["interfaces.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/interfaces",
-    visibility = ["//visibility:public"],
     deps = [
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",

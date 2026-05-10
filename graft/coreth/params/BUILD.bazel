@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "params",
     srcs = [
@@ -12,7 +17,6 @@ go_library(
         "protocol_params_ext.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/params",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/nativeasset",
         "//graft/coreth/params/extras",

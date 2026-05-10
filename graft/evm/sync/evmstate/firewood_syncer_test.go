@@ -81,7 +81,7 @@ func TestFirewoodSync(t *testing.T) {
 
 			// Code queue should be closed.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
-			require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+			require.ErrorIs(t, err, code.ErrQueueClosed)
 		})
 	}
 }
@@ -135,7 +135,7 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 
 			// After finalize, the queue should reject new code additions.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
-			require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+			require.ErrorIs(t, err, code.ErrQueueClosed)
 		})
 	}
 }
@@ -154,7 +154,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	)
 
 	// Create the producer code queue.
-	codeQueue, err := code.NewQueue(clientState.DiskDB().(ethdb.Database), make(chan struct{}))
+	codeQueue, err := code.NewQueue(clientState.DiskDB().(ethdb.Database))
 	require.NoError(t, err, "NewCodeQueue()")
 
 	// Create the consumer code syncer.
@@ -188,14 +188,12 @@ func createDB(t *testing.T) state.Database {
 	triedbConfig := &triedb.Config{
 		DBOverride: config.BackendConstructor,
 	}
-	// Create the state database using libevm's state package, then wrap it with
-	// firewood.NewStateAccessor to avoid an import cycle between firewood and state packages.
-	internalState := state.NewDatabaseWithConfig(diskdb, triedbConfig)
-	tdb := internalState.TrieDB().Backend().(*firewood.TrieDB)
+
+	cache := state.NewDatabaseWithConfig(diskdb, triedbConfig)
 	t.Cleanup(func() {
-		require.NoError(t, tdb.Close())
+		require.NoError(t, cache.TrieDB().Close())
 	})
-	return firewood.NewStateAccessor(internalState, tdb)
+	return cache
 }
 
 func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database, accounts map[*utilstest.Key]*types.StateAccount) {

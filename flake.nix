@@ -61,6 +61,7 @@
             # Linters
             shellcheck
             buildifier
+            yamlfmt
 
             # Protobuf
             buf
