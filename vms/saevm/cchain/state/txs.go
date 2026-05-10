@@ -1,16 +1,14 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// This file mirrors graft/coreth/plugin/evm/atomic/state/atomic_repository.go.
-// References to the old code are temporary; they will be removed once that
-// package is deleted.
-
 package state
 
 import (
 	"fmt"
 	"iter"
-	"slices"
+
+	// Imported for [state.AtomicRepository] comment resolution.
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -19,7 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
-// Tx index database layout (must remain compatible with the old coreth code):
+// Tx index database layout — these prefixes must remain byte-compatible
+// with entries written by [state.AtomicRepository] so the chain can read
+// entries produced by older nodes:
 //
 //	atomicTxDB     / [txID(32)]       -> [height(8 BE)] [len(4 BE)] [tx_bytes]
 //	atomicHeightTxDB / [height(8 BE)] -> codec.Marshal(0, []*tx.Tx)
@@ -28,40 +28,35 @@ var (
 	heightToTxsPrefix = prefixdb.MakePrefix([]byte("atomicHeightTxDB"))
 )
 
-// TxsAndHeight pairs a slice of accepted transactions with the block height
-// they were accepted at. Returned by [State.IterateTxsFromHeight].
-type TxsAndHeight struct {
-	Txs    []*tx.Tx
-	Height uint64
+// txsAndHeight pairs a slice of accepted transactions with the block height
+// they were accepted at.
+type txsAndHeight struct {
+	txs    []*tx.Tx
+	height uint64
 }
 
-// writeTxs indexes txs by ID and by height into batch. Txs are sorted by ID
-// before writing to match the order produced by the legacy txID-only
-// migration that pre-AP5 nodes ran.
+// writeSortedTxs indexes txs by ID and by height into batch. Txs must be
+// sorted by ID to match the order [state.AtomicRepository.write] used; the
+// height index must contain the same bytes here.
 //
-// Mirrors AtomicRepository.write (atomic_repository.go:256).
-func writeTxs(batch database.KeyValueWriter, height uint64, txs []*tx.Tx) error {
-	if len(txs) == 0 {
+// Mirrors [state.AtomicRepository.write].
+func writeSortedTxs(batch database.KeyValueWriter, height uint64, sorted []*tx.Tx) error {
+	if len(sorted) == 0 {
 		return nil
 	}
 
-	txs = slices.Clone(txs)
-	slices.SortFunc(txs, func(a, b *tx.Tx) int {
-		return a.ID().Compare(b.ID())
-	})
-
-	for _, tx := range txs {
+	for _, tx := range sorted {
 		if err := writeTxByID(batch, height, tx); err != nil {
 			return err
 		}
 	}
-	return writeTxsByHeight(batch, height, txs)
+	return writeTxsByHeight(batch, height, sorted)
 }
 
-// readTxByID returns the tx with the given ID along with the block height it
-// was accepted at.
+// readTxByID returns the tx with the given ID along with the block height
+// it was accepted at.
 //
-// Mirrors AtomicRepository.GetByTxID (atomic_repository.go:199).
+// Mirrors [state.AtomicRepository.GetByTxID].
 func readTxByID(db database.KeyValueReader, txID ids.ID) (*tx.Tx, uint64, error) {
 	b, err := db.Get(prefixdb.PrefixKey(txIDToTxPrefix, txID[:]))
 	if err != nil {
@@ -107,11 +102,13 @@ func writeTxsByHeight(db database.KeyValueWriter, height uint64, txs []*tx.Tx) e
 }
 
 // iterateTxsFromHeight returns an iterator yielding (txs, height) entries
-// starting at startHeight in ascending height order.
+// starting at startHeight in ascending height order. Heights with no txs
+// are skipped (the caller is expected to know that empty heights don't
+// change the trie).
 //
-// Mirrors AtomicRepository.IterateByHeight (atomic_repository.go:354).
-func iterateTxsFromHeight(db database.Iteratee, startHeight uint64) iter.Seq2[TxsAndHeight, error] {
-	return func(yield func(TxsAndHeight, error) bool) {
+// Mirrors [state.AtomicRepository.IterateByHeight].
+func iterateTxsFromHeight(db database.Iteratee, startHeight uint64) iter.Seq2[txsAndHeight, error] {
+	return func(yield func(txsAndHeight, error) bool) {
 		it := db.NewIteratorWithStartAndPrefix(
 			prefixdb.PrefixKey(heightToTxsPrefix, database.PackUInt64(startHeight)),
 			heightToTxsPrefix,
@@ -121,23 +118,23 @@ func iterateTxsFromHeight(db database.Iteratee, startHeight uint64) iter.Seq2[Tx
 		for it.Next() {
 			height, err := database.ParseUInt64(it.Key()[len(heightToTxsPrefix):])
 			if err != nil {
-				yield(TxsAndHeight{}, err)
+				yield(txsAndHeight{}, err)
 				return
 			}
 
 			txs, err := tx.ParseSlice(it.Value())
 			if err != nil {
-				yield(TxsAndHeight{}, err)
+				yield(txsAndHeight{}, err)
 				return
 			}
 
-			if !yield(TxsAndHeight{Txs: txs, Height: height}, nil) {
+			if !yield(txsAndHeight{txs: txs, height: height}, nil) {
 				return
 			}
 		}
 
 		if err := it.Error(); err != nil {
-			yield(TxsAndHeight{}, err)
+			yield(txsAndHeight{}, err)
 		}
 	}
 }

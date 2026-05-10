@@ -1,10 +1,6 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// This file mirrors graft/coreth/plugin/evm/atomic/state/atomic_trie.go.
-// References to the old code are temporary; they will be removed once that
-// package is deleted.
-
 package state
 
 import (
@@ -18,6 +14,8 @@ import (
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
 
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
@@ -29,12 +27,13 @@ import (
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
-// Database layout (must remain compatible with the old coreth code so that
-// migrations don't require a rewrite of these prefixes):
+// Database layout — these prefixes must remain byte-compatible with the
+// indices written by [state.AtomicTrie] so the chain can read entries
+// produced by older nodes:
 //
 //	atomicTrieMetaDB / "atomicTrieLastCommittedBlock" -> uint64(8 BE)
 //	atomicTrieMetaDB / [height(8 BE)]                 -> trie root (32 bytes)
-//	atomicTrieMetaDB / "atomicTrieLastAppliedBlock"   -> uint64(8 BE) [new, not in old]
+//	atomicTrieMetaDB / "atomicTrieLastAppliedBlock"   -> uint64(8 BE)
 //	atomicTrieDB     / <trie node keys>               -> RLP nodes (libevm trie)
 var (
 	trieMetadataPrefix     = prefixdb.MakePrefix([]byte("atomicTrieMetaDB"))
@@ -44,12 +43,15 @@ var (
 	trieStoragePrefix = []byte("atomicTrieDB")
 )
 
-// trieKeyLength matches AtomicTrie.TrieKeyLength in the old code: each leaf
-// is keyed by [height(8 BE) || blockchainID(32)].
+// trieKeyLength is the length of an atomic trie leaf key, which is laid
+// out as [height(8 BE) || blockchainID(32)].
+//
+// Matches [state.TrieKeyLength].
 const trieKeyLength = wrappers.LongLen + ids.IDLen
 
-// Memory cap for the in-memory trieDB between commits. Matches old coreth's
-// atomicTrieMemoryCap (atomic_trie.go:33).
+// Memory cap for the in-memory trieDB between commits.
+//
+// Matches [state.AtomicTrie.memoryCap].
 const (
 	trieMemoryCap     = 64 * units.MiB
 	trieMemoryCapTrim = trieMemoryCap - ethdb.IdealBatchSize
@@ -136,136 +138,90 @@ func newTrieDB(avaDB database.Database) *triedb.Database {
 	)
 }
 
-// nearestCommitHeight returns the largest multiple of commitInterval that is
-// less than or equal to height. Mirrors atomic_trie.go:126.
-func nearestCommitHeight(height, commitInterval uint64) uint64 {
-	return height - (height % commitInterval)
-}
-
-// trieState owns the in-memory atomic trie. It tracks the in-memory tip
-// (lastAcceptedRoot) and the height of the most recent on-disk commit.
-//
-// Mirrors AtomicTrie in graft/coreth/plugin/evm/atomic/state/atomic_trie.go.
-type trieState struct {
-	trieDB              *triedb.Database
-	commitInterval      uint64
-	lastAcceptedRoot    common.Hash
-	lastCommittedHeight uint64
-}
-
-// newTrieState initializes the in-memory trie state from db. If the on-disk
-// last-committed height is above lastAcceptedHeight (which can happen if
-// state was pruned back), it falls back to the nearest commit at or below
-// lastAcceptedHeight.
-//
-// Mirrors newAtomicTrie in atomic_trie.go:52.
-func newTrieState(db database.Database, lastAcceptedHeight, commitInterval uint64) (*trieState, error) {
-	root, height, err := readLastCommittedRoot(db)
-	if err != nil {
-		return nil, err
-	}
-
-	if height > lastAcceptedHeight {
-		height = nearestCommitHeight(lastAcceptedHeight, commitInterval)
-		root, err = readCommittedRoot(db, height)
-		if err != nil {
-			return nil, fmt.Errorf("loading committed root at fallback height %d: %w", height, err)
-		}
-	}
-
-	return &trieState{
-		trieDB:              newTrieDB(db),
-		commitInterval:      commitInterval,
-		lastAcceptedRoot:    root,
-		lastCommittedHeight: height,
-	}, nil
-}
-
-// apply writes ops into the atomic trie at height. The committed-root
+// applyTrie writes ops into the atomic trie at height. The committed-root
 // metadata write (when height crosses a commit boundary) is added to batch;
-// trie node writes are flushed by the underlying trieDB. Returns the new
-// trie root.
+// trie node writes are flushed by the underlying trieDB.
 //
-// Mirrors AtomicBackend.InsertTxs (atomic_backend.go:345) followed by
-// AtomicTrie.AcceptTrie (atomic_trie.go:265).
-func (t *trieState) apply(
+// It merges [state.AtomicBackend.InsertTxs] and [state.AtomicTrie.AcceptTrie].
+func (s *State) applyTrie(
 	batch database.KeyValueWriter,
 	height uint64,
 	ops map[ids.ID]*chainsatomic.Requests,
-) (common.Hash, error) {
-	tr, err := trie.New(trie.TrieID(t.lastAcceptedRoot), t.trieDB)
+) error {
+	tr, err := trie.New(trie.TrieID(s.lastAcceptedRoot), s.trieDB)
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("opening atomic trie at root %s: %w", t.lastAcceptedRoot, err)
+		return fmt.Errorf("opening atomic trie at root %s: %w", s.lastAcceptedRoot, err)
 	}
 
 	for chainID, requests := range ops {
-		valueBytes, err := marshalAtomicRequests(requests)
+		valueBytes, err := c.Marshal(codecVersion, requests)
 		if err != nil {
-			return common.Hash{}, fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
+			return fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
 		}
 
 		keyPacker := wrappers.Packer{Bytes: make([]byte, trieKeyLength)}
 		keyPacker.PackLong(height)
 		keyPacker.PackFixedBytes(chainID[:])
 		if err := tr.Update(keyPacker.Bytes, valueBytes); err != nil {
-			return common.Hash{}, fmt.Errorf("inserting trie key for chain %s: %w", chainID, err)
+			return fmt.Errorf("inserting trie key for chain %s: %w", chainID, err)
 		}
 	}
 
 	root, nodes, err := tr.Commit(false)
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("committing in-memory trie at height %d: %w", height, err)
+		return fmt.Errorf("committing in-memory trie at height %d: %w", height, err)
 	}
 	if nodes != nil {
-		if err := t.trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
-			return common.Hash{}, fmt.Errorf("updating trieDB with new nodes: %w", err)
+		if err := s.trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
+			return fmt.Errorf("updating trieDB with new nodes: %w", err)
 		}
 	}
-	if err := t.trieDB.Reference(root, common.Hash{}); err != nil {
-		return common.Hash{}, fmt.Errorf("referencing root %s: %w", root, err)
+	if err := s.trieDB.Reference(root, common.Hash{}); err != nil {
+		return fmt.Errorf("referencing root %s: %w", root, err)
 	}
 
 	// Bound in-memory trieDB size to prevent OOM if many heights pass between
-	// disk commits. Mirrors AtomicTrie.InsertTrie (atomic_trie.go:251).
-	if _, nodeSize, _ := t.trieDB.Size(); nodeSize > trieMemoryCap {
-		if err := t.trieDB.Cap(trieMemoryCapTrim); err != nil {
-			return common.Hash{}, fmt.Errorf("capping atomic trie at root %s: %w", root, err)
+	// disk commits. Mirrors [state.AtomicTrie.InsertTrie].
+	if _, nodeSize, _ := s.trieDB.Size(); nodeSize > trieMemoryCap {
+		if err := s.trieDB.Cap(trieMemoryCapTrim); err != nil {
+			return fmt.Errorf("capping atomic trie at root %s: %w", root, err)
 		}
 	}
 
 	// Catch up missed commit boundaries using the previous tip
-	// (t.lastAcceptedRoot still holds the prior root here).
-	// Mirrors the for-loop in AtomicTrie.AcceptTrie (atomic_trie.go:269).
-	for nextCommitHeight := t.lastCommittedHeight + t.commitInterval; nextCommitHeight < height; nextCommitHeight += t.commitInterval {
-		if err := t.commit(batch, nextCommitHeight, t.lastAcceptedRoot); err != nil {
-			return common.Hash{}, err
+	// (s.lastAcceptedRoot still holds the prior root here). Mirrors the
+	// for-loop in [state.AtomicTrie.AcceptTrie].
+	for nextCommitHeight := s.lastCommittedHeight + commitInterval; nextCommitHeight < height; nextCommitHeight += commitInterval {
+		if err := s.commitTrie(batch, nextCommitHeight, s.lastAcceptedRoot); err != nil {
+			return err
 		}
 	}
 
-	if height%t.commitInterval == 0 {
-		if err := t.commit(batch, height, root); err != nil {
-			return common.Hash{}, err
+	if height%commitInterval == 0 {
+		if err := s.commitTrie(batch, height, root); err != nil {
+			return err
 		}
 	}
 
 	// Dereference the previous tip. Either it was already committed (no-op)
 	// or the new root references all live data from it.
-	if err := t.trieDB.Dereference(t.lastAcceptedRoot); err != nil {
-		return common.Hash{}, fmt.Errorf("dereferencing prior root %s: %w", t.lastAcceptedRoot, err)
+	if err := s.trieDB.Dereference(s.lastAcceptedRoot); err != nil {
+		return fmt.Errorf("dereferencing prior root %s: %w", s.lastAcceptedRoot, err)
 	}
-	t.lastAcceptedRoot = root
-	return root, nil
+	s.lastAcceptedRoot = root
+	return nil
 }
 
-// commit flushes the trieDB at root and records (height, root) in batch.
-// Mirrors AtomicTrie.Commit (atomic_trie.go:135).
-func (t *trieState) commit(batch database.KeyValueWriter, height uint64, root common.Hash) error {
-	if err := t.trieDB.Commit(root, false); err != nil {
+// Mirrors [state.AtomicTrie.Commit].
+
+// commitTrie flushes the trieDB at root and records (height, root) in batch.
+func (s *State) commitTrie(batch database.KeyValueWriter, height uint64, root common.Hash) error {
+	if err := s.trieDB.Commit(root, false); err != nil {
 		return fmt.Errorf("committing trieDB at height %d root %s: %w", height, root, err)
 	}
 	if err := writeCommittedRoot(batch, height, root); err != nil {
 		return err
 	}
-	t.lastCommittedHeight = height
+	s.lastCommittedHeight = height
 	return nil
 }
