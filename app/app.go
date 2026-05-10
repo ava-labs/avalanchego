@@ -4,6 +4,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -33,7 +34,7 @@ var _ App = (*app)(nil)
 type App interface {
 	// Start kicks off the application and returns immediately.
 	// Start should only be called once.
-	Start()
+	Start(ctx context.Context)
 
 	// Stop notifies the application to exit and returns immediately.
 	// Stop should only be called after [Start].
@@ -45,7 +46,7 @@ type App interface {
 	ExitCode() int
 }
 
-func New(config nodeconfig.Config) (App, error) {
+func New(ctx context.Context, config nodeconfig.Config) (App, error) {
 	// Set the data directory permissions to be read write.
 	if err := perms.ChmodR(config.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
 		return nil, fmt.Errorf("failed to restrict the permissions of the database directory with: %w", err)
@@ -71,7 +72,7 @@ func New(config nodeconfig.Config) (App, error) {
 		return nil, err
 	}
 
-	n, err := node.New(&config, logFactory, log)
+	n, err := node.New(ctx, &config, logFactory, log)
 	if err != nil {
 		log.Fatal("failed to initialize node", zap.Error(err))
 		log.Stop()
@@ -86,9 +87,9 @@ func New(config nodeconfig.Config) (App, error) {
 	}, nil
 }
 
-func Run(app App) int {
+func Run(ctx context.Context, app App) int {
 	// start running the application
-	app.Start()
+	app.Start(ctx)
 
 	// register terminationSignals to kill the application
 	terminationSignals := make(chan os.Signal, 1)
@@ -138,7 +139,7 @@ type app struct {
 
 // Start the business logic of the node (as opposed to config reading, etc).
 // Does not block until the node is done.
-func (a *app) Start() {
+func (a *app) Start(ctx context.Context) {
 	// [p.ExitCode] will block until [p.exitWG.Done] is called
 	a.exitWG.Add(1)
 	go func() {
@@ -157,7 +158,7 @@ func (a *app) Start() {
 			a.log.StopOnPanic()
 		}()
 
-		err := a.node.Dispatch()
+		err := a.node.Dispatch(ctx)
 		a.log.Debug("dispatch returned",
 			zap.Error(err),
 		)

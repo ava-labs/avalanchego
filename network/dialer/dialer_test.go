@@ -33,7 +33,11 @@ func TestDialerDialCanceledContext(t *testing.T) {
 func TestDialerDial(t *testing.T) {
 	require := require.New(t)
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := (&net.ListenConfig{}).Listen(
+		t.Context(),
+		"tcp",
+		"127.0.0.1:0",
+	)
 	require.NoError(err)
 
 	listenedAddrPort, err := netip.ParseAddrPort(l.Addr().String())

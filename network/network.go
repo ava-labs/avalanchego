@@ -74,12 +74,13 @@ type Network interface {
 	StartClose()
 
 	// Should only be called once, will run until either a fatal error occurs,
-	// or the network is closed.
-	Dispatch() error
+	// the network is closed, or [ctx] is canceled.
+	// Canceling [ctx] triggers [StartClose].
+	Dispatch(ctx context.Context) error
 
 	// Attempt to connect to this IP. The network will never stop attempting to
 	// connect to this ID.
-	ManuallyTrack(nodeID ids.NodeID, ip netip.AddrPort)
+	ManuallyTrack(ctx context.Context, nodeID ids.NodeID, ip netip.AddrPort)
 
 	// PeerInfo returns information about peers. If [nodeIDs] is empty, returns
 	// info about all peers that have finished the handshake. Otherwise, returns
@@ -507,11 +508,14 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	return areWeAPrimaryNetworkAValidator || n.ipTracker.WantsConnection(nodeID)
 }
 
-func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
+func (n *network) Track(
+	ctx context.Context,
+	claimedIPPorts []*ips.ClaimedIPPort,
+) error {
 	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
 	trackAllSubnets := areWeAPrimaryNetworkAValidator || n.config.ConnectToAllValidators
 	for _, ip := range claimedIPPorts {
-		if err := n.track(ip, trackAllSubnets); err != nil {
+		if err := n.track(ctx, ip, trackAllSubnets); err != nil {
 			return err
 		}
 	}
@@ -523,17 +527,17 @@ func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
 // It is guaranteed that [Connected] will not be called with [nodeID] after this
 // call. Note that this is from the perspective of a single peer object, because
 // a peer with the same ID can reconnect to this network instance.
-func (n *network) Disconnected(nodeID ids.NodeID) {
+func (n *network) Disconnected(ctx context.Context, nodeID ids.NodeID) {
 	n.peersLock.RLock()
 	_, connecting := n.connectingPeers.GetByID(nodeID)
 	peer, connected := n.connectedPeers.GetByID(nodeID)
 	n.peersLock.RUnlock()
 
 	if connecting {
-		n.disconnectedFromConnecting(nodeID)
+		n.disconnectedFromConnecting(ctx, nodeID)
 	}
 	if connected {
-		n.disconnectedFromConnected(peer, nodeID)
+		n.disconnectedFromConnected(ctx, peer, nodeID)
 	}
 }
 
@@ -602,9 +606,16 @@ func (n *network) Peers(
 
 // Dispatch starts accepting connections from other nodes attempting to connect
 // to this node.
-func (n *network) Dispatch() error {
+func (n *network) Dispatch(ctx context.Context) error {
 	go n.runTimers() // Periodically perform operations
 	go n.inboundConnUpgradeThrottler.Dispatch()
+	go func() {
+		select {
+		case <-ctx.Done():
+			n.StartClose()
+		case <-n.onCloseCtx.Done():
+		}
+	}()
 	for n.onCloseCtx.Err() == nil { // Continuously accept new connections
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
@@ -650,7 +661,7 @@ func (n *network) Dispatch() error {
 				zap.Stringer("peerIP", ip),
 			)
 
-			if err := n.upgrade(conn, n.serverUpgrader, true); err != nil {
+			if err := n.upgrade(ctx, conn, n.serverUpgrader, true); err != nil {
 				n.peerConfig.Log.Verbo("failed to upgrade connection",
 					zap.String("direction", "inbound"),
 					zap.Error(err),
@@ -673,7 +684,11 @@ func (n *network) Dispatch() error {
 	return errs.Err
 }
 
-func (n *network) ManuallyTrack(nodeID ids.NodeID, ip netip.AddrPort) {
+func (n *network) ManuallyTrack(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	ip netip.AddrPort,
+) {
 	n.ipTracker.ManuallyTrack(nodeID)
 
 	n.peersLock.Lock()
@@ -691,11 +706,15 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip netip.AddrPort) {
 	if !isTracked {
 		tracked := newTrackedIP(ip)
 		n.trackedIPs[nodeID] = tracked
-		n.dial(nodeID, tracked)
+		n.dial(ctx, nodeID, tracked)
 	}
 }
 
-func (n *network) track(ip *ips.ClaimedIPPort, trackAllSubnets bool) error {
+func (n *network) track(
+	ctx context.Context,
+	ip *ips.ClaimedIPPort,
+	trackAllSubnets bool,
+) error {
 	// To avoid signature verification when the IP isn't needed, we
 	// optimistically filter out IPs. This can result in us not tracking an IP
 	// that we otherwise would have. This case can only happen if the node
@@ -744,7 +763,7 @@ func (n *network) track(ip *ips.ClaimedIPPort, trackAllSubnets bool) error {
 		tracked = newTrackedIP(ip.AddrPort)
 	}
 	n.trackedIPs[ip.NodeID] = tracked
-	n.dial(ip.NodeID, tracked)
+	n.dial(ctx, ip.NodeID, tracked)
 	return nil
 }
 
@@ -837,7 +856,10 @@ func (n *network) samplePeers(
 	)
 }
 
-func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
+func (n *network) disconnectedFromConnecting(
+	ctx context.Context,
+	nodeID ids.NodeID,
+) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
@@ -849,7 +871,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 		if n.ipTracker.WantsConnection(nodeID) {
 			tracked := tracked.trackNewIP(tracked.ip)
 			n.trackedIPs[nodeID] = tracked
-			n.dial(nodeID, tracked)
+			n.dial(ctx, nodeID, tracked)
 		} else {
 			tracked.stopTracking()
 			delete(n.trackedIPs, nodeID)
@@ -859,7 +881,11 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	n.metrics.disconnected.Inc()
 }
 
-func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
+func (n *network) disconnectedFromConnected(
+	ctx context.Context,
+	peer peer.Peer,
+	nodeID ids.NodeID,
+) {
 	n.ipTracker.Disconnected(nodeID)
 	n.router.Disconnected(nodeID)
 
@@ -872,7 +898,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	if ip, wantsConnection := n.ipTracker.GetIP(nodeID); wantsConnection {
 		tracked := newTrackedIP(ip.AddrPort)
 		n.trackedIPs[nodeID] = tracked
-		n.dial(nodeID, tracked)
+		n.dial(ctx, nodeID, tracked)
 	}
 
 	n.metrics.markDisconnected(peer)
@@ -897,7 +923,7 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 // If initiating a connection to [ip] fails, then dial will reattempt. However,
 // there is a randomized exponential backoff to avoid spamming connection
 // attempts.
-func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
+func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 	n.peerConfig.Log.Verbo("attempting to dial node",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("ip", ip.ip),
@@ -997,7 +1023,7 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 				zap.Stringer("peerIP", ip.ip),
 			)
 
-			err = n.upgrade(conn, n.clientUpgrader, false)
+			err = n.upgrade(ctx, conn, n.clientUpgrader, false)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
 					"failed to upgrade, attempting again",
@@ -1020,7 +1046,12 @@ func (n *network) dial(nodeID ids.NodeID, ip *trackedIP) {
 // If the connection is desired by the node, then the resulting upgraded
 // connection will be used to create a new peer. Otherwise the connection will
 // be immediately closed.
-func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool) error {
+func (n *network) upgrade(
+	ctx context.Context,
+	conn net.Conn,
+	upgrader peer.Upgrader,
+	isIngress bool,
+) error {
 	upgradeTimeout := n.peerConfig.Clock.Time().Add(n.config.ReadHandshakeTimeout)
 	if err := conn.SetReadDeadline(upgradeTimeout); err != nil {
 		_ = conn.Close()
@@ -1030,7 +1061,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		return err
 	}
 
-	nodeID, tlsConn, cert, err := upgrader.Upgrade(conn)
+	nodeID, tlsConn, cert, err := upgrader.Upgrade(ctx, conn)
 	if err != nil {
 		_ = conn.Close()
 		n.peerConfig.Log.Verbo("failed to upgrade connection",
@@ -1110,6 +1141,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 	// same [peerConfig.InboundMsgThrottler]. This is guaranteed by the above
 	// de-duplications for [connectingPeers] and [connectedPeers].
 	peer := peer.Start(
+		ctx,
 		n.peerConfig,
 		tlsConn,
 		cert,

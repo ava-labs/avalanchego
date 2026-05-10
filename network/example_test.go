@@ -122,7 +122,11 @@ func ExampleNewTestNetwork() {
 	// gossip will enable connecting to all the remaining nodes in the network.
 	bootstrappers := genesis.SampleBootstrappers(constants.FujiID, 5)
 	for _, bootstrapper := range bootstrappers {
-		network.ManuallyTrack(bootstrapper.ID, bootstrapper.IP)
+		network.ManuallyTrack(
+			context.Background(),
+			bootstrapper.ID,
+			bootstrapper.IP,
+		)
 	}
 
 	// Typically network.StartClose() should be called based on receiving a
@@ -137,7 +141,7 @@ func ExampleNewTestNetwork() {
 
 	// Calling network.Dispatch() will block until a fatal error occurs or
 	// network.StartClose() is called.
-	err = network.Dispatch()
+	err = network.Dispatch(context.Background())
 	log.Info(
 		"network exited",
 		zap.Error(err),

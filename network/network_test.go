@@ -280,7 +280,11 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
+			net.ManuallyTrack(
+				t.Context(),
+				config.MyNodeID,
+				config.MyIPPort.Get(),
+			)
 			// Wait until the node is connected to the first node.
 			// This forces nodes to connect to each other in a deterministic order.
 			require.Eventually(func() bool {
@@ -288,7 +292,9 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			}, 10*time.Second, time.Millisecond)
 		}
 
-		eg.Go(net.Dispatch)
+		eg.Go(func() error {
+			return net.Dispatch(t.Context())
+		})
 	}
 
 	if len(networks) > 1 {
@@ -305,6 +311,45 @@ func TestNewNetwork(t *testing.T) {
 		net.StartClose()
 	}
 	require.NoError(eg.Wait())
+}
+
+func TestDispatchStopsOnContextCancel(t *testing.T) {
+	require := require.New(t)
+
+	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 1, defaultConfig)
+	config := configs[0]
+
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
+	config.Beacons = vdrs
+	config.Validators = vdrs
+
+	netIntf, err := NewNetwork(
+		config,
+		upgrade.InitiallyActiveTime,
+		newMessageCreator(t),
+		prometheus.NewRegistry(),
+		logging.NoLog{},
+		listeners[0],
+		dialer,
+		&testHandler{},
+	)
+	require.NoError(err)
+
+	dispatchCtx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() {
+		done <- netIntf.Dispatch(dispatchCtx)
+	}()
+
+	cancel()
+
+	select {
+	case err := <-done:
+		require.NoError(err)
+	case <-time.After(5 * time.Second):
+		require.Fail("dispatch did not return after context cancellation")
+	}
 }
 
 func TestIngressConnCount(t *testing.T) {
@@ -469,17 +514,19 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	stakingCert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(err)
 
-	err = network.Track([]*ips.ClaimedIPPort{
-		ips.NewClaimedIPPort(
-			stakingCert,
-			netip.AddrPortFrom(
-				netip.AddrFrom4([4]byte{123, 132, 123, 123}),
-				10000,
+	err = network.Track(
+		t.Context(),
+		[]*ips.ClaimedIPPort{
+			ips.NewClaimedIPPort(
+				stakingCert,
+				netip.AddrPortFrom(
+					netip.AddrFrom4([4]byte{123, 132, 123, 123}),
+					10000,
+				),
+				1000, // timestamp
+				nil,  // signature
 			),
-			1000, // timestamp
-			nil,  // signature
-		),
-	})
+		})
 	// The signature is wrong so this peer tracking info isn't useful.
 	require.ErrorIs(err, staking.ErrECDSAVerificationFailure)
 
@@ -539,10 +586,16 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
+			net.ManuallyTrack(
+				t.Context(),
+				config.MyNodeID,
+				config.MyIPPort.Get(),
+			)
 		}
 
-		eg.Go(net.Dispatch)
+		eg.Go(func() error {
+			return net.Dispatch(t.Context())
+		})
 	}
 
 	network := networks[1].(*network)
@@ -621,17 +674,22 @@ func testDialDeletesNonValidators(t *testing.T, connectToAllValidators bool) {
 			stakingCert, err := staking.ParseCertificate(config.TLSConfig.Certificates[0].Leaf.Raw)
 			require.NoError(err)
 
-			require.NoError(net.Track([]*ips.ClaimedIPPort{
-				ips.NewClaimedIPPort(
-					stakingCert,
-					ip.AddrPort,
-					ip.Timestamp,
-					ip.TLSSignature,
-				),
-			}))
+			require.NoError(net.Track(
+				t.Context(),
+				[]*ips.ClaimedIPPort{
+					ips.NewClaimedIPPort(
+						stakingCert,
+						ip.AddrPort,
+						ip.Timestamp,
+						ip.TLSSignature,
+					),
+				},
+			))
 		}
 
-		eg.Go(net.Dispatch)
+		eg.Go(func() error {
+			return net.Dispatch(t.Context())
+		})
 	}
 
 	// Give the dialer time to run one iteration. This is racy, but should ony
@@ -693,12 +751,12 @@ func TestDialContext(t *testing.T) {
 		}
 	)
 
-	network.ManuallyTrack(neverDialedNodeID, neverDialedIP)
-	network.ManuallyTrack(dialedNodeID, dialedIP)
+	network.ManuallyTrack(t.Context(), neverDialedNodeID, neverDialedIP)
+	network.ManuallyTrack(t.Context(), dialedNodeID, dialedIP)
 
 	// Sanity check that when a non-cancelled context is given,
 	// we actually dial the peer.
-	network.dial(dialedNodeID, dialedTrackedIP)
+	network.dial(t.Context(), dialedNodeID, dialedTrackedIP)
 
 	gotDialedIPConn := make(chan struct{})
 	go func() {
@@ -710,7 +768,7 @@ func TestDialContext(t *testing.T) {
 	// Asset that when [n.onCloseCtx] is cancelled, dial returns immediately.
 	// That is, [neverDialedListener] doesn't accept a connection.
 	network.onCloseCtxCancel()
-	network.dial(neverDialedNodeID, neverDialedTrackedIP)
+	network.dial(t.Context(), neverDialedNodeID, neverDialedTrackedIP)
 
 	gotNeverDialedIPConn := make(chan struct{})
 	go func() {
@@ -770,10 +828,16 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
+			net.ManuallyTrack(
+				t.Context(),
+				config.MyNodeID,
+				config.MyIPPort.Get(),
+			)
 		}
 
-		eg.Go(net.Dispatch)
+		eg.Go(func() error {
+			return net.Dispatch(t.Context())
+		})
 	}
 
 	network := networks[1].(*network)
@@ -829,8 +893,14 @@ func TestGetAllPeers(t *testing.T) {
 	)
 
 	// Connect the non-validator peer to the validator network
-	nonValidatorNetwork.ManuallyTrack(networks[0].config.MyNodeID, networks[0].config.MyIPPort.Get())
-	eg.Go(nonValidatorNetwork.Dispatch)
+	nonValidatorNetwork.ManuallyTrack(
+		t.Context(),
+		networks[0].config.MyNodeID,
+		networks[0].config.MyIPPort.Get(),
+	)
+	eg.Go(func() error {
+		return nonValidatorNetwork.Dispatch(t.Context())
+	})
 
 	{
 		// The non-validator peer should be able to get all the peers in the network
