@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -414,6 +416,94 @@ func TestDiffStakersDelegator(t *testing.T) {
 	require.Empty(
 		iterator.ToSlice(delegatorIterator),
 	)
+}
+
+func TestDiffStakersDelegatorCancelOut(t *testing.T) {
+	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+
+	verify := func(t *testing.T, diff *diffStakers, parent iterator.Iterator[*Staker], want []*Staker) {
+		t.Helper()
+
+		iter := diff.GetDelegatorIterator(parent, delegator.SubnetID, delegator.NodeID)
+		defer iter.Release()
+		require.Equal(t, want, iterator.ToSlice(iter))
+	}
+
+	t.Run("delete then put same persisted delegator", func(t *testing.T) {
+		diff := &diffStakers{}
+		diff.DeleteDelegator(delegator)
+		diff.PutDelegator(delegator)
+
+		verify(t, diff, iterator.FromSlice(delegator), []*Staker{delegator})
+
+		iter := diff.GetStakerIterator(iterator.FromSlice(delegator))
+		defer iter.Release()
+		require.Equal(t, []*Staker{delegator}, iterator.ToSlice(iter))
+	})
+
+	t.Run("put then delete same delegator", func(t *testing.T) {
+		diff := &diffStakers{}
+		diff.PutDelegator(delegator)
+		diff.DeleteDelegator(delegator)
+
+		verify(t, diff, iterator.Empty[*Staker]{}, nil)
+
+		iter := diff.GetStakerIterator(iterator.Empty[*Staker]{})
+		defer iter.Release()
+		require.Empty(t, iterator.ToSlice(iter))
+	})
+}
+
+func TestBaseStakersDelegatorCancelOutPersistence(t *testing.T) {
+	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+
+	writeDiff := func(t *testing.T, v *baseStakers, list linkeddb.LinkedDB) {
+		t.Helper()
+		diff := v.validatorDiffs[delegator.SubnetID][delegator.NodeID]
+		require.NotNil(t, diff)
+		require.NoError(t, writeCurrentDelegatorDiff(list, diff, CodecVersion1))
+	}
+
+	t.Run("delete then put same persisted delegator", func(t *testing.T) {
+		list := linkeddb.NewDefault(memdb.New())
+		v := newBaseStakers()
+
+		// Persist the delegator.
+		v.PutDelegator(delegator)
+		writeDiff(t, v, list)
+
+		has, err := list.Has(delegator.TxID[:])
+		require.NoError(t, err)
+		require.True(t, has)
+
+		// Delete then re-add. The cancel-out must keep the DB entry.
+		v.DeleteDelegator(delegator)
+		v.PutDelegator(delegator)
+		writeDiff(t, v, list)
+
+		has, err = list.Has(delegator.TxID[:])
+		require.NoError(t, err)
+		require.True(t, has)
+	})
+
+	t.Run("put then delete same delegator", func(t *testing.T) {
+		list := linkeddb.NewDefault(memdb.New())
+		v := newBaseStakers()
+
+		// Put then delete in the same diff cycle. The cancel-out must not
+		// write the delegator to the DB.
+		v.PutDelegator(delegator)
+		v.DeleteDelegator(delegator)
+		writeDiff(t, v, list)
+
+		has, err := list.Has(delegator.TxID[:])
+		require.NoError(t, err)
+		require.False(t, has)
+
+		iter := v.GetDelegatorIterator(delegator.SubnetID, delegator.NodeID)
+		defer iter.Release()
+		require.Empty(t, iterator.ToSlice(iter))
+	})
 }
 
 func newTestStaker(subnetID ids.ID, nodeID ids.NodeID) *Staker {
