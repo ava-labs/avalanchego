@@ -169,17 +169,23 @@ func assertPrefixesEqual(t *testing.T, newDB, oldDB database.Database, height ui
 	for _, name := range retainedPrefixes {
 		newPDB := prefixdb.New([]byte(name), newDB)
 		oldPDB := prefixdb.New([]byte(name), oldDB)
-		assertDBsEqual(t, newPDB, oldPDB, name, height)
+		assertDBsEqual(t, newPDB, oldPDB, name, height, nil)
 	}
 
 	// atomicTrieMetaDB: the new code adds atomicTrieLastAppliedBlock under
 	// this prefix; the old code does not. Filter it out before comparing.
+	appliedKey := []byte("atomicTrieLastAppliedBlock")
 	newMeta := prefixdb.New([]byte("atomicTrieMetaDB"), newDB)
 	oldMeta := prefixdb.New([]byte("atomicTrieMetaDB"), oldDB)
-	assertMetaEqualSkippingApplied(t, newMeta, oldMeta, height)
+	assertDBsEqual(t, newMeta, oldMeta, "atomicTrieMetaDB", height, func(k []byte) bool {
+		return bytes.Equal(k, appliedKey)
+	})
 }
 
-func assertDBsEqual(t *testing.T, a, b database.Iteratee, prefix string, height uint64) {
+// assertDBsEqual iterates a and b in lockstep and asserts every (key,value)
+// matches. If skipA is non-nil, entries on the a side whose key satisfies
+// the predicate are skipped before comparison.
+func assertDBsEqual(t *testing.T, a, b database.Iteratee, prefix string, height uint64, skipA func([]byte) bool) {
 	t.Helper()
 
 	itA := a.NewIterator()
@@ -187,34 +193,9 @@ func assertDBsEqual(t *testing.T, a, b database.Iteratee, prefix string, height 
 	itB := b.NewIterator()
 	defer itB.Release()
 
-	for {
-		hasA := itA.Next()
-		hasB := itB.Next()
-		if !hasA && !hasB {
-			break
-		}
-
-		require.Equalf(t, hasA, hasB, "prefix=%s height=%d: iterator length mismatch", prefix, height)
-		require.Equalf(t, itA.Key(), itB.Key(), "prefix=%s height=%d: key mismatch", prefix, height)
-		require.Equalf(t, itA.Value(), itB.Value(), "prefix=%s height=%d key=%x: value mismatch", prefix, height, itA.Key())
-	}
-	require.NoError(t, itA.Error())
-	require.NoError(t, itB.Error())
-}
-
-func assertMetaEqualSkippingApplied(t *testing.T, newMeta, oldMeta database.Iteratee, height uint64) {
-	t.Helper()
-
-	itNew := newMeta.NewIterator()
-	defer itNew.Release()
-	itOld := oldMeta.NewIterator()
-	defer itOld.Release()
-
-	appliedKey := []byte("atomicTrieLastAppliedBlock")
-
-	advanceNew := func() bool {
-		for itNew.Next() {
-			if !bytes.Equal(itNew.Key(), appliedKey) {
+	advanceA := func() bool {
+		for itA.Next() {
+			if skipA == nil || !skipA(itA.Key()) {
 				return true
 			}
 		}
@@ -222,18 +203,18 @@ func assertMetaEqualSkippingApplied(t *testing.T, newMeta, oldMeta database.Iter
 	}
 
 	for {
-		hasNew := advanceNew()
-		hasOld := itOld.Next()
-		if !hasNew && !hasOld {
+		hasA := advanceA()
+		hasB := itB.Next()
+		if !hasA && !hasB {
 			break
 		}
 
-		require.Equalf(t, hasNew, hasOld, "atomicTrieMetaDB height=%d: iterator length mismatch", height)
-		require.Equalf(t, itOld.Key(), itNew.Key(), "atomicTrieMetaDB height=%d: key mismatch", height)
-		require.Equalf(t, itOld.Value(), itNew.Value(), "atomicTrieMetaDB height=%d key=%x: value mismatch", height, itOld.Key())
+		require.Equalf(t, hasA, hasB, "prefix=%s height=%d: iterator length mismatch", prefix, height)
+		require.Equalf(t, itB.Key(), itA.Key(), "prefix=%s height=%d: key mismatch", prefix, height)
+		require.Equalf(t, itB.Value(), itA.Value(), "prefix=%s height=%d key=%x: value mismatch", prefix, height, itA.Key())
 	}
-	require.NoError(t, itNew.Error())
-	require.NoError(t, itOld.Error())
+	require.NoError(t, itA.Error())
+	require.NoError(t, itB.Error())
 }
 
 // convertNewToOld serializes each new tx and parses the bytes through the

@@ -70,8 +70,8 @@ func New(db database.Database) (*State, error) {
 // are skipped because they don't change the trie.
 //
 // Mirrors [state.AtomicBackend.initialize], but reads only from the tx
-// index — [state.AtomicBackend]'s metadata about indexed-but-not-applied
-// heights is gone.
+// index; the metadata about indexed-but-not-applied heights tracked by
+// [state.AtomicBackend] is gone.
 func (s *State) replay() error {
 	batch := s.db.NewBatch()
 	for entry, err := range iterateTxsFromHeight(s.db, s.lastCommittedHeight+1) {
