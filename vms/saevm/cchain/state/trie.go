@@ -22,8 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 
-	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
@@ -138,16 +138,18 @@ func newTrieDB(avaDB database.Database) *triedb.Database {
 	)
 }
 
-// applyTrie writes ops into the atomic trie at height. The committed-root
-// metadata write (when height crosses a commit boundary) is added to batch;
-// trie node writes are flushed by the underlying trieDB.
+// applyTrie merges the atomic ops in sorted and writes them into the trie
+// at height. The committed-root metadata write (when height crosses a
+// commit boundary) is added to batch; trie node writes are flushed by the
+// underlying trieDB. sorted must be sorted by tx ID.
 //
 // It merges [state.AtomicBackend.InsertTxs] and [state.AtomicTrie.AcceptTrie].
-func (s *State) applyTrie(
-	batch database.KeyValueWriter,
-	height uint64,
-	ops map[ids.ID]*chainsatomic.Requests,
-) error {
+func (s *State) applyTrie(batch database.KeyValueWriter, height uint64, sorted []*tx.Tx) error {
+	ops, err := mergeAtomicOps(sorted)
+	if err != nil {
+		return err
+	}
+
 	tr, err := trie.New(trie.TrieID(s.lastAcceptedRoot), s.trieDB)
 	if err != nil {
 		return fmt.Errorf("opening atomic trie at root %s: %w", s.lastAcceptedRoot, err)

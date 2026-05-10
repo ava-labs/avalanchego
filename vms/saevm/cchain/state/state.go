@@ -81,11 +81,7 @@ func (s *State) replay() error {
 		if entry.height > s.lastAppliedHeight {
 			break
 		}
-		ops, err := mergeAtomicOps(entry.txs)
-		if err != nil {
-			return err
-		}
-		if err := s.applyTrie(batch, entry.height, ops); err != nil {
+		if err := s.applyTrie(batch, entry.height, entry.txs); err != nil {
 			return err
 		}
 	}
@@ -113,11 +109,7 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return err
 	}
 
-	ops, err := mergeAtomicOps(sorted)
-	if err != nil {
-		return err
-	}
-	if err := s.applyTrie(batch, height, ops); err != nil {
+	if err := s.applyTrie(batch, height, sorted); err != nil {
 		return err
 	}
 
