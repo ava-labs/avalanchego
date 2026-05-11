@@ -24,8 +24,8 @@ source "$AVALANCHE_PATH"/scripts/image_tag.sh
 # Subnet-EVM specific constants
 GOPATH="$(go env GOPATH)"
 DEFAULT_PLUGIN_DIR="${HOME}/.avalanchego/plugins"
-DEFAULT_VM_NAME="subnet-evm"
-DEFAULT_VM_ID="srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
+# shellcheck disable=SC1091
+source "$SUBNET_EVM_PATH/scripts/default-vm-data.sh"
 
 # Docker image names
 # Defaults to local to avoid unintentional pushes.
