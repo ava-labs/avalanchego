@@ -49,7 +49,7 @@ type Backend interface {
 type Txpool struct {
 	*Pending
 
-	ctx     *snow.Context
+	snowCtx *snow.Context
 	sub     event.Subscription
 	maxSize int
 
@@ -67,7 +67,7 @@ type Txpool struct {
 //
 // [Txpool.Close] MUST be called during shutdown to release allocated resources.
 func New(
-	ctx *snow.Context,
+	snowCtx *snow.Context,
 	chainConfig *params.ChainConfig,
 	pending *Pending,
 	chain Backend,
@@ -93,55 +93,64 @@ func New(
 	// to ensure we do not miss an update.
 	p := &Txpool{
 		Pending: pending,
-		ctx:     ctx,
+		snowCtx: snowCtx,
 		sub:     sub,
 		maxSize: maxSize,
 		state:   state,
 	}
-
-	go func() {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case e := <-executed:
-				b := e.Block
-				inputs, err := inputUTXOs(b, chainConfig)
-				if err != nil {
-					ctx.Log.Error("unable to get inputs from block",
-						zap.Stringer("blockHash", b.Hash()),
-						zap.Uint64("blockNumber", b.NumberU64()),
-						zap.Error(err),
-					)
-					continue
-				}
-
-				newState, err := chain.LastExecutedState()
-				if err != nil {
-					ctx.Log.Error("unable to get latest executed state",
-						zap.Error(err),
-					)
-					continue
-				}
-
-				p.stateLock.Lock()
-				p.lock.Lock()
-
-				p.removeConflicts(inputs)
-				p.state = newState
-
-				p.lock.Unlock()
-				p.stateLock.Unlock()
-			case err := <-sub.Err():
-				if err != nil {
-					ctx.Log.Error("pool subscription failed",
-						zap.Error(err),
-					)
-				}
-				return
-			}
-		}
-	}()
+	go p.updateState(chainConfig, chain, executed)
 	return p, nil
+}
+
+func (p *Txpool) updateState(
+	chainConfig *params.ChainConfig,
+	chain Backend,
+	executed <-chan core.ChainHeadEvent,
+) {
+	var (
+		sub = p.sub
+		log = p.snowCtx.Log
+	)
+	defer sub.Unsubscribe()
+	for {
+		select {
+		case e := <-executed:
+			b := e.Block
+			inputs, err := inputUTXOs(b, chainConfig)
+			if err != nil {
+				log.Error("unable to get inputs from block",
+					zap.Stringer("blockHash", b.Hash()),
+					zap.Uint64("blockNumber", b.NumberU64()),
+					zap.Error(err),
+				)
+				continue
+			}
+
+			newState, err := chain.LastExecutedState()
+			if err != nil {
+				log.Error("unable to get latest executed state",
+					zap.Error(err),
+				)
+				continue
+			}
+
+			p.stateLock.Lock()
+			p.lock.Lock()
+
+			p.removeConflicts(inputs)
+			p.state = newState
+
+			p.lock.Unlock()
+			p.stateLock.Unlock()
+		case err := <-sub.Err():
+			if err != nil {
+				log.Error("pool subscription failed",
+					zap.Error(err),
+				)
+			}
+			return
+		}
+	}
 }
 
 var (
@@ -163,11 +172,11 @@ var (
 //
 // Returns [ErrAlreadyKnown] if tx is already in the pool.
 func (p *Txpool) Add(tx *tx.Tx) error {
-	if err := tx.SanityCheck(p.ctx); err != nil {
+	if err := tx.SanityCheck(p.snowCtx); err != nil {
 		return fmt.Errorf("%w: %w", errSanityCheck, err)
 	}
 
-	t, err := newTxData(tx, p.ctx.AVAXAssetID)
+	t, err := newTxData(tx, p.snowCtx.AVAXAssetID)
 	if err != nil {
 		return err
 	}
@@ -182,7 +191,7 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	p.stateLock.RLock()
 	defer p.stateLock.RUnlock()
 
-	if err := tx.VerifyCredentials(p.ctx.SharedMemory); err != nil {
+	if err := tx.VerifyCredentials(p.snowCtx.SharedMemory); err != nil {
 		return fmt.Errorf("%w: %w", errVerifyCredentials, err)
 	}
 	if err := verifyOp(p.state, t.op); err != nil {
@@ -214,16 +223,8 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 		p.removeConflicts(cheap.inputs)
 	}
 
-	p.utxos.Put(t.id, t.inputs)
-	p.txs.Push(t.id, t)
-	p.cond.Broadcast()
+	p.add(t)
 	return nil
-}
-
-func (p *Txpool) removeConflicts(utxos set.Set[ids.ID]) {
-	for _, removed := range p.utxos.DeleteOverlapping(utxos) {
-		p.txs.Remove(removed.Key)
-	}
 }
 
 // Close releases all allocated resources.
@@ -282,7 +283,7 @@ type Pending struct {
 	cond *lock.Cond
 
 	// txs is the collection of transactions available to be included into a
-	// block, ordered as a min-heap by gas price.
+	// block, ordered as a min-heap by gas price for eviction.
 	txs heap.Map[ids.ID, *txData]
 	// utxos maps a txID to the set of utxoIDs it consumes.
 	utxos *setmap.SetMap[ids.ID, ids.ID]
@@ -351,6 +352,19 @@ func (p *Pending) AwaitTxs(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (p *Pending) removeConflicts(utxos set.Set[ids.ID]) {
+	for _, removed := range p.utxos.DeleteOverlapping(utxos) {
+		p.txs.Remove(removed.Key)
+	}
+}
+
+// add inserts t into the pool. It assumes there are no existing conflicts.
+func (p *Pending) add(t *txData) {
+	p.utxos.Put(t.id, t.inputs)
+	p.txs.Push(t.id, t)
+	p.cond.Broadcast()
 }
 
 // txData contains the values from [tx.Tx] that the pool uses for ordering and
