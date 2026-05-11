@@ -35,9 +35,9 @@ type block struct {
 }
 
 // blockSequence covers single-tx and multi-tx blocks at low heights, then
-// jumps past the commit boundary twice to exercise the trie commit and
-// on-disk metadata. Heights are non-contiguous on purpose: Apply doesn't
-// require contiguous heights.
+// hits each commit boundary directly so the trie commit and on-disk
+// metadata fire without a catch-up. Non-boundary heights can skip; boundary
+// heights themselves are part of the sequence.
 func blockSequence(t *testing.T) []block {
 	t.Helper()
 	return []block{
@@ -49,11 +49,12 @@ func blockSequence(t *testing.T) []block {
 		{8, []*tx.Tx{newExportTx(0xFF, 6)}},
 		{10, []*tx.Tx{newImportTx(0x11, 7), newImportTx(0x22, 8)}},
 		{12, []*tx.Tx{newExportTx(0x33, 9)}},
-		// Past the first commit boundary (4096) — triggers catch-up commit
-		// at 4096 using the tip from height 12.
-		{commitInterval + 2, []*tx.Tx{newImportTx(0x44, 10)}},
-		// Past the second commit boundary (8192) — another catch-up commit.
-		{2*commitInterval + 1, []*tx.Tx{newExportTx(0x55, 11)}},
+		// First commit boundary (4096) is applied directly.
+		{commitInterval, []*tx.Tx{newImportTx(0x44, 10)}},
+		{commitInterval + 2, []*tx.Tx{newImportTx(0x55, 11)}},
+		// Second commit boundary (8192) is applied directly.
+		{2 * commitInterval, []*tx.Tx{newExportTx(0x66, 12)}},
+		{2*commitInterval + 1, []*tx.Tx{newImportTx(0x77, 13)}},
 	}
 }
 

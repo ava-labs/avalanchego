@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 package(default_visibility = [
     "//vms/saevm/cchain:__subpackages__",
@@ -8,21 +9,19 @@ package(default_visibility = [
 go_library(
     name = "state",
     srcs = [
-        "bonus_blocks.go",
-        "genesis.go",
-        "trie.go",
-        "txs.go",
+        "codec.go",
+        "state.go",
     ],
-    embedsrcs = ["bonus_blocks.json"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/state",
     deps = [
+        "//chains/atomic",
+        "//codec",
+        "//codec/linearcodec",
         "//database",
         "//database/prefixdb",
+        "//graft/coreth/plugin/evm/atomic/state",
         "//graft/evm/triedb/hashdb",
         "//ids",
-        "//utils",
-        "//utils/constants",
-        "//utils/set",
         "//utils/units",
         "//utils/wrappers",
         "//vms/evm/database",
@@ -30,6 +29,29 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//trie/trienode",
         "@com_github_ava_labs_libevm//triedb",
+    ],
+)
+
+go_test(
+    name = "state_test",
+    srcs = ["state_test.go"],
+    embed = [":state"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//database/prefixdb",
+        "//database/versiondb",
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/atomic/state",
+        "//ids",
+        "//vms/components/avax",
+        "//vms/saevm/cchain/tx",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
     ],
 )
