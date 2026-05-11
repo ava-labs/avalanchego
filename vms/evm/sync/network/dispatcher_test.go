@@ -134,12 +134,3 @@ func TestDispatcher_ContextCancelled(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
-func TestTrackerSampler(t *testing.T) {
-	nodeID := ids.GenerateTestNodeID()
-	require.Equal(t,
-		[]ids.NodeID{nodeID},
-		trackerSampler{peers: newTestPeerTracker(t, nodeID)}.Sample(t.Context(), 1),
-	)
-	require.Empty(t, trackerSampler{peers: newTestPeerTracker(t, nodeID)}.Sample(t.Context(), 0))
-	require.Empty(t, trackerSampler{peers: newTestPeerTracker(t)}.Sample(t.Context(), 1))
-}

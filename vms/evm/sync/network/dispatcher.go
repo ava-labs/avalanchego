@@ -1,8 +1,6 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package network provides Dispatcher (a typed synchronous client over
-// one p2p handler ID) and aliases for the EVM state-sync RPCs.
 package network
 
 import (
