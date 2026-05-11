@@ -4,6 +4,13 @@ package sync;
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
+message GetProofRequest {
+  oneof request {
+    GetChangeProofRequest change_proof = 1;
+    GetRangeProofRequest range_proof = 2;
+  }
+}
+
 message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
@@ -13,13 +20,6 @@ message GetChangeProofRequest {
   uint32 bytes_limit = 6;
 }
 
-message GetChangeProofResponse {
-  oneof response {
-    bytes change_proof = 1;
-    bytes range_proof = 2;
-  }
-}
-
 // Range proof responses don't require any extra data, so no message is needed.
 message GetRangeProofRequest {
   bytes root_hash = 1;
@@ -27,6 +27,13 @@ message GetRangeProofRequest {
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
   uint32 bytes_limit = 5;
+}
+
+message GetProofResponse {
+  oneof response {
+    bytes change_proof = 1;
+    bytes range_proof = 2;
+  }
 }
 
 message ChangeProof {

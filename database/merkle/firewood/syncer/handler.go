@@ -9,14 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 )
 
-// NewGetRangeProofHandler returns a handler that services GetRangeProof requests
+// NewGetProofHandler returns a handler that services proof requests
 // using the provided Firewood database for p2p connections.
-func NewGetRangeProofHandler(db *ffi.Database) *sync.GetRangeProofHandler[*RangeProof, struct{}] {
-	return sync.NewGetRangeProofHandler(&database{db: db}, rangeProofMarshaler{})
-}
-
-// NewGetChangeProofHandler returns a handler that services GetChangeProof requests
-// using the provided Firewood database for p2p connections.
-func NewGetChangeProofHandler(db *ffi.Database) *sync.GetChangeProofHandler[*RangeProof, struct{}] {
-	return sync.NewGetChangeProofHandler(&database{db: db}, rangeProofMarshaler{}, changeProofMarshaler{})
+func NewGetProofHandler(db *ffi.Database) *sync.GetProofHandler[*RangeProof, struct{}] {
+	return sync.NewGetProofHandler(&database{db: db}, rangeProofMarshaler{}, changeProofMarshaler{})
 }
