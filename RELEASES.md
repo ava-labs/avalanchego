@@ -2,7 +2,8 @@
 
 ## Pending (v1.14.3)
 
-- None.
+### Fixes
+- Updated minimum Go version from `v1.25.8` to `v1.25.10`.
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
