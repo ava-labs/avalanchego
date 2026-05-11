@@ -218,6 +218,7 @@ type exportOption = options.Option[exportProperties]
 type exportProperties struct {
 	networkID uint32
 	amount    uint64
+	addr      ids.ShortID
 	creds     []tx.Credential
 }
 
@@ -233,44 +234,64 @@ func withAmount(amount uint64) exportOption {
 	})
 }
 
+func withAddress(addr ids.ShortID) exportOption {
+	return options.Func[exportProperties](func(p *exportProperties) {
+		p.addr = addr
+	})
+}
+
 func withCredentials(creds []tx.Credential) exportOption {
 	return options.Func[exportProperties](func(p *exportProperties) {
 		p.creds = creds
 	})
 }
 
-func newExport(tb testing.TB, sk *secp256k1.PrivateKey, opts ...exportOption) *tx.Tx {
+// newExport returns an export that consumes one input (nonce 0) per key, each
+// with the configured amount of AVAX.
+func newExport(tb testing.TB, sks []*secp256k1.PrivateKey, opts ...exportOption) *tx.Tx {
 	tb.Helper()
 
 	props := options.ApplyTo(&exportProperties{
 		networkID: constants.UnitTestID,
 		amount:    100,
 	}, opts...)
+
+	// [tx.Export.sanityCheck] requires inputs to be sorted by address.
+	sorted := slices.Clone(sks)
+	slices.SortFunc(sorted, func(a, b *secp256k1.PrivateKey) int {
+		return a.EthAddress().Cmp(b.EthAddress())
+	})
+
+	ins := make([]tx.Input, len(sorted))
+	for i, sk := range sorted {
+		ins[i] = tx.Input{
+			Address: sk.EthAddress(),
+			Amount:  props.amount,
+			AssetID: snowtest.AVAXAssetID,
+		}
+	}
 	e := &tx.Export{
 		NetworkID:        props.networkID,
 		BlockchainID:     snowtest.CChainID,
 		DestinationChain: snowtest.XChainID,
-		Ins: []tx.Input{{
-			Address: sk.EthAddress(),
-			Amount:  props.amount,
-			AssetID: snowtest.AVAXAssetID,
-		}},
+		Ins:              ins,
 		ExportedOutputs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: snowtest.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 1,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					Addrs:     []ids.ShortID{props.addr},
 				},
 			},
 		}},
 	}
 
-	sig := txtest.Sign(tb, e, sk)
-	creds := make([]tx.Credential, len(e.Ins))
-	for i := range creds {
-		creds[i] = &secp256k1fx.Credential{Sigs: []txtest.Signature{sig}}
+	creds := make([]tx.Credential, len(sorted))
+	for i, sk := range sorted {
+		creds[i] = &secp256k1fx.Credential{Sigs: []txtest.Signature{
+			txtest.Sign(tb, e, sk),
+		}}
 	}
 
 	props.creds = creds
@@ -305,28 +326,24 @@ func newEth(tb testing.TB, key *secp256k1.PrivateKey) *types.Transaction {
 func TestAdd(t *testing.T) {
 	const (
 		nonce   = 0
-		baseFee = 50
+		highFee = 100
+		midFee  = 75
+		lowFee  = 50
 	)
 	var (
-		sk    = newKey(t)
-		skMid = newKey(t)
-		skLow = newKey(t)
+		alice   = newKey(t)
+		bob     = newKey(t)
+		charles = newKey(t)
 
-		// Higher amount → more burned → higher gas price. The sk txs all
-		// share input (sk.EthAddress(), nonce 0) so they conflict with each
-		// other.
-		highFee   = newExport(t, sk, withAmount(baseFee+50))
-		midFee    = newExport(t, sk, withAmount(baseFee+25))
-		midFeeAlt = newExport(t, sk, withAmount(baseFee+25))
-		lowFee    = newExport(t, sk, withAmount(baseFee))
-
-		// Distinct senders → don't conflict with sk's txs. Fees chosen so
-		// that highFee > noConflictMid > noConflictLow.
-		noConflictMid = newExport(t, skMid, withAmount(baseFee+25))
-		noConflictLow = newExport(t, skLow, withAmount(baseFee))
+		aliceHigh          = newExport(t, []*secp256k1.PrivateKey{alice}, withAmount(highFee))
+		aliceHighConflict  = newExport(t, []*secp256k1.PrivateKey{alice}, withAmount(highFee), withAddress(ids.GenerateTestShortID()))
+		aliceAndBobMidHigh = newExport(t, []*secp256k1.PrivateKey{alice, bob}, withAmount(lowFee)) // gas price is between mid and high
+		bobMid             = newExport(t, []*secp256k1.PrivateKey{bob}, withAmount(midFee))
+		aliceLow           = newExport(t, []*secp256k1.PrivateKey{alice}, withAmount(lowFee))
+		charlesLow         = newExport(t, []*secp256k1.PrivateKey{charles}, withAmount(lowFee))
 
 		// Fails [tx.Tx.SanityCheck].
-		wrongNetwork = newExport(t, sk, withNetworkID(constants.UnitTestID+1))
+		wrongNetwork = newExport(t, []*secp256k1.PrivateKey{alice}, withNetworkID(constants.UnitTestID+1))
 		// Fails [tx.Tx.AsOp]. Calculating the number of signatures for the
 		// gas price errors because [avax.TestTransferable] is not a
 		// [*secp256k1fx.TransferInput].
@@ -346,17 +363,16 @@ func TestAdd(t *testing.T) {
 			},
 		}
 		// Fails [tx.Tx.VerifyCredentials].
-		missingCreds = newExport(t, sk, withCredentials(nil))
+		missingCreds = newExport(t, []*secp256k1.PrivateKey{alice}, withCredentials(nil))
 	)
-	require.NotEqual(t, midFee.ID(), midFeeAlt.ID(), "newExport should be random")
 
-	allKeys := []*secp256k1.PrivateKey{sk, skMid, skLow}
+	allKeys := []*secp256k1.PrivateKey{alice, bob, charles}
 	maxSizeTxs := make([]*tx.Tx, maxSize)
 	for i := range maxSizeTxs {
 		sk := newKey(t)
 		allKeys = append(allKeys, sk)
-		amount := baseFee + uint64(i) //#nosec G115 -- Won't overflow
-		maxSizeTxs[i] = newExport(t, sk, withAmount(amount))
+		amount := lowFee + uint64(i) //#nosec G115 -- Won't overflow
+		maxSizeTxs[i] = newExport(t, []*secp256k1.PrivateKey{sk}, withAmount(amount))
 	}
 	slices.Reverse(maxSizeTxs) // Sorted by descending fee.
 
@@ -386,61 +402,74 @@ func TestAdd(t *testing.T) {
 		{
 			name: "verify_state_failure",
 			initNonces: map[common.Address]uint64{
-				sk.EthAddress(): nonce + 1,
+				alice.EthAddress(): nonce + 1,
 			},
-			toAdd:   midFee,
+			toAdd:   aliceHigh,
 			wantErr: errVerifyState,
 		},
 		{
 			name:  "empty_pool",
-			toAdd: midFee,
-			want:  []*tx.Tx{midFee},
+			toAdd: aliceHigh,
+			want:  []*tx.Tx{aliceHigh},
 		},
 		{
 			name:  "higher_fee_evicts_conflict",
-			init:  []*tx.Tx{lowFee},
-			toAdd: highFee,
-			want:  []*tx.Tx{highFee},
+			init:  []*tx.Tx{aliceLow},
+			toAdd: aliceHigh,
+			want:  []*tx.Tx{aliceHigh},
 		},
 		{
 			name:    "lower_fee_rejected_by_conflict",
-			init:    []*tx.Tx{highFee},
-			toAdd:   lowFee,
+			init:    []*tx.Tx{aliceHigh},
+			toAdd:   aliceLow,
 			wantErr: errInsufficientFee,
-			want:    []*tx.Tx{highFee},
+			want:    []*tx.Tx{aliceHigh},
 		},
 		{
 			name:    "equal_fee_rejected_by_conflict",
-			init:    []*tx.Tx{midFee},
-			toAdd:   midFeeAlt,
+			init:    []*tx.Tx{aliceHigh},
+			toAdd:   aliceHighConflict,
 			wantErr: errInsufficientFee,
-			want:    []*tx.Tx{midFee},
+			want:    []*tx.Tx{aliceHigh},
 		},
 		{
 			name:    "already_known",
-			init:    []*tx.Tx{midFee},
-			toAdd:   midFee,
+			init:    []*tx.Tx{aliceHigh},
+			toAdd:   aliceHigh,
 			wantErr: ErrAlreadyKnown,
-			want:    []*tx.Tx{midFee},
+			want:    []*tx.Tx{aliceHigh},
 		},
 		{
 			name:  "ordered_by_gas_price_descending",
-			init:  []*tx.Tx{noConflictMid, noConflictLow},
-			toAdd: highFee,
-			want:  []*tx.Tx{highFee, noConflictMid, noConflictLow},
+			init:  []*tx.Tx{bobMid, charlesLow},
+			toAdd: aliceHigh,
+			want:  []*tx.Tx{aliceHigh, bobMid, charlesLow},
+		},
+		{
+			name:  "higher_fee_evicts_multiple_conflicts",
+			init:  []*tx.Tx{aliceLow, bobMid},
+			toAdd: aliceAndBobMidHigh,
+			want:  []*tx.Tx{aliceAndBobMidHigh},
+		},
+		{
+			name:    "insufficient_fee_against_one_conflict_keeps_all",
+			init:    []*tx.Tx{aliceHigh, bobMid},
+			toAdd:   aliceAndBobMidHigh,
+			wantErr: errInsufficientFee,
+			want:    []*tx.Tx{aliceHigh, bobMid},
 		},
 		{
 			name:    "pool_full_rejects_same_fee_as_cheapest",
 			init:    maxSizeTxs,
-			toAdd:   lowFee,
+			toAdd:   aliceLow,
 			wantErr: errInsufficientFee,
 			want:    maxSizeTxs,
 		},
 		{
 			name:  "pool_full_evicts_cheapest_for_higher_fee",
 			init:  maxSizeTxs,
-			toAdd: highFee,
-			want:  append([]*tx.Tx{highFee}, maxSizeTxs[:maxSize-1]...),
+			toAdd: aliceHigh,
+			want:  append([]*tx.Tx{aliceHigh}, maxSizeTxs[:maxSize-1]...),
 		},
 	}
 	for _, tt := range tests {
@@ -465,7 +494,7 @@ func TestAdd(t *testing.T) {
 func TestUpdateEvictsConflicts(t *testing.T) {
 	var (
 		sk     = newKey(t)
-		initTx = newExport(t, sk)
+		initTx = newExport(t, []*secp256k1.PrivateKey{sk})
 	)
 	tests := []struct {
 		name     string
@@ -477,7 +506,7 @@ func TestUpdateEvictsConflicts(t *testing.T) {
 			block: newBlock(
 				t,
 				withEthTxs(newEth(t, newKey(t))),
-				withAvaxTxs(newExport(t, newKey(t))),
+				withAvaxTxs(newExport(t, []*secp256k1.PrivateKey{newKey(t)})),
 			),
 			wantPool: []*tx.Tx{initTx},
 		},
@@ -487,7 +516,7 @@ func TestUpdateEvictsConflicts(t *testing.T) {
 		},
 		{
 			name:  "avax_tx_conflict_evicts_tx",
-			block: newBlock(t, withAvaxTxs(newExport(t, sk))),
+			block: newBlock(t, withAvaxTxs(newExport(t, []*secp256k1.PrivateKey{sk}))),
 		},
 	}
 	for _, tt := range tests {
@@ -509,7 +538,7 @@ func TestStateUpdate(t *testing.T) {
 	sut := newSUT(t, noBalance)
 
 	sk := newKey(t)
-	tx := newExport(t, sk)
+	tx := newExport(t, []*secp256k1.PrivateKey{sk})
 	require.ErrorIsf(t, sut.Add(tx), errVerifyState, "%T.Add()", sut)
 	sut.assertEquals(t)
 
@@ -524,7 +553,7 @@ func TestHasUnknown(t *testing.T) {
 	sut := newSUT(t, newState(t, sk))
 	require.Falsef(t, sut.Has(ids.GenerateTestID()), "%T.Has()", sut)
 
-	raw := newExport(t, sk)
+	raw := newExport(t, []*secp256k1.PrivateKey{sk})
 	require.NoErrorf(t, sut.Add(raw), "%T.Add(%T)", sut, raw)
 	require.Falsef(t, sut.Has(ids.GenerateTestID()), "%T.Has()", sut)
 }
@@ -542,7 +571,7 @@ func TestAwaitTxs(t *testing.T) {
 		synctest.Wait()
 		require.Emptyf(t, done, "%T.AwaitTxs() should be blocked", sut)
 
-		require.NoErrorf(t, sut.Add(newExport(t, sk)), "%T.Add()", sut)
+		require.NoErrorf(t, sut.Add(newExport(t, []*secp256k1.PrivateKey{sk})), "%T.Add()", sut)
 		require.NoErrorf(t, <-done, "%T.AwaitTxs()", sut)
 	})
 }
