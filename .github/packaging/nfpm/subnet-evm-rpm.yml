@@ -8,7 +8,7 @@ license: "BSD-3-Clause"
 depends:
   - "glibc >= 2.34"
 contents:
-  - src: "${SUBNET_EVM_BINARY}"
+  - src: "${BINARY_PATH}"
     # SUBNET_EVM_VM_ID is sourced from graft/subnet-evm/scripts/constants.sh
     dst: /var/opt/avalanchego/plugins/${SUBNET_EVM_VM_ID}
     expand: true

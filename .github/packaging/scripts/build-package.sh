@@ -56,12 +56,7 @@ fi
 
 # ── Package with nfpm ─────────────────────────────────────────────
 
-case "${PACKAGE}" in
-    avalanchego) export AVALANCHEGO_BINARY="${BINARY_PATH}" ;;
-    subnet-evm)  export SUBNET_EVM_BINARY="${BINARY_PATH}" ;;
-esac
-
-export VERSION PACKAGE_ARCH
+export VERSION PACKAGE_ARCH BINARY_PATH
 
 PKG_FILENAME="${PACKAGE}-${TAG}-${PACKAGE_ARCH}.${pkg_format_lower}"
 PKG_PATH="${OUTPUT_DIR}/${PKG_FILENAME}"
