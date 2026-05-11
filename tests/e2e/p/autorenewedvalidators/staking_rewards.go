@@ -42,6 +42,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			autoCompoundedRewardShares        = uint32(reward.PercentDenominator * 0.40) // 40%
 			updatedAutoCompoundedRewardShares = uint32(reward.PercentDenominator * 0.80) // 80%
 			stakingPeriod                     = 20 * time.Second
+			updatedStakingPeriod              = 15 * time.Second
 			delegationPeriod                  = stakingPeriod / 2 // delegator stakes for half the validator's period
 		)
 
@@ -124,6 +125,9 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			require.NoError(err)
 			validatorTxID = tx.ID()
 		})
+
+		chainTimeAtValidatorAdd, err := pvmClient.GetTimestamp(tc.DefaultContext())
+		require.NoError(err)
 
 		tc.By("funding delegator wallet", func() {
 			stake := delegatorWeight
@@ -217,8 +221,41 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			actualDelegatorPeriod = time.Duration(delegator.EndTime-delegator.StartTime) * time.Second
 		})
 
+		tc.By("updating period to 15s", func() {
+			pWallet = e2e.NewWalletWithConfig(tc, keychain, walletNodeURI, primary.WalletConfig{AutoRenewedValidatorTxIDs: []ids.ID{validatorTxID}}).P()
+
+			_, err := pWallet.IssueSetAutoRenewedValidatorConfigTx(
+				validatorTxID,
+				autoCompoundedRewardShares,
+				uint64(updatedStakingPeriod.Seconds()),
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+		})
+
+		tc.By("checking API fields reflect updated staking period", func() {
+			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
+			require.NoError(err)
+			require.Len(validators, 1)
+			require.NotNil(validators[0].Period)
+			require.Equal(uint64(updatedStakingPeriod.Seconds()), *validators[0].Period)
+			require.NotNil(validators[0].AutoCompoundRewardShares)
+			require.Equal(autoCompoundedRewardShares, *validators[0].AutoCompoundRewardShares)
+			require.NotNil(validators[0].ConfigOwner)
+			require.Equal(uint32(1), validators[0].ConfigOwner.Threshold)
+			require.Equal([]ids.ShortID{keychain.Keys[0].Address()}, validators[0].ConfigOwner.Addresses)
+		})
+
 		tc.By("waiting for the first staking cycle to complete", func() {
 			stakingHelper.waitForStakingCycleEnd(nodeID)
+		})
+
+		chainTimeAtCycle1End, err := pvmClient.GetTimestamp(tc.DefaultContext())
+		require.NoError(err)
+
+		tc.By("checking the first cycle duration matches the staking period", func() {
+			cycle1Duration := chainTimeAtCycle1End.Sub(chainTimeAtValidatorAdd)
+			require.Equal(stakingPeriod, cycle1Duration)
 		})
 
 		var expectedValidationReward1, expectedDelegateeReward1, expectedDelegatorReward1,
@@ -272,10 +309,23 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			_, err := pWallet.IssueSetAutoRenewedValidatorConfigTx(
 				validatorTxID,
 				updatedAutoCompoundedRewardShares,
-				uint64(stakingPeriod.Seconds()),
+				uint64(updatedStakingPeriod.Seconds()),
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
+		})
+
+		tc.By("checking API fields reflect updated auto compound shares", func() {
+			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
+			require.NoError(err)
+			require.Len(validators, 1)
+			require.NotNil(validators[0].Period)
+			require.Equal(uint64(updatedStakingPeriod.Seconds()), *validators[0].Period)
+			require.NotNil(validators[0].AutoCompoundRewardShares)
+			require.Equal(updatedAutoCompoundedRewardShares, *validators[0].AutoCompoundRewardShares)
+			require.NotNil(validators[0].ConfigOwner)
+			require.Equal(uint32(1), validators[0].ConfigOwner.Threshold)
+			require.Equal([]ids.ShortID{keychain.Keys[0].Address()}, validators[0].ConfigOwner.Addresses)
 		})
 
 		tc.By("retrieving supply before adding delegator2")
@@ -335,6 +385,14 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			stakingHelper.waitForStakingCycleEnd(nodeID)
 		})
 
+		chainTimeAtCycle2End, err := pvmClient.GetTimestamp(tc.DefaultContext())
+		require.NoError(err)
+
+		tc.By("checking the second cycle duration matches the updated staking period", func() {
+			cycle2Duration := chainTimeAtCycle2End.Sub(chainTimeAtCycle1End)
+			require.Equal(updatedStakingPeriod, cycle2Duration)
+		})
+
 		var expectedValidationReward2, expectedDelegateeReward2, expectedDelegator2Reward,
 			restakingValidationRewards2, restakingDelegateeRewards2 uint64
 		tc.By("checking reward balances after second cycle completion", func() {
@@ -354,7 +412,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 
 			// Calculate expected rewards for second cycle with 80% auto-compounded (20% withdrawn)
 			cycle2ValidatorWeight := weight + restakingValidationRewards1 + restakingDelegateeRewards1
-			potentialValidationReward2 := calculator.Calculate(stakingPeriod, cycle2ValidatorWeight, supplyAtCycle2Start)
+			potentialValidationReward2 := calculator.Calculate(updatedStakingPeriod, cycle2ValidatorWeight, supplyAtCycle2Start)
 			restakingValidationRewards2, expectedValidationReward2 = reward.Split(potentialValidationReward2, updatedAutoCompoundedRewardShares)
 
 			// Calculate delegator2 rewards
@@ -415,7 +473,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 		tc.By("checking final reward balances and stake returned", func() {
 			// Calculate expected rewards for third cycle (all rewards withdrawn since exiting)
 			cycle3ValidatorWeight := weight + restakingValidationRewards1 + restakingDelegateeRewards1 + restakingValidationRewards2 + restakingDelegateeRewards2
-			validatorPotentialReward3 := calculator.Calculate(stakingPeriod, cycle3ValidatorWeight, supplyAtCycle3Start)
+			validatorPotentialReward3 := calculator.Calculate(updatedStakingPeriod, cycle3ValidatorWeight, supplyAtCycle3Start)
 
 			// Check validation reward key balance includes all withdrawn + accrued validation rewards
 			validationKeychain := secp256k1fx.NewKeychain(validationRewardKey)
@@ -448,6 +506,36 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 
 			// The funded key should have received the original stake back.
 			require.Equal(fundedKeyBalancesBeforeExit[pContext.AVAXAssetID]+weight, fundedKeyBalances[pContext.AVAXAssetID])
+		})
+
+		tc.By("re-adding the same node as an auto-renewed validator after exit", func() {
+			pWallet = e2e.NewWallet(tc, keychain, walletNodeURI).P()
+			_, err := pWallet.IssueAddAutoRenewedValidatorTx(
+				nodeID,
+				weight,
+				nodePOP,
+				pContext.AVAXAssetID,
+				validationRewardsOwner,
+				delegationRewardsOwner,
+				configOwner,
+				delegationShares,
+				autoCompoundedRewardShares,
+				uint64(updatedStakingPeriod.Seconds()),
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+		})
+
+		tc.By("verifying the re-added validator is in the current set", func() {
+			tc.Eventually(func() bool {
+				validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
+				require.NoError(err)
+				return len(validators) == 1
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "re-added validator not found in current set")
+		})
+
+		tc.By("waiting for the re-added validator's staking cycle to complete", func() {
+			stakingHelper.waitForStakingCycleEnd(nodeID)
 		})
 
 		tc.By("stopping node to free up resources for a bootstrap check", func() {
