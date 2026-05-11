@@ -52,6 +52,7 @@ type Txpool struct {
 	snowCtx *snow.Context
 	sub     event.Subscription
 	maxSize int
+	wg      sync.WaitGroup
 
 	// stateLock is ordered before [Pending.lock]. Acquiring stateLock with
 	// [Pending.lock] held will deadlock.
@@ -98,7 +99,9 @@ func New(
 		maxSize: maxSize,
 		state:   state,
 	}
-	go p.updateState(chainConfig, chain, executed)
+	p.wg.Go(func() {
+		p.updateState(chainConfig, chain, executed)
+	})
 	return p, nil
 }
 
@@ -234,6 +237,7 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 // Close releases all allocated resources.
 func (p *Txpool) Close() {
 	p.sub.Unsubscribe()
+	p.wg.Wait()
 }
 
 // inputUTXOs returns the union of all UTXO IDs consumed by transactions in b,
