@@ -52,7 +52,7 @@ func StartTestPeer(
 	ip netip.AddrPort,
 	networkID uint32,
 	router router.InboundHandler,
-) (Peer, error) {
+) (*Peer, error) {
 	dialer := net.Dialer{}
 	conn, err := dialer.DialContext(ctx, constants.NetworkType, ip.String())
 	if err != nil {
