@@ -21,26 +21,17 @@ type MockListener struct {
 }
 
 func (ml *MockListener) Accept() (net.Conn, error) {
-	if ml.OnAcceptF == nil {
-		require.FailNow(ml.t, "unexpectedly called Accept")
-		return nil, nil
-	}
+	require.NotNil(ml.t, ml.OnAcceptF, "unexpectedly called Accept")
 	return ml.OnAcceptF()
 }
 
 func (ml *MockListener) Close() error {
-	if ml.OnCloseF == nil {
-		require.FailNow(ml.t, "unexpectedly called Close")
-		return nil
-	}
+	require.NotNil(ml.t, ml.OnCloseF, "unexpectedly called Close")
 	return ml.OnCloseF()
 }
 
 func (ml *MockListener) Addr() net.Addr {
-	if ml.OnAddrF == nil {
-		require.FailNow(ml.t, "unexpectedly called Addr")
-		return nil
-	}
+	require.NotNil(ml.t, ml.OnAddrF, "unexpectedly called Addr")
 	return ml.OnAddrF()
 }
 
@@ -62,7 +53,7 @@ func TestInboundConnThrottlerClose(t *testing.T) {
 	select {
 	case <-wrappedL.(*throttledListener).ctx.Done():
 	default:
-		require.FailNow("should have closed context")
+		t.Fatal("should have closed context")
 	}
 
 	// Accept() should return an error because the context is cancelled

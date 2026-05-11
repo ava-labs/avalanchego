@@ -2235,3 +2235,80 @@ func TestArchivalQueries(t *testing.T) {
 		})
 	}
 }
+
+// TestFirewoodArchive verifies that a Firewood archive node can reconstruct
+// historical state and build new state on top of it in steady state.
+//
+// With commit-interval = 10 and state-history = 11, Firewood's effective
+// deferred persistence commit count is 10, so it persists the latest committed
+// revision every 5 commits. After accepting 21 blocks:
+//   - Blocks 5, 10, 15, and 20 have persisted revisions.
+//   - Blocks 0 through 10 have aged out of the in-memory revision window.
+//
+// Querying state at every block from 0 through 10 exercises three paths:
+//   - Genesis state (block 0): reconstructed from the genesis spec via an
+//     in-memory hash-based trie; new state is then built on top of it.
+//   - Blocks without a persisted revision: reconstructed by walking back to
+//     the nearest persisted revision (or reconstructing genesis if none
+//     exists) and re-executing forward.
+//   - Blocks with a persisted revision: served directly, with new state
+//     built on top.
+func TestFirewoodArchive(t *testing.T) {
+	require := require.New(t)
+	ctx := t.Context()
+
+	configJSON := `{
+		"pruning-enabled": false,
+		"commit-interval": 10,
+		"state-history": 11
+	}`
+
+	const (
+		totalBlocks       = 21
+		historicalQueries = 10
+	)
+
+	vm := newDefaultTestVM()
+	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+		ConfigJSON: configJSON,
+		Scheme:     customrawdb.FirewoodScheme,
+	})
+	t.Cleanup(func() {
+		require.NoError(vm.Shutdown(ctx))
+	})
+
+	for range totalBlocks {
+		nonce := vm.txPool.Nonce(vmtest.TestEthAddrs[0])
+		signedTx := newSignedLegacyTx(
+			t,
+			vm.chainConfig,
+			vmtest.TestKeys[0].ToECDSA(),
+			nonce,
+			&common.Address{},
+			big.NewInt(0),
+			21_000,
+			vmtest.InitialBaseFee,
+			nil,
+		)
+		blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
+		require.NoError(err)
+		require.NoError(blk.Accept(ctx))
+	}
+
+	vm.blockChain.DrainAcceptorQueue()
+
+	handlers, err := vm.CreateHandlers(ctx)
+	require.NoError(err)
+
+	server := httptest.NewServer(handlers[ethRPCEndpoint])
+	t.Cleanup(server.Close)
+
+	client, err := ethclient.Dial(server.URL)
+	require.NoError(err)
+
+	for i := 0; i <= historicalQueries; i++ {
+		nonce, err := client.NonceAt(ctx, vmtest.TestEthAddrs[0], big.NewInt(int64(i)))
+		require.NoErrorf(err, "failed to get nonce at block %d", i)
+		require.Equal(uint64(i), nonce)
+	}
+}

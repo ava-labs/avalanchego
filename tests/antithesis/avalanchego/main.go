@@ -695,7 +695,7 @@ func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) error {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := avm.NewClient(uri, "X")
-		if err := avm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
+		if err := client.AwaitTxAccepted(ctx, txID, 100*time.Millisecond); err != nil {
 			return fmt.Errorf("failed to confirm X-chain transaction %s on %s: %w", txID, uri, err)
 		}
 		w.log.Info("confirmed X-chain transaction",
@@ -713,7 +713,7 @@ func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) error {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
-		if err := platformvm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
+		if err := client.AwaitTxAccepted(ctx, txID, 100*time.Millisecond); err != nil {
 			return fmt.Errorf("failed to confirm P-chain transaction %s on %s: %w", txID, uri, err)
 		}
 		w.log.Info("confirmed P-chain transaction",

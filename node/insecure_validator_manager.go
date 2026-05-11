@@ -15,7 +15,7 @@ import (
 )
 
 type insecureValidatorManager struct {
-	router.Router
+	router.ExternalHandler
 	log    logging.Logger
 	vdrs   validators.Manager
 	weight uint64
@@ -38,7 +38,7 @@ func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *vers
 			)
 		}
 	}
-	i.Router.Connected(vdrID, nodeVersion, subnetID)
+	i.ExternalHandler.Connected(vdrID, nodeVersion, subnetID)
 }
 
 func (i *insecureValidatorManager) Disconnected(vdrID ids.NodeID) {
@@ -52,5 +52,5 @@ func (i *insecureValidatorManager) Disconnected(vdrID ids.NodeID) {
 			zap.Error(err),
 		)
 	}
-	i.Router.Disconnected(vdrID)
+	i.ExternalHandler.Disconnected(vdrID)
 }

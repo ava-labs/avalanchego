@@ -5,24 +5,20 @@ package chains
 
 import (
 	"context"
-	"errors"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -30,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -37,18 +34,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
-	"github.com/ava-labs/avalanchego/vms/vmsmock"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
-
-// startChainCreatorNoPChain is used for testing to bypass setting up the pchain
-// and unblocking the chain creator
-func (m *manager) startChainCreatorNoPChain() {
-	m.chainCreatorExited.Add(1)
-	go m.dispatchChainCreator()
-
-	// typically creating the pchain would unblock the chain creator channel
-	close(m.unblockChainCreatorCh)
-}
 
 // newRouter returns a mock router that mocks the call of adding a chain to the router.
 func newRouter(t *testing.T, tm *timeout.Manager) router.Router {
@@ -90,43 +78,19 @@ func newTimeoutManager(t *testing.T) *timeout.Manager {
 	return timeoutManager
 }
 
-// newMockVMManager returns a VM manager that always returns a mock VM with
-// only the genesis block defined.
-func newMockVMManager(t *testing.T) vms.Manager {
-	ctrl := gomock.NewController(t)
-	vm := &blocktest.VM{}
-	vm.InitializeF = func(_ context.Context, _ *snow.Context, _ database.Database, _ []byte, _ []byte, _ []byte, _ []*common.Fx, _ common.AppSender) error {
-		return nil
-	}
-
-	vm.GetBlockIDAtHeightF = func(_ context.Context, height uint64) (ids.ID, error) {
-		require.Zero(t, height)
-		return snowmantest.GenesisID, nil
-	}
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		require.Equal(t, snowmantest.GenesisID, blkID)
-		return snowmantest.Genesis, nil
-	}
-	vm.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
-		return snowmantest.GenesisID, nil
-	}
-
-	factory := vmsmock.NewFactory(ctrl)
-	factory.EXPECT().New(gomock.Any()).Return(vm, nil).AnyTimes()
-
-	manager := vmsmock.NewManager(ctrl)
-	manager.EXPECT().GetFactory(gomock.Any()).Return(factory, nil).AnyTimes()
-
-	return manager
-}
-
-func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
+func newTestSubnets(t *testing.T, subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey) *Subnets {
 	config := map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
 		subnetID: {
 			SimplexParameters: &simplex.Parameters{
 				MaxNetworkDelay:    10 * time.Second,
 				MaxRebroadcastWait: 5 * time.Second,
+				InitialValidators: []simplex.ValidatorInfo{
+					{
+						NodeID:    nodeID,
+						PublicKey: pk.Compress(),
+					},
+				},
 			},
 		},
 	}
@@ -136,17 +100,28 @@ func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 	return subnets
 }
 
+func newTestVMManager(t *testing.T, vmID ids.ID) *vms.Manager {
+	vmManager := vms.NewManager(logging.NoLog{}, ids.NewAliaser())
+	require.NoError(t, vmManager.RegisterFactory(t.Context(), vmID, &xsvm.Factory{}))
+	return vmManager
+}
+
 func TestCreateSimplexChain(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
+	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{})
+	require.NoError(t, err)
+
 	chainParams := ChainParameters{
-		ID:       ids.GenerateTestID(),
-		SubnetID: ids.GenerateTestID(),
-		VMID:     ids.GenerateTestID(),
+		ID:          ids.GenerateTestID(),
+		SubnetID:    ids.GenerateTestID(),
+		VMID:        ids.GenerateTestID(),
+		GenesisData: genesisBytes,
 	}
-	logger := logging.NoLog{}
-	subnets := newTestSubnets(t, chainParams.SubnetID)
+	logger := logging.NewLogger("test", logging.NewWrappedCore(logging.Debug, os.Stdout, logging.Plain.ConsoleEncoder()))
 	signer, err := localsigner.New()
 	require.NoError(t, err)
+
+	subnets := newTestSubnets(t, chainParams.SubnetID, nodeID, signer.PublicKey())
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.DefaultRegisterer,
@@ -163,8 +138,26 @@ func TestCreateSimplexChain(t *testing.T) {
 	healthChecker, err := health.New(logger, prometheus.DefaultRegisterer)
 	require.NoError(t, err)
 
+	mc, err := message.NewCreator(
+		prometheus.NewRegistry(),
+		constants.DefaultNetworkCompressionType,
+		10*time.Second,
+	)
+	require.NoError(t, err)
+
 	tm := newTimeoutManager(t)
 	router := newRouter(t, tm)
+	cfg, err := network.NewTestNetworkConfig(
+		prometheus.NewRegistry(),
+		constants.LocalID,
+		validators,
+		set.Set[ids.ID]{},
+	)
+	require.NoError(t, err)
+
+	net, err := network.NewTestNetwork(logger, prometheus.NewRegistry(), cfg, router)
+	require.NoError(t, err)
+
 	managerConfig := &ManagerConfig{
 		NodeID:        nodeID,
 		StakingBLSKey: signer,
@@ -177,43 +170,55 @@ func TestCreateSimplexChain(t *testing.T) {
 		// Logging
 		Log: logger,
 		LogFactory: logging.NewFactory(logging.Config{
-			LogLevel:   logging.Debug,
-			LoggerName: "chain_logger",
+			LogLevel:     logging.Debug,
+			DisplayLevel: logging.Debug,
+			LoggerName:   "chain_logger",
 		}),
 
-		VMManager:  newMockVMManager(t),
+		VMManager:  newTestVMManager(t, chainParams.VMID),
 		Validators: validators,
-
+		MsgCreator: mc,
+		Net:        net,
 		// For handler initialization
-		FrontierPollFrequency:   1 * time.Second,
-		ConsensusAppConcurrency: 1,
-		ResourceTracker:         resourceTracker,
+		ResourceTracker: resourceTracker,
 
 		// For health check
 		Health: healthChecker,
 
+		// Database
+		DB: memdb.New(),
+
 		// Register the chain with router and timeout manager
 		TimeoutManager: tm,
 		Router:         router,
+
+		FrontierPollFrequency:   constants.DefaultFrontierPollFrequency,
+		ConsensusAppConcurrency: constants.DefaultConsensusAppConcurrency,
 	}
 
 	chainManager, err := New(managerConfig)
 	require.NoError(t, err)
 
-	chainManager.(*manager).startChainCreatorNoPChain()
+	// Create the chain synchronously rather than going through the chain
+	// creator goroutine, which is gated on the P-chain being bootstrapped.
+	chainManager.(*manager).createChain(chainParams)
 
-	// Queue chain creation
-	chainManager.QueueChainCreation(chainParams)
 	primaryAlias := chainManager.PrimaryAliasOrDefault(chainParams.ID)
+	id, err := chainManager.Lookup(primaryAlias)
+	require.NoError(t, err)
+	require.Equal(t, chainParams.ID, id)
 
-	for {
-		id, err := chainManager.Lookup(primaryAlias)
-		if errors.Is(err, ids.ErrNoIDWithAlias) {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-		require.NoError(t, err)
-		require.Equal(t, chainParams.ID, id)
-		return
-	}
+	require.Eventually(t, func() bool {
+		return chainManager.IsBootstrapped(id)
+	}, time.Minute, time.Millisecond*100)
+
+	// Capture the handler before Shutdown clears the router's handler map,
+	// since chainManager.Shutdown swallows per-chain shutdown timeouts.
+	chain := chainManager.(*manager).chains[id]
+	chainManager.Shutdown()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	_, err = chain.AwaitStopped(ctx)
+	require.NoError(t, err)
 }

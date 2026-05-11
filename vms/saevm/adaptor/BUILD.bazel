@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "adaptor",
+    srcs = ["adaptor.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/adaptor",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/consensus/snowman",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+    ],
+)

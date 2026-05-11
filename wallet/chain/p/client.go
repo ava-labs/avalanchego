@@ -55,7 +55,7 @@ func (c *Client) IssueTx(
 		return c.backend.AcceptTx(ctx, tx)
 	}
 
-	if err := platformvm.AwaitTxAccepted(c.client, ctx, txID, ops.PollFrequency()); err != nil {
+	if err := c.client.AwaitTxAccepted(ctx, txID, ops.PollFrequency()); err != nil {
 		return err
 	}
 

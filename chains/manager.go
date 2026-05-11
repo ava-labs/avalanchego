@@ -199,7 +199,7 @@ type ManagerConfig struct {
 	Tracer                    trace.Tracer
 	Log                       logging.Logger
 	LogFactory                logging.Factory
-	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
+	VMManager                 *vms.Manager // Manage mappings from vm ID --> vm
 	BlockAcceptorGroup        snow.AcceptorGroup
 	TxAcceptorGroup           snow.AcceptorGroup
 	VertexAcceptorGroup       snow.AcceptorGroup
@@ -1631,7 +1631,7 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 }
 
 // createSimplexHandler creates a handler that passes messages from the network to the consensus engine
-func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
+func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker) (handler.Handler, error) {
 	handlerReg, err := metrics.MakeAndRegister(
 		m.handlerGatherer,
 		primaryAlias,
@@ -1640,6 +1640,7 @@ func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, sb subnets.Su
 		return nil, err
 	}
 
+	noopHalt := func() {}
 	// Asynchronously passes messages from the network to the consensus engine
 	return handler.New(
 		ctx,
@@ -1653,7 +1654,7 @@ func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, sb subnets.Su
 		connectedValidators,
 		peerTracker,
 		handlerReg,
-		halter.Halt,
+		noopHalt,
 	)
 }
 
@@ -1735,9 +1736,24 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.Initializing,
 	})
-
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 	m.Log.Info("creating simplex chain", zap.String("chain", primaryAlias))
+
+	// Wrap the VM in meter/tracing VMs if enabled
+	if m.MeterVMEnabled {
+		meterchainvmReg, err := metrics.MakeAndRegister(
+			m.meterChainVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		vm = metervm.NewBlockVM(vm, meterchainvmReg)
+	}
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, primaryAlias, m.Tracer)
+	}
 
 	messageSender, err := m.createMessageSender(ctx, sb)
 	if err != nil {
@@ -1751,8 +1767,6 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	}
 
 	// TODO: wrap the vm in a LOCKED VM that locks the VM interface methods(excluding WaitForEvent)
-
-	var halter common.Halter
 	connectedValidators, err := m.createTrackedPeers(primaryAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error creating connected validators: %w", err)
@@ -1764,7 +1778,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("error creating peer tracking: %w", err)
 	}
 
-	h, err := m.createSimplexHandler(ctx, sb, primaryAlias, connectedValidators, peerTracker, halter)
+	h, err := m.createSimplexHandler(ctx, sb, primaryAlias, connectedValidators, peerTracker)
 	if err != nil {
 		return nil, fmt.Errorf("error creating handler: %w", err)
 	}
@@ -1790,10 +1804,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	}
 
 	walLocation := getChainWALLocation(ctx.ChainDataDir, ctx.ChainID)
-	chainWal, err := wal.New(walLocation)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create simplex wal: %w", err)
-	}
+	chainWal := wal.New(walLocation)
 
 	config := &simplex.Config{
 		Ctx:                simplexCtxConfig(ctx),
@@ -1812,16 +1823,16 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("couldn't create simplex engine: %w", err)
 	}
 
-	bootstrapper := &simplex.TODOBootstrapper{
+	bootstrapper := &simplex.NoopBootstrapper{
 		BootstrapTracker: sb,
 		Engine:           engine,
 	}
-
 	h.SetEngineManager(&handler.EngineManager{
 		DAG: nil,
 		Chain: &handler.Engine{
 			Bootstrapper: bootstrapper,
 			Consensus:    engine,
+			StateSyncer:  nil, // a nil StateSyncer, skips StateSync in favor of the Bootstrapper.
 		},
 	})
 

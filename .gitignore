@@ -1,6 +1,9 @@
 # Bazel symlinks
 /bazel-*
 
+# Local bazel overrides
+/.bazelrc.local
+
 *.log
 *~
 .DS_Store
@@ -41,6 +44,7 @@ tmp/
 *.fls
 *.gz
 *.pdf
+*.wal
 
 .coverage
 
@@ -60,8 +64,6 @@ tests/e2e/e2e.test
 tests/upgrade/upgrade.test
 
 vendor
-
-**/testdata
 
 .direnv
 # Personal extension to .envrc

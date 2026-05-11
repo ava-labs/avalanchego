@@ -4,19 +4,28 @@
 package node
 
 import (
+	"context"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/networking/router/routertest"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 const numValidators = 5_000
+
+type testExternalHandler struct{}
+
+func (*testExternalHandler) Connected(ids.NodeID, *version.Application, ids.ID) {}
+
+func (*testExternalHandler) Disconnected(ids.NodeID) {}
+
+func (*testExternalHandler) HandleInbound(context.Context, *message.InboundMessage) {}
 
 // Tests that reconnects that mutate the beacon manager's current total stake
 // weight is consistent. Test is not deterministic.
@@ -35,7 +44,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	wg := &sync.WaitGroup{}
 
 	b := beaconManager{
-		Router:                  routertest.New(t),
+		ExternalHandler:         &testExternalHandler{},
 		beacons:                 validatorSet,
 		requiredConns:           numValidators,
 		onSufficientlyConnected: make(chan struct{}),
