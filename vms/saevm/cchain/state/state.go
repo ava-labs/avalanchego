@@ -329,9 +329,9 @@ func applyTrie(trieDB *triedb.Database, root common.Hash, height uint64, txs []*
 		return common.Hash{}, fmt.Errorf("committing in-memory trie at height %d: %w", height, err)
 	}
 	if nodes != nil {
-		// The atomic trie is an isolated ref-counted graph with no real parent
-		// block; trieDB.Update's parent-root and block-number arguments are
-		// passed as placeholders that the hashdb backend does not consult.
+		// The parent-root and block-number args have no effect under hashdb;
+		// EmptyRootHash suppresses an otherwise-spurious parent-presence
+		// warning.
 		if err := trieDB.Update(newRoot, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
 			return common.Hash{}, fmt.Errorf("updating trieDB with new nodes: %w", err)
 		}
