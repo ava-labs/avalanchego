@@ -425,7 +425,6 @@ func TestDiffStakersDelegatorCancelOut(t *testing.T) {
 		t.Helper()
 
 		iter := diff.GetDelegatorIterator(parent, delegator.SubnetID, delegator.NodeID)
-		defer iter.Release()
 		require.Equal(t, want, iterator.ToSlice(iter))
 	}
 
@@ -437,7 +436,6 @@ func TestDiffStakersDelegatorCancelOut(t *testing.T) {
 		verify(t, diff, iterator.FromSlice(delegator), []*Staker{delegator})
 
 		iter := diff.GetStakerIterator(iterator.FromSlice(delegator))
-		defer iter.Release()
 		require.Equal(t, []*Staker{delegator}, iterator.ToSlice(iter))
 	})
 
@@ -449,7 +447,6 @@ func TestDiffStakersDelegatorCancelOut(t *testing.T) {
 		verify(t, diff, iterator.Empty[*Staker]{}, nil)
 
 		iter := diff.GetStakerIterator(iterator.Empty[*Staker]{})
-		defer iter.Release()
 		require.Empty(t, iterator.ToSlice(iter))
 	})
 }
@@ -501,7 +498,6 @@ func TestBaseStakersDelegatorCancelOutPersistence(t *testing.T) {
 		require.False(t, has)
 
 		iter := v.GetDelegatorIterator(delegator.SubnetID, delegator.NodeID)
-		defer iter.Release()
 		require.Empty(t, iterator.ToSlice(iter))
 	})
 }
