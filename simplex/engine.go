@@ -106,7 +106,7 @@ func newEngineWithSignerVerifier(ctx context.Context, snowCtx *snow.ConsensusCon
 		return nil, err
 	}
 
-	bt := newBlockTracker()
+	bt := newBlockTracker(config.VM)
 
 	storage, err := newStorage(ctx, config, qcDeserializer, bt)
 	if err != nil {
