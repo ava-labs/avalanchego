@@ -1,20 +1,26 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Differential tests asserting byte-for-byte equivalence between the new
-// vms/saevm/cchain/state package and the old
-// graft/coreth/plugin/evm/atomic/state package. The migration to the new
-// code does not run a database rewrite, so the indices retained by the new
-// code (atomicTxDB, atomicHeightTxDB, atomicTrieDB, atomicTrieMetaDB) must
-// produce the same on-disk bytes as the old code given the same inputs.
+// Tests for the state package. Two kinds:
+//
+//   - Differential tests that assert byte-for-byte equivalence between the
+//     new state package and the legacy graft/coreth/plugin/evm/atomic/state
+//     package. The migration to the new code does not run a database
+//     rewrite, so the indices retained by the new code (atomicTxDB,
+//     atomicHeightTxDB, atomicTrieDB, atomicTrieMetaDB) must produce the
+//     same on-disk bytes as the old code given the same inputs.
+//   - API tests that exercise [State]'s public methods directly.
 
 package state
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -26,12 +32,36 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 type block struct {
 	height uint64
 	txs    []*tx.Tx
+}
+
+// newTx returns an Import tx whose canonical bytes — and therefore tx ID —
+// are determined by outputIndex. All other fields are zero. Just enough
+// structure for the codec, ID derivation, and per-chain merging in
+// [applyTrie] to work; no semantic validity is asserted or needed by these
+// tests.
+func newTx(outputIndex uint32) *tx.Tx {
+	return &tx.Tx{
+		Unsigned: &tx.Import{
+			ImportedInputs: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{OutputIndex: outputIndex},
+				In:     &secp256k1fx.TransferInput{},
+			}},
+		},
+	}
+}
+
+func newState(t *testing.T) *State {
+	t.Helper()
+	s, err := New(memdb.New())
+	require.NoError(t, err)
+	return s
 }
 
 // blockSequence covers single-tx and multi-tx blocks at low heights, then
@@ -42,21 +72,23 @@ func blockSequence(t *testing.T) []block {
 	t.Helper()
 	return []block{
 		{1, nil}, // empty Apply: should be a no-op for both tx index and trie.
-		{2, []*tx.Tx{newImportTx(0xAA, 1)}},
-		{3, []*tx.Tx{newExportTx(0xBB, 2)}},
-		{5, []*tx.Tx{newImportTx(0xCC, 3), newExportTx(0xDD, 4)}},
-		{7, []*tx.Tx{newImportTx(0xEE, 5)}},
-		{8, []*tx.Tx{newExportTx(0xFF, 6)}},
-		{10, []*tx.Tx{newImportTx(0x11, 7), newImportTx(0x22, 8)}},
-		{12, []*tx.Tx{newExportTx(0x33, 9)}},
-		// First commit boundary (4096) is applied directly.
-		{commitInterval, []*tx.Tx{newImportTx(0x44, 10)}},
-		{commitInterval + 2, []*tx.Tx{newImportTx(0x55, 11)}},
-		// Second commit boundary (8192) is applied directly.
-		{2 * commitInterval, []*tx.Tx{newExportTx(0x66, 12)}},
-		{2*commitInterval + 1, []*tx.Tx{newImportTx(0x77, 13)}},
+		{2, []*tx.Tx{newTx(1)}},
+		{3, []*tx.Tx{newTx(2)}},
+		{5, []*tx.Tx{newTx(3), newTx(4)}},
+		{7, []*tx.Tx{newTx(5)}},
+		{8, []*tx.Tx{newTx(6)}},
+		{10, []*tx.Tx{newTx(7), newTx(8)}},
+		{12, []*tx.Tx{newTx(9)}},
+		{commitInterval, []*tx.Tx{newTx(10)}},
+		{commitInterval + 2, []*tx.Tx{newTx(11)}},
+		{2 * commitInterval, []*tx.Tx{newTx(12)}},
+		{2*commitInterval + 1, []*tx.Tx{newTx(13)}},
 	}
 }
+
+// ===========================================================================
+// Differential tests
+// ===========================================================================
 
 // TestStateDifferentialMatchesOldCoreth drives the same sequence of
 // (height, txs) blocks through both the new state package and the old
@@ -235,65 +267,203 @@ func convertNewToOld(t *testing.T, newTxs []*tx.Tx) []*atomic.Tx {
 	return out
 }
 
-// newImportTx returns a deterministic Import tx parameterized by a tag byte
-// (which makes IDs unique across calls) and nonce.
-func newImportTx(tag byte, nonce uint64) *tx.Tx {
-	utxoTxID := ids.ID{tag, 0x01}
-	assetID := ids.ID{tag, 0x02}
-	sourceChain := ids.ID{tag, 0x03}
-	addr := common.Address{tag, 0x04}
+// ===========================================================================
+// API tests
+// ===========================================================================
 
-	return &tx.Tx{
-		Unsigned: &tx.Import{
-			NetworkID:    1,
-			BlockchainID: ids.ID{tag, 0x05},
-			SourceChain:  sourceChain,
-			ImportedInputs: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{TxID: utxoTxID, OutputIndex: uint32(nonce)},
-				Asset:  avax.Asset{ID: assetID},
-				In: &secp256k1fx.TransferInput{
-					Amt:   1_000_000,
-					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-				},
-			}},
-			Outs: []tx.Output{{Address: addr, Amount: 1_000_000, AssetID: assetID}},
+func TestNew_EmptyDB(t *testing.T) {
+	require := require.New(t)
+	s := newState(t)
+
+	require.Equal(uint64(0), s.LastCommitted())
+
+	root, err := s.GetRoot(0)
+	require.NoError(err)
+	require.Equal(types.EmptyRootHash, root)
+}
+
+// TestApply table covers the Apply→{GetTx, GetRoot, LastCommitted} surface.
+// Every row asserts the same universal post-conditions, so individual rows
+// only need to describe the input sequence and the expected
+// last-committed height.
+func TestApply(t *testing.T) {
+	cases := []struct {
+		name              string
+		blocks            []block
+		wantLastCommitted uint64
+	}{
+		{
+			name: "empty applies at non-boundary heights",
+			blocks: []block{
+				{height: 1, txs: nil},
+				{height: 2, txs: []*tx.Tx{}},
+			},
+			wantLastCommitted: 0,
 		},
-		Creds: []tx.Credential{
-			&secp256k1fx.Credential{Sigs: [][65]byte{{}}},
+		{
+			name: "single tx at non-boundary height",
+			blocks: []block{
+				{height: 5, txs: []*tx.Tx{newTx(1)}},
+			},
+			wantLastCommitted: 0,
 		},
+		{
+			name: "multiple txs at single height",
+			blocks: []block{
+				{height: 5, txs: []*tx.Tx{newTx(1), newTx(2), newTx(3)}},
+			},
+			wantLastCommitted: 0,
+		},
+		{
+			name: "multiple non-boundary heights",
+			blocks: []block{
+				{height: 2, txs: []*tx.Tx{newTx(1)}},
+				{height: 3, txs: []*tx.Tx{newTx(2), newTx(3)}},
+				{height: 5, txs: []*tx.Tx{newTx(4)}},
+			},
+			wantLastCommitted: 0,
+		},
+		{
+			name: "crosses a single commit boundary",
+			blocks: []block{
+				{height: 1, txs: []*tx.Tx{newTx(1)}},
+				{height: commitInterval, txs: []*tx.Tx{newTx(2)}},
+				{height: commitInterval + 1, txs: []*tx.Tx{newTx(3)}},
+			},
+			wantLastCommitted: commitInterval,
+		},
+		{
+			name: "crosses two commit boundaries",
+			blocks: []block{
+				{height: commitInterval, txs: []*tx.Tx{newTx(1)}},
+				{height: 2 * commitInterval, txs: []*tx.Tx{newTx(2)}},
+			},
+			wantLastCommitted: 2 * commitInterval,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
+			s := newState(t)
+
+			// Snapshot inputs so the universal "Apply doesn't mutate the
+			// caller's slice" invariant can be checked at the end.
+			snapshots := make([][]*tx.Tx, len(tc.blocks))
+			for i, b := range tc.blocks {
+				snapshots[i] = slices.Clone(b.txs)
+			}
+
+			for _, b := range tc.blocks {
+				require.NoError(s.Apply(b.height, b.txs))
+			}
+
+			require.Equal(tc.wantLastCommitted, s.LastCommitted())
+
+			for i, b := range tc.blocks {
+				require.Equal(snapshots[i], b.txs, "Apply mutated input slice at block %d", i)
+			}
+
+			for _, b := range tc.blocks {
+				for _, want := range b.txs {
+					got, height, err := s.GetTx(want.ID())
+					require.NoError(err)
+					require.Equal(b.height, height)
+					require.Empty(cmp.Diff(want, got, txtest.CmpOpt()))
+				}
+
+				_, err := s.GetRoot(b.height)
+				if b.height%commitInterval == 0 {
+					require.NoError(err, "GetRoot at commit boundary %d", b.height)
+				} else {
+					require.ErrorIs(err, database.ErrNotFound, "GetRoot at non-boundary %d", b.height)
+				}
+			}
+
+			root, err := s.GetRoot(0)
+			require.NoError(err)
+			require.Equal(types.EmptyRootHash, root)
+
+			_, _, err = s.GetTx(ids.ID{0xDE, 0xAD, 0xBE, 0xEF})
+			require.ErrorIs(err, database.ErrNotFound)
+		})
 	}
 }
 
-// newExportTx returns a deterministic Export tx.
-func newExportTx(tag byte, nonce uint64) *tx.Tx {
-	assetID := ids.ID{tag, 0x02}
-	destChain := ids.ID{tag, 0x06}
-	addr := common.Address{tag, 0x07}
+// TestApply_SortInvariant verifies that the order of txs in the input slice
+// does not affect the on-disk trie root. The txs all target the same source
+// chain (zero), so without the sort in Apply, the per-chain Requests merge
+// in [applyTrie] would produce different trie value bytes — and therefore a
+// different root — depending on the input order.
+func TestApply_SortInvariant(t *testing.T) {
+	require := require.New(t)
 
-	return &tx.Tx{
-		Unsigned: &tx.Export{
-			NetworkID:        1,
-			BlockchainID:     ids.ID{tag, 0x05},
-			DestinationChain: destChain,
-			Ins: []tx.Input{{
-				Address: addr,
-				Amount:  500_000,
-				AssetID: assetID,
-				Nonce:   nonce,
-			}},
-			ExportedOutputs: []*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: assetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 500_000,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{{tag, 0x08}},
-					},
-				},
-			}},
-		},
-		Creds: []tx.Credential{
-			&secp256k1fx.Credential{Sigs: [][65]byte{{}}},
-		},
+	txs := []*tx.Tx{
+		newTx(1),
+		newTx(2),
+		newTx(3),
 	}
+
+	apply := func(in []*tx.Tx) common.Hash {
+		s := newState(t)
+		require.NoError(s.Apply(commitInterval, in))
+		root, err := s.GetRoot(commitInterval)
+		require.NoError(err)
+		return root
+	}
+
+	forward := apply(txs)
+	reversed := apply([]*tx.Tx{txs[2], txs[1], txs[0]})
+	rotated := apply([]*tx.Tx{txs[1], txs[2], txs[0]})
+
+	require.Equal(forward, reversed)
+	require.Equal(forward, rotated)
+	require.NotEqual(types.EmptyRootHash, forward)
+}
+
+// TestNew_ReplayPreservesState applies the full block sequence, discards
+// the in-memory state, re-opens via New, and verifies that the rebuilt
+// state matches what was in memory before the close and that subsequent
+// Apply calls extend the same trie tip.
+func TestNew_ReplayPreservesState(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	s, err := New(db)
+	require.NoError(err)
+
+	seq := blockSequence(t)
+	for _, b := range seq {
+		require.NoError(s.Apply(b.height, b.txs))
+	}
+	wantLastCommitted := s.LastCommitted()
+	wantRoot := s.currentRoot
+
+	reopened, err := New(db)
+	require.NoError(err)
+
+	require.Equal(wantLastCommitted, reopened.LastCommitted())
+	require.Equal(wantRoot, reopened.currentRoot)
+
+	for _, b := range seq {
+		for _, want := range b.txs {
+			got, height, err := reopened.GetTx(want.ID())
+			require.NoError(err)
+			require.Equal(b.height, height)
+			require.Empty(cmp.Diff(want, got, txtest.CmpOpt()))
+		}
+	}
+
+	// A subsequent Apply on the reopened state must extend the same trie
+	// tip: applying at the next commit boundary advances the last-committed
+	// marker and the new tx is retrievable.
+	extra := newTx(99)
+	nextBoundary := (wantLastCommitted/commitInterval + 1) * commitInterval
+	require.NoError(reopened.Apply(nextBoundary, []*tx.Tx{extra}))
+	require.Equal(nextBoundary, reopened.LastCommitted())
+
+	gotExtra, h, err := reopened.GetTx(extra.ID())
+	require.NoError(err)
+	require.Equal(nextBoundary, h)
+	require.Empty(cmp.Diff(extra, gotExtra, txtest.CmpOpt()))
 }
