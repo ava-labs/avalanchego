@@ -9,6 +9,9 @@
   - `eth_net_responsive_peers` -> `sdk_sync_peer_tracker_num_responsive_peers`
   - `eth_net_average_bandwidth` -> `sdk_sync_peer_tracker_average_bandwidth`
 
+### Fixes
+- Updated minimum Go version from `v1.25.8` to `v1.25.10`.
+
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 
 This version is backwards compatible to [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0). It is optional, but encouraged.
