@@ -235,10 +235,11 @@ func (p *Txpool) Close() {
 // covering both EVM-native account+nonce inputs and cross-chain inputs.
 func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) {
 	var (
+		ethTxs = b.Transactions()
 		signer = blocks.Signer(b, c)
-		inputs set.Set[ids.ID]
+		inputs = set.NewSet[ids.ID](len(ethTxs))
 	)
-	for i, t := range b.Transactions() {
+	for i, t := range ethTxs {
 		sender, err := signer.Sender(t)
 		if err != nil {
 			return nil, fmt.Errorf("getting sender of tx %s (%d): %w", t.Hash(), i, err)
@@ -246,11 +247,11 @@ func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) 
 		inputs.Add(tx.AccountInputID(sender, t.Nonce()))
 	}
 
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	avaxTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
-	for _, t := range txs {
+	for _, t := range avaxTxs {
 		inputs.Union(t.InputIDs())
 	}
 	return inputs, nil
