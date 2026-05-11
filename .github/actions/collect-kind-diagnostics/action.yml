@@ -1,0 +1,23 @@
+name: 'Collect kind diagnostics'
+description: 'Collect runner, Docker, kind, and Kubernetes diagnostics for kind-backed jobs'
+
+inputs:
+  artifact_name:
+    description: 'Name of the uploaded diagnostics artifact'
+    required: true
+  diagnostics_dir:
+    description: 'Directory to write diagnostics into'
+    default: /tmp/kind-diagnostics
+
+runs:
+  using: composite
+  steps:
+    - name: Collect diagnostics
+      shell: bash
+      run: ./scripts/collect_kind_diagnostics.sh "${{ inputs.diagnostics_dir }}"
+    - name: Upload diagnostics
+      uses: actions/upload-artifact@v6
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ inputs.diagnostics_dir }}
+        if-no-files-found: warn
