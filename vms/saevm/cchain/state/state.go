@@ -298,8 +298,7 @@ func writeTxByID(db database.KeyValueWriter, height uint64, tx *tx.Tx) error {
 }
 
 // writeTxsByHeight stores txs under the height key. Empty heights skip the
-// write: an empty payload would persist a byte sequence that no read
-// distinguishes from an absent key.
+// write to avoid needlessly populating the database with empty values.
 func writeTxsByHeight(db database.KeyValueWriter, height uint64, txs []*tx.Tx) error {
 	if len(txs) == 0 {
 		return nil
