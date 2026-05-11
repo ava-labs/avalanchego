@@ -51,6 +51,8 @@ var (
 
 // State holds the accepted transactions and the atomic-request trie. It is not
 // safe for concurrent use; callers must serialize calls to [State.Apply].
+//
+// When applying operations, shared memory is updated atomically with the state.
 type State struct {
 	snowCtx *snow.Context
 	db      database.Database
@@ -61,11 +63,8 @@ type State struct {
 	currentRoot         common.Hash
 }
 
-// New opens the state on db. On startup, the in-memory trie is rebuilt by
-// replaying the accepted-tx index from the last committed height up to the
-// current height.
-//
-// When applying operations, shared memory is updated atomically with the state.
+// New initializes the state with db. On startup, the in-memory trie is rebuilt
+// by replaying any applied but not yet committed transactions.
 func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 	root, committedHeight, err := readLastCommitted(db)
 	if err != nil {
@@ -148,7 +147,7 @@ func rootKey(height uint64) []byte {
 }
 
 // readLastApplied returns the most recent height passed to [State.Apply]. If
-// no Apply has been recorded, it returns 0.
+// none exists, it returns 0.
 func readLastApplied(db database.KeyValueReader) (uint64, error) {
 	switch height, err := database.GetUInt64(db, lastApplyKey); {
 	case err == database.ErrNotFound:
