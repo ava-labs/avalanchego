@@ -208,7 +208,7 @@ func (s *Syncer[_, _]) Sync(ctx context.Context) error {
 		return err
 	}
 
-	// Blocks until syncing is done or canceled.
+	// Blocks until syncing completes, errors, or the context is canceled.
 	s.workLoop(ctx)
 
 	// There was a fatal error.
