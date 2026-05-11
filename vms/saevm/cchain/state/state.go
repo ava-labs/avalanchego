@@ -17,12 +17,12 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/ava-labs/libevm/triedb/hashdb"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -74,9 +74,9 @@ func New(db database.Database) (*State, error) {
 	trieDB := triedb.NewDatabase(
 		rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(triePrefix, db))),
 		&triedb.Config{
-			DBOverride: hashdb.Config{
+			HashDB: &hashdb.Config{
 				CleanCacheSize: 64 * units.MiB,
-			}.BackendConstructor,
+			},
 		},
 	)
 
@@ -193,6 +193,9 @@ const commitInterval = 4096 // [config.defaultCommitInterval]
 // operations to the trie, indexes the txs by ID and by height, and on
 // commit-interval boundaries flushes the trie to disk. All on-disk writes are
 // committed atomically.
+//
+// Apply is a noop when height is not higher than the highest previously applied
+// height.
 func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if height <= s.currentHeight {
 		// TODO(StephenButtolph): Add logging here.
