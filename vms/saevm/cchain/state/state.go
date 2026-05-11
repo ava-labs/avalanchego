@@ -42,23 +42,14 @@ import (
 //	atomicTxDB       / [txID(32)]                     -> [height(8 BE)][len(4 BE)][tx_bytes]
 //	atomicHeightTxDB / [height(8 BE)]                 -> codec.Marshal(0, []*tx.Tx)
 var (
-	// Matches state.atomicTrieStoragePrefix.
-	triePrefix = []byte("atomicTrieDB")
+	triePrefix = []byte("atomicTrieDB") // [state.atomicTrieStoragePrefix]
 
-	// Matches state.atomicTrieMetaDBPrefix.
-	commitPrefix = prefixdb.MakePrefix([]byte("atomicTrieMetaDB"))
-	// Matches state.lastCommittedKey under commitPrefix.
-	lastCommittedHeightKey = prefixdb.PrefixKey(commitPrefix, []byte("atomicTrieLastCommittedBlock"))
+	commitPrefix  = prefixdb.MakePrefix([]byte("atomicTrieMetaDB"))                          // [state.atomicTrieMetaDBPrefix]
+	lastCommitKey = prefixdb.PrefixKey(commitPrefix, []byte("atomicTrieLastCommittedBlock")) // [state.lastCommittedKey]
 
-	// Matches state.atomicTxIDDBPrefix.
-	txIDPrefix = prefixdb.MakePrefix([]byte("atomicTxDB"))
-	// Matches state.atomicHeightTxDBPrefix.
-	heightPrefix = prefixdb.MakePrefix([]byte("atomicHeightTxDB"))
+	txIDPrefix   = prefixdb.MakePrefix([]byte("atomicTxDB"))       // [state.atomicTxIDDBPrefix]
+	heightPrefix = prefixdb.MakePrefix([]byte("atomicHeightTxDB")) // [state.atomicHeightTxDBPrefix]
 )
-
-func trieMetadataHeightKey(height uint64) []byte {
-	return prefixdb.PrefixKey(commitPrefix, database.PackUInt64(height))
-}
 
 // State holds the C-Chain custom state. It is not safe for concurrent use.
 //
@@ -113,7 +104,7 @@ func New(db database.Database) (*State, error) {
 // readLastCommittedRoot returns the last committed trie root and height. If
 // none have been written, it returns the empty root for the genesis block.
 func readLastCommittedRoot(db database.KeyValueReader) (common.Hash, uint64, error) {
-	height, err := database.GetUInt64(db, lastCommittedHeightKey)
+	height, err := database.GetUInt64(db, lastCommitKey)
 	switch {
 	case err == database.ErrNotFound:
 		return types.EmptyRootHash, 0, nil
@@ -134,26 +125,30 @@ func readCommittedRoot(db database.KeyValueReader, height uint64) (common.Hash, 
 	if height == 0 {
 		return types.EmptyRootHash, nil
 	}
-	root, err := database.GetID(db, trieMetadataHeightKey(height))
+	root, err := database.GetID(db, rootKey(height))
 	if err != nil {
 		return common.Hash{}, err
 	}
 	return common.Hash(root), nil
 }
 
-// txsAndHeight pairs a slice of accepted transactions with the block height
+func rootKey(height uint64) []byte {
+	return prefixdb.PrefixKey(commitPrefix, database.PackUInt64(height))
+}
+
+// txsEntry pairs a slice of accepted transactions with the block height
 // they were accepted at.
-type txsAndHeight struct {
-	txs    []*tx.Tx
+type txsEntry struct {
 	height uint64
+	txs    []*tx.Tx
 }
 
 // iterateTxsFromHeight returns an iterator yielding (txs, height) entries
 // starting at startHeight in ascending height order. Heights with no txs
 // are skipped (the caller is expected to know that empty heights don't
 // change the trie).
-func iterateTxsFromHeight(db database.Iteratee, startHeight uint64) iter.Seq2[txsAndHeight, error] {
-	return func(yield func(txsAndHeight, error) bool) {
+func iterateTxsFromHeight(db database.Iteratee, startHeight uint64) iter.Seq2[txsEntry, error] {
+	return func(yield func(txsEntry, error) bool) {
 		it := db.NewIteratorWithStartAndPrefix(
 			prefixdb.PrefixKey(heightPrefix, database.PackUInt64(startHeight)),
 			heightPrefix,
@@ -163,23 +158,23 @@ func iterateTxsFromHeight(db database.Iteratee, startHeight uint64) iter.Seq2[tx
 		for it.Next() {
 			height, err := database.ParseUInt64(it.Key()[len(heightPrefix):])
 			if err != nil {
-				yield(txsAndHeight{}, err)
+				yield(txsEntry{}, err)
 				return
 			}
 
 			txs, err := tx.ParseSlice(it.Value())
 			if err != nil {
-				yield(txsAndHeight{}, err)
+				yield(txsEntry{}, err)
 				return
 			}
 
-			if !yield(txsAndHeight{txs: txs, height: height}, nil) {
+			if !yield(txsEntry{height: height, txs: txs}, nil) {
 				return
 			}
 		}
 
 		if err := it.Error(); err != nil {
-			yield(txsAndHeight{}, err)
+			yield(txsEntry{}, err)
 		}
 	}
 }
@@ -256,10 +251,10 @@ func writeTxsByHeight(db database.KeyValueWriter, height uint64, txs []*tx.Tx) e
 // writeCommittedRoot maps height to root and marks it as the last committed
 // entry.
 func writeCommittedRoot(db database.KeyValueWriter, height uint64, root common.Hash) error {
-	if err := database.PutUInt64(db, lastCommittedHeightKey, height); err != nil {
+	if err := database.PutUInt64(db, lastCommitKey, height); err != nil {
 		return fmt.Errorf("writing last committed height: %w", err)
 	}
-	if err := database.PutID(db, trieMetadataHeightKey(height), ids.ID(root)); err != nil {
+	if err := database.PutID(db, rootKey(height), ids.ID(root)); err != nil {
 		return fmt.Errorf("writing committed root for height %d: %w", height, err)
 	}
 	return nil
@@ -326,15 +321,15 @@ func applyTrie(trieDB *triedb.Database, root common.Hash, height uint64, sorted 
 		}
 	}
 	for chainID, requests := range ops {
-		valueBytes, err := c.Marshal(codecVersion, requests)
+		v, err := c.Marshal(codecVersion, requests)
 		if err != nil {
 			return common.Hash{}, fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
 		}
 
-		keyPacker := wrappers.Packer{Bytes: make([]byte, trieKeyLength)}
-		keyPacker.PackLong(height)
-		keyPacker.PackFixedBytes(chainID[:])
-		if err := tr.Update(keyPacker.Bytes, valueBytes); err != nil {
+		p := wrappers.Packer{Bytes: make([]byte, trieKeyLength)}
+		p.PackLong(height)
+		p.PackFixedBytes(chainID[:])
+		if err := tr.Update(p.Bytes, v); err != nil {
 			return common.Hash{}, fmt.Errorf("inserting trie key for chain %s: %w", chainID, err)
 		}
 	}
@@ -352,8 +347,6 @@ func applyTrie(trieDB *triedb.Database, root common.Hash, height uint64, sorted 
 		return common.Hash{}, fmt.Errorf("referencing root %s: %w", newRoot, err)
 	}
 
-	// Memory cap for the in-memory trieDB between commits. Matches the
-	// unexported state.atomicTrieMemoryCap.
 	const (
 		trieMemoryCap     = 64 * units.MiB
 		trieMemoryCapTrim = trieMemoryCap - ethdb.IdealBatchSize
