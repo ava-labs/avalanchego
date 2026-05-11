@@ -14,7 +14,6 @@
 package state
 
 import (
-	"bytes"
 	"slices"
 	"testing"
 
@@ -187,13 +186,14 @@ func applyToBoth(t *testing.T, newSt *State, drv *oldDriver, oldVDB *versiondb.D
 }
 
 // retainedPrefixes are the prefixes whose contents must remain
-// byte-identical between old and new. They correspond to the four prefixdb
-// roots defined in old code at atomic_repository.go:30-34, minus
-// atomicRepoMetadataDB which the new code drops.
+// byte-identical between old and new. They correspond to the five prefixdb
+// roots defined in old code at atomic_repository.go:30-34.
 var retainedPrefixes = []string{
 	"atomicTxDB",
 	"atomicHeightTxDB",
 	"atomicTrieDB",
+	"atomicTrieMetaDB",
+	"atomicRepoMetadataDB",
 }
 
 func assertPrefixesEqual(t *testing.T, newDB, oldDB database.Database, height uint64) {
@@ -202,23 +202,13 @@ func assertPrefixesEqual(t *testing.T, newDB, oldDB database.Database, height ui
 	for _, name := range retainedPrefixes {
 		newPDB := prefixdb.New([]byte(name), newDB)
 		oldPDB := prefixdb.New([]byte(name), oldDB)
-		assertDBsEqual(t, newPDB, oldPDB, name, height, nil)
+		assertDBsEqual(t, newPDB, oldPDB, name, height)
 	}
-
-	// atomicTrieMetaDB: the new code adds atomicTrieLastAppliedBlock under
-	// this prefix; the old code does not. Filter it out before comparing.
-	appliedKey := []byte("atomicTrieLastAppliedBlock")
-	newMeta := prefixdb.New([]byte("atomicTrieMetaDB"), newDB)
-	oldMeta := prefixdb.New([]byte("atomicTrieMetaDB"), oldDB)
-	assertDBsEqual(t, newMeta, oldMeta, "atomicTrieMetaDB", height, func(k []byte) bool {
-		return bytes.Equal(k, appliedKey)
-	})
 }
 
 // assertDBsEqual iterates a and b in lockstep and asserts every (key,value)
-// matches. If skipA is non-nil, entries on the a side whose key satisfies
-// the predicate are skipped before comparison.
-func assertDBsEqual(t *testing.T, a, b database.Iteratee, prefix string, height uint64, skipA func([]byte) bool) {
+// matches.
+func assertDBsEqual(t *testing.T, a, b database.Iteratee, prefix string, height uint64) {
 	t.Helper()
 
 	itA := a.NewIterator()
@@ -226,17 +216,8 @@ func assertDBsEqual(t *testing.T, a, b database.Iteratee, prefix string, height 
 	itB := b.NewIterator()
 	defer itB.Release()
 
-	advanceA := func() bool {
-		for itA.Next() {
-			if skipA == nil || !skipA(itA.Key()) {
-				return true
-			}
-		}
-		return false
-	}
-
 	for {
-		hasA := advanceA()
+		hasA := itA.Next()
 		hasB := itB.Next()
 		if !hasA && !hasB {
 			break
@@ -437,13 +418,16 @@ func TestNew_ReplayPreservesState(t *testing.T) {
 		require.NoError(s.Apply(b.height, b.txs))
 	}
 	wantLastCommitted := s.LastCommitted()
-	wantRoot := s.currentRoot
+	wantCommittedRoot, err := s.GetRoot(wantLastCommitted)
+	require.NoError(err)
 
 	reopened, err := New(db)
 	require.NoError(err)
 
 	require.Equal(wantLastCommitted, reopened.LastCommitted())
-	require.Equal(wantRoot, reopened.currentRoot)
+	gotCommittedRoot, err := reopened.GetRoot(wantLastCommitted)
+	require.NoError(err)
+	require.Equal(wantCommittedRoot, gotCommittedRoot)
 
 	for _, b := range seq {
 		for _, want := range b.txs {

@@ -40,6 +40,9 @@ var (
 	commitPrefix  = prefixdb.MakePrefix([]byte("atomicTrieMetaDB"))                          // [state.atomicTrieMetaDBPrefix]
 	lastCommitKey = prefixdb.PrefixKey(commitPrefix, []byte("atomicTrieLastCommittedBlock")) // [state.lastCommittedKey]
 
+	applyPrefix  = prefixdb.MakePrefix([]byte("atomicRepoMetadataDB"))                 // [state.atomicRepoMetadataDBPrefix]
+	lastApplyKey = prefixdb.PrefixKey(applyPrefix, []byte("maxIndexedAtomicTxHeight")) // [state.maxIndexedHeightKey]
+
 	txIDPrefix   = prefixdb.MakePrefix([]byte("atomicTxDB"))       // [state.atomicTxIDDBPrefix]
 	heightPrefix = prefixdb.MakePrefix([]byte("atomicHeightTxDB")) // [state.atomicHeightTxDBPrefix]
 )
@@ -51,6 +54,7 @@ type State struct {
 	trieDB *triedb.Database
 
 	lastCommittedHeight uint64
+	currentHeight       uint64
 	currentRoot         common.Hash
 }
 
@@ -58,7 +62,11 @@ type State struct {
 // replaying the accepted-tx index from the last committed height up to the
 // current height.
 func New(db database.Database) (*State, error) {
-	root, height, err := readLastCommitted(db)
+	root, committedHeight, err := readLastCommitted(db)
+	if err != nil {
+		return nil, err
+	}
+	currentHeight, err := readLastApplied(db)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +80,7 @@ func New(db database.Database) (*State, error) {
 		},
 	)
 
-	for entry, err := range iterateTxs(db, height+1) {
+	for entry, err := range iterateTxs(db, committedHeight+1) {
 		if err != nil {
 			return nil, fmt.Errorf("replaying tx index: %w", err)
 		}
@@ -87,7 +95,8 @@ func New(db database.Database) (*State, error) {
 	return &State{
 		db:                  db,
 		trieDB:              trieDB,
-		lastCommittedHeight: height,
+		lastCommittedHeight: committedHeight,
+		currentHeight:       currentHeight,
 		currentRoot:         root,
 	}, nil
 }
@@ -124,6 +133,19 @@ func readCommittedRoot(db database.KeyValueReader, height uint64) (common.Hash, 
 
 func rootKey(height uint64) []byte {
 	return prefixdb.PrefixKey(commitPrefix, database.PackUInt64(height))
+}
+
+// readLastApplied returns the most recent height passed to [State.Apply]. If
+// no Apply has been recorded, it returns 0.
+func readLastApplied(db database.KeyValueReader) (uint64, error) {
+	switch height, err := database.GetUInt64(db, lastApplyKey); {
+	case err == database.ErrNotFound:
+		return 0, nil
+	case err != nil:
+		return 0, fmt.Errorf("getting last applied height: %w", err)
+	default:
+		return height, nil
+	}
 }
 
 type txsEntry struct {
@@ -171,9 +193,12 @@ const commitInterval = 4096 // [config.defaultCommitInterval]
 // operations to the trie, indexes the txs by ID and by height, and on
 // commit-interval boundaries flushes the trie to disk. All on-disk writes are
 // committed atomically.
-//
-// Apply must be called with contiguous monotonically-increasing heights.
 func (s *State) Apply(height uint64, txs []*tx.Tx) error {
+	if height <= s.currentHeight {
+		// TODO(StephenButtolph): Add logging here.
+		return nil
+	}
+
 	// The trie and the height-based index were initially generated from the
 	// already existing id-based index. This resulted in data canonically sorted
 	// by txID. To maintain this behavior, txs must be sorted by ID before
@@ -204,6 +229,10 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		}
 		s.lastCommittedHeight = height
 	}
+	if err := database.PutUInt64(batch, lastApplyKey, height); err != nil {
+		return fmt.Errorf("writing last applied height: %w", err)
+	}
+	s.currentHeight = height
 	if err := batch.Write(); err != nil {
 		return fmt.Errorf("committing batch at height %d: %w", height, err)
 	}
