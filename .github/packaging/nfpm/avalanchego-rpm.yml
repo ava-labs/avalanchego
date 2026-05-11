@@ -8,7 +8,7 @@ license: "BSD-3-Clause"
 depends:
   - "glibc >= 2.34"
 contents:
-  - src: "${AVALANCHEGO_BINARY}"
+  - src: "${BINARY_PATH}"
     dst: /var/opt/avalanchego/bin/avalanchego
     expand: true
     file_info:
