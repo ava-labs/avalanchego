@@ -227,6 +227,9 @@ const commitInterval = 4096 // [config.defaultCommitInterval]
 // height.
 func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if height <= s.currentHeight {
+		// During restarts, it is expected for SAE to reprocess already-applied
+		// heights. Shared memory is not safe to apply multiple times for the
+		// same height, so we MUST skip these duplicate applications.
 		s.snowCtx.Log.Debug("skipping writes for old height",
 			zap.Uint64("height", height),
 			zap.Uint64("currentHeight", s.currentHeight),
