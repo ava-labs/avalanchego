@@ -107,20 +107,22 @@ func (p *Txpool) updateState(
 	chain Backend,
 	executed <-chan core.ChainHeadEvent,
 ) {
-	var (
-		sub = p.sub
-		log = p.snowCtx.Log
-	)
+	sub := p.sub
 	defer sub.Unsubscribe()
 	for {
 		select {
 		case e := <-executed:
-			b := e.Block
+			var (
+				b   = e.Block
+				log = p.snowCtx.Log.With(
+					zap.Stringer("blockHash", b.Hash()),
+					zap.Uint64("blockNumber", b.NumberU64()),
+				)
+			)
+
 			inputs, err := inputUTXOs(b, chainConfig)
 			if err != nil {
 				log.Error("unable to get inputs from block",
-					zap.Stringer("blockHash", b.Hash()),
-					zap.Uint64("blockNumber", b.NumberU64()),
 					zap.Error(err),
 				)
 				continue
@@ -142,9 +144,11 @@ func (p *Txpool) updateState(
 
 			p.lock.Unlock()
 			p.stateLock.Unlock()
+
+			log.Debug("updated to new state")
 		case err := <-sub.Err():
 			if err != nil {
-				log.Error("pool subscription failed",
+				p.snowCtx.Log.Error("pool subscription failed",
 					zap.Error(err),
 				)
 			}
