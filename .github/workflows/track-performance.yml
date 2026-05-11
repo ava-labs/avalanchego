@@ -7,8 +7,6 @@ on:
     # These cron expressions are matched exactly in configure-benchmark to set parameters
     # Weekdays at 05:00 UTC (00:00 ET) - 1M blocks: 40M → 41M
     - cron: '0 5 * * 1-5'
-    # Weekly Saturday at 05:00 UTC (00:00 ET) - 10M blocks: 50M → 60M
-    - cron: '0 5 * * 6'
   workflow_dispatch:
     inputs:
       firewood:
@@ -82,15 +80,6 @@ jobs:
                 echo "name=daily-40m-41m" >> "$GITHUB_OUTPUT"
                 echo "test=firewood-40m-41m" >> "$GITHUB_OUTPUT"
                 echo "timeout-minutes=720" >> "$GITHUB_OUTPUT"
-                ;;
-              "0 5 * * 6")  # Weekly Saturday at 05:00 UTC: 10M blocks (50M → 60M)
-                echo "::notice::Schedule: weekly-50m-60m (blocks 50000001-60000000)"
-                echo "name=weekly-50m-60m" >> "$GITHUB_OUTPUT"
-                echo "start-block=50000001" >> "$GITHUB_OUTPUT"
-                echo "end-block=60000000" >> "$GITHUB_OUTPUT"
-                echo "block-dir-src=cchain-mainnet-blocks-50m-60m-ldb" >> "$GITHUB_OUTPUT"
-                echo "current-state-dir-src=cchain-current-state-firewood-50m" >> "$GITHUB_OUTPUT"
-                echo "timeout-minutes=2880" >> "$GITHUB_OUTPUT"
                 ;;
               *)
                 echo "::error::Unknown schedule: ${{ github.event.schedule }}"
@@ -174,7 +163,7 @@ jobs:
       - name: Summary
         run: |
           [[ "${{ steps.store.outcome }}" == "failure" ]] && echo "::warning::Benchmark storage failed"
-          
+
           {
             echo "## Benchmark: ${{ needs.configure-benchmark.outputs.name }}"
             echo
@@ -197,4 +186,3 @@ jobs:
             echo
             echo "[View trends](https://ava-labs.github.io/firewood/${{ steps.location.outputs.data-dir }}/)"
           } >> "$GITHUB_STEP_SUMMARY"
-
