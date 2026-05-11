@@ -18,12 +18,14 @@ import (
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/hashdb"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -50,8 +52,9 @@ var (
 // State holds the accepted transactions and the atomic-request trie. It is not
 // safe for concurrent use; callers must serialize calls to [State.Apply].
 type State struct {
-	db     database.Database
-	trieDB *triedb.Database
+	snowCtx *snow.Context
+	db      database.Database
+	trieDB  *triedb.Database
 
 	lastCommittedHeight uint64
 	currentHeight       uint64
@@ -61,7 +64,9 @@ type State struct {
 // New opens the state on db. On startup, the in-memory trie is rebuilt by
 // replaying the accepted-tx index from the last committed height up to the
 // current height.
-func New(db database.Database) (*State, error) {
+//
+// When applying operations, shared memory is updated atomically with the state.
+func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 	root, committedHeight, err := readLastCommitted(db)
 	if err != nil {
 		return nil, err
@@ -84,15 +89,22 @@ func New(db database.Database) (*State, error) {
 		if err != nil {
 			return nil, fmt.Errorf("replaying tx index: %w", err)
 		}
-		// Tx entries are written atomically with the committed root, so
-		// [applyTrie] should never commit a new root to disk.
-		root, err = applyTrie(trieDB, root, entry.height, entry.txs)
+		ops, err := atomicRequests(entry.txs)
 		if err != nil {
-			return nil, fmt.Errorf("replaying height %d: %w", entry.height, err)
+			return nil, fmt.Errorf("constructing ops at height %d: %w", entry.height, err)
+		}
+		// Tx entries are written atomically with the committed root, so
+		// [applyTrie] should never commit a new root to disk. The per-chain
+		// requests were already applied to shared memory at original Apply
+		// time; replay only rebuilds the in-memory trie tip.
+		root, err = applyTrie(trieDB, root, entry.height, ops)
+		if err != nil {
+			return nil, fmt.Errorf("replaying height %d on root %s: %w", entry.height, root, err)
 		}
 	}
 
 	return &State{
+		snowCtx:             snowCtx,
 		db:                  db,
 		trieDB:              trieDB,
 		lastCommittedHeight: committedHeight,
@@ -187,6 +199,24 @@ func iterateTxs(db database.Iteratee, startHeight uint64) iter.Seq2[txsEntry, er
 	}
 }
 
+// atomicRequests groups the atomic requests from txs by chainID.
+func atomicRequests(txs []*tx.Tx) (map[ids.ID]*atomic.Requests, error) {
+	ops := make(map[ids.ID]*atomic.Requests)
+	for _, t := range txs {
+		chainID, req, err := t.AtomicRequests()
+		if err != nil {
+			return nil, fmt.Errorf("getting atomic requests for tx %s: %w", t.ID(), err)
+		}
+		if existing, ok := ops[chainID]; ok {
+			existing.PutRequests = append(existing.PutRequests, req.PutRequests...)
+			existing.RemoveRequests = append(existing.RemoveRequests, req.RemoveRequests...)
+		} else {
+			ops[chainID] = req
+		}
+	}
+	return ops, nil
+}
+
 const commitInterval = 4096 // [config.defaultCommitInterval]
 
 // Apply persists the txs accepted at height. It applies their atomic
@@ -198,7 +228,10 @@ const commitInterval = 4096 // [config.defaultCommitInterval]
 // height.
 func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if height <= s.currentHeight {
-		// TODO(StephenButtolph): Add logging here.
+		s.snowCtx.Log.Debug("skipping writes for old height",
+			zap.Uint64("height", height),
+			zap.Uint64("currentHeight", s.currentHeight),
+		)
 		return nil
 	}
 
@@ -211,20 +244,24 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return a.ID().Compare(b.ID())
 	})
 
-	var err error
-	s.currentRoot, err = applyTrie(s.trieDB, s.currentRoot, height, sorted)
+	ops, err := atomicRequests(sorted)
 	if err != nil {
-		return fmt.Errorf("applying height %d: %w", height, err)
+		return fmt.Errorf("merging atomic ops: %w", err)
 	}
+	newRoot, err := applyTrie(s.trieDB, s.currentRoot, height, ops)
+	if err != nil {
+		return fmt.Errorf("applying trie on root %s: %w", s.currentRoot, err)
+	}
+	s.currentRoot = newRoot
 
 	batch := s.db.NewBatch()
 	for _, t := range sorted {
 		if err := writeTxByID(batch, height, t); err != nil {
-			return fmt.Errorf("writing tx %s at height %d: %w", t.ID(), height, err)
+			return fmt.Errorf("writing tx %s: %w", t.ID(), err)
 		}
 	}
 	if err := writeTxsByHeight(batch, height, sorted); err != nil {
-		return fmt.Errorf("writing txs at height %d: %w", height, err)
+		return fmt.Errorf("writing txs: %w", err)
 	}
 	if height%commitInterval == 0 {
 		if err := writeCommittedRoot(batch, height, s.currentRoot); err != nil {
@@ -236,8 +273,8 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("writing last applied height: %w", err)
 	}
 	s.currentHeight = height
-	if err := batch.Write(); err != nil {
-		return fmt.Errorf("committing batch at height %d: %w", height, err)
+	if err := s.snowCtx.SharedMemory.Apply(ops, batch); err != nil {
+		return fmt.Errorf("applying shared memory: %w", err)
 	}
 	return nil
 }
@@ -279,7 +316,7 @@ func writeCommittedRoot(db database.KeyValueWriter, height uint64, root common.H
 		return fmt.Errorf("writing last committed height: %w", err)
 	}
 	if err := database.PutID(db, rootKey(height), ids.ID(root)); err != nil {
-		return fmt.Errorf("writing committed root for height %d: %w", height, err)
+		return fmt.Errorf("writing committed root: %w", err)
 	}
 	return nil
 }
@@ -320,28 +357,15 @@ func (s *State) LastCommitted() uint64 {
 
 const trieKeyLength = state.TrieKeyLength
 
-// applyTrie updates the trie to include the atomic requests from txs into the
-// trie rooted at root. It flushes the new trie to disk if height is a commit
-// boundary and releases the prior root. It returns the new root.
-func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, txs []*tx.Tx) (common.Hash, error) {
+// applyTrie writes the per-chain ops into the trie rooted at oldRoot, flushes
+// the new trie to disk if height is a commit boundary, releases the prior
+// root, and returns the new root.
+func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*atomic.Requests) (common.Hash, error) {
 	tr, err := trie.New(trie.TrieID(oldRoot), trieDB)
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("opening atomic trie at root %s: %w", oldRoot, err)
+		return common.Hash{}, fmt.Errorf("opening trie: %w", err)
 	}
 
-	ops := make(map[ids.ID]*atomic.Requests)
-	for _, t := range txs {
-		chainID, req, err := t.AtomicRequests()
-		if err != nil {
-			return common.Hash{}, fmt.Errorf("getting atomic requests for tx %s: %w", t.ID(), err)
-		}
-		if existing, ok := ops[chainID]; ok {
-			existing.PutRequests = append(existing.PutRequests, req.PutRequests...)
-			existing.RemoveRequests = append(existing.RemoveRequests, req.RemoveRequests...)
-		} else {
-			ops[chainID] = req
-		}
-	}
 	for chainID, requests := range ops {
 		v, err := c.Marshal(codecVersion, requests)
 		if err != nil {
@@ -358,7 +382,7 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, txs 
 
 	newRoot, nodes, err := tr.Commit(false)
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("committing in-memory trie at height %d: %w", height, err)
+		return common.Hash{}, fmt.Errorf("committing in-memory trie: %w", err)
 	}
 	if nodes != nil {
 		// The parent-root and block-number args have no effect under hashdb;
@@ -369,7 +393,7 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, txs 
 		}
 	}
 	if err := trieDB.Reference(newRoot, common.Hash{}); err != nil {
-		return common.Hash{}, fmt.Errorf("referencing root %s: %w", newRoot, err)
+		return common.Hash{}, fmt.Errorf("referencing new root %s: %w", newRoot, err)
 	}
 
 	const (
@@ -380,17 +404,17 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, txs 
 	)
 	if _, nodeSize, _ := trieDB.Size(); nodeSize > memoryCap {
 		if err := trieDB.Cap(memoryCapTrim); err != nil {
-			return common.Hash{}, fmt.Errorf("capping atomic trie at root %s: %w", newRoot, err)
+			return common.Hash{}, fmt.Errorf("capping trie: %w", err)
 		}
 	}
 	if height%commitInterval == 0 {
 		if err := trieDB.Commit(newRoot, false); err != nil {
-			return common.Hash{}, fmt.Errorf("committing trieDB at height %d root %s: %w", height, newRoot, err)
+			return common.Hash{}, fmt.Errorf("committing trieDB at root %s: %w", newRoot, err)
 		}
 	}
 
 	if err := trieDB.Dereference(oldRoot); err != nil {
-		return common.Hash{}, fmt.Errorf("dereferencing prior root %s: %w", oldRoot, err)
+		return common.Hash{}, fmt.Errorf("dereferencing old root: %w", err)
 	}
 	return newRoot, nil
 }

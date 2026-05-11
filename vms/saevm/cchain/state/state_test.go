@@ -29,10 +29,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
 
 type block struct {
@@ -56,9 +59,21 @@ func newTx(outputIndex uint32) *tx.Tx {
 	}
 }
 
+// newSnowCtx returns a minimal [snow.Context] whose SharedMemory is wired to
+// db, satisfying [chainsatomic.SharedMemory.Apply]'s invariant that the
+// underlying database of any passed batches matches the underlying database
+// of the shared memory.
+func newSnowCtx(db database.Database) *snow.Context {
+	m := chainsatomic.NewMemory(db)
+	return &snow.Context{
+		SharedMemory: m.NewSharedMemory(ids.ID{0xCA}),
+	}
+}
+
 func newState(t *testing.T) *State {
 	t.Helper()
-	s, err := New(memdb.New())
+	db := memdb.New()
+	s, err := New(newSnowCtx(db), db)
 	require.NoError(t, err)
 	return s
 }
@@ -118,7 +133,7 @@ func TestStateDifferentialReplayMatchesOldCoreth(t *testing.T) {
 
 	// Re-open the new state. The old AtomicBackend is still in-memory; the
 	// new one is reconstructed only from disk via replay.
-	reopened, err := New(newDB)
+	reopened, err := New(newSnowCtx(newDB), newDB)
 	require.NoError(t, err)
 
 	for _, b := range seq[splitAt:] {
@@ -142,7 +157,7 @@ func newPair(t *testing.T) (newDB database.Database, oldUnderlying database.Data
 	oldUnderlying = memdb.New()
 	oldVDB = versiondb.New(oldUnderlying)
 
-	newSt, err := New(newDB)
+	newSt, err := New(newSnowCtx(newDB), newDB)
 	require.NoError(t, err)
 
 	repo, err := state.NewAtomicTxRepository(oldVDB, atomic.Codec, 0)
@@ -410,7 +425,8 @@ func TestNew_ReplayPreservesState(t *testing.T) {
 	require := require.New(t)
 
 	db := memdb.New()
-	s, err := New(db)
+	ctx := newSnowCtx(db)
+	s, err := New(ctx, db)
 	require.NoError(err)
 
 	seq := blockSequence(t)
@@ -421,7 +437,7 @@ func TestNew_ReplayPreservesState(t *testing.T) {
 	wantCommittedRoot, err := s.GetRoot(wantLastCommitted)
 	require.NoError(err)
 
-	reopened, err := New(db)
+	reopened, err := New(ctx, db)
 	require.NoError(err)
 
 	require.Equal(wantLastCommitted, reopened.LastCommitted())
