@@ -291,10 +291,10 @@ const trieKeyLength = state.TrieKeyLength
 // applyTrie updates the trie to include the atomic requests from txs into the
 // trie rooted at root. It flushes the new trie to disk if height is a commit
 // boundary and releases the prior root. It returns the new root.
-func applyTrie(trieDB *triedb.Database, root common.Hash, height uint64, txs []*tx.Tx) (common.Hash, error) {
-	tr, err := trie.New(trie.TrieID(root), trieDB)
+func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, txs []*tx.Tx) (common.Hash, error) {
+	tr, err := trie.New(trie.TrieID(oldRoot), trieDB)
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("opening atomic trie at root %s: %w", root, err)
+		return common.Hash{}, fmt.Errorf("opening atomic trie at root %s: %w", oldRoot, err)
 	}
 
 	ops := make(map[ids.ID]*atomic.Requests)
@@ -357,8 +357,8 @@ func applyTrie(trieDB *triedb.Database, root common.Hash, height uint64, txs []*
 		}
 	}
 
-	if err := trieDB.Dereference(root); err != nil {
-		return common.Hash{}, fmt.Errorf("dereferencing prior root %s: %w", root, err)
+	if err := trieDB.Dereference(oldRoot); err != nil {
+		return common.Hash{}, fmt.Errorf("dereferencing prior root %s: %w", oldRoot, err)
 	}
 	return newRoot, nil
 }
