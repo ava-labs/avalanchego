@@ -52,8 +52,10 @@ import (
 )
 
 const (
-	NumKeys              = 5
-	initialCChainFunding = 100 * units.Avax
+	NumKeys = 5
+	// initialCChainFunding is the per-worker C-Chain top-up in wei (10 AVAX),
+	// enough for over 100k self-transfers at typical gas prices.
+	initialCChainFunding = 10 * params.Ether
 	cChainTransferAmount = 10_000 // wei
 )
 
