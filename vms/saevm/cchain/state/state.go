@@ -351,7 +351,8 @@ func (s *State) GetRoot(height uint64) (common.Hash, error) {
 	return readCommittedRoot(s.db, height)
 }
 
-// LastCommitted returns the height of the most recent on-disk trie commit.
+// LastCommitted returns the highest height for which [State.GetRoot] will
+// return a committed root.
 func (s *State) LastCommitted() uint64 {
 	return s.lastCommittedHeight
 }
