@@ -63,15 +63,11 @@ build_binary() {
 # Resolve the subnet-evm VM ID from the canonical constants file.
 # Sets SUBNET_EVM_VM_ID (global) as a side effect.
 resolve_subnet_evm_vm_id() {
-    SUBNET_EVM_VM_ID=$(
-        grep '^DEFAULT_VM_ID=' "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh" \
-        | cut -d'"' -f2
-    )
-    if [[ -z "${SUBNET_EVM_VM_ID}" ]]; then
-        echo "ERROR: could not resolve SUBNET_EVM_VM_ID" >&2
-        return 1
-    fi
-    export SUBNET_EVM_VM_ID
+    # shellcheck disable=SC1091
+    source "${REPO_ROOT}/graft/subnet-evm/scripts/default-vm-data.sh"
+    # shellcheck disable=SC2154
+    : "${DEFAULT_VM_ID:?DEFAULT_VM_ID must be set by default-vm-data.sh}"
+    export SUBNET_EVM_VM_ID="${DEFAULT_VM_ID}"
 }
 
 # Generate the nfpm changelog file.
