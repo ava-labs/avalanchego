@@ -207,10 +207,9 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 
 impl<S: ReadableStorage> NodeStore<Committed, S> {
     /// Get the underlying storage for a `NodeStore`.
-    #[cfg(any(test, feature = "test_utils"))]
     #[must_use]
-    pub fn get_storage(&self) -> Arc<S> {
-        self.storage.clone()
+    pub const fn storage(&self) -> &Arc<S> {
+        &self.storage
     }
 }
 

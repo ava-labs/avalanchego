@@ -18,7 +18,7 @@ use firewood_storage::logger::{trace, warn};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use typed_builder::TypedBuilder;
 
-use crate::api::{self, ArcDynDbView, HashKey, IntoBatchIter, OptionalHashKeyExt};
+use crate::api::{self, ArcDynDbView, HashKey, HashKeyExt, IntoBatchIter, OptionalHashKeyExt};
 use crate::db::{BatchOp, UseParallel};
 use crate::merkle::Merkle;
 use crate::merkle::parallel::ParallelMerkle;
@@ -490,7 +490,9 @@ impl RevisionManager {
     /// Retrieve a committed revision by its root hash.
     /// To retrieve a revision involves a few steps:
     /// 1. Check the in-memory revision manager.
-    /// 2. Check `RootStore` (if it exists).
+    /// 2. If the caller requested the default empty-trie hash, return an
+    ///    empty committed nodestore.
+    /// 3. Check `RootStore` (if it exists).
     pub fn revision(&self, root_hash: HashKey) -> Result<CommittedRevision, RevisionManagerError> {
         // 1. Check the in-memory revision manager.
         // BLOCKING: read lock on `by_hash`. Concurrent writes (commit reap/insert) will pause
@@ -505,7 +507,15 @@ impl RevisionManager {
         }
         drop(by_hash);
 
-        // 2. Check `RootStore` (if it exists).
+        // 2. Default empty-trie short-circuit. An empty trie has no on-disk
+        //    root node, so `RootStore` can never produce it; synthesize one
+        //    against the file backing carried by the latest committed revision.
+        if HashKey::default_root_hash().as_ref() == Some(&root_hash) {
+            let storage = self.current_revision().storage().clone();
+            return Ok(Arc::new(NodeStore::new_empty_committed(storage)));
+        }
+
+        // 3. Check `RootStore` (if it exists).
         let root_store =
             self.root_store
                 .as_ref()
@@ -1015,5 +1025,70 @@ mod tests {
 
         let result = RevisionManager::new(config);
         assert!(result.is_ok());
+    }
+
+    /// Under `ethhash`, an empty committed revision is exposed via the
+    /// Ethereum empty-trie hash but never indexed in `RootStore` (an empty
+    /// trie has no on-disk root node, so there is no `LinearAddress` to
+    /// record). Once the in-memory entry is evicted from `by_hash`,
+    /// `revision()` previously fell through to `RootStore::get` and returned
+    /// `RevisionNotFound`. The fix synthesizes an empty committed nodestore
+    /// when the caller asks for the default empty-trie hash.
+    #[cfg(feature = "ethhash")]
+    #[test]
+    fn test_revision_empty_root_after_eviction() {
+        use firewood_storage::{LeafNode, NibblesIterator, Node, Path};
+
+        let empty_hash =
+            HashKey::default_root_hash().expect("ethhash exposes a default empty-trie hash");
+
+        let db_dir = tempfile::tempdir().unwrap();
+        let config = ConfigManager::builder()
+            .root_dir(db_dir.as_ref().to_path_buf())
+            .node_hash_algorithm(NodeHashAlgorithm::compile_option())
+            .create(true)
+            .manager(
+                // Smallest legal queue: max_revisions must exceed
+                // deferred_persistence_commit_count (default 1). Two slots is
+                // enough for the initial empty revision to be reaped after a
+                // pair of non-empty commits.
+                RevisionManagerConfig::builder().max_revisions(2).build(),
+            )
+            .build();
+
+        let manager = RevisionManager::new(config).unwrap();
+
+        // Sanity: the fresh manager indexes the empty revision under the
+        // default hash.
+        assert!(manager.revision(empty_hash.clone()).is_ok());
+
+        // Commit two non-empty revisions to push the empty one out of the
+        // in-memory queue and out of `by_hash`.
+        for i in 0..2u8 {
+            let base = manager.current_revision();
+            let mut proposal = NodeStore::new(&*base).unwrap();
+            *proposal.root_mut() = Some(Node::Leaf(LeafNode {
+                partial_path: Path::from_nibbles_iterator(NibblesIterator::new(&[i])),
+                value: Box::new([i]),
+            }));
+            let proposal: Arc<NodeStore<Arc<ImmutableProposal>, _>> =
+                Arc::new(proposal.try_into().unwrap());
+            manager.add_proposal(proposal.clone());
+            manager.commit(proposal).unwrap();
+        }
+
+        // Verify the empty revision has actually been evicted from the
+        // in-memory index — otherwise the next assertion would just be
+        // testing the step-1 path again.
+        assert!(
+            !manager.by_hash.read().contains_key(&empty_hash),
+            "precondition: empty-trie revision must have been evicted from by_hash"
+        );
+
+        // Empty hash should still resolve via the default-hash short-circuit.
+        let revision = manager
+            .revision(empty_hash.clone())
+            .expect("empty-trie revision must resolve via the default-hash short-circuit");
+        assert!(revision.root_address().is_none());
     }
 }
