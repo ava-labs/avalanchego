@@ -20,8 +20,34 @@ Today, tmpnet realizes topology only for kube-backed networks, using Chaos Mesh
 `NetworkChaos` resources to induce persistent one-way latency between declared
 locations.
 
-Topology is modeled as a property of the **network**, not of an individual
-node, because it describes relationships between sets of nodes.
+---
+
+## Conceptual model
+
+A few concepts to hold while reading the rest of the document. These are
+not derivable from the code at a glance, and getting them wrong tends to
+produce confused review comments or incorrect changes.
+
+- **Network-scoped, not node-scoped.** Topology describes relationships
+  between groups of nodes, so it lives on `tmpnet.Network` rather than on
+  individual nodes. A node does not "have" a topology; it participates in
+  one.
+- **Connections are directed.** Each `Connection` expresses one-way
+  latency from a source location to a destination. Symmetric latency
+  between two locations requires two connections, one in each direction.
+- **Mode separates two distinct failure classes.** `required` vs
+  `best-effort` only softens the case where the runtime cannot realize
+  topology at all (today: anything other than kube). Concrete realization
+  failures inside a supported runtime (missing Chaos Mesh, missing RBAC)
+  remain hard errors regardless of mode. Do not conflate "runtime is
+  unsupported" with "realization failed in a supported runtime."
+- **Steady-state, not bootstrap.** Realization happens after the network
+  reaches initial node health; teardown happens at `Network.Stop`.
+  Topology is part of the network's intended steady-state execution
+  environment, not its readiness check.
+- **The modeling triad is `Locations` + `Connectivity` + `Mode`.** Who
+  the named groups are, what directional latencies exist between them,
+  and what to do if this runtime cannot realize that declaration.
 
 ---
 
@@ -353,7 +379,6 @@ The current design should be reconsidered if any of these become true:
 
 - bootstrap/readiness should be proven under topology rather than only after an
   initial healthy state without topology
-
 - tmpnet gains an explicit destroy/delete lifecycle distinct from `Stop`
 - non-kube runtimes need real topology support rather than a warning/fail split
 - topology mutation after startup becomes a real product requirement
