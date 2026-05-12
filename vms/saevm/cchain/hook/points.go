@@ -15,12 +15,9 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
@@ -42,13 +39,13 @@ var _ hook.PointsG[*cchainTx] = (*Points)(nil)
 
 type Points struct {
 	blockBuilder
-	db          database.Database
+	state       *saestate.State
 	warpStorage *warp.Storage
 }
 
 func NewPoints(
 	ctx *snow.Context,
-	db database.Database,
+	state *saestate.State,
 	chainConfig *ethparams.ChainConfig,
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
@@ -82,7 +79,7 @@ func NewPoints(
 			potentialTxs: potentialTxs,
 			chainConfig:  chainConfig,
 		},
-		db,
+		state,
 		warpStorage,
 	}
 }
@@ -207,152 +204,8 @@ func (p *Points) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rec
 	}
 
 	height := b.NumberU64()
-	bonusBlocks := saestate.BonusBlocks(p.ctx.NetworkID)
-	isBonus := bonusBlocks.Contains(height)
-	writeTxs := saestate.WriteTxs
-	if isBonus {
-		writeTxs = saestate.WriteBonusTxs
-	}
-	if err := writeTxs(p.db, height, txs); err != nil {
-		return fmt.Errorf("failed to write txs of block %s (%d) to db: %w", b.Hash(), height, err)
-	}
-
-	ops, err := atomicOpsOf(txs)
-	if err != nil {
-		return fmt.Errorf("failed to extract atomic ops of block %s (%d): %w", b.Hash(), height, err)
-	}
-
-	// TODO: Write Ops into the atomic trie.
-	/*
-		var previousRoot common.Hash
-		trieDB := saestate.NewTrieDB(p.db)
-		tr, err := trie.New(trie.TrieID(previousRoot), trieDB)
-		if err != nil {
-			return fmt.Errorf("failed to create new trie: %v", err)
-		}
-
-		for chainID, requests := range ops {
-			requestBytes, err := tx.MarshalAtomicRequests(requests)
-			if err != nil {
-				return fmt.Errorf("failed to marshal atomic requests for chain %s: %v", chainID, err)
-			}
-
-			// key is [height]+[blockchainID]
-			const keyLength = wrappers.LongLen + ids.IDLen
-			p := wrappers.Packer{Bytes: make([]byte, keyLength)}
-			p.PackLong(height)
-			p.PackFixedBytes(chainID[:])
-			if err := tr.Update(p.Bytes, requestBytes); err != nil {
-				return err
-			}
-		}
-
-		root, nodes, err := tr.Commit(false)
-		if err != nil {
-			return err
-		}
-		if nodes != nil {
-			if err := trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
-				return err
-			}
-		}
-		if err := trieDB.Reference(root, common.Hash{}); err != nil {
-			return err
-		}
-
-		// Avoid OOM in-case there are a ton of atomic ops issued between DB
-		// commits.
-		const (
-			capTrigger = 64 * units.MiB
-			capLimit   = capTrigger - ethdb.IdealBatchSize
-		)
-		if _, nodeSize, _ := trieDB.Size(); nodeSize > capTrigger {
-			if err := trieDB.Cap(capLimit); err != nil {
-				return fmt.Errorf("failed to cap atomic trie for root %s: %w", root, err)
-			}
-		}
-
-		batch := p.db.NewBatch()
-
-		const commitInterval = 4096
-		if height%commitInterval == 0 {
-			if err := trieDB.Commit(root, false); err != nil {
-				return err
-			}
-			if err := saestate.WriteCommittedRoot(batch, height, root); err != nil {
-				return err
-			}
-		}
-
-		// The following dereferences, if any, the previously inserted root.
-		// This one can be dereferenced whether it has been:
-		// - committed, in which case the dereference is a no-op
-		// - not committed, in which case the current root we are inserting contains
-		//   references to all the relevant data from the previous root.
-		if err := trieDB.Dereference(previousRoot); err != nil {
-			return err
-		}
-	*/
-
-	batch := p.db.NewBatch()
-
-	// If this is a bonus block, write [commitBatch] without applying atomic ops
-	// to shared memory.
-	if isBonus {
-		p.ctx.Log.Info("skipping shared memory application on bonus block",
-			zap.Stringer("block_hash", b.Hash()),
-			zap.Uint64("block_height", height),
-		)
-		return batch.Write()
-	}
-
-	lastAppliedHeight, err := saestate.ReadLastAppliedHeight(p.db)
-	if err != nil {
-		return fmt.Errorf("failed to read last applied height from db: %w", err)
-	}
-
-	// SAE may re-execute blocks on startup. If the atomic ops were already
-	// applied to shared memory, we MUST not re-apply them.
-	if lastAppliedHeight >= height {
-		p.ctx.Log.Info("skipping shared memory application on already applied block",
-			zap.Stringer("block_hash", b.Hash()),
-			zap.Uint64("block_height", height),
-			zap.Uint64("last_applied_height", lastAppliedHeight),
-		)
-		return batch.Write()
-	}
-
-	if err := saestate.WriteLastAppliedHeight(batch, height); err != nil {
-		return fmt.Errorf("failed to write last applied height of block %s (%d) to db: %w", b.Hash(), height, err)
-	}
-	if err := p.ctx.SharedMemory.Apply(ops, batch); err != nil {
-		return fmt.Errorf("failed to apply atomic ops of block %s (%d) to shared memory: %w", b.Hash(), height, err)
+	if err := p.state.Apply(height, txs); err != nil {
+		return fmt.Errorf("failed to apply state for block %s (%d): %w", b.Hash(), height, err)
 	}
 	return nil
-}
-
-// atomicOpsOf returns the union of all atomic requests contained in txs.
-func atomicOpsOf(txs []*tx.Tx) (map[ids.ID]*atomic.Requests, error) {
-	// requests are appended in order of txID to be consistent with coreth's
-	// historical atomic trie format.
-	txs = slices.Clone(txs)
-	slices.SortFunc(txs, func(a, b *tx.Tx) int {
-		return a.ID().Compare(b.ID())
-	})
-
-	ops := make(map[ids.ID]*atomic.Requests)
-	for _, tx := range txs {
-		chainID, requests, err := tx.AtomicRequests()
-		if err != nil {
-			return nil, err
-		}
-
-		if request, ok := ops[chainID]; ok {
-			request.PutRequests = append(request.PutRequests, requests.PutRequests...)
-			request.RemoveRequests = append(request.RemoveRequests, requests.RemoveRequests...)
-		} else {
-			ops[chainID] = requests
-		}
-	}
-	return ops, nil
 }

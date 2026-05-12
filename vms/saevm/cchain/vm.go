@@ -60,7 +60,7 @@ type VM struct {
 	config  sae.Config
 
 	ctx          *snow.Context
-	db           avadb.Database
+	state        *state.State
 	mempool      *txpool.Txpool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
 
@@ -138,6 +138,13 @@ func (v *VM) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
+	snowCtx.Log.Info("constructing cross-chain state")
+
+	cchainState, err := state.New(snowCtx, avaDB)
+	if err != nil {
+		return fmt.Errorf("creating cchain state: %w", err)
+	}
+
 	snowCtx.Log.Info("parsing user config")
 
 	userConfig, err := ParseConfig(configBytes)
@@ -165,9 +172,10 @@ func (v *VM) Initialize(
 
 	pendingTxs := txpool.NewPending()
 	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
+
 	hooks := hook.NewPoints(
 		snowCtx,
-		avaDB,
+		cchainState,
 		config,
 		desiredDelayExcess,
 		desiredTargetExcess,
@@ -183,7 +191,7 @@ func (v *VM) Initialize(
 	}
 	v.VM = inner
 	v.ctx = snowCtx
-	v.db = avaDB
+	v.state = cchainState
 	v.hooks = hooks
 
 	v.mempool, err = txpool.New(snowCtx, config, pendingTxs, inner, 1024)
@@ -309,7 +317,7 @@ func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error
 		return nil, err
 	}
 
-	service := api.NewService(v.ctx, v.GethRPCBackends(), v.mempool, v.pushGossiper, v.db)
+	service := api.NewService(v.ctx, v.GethRPCBackends(), v.mempool, v.pushGossiper, v.state)
 	handler, err := rpc.NewHandler(avaxServiceName, service)
 	if err != nil {
 		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)
