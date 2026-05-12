@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -21,9 +22,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-var _ Marshaler[struct{}] = marshaler{}
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 type marshaler struct{}
+
+var _ Marshaler[struct{}] = marshaler{}
 
 func (marshaler) Marshal(struct{}) ([]byte, error) {
 	return []byte{1}, nil
@@ -33,11 +38,11 @@ func (marshaler) Unmarshal([]byte) (struct{}, error) {
 	return struct{}{}, nil
 }
 
-var _ DB[struct{}, struct{}] = (*db)(nil)
-
 type db struct {
 	id ids.ID
 }
+
+var _ DB[struct{}, struct{}] = (*db)(nil)
 
 func (db *db) GetMerkleRoot(context.Context) (ids.ID, error) {
 	return db.id, nil
@@ -84,8 +89,10 @@ func Test_Sync_BusyContextCancellation(t *testing.T) {
 	clientDB := &db{id: ids.Empty}
 
 	// Ensure the single thread doing work is blocked.
+	// This will cause the syncer to wait for more incoming work on the cond var,
+	// testing a path where the response handler is never called.
 	ch := make(chan struct{})
-	defer close(ch)
+	defer close(ch) // avoid leaking the goroutine
 	blockingHandler := p2p.TestHandler{
 		AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
 			cancel()
