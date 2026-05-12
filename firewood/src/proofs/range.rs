@@ -56,7 +56,97 @@
 //! }
 //! ```
 
+use std::num::NonZeroUsize;
+
+use crate::api::{self, FrozenRangeProof, HashKey};
+use firewood_storage::logger::warn;
+
 use super::types::{Proof, ProofCollection};
+
+/// `(start_key, end_key)` describing the next key range to fetch after a
+/// range or change proof. Returned by `find_next_key_after_*_proof`.
+pub type KeyRange = (Box<[u8]>, Option<Box<[u8]>>);
+
+/// Verification context captured after structural validation of a range proof.
+/// Stored so that downstream logic (root hash verification, `find_next_key`)
+/// can reference the original verification parameters without re-validating.
+#[derive(Debug)]
+pub struct RangeProofVerificationContext {
+    /// The expected root hash of the trie.
+    pub root: HashKey,
+    /// The lower bound of the verified key range, if any.
+    pub start_key: Option<Box<[u8]>>,
+    /// The upper bound of the verified key range, if any.
+    pub end_key: Option<Box<[u8]>>,
+    /// The maximum number of key/value pairs the proof was permitted to
+    /// contain. `None` means no limit.
+    pub max_length: Option<NonZeroUsize>,
+}
+
+/// Verify structural properties of a range proof and produce a
+/// [`RangeProofVerificationContext`] capturing the verification parameters
+/// for use by downstream logic.
+///
+/// ## ⚠️ Unimplemented ⚠️
+///
+/// Currently a stub: structural verification is not yet implemented. The
+/// returned context records the supplied parameters so that callers
+/// downstream of `verify_*` can still consume them. Tracked separately.
+///
+/// # Errors
+///
+/// Reserved for the implemented form; the current stub does not return
+/// errors.
+pub fn verify_range_proof_structure(
+    _proof: &FrozenRangeProof,
+    root: HashKey,
+    start_key: Option<&[u8]>,
+    end_key: Option<&[u8]>,
+    max_length: Option<NonZeroUsize>,
+) -> Result<RangeProofVerificationContext, api::Error> {
+    warn!("range proof verification not yet implemented");
+    Ok(RangeProofVerificationContext {
+        root,
+        start_key: start_key.map(Box::from),
+        end_key: end_key.map(Box::from),
+        max_length,
+    })
+}
+
+/// Determine the next key range to fetch after this range proof.
+///
+/// Returns `None` when the originally-requested range is fully accounted
+/// for; otherwise returns `Some((last_key, end_key))`.
+///
+/// # Errors
+///
+/// Currently does not return errors; the signature is `Result` for parity
+/// with the change-proof counterpart and to allow future error paths.
+pub fn find_next_key_after_range_proof(
+    proof: &FrozenRangeProof,
+    verification: &RangeProofVerificationContext,
+) -> Result<Option<KeyRange>, api::Error> {
+    // TODO(#352): proper implementation, this naively returns the last key
+    // in the range, which is correct, but not ideal.
+    let Some((last_key, _)) = proof.key_values().last() else {
+        // no key-values in the proof, so we are done
+        return Ok(None);
+    };
+
+    if proof.end_proof().is_empty() {
+        // unbounded, so we are done
+        return Ok(None);
+    }
+
+    if let Some(ref end_key) = verification.end_key
+        && **last_key >= **end_key
+    {
+        // reached or exceeded the end key, so we are done
+        return Ok(None);
+    }
+
+    Ok(Some((last_key.clone(), verification.end_key.clone())))
+}
 
 /// A range proof is a cryptographic proof that demonstrates a contiguous set of key-value pairs
 /// exists within a Merkle trie with a given root hash.

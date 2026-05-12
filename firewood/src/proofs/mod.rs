@@ -296,11 +296,15 @@ mod tests;
 pub(crate) mod types;
 
 pub use self::change::{
-    ChangeProof, ChangeProofVerificationContext, verify_change_proof_structure,
+    ChangeProof, ChangeProofVerificationContext, find_next_key_after_change_proof,
+    verify_change_proof_structure,
 };
 
 pub use self::header::InvalidHeader;
-pub use self::range::RangeProof;
+pub use self::range::{
+    KeyRange, RangeProof, RangeProofVerificationContext, find_next_key_after_range_proof,
+    verify_range_proof_structure,
+};
 pub use self::reader::ReadError;
 pub use self::types::{
     EmptyProofCollection, Proof, ProofCollection, ProofError, ProofNode, ProofType,

@@ -4,9 +4,8 @@
 use std::num::NonZeroUsize;
 
 use firewood::{
-    ProofError,
+    KeyRange, ProofError, RangeProofVerificationContext,
     api::{self, DbView, FrozenRangeProof, HashKey},
-    logger::warn,
 };
 use firewood_metrics::{MetricsContext, firewood_counter};
 
@@ -14,9 +13,6 @@ use crate::{
     BorrowedBytes, CodeIteratorHandle, CodeIteratorResult, DatabaseHandle, HashResult, Maybe,
     NextKeyRangeResult, RangeProofResult, ValueResult, VoidResult,
 };
-
-/// A key range represented by a start key and an optional end key.
-pub type KeyRange = (Box<[u8]>, Option<Box<[u8]>>);
 
 /// Arguments for creating a range proof.
 #[derive(Debug)]
@@ -75,16 +71,8 @@ pub struct VerifyRangeProofArgs<'a, 'db> {
 #[derive(Debug)]
 pub struct RangeProofContext<'db> {
     proof: FrozenRangeProof,
-    verification: Option<VerificationContext>,
+    verification: Option<RangeProofVerificationContext>,
     proposal_state: Option<ProposalState<'db>>,
-}
-
-#[derive(Debug)]
-struct VerificationContext {
-    root: HashKey,
-    start_key: Option<Box<[u8]>>,
-    end_key: Option<Box<[u8]>>,
-    max_length: Option<NonZeroUsize>,
 }
 
 #[derive(Debug)]
@@ -119,11 +107,6 @@ impl<'db> RangeProofContext<'db> {
     /// [`RangeProofContext::verify_and_propose`] to prepare a proposal against
     /// a specific database and [`RangeProofContext::verify_and_commit`] to
     /// commit the proof to a database.
-    ///
-    /// ## ⚠️ Unimplemented ⚠️
-    ///
-    /// Currently, this is a stub implementation that does not perform any
-    /// verification steps.
     fn verify(
         &mut self,
         root: HashKey,
@@ -146,13 +129,13 @@ impl<'db> RangeProofContext<'db> {
 
         debug_assert!(self.verification.is_none());
 
-        warn!("range proof verification not yet implemented");
-        self.verification = Some(VerificationContext {
+        self.verification = Some(firewood::verify_range_proof_structure(
+            &self.proof,
             root,
-            start_key: start_key.map(Box::from),
-            end_key: end_key.map(Box::from),
+            start_key,
+            end_key,
             max_length,
-        });
+        )?);
         Ok(())
     }
 
@@ -257,41 +240,24 @@ impl<'db> RangeProofContext<'db> {
     /// we are able to inspect the database and provide a more accurate value
     /// for `finalKey` than simply the last key in the set of key-value pairs.
     fn find_next_key(&mut self) -> Result<Option<KeyRange>, api::Error> {
-        // TODO(#352): proper implementation, this naively returns the last key in
-        // in the range, which is correct, but not ideal.
         let verification = self
             .verification
             .as_ref()
             .ok_or(api::Error::ProofError(ProofError::Unverified))?;
 
-        let Some((last_key, _)) = self.proof.key_values().last() else {
-            // no key-values in the proof, so we are done
-            return Ok(None);
-        };
-
+        // FFI-only optimization: if a proposal has been prepared/committed
+        // and its root already matches the verification target, the receiver
+        // is up-to-date and no further fetching is needed.
         let root_hash = match self.proposal_state {
             Some(ProposalState::Committed(ref hash)) => Ok(hash.clone()),
             Some(ProposalState::Proposed(ref proposal)) => Ok(proposal.root_hash()),
             None => Err(api::Error::ProofError(ProofError::Unverified)),
         }?;
         if root_hash.as_ref() == Some(&verification.root) {
-            // already at the target root, so we are done
             return Ok(None);
         }
 
-        if self.proof.end_proof().is_empty() {
-            // unbounded, so we are done
-            return Ok(None);
-        }
-
-        if let Some(ref end_key) = verification.end_key
-            && **last_key >= **end_key
-        {
-            // reached or exceeded the end key, so we are done
-            return Ok(None);
-        }
-
-        Ok(Some((last_key.clone(), verification.end_key.clone())))
+        firewood::find_next_key_after_range_proof(&self.proof, verification)
     }
 
     fn code_hash_iter(&self) -> Result<CodeIteratorHandle<'_>, api::Error> {

@@ -158,6 +158,46 @@ pub struct ChangeProofVerificationContext {
 
 type FrozenBatchOp = BatchOp<Box<[u8]>, Box<[u8]>>;
 
+/// Determine the next key range to fetch after this change proof.
+///
+/// Inspects the proof structure only — does not require a proposal.
+/// `end_key` is the original requested upper bound passed to the proof
+/// generator.
+///
+/// Returns `None` if the proof confirms there are no more keys in the
+/// requested range; otherwise returns `Some((last_op.key, end_key))` as
+/// a continuation.
+///
+/// # Errors
+///
+/// Returns [`ProofError::EndKeyLessThanLastKey`] when `last_op.key` is
+/// strictly greater than `end_key` — this indicates the proof was
+/// generated against a different `end_key` than the one supplied here.
+pub fn find_next_key_after_change_proof(
+    proof: &FrozenChangeProof,
+    end_key: Option<&[u8]>,
+) -> Result<Option<super::range::KeyRange>, api::Error> {
+    let Some(last_op) = proof.batch_ops().last() else {
+        // No changes in this range. If bounded, continue from end_key.
+        return Ok(end_key.map(|ek| (Box::from(ek), None)));
+    };
+
+    if proof.end_proof().is_empty() {
+        return Ok(None);
+    }
+
+    if let Some(end_key) = end_key {
+        if **last_op.key() > *end_key {
+            return Err(api::Error::ProofError(ProofError::EndKeyLessThanLastKey));
+        }
+        if **last_op.key() == *end_key {
+            return Ok(None);
+        }
+    }
+
+    Ok(Some((last_op.key().clone(), end_key.map(Box::from))))
+}
+
 /// Verify a boundary proof against `end_root` and optionally check that the
 /// proof's inclusion/exclusion result is consistent with `boundary_op`.
 ///

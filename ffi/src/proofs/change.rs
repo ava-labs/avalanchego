@@ -77,29 +77,11 @@ impl ChangeProofContext {
     /// `end_key` is the original requested end key passed to the proof
     /// generator.
     fn find_next_key(&self, end_key: Option<&[u8]>) -> Result<Option<KeyRange>, api::Error> {
-        let Some(proof) = &self.proof else {
-            return Err(api::Error::ProofError(ProofError::ProofIsNone));
-        };
-
-        let Some(last_op) = proof.batch_ops().last() else {
-            // No changes in this range. If bounded, continue from end_key.
-            return Ok(end_key.map(|ek| (Box::from(ek), None)));
-        };
-
-        if proof.end_proof().is_empty() {
-            return Ok(None);
-        }
-
-        if let Some(end_key) = end_key {
-            if **last_op.key() > *end_key {
-                return Err(api::Error::ProofError(ProofError::EndKeyLessThanLastKey));
-            }
-            if **last_op.key() == *end_key {
-                return Ok(None);
-            }
-        }
-
-        Ok(Some((last_op.key().clone(), end_key.map(Box::from))))
+        let proof = self
+            .proof
+            .as_ref()
+            .ok_or(api::Error::ProofError(ProofError::ProofIsNone))?;
+        firewood::find_next_key_after_change_proof(proof, end_key)
     }
 }
 

@@ -156,9 +156,10 @@ pub mod proofs;
 // Re-export commonly used proof types at the crate root for ergonomic access
 pub use merkle::{Key, Value, verify_change_proof_root_hash, verify_range_proof};
 pub use proofs::{
-    ChangeProof, ChangeProofVerificationContext, EmptyProofCollection, InvalidHeader, Proof,
-    ProofCollection, ProofError, ProofNode, ProofType, RangeProof, ReadError,
-    verify_change_proof_structure,
+    ChangeProof, ChangeProofVerificationContext, EmptyProofCollection, InvalidHeader, KeyRange,
+    Proof, ProofCollection, ProofError, ProofNode, ProofType, RangeProof,
+    RangeProofVerificationContext, ReadError, find_next_key_after_change_proof,
+    find_next_key_after_range_proof, verify_change_proof_structure, verify_range_proof_structure,
 };
 
 // Re-export the proc macro from firewood-macros
