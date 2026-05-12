@@ -62,13 +62,27 @@ build_binary() {
     echo "Binary built at: ${BINARY_PATH}"
 }
 
-# Resolve the subnet-evm VM ID from the canonical constants file.
+# Resolve the subnet-evm VM ID.
+#
+# Prefers the pure-data file (default-vm-data.sh). Falls back to grepping
+# DEFAULT_VM_ID from constants.sh for older tags pre-dating the data-file
+# split — workflow_dispatch on those tags only overlays .github/packaging,
+# so the data file is not present in the checkout.
+#
 # Sets SUBNET_EVM_VM_ID (global) as a side effect.
 resolve_subnet_evm_vm_id() {
-    # shellcheck disable=SC1091
-    source "${REPO_ROOT}/graft/subnet-evm/scripts/default-vm-data.sh"
-    # shellcheck disable=SC2154
-    : "${DEFAULT_VM_ID:?DEFAULT_VM_ID must be set by default-vm-data.sh}"
+    local data_file="${REPO_ROOT}/graft/subnet-evm/scripts/default-vm-data.sh"
+    local constants_file="${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh"
+    if [[ -f "${data_file}" ]]; then
+        # shellcheck disable=SC1091
+        source "${data_file}"
+        # shellcheck disable=SC2154
+        : "${DEFAULT_VM_ID:?DEFAULT_VM_ID must be set by default-vm-data.sh}"
+    else
+        # Older tags: DEFAULT_VM_ID is a literal assignment in constants.sh.
+        DEFAULT_VM_ID=$(grep '^DEFAULT_VM_ID=' "${constants_file}" | cut -d'"' -f2)
+        : "${DEFAULT_VM_ID:?DEFAULT_VM_ID not found in default-vm-data.sh or constants.sh}"
+    fi
     export SUBNET_EVM_VM_ID="${DEFAULT_VM_ID}"
 }
 

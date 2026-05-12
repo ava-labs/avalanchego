@@ -70,7 +70,7 @@ jobs:
         run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-rpms
         env:
           PACKAGING_TAG: ${{ steps.setup.outputs.tag }}
-          RPM_GPG_KEY_FILE: ${{ steps.setup.outputs.gpg-key-file }}
+          PKG_GPG_KEY_FILE: ${{ steps.setup.outputs.gpg-key-file }}
           NFPM_RPM_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
 
       - name: Upload RPMs as artifacts

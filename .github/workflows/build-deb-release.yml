@@ -1,0 +1,129 @@
+name: build-deb-packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build DEBs for'
+        required: true
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".github/packaging/**"
+      - ".github/workflows/build-deb-release.yml"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-deb:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+            deb_arch: amd64
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            deb_arch: arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      id-token: write  # required for AWS OIDC role assumption (S3 upload on release)
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # When building an older tag via workflow_dispatch, the tag's tree
+      # may not contain the packaging scripts. Overlay them from the
+      # workflow branch so that packaging:test-build-debs is available.
+      # Split into two steps because actions/checkout and the copy
+      # cannot be combined.
+      - name: Overlay packaging scripts from workflow branch
+        if: github.event.inputs.tag
+        uses: actions/checkout@v4
+        with:
+          path: .packaging-overlay
+          sparse-checkout: .github/packaging
+
+      - name: Apply packaging overlay
+        if: github.event.inputs.tag
+        run: |
+          cp -r .packaging-overlay/.github/packaging .github/packaging
+          rm -rf .packaging-overlay
+        shell: bash
+
+      - uses: ./.github/actions/setup-go-for-project
+
+      - name: Set up packaging environment
+        id: setup
+        run: ./.github/packaging/scripts/workflow-setup-packaging.sh
+        shell: bash
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+          GPG_PRIVATE_KEY: ${{ github.event_name != 'pull_request' && secrets.RPM_GPG_PRIVATE_KEY || '' }}
+
+      - name: Build and validate DEBs
+        run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-debs
+        env:
+          PACKAGING_TAG: ${{ steps.setup.outputs.tag }}
+          PKG_GPG_KEY_FILE: ${{ steps.setup.outputs.gpg-key-file }}
+          NFPM_DEB_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+
+      - name: Upload DEBs as artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v6
+        with:
+          name: debs-${{ matrix.deb_arch }}
+          path: |
+            build/deb/avalanchego-${{ steps.setup.outputs.tag }}-${{ matrix.deb_arch }}.deb
+            build/deb/subnet-evm-${{ steps.setup.outputs.tag }}-${{ matrix.deb_arch }}.deb
+            build/deb/DEB-GPG-KEY-avalanchego
+
+      # S3 publish (tag push or manual dispatch) — restores the path that the
+      # deleted build-ubuntu-{amd64,arm64}-release.yml workflows used to cover
+      # via build-deb-pkg.sh. Targets: s3://${BUCKET}/linux/debs/ubuntu/...
+      - name: Configure AWS credentials
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
+          aws-region: us-east-1
+
+      - name: Install aws cli
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
+        run: |
+          if ! command -v aws &>/dev/null; then
+            sudo snap install aws-cli --classic
+          fi
+
+      - name: Upload DEBs to S3
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ steps.setup.outputs.tag }}
+          ARCH: ${{ matrix.deb_arch }}
+          BUCKET: ${{ secrets.BUCKET }}
+        run: |
+          for release in jammy noble; do
+            aws s3 cp "build/deb/avalanchego-${TAG}-${ARCH}.deb" \
+              "s3://${BUCKET}/linux/debs/ubuntu/${release}/${ARCH}/"
+            aws s3 cp "build/deb/subnet-evm-${TAG}-${ARCH}.deb" \
+              "s3://${BUCKET}/linux/debs/ubuntu/${release}/${ARCH}/"
+            aws s3 cp "build/deb/DEB-GPG-KEY-avalanchego" \
+              "s3://${BUCKET}/linux/debs/ubuntu/${release}/"
+          done
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [[ -n "${{ steps.setup.outputs.gpg-key-file }}" ]]; then
+            rm -f "${{ steps.setup.outputs.gpg-key-file }}"
+          fi
+          rm -rf build/deb
+          sudo rm -rf build/gpg
+        shell: bash

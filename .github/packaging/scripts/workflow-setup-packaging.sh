@@ -40,6 +40,16 @@ echo "Resolved tag: ${TAG}" >&2
 
 GPG_PRIVATE_KEY="${GPG_PRIVATE_KEY:-}"
 
+# Release paths (tag push or workflow_dispatch) must use the configured
+# signing key. Falling through to the ephemeral-key path on a release event
+# would publish throwaway-signed packages alongside genuine releases — the
+# S3 upload step does not check signing-key provenance.
+if [[ -z "${GPG_PRIVATE_KEY}" && ( -n "${TAG_INPUT}" || "${GITHUB_REF}" == refs/tags/* ) ]]; then
+    echo "ERROR: GPG_PRIVATE_KEY is empty on a release-path build." >&2
+    echo "       Configure secrets.RPM_GPG_PRIVATE_KEY so the run can produce a signed release." >&2
+    exit 1
+fi
+
 if [[ -n "${GPG_PRIVATE_KEY}" ]]; then
     GPG_KEY_FILE="$(mktemp)"
     chmod 600 "${GPG_KEY_FILE}"

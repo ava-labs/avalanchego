@@ -1,0 +1,24 @@
+name: subnet-evm
+arch: "${PACKAGE_ARCH}"
+version: "${VERSION}"
+maintainer: "Ava Labs <security@avalabs.org>"
+description: "Subnet-EVM plugin for AvalancheGo"
+homepage: "https://github.com/ava-labs/avalanchego"
+license: "BSD-3-Clause"
+depends:
+  - "libc6 (>= 2.35)"
+contents:
+  - src: "${BINARY_PATH}"
+    # SUBNET_EVM_VM_ID is sourced from graft/subnet-evm/scripts/constants.sh
+    # DEB plugin path differs from RPM (/var/opt/...) to match /usr/local/bin/avalanchego
+    dst: /usr/local/lib/avalanchego/plugins/${SUBNET_EVM_VM_ID}
+    expand: true
+    file_info:
+      mode: 0755
+changelog: "${NFPM_CHANGELOG}"
+deb:
+  compression: gzip
+  signature:
+    key_file: "${NFPM_SIGNING_KEY}"
+    method: debsign
+    type: origin

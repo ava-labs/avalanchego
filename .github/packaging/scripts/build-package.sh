@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 
-# Build and sign an RPM package inside the container.
+# Build and sign a package (RPM or DEB) inside the container.
 #
 # Required env vars:
 #   PACKAGE        - "avalanchego" or "subnet-evm"
 #   VERSION        - Semantic version without "v" prefix (e.g., "1.14.1")
 #   TAG            - Git tag (e.g., "v1.14.1")
-#   PACKAGE_ARCH   - Architecture (x86_64 or aarch64)
+#   PACKAGE_ARCH   - Architecture (x86_64/aarch64 for RPM, amd64/arm64 for DEB)
 #   OUTPUT_DIR     - Directory for the output package (bind-mounted from host)
 #
 # Optional env vars:
-#   PKG_FORMAT              - Package format identifier (default: RPM)
-#   RPM_GPG_KEY_FILE    - Path to GPG private key
-#   NFPM_RPM_PASSPHRASE - GPG passphrase
+#   PKG_FORMAT          - Package format identifier ("RPM" or "DEB"; default: RPM)
+#   PKG_GPG_KEY_FILE    - Path to GPG private key
+#   NFPM_RPM_PASSPHRASE - GPG passphrase for RPM signing (read by nfpm)
+#   NFPM_DEB_PASSPHRASE - GPG passphrase for DEB signing (read by nfpm)
 #   AVALANCHEGO_COMMIT  - Git commit hash (auto-detected if not set)
 
 set -euo pipefail
@@ -44,14 +45,14 @@ generate_changelog "${VERSION}"
 
 # ── GPG signing ───────────────────────────────────────────────────
 
-GPG_KEY_FILE="${RPM_GPG_KEY_FILE:-}"
+GPG_KEY_FILE="${PKG_GPG_KEY_FILE:-}"
 GPG_PUBLIC_KEY="${OUTPUT_DIR}/${PKG_FORMAT}-GPG-KEY-avalanchego"
 
 setup_gpg "${GPG_KEY_FILE}" "${GPG_PUBLIC_KEY}" "${PKG_FORMAT}"
 
-# Ephemeral keys have no passphrase; nfpm needs the variable set empty
+# Ephemeral keys have no passphrase; nfpm reads NFPM_<FORMAT>_PASSPHRASE
 if [[ -z "${GPG_KEY_FILE}" ]]; then
-    export NFPM_RPM_PASSPHRASE=""
+    export "NFPM_${PKG_FORMAT}_PASSPHRASE="
 fi
 
 # ── Package with nfpm ─────────────────────────────────────────────
