@@ -73,13 +73,20 @@ tasks:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_HOST_ARCH}}'
       RPM_TAG: '{{.PACKAGING_TAG}}'
     deps: [build-builder-docker-image]
+    # Secrets are promoted to the task process env via YAML literals, then
+    # passed to docker via `-e VAR` (pass-through). Never interpolate them
+    # into the docker run command — values with whitespace or shell
+    # metacharacters would be split/expanded before docker sees them.
+    env:
+      PKG_GPG_KEY_FILE: '{{.PKG_GPG_KEY_FILE | default ""}}'
+      NFPM_RPM_PASSPHRASE: '{{.NFPM_RPM_PASSPHRASE | default ""}}'
     cmds:
       - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
       - cmd: >-
           docker run --rm
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
-          {{if .PKG_GPG_KEY_FILE}}-v {{.PKG_GPG_KEY_FILE}}:{{.PKG_GPG_KEY_FILE}}:ro{{end}}
+          ${PKG_GPG_KEY_FILE:+-v "${PKG_GPG_KEY_FILE}:${PKG_GPG_KEY_FILE}:ro"}
           -e PKG_FORMAT=RPM
           -e PACKAGE=avalanchego
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
@@ -87,8 +94,8 @@ tasks:
           -e PACKAGE_ARCH={{.PACKAGE_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
-          {{if .PKG_GPG_KEY_FILE}}-e PKG_GPG_KEY_FILE={{.PKG_GPG_KEY_FILE}}{{end}}
-          {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          -e PKG_GPG_KEY_FILE
+          -e NFPM_RPM_PASSPHRASE
           {{.PACKAGING_DOCKER_IMAGE}}
           .github/packaging/scripts/build-package.sh
 
@@ -98,13 +105,16 @@ tasks:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_HOST_ARCH}}'
       RPM_TAG: '{{.PACKAGING_TAG}}'
     deps: [build-builder-docker-image]
+    env:
+      PKG_GPG_KEY_FILE: '{{.PKG_GPG_KEY_FILE | default ""}}'
+      NFPM_RPM_PASSPHRASE: '{{.NFPM_RPM_PASSPHRASE | default ""}}'
     cmds:
       - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
       - cmd: >-
           docker run --rm
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
-          {{if .PKG_GPG_KEY_FILE}}-v {{.PKG_GPG_KEY_FILE}}:{{.PKG_GPG_KEY_FILE}}:ro{{end}}
+          ${PKG_GPG_KEY_FILE:+-v "${PKG_GPG_KEY_FILE}:${PKG_GPG_KEY_FILE}:ro"}
           -e PKG_FORMAT=RPM
           -e PACKAGE=subnet-evm
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
@@ -112,8 +122,8 @@ tasks:
           -e PACKAGE_ARCH={{.PACKAGE_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
-          {{if .PKG_GPG_KEY_FILE}}-e PKG_GPG_KEY_FILE={{.PKG_GPG_KEY_FILE}}{{end}}
-          {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          -e PKG_GPG_KEY_FILE
+          -e NFPM_RPM_PASSPHRASE
           {{.PACKAGING_DOCKER_IMAGE}}
           .github/packaging/scripts/build-package.sh
 
@@ -156,13 +166,16 @@ tasks:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_HOST_DEB_ARCH}}'
       DEB_TAG: '{{.PACKAGING_TAG}}'
     deps: [build-deb-builder-docker-image]
+    env:
+      PKG_GPG_KEY_FILE: '{{.PKG_GPG_KEY_FILE | default ""}}'
+      NFPM_DEB_PASSPHRASE: '{{.NFPM_DEB_PASSPHRASE | default ""}}'
     cmds:
       - cmd: mkdir -p {{.PACKAGING_DEB_OUTPUT_DIR}}
       - cmd: >-
           docker run --rm
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_DEB_OUTPUT_DIR}}:/output
-          {{if .PKG_GPG_KEY_FILE}}-v {{.PKG_GPG_KEY_FILE}}:{{.PKG_GPG_KEY_FILE}}:ro{{end}}
+          ${PKG_GPG_KEY_FILE:+-v "${PKG_GPG_KEY_FILE}:${PKG_GPG_KEY_FILE}:ro"}
           -e PKG_FORMAT=DEB
           -e PACKAGE=avalanchego
           -e VERSION={{trimPrefix "v" .DEB_TAG}}
@@ -170,8 +183,8 @@ tasks:
           -e PACKAGE_ARCH={{.PACKAGE_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
-          {{if .PKG_GPG_KEY_FILE}}-e PKG_GPG_KEY_FILE={{.PKG_GPG_KEY_FILE}}{{end}}
-          {{if .NFPM_DEB_PASSPHRASE}}-e NFPM_DEB_PASSPHRASE={{.NFPM_DEB_PASSPHRASE}}{{end}}
+          -e PKG_GPG_KEY_FILE
+          -e NFPM_DEB_PASSPHRASE
           {{.PACKAGING_DEB_DOCKER_IMAGE}}
           .github/packaging/scripts/build-package.sh
 
@@ -181,13 +194,16 @@ tasks:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_HOST_DEB_ARCH}}'
       DEB_TAG: '{{.PACKAGING_TAG}}'
     deps: [build-deb-builder-docker-image]
+    env:
+      PKG_GPG_KEY_FILE: '{{.PKG_GPG_KEY_FILE | default ""}}'
+      NFPM_DEB_PASSPHRASE: '{{.NFPM_DEB_PASSPHRASE | default ""}}'
     cmds:
       - cmd: mkdir -p {{.PACKAGING_DEB_OUTPUT_DIR}}
       - cmd: >-
           docker run --rm
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_DEB_OUTPUT_DIR}}:/output
-          {{if .PKG_GPG_KEY_FILE}}-v {{.PKG_GPG_KEY_FILE}}:{{.PKG_GPG_KEY_FILE}}:ro{{end}}
+          ${PKG_GPG_KEY_FILE:+-v "${PKG_GPG_KEY_FILE}:${PKG_GPG_KEY_FILE}:ro"}
           -e PKG_FORMAT=DEB
           -e PACKAGE=subnet-evm
           -e VERSION={{trimPrefix "v" .DEB_TAG}}
@@ -195,8 +211,8 @@ tasks:
           -e PACKAGE_ARCH={{.PACKAGE_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
-          {{if .PKG_GPG_KEY_FILE}}-e PKG_GPG_KEY_FILE={{.PKG_GPG_KEY_FILE}}{{end}}
-          {{if .NFPM_DEB_PASSPHRASE}}-e NFPM_DEB_PASSPHRASE={{.NFPM_DEB_PASSPHRASE}}{{end}}
+          -e PKG_GPG_KEY_FILE
+          -e NFPM_DEB_PASSPHRASE
           {{.PACKAGING_DEB_DOCKER_IMAGE}}
           .github/packaging/scripts/build-package.sh
 
