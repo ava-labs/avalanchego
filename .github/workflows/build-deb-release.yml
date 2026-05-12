@@ -53,6 +53,10 @@ jobs:
       - name: Apply packaging overlay
         if: github.event.inputs.tag
         run: |
+          # Replace the tag's .github/packaging atomically. `cp -r src dst`
+          # with an existing dst copies INTO dst (creates dst/packaging/...
+          # nesting and leaves the stale tree intact), so we remove first.
+          rm -rf .github/packaging
           cp -r .packaging-overlay/.github/packaging .github/packaging
           rm -rf .packaging-overlay
         shell: bash
