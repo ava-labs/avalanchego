@@ -273,7 +273,7 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 			return // [s.workLock] released by defer.
 		case s.processingWorkItems >= s.config.SimultaneousWorkLimit:
 			// We're already processing the maximum number of work items.
-			// Wait until one of them finishes.
+			// Wait until one of them finishes or the ctx is canceled.
 			if err := s.unprocessedWorkCond.Wait(ctx); err != nil {
 				s.setError(err)
 				return
@@ -284,7 +284,8 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 				// which could cause work to be added, so we're done.
 				return // [s.workLock] released by defer.
 			}
-			// There's no work to do, but the current work items could produce work.
+			// No work to do, but in-flight work may yet produce more.
+			// Wait returns when work is added or ctx is canceled.
 			if err := s.unprocessedWorkCond.Wait(ctx); err != nil {
 				s.setError(err)
 				return
