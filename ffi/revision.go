@@ -27,7 +27,7 @@ import (
 
 var (
 	ErrDroppedRevision       = errors.New("revision already dropped")
-	errRevisionNotFound      = errors.New("revision not found")
+	ErrRevisionNotFound      = errors.New("revision not found")
 	ErrEndRevisionNotFound   = errors.New("end revision not found")
 	ErrStartRevisionNotFound = errors.New("start revision not found")
 )
@@ -156,7 +156,7 @@ func getRevisionFromResult(result C.RevisionResult, wg *sync.WaitGroup) (*Revisi
 	case C.RevisionResult_NullHandlePointer:
 		return nil, errDBClosed
 	case C.RevisionResult_RevisionNotFound:
-		return nil, errRevisionNotFound
+		return nil, ErrRevisionNotFound
 	case C.RevisionResult_Ok:
 		body := (*C.RevisionResult_Ok_Body)(unsafe.Pointer(&result.anon0))
 		hashKey := *(*Hash)(unsafe.Pointer(&body.root_hash._0))

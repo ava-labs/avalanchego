@@ -616,7 +616,7 @@ func getRangeProofFromRangeProofResult(result C.RangeProofResult) (*RangeProof, 
 	case C.RangeProofResult_RevisionNotFound:
 		// NOTE: the result value contains the provided root hash, we could use
 		// it in the error message if needed.
-		return nil, errRevisionNotFound
+		return nil, ErrRevisionNotFound
 	case C.RangeProofResult_EmptyTrie:
 		return nil, errEmptyTrie
 	case C.RangeProofResult_Ok:

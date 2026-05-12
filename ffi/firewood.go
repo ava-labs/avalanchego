@@ -376,7 +376,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	val, err := getValueFromValueResult(C.fwd_get_latest(db.handle, newBorrowedBytes(key, &pinner)))
 	// The revision won't be found if the database is empty.
 	// This is valid, but should be treated as a non-existent key
-	if errors.Is(err, errRevisionNotFound) {
+	if errors.Is(err, ErrRevisionNotFound) {
 		return nil, nil
 	}
 
@@ -425,7 +425,7 @@ func (db *Database) LatestRevision() (*Revision, error) {
 	defer db.commitLock.Unlock()
 	root := db.root()
 	if root == EmptyRoot {
-		return nil, errRevisionNotFound
+		return nil, ErrRevisionNotFound
 	}
 	return db.Revision(root)
 }

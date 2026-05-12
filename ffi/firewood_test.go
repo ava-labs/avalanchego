@@ -1176,7 +1176,7 @@ func TestInvalidRevision(t *testing.T) {
 	// Create a fake revision with an valid root.
 	validRoot := Hash([]byte("counting 32 bytes to make a hash"))
 	_, err := db.Revision(validRoot)
-	r.ErrorIs(err, errRevisionNotFound, "Revision(valid root)")
+	r.ErrorIs(err, ErrRevisionNotFound, "Revision(valid root)")
 }
 
 // Tests that edge case `Get` calls are handled correctly.

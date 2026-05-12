@@ -300,7 +300,7 @@ func getValueFromValueResult(result C.ValueResult) ([]byte, error) {
 	case C.ValueResult_RevisionNotFound:
 		// NOTE: the result value contains the provided root hash, we could use
 		// it in the error message if needed.
-		return nil, errRevisionNotFound
+		return nil, ErrRevisionNotFound
 	case C.ValueResult_None:
 		return nil, nil
 	case C.ValueResult_Some:
