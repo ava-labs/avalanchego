@@ -117,7 +117,7 @@ type Syncer[R any, C any] struct {
 	// - An item is added to [processedWork].
 	// - Close() is called.
 	// [workLock] is its inner lock.
-	unprocessedWorkCond lock.Cond
+	unprocessedWorkCond *lock.Cond
 	// [workLock] must be held while accessing [processedWork].
 	processedWork *workHeap
 
@@ -191,7 +191,7 @@ func NewSyncer[R any, C any](
 		processedWork:   newWorkHeap(),
 		metrics:         metrics,
 	}
-	s.unprocessedWorkCond = *lock.NewCond(&s.workLock)
+	s.unprocessedWorkCond = lock.NewCond(&s.workLock)
 
 	return s, nil
 }
@@ -274,7 +274,10 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 		case s.processingWorkItems >= s.config.SimultaneousWorkLimit:
 			// We're already processing the maximum number of work items.
 			// Wait until one of them finishes.
-			_ = s.unprocessedWorkCond.Wait(ctx)
+			if err := s.unprocessedWorkCond.Wait(ctx); err != nil {
+				s.setError(err)
+				return
+			}
 		case s.unprocessedWork.Len() == 0:
 			if s.processingWorkItems == 0 {
 				// There's no work to do, and there are no work items being processed
@@ -282,7 +285,10 @@ func (s *Syncer[_, _]) workLoop(ctx context.Context) {
 				return // [s.workLock] released by defer.
 			}
 			// There's no work to do, but the current work items could produce work.
-			_ = s.unprocessedWorkCond.Wait(ctx)
+			if err := s.unprocessedWorkCond.Wait(ctx); err != nil {
+				s.setError(err)
+				return
+			}
 		default:
 			s.processingWorkItems++
 			work := s.unprocessedWork.GetWork()
