@@ -242,7 +242,8 @@ func (n *network) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if n.closed.Get() {
 		n.activeAppRequests.Release(1)
-		// Unblock synchronous waiters.
+		// Other error paths return an error so the synced caller bails before
+		// WaitForResult. Here we return nil, so unblock it explicitly.
 		return responseHandler.OnFailure()
 	}
 

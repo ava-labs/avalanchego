@@ -49,7 +49,7 @@ var _ Client = (*client)(nil)
 // Network is a transitional facade for the state-sync client over the
 // underlying p2p primitives, implemented by the graft coreth and subnet-evm
 // network packages. New consumers should hold a [p2p.PeerTracker] and
-// construct [p2p.Client]s directly rather than extending this interface.
+// construct each [p2p.Client] directly rather than extending this interface.
 type Network interface {
 	p2p.NodeSampler
 

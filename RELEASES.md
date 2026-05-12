@@ -4,10 +4,10 @@
 
 ### Metrics
 
-- Consolidated the coreth and subnet-evm sync peer trackers onto the shared `p2p.PeerTracker`. The following gauges are renamed. They were previously registered through libevm's metrics registry (exported under the `eth` prefix) and are now registered as native prometheus gauges on the `sdk` registry under the `sync_peer_tracker` namespace:
-  - `eth_net_tracked_peers` -> `sdk_sync_peer_tracker_num_tracked_peers`
-  - `eth_net_responsive_peers` -> `sdk_sync_peer_tracker_num_responsive_peers`
-  - `eth_net_average_bandwidth` -> `sdk_sync_peer_tracker_average_bandwidth`
+- Renamed Coreth and Subnet-EVM state-sync p2p metrics (`{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains):
+  - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
+  - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
+  - `avalanche_{vmName}_eth_net_average_bandwidth` -> `avalanche_{vmName}_sdk_sync_peer_tracker_average_bandwidth`
 
 ### Fixes
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
