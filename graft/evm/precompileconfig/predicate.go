@@ -8,14 +8,13 @@ package precompileconfig
 import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-
-	ethcore "github.com/ava-labs/libevm/core"
 )
 
 // PredicateContext is the context passed in to the Predicater interface to verify
@@ -66,7 +65,7 @@ func AccessListGasWithPredicates(
 			accessTupleGas := params.TxAccessListAddressGas + uint64(len(accessTuple.StorageKeys))*params.TxAccessListStorageKeyGas
 			totalGas, overflow := math.SafeAdd(gas, accessTupleGas)
 			if overflow {
-				return 0, ethcore.ErrGasUintOverflow
+				return 0, core.ErrGasUintOverflow
 			}
 			gas = totalGas
 		} else {
@@ -76,7 +75,7 @@ func AccessListGasWithPredicates(
 			}
 			totalGas, overflow := math.SafeAdd(gas, predicateGas)
 			if overflow {
-				return 0, ethcore.ErrGasUintOverflow
+				return 0, core.ErrGasUintOverflow
 			}
 			gas = totalGas
 		}
