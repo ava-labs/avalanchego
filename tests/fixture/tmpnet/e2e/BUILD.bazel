@@ -1,0 +1,20 @@
+load("//.bazel:defs.bzl", "go_test")
+
+go_test(
+    name = "e2e_test",
+    srcs = ["e2e_test.go"],
+    tags = ["manual"],
+    deps = [
+        "//ids",
+        "//tests",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//tests/fixture/tmpnet/flags",
+        "@com_github_chaos_mesh_chaos_mesh_api//v1alpha1",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_client_go//kubernetes",
+    ],
+)
