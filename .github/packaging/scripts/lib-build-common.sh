@@ -3,7 +3,8 @@
 # Shared functions for RPM and DEB package build scripts.
 #
 # Sourced (not executed) by build-package.sh.
-# All functions expect REPO_ROOT to be set by the caller.
+
+: "${REPO_ROOT:?REPO_ROOT must be set by the caller}"
 
 readonly PACKAGER_NAME="Ava Labs"
 readonly PACKAGER_EMAIL="security@avalabs.org"
@@ -75,6 +76,7 @@ resolve_subnet_evm_vm_id() {
 # Args: version (semver without "v" prefix)
 generate_changelog() {
     local version="${1:?version required}"
+    : "${NFPM_CHANGELOG:?NFPM_CHANGELOG must be set by the caller}"
 
     mkdir -p "$(dirname "${NFPM_CHANGELOG}")"
     cat > "${NFPM_CHANGELOG}" <<EOF
@@ -97,6 +99,7 @@ setup_gpg() {
     local gpg_key_file="${1:-}"
     local public_key_out="${2:?public key output path required}"
     local key_label="${3:-Package}"
+    : "${NFPM_SIGNING_KEY:?NFPM_SIGNING_KEY must be set by the caller}"
 
     mkdir -p "$(dirname "${NFPM_SIGNING_KEY}")"
 
