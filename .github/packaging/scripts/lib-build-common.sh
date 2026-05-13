@@ -41,6 +41,7 @@ build_binary() {
         avalanchego)
             echo "Building avalanchego..."
             "${REPO_ROOT}/scripts/build.sh"
+            # avalanchego_path is set by scripts/constants.sh, sourced in init_build_env
             # shellcheck disable=SC2154
             BINARY_PATH="${avalanchego_path}"
             ;;
@@ -87,6 +88,13 @@ generate_changelog() {
   changes:
     - note: "See https://github.com/ava-labs/avalanchego/releases/tag/v${version}"
 EOF
+
+    # Sanity-check the heredoc wrote the version line (catches silent
+    # substitution failures: empty file, unresolved ${version}, etc.)
+    if ! grep -q "^- semver: ${version}\$" "${NFPM_CHANGELOG}"; then
+        echo "ERROR: generated changelog ${NFPM_CHANGELOG} missing 'semver: ${version}'" >&2
+        return 1
+    fi
 }
 
 # Set up GPG signing (import provided key, reuse ephemeral, or generate new).

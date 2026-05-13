@@ -29,10 +29,12 @@ detect_host_arch() {
 # Args: pkg_dir file1 [file2 ...]
 assert_files_exist() {
     local pkg_dir="${1:?package directory required}"; shift
+    local missing=()
     for f in "$@"; do
-        if [[ ! -f "${pkg_dir}/${f}" ]]; then
-            echo "ERROR: expected file not found: ${pkg_dir}/${f}" >&2
-            exit 1
-        fi
+        [[ -f "${pkg_dir}/${f}" ]] || missing+=("${pkg_dir}/${f}")
     done
+    if (( ${#missing[@]} > 0 )); then
+        printf 'ERROR: expected file not found: %s\n' "${missing[@]}" >&2
+        exit 1
+    fi
 }
