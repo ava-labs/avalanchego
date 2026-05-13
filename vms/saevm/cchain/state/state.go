@@ -48,6 +48,9 @@ var (
 // State holds the accepted transactions and the atomic-request trie.
 //
 // When applying operations, shared memory is updated atomically with the state.
+//
+// [State.Close] MUST be called when finished with the state to release
+// resources.
 type State struct {
 	snowCtx *snow.Context
 	db      database.Database
