@@ -53,6 +53,9 @@ var (
 // State holds the accepted transactions and the atomic-request trie.
 //
 // When applying operations, shared memory is updated atomically with the state.
+//
+// [State.Close] MUST be called when finished with the state to release
+// resources.
 type State struct {
 	snowCtx *snow.Context
 	db      database.Database
@@ -64,8 +67,8 @@ type State struct {
 
 // New initializes the state with db.
 //
-// TODO(StephenButtolph): Coreth's commitInterval must be reduced to 1 prior to
-// transitioning to SAE. Otherwise the atomic trie may not contain operations
+// TODO(#5375): Coreth's commitInterval must be reduced to 1 prior to
+// transitioning to SAE. Otherwise, the atomic trie may not contain operations
 // for recent blocks.
 func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 	root, height, err := readLast(db)
@@ -80,7 +83,9 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 			rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(triePrefix, db))),
 			&triedb.Config{
 				HashDB: &hashdb.Config{
-					CleanCacheSize: 64 * units.MiB,
+					// This trie is append only, so we only need to cache the
+					// leading edge of the trie.
+					CleanCacheSize: units.MiB,
 				},
 			},
 		),
