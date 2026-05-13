@@ -6,6 +6,7 @@ use crate::api::{self, BatchOp, Db as DbTrait, DbView, FrozenChangeProof, Propos
 use crate::db::{Db, DbConfig};
 use crate::merkle::verify_change_proof_root_hash;
 use crate::{ChangeProofVerificationContext, verify_change_proof_structure};
+use firewood_storage::PathComponentSliceExt;
 
 // ── Test infrastructure ────────────────────────────────────────────────────
 
