@@ -385,8 +385,28 @@ fn fix_account_storage_root(
 }
 
 /// A proof that a given key-value pair either exists or does not exist in a trie.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct Proof<T: ?Sized>(T);
+
+impl<T> std::fmt::Debug for Proof<T>
+where
+    T: ProofCollection + ?Sized,
+    T::Node: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        struct Indexed<'a, N>(&'a [N]);
+        impl<N: std::fmt::Debug> std::fmt::Debug for Indexed<'_, N> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_map().entries(self.0.iter().enumerate()).finish()
+            }
+        }
+        let nodes = self.0.as_ref();
+        f.debug_struct("Proof")
+            .field("len", &nodes.len())
+            .field("nodes", &Indexed(nodes))
+            .finish()
+    }
+}
 
 impl<T: ProofCollection + ?Sized> Proof<T> {
     /// Verify a proof

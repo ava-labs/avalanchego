@@ -166,11 +166,27 @@ pub fn find_next_key_after_range_proof(
 /// - State synchronization between nodes
 /// - Light client verification
 /// - Efficient auditing of specific key ranges
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub struct RangeProof<K, V, H> {
     start_proof: Proof<H>,
     end_proof: Proof<H>,
     key_values: Box<[(K, V)]>,
+}
+
+impl<K, V, H> std::fmt::Debug for RangeProof<K, V, H>
+where
+    K: std::fmt::Debug,
+    V: std::fmt::Debug,
+    H: ProofCollection,
+    H::Node: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RangeProof")
+            .field("start_proof", &self.start_proof)
+            .field("end_proof", &self.end_proof)
+            .field("key_values", &self.key_values)
+            .finish()
+    }
 }
 
 impl<K, V, H> RangeProof<K, V, H>

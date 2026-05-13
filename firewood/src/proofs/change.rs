@@ -13,13 +13,28 @@ use crate::{
 /// trie with given start root hash, the resulting trie will have the given end root hash. It
 /// consists of the following:
 /// - A start proof: proves that the smallest key does/doesn't exist
-/// - An end proof: proves the the largest key does/doesn't exist
+/// - An end proof: proves that the largest key does/doesn't exist
 /// - The actual `BatchOp`s that specify the difference between the start and end tries.
-#[derive(Debug)]
 pub struct ChangeProof<K: AsRef<[u8]> + Debug, V: AsRef<[u8]> + Debug, H> {
     start_proof: Proof<H>,
     end_proof: Proof<H>,
     batch_ops: Box<[BatchOp<K, V>]>,
+}
+
+impl<K, V, H> std::fmt::Debug for ChangeProof<K, V, H>
+where
+    K: AsRef<[u8]> + Debug,
+    V: AsRef<[u8]> + Debug,
+    H: ProofCollection,
+    H::Node: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChangeProof")
+            .field("start_proof", &self.start_proof)
+            .field("end_proof", &self.end_proof)
+            .field("batch_ops", &self.batch_ops)
+            .finish()
+    }
 }
 
 impl<K, V, H> ChangeProof<K, V, H>

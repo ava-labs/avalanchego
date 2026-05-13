@@ -55,14 +55,14 @@ fn stored_key_values<K: AsRef<[u8]>>(
 
 #[test]
 fn outside_children_empty_proof() {
-    let result = compute_outside_children(&[], None, true).unwrap();
+    let result = compute_outside_children(&[], EdgeBoundary::Left(None)).unwrap();
     assert!(result.is_empty());
 }
 
 #[test]
 fn outside_children_single_node_no_boundary() {
     let nodes = [proof_node(&[1, 2])];
-    let result = compute_outside_children(&nodes, None, true).unwrap();
+    let result = compute_outside_children(&nodes, EdgeBoundary::Left(None)).unwrap();
     assert!(result.is_empty());
 }
 
@@ -71,7 +71,7 @@ fn outside_children_single_node_exact_match() {
     // Boundary matches terminal exactly — no children marked.
     let nodes = [proof_node(&[1, 2])];
     // boundary key 0x12 expands to nibbles [1, 2]
-    let result = compute_outside_children(&nodes, Some(&[0x12]), true).unwrap();
+    let result = compute_outside_children(&nodes, EdgeBoundary::Left(Some(&[0x12]))).unwrap();
     assert!(result.is_empty());
 }
 
@@ -79,7 +79,11 @@ fn outside_children_single_node_exact_match() {
 fn outside_children_single_node_exact_match_right_edge() {
     // Boundary matches terminal exactly on right edge — all children marked outside.
     let nodes = [proof_node(&[1, 2])];
-    let result = compute_outside_children(&nodes, Some(&[0x12]), false).unwrap();
+    let result = compute_outside_children(
+        &nodes,
+        EdgeBoundary::Right(RightBoundary::InRange(Some(&[0x12]))),
+    )
+    .unwrap();
     // Look up the mask for the terminal node at [1, 2].
     let mask = result[&nibble_path(&[1, 2])];
     for i in 0..16u8 {
@@ -96,7 +100,7 @@ fn outside_children_ancestor_left_edge() {
     // Terminal is ancestor of boundary. On-path nibble = 5.
     // Left edge: children < 5 are outside, plus child 5 itself.
     let nodes = [proof_node(&[1])];
-    let result = compute_outside_children(&nodes, Some(&[0x15]), true).unwrap();
+    let result = compute_outside_children(&nodes, EdgeBoundary::Left(Some(&[0x15]))).unwrap();
     let mask = result[&nibble_path(&[1])];
     // Children 0..=5 should be outside (left of 5, plus 5 itself)
     for i in 0..16u8 {
@@ -113,7 +117,11 @@ fn outside_children_ancestor_right_edge() {
     // Terminal key [1], boundary key 0x15 → nibbles [1, 5].
     // Right edge: children > 5 are outside, plus child 5 itself.
     let nodes = [proof_node(&[1])];
-    let result = compute_outside_children(&nodes, Some(&[0x15]), false).unwrap();
+    let result = compute_outside_children(
+        &nodes,
+        EdgeBoundary::Right(RightBoundary::InRange(Some(&[0x15]))),
+    )
+    .unwrap();
     let mask = result[&nibble_path(&[1])];
     for i in 0..16u8 {
         assert_eq!(
@@ -129,7 +137,7 @@ fn outside_children_diverges_past_terminal_left() {
     // Terminal key [1, 3], boundary nibbles [1, 5] (diverge at pos 1: 5 > 3).
     // Left edge + boundary past terminal → all children outside.
     let nodes = [proof_node(&[1, 3])];
-    let result = compute_outside_children(&nodes, Some(&[0x15]), true).unwrap();
+    let result = compute_outside_children(&nodes, EdgeBoundary::Left(Some(&[0x15]))).unwrap();
     let mask = result[&nibble_path(&[1, 3])];
     for i in 0..16u8 {
         assert!(
@@ -144,7 +152,7 @@ fn outside_children_diverges_before_terminal_left() {
     // Terminal key [1, 7], boundary nibbles [1, 5] (diverge at pos 1: 5 < 7).
     // Left edge + boundary before terminal → no children outside.
     let nodes = [proof_node(&[1, 7])];
-    let result = compute_outside_children(&nodes, Some(&[0x15]), true).unwrap();
+    let result = compute_outside_children(&nodes, EdgeBoundary::Left(Some(&[0x15]))).unwrap();
     assert!(
         !result.contains_key(&nibble_path(&[1, 7])),
         "no mask when boundary before terminal"
@@ -156,7 +164,7 @@ fn outside_children_two_nodes_left_edge() {
     // Parent [1], child [1, 5]. On-path nibble = 5.
     // Left edge: children < 5 on parent are outside.
     let nodes = [proof_node(&[1]), proof_node(&[1, 5])];
-    let result = compute_outside_children(&nodes, None, true).unwrap();
+    let result = compute_outside_children(&nodes, EdgeBoundary::Left(None)).unwrap();
     let mask = result[&nibble_path(&[1])];
     for i in 0..16u8 {
         assert_eq!(
@@ -172,7 +180,9 @@ fn outside_children_two_nodes_right_edge() {
     // Parent [1], child [1, 5]. On-path nibble = 5.
     // Right edge: children > 5 on parent are outside.
     let nodes = [proof_node(&[1]), proof_node(&[1, 5])];
-    let result = compute_outside_children(&nodes, None, false).unwrap();
+    let result =
+        compute_outside_children(&nodes, EdgeBoundary::Right(RightBoundary::InRange(None)))
+            .unwrap();
     let mask = result[&nibble_path(&[1])];
     for i in 0..16u8 {
         assert_eq!(
@@ -189,7 +199,7 @@ fn outside_children_child_not_prefixed_by_parent() {
     // child.key.get(parent.key.len()) = [2,5].get(1) = Some(5), so no error;
     // but child key [1] with parent [1, 2] means child.key.get(2) = None → error.
     let nodes = [proof_node(&[1, 2]), proof_node(&[1])];
-    let result = compute_outside_children(&nodes, None, true);
+    let result = compute_outside_children(&nodes, EdgeBoundary::Left(None));
     assert!(
         matches!(result, Err(ProofError::ShouldBePrefixOfNextKey)),
         "expected ShouldBePrefixOfNextKey, got {result:?}"
@@ -211,6 +221,244 @@ fn test_missing_key_proof() {
 
         proof.verify(key, None::<&[u8]>, &root_hash).unwrap();
     }
+}
+
+#[test]
+// A truncated bounded range proof: caller asks for [start, end] with a limit
+// that is hit, so the generator anchors `end_proof` at the last returned key
+// rather than at `end`. The verifier must accept the proof when called with
+// the originally requested `(start, end)` — those are the only bounds the
+// caller has; it cannot predict the post-truncation anchor.
+fn test_truncated_bounded_range_proof_round_trip() {
+    let items: Vec<([u8; 4], [u8; 4])> = (0u32..1000)
+        .map(|i| (i.to_be_bytes(), i.to_be_bytes()))
+        .collect();
+    let merkle = init_merkle(items.iter().map(|(k, v)| (k.as_slice(), v.as_slice())));
+    let root_hash = merkle.nodestore().root_hash().unwrap();
+
+    // Bound covers many keys; limit forces truncation.
+    let start = items[10].0;
+    let end = items[900].0;
+    let limit = NonZeroUsize::new(8).unwrap();
+
+    let range_proof = merkle
+        .range_proof(Some(&start), Some(&end), Some(limit))
+        .unwrap();
+
+    assert_eq!(range_proof.key_values().len(), limit.get());
+
+    // Verify with the *original* requested bounds — the only ones the caller
+    // can provide. End_proof anchors at the last returned key, not `end`.
+    verify_range_proof(Some(&start), Some(&end), &root_hash, &range_proof).unwrap();
+}
+
+#[test]
+// End-proof terminal is a value-node strict prefix of last_kv: trie
+// {0x05, 0x10, 0x10\x10, 0x10\x50}, range [0x05, 0x10\x30]. The end_proof
+// terminates at the branch node `0x10` (which has value "parent" and
+// children at nibbles 1 and 5). The terminal's full key 0x10 is *less
+// than* last_kv 0x10\x10, so the right-edge anchor is the caller's
+// requested bound `0x10\x30` (inclusive); verify_edge then anchors the
+// proof against `0x10\x30` and the hash check correctly catches any
+// tampering of `0x10\x10`'s value.
+fn test_terminal_strict_prefix_of_last_kv_verifies() {
+    let items: &[(&[u8], &[u8])] = &[
+        (b"\x05", b"before"),
+        (b"\x10", b"parent"),
+        (b"\x10\x10", b"in_range"),
+        (b"\x10\x50", b"after"),
+    ];
+    let merkle = init_merkle(items.iter().copied());
+    let root_hash = merkle.nodestore().root_hash().unwrap();
+
+    let range_proof = merkle
+        .range_proof(Some(b"\x05".as_slice()), Some(b"\x10\x30".as_slice()), None)
+        .unwrap();
+
+    // Honest proof contains the three in-range keys.
+    assert_eq!(range_proof.key_values().len(), 3);
+
+    verify_range_proof(
+        Some(b"\x05".as_slice()),
+        Some(b"\x10\x30".as_slice()),
+        &root_hash,
+        &range_proof,
+    )
+    .unwrap();
+}
+
+#[test]
+// Dropped trailing key collapses to a smaller proven range: same trie as
+// `test_terminal_strict_prefix_of_last_kv_verifies`, but an attacker
+// omits `0x10\x10` from key_values. The end_proof's terminal is the
+// branch `0x10` — terminal_full_key now equals the (tampered) last_kv
+// 0x10, so the right-edge anchor is **inclusive at last_kv = 0x10**.
+// Under that anchor the proof verifies (it is structurally a valid proof
+// of [0x05, 0x10]). The verifier reports success; the *caller* observes
+// that `last_kv < the requested bound` and re-requests `(0x10, 0x10\x30]`
+// — that follow-up query is what surfaces the omitted `0x10\x10`. No
+// information is hidden.
+fn test_dropped_trailing_key_accepted_as_partial_coverage() {
+    let items: &[(&[u8], &[u8])] = &[
+        (b"\x05", b"before"),
+        (b"\x10", b"parent"),
+        (b"\x10\x10", b"in_range"),
+        (b"\x10\x50", b"after"),
+    ];
+    let merkle = init_merkle(items.iter().copied());
+    let root_hash = merkle.nodestore().root_hash().unwrap();
+
+    let honest = merkle
+        .range_proof(Some(b"\x05".as_slice()), Some(b"\x10\x30".as_slice()), None)
+        .unwrap();
+
+    // Drop `0x10\x10` from key_values, keeping the original end_proof.
+    let tampered_kvs: KeyValuePairs = honest
+        .key_values()
+        .iter()
+        .filter(|(k, _)| k.as_ref() != b"\x10\x10")
+        .map(|(k, v)| (k.as_ref().into(), v.as_ref().into()))
+        .collect();
+    assert_eq!(tampered_kvs.len(), 2);
+    assert_eq!(tampered_kvs.last().unwrap().0.as_ref(), b"\x10");
+
+    let tampered = RangeProof::new(
+        crate::Proof::<Box<[ProofNode]>>::new(honest.start_proof().as_ref().into()),
+        crate::Proof::<Box<[ProofNode]>>::new(honest.end_proof().as_ref().into()),
+        tampered_kvs.into_boxed_slice(),
+    );
+
+    // The verifier accepts: the proof is internally consistent and proves
+    // `[0x05, 0x10]`. It is *not* the verifier's job to enforce that the
+    // proven range matches the requested range — partial coverage is a
+    // valid outcome the caller is responsible for handling.
+    verify_range_proof(
+        Some(b"\x05".as_slice()),
+        Some(b"\x10\x30".as_slice()),
+        &root_hash,
+        &tampered,
+    )
+    .unwrap();
+
+    // The caller's `last_kv < requested_last` check is what flags partial
+    // coverage and should drive a follow-up request.
+    assert!(tampered.key_values().last().unwrap().0.as_ref() < b"\x10\x30".as_slice());
+}
+
+#[test]
+// Tampering the *value* of an in-range key must be rejected. Same trie
+// and request as `test_terminal_strict_prefix_of_last_kv_verifies`, but
+// the value of `0x10\x10` is altered in key_values. With anchor =
+// requested bound `0x10\x30` (inclusive, fallback path),
+// `compute_outside_children` keeps `0x10`'s child 1 in-range, so the
+// hash check recurses into the proving trie's tampered `0x10\x10` leaf
+// and the root hash mismatches.
+fn test_tampered_in_range_value_rejected() {
+    let items: &[(&[u8], &[u8])] = &[
+        (b"\x05", b"before"),
+        (b"\x10", b"parent"),
+        (b"\x10\x10", b"in_range"),
+        (b"\x10\x50", b"after"),
+    ];
+    let merkle = init_merkle(items.iter().copied());
+    let root_hash = merkle.nodestore().root_hash().unwrap();
+
+    let honest = merkle
+        .range_proof(Some(b"\x05".as_slice()), Some(b"\x10\x30".as_slice()), None)
+        .unwrap();
+
+    let mut tampered_kvs: KeyValuePairs = honest
+        .key_values()
+        .iter()
+        .map(|(k, v)| (k.as_ref().into(), v.as_ref().into()))
+        .collect();
+    // Tamper the value of `0x10\x10`.
+    for (k, v) in &mut tampered_kvs {
+        if k.as_ref() == b"\x10\x10" {
+            *v = b"WRONG".to_vec().into_boxed_slice();
+        }
+    }
+
+    let tampered = RangeProof::new(
+        crate::Proof::<Box<[ProofNode]>>::new(honest.start_proof().as_ref().into()),
+        crate::Proof::<Box<[ProofNode]>>::new(honest.end_proof().as_ref().into()),
+        tampered_kvs.into_boxed_slice(),
+    );
+
+    let result = verify_range_proof(
+        Some(b"\x05".as_slice()),
+        Some(b"\x10\x30".as_slice()),
+        &root_hash,
+        &tampered,
+    );
+    assert!(
+        result.is_err(),
+        "tampered \\x10\\x10 value should be rejected, got: {result:?}"
+    );
+}
+
+#[test]
+// Divergent terminal past last_kv: trie {0x05, 0x10\x50}, range
+// [0x05, 0x10\x30]. The end_proof of `0x10\x30` walks root → leaf
+// `0x10\x50` (the leaf's path diverges from `0x10\x30` at the `5` vs `3`
+// nibble). terminal.value_digest is set, terminal_full_key = 0x10\x50 >
+// last_kv 0x05 → right-edge anchor is **exclusive at 0x10\x50**. The
+// proof structurally proves `[0x05, 0x10\x50)`, which covers the
+// requested `[0x05, 0x10\x30]`.
+fn test_divergent_terminal_past_last_kv() {
+    let items: &[(&[u8], &[u8])] = &[(b"\x05", b"a"), (b"\x10\x50", b"z")];
+    let merkle = init_merkle(items.iter().copied());
+    let root_hash = merkle.nodestore().root_hash().unwrap();
+
+    let range_proof = merkle
+        .range_proof(Some(b"\x05".as_slice()), Some(b"\x10\x30".as_slice()), None)
+        .unwrap();
+
+    // Only `0x05` is in [0x05, 0x10\x30]; `0x10\x50` is past the bound.
+    assert_eq!(range_proof.key_values().len(), 1);
+    assert_eq!(range_proof.key_values()[0].0.as_ref(), b"\x05");
+
+    verify_range_proof(
+        Some(b"\x05".as_slice()),
+        Some(b"\x10\x30".as_slice()),
+        &root_hash,
+        &range_proof,
+    )
+    .unwrap();
+}
+
+#[test]
+// Symmetric mirror of `test_divergent_terminal_past_last_kv` on the left
+// edge: trie {0x05, 0x10}, range [0x07, 0x10]. `start_key = 0x07` doesn't
+// exist; `prove(0x07)` walks root → leaf 0x05 (divergent), so the
+// start_proof's terminal is a value-node at full key 0x05, which is
+// *less than* `first_kv = 0x10`. This is the structural mirror of the
+// right-edge "exclusive at terminal" case — the terminal's full key is
+// outside the proven range, on the wrong side of the left boundary.
+//
+// The current code uses `EdgeBoundary::Left(start_key)` (always inclusive
+// on the left edge); if the existing logic implicitly handles this case
+// correctly, this test passes. If it doesn't, we'd need a `LeftOutOfRange`
+// variant for symmetry.
+fn test_divergent_terminal_before_first_kv() {
+    let items: &[(&[u8], &[u8])] = &[(b"\x05", b"a"), (b"\x10", b"b")];
+    let merkle = init_merkle(items.iter().copied());
+    let root_hash = merkle.nodestore().root_hash().unwrap();
+
+    let range_proof = merkle
+        .range_proof(Some(b"\x07".as_slice()), Some(b"\x10".as_slice()), None)
+        .unwrap();
+
+    assert_eq!(range_proof.key_values().len(), 1);
+    assert_eq!(range_proof.key_values()[0].0.as_ref(), b"\x10");
+
+    verify_range_proof(
+        Some(b"\x07".as_slice()),
+        Some(b"\x10".as_slice()),
+        &root_hash,
+        &range_proof,
+    )
+    .unwrap();
 }
 
 #[test]
