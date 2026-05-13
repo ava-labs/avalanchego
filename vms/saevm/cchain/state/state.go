@@ -201,6 +201,11 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("applying shared memory: %w", err)
 	}
 
+	s.snowCtx.Log.Debug("updated atomic trie",
+		zap.Uint64("height", height),
+		zap.Stringer("root", newRoot),
+	)
+
 	s.currentRoot = newRoot
 	s.currentHeight.Store(height)
 	return nil
