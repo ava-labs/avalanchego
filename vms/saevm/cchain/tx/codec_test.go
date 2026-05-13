@@ -5,7 +5,6 @@ package tx_test
 
 import (
 	"encoding/json"
-	"errors"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -41,8 +40,8 @@ func TestID(t *testing.T) {
 		t.Run(tx.name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
 				// We must parse the old tx to properly initialize the ID.
-				old, err := parseOldTx(tx.bytes)
-				require.NoError(t, err, "parseOldTx()")
+				old, err := txtest.ParseOld(tx.bytes)
+				require.NoError(t, err, "txtest.ParseOld()")
 				assert.Equalf(t, tx.id, old.ID(), "%T.ID()", old)
 			})
 			t.Run("new", func(t *testing.T) {
@@ -69,24 +68,6 @@ func TestBytes(t *testing.T) {
 	}
 }
 
-var errUnexpectedCredentialType = errors.New("unexpected credential type")
-
-// parseOldTx parses a transaction using coreth's old parsing logic but enforces
-// additional restrictions. Coreth's parsing logic is overly permissive and
-// depends on later verification in [vm.VerifierBackend].
-func parseOldTx(b []byte) (*atomic.Tx, error) {
-	tx, err := atomic.ExtractAtomicTx(b, atomic.Codec)
-	if err != nil {
-		return nil, err
-	}
-	for _, cred := range tx.Creds {
-		if _, ok := cred.(*secp256k1fx.Credential); !ok {
-			return nil, errUnexpectedCredentialType
-		}
-	}
-	return tx, nil
-}
-
 // oldCmpOpt returns a configuration for [cmp.Diff] to compare [atomic.Tx]
 // instances.
 func oldCmpOpt() cmp.Option {
@@ -104,8 +85,8 @@ func TestParse(t *testing.T) {
 	for _, tx := range allTxs {
 		t.Run(tx.name, func(t *testing.T) {
 			t.Run("old", func(t *testing.T) {
-				got, err := parseOldTx(tx.bytes)
-				require.NoError(t, err, "parseOldTx()")
+				got, err := txtest.ParseOld(tx.bytes)
+				require.NoError(t, err, "txtest.ParseOld()")
 				if diff := cmp.Diff(tx.old, got, oldCmpOpt()); diff != "" {
 					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
 				}
@@ -157,13 +138,13 @@ func FuzzParseCompatibility(f *testing.F) {
 		f.Add(tx.bytes)
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
-		_, oldErr := parseOldTx(data)
+		_, oldErr := txtest.ParseOld(data)
 		oldOk := oldErr == nil
 
 		_, newErr := Parse(data)
 		newOk := newErr == nil
 
-		assert.Equal(t, oldOk, newOk, "Parse(b) == parseOldTx(b)")
+		assert.Equal(t, oldOk, newOk, "Parse(b) == txtest.ParseOld(b)")
 	})
 }
 
@@ -273,24 +254,6 @@ func FuzzParseSliceRoundTrip(f *testing.F) {
 	})
 }
 
-// parseOldTxs parses a slice of transactions using coreth's old parsing logic
-// but enforces additional restrictions. Coreth's parsing logic is overly
-// permissive and depends on later verification in [vm.VerifierBackend].
-func parseOldTxs(b []byte) ([]*atomic.Tx, error) {
-	txs, err := atomic.ExtractAtomicTxs(b, true, atomic.Codec)
-	if err != nil {
-		return nil, err
-	}
-	for _, tx := range txs {
-		for _, cred := range tx.Creds {
-			if _, ok := cred.(*secp256k1fx.Credential); !ok {
-				return nil, errUnexpectedCredentialType
-			}
-		}
-	}
-	return txs, nil
-}
-
 func FuzzParseSliceCompatibility(f *testing.F) {
 	{
 		newTxs := make([]*Tx, len(allTxs))
@@ -303,13 +266,13 @@ func FuzzParseSliceCompatibility(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		_, oldErr := parseOldTxs(data)
+		_, oldErr := txtest.ParseOlds(data)
 		oldOk := oldErr == nil
 
 		_, newErr := ParseSlice(data)
 		newOk := newErr == nil
 
-		assert.Equal(t, oldOk, newOk, "ParseSlice(b) == parseOldTxs(b)")
+		assert.Equal(t, oldOk, newOk, "ParseSlice(b) == txtest.ParseOlds(b)")
 	})
 }
 
@@ -538,21 +501,9 @@ func TestJSONMarshal(t *testing.T) {
 	}
 }
 
-// toOldTx converts a transaction from the new format into coreth's old format.
-func toOldTx(tb testing.TB, newTx *Tx) *atomic.Tx {
-	tb.Helper()
-
-	bytes, err := newTx.Bytes()
-	require.NoErrorf(tb, err, "%T.Bytes()", newTx)
-
-	oldTx, err := parseOldTx(bytes)
-	require.NoError(tb, err, "parseOldTx()")
-	return oldTx
-}
-
 func FuzzJSONCompatibility(f *testing.F) {
 	fuzz(f, func(t *testing.T, newTx *Tx) {
-		oldTx := toOldTx(t, newTx)
+		oldTx := txtest.ToOld(t, newTx)
 		want, err := json.Marshal(oldTx)
 		require.NoErrorf(t, err, "json.Marshal(%T)", oldTx)
 
