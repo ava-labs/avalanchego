@@ -42,7 +42,7 @@ var (
 	commitPrefix  = prefixdb.MakePrefix([]byte("atomicTrieMetaDB"))                          // See state.atomicTrieMetaDBPrefix
 	lastHeightKey = prefixdb.PrefixKey(commitPrefix, []byte("atomicTrieLastCommittedBlock")) // See state.lastCommittedKey
 
-	txIDPrefix = prefixdb.MakePrefix([]byte("atomicTxDB")) // See state.atomicTxIDDBPrefix
+	txPrefix = prefixdb.MakePrefix([]byte("atomicTxDB")) // See state.atomicTxIDDBPrefix
 )
 
 // State holds the accepted transactions and the atomic-request trie.
@@ -150,7 +150,7 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 
 	batch := s.db.NewBatch()
 	for _, t := range txs {
-		if err := writeTxByID(batch, height, t); err != nil {
+		if err := writeTx(batch, height, t); err != nil {
 			return fmt.Errorf("writing tx %s: %w", t.ID(), err)
 		}
 	}
@@ -256,7 +256,7 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops 
 // caller to fetch the block to get the tx. Paying that extra block fetch on the
 // read side is almost certainly worth avoiding the duplicate write, since this
 // index is only read from the API.
-func writeTxByID(db database.KeyValueWriter, height uint64, t *tx.Tx) error {
+func writeTx(db database.KeyValueWriter, height uint64, t *tx.Tx) error {
 	txBytes, err := t.Bytes()
 	if err != nil {
 		return err
@@ -273,7 +273,7 @@ func writeTxByID(db database.KeyValueWriter, height uint64, t *tx.Tx) error {
 }
 
 func txKey(id ids.ID) []byte {
-	return prefixdb.PrefixKey(txIDPrefix, id[:])
+	return prefixdb.PrefixKey(txPrefix, id[:])
 }
 
 // GetTx returns the tx with the given ID along with the block height it was
