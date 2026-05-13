@@ -83,7 +83,7 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 			&triedb.Config{
 				HashDB: &hashdb.Config{
 					// This trie is append only, so we only need to cache the
-					// leading edge of the trie.
+					// leading edge.
 					CleanCacheSize: units.MiB,
 				},
 			},
