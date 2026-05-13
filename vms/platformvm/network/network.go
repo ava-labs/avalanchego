@@ -49,7 +49,7 @@ func New(
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 	stateLock sync.Locker,
-	state state.State,
+	state *state.State,
 	signer warp.Signer,
 	registerer prometheus.Registerer,
 	config config.Network,

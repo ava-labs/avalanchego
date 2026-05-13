@@ -212,7 +212,7 @@ func (vm *VM) Initialize(
 		gossipWG.Wait()
 		return nil
 	})
-	if err := registerWarpHandler(vm.VM, warpStorage, snowCtx.WarpSigner); err != nil {
+	if err := registerWarpHandler(vm.VM, warpStorage, snowCtx.WarpSigner, snowCtx.Log); err != nil {
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
 	return nil

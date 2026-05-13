@@ -416,6 +416,157 @@ type AggregatedValidatorDiff struct {
 	CurrentWeight  uint64 // Weight at current height (0 if validator was removed)
 }
 
+// GetAggregatedValidatorDiffs returns the net validator changes for subnetID
+// between previousHeight (exclusive) and currentHeight (inclusive).
+//
+// For additions (PreviousWeight==0), PublicKey is set to the current key.
+// For removals (CurrentWeight==0), PublicKey is set to the key at previousHeight.
+// For weight-only modifications, PublicKey is nil.
+func (s *State) GetAggregatedValidatorDiffs(
+	ctx context.Context,
+	subnetID ids.ID,
+	previousHeight uint64,
+	currentHeight uint64,
+) ([]AggregatedValidatorDiff, error) {
+	// Get the validator set at currentHeight to look up current weights and keys.
+	vdrsAtCurrent, err := s.ctx.ValidatorState.GetValidatorSet(ctx, currentHeight, subnetID)
+	if err != nil {
+		return nil, fmt.Errorf("getting validator set at height %d: %w", currentHeight, err)
+	}
+
+	// Aggregate net weight changes per node across all heights in
+	// (previousHeight, currentHeight].
+	netDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
+
+	weightDiffIter := s.validatorWeightDiffsBySubnetIDDB.NewIteratorWithStartAndPrefix(
+		marshalStartDiffKeyBySubnetID(subnetID, currentHeight),
+		subnetID[:],
+	)
+	defer weightDiffIter.Release()
+
+	for weightDiffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		_, parsedHeight, nodeID, err := unmarshalDiffKeyBySubnetID(weightDiffIter.Key())
+		if err != nil {
+			return nil, err
+		}
+		if parsedHeight <= previousHeight {
+			break
+		}
+
+		weightDiff, err := unmarshalWeightDiff(weightDiffIter.Value())
+		if err != nil {
+			return nil, err
+		}
+
+		nd := netDiffs[nodeID]
+		if nd == nil {
+			nd = &ValidatorWeightDiff{}
+			netDiffs[nodeID] = nd
+		}
+		if weightDiff.Decrease {
+			if err := nd.Sub(weightDiff.Amount); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := nd.Add(weightDiff.Amount); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := weightDiffIter.Error(); err != nil {
+		return nil, err
+	}
+
+	// For nodes with net changes, collect the public key at previousHeight.
+	// Iterating in decreasing height order, the last stored value per node comes
+	// from the lowest height in range. That value is the key at parsedHeight-1,
+	// which equals the key at previousHeight (no further changes exist in range).
+	prevKeys := make(map[ids.NodeID][]byte)
+
+	pkDiffIter := s.validatorPublicKeyDiffsBySubnetIDDB.NewIteratorWithStartAndPrefix(
+		marshalStartDiffKeyBySubnetID(subnetID, currentHeight),
+		subnetID[:],
+	)
+	defer pkDiffIter.Release()
+
+	for pkDiffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		_, parsedHeight, nodeID, err := unmarshalDiffKeyBySubnetID(pkDiffIter.Key())
+		if err != nil {
+			return nil, err
+		}
+		if parsedHeight <= previousHeight {
+			break
+		}
+
+		if _, ok := netDiffs[nodeID]; !ok {
+			continue
+		}
+		// Overwrite on each iteration; since we go high→low, the last write
+		// comes from the lowest height and gives the key at previousHeight.
+		prevKeys[nodeID] = pkDiffIter.Value()
+	}
+	if err := pkDiffIter.Error(); err != nil {
+		return nil, err
+	}
+
+	result := make([]AggregatedValidatorDiff, 0, len(netDiffs))
+	for nodeID, nd := range netDiffs {
+		if nd.Amount == 0 {
+			continue
+		}
+
+		var currentWeight uint64
+		var currentKeyBytes []byte
+		if vdr, ok := vdrsAtCurrent[nodeID]; ok {
+			currentWeight = vdr.Weight
+			if vdr.PublicKey != nil {
+				currentKeyBytes = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
+			}
+		}
+
+		var previousWeight uint64
+		if nd.Decrease {
+			// Net: weight decreased → previous was higher.
+			previousWeight = currentWeight + nd.Amount
+		} else {
+			// Net: weight increased → previous was lower (zero for new additions).
+			if nd.Amount >= currentWeight {
+				previousWeight = 0
+			} else {
+				previousWeight = currentWeight - nd.Amount
+			}
+		}
+
+		var publicKey []byte
+		switch {
+		case previousWeight == 0 && currentWeight > 0:
+			// Addition: use the current public key.
+			publicKey = currentKeyBytes
+		case previousWeight > 0 && currentWeight == 0:
+			// Removal: use the public key at previousHeight from the DB.
+			publicKey = prevKeys[nodeID]
+		// Weight-only modification: leave publicKey nil.
+		}
+
+		result = append(result, AggregatedValidatorDiff{
+			NodeID:         nodeID,
+			PublicKey:      publicKey,
+			PreviousWeight: previousWeight,
+			CurrentWeight:  currentWeight,
+		})
+	}
+
+	return result, nil
+}
+
 type txBytesAndStatus struct {
 	Tx     []byte        `serialize:"true"`
 	Status status.Status `serialize:"true"`

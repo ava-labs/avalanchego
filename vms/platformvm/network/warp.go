@@ -66,7 +66,7 @@ var _ acp118.Verifier = (*signatureRequestVerifier)(nil)
 type signatureRequestVerifier struct {
 	vdrsState validators.State
 	stateLock sync.Locker
-	state     state.State
+	state     *state.State
 	log       logging.Logger
 }
 
@@ -104,6 +104,8 @@ func (s signatureRequestVerifier) Verify(
 		return s.verifyL1ValidatorRegistration(payload, justification)
 	case *message.L1ValidatorWeight:
 		return s.verifyL1ValidatorWeight(payload)
+	case *message.ValidatorSetMerkleCommitment:
+		return s.verifyValidatorSetMerkleCommitment(ctx, payload)
 	case *message.ValidatorSetState:
 		return s.verifyValidatorSetState(ctx, payload)
 	case *message.ValidatorSetDiff:
@@ -953,6 +955,129 @@ func (s signatureRequestVerifier) verifyValidatorSetDiff(
 	)
 
 	return nil
+}
+
+func (s signatureRequestVerifier) verifyValidatorSetMerkleCommitment(
+	ctx context.Context,
+	msg *message.ValidatorSetMerkleCommitment,
+) *common.AppError {
+	s.log.Debug("verifying validator set merkle commitment",
+		zap.Stringer("blockchainID", msg.AvalancheBlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+	)
+
+	minHeight, err := s.vdrsState.GetMinimumHeight(ctx)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get minimum height: " + err.Error(),
+		}
+	}
+	if msg.PChainHeight < minHeight {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("invalid height. provided %d. current minimum %d", msg.PChainHeight, minHeight),
+		}
+	}
+
+	if appErr := s.verifyBlockTimestamp(msg.PChainHeight, msg.PChainTimestamp, common.ErrUndefined.Code, "current"); appErr != nil {
+		return appErr
+	}
+
+	canonicalValidatorSet, err := warp.GetCanonicalValidatorSetFromChainID(ctx, s.vdrsState, msg.PChainHeight, msg.AvalancheBlockchainID)
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get canonical validator set: " + err.Error(),
+		}
+	}
+
+	var totalWeight uint64
+	layer := make([][32]byte, len(canonicalValidatorSet.Validators))
+	for i, v := range canonicalValidatorSet.Validators {
+		totalWeight += v.Weight
+		layer[i] = merkleValidatorLeafHash([96]byte(v.PublicKey.Serialize()), v.Weight)
+	}
+
+	if msg.TotalWeight != totalWeight {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("total weight mismatch: provided %d, expected %d", msg.TotalWeight, totalWeight),
+		}
+	}
+
+	root := buildMerkleRoot(layer)
+	if msg.RootHash != root {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: fmt.Sprintf("merkle root mismatch: provided %x, expected %x", msg.RootHash, root),
+		}
+	}
+
+	s.log.Info("validator set merkle commitment verified",
+		zap.Stringer("blockchainID", msg.AvalancheBlockchainID),
+		zap.Uint64("pChainHeight", msg.PChainHeight),
+		zap.Int("numValidators", len(canonicalValidatorSet.Validators)),
+		zap.Uint64("totalWeight", totalWeight),
+	)
+
+	return nil
+}
+
+// merkleValidatorLeafHash computes the Merkle leaf hash for a validator using
+// the 128-byte BLST-padded public key format:
+// sha256([16 zeros][48 bytes X][16 zeros][48 bytes Y][8 bytes weight]).
+// This matches Solidity's sha256(abi.encodePacked(paddedKey, weight)) in
+// ValidatorSets.verifyMerkleAttestation.
+func merkleValidatorLeafHash(pk [96]byte, weight uint64) [32]byte {
+	var buf [136]byte
+	copy(buf[16:64], pk[:48])  // X coordinate → bytes 16-63
+	copy(buf[80:128], pk[48:]) // Y coordinate → bytes 80-127
+	binary.BigEndian.PutUint64(buf[128:], weight)
+	return sha256.Sum256(buf[:])
+}
+
+// nullLeafHash is sha256 of 136 zero bytes (null padded key + zero weight).
+// It is used to pad the validator set to the next power of two so the resulting
+// tree is always balanced and compatible with OpenZeppelin's multiProofVerify.
+var nullLeafHash = sha256.Sum256(make([]byte, 136))
+
+// buildMerkleRoot builds a Merkle root from a slice of leaf hashes using
+// sorted-pair hashing at each level. The leaf set is padded to the next power
+// of two with nullLeafHash to match the relayer's BuildMerkleRoot.
+func buildMerkleRoot(layer [][32]byte) [32]byte {
+	if len(layer) == 0 {
+		return [32]byte{}
+	}
+	// Pad to next power of two.
+	n := 1
+	for n < len(layer) {
+		n <<= 1
+	}
+	padded := make([][32]byte, n)
+	copy(padded, layer)
+	for i := len(layer); i < n; i++ {
+		padded[i] = nullLeafHash
+	}
+	layer = padded
+	for len(layer) > 1 {
+		nextLen := len(layer) / 2 // always even after padding
+		nextLayer := make([][32]byte, nextLen)
+		for i := 0; i < nextLen; i++ {
+			nextLayer[i] = merklePairHash(layer[2*i], layer[2*i+1])
+		}
+		layer = nextLayer
+	}
+	return layer[0]
+}
+
+// merklePairHash hashes two 32-byte values together after sorting them
+// lexicographically so that merklePairHash(a,b) == merklePairHash(b,a).
+func merklePairHash(a, b [32]byte) [32]byte {
+	if bytes.Compare(a[:], b[:]) > 0 {
+		a, b = b, a
+	}
+	return sha256.Sum256(append(a[:], b[:]...))
 }
 
 // verifyBlockTimestamp verifies that the block at the given height is a Banff

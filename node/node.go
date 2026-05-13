@@ -791,11 +791,6 @@ func (n *Node) initDatabase() error {
 		return err
 	}
 
-	n.DB, err = meterdb.New(meterDBReg, db)
-	if err != nil {
-		return err
-	}
-
 	meterDBReg, err := metrics.MakeAndRegister(
 		n.MeterDBMetricsGatherer,
 		"all",
