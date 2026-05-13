@@ -107,7 +107,15 @@ type ChainConfig struct {
 
 	AvalancheContext `json:"-"` // Avalanche specific context set during VM initialization. Not serialized.
 
-	FeeConfig          commontype.FeeConfig `json:"feeConfig"`                    // Set the configuration for the dynamic fee algorithm
+	// FeeConfig configures the legacy pre-Helicon dynamic fee algorithm.
+	//
+	// Deprecated: see [commontype.FeeConfig]. Retained on this struct
+	// for the legacy `graft/subnet-evm` plugin and for JSON
+	// round-trip compatibility (`eth_getChainConfig` continues to
+	// return it). The new SAE binary (`vms/subnetevm`) does not read
+	// or validate this field; ACP-176 owns gas pricing and ACP-224
+	// owns runtime fee config.
+	FeeConfig          commontype.FeeConfig `json:"feeConfig"`
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
@@ -313,9 +321,25 @@ func checkForks(forks []fork) error {
 }
 
 // Verify verifies chain config.
+//
+// [commontype.FeeConfig] validation is gated on a sentinel check:
+// when `c.FeeConfig == commontype.EmptyFeeConfig` (i.e. the
+// zero-valued struct, which is what subnet-evm-sae callers leave
+// behind because ACP-176 owns gas pricing and the field is inert),
+// the validation is skipped. The legacy `graft/subnet-evm` plugin
+// substitutes [params.DefaultFeeConfig] for an empty FeeConfig at
+// `parseGenesis` time, so it never reaches this method with the
+// sentinel value and its strict validation semantics are preserved.
+// A partially-populated FeeConfig is NOT equal to the sentinel and
+// will still be validated (and fail) -- that's intended: a partial
+// config is unusable on either binary and operators should see a
+// clear error.
 func (c *ChainConfig) Verify() error {
-	if err := c.FeeConfig.Verify(); err != nil {
-		return fmt.Errorf("invalid fee config: %w", err)
+	// TODO (ceyonur): remove this after post-Helicon cleanup.
+	if c.FeeConfig != commontype.EmptyFeeConfig {
+		if err := c.FeeConfig.Verify(); err != nil {
+			return fmt.Errorf("invalid fee config: %w", err)
+		}
 	}
 
 	// Verify the precompile upgrades are internally consistent given the existing chainConfig.

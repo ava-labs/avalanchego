@@ -311,8 +311,6 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (
 	configExtra.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
 	}
-	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
-
 	// Set network upgrade defaults
 	configExtra.SetDefaults(ctx.NetworkUpgrades)
 

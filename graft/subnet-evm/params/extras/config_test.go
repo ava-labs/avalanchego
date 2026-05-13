@@ -103,18 +103,14 @@ func TestChainConfigVerify(t *testing.T) {
 		BlockGasCostStep:         big.NewInt(1),
 	}
 
+	// FeeConfig validation is performed by [core.Genesis.Verify]
+	// (legacy-only path), not here, so this table no longer exercises
+	// invalid-FeeConfig cases. The underlying [commontype.FeeConfig.Verify]
+	// is covered directly by `commontype/fee_config_test.go::TestVerify`.
 	tests := map[string]struct {
 		config    ChainConfig
 		wantError error
 	}{
-		"invalid_feeconfig": {
-			config: ChainConfig{
-				FeeConfig: commontype.FeeConfig{
-					GasLimit: nil,
-				},
-			},
-			wantError: commontype.ErrGasLimitNil,
-		},
 		"invalid_precompile_upgrades": {
 			// Also see precompile_config_test.go TestVerifyWithChainConfig* tests
 			config: ChainConfig{
