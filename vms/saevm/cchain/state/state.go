@@ -74,6 +74,10 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 	s := &State{
 		snowCtx: snowCtx,
 		db:      db,
+		// Coreth previously wrapped db in a versiondb before using
+		// [prefixdb.New]. To maintain byte compatibility with the existing
+		// trie, we must use [prefixdb.NewNested] rather than [prefixdb.New] and
+		// not compress the prefix.
 		trieDB: triedb.NewDatabase(
 			rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(triePrefix, db))),
 			&triedb.Config{
@@ -212,6 +216,12 @@ const trieKeyLength = state.TrieKeyLength
 // applyTrie writes the per-chain ops into the trie rooted at oldRoot, flushes
 // the resulting trie to disk, and returns the new root.
 func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*oldatomic.Requests) (common.Hash, error) {
+	// Most blocks don't have atomic requests, so we avoid any unnecessary disk
+	// reads in that case.
+	if len(ops) == 0 {
+		return oldRoot, nil
+	}
+
 	tr, err := trie.New(trie.TrieID(oldRoot), trieDB)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("opening trie: %w", err)
