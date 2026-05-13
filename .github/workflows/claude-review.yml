@@ -10,7 +10,7 @@ jobs:
   review:
     if: >-
       github.event.label.name == 'ai-review' &&
-      contains(fromJSON('["MEMBER", "COLLABORATOR", "OWNER", "CONTRIBUTOR"]'), github.event.pull_request.author_association) &&
+      contains(fromJSON('["MEMBER", "COLLABORATOR", "OWNER" ]'), github.event.pull_request.author_association) &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     permissions:
