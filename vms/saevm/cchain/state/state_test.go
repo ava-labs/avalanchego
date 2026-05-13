@@ -1,25 +1,21 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Tests for the state package. Two kinds:
-//
-//   - Differential tests that assert byte-for-byte equivalence between the
-//     new state package and the legacy graft/coreth/plugin/evm/atomic/state
-//     package. The migration to the new code does not run a database
-//     rewrite, so the indices retained by the new code (atomicTxDB,
-//     atomicHeightTxDB, atomicTrieDB, atomicTrieMetaDB) must produce the
-//     same on-disk bytes as the old code given the same inputs.
-//   - API tests that exercise [State]'s public methods directly.
-
 package state
 
 import (
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"math"
 	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -27,443 +23,504 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
+	oldstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 )
 
+// SUT bundles the system under test: a state implementation plus both sides
+// of the shared-memory pair.
+type SUT struct {
+	stateImpl
+
+	// db is used for both the chain state and shared memory
+	db database.Database
+	// sharedMemoryDB contains all the shared memory state.
+	sharedMemoryDB *prefixdb.Database
+}
+
+func newSUT(tb testing.TB, opts ...sutOption) *SUT {
+	tb.Helper()
+
+	props := options.ApplyTo(&sutProperties{
+		db:  memdb.New(),
+		new: newState,
+	}, opts...)
+
+	chainDB := prefixdb.New([]byte("chain"), props.db)
+	smDB := prefixdb.New([]byte("shared memory"), props.db)
+	mem := chainsatomic.NewMemory(smDB)
+	self := mem.NewSharedMemory(snowtest.CChainID)
+
+	state := props.new(tb, chainDB, self)
+	tb.Cleanup(func() {
+		require.NoErrorf(tb, state.Close(), "%T.Close()", state)
+	})
+	return &SUT{
+		stateImpl:      state,
+		db:             props.db,
+		sharedMemoryDB: smDB,
+	}
+}
+
+// stateImpl is the surface common to [State] and [oldState]. It's used by the
+// [SUT] so the same test helpers can drive either backend.
+type stateImpl interface {
+	Apply(height uint64, txs []*tx.Tx) error
+	GetTx(txID ids.ID) (*tx.Tx, uint64, error)
+	GetRoot(height uint64) (common.Hash, error)
+	CurrentHeight() uint64
+	Close() error
+}
+
+// A sutOption configures the default SUT properties used by [newSUT].
+type sutOption = options.Option[sutProperties]
+
+type sutProperties struct {
+	// db is used for both the chain state and shared memory.
+	db  database.Database
+	new func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl
+}
+
+// withDB configures the SUT to use the given database.
+func withDB(db database.Database) sutOption {
+	return options.Func[sutProperties](func(p *sutProperties) {
+		p.db = db
+	})
+}
+
+// withLegacyBackend configures the SUT to use [oldState] rather than [State].
+func withLegacyBackend() sutOption {
+	return options.Func[sutProperties](func(p *sutProperties) {
+		p.new = newOldState
+	})
+}
+
+func newState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
+	ctx := snowtest.Context(tb, snowtest.CChainID)
+	ctx.Log = saetest.NewTBLogger(tb, logging.Debug)
+	ctx.SharedMemory = sm
+
+	s, err := New(ctx, db)
+	require.NoErrorf(tb, err, "New(%T, %T)", ctx, db)
+	return s
+}
+
+// oldState drives the legacy [oldstate] package behind a surface that mirrors
+// [State].
+type oldState struct {
+	tb      testing.TB
+	db      database.Database
+	repo    *oldstate.AtomicRepository
+	backend *oldstate.AtomicBackend
+	parent  common.Hash
+}
+
+func newOldState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
+	repo, err := oldstate.NewAtomicTxRepository(versiondb.New(db), atomic.Codec, 0)
+	require.NoErrorf(tb, err, "state.NewAtomicTxRepository(%T, %T, ...)", db, atomic.Codec)
+
+	// Making the legacy backend commit at every height matches the new State's
+	// every-height-is-committed semantics.
+	const commitInterval = 1
+	backend, err := oldstate.NewAtomicBackend(sm, nil, repo, 0, common.Hash{}, commitInterval)
+	require.NoErrorf(tb, err, "state.NewAtomicBackend(%T, %T)", sm, repo)
+	return &oldState{
+		tb:      tb,
+		db:      db,
+		repo:    repo,
+		backend: backend,
+	}
+}
+
+func (o *oldState) Apply(height uint64, txs []*tx.Tx) error {
+	var blockHash common.Hash
+	binary.BigEndian.PutUint64(blockHash[:], height)
+
+	oldTxs := txtest.ToOlds(o.tb, txs)
+	if _, err := o.backend.InsertTxs(blockHash, height, o.parent, oldTxs); err != nil {
+		return err
+	}
+	as, err := o.backend.GetVerifiedAtomicState(blockHash)
+	if err != nil {
+		return err
+	}
+	// The batch is needed to satisfy the API; it carries no extra writes.
+	if err := as.Accept(o.db.NewBatch()); err != nil {
+		return err
+	}
+	o.parent = blockHash
+	return nil
+}
+
+func (o *oldState) GetTx(txID ids.ID) (*tx.Tx, uint64, error) {
+	oldTx, height, err := o.repo.GetByTxID(txID)
+	if err != nil {
+		return nil, 0, err
+	}
+	return txtest.ToNew(o.tb, oldTx), height, nil
+}
+
+func (o *oldState) GetRoot(height uint64) (common.Hash, error) {
+	return o.backend.AtomicTrie().Root(height)
+}
+
+func (o *oldState) CurrentHeight() uint64 {
+	_, h := o.backend.AtomicTrie().LastCommitted()
+	return h
+}
+
+func (*oldState) Close() error { return nil }
+
+// block bundles a height and the txs accepted at it. Tests in this file pass
+// blocks to State.Apply (and to the oldState shim) one at a time.
 type block struct {
 	height uint64
 	txs    []*tx.Tx
 }
 
-// newTx returns an Import tx whose canonical bytes — and therefore tx ID —
-// are determined by outputIndex. All other fields are zero. Just enough
-// structure for the codec, ID derivation, and per-chain merging in
-// [applyTrie] to work; no semantic validity is asserted or needed by these
-// tests.
-func newTx(outputIndex uint32) *tx.Tx {
+// apply calls [SUT.Apply] for each block in order and fails if any call errors.
+func (s *SUT) apply(tb testing.TB, blocks ...block) {
+	tb.Helper()
+
+	for _, b := range blocks {
+		require.NoErrorf(tb, s.Apply(b.height, b.txs), "%T.Apply(%d)", s.stateImpl, b.height)
+	}
+}
+
+func (s *SUT) assertEqual(tb testing.TB, want *SUT) {
+	tb.Helper()
+
+	currentHeight := s.CurrentHeight()
+	require.Equalf(tb, want.CurrentHeight(), currentHeight, "%T.CurrentHeight()", s.stateImpl)
+
+	for h := range currentHeight + 1 {
+		wantRoot, err := want.GetRoot(h)
+		require.NoErrorf(tb, err, "%T.GetRoot(%d)", want.stateImpl, h)
+
+		gotRoot, err := s.GetRoot(h)
+		require.NoErrorf(tb, err, "%T.GetRoot(%d)", s.stateImpl, h)
+		assert.Equalf(tb, wantRoot, gotRoot, "%T.GetRoot(%d)", s.stateImpl, h)
+	}
+
+	type entry struct {
+		Key   []byte
+		Value []byte
+	}
+	dbEntries := func(db database.Database) []entry {
+		tb.Helper()
+
+		it := db.NewIterator()
+		defer it.Release()
+
+		var out []entry
+		for it.Next() {
+			out = append(out, entry{
+				Key:   slices.Clone(it.Key()),
+				Value: slices.Clone(it.Value()),
+			})
+		}
+		require.NoErrorf(tb, it.Error(), "%T.Error()", it)
+		return out
+	}
+
+	wantEntries := dbEntries(want.sharedMemoryDB)
+	gotEntries := dbEntries(s.sharedMemoryDB)
+	assert.Equalf(tb, wantEntries, gotEntries, "shared memory")
+}
+
+func (s *SUT) assertHasTxs(tb testing.TB, blocks []block) {
+	tb.Helper()
+
+	for _, b := range blocks {
+		for _, want := range b.txs {
+			got, height, err := s.GetTx(want.ID())
+			require.NoErrorf(tb, err, "%T.GetTx(%d)", s.stateImpl, b.height)
+			assert.Equalf(tb, b.height, height, "%T.GetTx(%d).Height", s.stateImpl, b.height)
+			if diff := cmp.Diff(want, got, txtest.CmpOpt()); diff != "" {
+				tb.Errorf("%T.GetTx(%d).Tx diff (-want +got):\n%s", s.stateImpl, b.height, diff)
+			}
+		}
+	}
+}
+
+// TestEmpty verifies the state behavior prior to applying any transactions.
+func TestEmpty(t *testing.T) {
+	s := newSUT(t)
+	require.Zerof(t, s.CurrentHeight(), "%T.CurrentHeight()", s.stateImpl)
+
+	_, _, err := s.GetTx(ids.GenerateTestID())
+	require.ErrorIsf(t, err, database.ErrNotFound, "%T.GetTx(...)", s.stateImpl)
+
+	tests := []struct {
+		height  uint64
+		want    common.Hash
+		wantErr error
+	}{
+		{height: 0, want: types.EmptyRootHash},
+		{height: 1, wantErr: database.ErrNotFound},
+	}
+	for _, test := range tests {
+		root, err := s.GetRoot(test.height)
+		require.ErrorIsf(t, err, test.wantErr, "%T.GetRoot(%d)", s.stateImpl, test.height)
+		assert.Equalf(t, test.want, root, "%T.GetRoot(%d)", s.stateImpl, test.height)
+	}
+}
+
+// builder is a helper for constructing transactions.
+type builder struct {
+	count uint32
+}
+
+// newImport returns a minimal [tx.Import] that consumes a unique input from
+// shared memory.
+func (b *builder) newImport() *tx.Tx {
+	b.count++
 	return &tx.Tx{
 		Unsigned: &tx.Import{
+			SourceChain: snowtest.XChainID,
 			ImportedInputs: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{OutputIndex: outputIndex},
-				In:     &secp256k1fx.TransferInput{},
+				UTXOID: avax.UTXOID{
+					OutputIndex: b.count,
+				},
+				In: &secp256k1fx.TransferInput{},
 			}},
 		},
 	}
 }
 
-// newSnowCtx returns a minimal [snow.Context] whose SharedMemory is wired to
-// db, satisfying [chainsatomic.SharedMemory.Apply]'s invariant that the
-// underlying database of any passed batches matches the underlying database
-// of the shared memory.
-func newSnowCtx(db database.Database) *snow.Context {
-	m := chainsatomic.NewMemory(db)
-	return &snow.Context{
-		SharedMemory: m.NewSharedMemory(ids.ID{0xCA}),
+// newExport returns a minimal [tx.Export] that produces a unique output into
+// shared memory.
+func (b *builder) newExport() *tx.Tx {
+	b.count++
+	return &tx.Tx{
+		Unsigned: &tx.Export{
+			DestinationChain: snowtest.XChainID,
+			ExportedOutputs: []*avax.TransferableOutput{{
+				Out: &secp256k1fx.TransferOutput{
+					Amt: uint64(b.count),
+				},
+			}},
+		},
 	}
 }
 
-func newState(t *testing.T) *State {
-	t.Helper()
-	db := memdb.New()
-	s, err := New(newSnowCtx(db), db)
-	require.NoError(t, err)
-	return s
-}
-
-// blockSequence covers single-tx and multi-tx blocks at low heights, then
-// hits each commit boundary directly so the trie commit and on-disk
-// metadata fire without a catch-up. Non-boundary heights can skip; boundary
-// heights themselves are part of the sequence.
-func blockSequence(t *testing.T) []block {
-	t.Helper()
-	return []block{
-		{1, nil}, // empty Apply: should be a no-op for both tx index and trie.
-		{2, []*tx.Tx{newTx(1)}},
-		{3, []*tx.Tx{newTx(2)}},
-		{5, []*tx.Tx{newTx(3), newTx(4)}},
-		{7, []*tx.Tx{newTx(5)}},
-		{8, []*tx.Tx{newTx(6)}},
-		{10, []*tx.Tx{newTx(7), newTx(8)}},
-		{12, []*tx.Tx{newTx(9)}},
-		{commitInterval, []*tx.Tx{newTx(10)}},
-		{commitInterval + 2, []*tx.Tx{newTx(11)}},
-		{2 * commitInterval, []*tx.Tx{newTx(12)}},
-		{2*commitInterval + 1, []*tx.Tx{newTx(13)}},
-	}
-}
-
-// ===========================================================================
-// Differential tests
-// ===========================================================================
-
-// TestStateDifferentialMatchesOldCoreth drives the same sequence of
-// (height, txs) blocks through both the new state package and the old
-// coreth atomic state package, then asserts every byte under each retained
-// prefix is equal between the two databases.
-func TestStateDifferentialMatchesOldCoreth(t *testing.T) {
-	newDB, oldUnderlying, oldVDB, newSt, oldDriver := newPair(t)
-	for _, b := range blockSequence(t) {
-		applyToBoth(t, newSt, oldDriver, oldVDB, b)
-		assertPrefixesEqual(t, newDB, oldUnderlying, b.height)
-	}
-}
-
-// TestStateDifferentialReplayMatchesOldCoreth applies a sequence, drops
-// the in-memory state on the new side (re-opens via New), then
-// continues applying. Verifies that replay reconstructs the in-memory tip
-// such that subsequent Apply calls remain byte-equivalent to the old code.
-func TestStateDifferentialReplayMatchesOldCoreth(t *testing.T) {
-	newDB, oldUnderlying, oldVDB, newSt, oldDriver := newPair(t)
-
-	seq := blockSequence(t)
-	splitAt := len(seq) / 2
-
-	for _, b := range seq[:splitAt] {
-		applyToBoth(t, newSt, oldDriver, oldVDB, b)
-	}
-	assertPrefixesEqual(t, newDB, oldUnderlying, seq[splitAt-1].height)
-
-	// Re-open the new state. The old AtomicBackend is still in-memory; the
-	// new one is reconstructed only from disk via replay.
-	reopened, err := New(newSnowCtx(newDB), newDB)
-	require.NoError(t, err)
-
-	for _, b := range seq[splitAt:] {
-		applyToBoth(t, reopened, oldDriver, oldVDB, b)
-		assertPrefixesEqual(t, newDB, oldUnderlying, b.height)
-	}
-}
-
-// oldDriver wraps the old AtomicBackend / AtomicRepository so the test can
-// drive the equivalent operations of the new state.Apply.
-type oldDriver struct {
-	repo      *state.AtomicRepository
-	backend   *state.AtomicBackend
-	parent    common.Hash
-	heightCnt uint64
-}
-
-func newPair(t *testing.T) (newDB database.Database, oldUnderlying database.Database, oldVDB *versiondb.Database, newSt *State, drv *oldDriver) {
-	t.Helper()
-	newDB = memdb.New()
-	oldUnderlying = memdb.New()
-	oldVDB = versiondb.New(oldUnderlying)
-
-	newSt, err := New(newSnowCtx(newDB), newDB)
-	require.NoError(t, err)
-
-	repo, err := state.NewAtomicTxRepository(oldVDB, atomic.Codec, 0)
-	require.NoError(t, err)
-	backend, err := state.NewAtomicBackend(nil, nil, repo, 0, common.Hash{}, commitInterval)
-	require.NoError(t, err)
-
-	drv = &oldDriver{repo: repo, backend: backend}
-	return
-}
-
-func applyToBoth(t *testing.T, newSt *State, drv *oldDriver, oldVDB *versiondb.Database, b block) {
-	t.Helper()
-
-	// New side: single Apply does everything.
-	require.NoError(t, newSt.Apply(b.height, b.txs))
-
-	// Old side: convert txs, drive InsertTxs + Repo.Write + AcceptTrie,
-	// then commit the versiondb.
-	oldTxs := convertNewToOld(t, b.txs)
-
-	// Generate a unique block hash deterministically. drv.heightCnt is used
-	// instead of b.height so non-sequential heights still get unique hashes
-	// (height bytes alone could collide if a future test reuses heights).
-	drv.heightCnt++
-	var blockHash common.Hash
-	blockHash[0] = byte(drv.heightCnt >> 8)
-	blockHash[1] = byte(drv.heightCnt)
-	blockHash[31] = byte(b.height)
-
-	root, err := drv.backend.InsertTxs(blockHash, b.height, drv.parent, oldTxs)
-	require.NoError(t, err)
-
-	require.NoError(t, drv.repo.Write(b.height, oldTxs))
-	_, err = drv.backend.AtomicTrie().AcceptTrie(b.height, root)
-	require.NoError(t, err)
-	drv.backend.SetLastAccepted(blockHash)
-	drv.parent = blockHash
-
-	require.NoError(t, oldVDB.Commit())
-}
-
-// retainedPrefixes are the prefixes whose contents must remain
-// byte-identical between old and new. They correspond to the five prefixdb
-// roots defined in old code at atomic_repository.go:30-34.
-var retainedPrefixes = []string{
-	"atomicTxDB",
-	"atomicHeightTxDB",
-	"atomicTrieDB",
-	"atomicTrieMetaDB",
-	"atomicRepoMetadataDB",
-}
-
-func assertPrefixesEqual(t *testing.T, newDB, oldDB database.Database, height uint64) {
-	t.Helper()
-
-	for _, name := range retainedPrefixes {
-		newPDB := prefixdb.New([]byte(name), newDB)
-		oldPDB := prefixdb.New([]byte(name), oldDB)
-		assertDBsEqual(t, newPDB, oldPDB, name, height)
-	}
-}
-
-// assertDBsEqual iterates a and b in lockstep and asserts every (key,value)
-// matches.
-func assertDBsEqual(t *testing.T, a, b database.Iteratee, prefix string, height uint64) {
-	t.Helper()
-
-	itA := a.NewIterator()
-	defer itA.Release()
-	itB := b.NewIterator()
-	defer itB.Release()
-
-	for {
-		hasA := itA.Next()
-		hasB := itB.Next()
-		if !hasA && !hasB {
-			break
-		}
-
-		require.Equalf(t, hasA, hasB, "prefix=%s height=%d: iterator length mismatch", prefix, height)
-		require.Equalf(t, itB.Key(), itA.Key(), "prefix=%s height=%d: key mismatch", prefix, height)
-		require.Equalf(t, itB.Value(), itA.Value(), "prefix=%s height=%d key=%x: value mismatch", prefix, height, itA.Key())
-	}
-	require.NoError(t, itA.Error())
-	require.NoError(t, itB.Error())
-}
-
-// convertNewToOld serializes each new tx and parses the bytes through the
-// old codec to produce an equivalent old atomic.Tx. The codec registration
-// order matches between the two packages, so this round-trip preserves
-// bytes.
-func convertNewToOld(t *testing.T, newTxs []*tx.Tx) []*atomic.Tx {
-	t.Helper()
-	out := make([]*atomic.Tx, len(newTxs))
-	for i, n := range newTxs {
-		b, err := n.Bytes()
-		require.NoError(t, err)
-		oldTx, err := atomic.ExtractAtomicTx(b, atomic.Codec)
-		require.NoError(t, err)
-		out[i] = oldTx
-	}
-	return out
-}
-
-// ===========================================================================
-// API tests
-// ===========================================================================
-
-func TestNew_EmptyDB(t *testing.T) {
-	require := require.New(t)
-	s := newState(t)
-
-	require.Equal(uint64(0), s.LastCommitted())
-
-	root, err := s.GetRoot(0)
-	require.NoError(err)
-	require.Equal(types.EmptyRootHash, root)
-}
-
-// TestApply table covers the Apply→{GetTx, GetRoot, LastCommitted} surface.
-// Every row asserts the same universal post-conditions, so individual rows
-// only need to describe the input sequence and the expected
-// last-committed height.
+// TestApply verifies that applying blocks results in the same state as the
+// prior coreth code regardless of when the state is migrated to the new
+// implementation.
 func TestApply(t *testing.T) {
-	cases := []struct {
-		name              string
-		blocks            []block
-		wantLastCommitted uint64
+	var build builder
+	tests := []struct {
+		name   string
+		blocks []block
 	}{
 		{
-			name: "empty applies at non-boundary heights",
+			name: "empty",
 			blocks: []block{
 				{height: 1, txs: nil},
 				{height: 2, txs: []*tx.Tx{}},
 			},
-			wantLastCommitted: 0,
 		},
 		{
-			name: "single tx at non-boundary height",
+			name: "single_import",
 			blocks: []block{
-				{height: 5, txs: []*tx.Tx{newTx(1)}},
+				{height: 1, txs: []*tx.Tx{build.newImport()}},
 			},
-			wantLastCommitted: 0,
 		},
 		{
-			name: "multiple txs at single height",
+			name: "single_export",
 			blocks: []block{
-				{height: 5, txs: []*tx.Tx{newTx(1), newTx(2), newTx(3)}},
+				{height: 1, txs: []*tx.Tx{build.newExport()}},
 			},
-			wantLastCommitted: 0,
 		},
 		{
-			name: "multiple non-boundary heights",
+			name: "multi_tx_single_height",
 			blocks: []block{
-				{height: 2, txs: []*tx.Tx{newTx(1)}},
-				{height: 3, txs: []*tx.Tx{newTx(2), newTx(3)}},
-				{height: 5, txs: []*tx.Tx{newTx(4)}},
+				{
+					height: 1,
+					txs: []*tx.Tx{
+						build.newImport(),
+						build.newExport(),
+						build.newImport(),
+					},
+				},
 			},
-			wantLastCommitted: 0,
 		},
 		{
-			name: "crosses a single commit boundary",
+			name: "mixed",
 			blocks: []block{
-				{height: 1, txs: []*tx.Tx{newTx(1)}},
-				{height: commitInterval, txs: []*tx.Tx{newTx(2)}},
-				{height: commitInterval + 1, txs: []*tx.Tx{newTx(3)}},
+				{height: 1, txs: []*tx.Tx{build.newImport()}},
+				{height: 2, txs: nil},
+				{height: 3, txs: []*tx.Tx{build.newExport(), build.newImport()}},
+				{height: 4, txs: nil},
+				{height: 5, txs: []*tx.Tx{build.newImport()}},
+				{height: 6, txs: []*tx.Tx{build.newExport()}},
 			},
-			wantLastCommitted: commitInterval,
-		},
-		{
-			name: "crosses two commit boundaries",
-			blocks: []block{
-				{height: commitInterval, txs: []*tx.Tx{newTx(1)}},
-				{height: 2 * commitInterval, txs: []*tx.Tx{newTx(2)}},
-			},
-			wantLastCommitted: 2 * commitInterval,
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			require := require.New(t)
-			s := newState(t)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
-			// Snapshot inputs so the universal "Apply doesn't mutate the
-			// caller's slice" invariant can be checked at the end.
-			snapshots := make([][]*tx.Tx, len(tc.blocks))
-			for i, b := range tc.blocks {
-				snapshots[i] = slices.Clone(b.txs)
+			legacy := newSUT(t, withLegacyBackend())
+			fresh := newSUT(t)
+			migrations := make([]*SUT, len(test.blocks))
+			for i := range migrations {
+				migrations[i] = newSUT(t, withLegacyBackend())
 			}
 
-			for _, b := range tc.blocks {
-				require.NoError(s.Apply(b.height, b.txs))
-			}
+			for i, b := range test.blocks {
+				migrations[i] = newSUT(t, withDB(migrations[i].db))
 
-			require.Equal(tc.wantLastCommitted, s.LastCommitted())
-
-			for i, b := range tc.blocks {
-				require.Equal(snapshots[i], b.txs, "Apply mutated input slice at block %d", i)
-			}
-
-			for _, b := range tc.blocks {
-				for _, want := range b.txs {
-					got, height, err := s.GetTx(want.ID())
-					require.NoError(err)
-					require.Equal(b.height, height)
-					require.Empty(cmp.Diff(want, got, txtest.CmpOpt()))
+				all := append([]*SUT{legacy, fresh}, migrations...)
+				for _, sut := range all {
+					sut.apply(t, b)
 				}
 
-				_, err := s.GetRoot(b.height)
-				if b.height%commitInterval == 0 {
-					require.NoError(err, "GetRoot at commit boundary %d", b.height)
-				} else {
-					require.ErrorIs(err, database.ErrNotFound, "GetRoot at non-boundary %d", b.height)
+				reopenedFresh := newSUT(t, withDB(fresh.db))
+				all = append(all, reopenedFresh)
+				for _, sut := range all {
+					sut.assertEqual(t, legacy)
+					sut.assertHasTxs(t, test.blocks[:i+1])
 				}
 			}
-
-			root, err := s.GetRoot(0)
-			require.NoError(err)
-			require.Equal(types.EmptyRootHash, root)
-
-			_, _, err = s.GetTx(ids.ID{0xDE, 0xAD, 0xBE, 0xEF})
-			require.ErrorIs(err, database.ErrNotFound)
 		})
 	}
 }
 
-// TestApply_SortInvariant verifies that the order of txs in the input slice
-// does not affect the on-disk trie root. The txs all target the same source
-// chain (zero), so without the sort in Apply, the per-chain Requests merge
-// in [applyTrie] would produce different trie value bytes — and therefore a
-// different root — depending on the input order.
+// TestApply_SortInvariant verifies that the order of txs passed to Apply does
+// not affect the resulting state.
 func TestApply_SortInvariant(t *testing.T) {
-	require := require.New(t)
-
-	txs := []*tx.Tx{
-		newTx(1),
-		newTx(2),
-		newTx(3),
+	var build builder
+	forward := []*tx.Tx{
+		build.newImport(),
+		build.newImport(),
+		build.newImport(),
 	}
+	backward := slices.Clone(forward)
+	slices.Reverse(backward)
 
-	apply := func(in []*tx.Tx) common.Hash {
-		s := newState(t)
-		require.NoError(s.Apply(commitInterval, in))
-		root, err := s.GetRoot(commitInterval)
-		require.NoError(err)
+	getRoot := func(txs []*tx.Tx) common.Hash {
+		s := newSUT(t)
+
+		const height = 1
+		snapshot := slices.Clone(txs)
+		require.NoErrorf(t, s.Apply(height, txs), "%T.Apply(%d)", s.stateImpl, height)
+		require.Equal(t, snapshot, txs, "Apply must not mutate the caller's slice")
+
+		root, err := s.GetRoot(height)
+		require.NoErrorf(t, err, "%T.GetRoot(%d)", s.stateImpl, height)
 		return root
 	}
-
-	forward := apply(txs)
-	reversed := apply([]*tx.Tx{txs[2], txs[1], txs[0]})
-	rotated := apply([]*tx.Tx{txs[1], txs[2], txs[0]})
-
-	require.Equal(forward, reversed)
-	require.Equal(forward, rotated)
-	require.NotEqual(types.EmptyRootHash, forward)
+	require.Equal(t, getRoot(forward), getRoot(backward), "Apply must be invariant to the order of txs")
 }
 
-// TestNew_ReplayPreservesState applies the full block sequence, discards
-// the in-memory state, re-opens via New, and verifies that the rebuilt
-// state matches what was in memory before the close and that subsequent
-// Apply calls extend the same trie tip.
-func TestNew_ReplayPreservesState(t *testing.T) {
-	require := require.New(t)
-
-	db := memdb.New()
-	ctx := newSnowCtx(db)
-	s, err := New(ctx, db)
-	require.NoError(err)
-
-	seq := blockSequence(t)
-	for _, b := range seq {
-		require.NoError(s.Apply(b.height, b.txs))
-	}
-	wantLastCommitted := s.LastCommitted()
-	wantCommittedRoot, err := s.GetRoot(wantLastCommitted)
-	require.NoError(err)
-
-	reopened, err := New(ctx, db)
-	require.NoError(err)
-
-	require.Equal(wantLastCommitted, reopened.LastCommitted())
-	gotCommittedRoot, err := reopened.GetRoot(wantLastCommitted)
-	require.NoError(err)
-	require.Equal(wantCommittedRoot, gotCommittedRoot)
-
-	for _, b := range seq {
-		for _, want := range b.txs {
-			got, height, err := reopened.GetTx(want.ID())
-			require.NoError(err)
-			require.Equal(b.height, height)
-			require.Empty(cmp.Diff(want, got, txtest.CmpOpt()))
-		}
+// TestCrash verifies that crashes while applying are gracefully handled.
+func TestCrash(t *testing.T) {
+	var build builder
+	blocks := []block{
+		{height: 1, txs: nil},
+		{height: 2, txs: []*tx.Tx{build.newImport()}},
+		{height: 3, txs: []*tx.Tx{build.newExport(), build.newImport()}},
+		{height: 4, txs: nil},
+		{height: 5, txs: []*tx.Tx{build.newImport()}},
+		{height: 6, txs: []*tx.Tx{build.newExport()}},
+		{height: 7, txs: []*tx.Tx{build.newImport(), build.newExport()}},
 	}
 
-	// A subsequent Apply on the reopened state must extend the same trie
-	// tip: applying at the next commit boundary advances the last-committed
-	// marker and the new tx is retrievable.
-	extra := newTx(99)
-	nextBoundary := (wantLastCommitted/commitInterval + 1) * commitInterval
-	require.NoError(reopened.Apply(nextBoundary, []*tx.Tx{extra}))
-	require.Equal(nextBoundary, reopened.LastCommitted())
+	wantDB := newFlakyDB(memdb.New(), math.MaxInt)
+	want := newSUT(t, withDB(wantDB))
+	want.apply(t, blocks...)
 
-	gotExtra, h, err := reopened.GetTx(extra.ID())
-	require.NoError(err)
-	require.Equal(nextBoundary, h)
-	require.Empty(cmp.Diff(extra, gotExtra, txtest.CmpOpt()))
+	for failAfter := range wantDB.calls {
+		t.Run(fmt.Sprintf("failAfter_%d", failAfter), func(t *testing.T) {
+			t.Parallel()
+
+			db := memdb.New()
+			preCrash := newSUT(t, withDB(newFlakyDB(db, failAfter)))
+			remainingBlocks := blocks
+			for i, b := range blocks {
+				if err := preCrash.Apply(b.height, b.txs); err != nil {
+					require.ErrorIsf(t, err, errInjected, "%T.Apply(%d)", preCrash.stateImpl, b.height)
+					break
+				}
+				remainingBlocks = blocks[i+1:]
+			}
+
+			got := newSUT(t, withDB(db))
+			got.apply(t, remainingBlocks...)
+
+			got.assertHasTxs(t, blocks)
+			got.assertEqual(t, want)
+		})
+	}
 }
+
+var errInjected = errors.New("injected fault")
+
+// flakyDB wraps a database and fails after a configured number of mutating
+// operations. Each [flakyDB.Put], [flakyDB.Delete], and [flakyBatch.Write]
+// counts as an op; reads and iteration are not counted and never fail.
+type flakyDB struct {
+	database.Database
+	failAfter int
+	calls     int
+}
+
+func newFlakyDB(db database.Database, failAfter int) *flakyDB {
+	return &flakyDB{
+		Database:  db,
+		failAfter: failAfter,
+	}
+}
+
+func (f *flakyDB) shouldFail() error {
+	if f.calls >= f.failAfter {
+		return errInjected
+	}
+	f.calls++
+	return nil
+}
+
+func (f *flakyDB) Put(key, value []byte) error {
+	if err := f.shouldFail(); err != nil {
+		return err
+	}
+	return f.Database.Put(key, value)
+}
+
+func (f *flakyDB) Delete(key []byte) error {
+	if err := f.shouldFail(); err != nil {
+		return err
+	}
+	return f.Database.Delete(key)
+}
+
+func (f *flakyDB) NewBatch() database.Batch {
+	return &flakyBatch{Batch: f.Database.NewBatch(), db: f}
+}
+
+type flakyBatch struct {
+	database.Batch
+	db *flakyDB
+}
+
+func (b *flakyBatch) Write() error {
+	if err := b.db.shouldFail(); err != nil {
+		return err
+	}
+	return b.Batch.Write()
+}
+
+// Inner returns the wrapper so that [chainsatomic.WriteAll] calls
+// [flakyBatch.Write].
+func (b *flakyBatch) Inner() database.Batch { return b }
