@@ -7,6 +7,7 @@ package precompileconfig
 
 import (
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
-	cmath "github.com/ava-labs/libevm/common/math"
 	ethcore "github.com/ava-labs/libevm/core"
 )
 
@@ -64,7 +64,7 @@ func AccessListGasWithPredicates(
 			// Therefore, we only check for overflow when adding to [totalGas], which could include the sum of values
 			// returned by a predicate.
 			accessTupleGas := params.TxAccessListAddressGas + uint64(len(accessTuple.StorageKeys))*params.TxAccessListStorageKeyGas
-			totalGas, overflow := cmath.SafeAdd(gas, accessTupleGas)
+			totalGas, overflow := math.SafeAdd(gas, accessTupleGas)
 			if overflow {
 				return 0, ethcore.ErrGasUintOverflow
 			}
@@ -74,7 +74,7 @@ func AccessListGasWithPredicates(
 			if err != nil {
 				return 0, err
 			}
-			totalGas, overflow := cmath.SafeAdd(gas, predicateGas)
+			totalGas, overflow := math.SafeAdd(gas, predicateGas)
 			if overflow {
 				return 0, ethcore.ErrGasUintOverflow
 			}
