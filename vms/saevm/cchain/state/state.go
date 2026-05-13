@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 
-	oldatomic "github.com/ava-labs/avalanchego/chains/atomic"
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
@@ -184,7 +184,7 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 }
 
 // atomicRequests groups the atomic requests from txs by chainID.
-func atomicRequests(txs []*tx.Tx) (map[ids.ID]*oldatomic.Requests, error) {
+func atomicRequests(txs []*tx.Tx) (map[ids.ID]*chainsatomic.Requests, error) {
 	// To produce a byte-identical trie, txs must be merged in txID order.
 	// This matches the order they were originally read from the tx index when
 	// the trie was first built. Without sorting, the PutRequests and
@@ -195,7 +195,7 @@ func atomicRequests(txs []*tx.Tx) (map[ids.ID]*oldatomic.Requests, error) {
 		return a.ID().Compare(b.ID())
 	})
 
-	ops := make(map[ids.ID]*oldatomic.Requests)
+	ops := make(map[ids.ID]*chainsatomic.Requests)
 	for _, t := range sorted {
 		chainID, req, err := t.AtomicRequests()
 		if err != nil {
@@ -215,7 +215,7 @@ const trieKeyLength = state.TrieKeyLength
 
 // applyTrie writes the per-chain ops into the trie rooted at oldRoot, flushes
 // the resulting trie to disk, and returns the new root.
-func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*oldatomic.Requests) (common.Hash, error) {
+func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*chainsatomic.Requests) (common.Hash, error) {
 	// Most blocks don't have atomic requests, so we avoid any unnecessary disk
 	// reads in that case.
 	if len(ops) == 0 {
