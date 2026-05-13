@@ -110,6 +110,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))
 				config.EXPECT().IsDurango(gomock.Any()).Return(false)
+				config.EXPECT().IsHelicon(gomock.Any()).Return(false)
 				return config
 			}(),
 			ExpectedError: allowlist.ErrCannotAddManagersBeforeDurango,

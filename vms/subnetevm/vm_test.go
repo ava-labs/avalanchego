@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 
+	avadb "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
@@ -139,38 +140,8 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	}
 	configBytes := mustMarshalJSON(t, &chainConfig)
 
-	vm := New()
-
-	// Pin the VM's mockable clock BEFORE `Initialize` so that
-	// `sae.Config.Now` (wired to `vm.clock.Time` inside `Initialize`)
-	// and the validator uptime tracker both observe a deterministic
-	// instant from their very first read. Subsequent test-side advances
-	// via `sut.setTime`/`advanceTime` flow through the same clock.
-	if cfg.clockTime != nil {
-		vm.clock.Set(*cfg.clockTime)
-	}
-
-	// allow receiving responses via [SUT.verifyWarpMessage]
-	appResponseCh := make(chan []byte, 1)
-	appErrCh := make(chan *engcommon.AppError, 1)
-	appSender := &enginetest.SenderStub{
-		SentAppResponse: appResponseCh,
-		SentAppError:    appErrCh,
-	}
-
-	require.NoError(t, vm.Initialize(
-		ctx,
-		snowCtx,
-		baseDB,
-		genesisBytes,
-		upgradeBytes,
-		configBytes,
-		nil,
-		appSender,
-	))
-	t.Cleanup(func() {
-		require.NoError(t, vm.Shutdown(context.WithoutCancel(ctx)))
-	})
+	vm, appSender, err := tryInitVM(t, ctx, snowCtx, baseDB, cfg.clockTime, genesisBytes, upgradeBytes, configBytes)
+	require.NoError(t, err)
 
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp))
 
@@ -206,9 +177,46 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 			types.LatestSigner(genesis.Config),
 		),
 		validatorKeys: validatorKeys,
-		appResponse:   appResponseCh,
-		appErr:        appErrCh,
+		appResponse:   appSender.SentAppResponse,
+		appErr:        appSender.SentAppError,
 	}
+}
+
+// tryInitVM is the minimum shared core for spinning up an SAE VM in
+// tests: VM construction, optional clock pin, app sender, then
+// `Initialize` + shutdown cleanup. Returns the VM + sender on success
+// and the `Initialize` error otherwise. Used by [newSUT] (which
+// asserts NoError + builds the rest of the SUT) and by parse-time
+// tests that want to assert on a specific `Initialize` failure.
+//
+// The VM's mockable clock must be pinned BEFORE `Initialize` so
+// `sae.Config.Now` (wired to `vm.clock.Time` inside `Initialize`) and
+// the validator uptime tracker both observe a deterministic instant
+// from their very first read; pass `clockTime` to do so.
+func tryInitVM(
+	t *testing.T,
+	ctx context.Context,
+	snowCtx *snow.Context,
+	db avadb.Database,
+	clockTime *time.Time,
+	genesisBytes, upgradeBytes, configBytes []byte,
+) (*VM, *enginetest.SenderStub, error) {
+	t.Helper()
+	vm := New()
+	if clockTime != nil {
+		vm.clock.Set(*clockTime)
+	}
+	appSender := &enginetest.SenderStub{
+		SentAppResponse: make(chan []byte, 1),
+		SentAppError:    make(chan *engcommon.AppError, 1),
+	}
+	if err := vm.Initialize(ctx, snowCtx, db, genesisBytes, upgradeBytes, configBytes, nil, appSender); err != nil {
+		return nil, nil, err
+	}
+	t.Cleanup(func() {
+		require.NoError(t, vm.Shutdown(context.WithoutCancel(ctx)))
+	})
+	return vm, appSender, nil
 }
 
 func newTestGenesis(fork upgradetest.Fork, keychain *saetest.KeyChain) *core.Genesis {

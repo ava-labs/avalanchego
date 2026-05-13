@@ -156,6 +156,15 @@ type testVM struct {
 }
 
 func newVM(t *testing.T, config testVMConfig) *testVM {
+	tvm, err := tryNewVM(t, config)
+	require.NoError(t, err, "error initializing vm")
+	return tvm
+}
+
+// tryNewVM mirrors [newVM] but returns the [VM.Initialize] error
+// instead of asserting `NoError`. Use from tests that want to assert
+// a specific Initialize failure.
+func tryNewVM(t *testing.T, config testVMConfig) (*testVM, error) {
 	ctx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 	fork := upgradetest.Latest
 	if config.fork != nil {
@@ -184,7 +193,7 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
 
-	err := vm.Initialize(
+	if err := vm.Initialize(
 		t.Context(),
 		ctx,
 		prefixedDB,
@@ -193,8 +202,9 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 		[]byte(config.configJSON),
 		[]*commonEng.Fx{},
 		appSender,
-	)
-	require.NoError(t, err, "error initializing vm")
+	); err != nil {
+		return nil, err
+	}
 
 	if !config.isSyncing {
 		require.NoError(t, vm.SetState(t.Context(), snow.Bootstrapping))
@@ -207,7 +217,7 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 		atomicMemory: atomicMemory,
 		appSender:    appSender,
 		config:       config,
-	}
+	}, nil
 }
 
 // Firewood cannot yet be run with an empty config.
@@ -2741,6 +2751,10 @@ func TestStandaloneDB(t *testing.T) {
 }
 
 func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
+	// The legacy feeManager precompile is rejected when scheduled at
+	// or after Helicon (see feemanager.Config.Verify)
+	graniteFork := upgradetest.Granite
+
 	// Setup chain params
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
@@ -2768,6 +2782,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 	})
 
@@ -2791,6 +2806,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 
 	// restart vm and try again
 	restartedTVM, err := restartVM(tvm, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 	})
 	require.NoError(t, err)
