@@ -75,7 +75,9 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 			rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(triePrefix, db))),
 			&triedb.Config{
 				HashDB: &hashdb.Config{
-					CleanCacheSize: 64 * units.MiB,
+					// This trie is append only, so we only need to cache the
+					// leading edge of the trie.
+					CleanCacheSize: units.MiB,
 				},
 			},
 		),
