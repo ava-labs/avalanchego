@@ -326,7 +326,6 @@ The current design should be reconsidered if any of these change:
 - Build script: `/.github/packaging/scripts/build-rpm.sh`
 - Validation script: `/.github/packaging/scripts/validate-rpm.sh`
 - Root task include: `/Taskfile.yml`
-- Documentation guidance: `/docs/documentation-guidelines.md`
 
 ### Maintainer background for revisiting linking choices
 
