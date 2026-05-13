@@ -44,7 +44,7 @@ jobs:
       # cannot be combined.
       - name: Overlay packaging scripts from workflow branch
         if: github.event.inputs.tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: .packaging-overlay
           sparse-checkout: .github/packaging
