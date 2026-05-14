@@ -224,8 +224,7 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 	}
 
 	// Compute rules at the LAST-SETTLED block so they correspond to the same
-	// as [State.db]. State-dependent precompile checks (e.g. the
-	// txallowlist sender check in vms/subnetevm) read storage from `s.db` and
+	// as [State.db]. State-dependent precompile checks read storage from `s.db` and
 	// gate that read with `rules.IsPrecompileEnabled(...)`.
 	settledRules := s.config.Rules(s.settled.Number, true /*isMerge*/, s.settled.Time)
 	if err := s.hooks.CanExecuteTransaction(settledRules, from, tx.To(), s.db); err != nil {

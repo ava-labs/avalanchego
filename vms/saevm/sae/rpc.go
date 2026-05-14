@@ -30,8 +30,8 @@ func (vm *VM) GethRPCBackends() saerpc.GethBackends {
 
 // RPCServer returns the libevm `*rpc.Server` backing the JSON-RPC handlers
 // served at `/rpc` and `/ws`. Downstream VMs may call `RegisterName` on the
-// returned server to add VM-specific methods to existing namespaces (e.g.
-// subnet-evm's `eth_getActiveRulesAt`). Must be called after `NewVM`.
+// returned server to add VM-specific methods to existing namespaces.
+// Must be called after `NewVM`.
 func (vm *VM) RPCServer() *rpc.Server {
 	return vm.rpcProvider.Server()
 }

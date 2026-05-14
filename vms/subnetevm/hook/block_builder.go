@@ -148,6 +148,7 @@ func (b *blockBuilder) BuildBlock(
 		return nil, errEmptyBlock
 	}
 
+	// TODO (ceyonur): consider using settled state vs worstcaseState
 	header.Coinbase = b.resolveCoinbase(settled, worstcaseState)
 
 	rules := b.chainConfig.Rules(header.Number, subnetevmparams.IsMergeTODO, header.Time)
