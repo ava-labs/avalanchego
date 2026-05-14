@@ -400,6 +400,24 @@ func TestApply(t *testing.T) {
 // TestApply_SortInvariant verifies that the order of txs passed to Apply does
 // not affect the resulting state.
 func TestApply_SortInvariant(t *testing.T) {
+	getRoot := func(txs []*tx.Tx) common.Hash {
+		t.Helper()
+
+		snapshot := slices.Clone(txs)
+		defer func() {
+			require.Equal(t, snapshot, txs, "Apply must not mutate the caller's slice")
+		}()
+
+		s := newSUT(t)
+
+		const height = 1
+		require.NoErrorf(t, s.Apply(height, txs), "%T.Apply(%d)", s.stateImpl, height)
+
+		root, err := s.GetRoot(height)
+		require.NoErrorf(t, err, "%T.GetRoot(%d)", s.stateImpl, height)
+		return root
+	}
+
 	var build builder
 	forward := []*tx.Tx{
 		build.newImport(),
@@ -409,19 +427,9 @@ func TestApply_SortInvariant(t *testing.T) {
 	backward := slices.Clone(forward)
 	slices.Reverse(backward)
 
-	getRoot := func(txs []*tx.Tx) common.Hash {
-		s := newSUT(t)
-
-		const height = 1
-		snapshot := slices.Clone(txs)
-		require.NoErrorf(t, s.Apply(height, txs), "%T.Apply(%d)", s.stateImpl, height)
-		require.Equal(t, snapshot, txs, "Apply must not mutate the caller's slice")
-
-		root, err := s.GetRoot(height)
-		require.NoErrorf(t, err, "%T.GetRoot(%d)", s.stateImpl, height)
-		return root
-	}
-	require.Equal(t, getRoot(forward), getRoot(backward), "Apply must be invariant to the order of txs")
+	forwardRoot := getRoot(forward)
+	backwardRoot := getRoot(backward)
+	require.Equal(t, forwardRoot, backwardRoot, "Apply must be invariant to the order of txs")
 }
 
 // TestCrash verifies that crashes while applying are gracefully handled.
