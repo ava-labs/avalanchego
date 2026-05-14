@@ -213,6 +213,8 @@ func atomicRequests(txs []*tx.Tx) (map[ids.ID]*chainsatomic.Requests, error) {
 	return ops, nil
 }
 
+var errCleanTrieAfterUpdates = errors.New("clean trie after updates")
+
 // applyTrie writes the per-chain ops into the trie rooted at oldRoot, flushes
 // the resulting trie to disk, and returns the new root.
 func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*chainsatomic.Requests) (common.Hash, error) {
@@ -251,13 +253,11 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops 
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("committing in-memory trie: %w", err)
 	}
-	if nodes != nil {
-		// The parent-root and block-number args have no effect with hashdb;
-		// EmptyRootHash suppresses an otherwise-spurious parent-presence
-		// warning.
-		if err := trieDB.Update(newRoot, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
-			return common.Hash{}, fmt.Errorf("updating trieDB with new nodes: %w", err)
-		}
+	if nodes == nil {
+		return common.Hash{}, errCleanTrieAfterUpdates
+	}
+	if err := trieDB.Update(newRoot, oldRoot, height, trienode.NewWithNodeSet(nodes), nil); err != nil {
+		return common.Hash{}, fmt.Errorf("updating trieDB with new nodes: %w", err)
 	}
 
 	const logAsInfo = false
