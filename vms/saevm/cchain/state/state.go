@@ -60,7 +60,10 @@ type State struct {
 	db      database.Database
 	trieDB  *triedb.Database
 
-	currentRoot   common.Hash
+	currentRoot common.Hash
+
+	// currentHeight is atomic to allow [State.CurrentHeight] to be called
+	// concurrently with [State.Apply].
 	currentHeight atomic.Uint64
 }
 
