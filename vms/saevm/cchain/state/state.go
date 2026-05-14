@@ -6,6 +6,7 @@
 package state
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,7 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 
-	oldatomic "github.com/ava-labs/avalanchego/chains/atomic"
+	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
@@ -47,12 +48,15 @@ var (
 	commitPrefix  = prefixdb.MakePrefix([]byte("atomicTrieMetaDB"))                          // See state.atomicTrieMetaDBPrefix
 	lastHeightKey = prefixdb.PrefixKey(commitPrefix, []byte("atomicTrieLastCommittedBlock")) // See state.lastCommittedKey
 
-	txIDPrefix = prefixdb.MakePrefix([]byte("atomicTxDB")) // See state.atomicTxIDDBPrefix
+	txPrefix = prefixdb.MakePrefix([]byte("atomicTxDB")) // See state.atomicTxIDDBPrefix
 )
 
 // State holds the accepted transactions and the atomic-request trie.
 //
 // When applying operations, shared memory is updated atomically with the state.
+//
+// [State.Apply] and [State.Close] MUST NOT be called concurrently with
+// themselves or each other. All other methods are safe to call concurrently.
 //
 // [State.Close] MUST be called when finished with the state to release
 // resources.
@@ -61,7 +65,10 @@ type State struct {
 	db      database.Database
 	trieDB  *triedb.Database
 
-	currentRoot   common.Hash
+	currentRoot common.Hash
+
+	// currentHeight is atomic to allow [State.CurrentHeight] to be called
+	// concurrently with [State.Apply].
 	currentHeight atomic.Uint64
 }
 
@@ -79,12 +86,16 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 	s := &State{
 		snowCtx: snowCtx,
 		db:      db,
+		// Coreth previously wrapped db in a versiondb before using
+		// [prefixdb.New]. To maintain byte compatibility with the existing
+		// trie, we must use [prefixdb.NewNested] rather than [prefixdb.New] and
+		// not compress the prefix.
 		trieDB: triedb.NewDatabase(
 			rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(triePrefix, db))),
 			&triedb.Config{
 				HashDB: &hashdb.Config{
 					// This trie is append only, so we only need to cache the
-					// leading edge of the trie.
+					// leading edge.
 					CleanCacheSize: units.MiB,
 				},
 			},
@@ -146,8 +157,6 @@ func isBonusBlock(networkID uint32, height uint64) bool {
 // operations to shared memory.
 //
 // Apply is a noop when height is not higher than [State.CurrentHeight].
-//
-// Apply is not thread safe.
 func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if currentHeight := s.currentHeight.Load(); height <= currentHeight {
 		// During restarts, it is expected for SAE to reprocess already-applied
@@ -182,7 +191,7 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 				continue
 			}
 		}
-		if err := writeTxByID(batch, height, t); err != nil {
+		if err := writeTx(batch, height, t); err != nil {
 			return fmt.Errorf("writing tx %s: %w", t.ID(), err)
 		}
 	}
@@ -217,7 +226,7 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 }
 
 // atomicRequests groups the atomic requests from txs by chainID.
-func atomicRequests(txs []*tx.Tx) (map[ids.ID]*oldatomic.Requests, error) {
+func atomicRequests(txs []*tx.Tx) (map[ids.ID]*chainsatomic.Requests, error) {
 	// To produce a byte-identical trie, txs must be merged in txID order.
 	// This matches the order they were originally read from the tx index when
 	// the trie was first built. Without sorting, the PutRequests and
@@ -228,7 +237,7 @@ func atomicRequests(txs []*tx.Tx) (map[ids.ID]*oldatomic.Requests, error) {
 		return a.ID().Compare(b.ID())
 	})
 
-	ops := make(map[ids.ID]*oldatomic.Requests)
+	ops := make(map[ids.ID]*chainsatomic.Requests)
 	for _, t := range sorted {
 		chainID, req, err := t.AtomicRequests()
 		if err != nil {
@@ -244,11 +253,17 @@ func atomicRequests(txs []*tx.Tx) (map[ids.ID]*oldatomic.Requests, error) {
 	return ops, nil
 }
 
-const trieKeyLength = state.TrieKeyLength
+var errCleanTrieAfterUpdates = errors.New("clean trie after updates")
 
 // applyTrie writes the per-chain ops into the trie rooted at oldRoot, flushes
 // the resulting trie to disk, and returns the new root.
-func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*oldatomic.Requests) (common.Hash, error) {
+func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*chainsatomic.Requests) (common.Hash, error) {
+	// Most blocks don't have atomic requests, so we avoid any unnecessary trie
+	// operations in that case.
+	if len(ops) == 0 {
+		return oldRoot, nil
+	}
+
 	tr, err := trie.New(trie.TrieID(oldRoot), trieDB)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("opening trie: %w", err)
@@ -262,27 +277,31 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops 
 			return common.Hash{}, fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
 		}
 
-		p := wrappers.Packer{Bytes: make([]byte, trieKeyLength)}
-		p.PackLong(height)
-		p.PackFixedBytes(chainID[:])
-		if err := tr.Update(p.Bytes, v); err != nil {
+		const keyLength = state.TrieKeyLength
+		k := make([]byte, keyLength)
+		binary.BigEndian.PutUint64(k, height)
+		copy(k[wrappers.LongLen:], chainID[:])
+		if err := tr.Update(k, v); err != nil {
 			return common.Hash{}, fmt.Errorf("inserting trie key for chain %s: %w", chainID, err)
 		}
 	}
 
-	newRoot, nodes, err := tr.Commit(false)
+	// [hashdb.Database.Update] would attempt to RLP-decode collected leaves as
+	// [types.StateAccount] to reference storage subtries.
+	const collectLeafs = false
+	newRoot, nodes, err := tr.Commit(collectLeafs)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("committing in-memory trie: %w", err)
 	}
-	if nodes != nil {
-		// The parent-root and block-number args have no effect with hashdb;
-		// EmptyRootHash suppresses an otherwise-spurious parent-presence
-		// warning.
-		if err := trieDB.Update(newRoot, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil); err != nil {
-			return common.Hash{}, fmt.Errorf("updating trieDB with new nodes: %w", err)
-		}
+	if nodes == nil {
+		return common.Hash{}, errCleanTrieAfterUpdates
 	}
-	if err := trieDB.Commit(newRoot, false); err != nil {
+	if err := trieDB.Update(newRoot, oldRoot, height, trienode.NewWithNodeSet(nodes), nil); err != nil {
+		return common.Hash{}, fmt.Errorf("updating trieDB with new nodes: %w", err)
+	}
+
+	const logAsInfo = false
+	if err := trieDB.Commit(newRoot, logAsInfo); err != nil {
 		return common.Hash{}, fmt.Errorf("committing trieDB at root %s: %w", newRoot, err)
 	}
 	return newRoot, nil
@@ -293,7 +312,7 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops 
 // caller to fetch the block to get the tx. Paying that extra block fetch on the
 // read side is almost certainly worth avoiding the duplicate write, since this
 // index is only read from the API.
-func writeTxByID(db database.KeyValueWriter, height uint64, t *tx.Tx) error {
+func writeTx(db database.KeyValueWriter, height uint64, t *tx.Tx) error {
 	txBytes, err := t.Bytes()
 	if err != nil {
 		return err
@@ -310,7 +329,7 @@ func writeTxByID(db database.KeyValueWriter, height uint64, t *tx.Tx) error {
 }
 
 func txKey(id ids.ID) []byte {
-	return prefixdb.PrefixKey(txIDPrefix, id[:])
+	return prefixdb.PrefixKey(txPrefix, id[:])
 }
 
 // GetTx returns the tx with the given ID along with the block height it was
