@@ -565,12 +565,12 @@ func TestGetValidatorRules(t *testing.T) {
 		customAssetID = ids.GenerateTestID()
 		subnetID      = ids.GenerateTestID()
 
-		minValidatorStake    uint64        = 1
-		maxValidatorStake    uint64        = 2
-		minStakeDuration     time.Duration = time.Second
-		maxStakeDuration     time.Duration = 4 * time.Second
-		minDelegationFee     uint32        = 1337
-		heliconMinStakeDuration time.Duration = 3 * time.Second
+		minValidatorStake       uint64 = 1
+		maxValidatorStake       uint64 = 2
+		minStakeDuration               = time.Second
+		maxStakeDuration               = 4 * time.Second
+		minDelegationFee        uint32 = 1337
+		heliconMinStakeDuration        = 3 * time.Second
 	)
 
 	tests := []test{
@@ -693,11 +693,11 @@ func TestGetDelegatorRules(t *testing.T) {
 		customAssetID = ids.GenerateTestID()
 		subnetID      = ids.GenerateTestID()
 
-		minDelegatorStake       uint64        = 1
-		maxValidatorStake       uint64        = 2
-		minStakeDuration        time.Duration = time.Second
-		maxStakeDuration        time.Duration = 4 * time.Second
-		heliconMinStakeDuration time.Duration = 3 * time.Second
+		minDelegatorStake       uint64 = 1
+		maxValidatorStake       uint64 = 2
+		minStakeDuration               = time.Second
+		maxStakeDuration               = 4 * time.Second
+		heliconMinStakeDuration        = 3 * time.Second
 	)
 	tests := []test{
 		{
