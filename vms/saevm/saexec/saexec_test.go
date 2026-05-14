@@ -105,7 +105,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
-	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, blockstest.WithTrieDBConfig(tdbConfig), blockstest.WithGasTarget(sutCfg.hooks.Target))
+	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, blockstest.WithTrieDBConfig(tdbConfig), blockstest.WithGasTarget(sutCfg.hooks.Target), blockstest.WithBaseFee(1))
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),

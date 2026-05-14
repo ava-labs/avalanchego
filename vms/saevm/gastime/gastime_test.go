@@ -18,11 +18,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
-func mustNew(tb testing.TB, at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceConfig) *Time {
+func mustNewFromExcess(tb testing.TB, at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceConfig) *Time {
 	tb.Helper()
-	tm, err := New(at, target, startingExcess, gasPriceConfig)
+	tm, err := newFromExcess(at, target, startingExcess, gasPriceConfig)
 	require.NoError(tb, err, "New(%v, %d, %d, %v)", at, target, startingExcess, gasPriceConfig)
 	return tm
+}
+
+func newFromExcess(at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceConfig) (*Time, error) {
+	pt := proxytime.Of[gas.Gas](at)
+	target = clampTarget(target)
+	pt.SetRate(rateOf(target))
+	return FromProxyTime(pt, startingExcess, gasPriceConfig)
 }
 
 func (tm *Time) cloneViaCanotoRoundTrip(tb testing.TB) *Time {
@@ -33,7 +40,7 @@ func (tm *Time) cloneViaCanotoRoundTrip(tb testing.TB) *Time {
 }
 
 func TestClone(t *testing.T) {
-	tm := mustNew(t, time.Unix(42, 1), 1e6, 1e5, GasPriceConfig{TargetToExcessScaling: 100, MinPrice: 200})
+	tm := mustNewFromExcess(t, time.Unix(42, 1), 1e6, 1e5, GasPriceConfig{TargetToExcessScaling: 100, MinPrice: 200})
 
 	if diff := cmp.Diff(tm, tm.Clone(), CmpOpt()); diff != "" {
 		t.Errorf("%T.Clone() diff (-want +got):\n%s", tm, diff)
@@ -75,20 +82,21 @@ func (tm *Time) requireState(tb testing.TB, desc string, want state, opts ...cmp
 	}
 }
 
-func TestNew(t *testing.T) {
+func TestNewInitialState(t *testing.T) {
 	frac := func(num, den gas.Gas) (f proxytime.FractionalSecond[gas.Gas]) {
 		f.Numerator = num
 		f.Denominator = den
 		return
 	}
 
-	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Config", "Price")
+	ignore := cmpopts.IgnoreFields(state{}, "Rate", "Config", "Excess")
 
 	tests := []struct {
-		name           string
-		unix, nanos    int64
-		target, excess gas.Gas
-		want           state
+		name        string
+		unix, nanos int64
+		target      gas.Gas
+		price       gas.Price
+		want        state
 	}{
 		{
 			name:   "rate at nanosecond resolution",
@@ -99,6 +107,7 @@ func TestNew(t *testing.T) {
 				UnixTime:           42,
 				ConsumedThisSecond: frac(123_456, 1e9),
 				Target:             1e9 / TargetToRate,
+				Price:              DefaultMinPrice,
 			},
 		},
 		{
@@ -106,12 +115,12 @@ func TestNew(t *testing.T) {
 			unix:   100,
 			nanos:  TargetToRate,
 			target: 50 / TargetToRate,
-			excess: 987_654,
+			price:  math.MaxUint64,
 			want: state{
 				UnixTime:           100,
 				ConsumedThisSecond: frac(1, 50),
 				Target:             50 / TargetToRate,
-				Excess:             987_654,
+				Price:              math.MaxUint64,
 			},
 		},
 	}
@@ -119,8 +128,9 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tm := time.Unix(tt.unix, tt.nanos)
-			got := mustNew(t, tm, tt.target, tt.excess, DefaultGasPriceConfig())
-			got.requireState(t, fmt.Sprintf("New(%v, %d, %d)", tm, tt.target, tt.excess), tt.want, ignore)
+			got, err := New(tm, tt.target, tt.price, DefaultGasPriceConfig())
+			require.NoError(t, err)
+			got.requireState(t, fmt.Sprintf("New(%v, %d, %d)", tm, tt.target, tt.price), tt.want, ignore)
 		})
 	}
 }
@@ -134,7 +144,7 @@ func TestNewZeroTarget(t *testing.T) {
 
 func TestExcess(t *testing.T) {
 	const rate = gas.Gas(3.2e6)
-	tm := mustNew(t, time.Unix(42, 0), rate/2, 0, DefaultGasPriceConfig())
+	tm := mustNewFromExcess(t, time.Unix(42, 0), rate/2, 0, DefaultGasPriceConfig())
 
 	frac := func(num gas.Gas) (f proxytime.FractionalSecond[gas.Gas]) {
 		f.Numerator = num
@@ -322,7 +332,7 @@ func TestMinAndStaticPrice(t *testing.T) {
 			cfg.MinPrice = tt.minPrice
 			cfg.StaticPricing = tt.static
 
-			tm, err := New(time.Unix(0, 0), target, tt.startingExcess, cfg)
+			tm, err := newFromExcess(time.Unix(0, 0), target, tt.startingExcess, cfg)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("New(..., %+v) %s", cfg, diff)
 			}
@@ -342,7 +352,7 @@ func TestTickExcessOverflow(t *testing.T) {
 		startExcess = math.MaxUint64 - shortFall
 		tick        = TargetToRate * (1 + shortFall) // increases excess by 1+shortFall -> overflow risk
 	)
-	tm := mustNew(t, time.Unix(0, 0), 1, startExcess, DefaultGasPriceConfig())
+	tm := mustNewFromExcess(t, time.Unix(0, 0), 1, startExcess, DefaultGasPriceConfig())
 	tm.Tick(tick)
 	require.Greater(t, tm.Excess(), gas.Gas(startExcess), "Excess() must increase after Tick(>1)")
 }

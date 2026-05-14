@@ -41,7 +41,7 @@ func TestInvalidConfigRejected(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tm := mustNew(t, time.Unix(42, 0), target, 0, DefaultGasPriceConfig())
+			tm := mustNewFromExcess(t, time.Unix(42, 0), target, 0, DefaultGasPriceConfig())
 
 			initialScaling := tm.config.TargetToExcessScaling
 			initialMinPrice := tm.config.MinPrice
@@ -63,7 +63,7 @@ func TestTargetUpdateTiming(t *testing.T) {
 		initialTarget gas.Gas = 1_600_000
 		initialExcess         = 1_234_567_890
 	)
-	tm := mustNew(t, time.Unix(initialTime, 0), initialTarget, initialExcess, DefaultGasPriceConfig())
+	tm := mustNewFromExcess(t, time.Unix(initialTime, 0), initialTarget, initialExcess, DefaultGasPriceConfig())
 	initialRate := tm.Rate()
 
 	const (
@@ -109,8 +109,8 @@ func FuzzWorstCasePrice(f *testing.F) {
 		gasCfg := DefaultGasPriceConfig()
 
 		initUnix := int64(min(initTimestamp, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
-		worstcase := mustNew(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
-		actual := mustNew(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
+		worstcase := mustNewFromExcess(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
+		actual := mustNewFromExcess(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
 
 		blocks := []struct {
 			time   uint64
@@ -766,7 +766,7 @@ func TestAfterBlock(t *testing.T) {
 	ignore := cmpopts.IgnoreFields(state{}, "UnixTime", "ConsumedThisSecond", "Target", "Config")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tm := mustNew(t, time.Unix(0, 0), tt.init.Target, tt.init.Excess, tt.init.Config)
+			tm := mustNewFromExcess(t, time.Unix(0, 0), tt.init.Target, tt.init.Excess, tt.init.Config)
 
 			tt.init.Rate = tm.Target() * TargetToRate
 			tm.requireState(
@@ -809,8 +809,8 @@ func TestOscillatingMinPrice(t *testing.T) {
 	lowPriceConfig := highPriceConfig
 	lowPriceConfig.MinPrice = lowMinPrice
 
-	control := mustNew(t, time.Unix(0, 0), target, 0, highPriceConfig)
-	modified := mustNew(t, time.Unix(0, 0), target, 0, highPriceConfig)
+	control := mustNewFromExcess(t, time.Unix(0, 0), target, 0, highPriceConfig)
+	modified := mustNewFromExcess(t, time.Unix(0, 0), target, 0, highPriceConfig)
 
 	require.Equalf(t, highMinPrice, control.Price(), "%T.Price()", control)
 	require.Equalf(t, highMinPrice, modified.Price(), "%T.Price()", modified)
