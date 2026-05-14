@@ -25,12 +25,9 @@ if [[ -n "${GPG_KEY_FILE:-}" && -s "${GPG_KEY_FILE}" ]]; then
         echo "Verifying signature for ${archive}..."
         gpg --batch --verify "${archive}.sig" "${archive}"
     }
-
-    GPG_SIGNING_ENABLED=true
 else
     echo "No GPG key provided, skipping archive signing."
     sign_archive() { :; }
-    GPG_SIGNING_ENABLED=false
 fi
 
 # ── Build avalanchego zip ────────────────────────────────────────
@@ -39,17 +36,9 @@ echo "Build avalanchego zip package..."
 echo "Tag: $TAG"
 7z a "avalanchego-macos-${TAG}.zip" build/avalanchego
 sign_archive "avalanchego-macos-${TAG}.zip"
-aws s3 cp "avalanchego-macos-${TAG}.zip" "s3://${BUCKET}/macos/"
-if [[ "$GPG_SIGNING_ENABLED" == "true" ]]; then
-    aws s3 cp "avalanchego-macos-${TAG}.zip.sig" "s3://${BUCKET}/macos/"
-fi
 
 # ── Build subnet-evm zip ────────────────────────────────────────
 
 echo "Build subnet-evm zip package..."
 7z a "subnet-evm-macos-${TAG}.zip" build/subnet-evm
 sign_archive "subnet-evm-macos-${TAG}.zip"
-aws s3 cp "subnet-evm-macos-${TAG}.zip" "s3://${BUCKET}/macos/"
-if [[ "$GPG_SIGNING_ENABLED" == "true" ]]; then
-    aws s3 cp "subnet-evm-macos-${TAG}.zip.sig" "s3://${BUCKET}/macos/"
-fi
