@@ -371,6 +371,12 @@ func TestApply(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
+			// There are three different SUTs used in this test:
+			//   - legacy: backed by the prior coreth code and used as the
+			//     reference implementation.
+			// 	 - fresh: backed by the new implementation.
+			//   - migrations[i]: legacy for blocks [0, i), then switched to the
+			//     new implementation for [i, n).
 			legacy := newSUT(t, withLegacyBackend())
 			fresh := newSUT(t)
 			migrations := make([]*SUT, len(test.blocks))
@@ -386,6 +392,8 @@ func TestApply(t *testing.T) {
 					sut.apply(t, b)
 				}
 
+				// Reopening the fresh SUT verifies that the new implementation
+				// correctly flushes to disk and can reload from it.
 				reopenedFresh := newSUT(t, withDB(fresh.db))
 				all = append(all, reopenedFresh)
 				for _, sut := range all {
@@ -449,6 +457,8 @@ func TestCrash(t *testing.T) {
 	want := newSUT(t, withDB(wantDB))
 	want.apply(t, blocks...)
 
+	// Iterating over all of the calls made to the db allows us to crash at
+	// every possible point during Apply.
 	for failAfter := range wantDB.calls {
 		t.Run(fmt.Sprintf("failAfter_%d", failAfter), func(t *testing.T) {
 			t.Parallel()
