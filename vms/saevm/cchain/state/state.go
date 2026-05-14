@@ -49,6 +49,9 @@ var (
 //
 // When applying operations, shared memory is updated atomically with the state.
 //
+// [State.Apply] and [State.Close] must not be called concurrently with
+// themselves or each other. All other methods are safe to call concurrently.
+//
 // [State.Close] MUST be called when finished with the state to release
 // resources.
 type State struct {
@@ -129,8 +132,6 @@ func rootKey(height uint64) []byte {
 // operations to shared memory.
 //
 // Apply is a noop when height is not higher than [State.CurrentHeight].
-//
-// Apply is not thread safe.
 func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if currentHeight := s.currentHeight.Load(); height <= currentHeight {
 		// During restarts, it is expected for SAE to reprocess already-applied
