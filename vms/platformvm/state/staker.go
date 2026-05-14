@@ -96,11 +96,27 @@ func (s *Staker) Less(than *Staker) bool {
 
 func NewCurrentStaker(
 	txID ids.ID,
-	staker txs.BoundedStaker,
+	staker txs.Staker,
 	startTime time.Time,
 	potentialReward uint64,
 ) (*Staker, error) {
-	return NewStaker(txID, staker, startTime, staker.EndTime(), staker.Weight(), potentialReward)
+	publicKey, _, err := staker.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	endTime := staker.EndTime()
+	return &Staker{
+		TxID:            txID,
+		NodeID:          staker.NodeID(),
+		PublicKey:       publicKey,
+		SubnetID:        staker.SubnetID(),
+		Weight:          staker.Weight(),
+		StartTime:       startTime,
+		EndTime:         endTime,
+		PotentialReward: potentialReward,
+		NextTime:        endTime,
+		Priority:        staker.CurrentPriority(),
+	}, nil
 }
 
 func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) {
@@ -119,31 +135,5 @@ func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) 
 		EndTime:   staker.EndTime(),
 		NextTime:  startTime,
 		Priority:  staker.PendingPriority(),
-	}, nil
-}
-
-func NewStaker(
-	txID ids.ID,
-	staker txs.Staker,
-	startTime time.Time,
-	endTime time.Time,
-	weight uint64, // we need this, because staker.Weight() returns the initial weight (without any accrued rewards)
-	potentialReward uint64,
-) (*Staker, error) {
-	publicKey, _, err := staker.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	return &Staker{
-		TxID:            txID,
-		NodeID:          staker.NodeID(),
-		PublicKey:       publicKey,
-		SubnetID:        staker.SubnetID(),
-		Weight:          weight,
-		StartTime:       startTime,
-		EndTime:         endTime,
-		PotentialReward: potentialReward,
-		NextTime:        endTime,
-		Priority:        staker.CurrentPriority(),
 	}, nil
 }
