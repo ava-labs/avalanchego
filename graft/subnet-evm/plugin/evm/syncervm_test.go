@@ -212,6 +212,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 				syncableInterval:   256,
 				stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 				syncMode:           block.StateSyncStatic,
+				stateScheme:        scheme,
 				responseIntercept: func(syncerVM *VM, nodeID ids.NodeID, requestID uint32, response []byte) {
 					lock.Lock()
 					defer lock.Unlock()
