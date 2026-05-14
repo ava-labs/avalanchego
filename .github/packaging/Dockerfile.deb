@@ -1,7 +1,8 @@
 # Build container for DEB packaging of avalanchego and subnet-evm.
 #
-# Based on Ubuntu 22.04 (jammy) for DEB-native tooling (dpkg-sig).
-# Source tree is bind-mounted at runtime, not COPY'd.
+# Based on Ubuntu 22.04 (jammy) so the produced binary's glibc floor
+# matches the oldest supported target release. Source tree is bind-mounted
+# at runtime, not COPY'd.
 #
 # Usage (via build-builder-image.sh with DOCKERFILE=Dockerfile.deb):
 #   DOCKERFILE=Dockerfile.deb .github/packaging/scripts/build-builder-image.sh
@@ -18,15 +19,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install build dependencies
 # - gcc: required for cgo (CGO_ENABLED=1 in scripts/constants.sh)
 # - gettext: envsubst for nfpm config template expansion
-# - gnupg: GPG signing
-# - dpkg-sig: DEB package signing (post-build)
+# - gnupg: GPG key import for nfpm-native DEB signing
 # - git: version detection in build scripts
 # - curl: downloading Go and nfpm
 RUN apt-get update && apt-get install -y \
         gcc \
         gettext \
         gnupg \
-        dpkg-sig \
         git \
         curl \
     && rm -rf /var/lib/apt/lists/*

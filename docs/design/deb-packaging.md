@@ -44,9 +44,13 @@ shared packaging scripts under `.github/packaging/scripts/`.
 Shared key handling matches
 [RPM Packaging / GPG signing](./rpm-packaging.md#gpg-signing).
 
-DEBs are signed after `nfpm` produces the package, using `dpkg-sig`.
-This is required because `nfpm` inline signing is not compatible with
-`dpkg-sig --verify`.
+DEBs are signed inline by `nfpm` via the `deb.signature.key_file`
+configuration in `.github/packaging/nfpm/*-deb.yml`. The signature is
+written as a detached GPG signature in the `_gpgorigin` ar member
+covering the concatenation of `debian-binary`, the control archive, and
+the data archive in ar-member order. Validation runs `gpg --verify`
+against that concatenation; no post-build or distro-specific signing
+tool is involved.
 
 ### Version smoke test
 
@@ -82,6 +86,5 @@ Shared glibc and container-build rationale is documented in
 DEB-specific validation differs in two places:
 
 - Packages are built in `ubuntu:22.04`
-- Validation runs in both `ubuntu:22.04` and `ubuntu:24.04`
-- Signature verification runs only in `ubuntu:22.04` because
-  `dpkg-sig` is not available in Ubuntu 24.04
+- Validation (signature verify, install, smoke test) runs in both
+  `ubuntu:22.04` and `ubuntu:24.04`
