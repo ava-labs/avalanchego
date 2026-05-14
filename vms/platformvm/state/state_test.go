@@ -3415,7 +3415,7 @@ func testGetStakingInfo(t *testing.T, newCSF func(t *testing.T) CurrentStakers) 
 		wantErr  error
 	}{
 		{
-			name: "validator does not exist",
+			name: "validator_does_not_exist",
 			newCSF: func(t *testing.T) CurrentStakers {
 				return newCSF(t)
 			},
@@ -3424,7 +3424,7 @@ func testGetStakingInfo(t *testing.T, newCSF func(t *testing.T) CurrentStakers) 
 			wantErr:  database.ErrNotFound,
 		},
 		{
-			name: "default to not found",
+			name: "default_to_not_found",
 			newCSF: func(t *testing.T) CurrentStakers {
 				cs := newCSF(t)
 
@@ -3439,7 +3439,7 @@ func testGetStakingInfo(t *testing.T, newCSF func(t *testing.T) CurrentStakers) 
 			wantErr:  database.ErrNotFound,
 		},
 		{
-			name: "staking info set for committed validator",
+			name: "staking_info_set_for_committed_validator",
 			newCSF: func(t *testing.T) CurrentStakers {
 				cs := newCSF(t)
 
@@ -3454,7 +3454,7 @@ func testGetStakingInfo(t *testing.T, newCSF func(t *testing.T) CurrentStakers) 
 			want:     StakingInfo{DelegateeReward: 123},
 		},
 		{
-			name: "validator added in current diff and staking info set",
+			name: "validator_added_in_current_diff_and_staking_info_set",
 			newCSF: func(t *testing.T) CurrentStakers {
 				t.Skip("base does not allow updating mutable data associated with a validator before it has been written")
 				cs := newCSF(t)
@@ -3470,7 +3470,7 @@ func testGetStakingInfo(t *testing.T, newCSF func(t *testing.T) CurrentStakers) 
 			want:     StakingInfo{DelegateeReward: 123},
 		},
 		{
-			name: "staking info deleted when validator deleted",
+			name: "staking_info_deleted_when_validator_deleted",
 			newCSF: func(t *testing.T) CurrentStakers {
 				cs := newCSF(t)
 
@@ -3507,7 +3507,7 @@ func testSetStakingInfo(t *testing.T, csF func(t *testing.T) CurrentStakers) {
 		wantErr  error
 	}{
 		{
-			name:     "validator does not exist",
+			name: "validator_does_not_exist",
 			csF:      csF,
 			subnetID: ids.GenerateTestID(),
 			nodeID:   ids.GenerateTestNodeID(),
@@ -3515,7 +3515,7 @@ func testSetStakingInfo(t *testing.T, csF func(t *testing.T) CurrentStakers) {
 			wantErr:  database.ErrNotFound,
 		},
 		{
-			name: "committed validator",
+			name: "committed_validator",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3527,7 +3527,7 @@ func testSetStakingInfo(t *testing.T, csF func(t *testing.T) CurrentStakers) {
 			info:     StakingInfo{DelegateeReward: 123},
 		},
 		{
-			name: "validator added in current diff",
+			name: "validator_added_in_current_diff",
 			csF: func(t *testing.T) CurrentStakers {
 				// TODO
 				t.Skip("base does not allow updating mutable data associated with a validator before it has been written")
@@ -3564,13 +3564,13 @@ func testGetCurrentDelegatorIterator(t *testing.T, csF func(t *testing.T) Curren
 		want     []*Staker
 	}{
 		{
-			name:     "validator does not exist",
+			name: "validator_does_not_exist",
 			subnetID: ids.GenerateTestID(),
 			nodeID:   ids.GenerateTestNodeID(),
 			csF:      csF,
 		},
 		{
-			name: "no delegators",
+			name: "no_delegators",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3583,7 +3583,7 @@ func testGetCurrentDelegatorIterator(t *testing.T, csF func(t *testing.T) Curren
 			nodeID:   ids.NodeID{2},
 		},
 		{
-			name: "delegators ordered by increasing next time",
+			name: "delegators_ordered_by_increasing_next_time",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3629,7 +3629,7 @@ func testGetCurrentDelegatorIterator(t *testing.T, csF func(t *testing.T) Curren
 			}(),
 		},
 		{
-			name: "delegator deleted",
+			name: "delegator_deleted",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3647,7 +3647,7 @@ func testGetCurrentDelegatorIterator(t *testing.T, csF func(t *testing.T) Curren
 			nodeID:   ids.NodeID{2},
 		},
 		{
-			name: "validator deleted",
+			name: "validator_deleted",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3681,18 +3681,18 @@ func testPutCurrentDelegator(t *testing.T, csF func(t *testing.T) CurrentStakers
 		wantErr   error
 	}{
 		{
-			name:      "validator does not exist",
+			name: "validator_does_not_exist",
 			csF:       csF,
 			delegator: newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID()),
 			wantErr:   database.ErrNotFound,
 		},
 		{
-			name:      "delegator added to committed validator",
+			name: "delegator_added_to_committed_validator",
 			csF:       csF,
 			delegator: newTestStaker(constants.PrimaryNetworkID, defaultValidatorNodeID),
 		},
 		{
-			name: "delegator added to added validator",
+			name: "delegator_added_to_added_validator",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3704,7 +3704,7 @@ func testPutCurrentDelegator(t *testing.T, csF func(t *testing.T) CurrentStakers
 			delegator: newTestStaker(ids.ID{1}, ids.NodeID{2}),
 		},
 		{
-			name: "duplicate put",
+			name: "duplicate_put",
 			csF: func(t *testing.T) CurrentStakers {
 				//  TODO enable this test once behavior is updated
 				t.Skip("currently we do not error if a duplicate delegator is added")
@@ -3748,7 +3748,7 @@ func testDeleteCurrentDelegator(t *testing.T, csF func(t *testing.T) CurrentStak
 		wantErr   error
 	}{
 		{
-			name: "validator does not exist",
+			name: "validator_does_not_exist",
 			csF:  csF,
 			delegator: func() *Staker {
 				return newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
@@ -3756,7 +3756,7 @@ func testDeleteCurrentDelegator(t *testing.T, csF func(t *testing.T) CurrentStak
 			wantErr: database.ErrNotFound,
 		},
 		{
-			name: "delegator does not exist",
+			name: "delegator_does_not_exist",
 			csF: func(t *testing.T) CurrentStakers {
 				// TODO enable when behavior is updated
 				t.Skip("currently we do not error when on deletions on delegators that do not exist")
@@ -3774,7 +3774,7 @@ func testDeleteCurrentDelegator(t *testing.T, csF func(t *testing.T) CurrentStak
 			wantErr: database.ErrNotFound,
 		},
 		{
-			name: "delegator deleted",
+			name: "delegator_deleted",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3819,12 +3819,12 @@ func testGetCurrentStakerIterator(t *testing.T, csF func(t *testing.T) CurrentSt
 		want []*Staker
 	}{
 		{
-			name: "get committed validator",
+			name: "get_committed_validator",
 			csF:  csF,
 			want: []*Staker{genesisValidator},
 		},
 		{
-			name: "sorted by priority",
+			name: "sorted_by_priority",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3883,7 +3883,7 @@ func testGetCurrentStakerIterator(t *testing.T, csF func(t *testing.T) CurrentSt
 			}(),
 		},
 		{
-			name: "delegator deleted",
+			name: "delegator_deleted",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3912,7 +3912,7 @@ func testGetCurrentStakerIterator(t *testing.T, csF func(t *testing.T) CurrentSt
 			}(),
 		},
 		{
-			name: "added validator deleted",
+			name: "added_validator_deleted",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3927,7 +3927,7 @@ func testGetCurrentStakerIterator(t *testing.T, csF func(t *testing.T) CurrentSt
 			want: []*Staker{genesisValidator},
 		},
 		{
-			name: "committed validator deleted",
+			name: "committed_validator_deleted",
 			csF: func(t *testing.T) CurrentStakers {
 				cs := csF(t)
 
@@ -3955,7 +3955,7 @@ func TestStateAndDiffIntegration(t *testing.T) {
 		subnetID ids.ID
 	}{
 		{
-			name:     "primary network",
+			name: "primary_network",
 			subnetID: constants.PrimaryNetworkID,
 		},
 		{
@@ -3966,7 +3966,7 @@ func TestStateAndDiffIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Run("delete validator and its delegator", func(t *testing.T) {
+			t.Run("delete_validator_and_its_delegator", func(t *testing.T) {
 				state := newTestState(t, memdb.New())
 
 				diff, err := NewDiffOn(state, true)
