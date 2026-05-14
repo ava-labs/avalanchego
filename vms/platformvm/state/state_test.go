@@ -3507,7 +3507,7 @@ func testSetStakingInfo(t *testing.T, csF func(t *testing.T) CurrentStakers) {
 		wantErr  error
 	}{
 		{
-			name: "validator_does_not_exist",
+			name:     "validator_does_not_exist",
 			csF:      csF,
 			subnetID: ids.GenerateTestID(),
 			nodeID:   ids.GenerateTestNodeID(),
@@ -3564,7 +3564,7 @@ func testGetCurrentDelegatorIterator(t *testing.T, csF func(t *testing.T) Curren
 		want     []*Staker
 	}{
 		{
-			name: "validator_does_not_exist",
+			name:     "validator_does_not_exist",
 			subnetID: ids.GenerateTestID(),
 			nodeID:   ids.GenerateTestNodeID(),
 			csF:      csF,
@@ -3681,13 +3681,13 @@ func testPutCurrentDelegator(t *testing.T, csF func(t *testing.T) CurrentStakers
 		wantErr   error
 	}{
 		{
-			name: "validator_does_not_exist",
+			name:      "validator_does_not_exist",
 			csF:       csF,
 			delegator: newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID()),
 			wantErr:   database.ErrNotFound,
 		},
 		{
-			name: "delegator_added_to_committed_validator",
+			name:      "delegator_added_to_committed_validator",
 			csF:       csF,
 			delegator: newTestStaker(constants.PrimaryNetworkID, defaultValidatorNodeID),
 		},
@@ -3955,7 +3955,7 @@ func TestStateAndDiffIntegration(t *testing.T) {
 		subnetID ids.ID
 	}{
 		{
-			name: "primary_network",
+			name:     "primary_network",
 			subnetID: constants.PrimaryNetworkID,
 		},
 		{
