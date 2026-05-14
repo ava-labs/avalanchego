@@ -6,6 +6,7 @@
 package state
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"slices"
@@ -212,13 +213,11 @@ func atomicRequests(txs []*tx.Tx) (map[ids.ID]*chainsatomic.Requests, error) {
 	return ops, nil
 }
 
-const trieKeyLength = state.TrieKeyLength
-
 // applyTrie writes the per-chain ops into the trie rooted at oldRoot, flushes
 // the resulting trie to disk, and returns the new root.
 func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*chainsatomic.Requests) (common.Hash, error) {
-	// Most blocks don't have atomic requests, so we avoid any unnecessary disk
-	// reads in that case.
+	// Most blocks don't have atomic requests, so we avoid any unnecessary trie
+	// operations in that case.
 	if len(ops) == 0 {
 		return oldRoot, nil
 	}
@@ -236,15 +235,19 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops 
 			return common.Hash{}, fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
 		}
 
-		p := wrappers.Packer{Bytes: make([]byte, trieKeyLength)}
-		p.PackLong(height)
-		p.PackFixedBytes(chainID[:])
-		if err := tr.Update(p.Bytes, v); err != nil {
+		const keyLength = state.TrieKeyLength
+		k := make([]byte, keyLength)
+		binary.BigEndian.PutUint64(k, height)
+		copy(k[wrappers.LongLen:], chainID[:])
+		if err := tr.Update(k, v); err != nil {
 			return common.Hash{}, fmt.Errorf("inserting trie key for chain %s: %w", chainID, err)
 		}
 	}
 
-	newRoot, nodes, err := tr.Commit(false)
+	// [hashdb.Database.Update] would attempt to RLP-decode collected leaves as
+	// [types.StateAccount] to reference storage subtries.
+	const collectLeafs = false
+	newRoot, nodes, err := tr.Commit(collectLeafs)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("committing in-memory trie: %w", err)
 	}
@@ -256,7 +259,9 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops 
 			return common.Hash{}, fmt.Errorf("updating trieDB with new nodes: %w", err)
 		}
 	}
-	if err := trieDB.Commit(newRoot, false); err != nil {
+
+	const logAsInfo = false
+	if err := trieDB.Commit(newRoot, logAsInfo); err != nil {
 		return common.Hash{}, fmt.Errorf("committing trieDB at root %s: %w", newRoot, err)
 	}
 	return newRoot, nil
