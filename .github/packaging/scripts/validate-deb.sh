@@ -2,9 +2,9 @@
 
 # Post-build validation of DEB packages.
 #
-# Validates locally-built DEBs by running fresh Ubuntu containers:
-# - ubuntu:22.04 (jammy): signature verification, install, and smoke test
-# - ubuntu:24.04 (noble): install and smoke test only (dpkg-sig unavailable)
+# Validates locally-built DEBs by running fresh Ubuntu containers for both
+# jammy (22.04) and noble (24.04): verify the nFPM-native _gpgorigin
+# signature, install the package, and run the smoke test.
 #
 # Required env vars:
 #   TAG            - Git tag (e.g., "v1.14.1")
@@ -34,51 +34,55 @@ assert_files_exist "${DEB_DIR}" \
     "avalanchego-${TAG}-${PACKAGE_ARCH}.deb" \
     "subnet-evm-${TAG}-${PACKAGE_ARCH}.deb"
 
-# ── Signature verification (jammy only) ──────────────────────────
-# dpkg-sig was removed from Ubuntu 24.04 (noble) repositories.
-# Verify signatures in jammy where dpkg-sig is available; the signature
-# is embedded in the .deb and does not change between Ubuntu releases.
-
-echo "=== Verifying DEB signatures in fresh ubuntu:22.04 container ==="
-docker run --rm \
-    -v "${DEB_DIR}:/debs:ro" \
-    ubuntu:22.04 \
-    bash -euxc '
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get update
-        apt-get install -y dpkg-sig gnupg
-
-        if [[ -f /debs/DEB-GPG-KEY-avalanchego ]]; then
-            gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
-            dpkg-sig --verify "/debs/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.deb"
-            dpkg-sig --verify "/debs/subnet-evm-'"${TAG}"'-'"${PACKAGE_ARCH}"'.deb"
-        else
-            echo "Skipping GPG verification (unsigned build)"
-        fi
-    '
-
-# ── Install and smoke test (both jammy and noble) ────────────────
-# Validates that the jammy-built binary installs and runs on both releases.
+# ── Verify + install + smoke test (both jammy and noble) ─────────
+# nfpm stores a detached GPG signature in the `_gpgorigin` ar member,
+# covering debian-binary + control.tar.* + data.tar.* concatenated in
+# ar-member order. Verifying with `gpg --verify` keeps the same flow
+# on every supported Ubuntu release.
 
 for UBUNTU_IMAGE in ubuntu:22.04 ubuntu:24.04; do
-    echo "=== Install and smoke test in fresh ${UBUNTU_IMAGE} container ==="
+    echo "=== Verify, install and smoke test in fresh ${UBUNTU_IMAGE} container ==="
     docker run --rm \
         -v "${DEB_DIR}:/debs:ro" \
         -v "${SCRIPTS_DIR}/smoke-test.sh:/smoke-test.sh:ro" \
+        -e "TAG=${TAG}" \
+        -e "PACKAGE_ARCH=${PACKAGE_ARCH}" \
+        -e "GIT_COMMIT=${GIT_COMMIT}" \
+        -e "SUBNET_EVM_VM_ID=${SUBNET_EVM_VM_ID}" \
         "${UBUNTU_IMAGE}" \
         bash -euxc '
             export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y binutils gnupg
 
-            # Install both packages
-            dpkg -i "/debs/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.deb"
-            dpkg -i "/debs/subnet-evm-'"${TAG}"'-'"${PACKAGE_ARCH}"'.deb"
+            verify_deb_signature() {
+                local deb="$1"
+                local workdir
+                workdir=$(mktemp -d)
+                ( cd "${workdir}" && ar x "${deb}" )
+                cat "${workdir}/debian-binary" \
+                    "${workdir}"/control.tar.* \
+                    "${workdir}"/data.tar.* > "${workdir}/combined"
+                gpg --verify "${workdir}/_gpgorigin" "${workdir}/combined"
+                rm -rf "${workdir}"
+            }
 
-            # Run shared smoke test
+            if [[ -f /debs/DEB-GPG-KEY-avalanchego ]]; then
+                gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
+                verify_deb_signature "/debs/avalanchego-${TAG}-${PACKAGE_ARCH}.deb"
+                verify_deb_signature "/debs/subnet-evm-${TAG}-${PACKAGE_ARCH}.deb"
+            else
+                echo "Skipping GPG verification (unsigned build)"
+            fi
+
+            dpkg -i "/debs/avalanchego-${TAG}-${PACKAGE_ARCH}.deb"
+            dpkg -i "/debs/subnet-evm-${TAG}-${PACKAGE_ARCH}.deb"
+
             bash /smoke-test.sh \
                 /usr/local/bin/avalanchego \
                 /usr/local/lib/avalanchego/plugins \
-                "'"${GIT_COMMIT}"'" \
-                "'"${SUBNET_EVM_VM_ID}"'"
+                "${GIT_COMMIT}" \
+                "${SUBNET_EVM_VM_ID}"
         '
 done
 
