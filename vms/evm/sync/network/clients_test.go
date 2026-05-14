@@ -16,8 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 // Verifies each per-RPC alias returns the right typed response.
@@ -99,4 +100,3 @@ func TestClients_Send(t *testing.T) {
 		})
 	}
 }
-

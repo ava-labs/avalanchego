@@ -5,6 +5,7 @@ package network
 
 import (
 	"github.com/ava-labs/avalanchego/network/p2p"
+
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
