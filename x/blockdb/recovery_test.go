@@ -557,7 +557,7 @@ func resetIndexToBlock(store *Database, blockSize uint64, minHeight uint64) erro
 
 	header := indexFileHeader{
 		Version:         indexFileVersion,
-		MaxDataFileSize: DefaultMaxDataFileSize,
+		MaxDataFileSize: defaultMaxDataFileSize,
 		MinHeight:       minHeight,
 		MaxHeight:       minHeight,
 		NextWriteOffset: uint64(sizeOfBlockEntryHeader) + blockSize,

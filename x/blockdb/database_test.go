@@ -190,7 +190,7 @@ func TestNew_IndexFileErrors(t *testing.T) {
 				header := indexFileHeader{
 					Version:         999, // Wrong version
 					MinHeight:       0,
-					MaxDataFileSize: DefaultMaxDataFileSize,
+					MaxDataFileSize: defaultMaxDataFileSize,
 					MaxHeight:       unsetHeight,
 					NextWriteOffset: 0,
 				}

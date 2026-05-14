@@ -49,10 +49,10 @@ func TestReadOperations(t *testing.T) {
 			readHeight: 25,
 			config: &Config{
 				MinimumHeight:      20,
-				MaxDataFileSize:    DefaultMaxDataFileSize,
+				MaxDataFileSize:    defaultMaxDataFileSize,
 				CheckpointInterval: 1024,
-				MaxDataFiles:       DefaultMaxDataFiles,
-				BlockCacheSize:     DefaultBlockCacheSize,
+				MaxDataFiles:       defaultMaxDataFiles,
+				BlockCacheSize:     defaultBlockCacheSize,
 			},
 		},
 		{
@@ -68,10 +68,10 @@ func TestReadOperations(t *testing.T) {
 			readHeight: 5,
 			config: &Config{
 				MinimumHeight:      10,
-				MaxDataFileSize:    DefaultMaxDataFileSize,
+				MaxDataFileSize:    defaultMaxDataFileSize,
 				CheckpointInterval: 1024,
-				MaxDataFiles:       DefaultMaxDataFiles,
-				BlockCacheSize:     DefaultBlockCacheSize,
+				MaxDataFiles:       defaultMaxDataFiles,
+				BlockCacheSize:     defaultBlockCacheSize,
 			},
 			wantErr: ErrInvalidBlockHeight,
 		},

@@ -6,12 +6,9 @@ package blockdb
 import "errors"
 
 const (
-	// DefaultMaxDataFileSize is the maximum size of a single data file in bytes.
-	DefaultMaxDataFileSize = 500 * 1024 * 1024 * 1024 // 500GB
-	// DefaultMaxDataFiles is the maximum number of cached data file descriptors.
-	DefaultMaxDataFiles = 10
-	// DefaultBlockCacheSize is the number of blocks held in the LRU cache.
-	DefaultBlockCacheSize uint16 = 256
+	defaultMaxDataFileSize        = 500 * 1024 * 1024 * 1024 // 500GB
+	defaultMaxDataFiles           = 10
+	defaultBlockCacheSize  uint16 = 256
 )
 
 // Config contains configuration parameters for BlockDB.
@@ -45,9 +42,9 @@ type Config struct {
 // IndexDir and DataDir must be set before use.
 func DefaultConfig() Config {
 	return Config{
-		MaxDataFileSize:    DefaultMaxDataFileSize,
-		MaxDataFiles:       DefaultMaxDataFiles,
-		BlockCacheSize:     DefaultBlockCacheSize,
+		MaxDataFileSize:    defaultMaxDataFileSize,
+		MaxDataFiles:       defaultMaxDataFiles,
+		BlockCacheSize:     defaultBlockCacheSize,
 		CheckpointInterval: 1024,
 		SyncToDisk:         true,
 	}
