@@ -50,7 +50,7 @@ var (
 //
 // When applying operations, shared memory is updated atomically with the state.
 //
-// [State.Apply] and [State.Close] must not be called concurrently with
+// [State.Apply] and [State.Close] MUST NOT be called concurrently with
 // themselves or each other. All other methods are safe to call concurrently.
 //
 // [State.Close] MUST be called when finished with the state to release
