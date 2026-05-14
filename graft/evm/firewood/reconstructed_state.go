@@ -17,21 +17,28 @@ var _ state.Database = (*reconstructedStateAccessor)(nil)
 // and OpenStorageTrie to return reconstructed tries backed by an [ffi.Reconstructed].
 type reconstructedStateAccessor struct {
 	state.Database
-	recon *ffi.Reconstructed
+	recon             *ffi.Reconstructed
+	computeRootOnHash bool
 }
 
 // NewReconstructedStateAccessor creates a [state.Database] that opens tries
 // backed by the given [ffi.Reconstructed] view. The [ffi.Reconstructed] view is
 // mutated in place by trie operations, so the caller must not use it concurrently.
 //
+// If computeRootOnHash is false, reconstructed trie Hash and Commit calls apply
+// pending writes but return the cached root without forcing an expensive
+// reconstructed root computation. This mode is intended for replay paths that
+// only need Hash as a state-flush point and validate the final root separately.
+//
 // The provided db must have been returned by [NewStateAccessor].
-func NewReconstructedStateAccessor(db state.Database, recon *ffi.Reconstructed) (state.Database, error) {
+func NewReconstructedStateAccessor(db state.Database, recon *ffi.Reconstructed, computeRootOnHash bool) (state.Database, error) {
 	if _, ok := db.(*stateAccessor); !ok {
 		return nil, fmt.Errorf("expected *stateAccessor, got %T", db)
 	}
 	return &reconstructedStateAccessor{
-		Database: db,
-		recon:    recon,
+		Database:          db,
+		recon:             recon,
+		computeRootOnHash: computeRootOnHash,
 	}, nil
 }
 
@@ -44,7 +51,7 @@ func (s *reconstructedStateAccessor) OpenTrie(hash common.Hash) (state.Trie, err
 		return nil, fmt.Errorf("expected root hash %s but got %s", hash, currRoot)
 	}
 
-	t, err := newReconstructedAccountTrie(s.recon)
+	t, err := newReconstructedAccountTrie(s.recon, s.computeRootOnHash)
 	if err != nil {
 		return nil, err
 	}

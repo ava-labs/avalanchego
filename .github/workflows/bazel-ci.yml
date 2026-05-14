@@ -12,6 +12,9 @@ on:
         required: true
         type: string
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 
@@ -47,7 +50,7 @@ jobs:
   check-metadata:
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Check Bazel metadata
         uses: ./.github/actions/run-bazel-task
         with:
@@ -58,7 +61,7 @@ jobs:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
@@ -69,7 +72,7 @@ jobs:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run coreth unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
@@ -80,7 +83,7 @@ jobs:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run subnet-evm unit tests with Bazel
         uses: ./.github/actions/run-bazel-task
         with:
@@ -91,7 +94,7 @@ jobs:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run e2e tests with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:

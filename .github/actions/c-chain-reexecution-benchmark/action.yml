@@ -90,14 +90,14 @@ runs:
     - run: echo "dependencies installed"
       shell: nix develop --command bash {0}
     # Cache Go modules (architecture-independent)
-    - uses: actions/cache@v4
+    - uses: actions/cache@v5
       id: go-mod-cache
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum') }}
         restore-keys: ${{ runner.os }}-go-mod-
     # Cache Go build cache (architecture-specific)
-    - uses: actions/cache@v4
+    - uses: actions/cache@v5
       with:
         path: ~/.cache/go-build
         key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum') }}
@@ -121,7 +121,7 @@ runs:
       shell: bash
       run: echo "::warning::Monitoring credentials not found. Skipping collector start. Is the PR from a fork branch?"
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
@@ -160,7 +160,7 @@ runs:
         TMPDIR: /tmp
         NIX_BUILD_TOP: /tmp
     - name: Upload Benchmark Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: benchmark-output-${{ inputs.test }}-${{ inputs.runner_type }}
         path: ${{ env.BENCHMARK_OUTPUT_FILE }}
