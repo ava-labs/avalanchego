@@ -87,7 +87,7 @@ func TestReadOperations(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				return db.writeIndexEntryAt(offset, entry.Offset, entry.CompressedSize)
+				return db.writeIndexEntryAt(offset, entry.Offset, entry.Size)
 			},
 			wantErr: ErrCorrupted,
 		},
@@ -103,7 +103,7 @@ func TestReadOperations(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				return db.writeIndexEntryAt(offset, entry.Offset, entry.CompressedSize+1)
+				return db.writeIndexEntryAt(offset, entry.Offset, entry.Size+1)
 			},
 			wantErr: ErrCorrupted,
 		},
@@ -120,7 +120,7 @@ func TestReadOperations(t *testing.T) {
 					return err
 				}
 				// 12 is the byte offset of the Checksum field within the
-				// serialized blockEntryHeader (8B Height + 4B CompressedSize).
+				// serialized blockEntryHeader (8B Height + 4B Size).
 				const checksumOffset = 12
 				var bad [8]byte
 				binary.LittleEndian.PutUint64(bad[:], 0xDEADBEEF)

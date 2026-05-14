@@ -60,17 +60,19 @@ var (
 // blockEntryHeader is the header of a block entry in the data file.
 // This is not the header portion of the block data itself.
 type blockEntryHeader struct {
-	Height         uint64
-	CompressedSize uint32
-	Checksum       uint64
-	Version        uint16
+	Height uint64
+	// Size is the number of bytes the compressed block data occupies in the data file
+	// (excluding this header).
+	Size     uint32
+	Checksum uint64
+	Version  uint16
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
 func (beh blockEntryHeader) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, sizeOfBlockEntryHeader)
 	binary.LittleEndian.PutUint64(buf[0:], beh.Height)
-	binary.LittleEndian.PutUint32(buf[8:], beh.CompressedSize)
+	binary.LittleEndian.PutUint32(buf[8:], beh.Size)
 	binary.LittleEndian.PutUint64(buf[12:], beh.Checksum)
 	binary.LittleEndian.PutUint16(buf[20:], beh.Version)
 	return buf, nil
@@ -82,7 +84,7 @@ func (beh *blockEntryHeader) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("%w: incorrect data length to unmarshal blockEntryHeader: got %d bytes, need exactly %d", ErrCorrupted, len(data), sizeOfBlockEntryHeader)
 	}
 	beh.Height = binary.LittleEndian.Uint64(data[0:])
-	beh.CompressedSize = binary.LittleEndian.Uint32(data[8:])
+	beh.Size = binary.LittleEndian.Uint32(data[8:])
 	beh.Checksum = binary.LittleEndian.Uint64(data[12:])
 	beh.Version = binary.LittleEndian.Uint16(data[20:])
 	return nil
@@ -91,8 +93,9 @@ func (beh *blockEntryHeader) UnmarshalBinary(data []byte) error {
 type indexEntry struct {
 	// Offset is the byte offset in the data file where the block's header starts.
 	Offset uint64
-	// CompressedSize is the length in bytes of the compressed block data (excluding the blockEntryHeader).
-	CompressedSize uint32
+	// Size is the number of bytes the compressed block data occupies in the data file
+	// (excluding the blockEntryHeader).
+	Size uint32
 	// Reserved for future use and ensures alignment
 	Reserved [4]byte
 }
@@ -100,14 +103,14 @@ type indexEntry struct {
 // isEmpty returns true if this entry is uninitialized.
 // This indicates a slot where no block has been written.
 func (e indexEntry) isEmpty() bool {
-	return e.Offset == 0 && e.CompressedSize == 0
+	return e.Offset == 0 && e.Size == 0
 }
 
 // MarshalBinary implements encoding.BinaryMarshaler for indexEntry.
 func (e indexEntry) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, sizeOfIndexEntry)
 	binary.LittleEndian.PutUint64(buf[0:], e.Offset)
-	binary.LittleEndian.PutUint32(buf[8:], e.CompressedSize)
+	binary.LittleEndian.PutUint32(buf[8:], e.Size)
 	return buf, nil
 }
 
@@ -117,7 +120,7 @@ func (e *indexEntry) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("%w: incorrect data length to unmarshal indexEntry: got %d bytes, need exactly %d", ErrCorrupted, len(data), sizeOfIndexEntry)
 	}
 	e.Offset = binary.LittleEndian.Uint64(data[0:])
-	e.CompressedSize = binary.LittleEndian.Uint32(data[8:])
+	e.Size = binary.LittleEndian.Uint32(data[8:])
 	return nil
 }
 
@@ -330,10 +333,10 @@ func (db *Database) Put(height uint64, block []byte) error {
 	}
 
 	bh := blockEntryHeader{
-		Height:         height,
-		CompressedSize: blockDataLen,
-		Checksum:       calculateChecksum(block),
-		Version:        blockEntryVersion,
+		Height:   height,
+		Size:     blockDataLen,
+		Checksum: calculateChecksum(block),
+		Version:  blockEntryVersion,
 	}
 	if err := db.writeBlockAt(writeDataOffset, bh, blockToWrite); err != nil {
 		db.log.Error("Failed to write block: error writing block data",
@@ -430,7 +433,7 @@ func (db *Database) Get(height uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	totalReadSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(indexEntry.CompressedSize))
+	totalReadSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(indexEntry.Size))
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute total read size: %w", err)
 	}
@@ -450,7 +453,7 @@ func (db *Database) Get(height uint64) ([]byte, error) {
 			db.log.Error("Failed to read block: failed to read block data from file",
 				zap.Uint64("height", height),
 				zap.Uint64("localOffset", localOffset),
-				zap.Uint32("compressedSize", indexEntry.CompressedSize),
+				zap.Uint32("size (compressed)", indexEntry.Size),
 				zap.Error(err),
 			)
 			return nil, fmt.Errorf("failed to read block header and data: %w", err)
@@ -465,8 +468,8 @@ func (db *Database) Get(height uint64) ([]byte, error) {
 	if bh.Height != height {
 		return nil, fmt.Errorf("%w: requested height %d but block header contains height %d", ErrCorrupted, height, bh.Height)
 	}
-	if bh.CompressedSize != indexEntry.CompressedSize {
-		return nil, fmt.Errorf("%w: compressed size mismatch for height %d: block header has %d, index entry has %d", ErrCorrupted, height, bh.CompressedSize, indexEntry.CompressedSize)
+	if bh.Size != indexEntry.Size {
+		return nil, fmt.Errorf("%w: compressed size mismatch for height %d: block header has %d, index entry has %d", ErrCorrupted, height, bh.Size, indexEntry.Size)
 	}
 	compressedData := buf[int(sizeOfBlockEntryHeader):]
 	decompressed, err := db.compressor.Decompress(compressedData)
@@ -612,8 +615,8 @@ func (db *Database) readIndexEntry(height uint64) (indexEntry, error) {
 
 func (db *Database) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset uint64, blockDataLen uint32) error {
 	e := indexEntry{
-		Offset:         dataFileBlockOffset,
-		CompressedSize: blockDataLen,
+		Offset: dataFileBlockOffset,
+		Size:   blockDataLen,
 	}
 
 	entryBytes, err := e.MarshalBinary()
@@ -764,12 +767,12 @@ func (db *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error 
 		}
 		db.log.Debug("Recovery: Successfully validated and indexed block",
 			zap.Uint64("height", bh.Height),
-			zap.Uint32("compressedSize", bh.CompressedSize),
+			zap.Uint32("size (compressed)", bh.Size),
 			zap.Uint64("dataOffset", currentScanOffset),
 		)
 		numRecoveredHeights++
 		maxRecoveredHeight = max(maxRecoveredHeight, bh.Height)
-		blockTotalSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.CompressedSize))
+		blockTotalSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.Size))
 		if err != nil {
 			return fmt.Errorf("recovery: overflow in block size calculation: %w", err)
 		}
@@ -819,8 +822,8 @@ func (db *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEnt
 	if err := bh.UnmarshalBinary(bhBuf); err != nil {
 		return bh, fmt.Errorf("%w: error deserializing block header at offset %d: %w", ErrCorrupted, offset, err)
 	}
-	if bh.CompressedSize == 0 {
-		return bh, fmt.Errorf("%w: invalid block size in header at offset %d: %d", ErrCorrupted, offset, bh.CompressedSize)
+	if bh.Size == 0 {
+		return bh, fmt.Errorf("%w: invalid block size in header at offset %d: %d", ErrCorrupted, offset, bh.Size)
 	}
 	if bh.Version > blockEntryVersion {
 		return bh, fmt.Errorf("%w: invalid block entry version at offset %d, version %d is greater than the current version %d", ErrCorrupted, offset, bh.Version, blockEntryVersion)
@@ -835,14 +838,14 @@ func (db *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEnt
 	if err != nil {
 		return bh, fmt.Errorf("calculating block end offset would overflow at offset %d: %w", offset, err)
 	}
-	expectedBlockEndOffset, err = safemath.Add(expectedBlockEndOffset, uint64(bh.CompressedSize))
+	expectedBlockEndOffset, err = safemath.Add(expectedBlockEndOffset, uint64(bh.Size))
 	if err != nil {
 		return bh, fmt.Errorf("calculating block end offset would overflow at offset %d: %w", offset, err)
 	}
 	if expectedBlockEndOffset > totalDataSize {
 		return bh, fmt.Errorf("%w: block data out of bounds at offset %d", ErrCorrupted, offset)
 	}
-	blockData := make([]byte, bh.CompressedSize)
+	blockData := make([]byte, bh.Size)
 	blockDataOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
 	if err != nil {
 		return bh, fmt.Errorf("calculating block data offset would overflow at offset %d: %w", offset, err)
@@ -865,7 +868,7 @@ func (db *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEnt
 	if idxErr != nil {
 		return bh, fmt.Errorf("cannot get index offset for recovered block %d: %w", bh.Height, idxErr)
 	}
-	if err := db.writeIndexEntryAt(indexFileOffset, offset, bh.CompressedSize); err != nil {
+	if err := db.writeIndexEntryAt(indexFileOffset, offset, bh.Size); err != nil {
 		return bh, fmt.Errorf("failed to update index for recovered block %d: %w", bh.Height, err)
 	}
 	return bh, nil
