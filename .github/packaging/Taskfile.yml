@@ -1,7 +1,8 @@
 # Packaging tasks for avalanchego and subnet-evm (RPM and DEB).
 #
 # RPMs are built inside a Rocky Linux 9 container (glibc 2.34).
-# DEBs are built inside an Ubuntu 22.04 container (dpkg-sig signing).
+# DEBs are built inside an Ubuntu 22.04 container (glibc 2.35).
+# Both formats are signed inline by nfpm.
 # PACKAGING_TAG defaults to v0.0.0 for local testing; set for release builds.
 
 version: '3'
