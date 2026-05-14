@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -22,8 +23,8 @@ var (
 	errNoPeers           = errors.New("no peers available")
 	errSendRequest       = errors.New("send request")
 	errHandlerFailed     = errors.New("handler request failed")
-	errUnmarshalResponse = errors.New("unmarshal response")
 	errMarshalRequest    = errors.New("marshal request")
+	errUnmarshalResponse = errors.New("unmarshal response")
 )
 
 // Dispatcher is a typed synchronous client for one handler ID. Safe for
@@ -47,31 +48,35 @@ func NewDispatcher[Req, Resp proto.Message](
 }
 
 // Send picks a peer, sends req, unmarshals into resp. Returns the chosen
-// nodeID. Selection is explicit (not AppRequestAny) so RegisterRequest
-// runs before sending and prevents concurrent picks of the same peer.
-func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (ids.NodeID, error) {
+// nodeID and an Outcome the caller must mark after content validation.
+// Selection is explicit (not AppRequestAny) so RegisterRequest runs
+// before sending and prevents concurrent picks of the same peer.
+//
+// On transport-level failure (no peers, send error, ctx, unmarshal),
+// Outcome is nil and the peer has already been marked as a failure.
+func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (ids.NodeID, *Outcome, error) {
 	nodeID, ok := d.peers.SelectPeer()
 	if !ok {
-		return ids.EmptyNodeID, errNoPeers
+		return ids.EmptyNodeID, nil, errNoPeers
 	}
-	if err := d.SendTo(ctx, nodeID, req, resp); err != nil {
-		return ids.EmptyNodeID, err
+	outcome, err := d.SendTo(ctx, nodeID, req, resp)
+	if err != nil {
+		return ids.EmptyNodeID, nil, err
 	}
-	return nodeID, nil
+	return nodeID, outcome, nil
 }
 
-// SendTo sends req to an explicit peer. The tracker is still notified
-// for bandwidth scoring.
-func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) error {
+// SendTo sends req to an explicit peer. Same Outcome contract as Send.
+func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (*Outcome, error) {
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errMarshalRequest, err)
+		return nil, fmt.Errorf("%w: %w", errMarshalRequest, err)
 	}
 	return d.dispatch(ctx, nodeID, requestBytes, resp)
 }
 
 // dispatch is the inner send-and-await cycle.
-func (d *Dispatcher[Req, Resp]) dispatch(ctx context.Context, nodeID ids.NodeID, requestBytes []byte, resp Resp) error {
+func (d *Dispatcher[Req, Resp]) dispatch(ctx context.Context, nodeID ids.NodeID, requestBytes []byte, resp Resp) (*Outcome, error) {
 	d.peers.RegisterRequest(nodeID)
 
 	type result struct {
@@ -86,26 +91,58 @@ func (d *Dispatcher[Req, Resp]) dispatch(ctx context.Context, nodeID ids.NodeID,
 	start := time.Now()
 	if err := d.client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
 		d.peers.RegisterFailure(nodeID)
-		return fmt.Errorf("%w: %w", errSendRequest, err)
+		return nil, fmt.Errorf("%w: %w", errSendRequest, err)
 	}
 
 	select {
 	case <-ctx.Done():
 		d.peers.RegisterFailure(nodeID)
-		return ctx.Err()
+		return nil, ctx.Err()
 	case r := <-resultCh:
 		if r.err != nil {
 			d.peers.RegisterFailure(nodeID)
-			return fmt.Errorf("%w: %w", errHandlerFailed, r.err)
+			return nil, fmt.Errorf("%w: %w", errHandlerFailed, r.err)
 		}
+
+		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
 		if err := proto.Unmarshal(r.bytes, resp); err != nil {
 			d.peers.RegisterFailure(nodeID)
-			return fmt.Errorf("%w: %w", errUnmarshalResponse, err)
+			return nil, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
 		}
-		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
-		d.peers.RegisterResponse(nodeID, bandwidth)
-		return nil
+		return &Outcome{
+			peers:     d.peers,
+			nodeID:    nodeID,
+			bandwidth: bandwidth,
+		}, nil
 	}
+}
+
+// Outcome defers peer scoring to the caller, who knows whether the
+// response is semantically valid. Exactly one of Success or Failure
+// must be called per response. Forgetting both leaves the peer with a
+// pending RegisterRequest until their next request or disconnect.
+type Outcome struct {
+	peers     *p2p.PeerTracker
+	nodeID    ids.NodeID
+	bandwidth float64
+	once      sync.Once
+}
+
+// Success records the response as semantically valid using the
+// bandwidth measured at dispatch time.
+func (o *Outcome) Success() {
+	if o == nil {
+		return
+	}
+	o.once.Do(func() { o.peers.RegisterResponse(o.nodeID, o.bandwidth) })
+}
+
+// Failure records the response as semantically invalid.
+func (o *Outcome) Failure() {
+	if o == nil {
+		return
+	}
+	o.once.Do(func() { o.peers.RegisterFailure(o.nodeID) })
 }
 
 var _ p2p.NodeSampler = (*trackerSampler)(nil)

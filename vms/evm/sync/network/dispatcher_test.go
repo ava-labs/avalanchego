@@ -68,7 +68,10 @@ func TestDispatcher_SendTo(t *testing.T) {
 	c := newTestLeafsClient(t, ctx, nodeID, echoHandler(wantBytes), newTestPeerTracker(t, nodeID))
 
 	got := &syncpb.LeafsResponse{}
-	require.NoError(t, c.SendTo(ctx, nodeID, &syncpb.GetLeafsRequest{}, got))
+	outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafsRequest{}, got)
+	require.NoError(t, err)
+	require.NotNil(t, outcome)
+	outcome.Success()
 	require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
 }
 
@@ -108,8 +111,10 @@ func TestDispatcher_FailurePaths(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			c := newTestLeafsClient(t, ctx, nodeID, tt.handler, newTestPeerTracker(t, tt.peers...))
-			_, err := c.Send(ctx, &syncpb.GetLeafsRequest{}, &syncpb.LeafsResponse{})
+			_, outcome, err := c.Send(ctx, &syncpb.GetLeafsRequest{}, &syncpb.LeafsResponse{})
 			require.ErrorIs(t, err, tt.wantErr)
+			// Transport failures auto-register, caller gets no Outcome.
+			require.Nil(t, outcome)
 		})
 	}
 }
@@ -130,7 +135,43 @@ func TestDispatcher_ContextCancelled(t *testing.T) {
 	cancel()
 
 	c := newTestLeafsClient(t, ctx, nodeID, handler, newTestPeerTracker(t, nodeID))
-	_, err := c.Send(ctx, &syncpb.GetLeafsRequest{}, &syncpb.LeafsResponse{})
+	_, outcome, err := c.Send(ctx, &syncpb.GetLeafsRequest{}, &syncpb.LeafsResponse{})
 	require.ErrorIs(t, err, context.Canceled)
+	require.Nil(t, outcome)
+}
+
+// Nil receiver is a no-op so a deferred Success/Failure before the err
+// check is harmless.
+func TestOutcome_NilSafe(t *testing.T) {
+	require.NotPanics(t, func() { (*Outcome)(nil).Success() })
+	require.NotPanics(t, func() { (*Outcome)(nil).Failure() })
+}
+
+// sync.Once makes both methods idempotent, the second call is a no-op.
+func TestOutcome_Idempotent(t *testing.T) {
+	tests := []struct {
+		name string
+		mark func(*Outcome)
+	}{
+		{"success twice", func(o *Outcome) { o.Success(); o.Success() }},
+		{"failure twice", func(o *Outcome) { o.Failure(); o.Failure() }},
+		{"success then failure", func(o *Outcome) { o.Success(); o.Failure() }},
+		{"failure then success", func(o *Outcome) { o.Failure(); o.Success() }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
+			nodeID := ids.GenerateTestNodeID()
+			want := &syncpb.LeafsResponse{Keys: [][]byte{{1}}}
+			wantBytes, err := proto.Marshal(want)
+			require.NoError(t, err)
+			c := newTestLeafsClient(t, ctx, nodeID, echoHandler(wantBytes), newTestPeerTracker(t, nodeID))
+
+			_, outcome, err := c.Send(ctx, &syncpb.GetLeafsRequest{}, &syncpb.LeafsResponse{})
+			require.NoError(t, err)
+			require.NotPanics(t, func() { tt.mark(outcome) })
+		})
+	}
 }
 

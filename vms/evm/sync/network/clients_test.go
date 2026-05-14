@@ -72,25 +72,27 @@ func TestClients_Send(t *testing.T) {
 				got       proto.Message
 				gotNodeID ids.NodeID
 			)
+			var outcome *Outcome
 			switch req := tt.request.(type) {
 			case *syncpb.GetLeafsRequest:
 				resp := &syncpb.LeafsResponse{}
-				n, err := (&LeafsClient{client: client, peers: peers}).Send(ctx, req, resp)
+				n, o, err := (&LeafsClient{client: client, peers: peers}).Send(ctx, req, resp)
 				require.NoError(t, err)
-				got, gotNodeID = resp, n
+				got, gotNodeID, outcome = resp, n, o
 			case *syncpb.GetCodeRequest:
 				resp := &syncpb.CodeResponse{}
-				n, err := (&CodeClient{client: client, peers: peers}).Send(ctx, req, resp)
+				n, o, err := (&CodeClient{client: client, peers: peers}).Send(ctx, req, resp)
 				require.NoError(t, err)
-				got, gotNodeID = resp, n
+				got, gotNodeID, outcome = resp, n, o
 			case *syncpb.GetBlockRequest:
 				resp := &syncpb.BlockResponse{}
-				n, err := (&BlockClient{client: client, peers: peers}).Send(ctx, req, resp)
+				n, o, err := (&BlockClient{client: client, peers: peers}).Send(ctx, req, resp)
 				require.NoError(t, err)
-				got, gotNodeID = resp, n
+				got, gotNodeID, outcome = resp, n, o
 			default:
 				t.Fatalf("unhandled request type %T", req)
 			}
+			outcome.Success()
 
 			require.Equal(t, nodeID, gotNodeID)
 			require.Empty(t, cmp.Diff(tt.wantResp, got, protocmp.Transform()))
