@@ -27,7 +27,6 @@ concurrency:
 # Supported architectures are:
 # - x86_64-unknown-linux-gnu
 # - aarch64-unknown-linux-gnu
-# - x86_64-apple-darwin
 # - aarch64-apple-darwin
 jobs:
   # Build the static libraries for each target architecture and upload
@@ -37,15 +36,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-          - os: ubuntu-22.04-arm
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-          - os: macos-latest
+          - os: macos-26
             target: aarch64-apple-darwin
-            pre-build-cmd: echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
-          - os: macos-latest
-            target: x86_64-apple-darwin
             pre-build-cmd: echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
     outputs:
       has_secrets: ${{ steps.check_secrets.outputs.has_secrets }}
@@ -95,7 +91,7 @@ jobs:
   push-firewood-ffi-libs:
     needs: build-firewood-ffi-libs
     if: needs.build-firewood-ffi-libs.outputs.has_secrets == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       target_branch: ${{ steps.determine_branch.outputs.target_branch }}
     steps:
@@ -188,7 +184,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-22.04-arm, macos-latest]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-26]
     needs: push-firewood-ffi-libs
     continue-on-error: true
     steps:
@@ -208,7 +204,7 @@ jobs:
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test ./...
 
   remove-if-pr-only:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [push-firewood-ffi-libs, test-firewood-ffi-libs]
     if: needs.push-firewood-ffi-libs.result == 'success' && github.event_name == 'pull_request'
     permissions:
