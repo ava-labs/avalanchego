@@ -2250,6 +2250,7 @@ func (s *State) initValidatorSets() error {
 }
 
 func (s *State) write(updateValidators bool, height uint64) error {
+	// TODO: use codecVersion2 when state is persisting auto-renewed validator metadata
 	codecVersion := CodecVersion1
 	if !s.upgrades.IsDurangoActivated(s.GetTimestamp()) {
 		codecVersion = CodecVersion0

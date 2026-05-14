@@ -34,12 +34,17 @@ type validatorMetadata struct {
 	StakerStartTime          uint64        `          v1:"true"`
 
 	// Auto-renewed validators.
-	// Weight is computed as: tx.Weight + AccruedRewards + AccruedDelegateeRewards
-	AccruedRewards           uint64 `v2:"true"` // the sum of validation rewards restaked from previous cycles.
-	AccruedDelegateeRewards  uint64 `v2:"true"` // the sum of delegatee rewards restaked from previous cycles.
-	AutoCompoundRewardShares uint32 `v2:"true"` // the percentage of rewards to restake at cycle end
-	Period                   uint64 `v2:"true"` // the validation cycle duration in seconds.
-	StakerEndTime            uint64 `v2:"true"` // the Unix timestamp (seconds) when the current cycle ends.
+	// Weight is computed as: tx.Weight + AccruedValidationRewards + AccruedDelegateeRewards
+	// AccruedValidationRewards is the sum of validation rewards restaked from previous cycles.
+	AccruedValidationRewards uint64 `v2:"true"`
+	// AccruedDelegateeRewards is the sum of delegatee rewards restaked from previous cycles.
+	AccruedDelegateeRewards uint64 `v2:"true"`
+	// AutoCompoundRewardShares is the percentage of rewards to restake at cycle end.
+	AutoCompoundRewardShares uint32 `v2:"true"`
+	// NextPeriod is the next validation cycle duration, in seconds.
+	NextPeriod uint64 `v2:"true"`
+	// StakerEndTime is the Unix timestamp, in seconds, when the current cycle ends.
+	StakerEndTime uint64 `v2:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
@@ -85,23 +90,27 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 
 // StakingInfo holds mutable validator data that can be modified.
 type StakingInfo struct {
+	// DelegateeReward is the delegatee reward accrued during the current cycle.
 	DelegateeReward uint64
 
 	// Auto-renewed validators.
-	AccruedRewards           uint64
-	AccruedDelegateeRewards  uint64
+	// AccruedValidationRewards is the sum of validation rewards restaked from previous cycles.
+	AccruedValidationRewards uint64
+	// AccruedDelegateeRewards is the sum of delegatee rewards restaked from previous cycles.
+	AccruedDelegateeRewards uint64
+	// AutoCompoundRewardShares is the percentage of rewards to restake at cycle end.
 	AutoCompoundRewardShares uint32
-	// Period is the validation cycle duration, in seconds.
-	Period uint64
+	// NextPeriod is the next validation cycle duration, in seconds.
+	NextPeriod uint64
 }
 
 func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
 	return StakingInfo{
 		DelegateeReward:          vdrMetadata.PotentialDelegateeReward,
-		AccruedRewards:           vdrMetadata.AccruedRewards,
+		AccruedValidationRewards: vdrMetadata.AccruedValidationRewards,
 		AccruedDelegateeRewards:  vdrMetadata.AccruedDelegateeRewards,
 		AutoCompoundRewardShares: vdrMetadata.AutoCompoundRewardShares,
-		Period:                   vdrMetadata.Period,
+		NextPeriod:               vdrMetadata.NextPeriod,
 	}
 }
 
@@ -208,10 +217,10 @@ func (vs *validatorState) SetStakingInfo(
 		return database.ErrNotFound
 	}
 	metadata.PotentialDelegateeReward = stakingInfo.DelegateeReward
-	metadata.AccruedRewards = stakingInfo.AccruedRewards
+	metadata.AccruedValidationRewards = stakingInfo.AccruedValidationRewards
 	metadata.AccruedDelegateeRewards = stakingInfo.AccruedDelegateeRewards
 	metadata.AutoCompoundRewardShares = stakingInfo.AutoCompoundRewardShares
-	metadata.Period = stakingInfo.Period
+	metadata.NextPeriod = stakingInfo.NextPeriod
 
 	vs.addUpdatedTxID(vdrID, subnetID, metadata.txID)
 	return nil
