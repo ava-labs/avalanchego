@@ -153,7 +153,7 @@ tasks:
     cmd: '{{.NIX_RUN}} ./graft/subnet-evm/scripts/build.sh'
 
   build-subnet-evm-sae:
-    desc: Builds subnet-evm SAE plugin (vms/subnetevm) and symlinks it to the SubnetEVMID plugin path (replaces the legacy graft/subnet-evm plugin)
+    desc: Builds subnet-evm SAE plugin (vms/saevm/subnetevm) and symlinks it to the SubnetEVMID plugin path (replaces the legacy graft/subnet-evm plugin)
     cmd: '{{.NIX_RUN}} ./scripts/build_subnet_evm_sae.sh'
 
   build-subnet-evm-image:
@@ -465,7 +465,7 @@ tasks:
       - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
 
   test-e2e-warp-sae:
-    desc: Runs warp e2e tests against the new SAE-based subnet-evm plugin (vms/subnetevm)
+    desc: Runs warp e2e tests against the new SAE-based subnet-evm plugin (vms/saevm/subnetevm)
     env:
       E2E_TARGET: ./tests/e2e/warp
     cmds:

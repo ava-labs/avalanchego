@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/subnetevm/hook/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
 )
 
 func TestMain(m *testing.M) {

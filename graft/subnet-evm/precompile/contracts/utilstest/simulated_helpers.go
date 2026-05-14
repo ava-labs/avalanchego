@@ -39,7 +39,7 @@ func NewAuth(t *testing.T, key *ecdsa.PrivateKey, chainID *big.Int) *bind.Transa
 // plugin's libevm-hook driven txallowlist enforcement, which is intentionally
 // short-circuited post-Helicon by [extras.RulesExtra.CanExecuteTransaction]
 // (see comment there). Helicon-active chains are served by the SAE port at
-// vms/subnetevm and test the same enforcement via SAE worst-case admission.
+// vms/saevm/subnetevm and test the same enforcement via SAE worst-case admission.
 func NewBackendWithPrecompile(
 	t *testing.T,
 	precompileCfg precompileconfig.Config,

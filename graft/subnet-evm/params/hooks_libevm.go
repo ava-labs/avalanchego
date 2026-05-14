@@ -66,7 +66,7 @@ func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, sta
 // state-dependent precompile checks. To avoid the halt, we short-circuit this hook post-Helicon and let
 // the SAE worst-case path enforce the same check via [EnforceTxAllowList]
 // against the last-settled rules+state pair (see
-// [vms/subnetevm/hook.Points.CanExecuteTransaction]).
+// [vms/saevm/subnetevm/hook.Points.CanExecuteTransaction]).
 //
 // Pre-Helicon (synchronous chain), this stays strict because there is no
 // admission/execution gap.

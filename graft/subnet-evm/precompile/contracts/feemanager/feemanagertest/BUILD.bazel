@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "feemanagertest",
+    srcs = ["retirement.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/feemanagertest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/precompile/contracts/feemanager",
+        "//graft/subnet-evm/precompile/contracts/nativeminter",
+        "//utils",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+    ],
+)

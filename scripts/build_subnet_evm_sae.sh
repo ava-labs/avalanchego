@@ -15,7 +15,7 @@ BINARY_PATH="${AVALANCHEGO_BUILD_PATH:-${AVALANCHE_PATH}/build}/subnet-evm-sae"
 echo "Building Subnet-EVM SAE plugin @ GitCommit: ${git_commit} at ${BINARY_PATH}"
 # shellcheck disable=SC2086
 go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=${git_commit} ${static_ld_flags}" \
-  -o "${BINARY_PATH}" ./vms/subnetevm/plugin/
+  -o "${BINARY_PATH}" ./vms/saevm/subnetevm/plugin/
 
 # Symlink to both global and local plugin directories under the SubnetEVMID
 # (`srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy`) so it replaces the

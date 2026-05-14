@@ -1954,7 +1954,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	// Pin to pre-Helicon: the legacy synchronous plugin's libevm txallowlist
 	// hook is intentionally short-circuited post-Helicon (see
 	// extras.RulesExtra.CanExecuteTransaction). Helicon-active chains are
-	// served by the SAE port at vms/subnetevm and exercise the same check
+	// served by the SAE port at vms/saevm/subnetevm and exercise the same check
 	// via SAE worst-case admission.
 	graniteFork := upgradetest.Granite
 

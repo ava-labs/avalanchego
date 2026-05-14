@@ -53,7 +53,7 @@ var (
 // Deprecated: superseded by ACP-176 (gas pricing) and ACP-224
 // (runtime fee config). Retained for the legacy `graft/subnet-evm`
 // plugin and the now-retired `feeManager` precompile. The new SAE
-// binary (`vms/subnetevm`) does not read or validate this type at
+// binary (`vms/saevm/subnetevm`) does not read or validate this type at
 // runtime; see [extras.ChainConfig.Verify] for the SAE entry point
 // that intentionally skips fee-config validation. Scheduled for
 // removal in `post-helicon-cleanup`.

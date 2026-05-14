@@ -112,7 +112,7 @@ type ChainConfig struct {
 	// Deprecated: see [commontype.FeeConfig]. Retained on this struct
 	// for the legacy `graft/subnet-evm` plugin and for JSON
 	// round-trip compatibility (`eth_getChainConfig` continues to
-	// return it). The new SAE binary (`vms/subnetevm`) does not read
+	// return it). The new SAE binary (`vms/saevm/subnetevm`) does not read
 	// or validate this field; ACP-176 owns gas pricing and ACP-224
 	// owns runtime fee config.
 	FeeConfig          commontype.FeeConfig `json:"feeConfig"`
