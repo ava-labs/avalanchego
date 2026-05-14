@@ -60,8 +60,8 @@ type VM struct {
 	config  sae.Config
 
 	ctx          *snow.Context
-	db           avadb.Database
-	mempool      *txpool.Mempool
+	state        *state.State
+	mempool      *txpool.Txpool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
 
 	// TODO(alarso16): remove later
@@ -70,7 +70,7 @@ type VM struct {
 	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
 	// If a resource depends on another resource, it MUST be added AFTER the
 	// resource it depends on.
-	onClose []func()
+	onClose []func() error
 
 	preference       atomic.Pointer[blocks.Block]
 	lastWaitForEvent utils.Atomic[time.Time]
@@ -138,6 +138,14 @@ func (v *VM) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
+	snowCtx.Log.Info("constructing cross-chain state")
+
+	cchainState, err := state.New(snowCtx, avaDB)
+	if err != nil {
+		return fmt.Errorf("creating cchain state: %w", err)
+	}
+	v.onClose = append(v.onClose, cchainState.Close)
+
 	snowCtx.Log.Info("parsing user config")
 
 	userConfig, err := ParseConfig(configBytes)
@@ -163,15 +171,16 @@ func (v *VM) Initialize(
 		*desiredTargetExcess = acp176.DesiredTargetExcess(*userConfig.GasTarget)
 	}
 
-	txs := txpool.NewTxs()
+	pendingTxs := txpool.NewPending()
 	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
+
 	hooks := hook.NewPoints(
 		snowCtx,
-		avaDB,
+		cchainState,
 		config,
 		desiredDelayExcess,
 		desiredTargetExcess,
-		txs,
+		pendingTxs,
 		warpStorage,
 	)
 
@@ -183,16 +192,23 @@ func (v *VM) Initialize(
 	}
 	v.VM = inner
 	v.ctx = snowCtx
-	v.db = avaDB
-	v.mempool = txpool.New(txs, snowCtx, inner.GethRPCBackends())
-	v.onClose = append(v.onClose, v.mempool.Close)
+	v.state = cchainState
 	v.hooks = hooks
+
+	v.mempool, err = txpool.New(snowCtx, config, pendingTxs, inner, 1024)
+	if err != nil {
+		return fmt.Errorf("creating txpool: %w", err)
+	}
+	v.onClose = append(v.onClose, func() error {
+		v.mempool.Close()
+		return nil
+	})
 
 	snowCtx.Log.Info("registering coreth metrics")
 
 	metrics := prometheus.NewRegistry()
 	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
-		return fmt.Errorf("failed to register metrics: %w", err)
+		return fmt.Errorf("registering metrics: %w", err)
 	}
 
 	snowCtx.Log.Info("p2p gossip")
@@ -238,9 +254,10 @@ func (v *VM) Initialize(
 			const pushGossipPeriod = 100 * time.Millisecond
 			gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
 		})
-		v.onClose = append(v.onClose, func() {
+		v.onClose = append(v.onClose, func() error {
 			cancel()
 			wg.Wait()
+			return nil
 		})
 	}
 
@@ -305,7 +322,7 @@ func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error
 		return nil, err
 	}
 
-	service := api.NewService(v.ctx, v.GethRPCBackends(), v.mempool, v.pushGossiper, v.db)
+	service := api.NewService(v.ctx, v.GethRPCBackends(), v.mempool, v.pushGossiper, v.state)
 	handler, err := rpc.NewHandler(avaxServiceName, service)
 	if err != nil {
 		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", avaxServiceName, err)
@@ -376,7 +393,7 @@ func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	}()
 	go func() {
 		defer cancel()
-		err := v.mempool.Txs.AwaitTxs(ctx)
+		err := v.mempool.AwaitTxs(ctx)
 		results <- result{common.PendingTxs, err}
 	}()
 
@@ -413,9 +430,14 @@ func (v *VM) RejectBlock(ctx context.Context, b *blocks.Block) error {
 }
 
 func (v *VM) Shutdown(ctx context.Context) error {
-	for _, f := range slices.Backward(v.onClose) {
-		f()
+	errs := make([]error, len(v.onClose))
+	for i, f := range slices.Backward(v.onClose) {
+		errs[i] = f()
 	}
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("closing resources: %w", err)
+	}
+
 	if v.VM == nil {
 		return nil
 	}

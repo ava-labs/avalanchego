@@ -28,7 +28,7 @@ import (
 // WarpACP118Peer is a test peer connection plus the deque of inbound P2P
 // messages used by tmpnet warp e2e tests.
 type WarpACP118Peer struct {
-	Peer     peer.Peer
+	Peer     *peer.Peer
 	Messages buffer.BlockingDeque[*message.InboundMessage]
 }
 

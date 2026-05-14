@@ -7,8 +7,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/libevm"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -135,4 +137,15 @@ func (vm *VM) RejectBlock(ctx context.Context, b *blocks.Block) error {
 // emitted after consensus acceptance via [VM.AcceptBlock].
 func (vm *VM) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
 	return vm.acceptedBlocks.Subscribe(ch)
+}
+
+// SubscribeChainHeadEvent returns a new subscription for each
+// [core.ChainHeadEvent] emitted after execution of a [blocks.Block].
+func (vm *VM) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return vm.exec.SubscribeChainHeadEvent(ch)
+}
+
+// LastExecutedState returns the last executed state of the chain.
+func (vm *VM) LastExecutedState() (libevm.StateReader, error) {
+	return vm.exec.StateDB(vm.exec.LastExecuted().PostExecutionStateRoot())
 }

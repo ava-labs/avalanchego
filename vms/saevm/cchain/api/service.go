@@ -31,24 +31,24 @@ import (
 type Service struct {
 	ctx          *snow.Context
 	backend      rpc.GethBackends
-	mempool      *txpool.Mempool
+	mempool      *txpool.Txpool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
-	db           database.KeyValueReader
+	state        *state.State
 }
 
 func NewService(
 	ctx *snow.Context,
 	backend rpc.GethBackends,
-	mempool *txpool.Mempool,
+	mempool *txpool.Txpool,
 	pushGossiper *gossip.PushGossiper[*tx.Tx],
-	db database.KeyValueReader,
+	state *state.State,
 ) *Service {
 	return &Service{
 		ctx,
 		backend,
 		mempool,
 		pushGossiper,
-		db,
+		state,
 	}
 }
 
@@ -253,7 +253,7 @@ func (s *Service) GetAtomicTx(_ *http.Request, a *api.GetTxArgs, r *Tx) error {
 }
 
 func (s *Service) readTx(txID ids.ID) (*tx.Tx, uint64, error) {
-	tx, height, err := state.ReadTxByID(s.db, txID)
+	tx, height, err := s.state.GetTx(txID)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 package(default_visibility = [
     "//vms/saevm/cchain:__subpackages__",
@@ -7,11 +8,7 @@ package(default_visibility = [
 
 go_library(
     name = "txpool",
-    srcs = [
-        "mempool.go",
-        "tx.go",
-        "txs.go",
-    ],
+    srcs = ["txpool.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool",
     deps = [
         "//graft/coreth/params",
@@ -25,13 +22,46 @@ go_library(
         "//vms/saevm/blocks",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/hook",
-        "//vms/saevm/sae/rpc",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//event",
-        "@com_github_ava_labs_libevm//log",
-        "@com_github_ava_labs_libevm//rpc",
-        "@com_github_holiman_uint256//:uint256",
+        "@com_github_ava_labs_libevm//libevm",
         "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "txpool_test",
+    srcs = ["txpool_test.go"],
+    embed = [":txpool"],
+    deps = [
+        "//graft/coreth/plugin/evm",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//ids",
+        "//snow/snowtest",
+        "//utils",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//utils/logging",
+        "//vms/components/avax",
+        "//vms/saevm/cchain/tx",
+        "//vms/saevm/cchain/tx/txtest",
+        "//vms/saevm/hook",
+        "//vms/saevm/saetest",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
     ],
 )

@@ -9,9 +9,9 @@ go_library(
     name = "bindings",
     srcs = [
         "compile.go",
-        "gen_iacp224feemanager_binding.go",
+        "gen_igaspricemanager_binding.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/acp224feemanager/acp224feemanagertest/bindings",
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager/gaspricemanagertest/bindings",
     deps = [
         "//graft/subnet-evm/accounts/abi/bind",
         "@com_github_ava_labs_libevm//:libevm",

@@ -266,7 +266,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, ginkgo.Serial, ginkgo.Label("w
 })
 
 type warpPeer struct {
-	peer     peer.Peer
+	peer     *peer.Peer
 	messages buffer.BlockingDeque[*p2pmessage.InboundMessage]
 }
 

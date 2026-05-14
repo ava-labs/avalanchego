@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
@@ -35,7 +34,7 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-var _ hook.BlockBuilder[*txpool.Tx] = (*blockBuilder)(nil)
+var _ hook.BlockBuilder[*cchainTx] = (*blockBuilder)(nil)
 
 type params struct {
 	delayExcess  *acp226.DelayExcess
@@ -50,7 +49,7 @@ type blockBuilder struct {
 	// When fields in params are set, the block builder will build blocks that
 	// move the network values towards their desired values.
 	desired      params
-	potentialTxs func() iter.Seq[*txpool.Tx]
+	potentialTxs func() iter.Seq[*cchainTx]
 }
 
 func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) {
@@ -111,9 +110,9 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 	), nil
 }
 
-func (b *blockBuilder) PotentialEndOfBlockOps(ctx context.Context, header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*txpool.Tx] {
+func (b *blockBuilder) PotentialEndOfBlockOps(ctx context.Context, header *types.Header, settledHash common.Hash, source saetypes.BlockSource) iter.Seq[*cchainTx] {
 	seq := b.potentialTxs()
-	return func(yield func(*txpool.Tx) bool) {
+	return func(yield func(*cchainTx) bool) {
 		// Transactions are verified against the last executed state. We must
 		// guarantee that they don't conflict with any transactions in blocks
 		// between the block we are building and the last executed block.
