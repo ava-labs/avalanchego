@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -37,6 +38,10 @@ const (
 var (
 	errBlockHeightNotUint64 = errors.New("block height not uint64")
 	errBlockTooFarInFuture  = errors.New("block too far in the future")
+
+	errTxHashMismatch         = errors.New("transaction hash mismatch")
+	errUncleHashMismatch      = errors.New("uncle hash mismatch")
+	errWithdrawalHashMismatch = errors.New("withdrawals hash mismatch")
 )
 
 // ParseBlock parses the buffer as [rlp] encoding of a [types.Block]. It does
@@ -55,6 +60,23 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 	// make this some future engineer's problem in a few millennia.
 	if b.Time() > unix(vm.config.Now())+maxFutureBlockSeconds {
 		return nil, fmt.Errorf("%w: >%s", errBlockTooFarInFuture, maxFutureBlockDuration)
+	}
+
+	// Block body must match what is declared by the header.
+	hasher := trie.NewStackTrie(nil)
+	if types.DeriveSha(types.Transactions(b.Transactions()), hasher) != b.Header().TxHash {
+		return nil, errTxHashMismatch
+	}
+	if types.CalcUncleHash(b.Uncles()) != b.Header().UncleHash {
+		return nil, errUncleHashMismatch
+	}
+	// If blob gas is set, withdrawals hash isn't nil.
+	if b.Header().WithdrawalsHash == nil {
+		if len(b.Withdrawals()) > 0 {
+			return nil, errWithdrawalHashMismatch
+		}
+	} else if types.DeriveSha(types.Withdrawals(b.Withdrawals()), hasher) != *b.Header().WithdrawalsHash {
+		return nil, errWithdrawalHashMismatch
 	}
 
 	return vm.blockBuilder.new(b, nil, nil)
@@ -98,8 +120,8 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 	// also provides a clearer failure message.
 	if reH, verH := rebuilt.Hash(), b.Hash(); reH != verH {
 		vm.log().Debug("block verification failed",
-			zap.Reflect("block", b.Header()),
-			zap.Reflect("rebuilt", rebuilt.Header()),
+			zap.String("block", fmt.Sprintf("%+v", b.Header())),
+			zap.String("rebuilt", fmt.Sprintf("%+v", rebuilt.Header())),
 		)
 		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", errHashMismatch, reH, verH)
 	}

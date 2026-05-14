@@ -767,24 +767,56 @@ func TestSyntacticBlockChecks(t *testing.T) {
 		{
 			name: "block_height_overflow_protection",
 			header: &types.Header{
-				Number: new(big.Int).Lsh(big.NewInt(1), 64),
+				Number:    new(big.Int).Lsh(big.NewInt(1), 64),
+				UncleHash: types.EmptyUncleHash,
+				TxHash:    types.EmptyTxsHash,
 			},
 			wantErr: errBlockHeightNotUint64,
 		},
 		{
 			name: "block_time_at_maximum",
 			header: &types.Header{
-				Number: big.NewInt(1),
-				Time:   now + maxFutureBlockSeconds,
+				Number:    big.NewInt(1),
+				UncleHash: types.EmptyUncleHash,
+				Time:      now + maxFutureBlockSeconds,
+				TxHash:    types.EmptyTxsHash,
 			},
 		},
 		{
 			name: "block_time_after_maximum",
 			header: &types.Header{
-				Number: big.NewInt(1),
-				Time:   now + maxFutureBlockSeconds + 1,
+				Number:    big.NewInt(1),
+				UncleHash: types.EmptyUncleHash,
+				Time:      now + maxFutureBlockSeconds + 1,
+				TxHash:    types.EmptyTxsHash,
 			},
 			wantErr: errBlockTooFarInFuture,
+		},
+		{
+			name: "invalid_tx_hash",
+			header: &types.Header{
+				Number:    big.NewInt(1),
+				UncleHash: types.EmptyUncleHash,
+			},
+			wantErr: errTxHashMismatch,
+		},
+		{
+			name: "invalid_uncle_hash",
+			header: &types.Header{
+				Number: big.NewInt(1),
+				TxHash: types.EmptyTxsHash,
+			},
+			wantErr: errUncleHashMismatch,
+		},
+		{
+			name: "invalid_withdrawals_hash",
+			header: &types.Header{
+				Number:          big.NewInt(1),
+				TxHash:          types.EmptyTxsHash,
+				UncleHash:       types.EmptyUncleHash,
+				WithdrawalsHash: &common.Hash{},
+			},
+			wantErr: errWithdrawalHashMismatch,
 		},
 	}
 
