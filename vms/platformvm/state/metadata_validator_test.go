@@ -457,7 +457,7 @@ func TestParseValidatorMetadata(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xF4,
 				// auto compound reward shares
 				0x00, 0x04, 0x93, 0xE0,
-				// renewal period
+				// next period
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x51, 0x80,
 				// staker end time (400000 = 0x61A80)
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x1A, 0x80,
@@ -469,10 +469,10 @@ func TestParseValidatorMetadata(t *testing.T) {
 				PotentialReward:          100000,
 				PotentialDelegateeReward: 20000,
 				StakerStartTime:          300000,
-				AccruedRewards:           1000,
+				AccruedValidationRewards: 1000,
 				AccruedDelegateeRewards:  500,
 				AutoCompoundRewardShares: 300000,
-				Period:                   86400,
+				NextPeriod:               86400,
 				StakerEndTime:            400000,
 			},
 			expectedErr: nil,
@@ -482,14 +482,6 @@ func TestParseValidatorMetadata(t *testing.T) {
 			bytes: []byte{
 				// codec version
 				0x00, 0x03,
-				// up duration
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
-				// last updated
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x0D, 0xBB, 0xA0,
-				// potential reward
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xA0,
-				// potential delegatee reward
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4E, 0x20,
 			},
 			expected:    nil,
 			expectedErr: codec.ErrUnknownVersion,
