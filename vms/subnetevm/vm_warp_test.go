@@ -4,6 +4,7 @@
 package subnetevm
 
 import (
+	"maps"
 	"math/big"
 	"os"
 	"testing"
@@ -61,11 +62,17 @@ func withWarpEnabled() sutOption {
 				prev(genesis, addresses)
 			}
 			extra := params.GetExtra(genesis.Config)
-			if extra.GenesisPrecompiles == nil {
-				extra.GenesisPrecompiles = extras.Precompiles{}
+			// `subnetevmparams.Copy` is a two-level shallow copy, so
+			// `extra.GenesisPrecompiles` may still alias the map held by
+			// `paramstest.ForkToChainConfig[fork]`. Clone before writing
+			// so the warp entry stays scoped to this genesis.
+			new := maps.Clone(extra.GenesisPrecompiles)
+			if new == nil {
+				new = extras.Precompiles{}
 			}
 			activationTS := utils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix()))
-			extra.GenesisPrecompiles[warpcontract.ConfigKey] = warpcontract.NewDefaultConfig(activationTS)
+			new[warpcontract.ConfigKey] = warpcontract.NewDefaultConfig(activationTS)
+			extra.GenesisPrecompiles = new
 		}
 	})
 }
