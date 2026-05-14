@@ -88,7 +88,6 @@ func (beh *blockEntryHeader) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-// indexEntry represents an entry in the index file.
 type indexEntry struct {
 	// Offset is the byte offset in the data file where the block's header starts.
 	Offset uint64
@@ -98,9 +97,9 @@ type indexEntry struct {
 	Reserved [4]byte
 }
 
-// IsEmpty returns true if this entry is uninitialized.
+// isEmpty returns true if this entry is uninitialized.
 // This indicates a slot where no block has been written.
-func (e indexEntry) IsEmpty() bool {
+func (e indexEntry) isEmpty() bool {
 	return e.Offset == 0 && e.CompressedSize == 0
 }
 
@@ -122,7 +121,6 @@ func (e *indexEntry) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-// indexFileHeader is the header of the index file.
 type indexFileHeader struct {
 	Version         uint64
 	MaxDataFileSize uint64
@@ -163,7 +161,7 @@ func (h *indexFileHeader) UnmarshalBinary(data []byte) error {
 // Database stores blockchain blocks on disk and provides methods to read and write blocks.
 type Database struct {
 	indexFile  *os.File
-	config     DatabaseConfig
+	config     Config
 	header     indexFileHeader
 	log        logging.Logger
 	closed     bool
@@ -186,14 +184,13 @@ type Database struct {
 }
 
 // New creates a block database with the given configuration and logger.
-func New(config DatabaseConfig, log logging.Logger) (database.HeightIndex, error) {
+func New(config Config, log logging.Logger) (database.HeightIndex, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
 
-	databaseLog := log
-	if databaseLog == nil {
-		databaseLog = logging.NoLog{}
+	if log == nil {
+		log = logging.NoLog{}
 	}
 
 	// from benchmarks, zstd.BestSpeed is about 100% faster than the default
@@ -206,7 +203,7 @@ func New(config DatabaseConfig, log logging.Logger) (database.HeightIndex, error
 
 	db := &Database{
 		config: config,
-		log:    databaseLog,
+		log:    log,
 		fileCache: lru.NewCacheWithOnEvict(config.MaxDataFiles, func(_ int, f *os.File) {
 			if f != nil {
 				f.Close()
@@ -500,7 +497,7 @@ func (db *Database) Has(height uint64) (bool, error) {
 		if errors.Is(err, database.ErrNotFound) || errors.Is(err, ErrInvalidBlockHeight) {
 			return false, nil
 		}
-		db.log.Error("Failed to check if block exists: failed to read index entry",
+		db.log.Error("Failed to check if block exists",
 			zap.Uint64("height", height),
 			zap.Error(err),
 		)
@@ -606,7 +603,7 @@ func (db *Database) readIndexEntry(height uint64) (indexEntry, error) {
 		return entry, fmt.Errorf("failed to deserialize index entry for height %d: %w", height, err)
 	}
 
-	if entry.IsEmpty() {
+	if entry.isEmpty() {
 		return entry, fmt.Errorf("%w: empty index entry for height %d", database.ErrNotFound, height)
 	}
 

@@ -22,7 +22,7 @@ func TestReadOperations(t *testing.T) {
 		name       string
 		readHeight uint64
 		noBlock    bool
-		config     *DatabaseConfig
+		config     *Config
 		setup      func(db *Database) error
 		wantErr    error
 	}{
@@ -47,7 +47,7 @@ func TestReadOperations(t *testing.T) {
 		{
 			name:       "read valid block with non-zero minimum height",
 			readHeight: 25,
-			config: &DatabaseConfig{
+			config: &Config{
 				MinimumHeight:      20,
 				MaxDataFileSize:    DefaultMaxDataFileSize,
 				CheckpointInterval: 1024,
@@ -66,7 +66,7 @@ func TestReadOperations(t *testing.T) {
 		{
 			name:       "height below minimum",
 			readHeight: 5,
-			config: &DatabaseConfig{
+			config: &Config{
 				MinimumHeight:      10,
 				MaxDataFileSize:    DefaultMaxDataFileSize,
 				CheckpointInterval: 1024,
@@ -258,37 +258,37 @@ func TestHasBlock(t *testing.T) {
 		dbClosed bool
 	}{
 		{
-			name:     "has_height",
+			name:     "has height",
 			height:   12,
 			expected: true,
 		},
 		{
-			name:     "below_minimum_height",
+			name:     "below minimum height",
 			height:   0,
 			expected: false,
 		},
 		{
-			name:     "above_max_height",
+			name:     "above max height",
 			height:   minHeight + blocksCount + 1,
 			expected: false,
 		},
 		{
-			name:     "at_max_height",
+			name:     "at max height",
 			height:   minHeight + blocksCount,
 			expected: true,
 		},
 		{
-			name:     "at_min_height",
+			name:     "at min height",
 			height:   minHeight,
 			expected: true,
 		},
 		{
-			name:     "no_block",
+			name:     "no block",
 			height:   gapHeight,
 			expected: false,
 		},
 		{
-			name:     "db_closed",
+			name:     "db closed",
 			dbClosed: true,
 			wantErr:  database.ErrClosed,
 		},

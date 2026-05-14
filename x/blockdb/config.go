@@ -14,8 +14,8 @@ const (
 	DefaultBlockCacheSize uint16 = 256
 )
 
-// DatabaseConfig contains configuration parameters for BlockDB.
-type DatabaseConfig struct {
+// Config contains configuration parameters for BlockDB.
+type Config struct {
 	// IndexDir is the directory where the index file is stored.
 	IndexDir string
 
@@ -43,8 +43,8 @@ type DatabaseConfig struct {
 
 // DefaultConfig returns the default options for BlockDB.
 // IndexDir and DataDir must be set before use.
-func DefaultConfig() DatabaseConfig {
-	return DatabaseConfig{
+func DefaultConfig() Config {
+	return Config{
 		MaxDataFileSize:    DefaultMaxDataFileSize,
 		MaxDataFiles:       DefaultMaxDataFiles,
 		BlockCacheSize:     DefaultBlockCacheSize,
@@ -54,62 +54,62 @@ func DefaultConfig() DatabaseConfig {
 }
 
 // WithDir sets both IndexDir and DataDir to the given value.
-func (c DatabaseConfig) WithDir(directory string) DatabaseConfig {
+func (c Config) WithDir(directory string) Config {
 	c.IndexDir = directory
 	c.DataDir = directory
 	return c
 }
 
 // WithIndexDir returns a copy of the config with IndexDir set to the given value.
-func (c DatabaseConfig) WithIndexDir(indexDir string) DatabaseConfig {
+func (c Config) WithIndexDir(indexDir string) Config {
 	c.IndexDir = indexDir
 	return c
 }
 
 // WithDataDir returns a copy of the config with DataDir set to the given value.
-func (c DatabaseConfig) WithDataDir(dataDir string) DatabaseConfig {
+func (c Config) WithDataDir(dataDir string) Config {
 	c.DataDir = dataDir
 	return c
 }
 
 // WithSyncToDisk returns a copy of the config with SyncToDisk set to the given value.
-func (c DatabaseConfig) WithSyncToDisk(syncToDisk bool) DatabaseConfig {
+func (c Config) WithSyncToDisk(syncToDisk bool) Config {
 	c.SyncToDisk = syncToDisk
 	return c
 }
 
 // WithMinimumHeight returns a copy of the config with MinimumHeight set to the given value.
-func (c DatabaseConfig) WithMinimumHeight(minHeight uint64) DatabaseConfig {
+func (c Config) WithMinimumHeight(minHeight uint64) Config {
 	c.MinimumHeight = minHeight
 	return c
 }
 
 // WithMaxDataFileSize returns a copy of the config with MaxDataFileSize set to the given value.
-func (c DatabaseConfig) WithMaxDataFileSize(maxSize uint64) DatabaseConfig {
+func (c Config) WithMaxDataFileSize(maxSize uint64) Config {
 	c.MaxDataFileSize = maxSize
 	return c
 }
 
 // WithMaxDataFiles returns a copy of the config with MaxDataFiles set to the given value.
-func (c DatabaseConfig) WithMaxDataFiles(maxFiles int) DatabaseConfig {
+func (c Config) WithMaxDataFiles(maxFiles int) Config {
 	c.MaxDataFiles = maxFiles
 	return c
 }
 
 // WithBlockCacheSize returns a copy of the config with BlockCacheSize set to the given value.
-func (c DatabaseConfig) WithBlockCacheSize(size uint16) DatabaseConfig {
+func (c Config) WithBlockCacheSize(size uint16) Config {
 	c.BlockCacheSize = size
 	return c
 }
 
 // WithCheckpointInterval returns a copy of the config with CheckpointInterval set to the given value.
-func (c DatabaseConfig) WithCheckpointInterval(interval uint64) DatabaseConfig {
+func (c Config) WithCheckpointInterval(interval uint64) Config {
 	c.CheckpointInterval = interval
 	return c
 }
 
 // Validate checks if the store options are valid.
-func (c DatabaseConfig) Validate() error {
+func (c Config) Validate() error {
 	if c.IndexDir == "" {
 		return errors.New("IndexDir must be provided")
 	}

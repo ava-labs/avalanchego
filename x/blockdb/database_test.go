@@ -73,10 +73,9 @@ func TestSyncPersistence(t *testing.T) {
 func TestNew_Params(t *testing.T) {
 	tempDir := t.TempDir()
 	tests := []struct {
-		name        string
-		config      DatabaseConfig
-		wantErr     error
-		expectClose bool
+		name    string
+		config  Config
+		wantErr error
 	}{
 		{
 			name:   "default config",
@@ -279,7 +278,7 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 func TestFileCache_Eviction(t *testing.T) {
 	tests := []struct {
 		name   string
-		config DatabaseConfig
+		config Config
 	}{
 		{
 			name:   "data file eviction",
@@ -412,7 +411,7 @@ func TestStructSizes(t *testing.T) {
 		expectedBinarySize  int
 		expectedMarshalSize int
 		expectedPadding     uintptr
-		createInstance      func() interface{}
+		createInstance      func() any
 	}{
 		{
 			name:                "indexFileHeader",
@@ -422,7 +421,7 @@ func TestStructSizes(t *testing.T) {
 			expectedBinarySize:  64,
 			expectedMarshalSize: 64,
 			expectedPadding:     0,
-			createInstance:      func() interface{} { return indexFileHeader{} },
+			createInstance:      func() any { return indexFileHeader{} },
 		},
 		{
 			name:                "blockEntryHeader",
@@ -432,7 +431,7 @@ func TestStructSizes(t *testing.T) {
 			expectedBinarySize:  22,
 			expectedMarshalSize: 22,
 			expectedPadding:     10,
-			createInstance:      func() interface{} { return blockEntryHeader{} },
+			createInstance:      func() any { return blockEntryHeader{} },
 		},
 		{
 			name:                "indexEntry",
@@ -442,7 +441,7 @@ func TestStructSizes(t *testing.T) {
 			expectedBinarySize:  16,
 			expectedMarshalSize: 16,
 			expectedPadding:     0,
-			createInstance:      func() interface{} { return indexEntry{} },
+			createInstance:      func() any { return indexEntry{} },
 		},
 	}
 

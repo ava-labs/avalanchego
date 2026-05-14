@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func newDatabase(t *testing.T, config DatabaseConfig) *Database {
+func newDatabase(t *testing.T, config Config) *Database {
 	t.Helper()
 
 	db := newHeightIndexDatabase(t, config.WithBlockCacheSize(0))
@@ -23,7 +23,7 @@ func newDatabase(t *testing.T, config DatabaseConfig) *Database {
 	return db.(*Database)
 }
 
-func newHeightIndexDatabase(t *testing.T, config DatabaseConfig) database.HeightIndex {
+func newHeightIndexDatabase(t *testing.T, config Config) database.HeightIndex {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -39,7 +39,7 @@ func newHeightIndexDatabase(t *testing.T, config DatabaseConfig) database.Height
 	return db
 }
 
-func newCacheDatabase(t *testing.T, config DatabaseConfig) *cacheDB {
+func newCacheDatabase(t *testing.T, config Config) *cacheDB {
 	t.Helper()
 
 	db := newHeightIndexDatabase(t, config)

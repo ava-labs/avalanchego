@@ -58,7 +58,7 @@ func TestPut_MaxHeight(t *testing.T) {
 	tests := []struct {
 		name               string
 		blockHeights       []uint64 // block heights to write, in order
-		config             DatabaseConfig
+		config             Config
 		expectedMaxHeight  uint64
 		syncToDisk         bool
 		checkpointInterval uint64
@@ -218,7 +218,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 		height             uint64
 		block              []byte
 		setup              func(db *Database)
-		config             DatabaseConfig
+		config             Config
 		disableCompression bool
 		wantErr            error
 		wantErrMsg         string
