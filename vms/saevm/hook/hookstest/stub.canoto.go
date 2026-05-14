@@ -309,6 +309,229 @@ func (c *extra) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 }
 
 const (
+	canoto__storedSettled__height       = 1
+	canoto__storedSettled__gasUnix      = 2
+	canoto__storedSettled__gasNumerator = 3
+	canoto__storedSettled__excess       = 4
+
+	canoto__storedSettled__height__tag       = "\x08" // canoto.Tag(canoto__storedSettled__height, canoto.Varint)
+	canoto__storedSettled__gasUnix__tag      = "\x10" // canoto.Tag(canoto__storedSettled__gasUnix, canoto.Varint)
+	canoto__storedSettled__gasNumerator__tag = "\x18" // canoto.Tag(canoto__storedSettled__gasNumerator, canoto.Varint)
+	canoto__storedSettled__excess__tag       = "\x20" // canoto.Tag(canoto__storedSettled__excess, canoto.Varint)
+)
+
+type canotoData_storedSettled struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*storedSettled) CanotoSpec(...reflect.Type) *canoto.Spec {
+	var zero storedSettled
+	s := &canoto.Spec{
+		Name: "storedSettled",
+		Fields: []canoto.FieldType{
+			{
+				FieldNumber: canoto__storedSettled__height,
+				Name:        "height",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.height),
+			},
+			{
+				FieldNumber: canoto__storedSettled__gasUnix,
+				Name:        "gasUnix",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.gasUnix),
+			},
+			{
+				FieldNumber: canoto__storedSettled__gasNumerator,
+				Name:        "gasNumerator",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.gasNumerator),
+			},
+			{
+				FieldNumber: canoto__storedSettled__excess,
+				Name:        "excess",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.excess),
+			},
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *storedSettled) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *storedSettled) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = storedSettled{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canoto__storedSettled__height:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.height); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.height) {
+				return canoto.ErrZeroValue
+			}
+		case canoto__storedSettled__gasUnix:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.gasUnix); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.gasUnix) {
+				return canoto.ErrZeroValue
+			}
+		case canoto__storedSettled__gasNumerator:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.gasNumerator); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.gasNumerator) {
+				return canoto.ErrZeroValue
+			}
+		case canoto__storedSettled__excess:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.excess); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.excess) {
+				return canoto.ErrZeroValue
+			}
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *storedSettled) ValidCanoto() bool {
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *storedSettled) CalculateCanotoCache() {
+	var size uint64
+	if !canoto.IsZero(c.height) {
+		size += uint64(len(canoto__storedSettled__height__tag)) + canoto.SizeUint(c.height)
+	}
+	if !canoto.IsZero(c.gasUnix) {
+		size += uint64(len(canoto__storedSettled__gasUnix__tag)) + canoto.SizeUint(c.gasUnix)
+	}
+	if !canoto.IsZero(c.gasNumerator) {
+		size += uint64(len(canoto__storedSettled__gasNumerator__tag)) + canoto.SizeUint(c.gasNumerator)
+	}
+	if !canoto.IsZero(c.excess) {
+		size += uint64(len(canoto__storedSettled__excess__tag)) + canoto.SizeUint(c.excess)
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *storedSettled) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *storedSettled) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *storedSettled) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if !canoto.IsZero(c.height) {
+		canoto.Append(&w, canoto__storedSettled__height__tag)
+		canoto.AppendUint(&w, c.height)
+	}
+	if !canoto.IsZero(c.gasUnix) {
+		canoto.Append(&w, canoto__storedSettled__gasUnix__tag)
+		canoto.AppendUint(&w, c.gasUnix)
+	}
+	if !canoto.IsZero(c.gasNumerator) {
+		canoto.Append(&w, canoto__storedSettled__gasNumerator__tag)
+		canoto.AppendUint(&w, c.gasNumerator)
+	}
+	if !canoto.IsZero(c.excess) {
+		canoto.Append(&w, canoto__storedSettled__excess__tag)
+		canoto.AppendUint(&w, c.excess)
+	}
+	return w
+}
+
+const (
 	canoto__Op__ID        = 1
 	canoto__Op__Gas       = 2
 	canoto__Op__GasFeeCap = 3

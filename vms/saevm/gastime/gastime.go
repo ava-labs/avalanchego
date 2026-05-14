@@ -5,7 +5,6 @@
 package gastime
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -68,23 +67,26 @@ func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time,
 	return t, nil
 }
 
-func FromProxyTime(tm *proxytime.Time[gas.Gas], target, excess gas.Gas, gasPriceConfig GasPriceConfig) (*Time, error) {
-	if err := gasPriceConfig.Validate(); err != nil {
+// FromProxyTime returns a new [Time] derived from the provided [proxytime.Time].
+// The provided time MUST have a rate corresponding to the target.
+func FromProxyTime(tm *proxytime.Time[gas.Gas], excess gas.Gas, c GasPriceConfig) (*Time, error) {
+	if err := c.Validate(); err != nil {
 		return nil, err
 	}
 
-	target = clampTarget(target)
-	rate := rateOf(target)
-	if tm.Rate() != rate {
-		return nil, fmt.Errorf("unexpected rate: got %d, want %d", tm.Rate(), rate)
+	if c.StaticPricing {
+		excess = 0
 	}
 
-	return &Time{
+	target := clampTarget(tm.Rate() / TargetToRate)
+	t := &Time{
 		Time:   tm,
 		target: target,
 		excess: excess,
-		config: gasPriceConfig,
-	}, nil
+		config: c,
+	}
+	t.enforceMinExcess()
+	return t, nil
 }
 
 // MinTarget is the minimum allowable [Time.Target] to avoid division by zero.

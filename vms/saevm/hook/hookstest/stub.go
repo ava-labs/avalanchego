@@ -171,7 +171,7 @@ func BuildBlock(
 	}
 
 	e.ops = ops
-	e.settled = settled
+	e.settled = fromHook(settled)
 
 	header.Extra = e.MarshalCanoto()
 	return types.NewBlock(header, txs, nil, receipts, saetest.TrieHasher()), nil
@@ -209,7 +209,7 @@ func (*Stub) BlockTime(hdr *types.Header) time.Time {
 // Settled returns the settled information encoded in the Header by [Stub.BuildBlock]
 // or [BuildBlock].
 func (*Stub) Settled(hdr *types.Header) hook.Settled {
-	return getHeaderExtra(hdr).settled
+	return getHeaderExtra(hdr).settled.toHook()
 }
 
 // EndOfBlockOps return the ops included in the block by [BuildBlock].
@@ -257,9 +257,37 @@ func (*Stub) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) e
 type extra struct {
 	subSec  time.Duration `canoto:"int,1"` //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
 	ops     []Op          `canoto:"repeated value,2"`
-	settled hook.Settled  `canoto:"value,3"`
+	settled storedSettled `canoto:"value,3"`
 
 	canotoData canotoData_extra
+}
+
+//nolint:revive // struct-tag: canoto allows unexported fields
+type storedSettled struct {
+	height       uint64  `canoto:"uint,1"`
+	gasUnix      uint64  `canoto:"uint,2"`
+	gasNumerator gas.Gas `canoto:"uint,3"`
+	excess       gas.Gas `canoto:"uint,4"`
+
+	canotoData canotoData_storedSettled
+}
+
+func fromHook(s hook.Settled) storedSettled {
+	return storedSettled{
+		height:       s.Height,
+		gasUnix:      s.GasUnix,
+		gasNumerator: s.GasNumerator,
+		excess:       s.Excess,
+	}
+}
+
+func (s storedSettled) toHook() hook.Settled {
+	return hook.Settled{
+		Height:       s.height,
+		GasUnix:      s.gasUnix,
+		GasNumerator: s.gasNumerator,
+		Excess:       s.excess,
+	}
 }
 
 // Op is a serializable representation of [hook.Op].

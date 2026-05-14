@@ -217,7 +217,7 @@ func TestAsTime(t *testing.T) {
 	const rate = 500
 	stdlib := time.Date(1986, time.October, 1, 0, 0, 0, 0, time.UTC)
 
-	tm := New(uint64(stdlib.Unix()), 0, uint64(rate)) //#nosec G115 -- Known to not overflow
+	tm := New[uint64](uint64(stdlib.Unix()), 0, rate) //#nosec G115 -- Known to not overflow
 	if got, want := tm.AsTime(), stdlib; !got.Equal(want) {
 		t.Fatalf("%T.AsTime() at construction got %v; want %v", tm, got, want)
 	}

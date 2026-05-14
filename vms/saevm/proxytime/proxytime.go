@@ -47,8 +47,9 @@ func (tm *Time[D]) Clone() *Time[D] {
 	}
 }
 
-// New returns a new [Time], set from a Unix timestamp. The passage of `hertz`
-// units is equivalent to a tick of 1 second.
+// New returns a new [Time], set from a Unix timestamp. The passage of hertz
+// units is equivalent to a tick of 1 second. frac is a subsecond portion of
+// time, denominated in hertz.
 func New[D Duration](unixSeconds uint64, frac D, hertz D) *Time[D] {
 	tm := &Time[D]{
 		seconds: unixSeconds,

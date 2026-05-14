@@ -1012,21 +1012,18 @@ func TestSettledGasTime(t *testing.T) {
 		}
 		bs = append(bs, b)
 	}
-	require.NoErrorf(t, bs[len(bs)-1].WaitUntilExecuted(ctx), "last block.WaitUntilExecuted()")
 
 	for i, b := range bs {
 		if i == 0 {
-			continue // genesis block has no gas time
+			continue // genesis block has no [hook.Settled] struct.
 		}
 		settledHeight := sut.hooks.Settled(b.Header()).Height
 		settledBlock := bs[settledHeight]
-		expectedGasTime := settledBlock.ExecutedByGasTime()
-		foundGasTime, err := hook.SettledGasTime(sut.hooks, settledBlock.Header(), b.Header())
-		if foundGasTime.Excess() > 1 {
-			t.Logf("%d excess", foundGasTime.Excess())
-		}
+
+		want := settledBlock.ExecutedByGasTime()
+		got, err := hook.SettledGasTime(sut.hooks, settledBlock.Header(), b.Header())
 		require.NoErrorf(t, err, "SettledGasTime() for block %d (settled height %d)", b.Height(), settledHeight)
-		if diff := cmp.Diff(expectedGasTime, foundGasTime, gastime.CmpOpt()); diff != "" {
+		if diff := cmp.Diff(want, got, gastime.CmpOpt()); diff != "" {
 			t.Errorf("SettledGasTime() for block %d (settled at height %d) diff (-want +got):\n%s", b.Height(), settledHeight, diff)
 		}
 	}

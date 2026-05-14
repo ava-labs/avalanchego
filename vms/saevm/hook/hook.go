@@ -117,15 +117,13 @@ type BlockBuilder[T Transaction] interface {
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
-	// All fields of [SettledState] MUST be populated, otherwise state sync
-	// and recovery will not function correctly.
 	BuildBlock(
 		header *types.Header,
 		blockCtx *block.Context,
 		txs []*types.Transaction,
 		receipts []*types.Receipt,
 		endOfBlockOps []T,
-		settledStuff Settled,
+		settled Settled,
 	) (*types.Block, error)
 }
 
@@ -207,17 +205,12 @@ func MinimumGasConsumption(txLimit uint64) uint64 {
 	return intmath.CeilDiv(txLimit, saeparams.Lambda)
 }
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
-
 // Settled includes information about the block that is settled by a header.
-
 type Settled struct {
-	Height       uint64  `canoto:"uint,1"`
-	GasUnix      uint64  `canoto:"uint,2"`
-	GasNumerator gas.Gas `canoto:"uint,3"`
-	Excess       gas.Gas `canoto:"uint,4"`
-
-	canotoData canotoData_Settled
+	Height       uint64
+	GasUnix      uint64
+	GasNumerator gas.Gas
+	Excess       gas.Gas
 }
 
 // SettledGasTime is a helper that given a header and its settler, returns the
@@ -229,5 +222,5 @@ func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, er
 	s := h.Settled(settler)
 
 	pt := proxytime.New(s.GasUnix, s.GasNumerator, gastime.SafeRateOfTarget(target))
-	return gastime.FromProxyTime(pt, target, s.Excess, cfg)
+	return gastime.FromProxyTime(pt, s.Excess, cfg)
 }

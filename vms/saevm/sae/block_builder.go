@@ -310,6 +310,8 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		receipts = append(receipts, b.Receipts()...)
 	}
 
+	// All fields of [hook.Settled] MUST be populated, otherwise state sync
+	// and recovery will not function correctly.
 	settledGasTime := lastSettled.ExecutedByGasTime()
 	ethB, err := builder.BuildBlock(
 		hdr,

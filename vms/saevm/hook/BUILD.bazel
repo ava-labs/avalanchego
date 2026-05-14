@@ -3,10 +3,7 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "hook",
-    srcs = [
-        "hook.canoto.go",
-        "hook.go",
-    ],
+    srcs = ["hook.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/hook",
     visibility = ["//visibility:public"],
     deps = [
@@ -25,7 +22,6 @@ go_library(
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
-        "@com_github_stephenbuttolph_canoto//:canoto",
     ],
 )
 
