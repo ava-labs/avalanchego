@@ -397,39 +397,48 @@ impl RevisionManager {
     /// Proposal cleanup and reparenting.
     /// Called after releasing the committed revisions write lock.
     pub(crate) fn commit_cleanup(&self, proposal: &ProposedRevision) {
-        // Free proposal that is being committed as well as any proposals no longer
-        // referenced by anyone else. Track how many were discarded (dropped without commit).
-        {
-            // BLOCKING: mutex lock on `proposals`. Held while scanning all open proposals.
-            // Duration is proportional to the number of live proposals. In pathological cases
-            // (many stale proposals) this extends the overall time the commit function runs,
-            // though it is no longer inside the `in_memory_revisions` write lock at this point.
-            let mut lock = self.proposals.lock();
-            let mut discarded = 0u64;
-            lock.retain(|p| {
-                let should_retain = !Arc::ptr_eq(p, proposal) && Arc::strong_count(p) > 1;
-                if !should_retain {
-                    discarded = discarded.wrapping_add(1);
-                }
-                should_retain
-            });
-
-            if discarded > 0 {
-                firewood_counter!(PROPOSALS_DISCARDED).increment(discarded);
+        // Free the proposal being committed and any proposals no longer referenced
+        // by anyone else, then reparent the survivors that referenced this proposal.
+        // Both phases run under a single lock acquisition so the reparented set is
+        // exactly the survivors of cleanup — no other thread can insert or remove
+        // proposals between the two phases.
+        //
+        // BLOCKING: mutex lock on `proposals`. Held while scanning all open proposals
+        // (cleanup) and then iterating survivors (reparent). Duration is proportional
+        // to the number of live proposals. In pathological cases (many stale proposals)
+        // this extends the overall time the commit function runs, though it is no
+        // longer inside the `in_memory_revisions` write lock at this point.
+        let mut lock = self.proposals.lock();
+        let mut discarded = 0u64;
+        lock.retain(|p| {
+            // The proposal being committed leaves the list but isn't a
+            // discard — it was successfully committed. Only abandoned
+            // proposals (no external strong refs) count toward
+            // PROPOSALS_DISCARDED.
+            if Arc::ptr_eq(p, proposal) {
+                return false;
             }
+            if Arc::strong_count(p) <= 1 {
+                discarded = discarded.wrapping_add(1);
+                return false;
+            }
+            true
+        });
 
-            // Update uncommitted proposals gauge after cleanup
-            firewood_gauge!(PROPOSALS_UNCOMMITTED).set_integer(lock.len());
+        if discarded > 0 {
+            firewood_counter!(PROPOSALS_DISCARDED).increment(discarded);
         }
 
-        // then reparent any proposals that have this proposal as a parent
-        // BLOCKING: second acquisition of the `proposals` mutex in this function. Held while
-        // iterating all open proposals to reparent them. Re-acquiring after the first lock
-        // drop avoids long holds, but two separate acquisitions mean the proposal list could
-        // have changed between the two critical sections.
-        for p in &*self.proposals.lock() {
+        // Update uncommitted proposals gauge after cleanup
+        firewood_gauge!(PROPOSALS_UNCOMMITTED).set_integer(lock.len());
+
+        // Reparent any surviving proposals that have this proposal as a parent.
+        // `commit_reparent` only locks each proposal's own `parent` field, not
+        // `self.proposals`, so calling it under the outer lock cannot deadlock.
+        for p in lock.iter() {
             proposal.commit_reparent(p);
         }
+        drop(lock);
 
         if crate::logger::trace_enabled() {
             let committed = proposal.as_committed();
