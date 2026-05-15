@@ -12,11 +12,14 @@ go_library(
     srcs = [
         "cmp.go",
         "fuzzer.go",
+        "legacy.go",
         "wallet.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest",
     deps = [
         "//codec",
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/atomic/vm",
         "//ids",
         "//utils/crypto/keychain",
         "//utils/crypto/secp256k1",
