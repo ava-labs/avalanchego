@@ -923,6 +923,8 @@ func (s *State) DeleteCurrentValidator(staker *Staker) error {
 	return nil
 }
 
+// verifyNoDelegators checks that the validator for the subnetID and nodeID pair does not have
+// delegators associated with it.
 func verifyNoDelegators(cs CurrentStakers, subnetID ids.ID, nodeID ids.NodeID) error {
 	itr, err := cs.GetCurrentDelegatorIterator(subnetID, nodeID)
 	if err != nil {

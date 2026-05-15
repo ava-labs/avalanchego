@@ -727,12 +727,13 @@ func (d *Diff) Apply(baseState Chain) error {
 	return nil
 }
 
-func addCurrentDelegators(baseState Chain, validatorDiff *diffValidator) error {
-	addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
+// addCurrentDelegators adds all delegators for validator to baseState
+func addCurrentDelegators(state Chain, validator *diffValidator) error {
+	addedDelegatorIterator := iterator.FromTree(validator.addedDelegators)
 	defer addedDelegatorIterator.Release()
 
 	for addedDelegatorIterator.Next() {
-		if err := baseState.PutCurrentDelegator(addedDelegatorIterator.Value()); err != nil {
+		if err := state.PutCurrentDelegator(addedDelegatorIterator.Value()); err != nil {
 			return fmt.Errorf("putting current delegator: %w", err)
 		}
 	}
