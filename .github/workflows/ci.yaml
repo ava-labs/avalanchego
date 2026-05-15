@@ -221,6 +221,7 @@ jobs:
             !CHANGELOG.md
             !target/**
             !.github/**
+            !.claude/**
       - name: doc generation
         run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items --no-deps
 

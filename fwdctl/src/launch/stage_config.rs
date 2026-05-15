@@ -161,7 +161,7 @@ impl StageConfig {
         if self.scenarios.contains_key(DEFAULT_SCENARIO) {
             Ok(())
         } else {
-            Err(ConfigError::ScenarioNotFound(DEFAULT_SCENARIO.to_string()))
+            Err(ConfigError::ScenarioNotFound(DEFAULT_SCENARIO.to_owned()))
         }
     }
 
@@ -222,7 +222,7 @@ impl StageConfig {
     fn get_scenario_stages(&self, scenario_name: &str) -> Result<Vec<ResolvedStage>, ConfigError> {
         self.scenarios
             .get(scenario_name)
-            .ok_or_else(|| ConfigError::ScenarioNotFound(scenario_name.to_string()))?
+            .ok_or_else(|| ConfigError::ScenarioNotFound(scenario_name.to_owned()))?
             .stages
             .iter()
             .map(|r| self.resolve_stage_ref(r))

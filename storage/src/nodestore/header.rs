@@ -327,7 +327,7 @@ impl NodeStoreHeader {
     ) -> Result<Self, crate::FileIoError> {
         // TODO(#1088): remove this after implementing runtime selection of hash algorithms
         storage.node_hash_algorithm().validate_init().map_err(|e| {
-            storage.file_io_error(e, 0, Some("NodeHashAlgorithm::validate_init".to_string()))
+            storage.file_io_error(e, 0, Some("NodeHashAlgorithm::validate_init".to_owned()))
         })?;
 
         let mut this = bytemuck::zeroed::<Self>();
@@ -336,10 +336,10 @@ impl NodeStoreHeader {
             .stream_from(0)?
             .read_exact(header_bytes)
             .map_err(|e| {
-                storage.file_io_error(e, 0, Some("NodeStoreHeader::read_from_storage".to_string()))
+                storage.file_io_error(e, 0, Some("NodeStoreHeader::read_from_storage".to_owned()))
             })?;
         this.validate(storage.node_hash_algorithm()).map_err(|e| {
-            storage.file_io_error(e, 0, Some("NodeStoreHeader::validate".to_string()))
+            storage.file_io_error(e, 0, Some("NodeStoreHeader::validate".to_owned()))
         })?;
 
         Ok(this)

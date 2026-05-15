@@ -56,7 +56,7 @@ impl FileBacked {
         self.fd.try_lock().map_err(|e| {
             let context =
                 "unable to obtain advisory lock: database may be opened by another instance"
-                    .to_string();
+                    .to_owned();
             // Convert TryLockError to a generic IO error for our FileIoError
             let io_error = std::io::Error::new(std::io::ErrorKind::WouldBlock, e);
             self.file_io_error(io_error, 0, Some(context))
@@ -83,7 +83,7 @@ impl FileBacked {
                 inner: e,
                 filename: Some(path.clone()),
                 offset: 0,
-                context: Some("file open".to_string()),
+                context: Some("file open".to_owned()),
             })?;
 
         #[cfg(feature = "io-uring")]
@@ -91,7 +91,7 @@ impl FileBacked {
             inner: err,
             filename: Some(path.clone()),
             offset: 0,
-            context: Some("io_uring setup".to_string()),
+            context: Some("io_uring setup".to_owned()),
         })?;
 
         Ok(Self {
@@ -110,7 +110,7 @@ impl FileBacked {
     pub fn set_len(&self, size: u64) -> Result<(), FileIoError> {
         self.fd
             .set_len(size)
-            .map_err(|e| self.file_io_error(e, 0, Some("set_len".to_string())))
+            .map_err(|e| self.file_io_error(e, 0, Some("set_len".to_owned())))
     }
 }
 
@@ -129,7 +129,7 @@ impl ReadableStorage for FileBacked {
         Ok(self
             .fd
             .metadata()
-            .map_err(|e| self.file_io_error(e, 0, Some("size".to_string())))?
+            .map_err(|e| self.file_io_error(e, 0, Some("size".to_owned())))?
             .len())
     }
 
@@ -195,7 +195,7 @@ impl WritableStorage for FileBacked {
                 firewood_counter!(IO_BYTES_WRITTEN).increment(object.len() as u64);
                 object.len()
             })
-            .map_err(|e| self.file_io_error(e, offset, Some("write".to_string())))
+            .map_err(|e| self.file_io_error(e, offset, Some("write".to_owned())))
     }
 
     #[cfg(feature = "io-uring")]
@@ -379,7 +379,7 @@ mod test {
         let mut reader = fb.stream_from(0).unwrap();
         let mut buf: String = String::new();
         assert_eq!(reader.read_to_string(&mut buf).unwrap(), 11);
-        assert_eq!(buf, "hello world".to_string());
+        assert_eq!(buf, "hello world".to_owned());
         assert_eq!(0, reader.read(&mut [0u8; 1]).unwrap());
 
         // byte at a time
@@ -396,7 +396,7 @@ mod test {
         let mut reader = fb.stream_from(6).unwrap();
         buf = String::new();
         assert_eq!(reader.read_to_string(&mut buf).unwrap(), 5);
-        assert_eq!(buf, "world".to_string());
+        assert_eq!(buf, "world".to_owned());
     }
 
     #[test]

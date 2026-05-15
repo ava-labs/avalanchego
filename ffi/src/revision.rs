@@ -60,7 +60,7 @@ impl<'db> RevisionHandle<'db> {
     ) -> Result<ReconstructedHandle<'db>, api::Error> {
         let Some(historical) = self.historical.as_ref() else {
             return Err(api::Error::FeatureNotSupported(
-                "reconstruct requires a historical (committed) revision handle".to_string(),
+                "reconstruct requires a historical (committed) revision handle".to_owned(),
             ));
         };
         let reconstructed = self

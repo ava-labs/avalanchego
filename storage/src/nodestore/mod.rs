@@ -1181,14 +1181,14 @@ fn area_index_and_size<S: ReadableStorage>(
         storage.file_io_error(
             Error::new(ErrorKind::InvalidData, e),
             addr.get(),
-            Some("area_index_and_size".to_string()),
+            Some("area_index_and_size".to_owned()),
         )
     })?)
     .ok_or_else(|| {
         storage.file_io_error(
             Error::new(ErrorKind::InvalidData, "invalid area index"),
             addr.get(),
-            Some("area_index_and_size".to_string()),
+            Some("area_index_and_size".to_owned()),
         )
     })?;
 
@@ -1247,7 +1247,7 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
         let node: SharedNode = Node::from_reader(&mut area_stream)
             .map_err(|e| {
                 self.storage
-                    .file_io_error(e, actual_addr, Some("read_node_from_disk".to_string()))
+                    .file_io_error(e, actual_addr, Some("read_node_from_disk".to_owned()))
             })?
             .into();
         let length = area_stream
@@ -1257,7 +1257,7 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
                 self.storage.file_io_error(
                     Error::other("Reader offset went backwards"),
                     actual_addr,
-                    Some("read_node_with_num_bytes_from_disk".to_string()),
+                    Some("read_node_with_num_bytes_from_disk".to_owned()),
                 )
             })?;
         Ok((node, length.saturating_add(1))) // add 1 for the area size index byte

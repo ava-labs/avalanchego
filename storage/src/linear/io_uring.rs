@@ -773,7 +773,7 @@ mod errors {
                     io::Error::other(self),
                     path,
                     0,
-                    Some("multiple io_uring write errors".to_string()),
+                    Some("multiple io_uring write errors".to_owned()),
                 )
             }
         }

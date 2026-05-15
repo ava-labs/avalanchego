@@ -161,11 +161,7 @@ impl FreeArea {
         let free_area_addr = address.get();
         let stored_area_stream = storage.stream_from(free_area_addr)?;
         Self::from_storage_reader(stored_area_stream).map_err(|e| {
-            storage.file_io_error(
-                e,
-                free_area_addr,
-                Some("FreeArea::from_storage".to_string()),
-            )
+            storage.file_io_error(e, free_area_addr, Some("FreeArea::from_storage".to_owned()))
         })
     }
 

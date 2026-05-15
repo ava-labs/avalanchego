@@ -89,8 +89,8 @@ pub async fn latest_ubuntu_ami(
         Some(ArchitectureType::X8664) => "amd64",
         _ => {
             return Err(LaunchError::InvalidInstanceType(
-                instance_type.to_string(),
-                "unsupported architecture".to_string(),
+                instance_type.to_owned(),
+                "unsupported architecture".to_owned(),
             ));
         }
     };
@@ -105,13 +105,13 @@ pub async fn latest_ubuntu_ami(
         .await?;
 
     let mut images = response.images().to_vec();
-    images.sort_by_key(|img| img.creation_date().unwrap_or_default().to_string());
+    images.sort_by_key(|img| img.creation_date().unwrap_or_default().to_owned());
 
     images
         .last()
         .and_then(|img| img.image_id())
         .map(String::from)
-        .ok_or_else(|| LaunchError::NoMatchingAmi(arch.to_string()))
+        .ok_or_else(|| LaunchError::NoMatchingAmi(arch.to_owned()))
 }
 
 async fn ami_root_device_name(ec2: &Ec2Client, ami_id: &str) -> Result<String, LaunchError> {

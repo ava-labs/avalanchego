@@ -8,7 +8,7 @@ fn main() {
     let git_sha = match Command::new("git").args(["rev-parse", "HEAD"]).output() {
         Ok(output) => {
             if output.status.success() {
-                String::from_utf8_lossy(&output.stdout).trim().to_string()
+                String::from_utf8_lossy(&output.stdout).trim().to_owned()
             } else {
                 let error_msg = String::from_utf8_lossy(&output.stderr);
                 format!("git error: {}", error_msg.trim())

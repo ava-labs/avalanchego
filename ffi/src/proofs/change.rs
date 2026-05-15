@@ -164,7 +164,7 @@ impl<'a> CodeIteratorHandle<'a> {
         #[cfg(not(feature = "ethhash"))]
         {
             Err(api::Error::FeatureNotSupported(
-                "ethhash code hash iterator".to_string(),
+                "ethhash code hash iterator".to_owned(),
             ))
         }
 

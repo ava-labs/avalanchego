@@ -78,7 +78,7 @@ impl CloudInitContext {
         };
         Ok(Self {
             swap_gib: 16,
-            scenario_name: opts.scenario_name().to_string(),
+            scenario_name: opts.scenario_name().to_owned(),
             template_ctx,
             config,
         })

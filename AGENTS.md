@@ -223,6 +223,10 @@ Key dependencies are centrally managed in workspace `Cargo.toml`:
 
 7. **Workspace Awareness**: This is a multi-crate workspace. Changes may affect multiple crates. Check `Cargo.toml` for workspace structure.
 
+## Code Review Guidelines
+
+See [`CODE_REVIEW.md`](./CODE_REVIEW.md) for the complete set of code review checks.
+
 ## Additional Resources
 
 - [Auto-generated docs](https://ava-labs.github.io/firewood/firewood/)
