@@ -16,7 +16,7 @@ vars:
   PACKAGING_GO_VERSION:
     sh: go list -m -f '{{ "{{.GoVersion}}" }}' | head -1
   # Map uname -m to RPM arch names (arm64 -> aarch64).
-  PACKAGING_HOST_ARCH:
+  PACKAGING_RPM_HOST_ARCH:
     sh: |
       arch=$(uname -m)
       case "${arch}" in
@@ -31,7 +31,7 @@ vars:
   PACKAGING_TAG:
     sh: echo "${PACKAGING_TAG:-v0.0.0}"
   # Map uname -m to DEB arch names (x86_64 -> amd64).
-  PACKAGING_HOST_DEB_ARCH:
+  PACKAGING_DEB_HOST_ARCH:
     sh: |
       arch=$(uname -m)
       case "${arch}" in
@@ -39,9 +39,9 @@ vars:
         aarch64|arm64) echo "arm64" ;;
         *)             echo "${arch}" ;;
       esac
-  PACKAGING_DOCKER_IMAGE: avalanchego-rpm-builder
+  PACKAGING_RPM_DOCKER_IMAGE: avalanchego-rpm-builder
   PACKAGING_DEB_DOCKER_IMAGE: avalanchego-deb-builder
-  PACKAGING_OUTPUT_DIR: '{{.REPO_ROOT}}/build/rpm'
+  PACKAGING_RPM_OUTPUT_DIR: '{{.REPO_ROOT}}/build/rpm'
   PACKAGING_DEB_OUTPUT_DIR: '{{.REPO_ROOT}}/build/deb'
 
 tasks:
@@ -61,7 +61,7 @@ tasks:
     internal: true
     env:
       GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
-      DOCKER_IMAGE: '{{.PACKAGING_DOCKER_IMAGE}}'
+      DOCKER_IMAGE: '{{.PACKAGING_RPM_DOCKER_IMAGE}}'
       CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
       DOCKERFILE: Dockerfile.rpm
     cmds:
@@ -98,7 +98,7 @@ tasks:
   build-avalanchego-rpm:
     desc: Builds RPM for avalanchego
     vars:
-      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .RPM_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
     deps: [build-builder-docker-image]
     cmds:
       - task: build-package
@@ -107,14 +107,14 @@ tasks:
           NFPM_PACKAGER: rpm
           TAG: '{{.PACKAGING_TAG}}'
           PACKAGE_ARCH: '{{.PACKAGE_ARCH}}'
-          OUTPUT_DIR: '{{.PACKAGING_OUTPUT_DIR}}'
-          DOCKER_IMAGE: '{{.PACKAGING_DOCKER_IMAGE}}'
+          OUTPUT_DIR: '{{.PACKAGING_RPM_OUTPUT_DIR}}'
+          DOCKER_IMAGE: '{{.PACKAGING_RPM_DOCKER_IMAGE}}'
           GPG_KEY_FILE: '{{.RPM_GPG_KEY_FILE | default ""}}'
 
   build-subnet-evm-rpm:
     desc: Builds RPM for subnet-evm
     vars:
-      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .RPM_ARCH | default .PACKAGING_HOST_ARCH}}'
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .RPM_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
     deps: [build-builder-docker-image]
     cmds:
       - task: build-package
@@ -123,8 +123,8 @@ tasks:
           NFPM_PACKAGER: rpm
           TAG: '{{.PACKAGING_TAG}}'
           PACKAGE_ARCH: '{{.PACKAGE_ARCH}}'
-          OUTPUT_DIR: '{{.PACKAGING_OUTPUT_DIR}}'
-          DOCKER_IMAGE: '{{.PACKAGING_DOCKER_IMAGE}}'
+          OUTPUT_DIR: '{{.PACKAGING_RPM_OUTPUT_DIR}}'
+          DOCKER_IMAGE: '{{.PACKAGING_RPM_DOCKER_IMAGE}}'
           GPG_KEY_FILE: '{{.RPM_GPG_KEY_FILE | default ""}}'
 
   test-build-rpms:
@@ -164,7 +164,7 @@ tasks:
   build-avalanchego-deb:
     desc: Builds DEB for avalanchego
     vars:
-      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .DEB_ARCH | default .PACKAGING_HOST_DEB_ARCH}}'
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .DEB_ARCH | default .PACKAGING_DEB_HOST_ARCH}}'
     deps: [build-deb-builder-docker-image]
     cmds:
       - task: build-package
@@ -180,7 +180,7 @@ tasks:
   build-subnet-evm-deb:
     desc: Builds DEB for subnet-evm
     vars:
-      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .DEB_ARCH | default .PACKAGING_HOST_DEB_ARCH}}'
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .DEB_ARCH | default .PACKAGING_DEB_HOST_ARCH}}'
     deps: [build-deb-builder-docker-image]
     cmds:
       - task: build-package
