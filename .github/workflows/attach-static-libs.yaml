@@ -73,14 +73,14 @@ jobs:
           path: target/${{ matrix.target }}/maxperf/libfirewood_ffi.a
           if-no-files-found: error
 
-      - name: Check if FIREWOOD_GO_GITHUB_TOKEN is set
+      - name: Check if FIREWOOD_GO_DEPLOY_KEY is set
         id: check_secrets
         run: |
-          if [ -z "${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}" ]; then
-            echo "FIREWOOD_GO_GITHUB_TOKEN is not set"
+          if [ -z "${{ secrets.FIREWOOD_GO_DEPLOY_KEY }}" ]; then
+            echo "FIREWOOD_GO_DEPLOY_KEY is not set"
             echo "has_secrets=false" >> "$GITHUB_OUTPUT"
           else
-            echo "FIREWOOD_GO_GITHUB_TOKEN is set"
+            echo "FIREWOOD_GO_DEPLOY_KEY is set"
             echo "has_secrets=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -126,7 +126,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: ava-labs/firewood-go-ethhash
-          token: ${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}
+          ssh-key: ${{ secrets.FIREWOOD_GO_DEPLOY_KEY }}
           path: firewood-go-ethhash
 
       - name: Copy FFI Source Code
@@ -191,7 +191,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: ava-labs/firewood-go-ethhash
-          token: ${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}
+          ssh-key: ${{ secrets.FIREWOOD_GO_DEPLOY_KEY }}
           ref: ${{ needs.push-firewood-ffi-libs.outputs.target_branch }}
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -215,7 +215,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: ava-labs/firewood-go-ethhash
-          token: ${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}
+          ssh-key: ${{ secrets.FIREWOOD_GO_DEPLOY_KEY }}
           ref: ${{ needs.push-firewood-ffi-libs.outputs.target_branch }}
       - name: Delete branch
         run: |
