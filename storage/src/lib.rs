@@ -61,10 +61,10 @@ pub use node::{BranchNode, Child, Children, ChildrenSlots, LeafNode, Node, PathI
 #[cfg(feature = "ethhash")]
 pub use nodestore::fix_account_storage_root_value;
 pub use nodestore::{
-    AreaIndex, Committed, CommittedParentHash, HashedNodeReader, ImmutableProposal, LinearAddress,
-    Mutable, MutableKind, NodeHashAlgorithm, NodeHashAlgorithmTryFromIntError, NodeReader,
-    NodeStore, NodeStoreHeader, Parentable, Propose, Recon, Reconstructed, ReconstructionSource,
-    RootReader, TrieReader,
+    AreaIndex, Committed, CommittedId, CommittedParentHash, HashedNodeReader, ImmutableProposal,
+    LinearAddress, Mutable, MutableKind, NodeHashAlgorithm, NodeHashAlgorithmTryFromIntError,
+    NodeReader, NodeStore, NodeStoreHeader, Parentable, Propose, Recon, Reconstructed,
+    ReconstructionSource, RootReader, TrieReader,
 };
 pub use path::{
     ComponentIter, IntoSplitPath, JoinedPath, PackedBytes, PackedPathComponents, PackedPathRef,

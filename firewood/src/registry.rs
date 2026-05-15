@@ -21,6 +21,10 @@ firewood_metrics::define_metrics! {
         COMMITS_TOTAL          = "firewood_commits_total",
         /// Number of proposal commit operations
         PROPOSAL_COMMITS       = "firewood_proposal_commits_total",
+        /// Number of proposal commits absorbed by the trivial fast path
+        /// (proposal root hash equals current revision's; no new revision
+        /// pushed, but proposal cleanup and reparenting still run)
+        PROPOSAL_COMMITS_TRIVIAL = "firewood_proposal_commits_trivial_total",
         /// Number of root store persist operations
         PERSIST_ROOT_STORE     = "firewood_persist_root_store_total",
     },

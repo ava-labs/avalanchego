@@ -27,8 +27,9 @@ use firewood_metrics::{GaugeExt, firewood_counter, firewood_gauge, firewood_hist
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::RootStore;
 use firewood_storage::{
-    BranchNode, Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, Mutable,
-    MutableKind, NodeHashAlgorithm, NodeStore, NodeStoreHeader, Propose, Recon, TrieHash,
+    BranchNode, Committed, CommittedId, FileBacked, FileIoError, HashedNodeReader,
+    ImmutableProposal, Mutable, MutableKind, NodeHashAlgorithm, NodeStore, NodeStoreHeader,
+    Propose, Recon, TrieHash,
 };
 
 pub(crate) const DB_FILE_NAME: &str = "firewood.db";
@@ -290,10 +291,10 @@ impl RevisionManager {
             .record(__lock_start.elapsed().as_secs_f64());
 
         // Steps 1-5: validate, reap, persist, insert (under write lock)
-        self.commit_critical_section(&proposal, &mut revisions_guard)?;
+        let new_id = self.commit_critical_section(&proposal, &mut revisions_guard)?;
         drop(revisions_guard);
         // Step 6: proposal cleanup and reparenting (lock released)
-        self.commit_cleanup(&proposal);
+        self.commit_cleanup(&proposal, new_id);
         Ok(())
     }
 
@@ -315,23 +316,35 @@ impl RevisionManager {
     /// old revisions that exceed `max_revisions`, signals the persist worker,
     /// and inserts the new committed revision into the queue. The caller must
     /// hold the write lock on committed revisions and pass the locked queue in.
+    ///
+    /// Returns the [`CommittedId`] of the revision the proposal now lives in:
+    /// either the freshly-inserted revision for a regular commit, or the
+    /// current latest revision's id when the proposal was absorbed by the
+    /// trivial fast path (proposal root hash equals the latest revision's).
+    /// The caller passes this id to [`Self::commit_cleanup`], which uses it
+    /// to reparent any sibling proposals that pointed at the just-committed
+    /// proposal.
     pub(crate) fn commit_critical_section(
         &self,
         proposal: &ProposedRevision,
         revisions: &mut VecDeque<CommittedRevision>,
-    ) -> Result<(), RevisionManagerError> {
+    ) -> Result<CommittedId, RevisionManagerError> {
         // Check if the persist worker has failed.
         self.persist_worker
             .check_error()
             .map_err(RevisionManagerError::PersistError)?;
 
-        // Commit check
         let current_revision = revisions.back().expect("there is always one revision");
-        if !proposal.parent_hash_is(current_revision.root_hash()) {
+        if !proposal.parent_id_is(current_revision.committed_id()) {
             return Err(RevisionManagerError::NotLatest {
                 provided: proposal.root_hash(),
                 expected: current_revision.root_hash(),
             });
+        }
+
+        if proposal.root_hash() == current_revision.root_hash() {
+            firewood_counter!(PROPOSAL_COMMITS_TRIVIAL).increment(1);
+            return Ok(current_revision.committed_id());
         }
 
         let committed = proposal.as_committed();
@@ -370,6 +383,8 @@ impl RevisionManager {
             firewood_gauge!(MAX_REVISIONS).set_integer(self.max_revisions);
         }
 
+        let new_id = committed.committed_id();
+
         // Signal to the `PersistWorker` to persist this revision.
         let committed: CommittedRevision = committed.into();
         let __submit_start = ::std::time::Instant::now();
@@ -391,12 +406,15 @@ impl RevisionManager {
             self.by_hash.write().insert(hash, committed);
         }
 
-        Ok(())
+        Ok(new_id)
     }
 
     /// Proposal cleanup and reparenting.
     /// Called after releasing the committed revisions write lock.
-    pub(crate) fn commit_cleanup(&self, proposal: &ProposedRevision) {
+    ///
+    /// `new_id` is the [`CommittedId`] children of `proposal` should reparent
+    /// onto — the value returned by [`Self::commit_critical_section`].
+    pub(crate) fn commit_cleanup(&self, proposal: &ProposedRevision, new_id: CommittedId) {
         // Free the proposal being committed and any proposals no longer referenced
         // by anyone else, then reparent the survivors that referenced this proposal.
         // Both phases run under a single lock acquisition so the reparented set is
@@ -436,7 +454,7 @@ impl RevisionManager {
         // `commit_reparent` only locks each proposal's own `parent` field, not
         // `self.proposals`, so calling it under the outer lock cannot deadlock.
         for p in lock.iter() {
-            proposal.commit_reparent(p);
+            proposal.commit_reparent(p, new_id);
         }
         drop(lock);
 

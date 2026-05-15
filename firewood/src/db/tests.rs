@@ -3,6 +3,7 @@
 
 #![expect(clippy::unwrap_used)]
 
+mod concurrent_rebase;
 mod merge;
 
 use super::test::TestDb;

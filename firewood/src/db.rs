@@ -529,24 +529,29 @@ impl Proposal<'_> {
         let mut revisions_guard = db.manager.lock_committed_revisions();
         let current = revisions_guard.back().expect("always one revision");
 
-        if !nodestore.parent_hash_is(current.root_hash()) {
+        if !nodestore.parent_id_is(current.committed_id()) {
             // Parent is stale — rebase onto the current revision.
             let old_parent = match nodestore.committed_parent_hash() {
                 CommittedParentHash::NotCommitted => {
                     return Err(api::Error::ParentNotCommitted);
                 }
-                CommittedParentHash::Hash(Some(hash)) => db.manager.revision(hash)?,
-                CommittedParentHash::Hash(None) => {
-                    // Empty trie parent — use the initial empty revision.
-                    revisions_guard
-                        .front()
-                        .expect("always one revision")
-                        .clone()
-                }
+                CommittedParentHash::Hash(Some(hash)) => Some(db.manager.revision(hash)?),
+                CommittedParentHash::Hash(None) => None,
             };
             db.manager.remove_proposal(&nodestore);
 
-            let diff = DiffMerkleNodeStream::new(&*old_parent, &*nodestore, Box::default())?;
+            // Empty trie parent — diff against a synthetic empty view.
+            // Avoids depending on the manager's revisions queue, whose front
+            // entry is not guaranteed to still be empty once `max_revisions`
+            // has been exceeded.
+            let empty_parent;
+            let old_parent_ref: &NodeStore<Committed, FileBacked> = if let Some(rev) = &old_parent {
+                rev
+            } else {
+                empty_parent = nodestore.empty_committed_sibling();
+                &empty_parent
+            };
+            let diff = DiffMerkleNodeStream::new(old_parent_ref, &*nodestore, Box::default())?;
             let batch_ops: Vec<BatchOp<crate::merkle::Key, crate::merkle::Value>> =
                 diff.collect::<Result<_, _>>()?;
 
@@ -555,10 +560,11 @@ impl Proposal<'_> {
         }
 
         let hash = api::DbView::root_hash(&*nodestore);
-        db.manager
+        let new_id = db
+            .manager
             .commit_critical_section(&nodestore, &mut revisions_guard)?;
         drop(revisions_guard);
-        db.manager.commit_cleanup(&nodestore);
+        db.manager.commit_cleanup(&nodestore, new_id);
         Ok(hash)
     }
 
