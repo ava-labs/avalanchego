@@ -3550,7 +3550,7 @@ func testSetStakingInfo(t *testing.T, csF func(t *testing.T) CurrentStakers) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.csF(t).SetStakingInfo(tt.subnetID, tt.nodeID, tt.info)
-			require.Equal(t, tt.wantErr, err)
+			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }
@@ -3801,7 +3801,7 @@ func testDeleteCurrentDelegator(t *testing.T, csF func(t *testing.T) CurrentStak
 			cs := tt.csF(t)
 
 			err := cs.DeleteCurrentDelegator(tt.delegator)
-			require.Equal(t, tt.wantErr, err)
+			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }
