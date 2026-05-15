@@ -20,44 +20,46 @@ import (
 const epsilon = 1e-6
 
 var (
-	errNoPeers           = errors.New("no peers available")
-	errSendRequest       = errors.New("send request")
-	errHandlerFailed     = errors.New("handler request failed")
-	errMarshalRequest    = errors.New("marshal request")
-	errUnmarshalResponse = errors.New("unmarshal response")
+	ErrNoPeers           = errors.New("no peers available")
+	ErrSendRequest       = errors.New("send request")
+	ErrHandlerFailed     = errors.New("handler request failed")
+	ErrMarshalRequest    = errors.New("marshal request")
+	ErrUnmarshalResponse = errors.New("unmarshal response")
 )
 
-// Dispatcher is a typed synchronous client for one handler ID. Safe for
-// concurrent use. Instantiate against a new handler ID to add an RPC type.
+// Dispatcher is a typed synchronous client bound to one handler ID.
+// Use one instance per RPC type.
 type Dispatcher[Req, Resp proto.Message] struct {
 	client *p2p.Client
 	peers  *p2p.PeerTracker
 }
 
-// NewDispatcher binds a [p2p.Client] at handlerID using peers for
-// selection and bandwidth scoring.
+// NewDispatcher returns a typed [Dispatcher] over client and peers.
+// Build client via [NewClient] in production.
 func NewDispatcher[Req, Resp proto.Message](
-	p2pNet *p2p.Network,
-	handlerID uint64,
+	client *p2p.Client,
 	peers *p2p.PeerTracker,
 ) *Dispatcher[Req, Resp] {
-	return &Dispatcher[Req, Resp]{
-		client: p2pNet.NewClient(handlerID, trackerSampler{peers: peers}),
-		peers:  peers,
-	}
+	return &Dispatcher[Req, Resp]{client: client, peers: peers}
 }
 
-// Send picks a peer, sends req, unmarshals into resp. Returns the chosen
-// nodeID and an Outcome the caller must mark after content validation.
-// Selection is explicit (not AppRequestAny) so RegisterRequest runs
-// before sending and prevents concurrent picks of the same peer.
+// NewClient returns a [p2p.Client] at handlerID on p2pNet. The sampler
+// is a no-op because [Dispatcher] always picks an explicit peer.
+func NewClient(p2pNet *p2p.Network, handlerID uint64) *p2p.Client {
+	return p2pNet.NewClient(handlerID, nopSampler{})
+}
+
+// Send picks a peer via [p2p.PeerTracker.SelectPeer] and forwards req
+// to it. Returns the chosen nodeID and an [Outcome] for the caller to
+// score after content validation. On error, [Outcome] is nil and the
+// peer has already been scored.
 //
-// On transport-level failure (no peers, send error, ctx, unmarshal),
-// Outcome is nil and the peer has already been marked as a failure.
+// Selection is explicit (not [p2p.Client.AppRequestAny]) so the
+// [RegisterRequest] pairs with the eventual `Success` or `Failure` call.
 func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (ids.NodeID, *Outcome, error) {
 	nodeID, ok := d.peers.SelectPeer()
 	if !ok {
-		return ids.EmptyNodeID, nil, errNoPeers
+		return ids.EmptyNodeID, nil, ErrNoPeers
 	}
 	outcome, err := d.SendTo(ctx, nodeID, req, resp)
 	if err != nil {
@@ -66,17 +68,15 @@ func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (i
 	return nodeID, outcome, nil
 }
 
-// SendTo sends req to an explicit peer. Same Outcome contract as Send.
+// SendTo sends req to nodeID. Returns an [Outcome] for the caller to
+// score after content validation. On error, Outcome is nil and the
+// peer has already been scored.
 func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (*Outcome, error) {
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errMarshalRequest, err)
+		return nil, fmt.Errorf("%w: %w", ErrMarshalRequest, err)
 	}
-	return d.dispatch(ctx, nodeID, requestBytes, resp)
-}
 
-// dispatch is the inner send-and-await cycle.
-func (d *Dispatcher[Req, Resp]) dispatch(ctx context.Context, nodeID ids.NodeID, requestBytes []byte, resp Resp) (*Outcome, error) {
 	d.peers.RegisterRequest(nodeID)
 
 	type result struct {
@@ -91,7 +91,7 @@ func (d *Dispatcher[Req, Resp]) dispatch(ctx context.Context, nodeID ids.NodeID,
 	start := time.Now()
 	if err := d.client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
 		d.peers.RegisterFailure(nodeID)
-		return nil, fmt.Errorf("%w: %w", errSendRequest, err)
+		return nil, fmt.Errorf("%w: %w", ErrSendRequest, err)
 	}
 
 	select {
@@ -101,13 +101,13 @@ func (d *Dispatcher[Req, Resp]) dispatch(ctx context.Context, nodeID ids.NodeID,
 	case r := <-resultCh:
 		if r.err != nil {
 			d.peers.RegisterFailure(nodeID)
-			return nil, fmt.Errorf("%w: %w", errHandlerFailed, r.err)
+			return nil, fmt.Errorf("%w: %w", ErrHandlerFailed, r.err)
 		}
 
 		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
 		if err := proto.Unmarshal(r.bytes, resp); err != nil {
 			d.peers.RegisterFailure(nodeID)
-			return nil, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
+			return nil, fmt.Errorf("%w: %w", ErrUnmarshalResponse, err)
 		}
 		return &Outcome{
 			peers:     d.peers,
@@ -117,10 +117,15 @@ func (d *Dispatcher[Req, Resp]) dispatch(ctx context.Context, nodeID ids.NodeID,
 	}
 }
 
-// Outcome defers peer scoring to the caller, who knows whether the
-// response is semantically valid. Exactly one of Success or Failure
-// must be called per response. Forgetting both leaves the peer with a
-// pending RegisterRequest until their next request or disconnect.
+// Outcome is the caller's handle to score a peer after validating its
+// response. [Send] and [SendTo] return a non-nil Outcome only on
+// transport success. Transport failures are already scored by the
+// dispatcher.
+//
+// Call exactly one of Success or Failure. Both are idempotent, so the
+// canonical `defer outcome.Failure()` plus `outcome.Success()` happy
+// path is safe. Forgetting both leaves an unpaired [RegisterRequest] on
+// the [p2p.PeerTracker].
 type Outcome struct {
 	peers     *p2p.PeerTracker
 	nodeID    ids.NodeID
@@ -128,38 +133,22 @@ type Outcome struct {
 	once      sync.Once
 }
 
-// Success records the response as semantically valid using the
+// Success records the response as semantically valid, using the
 // bandwidth measured at dispatch time.
 func (o *Outcome) Success() {
-	if o == nil {
-		return
-	}
 	o.once.Do(func() { o.peers.RegisterResponse(o.nodeID, o.bandwidth) })
 }
 
 // Failure records the response as semantically invalid.
 func (o *Outcome) Failure() {
-	if o == nil {
-		return
-	}
 	o.once.Do(func() { o.peers.RegisterFailure(o.nodeID) })
 }
 
-var _ p2p.NodeSampler = (*trackerSampler)(nil)
+var _ p2p.NodeSampler = nopSampler{}
 
-// trackerSampler is a defensive fallback for AppRequestAny on the
-// underlying [p2p.Client]. Dispatcher itself never uses it.
-type trackerSampler struct {
-	peers *p2p.PeerTracker
-}
+// nopSampler is a no-op [p2p.NodeSampler]. Required because
+// [p2p.Network.NewClient] needs a non-nil sampler, but [Dispatcher]
+// always picks an explicit peer so [Sample] never runs.
+type nopSampler struct{}
 
-func (s trackerSampler) Sample(_ context.Context, limit int) []ids.NodeID {
-	if limit <= 0 {
-		return nil
-	}
-	nodeID, ok := s.peers.SelectPeer()
-	if !ok {
-		return nil
-	}
-	return []ids.NodeID{nodeID}
-}
+func (nopSampler) Sample(context.Context, int) []ids.NodeID { return nil }
