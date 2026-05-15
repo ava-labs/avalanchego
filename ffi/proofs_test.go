@@ -254,10 +254,7 @@ func TestRangeProofVerify(t *testing.T) {
 	// Verify with wrong root should fail
 	root[0] ^= 0xFF
 	err = proof.Verify(root, nothing(), nothing(), rangeProofLenTruncated)
-
-	// TODO(#738): re-enable after verification is implemented
-	// r.Error(err, "Verification with wrong root should fail")
-	r.NoError(err)
+	r.Error(err, "Verification with wrong root should fail")
 }
 
 func TestVerifyAndCommitRangeProof(t *testing.T) {

@@ -59,7 +59,8 @@
 use std::num::NonZeroUsize;
 
 use crate::api::{self, FrozenRangeProof, HashKey};
-use firewood_storage::logger::warn;
+use crate::merkle::verify_range_proof;
+use crate::proofs::ProofError;
 
 use super::types::{Proof, ProofCollection};
 
@@ -87,24 +88,33 @@ pub struct RangeProofVerificationContext {
 /// [`RangeProofVerificationContext`] capturing the verification parameters
 /// for use by downstream logic.
 ///
-/// ## ⚠️ Unimplemented ⚠️
-///
-/// Currently a stub: structural verification is not yet implemented. The
-/// returned context records the supplied parameters so that callers
-/// downstream of `verify_*` can still consume them. Tracked separately.
+/// Enforces `max_length` against the proof's key-value count, then runs
+/// the cryptographic range-proof verification via
+/// [`verify_range_proof`].
 ///
 /// # Errors
 ///
-/// Reserved for the implemented form; the current stub does not return
-/// errors.
+/// Returns [`api::Error::ProofError`] with
+/// [`ProofError::ProofIsLargerThanMaxLength`] if the proof contains more
+/// key-value pairs than `max_length` permits, or any error surfaced by
+/// the underlying range-proof verification.
 pub fn verify_range_proof_structure(
-    _proof: &FrozenRangeProof,
+    proof: &FrozenRangeProof,
     root: HashKey,
     start_key: Option<&[u8]>,
     end_key: Option<&[u8]>,
     max_length: Option<NonZeroUsize>,
 ) -> Result<RangeProofVerificationContext, api::Error> {
-    warn!("range proof verification not yet implemented");
+    if let Some(max) = max_length
+        && proof.key_values().len() > max.get()
+    {
+        return Err(api::Error::ProofError(
+            ProofError::ProofIsLargerThanMaxLength,
+        ));
+    }
+
+    verify_range_proof(start_key, end_key, &root, proof)?;
+
     Ok(RangeProofVerificationContext {
         root,
         start_key: start_key.map(Box::from),

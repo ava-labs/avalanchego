@@ -253,6 +253,31 @@ fn test_truncated_bounded_range_proof_round_trip() {
 }
 
 #[test]
+// Unbounded full-range proof: start_key = end_key = None. `Merkle::range_proof`
+// produces a proof with empty start_proof, empty end_proof, and every key in
+// the trie. The verifier must accept this shape — the root-hash reconstruction
+// is the safety net. Regression for the FFI path (TestRoundTripSerialization
+// et al.) where the prior check rejected empty end_proof whenever key_values
+// was non-empty.
+fn test_full_range_proof_verifies_unbounded() {
+    let merkle = init_merkle((u8::MIN..=u8::MAX).map(|k| ([k], [k])));
+    let root_hash = merkle.nodestore().root_hash().unwrap();
+
+    let range_proof = merkle.range_proof(None, None, None).unwrap();
+    assert_eq!(range_proof.key_values().len(), u8::MAX as usize + 1);
+    assert!(range_proof.start_proof().is_empty());
+    assert!(range_proof.end_proof().is_empty());
+
+    verify_range_proof::<_>(
+        Option::<&[u8]>::None,
+        Option::<&[u8]>::None,
+        &root_hash,
+        &range_proof,
+    )
+    .unwrap();
+}
+
+#[test]
 // End-proof terminal is a value-node strict prefix of last_kv: trie
 // {0x05, 0x10, 0x10\x10, 0x10\x50}, range [0x05, 0x10\x30]. The end_proof
 // terminates at the branch node `0x10` (which has value "parent" and

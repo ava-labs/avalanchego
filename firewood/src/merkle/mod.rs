@@ -667,8 +667,13 @@ pub fn verify_range_proof<H: ProofCollection<Node = ProofNode>>(
         return Err(api::Error::ProofError(ProofError::UnexpectedStartProof));
     }
 
-    // Require end proof when there are key-value pairs or an end key is specified
-    if proof.end_proof().is_empty() && (last_key_bytes.is_some() || !key_values.is_empty()) {
+    // Require end proof when an end key is specified. An unbounded
+    // request (last_key = None) is allowed to carry an empty end_proof
+    // even when key_values is non-empty: `Merkle::range_proof` produces
+    // exactly that shape, and the root-hash reconstruction below is the
+    // safety net — any key the prover omitted past the last reported
+    // entry would change the reconstructed hash.
+    if proof.end_proof().is_empty() && last_key_bytes.is_some() {
         return Err(api::Error::ProofError(ProofError::NoEndProof));
     }
 
