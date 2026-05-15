@@ -191,10 +191,7 @@ func (vm *VM) Initialize(
 		chainCtx.Log,
 		chainCtx.NodeID,
 		chainCtx.SubnetID,
-		validators.NewLockedState(
-			&chainCtx.Lock,
-			validatorManager,
-		),
+		chainCtx.WarpValidatorState,
 		txVerifier,
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,

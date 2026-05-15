@@ -57,6 +57,10 @@ type Context struct {
 
 	// snowman++ attributes
 	ValidatorState validators.State // interface for P-Chain validators
+
+	// Locked, cached [validators.State] for warp signature verification.
+	WarpValidatorState validators.State
+
 	// Chain-specific directory where arbitrary data can be written
 	ChainDataDir string
 }

@@ -1153,6 +1153,8 @@ func (m *manager) createSnowmanChain(
 		}
 		m.validatorState = valState
 
+		ctx.WarpValidatorState = m.validatorState
+
 		// Set this func only for platform
 		//
 		// The snowman bootstrapper ensures this function is only executed once, so
