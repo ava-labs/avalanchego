@@ -49,6 +49,7 @@ pub(crate) mod persist;
 pub(crate) mod primitives;
 
 use crate::IntoHashType;
+use crate::arc_swap_triomphe::TriompheArc;
 use crate::linear::{OffsetReader, ReadableNodeMode};
 use crate::logger::{debug, trace};
 use crate::node::branch::ReadSerializable as _;
@@ -766,16 +767,31 @@ pub struct NodeStore<T, S> {
 /// Contains state for a reconstructed revision of the trie.
 /// These are unparented, and only contain an in-memory root.
 ///
-/// The root node is stored as a [`SharedNode`] at construction time.
-/// The root hash is computed lazily on the first call to
-/// [`HashedNodeReader::root_hash`] and cached in a [`OnceLock`] for
-/// lock-free access on subsequent reads.
-#[derive(Debug, Clone)]
+/// The root node is held in an [`arc_swap::ArcSwapAny`] so that
+/// [`HashedNodeReader::root_hash`] can replace it atomically with the
+/// fully-hashed version produced by hashing (children rewritten from
+/// `Child::Node` to `Child::MaybePersisted`). Reconstruction chains that
+/// never request the hash never pay for the swap.
+#[derive(Debug)]
 pub struct Reconstructed {
-    /// The root node, wrapped in a [`SharedNode`] at construction.
-    node: Option<SharedNode>,
+    /// The current root node. `None` for an empty trie; otherwise an
+    /// atomically-swappable `SharedNode`. After the first `root_hash` call
+    /// the swapped-in value's children are all `Child::MaybePersisted`.
+    root: Option<arc_swap::ArcSwapAny<TriompheArc<Node>>>,
     /// Lazily computed root hash (write-once, then lock-free reads).
     hash: OnceLock<TrieHash>,
+}
+
+impl Clone for Reconstructed {
+    fn clone(&self) -> Self {
+        Self {
+            root: self
+                .root
+                .as_ref()
+                .map(|swap| arc_swap::ArcSwapAny::new(swap.load_full())),
+            hash: self.hash.clone(),
+        }
+    }
 }
 
 /// Proposal-specific fields for a mutable nodestore.
@@ -839,11 +855,15 @@ pub struct Mutable<Kind> {
 /// For reconstruct on reconstruct, this avoids cloning
 impl<S: ReadableStorage> From<NodeStore<Reconstructed, S>> for NodeStore<Mutable<Recon>, S> {
     fn from(val: NodeStore<Reconstructed, S>) -> Self {
+        // Consume the ArcSwap to get back the SharedNode, then unwrap_or_clone to extract
+        // an owned Node. In the linear M->R->M->R chain the SharedNode is uniquely held,
+        // so this is a free move.
+        let root = val
+            .kind
+            .root
+            .map(|swap| triomphe::Arc::unwrap_or_clone(swap.into_inner().into_inner()));
         NodeStore {
-            kind: Mutable {
-                root: val.kind.node.map(triomphe::Arc::unwrap_or_clone),
-                inner: Recon,
-            },
+            kind: Mutable { root, inner: Recon },
             storage: val.storage,
             must_recompute_storage_hash: val.must_recompute_storage_hash,
         }
@@ -854,7 +874,10 @@ impl<S: ReadableStorage> From<NodeStore<Mutable<Recon>, S>> for NodeStore<Recons
     fn from(val: NodeStore<Mutable<Recon>, S>) -> Self {
         NodeStore {
             kind: Reconstructed {
-                node: val.kind.root.map(triomphe::Arc::new),
+                root: val
+                    .kind
+                    .root
+                    .map(|n| arc_swap::ArcSwapAny::new(TriompheArc::new(triomphe::Arc::new(n)))),
                 hash: OnceLock::new(),
             },
             storage: val.storage,
@@ -1068,7 +1091,10 @@ impl<S: ReadableStorage> RootReader for NodeStore<Arc<ImmutableProposal>, S> {
 
 impl<S: ReadableStorage> RootReader for NodeStore<Reconstructed, S> {
     fn root_node(&self) -> Option<SharedNode> {
-        self.kind.node.clone()
+        self.kind
+            .root
+            .as_ref()
+            .map(|swap| swap.load_full().into_inner())
     }
 
     fn root_as_maybe_persisted_node(&self) -> Option<MaybePersistedNode> {
@@ -1102,22 +1128,33 @@ where
         None
     }
 
-    // Lazily compute and cache the hash. We don't use parallel hash
-    // calculations here because reconstructed views don't benefit as much
-    // from spinning up multiple threads.
+    // Lazily compute and cache the hash. The hashed root (with children rewritten
+    // to `Child::MaybePersisted`) is swapped back into `self.kind.root` so any
+    // subsequent fork-then-reconstruct walks Arc-shared children instead of
+    // deep-cloning every `Child::Node` subtree. We don't parallelise the hash
+    // because reconstructed views don't benefit much from multiple threads.
     fn root_hash(&self) -> Option<TrieHash> {
-        let node = self.kind.node.as_ref()?;
         if let Some(hash) = self.kind.hash.get() {
             return Some(hash.clone());
         }
-        let node_val: Node = Node::clone(node);
+        let swap = self.kind.root.as_ref()?;
+        let current = swap.load_full();
+        let node_val: Node = Node::clone(&current);
         #[cfg(feature = "ethhash")]
-        let (_, hash) = self.hash_helper(node_val, Path::new()).ok()?;
+        let (hashed_mp, hash) = self.hash_helper(node_val, Path::new()).ok()?;
         #[cfg(not(feature = "ethhash"))]
-        let (_, hash) =
+        let (hashed_mp, hash) =
             NodeStore::<Mutable<Propose>, S>::hash_helper(node_val, Path::new()).ok()?;
+        // Extract the in-memory SharedNode from the freshly-built MaybePersistedNode
+        // (always the `Unpersisted` variant here, so this is a Mutex lock + Arc clone,
+        // no I/O). Replace the unhashed root with the fully-hashed one. If another
+        // thread raced us, the loser's swap overwrites with an equivalent tree; both
+        // contain the same trie content, only the children's form differs
+        // (`Child::Node` vs `Child::MaybePersisted`) and both are valid reads.
+        let hashed_shared = hashed_mp.as_shared_node(self).ok()?;
+        swap.store(TriompheArc::new(hashed_shared));
         let hash = hash.into_triehash();
-        // If another thread raced us, discard ours — both computed the same value.
+        // If another thread raced us on the hash too, discard ours — same value.
         let _ = self.kind.hash.set(hash.clone());
         Some(hash)
     }
@@ -1677,5 +1714,58 @@ mod tests {
         let reconstructed: NodeStore<Reconstructed, _> = recon.into();
 
         assert_eq!(reconstructed.root_hash(), None);
+    }
+
+    #[test]
+    fn reconstructed_root_hash_rewrites_root_children() {
+        // After root_hash() runs, the swapped-in root must have no Child::Node
+        // children — they should all be Child::MaybePersisted. hash_helper works
+        // bottom-up, so if no Child::Node remains at the root, none remains below.
+        let storage = Arc::new(MemStore::default());
+        let mut recon = NodeStore::new_empty_recon(Arc::clone(&storage));
+
+        let mut children = Children::new();
+        children[PathComponent::ALL[0x0]] = Some(Child::Node(Node::Leaf(LeafNode {
+            partial_path: Path::from_nibbles_iterator(NibblesIterator::new(b"abc")),
+            value: b"v0".to_vec().into_boxed_slice(),
+        })));
+        children[PathComponent::ALL[0xF]] = Some(Child::Node(Node::Leaf(LeafNode {
+            partial_path: Path::from_nibbles_iterator(NibblesIterator::new(b"xyz")),
+            value: b"vf".to_vec().into_boxed_slice(),
+        })));
+        recon.root_mut().replace(Node::Branch(Box::new(BranchNode {
+            partial_path: Path::new(),
+            value: None,
+            children,
+        })));
+
+        let reconstructed: NodeStore<Reconstructed, _> = recon.into();
+
+        // Sanity: pre-hash, the root branch has at least one Child::Node.
+        let before = reconstructed.root_node().expect("root present");
+        let Node::Branch(b) = &*before else {
+            panic!("root must be a branch");
+        };
+        assert!(
+            b.children
+                .iter_present()
+                .any(|(_, c)| matches!(c, Child::Node(_))),
+            "fixture must start with at least one Child::Node"
+        );
+        drop(before);
+
+        assert!(reconstructed.root_hash().is_some());
+
+        // After root_hash, no Child::Node remains at the root.
+        let after = reconstructed.root_node().expect("root present");
+        let Node::Branch(b) = &*after else {
+            panic!("root must still be a branch");
+        };
+        for (_, child) in b.children.iter_present() {
+            assert!(
+                !matches!(child, Child::Node(_)),
+                "root child still Child::Node after root_hash: {child:?}"
+            );
+        }
     }
 }

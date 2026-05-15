@@ -22,6 +22,7 @@
 use std::fmt::{Display, Formatter, LowerHex, Result};
 use std::ops::Range;
 
+mod arc_swap_triomphe;
 mod checker;
 mod hashednode;
 mod hashedshunt;

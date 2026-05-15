@@ -50,6 +50,7 @@ io-uring = { version = "0.7.12", optional = true }
 log = { version = "0.4.29", optional = true }
 sha3 = { version = "0.10.9", optional = true }
 bumpalo = { version = "3.20.2", features = ["collections", "std"] }
+arc-swap = "1.9.1"
 
 [dev-dependencies]
 cfg-if = "1.0.4"
