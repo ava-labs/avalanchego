@@ -9,7 +9,7 @@ depends:
   - "libc6 (>= 2.34)"
 contents:
   - src: "${BINARY_PATH}"
-    # SUBNET_EVM_VM_ID is sourced from graft/subnet-evm/scripts/constants.sh
+    # SUBNET_EVM_VM_ID is sourced from graft/subnet-evm/scripts/default-vm-data.sh
     dst: /usr/local/lib/avalanchego/plugins/${SUBNET_EVM_VM_ID}
     expand: true
     file_info:
