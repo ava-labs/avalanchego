@@ -74,6 +74,8 @@ tasks:
       PASSPHRASE_ENV: 'NFPM_{{.NFPM_PACKAGER | upper}}_PASSPHRASE'
     env:
       GPG_KEY_PASSPHRASE: '{{.GPG_KEY_PASSPHRASE}}'
+      VERSION: '{{trimPrefix "v" .TAG}}'
+      TAG: '{{.TAG}}'
     cmds:
       - cmd: mkdir -p {{.OUTPUT_DIR}}
       - cmd: >-
@@ -83,8 +85,8 @@ tasks:
           {{if .GPG_KEY_FILE}}-v {{.GPG_KEY_FILE}}:{{.GPG_KEY_FILE}}:ro{{end}}
           -e NFPM_PACKAGER={{.NFPM_PACKAGER}}
           -e PACKAGE={{.PACKAGE}}
-          -e VERSION={{trimPrefix "v" .TAG}}
-          -e TAG={{.TAG}}
+          -e VERSION
+          -e TAG
           -e PACKAGE_ARCH={{.PACKAGE_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
