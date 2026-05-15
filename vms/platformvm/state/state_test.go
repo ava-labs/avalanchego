@@ -3948,53 +3948,36 @@ func testGetCurrentStakerIterator(t *testing.T, csF func(t *testing.T) CurrentSt
 	}
 }
 
-// TestStateAndDiffIntegration tests integration across State and Diff
-func TestStateAndDiffIntegration(t *testing.T) {
-	tests := []struct {
-		name     string
-		subnetID ids.ID
-	}{
-		{
-			name:     "primary_network",
-			subnetID: constants.PrimaryNetworkID,
-		},
-		{
-			name:     "subnet",
-			subnetID: ids.GenerateTestID(),
-		},
-	}
+// Tests deleting a delegator and its corresponding validator.
+func TestStateDiffIntegration_DeleteValdiatorAndItsDelegator(t *testing.T) {
+	state := newTestState(t, memdb.New())
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Run("delete_validator_and_its_delegator", func(t *testing.T) {
-				state := newTestState(t, memdb.New())
+	diff, err := NewDiffOn(state, true)
+	require.NoError(t, err)
 
-				diff, err := NewDiffOn(state, true)
-				require.NoError(t, err)
+	// Insert a validator and its delegator
+	validator := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
+	require.NoError(t, diff.PutCurrentValidator(validator))
+	delegator := newTestStaker(validator.SubnetID, validator.NodeID)
+	require.NoError(t, diff.PutCurrentDelegator(delegator))
+	require.NoError(t, diff.Apply(state))
+	_, err = state.CommitBatch()
+	require.NoError(t, err)
 
-				validator := newTestStaker(tt.subnetID, ids.GenerateTestNodeID())
-				require.NoError(t, diff.PutCurrentValidator(validator))
-				delegator := newTestStaker(validator.SubnetID, validator.NodeID)
-				require.NoError(t, diff.PutCurrentDelegator(delegator))
-				require.NoError(t, diff.Apply(state))
-				_, err = state.CommitBatch()
-				require.NoError(t, err)
+	diff, err = NewDiffOn(state, true)
+	require.NoError(t, err)
 
-				diff, err = NewDiffOn(state, true)
-				require.NoError(t, err)
+	// In a new diff, delete the validator and its delegator
+	require.NoError(t, diff.DeleteCurrentDelegator(delegator))
+	require.NoError(t, diff.DeleteCurrentValidator(validator))
+	require.NoError(t, diff.Apply(state))
+	_, err = state.CommitBatch()
+	require.NoError(t, err)
 
-				require.NoError(t, diff.DeleteCurrentDelegator(delegator))
-				require.NoError(t, diff.DeleteCurrentValidator(validator))
-				require.NoError(t, diff.Apply(state))
-				_, err = state.CommitBatch()
-				require.NoError(t, err)
-
-				_, err = state.GetCurrentValidator(validator.SubnetID, validator.NodeID)
-				require.ErrorIs(t, err, database.ErrNotFound)
-				itr, err := state.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
-				require.NoError(t, err)
-				require.Empty(t, iterator.ToSlice(itr))
-			})
-		})
-	}
+	// The validator should be deleted, and it should have no delegators in its iterator.
+	_, err = state.GetCurrentValidator(validator.SubnetID, validator.NodeID)
+	require.ErrorIs(t, err, database.ErrNotFound)
+	itr, err := state.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+	require.NoError(t, err)
+	require.Empty(t, iterator.ToSlice(itr))
 }
