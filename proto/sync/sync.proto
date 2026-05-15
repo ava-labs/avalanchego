@@ -13,30 +13,31 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 // p2p handler ID (EVMLeafsRequestHandlerID, EVMCodeRequestHandlerID,
 // EVMBlockRequestHandlerID in network/p2p/handler.go).
 
-// NodeType selects which trie a leaf-range request walks.
+// EVMNodeType selects which EVM-sync trie a leaf-range request walks.
+// Distinct from Firewood/merkledb sync types in this file.
 //   - STATE_TRIE is the EVM account and storage trie: account balances,
 //     nonces, storage slots, and code hashes.
 //   - ATOMIC_TRIE is the C-Chain atomic operations trie used for cross-chain
 //     transfers between the C-Chain and the X-/P-Chains via shared memory.
-enum NodeType {
-  NODE_TYPE_UNSPECIFIED = 0;
-  NODE_TYPE_STATE_TRIE = 1;
-  NODE_TYPE_ATOMIC_TRIE = 2;
+enum EVMNodeType {
+  EVM_NODE_TYPE_UNSPECIFIED = 0;
+  EVM_NODE_TYPE_STATE_TRIE = 1;
+  EVM_NODE_TYPE_ATOMIC_TRIE = 2;
 }
 
-message GetLeafsRequest {
+message GetLeafRequest {
   bytes root_hash = 1;
   // Empty for account trie, non-empty for storage trie.
   bytes account_hash = 2;
   bytes start_key = 3;
   bytes end_key = 4;
   uint32 key_limit = 5;
-  NodeType node_type = 6;
+  EVMNodeType node_type = 6;
 }
 
-// LeafsResponse intentionally omits the legacy `More` field which is set
+// LeafResponse intentionally omits the legacy `More` field which is set
 // client-side after range-proof verification, never on the wire.
-message LeafsResponse {
+message LeafResponse {
   repeated bytes keys = 1;
   repeated bytes values = 2;
   repeated bytes proof_vals = 3;

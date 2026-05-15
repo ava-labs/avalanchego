@@ -4,9 +4,7 @@
 package network
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
@@ -14,9 +12,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -31,13 +27,13 @@ func TestClients_Send(t *testing.T) {
 		wantResp proto.Message
 	}{
 		{
-			name: "LeafsClient",
-			request: &syncpb.GetLeafsRequest{
+			name: "LeafClient",
+			request: &syncpb.GetLeafRequest{
 				RootHash: []byte{0xab},
 				KeyLimit: 1024,
-				NodeType: syncpb.NodeType_NODE_TYPE_STATE_TRIE,
+				NodeType: syncpb.EVMNodeType_EVM_NODE_TYPE_STATE_TRIE,
 			},
-			wantResp: &syncpb.LeafsResponse{
+			wantResp: &syncpb.LeafResponse{
 				Keys:      [][]byte{{1, 2, 3}},
 				Values:    [][]byte{{4, 5, 6}},
 				ProofVals: [][]byte{{7, 8}},
@@ -61,12 +57,7 @@ func TestClients_Send(t *testing.T) {
 			wantBytes, err := proto.Marshal(tt.wantResp)
 			require.NoError(t, err)
 
-			handler := p2p.TestHandler{
-				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-					return wantBytes, nil
-				},
-			}
-			client := p2ptest.NewSelfClient(t, ctx, nodeID, handler)
+			client := p2ptest.NewSelfClient(t, ctx, nodeID, echoHandler(wantBytes))
 			peers := newTestPeerTracker(t, nodeID)
 
 			var (
@@ -75,9 +66,9 @@ func TestClients_Send(t *testing.T) {
 			)
 			var outcome *Outcome
 			switch req := tt.request.(type) {
-			case *syncpb.GetLeafsRequest:
-				resp := &syncpb.LeafsResponse{}
-				n, o, err := (&LeafsClient{client: client, peers: peers}).Send(ctx, req, resp)
+			case *syncpb.GetLeafRequest:
+				resp := &syncpb.LeafResponse{}
+				n, o, err := (&LeafClient{client: client, peers: peers}).Send(ctx, req, resp)
 				require.NoError(t, err)
 				got, gotNodeID, outcome = resp, n, o
 			case *syncpb.GetCodeRequest:

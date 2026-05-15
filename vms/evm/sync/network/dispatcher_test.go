@@ -48,11 +48,11 @@ func echoHandler(b []byte) p2p.Handler {
 	}
 }
 
-// LeafsClient is the test vehicle for Dispatcher behavior. The dispatch
+// LeafClient is the test vehicle for Dispatcher behavior. The dispatch
 // path is shared by every per-RPC client.
-func newTestLeafsClient(t *testing.T, ctx context.Context, nodeID ids.NodeID, handler p2p.Handler, peers *p2p.PeerTracker) *LeafsClient {
+func newTestLeafClient(t *testing.T, ctx context.Context, nodeID ids.NodeID, handler p2p.Handler, peers *p2p.PeerTracker) *LeafClient {
 	t.Helper()
-	return &LeafsClient{
+	return &LeafClient{
 		client: p2ptest.NewSelfClient(t, ctx, nodeID, handler),
 		peers:  peers,
 	}
@@ -62,14 +62,14 @@ func TestDispatcher_SendTo(t *testing.T) {
 	ctx := t.Context()
 	nodeID := ids.GenerateTestNodeID()
 
-	want := &syncpb.LeafsResponse{Keys: [][]byte{{1, 2, 3}}}
+	want := &syncpb.LeafResponse{Keys: [][]byte{{1, 2, 3}}}
 	wantBytes, err := proto.Marshal(want)
 	require.NoError(t, err)
 
-	c := newTestLeafsClient(t, ctx, nodeID, echoHandler(wantBytes), newTestPeerTracker(t, nodeID))
+	c := newTestLeafClient(t, ctx, nodeID, echoHandler(wantBytes), newTestPeerTracker(t, nodeID))
 
-	got := &syncpb.LeafsResponse{}
-	outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafsRequest{}, got)
+	got := &syncpb.LeafResponse{}
+	outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, got)
 	require.NoError(t, err)
 	require.NotNil(t, outcome)
 	outcome.Success()
@@ -111,8 +111,8 @@ func TestDispatcher_FailurePaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			c := newTestLeafsClient(t, ctx, nodeID, tt.handler, newTestPeerTracker(t, tt.peers...))
-			_, outcome, err := c.Send(ctx, &syncpb.GetLeafsRequest{}, &syncpb.LeafsResponse{})
+			c := newTestLeafClient(t, ctx, nodeID, tt.handler, newTestPeerTracker(t, tt.peers...))
+			_, outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.LeafResponse{})
 			require.ErrorIs(t, err, tt.wantErr)
 			// Transport failures auto-register, caller gets no Outcome.
 			require.Nil(t, outcome)
@@ -135,8 +135,8 @@ func TestDispatcher_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	c := newTestLeafsClient(t, ctx, nodeID, handler, newTestPeerTracker(t, nodeID))
-	_, outcome, err := c.Send(ctx, &syncpb.GetLeafsRequest{}, &syncpb.LeafsResponse{})
+	c := newTestLeafClient(t, ctx, nodeID, handler, newTestPeerTracker(t, nodeID))
+	_, outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.LeafResponse{})
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, outcome)
 }
@@ -164,12 +164,12 @@ func TestOutcome_Idempotent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			nodeID := ids.GenerateTestNodeID()
-			want := &syncpb.LeafsResponse{Keys: [][]byte{{1}}}
+			want := &syncpb.LeafResponse{Keys: [][]byte{{1}}}
 			wantBytes, err := proto.Marshal(want)
 			require.NoError(t, err)
-			c := newTestLeafsClient(t, ctx, nodeID, echoHandler(wantBytes), newTestPeerTracker(t, nodeID))
+			c := newTestLeafClient(t, ctx, nodeID, echoHandler(wantBytes), newTestPeerTracker(t, nodeID))
 
-			_, outcome, err := c.Send(ctx, &syncpb.GetLeafsRequest{}, &syncpb.LeafsResponse{})
+			_, outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.LeafResponse{})
 			require.NoError(t, err)
 			require.NotPanics(t, func() { tt.mark(outcome) })
 		})

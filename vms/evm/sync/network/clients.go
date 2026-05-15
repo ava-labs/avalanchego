@@ -9,9 +9,9 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// LeafsClient sends leaf-range requests. Range-proof verification is the
+// LeafClient sends leaf-range requests. Range-proof verification is the
 // caller's responsibility.
-type LeafsClient = Dispatcher[*syncpb.GetLeafsRequest, *syncpb.LeafsResponse]
+type LeafClient = Dispatcher[*syncpb.GetLeafRequest, *syncpb.LeafResponse]
 
 // CodeClient sends code-by-hash requests.
 type CodeClient = Dispatcher[*syncpb.GetCodeRequest, *syncpb.CodeResponse]
@@ -19,20 +19,20 @@ type CodeClient = Dispatcher[*syncpb.GetCodeRequest, *syncpb.CodeResponse]
 // BlockClient sends block-batch requests.
 type BlockClient = Dispatcher[*syncpb.GetBlockRequest, *syncpb.BlockResponse]
 
-func NewLeafsClient(p2pNet *p2p.Network, peers *p2p.PeerTracker) *LeafsClient {
-	return NewDispatcher[*syncpb.GetLeafsRequest, *syncpb.LeafsResponse](
-		p2pNet, p2p.EVMLeafsRequestHandlerID, peers,
+func NewLeafClient(n *p2p.Network, peers *p2p.PeerTracker) *LeafClient {
+	return NewDispatcher[*syncpb.GetLeafRequest, *syncpb.LeafResponse](
+		n, p2p.EVMLeafsRequestHandlerID, peers,
 	)
 }
 
-func NewCodeClient(p2pNet *p2p.Network, peers *p2p.PeerTracker) *CodeClient {
+func NewCodeClient(n *p2p.Network, peers *p2p.PeerTracker) *CodeClient {
 	return NewDispatcher[*syncpb.GetCodeRequest, *syncpb.CodeResponse](
-		p2pNet, p2p.EVMCodeRequestHandlerID, peers,
+		n, p2p.EVMCodeRequestHandlerID, peers,
 	)
 }
 
-func NewBlockClient(p2pNet *p2p.Network, peers *p2p.PeerTracker) *BlockClient {
+func NewBlockClient(n *p2p.Network, peers *p2p.PeerTracker) *BlockClient {
 	return NewDispatcher[*syncpb.GetBlockRequest, *syncpb.BlockResponse](
-		p2pNet, p2p.EVMBlockRequestHandlerID, peers,
+		n, p2p.EVMBlockRequestHandlerID, peers,
 	)
 }
