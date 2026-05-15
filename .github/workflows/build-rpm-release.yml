@@ -56,7 +56,7 @@ jobs:
         if: github.event.inputs.tag
         run: |
           rm -rf .github/packaging
-          cp -r .packaging-overlay/.github/packaging .github/packaging
+          mv .packaging-overlay/.github/packaging .github/packaging
           rm -rf .packaging-overlay
         shell: bash
 
