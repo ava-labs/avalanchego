@@ -381,17 +381,24 @@ impl<K: MutableKind, S: ReadableStorage> NodeStore<Mutable<K>, S> {
     }
 }
 
-impl<S: ReadableStorage> NodeStore<Mutable<Recon>, S> {
+impl<S: ReadableStorage> NodeStore<Mutable<Recon<S>>, S> {
     /// Create a new mutable nodestore for reconstruction from a read-capable parent.
     ///
     /// Unlike [`NodeStore::new`], this constructor does not require `Parentable`.
     /// It is intended for linear reconstruction flows (e.g. historical or reconstructed views)
     /// that should not participate in proposal parent/reparent semantics.
     ///
+    /// `parent_anchor` is the committed revision to retain so it cannot be
+    /// reaped while this reconstruction (and any `Reconstructed` derived from
+    /// it) is alive. It is propagated to [`Reconstructed::parent_anchor`].
+    ///
     /// # Errors
     ///
     /// Returns a [`FileIoError`] if the parent root cannot be read.
-    pub(crate) fn new_for_reconstruction<T>(parent: &NodeStore<T, S>) -> Result<Self, FileIoError>
+    pub(crate) fn new_for_reconstruction<T>(
+        parent: &NodeStore<T, S>,
+        parent_anchor: Arc<NodeStore<Committed, S>>,
+    ) -> Result<Self, FileIoError>
     where
         NodeStore<T, S>: TrieReader,
     {
@@ -403,27 +410,36 @@ impl<S: ReadableStorage> NodeStore<Mutable<Recon>, S> {
         };
 
         Ok(NodeStore {
-            kind: Mutable { root, inner: Recon },
+            kind: Mutable {
+                root,
+                inner: Recon { parent_anchor },
+            },
             storage: parent.storage.clone(),
             must_recompute_storage_hash: parent.must_recompute_storage_hash,
         })
     }
 }
 
-impl<T: ReconstructionSource, S: ReadableStorage> NodeStore<T, S>
+impl<T: ReconstructionSource<S>, S: ReadableStorage> NodeStore<T, S>
 where
     NodeStore<T, S>: TrieReader,
+    Self: Sized,
 {
     /// Create a mutable reconstruction child from a committed or reconstructed parent.
     ///
     /// This constructor is restricted to [`Committed`] and [`Reconstructed`] nodestores
     /// via the [`ReconstructionSource`] bound, preventing reconstruction from proposals.
+    /// The caller's `Arc` is used (or its anchor inherited) to pin the committed
+    /// revision against reaping for the lifetime of the resulting view.
     ///
     /// # Errors
     ///
     /// Returns a [`FileIoError`] if the parent root cannot be read.
-    pub fn reconstruction_child(&self) -> Result<NodeStore<Mutable<Recon>, S>, FileIoError> {
-        NodeStore::new_for_reconstruction(self)
+    pub fn reconstruction_child(
+        self: &Arc<Self>,
+    ) -> Result<NodeStore<Mutable<Recon<S>>, S>, FileIoError> {
+        let anchor = T::committed_anchor(self);
+        NodeStore::new_for_reconstruction(self, anchor)
     }
 }
 
@@ -459,15 +475,18 @@ impl<S: WritableStorage> NodeStore<Mutable<Propose>, S> {
     }
 }
 
-impl<S> NodeStore<Mutable<Recon>, S> {
-    /// Creates a new, empty, reconstruction [`NodeStore`].
-    /// This is used during testing of reconstruction workflows.
+impl<S: ReadableStorage> NodeStore<Mutable<Recon<S>>, S> {
+    /// Creates a new, empty, reconstruction [`NodeStore`] backed by a fresh
+    /// empty committed parent. Used by tests of reconstruction workflows;
+    /// production reconstructions always go through
+    /// [`NodeStore::reconstruction_child`] with a real `Committed` source.
     #[cfg(any(test, feature = "test_utils"))]
-    pub const fn new_empty_recon(storage: Arc<S>) -> Self {
+    pub fn new_empty_recon(storage: Arc<S>) -> Self {
+        let parent_anchor = Arc::new(NodeStore::new_empty_committed(Arc::clone(&storage)));
         NodeStore {
             kind: Mutable {
                 root: None,
-                inner: Recon,
+                inner: Recon { parent_anchor },
             },
             storage,
             must_recompute_storage_hash: true,
@@ -488,14 +507,36 @@ pub trait HashedNodeReader: TrieReader {
 pub trait TrieReader: NodeReader + RootReader {}
 impl<T> TrieReader for T where T: NodeReader + RootReader {}
 
-/// Marker trait for nodestore states that can serve as the source for reconstruction.
+/// Trait for nodestore states that can serve as the source for reconstruction.
 ///
 /// Only [`Committed`] and [`Reconstructed`] implement this trait. Proposals
 /// ([`Arc<ImmutableProposal>`] and [`Mutable<Propose>`]) are excluded because
 /// reconstruction chains should only branch from persisted or already-reconstructed state.
-pub trait ReconstructionSource {}
-impl ReconstructionSource for Committed {}
-impl ReconstructionSource for Reconstructed {}
+///
+/// The associated [`committed_anchor`](Self::committed_anchor) method extracts
+/// (or clones) the committed revision that should be pinned by any derived
+/// `Reconstructed`, given the caller's `Arc` to the parent nodestore.
+pub trait ReconstructionSource<S> {
+    /// Produce the committed anchor for a `Reconstructed` derived from this
+    /// parent. For [`Committed`] parents this clones the caller's `Arc`; for
+    /// [`Reconstructed`] parents this clones the parent's existing anchor so
+    /// every derived `Reconstructed` pins the same original committed root.
+    fn committed_anchor(arc: &Arc<NodeStore<Self, S>>) -> Arc<NodeStore<Committed, S>>
+    where
+        Self: Sized;
+}
+
+impl<S: ReadableStorage> ReconstructionSource<S> for Committed {
+    fn committed_anchor(arc: &Arc<NodeStore<Self, S>>) -> Arc<NodeStore<Committed, S>> {
+        Arc::clone(arc)
+    }
+}
+
+impl<S: ReadableStorage> ReconstructionSource<S> for Reconstructed<S> {
+    fn committed_anchor(arc: &Arc<NodeStore<Self, S>>) -> Arc<NodeStore<Committed, S>> {
+        Arc::clone(&arc.kind.parent_anchor)
+    }
+}
 
 /// Reads nodes from a merkle trie.
 pub trait NodeReader {
@@ -773,16 +814,21 @@ pub struct NodeStore<T, S> {
 /// `Child::Node` to `Child::MaybePersisted`). Reconstruction chains that
 /// never request the hash never pay for the swap.
 #[derive(Debug)]
-pub struct Reconstructed {
+pub struct Reconstructed<S> {
     /// The current root node. `None` for an empty trie; otherwise an
     /// atomically-swappable `SharedNode`. After the first `root_hash` call
     /// the swapped-in value's children are all `Child::MaybePersisted`.
     root: Option<arc_swap::ArcSwapAny<TriompheArc<Node>>>,
     /// Lazily computed root hash (write-once, then lock-free reads).
     hash: OnceLock<TrieHash>,
+    /// Strong reference to the committed revision whose disk addresses this
+    /// view (transitively) references. Holding it prevents the
+    /// `RevisionManager` from reaping that revision while this `Reconstructed`
+    /// is alive.
+    pub(crate) parent_anchor: Arc<NodeStore<Committed, S>>,
 }
 
-impl Clone for Reconstructed {
+impl<S> Clone for Reconstructed<S> {
     fn clone(&self) -> Self {
         Self {
             root: self
@@ -790,6 +836,7 @@ impl Clone for Reconstructed {
                 .as_ref()
                 .map(|swap| arc_swap::ArcSwapAny::new(swap.load_full())),
             hash: self.hash.clone(),
+            parent_anchor: Arc::clone(&self.parent_anchor),
         }
     }
 }
@@ -803,9 +850,17 @@ pub struct Propose {
 }
 
 /// Reconstruction-specific marker for a mutable nodestore.
-/// Zero-size: no delete list and no parent are needed for linear reconstruction chains.
+///
+/// Carries the committed-revision anchor inherited from the source
+/// `Reconstructed` (or `Committed`) so the new `Reconstructed` produced by
+/// `From<Mutable<Recon<S>>>` can retain the same pin. No delete list or
+/// parent-proposal field is needed; reconstruction chains do not participate
+/// in the future-delete log.
 #[derive(Debug)]
-pub struct Recon;
+pub struct Recon<S> {
+    /// See [`Reconstructed::parent_anchor`].
+    pub(crate) parent_anchor: Arc<NodeStore<Committed, S>>,
+}
 
 /// Behaviour that differs between proposal and reconstruction mutable nodestores.
 ///
@@ -830,7 +885,7 @@ impl MutableKind for Propose {
     }
 }
 
-impl MutableKind for Recon {
+impl<S: std::fmt::Debug + Send + Sync> MutableKind for Recon<S> {
     #[inline]
     fn track_deleted(&mut self, _node: MaybePersistedNode) {
         // Reconstruction views are ephemeral; no delete list to maintain.
@@ -853,8 +908,8 @@ pub struct Mutable<Kind> {
 /// create a mutable root node for a new Reconstructed
 /// with this root.
 /// For reconstruct on reconstruct, this avoids cloning
-impl<S: ReadableStorage> From<NodeStore<Reconstructed, S>> for NodeStore<Mutable<Recon>, S> {
-    fn from(val: NodeStore<Reconstructed, S>) -> Self {
+impl<S: ReadableStorage> From<NodeStore<Reconstructed<S>, S>> for NodeStore<Mutable<Recon<S>>, S> {
+    fn from(val: NodeStore<Reconstructed<S>, S>) -> Self {
         // Consume the ArcSwap to get back the SharedNode, then unwrap_or_clone to extract
         // an owned Node. In the linear M->R->M->R chain the SharedNode is uniquely held,
         // so this is a free move.
@@ -863,22 +918,11 @@ impl<S: ReadableStorage> From<NodeStore<Reconstructed, S>> for NodeStore<Mutable
             .root
             .map(|swap| triomphe::Arc::unwrap_or_clone(swap.into_inner().into_inner()));
         NodeStore {
-            kind: Mutable { root, inner: Recon },
-            storage: val.storage,
-            must_recompute_storage_hash: val.must_recompute_storage_hash,
-        }
-    }
-}
-
-impl<S: ReadableStorage> From<NodeStore<Mutable<Recon>, S>> for NodeStore<Reconstructed, S> {
-    fn from(val: NodeStore<Mutable<Recon>, S>) -> Self {
-        NodeStore {
-            kind: Reconstructed {
-                root: val
-                    .kind
-                    .root
-                    .map(|n| arc_swap::ArcSwapAny::new(TriompheArc::new(triomphe::Arc::new(n)))),
-                hash: OnceLock::new(),
+            kind: Mutable {
+                root,
+                inner: Recon {
+                    parent_anchor: val.kind.parent_anchor,
+                },
             },
             storage: val.storage,
             must_recompute_storage_hash: val.must_recompute_storage_hash,
@@ -886,8 +930,27 @@ impl<S: ReadableStorage> From<NodeStore<Mutable<Recon>, S>> for NodeStore<Recons
     }
 }
 
-impl<S: ReadableStorage> From<Arc<NodeStore<Reconstructed, S>>> for NodeStore<Mutable<Recon>, S> {
-    fn from(val: Arc<NodeStore<Reconstructed, S>>) -> Self {
+impl<S: ReadableStorage> From<NodeStore<Mutable<Recon<S>>, S>> for NodeStore<Reconstructed<S>, S> {
+    fn from(val: NodeStore<Mutable<Recon<S>>, S>) -> Self {
+        NodeStore {
+            kind: Reconstructed {
+                root: val
+                    .kind
+                    .root
+                    .map(|n| arc_swap::ArcSwapAny::new(TriompheArc::new(triomphe::Arc::new(n)))),
+                hash: OnceLock::new(),
+                parent_anchor: val.kind.inner.parent_anchor,
+            },
+            storage: val.storage,
+            must_recompute_storage_hash: val.must_recompute_storage_hash,
+        }
+    }
+}
+
+impl<S: ReadableStorage> From<Arc<NodeStore<Reconstructed<S>, S>>>
+    for NodeStore<Mutable<Recon<S>>, S>
+{
+    fn from(val: Arc<NodeStore<Reconstructed<S>, S>>) -> Self {
         // Fast path: if this Arc is uniquely owned, `try_unwrap` is O(1) and lets us move the
         // reconstructed root out without cloning.
         // Why this Arc might be shared: a caller could keep another handle alive (e.g. iterating
@@ -907,7 +970,7 @@ impl<S: ReadableStorage> From<Arc<NodeStore<Reconstructed, S>>> for NodeStore<Mu
 ///
 /// This clones the [`SharedNode`] arc (cheap ref-count bump) and the
 /// [`OnceLock`] hash (cloned if already computed, empty otherwise).
-impl<S> Clone for NodeStore<Reconstructed, S> {
+impl<S> Clone for NodeStore<Reconstructed<S>, S> {
     fn clone(&self) -> Self {
         NodeStore {
             kind: self.kind.clone(),
@@ -1029,7 +1092,7 @@ impl<T, S: ReadableStorage> NodeReader for NodeStore<Mutable<T>, S> {
     }
 }
 
-impl<S: ReadableStorage> NodeReader for NodeStore<Reconstructed, S> {
+impl<S: ReadableStorage> NodeReader for NodeStore<Reconstructed<S>, S> {
     fn read_node(&self, addr: LinearAddress) -> Result<SharedNode, FileIoError> {
         self.read_node_from_disk(addr, ReadableNodeMode::ReconRead)
     }
@@ -1089,7 +1152,7 @@ impl<S: ReadableStorage> RootReader for NodeStore<Arc<ImmutableProposal>, S> {
     }
 }
 
-impl<S: ReadableStorage> RootReader for NodeStore<Reconstructed, S> {
+impl<S: ReadableStorage> RootReader for NodeStore<Reconstructed<S>, S> {
     fn root_node(&self) -> Option<SharedNode> {
         self.kind
             .root
@@ -1119,9 +1182,9 @@ where
 
 // This implements HashedNodeReader, can never be persisted,
 // and the root_hash is computed lazily via OnceLock.
-impl<S: ReadableStorage> HashedNodeReader for NodeStore<Reconstructed, S>
+impl<S: ReadableStorage> HashedNodeReader for NodeStore<Reconstructed<S>, S>
 where
-    NodeStore<Reconstructed, S>: TrieReader,
+    NodeStore<Reconstructed<S>, S>: TrieReader,
 {
     fn root_address(&self) -> Option<LinearAddress> {
         // Reconstructed views are read-only overlays and are never persisted.
@@ -1662,7 +1725,7 @@ mod tests {
             value: b"value".to_vec().into_boxed_slice(),
         }));
 
-        let reconstructed: NodeStore<Reconstructed, _> = recon.into();
+        let reconstructed: NodeStore<Reconstructed<_>, _> = recon.into();
 
         assert_eq!(reconstructed.root_address(), None);
     }
@@ -1677,7 +1740,7 @@ mod tests {
             value: b"value".to_vec().into_boxed_slice(),
         }));
 
-        let reconstructed: NodeStore<Reconstructed, _> = recon.into();
+        let reconstructed: NodeStore<Reconstructed<_>, _> = recon.into();
 
         // Conversion should not eagerly hash reconstructed roots.
         assert!(reconstructed.kind.hash.get().is_none());
@@ -1693,7 +1756,7 @@ mod tests {
             value: b"value".to_vec().into_boxed_slice(),
         }));
 
-        let reconstructed: NodeStore<Reconstructed, _> = recon.into();
+        let reconstructed: NodeStore<Reconstructed<_>, _> = recon.into();
 
         // Before hashing, the OnceLock is empty
         assert!(reconstructed.kind.hash.get().is_none());
@@ -1711,7 +1774,7 @@ mod tests {
         let storage = Arc::new(MemStore::default());
         let recon = NodeStore::new_empty_recon(Arc::clone(&storage));
 
-        let reconstructed: NodeStore<Reconstructed, _> = recon.into();
+        let reconstructed: NodeStore<Reconstructed<_>, _> = recon.into();
 
         assert_eq!(reconstructed.root_hash(), None);
     }
@@ -1739,7 +1802,7 @@ mod tests {
             children,
         })));
 
-        let reconstructed: NodeStore<Reconstructed, _> = recon.into();
+        let reconstructed: NodeStore<Reconstructed<_>, _> = recon.into();
 
         // Sanity: pre-hash, the root branch has at least one Child::Node.
         let before = reconstructed.root_node().expect("root present");
@@ -1767,5 +1830,40 @@ mod tests {
                 "root child still Child::Node after root_hash: {child:?}"
             );
         }
+    }
+
+    #[test]
+    fn reconstructed_pins_committed_parent() {
+        // A Reconstructed must hold a strong Arc to its committed parent so
+        // the RevisionManager cannot reap the revision (and free its on-disk
+        // nodes) while a derived view is still alive.
+        let storage = Arc::new(MemStore::default());
+        let committed = Arc::new(NodeStore::new_empty_committed(Arc::clone(&storage)));
+        assert_eq!(Arc::strong_count(&committed), 1);
+
+        let recon = NodeStore::<Mutable<Recon<_>>, _>::new_for_reconstruction(
+            &*committed,
+            Arc::clone(&committed),
+        )
+        .unwrap();
+        assert_eq!(
+            Arc::strong_count(&committed),
+            2,
+            "Mutable<Recon> should pin the committed parent"
+        );
+
+        let reconstructed: NodeStore<Reconstructed<_>, _> = recon.into();
+        assert_eq!(
+            Arc::strong_count(&committed),
+            2,
+            "Reconstructed inherits the same pin (no extra clone)"
+        );
+
+        drop(reconstructed);
+        assert_eq!(
+            Arc::strong_count(&committed),
+            1,
+            "dropping the Reconstructed releases the pin"
+        );
     }
 }

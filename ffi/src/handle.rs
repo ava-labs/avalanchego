@@ -2,6 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use std::num::{NonZeroU64, NonZeroUsize};
+use std::sync::Arc;
 
 use firewood::{
     api::{
@@ -249,7 +250,7 @@ impl DatabaseHandle {
     /// Returns an error if reconstruction fails.
     pub fn reconstruct_from_view<'db>(
         &'db self,
-        parent: &NodeStore<Committed, FileBacked>,
+        parent: &Arc<NodeStore<Committed, FileBacked>>,
         batch: impl IntoBatchIter,
     ) -> Result<firewood::db::ReconstructedView<'db>, api::Error> {
         self.db.reconstruct_from_view(parent, batch)

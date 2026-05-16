@@ -150,9 +150,8 @@ fn bench_reconstructed_chain(criterion: &mut Criterion) {
                     let historical = db.revision(root_hash).unwrap();
 
                     let second_batch = batches_iter.next().unwrap();
-                    let mut reconstructed = db
-                        .reconstruct_from_view(historical.as_ref(), second_batch)
-                        .unwrap();
+                    let mut reconstructed =
+                        db.reconstruct_from_view(&historical, second_batch).unwrap();
 
                     for batch in batches_iter {
                         reconstructed = reconstructed.reconstruct(batch).unwrap();

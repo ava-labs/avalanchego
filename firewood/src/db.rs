@@ -343,11 +343,11 @@ impl Db {
     /// Returns an error if reconstruction fails.
     pub fn reconstruct_from_view<P>(
         &self,
-        parent: &NodeStore<P, FileBacked>,
+        parent: &Arc<NodeStore<P, FileBacked>>,
         batch: impl IntoBatchIter,
     ) -> Result<ReconstructedView<'_>, api::Error>
     where
-        P: ReconstructionSource,
+        P: ReconstructionSource<FileBacked>,
         NodeStore<P, FileBacked>: TrieReader,
     {
         let next_nodestore = parent.reconstruction_child()?;
@@ -369,7 +369,7 @@ impl Db {
     /// Returns an error if reconstruction fails.
     fn reconstruct_from_reconstructed(
         &self,
-        parent: Arc<NodeStore<Reconstructed, FileBacked>>,
+        parent: Arc<NodeStore<Reconstructed<FileBacked>, FileBacked>>,
         batch: impl IntoBatchIter,
     ) -> Result<ReconstructedView<'_>, api::Error> {
         let next_nodestore = parent.into();
@@ -443,7 +443,7 @@ pub struct Proposal<'db> {
 #[derive(Debug)]
 /// A user-visible reconstructed view.
 pub struct ReconstructedView<'db> {
-    nodestore: Arc<NodeStore<Reconstructed, FileBacked>>,
+    nodestore: Arc<NodeStore<Reconstructed<FileBacked>, FileBacked>>,
     db: &'db Db,
 }
 
@@ -590,7 +590,7 @@ impl Proposal<'_> {
 
 impl api::DbView for ReconstructedView<'_> {
     type Iter<'view>
-        = MerkleKeyValueIter<'view, NodeStore<Reconstructed, FileBacked>>
+        = MerkleKeyValueIter<'view, NodeStore<Reconstructed<FileBacked>, FileBacked>>
     where
         Self: 'view;
 
@@ -742,10 +742,10 @@ mod test {
         ];
 
         let parallel_reconstructed = parallel_db
-            .reconstruct_from_view(parallel_historical.as_ref(), reconstruct_batch.clone())
+            .reconstruct_from_view(&parallel_historical, reconstruct_batch.clone())
             .unwrap();
         let serial_reconstructed = serial_db
-            .reconstruct_from_view(serial_historical.as_ref(), reconstruct_batch)
+            .reconstruct_from_view(&serial_historical, reconstruct_batch)
             .unwrap();
 
         assert_eq!(
@@ -804,7 +804,7 @@ mod test {
 
         let reconstructed = db
             .reconstruct_from_view(
-                historical.as_ref(),
+                &historical,
                 vec![BatchOp::Put {
                     key: b"base",
                     value: b"v1",

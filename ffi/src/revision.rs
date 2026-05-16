@@ -63,9 +63,7 @@ impl<'db> RevisionHandle<'db> {
                 "reconstruct requires a historical (committed) revision handle".to_owned(),
             ));
         };
-        let reconstructed = self
-            .handle
-            .reconstruct_from_view(historical.as_ref(), values)?;
+        let reconstructed = self.handle.reconstruct_from_view(historical, values)?;
         Ok(ReconstructedHandle::new(reconstructed, self.handle))
     }
 }

@@ -658,9 +658,9 @@ impl RevisionManager {
 
     /// Serial batch application for reconstruction chains.
     pub(crate) fn apply_batch_recon(
-        mutable_nodestore: NodeStore<Mutable<Recon>, FileBacked>,
+        mutable_nodestore: NodeStore<Mutable<Recon<FileBacked>>, FileBacked>,
         batch: impl IntoBatchIter,
-    ) -> Result<NodeStore<Mutable<Recon>, FileBacked>, api::Error> {
+    ) -> Result<NodeStore<Mutable<Recon<FileBacked>>, FileBacked>, api::Error> {
         Self::apply_batch_serial(mutable_nodestore, batch)
     }
 
