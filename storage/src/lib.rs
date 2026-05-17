@@ -42,6 +42,10 @@ mod u4;
 /// Logger module for handling logging functionality
 pub mod logger;
 
+/// Ethereum MPT path encoding primitives shared by the ethhash hasher and the
+/// `eth_getProof`-compatible proof emitter.
+pub mod eth_encoding;
+
 /// Minimal in-tree RLP encoder/decoder used by ethhash and account-value handling.
 pub(crate) mod rlp;
 
