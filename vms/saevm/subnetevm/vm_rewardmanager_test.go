@@ -14,16 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
-	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 // blockBuildAdvance must exceed ACP-226's minDelay (~2s at initial delay excess).
@@ -95,7 +96,7 @@ func settleRewardManagerMutation(t *testing.T, sut *SUT, fromIdx int) {
 	t.Helper()
 	sut.advanceTime(t, settleAdvance)
 	sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
-	_ = sut.buildAndAcceptBlock(t)
+	_ = sut.buildAcceptExecuteBlock(t)
 }
 
 // TestRewardManagerDefaultBurnSAE: no rewardmanager precompile,
@@ -108,13 +109,13 @@ func TestRewardManagerDefaultBurnSAE(t *testing.T) {
 		t,
 		withFork(upgradetest.Helicon),
 		withNumAccounts(1),
-		withNow(&now),
+		withNow(now),
 	)
 
 	preBurn := balanceOf(t, sut, constants.BlackholeAddr)
 
 	tx := sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
-	block := sut.buildAndAcceptBlock(t)
+	block := sut.buildAcceptExecuteBlock(t)
 	requireBlockContainsTxs(t, block, tx.Hash())
 	sut.requireTxSucceeded(t, tx)
 
@@ -137,7 +138,7 @@ func TestRewardManagerGenesisAllowFeeRecipientsSAE(t *testing.T) {
 		t,
 		withFork(upgradetest.Helicon),
 		withNumAccounts(1),
-		withNow(&now),
+		withNow(now),
 		withFeeRecipient(validator),
 		withGenesisConfig(func(genesis *core.Genesis, _ []common.Address) {
 			subnetevmparams.GetExtra(genesis.Config).AllowFeeRecipients = true
@@ -148,7 +149,7 @@ func TestRewardManagerGenesisAllowFeeRecipientsSAE(t *testing.T) {
 	preBurn := balanceOf(t, sut, constants.BlackholeAddr)
 
 	tx := sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
-	block := sut.buildAndAcceptBlock(t)
+	block := sut.buildAcceptExecuteBlock(t)
 	requireBlockContainsTxs(t, block, tx.Hash())
 	sut.requireTxSucceeded(t, tx)
 
@@ -192,7 +193,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 		t,
 		withFork(upgradetest.Helicon),
 		withNumAccounts(2),
-		withNow(&now),
+		withNow(now),
 		withFeeRecipient(validator),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			subnetevmparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
@@ -244,7 +245,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 			mutation, err := s.mutationFn()
 			require.NoError(t, err)
 			mutationTx := sendRewardManagerTx(t, sut, adminIdx, mutation)
-			_ = sut.buildAndAcceptBlock(t)
+			_ = sut.buildAcceptExecuteBlock(t)
 			sut.requireTxSucceeded(t, mutationTx)
 
 			settleRewardManagerMutation(t, sut, adminIdx)
@@ -256,7 +257,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 
 			sut.advanceTime(t, blockBuildAdvance)
 			deliverTx := sendTippedTransferTxTo(t, sut, adminIdx, dustSink, common.Big1)
-			_ = sut.buildAndAcceptBlock(t)
+			_ = sut.buildAcceptExecuteBlock(t)
 			sut.requireTxSucceeded(t, deliverTx)
 
 			for _, r := range recipients {
@@ -276,7 +277,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 		data, err := rewardmanager.PackSetRewardAddress(common.HexToAddress("0xdead"))
 		require.NoError(t, err)
 		rejectTx := sendRewardManagerTx(t, sut, nonAdminIdx, data)
-		_ = sut.buildAndAcceptBlock(t)
+		_ = sut.buildAcceptExecuteBlock(t)
 		sut.requireTxFailed(t, rejectTx)
 	})
 }
@@ -340,7 +341,7 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 			opts := append([]sutOption{
 				withFork(upgradetest.Helicon),
 				withNumAccounts(1),
-				withNow(&now),
+				withNow(now),
 			}, test.opts...)
 			sut := newSUT(t, opts...)
 
@@ -366,8 +367,7 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 			require.NoError(t, err)
 
 			err = sut.vm.VerifyBlock(sut.ctx, nil, forged)
-			require.Error(t, err, "VerifyBlock MUST reject a block with a forged Coinbase")
-			require.Contains(t, err.Error(), "hash mismatch",
+			require.ErrorIs(t, err, sae.ErrHashMismatch,
 				"forged Coinbase must trip SAE's rebuild-and-compare hash check")
 		})
 	}

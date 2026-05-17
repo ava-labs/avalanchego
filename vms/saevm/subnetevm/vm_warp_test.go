@@ -9,7 +9,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
@@ -32,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/warp"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
@@ -66,13 +66,13 @@ func withWarpEnabled() sutOption {
 			// `extra.GenesisPrecompiles` may still alias the map held by
 			// `paramstest.ForkToChainConfig[fork]`. Clone before writing
 			// so the warp entry stays scoped to this genesis.
-			new := maps.Clone(extra.GenesisPrecompiles)
-			if new == nil {
-				new = extras.Precompiles{}
+			cpy := maps.Clone(extra.GenesisPrecompiles)
+			if cpy == nil {
+				cpy = extras.Precompiles{}
 			}
 			activationTS := utils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix()))
-			new[warpcontract.ConfigKey] = warpcontract.NewDefaultConfig(activationTS)
-			extra.GenesisPrecompiles = new
+			cpy[warpcontract.ConfigKey] = warpcontract.NewDefaultConfig(activationTS)
+			extra.GenesisPrecompiles = cpy
 		}
 	})
 }
@@ -249,7 +249,7 @@ func (s *SUT) sendWarpTx(
 		AccessList: accessList,
 	})
 
-	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
 	return tx
 }
 
@@ -317,7 +317,7 @@ func (s *SUT) verifyWarpMessage(t *testing.T, payloadData []byte, expected int32
 	case responseBytes = <-s.appResponse:
 	case appErr = <-s.appErr:
 	case <-t.Context().Done():
-		require.Fail(t, "waiting for app response", t.Context().Err())
+		t.Fatalf("waiting for app response: %v", t.Context().Err())
 	}
 
 	switch expected {
