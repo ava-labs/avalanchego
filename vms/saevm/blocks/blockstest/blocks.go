@@ -53,7 +53,8 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 	if props.settled == nil {
 		props.settled = props.header
 	}
-	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settled)
+	require.NoError(tb, hookstest.FinalizeHeader(props.header, props.settled), "hookstest.FinalizeHeader()")
+	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops)
 	require.NoError(tb, err, "hookstest.BuildBlock()")
 	return block
 }
@@ -142,7 +143,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 
 	b := NewBlock(tb, gen.ToBlock(), nil, nil)
 	h := hookstest.NewStub(conf.gasTarget)
-	require.NoErrorf(tb, b.MarkSynchronous(h, db, xdb, conf.gasExcess), "%T.MarkSynchronous()", b)
+	require.NoErrorf(tb, b.MarkSynchronous(h, db, conf.tdbConfig, xdb, conf.gasExcess), "%T.MarkSynchronous()", b)
 	return b
 }
 

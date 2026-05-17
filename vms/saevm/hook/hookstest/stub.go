@@ -143,6 +143,26 @@ func (s *Stub) PotentialEndOfBlockOps(ctx context.Context, header *types.Header,
 	}
 }
 
+// FinalizeHeader stamps the settled-block height into the stub's `extra`
+// canoto blob carried in [types.Header.Extra], so [Stub.SettledHeight] can
+// recover it during worst-case and execution. Standalone counterpart of
+// [Stub.FinalizeHeader] for non-stub call sites.
+func FinalizeHeader(header *types.Header, settled *types.Header) error {
+	var e extra
+	if err := e.UnmarshalCanoto(header.Extra); err != nil {
+		return err
+	}
+	e.settledHeight = settled.Number.Uint64()
+	header.Extra = e.MarshalCanoto()
+	return nil
+}
+
+// FinalizeHeader stamps the settled-block height into the stub's `extra`
+// canoto blob; see [FinalizeHeader].
+func (*Stub) FinalizeHeader(header *types.Header, settled *types.Header) error {
+	return FinalizeHeader(header, settled)
+}
+
 // BuildBlock calls [BuildBlock] with its arguments.
 func (*Stub) BuildBlock(
 	header *types.Header,
@@ -151,20 +171,20 @@ func (*Stub) BuildBlock(
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settled *types.Header,
+	_ *types.Header,
 ) (*types.Block, error) {
-	return BuildBlock(header, blockCtx, txs, receipts, ops, settled)
+	return BuildBlock(header, blockCtx, txs, receipts, ops)
 }
 
 // BuildBlock encodes ops into [types.Header.Extra] and calls [types.NewBlock]
-// with the other arguments.
+// with the other arguments. `header.Extra` is expected to already carry the
+// settled-block height stamped by [Stub.FinalizeHeader].
 func BuildBlock(
 	header *types.Header,
 	_ *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settled *types.Header,
 ) (*types.Block, error) {
 	var e extra
 	// If the header originally had fractional seconds set, we keep them in the
@@ -174,7 +194,6 @@ func BuildBlock(
 	}
 
 	e.ops = ops
-	e.settledHeight = settled.Number.Uint64()
 	header.Extra = e.MarshalCanoto()
 	return types.NewBlock(header, txs, nil, receipts, saetest.TrieHasher()), nil
 }
@@ -195,9 +214,20 @@ func (s *Stub) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[Op], error)
 	})), nil
 }
 
-// GasConfigAfter ignores its argument and always returns [Stub.Target] and [Stub.GasPriceConfig].
-func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	return s.Target, s.GasPriceConfig
+// ExecutionArtifact returns nil bytes; the stub has no persisted artifact.
+func (*Stub) ExecutionArtifact(*types.Header, libevm.StateReader) ([]byte, error) {
+	return nil, nil
+}
+
+// GasConfigAt ignores state and returns [Stub.Target] and [Stub.GasPriceConfig].
+func (s *Stub) GasConfigAt(h *types.Header, _ libevm.StateReader) (gas.Gas, gastime.GasPriceConfig, error) {
+	return s.GasConfigAfter(h)
+}
+
+// GasConfigAfter ignores its argument and always returns [Stub.Target] and
+// [Stub.GasPriceConfig].
+func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig, error) {
+	return s.Target, s.GasPriceConfig, nil
 }
 
 // BlockTime returns exact block time from [Stub.BuildHeader] by combining the

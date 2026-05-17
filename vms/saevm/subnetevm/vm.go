@@ -14,9 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	libevmcommon "github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
@@ -24,6 +21,9 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+
+	// Force-load precompiles to trigger registration
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // Force-load precompiles to trigger registration
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -46,7 +46,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
-	subnetevmapi "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/api"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/state"
@@ -54,10 +55,10 @@ import (
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
+	subnetevmapi "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/api"
 	saewarp "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/warp"
-
-	// Force-load precompiles to trigger registration
-	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // Force-load precompiles to trigger registration
+	libevmcommon "github.com/ava-labs/libevm/common"
 )
 
 // VM is a harness around an [sae.VM], providing an `Initialize`
@@ -65,13 +66,8 @@ import (
 // accepted synchronous block.
 type VM struct {
 	*sae.VM // created by [SinceGenesis.Initialize]
-	config  sae.Config
 
 	ctx *snow.Context
-	db  avadb.Database
-
-	// TODO(alarso16): remove later
-	hooks *hook.Points
 
 	// toClose are closed in reverse order during [VM.Shutdown]. If a
 	// resource depends on another resource, it MUST be added AFTER the
@@ -95,12 +91,8 @@ var _ io.Closer = (*closerFunc)(nil)
 func (f closerFunc) Close() error { return f() }
 
 // New constructs a new [VM].
-func New(c sae.Config) *VM {
-	v := &VM{config: c}
-	if v.config.Now == nil {
-		v.config.Now = v.clock.Time
-	}
-	return v
+func New() *VM {
+	return &VM{}
 }
 
 const warpSignatureCacheSize = 512
@@ -118,11 +110,49 @@ func (v *VM) Initialize(
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
+	snowCtx.Log.Info("parsing user config")
+
+	userConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return err
+	}
+
+	if userConfig.LogLevel != "" {
+		alias, aliasErr := snowCtx.BCLookup.PrimaryAlias(snowCtx.ChainID)
+		if aliasErr != nil {
+			alias = snowCtx.ChainID.String()
+		}
+		// TODO(ceyonur): Add JSON format support
+		if _, err := subnetevmlog.InitLogger(alias, userConfig.LogLevel, false, snowCtx.Log); err != nil {
+			return fmt.Errorf("initializing libevm logger: %w", err)
+		}
+		// Also change the SAE/avalanchego-side logger so `vms/saevm`
+		// Go code (executor, block builder, gasprice, ...) follows the
+		// same threshold. Levels that libevm accepts but avalanchego
+		// does not (e.g. "crit") are tolerated: we leave snowCtx.Log
+		// at its avalanchego-configured level rather than fail.
+		if avaLevel, levelErr := logging.ToLevel(userConfig.LogLevel); levelErr == nil {
+			snowCtx.Log.SetLevel(avaLevel)
+		} else {
+			snowCtx.Log.Warn("could not map config log-level to avalanchego level; SAE-side logger left at avalanchego-configured level",
+				zap.String("logLevel", userConfig.LogLevel),
+				zap.Error(levelErr),
+			)
+		}
+	}
+
+	saeConfig := sae.Config{
+		MempoolConfig: userConfig.toMempoolConfig(),
+		DBConfig:      userConfig.toDBConfig(),
+		RPCConfig:     userConfig.toRPCConfig(),
+		Now:           v.clock.Time,
+	}
+
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
 	db := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
-	tdb := triedb.NewDatabase(db, v.config.DBConfig.TrieDBConfig)
+	tdb := triedb.NewDatabase(db, saeConfig.DBConfig.TrieDBConfig)
 
 	snowCtx.Log.Info("parsing genesis")
 
@@ -158,13 +188,6 @@ func (v *VM) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %w", err)
 	}
 
-	snowCtx.Log.Info("parsing user config")
-
-	userConfig, err := ParseConfig(configBytes)
-	if err != nil {
-		return err
-	}
-
 	snowCtx.Log.Info("parsing warp message overrides")
 
 	warpMessages, err := userConfig.WarpMessages()
@@ -186,9 +209,8 @@ func (v *VM) Initialize(
 	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := hook.NewPoints(
 		snowCtx,
-		avaDB,
 		config,
-		v.config.Now,
+		saeConfig.Now,
 		desiredDelayExcess,
 		desiredTargetExcess,
 		warpStorage,
@@ -197,14 +219,12 @@ func (v *VM) Initialize(
 
 	snowCtx.Log.Info("constructing the sae VM")
 
-	inner, err := sae.NewVM(ctx, hooks, v.config, snowCtx, config, db, lastSync, appSender)
+	inner, err := sae.NewVM(ctx, hooks, saeConfig, snowCtx, config, db, lastSync, appSender)
 	if err != nil {
 		return err
 	}
 	v.VM = inner
 	v.ctx = snowCtx
-	v.db = avaDB
-	v.hooks = hooks
 
 	snowCtx.Log.Info("registering the validators manager")
 
@@ -240,6 +260,14 @@ func (v *VM) Initialize(
 	return nil
 }
 
+// nodeFeeRecipient resolves the local node's preferred fee recipient
+// for inclusion in `header.Coinbase` when the chain allows custom fee
+// recipients. Empty / unset `Config.FeeRecipient` defaults to
+// [constants.BlackholeAddr] (explicit burn). If the operator left it
+// unset on a chain where fee routing CAN go to a custom address
+// (genesis-flag `AllowFeeRecipients=true` or rewardmanager precompile
+// configured anywhere in the chain config -- not necessarily activated),
+// log a warning so they don't silently burn their fees.
 func nodeFeeRecipient(userConfig Config, chainConfig *subnetevmparams.ChainConfig, log logging.Logger) libevmcommon.Address {
 	if userConfig.FeeRecipient != "" {
 		return libevmcommon.HexToAddress(userConfig.FeeRecipient)
@@ -252,6 +280,10 @@ func nodeFeeRecipient(userConfig Config, chainConfig *subnetevmparams.ChainConfi
 	return constants.BlackholeAddr
 }
 
+// chainAllowsCustomFeeRecipient reports whether the chain config (genesis
+// + upgrades) permits a node to stamp a custom fee recipient
+// into `header.Coinbase`. Returns a short human-readable reason when it
+// does (for log fields).
 func chainAllowsCustomFeeRecipient(chainConfig *subnetevmparams.ChainConfig) (reason string, custom bool) {
 	configExtra := subnetevmparams.GetExtra(chainConfig)
 	if configExtra.AllowFeeRecipients {
@@ -279,8 +311,6 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (
 	configExtra.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
 	}
-	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
-
 	// Set network upgrade defaults
 	configExtra.SetDefaults(ctx.NetworkUpgrades)
 
@@ -306,6 +336,10 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (
 		configExtra.Override(overrides)
 	}
 
+	// Retire the legacy `feeManager` precompile at Helicon: reject
+	// post-Helicon upgrades, normalize a stale genesis activation,
+	// and inject the synthetic disable that wipes pre-existing
+	// storage at the Helicon block.
 	if heliconTS, ok := configExtra.NetworkUpgrades.ScheduledHeliconTimestamp(); ok {
 		normalizedGenesisPrecompiles, err := retirement.ReconcileForHelicon(configExtra, g.Timestamp, heliconTS)
 		if err != nil {
@@ -355,8 +389,8 @@ func (v *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) 
 	return v.VM.SetPreference(ctx, id, bCtx)
 }
 
-// Connected forwards to the embedded `*p2p.Network` after notifying the
-// validators manager.
+// Connected forwards to the embedded `*p2p.Network` (via `*sae.VM`)
+// AFTER notifying the validators manager.
 func (v *VM) Connected(ctx context.Context, nodeID ids.NodeID, ver *version.Application) error {
 	if err := v.validators.Connect(nodeID); err != nil {
 		return err
@@ -364,8 +398,8 @@ func (v *VM) Connected(ctx context.Context, nodeID ids.NodeID, ver *version.Appl
 	return v.VM.Connected(ctx, nodeID, ver)
 }
 
-// Disconnected forwards to the embedded `*p2p.Network` after notifying the
-// validators manager.
+// Disconnected forwards to the embedded `*p2p.Network` (via `*sae.VM`)
+// AFTER notifying the validators manager.
 func (v *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if err := v.validators.Disconnect(nodeID); err != nil {
 		return err
@@ -373,8 +407,10 @@ func (v *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	return v.VM.Disconnected(ctx, nodeID)
 }
 
-// SetState forwards to `*sae.VM.SetState` and starts validator uptime
-// tracking on the first transition to normal operation.
+// SetState forwards to `*sae.VM.SetState` and, on the first transition
+// to `snow.NormalOp`, hands off to the validators manager (which
+// performs the initial uptime sync and spawns the periodic-sync
+// goroutine; both are no-ops on subsequent calls).
 func (v *VM) SetState(ctx context.Context, state snow.State) error {
 	if err := v.VM.SetState(ctx, state); err != nil {
 		return err

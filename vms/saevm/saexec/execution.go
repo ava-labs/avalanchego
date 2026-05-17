@@ -125,12 +125,13 @@ type (
 
 	// ExecutionResults holds the outputs of [Execute].
 	ExecutionResults struct {
-		BaseFee  *uint256.Int
-		StateDB  *state.StateDB
-		Signer   types.Signer
-		BlockCtx vm.BlockContext
-		Receipts types.Receipts
-		FinishBy struct {
+		BaseFee      *uint256.Int
+		StateDB      *state.StateDB
+		Signer       types.Signer
+		BlockCtx     vm.BlockContext
+		Receipts     types.Receipts
+		HookArtifact []byte
+		FinishBy     struct {
 			Gas  *gastime.Time
 			Wall time.Time
 		}
@@ -253,9 +254,23 @@ func Execute(
 	}
 
 	endTime := time.Now()
-	target, gasCfg := hooks.GasConfigAfter(b.Header())
+	// [hook.Points.GasConfigAfter] resolves any persisted hook artifact
+	// internally (keyed by SettledHeight). Failure to load is fatal: a
+	// divergence between worst-case and actual on the gas clock is a
+	// chain-halting bug.
+	// TODO: consider not copying header here.
+	target, gasCfg, err := hooks.GasConfigAfter(b.Header())
+	if err != nil {
+		return nil, fmt.Errorf("%w: GasConfigAfter: %v", errFatal, err)
+	}
 	if err := gasClock.AfterBlock(blockGasConsumed, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("after-block gas time update: %w", err)
+	}
+
+	// TODO: consider not copying header here.
+	artifact, err := hooks.ExecutionArtifact(b.Header(), stateDB)
+	if err != nil {
+		return nil, fmt.Errorf("%w: ExecutionArtifact: %v", errFatal, err)
 	}
 
 	log.Debug(
@@ -266,11 +281,12 @@ func Execute(
 	)
 
 	r := &ExecutionResults{
-		BaseFee:  baseFee,
-		StateDB:  stateDB,
-		Signer:   signer,
-		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
-		Receipts: receipts,
+		BaseFee:      baseFee,
+		StateDB:      stateDB,
+		Signer:       signer,
+		BlockCtx:     core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
+		Receipts:     receipts,
+		HookArtifact: artifact,
 	}
 	r.FinishBy.Gas = gasClock
 	r.FinishBy.Wall = endTime
@@ -298,7 +314,7 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	// 1. [blocks.Block.MarkExecuted] guarantees disk then in-memory changes.
 	// 2. Internal indicator of last executed MUST follow in-memory change.
 	// 3. External indicator of last executed MUST follow internal indicator.
-	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
+	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.HookArtifact, r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
 	e.sendPostExecutionEvents(b.EthBlock(), r.Receipts) // (3)

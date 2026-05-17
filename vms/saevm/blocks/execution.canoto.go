@@ -31,11 +31,13 @@ const (
 	canoto__executionResults__baseFee       = 2
 	canoto__executionResults__receiptRoot   = 3
 	canoto__executionResults__stateRootPost = 4
+	canoto__executionResults__hookArtifact  = 5
 
 	canoto__executionResults__byGas__tag         = "\x0a" // canoto.Tag(canoto__executionResults__byGas, canoto.Len)
 	canoto__executionResults__baseFee__tag       = "\x12" // canoto.Tag(canoto__executionResults__baseFee, canoto.Len)
 	canoto__executionResults__receiptRoot__tag   = "\x1a" // canoto.Tag(canoto__executionResults__receiptRoot, canoto.Len)
 	canoto__executionResults__stateRootPost__tag = "\x22" // canoto.Tag(canoto__executionResults__stateRootPost, canoto.Len)
+	canoto__executionResults__hookArtifact__tag  = "\x2a" // canoto.Tag(canoto__executionResults__hookArtifact, canoto.Len)
 )
 
 type canotoData_executionResults struct {
@@ -79,6 +81,12 @@ func (*executionResults) CanotoSpec(types ...reflect.Type) *canoto.Spec {
 				Name:           "stateRootPost",
 				OneOf:          "",
 				TypeFixedBytes: uint64(len(zero.stateRootPost)),
+			},
+			{
+				FieldNumber: canoto__executionResults__hookArtifact,
+				Name:        "hookArtifact",
+				OneOf:       "",
+				TypeBytes:   true,
 			},
 		},
 	}
@@ -222,6 +230,17 @@ func (c *executionResults) UnmarshalCanotoFrom(r canoto.Reader) error {
 				return canoto.ErrZeroValue
 			}
 			r.B = r.B[expectedLength:]
+		case canoto__executionResults__hookArtifact:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadBytes(&r, &c.hookArtifact); err != nil {
+				return err
+			}
+			if len(c.hookArtifact) == 0 {
+				return canoto.ErrZeroValue
+			}
 		default:
 			return canoto.ErrUnknownField
 		}
@@ -268,6 +287,9 @@ func (c *executionResults) CalculateCanotoCache() {
 	}
 	if !canoto.IsZero(c.stateRootPost) {
 		size += uint64(len(canoto__executionResults__stateRootPost__tag)) + canoto.SizeBytes((&c.stateRootPost)[:])
+	}
+	if len(c.hookArtifact) != 0 {
+		size += uint64(len(canoto__executionResults__hookArtifact__tag)) + canoto.SizeBytes(c.hookArtifact)
 	}
 	atomic.StoreUint64(&c.canotoData.size, size)
 }
@@ -326,6 +348,10 @@ func (c *executionResults) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 	if !canoto.IsZero(c.stateRootPost) {
 		canoto.Append(&w, canoto__executionResults__stateRootPost__tag)
 		canoto.AppendBytes(&w, (&c.stateRootPost)[:])
+	}
+	if len(c.hookArtifact) != 0 {
+		canoto.Append(&w, canoto__executionResults__hookArtifact__tag)
+		canoto.AppendBytes(&w, c.hookArtifact)
 	}
 	return w
 }

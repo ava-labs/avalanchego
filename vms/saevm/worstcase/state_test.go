@@ -292,7 +292,8 @@ func TestMultipleBlocks(t *testing.T) {
 
 		got, err := state.FinishBlock()
 		require.NoError(t, err, "FinishBlock()")
-		target, c := sut.hooks.GasConfigAfter(header)
+		target, c, err := sut.hooks.GasConfigAfter(header)
+		require.NoError(t, err, "GasConfigAfter()")
 		require.NoError(t, wantLatestEndTime.AfterBlock(gas.Gas(state.GasUsed()), target, c), "AfterBlock()")
 
 		want := &blocks.WorstCaseBounds{

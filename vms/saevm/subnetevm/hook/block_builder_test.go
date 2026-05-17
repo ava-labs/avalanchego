@@ -60,12 +60,13 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 
 	// Builder side: stamp `builderCoinbase` into a real block.
 	builderPts := NewPoints(
-		nil, nil, &chainCfg,
+		nil, &chainCfg,
 		func() time.Time { return time.UnixMilli(int64(nowMS)) },
 		nil, nil, nil, builderCoinbase,
 	)
 	builderHdr, err := builderPts.blockBuilder.BuildHeader(parent)
 	require.NoError(t, err)
+	require.NoError(t, builderPts.blockBuilder.FinalizeHeader(builderHdr, settled))
 	builderBlock, err := builderPts.blockBuilder.BuildBlock(
 		builderHdr, nil, nil, []*types.Transaction{tx}, nil, nil, settled,
 	)
@@ -75,11 +76,12 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 
 	// Rebuilder side: a DIFFERENT node (rebuilderCoinbase != builderCoinbase)
 	// rebuilds builderBlock. Its rebuilt block must carry builderCoinbase.
-	rebuilderPts := NewPoints(nil, nil, &chainCfg, nil, nil, nil, nil, rebuilderCoinbase)
+	rebuilderPts := NewPoints(nil, &chainCfg, nil, nil, nil, nil, rebuilderCoinbase)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(builderBlock)
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
 	require.NoError(t, err)
+	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled))
 	rebuilt, err := rebuilder.BuildBlock(
 		rebuiltHdr, nil, nil, []*types.Transaction{tx}, nil, nil, settled,
 	)
@@ -144,11 +146,12 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	})
 	forgedBlock := types.NewBlockWithHeader(forgedHdr)
 
-	rebuilderPts := NewPoints(nil, nil, &chainCfg, nil, nil, nil, nil, forgedCoinbase /* same as builder; doesn't matter */)
+	rebuilderPts := NewPoints(nil, &chainCfg, nil, nil, nil, nil, forgedCoinbase /* same as builder; doesn't matter */)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(forgedBlock)
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
 	require.NoError(t, err)
+	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled))
 	rebuilt, err := rebuilder.BuildBlock(
 		rebuiltHdr, nil, nil, []*types.Transaction{tx}, nil, nil, settled,
 	)

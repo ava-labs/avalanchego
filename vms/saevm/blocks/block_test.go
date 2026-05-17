@@ -73,7 +73,7 @@ func newChain(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, s
 			// [newChain], and non-zero sub-second time for genesis is
 			// unnecessary.
 			h := hookstest.NewStub(1)
-			require.NoError(tb, b.MarkSynchronous(h, db, xdb, 0), "MarkSynchronous()")
+			require.NoError(tb, b.MarkSynchronous(h, db, nil, xdb, 0), "MarkSynchronous()")
 		}
 
 		parent = byNum[n]

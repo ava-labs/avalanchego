@@ -113,7 +113,11 @@ var (
 //
 // It is not necessary for [types.Header.GasLimit] nor [types.Header.BaseFee] to
 // be set. However, all other fields should be populated and
-// [types.Header.ParentHash] must match the previous block's hash.
+// [types.Header.ParentHash] must match the previous block's hash. In
+// particular, settled-state-dependent fields like `SettledHeight` MUST have
+// been stamped via [hook.BlockBuilder.FinalizeHeader] before this method is
+// called -- the worst-case `hooks.GasConfigAfter` call in
+// [State.FinishBlock] reads them off the header.
 //
 // If the queue is too full to accept another block, [ErrQueueFull] is returned.
 func (s *State) StartBlock(h *types.Header) error {
@@ -162,7 +166,9 @@ func safeMaxBlockSize(clock *gastime.Time) gas.Gas {
 	return min(clock.Rate(), maxSafeRate) * maxGasSecondsPerBlock
 }
 
-// StateDB returns the settled-state view captured in [NewState].
+// StateDB returns the underlying [state.StateDB] rooted at the settled
+// block captured in [NewState]. It is intended for hook
+// consumers that need to read settled-as-of-build-time state.
 func (s *State) StateDB() *state.StateDB {
 	return s.db
 }
@@ -222,8 +228,7 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 	}
 
 	// Compute rules at the LAST-SETTLED block so they correspond to the same
-	// as [State.db]. State-dependent precompile checks (e.g. the
-	// txallowlist sender check in vms/saevm/subnetevm) read storage from `s.db` and
+	// as [State.db]. State-dependent precompile checks read storage from `s.db` and
 	// gate that read with `rules.IsPrecompileEnabled(...)`.
 	settledRules := s.config.Rules(s.settled.Number, true /*isMerge*/, s.settled.Time)
 	if err := s.hooks.CanExecuteTransaction(settledRules, from, tx.To(), s.db); err != nil {
@@ -350,7 +355,10 @@ func (s *State) GasUsed() uint64 {
 // resulted in said transaction being included, which is reflected in the
 // indexing of tx-sender balances.
 func (s *State) FinishBlock() (*blocks.WorstCaseBounds, error) {
-	target, gasCfg := s.hooks.GasConfigAfter(s.curr)
+	target, gasCfg, err := s.hooks.GasConfigAfter(s.curr)
+	if err != nil {
+		return nil, fmt.Errorf("worst-case GasConfigAfter: %w", err)
+	}
 	if err := s.clock.AfterBlock(s.blockSize, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("finishing block gas time update: %w", err)
 	}
