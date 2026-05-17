@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -303,6 +304,15 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (
 			log.Info("Applying network upgrade overrides", "overrides", string(marshaled))
 		}
 		configExtra.Override(overrides)
+	}
+
+	if heliconTS, ok := configExtra.NetworkUpgrades.ScheduledHeliconTimestamp(); ok {
+		normalizedGenesisPrecompiles, err := retirement.ReconcileForHelicon(configExtra, g.Timestamp, heliconTS)
+		if err != nil {
+			return nil, err
+		}
+		configExtra.GenesisPrecompiles = normalizedGenesisPrecompiles
+		configExtra.PrecompileUpgrades = retirement.ForceDisableAtHelicon(configExtra, heliconTS)
 	}
 
 	if err := configExtra.Verify(); err != nil {

@@ -49,6 +49,14 @@ var (
 // This struct is used by Genesis and Fee Manager precompile.
 // Any modification of this struct has direct affect on the precompiled contract
 // and changes should be carefully handled in the precompiled contract code.
+//
+// Deprecated: superseded by ACP-176 (gas pricing) and ACP-224
+// (runtime fee config). Retained for the legacy `graft/subnet-evm`
+// plugin and the now-retired `feeManager` precompile. The new SAE
+// binary (`vms/saevm/subnetevm`) does not read or validate this type at
+// runtime; see [extras.ChainConfig.Verify] for the SAE entry point
+// that intentionally skips fee-config validation. Scheduled for
+// removal in `post-helicon-cleanup`.
 type FeeConfig struct {
 	// GasLimit sets the max amount of gas consumed per block.
 	GasLimit *big.Int `json:"gasLimit,omitempty"`
@@ -86,10 +94,17 @@ type FeeConfig struct {
 	BlockGasCostStep *big.Int `json:"blockGasCostStep,omitempty"`
 }
 
-// represents an empty fee config without any field
+// EmptyFeeConfig represents an empty fee config without any field.
+//
+// Deprecated: see [FeeConfig].
 var EmptyFeeConfig = FeeConfig{}
 
 // Verify checks fields of this config to ensure a valid fee configuration is provided.
+//
+// Deprecated: see [FeeConfig]. Only invoked by the legacy
+// `graft/subnet-evm` plugin (via [core.Genesis.Verify]) and the
+// retired `feeManager` precompile path. New SAE call sites should
+// not invoke this.
 func (f *FeeConfig) Verify() error {
 	switch {
 	case f.GasLimit == nil:
@@ -132,6 +147,8 @@ func (f *FeeConfig) Verify() error {
 }
 
 // Equal checks if given [other] is same with this FeeConfig.
+//
+// Deprecated: see [FeeConfig].
 func (f *FeeConfig) Equal(other *FeeConfig) bool {
 	if other == nil {
 		return false

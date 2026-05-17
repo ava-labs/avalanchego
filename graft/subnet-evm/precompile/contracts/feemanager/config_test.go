@@ -48,6 +48,42 @@ func TestVerify(t *testing.T) {
 	allowlisttest.VerifyPrecompileWithAllowListTests(t, feemanager.Module, tests)
 }
 
+// TestVerifyHeliconRetirement covers the rule that the legacy feeManager
+// precompile cannot be ENABLED at or after Helicon.
+func TestVerifyHeliconRetirement(t *testing.T) {
+	admins := []common.Address{allowlisttest.TestAdminAddr}
+
+	mkChainConfig := func(t *testing.T, isHelicon bool) precompileconfig.ChainConfig {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		c := precompileconfig.NewMockChainConfig(ctrl)
+		c.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+		c.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
+		c.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(true)
+		c.EXPECT().IsHelicon(gomock.Any()).AnyTimes().Return(isHelicon)
+		return c
+	}
+
+	tests := map[string]precompiletest.ConfigVerifyTest{
+		"enable pre-Helicon is allowed": {
+			Config:        feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			ChainConfig:   mkChainConfig(t, false),
+			ExpectedError: nil,
+		},
+		"enable at-or-after Helicon is rejected": {
+			Config:        feemanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			ChainConfig:   mkChainConfig(t, true),
+			ExpectedError: feemanager.ErrFeeManagerEnabledAfterHelicon,
+		},
+		"disable at-or-after Helicon is allowed": {
+			Config:        feemanager.NewDisableConfig(utils.PointerTo[uint64](3)),
+			ChainConfig:   mkChainConfig(t, true),
+			ExpectedError: nil,
+		},
+	}
+	precompiletest.RunVerifyTests(t, tests)
+}
+
 func TestEqual(t *testing.T) {
 	admins := []common.Address{allowlisttest.TestAdminAddr}
 	enableds := []common.Address{allowlisttest.TestEnabledAddr}

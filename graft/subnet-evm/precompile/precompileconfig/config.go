@@ -83,6 +83,8 @@ type ChainConfig interface {
 	AllowedFeeRecipients() bool
 	// IsDurango returns true if the time is after Durango.
 	IsDurango(time uint64) bool
+	// IsHelicon returns true if the time is at or after Helicon.
+	IsHelicon(time uint64) bool
 }
 
 // Rules defines the interface that provides information about the current rules of the chain.

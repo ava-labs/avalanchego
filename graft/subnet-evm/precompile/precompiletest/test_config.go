@@ -33,15 +33,16 @@ func RunVerifyTests(t *testing.T, tests map[string]ConfigVerifyTest) {
 			t.Helper()
 			require := require.New(t)
 
-			chainConfig := test.ChainConfig
-			if chainConfig == nil {
-				ctrl := gomock.NewController(t)
-				mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
-				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
-				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
-				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(true)
-				chainConfig = mockChainConfig
-			}
+		chainConfig := test.ChainConfig
+		if chainConfig == nil {
+			ctrl := gomock.NewController(t)
+			mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
+			mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
+			mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
+			mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(true)
+			mockChainConfig.EXPECT().IsHelicon(gomock.Any()).AnyTimes().Return(false)
+			chainConfig = mockChainConfig
+		}
 			err := test.Config.Verify(chainConfig)
 			require.ErrorIs(err, test.ExpectedError)
 		})
