@@ -64,7 +64,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	"github.com/ava-labs/avalanchego/ids"
@@ -562,14 +562,14 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, a
 	// Apply parse-time `feeManager` retirement at Helicon: reject
 	// post-Helicon upgrades, normalize a stale genesis activation,
 	// and inject the synthetic disable that wipes pre-existing
-	// storage at the Helicon block (see [feemanager.ReconcileForHelicon]).
+	// storage at the Helicon block.
 	if heliconTS, ok := configExtra.NetworkUpgrades.ScheduledHeliconTimestamp(); ok {
-		normalizedGenesisPrecompiles, err := feemanager.ReconcileForHelicon(configExtra, g.Timestamp, heliconTS)
+		normalizedGenesisPrecompiles, err := retirement.ReconcileForHelicon(configExtra, g.Timestamp, heliconTS)
 		if err != nil {
 			return nil, err
 		}
 		configExtra.GenesisPrecompiles = normalizedGenesisPrecompiles
-		configExtra.PrecompileUpgrades = feemanager.ForceDisableAtHelicon(configExtra, heliconTS)
+		configExtra.PrecompileUpgrades = retirement.ForceDisableAtHelicon(configExtra, heliconTS)
 	}
 
 	if err := g.Verify(); err != nil {

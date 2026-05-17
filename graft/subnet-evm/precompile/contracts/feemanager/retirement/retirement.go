@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package feemanager
+package retirement
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/utils"
 )
@@ -20,12 +21,13 @@ import (
 //     (enable OR disable) scheduled at `>= helicon`. Such entries are
 //     invalid under subnet-evm-sae and operators must remove them from
 //     `upgradeBytes`. Returns an error wrapping
-//     [ErrFeeManagerEnabledAfterHelicon] with the offending index for
-//     diagnosis.
+//     [feemanager.ErrFeeManagerEnabledAfterHelicon] with the
+//     offending index for diagnosis.
 //  2. Compute the post-normalization `GenesisPrecompiles` map: drop a
 //     `feeManager` entry that would activate at or after Helicon on a
 //     chain whose genesis pre-dates Helicon, so already-running chains
-//     do not brick on [Config.Verify]'s post-Helicon rejection.
+//     do not brick on [feemanager.Config.Verify]'s post-Helicon
+//     rejection.
 //     Genesis is immutable for an already-accepted chain, leaving the
 //     operator no recourse, hence this safety valve. The same
 //     workaround is intentionally NOT applied to
@@ -62,11 +64,11 @@ func ReconcileForHelicon(cfg *extras.ChainConfig, genesisTimestamp, helicon uint
 // avoid a spurious injection when a stale post-Helicon entry would
 // otherwise have been dropped.
 func ForceDisableAtHelicon(cfg *extras.ChainConfig, helicon uint64) []extras.PrecompileUpgrade {
-	if !cfg.IsPrecompileEnabled(ContractAddress, helicon) {
+	if !cfg.IsPrecompileEnabled(feemanager.ContractAddress, helicon) {
 		return cfg.PrecompileUpgrades
 	}
 	disable := extras.PrecompileUpgrade{
-		Config: NewDisableConfig(utils.PointerTo(helicon)),
+		Config: feemanager.NewDisableConfig(utils.PointerTo(helicon)),
 	}
 	out := insertUpgradeBeforeFirstAfter(cfg.PrecompileUpgrades, disable, helicon)
 	log.Warn(
@@ -78,7 +80,7 @@ func ForceDisableAtHelicon(cfg *extras.ChainConfig, helicon uint64) []extras.Pre
 
 func rejectUpgradesAtOrAfter(upgrades []extras.PrecompileUpgrade, helicon uint64) error {
 	for i, up := range upgrades {
-		if up.Key() != ConfigKey {
+		if up.Key() != feemanager.ConfigKey {
 			continue
 		}
 		ts := up.Timestamp()
@@ -91,7 +93,7 @@ func rejectUpgradesAtOrAfter(upgrades []extras.PrecompileUpgrade, helicon uint64
 		}
 		return fmt.Errorf(
 			"%w: %s upgrade at PrecompileUpgrades[%d] (timestamp=%d) (Helicon=%d); remove this entry from upgrades",
-			ErrFeeManagerEnabledAfterHelicon, kind, i, *ts, helicon,
+			feemanager.ErrFeeManagerEnabledAfterHelicon, kind, i, *ts, helicon,
 		)
 	}
 	return nil
@@ -102,7 +104,7 @@ func normalizeGenesisPrecompile(
 	genesisTimestamp uint64,
 	helicon uint64,
 ) map[string]precompileconfig.Config {
-	cfg, ok := genesisPrecompiles[ConfigKey]
+	cfg, ok := genesisPrecompiles[feemanager.ConfigKey]
 	// IsDisabled is technically not possible here because the precompile cannot be disabled at genesis
 	// but we check for it anyway to be safe; and defer to Config.Verify for the canonical error.
 	if !ok || cfg.IsDisabled() {
@@ -121,7 +123,7 @@ func normalizeGenesisPrecompile(
 
 	out := make(map[string]precompileconfig.Config, len(genesisPrecompiles)-1)
 	for k, v := range genesisPrecompiles {
-		if k == ConfigKey {
+		if k == feemanager.ConfigKey {
 			continue
 		}
 		out[k] = v

@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package feemanager_test
+package retirement_test
 
 import (
 	"testing"
@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/feemanagertest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -42,11 +42,10 @@ func TestRetirementCases(t *testing.T) {
 
 // simulateParseGenesis applies the same `feeManager`-related helper
 // composition that `parseGenesis` runs on each VM:
-//  1. [feemanager.ReconcileForHelicon] on the chain config.
-//  2. [feemanager.ForceDisableAtHelicon] on the post-reconcile config.
+//  1. [retirement.ReconcileForHelicon] on the chain config.
+//  2. [retirement.ForceDisableAtHelicon] on the post-reconcile config.
 //  3. [extras.ChainConfig.Verify] on the post-reconcile config; this
-//     covers the per-entry [feemanager.Config.Verify] pass that
-//     enforces the post-Helicon enable rejection.
+//     covers the per-entry post-Helicon enable rejection.
 //
 // Returns the post-reconcile chain config (so callers can assert on
 // `GenesisPrecompiles` + `PrecompileUpgrades`) and the first error
@@ -77,12 +76,12 @@ func simulateParseGenesis(t *testing.T, tc feemanagertest.RetirementCase, helico
 	chainConfig.GenesisPrecompiles = genesisPrecompiles
 	chainConfig.PrecompileUpgrades = tc.Upgrades
 
-	genesis, err := feemanager.ReconcileForHelicon(&chainConfig, tc.GenesisTimestamp, helicon)
+	genesis, err := retirement.ReconcileForHelicon(&chainConfig, tc.GenesisTimestamp, helicon)
 	if err != nil {
 		return nil, err
 	}
 	chainConfig.GenesisPrecompiles = genesis
-	chainConfig.PrecompileUpgrades = feemanager.ForceDisableAtHelicon(&chainConfig, helicon)
+	chainConfig.PrecompileUpgrades = retirement.ForceDisableAtHelicon(&chainConfig, helicon)
 
 	if err := chainConfig.Verify(); err != nil {
 		return nil, err
