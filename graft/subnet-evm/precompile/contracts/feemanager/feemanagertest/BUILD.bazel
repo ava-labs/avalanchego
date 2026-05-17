@@ -16,3 +16,8 @@ go_library(
         "@com_github_stretchr_testify//require",
     ],
 )
+
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])

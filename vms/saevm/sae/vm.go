@@ -156,7 +156,7 @@ func NewVM[T hook.Transaction](
 	vm.last.synchronous = lastSync.Height()
 
 	{ // ==========  Sync -> Async  ==========
-		if err := lastSync.MarkSynchronous(hooks, db, xdb, cfg.ExcessAfterLastSynchronous); err != nil {
+		if err := lastSync.MarkSynchronous(hooks, db, cfg.DBConfig.TrieDBConfig, xdb, cfg.ExcessAfterLastSynchronous); err != nil {
 			return nil, fmt.Errorf("%T{genesis}.MarkSynchronous(): %v", lastSync, err)
 		}
 		if err := canonicaliseLastSynchronous(db, lastSync); err != nil {

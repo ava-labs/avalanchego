@@ -125,11 +125,25 @@ func (p *Points) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, 
 	return saetypes.ExecutionResults{HeightIndex: db}, err
 }
 
-func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+// ExecutionArtifact returns nil: C-chain has no precompile-driven gas
+// configuration, so nothing needs to be persisted alongside execution results.
+func (*Points) ExecutionArtifact(*types.Header, libevm.StateReader) ([]byte, error) {
+	return nil, nil
+}
+
+// GasConfigAt returns ACP-176 defaults derived purely from `h`.
+func (p *Points) GasConfigAt(h *types.Header, _ libevm.StateReader) (gas.Gas, gastime.GasPriceConfig, error) {
+	return p.GasConfigAfter(h)
+}
+
+// GasConfigAfter returns ACP-176 defaults derived purely from `h`. C-chain
+// has no precompile-driven fee configuration, so no artifact lookup is
+// performed.
+func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, gastime.GasPriceConfig, error) {
 	return targetExcess(h).Target(), gastime.GasPriceConfig{
 		TargetToExcessScaling: acp176.TargetToExcessScaling,
 		MinPrice:              acp176.MinPrice,
-	}
+	}, nil
 }
 
 func targetExcess(h *types.Header) acp176.TargetExcess {

@@ -144,7 +144,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 
 	adminMint := sendMintTx(t, sut, adminIdx, target, mintAmount)
 	nonAdminMint := sendMintTx(t, sut, nonAdminIdx, target, mintAmount)
-	block := sut.buildAndAcceptBlock(t)
+	block := sut.buildAcceptExecuteBlock(t)
 	requireBlockContainsTxs(t, block, adminMint.Hash(), nonAdminMint.Hash())
 	sut.requireTxSucceeded(t, adminMint)
 	sut.requireTxFailed(t, nonAdminMint)
@@ -169,7 +169,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	// observable proof the precompile is no longer active.
 	sut.setTime(t, disableTime)
 	postDisableMint := sendMintTx(t, sut, adminIdx, target, mintAmount)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, postDisableMint.Hash(), block.Transactions()[0].Hash())
 
@@ -193,7 +193,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	// Allow the disable activation to settle so finalized catches up.
 	sut.advanceTime(t, saeparams.Tau+time.Second)
 	settleTx := sut.sendTransferTx(t, adminIdx, nonAdminIdx, common.Big1)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, settleTx.Hash(), block.Transactions()[0].Hash())
 	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, nativeminter.ContractAddress, admin, rpc.FinalizedBlockNumber),
@@ -206,7 +206,7 @@ func TestNativeMinterPrecompileUpgradesSAE(t *testing.T) {
 	// precompile already enabled with the new roles and succeeds.
 	sut.setTime(t, reenableTime)
 	managerMint := sendMintTx(t, sut, nonAdminIdx, target, mintAmount)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, managerMint.Hash(), block.Transactions()[0].Hash())
 	sut.requireTxSucceeded(t, managerMint)

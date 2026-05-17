@@ -110,7 +110,7 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// code at the deploy address.
 	adminDeploy := sut.sendDeployTx(t, adminIdx)
 	nonAdminDeploy := sut.sendDeployTx(t, nonAdminIdx)
-	block := sut.buildAndAcceptBlock(t)
+	block := sut.buildAcceptExecuteBlock(t)
 	requireBlockContainsTxs(t, block, adminDeploy.Hash(), nonAdminDeploy.Hash())
 	sut.requireDeploySucceeded(t, adminDeploy)
 	sut.requireDeployFailed(t, nonAdminDeploy)
@@ -121,7 +121,7 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// precompile already disabled and `CanCreateContract` is a no-op.
 	sut.setTime(t, disableTime)
 	postDisableDeploy := sut.sendDeployTx(t, nonAdminIdx)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, postDisableDeploy.Hash(), block.Transactions()[0].Hash())
 	sut.requireDeploySucceeded(t, postDisableDeploy)
@@ -141,7 +141,7 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// Allow the disable activation to settle so finalized catches up.
 	sut.advanceTime(t, saeparams.Tau+time.Second)
 	settleTx := sut.sendTransferTx(t, adminIdx, nonAdminIdx, common.Big1)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, settleTx.Hash(), block.Transactions()[0].Hash())
 	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, deployerallowlist.ContractAddress, admin, rpc.FinalizedBlockNumber),
@@ -155,7 +155,7 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// the new roles and succeeds.
 	sut.setTime(t, reenableTime)
 	managerDeploy := sut.sendDeployTx(t, nonAdminIdx)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, managerDeploy.Hash(), block.Transactions()[0].Hash())
 	sut.requireDeploySucceeded(t, managerDeploy)

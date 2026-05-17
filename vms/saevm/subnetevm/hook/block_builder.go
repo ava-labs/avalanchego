@@ -101,7 +101,7 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			// settled-state-as-of-build-time (rewardmanager precompile)
 			// which is not in scope here. [BuildBlock] receives the
 			// worst-case state from SAE and overwrites this field before
-			// the block is sealed.
+			// the block is sealed (see [blockBuilder.resolveCoinbase]).
 			Coinbase:         constants.BlackholeAddr,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
@@ -119,7 +119,7 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			TimeMilliseconds: utils.PointerTo[uint64](nowMS),
 			MinDelayExcess:   &mde,
 			TargetExcess:     &te,
-			SettledHeight:    utils.PointerTo[uint64](0), // Populated in BuildBlock
+			SettledHeight:    utils.PointerTo[uint64](0), // Populated in FinalizeHeader
 		},
 	), nil
 }
@@ -131,6 +131,22 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 // the rationale.
 func (*blockBuilder) PotentialEndOfBlockOps(_ context.Context, _ *types.Header, _ common.Hash, _ saetypes.BlockSource) iter.Seq[*Tx] {
 	return func(_ func(*Tx) bool) {}
+}
+
+// FinalizeHeader stamps the persisted `SettledHeight` field on `header` so
+// downstream hook lookups (e.g. [Points.GasConfigAfter]) can key into the
+// execution-results DB.
+//
+// `Coinbase` is intentionally NOT stamped here: it depends on the
+// settled-state read of the rewardmanager precompile and is therefore
+// resolved at [blockBuilder.BuildBlock] time, where the worst-case state
+// reader is passed in explicitly. This separation keeps `FinalizeHeader` a
+// pure function of the headers it receives.
+func (*blockBuilder) FinalizeHeader(header *types.Header, settled *types.Header) error {
+	settledHeight := settled.Number.Uint64()
+	headerExtra := customtypes.GetHeaderExtra(header)
+	headerExtra.SettledHeight = &settledHeight
+	return nil
 }
 
 var errEmptyBlock = errors.New("empty block")
@@ -159,9 +175,6 @@ func (b *blockBuilder) BuildBlock(
 	}
 	header.Extra = customheader.SetPredicateBytesInExtra(header.Extra, predicateBytes)
 
-	settledHeight := settled.Number.Uint64()
-	headerExtra := customtypes.GetHeaderExtra(header)
-	headerExtra.SettledHeight = &settledHeight
 	return types.NewBlock(
 		header,
 		txs,

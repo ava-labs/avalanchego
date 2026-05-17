@@ -113,7 +113,11 @@ var (
 //
 // It is not necessary for [types.Header.GasLimit] nor [types.Header.BaseFee] to
 // be set. However, all other fields should be populated and
-// [types.Header.ParentHash] must match the previous block's hash.
+// [types.Header.ParentHash] must match the previous block's hash. In
+// particular, settled-state-dependent fields like `SettledHeight` MUST have
+// been stamped via [hook.BlockBuilder.FinalizeHeader] before this method is
+// called -- the worst-case `hooks.GasConfigAfter` call in
+// [State.FinishBlock] reads them off the header.
 //
 // If the queue is too full to accept another block, [ErrQueueFull] is returned.
 func (s *State) StartBlock(h *types.Header) error {
@@ -351,7 +355,10 @@ func (s *State) GasUsed() uint64 {
 // resulted in said transaction being included, which is reflected in the
 // indexing of tx-sender balances.
 func (s *State) FinishBlock() (*blocks.WorstCaseBounds, error) {
-	target, gasCfg := s.hooks.GasConfigAfter(s.curr)
+	target, gasCfg, err := s.hooks.GasConfigAfter(s.curr)
+	if err != nil {
+		return nil, fmt.Errorf("worst-case GasConfigAfter: %w", err)
+	}
 	if err := s.clock.AfterBlock(s.blockSize, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("finishing block gas time update: %w", err)
 	}

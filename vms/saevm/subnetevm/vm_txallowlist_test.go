@@ -110,14 +110,14 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 		vmerrors.ErrSenderAddressNotAllowListed.Error(),
 		"non-admin tx must be rejected at mempool ingress while allowlist is enabled",
 	)
-	block := sut.buildAndAcceptBlock(t)
+	block := sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1, "non-admin tx must be excluded while allowlist is enabled")
 	require.Equal(t, fundNonAdmin.Hash(), block.Transactions()[0].Hash())
 
 	// Step 1: advance to `disableTime` and produce the activation block.
 	sut.setTime(t, disableTime)
 	disableActivationTx := sut.sendTransferTx(t, adminIdx, nonAdminIdx, common.Big1)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, disableActivationTx.Hash(), block.Transactions()[0].Hash())
 
@@ -139,7 +139,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	require.NoError(t, sut.client.SendTransaction(sut.ctx, droppedTx),
 		"previously-blocked tx must be admitted at mempool ingress once disable executes")
 	sut.advanceTime(t, saeparams.Tau+time.Second)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1, "previously-blocked tx must be included once disable settles")
 	require.Equal(t, droppedTx.Hash(), block.Transactions()[0].Hash())
 
@@ -153,7 +153,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// block.
 	sut.setTime(t, reenableTime)
 	reenableActivationTx := sut.sendTransferTx(t, adminIdx, nonAdminIdx, common.Big1)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, reenableActivationTx.Hash(), block.Transactions()[0].Hash())
 
@@ -171,7 +171,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	// (3) `nonAdmin` is now a manager and must be admissible
 	sut.advanceTime(t, saeparams.Tau+time.Second)
 	managerTx := sut.sendTransferTx(t, nonAdminIdx, adminIdx, common.Big1)
-	block = sut.buildAndAcceptBlock(t)
+	block = sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1, "manager tx must be admitted after re-enable settles")
 	require.Equal(t, managerTx.Hash(), block.Transactions()[0].Hash())
 

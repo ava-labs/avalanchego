@@ -74,7 +74,7 @@ func TestFeeManagerForceDisabledAtHeliconActivation(t *testing.T) {
 	// Build a block past Helicon. Activator fires the synthetic Disable
 	// upgrade, SelfDestruct + Finalise wipe 0x02..03.
 	settleTx := sut.sendTransferTx(t, adminIdx, 1, common.Big1)
-	block := sut.buildAndAcceptBlock(t)
+	block := sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, settleTx.Hash(), block.Transactions()[0].Hash())
 
@@ -152,4 +152,3 @@ func zeroFeeConfig() commontype.FeeConfig {
 		BlockGasCostStep:         new(big.Int),
 	}
 }
-

@@ -44,6 +44,9 @@ type executionResults struct {
 	baseFee       uint256.Int  `canoto:"fixed repeated uint,2"`
 	receiptRoot   common.Hash  `canoto:"fixed bytes,3"`
 	stateRootPost common.Hash  `canoto:"fixed bytes,4"`
+	// hookArtifact is arbitrary bytes returned by [hook.Points.ExecutionArtifact]
+	// and stored alongside SAE's own execution artifacts.
+	hookArtifact []byte `canoto:"bytes,5"`
 
 	ephemeralExecutionResults // not for canotofication
 
@@ -91,6 +94,7 @@ func (b *Block) MarkExecuted(
 	byGas *gastime.Time,
 	byWall time.Time,
 	baseFee *big.Int,
+	hookArtifact []byte,
 	receipts types.Receipts,
 	stateRootPost common.Hash,
 	lastExecuted *atomic.Pointer[Block],
@@ -110,6 +114,7 @@ func (b *Block) MarkExecuted(
 		byGas:         *byGas.Clone(),
 		receiptRoot:   types.DeriveSha(receipts, trie.NewStackTrie(nil)),
 		stateRootPost: stateRootPost,
+		hookArtifact:  hookArtifact,
 		ephemeralExecutionResults: ephemeralExecutionResults{
 			byWall:   byWall,
 			receipts: slices.Clone(receipts),
@@ -222,6 +227,7 @@ func (e *executionResults) executedByWallTime() time.Time       { return e.byWal
 func (e *executionResults) cloneBaseFee() *uint256.Int          { return e.baseFee.Clone() }
 func (e *executionResults) cloneReceiptsSlice() types.Receipts  { return slices.Clone(e.receipts) }
 func (e *executionResults) postExecutionStateRoot() common.Hash { return e.stateRootPost }
+func (e *executionResults) hookArtifactValue() []byte           { return slices.Clone(e.hookArtifact) }
 
 // ExecutedByGasTime blocks until [Block.MarkExecuted] has been called and
 // returns a clone of the gas time passed to it.
@@ -251,6 +257,12 @@ func (b *Block) Receipts() types.Receipts {
 // returns the state root passed to it.
 func (b *Block) PostExecutionStateRoot() common.Hash {
 	return executionArtefact(b, "state root", (*executionResults).postExecutionStateRoot)
+}
+
+// HookArtifact returns the opaque hook-owned artifact persisted with execution
+// results. It blocks until [Block.MarkExecuted] has been called.
+func (b *Block) HookArtifact() []byte {
+	return executionArtefact(b, "hook artifact", (*executionResults).hookArtifactValue)
 }
 
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
@@ -309,4 +321,11 @@ func PostExecutionStateRoot(xdb saetypes.ExecutionResults, blockNum uint64) (com
 // block was executed (as against the worst-case prediction).
 func ExecutionBaseFee(xdb saetypes.ExecutionResults, blockNum uint64) (*uint256.Int, error) {
 	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).cloneBaseFee)
+}
+
+// HookArtifact mirrors the behaviour of [Block.RestoreExecutionArtefacts],
+// without requiring a full [Block], and only returning the persisted
+// hook-owned artifact bytes at `blockNum`.
+func HookArtifact(xdb saetypes.ExecutionResults, blockNum uint64) ([]byte, error) {
+	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).hookArtifactValue)
 }

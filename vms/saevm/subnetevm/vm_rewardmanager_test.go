@@ -96,7 +96,7 @@ func settleRewardManagerMutation(t *testing.T, sut *SUT, fromIdx int) {
 	t.Helper()
 	sut.advanceTime(t, settleAdvance)
 	sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
-	_ = sut.buildAndAcceptBlock(t)
+	_ = sut.buildAcceptExecuteBlock(t)
 }
 
 // TestRewardManagerDefaultBurnSAE: no rewardmanager precompile,
@@ -115,7 +115,7 @@ func TestRewardManagerDefaultBurnSAE(t *testing.T) {
 	preBurn := balanceOf(t, sut, constants.BlackholeAddr)
 
 	tx := sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
-	block := sut.buildAndAcceptBlock(t)
+	block := sut.buildAcceptExecuteBlock(t)
 	requireBlockContainsTxs(t, block, tx.Hash())
 	sut.requireTxSucceeded(t, tx)
 
@@ -149,7 +149,7 @@ func TestRewardManagerGenesisAllowFeeRecipientsSAE(t *testing.T) {
 	preBurn := balanceOf(t, sut, constants.BlackholeAddr)
 
 	tx := sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
-	block := sut.buildAndAcceptBlock(t)
+	block := sut.buildAcceptExecuteBlock(t)
 	requireBlockContainsTxs(t, block, tx.Hash())
 	sut.requireTxSucceeded(t, tx)
 
@@ -245,7 +245,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 			mutation, err := s.mutationFn()
 			require.NoError(t, err)
 			mutationTx := sendRewardManagerTx(t, sut, adminIdx, mutation)
-			_ = sut.buildAndAcceptBlock(t)
+			_ = sut.buildAcceptExecuteBlock(t)
 			sut.requireTxSucceeded(t, mutationTx)
 
 			settleRewardManagerMutation(t, sut, adminIdx)
@@ -257,7 +257,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 
 			sut.advanceTime(t, blockBuildAdvance)
 			deliverTx := sendTippedTransferTxTo(t, sut, adminIdx, dustSink, common.Big1)
-			_ = sut.buildAndAcceptBlock(t)
+			_ = sut.buildAcceptExecuteBlock(t)
 			sut.requireTxSucceeded(t, deliverTx)
 
 			for _, r := range recipients {
@@ -277,7 +277,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 		data, err := rewardmanager.PackSetRewardAddress(common.HexToAddress("0xdead"))
 		require.NoError(t, err)
 		rejectTx := sendRewardManagerTx(t, sut, nonAdminIdx, data)
-		_ = sut.buildAndAcceptBlock(t)
+		_ = sut.buildAcceptExecuteBlock(t)
 		sut.requireTxFailed(t, rejectTx)
 	})
 }

@@ -225,6 +225,14 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	}
 
 	hdr.Root = lastSettled.PostExecutionStateRoot()
+	// Note: It might be tempting to pass the state here at first,
+	// but the state MAY change later due to ApplyTx/Apply.
+	if err := builder.FinalizeHeader(hdr, lastSettled.Header()); err != nil {
+		log.Warn("Could not finalize header for new block",
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("finalizing header for new block: %w", err)
+	}
 	if err := state.StartBlock(hdr); err != nil {
 		// A full queue is a normal mode of operation (backpressure working as
 		// intended) so should not be a warning.

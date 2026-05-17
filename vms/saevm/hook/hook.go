@@ -57,9 +57,19 @@ type Points interface {
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.
 	ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error)
+	// ExecutionArtifact returns hook-owned bytes derived from `state` (the
+	// post-execution state of the block identified by `h`). SAE persists the
+	// returned bytes alongside its own execution artifacts; the encoding is
+	// opaque to SAE. Implementations MAY return `nil` to indicate no artifact.
+	ExecutionArtifact(h *types.Header, state libevm.StateReader) ([]byte, error)
+	// GasConfigAt returns the gas target and configuration derived directly
+	// from `h`'s post-execution state.
+	GasConfigAt(h *types.Header, state libevm.StateReader) (target gas.Gas, c gastime.GasPriceConfig, err error)
 	// GasConfigAfter returns the gas target and configuration that should go
-	// into effect immediately after the provided block.
-	GasConfigAfter(*types.Header) (target gas.Gas, c gastime.GasPriceConfig)
+	// into effect immediately after `h`. Implementations resolve any
+	// previously-persisted hook artifact themselves, typically via a lookup
+	// keyed by [Points.SettledHeight] against [Points.ExecutionResultsDB].
+	GasConfigAfter(h *types.Header) (target gas.Gas, c gastime.GasPriceConfig, err error)
 	// BlockTime returns the exact block time for the given header, as recorded
 	// in [BlockBuilder.BuildHeader]. The returned time MUST match the header
 	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
@@ -116,6 +126,10 @@ type BlockBuilder[T Transaction] interface {
 	// SAE always uses this method instead of directly constructing a header, to
 	// ensure any libevm header extras are properly populated.
 	BuildHeader(parent *types.Header) (*types.Header, error)
+	// FinalizeHeader populates header fields on `hdr` that depend on `settled`
+	// SAE calls this after `lastSettled` has been determined and
+	// BEFORE the worst-case projection consumes the header.
+	FinalizeHeader(hdr *types.Header, settled *types.Header) error
 	// PotentialEndOfBlockOps returns an iterator of custom transactions that
 	// would be valid to include into a block.
 	//

@@ -33,7 +33,7 @@ import (
 // post-execution artefacts (other than the gas time).
 func (b *Block) markExecutedForTests(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, tm *gastime.Time) {
 	tb.Helper()
-	require.NoError(tb, b.MarkExecuted(db, xdb, tm, time.Time{}, new(big.Int), nil, common.Hash{}, new(atomic.Pointer[Block])), "MarkExecuted()")
+	require.NoError(tb, b.MarkExecuted(db, xdb, tm, time.Time{}, new(big.Int), nil, nil, common.Hash{}, new(atomic.Pointer[Block])), "MarkExecuted()")
 }
 
 func TestMarkExecuted(t *testing.T) {
@@ -98,7 +98,8 @@ func TestMarkExecuted(t *testing.T) {
 		})
 	}
 	lastExecuted := new(atomic.Pointer[Block])
-	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
+	hookArtifact := []byte("hook-owned-bytes")
+	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), hookArtifact, receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
 	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
 	require.NoError(t, fromDB.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "RestoreExecutionArtefacts()")
@@ -131,6 +132,7 @@ func TestMarkExecuted(t *testing.T) {
 			assert.Empty(t, cmp.Diff(receipts, b.Receipts(), cmputils.Receipts(), cmputils.NilSlicesAreEmpty[[]*types.Log]()), "Receipts()")
 
 			assert.Equal(t, stateRoot, b.PostExecutionStateRoot(), "PostExecutionStateRoot()") // i.e. this block
+			assert.Equal(t, hookArtifact, b.HookArtifact(), "HookArtifact()")
 			// Although not directly relevant to MarkExecuted, demonstrate that the
 			// two notions of a state root are in fact different.
 			assert.Equal(t, settles.EthBlock().Root(), b.SettledStateRoot(), "SettledStateRoot()") // i.e. the block this block settles
@@ -143,7 +145,7 @@ func TestMarkExecuted(t *testing.T) {
 			t.Run("MarkExecuted_again", func(t *testing.T) {
 				rec := saetest.NewLogRecorder(logging.Warn)
 				b.log = rec
-				require.ErrorIs(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), errMarkBlockExecutedAgain)
+				require.ErrorIs(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), hookArtifact, receipts, stateRoot, lastExecuted), errMarkBlockExecutedAgain)
 				// The database's head block might have been corrupted so this MUST
 				// be a fatal action.
 				assert.Len(t, rec.At(logging.Fatal), 1, "FATAL logs")

@@ -66,6 +66,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	)
 	builderHdr, err := builderPts.blockBuilder.BuildHeader(parent)
 	require.NoError(t, err)
+	require.NoError(t, builderPts.blockBuilder.FinalizeHeader(builderHdr, settled))
 	builderBlock, err := builderPts.blockBuilder.BuildBlock(
 		builderHdr, nil, nil, []*types.Transaction{tx}, nil, nil, settled,
 	)
@@ -80,6 +81,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
 	require.NoError(t, err)
+	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled))
 	rebuilt, err := rebuilder.BuildBlock(
 		rebuiltHdr, nil, nil, []*types.Transaction{tx}, nil, nil, settled,
 	)
@@ -149,6 +151,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
 	require.NoError(t, err)
+	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled))
 	rebuilt, err := rebuilder.BuildBlock(
 		rebuiltHdr, nil, nil, []*types.Transaction{tx}, nil, nil, settled,
 	)

@@ -11,7 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -69,9 +71,7 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 // behaviour is impossible under SAE rules.
 //
 // Arguments required by [Block.MarkExecuted] but not accepted by
-// MarkSynchronous are derived from the block to maintain invariants. The
-// `subSecondBlockTime` argument MUST follow the same constraints as the
-// respective [hook.Points] method.
+// MarkSynchronous are derived from the block to maintain invariants.
 //
 // MarkSynchronous and [Block.Synchronous] are not safe for concurrent use. This
 // method MUST therefore be called *before* instantiating the SAE VM.
@@ -85,13 +85,31 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 // has not yet commenced asynchronous execution.
 //
 // TODO(arr4n) refactor to avoid requiring DB writes.
-func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.ExecutionResults, excessAfter gas.Gas) error {
+func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, trieDBConfig *triedb.Config, xdb types.ExecutionResults, excessAfter gas.Gas) error {
 	ethB := b.EthBlock()
+	// State is read to derive the post-execution hook artifact (e.g. ACP-224
+	// gas-config pinning) and the initial gas target/config from `h`'s
+	// post-execution state. [saedb.Tracker] is the canonical state opener
+	// elsewhere, but it does not yet exist at this point in SAE init.
+	// TODO: route through the production [saedb.Tracker] once init ordering
+	// allows one to exist before MarkSynchronous.
+	stateDB, err := state.New(ethB.Root(), state.NewDatabaseWithConfig(db, trieDBConfig), nil)
+	if err != nil {
+		return fmt.Errorf("opening synchronous block state: %w", err)
+	}
+	hookArtifact, err := hooks.ExecutionArtifact(b.Header(), stateDB)
+	if err != nil {
+		return fmt.Errorf("hooks.ExecutionArtifact: %w", err)
+	}
+
 	// Receipts of a synchronous block have already been "settled" by the block
 	// itself. As the only reason to pass receipts here is for later settlement
 	// in another block, there is no need to pass anything meaningful as it
 	// would also require them to be received as an argument to MarkSynchronous.
-	target, cfg := hooks.GasConfigAfter(b.Header())
+	target, cfg, err := hooks.GasConfigAt(b.Header(), stateDB)
+	if err != nil {
+		return fmt.Errorf("hooks.GasConfigAt: %w", err)
+	}
 	execTime, err := gastime.New(
 		hooks.BlockTime(b.Header()),
 		// Target, excess, and config _after_ are a requirement of
@@ -107,6 +125,7 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 		byGas:         *execTime.Clone(),
 		receiptRoot:   ethB.ReceiptHash(),
 		stateRootPost: ethB.Root(),
+		hookArtifact:  hookArtifact,
 	}
 	if err := e.setBaseFee(ethB.BaseFee()); err != nil {
 		return err

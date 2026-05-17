@@ -5,6 +5,7 @@ package hook
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -12,12 +13,15 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/warp"
@@ -35,6 +39,10 @@ var _ saehook.PointsG[*Tx] = (*Points)(nil)
 type Points struct {
 	blockBuilder
 	warpStorage *warp.Storage
+	// xdb is captured by [Points.ExecutionResultsDB] and used by
+	// [Points.GasConfigAfter] to load the previously-persisted hook artifact
+	// at the height returned by [Points.SettledHeight].
+	xdb saetypes.ExecutionResults
 }
 
 // NewPoints constructs a new [Points] for use as a [saehook.PointsG].
@@ -84,14 +92,97 @@ func (p *Points) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, 
 		blockdb.DefaultConfig().WithDir(dataDir),
 		p.ctx.Log,
 	)
-	return saetypes.ExecutionResults{HeightIndex: db}, err
+	if err != nil {
+		return saetypes.ExecutionResults{}, err
+	}
+	p.xdb = saetypes.ExecutionResults{HeightIndex: db}
+	return p.xdb, nil
 }
 
-func (*Points) GasConfigAfter(h *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	return targetExcess(h).Target(), gastime.GasPriceConfig{
-		TargetToExcessScaling: acp176.TargetToExcessScaling,
-		MinPrice:              acp176.MinPrice,
+// ExecutionArtifact projects gaspricemanager storage into opaque bytes for
+// SAE to persist alongside its execution artifacts. Returns `nil` (read back
+// as defaults) when the precompile is not enabled at `h.Time` or has no
+// stored configuration.
+func (p *Points) ExecutionArtifact(h *types.Header, state libevm.StateReader) ([]byte, error) {
+	configExtra := subnetevmparams.GetExtra(p.chainConfig)
+	// Gate on `h.Time` (NOT `settled.Time`): `state` here is `h`'s post-exec
+	// state.
+	if !configExtra.IsPrecompileEnabled(gaspricemanager.ContractAddress, h.Time) {
+		return nil, nil
 	}
+	stored := gaspricemanager.GetStoredGasPriceConfig(state, gaspricemanager.ContractAddress)
+	if stored == (commontype.GasPriceConfig{}) {
+		// Activation runs [gaspricemanager.configurator.Configure] which
+		// always writes a non-zero config (MinGasPrice > 0), and the only
+		// mutator path also enforces non-zero via [commontype.GasPriceConfig.Verify].
+		// Reaching here therefore indicates corrupt or missing storage at an
+		// activated precompile, which would cause silent divergence if
+		// papered over with defaults.
+		return nil, fmt.Errorf("gaspricemanager enabled at block %d but storage is zero", h.Number)
+	}
+	art := gasConfigArtifact{
+		ValidatorTargetGas: stored.ValidatorTargetGas,
+		TargetGas:          gas.Gas(stored.TargetGas),
+		GasPriceConfig: gastime.GasPriceConfig{
+			TargetToExcessScaling: scalingFromTimeToDouble(stored.TimeToDouble),
+			MinPrice:              gas.Price(stored.MinGasPrice),
+			StaticPricing:         stored.StaticPricing,
+		},
+	}
+	return art.MarshalCanoto(), nil
+}
+
+// GasConfigAt derives the gas config directly from `h`'s post-execution state.
+func (p *Points) GasConfigAt(h *types.Header, state libevm.StateReader) (gas.Gas, gastime.GasPriceConfig, error) {
+	bytes, err := p.ExecutionArtifact(h, state)
+	if err != nil {
+		return 0, gastime.GasPriceConfig{}, err
+	}
+	return gasConfigFromArtifact(targetExcess(h).Target(), bytes)
+}
+
+// GasConfigAfter combines the previously-persisted hook artifact with the
+// current header. When validators control the target gas, the header's
+// `TargetExcess` remains the source of truth; otherwise the artifact pins the
+// target. The artifact is loaded from [Points.ExecutionResultsDB] keyed by
+// `SettledHeight(h)`; a missing entry or empty payload falls back to
+// header-derived defaults (e.g. for blocks settled before the gaspricemanager
+// precompile activated, and for synchronous blocks whose execution results
+// carry no artifact).
+func (p *Points) GasConfigAfter(h *types.Header) (gas.Gas, gastime.GasPriceConfig, error) {
+	headerTarget := targetExcess(h).Target()
+	bytes, err := blocks.HookArtifact(p.xdb, p.SettledHeight(h))
+	if err != nil {
+		return 0, gastime.GasPriceConfig{}, fmt.Errorf("loading gas-config artifact: %w", err)
+	}
+	return gasConfigFromArtifact(headerTarget, bytes)
+}
+
+func gasConfigFromArtifact(headerTarget gas.Gas, bytes []byte) (gas.Gas, gastime.GasPriceConfig, error) {
+	if len(bytes) == 0 {
+		return headerTarget, gastime.DefaultGasPriceConfig(), nil
+	}
+	art := new(gasConfigArtifact)
+	if err := art.UnmarshalCanoto(bytes); err != nil {
+		return 0, gastime.GasPriceConfig{}, fmt.Errorf("decoding gas-config artifact: %w", err)
+	}
+	target, cfg := art.effective(headerTarget)
+	return target, cfg, nil
+}
+
+// scalingFromTimeToDouble converts ACP-224's `TimeToDouble` (seconds) into the
+// K/T ratio used by ACP-176 / gastime: K = T * TimeToDouble / ln(2), so
+// TargetToExcessScaling = round(TimeToDouble / ln(2)). The default 60s
+// round-trips to the ACP-176 default of 87.
+//
+// For `StaticPricing` configs `TimeToDouble` is 0 and unused (gastime zeroes
+// excess in that branch instead of scaling), but the gastime invariant
+// requires `TargetToExcessScaling != 0`, so we return the ACP-176 default.
+func scalingFromTimeToDouble(ttd uint64) gas.Gas {
+	if ttd == 0 {
+		return acp176.TargetToExcessScaling
+	}
+	return gas.Gas(math.Round(float64(ttd) / math.Ln2))
 }
 
 func targetExcess(h *types.Header) acp176.TargetExcess {
