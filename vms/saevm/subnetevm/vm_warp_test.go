@@ -66,13 +66,13 @@ func withWarpEnabled() sutOption {
 			// `extra.GenesisPrecompiles` may still alias the map held by
 			// `paramstest.ForkToChainConfig[fork]`. Clone before writing
 			// so the warp entry stays scoped to this genesis.
-			new := maps.Clone(extra.GenesisPrecompiles)
-			if new == nil {
-				new = extras.Precompiles{}
+			cpy := maps.Clone(extra.GenesisPrecompiles)
+			if cpy == nil {
+				cpy = extras.Precompiles{}
 			}
 			activationTS := utils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix()))
-			new[warpcontract.ConfigKey] = warpcontract.NewDefaultConfig(activationTS)
-			extra.GenesisPrecompiles = new
+			cpy[warpcontract.ConfigKey] = warpcontract.NewDefaultConfig(activationTS)
+			extra.GenesisPrecompiles = cpy
 		}
 	})
 }

@@ -143,12 +143,15 @@ func (p *Points) GasConfigAt(h *types.Header, state libevm.StateReader) (gas.Gas
 
 // GasConfigAfter combines the previously-persisted hook artifact with the
 // current header. When validators control the target gas, the header's
-// `TargetExcess` remains the source of truth; otherwise the artifact pins the
-// target. The artifact is loaded from [Points.ExecutionResultsDB] keyed by
-// `SettledHeight(h)`; a missing entry or empty payload falls back to
-// header-derived defaults (e.g. for blocks settled before the gaspricemanager
-// precompile activated, and for synchronous blocks whose execution results
-// carry no artifact).
+// `TargetExcess` remains the source of truth; otherwise the artifact pins
+// the target. The artifact is loaded from [Points.ExecutionResultsDB] keyed
+// by `SettledHeight(h)`; an empty payload falls back to header-derived
+// defaults (e.g. for blocks settled before the gaspricemanager precompile
+// activated, and for synchronous blocks whose execution results carry no
+// artifact). A missing xdb entry is a chain-halting consensus-critical bug:
+// every settled height is guaranteed to have an [executionResults] row
+// (written by [Block.MarkSynchronous] / [Block.MarkExecuted]), so absence
+// indicates a persistence-layer fault rather than a normal state.
 func (p *Points) GasConfigAfter(h *types.Header) (gas.Gas, gastime.GasPriceConfig, error) {
 	headerTarget := targetExcess(h).Target()
 	bytes, err := blocks.HookArtifact(p.xdb, p.SettledHeight(h))

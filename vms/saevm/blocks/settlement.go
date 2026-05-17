@@ -91,6 +91,14 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, trieDBConf
 	// gas-config pinning) and the initial gas target/config from `h`'s
 	// post-execution state. [saedb.Tracker] is the canonical state opener
 	// elsewhere, but it does not yet exist at this point in SAE init.
+	//
+	// For always-SAE chains this opens the genesis state and is always safe
+	// (genesis state is committed by [core.SetupGenesisBlock]). For
+	// transition chains a non-genesis pre-SAE block whose state was pruned
+	// before the upgrade would cause this open to fail when the block is
+	// materialised via SAE's `settledBlockFromDB` (e.g. an `eth_getBlockByHash`
+	// RPC for an old block).
+	//
 	// TODO: route through the production [saedb.Tracker] once init ordering
 	// allows one to exist before MarkSynchronous.
 	stateDB, err := state.New(ethB.Root(), state.NewDatabaseWithConfig(db, trieDBConfig), nil)

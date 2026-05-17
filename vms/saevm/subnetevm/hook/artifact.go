@@ -14,8 +14,6 @@ import (
 // state that is persisted as a hook artifact (see [hook.Points.ExecutionArtifact]).
 // It is later combined with the consuming block's header in [Points.GasConfigAfter]
 // to derive the gas target and price config.
-//
-//nolint:revive // struct-tag: canoto allows unexported fields
 type gasConfigArtifact struct {
 	ValidatorTargetGas bool                   `canoto:"bool,1"`
 	TargetGas          gas.Gas                `canoto:"uint,2"`
