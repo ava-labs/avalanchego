@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -39,10 +38,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
@@ -56,11 +53,6 @@ type SUT struct {
 	// Wallet for issuing transactions
 	ethWallet     *saetest.Wallet
 	validatorKeys []*localsigner.LocalSigner
-
-	// For issuing atomic transactions
-	atomicKey    *secp256k1.PrivateKey
-	atomicMemory *avalancheatomic.Memory
-	avaxClient   *rpc.Client
 
 	// See [SUT.verifyWarpMessage]
 	appResponse chan []byte
@@ -81,19 +73,16 @@ func newSUT(t *testing.T) *SUT {
 	ctx := logger.CancelOnError(t.Context())
 
 	baseDB := memdb.New()
-	atomicMemory := avalancheatomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
-	snowCtx, validatorKeys := newSnowCtx(t, upgrades, atomicMemory)
+	snowCtx, validatorKeys := newSnowCtx(t, upgrades)
 
 	mempoolConf := legacypool.DefaultConfig
 	mempoolConf.Journal = "/dev/null"
 
 	const numKeys = 1
 	keychain := saetest.NewUNSAFEKeyChain(t, numKeys)
-	atomicKey, err := secp256k1.NewPrivateKey()
-	require.NoError(t, err)
 	g := &core.Genesis{
 		Config:     paramstest.ForkToChainConfig[fork],
-		Alloc:      saetest.MaxAllocFor(append(keychain.Addresses(), atomicKey.EthAddress())...),
+		Alloc:      saetest.MaxAllocFor(keychain.Addresses()...),
 		Timestamp:  saeparams.TauSeconds,
 		Difficulty: big.NewInt(0),
 	}
@@ -143,11 +132,6 @@ func newSUT(t *testing.T) *SUT {
 
 	client := ethclient.NewClient(rpcClient)
 
-	avaxServer := httptest.NewServer(handlers[avaxHTTPExtensionPath])
-	t.Cleanup(avaxServer.Close)
-	avaxClient, err := rpc.Dial("http://" + avaxServer.Listener.Addr().String())
-	require.NoError(t, err)
-
 	// TODO(alarso16): delete this - it should be on the VM
 	lastID, err := vm.LastAccepted(ctx)
 	require.NoError(t, err)
@@ -165,9 +149,6 @@ func newSUT(t *testing.T) *SUT {
 		validatorKeys: validatorKeys,
 		appResponse:   appResponseCh,
 		appErr:        appErrCh,
-		atomicKey:     atomicKey,
-		atomicMemory:  atomicMemory,
-		avaxClient:    avaxClient,
 	}
 }
 
@@ -192,14 +173,13 @@ func (s *SUT) acceptAndExecuteBlock(t *testing.T, built *blocks.Block) {
 	require.NoError(t, built.WaitUntilExecuted(s.ctx))
 }
 
-func newSnowCtx(t *testing.T, upgrades upgrade.Config, atomicMemory *avalancheatomic.Memory) (*snow.Context, []*localsigner.LocalSigner) {
+func newSnowCtx(t *testing.T, upgrades upgrade.Config) (*snow.Context, []*localsigner.LocalSigner) {
 	t.Helper()
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	snowCtx.NetworkUpgrades = upgrades
 	validatorState, validatorKeys := newValidatorState(snowCtx.SubnetID)
 	snowCtx.ValidatorState = validatorState
-	snowCtx.SharedMemory = atomicMemory.NewSharedMemory(snowCtx.ChainID)
 	return snowCtx, validatorKeys
 }
 
