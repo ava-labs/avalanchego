@@ -28,23 +28,23 @@ var GasPriceManagerABI = contract.ParseABI(GasPriceManagerRawABI)
 const (
 	numGasPriceConfigField = 5 // validatorTargetGas, targetGas, staticPricing, minGasPrice, timeToDouble
 
-	getGasPriceConfigGasCost              uint64 = contract.ReadGasCostPerSlot
-	getGasPriceConfigLastChangedAtGasCost uint64 = contract.ReadGasCostPerSlot
+	GetGasPriceConfigGasCost              uint64 = contract.ReadGasCostPerSlot
+	GetGasPriceConfigLastChangedAtGasCost uint64 = contract.ReadGasCostPerSlot
 	// GasPriceConfigUpdated has 2 topics (event sig + indexed sender) and non-indexed
 	// data containing old + new GasPriceConfig. Each config has numGasPriceConfigField
 	// static fields, each ABI-encoded as a 32-byte word, so the total data size
 	// is numGasPriceConfigField * 32 bytes * 2 configs.
 	gasPriceConfigUpdatedEventGasCost uint64 = contract.LogGas + contract.LogTopicGas*2 + contract.LogDataGas*numGasPriceConfigField*common.HashLength*2
-	setGasPriceConfigGasCost          uint64 = allowlist.ReadAllowListGasCost +
+	SetGasPriceConfigGasCost          uint64 = allowlist.ReadAllowListGasCost +
 		contract.WriteGasCostPerSlot*2 + // gas price config slot + lastChangedAt slot
-		getGasPriceConfigGasCost + // reading old config for event
+		GetGasPriceConfigGasCost + // reading old config for event
 		gasPriceConfigUpdatedEventGasCost
 )
 
 var (
-	errCannotSetGasPriceConfig = errors.New("non-enabled cannot call setGasPriceConfig")
+	ErrCannotSetGasPriceConfig = errors.New("non-enabled cannot call setGasPriceConfig")
 	errInvalidABIConfig        = errors.New("failed to convert ABI config")
-	errNilBlockNumber          = errors.New("block number cannot be nil")
+	ErrNilBlockNumber          = errors.New("block number cannot be nil")
 )
 
 var gasPriceManagerPrecompile = createGasPriceManagerPrecompile()
@@ -83,7 +83,7 @@ func getGasPriceConfig(
 	suppliedGas uint64,
 	readOnly bool, // ignored - method only reads
 ) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, getGasPriceConfigGasCost); err != nil {
+	if remainingGas, err = contract.DeductGas(suppliedGas, GetGasPriceConfigGasCost); err != nil {
 		return nil, 0, err
 	}
 
@@ -125,7 +125,7 @@ func getGasPriceConfigLastChangedAt(
 	suppliedGas uint64,
 	readOnly bool, // ignored - method only reads
 ) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, getGasPriceConfigLastChangedAtGasCost); err != nil {
+	if remainingGas, err = contract.DeductGas(suppliedGas, GetGasPriceConfigLastChangedAtGasCost); err != nil {
 		return nil, 0, err
 	}
 
@@ -168,7 +168,7 @@ func setGasPriceConfig(
 	suppliedGas uint64,
 	readOnly bool,
 ) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, setGasPriceConfigGasCost); err != nil {
+	if remainingGas, err = contract.DeductGas(suppliedGas, SetGasPriceConfigGasCost); err != nil {
 		return nil, 0, err
 	}
 
@@ -179,7 +179,7 @@ func setGasPriceConfig(
 	stateDB := accessibleState.GetStateDB()
 	callerStatus := GetGasPriceManagerAllowListStatus(stateDB, self, caller)
 	if !callerStatus.IsEnabled() {
-		return nil, remainingGas, fmt.Errorf("%w: %s", errCannotSetGasPriceConfig, caller)
+		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotSetGasPriceConfig, caller)
 	}
 
 	gasPriceConfig, err := UnpackSetGasPriceConfigInput(input)
@@ -189,7 +189,7 @@ func setGasPriceConfig(
 
 	blockNumber := accessibleState.GetBlockContext().Number()
 	if blockNumber == nil {
-		return nil, remainingGas, errNilBlockNumber
+		return nil, remainingGas, ErrNilBlockNumber
 	}
 
 	oldConfig := GetStoredGasPriceConfig(stateDB, self)
