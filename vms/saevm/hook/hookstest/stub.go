@@ -36,7 +36,8 @@ type Stub struct {
 	InvalidOpIDs            set.Set[ids.ID]
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
-	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
+	CanExecuteTransactionFn func(params.Rules, common.Address, *common.Address, libevm.StateReader) error
+	BeforeExecutingBlockFn  func(params.Rules, *types.Header, *state.StateDB, *types.Block) error
 	GasPriceConfig          gastime.GasPriceConfig
 }
 
@@ -233,15 +234,19 @@ func getHeaderExtra(hdr *types.Header) extra {
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
 // otherwise it allows all transactions.
-func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr libevm.StateReader) error {
+func (s *Stub) CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, sr libevm.StateReader) error {
 	if fn := s.CanExecuteTransactionFn; fn != nil {
-		return fn(from, to, sr)
+		return fn(rules, from, to, sr)
 	}
 	return nil
 }
 
-// BeforeExecutingBlock is a no-op that always returns nil.
-func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+// BeforeExecutingBlock proxies to [Stub.BeforeExecutingBlockFn] if non-nil,
+// otherwise it is a no-op that always returns nil.
+func (s *Stub) BeforeExecutingBlock(rules params.Rules, parent *types.Header, sdb *state.StateDB, block *types.Block) error {
+	if fn := s.BeforeExecutingBlockFn; fn != nil {
+		return fn(rules, parent, sdb, block)
+	}
 	return nil
 }
 
