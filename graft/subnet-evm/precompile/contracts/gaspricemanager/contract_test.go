@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package gaspricemanager
+package gaspricemanager_test
 
 import (
 	"math/big"
@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
 )
 
@@ -38,7 +39,7 @@ var (
 
 	// defaultConfig sets up roles via Configure, which also stores
 	// DefaultGasPriceConfig to contract storage.
-	defaultConfig = &Config{
+	defaultConfig = &gaspricemanager.Config{
 		AllowListConfig: allowlist.AllowListConfig{
 			AdminAddresses:   []common.Address{allowlisttest.TestAdminAddr},
 			ManagerAddresses: []common.Address{allowlisttest.TestManagerAddr},
@@ -49,40 +50,40 @@ var (
 
 func mustPackGetGasPriceConfigInput(t testing.TB) []byte {
 	t.Helper()
-	input, err := PackGetGasPriceConfig()
+	input, err := gaspricemanager.PackGetGasPriceConfig()
 	require.NoError(t, err, "PackGetGasPriceConfig()")
 	return input
 }
 
 func mustPackGetGasPriceConfigLastChangedAtInput(t testing.TB) []byte {
 	t.Helper()
-	input, err := PackGetGasPriceConfigLastChangedAt()
+	input, err := gaspricemanager.PackGetGasPriceConfigLastChangedAt()
 	require.NoError(t, err, "PackGetGasPriceConfigLastChangedAt()")
 	return input
 }
 
 func mustPackSetGasPriceConfigInput(t testing.TB, config commontype.GasPriceConfig) []byte {
 	t.Helper()
-	input, err := PackSetGasPriceConfig(config)
+	input, err := gaspricemanager.PackSetGasPriceConfig(config)
 	require.NoError(t, err, "PackSetGasPriceConfig()")
 	return input
 }
 
 func mustStoreTestGasPriceConfig(t testing.TB, state *extstate.StateDB) {
 	t.Helper()
-	require.NoError(t, StoreGasPriceConfig(state, ContractAddress, testGasPriceConfig, testBlockNumber), "StoreGasPriceConfig()")
+	require.NoError(t, gaspricemanager.StoreGasPriceConfig(state, gaspricemanager.ContractAddress, testGasPriceConfig, testBlockNumber), "StoreGasPriceConfig()")
 }
 
 func mustPackGetGasPriceConfigOutput(t testing.TB, config commontype.GasPriceConfig) []byte {
 	t.Helper()
-	res, err := PackGetGasPriceConfigOutput(config)
+	res, err := gaspricemanager.PackGetGasPriceConfigOutput(config)
 	require.NoError(t, err, "PackGetGasPriceConfigOutput()")
 	return res
 }
 
 func mustPackGetGasPriceConfigLastChangedAtOutput(t testing.TB, blockNumber *big.Int) []byte {
 	t.Helper()
-	res, err := PackGetGasPriceConfigLastChangedAtOutput(blockNumber)
+	res, err := gaspricemanager.PackGetGasPriceConfigLastChangedAtOutput(blockNumber)
 	require.NoError(t, err, "PackGetGasPriceConfigLastChangedAtOutput()")
 	return res
 }
@@ -95,7 +96,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller:      allowlisttest.TestNoRoleAddr,
 			Config:      defaultConfig,
 			InputFn:     mustPackGetGasPriceConfigInput,
-			SuppliedGas: getGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigOutput(t, commontype.DefaultGasPriceConfig()),
 		},
 		{
@@ -103,7 +104,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller:      allowlisttest.TestEnabledAddr,
 			Config:      defaultConfig,
 			InputFn:     mustPackGetGasPriceConfigInput,
-			SuppliedGas: getGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigOutput(t, commontype.DefaultGasPriceConfig()),
 		},
 		{
@@ -111,7 +112,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller:      allowlisttest.TestManagerAddr,
 			Config:      defaultConfig,
 			InputFn:     mustPackGetGasPriceConfigInput,
-			SuppliedGas: getGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigOutput(t, commontype.DefaultGasPriceConfig()),
 		},
 		{
@@ -119,17 +120,17 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller:      allowlisttest.TestAdminAddr,
 			Config:      defaultConfig,
 			InputFn:     mustPackGetGasPriceConfigInput,
-			SuppliedGas: getGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigOutput(t, commontype.DefaultGasPriceConfig()),
 		},
 		{
 			Name:    "getGasPriceConfig_returns_initialGasPriceConfig_from_configure",
 			Caller:  allowlisttest.TestNoRoleAddr,
 			InputFn: mustPackGetGasPriceConfigInput,
-			Config: &Config{
+			Config: &gaspricemanager.Config{
 				InitialGasPriceConfig: &testGasPriceConfig,
 			},
-			SuppliedGas: getGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigOutput(t, testGasPriceConfig),
 		},
 		{
@@ -137,7 +138,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller:      allowlisttest.TestEnabledAddr,
 			BeforeHook:  mustStoreTestGasPriceConfig,
 			InputFn:     mustPackGetGasPriceConfigInput,
-			SuppliedGas: getGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigOutput(t, testGasPriceConfig),
 		},
 		{
@@ -145,17 +146,17 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller: allowlisttest.TestEnabledAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				t.Helper()
-				require.NoError(t, StoreGasPriceConfig(state, ContractAddress, testBoolGasPriceConfig, testBlockNumber), "StoreGasPriceConfig()")
+				require.NoError(t, gaspricemanager.StoreGasPriceConfig(state, gaspricemanager.ContractAddress, testBoolGasPriceConfig, testBlockNumber), "StoreGasPriceConfig()")
 			},
 			InputFn:     mustPackGetGasPriceConfigInput,
-			SuppliedGas: getGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigOutput(t, testBoolGasPriceConfig),
 		},
 		{
 			Name:        "getGasPriceConfig_insufficient_gas",
 			Caller:      allowlisttest.TestNoRoleAddr,
 			InputFn:     mustPackGetGasPriceConfigInput,
-			SuppliedGas: getGasPriceConfigGasCost - 1,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigGasCost - 1,
 			ExpectedErr: vm.ErrOutOfGas,
 		},
 
@@ -165,7 +166,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller:      allowlisttest.TestNoRoleAddr,
 			BeforeHook:  mustStoreTestGasPriceConfig,
 			InputFn:     mustPackGetGasPriceConfigLastChangedAtInput,
-			SuppliedGas: getGasPriceConfigLastChangedAtGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigLastChangedAtGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigLastChangedAtOutput(t, testBlockNumber),
 		},
 		{
@@ -173,7 +174,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller:      allowlisttest.TestEnabledAddr,
 			BeforeHook:  mustStoreTestGasPriceConfig,
 			InputFn:     mustPackGetGasPriceConfigLastChangedAtInput,
-			SuppliedGas: getGasPriceConfigLastChangedAtGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigLastChangedAtGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigLastChangedAtOutput(t, testBlockNumber),
 		},
 		{
@@ -181,7 +182,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller:      allowlisttest.TestManagerAddr,
 			BeforeHook:  mustStoreTestGasPriceConfig,
 			InputFn:     mustPackGetGasPriceConfigLastChangedAtInput,
-			SuppliedGas: getGasPriceConfigLastChangedAtGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigLastChangedAtGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigLastChangedAtOutput(t, testBlockNumber),
 		},
 		{
@@ -189,14 +190,14 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller:      allowlisttest.TestAdminAddr,
 			BeforeHook:  mustStoreTestGasPriceConfig,
 			InputFn:     mustPackGetGasPriceConfigLastChangedAtInput,
-			SuppliedGas: getGasPriceConfigLastChangedAtGasCost,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigLastChangedAtGasCost,
 			ExpectedRes: mustPackGetGasPriceConfigLastChangedAtOutput(t, testBlockNumber),
 		},
 		{
 			Name:        "getGasPriceConfigLastChangedAt_insufficient_gas",
 			Caller:      allowlisttest.TestNoRoleAddr,
 			InputFn:     mustPackGetGasPriceConfigLastChangedAtInput,
-			SuppliedGas: getGasPriceConfigLastChangedAtGasCost - 1,
+			SuppliedGas: gaspricemanager.GetGasPriceConfigLastChangedAtGasCost - 1,
 			ExpectedErr: vm.ErrOutOfGas,
 		},
 
@@ -208,8 +209,8 @@ func TestGasPriceManagerRun(t *testing.T) {
 			InputFn: func(t testing.TB) []byte {
 				return mustPackSetGasPriceConfigInput(t, testGasPriceConfig)
 			},
-			SuppliedGas: setGasPriceConfigGasCost,
-			ExpectedErr: errCannotSetGasPriceConfig,
+			SuppliedGas: gaspricemanager.SetGasPriceConfigGasCost,
+			ExpectedErr: gaspricemanager.ErrCannotSetGasPriceConfig,
 		},
 		{
 			Name:   "setGasPriceConfig_from_Enabled",
@@ -218,10 +219,10 @@ func TestGasPriceManagerRun(t *testing.T) {
 			InputFn: func(t testing.TB) []byte {
 				return mustPackSetGasPriceConfigInput(t, testGasPriceConfig)
 			},
-			SuppliedGas: setGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.SetGasPriceConfigGasCost,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				got := GetStoredGasPriceConfig(state, ContractAddress)
+				got := gaspricemanager.GetStoredGasPriceConfig(state, gaspricemanager.ContractAddress)
 				require.Equal(t, testGasPriceConfig, got, "GetStoredGasPriceConfig()")
 			},
 		},
@@ -232,10 +233,10 @@ func TestGasPriceManagerRun(t *testing.T) {
 			InputFn: func(t testing.TB) []byte {
 				return mustPackSetGasPriceConfigInput(t, testGasPriceConfig)
 			},
-			SuppliedGas: setGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.SetGasPriceConfigGasCost,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				got := GetStoredGasPriceConfig(state, ContractAddress)
+				got := gaspricemanager.GetStoredGasPriceConfig(state, gaspricemanager.ContractAddress)
 				require.Equal(t, testGasPriceConfig, got, "GetStoredGasPriceConfig()")
 			},
 		},
@@ -246,10 +247,10 @@ func TestGasPriceManagerRun(t *testing.T) {
 			InputFn: func(t testing.TB) []byte {
 				return mustPackSetGasPriceConfigInput(t, testGasPriceConfig)
 			},
-			SuppliedGas: setGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.SetGasPriceConfigGasCost,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				got := GetStoredGasPriceConfig(state, ContractAddress)
+				got := gaspricemanager.GetStoredGasPriceConfig(state, gaspricemanager.ContractAddress)
 				require.Equal(t, testGasPriceConfig, got, "GetStoredGasPriceConfig()")
 			},
 		},
@@ -260,7 +261,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 			InputFn: func(t testing.TB) []byte {
 				return mustPackSetGasPriceConfigInput(t, testGasPriceConfig)
 			},
-			SuppliedGas: setGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.SetGasPriceConfigGasCost,
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection,
 		},
@@ -270,7 +271,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 			InputFn: func(t testing.TB) []byte {
 				return mustPackSetGasPriceConfigInput(t, testGasPriceConfig)
 			},
-			SuppliedGas: setGasPriceConfigGasCost - 1,
+			SuppliedGas: gaspricemanager.SetGasPriceConfigGasCost - 1,
 			ExpectedErr: vm.ErrOutOfGas,
 		},
 		{
@@ -278,8 +279,8 @@ func TestGasPriceManagerRun(t *testing.T) {
 			Caller: allowlisttest.TestEnabledAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				t.Helper()
-				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
-				require.NoError(t, StoreGasPriceConfig(state, ContractAddress, commontype.DefaultGasPriceConfig(), big.NewInt(0)), "StoreGasPriceConfig()")
+				allowlisttest.SetDefaultRoles(gaspricemanager.Module.Address)(t, state)
+				require.NoError(t, gaspricemanager.StoreGasPriceConfig(state, gaspricemanager.ContractAddress, commontype.DefaultGasPriceConfig(), big.NewInt(0)), "StoreGasPriceConfig()")
 			},
 			InputFn: func(t testing.TB) []byte {
 				return mustPackSetGasPriceConfigInput(t, testGasPriceConfig)
@@ -288,8 +289,8 @@ func TestGasPriceManagerRun(t *testing.T) {
 				mbc.EXPECT().Number().Return((*big.Int)(nil)).AnyTimes()
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
-			SuppliedGas: setGasPriceConfigGasCost,
-			ExpectedErr: errNilBlockNumber,
+			SuppliedGas: gaspricemanager.SetGasPriceConfigGasCost,
+			ExpectedErr: gaspricemanager.ErrNilBlockNumber,
 		},
 		{
 			Name:   "setGasPriceConfig_invalid_config",
@@ -301,7 +302,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 					TimeToDouble: 60,
 				})
 			},
-			SuppliedGas: setGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.SetGasPriceConfigGasCost,
 			ExpectedErr: commontype.ErrMinGasPriceTooLow,
 		},
 		{
@@ -315,22 +316,22 @@ func TestGasPriceManagerRun(t *testing.T) {
 				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
-			SuppliedGas: setGasPriceConfigGasCost,
+			SuppliedGas: gaspricemanager.SetGasPriceConfigGasCost,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				gasPriceConfig := GetStoredGasPriceConfig(state, ContractAddress)
+				gasPriceConfig := gaspricemanager.GetStoredGasPriceConfig(state, gaspricemanager.ContractAddress)
 				require.Equal(t, testGasPriceConfig, gasPriceConfig, "GetStoredGasPriceConfig()")
 
-				lastChangedAt := GetGasPriceConfigLastChangedAt(state, ContractAddress)
+				lastChangedAt := gaspricemanager.GetGasPriceConfigLastChangedAt(state, gaspricemanager.ContractAddress)
 				require.Equal(t, testBlockNumber, lastChangedAt, "GetGasPriceConfigLastChangedAt()")
 
 				logs := state.Logs()
 				require.Len(t, logs, 1, "logs emitted")
 				log := logs[0]
-				require.Equal(t, ContractAddress, log.Address, "log address")
+				require.Equal(t, gaspricemanager.ContractAddress, log.Address, "log address")
 
 				require.Len(t, log.Topics, 2, "topics (event sig + indexed sender)")
-				wantTopics, _, err := PackGasPriceConfigUpdatedEvent(
+				wantTopics, _, err := gaspricemanager.PackGasPriceConfigUpdatedEvent(
 					allowlisttest.TestEnabledAddr,
 					commontype.DefaultGasPriceConfig(),
 					testGasPriceConfig,
@@ -338,7 +339,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 				require.NoError(t, err, "PackGasPriceConfigUpdatedEvent()")
 				require.Equal(t, wantTopics, log.Topics, "event topics")
 
-				unpacked, err := UnpackGasPriceConfigUpdatedEventData(log.Data)
+				unpacked, err := gaspricemanager.UnpackGasPriceConfigUpdatedEventData(log.Data)
 				require.NoError(t, err, "UnpackGasPriceConfigUpdatedEventData()")
 				require.Equal(t, commontype.DefaultGasPriceConfig(), unpacked.OldGasPriceConfig, "old gas price config in event")
 				require.Equal(t, testGasPriceConfig, unpacked.NewGasPriceConfig, "new gas price config in event")
@@ -346,7 +347,7 @@ func TestGasPriceManagerRun(t *testing.T) {
 		},
 	}
 
-	allowlisttest.RunPrecompileWithAllowListTests(t, Module, tests)
+	allowlisttest.RunPrecompileWithAllowListTests(t, gaspricemanager.Module, tests)
 }
 
 func TestUnpackSetGasPriceConfigInput_malformed(t *testing.T) {
@@ -372,7 +373,7 @@ func TestUnpackSetGasPriceConfigInput_malformed(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := UnpackSetGasPriceConfigInput(tt.input)
+			_, err := gaspricemanager.UnpackSetGasPriceConfigInput(tt.input)
 			//nolint:forbidigo // ABI decode errors are unexported; ErrorIs is not possible
 			require.ErrorContains(t, err, tt.wantErr, "UnpackSetGasPriceConfigInput(%x)", tt.input)
 		})
