@@ -135,13 +135,18 @@ type BlockBuilder[T Transaction] interface {
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
+	//
+	// `worstcaseState` is SAE's worst-case [state.StateDB] (read-only),
+	// rooted at `settled`'s post-execution state. `settled` is the
+	// last-settled block at build time and is deterministic across nodes (see [blocks.LastToSettleAt]).
 	BuildBlock(
 		header *types.Header,
+		worstcaseState libevm.StateReader,
 		blockCtx *block.Context,
 		txs []*types.Transaction,
 		receipts []*types.Receipt,
 		endOfBlockOps []T,
-		settledHeight uint64,
+		settled *types.Header,
 	) (*types.Block, error)
 }
 

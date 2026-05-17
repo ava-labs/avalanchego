@@ -146,13 +146,14 @@ func (s *Stub) PotentialEndOfBlockOps(ctx context.Context, header *types.Header,
 // BuildBlock calls [BuildBlock] with its arguments.
 func (*Stub) BuildBlock(
 	header *types.Header,
+	_ libevm.StateReader,
 	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settledHeight uint64,
+	settled *types.Header,
 ) (*types.Block, error) {
-	return BuildBlock(header, blockCtx, txs, receipts, ops, settledHeight)
+	return BuildBlock(header, blockCtx, txs, receipts, ops, settled)
 }
 
 // BuildBlock encodes ops into [types.Header.Extra] and calls [types.NewBlock]
@@ -163,7 +164,7 @@ func BuildBlock(
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settledHeight uint64,
+	settled *types.Header,
 ) (*types.Block, error) {
 	var e extra
 	// If the header originally had fractional seconds set, we keep them in the
@@ -173,7 +174,7 @@ func BuildBlock(
 	}
 
 	e.ops = ops
-	e.settledHeight = settledHeight
+	e.settledHeight = settled.Number.Uint64()
 	header.Extra = e.MarshalCanoto()
 	return types.NewBlock(header, txs, nil, receipts, saetest.TrieHasher()), nil
 }

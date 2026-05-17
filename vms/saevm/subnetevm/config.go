@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -31,7 +32,15 @@ type Config struct {
 	// on-chain event ie. block or AddressedCall) that the node should be
 	// willing to sign.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
+
+	// FeeRecipient is the local node's preferred fee recipient when the
+	// network allows fee recipients (`AllowFeeRecipients=true` or
+	// rewardmanager `allowFeeRecipients()`). Must be empty (=> burn) or a
+	// valid hex address; [ParseConfig] rejects any other value.
+	FeeRecipient string `json:"feeRecipient"`
 }
+
+var errInvalidFeeRecipient = errors.New("invalid fee recipient")
 
 func ParseConfig(b []byte) (Config, error) {
 	var c Config
@@ -41,6 +50,10 @@ func ParseConfig(b []byte) (Config, error) {
 
 	if err := json.Unmarshal(b, &c); err != nil {
 		return Config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+	}
+
+	if c.FeeRecipient != "" && !common.IsHexAddress(c.FeeRecipient) {
+		return Config{}, fmt.Errorf("%w: %q is not a valid hex address", errInvalidFeeRecipient, c.FeeRecipient)
 	}
 	return c, nil
 }
