@@ -9,29 +9,22 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/ethtest"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rpc"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
@@ -48,19 +41,25 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/api/client"
 
+	avadb "github.com/ava-labs/avalanchego/database"
+	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 type SUT struct {
-	ctx       context.Context
-	snowCtx   *snow.Context
-	vm        *VM
-	ethClient *ethclient.Client
+	ctx     context.Context
+	snowCtx *snow.Context
+	vm      *VM
 
-	client client.Client
+	// client serves both the standard Ethereum surface (via the embedded
+	// `*ethclient.Client`) and the subnet-evm-specific methods.
+	client *client.Client
 
 	// Wallet for issuing transactions
 	ethWallet     *saetest.Wallet
@@ -69,6 +68,18 @@ type SUT struct {
 	// See [SUT.verifyWarpMessage]
 	appResponse chan []byte
 	appErr      chan *engcommon.AppError
+
+	// Per-boot resources (replaced by [SUT.restart]).
+	shutdownVM func() error
+	apiServer  *httptest.Server
+
+	// Persistent restart inputs.
+	baseDB       avadb.Database
+	cfg          *sutConfig
+	upgrades     upgrade.Config
+	genesisBytes []byte
+	upgradeBytes []byte
+	configBytes  []byte
 }
 
 type (
@@ -86,6 +97,10 @@ type (
 		// `Config.FeeRecipient` (as a hex string) to the VM. When nil, the
 		// VM's default (zero address => effective burn) applies.
 		feeRecipient *common.Address
+		// gasTarget, if non-nil, sets the validator's preferred gas-per-second
+		// target (Config.GasTarget); the resulting `DesiredTargetExcess` is
+		// what `header.TargetExcess` evolves toward (rate-limited per ACP-176).
+		gasTarget *gas.Gas
 		// configureValidatorState, if non-nil, is invoked AFTER the
 		// default `*validatorstest.State` has been built (with the
 		// always-empty `GetCurrentValidatorSetF` default) and BEFORE
@@ -115,14 +130,6 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	ctx := logger.CancelOnError(t.Context())
 
 	baseDB := memdb.New()
-	snowCtx, validatorKeys := newSnowCtx(t, upgrades)
-	if cfg.configureValidatorState != nil {
-		// Safe: `newSnowCtx` always installs a `*validatorstest.State`.
-		cfg.configureValidatorState(snowCtx.ValidatorState.(*validatorstest.State))
-	}
-
-	mempoolConf := legacypool.DefaultConfig
-	mempoolConf.Journal = "/dev/null"
 
 	keychain := saetest.NewUNSAFEKeyChain(t, cfg.numAccounts)
 	genesis := newTestGenesis(cfg.fork, keychain)
@@ -136,96 +143,182 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		upgradeBytes = cfg.configureUpgrade(keychain.Addresses())
 	}
 
-	var configBytes []byte
+	// Build per-chain config bytes from [DefaultConfig], with optional
+	// test overrides layered on top. The legacypool journal is
+	// inherently disabled because `LocalTxsEnabled=false` by default
+	// (yields `NoLocals=true`), so no journal-path override is needed.
+	chainConfig := DefaultConfig()
 	if cfg.feeRecipient != nil {
-		configBytes = mustMarshalJSON(t, &Config{FeeRecipient: cfg.feeRecipient.Hex()})
+		chainConfig.FeeRecipient = cfg.feeRecipient.Hex()
 	}
-
-	saeConfig := sae.Config{
-		MempoolConfig: mempoolConf,
-		DBConfig: saedb.Config{
-			TrieDBConfig: triedb.HashDefaults,
-		},
+	if cfg.gasTarget != nil {
+		chainConfig.GasTarget = cfg.gasTarget
 	}
-	vm := New(saeConfig)
+	configBytes := mustMarshalJSON(t, &chainConfig)
 
-	// Pin the VM's mockable clock BEFORE `Initialize` so that
-	// `sae.Config.Now` (defaulted to `vm.clock.Time` in `New`) and the
-	// validator uptime tracker both observe a deterministic instant
-	// from their very first read. Subsequent test-side advances via
-	// `sut.setTime`/`advanceTime` flow through the same clock.
-	if cfg.clockTime != nil {
-		vm.clock.Set(*cfg.clockTime)
-	}
-
-	// allow receiving responses via [SUT.verifyWarpMessage]
-	appResponseCh := make(chan []byte, 1)
-	appErrCh := make(chan *engcommon.AppError, 1)
-	appSender := &enginetest.SenderStub{
-		SentAppResponse: appResponseCh,
-		SentAppError:    appErrCh,
-	}
-
-	require.NoError(t, vm.Initialize(
-		ctx,
-		snowCtx,
-		baseDB,
-		genesisBytes,
-		upgradeBytes,
-		configBytes,
-		nil,
-		appSender,
-	))
-	t.Cleanup(func() {
-		require.NoError(t, vm.Shutdown(context.WithoutCancel(ctx)))
-	})
-
-	require.NoError(t, vm.SetState(ctx, snow.NormalOp))
-
-	handlers, err := vm.CreateHandlers(ctx)
-	require.NoError(t, err)
-	server := httptest.NewServer(handlers["/ws"])
-	t.Cleanup(server.Close)
-
-	// Mount every non-`/ws` handler returned by `CreateHandlers` on a
-	// single shared mux so typed JSON-RPC clients can target a single
-	// base URL (matching how AvalancheGo serves these in production).
-	// `/ws` stays on its own server because the eth client dials it as
-	// a websocket.
-	apiMux := http.NewServeMux()
-	for path, handler := range handlers {
-		if path == "/ws" {
-			continue
-		}
-		apiMux.Handle(path, handler)
-	}
-	apiServer := httptest.NewServer(apiMux)
-	t.Cleanup(apiServer.Close)
-
-	uri := server.Listener.Addr().String()
-	rpcClient, err := rpc.Dial("ws://" + uri)
-	require.NoError(t, err)
-	t.Cleanup(rpcClient.Close)
-
-	// TODO(alarso16): delete this - it should be on the VM
-	lastID, err := vm.LastAccepted(ctx)
-	require.NoError(t, err)
-	require.NoError(t, vm.SetPreference(ctx, lastID, nil))
-
-	return &SUT{
-		ctx:       ctx,
-		snowCtx:   snowCtx,
-		vm:        vm,
-		ethClient: ethclient.NewClient(rpcClient),
-		client:    client.NewClientWithURL(apiServer.URL),
+	sut := &SUT{
+		ctx: ctx,
 		ethWallet: saetest.NewWalletWithKeyChain(
 			keychain,
 			types.LatestSigner(genesis.Config),
 		),
-		validatorKeys: validatorKeys,
-		appResponse:   appResponseCh,
-		appErr:        appErrCh,
+		baseDB:       baseDB,
+		cfg:          cfg,
+		upgrades:     upgrades,
+		genesisBytes: genesisBytes,
+		upgradeBytes: upgradeBytes,
+		configBytes:  configBytes,
 	}
+	sut.bootVM(t, cfg.clockTime)
+
+	// Single cleanup that always operates on the latest per-boot
+	// resources (post-[SUT.restart]).
+	t.Cleanup(func() {
+		if sut.shutdownVM != nil {
+			require.NoError(t, sut.shutdownVM())
+		}
+		if sut.apiServer != nil {
+			sut.apiServer.Close()
+		}
+	})
+	return sut
+}
+
+// bootVM initialises a fresh VM against [SUT.baseDB] and wires the API
+// surface onto the SUT. Used by [newSUT] for first boot and by
+// [SUT.restart] to spin a new VM against the same on-disk state.
+//
+// `clockTime`, if non-nil, pins the new VM's mockable clock before
+// `Initialize` runs (matching [withNow] semantics). A restart MUST pass
+// the previous VM's clock value so block-building separation against
+// the last-accepted block remains satisfied.
+//
+// Each boot constructs a new `snowCtx` so the embedded metrics registry
+// is fresh; otherwise the `"sae"` namespace would conflict on restart.
+// Validator-state customisations from [sutConfig.configureValidatorState]
+// are re-applied; the per-validator BLS keys are regenerated on each
+// boot, so tests that hold onto [SUT.validatorKeys] across a restart
+// must re-read them.
+func (s *SUT) bootVM(t *testing.T, clockTime *time.Time) {
+	t.Helper()
+
+	snowCtx, validatorKeys := newSnowCtx(t, s.upgrades)
+	if s.cfg.configureValidatorState != nil {
+		// Safe: `newSnowCtx` always installs a `*validatorstest.State`.
+		s.cfg.configureValidatorState(snowCtx.ValidatorState.(*validatorstest.State))
+	}
+
+	vm, appSender, shutdownVM, err := initVM(s.ctx, snowCtx, s.baseDB, clockTime, s.genesisBytes, s.upgradeBytes, s.configBytes)
+	require.NoError(t, err)
+
+	require.NoError(t, vm.SetState(s.ctx, snow.NormalOp))
+
+	handlers, err := vm.CreateHandlers(s.ctx)
+	require.NoError(t, err)
+
+	// Mount every handler returned by `CreateHandlers` on a single shared
+	// mux so typed JSON-RPC clients can target a single base URL (matching
+	// how AvalancheGo serves these in production).
+	apiMux := http.NewServeMux()
+	for path, handler := range handlers {
+		apiMux.Handle(path, handler)
+	}
+	apiServer := httptest.NewServer(apiMux)
+
+	c, err := client.NewClientWithURL(apiServer.URL)
+	require.NoError(t, err)
+
+	// TODO(alarso16): delete this - it should be on the VM
+	lastID, err := vm.LastAccepted(s.ctx)
+	require.NoError(t, err)
+	require.NoError(t, vm.SetPreference(s.ctx, lastID, nil))
+
+	s.vm = vm
+	s.snowCtx = snowCtx
+	s.validatorKeys = validatorKeys
+	s.client = c
+	s.shutdownVM = shutdownVM
+	s.apiServer = apiServer
+	s.appResponse = appSender.SentAppResponse
+	s.appErr = appSender.SentAppError
+}
+
+// restart shuts down the current VM (and tears down its API surface), then
+// re-initialises a fresh VM against the same backing database so a test can
+// assert that on-disk state alone is sufficient to resume operation.
+//
+// The mockable clock is carried over so block-building separation against
+// the last-accepted block holds.
+func (s *SUT) restart(t *testing.T) {
+	t.Helper()
+
+	prevClock := s.vm.clock.Time()
+	require.NoError(t, s.shutdownVM())
+	s.apiServer.Close()
+	s.shutdownVM = nil
+	s.apiServer = nil
+
+	s.bootVM(t, &prevClock)
+}
+
+// initVM constructs a VM, pins the mockable clock if requested, and runs
+// `Initialize`. The returned shutdown closure is safe to call multiple
+// times; subsequent calls are no-ops.
+//
+// The clock must be pinned BEFORE `Initialize` so `sae.Config.Now` (wired
+// to `vm.clock.Time` inside `Initialize`) and the validator uptime tracker
+// both observe a deterministic instant from their very first read.
+func initVM(
+	ctx context.Context,
+	snowCtx *snow.Context,
+	db avadb.Database,
+	clockTime *time.Time,
+	genesisBytes, upgradeBytes, configBytes []byte,
+) (*VM, *enginetest.SenderStub, func() error, error) {
+	vm := New()
+	if clockTime != nil {
+		vm.clock.Set(*clockTime)
+	}
+	appSender := &enginetest.SenderStub{
+		SentAppResponse: make(chan []byte, 1),
+		SentAppError:    make(chan *engcommon.AppError, 1),
+	}
+	if err := vm.Initialize(ctx, snowCtx, db, genesisBytes, upgradeBytes, configBytes, nil, appSender); err != nil {
+		return nil, nil, nil, err
+	}
+	var (
+		once     sync.Once
+		closeErr error
+	)
+	shutdown := func() error {
+		once.Do(func() {
+			closeErr = vm.Shutdown(context.WithoutCancel(ctx))
+		})
+		return closeErr
+	}
+	return vm, appSender, shutdown, nil
+}
+
+// tryInitVM wraps [initVM] for parse-time tests that want to assert on a
+// specific `Initialize` failure. Successful inits register a `t.Cleanup`
+// shutdown.
+func tryInitVM(
+	t *testing.T,
+	ctx context.Context,
+	snowCtx *snow.Context,
+	db avadb.Database,
+	clockTime *time.Time,
+	genesisBytes, upgradeBytes, configBytes []byte,
+) (*VM, *enginetest.SenderStub, error) {
+	t.Helper()
+	vm, appSender, shutdown, err := initVM(ctx, snowCtx, db, clockTime, genesisBytes, upgradeBytes, configBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	t.Cleanup(func() {
+		require.NoError(t, shutdown())
+	})
+	return vm, appSender, nil
 }
 
 func newTestGenesis(fork upgradetest.Fork, keychain *saetest.KeyChain) *core.Genesis {
@@ -238,7 +331,7 @@ func newTestGenesis(fork upgradetest.Fork, keychain *saetest.KeyChain) *core.Gen
 	}
 }
 
-func withFork(fork upgradetest.Fork) sutOption {
+func withFork(fork upgradetest.Fork) sutOption { //nolint:unparam // Helicon and Latest currently both equal 15 but caller-controlled by design
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.fork = fork
 	})
@@ -322,6 +415,18 @@ func withFeeRecipient(addr common.Address) sutOption {
 	})
 }
 
+// withGasTarget pins the validator's preferred per-second gas target
+// (`Config.GasTarget`). The VM converts this to a `DesiredTargetExcess` that
+// `header.TargetExcess` evolves toward (rate-limited per ACP-226 to
+// [acp176.MaxTargetExcessDiff] per block). Tests use this to drive
+// observable per-block changes in `header.GasLimit` (which is linear in the
+// target gas).
+func withGasTarget(target gas.Gas) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.gasTarget = &target
+	})
+}
+
 func (s *SUT) buildAndVerifyBlock(t *testing.T, blockCtx *block.Context) *blocks.Block {
 	t.Helper()
 
@@ -360,7 +465,7 @@ func (s *SUT) sendTransferTx(t *testing.T, from int, to int, value *big.Int) *ty
 	t.Helper()
 
 	tx := s.signTransferTx(t, from, to, value)
-	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
 	return tx
 }
 
@@ -377,7 +482,7 @@ func (s *SUT) signTransferTx(t *testing.T, from int, to int, value *big.Int) *ty
 	})
 }
 
-func (s *SUT) buildAndAcceptBlock(t *testing.T) *blocks.Block {
+func (s *SUT) buildAcceptExecuteBlock(t *testing.T) *blocks.Block {
 	t.Helper()
 
 	built := s.buildAndVerifyBlock(t, nil)
@@ -421,7 +526,7 @@ func (s *SUT) sendDeployTx(t *testing.T, from int) *types.Transaction {
 	t.Helper()
 
 	tx := s.signDeployTx(t, from)
-	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
 	return tx
 }
 
@@ -446,7 +551,7 @@ func (s *SUT) sendCallTx(t *testing.T, from int, to common.Address, data []byte,
 	t.Helper()
 
 	tx := s.signCallTx(t, from, to, data, gas)
-	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
 	return tx
 }
 
@@ -492,7 +597,7 @@ func requireBlockContainsTxs(t *testing.T, block *blocks.Block, want ...common.H
 func (s *SUT) requireTxSucceeded(t *testing.T, tx *types.Transaction) *types.Receipt {
 	t.Helper()
 
-	receipt, err := s.ethClient.TransactionReceipt(s.ctx, tx.Hash())
+	receipt, err := s.client.TransactionReceipt(s.ctx, tx.Hash())
 	require.NoErrorf(t, err, "TransactionReceipt(%#x)", tx.Hash())
 	require.Equalf(t, types.ReceiptStatusSuccessful, receipt.Status,
 		"tx %#x must succeed (status=1)", tx.Hash())
@@ -506,7 +611,7 @@ func (s *SUT) requireTxSucceeded(t *testing.T, tx *types.Transaction) *types.Rec
 func (s *SUT) requireTxFailed(t *testing.T, tx *types.Transaction) *types.Receipt {
 	t.Helper()
 
-	receipt, err := s.ethClient.TransactionReceipt(s.ctx, tx.Hash())
+	receipt, err := s.client.TransactionReceipt(s.ctx, tx.Hash())
 	require.NoErrorf(t, err, "TransactionReceipt(%#x)", tx.Hash())
 	require.Equalf(t, types.ReceiptStatusFailed, receipt.Status,
 		"tx %#x must revert (status=0)", tx.Hash())
@@ -524,7 +629,7 @@ func (s *SUT) requireDeploySucceeded(t *testing.T, tx *types.Transaction) {
 	require.NotEqualf(t, (common.Address{}), receipt.ContractAddress,
 		"successful deploy must populate ContractAddress")
 
-	code, err := s.ethClient.CodeAt(s.ctx, receipt.ContractAddress, nil)
+	code, err := s.client.CodeAt(s.ctx, receipt.ContractAddress, nil)
 	require.NoErrorf(t, err, "CodeAt(%s)", receipt.ContractAddress)
 	require.NotEmptyf(t, code, "successful deploy at %s must leave code on chain", receipt.ContractAddress)
 }
@@ -542,7 +647,7 @@ func (s *SUT) requireDeployFailed(t *testing.T, tx *types.Transaction) {
 	receipt := s.requireTxFailed(t, tx)
 	// receipt.ContractAddress is still derived from (sender, nonce) even
 	// for failed deploys; assert the address has no code.
-	code, err := s.ethClient.CodeAt(s.ctx, receipt.ContractAddress, nil)
+	code, err := s.client.CodeAt(s.ctx, receipt.ContractAddress, nil)
 	require.NoErrorf(t, err, "CodeAt(%s)", receipt.ContractAddress)
 	require.Emptyf(t, code, "failed deploy must leave no code at %s", receipt.ContractAddress)
 }
@@ -614,11 +719,11 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	)
 
 	// Pre-activation: target is empty (no balance, no storage).
-	preBalance, err := sut.ethClient.BalanceAt(sut.ctx, target, nil)
+	preBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	require.Zero(t, preBalance.Sign(), "target balance must be 0 before activation")
 
-	preStorage, err := sut.ethClient.StorageAt(sut.ctx, target, storageSlot, nil)
+	preStorage, err := sut.client.StorageAt(sut.ctx, target, storageSlot, nil)
 	require.NoError(t, err)
 	require.Equal(t, common.Hash{}.Bytes(), preStorage, "storage slot must be empty before activation")
 
@@ -629,15 +734,15 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	// observable in isolation.
 	sut.setTime(t, activationTime)
 	_ = sut.sendTransferTx(t, fromIdx, toIdx, common.Big1)
-	_ = sut.buildAndAcceptBlock(t)
+	_ = sut.buildAcceptExecuteBlock(t)
 
 	// Post-activation: balance + storage reflect the StateUpgrade exactly.
-	postBalance, err := sut.ethClient.BalanceAt(sut.ctx, target, nil)
+	postBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	require.Zerof(t, postBalance.Cmp(balanceBump),
 		"target balance must reflect StateUpgrade balance bump (want=%s got=%s)", balanceBump, postBalance)
 
-	postStorage, err := sut.ethClient.StorageAt(sut.ctx, target, storageSlot, nil)
+	postStorage, err := sut.client.StorageAt(sut.ctx, target, storageSlot, nil)
 	require.NoError(t, err)
 	require.Equal(t, storageValue.Bytes(), postStorage, "storage slot must reflect the StateUpgrade")
 }

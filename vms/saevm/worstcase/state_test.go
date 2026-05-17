@@ -644,7 +644,7 @@ func TestCanExecuteTransactionHook(t *testing.T) {
 	sut := newSUT(t, saetest.MaxAllocFor(wallet.Addresses()...))
 
 	errSenderBlocked := errors.New("sender blocked by allowlist")
-	sut.hooks.CanExecuteTransactionFn = func(from common.Address, _ *common.Address, _ libevm.StateReader) error {
+	sut.hooks.CanExecuteTransactionFn = func(_ params.Rules, from common.Address, _ *common.Address, _ libevm.StateReader) error {
 		if from == wallet.Addresses()[blocked] {
 			return errSenderBlocked
 		}

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	subnetevmcore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -127,8 +128,27 @@ func (*Points) EndOfBlockOps(*types.Block) ([]saehook.Op, error) {
 	return nil, nil
 }
 
-func (*Points) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
-	return nil
+// CanExecuteTransaction enforces the txallowlist sender check against the
+// caller-supplied `rules`+`state` pair (typically last-settled), bypassing
+// the libevm hook which is short-circuited post-Helicon to avoid fatal-halt
+// on stale-state divergence (see [subnetevmparams.RulesExtra.CanExecuteTransaction]).
+// Libevm extras MUST be registered first
+//
+// Deployer allowlist is intentionally NOT enforced here: its libevm hook
+// ([subnetevmparams.RulesExtra.CanCreateContract]) runs INSIDE the EVM and
+// surfaces failures as `vmerr` (frame-local revert) rather than invalidating the block,
+// so SAE has no halt risk to guard against.
+// It also covers nested CREATE/CREATE2 frames invisible to admission here.
+// Trade-off: deploy txs from non-allow-listed senders are mined with
+// status=failed instead of being rejected at ingress.
+func (*Points) CanExecuteTransaction(rules ethparams.Rules, from common.Address, _ *common.Address, state libevm.StateReader) error {
+	extra := subnetevmparams.GetRulesExtra(rules)
+	return subnetevmparams.RulesExtra(*extra).EnforceTxAllowList(from, state)
+}
+
+func (*Points) RequiresTransactionAdmissionCheck(rules ethparams.Rules) bool {
+	extra := subnetevmparams.GetRulesExtra(rules)
+	return extra.IsPrecompileEnabled(txallowlist.ContractAddress)
 }
 
 // BeforeExecutingBlock activates / deactivates timestamp-scheduled

@@ -52,6 +52,15 @@ func (Marshaller) UnmarshalGossip(buf []byte) (Transaction, error) {
 	return tx, nil
 }
 
+// An Admitter gates inbound transactions for the mempool.
+//
+// Implementations MUST make `Admit` cheap when no relevant check is required (i.e no precompile is active)
+type Admitter interface {
+	// Admit returns nil if `tx` is allowed into the mempool, or an error
+	// describing why it was rejected. Safe for concurrent use.
+	Admit(tx *types.Transaction) error
+}
+
 // Set couples a [gossip.BloomSet] with a [txpool.TxPool] that acts as the
 // backing for the set.
 type Set struct {
@@ -64,8 +73,11 @@ type Set struct {
 
 // NewSet returns a new Set. Use [gossip.BloomSet.Add] or [Set.SendTx] to add
 // transactions to the pool, which SHOULD NOT be populated directly.
-func NewSet(pool *txpool.TxPool, config gossip.BloomSetConfig) (*Set, error) {
-	s := &txSet{pool}
+//
+// `admitter` gates every inbound tx (gossip + RPC) before it reaches the
+// pool; pass `nil` to disable.
+func NewSet(pool *txpool.TxPool, admitter Admitter, config gossip.BloomSetConfig) (*Set, error) {
+	s := &txSet{pool: pool, admitter: admitter}
 	bs, err := gossip.NewBloomSet(s, config)
 	if err != nil {
 		return nil, err
@@ -80,7 +92,8 @@ func NewSet(pool *txpool.TxPool, config gossip.BloomSetConfig) (*Set, error) {
 var _ gossip.Set[Transaction] = (*txSet)(nil)
 
 type txSet struct {
-	pool *txpool.TxPool
+	pool     *txpool.TxPool
+	admitter Admitter
 }
 
 func (s *txSet) Add(tx Transaction) error {
@@ -93,8 +106,32 @@ func (s *txSet) Add(tx Transaction) error {
 	return errors.Join(errs...)
 }
 
+// addToPool runs each tx through the configured [Admitter] (if any) and
+// forwards the survivors to the pool. The returned slice is index-aligned
+// with `txs`, mirroring [txpool.TxPool.Add].
 func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
-	return s.pool.Add(txs, local, false /*sync*/)
+	if s.admitter == nil {
+		return s.pool.Add(txs, local, false /*sync*/)
+	}
+
+	errs := make([]error, len(txs))
+	admitted := make([]*types.Transaction, 0, len(txs))
+	idx := make([]int, 0, len(txs))
+	for i, tx := range txs {
+		if err := s.admitter.Admit(tx); err != nil {
+			errs[i] = err
+			continue
+		}
+		admitted = append(admitted, tx)
+		idx = append(idx, i)
+	}
+	if len(admitted) == 0 {
+		return errs
+	}
+	for i, err := range s.pool.Add(admitted, local, false /*sync*/) {
+		errs[idx[i]] = err
+	}
+	return errs
 }
 
 func (s *txSet) Has(id ids.ID) bool {
