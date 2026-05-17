@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"sync/atomic"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
@@ -34,11 +36,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
+	subnetevmapi "github.com/ava-labs/avalanchego/vms/saevm/subnetevm/api"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/hook/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/state"
+	"github.com/ava-labs/avalanchego/vms/saevm/subnetevm/validators"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	subnetevmparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -59,20 +65,34 @@ type VM struct {
 	// TODO(alarso16): remove later
 	hooks *hook.Points
 
-	// onClose are executed in reverse order during [SinceGenesis.Shutdown].
-	// If a resource depends on another resource, it MUST be added AFTER the
-	// resource it depends on.
-	onClose []func()
+	// toClose are closed in reverse order during [VM.Shutdown]. If a
+	// resource depends on another resource, it MUST be added AFTER the
+	// resource it depends on. Mirrors `*sae.VM.toClose`.
+	toClose []io.Closer
+
+	clock mockable.Clock
+
+	validators *validators.Manager
 
 	preference       atomic.Pointer[blocks.Block]
 	lastWaitForEvent utils.Atomic[time.Time]
 }
 
+// closerFunc adapts a func() error to [io.Closer]. Mirrors `*sae.VM`'s
+// helper of the same name.
+type closerFunc func() error
+
+var _ io.Closer = (*closerFunc)(nil)
+
+func (f closerFunc) Close() error { return f() }
+
 // New constructs a new [VM].
 func New(c sae.Config) *VM {
-	return &VM{
-		config: c,
+	v := &VM{config: c}
+	if v.config.Now == nil {
+		v.config.Now = v.clock.Time
 	}
+	return v
 }
 
 const warpSignatureCacheSize = 512
@@ -176,6 +196,14 @@ func (v *VM) Initialize(
 	v.db = avaDB
 	v.hooks = hooks
 
+	snowCtx.Log.Info("registering the validators manager")
+
+	v.validators, err = validators.New(snowCtx.ValidatorState, snowCtx.SubnetID, avaDB, &v.clock, snowCtx.Log)
+	if err != nil {
+		return err
+	}
+	v.toClose = append(v.toClose, closerFunc(v.validators.Shutdown))
+
 	snowCtx.Log.Info("registering subnetevm metrics")
 
 	metrics := prometheus.NewRegistry()
@@ -186,7 +214,7 @@ func (v *VM) Initialize(
 	snowCtx.Log.Info("warp handlers")
 
 	{ // ==========  Warp Handler  ==========
-		warpVerifier := saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage, nil)
+		warpVerifier := saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage, v.validators.Tracker())
 		warpHandler := acp118.NewCachedHandler(
 			lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
 			warpVerifier,
@@ -233,8 +261,24 @@ func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
 	return g, nil
 }
 
+const (
+	validatorsServiceName       = "validators"
+	validatorsHTTPExtensionPath = "/" + validatorsServiceName
+)
+
 func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	return v.VM.CreateHandlers(ctx)
+	m, err := v.VM.CreateHandlers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	service := subnetevmapi.NewValidatorsAPI(v.ctx.ValidatorState, v.ctx.SubnetID, v.validators.Tracker(), v.VM.ValidatorPeers)
+	handler, err := rpc.NewHandler(validatorsServiceName, service)
+	if err != nil {
+		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", validatorsServiceName, err)
+	}
+	m[validatorsHTTPExtensionPath] = handler
+	return m, nil
 }
 
 func (v *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
@@ -244,6 +288,36 @@ func (v *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) 
 	}
 	v.preference.Store(b)
 	return v.VM.SetPreference(ctx, id, bCtx)
+}
+
+// Connected forwards to the embedded `*p2p.Network` after notifying the
+// validators manager.
+func (v *VM) Connected(ctx context.Context, nodeID ids.NodeID, ver *version.Application) error {
+	if err := v.validators.Connect(nodeID); err != nil {
+		return err
+	}
+	return v.VM.Connected(ctx, nodeID, ver)
+}
+
+// Disconnected forwards to the embedded `*p2p.Network` after notifying the
+// validators manager.
+func (v *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := v.validators.Disconnect(nodeID); err != nil {
+		return err
+	}
+	return v.VM.Disconnected(ctx, nodeID)
+}
+
+// SetState forwards to `*sae.VM.SetState` and starts validator uptime
+// tracking on the first transition to normal operation.
+func (v *VM) SetState(ctx context.Context, state snow.State) error {
+	if err := v.VM.SetState(ctx, state); err != nil {
+		return err
+	}
+	if state != snow.NormalOp {
+		return nil
+	}
+	return v.validators.Dispatch()
 }
 
 // Prevent busy looping when the chain is more advanced than the mempool.
@@ -303,13 +377,18 @@ func minNextBlockTime(h *types.Header) time.Time {
 }
 
 func (v *VM) Shutdown(ctx context.Context) error {
-	for _, f := range slices.Backward(v.onClose) {
-		f()
+	errs := make([]error, 0)
+	for _, c := range slices.Backward(v.toClose) {
+		if err := c.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	if v.VM == nil {
-		return nil
+	if v.VM != nil {
+		if err := v.VM.Shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return v.VM.Shutdown(ctx)
+	return errors.Join(errs...)
 }
 
 // blockClient adapts [sae.VM] to the [saewarp.BlockClient] interface.
