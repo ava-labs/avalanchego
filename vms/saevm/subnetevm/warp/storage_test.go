@@ -31,20 +31,20 @@ func newHash(tb testing.TB) (*warp.UnsignedMessage, *payload.Hash) {
 	return m, p
 }
 
-func newAddressedCall(tb testing.TB) (*warp.UnsignedMessage, *payload.AddressedCall) {
+func newAddressedCall(tb testing.TB, data []byte) *warp.UnsignedMessage {
 	p, err := payload.NewAddressedCall(
 		utils.RandomBytes(20),
-		[]byte("test"),
+		data,
 	)
 	require.NoError(tb, err)
 
 	m, err := warp.NewUnsignedMessage(networkID, sourceChainID, p.Bytes())
 	require.NoError(tb, err)
-	return m, p
+	return m
 }
 
 func TestStorage(t *testing.T) {
-	msg, _ := newAddressedCall(t)
+	msg := newAddressedCall(t, []byte("test"))
 	tests := []struct {
 		name      string
 		overrides []*warp.UnsignedMessage

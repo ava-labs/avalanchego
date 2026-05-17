@@ -4,17 +4,21 @@
 package subnetevm
 
 import (
+	"maps"
 	"math/big"
 	"os"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/ids"
@@ -22,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -39,10 +44,43 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// withWarpEnabled schedules the `warp` precompile at genesis so that the SAE
+// block builder populates predicate bytes in `header.Extra` and ABI calls to
+// `warpcontract.ContractAddress` are routed to the warp precompile.
+//
+// Composes with any pre-existing `withGenesisConfig`: the prior callback runs
+// first, then warp is registered into [extras.ChainConfig.GenesisPrecompiles].
+// The activation timestamp matches `upgrade.InitiallyActiveTime` (the time
+// returned by `upgradetest.GetConfig` for any scheduled fork), satisfying
+// [warpcontract.Config.Verify]'s "warp must activate at-or-after Durango"
+// invariant on every fork the SUT supports.
+func withWarpEnabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		prev := c.configureGenesis
+		c.configureGenesis = func(genesis *core.Genesis, addresses []common.Address) {
+			if prev != nil {
+				prev(genesis, addresses)
+			}
+			extra := params.GetExtra(genesis.Config)
+			// `subnetevmparams.Copy` is a two-level shallow copy, so
+			// `extra.GenesisPrecompiles` may still alias the map held by
+			// `paramstest.ForkToChainConfig[fork]`. Clone before writing
+			// so the warp entry stays scoped to this genesis.
+			new := maps.Clone(extra.GenesisPrecompiles)
+			if new == nil {
+				new = extras.Precompiles{}
+			}
+			activationTS := utils.PointerTo(uint64(upgrade.InitiallyActiveTime.Unix()))
+			new[warpcontract.ConfigKey] = warpcontract.NewDefaultConfig(activationTS)
+			extra.GenesisPrecompiles = new
+		}
+	})
+}
+
 // TestSendWarpMessage checks availability of warp verification requests
 // relative to block execution.
 func TestSendWarpMessage(t *testing.T) {
-	sut := newSUT(t)
+	sut := newSUT(t, withWarpEnabled())
 
 	payloadData := utils.RandomBytes(100)
 
@@ -58,7 +96,7 @@ func TestSendWarpMessage(t *testing.T) {
 	addressedPayload, err := payload.NewAddressedCall(sut.ethWallet.Addresses()[0].Bytes(), payloadData)
 	require.NoError(t, err)
 	unsignedMessage := sut.newUnsignedWarpMessage(t, addressedPayload.Bytes())
-	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), int32(warp.TypeErrCode))
+	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), int32(warp.VerifyErrCode))
 
 	blockHashPayload, err := payload.NewHash(built.ID())
 	require.NoError(t, err)
@@ -90,7 +128,7 @@ func TestSendWarpMessage(t *testing.T) {
 }
 
 func TestPredicateVerification(t *testing.T) {
-	sut := newSUT(t)
+	sut := newSUT(t, withWarpEnabled())
 
 	sourceAddress := sut.ethWallet.Addresses()[0]
 	addressedPayload, err := payload.NewAddressedCall(sourceAddress.Bytes(), []byte{1, 2, 3})
@@ -211,7 +249,7 @@ func (s *SUT) sendWarpTx(
 		AccessList: accessList,
 	})
 
-	require.NoError(t, s.client.SendTransaction(s.ctx, tx))
+	require.NoError(t, s.ethClient.SendTransaction(s.ctx, tx))
 	return tx
 }
 

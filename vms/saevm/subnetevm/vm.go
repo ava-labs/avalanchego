@@ -186,7 +186,7 @@ func (v *VM) Initialize(
 	snowCtx.Log.Info("warp handlers")
 
 	{ // ==========  Warp Handler  ==========
-		warpVerifier := saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage)
+		warpVerifier := saewarp.NewVerifier(&blockClient{vm: inner}, warpStorage, nil)
 		warpHandler := acp118.NewCachedHandler(
 			lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
 			warpVerifier,
