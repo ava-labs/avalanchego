@@ -2053,9 +2053,11 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 
 // Test that the fee manager changes fee configuration
 func TestFeeManagerChangeFee(t *testing.T) {
+	graniteFork := upgradetest.Granite
+
 	// Setup chain params
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[graniteFork]))))
 	configExtra := params.GetExtra(genesis.Config)
 	configExtra.GenesisPrecompiles = extras.Precompiles{
 		feemanager.ConfigKey: feemanager.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
@@ -2079,6 +2081,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 	})
 
