@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -25,6 +26,14 @@ import (
 // of the JSON-RPC namespaces supported by the VM.
 func (vm *VM) GethRPCBackends() saerpc.GethBackends {
 	return vm.rpcProvider.GethBackends()
+}
+
+// RPCServer returns the libevm `*rpc.Server` backing the JSON-RPC handlers
+// served at `/rpc` and `/ws`. Downstream VMs may call `RegisterName` on the
+// returned server to add VM-specific methods to existing namespaces.
+// Must be called after `NewVM`.
+func (vm *VM) RPCServer() *rpc.Server {
+	return vm.rpcProvider.Server()
 }
 
 func (vm *VM) chain() saerpc.Chain {
