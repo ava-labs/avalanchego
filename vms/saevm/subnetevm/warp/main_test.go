@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
 // TestMain registers libevm extras required by [params.GetRulesExtra] and
