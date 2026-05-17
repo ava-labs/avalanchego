@@ -16,7 +16,6 @@ import (
 
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
@@ -325,16 +324,17 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte) (
 		configExtra.UpgradeConfig = upgradeConfig
 	}
 
-	if configExtra.UpgradeConfig.NetworkUpgradeOverrides != nil {
-		overrides := configExtra.UpgradeConfig.NetworkUpgradeOverrides
-		marshaled, err := json.Marshal(overrides)
-		if err != nil {
-			log.Warn("Failed to marshal network upgrade overrides", "error", err, "overrides", overrides)
-		} else {
-			log.Info("Applying network upgrade overrides", "overrides", string(marshaled))
-		}
-		configExtra.Override(overrides)
-	}
+	// TODO(ceyonur): Decide if we want to support network upgrade overrides for this VM.
+	// if configExtra.UpgradeConfig.NetworkUpgradeOverrides != nil {
+	// 	overrides := configExtra.UpgradeConfig.NetworkUpgradeOverrides
+	// 	marshaled, err := json.Marshal(overrides)
+	// 	if err != nil {
+	// 		log.Warn("Failed to marshal network upgrade overrides", "error", err, "overrides", overrides)
+	// 	} else {
+	// 		log.Info("Applying network upgrade overrides", "overrides", string(marshaled))
+	// 	}
+	// 	configExtra.Override(overrides)
+	// }
 
 	// Retire the legacy `feeManager` precompile at Helicon: reject
 	// post-Helicon upgrades, normalize a stale genesis activation,
