@@ -440,7 +440,7 @@ pub struct Proposal<'db> {
     db: &'db Db,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 /// A user-visible reconstructed view.
 pub struct ReconstructedView<'db> {
     nodestore: Arc<NodeStore<Reconstructed<FileBacked>, FileBacked>>,
@@ -823,6 +823,124 @@ mod test {
 
         assert_eq!(&*reconstructed.val(b"base").unwrap().unwrap(), b"v1");
         assert_eq!(&*reconstructed.val(b"next").unwrap().unwrap(), b"v2");
+    }
+
+    #[test]
+    fn test_reconstruct_clone_is_independent() {
+        let db = TestDb::new();
+
+        // Build a base committed revision.
+        let initial = db
+            .propose(vec![BatchOp::Put {
+                key: b"base",
+                value: b"v0",
+            }])
+            .unwrap();
+        initial.commit().unwrap();
+        let historical_hash = db.root_hash().unwrap();
+        let historical = db.revision(historical_hash).unwrap();
+
+        // Build a reconstructed view on top of the historical revision.
+        let original = db
+            .reconstruct_from_view(
+                &historical,
+                vec![BatchOp::Put {
+                    key: b"shared",
+                    value: b"v1",
+                }],
+            )
+            .unwrap();
+        let original_root = original.root_hash();
+
+        // Verify that a cloned reconstructed revision has the same state as the original.
+        let cloned = original.clone();
+        assert_eq!(cloned.root_hash(), original_root);
+        assert_eq!(&*cloned.val(b"base").unwrap().unwrap(), b"v0");
+        assert_eq!(&*cloned.val(b"shared").unwrap().unwrap(), b"v1");
+
+        // Mutating the clone via reconstruct does not affect the original.
+        let new_cloned = cloned
+            .reconstruct(vec![BatchOp::Put {
+                key: b"clone_only",
+                value: b"v2",
+            }])
+            .unwrap();
+        assert_eq!(&*new_cloned.val(b"clone_only").unwrap().unwrap(), b"v2");
+        assert_eq!(original.val(b"clone_only").unwrap(), None);
+        assert_eq!(original.root_hash(), original_root);
+
+        // Mutating the original via reconstruct does not affect the clone.
+        let original_next = original
+            .reconstruct(vec![BatchOp::Put {
+                key: b"original_only",
+                value: b"v3",
+            }])
+            .unwrap();
+        assert_eq!(
+            &*original_next.val(b"original_only").unwrap().unwrap(),
+            b"v3"
+        );
+        assert_eq!(new_cloned.val(b"original_only").unwrap(), None);
+    }
+
+    #[test]
+    fn test_reconstruct_clone_of_clone() {
+        let db = TestDb::new();
+
+        // Build a base committed revision.
+        let initial = db
+            .propose(vec![BatchOp::Put {
+                key: b"base",
+                value: b"v0",
+            }])
+            .unwrap();
+        initial.commit().unwrap();
+        let historical_hash = db.root_hash().unwrap();
+        let historical = db.revision(historical_hash).unwrap();
+
+        // Build a reconstructed view on top of the historical revision.
+        let original = db
+            .reconstruct_from_view(
+                &historical,
+                vec![BatchOp::Put {
+                    key: b"shared",
+                    value: b"v1",
+                }],
+            )
+            .unwrap();
+        let original_root = original.root_hash();
+
+        let first_clone = original.clone();
+        let second_clone = first_clone.clone();
+
+        // Verify that the first and second clones are usable
+        assert_eq!(original_root, first_clone.root_hash());
+        assert_eq!(original_root, second_clone.root_hash());
+    }
+
+    #[test]
+    fn test_reconstruct_clone_outlives_original() {
+        let db = TestDb::new();
+
+        let key = b"k";
+        let value = b"v";
+        let initial = db.propose(vec![BatchOp::Put { key, value }]).unwrap();
+        initial.commit().unwrap();
+
+        let historical_hash = db.root_hash().unwrap();
+        let historical = db.revision(historical_hash).unwrap();
+
+        let original = db
+            .reconstruct_from_view(&historical, Vec::<BatchOp<&[u8], &[u8]>>::new())
+            .unwrap();
+        let cloned = original.clone();
+        let expected_root = original.root_hash();
+
+        drop(original);
+
+        // The clone is fully functional after the original is dropped.
+        assert_eq!(cloned.root_hash(), expected_root);
+        assert_eq!(&*cloned.val(b"k").unwrap().unwrap(), b"v");
     }
 
     #[test]

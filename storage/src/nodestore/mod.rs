@@ -953,15 +953,16 @@ impl<S: ReadableStorage> From<Arc<NodeStore<Reconstructed<S>, S>>>
     fn from(val: Arc<NodeStore<Reconstructed<S>, S>>) -> Self {
         // Fast path: if this Arc is uniquely owned, `try_unwrap` is O(1) and lets us move the
         // reconstructed root out without cloning.
-        // Why this Arc might be shared: a caller could keep another handle alive (e.g. iterating
-        // over a reconstructed view while also deriving the next reconstructed state), which makes
-        // `try_unwrap` fail even though conversion is still valid.
-        // Fallback cost: when shared, we must clone the `NodeStore<Reconstructed, S>`, which
-        // clones the root `SharedNode` arc and then `Arc::unwrap_or_clone` extracts the `Node`.
-        // This shared-Arc fallback does not match our known reconstruction use cases, where the
-        // previous reconstructed handle is typically consumed before building the next one.
-        // We do this to avoid forcing callers to guarantee uniqueness while still exploiting the
-        // cheaper move path whenever possible.
+        // The fallback (shared-Arc) path is reachable in two ways:
+        //   1. A caller produced sibling views via `ReconstructedView::clone` and is keeping
+        //      another sibling alive across this call.
+        //   2. A caller is iterating over the reconstructed view (the iterator holds an Arc
+        //      clone via `ReconstructedView::view`) while also deriving the next reconstructed
+        //      state.
+        // Fallback cost: producing an owned root from the shared Arc requires recursively
+        // cloning the in-memory subtree attached to it. We accept this fallback so callers
+        // don't have to guarantee uniqueness, while still exploiting the cheaper move path
+        // whenever possible.
         Self::from(Arc::unwrap_or_clone(val))
     }
 }

@@ -86,6 +86,15 @@ impl<'db> ReconstructedHandle<'db> {
         let next = self.reconstructed.reconstruct(values)?;
         Ok(Self::new(next, self.handle))
     }
+
+    /// Produces an independent handle backed by the same underlying state.
+    ///
+    /// Each clone owns its own handle and may be dropped independently. The
+    /// two distinct handles may be used independently.
+    #[must_use]
+    pub fn clone_view(&self) -> Self {
+        Self::new(self.reconstructed.clone(), self.handle)
+    }
 }
 
 impl crate::MetricsContextExt for ReconstructedHandle<'_> {

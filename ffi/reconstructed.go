@@ -13,6 +13,8 @@ package ffi
 // #cgo nocallback fwd_iter_on_reconstructed
 // #cgo noescape fwd_reconstruct_on_reconstructed
 // #cgo nocallback fwd_reconstruct_on_reconstructed
+// #cgo noescape fwd_clone_reconstructed
+// #cgo nocallback fwd_clone_reconstructed
 // #cgo noescape fwd_reconstructed_dump
 // #cgo nocallback fwd_reconstructed_dump
 // #cgo noescape fwd_free_reconstructed
@@ -169,6 +171,21 @@ func (r *Reconstructed) Reconstruct(batch []BatchOp) error {
 	r.rootMu.Unlock()
 
 	return nil
+}
+
+// Clone returns an independent [Reconstructed] handle that shares the
+// underlying view with the receiver. The two handles can be used, reconstructed,
+// and freed independently.
+func (r *Reconstructed) Clone() (*Reconstructed, error) {
+	r.keepAliveHandle.mu.RLock()
+	defer r.keepAliveHandle.mu.RUnlock()
+
+	if r.dropped {
+		return nil, ErrDroppedReconstructed
+	}
+
+	result := C.fwd_clone_reconstructed(r.ptr)
+	return getReconstructedFromResult(result, r.keepAliveHandle.outstandingHandles)
 }
 
 // Dump returns a DOT (Graphviz) representation of this reconstructed view.

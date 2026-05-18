@@ -535,6 +535,45 @@ typedef struct ValueResult {
 } ValueResult;
 
 /**
+ * A result type returned from FFI functions that create a reconstructed view.
+ */
+enum ReconstructedResult_Tag {
+  /**
+   * The caller provided a null pointer to an input handle.
+   */
+  ReconstructedResult_NullHandlePointer,
+  /**
+   * Building the reconstructed view was successful and the handle is returned.
+   */
+  ReconstructedResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`].
+   */
+  ReconstructedResult_Err,
+};
+typedef size_t ReconstructedResult_Tag;
+
+typedef struct ReconstructedResult_Ok_Body {
+  /**
+   * An opaque pointer to the [`ReconstructedHandle`].
+   * The value should be freed with [`fwd_free_reconstructed`].
+   *
+   * [`fwd_free_reconstructed`]: crate::fwd_free_reconstructed
+   */
+  struct ReconstructedHandle *handle;
+} ReconstructedResult_Ok_Body;
+
+typedef struct ReconstructedResult {
+  ReconstructedResult_Tag tag;
+  union {
+    ReconstructedResult_Ok_Body ok;
+    struct {
+      OwnedBytes err;
+    };
+  };
+} ReconstructedResult;
+
+/**
  * Arguments for creating a change proof.
  */
 typedef struct CreateChangeProofArgs {
@@ -1366,45 +1405,6 @@ typedef struct CodeIteratorResult {
 } CodeIteratorResult;
 
 /**
- * A result type returned from FFI functions that create a reconstructed view.
- */
-enum ReconstructedResult_Tag {
-  /**
-   * The caller provided a null pointer to an input handle.
-   */
-  ReconstructedResult_NullHandlePointer,
-  /**
-   * Building the reconstructed view was successful and the handle is returned.
-   */
-  ReconstructedResult_Ok,
-  /**
-   * An error occurred and the message is returned as an [`OwnedBytes`].
-   */
-  ReconstructedResult_Err,
-};
-typedef size_t ReconstructedResult_Tag;
-
-typedef struct ReconstructedResult_Ok_Body {
-  /**
-   * An opaque pointer to the [`ReconstructedHandle`].
-   * The value should be freed with [`fwd_free_reconstructed`].
-   *
-   * [`fwd_free_reconstructed`]: crate::fwd_free_reconstructed
-   */
-  struct ReconstructedHandle *handle;
-} ReconstructedResult_Ok_Body;
-
-typedef struct ReconstructedResult {
-  ReconstructedResult_Tag tag;
-  union {
-    ReconstructedResult_Ok_Body ok;
-    struct {
-      OwnedBytes err;
-    };
-  };
-} ReconstructedResult;
-
-/**
  * Arguments for initializing logging for the Firewood FFI.
  */
 typedef struct LogArgs {
@@ -1513,6 +1513,34 @@ struct ChangeProofResult fwd_change_proof_from_bytes(BorrowedBytes bytes);
  * - [`ValueResult::Err`] if serialization failed.
  */
 struct ValueResult fwd_change_proof_to_bytes(const struct ChangeProofContext *proof);
+
+/**
+ * Produces an independent reconstructed handle that shares the underlying
+ * view with the input handle. Both handles can be used, reconstructed, and
+ * freed independently.
+ *
+ * # Arguments
+ *
+ * * `handle` - The reconstructed handle returned by [`fwd_reconstruct_on_revision`],
+ *   [`fwd_reconstruct_on_reconstructed`], or a previous call to [`fwd_clone_reconstructed`].
+ *
+ * # Returns
+ *
+ * - [`ReconstructedResult::NullHandlePointer`] if the provided handle is null.
+ * - [`ReconstructedResult::Ok`] with a new [`ReconstructedHandle`] that
+ *   shares the underlying view with the input handle.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * ensure that `handle` is a valid pointer to a [`ReconstructedHandle`].
+ * * call [`fwd_free_reconstructed`] to free the returned handle when it is
+ *   no longer needed.
+ * * ensure that the underlying [`DatabaseHandle`] remains valid (not closed
+ *   via [`fwd_close_db`]) for as long as the returned [`ReconstructedHandle`]
+ *   is in use.
+ */
+struct ReconstructedResult fwd_clone_reconstructed(const struct ReconstructedHandle *handle);
 
 /**
  * Close and free the memory for a database handle

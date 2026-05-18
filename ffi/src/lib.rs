@@ -621,6 +621,39 @@ pub extern "C" fn fwd_reconstruct_on_reconstructed<'db>(
     invoke_with_handle(handle, move |h| h.reconstruct(values))
 }
 
+/// Produces an independent reconstructed handle that shares the underlying
+/// view with the input handle. Both handles can be used, reconstructed, and
+/// freed independently.
+///
+/// # Arguments
+///
+/// * `handle` - The reconstructed handle returned by [`fwd_reconstruct_on_revision`],
+///   [`fwd_reconstruct_on_reconstructed`], or a previous call to [`fwd_clone_reconstructed`].
+///
+/// # Returns
+///
+/// - [`ReconstructedResult::NullHandlePointer`] if the provided handle is null.
+/// - [`ReconstructedResult::Ok`] with a new [`ReconstructedHandle`] that
+///   shares the underlying view with the input handle.
+///
+/// # Safety
+///
+/// The caller must:
+/// * ensure that `handle` is a valid pointer to a [`ReconstructedHandle`].
+/// * call [`fwd_free_reconstructed`] to free the returned handle when it is
+///   no longer needed.
+/// * ensure that the underlying [`DatabaseHandle`] remains valid (not closed
+///   via [`fwd_close_db`]) for as long as the returned [`ReconstructedHandle`]
+///   is in use.
+#[unsafe(no_mangle)]
+pub extern "C" fn fwd_clone_reconstructed<'db>(
+    handle: Option<&ReconstructedHandle<'db>>,
+) -> ReconstructedResult<'db> {
+    invoke_with_handle(handle, move |h| {
+        Ok::<_, firewood::api::Error>(h.clone_view())
+    })
+}
+
 /// Commits a proposal to the database.
 ///
 /// This function will consume the proposal regardless of whether the commit

@@ -187,6 +187,100 @@ func TestReconstructedDropThenUse(t *testing.T) {
 	r.ErrorIs(err, ErrDroppedReconstructed)
 }
 
+// TestReconstructedClone verifies that a Reconstruct call on a clone does
+// not affect the original handle's view of the same key.
+func TestReconstructedClone(t *testing.T) {
+	r := require.New(t)
+	db := newTestDatabase(t)
+
+	// A reconstructed view must be built from a committed revision.
+	root, err := db.Update([]BatchOp{Put([]byte("foo"), []byte("bar"))})
+	r.NoError(err)
+	rev, err := db.Revision(root)
+	r.NoError(err)
+	t.Cleanup(func() { r.NoError(rev.Drop()) })
+
+	var (
+		key      = []byte("k")
+		value    = []byte("v")
+		newValue = []byte("newV")
+	)
+
+	original, err := rev.Reconstruct([]BatchOp{Put(key, value)})
+	r.NoError(err)
+	t.Cleanup(func() { r.NoError(original.Drop()) })
+
+	cloned, err := original.Clone()
+	r.NoError(err)
+	t.Cleanup(func() { r.NoError(cloned.Drop()) })
+
+	r.NoError(cloned.Reconstruct([]BatchOp{Put(key, newValue)}))
+
+	got, err := original.Get(key)
+	r.NoError(err)
+	r.Equal(value, got)
+}
+
+// TestReconstructedCloneOutlivesOriginal verifies that dropping the original
+// reconstructed handle does not invalidate the clone.
+func TestReconstructedCloneOutlivesOriginal(t *testing.T) {
+	r := require.New(t)
+	db := newTestDatabase(t)
+
+	const (
+		keysPerBatch = 2
+		numKeys      = 2 * keysPerBatch
+	)
+
+	keys, vals, batch := kvForTest(numKeys)
+	root, err := db.Update(batch[:keysPerBatch])
+	r.NoError(err)
+
+	rev, err := db.Revision(root)
+	r.NoError(err)
+	t.Cleanup(func() { r.NoError(rev.Drop()) })
+
+	original, err := rev.Reconstruct(batch[keysPerBatch:])
+	r.NoError(err)
+
+	cloned, err := original.Clone()
+	r.NoError(err)
+	t.Cleanup(func() { r.NoError(cloned.Drop()) })
+
+	expectedRoot := original.Root()
+	r.NoError(original.Drop())
+
+	// Clone remains fully functional after the original is dropped.
+	r.Equal(expectedRoot, cloned.Root())
+	for i := range len(keys) {
+		got, err := cloned.Get(keys[i])
+		r.NoError(err)
+		r.Equal(vals[i], got)
+	}
+}
+
+// TestReconstructedCloneAfterDrop verifies that Clone cannot be called on a
+// dropped reconstructed handle.
+func TestReconstructedCloneAfterDrop(t *testing.T) {
+	r := require.New(t)
+	db := newTestDatabase(t)
+
+	_, _, batch := kvForTest(4)
+	root, err := db.Update(batch[:2])
+	r.NoError(err)
+
+	rev, err := db.Revision(root)
+	r.NoError(err)
+	t.Cleanup(func() { r.NoError(rev.Drop()) })
+
+	reconstructed, err := rev.Reconstruct(nil)
+	r.NoError(err)
+	r.NoError(reconstructed.Drop())
+
+	_, err = reconstructed.Clone()
+	r.ErrorIs(err, ErrDroppedReconstructed)
+}
+
 // TestReconstructedConcurrentGetAndDrop verifies that concurrent Get and Drop
 // calls do not panic or return unexpected errors. Every goroutine must see
 // either a successful result or ErrDroppedReconstructed.
