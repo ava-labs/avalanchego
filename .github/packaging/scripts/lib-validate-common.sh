@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Shared functions for package validation scripts.
-# Sourced by validate-rpm.sh.
 
 # Detect host architecture for the given package format.
 # Sets PACKAGE_ARCH (global) if not already set by the caller.
