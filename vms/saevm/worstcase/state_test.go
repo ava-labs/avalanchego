@@ -292,7 +292,8 @@ func TestMultipleBlocks(t *testing.T) {
 
 		got, err := state.FinishBlock()
 		require.NoError(t, err, "FinishBlock()")
-		target, c := sut.hooks.GasConfigAfter(header)
+		target, c, err := sut.hooks.GasConfigAfter(header)
+		require.NoError(t, err, "GasConfigAfter()")
 		require.NoError(t, wantLatestEndTime.AfterBlock(gas.Gas(state.GasUsed()), target, c), "AfterBlock()")
 
 		want := &blocks.WorstCaseBounds{
@@ -644,7 +645,7 @@ func TestCanExecuteTransactionHook(t *testing.T) {
 	sut := newSUT(t, saetest.MaxAllocFor(wallet.Addresses()...))
 
 	errSenderBlocked := errors.New("sender blocked by allowlist")
-	sut.hooks.CanExecuteTransactionFn = func(from common.Address, _ *common.Address, _ libevm.StateReader) error {
+	sut.hooks.CanExecuteTransactionFn = func(_ params.Rules, from common.Address, _ *common.Address, _ libevm.StateReader) error {
 		if from == wallet.Addresses()[blocked] {
 			return errSenderBlocked
 		}

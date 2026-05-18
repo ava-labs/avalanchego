@@ -48,19 +48,22 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 			BlobGasUsed:     new(uint64),
 			ExcessBlobGas:   new(uint64),
 		},
-		settledHeight: parent.NumberU64() + 1, // synchronoous
 	}
 	props = options.ApplyTo(props, opts...)
-	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settledHeight)
+	if props.settled == nil {
+		props.settled = props.header
+	}
+	require.NoError(tb, hookstest.FinalizeHeader(props.header, props.settled), "hookstest.FinalizeHeader()")
+	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops)
 	require.NoError(tb, err, "hookstest.BuildBlock()")
 	return block
 }
 
 type ethBlockProperties struct {
-	header        *types.Header
-	receipts      types.Receipts
-	ops           []hookstest.Op
-	settledHeight uint64
+	header   *types.Header
+	receipts types.Receipts
+	ops      []hookstest.Op
+	settled  *types.Header
 }
 
 // ModifyHeader returns an option to modify the [types.Header] constructed by
@@ -140,7 +143,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 
 	b := NewBlock(tb, gen.ToBlock(), nil, nil)
 	h := hookstest.NewStub(conf.gasTarget)
-	require.NoErrorf(tb, b.MarkSynchronous(h, db, xdb, conf.gasExcess), "%T.MarkSynchronous()", b)
+	require.NoErrorf(tb, b.MarkSynchronous(h, db, conf.tdbConfig, xdb, conf.gasExcess), "%T.MarkSynchronous()", b)
 	return b
 }
 

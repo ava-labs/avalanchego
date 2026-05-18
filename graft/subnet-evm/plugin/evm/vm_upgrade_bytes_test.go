@@ -36,6 +36,13 @@ import (
 )
 
 func TestVMUpgradeBytesPrecompile(t *testing.T) {
+	// Pin to pre-Helicon: the legacy synchronous plugin's libevm txallowlist
+	// hook is intentionally short-circuited post-Helicon (see
+	// extras.RulesExtra.CanExecuteTransaction). The default `newVM` fork is
+	// `upgradetest.Latest` (= Helicon), which would silently disable the
+	// admission check the assertions below depend on.
+	graniteFork := upgradetest.Granite
+
 	// Make a TxAllowListConfig upgrade at genesis and convert it to JSON to apply as upgradeBytes.
 	enableAllowListTimestamp := upgrade.InitiallyActiveTime // enable at initial time
 	upgradeConfig := &extras.UpgradeConfig{
@@ -50,6 +57,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 
 	// initialize the VM with these upgrade bytes
 	tvm := newVM(t, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: genesisJSONSubnetEVM,
 		upgradeJSON: string(upgradeBytesJSON),
 	})

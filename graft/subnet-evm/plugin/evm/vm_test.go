@@ -156,6 +156,15 @@ type testVM struct {
 }
 
 func newVM(t *testing.T, config testVMConfig) *testVM {
+	tvm, err := tryNewVM(t, config)
+	require.NoError(t, err, "error initializing vm")
+	return tvm
+}
+
+// tryNewVM mirrors [newVM] but returns the [VM.Initialize] error
+// instead of asserting `NoError`. Use from tests that want to assert
+// a specific Initialize failure.
+func tryNewVM(t *testing.T, config testVMConfig) (*testVM, error) {
 	ctx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
 	fork := upgradetest.Latest
 	if config.fork != nil {
@@ -184,7 +193,7 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
 
-	err := vm.Initialize(
+	if err := vm.Initialize(
 		t.Context(),
 		ctx,
 		prefixedDB,
@@ -193,8 +202,9 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 		[]byte(config.configJSON),
 		[]*commonEng.Fx{},
 		appSender,
-	)
-	require.NoError(t, err, "error initializing vm")
+	); err != nil {
+		return nil, err
+	}
 
 	if !config.isSyncing {
 		require.NoError(t, vm.SetState(t.Context(), snow.Bootstrapping))
@@ -207,7 +217,7 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 		atomicMemory: atomicMemory,
 		appSender:    appSender,
 		config:       config,
-	}
+	}, nil
 }
 
 // Firewood cannot yet be run with an empty config.
@@ -1941,9 +1951,16 @@ func TestVerifyManagerConfig(t *testing.T) {
 // Test that the tx allow list allows whitelisted transactions and blocks non-whitelisted addresses
 // and the allowlist is removed after the precompile is disabled.
 func TestTxAllowListDisablePrecompile(t *testing.T) {
+	// Pin to pre-Helicon: the legacy synchronous plugin's libevm txallowlist
+	// hook is intentionally short-circuited post-Helicon (see
+	// extras.RulesExtra.CanExecuteTransaction). Helicon-active chains are
+	// served by the SAE port at vms/saevm/subnetevm and exercise the same check
+	// via SAE worst-case admission.
+	graniteFork := upgradetest.Granite
+
 	// Setup chain params
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[graniteFork]))))
 	enableAllowListTimestamp := upgrade.InitiallyActiveTime // enable at initially active time
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.TimeToNewUint64(enableAllowListTimestamp), testEthAddrs[0:1], nil, nil),
@@ -1968,6 +1985,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	`, disableAllowListTimestamp.Unix())
 
 	tvm := newVM(t, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 		upgradeJSON: upgradeConfig,
 	})
@@ -2035,9 +2053,11 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 
 // Test that the fee manager changes fee configuration
 func TestFeeManagerChangeFee(t *testing.T) {
+	graniteFork := upgradetest.Granite
+
 	// Setup chain params
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[graniteFork]))))
 	configExtra := params.GetExtra(genesis.Config)
 	configExtra.GenesisPrecompiles = extras.Precompiles{
 		feemanager.ConfigKey: feemanager.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
@@ -2061,6 +2081,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 	})
 
@@ -2733,6 +2754,10 @@ func TestStandaloneDB(t *testing.T) {
 }
 
 func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
+	// The legacy feeManager precompile is rejected when scheduled at
+	// or after Helicon (see feemanager.Config.Verify)
+	graniteFork := upgradetest.Granite
+
 	// Setup chain params
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
@@ -2760,6 +2785,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 	})
 
@@ -2783,6 +2809,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 
 	// restart vm and try again
 	restartedTVM, err := restartVM(tvm, testVMConfig{
+		fork:        &graniteFork,
 		genesisJSON: string(genesisJSON),
 	})
 	require.NoError(t, err)

@@ -66,6 +66,7 @@ go_library(
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//graft/subnet-evm/plugin/evm/extension",
         "//graft/subnet-evm/plugin/evm/log",
+        "//graft/subnet-evm/precompile/contracts/feemanager/retirement",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/registry",
         "//graft/subnet-evm/warp",
@@ -123,6 +124,7 @@ graft_go_test(
     srcs = [
         "block_builder_test.go",
         "block_test.go",
+        "feemanager_retirement_test.go",
         "gossip_test.go",
         "syncervm_test.go",
         "tx_gossip_test.go",
@@ -171,6 +173,7 @@ graft_go_test(
         "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/contracts/deployerallowlist",
         "//graft/subnet-evm/precompile/contracts/feemanager",
+        "//graft/subnet-evm/precompile/contracts/feemanager/feemanagertest",
         "//graft/subnet-evm/precompile/contracts/rewardmanager",
         "//graft/subnet-evm/precompile/contracts/txallowlist",
         "//graft/subnet-evm/precompile/contracts/warp",

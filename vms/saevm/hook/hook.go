@@ -57,9 +57,19 @@ type Points interface {
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.
 	ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error)
+	// ExecutionArtifact returns hook-owned bytes derived from `state` (the
+	// post-execution state of the block identified by `h`). SAE persists the
+	// returned bytes alongside its own execution artifacts; the encoding is
+	// opaque to SAE. Implementations MAY return `nil` to indicate no artifact.
+	ExecutionArtifact(h *types.Header, state libevm.StateReader) ([]byte, error)
+	// GasConfigAt returns the gas target and configuration derived directly
+	// from `h`'s post-execution state.
+	GasConfigAt(h *types.Header, state libevm.StateReader) (target gas.Gas, c gastime.GasPriceConfig, err error)
 	// GasConfigAfter returns the gas target and configuration that should go
-	// into effect immediately after the provided block.
-	GasConfigAfter(*types.Header) (target gas.Gas, c gastime.GasPriceConfig)
+	// into effect immediately after `h`. Implementations resolve any
+	// previously-persisted hook artifact themselves, typically via a lookup
+	// keyed by [Points.SettledHeight] against [Points.ExecutionResultsDB].
+	GasConfigAfter(h *types.Header) (target gas.Gas, c gastime.GasPriceConfig, err error)
 	// BlockTime returns the exact block time for the given header, as recorded
 	// in [BlockBuilder.BuildHeader]. The returned time MUST match the header
 	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
@@ -75,10 +85,30 @@ type Points interface {
 	// execution.
 	EndOfBlockOps(*types.Block) ([]Op, error)
 	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
-	// so that consumers can use a single concrete type for both SAE and libevm hooks.
-	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
+	// so that consumers can share the same check between the SAE worst-case
+	// admission path and the libevm hook fired during actual EVM execution.
+	//
+	// Unlike the libevm hook (which is keyed by [params.Rules] via its
+	// receiver), [Points] is one long-lived value per VM, so the rules for the
+	// block being checked MUST be passed explicitly. SAE worst-case calls this
+	// with rules computed from the LAST-SETTLED block. Implementations MUST
+	// treat the rules and state as a consistent pair, e.g. when
+	// gating with `rules.IsPrecompileEnabled(...)` against contract storage
+	// reads. The trade-off is strict-as-of-last-settled enforcement (a few seconds of leakage after a role
+	// removal) instead of strict-as-of-parent.
+	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
+	// RequiresTransactionAdmissionCheck reports whether
+	// [CanExecuteTransaction] could reject any tx under `rules`. MUST be a
+	// cheap, rules-only check used to skip sender recovery and state opening
+	// when no relevant precompile is active. Over-reporting (returning true)
+	// is safe; under-reporting is not.
+	RequiresTransactionAdmissionCheck(rules params.Rules) bool
 	// BeforeExecutingBlock is called immediately prior to executing the block.
-	BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error
+	// `parent` is the header of the block whose post-execution state `state`
+	// is rooted at; it provides `parent.Time` for upgrade-activation windowing
+	// and is the equivalent of what the legacy plugin's [core.StateProcessor]
+	// reads via `&parent.Time`.
+	BeforeExecutingBlock(rules params.Rules, parent *types.Header, state *state.StateDB, block *types.Block) error
 	// AfterExecutingBlock is called immediately after executing the block.
 	AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 }
@@ -96,6 +126,10 @@ type BlockBuilder[T Transaction] interface {
 	// SAE always uses this method instead of directly constructing a header, to
 	// ensure any libevm header extras are properly populated.
 	BuildHeader(parent *types.Header) (*types.Header, error)
+	// FinalizeHeader populates header fields on `hdr` that depend on `settled`
+	// SAE calls this after `lastSettled` has been determined and
+	// BEFORE the worst-case projection consumes the header.
+	FinalizeHeader(hdr *types.Header, settled *types.Header) error
 	// PotentialEndOfBlockOps returns an iterator of custom transactions that
 	// would be valid to include into a block.
 	//
@@ -115,13 +149,18 @@ type BlockBuilder[T Transaction] interface {
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
+	//
+	// `worstcaseState` is SAE's worst-case [state.StateDB] (read-only),
+	// rooted at `settled`'s post-execution state. `settled` is the
+	// last-settled block at build time and is deterministic across nodes (see [blocks.LastToSettleAt]).
 	BuildBlock(
 		header *types.Header,
+		worstcaseState libevm.StateReader,
 		blockCtx *block.Context,
 		txs []*types.Transaction,
 		receipts []*types.Receipt,
 		endOfBlockOps []T,
-		settledHeight uint64,
+		settled *types.Header,
 	) (*types.Block, error)
 }
 

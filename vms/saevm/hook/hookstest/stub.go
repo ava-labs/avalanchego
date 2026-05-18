@@ -36,7 +36,9 @@ type Stub struct {
 	InvalidOpIDs            set.Set[ids.ID]
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
-	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
+	CanExecuteTransactionFn func(params.Rules, common.Address, *common.Address, libevm.StateReader) error
+	RequiresAdmissionCheck  func(params.Rules) bool
+	BeforeExecutingBlockFn  func(params.Rules, *types.Header, *state.StateDB, *types.Block) error
 	GasPriceConfig          gastime.GasPriceConfig
 }
 
@@ -141,27 +143,48 @@ func (s *Stub) PotentialEndOfBlockOps(ctx context.Context, header *types.Header,
 	}
 }
 
+// FinalizeHeader stamps the settled-block height into the stub's `extra`
+// canoto blob carried in [types.Header.Extra], so [Stub.SettledHeight] can
+// recover it during worst-case and execution. Standalone counterpart of
+// [Stub.FinalizeHeader] for non-stub call sites.
+func FinalizeHeader(header *types.Header, settled *types.Header) error {
+	var e extra
+	if err := e.UnmarshalCanoto(header.Extra); err != nil {
+		return err
+	}
+	e.settledHeight = settled.Number.Uint64()
+	header.Extra = e.MarshalCanoto()
+	return nil
+}
+
+// FinalizeHeader stamps the settled-block height into the stub's `extra`
+// canoto blob; see [FinalizeHeader].
+func (*Stub) FinalizeHeader(header *types.Header, settled *types.Header) error {
+	return FinalizeHeader(header, settled)
+}
+
 // BuildBlock calls [BuildBlock] with its arguments.
 func (*Stub) BuildBlock(
 	header *types.Header,
+	_ libevm.StateReader,
 	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settledHeight uint64,
+	_ *types.Header,
 ) (*types.Block, error) {
-	return BuildBlock(header, blockCtx, txs, receipts, ops, settledHeight)
+	return BuildBlock(header, blockCtx, txs, receipts, ops)
 }
 
 // BuildBlock encodes ops into [types.Header.Extra] and calls [types.NewBlock]
-// with the other arguments.
+// with the other arguments. `header.Extra` is expected to already carry the
+// settled-block height stamped by [Stub.FinalizeHeader].
 func BuildBlock(
 	header *types.Header,
 	_ *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	ops []Op,
-	settledHeight uint64,
 ) (*types.Block, error) {
 	var e extra
 	// If the header originally had fractional seconds set, we keep them in the
@@ -171,7 +194,6 @@ func BuildBlock(
 	}
 
 	e.ops = ops
-	e.settledHeight = settledHeight
 	header.Extra = e.MarshalCanoto()
 	return types.NewBlock(header, txs, nil, receipts, saetest.TrieHasher()), nil
 }
@@ -192,9 +214,20 @@ func (s *Stub) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[Op], error)
 	})), nil
 }
 
-// GasConfigAfter ignores its argument and always returns [Stub.Target] and [Stub.GasPriceConfig].
-func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	return s.Target, s.GasPriceConfig
+// ExecutionArtifact returns nil bytes; the stub has no persisted artifact.
+func (*Stub) ExecutionArtifact(*types.Header, libevm.StateReader) ([]byte, error) {
+	return nil, nil
+}
+
+// GasConfigAt ignores state and returns [Stub.Target] and [Stub.GasPriceConfig].
+func (s *Stub) GasConfigAt(h *types.Header, _ libevm.StateReader) (gas.Gas, gastime.GasPriceConfig, error) {
+	return s.GasConfigAfter(h)
+}
+
+// GasConfigAfter ignores its argument and always returns [Stub.Target] and
+// [Stub.GasPriceConfig].
+func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig, error) {
+	return s.Target, s.GasPriceConfig, nil
 }
 
 // BlockTime returns exact block time from [Stub.BuildHeader] by combining the
@@ -233,15 +266,26 @@ func getHeaderExtra(hdr *types.Header) extra {
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
 // otherwise it allows all transactions.
-func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr libevm.StateReader) error {
+func (s *Stub) CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, sr libevm.StateReader) error {
 	if fn := s.CanExecuteTransactionFn; fn != nil {
-		return fn(from, to, sr)
+		return fn(rules, from, to, sr)
 	}
 	return nil
 }
 
-// BeforeExecutingBlock is a no-op that always returns nil.
-func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+func (s *Stub) RequiresTransactionAdmissionCheck(rules params.Rules) bool {
+	if fn := s.RequiresAdmissionCheck; fn != nil {
+		return fn(rules)
+	}
+	return false
+}
+
+// BeforeExecutingBlock proxies to [Stub.BeforeExecutingBlockFn] if non-nil,
+// otherwise it is a no-op that always returns nil.
+func (s *Stub) BeforeExecutingBlock(rules params.Rules, parent *types.Header, sdb *state.StateDB, block *types.Block) error {
+	if fn := s.BeforeExecutingBlockFn; fn != nil {
+		return fn(rules, parent, sdb, block)
+	}
 	return nil
 }
 

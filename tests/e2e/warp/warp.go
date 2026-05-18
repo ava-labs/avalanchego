@@ -595,7 +595,11 @@ func (w *warpTest) deliverVerifiedWarpToReceivingChain(
 
 	tc.By("sending getVerified warp transaction", func() {
 		preFundedKey := w.receivingSubnet.Validators[0].preFundedKey
-		nonce, err := client.NonceAt(ctx, crypto.PubkeyToAddress(preFundedKey.PublicKey), nil)
+		// Use pending-nonce so consecutive deliveries on the same subnet
+		// (e.g. the SubnetA -> SubnetA scenario) don't collide on the
+		// just-mined-but-not-yet-accepted nonce -- otherwise the second
+		// tx is rejected as a replacement-underpriced same-nonce tx.
+		nonce, err := client.PendingNonceAt(ctx, crypto.PubkeyToAddress(preFundedKey.PublicKey))
 		require.NoError(err)
 
 		packedInput, err := packCalldata()

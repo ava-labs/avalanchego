@@ -47,6 +47,13 @@ type State struct {
 
 	db    *state.StateDB
 	clock *gastime.Time
+	// settled is the block whose post-execution state root [State.db] is rooted
+	// at. It is captured in [NewState] and never advanced; SAE worst-case never
+	// "moves on" from the settled snapshot, it only projects nonce/balance
+	// deltas via [hook.Op] on top. State-dependent admission checks (e.g. the
+	// txallowlist precompile) MUST use rules computed from this header so that
+	// `IsPrecompileEnabled(...)` agrees with what the StateDB actually knows.
+	settled *types.Header
 	// expectedParentHash is used to sanity check that blocks are provided in
 	// order. The [types.Header] in the `curr` field is modified to reflect
 	// worst-case bounds (which will almost certainly differ from actual values
@@ -83,6 +90,7 @@ func NewState(
 		config:             config,
 		db:                 db,
 		clock:              settled.ExecutedByGasTime(),
+		settled:            settled.Header(),
 		expectedParentHash: settled.Hash(),
 	}, nil
 }
@@ -105,7 +113,11 @@ var (
 //
 // It is not necessary for [types.Header.GasLimit] nor [types.Header.BaseFee] to
 // be set. However, all other fields should be populated and
-// [types.Header.ParentHash] must match the previous block's hash.
+// [types.Header.ParentHash] must match the previous block's hash. In
+// particular, settled-state-dependent fields like `SettledHeight` MUST have
+// been stamped via [hook.BlockBuilder.FinalizeHeader] before this method is
+// called -- the worst-case `hooks.GasConfigAfter` call in
+// [State.FinishBlock] reads them off the header.
 //
 // If the queue is too full to accept another block, [ErrQueueFull] is returned.
 func (s *State) StartBlock(h *types.Header) error {
@@ -152,6 +164,13 @@ func safeMaxBlockSize(clock *gastime.Time) gas.Gas {
 		maxSafeRate                gas.Gas = maxGasInClosedQueue / maxGasSecondsInClosedQueue
 	)
 	return min(clock.Rate(), maxSafeRate) * maxGasSecondsPerBlock
+}
+
+// StateDB returns the underlying [state.StateDB] rooted at the settled
+// block captured in [NewState]. It is intended for hook
+// consumers that need to read settled-as-of-build-time state.
+func (s *State) StateDB() *state.StateDB {
+	return s.db
 }
 
 // GasLimit returns the available gas limit for the current block.
@@ -208,7 +227,11 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 		return fmt.Errorf("%w: address %v, codehash: %s", core.ErrSenderNoEOA, from.Hex(), codeHash)
 	}
 
-	if err := s.hooks.CanExecuteTransaction(from, tx.To(), s.db); err != nil {
+	// Compute rules at the LAST-SETTLED block so they correspond to the same
+	// as [State.db]. State-dependent precompile checks read storage from `s.db` and
+	// gate that read with `rules.IsPrecompileEnabled(...)`.
+	settledRules := s.config.Rules(s.settled.Number, true /*isMerge*/, s.settled.Time)
+	if err := s.hooks.CanExecuteTransaction(settledRules, from, tx.To(), s.db); err != nil {
 		return fmt.Errorf("transaction blocked by CanExecuteTransaction hook: %w", err)
 	}
 
@@ -332,7 +355,10 @@ func (s *State) GasUsed() uint64 {
 // resulted in said transaction being included, which is reflected in the
 // indexing of tx-sender balances.
 func (s *State) FinishBlock() (*blocks.WorstCaseBounds, error) {
-	target, gasCfg := s.hooks.GasConfigAfter(s.curr)
+	target, gasCfg, err := s.hooks.GasConfigAfter(s.curr)
+	if err != nil {
+		return nil, fmt.Errorf("worst-case GasConfigAfter: %w", err)
+	}
 	if err := s.clock.AfterBlock(s.blockSize, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("finishing block gas time update: %w", err)
 	}

@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "retirement",
+    srcs = ["retirement.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/precompile/contracts/feemanager",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "//utils",
+        "@com_github_ava_labs_libevm//log",
+    ],
+)
+
+graft_go_test(
+    name = "retirement_test",
+    srcs = ["retirement_test.go"],
+    deps = [
+        ":retirement",
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/precompile/contracts/feemanager/feemanagertest",
+        "//snow",
+        "//upgrade/upgradetest",
+        "//utils",
+        "@com_github_stretchr_testify//require",
+    ],
+)

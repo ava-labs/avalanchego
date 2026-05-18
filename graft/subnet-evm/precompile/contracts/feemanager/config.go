@@ -4,6 +4,9 @@
 package feemanager
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
@@ -12,6 +15,13 @@ import (
 )
 
 var _ precompileconfig.Config = (*Config)(nil)
+
+// ErrFeeManagerEnabledAfterHelicon is returned by [Config.Verify] when a
+// `feeManager` ENABLE config (`Disable: false`) is scheduled at a
+// timestamp at or after Helicon. The legacy precompile is permanently
+// retired post-Helicon: gas pricing moves to ACP-176 and runtime
+// fee-config control moves to ACP-224's `acp224feemanager`.
+var ErrFeeManagerEnabledAfterHelicon = errors.New("feeManager precompile cannot be enabled at or after Helicon")
 
 // Config implements the StatefulPrecompileConfig interface while adding in the
 // FeeManager specific precompile config.
@@ -72,6 +82,10 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 
 // Verify tries to verify Config and returns an error accordingly.
 func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
+	// Reject ENABLE entries at or after Helicon.
+	if ts := c.Timestamp(); ts != nil && !c.IsDisabled() && chainConfig.IsHelicon(*ts) {
+		return fmt.Errorf("%w: blockTimestamp=%d", ErrFeeManagerEnabledAfterHelicon, *ts)
+	}
 	if err := c.AllowListConfig.Verify(chainConfig, c.Upgrade); err != nil {
 		return err
 	}

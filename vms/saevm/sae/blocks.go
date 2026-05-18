@@ -69,7 +69,11 @@ func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Bloc
 var (
 	errUnknownParent     = errors.New("unknown parent")
 	errBlockHeightTooLow = errors.New("block height too low")
-	errHashMismatch      = errors.New("hash mismatch")
+	// ErrHashMismatch is returned by [VM.VerifyBlock] when the locally
+	// rebuilt block does not hash-match the received block. Exported so
+	// callers / tests can `errors.Is` against it (e.g. assertions that a
+	// forged header field trips the rebuild-and-compare check).
+	ErrHashMismatch = errors.New("hash mismatch")
 )
 
 // VerifyBlock validates the block and, if successful, populates its ancestry.
@@ -101,7 +105,7 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 			zap.Reflect("block", b.Header()),
 			zap.Reflect("rebuilt", rebuilt.Header()),
 		)
-		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", errHashMismatch, reH, verH)
+		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", ErrHashMismatch, reH, verH)
 	}
 	if err := b.CopyAncestorsFrom(rebuilt); err != nil {
 		return err
@@ -187,7 +191,7 @@ func (vm *VM) settledBlockFromDB(db ethdb.Reader, hash common.Hash, num uint64) 
 	// Excess is only used for executing the next block, which can never
 	// be the case if `b` isn't actually the last synchronous block, so
 	// passing the same value for all is OK.
-	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
+	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.config.DBConfig.TrieDBConfig, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
 		return nil, err
 	}
 	return b, nil

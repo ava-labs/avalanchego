@@ -231,6 +231,20 @@ func (mr *MockChainConfigMockRecorder) IsDurango(time any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDurango", reflect.TypeOf((*MockChainConfig)(nil).IsDurango), time)
 }
 
+// IsHelicon mocks base method.
+func (m *MockChainConfig) IsHelicon(time uint64) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsHelicon", time)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsHelicon indicates an expected call of IsHelicon.
+func (mr *MockChainConfigMockRecorder) IsHelicon(time any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsHelicon", reflect.TypeOf((*MockChainConfig)(nil).IsHelicon), time)
+}
+
 // MockAccepter is a mock of Accepter interface.
 type MockAccepter struct {
 	ctrl     *gomock.Controller

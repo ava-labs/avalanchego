@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
@@ -104,7 +105,7 @@ func (b *blockBuilder) BuildHeader(parent *types.Header) (*types.Header, error) 
 			TimeMilliseconds: utils.PointerTo[uint64](nowMS),
 			MinDelayExcess:   &mde,
 			TargetExcess:     &te,
-			SettledHeight:    utils.PointerTo[uint64](0), // Populated in BuildBlock
+			SettledHeight:    utils.PointerTo[uint64](0), // Populated in FinalizeHeader
 		},
 	), nil
 }
@@ -155,15 +156,27 @@ func (b *blockBuilder) PotentialEndOfBlockOps(ctx context.Context, header *types
 	}
 }
 
+// FinalizeHeader stamps the persisted `SettledHeight` field on `header` so
+// downstream hook lookups (e.g. [Points.GasConfigAfter]) can key into the
+// execution-results DB. C-chain has no other settled-state-dependent header
+// fields.
+func (*blockBuilder) FinalizeHeader(header *types.Header, settled *types.Header) error {
+	settledHeight := settled.Number.Uint64()
+	headerExtra := customtypes.GetHeaderExtra(header)
+	headerExtra.SettledHeight = &settledHeight
+	return nil
+}
+
 var errEmptyBlock = errors.New("empty block")
 
 func (b *blockBuilder) BuildBlock(
 	header *types.Header,
+	_ libevm.StateReader,
 	blockCtx *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
 	poolTxs []*cchainTx,
-	settledHeight uint64,
+	_ *types.Header,
 ) (*types.Block, error) {
 	if len(txs) == 0 && len(poolTxs) == 0 {
 		return nil, errEmptyBlock
@@ -188,8 +201,6 @@ func (b *blockBuilder) BuildBlock(
 	// information is included in [types.Header.Extra].
 	header.Extra = customheader.SetPredicateBytesInExtra(rulesExtra.AvalancheRules, header.Extra, predicateBytes)
 
-	headerExtra := customtypes.GetHeaderExtra(header)
-	headerExtra.SettledHeight = &settledHeight
 	return customtypes.NewBlockWithExtData(
 		header,
 		txs,
