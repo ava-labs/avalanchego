@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "proxytime",
+    srcs = [
+        "cmpopt.go",
+        "proxytime.canoto.go",
+        "proxytime.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/proxytime",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/saevm/intmath",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_stephenbuttolph_canoto//:canoto",
+    ],
+)
+
+go_test(
+    name = "proxytime_test",
+    srcs = ["proxytime_test.go"],
+    data = glob(["testdata/**"]),
+    embed = [":proxytime"],
+    deps = [
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

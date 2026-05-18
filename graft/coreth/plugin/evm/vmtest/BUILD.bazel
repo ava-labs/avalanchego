@@ -1,5 +1,10 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "vmtest",
     srcs = [
@@ -8,7 +13,6 @@ go_library(
         "test_vm.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest",
-    visibility = ["//visibility:public"],
     deps = [
         "//api/metrics",
         "//chains/atomic",
@@ -25,7 +29,6 @@ go_library(
         "//graft/coreth/plugin/evm/upgrade/ap3",
         "//graft/evm/constants",
         "//graft/evm/firewood",
-        "//graft/evm/sync/client",
         "//graft/evm/sync/engine",
         "//graft/evm/sync/synctest",
         "//graft/evm/utils/utilstest",
@@ -41,6 +44,7 @@ go_library(
         "//utils",
         "//utils/crypto/secp256k1",
         "//utils/set",
+        "//version",
         "//vms/components/chain",
         "//vms/evm/database",
         "//vms/evm/predicate",

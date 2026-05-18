@@ -76,6 +76,7 @@ go_test(
         "//snow/engine/snowman/block/blocktest",
         "//snow/networking/sender/sendermock",
         "//snow/snowtest",
+        "//utils",
         "//utils/constants",
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",

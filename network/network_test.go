@@ -366,13 +366,13 @@ func TestSend(t *testing.T) {
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
-				require.FailNow("unexpected message received")
+				t.Fatal("unexpected message received")
 			}),
 			router.InboundHandlerFunc(func(_ context.Context, msg *message.InboundMessage) {
 				received <- msg
 			}),
 			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
-				require.FailNow("unexpected message received")
+				t.Fatal("unexpected message received")
 			}),
 		},
 	)
@@ -411,13 +411,13 @@ func TestSendWithFilter(t *testing.T) {
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
-				require.FailNow("unexpected message received")
+				t.Fatal("unexpected message received")
 			}),
 			router.InboundHandlerFunc(func(_ context.Context, msg *message.InboundMessage) {
 				received <- msg
 			}),
 			router.InboundHandlerFunc(func(context.Context, *message.InboundMessage) {
-				require.FailNow("unexpected message received")
+				t.Fatal("unexpected message received")
 			}),
 		},
 	)
@@ -526,7 +526,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			&testHandler{
 				InboundHandler: nil,
 				ConnectedF: func(ids.NodeID, *version.Application, ids.ID) {
-					require.FailNow("unexpectedly connected to a peer")
+					t.Fatal("unexpectedly connected to a peer")
 				},
 				DisconnectedF: nil,
 			},
@@ -601,7 +601,7 @@ func testDialDeletesNonValidators(t *testing.T, connectToAllValidators bool) {
 			&testHandler{
 				InboundHandler: nil,
 				ConnectedF: func(ids.NodeID, *version.Application, ids.ID) {
-					require.FailNow("unexpectedly connected to a peer")
+					t.Fatal("unexpectedly connected to a peer")
 				},
 				DisconnectedF: nil,
 			},
@@ -720,7 +720,7 @@ func TestDialContext(t *testing.T) {
 
 	select {
 	case <-gotNeverDialedIPConn:
-		require.FailNow("unexpectedly connected to peer")
+		t.Fatal("unexpectedly connected to peer")
 	default:
 	}
 

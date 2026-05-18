@@ -486,11 +486,11 @@ func TestOptionTimestampValidity(t *testing.T) {
 	require.NoError(statefulBlock.Accept(t.Context()))
 
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
-		require.FailNow("called GetBlock when unable to handle the error")
+		t.Fatal("called GetBlock when unable to handle the error")
 		return nil, nil
 	}
 	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
-		require.FailNow("called ParseBlock when unable to handle the error")
+		t.Fatal("called ParseBlock when unable to handle the error")
 		return nil, nil
 	}
 
@@ -578,11 +578,11 @@ func TestOptionTimestampValidity(t *testing.T) {
 	require.LessOrEqual(statefulOptionBlock.Height(), proVM.lastAcceptedHeight)
 
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
-		require.FailNow("called GetBlock when unable to handle the error")
+		t.Fatal("called GetBlock when unable to handle the error")
 		return nil, nil
 	}
 	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
-		require.FailNow("called ParseBlock when unable to handle the error")
+		t.Fatal("called ParseBlock when unable to handle the error")
 		return nil, nil
 	}
 

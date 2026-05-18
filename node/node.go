@@ -327,7 +327,7 @@ type Node struct {
 	msgCreator message.Creator
 
 	// Manages network timeouts
-	timeoutManager timeout.Manager
+	timeoutManager *timeout.Manager
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager

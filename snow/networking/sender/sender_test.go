@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendertest"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/snow/networking/timeout/timeoutmock"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -681,6 +680,15 @@ func (h *testInternalHandler) popInternalMessage(t *testing.T) *message.InboundM
 func (*testInternalHandler) Benched(ids.ID, ids.NodeID)   {}
 func (*testInternalHandler) Unbenched(ids.ID, ids.NodeID) {}
 
+type testBenchlist struct {
+	benchlist.Manager
+	benched set.Set[ids.NodeID]
+}
+
+func (b *testBenchlist) IsBenched(_ ids.ID, nodeID ids.NodeID) bool {
+	return b.benched.Contains(nodeID)
+}
+
 func requireRegisteredRequest(t *testing.T, expectedReq, actualReq registeredRequest) {
 	require := require.New(t)
 	require.Equal(expectedReq.nodeID, actualReq.nodeID)
@@ -887,7 +895,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			var (
 				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender      = sendermock.NewExternalSender(ctrl)
-				timeoutManager      = timeoutmock.NewManager(ctrl)
+				timeoutManager      = newTimeoutManager(t, benchlist.NewNoBenchlist(), deadline)
 				testInternalHandler = &testInternalHandler{}
 				nodeIDs             = set.Of(successNodeID, failedNodeID, ctx.NodeID)
 				nodeIDsCopy         set.Set[ids.NodeID]
@@ -909,9 +917,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
-
-			// Set the timeout (deadline)
-			timeoutManager.EXPECT().TimeoutDuration().Return(deadline).AnyTimes()
 
 			// Make sure we're making the correct outbound message.
 			tt.setMsgCreatorExpect(msgCreator)
@@ -1098,7 +1103,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			var (
 				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender      = sendermock.NewExternalSender(ctrl)
-				timeoutManager      = timeoutmock.NewManager(ctrl)
+				timeoutManager      = newTimeoutManager(t, benchlist.NewNoBenchlist(), deadline)
 				testInternalHandler = &testInternalHandler{}
 			)
 
@@ -1113,9 +1118,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
-
-			// Set the timeout (deadline)
-			timeoutManager.EXPECT().TimeoutDuration().Return(deadline).AnyTimes()
 
 			// Case: sending to ourselves
 			{
@@ -1254,7 +1256,8 @@ func TestSender_Single_Request(t *testing.T) {
 			var (
 				msgCreator          = messagemock.NewOutboundMsgBuilder(ctrl)
 				externalSender      = sendermock.NewExternalSender(ctrl)
-				timeoutManager      = timeoutmock.NewManager(ctrl)
+				bl                  = &testBenchlist{Manager: benchlist.NewNoBenchlist()}
+				timeoutManager      = newTimeoutManager(t, bl, deadline)
 				testInternalHandler = &testInternalHandler{}
 			)
 
@@ -1273,9 +1276,6 @@ func TestSender_Single_Request(t *testing.T) {
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
-
-			// Set the timeout (deadline)
-			timeoutManager.EXPECT().TimeoutDuration().Return(deadline).AnyTimes()
 
 			// Case: sending to myself
 			{
@@ -1299,7 +1299,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Case: Node is benched
 			{
-				timeoutManager.EXPECT().IsBenched(ctx.ChainID, destinationNodeID).Return(true)
+				bl.benched.Add(destinationNodeID)
 
 				// Make sure we're expecting the correct outbound message.
 				tt.setMsgCreatorExpect(msgCreator)
@@ -1320,7 +1320,7 @@ func TestSender_Single_Request(t *testing.T) {
 
 			// Case: Node is not myself, not benched and send fails
 			{
-				timeoutManager.EXPECT().IsBenched(ctx.ChainID, destinationNodeID).Return(false)
+				bl.benched.Remove(destinationNodeID)
 
 				// Make sure we're making the correct outbound message.
 				tt.setMsgCreatorExpect(msgCreator)
@@ -1340,6 +1340,28 @@ func TestSender_Single_Request(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newTimeoutManager(t testing.TB, benchlistMgr benchlist.Manager, initialTimeout time.Duration) *timeout.Manager {
+	t.Helper()
+	tm, err := timeout.NewManager(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     initialTimeout,
+			MinimumTimeout:     initialTimeout,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutCoefficient: 1.25,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlistMgr,
+		prometheus.NewRegistry(),
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+
+	go tm.Dispatch()
+	t.Cleanup(tm.Stop)
+
+	return tm
 }
 
 func noopSubscription(ctx context.Context) (common.Message, error) {
