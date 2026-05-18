@@ -1420,7 +1420,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 
 	stakingInfo := state.StakingInfo{
 		AutoCompoundRewardShares: tx.AutoCompoundRewardShares,
-		Period:                   tx.Period,
+		NextPeriod:               tx.Period,
 	}
 	if err := e.state.SetStakingInfo(staker.SubnetID, staker.NodeID, stakingInfo); err != nil {
 		return fmt.Errorf("setting staking info: %w", err)
@@ -1454,7 +1454,7 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRene
 	}
 
 	stakingInfo.AutoCompoundRewardShares = tx.AutoCompoundRewardShares
-	stakingInfo.Period = tx.Period
+	stakingInfo.NextPeriod = tx.Period
 
 	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
 		return fmt.Errorf("could not set staking info: %w", err)
