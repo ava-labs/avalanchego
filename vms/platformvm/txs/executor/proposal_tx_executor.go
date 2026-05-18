@@ -429,7 +429,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		return err
 	}
 
-	if stakingInfo.Period > 0 {
+	if stakingInfo.NextPeriod > 0 {
 		// Running auto-renewed staker: validator will continue to the next cycle.
 		// On commit: restake rewards (based on AutoCompoundRewardShares) and start new cycle.
 		// On abort: return stake + accrued rewards, forfeit current cycle's rewards.
@@ -689,7 +689,7 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 
 	if _, err = e.createRewardsUTXOs(
 		addAutoRenewedValidatorTx,
-		stakingInfo.AccruedRewards,
+		stakingInfo.AccruedValidationRewards,
 		totalDelegateeRewards,
 		e.onAbortState,
 		uint32(len(e.tx.Unsigned.Outputs())),
@@ -756,10 +756,10 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 		return err
 	}
 
-	newAccruedRewards := stakingInfo.AccruedRewards
+	newAccruedRewards := stakingInfo.AccruedValidationRewards
 	newWeight := validator.Weight
 	if restakingRewards > 0 {
-		newAccruedRewards, err = math.Add(stakingInfo.AccruedRewards, restakingRewards)
+		newAccruedRewards, err = math.Add(stakingInfo.AccruedValidationRewards, restakingRewards)
 		if err != nil {
 			return err
 		}
@@ -824,7 +824,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 		return err
 	}
 
-	duration := time.Duration(stakingInfo.Period) * time.Second
+	duration := time.Duration(stakingInfo.NextPeriod) * time.Second
 	potentialReward := rewards.Calculate(
 		duration,
 		newWeight,
@@ -858,7 +858,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 
 	// Update staking info
 	stakingInfo.DelegateeReward = 0
-	stakingInfo.AccruedRewards = newAccruedRewards
+	stakingInfo.AccruedValidationRewards = newAccruedRewards
 	stakingInfo.AccruedDelegateeRewards = newAccruedDelegateeRewards
 
 	if err := e.onCommitState.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
@@ -891,7 +891,7 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 		return err
 	}
 
-	totalRewards, err := math.Add(validator.PotentialReward, stakingInfo.AccruedRewards)
+	totalRewards, err := math.Add(validator.PotentialReward, stakingInfo.AccruedValidationRewards)
 	if err != nil {
 		return err
 	}
