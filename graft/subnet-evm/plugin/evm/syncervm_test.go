@@ -109,9 +109,10 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 	var lock sync.Mutex
 	reqCount := 0
+	const maxRequestsBeforeShutdown = 10
 	test := syncTest{
 		syncableInterval:   256,
-		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
+		stateSyncMinBlocks: 50, // must be less than syncableInterval to perform sync
 		syncMode:           block.StateSyncStatic,
 		stateScheme:        scheme,
 		responseIntercept: func(syncerVM *VM, nodeID ids.NodeID, requestID uint32, response []byte) {
@@ -119,12 +120,12 @@ func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 			defer lock.Unlock()
 
 			reqCount++
-			// Fail all requests after number 10 to interrupt the sync
+			// Fail all requests after number maxRequestsBeforeShutdown to interrupt the sync
 			// TODO(alarso16): Changing this value may cause the test to fail.
 			// Syncer cannot know whether it failed or not, so it relies on state root matching.
-			if reqCount == 10 {
+			if reqCount == maxRequestsBeforeShutdown {
 				assert.NoError(t, syncerVM.Client.Shutdown(), "Shutdown()")
-			} else if reqCount < 10 {
+			} else if reqCount < maxRequestsBeforeShutdown {
 				assert.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "AppResponse()")
 			}
 		},
@@ -180,8 +181,9 @@ func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 		require.NoError(t, err)
 		require.False(t, enabled, "sync should be disabled")
 
-		// Process the first 10 blocks from the serverVM
-		for i := uint64(1); i < 10; i++ {
+		// Process some blocks to prove state is valid
+		const blocksToProcess = 10
+		for i := uint64(1); i < blocksToProcess; i++ {
 			ethBlock := vmSetup.serverVM.blockChain.GetBlockByNumber(i)
 			require.NotNil(t, ethBlock, "VM Server did not have a block available at height %d", i)
 			b, err := rlp.EncodeToBytes(ethBlock)
@@ -203,6 +205,7 @@ func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 func TestVMShutdownWhileSyncing(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
+			const numRequests = 50
 			var (
 				lock    sync.Mutex
 				vmSetup *syncVMSetup
@@ -210,7 +213,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 			reqCount := 0
 			test := syncTest{
 				syncableInterval:   256,
-				stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
+				stateSyncMinBlocks: 50, // must be less than syncableInterval to perform sync
 				syncMode:           block.StateSyncStatic,
 				stateScheme:        scheme,
 				responseIntercept: func(syncerVM *VM, nodeID ids.NodeID, requestID uint32, response []byte) {
@@ -218,11 +221,11 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 					defer lock.Unlock()
 
 					reqCount++
-					// Shutdown the VM after 50 requests to interrupt the sync
-					if reqCount == 50 {
+					// Shutdown the VM after numRequests to interrupt the sync
+					if reqCount == numRequests {
 						// Note this verifies the VM shutdown does not time out while syncing.
 						assert.NoError(t, vmSetup.shutdownOnceSyncerVM.Shutdown(t.Context()), "Shutdown()")
-					} else if reqCount < 50 {
+					} else if reqCount < numRequests {
 						assert.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "AppResponse()")
 					}
 				},
