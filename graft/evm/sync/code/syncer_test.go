@@ -6,6 +6,7 @@ package code
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -162,43 +163,103 @@ func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
 	})
 }
 
-// TestCodeSyncerCleansMarkerWhenCodeOnDiskAndInFlightHeld is a deterministic
-// regression test for an orphan code-to-fetch marker. When the code is
-// already on disk, the worker must delete the marker even if inFlight is
-// already held by another worker.
-func TestCodeSyncerCleansMarkerWhenCodeOnDiskAndInFlightHeld(t *testing.T) {
+// TestCodeSyncerCleansMarkerRewrittenMidCleanup is a deterministic
+// regression test for an orphan code-to-fetch marker. A wrapped client
+// DB pauses the first Batch.Write after the delete commits. The test
+// then rewrites the marker and enqueues a duplicate, forcing a sibling
+// worker to handle a marker recreated mid-cleanup.
+func TestCodeSyncerCleansMarkerRewrittenMidCleanup(t *testing.T) {
 	t.Parallel()
 
 	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		codeBytes := utils.RandomBytes(100)
 		codeHash := crypto.Keccak256Hash(codeBytes)
 
-		clientDB := rawdb.NewMemoryDatabase()
-		rawdb.WriteCode(clientDB, codeHash, codeBytes)
-		require.NoError(t, customrawdb.WriteCodeToFetch(clientDB, codeHash))
+		// probeHash is a synchronization barrier. Its code is on disk so
+		// dequeueing it does not affect codeHash's marker.
+		probeBytes := utils.RandomBytes(100)
+		probeHash := crypto.Keccak256Hash(probeBytes)
+
+		rawDB := rawdb.NewMemoryDatabase()
+		clientDB := newBlockingBatchDB(rawDB)
+
+		rawdb.WriteCode(rawDB, codeHash, codeBytes)
+		require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
+		rawdb.WriteCode(rawDB, probeHash, probeBytes)
 
 		serverDB := memorydb.New()
 		rawdb.WriteCode(serverDB, codeHash, codeBytes)
+		rawdb.WriteCode(serverDB, probeHash, probeBytes)
 		handler := handlers.NewCodeRequestHandler(serverDB, c, handlerstats.NewNoopHandlerStats())
 		mockClient := client.NewTestClient(c, nil, handler, nil)
 
-		ch := make(chan common.Hash, 1)
-		codeSyncer, err := NewSyncer(mockClient, clientDB, ch)
+		ch := make(chan common.Hash)
+		codeSyncer, err := NewSyncer(mockClient, clientDB, ch, WithNumWorkers(2))
 		require.NoError(t, err)
 
-		// Pretend another worker is already processing this hash.
-		codeSyncer.inFlight.Store(codeHash, struct{}{})
+		syncErrCh := make(chan error, 1)
+		go func() { syncErrCh <- codeSyncer.Sync(t.Context()) }()
 
+		// A worker takes codeHash, commits the marker delete, then pauses
+		// inside the wrapped Batch.Write.
 		ch <- codeHash
+		<-clientDB.blocked
+
+		// Rewrite the marker (modelling a concurrent AddCode) and enqueue
+		// a duplicate for a sibling worker.
+		require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
+		ch <- codeHash
+
+		// Barrier! This send returns only after the sibling has processed
+		// the duplicate and is back at the channel receive, so its decision
+		// is committed before we release the paused worker.
+		ch <- probeHash
+
+		close(clientDB.release)
 		close(ch)
 
-		require.NoError(t, codeSyncer.Sync(t.Context()))
+		require.NoError(t, <-syncErrCh)
 
-		it := customrawdb.NewCodeToFetchIterator(clientDB)
+		it := customrawdb.NewCodeToFetchIterator(rawDB)
 		defer it.Release()
 		require.False(t, it.Next(), "stale code-to-fetch marker remained after sync")
 		require.NoError(t, it.Error())
 	})
+}
+
+// blockingBatchDB pauses inside the first Batch.Write after the commit
+// lands. Subsequent writes are not blocked.
+type blockingBatchDB struct {
+	ethdb.Database
+	primed  atomic.Bool
+	blocked chan struct{}
+	release chan struct{}
+}
+
+func newBlockingBatchDB(inner ethdb.Database) *blockingBatchDB {
+	return &blockingBatchDB{
+		Database: inner,
+		blocked:  make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+}
+
+func (db *blockingBatchDB) NewBatch() ethdb.Batch {
+	return &blockingBatch{Batch: db.Database.NewBatch(), db: db}
+}
+
+type blockingBatch struct {
+	ethdb.Batch
+	db *blockingBatchDB
+}
+
+func (b *blockingBatch) Write() error {
+	err := b.Batch.Write()
+	if b.db.primed.CompareAndSwap(false, true) {
+		close(b.db.blocked)
+		<-b.db.release
+	}
+	return err
 }
 
 // TestCodeSyncerDuplicateAddCodeNoMarkerLeak stresses the same invariant
