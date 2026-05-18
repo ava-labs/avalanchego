@@ -923,7 +923,6 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		Priority:        addAutoRenewedValidatorTx.CurrentPriority(),
 	}
 
-	require.NoError(err)
 	require.NoError(service.vm.state.PutCurrentValidator(staker))
 	service.vm.state.AddTx(tx, status.Committed)
 	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
