@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	// Added for comment resolution.
 	_ "github.com/ava-labs/libevm/core/txpool"
 	_ "github.com/ava-labs/libevm/eth/filters"
 
