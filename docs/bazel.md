@@ -171,9 +171,12 @@ Run `task bazel-generate-metadata` after:
 - Modifying `MODULE.bazel`
 
 `task bazel-generate-metadata` also refreshes `MODULE.bazel.lock` into the
-same analyzed steady state that normal Bazel build/query commands materialize.
-This avoids a class of drift where `bazel mod tidy` alone leaves the lockfile
-under-materialized and a later Bazel invocation rewrites it opportunistically.
+same post-module-extension steady state that normal Bazel module resolution can
+materialize. This avoids a class of drift where `bazel mod tidy` alone leaves
+the lockfile under-materialized and a later Bazel invocation rewrites it
+opportunistically. In practice, `bazelisk mod deps --lockfile_mode=update`
+materializes module-extension state more completely than a narrow
+`bazel build --nobuild //main:avalanchego` normalization step.
 
 ### How Gazelle Handles Multiple Modules
 
@@ -472,7 +475,7 @@ task bazel-generate-metadata
 # Update MODULE.bazel use_repo calls
 task bazel-mod-tidy               # or: bazel mod tidy
 
-# Refresh MODULE.bazel.lock in its analyzed steady state
+# Refresh MODULE.bazel.lock in its post-module-extension steady state
 task bazel-sync-module-lock
 
 # Clean build outputs

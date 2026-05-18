@@ -35,9 +35,9 @@ if ! ./scripts/run_task.sh check-bazel-generate-patches; then
   exit 1
 fi
 
-# Keep the committed module lock in the same post-analysis state that
-# normal Bazel commands materialize, so CI catches drift before later
-# build/query steps mutate MODULE.bazel.lock opportunistically.
+# Keep the committed module lock in the same post-module-extension state that
+# normal Bazel module resolution can materialize, so CI catches drift before
+# later commands rewrite MODULE.bazel.lock opportunistically.
 if ! ./scripts/run_task.sh check-bazel-module-lock; then
   print_help
   exit 1

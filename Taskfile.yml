@@ -74,10 +74,10 @@ tasks:
     cmd: '{{.NIX_RUN}} bazelisk mod tidy'
 
   bazel-sync-module-lock:
-    desc: Regenerate MODULE.bazel.lock in its analyzed steady state
+    desc: Regenerate MODULE.bazel.lock in its post-module-extension steady state
     cmds:
       - task: bazel-mod-tidy
-      - cmd: '{{.NIX_RUN}} bazelisk build --nobuild //main:avalanchego'
+      - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
   bazel-test:
     desc: Run unit tests with Bazel (shuffle on, race on)
@@ -188,15 +188,15 @@ tasks:
       - task: bazel-generate-patches
       - task: check-clean-branch
 
+  check-bazel-gazelle-generate:
+    desc: Check that generated BUILD files are up-to-date
+    cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
+
   check-bazel-module-lock:
     desc: Checks that MODULE.bazel.lock is up-to-date (requires a clean working tree)
     cmds:
       - task: bazel-sync-module-lock
       - task: check-clean-branch
-
-  check-bazel-gazelle-generate:
-    desc: Check that generated BUILD files are up-to-date
-    cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
