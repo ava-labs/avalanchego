@@ -1938,7 +1938,7 @@ func (s *State) loadCurrentValidators() error {
 		var staker *Staker
 		switch stakerTx := tx.Unsigned.(type) {
 		case *txs.AddAutoRenewedValidatorTx:
-			weight, err := safemath.Add(stakerTx.Weight(), metadata.AccruedRewards)
+			weight, err := safemath.Add(stakerTx.Weight(), metadata.AccruedValidationRewards)
 			if err != nil {
 				return fmt.Errorf("overflow computing weight: %w", err)
 			}
