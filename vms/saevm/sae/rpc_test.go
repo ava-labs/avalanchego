@@ -145,7 +145,6 @@ func TestSubscriptions(t *testing.T) {
 	// the subscription will not receive the tx.
 	//
 	// This is not a production issue, because the subscription will be eventually created.
-	// gets dropped and the test hangs.
 	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
 		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
 	}
