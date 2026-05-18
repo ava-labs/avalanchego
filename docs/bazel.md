@@ -24,7 +24,7 @@ task bazel-build-opt
 # Run unit tests
 task bazel-test
 
-# Update Bazel metadata after changing Go imports
+# Update Bazel metadata after changing Go imports or Bazel module deps
 task bazel-generate-metadata
 
 # Clean build cache
@@ -105,7 +105,7 @@ gazelle prefix directives.
 | File | Purpose | Safe to Delete? |
 |------|---------|-----------------|
 | `MODULE.bazel` | Bazel module definition, dependencies, patches | **No** |
-| `MODULE.bazel.lock` | Locked dependency versions | Yes (regenerated) |
+| `MODULE.bazel.lock` | Locked module/dependency resolution state | Yes (regenerated) |
 | `go.work` | Go workspace aggregating all modules (used by `go_deps`) | **No** |
 | `.bazelrc` | Bazel build flags and settings | **No** |
 | `.bazelignore` | Directories excluded from Bazel | **No** |
@@ -168,6 +168,12 @@ Run `task bazel-generate-metadata` after:
 - Changing import statements
 - Adding new packages/directories
 - Modifying `go.mod` dependencies
+- Modifying `MODULE.bazel`
+
+`task bazel-generate-metadata` also refreshes `MODULE.bazel.lock` into the
+same analyzed steady state that normal Bazel build/query commands materialize.
+This avoids a class of drift where `bazel mod tidy` alone leaves the lockfile
+under-materialized and a later Bazel invocation rewrites it opportunistically.
 
 ### How Gazelle Handles Multiple Modules
 
@@ -332,6 +338,12 @@ control rather than generating them at build time. This avoids proto
 toolchain complexity in Bazel while maintaining compatibility with the
 existing `go generate` workflow.
 
+Bazel targets that import protobuf runtime packages depend on the Go module
+`google.golang.org/protobuf` through `go_deps.from_file(go_work = "//:go.work")`
+and refer to it as `@org_golang_google_protobuf//...`. The repo does not rely
+on direct `protobuf` / `rules_proto` Bazel module dependencies for proto code
+generation.
+
 ## Common Tasks
 
 ### Building
@@ -460,6 +472,9 @@ task bazel-generate-metadata
 # Update MODULE.bazel use_repo calls
 task bazel-mod-tidy               # or: bazel mod tidy
 
+# Refresh MODULE.bazel.lock in its analyzed steady state
+task bazel-sync-module-lock
+
 # Clean build outputs
 task bazel-clean                  # or: bazel clean
 
@@ -476,6 +491,10 @@ error instead of surfacing later as multiple downstream Bazel failures.
 This is especially useful for pull requests tested against a moving base
 branch, where the metadata included in the PR may be stale relative to
 the current merge target.
+
+That check includes `MODULE.bazel.lock`, so lockfile drift caused by Bazel
+module resolution or analysis is caught in the metadata phase rather than
+showing up later as a surprising working-tree mutation.
 
 The GitHub Actions Bazel workflow also defines a single aggregate job,
 `bazel-required`, that depends on the other jobs in the workflow via

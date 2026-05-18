@@ -59,6 +59,7 @@ tasks:
       - task: bazel-gazelle-generate
       - task: bazel-fmt
       - task: bazel-generate-patches
+      - task: bazel-sync-module-lock
 
   bazel-generate-patches:
     desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
@@ -71,6 +72,12 @@ tasks:
   bazel-mod-tidy:
     desc: Update use_repo() in MODULE.bazel from go.mod
     cmd: '{{.NIX_RUN}} bazelisk mod tidy'
+
+  bazel-sync-module-lock:
+    desc: Regenerate MODULE.bazel.lock in its analyzed steady state
+    cmds:
+      - task: bazel-mod-tidy
+      - cmd: '{{.NIX_RUN}} bazelisk build --nobuild //main:avalanchego'
 
   bazel-test:
     desc: Run unit tests with Bazel (shuffle on, race on)
@@ -179,6 +186,12 @@ tasks:
     desc: Checks that generated patches are up-to-date (requires a clean working tree)
     cmds:
       - task: bazel-generate-patches
+      - task: check-clean-branch
+
+  check-bazel-module-lock:
+    desc: Checks that MODULE.bazel.lock is up-to-date (requires a clean working tree)
+    cmds:
+      - task: bazel-sync-module-lock
       - task: check-clean-branch
 
   check-bazel-gazelle-generate:
