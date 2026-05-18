@@ -468,6 +468,407 @@ go_test(
 )
 ```
 
+### Diff-Aware Test Selection with Impacted Targets
+
+An impacted-target tool compares two revisions of a Bazel workspace and reports
+the set of **impacted targets**: Bazel targets whose definition or transitive
+inputs are affected by the change between the two revisions. `bazel-diff` is
+one candidate implementation of this model.
+
+#### Intended architecture: diff-range-driven selective execution
+
+Selective Bazel test execution should be treated as a layer **above** the
+ordinary Bazel test targets, not as a replacement for them.
+
+- The ordinary Bazel targets remain the source of truth for what can be built
+  and tested.
+- A higher-level selective-testing layer determines which subset of those test
+  targets is relevant for a particular git diff.
+- Local developers can still run the full Bazel target sets directly when they
+  want exhaustive validation.
+- CI and local workflows can use the selective-testing layer to reduce work when
+  only part of the graph is affected.
+
+The intended user-facing interface for this layer is **`targeted-bazel`**. It
+accepts normal Bazel-style invocations and only changes behavior when diff-aware
+selection is enabled. In other words:
+
+- without a diff input, `targeted-bazel ...` should behave like plain `bazel ...`
+- with a diff input, `targeted-bazel --diff <range> ...` should narrow the
+  requested Bazel target set to the impacted subset selected by policy
+
+This keeps the selective layer close to ordinary Bazel usage instead of forcing
+callers to learn a separate partition-specific command shape.
+
+`targeted-bazel` is the intended command surface. The lower-level impacted-target
+machinery exists to support that behavior and may evolve, but task entrypoints
+and user-facing documentation should center `targeted-bazel` rather than the
+implementation details behind it.
+
+The core abstraction for this layer is a **git diff range**.
+
+Examples:
+
+- `origin/master..HEAD` - committed changes on the current branch
+- `origin/master..` - committed changes plus the current working tree
+- `HEAD^..` - the previous revision through the current working tree
+
+Open-ended ranges are interpreted as comparing the left-hand revision against
+`HEAD` plus any staged and unstaged working-tree changes.
+
+The intended responsibility split is:
+
+- **Outside Bazel:** choose the git diff range to analyze.
+  - Examples: CI may choose a branch-delta range for a rebased PR branch, while
+    a developer may choose `origin/master..` locally.
+  - This is workflow policy, not impacted-target computation.
+- **Inside Bazel:** given a chosen diff range, compute impacted labels, filter
+  them to the relevant partition, and optionally execute the selected tests.
+
+The main reason to move more of this mechanism into Bazel is not that manifest
+computation is expensive or that caching the manifest is especially important.
+The value is that Bazel gives the mechanism a more explicit structure:
+
+- named inputs
+- a named derived artifact
+- a clear consumer of that artifact
+
+In other words, the selective-testing layer should be understandable as:
+
+```text
+diff range + current workspace + selector machinery
+  -> selected-test manifest
+  -> test execution
+```
+
+This makes the interface explicit instead of leaving it as workflow glue hidden
+inside scripts. The important derived artifact is the **selected-test
+manifest**. If selector machinery changes, the manifest must be recomputed. If
+that recomputation produces the same manifest, the required test execution does
+not change. If it produces a different manifest, the selected tests change.
+
+This separation keeps the contract clear:
+
+- the caller decides **what diff range** should be analyzed
+- the Bazel-owned selective-testing layer decides **which Bazel targets** that
+  diff range impacts
+- the ordinary Bazel test targets remain directly runnable without selective
+  filtering
+
+Example output is a newline-delimited list of Bazel labels:
+
+```text
+//utils:go_default_library
+//utils:go_default_test
+//network/p2p:go_default_library
+```
+
+This is different from plain `bazel test //...` behavior:
+
+- Bazel executes targets you ask it to build or test.
+- An impacted-target tool helps decide **which** targets are relevant for a given git diff.
+- Repo scripts/tasks can then filter the impacted target set down to the test
+  targets or CI partition they care about.
+
+For Go in particular, the useful granularity is usually the Bazel target, not an
+individual `TestXxx` function. A change to a package's production code may
+impact that package's library target, its test target, and downstream test
+targets that depend on it. A change to only `*_test.go` files should usually
+impact that package's test target without necessarily impacting downstream
+consumers of the package's library target.
+
+#### Local-first workflow
+
+Diff-aware selection must be reproducible locally, but there are two useful
+comparison modes and they answer slightly different questions:
+
+1. **Local branch-delta mode** compares the branch's current checkout against
+   its fork-point with the base branch (usually `git merge-base origin/master
+   HEAD`). This answers: "what changed on this branch since it diverged?"
+2. **Pull-request merged-result mode** compares the current base-branch tip
+   against the synthetic merge commit that GitHub creates for `pull_request`
+   workflows. This answers: "what changes when this PR is merged into the
+   current base branch right now?"
+
+The intended local workflow is therefore:
+
+1. choose the comparison mode that matches the question you are asking
+2. choose a git diff range for that mode (for local branch-delta work this is
+   usually the branch fork-point through the current checkout or working tree)
+3. run the normal Bazel command through `targeted-bazel`
+4. let the selector narrow that requested target set when a diff is provided
+5. otherwise let the command pass through unchanged as ordinary `bazel`
+
+For example:
+
+```bash
+# Plain bazel-style execution
+ targeted-bazel test //graft/coreth/... //graft/evm/...
+
+# Diff-aware execution against the same requested Bazel scope
+ targeted-bazel --diff origin/master.. test //graft/coreth/... //graft/evm/...
+```
+
+In the current rollout, the same task entrypoints can be used in both places:
+
+- **Locally:** if `BAZEL_IMPACTED_BASE_SHA` and `BAZEL_IMPACTED_DIFF_RANGE` are
+  unset, `targeted-bazel` behaves like ordinary `bazel`.
+- **In CI:** those env vars can be set to enable selective execution against a
+  chosen diff range without changing the task shape.
+
+This keeps local validation and CI behavior aligned without pretending that
+branch-delta and merged-result comparisons are interchangeable.
+
+#### Relationship to CI partitioning
+
+The repository keeps separate Bazel CI jobs (`unit-main`, `unit-coreth`,
+`unit-subnet-evm`, `e2e`) for wall-clock and resource reasons. Diff-aware test
+selection is meant to reduce unnecessary work within that partitioned model,
+not replace it with a single monolithic job. In practice this means a CI job may
+use diff information to skip itself entirely or to run only the impacted test
+targets within its partition.
+
+#### Relationship to caching
+
+Diff-aware selection and caching solve different problems:
+
+- An impacted-target tool minimizes **scope** by telling us which targets are impacted by a
+  change.
+- Bazel's local and remote caches minimize **re-execution** by reusing results
+  for selected targets whose inputs have already been validated.
+
+Local development already benefits from a persistent on-disk cache. CI can gain
+similar benefits from a remote cache, which becomes more important as the repo's
+build graph grows to include more expensive toolchains and dependencies.
+
+#### Trust boundary: in-graph vs out-of-graph inputs
+
+Affected-target analysis is only trustworthy to the extent that the relevant
+inputs are visible to Bazel's dependency graph.
+
+- **In-graph inputs** are candidates for precise affected-target analysis.
+- **Out-of-graph inputs** are not safe to rely on for selective CI skipping.
+
+For this repo, examples of likely in-graph inputs include:
+
+- `*.go` and `*_test.go`
+- `go.mod` and `go.work`
+- `MODULE.bazel`
+- `BUILD.bazel` and `.bzl`
+- declared external dependencies
+- Bazel-managed toolchains and platform/configuration inputs
+
+Examples of likely out-of-graph inputs unless explicitly modeled include:
+
+- GitHub-hosted runner image drift
+- undeclared environment variables
+- user/system bazelrc files
+- host-installed tools that are not provided by Bazel or the repo's pinned nix
+  environment
+- host OS / Xcode / CommandLineTools changes unless they are treated as explicit
+  CI environment identity inputs
+
+The operating rule is conservative: if an important input is outside the graph,
+CI should run more, not less. False positives (running extra tests) are
+acceptable. False negatives (skipping tests that should have run) are not.
+
+#### Environment identity and CI trust
+
+Selective CI decisions depend not only on source inputs, but also on the
+identity of the execution environment used to validate them.
+
+For Linux CI, this may be represented by a pinned Docker image digest and/or a
+pinned nix environment identity. For macOS CI, this may be represented by the
+full macOS version together with relevant Apple toolchain identity (for example
+Xcode or CommandLineTools version) and the runner class/label.
+
+When that environment identity changes, prior selective-CI assumptions are not
+automatically trusted. The conservative response is to re-establish a baseline
+with broad/full CI before relying on selective skipping again for that
+environment.
+
+#### Authoritative baselines
+
+A useful mental model is to treat successful base-branch runs as the
+authoritative source of affected-target metadata for an immutable revision and a
+specific execution environment identity.
+
+PR runs may consume previously generated metadata only when the relevant inputs
+match, including:
+
+- base commit SHA
+- Bazel version
+- affected-target tool version
+- execution environment identity
+
+If any of those differ, recomputation or conservative fallback is required.
+This is especially relevant after CI environment changes, where the first
+successful authoritative run in the new environment establishes a new trusted
+baseline.
+
+#### Current behavior
+
+- Pull-request runs for the three Bazel unit partitions (`unit-main`,
+  `unit-coreth`, `unit-subnet-evm`) perform a **cheap selector step first
+  inside each unit job** before paying for the repo's heavier Bazel task path.
+- The job-facing selector boundary is intentionally a **single entry point per
+  partition**. In current CI that selector is `select-bazel-tests`, and it is
+  responsible for:
+  - impacted-target computation
+  - partition-local filtering to non-manual `go_test` targets
+  - deciding whether the job should run in `full`, `skip`, or `selective` mode
+- On GitHub-hosted runners, that selector step currently relies on:
+  - `actions/setup-go` for host Go
+  - preinstalled `bazelisk`
+  - Bazel's configured JDK (queried via `bazel info java-home` when host `java`
+    is not on `PATH`)
+  - direct download/caching of the `bazel-diff` jar
+- If a partition-local manifest is empty, that unit job exits successfully
+  without running the heavier Bazel task.
+- If the manifest is non-empty, the unit job currently falls through to the
+  existing selective `targeted-bazel` task.
+- If no trusted diff is available, or if selector computation fails, CI fails
+  open to the full partition task rather than risking an unsafe skip.
+- On `pull_request` workflows, GitHub checks out a synthetic merge commit by
+  default. In that mode, impacted-target selection compares the current base
+  branch tip (`github.event.pull_request.base.sha`) against that synthetic
+  merge result. This intentionally answers "what is impacted by merging this
+  PR into the current base branch?" rather than only "what changed on the PR
+  branch since it forked?"
+- Merge queue and other non-PR flows use the full partition task.
+- Full `master` / postsubmit validation remains authoritative.
+- The Bazel `e2e` job does not use impacted-target selection.
+- Impacted-target tooling is not used as the sole detector of runner-image or
+  other out-of-graph environment drift.
+
+#### Workflow boundary for selective unit jobs
+
+The current workflow intentionally does **not** compute impacted targets in a
+separate upstream job and share them to the unit partitions via artifacts.
+That shape was explored and is a plausible future optimization boundary, but it
+is not the current default for one reason: at current CI economics, the fixed
+per-job setup costs are too large relative to the computation being shared.
+
+The important comparison is not just:
+
+- "compute impacted targets once" versus
+- "compute impacted targets three times"
+
+It is:
+
+- saved repeated impacted-target computation versus
+- added cost from an extra job boundary, checkout, lightweight host setup,
+  dependency serialization, and artifact upload/download handoff.
+
+In practice, the deciding factor was that the fixed setup cost of a separate
+compute job was of similar magnitude to the impacted-target computation it was
+trying to amortize. Under those conditions, introducing an upstream
+`compute-impacted-targets` job added complexity and dependency latency without a
+clear wall-clock win.
+
+That is why the current integration boundary is a **single selector step per
+unit job** rather than a shared impacted-target artifact lifecycle. This should
+not be interpreted as claiming that impacted-target computation and
+partition-local filtering are conceptually inseparable. They are distinct
+operations, and it is still reasonable to separate them internally for
+benchmarking, diagnostics, or implementation clarity. The point is only that
+**the workflow-level API** for the unit jobs is intentionally unified.
+
+Future maintainers should reconsider a separate shared compute job only if the
+assumptions above change materially. In particular, revisiting that design is
+reasonable if one or more of the following become true:
+
+- fixed per-job setup costs (job startup, checkout, host setup) fall
+  substantially
+- impacted-target computation becomes substantially more expensive
+- multiple workflow consumers genuinely need the same computed target set
+- artifact sharing becomes cheaper than repeated per-job computation
+- measurements show a clear wall-clock or cost win from a shared compute job
+
+The selector path used by CI should also remain locally reproducible. CI-specific
+plumbing should stay thin, and core selector behavior should continue to live in
+repo code, scripts, or tools rather than only inside GitHub Actions-only
+abstractions.
+
+Validation for this path is intentionally split across layers:
+
+- logic/unit coverage for `tools/impactedtests`
+- a dedicated Bazel integration test/job for the selector integration path
+- exclusion of `tools/impactedtests` from the legacy `go test ./...` unit sweep
+- a Bazel `manual` tag on the integration target so broad Bazel test sweeps do
+  not pull it in accidentally
+
+#### Conservative rollout policy
+
+Affected-target tooling should be introduced gradually:
+
+1. local observability first (`print` impacted targets)
+2. validate narrow repo-specific scenarios
+3. apply to one CI partition
+4. use selective execution for pull-request runs first
+5. keep merge queue and `master`/postsubmit on full partition runs while confidence is being established
+6. fail open to broader execution when uncertainty comes from selective-test computation (for example impacted-target calculation or partition query failure)
+7. expand scope only after confidence is earned
+
+The near-term goal is not perfect selective CI for every Bazel change. The goal
+is a conservative, understandable rollout that reduces unnecessary work without
+weakening merge safety.
+
+Current selector timings on a fast local machine are on the order of ~9-12s per
+invocation. On GitHub-hosted runners, after moving selection ahead of Nix, the
+empty-manifest Bazel unit jobs are roughly:
+
+- Linux: ~1 minute
+- Darwin: ~2 minutes
+
+That is a large improvement over the previous multi-minute Nix/bootstrap path,
+but it is not "free" yet. The remaining cost is mostly selector work itself
+(`go run`, Bazel startup/query work, and `bazel-diff` hash generation), not Nix.
+
+#### What is and is not worth optimizing next
+
+The biggest win already landed was: **do not pay Nix/bootstrap for empty PR unit
+jobs**.
+
+For the current GitHub-hosted runner setup, the following are usually **not**
+the most interesting optimization targets:
+
+- manually installing Bazelisk (it is already preinstalled)
+- manually installing Java (it is already preinstalled)
+- swapping `go run` for downloaded selector binaries without evidence that Go
+  startup is the dominant cost
+- Bazelizing the selector tools purely as a latency optimization; that may
+  actually be counterproductive for a pre-Bazel decision step
+
+The more promising next optimizations are:
+
+- reuse authoritative base-branch selector artifacts or base hashes instead of
+  recomputing both sides on every PR job
+- cache or pre-provision `bazel-diff`
+- reuse the already-computed partition manifests on the non-empty path instead
+  of selecting twice
+- look for further selector cost reductions only after measuring the current
+  per-job selector path
+
+#### PR minimization vs authoritative merge validation
+
+A useful interim policy is:
+
+- **Pull-request runs** may use impacted-target selection to reduce latency and cost.
+- **Merge queue and `master` / postsubmit runs** continue to run the full partition.
+
+This preserves an important safety property: no change is merged and then left
+without a full run in the authoritative CI environment. It also limits the risk
+from environment drift or other out-of-graph inputs. If a runner image,
+toolchain, or other CI dependency changes in a way that the affected-target tool
+does not model, a full postsubmit run on `master` will still detect the breakage
+promptly.
+
+Under this policy, the affected-target mechanism is responsible only for being a
+useful, conservative selector for PR-side Bazel-graph changes. It is not solely
+responsible for guaranteeing long-term branch health in the presence of CI
+environment drift; full postsubmit runs retain that role.
+
 ### Maintenance
 
 ```bash
