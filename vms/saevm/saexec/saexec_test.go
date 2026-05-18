@@ -192,9 +192,9 @@ func TestExecutionMetrics(t *testing.T) {
 
 	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
 	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	// [Executor.afterExecution] updates [Metrics.LastExecutedHeight] after
+	// [Executor.afterExecution] updates LastExecutedHeight after
 	// [blocks.Block.MarkExecuted] returns, so the gauge can lag behind
-	// [blocks.Block.WaitUntilExecuted] unblocking.
+	// [blocks.Block.WaitUntilExecuted] unblocking for a brief period.
 	require.Eventually(t, func() bool {
 		return testutil.ToFloat64(sut.metrics.LastExecutedHeight) == float64(b.Height())
 	}, time.Second, 10*time.Millisecond, "last executed height")

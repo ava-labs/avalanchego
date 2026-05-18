@@ -1,9 +1,10 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package metrics defines SAE Prometheus collectors. These lifecycle frontier
-// metrics can be compared with Snowman accepted height to derive execution and
-// settlement lag.
+// metrics defines SAE Prometheus collectors. These lifecycle
+// metrics are useful in their own right for configuring dashboards
+// and alerts and can also be compared with Snowman metrics to derive
+// additional metrics like settlement lag.
 package metrics
 
 import (
@@ -12,7 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Metrics holds SAE Prometheus collectors and provides semantic update methods.
+// Metrics holds SAE Prometheus collectors and provides update methods.
 type Metrics struct {
 	LastExecutedHeight prometheus.Gauge
 	LastSettledHeight  prometheus.Gauge
