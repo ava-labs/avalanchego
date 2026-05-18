@@ -62,7 +62,10 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	onDecisionState, err := state.NewDiff(parentID, v.backend)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		v.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(b.Timestamp()),
+	)
+	onDecisionState, err := state.NewDiff(parentID, v.backend, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return err
 	}
@@ -84,12 +87,12 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	onCommitState, err := state.NewDiffOn(onDecisionState)
+	onCommitState, err := state.NewDiffOn(onDecisionState, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return err
 	}
 
-	onAbortState, err := state.NewDiffOn(onDecisionState)
+	onAbortState, err := state.NewDiffOn(onDecisionState, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return err
 	}
@@ -114,7 +117,10 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 	}
 
 	parentID := b.Parent()
-	onAcceptState, err := state.NewDiff(parentID, v.backend)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		v.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(b.Timestamp()),
+	)
+	onAcceptState, err := state.NewDiff(parentID, v.backend, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return err
 	}
@@ -159,11 +165,11 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	}
 
 	parentID := b.Parent()
-	onCommitState, err := state.NewDiff(parentID, v.backend)
+	onCommitState, err := state.NewDiff(parentID, v.backend, state.StakerAdditionAfterDeletionForbidden)
 	if err != nil {
 		return err
 	}
-	onAbortState, err := state.NewDiff(parentID, v.backend)
+	onAbortState, err := state.NewDiff(parentID, v.backend, state.StakerAdditionAfterDeletionForbidden)
 	if err != nil {
 		return err
 	}
@@ -189,7 +195,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	parentID := b.Parent()
-	onAcceptState, err := state.NewDiff(parentID, v)
+	onAcceptState, err := state.NewDiff(parentID, v, state.StakerAdditionAfterDeletionForbidden)
 	if err != nil {
 		return err
 	}
@@ -407,10 +413,10 @@ func (v *verifier) commitBlock(b block.Block) error {
 func (v *verifier) proposalBlock(
 	b block.Block,
 	tx *txs.Tx,
-	onDecisionState state.Diff,
+	onDecisionState *state.Diff,
 	gasConsumed gas.Gas,
-	onCommitState state.Diff,
-	onAbortState state.Diff,
+	onCommitState *state.Diff,
+	onAbortState *state.Diff,
 	feeCalculator txfee.Calculator,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
@@ -471,7 +477,7 @@ func (v *verifier) standardBlock(
 	b block.Block,
 	txs []*txs.Tx,
 	feeCalculator txfee.Calculator,
-	onAcceptState state.Diff,
+	onAcceptState *state.Diff,
 	changedDuringAdvanceTime bool,
 ) error {
 	inputs, atomicRequests, onAcceptFunc, gasConsumed, lowBalanceL1ValidatorsEvicted, err := v.processStandardTxs(
@@ -515,7 +521,7 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calculator, diff state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calculator, diff *state.Diff, parentID ids.ID) (
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),
@@ -669,7 +675,7 @@ func calculateBlockMetrics(
 // true if at least one L1 validator was deactivated.
 func deactivateLowBalanceL1Validators(
 	config validatorfee.Config,
-	diff state.Diff,
+	diff *state.Diff,
 ) (bool, error) {
 	var (
 		accruedFees       = diff.GetAccruedFees()

@@ -56,7 +56,8 @@ func TestStorageNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := newEngineConfig(t, 1)
-			_, verifier := NewBLSAuth(config)
+			_, verifier, err := NewBLSAuth(config)
+			require.NoError(t, err)
 			qc := QCDeserializer{
 				verifier: &verifier,
 			}
@@ -71,15 +72,17 @@ func TestStorageNew(t *testing.T) {
 }
 
 func TestStorageRetrieve(t *testing.T) {
-	genesis := newTestBlock(t, newBlockConfig{})
+	numNodes := 4
+	genesis := newTestBlock(t, newBlockConfig{numNodes: uint64(numNodes)})
 	genesisBytes, err := genesis.Bytes()
 	require.NoError(t, err)
 
 	vm := newTestVM()
 	ctx := t.Context()
-	config := newEngineConfig(t, 4)
+	config := newEngineConfig(t, uint64(numNodes))
 	config.VM = vm
-	_, verifier := NewBLSAuth(config)
+	_, verifier, err := NewBLSAuth(config)
+	require.NoError(t, err)
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
@@ -130,14 +133,16 @@ func TestStorageRetrieve(t *testing.T) {
 
 func TestStorageIndexFails(t *testing.T) {
 	ctx := t.Context()
-	genesis := newTestBlock(t, newBlockConfig{})
+	numNodes := uint64(4)
+	genesis := newTestBlock(t, newBlockConfig{numNodes: numNodes})
 	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
 	child2 := newTestBlock(t, newBlockConfig{prev: child1})
 
-	configs := newNetworkConfigs(t, 4)
+	configs := newNetworkConfigs(t, numNodes)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
@@ -215,15 +220,18 @@ func TestStorageIndexFails(t *testing.T) {
 // previous digest of the block being indexed.
 func TestIndexMismatchedChild(t *testing.T) {
 	ctx := t.Context()
-	genesis := newTestBlock(t, newBlockConfig{})
+	numNodes := uint64(4)
+
+	genesis := newTestBlock(t, newBlockConfig{numNodes: numNodes})
 	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
 	child1Sibling := newTestBlock(t, newBlockConfig{prev: genesis})
 	child2Nephew := newTestBlock(t, newBlockConfig{prev: child1Sibling})
 
-	configs := newNetworkConfigs(t, 4)
+	configs := newNetworkConfigs(t, numNodes)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
@@ -250,10 +258,12 @@ func TestIndexMismatchedChild(t *testing.T) {
 // TestStorageIndexSuccess indexes 10 blocks and verifies that they can be retrieved.
 func TestStorageIndexSuccess(t *testing.T) {
 	ctx := t.Context()
-	genesis := newTestBlock(t, newBlockConfig{})
-	configs := newNetworkConfigs(t, 4)
+	numNodes := uint64(4)
+	genesis := newTestBlock(t, newBlockConfig{numNodes: 4})
+	configs := newNetworkConfigs(t, numNodes)
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	qc := QCDeserializer{verifier: &verifier}
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 

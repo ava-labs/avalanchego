@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "disable-l1-validator_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/disable-l1-validator",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "disable-l1-validator",
+    embed = [":disable-l1-validator_lib"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "gruntime",
+    srcs = [
+        "runtime_client.go",
+        "runtime_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/rpcchainvm/gruntime",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/pb/vm/runtime",
+        "//vms/rpcchainvm/runtime",
+        "@org_golang_google_protobuf//types/known/emptypb",
+    ],
+)

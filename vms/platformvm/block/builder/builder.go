@@ -363,7 +363,10 @@ func packDurangoBlockTxs(
 	pChainHeight uint64,
 	remainingSize int,
 ) ([]*txs.Tx, error) {
-	stateDiff, err := state.NewDiffOn(parentState)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		backend.Config.UpgradeConfig.IsHeliconActivated(timestamp),
+	)
+	stateDiff, err := state.NewDiffOn(parentState, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +427,10 @@ func packEtnaBlockTxs(
 	pChainHeight uint64,
 	minCapacity gas.Gas,
 ) ([]*txs.Tx, error) {
-	stateDiff, err := state.NewDiffOn(parentState)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		backend.Config.UpgradeConfig.IsHeliconActivated(timestamp),
+	)
+	stateDiff, err := state.NewDiffOn(parentState, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +522,7 @@ func packEtnaBlockTxs(
 func executeTx(
 	ctx context.Context,
 	parentID ids.ID,
-	stateDiff state.Diff,
+	stateDiff *state.Diff,
 	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
@@ -547,7 +553,10 @@ func executeTx(
 		return false, nil
 	}
 
-	txDiff, err := state.NewDiffOn(stateDiff)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		backend.Config.UpgradeConfig.IsHeliconActivated(stateDiff.GetTimestamp()),
+	)
+	txDiff, err := state.NewDiffOn(stateDiff, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return false, err
 	}

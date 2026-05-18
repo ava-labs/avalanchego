@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "state",
+    srcs = [
+        "keys.go",
+        "storage.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/state",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//utils/math",
+        "//vms/platformvm/warp",
+    ],
+)

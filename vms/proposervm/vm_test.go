@@ -158,6 +158,8 @@ func initTestProposerVM(
 		},
 	)
 
+	proVM.Set(snowmantest.GenesisTimestamp)
+
 	valState := &validatorstest.State{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
@@ -216,8 +218,6 @@ func initTestProposerVM(
 
 	require.NoError(proVM.SetState(t.Context(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(t.Context(), snowmantest.GenesisID))
-
-	proVM.Set(snowmantest.GenesisTimestamp)
 
 	return coreVM, valState, proVM, db
 }
@@ -375,7 +375,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			prefcoreBlk = coreBlk2
 			return nil
 		default:
-			require.FailNow("prefID does not match coreBlk1 or coreBlk2")
+			t.Fatal("prefID does not match coreBlk1 or coreBlk2")
 			return nil
 		}
 	}
@@ -386,7 +386,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		case bytes.Equal(b, coreBlk2.Bytes()):
 			return coreBlk2, nil
 		default:
-			require.FailNow("bytes do not match coreBlk1 or coreBlk2")
+			t.Fatal("bytes do not match coreBlk1 or coreBlk2")
 			return nil, nil
 		}
 	}
@@ -443,7 +443,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			wronglyPreferredcoreBlk = coreBlk1
 			return nil
 		default:
-			require.FailNow("Unknown core Blocks set as preferred")
+			t.Fatal("Unknown core Blocks set as preferred")
 			return nil
 		}
 	}
@@ -454,7 +454,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		case bytes.Equal(b, coreBlk2.Bytes()):
 			return coreBlk2, nil
 		default:
-			require.FailNow("Wrong bytes")
+			t.Fatal("Wrong bytes")
 			return nil, nil
 		}
 	}
@@ -610,7 +610,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		case bytes.Equal(b, netcoreBlk.Bytes()):
 			return netcoreBlk, nil
 		default:
-			require.FailNow("Unknown bytes")
+			t.Fatal("Unknown bytes")
 			return nil, nil
 		}
 	}
@@ -1048,7 +1048,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	require.NoError(proVM.SetPreference(t.Context(), parsedBlock.ID()))
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		require.FailNow(fmt.Errorf("%w: BuildBlock", errUnexpectedCall).Error())
+		t.Fatalf("%v: BuildBlock", errUnexpectedCall)
 		return nil, errUnexpectedCall
 	}
 

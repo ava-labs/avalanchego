@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/network/stats"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -34,43 +34,48 @@ const (
 )
 
 var (
-	errAcquiringSemaphore                      = errors.New("error acquiring semaphore")
-	errEmptyNodeID                             = errors.New("cannot send request to empty nodeID")
-	errExpiredRequest                          = errors.New("expired request")
-	errNoPeersFound                            = errors.New("no peers found matching version")
-	_                     Network              = (*network)(nil)
-	_                     validators.Connector = (*network)(nil)
-	_                     common.AppHandler    = (*network)(nil)
+	_ Network              = (*network)(nil)
+	_ validators.Connector = (*network)(nil)
+	_ common.AppHandler    = (*network)(nil)
+
+	errAcquiringSemaphore = errors.New("error acquiring semaphore")
+	errEmptyNodeID        = errors.New("cannot send request to empty nodeID")
+	errExpiredRequest     = errors.New("expired request")
+	errNoPeersFound       = errors.New("no peers found")
+
+	timeUntilDeadline = metrics.GetOrRegisterTimer("net_req_time_until_deadline", nil)
+	droppedRequests   = metrics.GetOrRegisterCounter("net_req_deadline_dropped", nil)
 )
 
 // SyncedNetworkClient defines ability to send request / response through the Network
 type SyncedNetworkClient interface {
-	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
-	// node version greater than or equal to minVersion.
+	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 	// the request should be retried.
-	SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
+	SendSyncedAppRequestAny(ctx context.Context, request []byte) ([]byte, ids.NodeID, error)
 
 	// SendSyncedAppRequest synchronously sends request to the selected nodeID
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
 	SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// TrackBandwidth should be called for each valid request with the bandwidth
-	// (length of response divided by request time), and with 0 if the response is invalid.
-	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
+	// RegisterResponse records a successful response from nodeID with the
+	// observed bandwidth (response bytes divided by request time).
+	RegisterResponse(nodeID ids.NodeID, bandwidth float64)
+
+	// RegisterFailure records a failed response from nodeID.
+	RegisterFailure(nodeID ids.NodeID)
 }
 
 type Network interface {
 	validators.Connector
 	common.AppHandler
+	p2p.NodeSampler
 
 	SyncedNetworkClient
 
-	// SendAppRequestAny sends request to an arbitrary peer with a
-	// node version greater than or equal to minVersion.
-	// Returns the ID of the chosen peer, and an error if the request could not
-	// be sent to a peer with the desired [minVersion].
-	SendAppRequestAny(ctx context.Context, minVersion *version.Application, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
+	// SendAppRequestAny sends request to an arbitrary peer.
+	// Returns the ID of the chosen peer, and an error if no peer is available.
+	SendAppRequestAny(ctx context.Context, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
 
 	// SendAppRequest sends message to given nodeID, notifying handler when there's a response or timeout
 	SendAppRequest(ctx context.Context, nodeID ids.NodeID, message []byte, handler message.ResponseHandler) error
@@ -94,7 +99,6 @@ type Network interface {
 // each peer in linear fashion
 type network struct {
 	lock                       sync.RWMutex                       // lock for mutating state of this Network struct
-	self                       ids.NodeID                         // NodeID of this node
 	requestIDGen               uint32                             // requestID counter used to track outbound requests
 	outstandingRequestHandlers map[uint32]message.ResponseHandler // maps avalanchego requestID => message.ResponseHandler
 	activeAppRequests          *semaphore.Weighted                // controls maximum number of active outbound requests
@@ -102,8 +106,7 @@ type network struct {
 	appSender                  common.AppSender                   // avalanchego AppSender for sending messages
 	codec                      codec.Manager                      // Codec used for parsing messages
 	appRequestHandler          message.RequestHandler             // maps request type => handler
-	peers                      *peerTracker                       // tracking of peers & bandwidth
-	appStats                   stats.RequestHandlerStats          // Provide request handler metrics
+	peers                      *p2p.PeerTracker                   // tracking of peers & bandwidth
 
 	// Set to true when Shutdown is called, after which all operations on this
 	// struct are no-ops.
@@ -118,6 +121,8 @@ type network struct {
 	p2pValidators *p2p.Validators
 }
 
+// NewNetwork constructs a [Network] uniting the legacy synchronous message
+// handling with the new [p2p.Network].
 func NewNetwork(
 	ctx *snow.Context,
 	appSender common.AppSender,
@@ -141,26 +146,50 @@ func NewNetwork(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize p2p network: %w", err)
 	}
+	peers, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"sync_peer_tracker",
+		registerer,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create peer tracker: %w", err)
+	}
 	return &network{
 		appSender:                  appSender,
 		codec:                      codec,
-		self:                       ctx.NodeID,
 		outstandingRequestHandlers: make(map[uint32]message.ResponseHandler),
 		activeAppRequests:          semaphore.NewWeighted(maxActiveAppRequests),
 		sdkNetwork:                 p2pNetwork,
 		appRequestHandler:          message.NoopRequestHandler{},
-		peers:                      NewPeerTracker(),
-		appStats:                   stats.NewRequestHandlerStats(),
+		peers:                      peers,
 		p2pValidators:              p2pValidators,
 	}, nil
 }
 
-// SendAppRequestAny synchronously sends request to an arbitrary peer with a
-// node version greater than or equal to minVersion. If minVersion is nil,
-// the request will be sent to any peer regardless of their version.
-// Returns the ID of the chosen peer, and an error if the request could not
-// be sent to a peer with the desired [minVersion].
-func (n *network) SendAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
+// Sample returns a random sample of connected peers.
+// `limit` is ignored, and one peer will be returned.
+// The peer returned may not be a validator - to sample validators,
+// use [p2p.Validators.Sample] instead.
+func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
+	if limit <= 0 {
+		return nil
+	}
+	if limit > 1 {
+		log.Warn("Sample called with limit > 1, but only 1 peer will be returned", "limit", limit)
+	}
+
+	node, ok := n.peers.SelectPeer()
+	if !ok {
+		return nil
+	}
+	return []ids.NodeID{node}
+}
+
+// SendAppRequestAny synchronously sends request to an arbitrary peer.
+// Returns the ID of the chosen peer, and an error if no peer is available.
+func (n *network) SendAppRequestAny(ctx context.Context, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
 	// If the context was cancelled, we can skip sending this request.
 	if err := ctx.Err(); err != nil {
 		return ids.EmptyNodeID, err
@@ -173,16 +202,13 @@ func (n *network) SendAppRequestAny(ctx context.Context, minVersion *version.App
 
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	nodeID, ok, err := n.peers.GetAnyPeer(minVersion)
-	if err != nil {
-		return ids.EmptyNodeID, err
-	}
+	nodeID, ok := n.peers.SelectPeer()
 	if ok {
 		return nodeID, n.sendAppRequest(ctx, nodeID, request, handler)
 	}
 
 	n.activeAppRequests.Release(1)
-	return ids.EmptyNodeID, fmt.Errorf("%w: version: %s, numPeers: %d", errNoPeersFound, minVersion, n.peers.Size())
+	return ids.EmptyNodeID, fmt.Errorf("%w: numPeers: %d", errNoPeersFound, n.peers.Size())
 }
 
 // SendAppRequest sends request message bytes to specified nodeID, notifying the responseHandler on response or failure
@@ -207,16 +233,18 @@ func (n *network) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 	return n.sendAppRequest(ctx, nodeID, request, responseHandler)
 }
 
-// sendAppRequest sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingRequestHandlers]
+// sendAppRequest sends request message bytes to specified nodeID and adds responseHandler to outstandingRequestHandlers
 // so that it can be invoked when the network receives either a response or failure message.
-// Assumes [nodeID] is never [self] since we guarantee [self] will not be added to the [peers] map.
+// Assumes nodeID is never the local node since the peer tracker is configured with the local node in its ignoredNodes set.
 // Releases active requests semaphore if there was an error in sending the request
-// Returns an error if [appSender] is unable to make the request.
+// Returns an error if appSender is unable to make the request.
 // Assumes write lock is held
 func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if n.closed.Get() {
 		n.activeAppRequests.Release(1)
-		return nil
+		// Other error paths return an error so the synced caller bails before
+		// WaitForResult. Here we return nil, so unblock it explicitly.
+		return responseHandler.OnFailure()
 	}
 
 	// If the context was cancelled, we can skip sending this request.
@@ -226,7 +254,7 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 	}
 
 	log.Debug("sending request to peer", "nodeID", nodeID, "requestLen", len(request))
-	n.peers.TrackPeer(nodeID)
+	n.peers.RegisterRequest(nodeID)
 
 	requestID := n.nextRequestID()
 	n.outstandingRequestHandlers[requestID] = responseHandler
@@ -280,8 +308,10 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 		return n.sdkNetwork.AppRequest(ctx, nodeID, requestID, deadline, request)
 	}
 
-	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.appStats)
+	bufferedDeadline, err := timeUntil(deadline)
 	if err != nil {
+		// Drop the request if we already missed the deadline to respond.
+		droppedRequests.Inc(1)
 		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
 		return nil
 	}
@@ -349,13 +379,13 @@ func (n *network) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reque
 	return handler.OnFailure()
 }
 
-// calculateTimeUntilDeadline calculates the time until deadline and drops it if we missed he deadline to response.
+// timeUntil calculates the time until deadline and returns an error if the deadline has passed.
 // This function updates metrics for app requests.
 // This is called by [AppRequest].
-func calculateTimeUntilDeadline(deadline time.Time, stats stats.RequestHandlerStats) (time.Time, error) {
+func timeUntil(deadline time.Time) (time.Time, error) {
 	// calculate how much time is left until the deadline
 	timeTillDeadline := time.Until(deadline)
-	stats.UpdateTimeUntilDeadline(timeTillDeadline)
+	timeUntilDeadline.Update(timeTillDeadline)
 
 	// bufferedDeadline is half the time till actual deadline so that the message has a reasonable chance
 	// of completing its processing and sending the response to the peer.
@@ -363,8 +393,6 @@ func calculateTimeUntilDeadline(deadline time.Time, stats stats.RequestHandlerSt
 
 	// check if we have enough time to handle this request
 	if time.Until(bufferedDeadline) < minRequestHandlingDuration {
-		// Drop the request if we already missed the deadline to respond.
-		stats.IncDeadlineDroppedRequest()
 		return time.Time{}, errExpiredRequest
 	}
 
@@ -406,10 +434,8 @@ func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 		return nil
 	}
 
-	if nodeID != n.self {
-		// The legacy peer tracker doesn't expect to be connected to itself.
-		n.peers.Connected(nodeID, nodeVersion)
-	}
+	// [p2p.PeerTracker] filters out self via the ignoredNodes set passed at construction.
+	n.peers.Connected(nodeID, nodeVersion)
 
 	return n.sdkNetwork.Connected(ctx, nodeID, nodeVersion)
 }
@@ -424,15 +450,13 @@ func (n *network) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 		return nil
 	}
 
-	if nodeID != n.self {
-		// The legacy peer tracker doesn't expect to be connected to itself.
-		n.peers.Disconnected(nodeID)
-	}
+	// Disconnect is idempotent. Safe to call even if Connected was filtered out.
+	n.peers.Disconnected(nodeID)
 
 	return n.sdkNetwork.Disconnected(ctx, nodeID)
 }
 
-// Shutdown disconnects all peers
+// Shutdown marks the network as closed and fails all outstanding requests.
 func (n *network) Shutdown() {
 	n.lock.Lock()
 	defer n.lock.Unlock()
@@ -443,8 +467,7 @@ func (n *network) Shutdown() {
 		delete(n.outstandingRequestHandlers, requestID)
 	}
 
-	n.peers = NewPeerTracker() // reset peers
-	n.closed.Set(true)         // mark network as closed
+	n.closed.Set(true) // mark network as closed
 }
 
 func (n *network) SetRequestHandler(handler message.RequestHandler) {
@@ -461,20 +484,20 @@ func (n *network) Size() uint32 {
 	return uint32(n.peers.Size())
 }
 
-func (n *network) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-
-	n.peers.TrackBandwidth(nodeID, bandwidth)
+func (n *network) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {
+	n.peers.RegisterResponse(nodeID, bandwidth)
 }
 
-// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
-// node version greater than or equal to minVersion.
+func (n *network) RegisterFailure(nodeID ids.NodeID) {
+	n.peers.RegisterFailure(nodeID)
+}
+
+// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 // Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 // the request should be retried.
-func (n *network) SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (n *network) SendSyncedAppRequestAny(ctx context.Context, request []byte) ([]byte, ids.NodeID, error) {
 	waitingHandler := newWaitingResponseHandler()
-	nodeID, err := n.SendAppRequestAny(ctx, minVersion, request, waitingHandler)
+	nodeID, err := n.SendAppRequestAny(ctx, request, waitingHandler)
 	if err != nil {
 		return nil, nodeID, err
 	}

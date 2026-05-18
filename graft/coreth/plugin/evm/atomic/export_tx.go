@@ -240,9 +240,9 @@ func NewExportTx(
 	}}
 
 	var (
-		avaxNeeded           uint64 = 0
-		ins, avaxIns         []EVMInput
-		signers, avaxSigners [][]*secp256k1.PrivateKey
+		avaxNeeded           uint64                    = 0
+		ins, avaxIns         []EVMInput                //nolint:prealloc // sizes depend on runtime values not known at declaration
+		signers, avaxSigners [][]*secp256k1.PrivateKey //nolint:prealloc // sizes depend on runtime values not known at declaration
 		err                  error
 	)
 

@@ -1,0 +1,3 @@
+# This package contains custom Bazel macros and patches for avalanchego.
+
+exports_files(["defs.bzl"])

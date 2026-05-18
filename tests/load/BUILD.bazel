@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "load",
+    srcs = [
+        "generator.go",
+        "metrics.go",
+        "tests.go",
+        "wallet.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tests/load",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//tests",
+        "//tests/load/contracts",
+        "//utils/logging",
+        "//utils/sampler",
+        "@com_github_ava_labs_libevm//accounts/abi/bind",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethclient",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_sync//errgroup",
+    ],
+)

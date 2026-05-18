@@ -6,8 +6,6 @@ package core
 import (
 	"fmt"
 	"math/big"
-	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 
@@ -127,79 +125,24 @@ var reexecTests = []ReexecTest{
 	},
 }
 
-func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
-	newDB := rawdb.NewMemoryDatabase()
-	iter := db.NewIterator(nil, nil)
-	defer iter.Release()
-	for iter.Next() {
-		if err := newDB.Put(iter.Key(), iter.Value()); err != nil {
-			return nil, err
-		}
-	}
-
-	return newDB, nil
-}
-
-// copyDir recursively copies all files and folders from a directory [src] to a
-// new temporary directory and returns the path to the new directory.
-func copyDir(t *testing.T, src string) string {
-	t.Helper()
-
-	if src == "" {
-		return ""
-	}
-
-	dst := t.TempDir()
-	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Calculate the relative path from src
-		relPath, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-
-		// Skip the root directory itself
-		if relPath == "." {
-			return nil
-		}
-
-		dstPath := filepath.Join(dst, relPath)
-
-		if info.IsDir() {
-			return os.MkdirAll(dstPath, info.Mode().Perm())
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		return os.WriteFile(dstPath, data, info.Mode().Perm())
-	})
-
-	require.NoError(t, err)
-	return dst
-}
-
 // checkBlockChainState creates a new BlockChain instance and checks that exporting each block from
 // genesis to last accepted from the original instance yields the same last accepted block and state
 // root.
-// Additionally, create another BlockChain instance from [originalDB] to ensure that BlockChain is
+// Additionally, create another BlockChain instance from its databases to ensure that BlockChain is
 // persisted correctly through a restart.
+// checkBlockChainState consumes `bc` and all database references, and it cannot be used afterwards.
+// Note: [BlockChain.Stop] is safe to be called multiple times.
 func checkBlockChainState(
 	t *testing.T,
 	bc *BlockChain,
 	gspec *Genesis,
-	originalDB ethdb.Database,
 	create createFunc,
 	checkState func(sdb *state.StateDB) error,
 ) (*BlockChain, *BlockChain) {
 	var (
 		require           = require.New(t)
 		lastAcceptedBlock = bc.LastConsensusAcceptedBlock()
+		oldDB             = bc.db
 		newDB             = rawdb.NewMemoryDatabase()
 	)
 
@@ -210,7 +153,7 @@ func checkBlockChainState(
 	oldChainDataDir := bc.CacheConfig().ChainDataDir // cacheConfig uses same reference in most tests
 	newBlockChain, err := create(newDB, gspec, common.Hash{}, t.TempDir())
 	require.NoError(err, "Failed to create new blockchain instance")
-	defer newBlockChain.Stop()
+	t.Cleanup(newBlockChain.Stop)
 
 	for i := uint64(1); i <= lastAcceptedBlock.NumberU64(); i++ {
 		block := bc.GetBlockByNumber(i)
@@ -228,13 +171,10 @@ func checkBlockChainState(
 	require.NoError(err)
 	require.NoErrorf(checkState(acceptedState), "Check state failed for newly generated blockchain")
 
-	// Copy the database over to prevent any issues when re-using [originalDB] after this call.
-	originalDB, err = copyMemDB(originalDB)
+	bc.Stop()
+	restartedChain, err := create(oldDB, gspec, lastAcceptedBlock.Hash(), oldChainDataDir)
 	require.NoError(err)
-	newChainDataDir := copyDir(t, oldChainDataDir)
-	restartedChain, err := create(originalDB, gspec, lastAcceptedBlock.Hash(), newChainDataDir)
-	require.NoError(err)
-	defer restartedChain.Stop()
+	t.Cleanup(restartedChain.Stop)
 
 	currentBlock := restartedChain.CurrentBlock()
 	require.Equal(lastAcceptedBlock.Hash(), currentBlock.Hash(), "Restarted chain's current block does not match last accepted block")
@@ -310,7 +250,7 @@ func InsertChainAcceptSingleBlock(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 func InsertLongForkedChain(t *testing.T, create createFunc) {
@@ -442,7 +382,7 @@ func InsertLongForkedChain(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 func AcceptNonCanonicalBlock(t *testing.T, create createFunc) {
@@ -532,7 +472,7 @@ func AcceptNonCanonicalBlock(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 func SetPreferenceRewind(t *testing.T, create createFunc) {
@@ -608,8 +548,13 @@ func SetPreferenceRewind(t *testing.T, create createFunc) {
 		}
 		return nil
 	}
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkGenesisState)
+	_, blockchain = checkBlockChainState(t, blockchain, gspec, create, checkGenesisState)
 
+	// Because the blockchain is restarted in checkBlockChainState
+	// we need to re-insert the chain before accepting the first block again.
+	_, err = blockchain.InsertChain(chain)
+	require.NoError(err)
+	require.NoError(blockchain.SetPreference(chain[0]))
 	require.NoError(blockchain.Accept(chain[0]))
 	blockchain.DrainAcceptorQueue()
 
@@ -643,7 +588,7 @@ func SetPreferenceRewind(t *testing.T, create createFunc) {
 		}
 		return nil
 	}
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkUpdatedState)
+	checkBlockChainState(t, blockchain, gspec, create, checkUpdatedState)
 }
 
 func BuildOnVariousStages(t *testing.T, create createFunc) {
@@ -790,7 +735,7 @@ func BuildOnVariousStages(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 func EmptyBlocks(t *testing.T, create createFunc) {
@@ -821,7 +766,7 @@ func EmptyBlocks(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 func EmptyAndNonEmptyBlocks(t *testing.T, create createFunc) {
@@ -885,7 +830,7 @@ func EmptyAndNonEmptyBlocks(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 func ReorgReInsert(t *testing.T, create createFunc) {
@@ -960,7 +905,7 @@ func ReorgReInsert(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 // Insert two different chains that result in the identical state root.
@@ -1080,7 +1025,7 @@ func AcceptBlockIdenticalStateRoot(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 // Insert two different chains that result in the identical state root.
@@ -1219,7 +1164,7 @@ func ReprocessAcceptBlockIdenticalStateRoot(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 func GenerateChainInvalidBlockFee(t *testing.T, create createFunc) {
@@ -1387,7 +1332,7 @@ func InsertChainValidBlockFee(t *testing.T, create createFunc) {
 		return nil
 	}
 
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 // StatefulPrecompiles provides a testing framework to ensure that processing transactions interacting with the stateful precompiles work as expected.
@@ -1555,7 +1500,7 @@ func StatefulPrecompiles(t *testing.T, create createFunc) {
 	}
 
 	// This tests that the precompiles work as expected when they are enabled
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+	checkBlockChainState(t, blockchain, gspec, create, checkState)
 }
 
 func ReexecBlocks(t *testing.T, create ReexecTestFunc) {
@@ -1659,7 +1604,7 @@ func ReexecBlocks(t *testing.T, create ReexecTestFunc) {
 		return create(db, gspec, lastAcceptedHash, dataPath, blockchain.cacheConfig.CommitInterval)
 	}
 
-	newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, chainDB, checkCreate, checkState)
+	newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, checkCreate, checkState)
 
 	allTxs := slices.Concat(foundTxs, missingTxs)
 	for _, bc := range []*BlockChain{newChain, restartedChain} {
@@ -1779,7 +1724,7 @@ func ReexecMaxBlocks(t *testing.T, create ReexecTestFunc) {
 	checkCreate := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, dataPath string) (*BlockChain, error) {
 		return create(db, gspec, lastAcceptedHash, dataPath, uint64(newCommitInterval))
 	}
-	newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, chainDB, checkCreate, checkState)
+	newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, checkCreate, checkState)
 
 	allTxs := slices.Concat(foundTxs, missingTxs)
 	for _, bc := range []*BlockChain{newChain, restartedChain} {
@@ -1836,8 +1781,7 @@ func ReexecCorruptedStateTest(t *testing.T, create ReexecTestFunc) {
 	blockchain.Stop()
 
 	// Restart blockchain with existing state
-	newDir := copyDir(t, tempDir) // avoid file lock
-	restartedBlockchain, err := create(chainDB, gspec, chain[1].Hash(), newDir, 4096)
+	restartedBlockchain, err := create(chainDB, gspec, chain[1].Hash(), tempDir, 4096)
 	require.NoError(t, err)
 	defer restartedBlockchain.Stop()
 
@@ -1879,5 +1823,5 @@ func ReexecCorruptedStateTest(t *testing.T, create ReexecTestFunc) {
 		return create(db, gspec, lastAcceptedHash, dataPath, blockchain.cacheConfig.CommitInterval)
 	}
 
-	checkBlockChainState(t, restartedBlockchain, gspec, chainDB, checkCreate, checkState)
+	checkBlockChainState(t, restartedBlockchain, gspec, checkCreate, checkState)
 }

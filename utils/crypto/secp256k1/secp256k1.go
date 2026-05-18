@@ -307,7 +307,7 @@ func sigToRawSig(sig []byte) ([]byte, error) {
 		return nil, errInvalidSigLen
 	}
 	newSig := make([]byte, SignatureLen)
-	newSig[0] = sig[SignatureLen-1] + compactSigMagicOffset
+	newSig[0] = sig[SignatureLen-1] + compactSigMagicOffset //nolint:gosec // G602: length is validated above
 	copy(newSig[1:], sig)
 	return newSig, nil
 }

@@ -108,7 +108,7 @@ func advanceTimeTo(
 	backend *Backend,
 	parentState state.Chain,
 	newChainTime time.Time,
-) (state.Diff, bool, error) {
+) (*state.Diff, bool, error) {
 	// We promote pending stakers to current stakers first and remove
 	// completed stakers from the current staker set. We assume that any
 	// promoted staker will not immediately be removed from the current staker
@@ -117,7 +117,10 @@ func advanceTimeTo(
 	// Invariant: MinStakeDuration > 0 => guarantees [StartTime] != [EndTime]
 	// Invariant: [newChainTime] <= nextStakerChangeTime.
 
-	changes, err := state.NewDiffOn(parentState)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		backend.Config.UpgradeConfig.IsHeliconActivated(newChainTime),
+	)
+	changes, err := state.NewDiffOn(parentState, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return nil, false, err
 	}
@@ -182,7 +185,9 @@ func advanceTimeTo(
 			changes.DeletePendingValidator(stakerToRemove)
 
 		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
-			changes.PutCurrentDelegator(&stakerToAdd)
+			if err := changes.PutCurrentDelegator(&stakerToAdd); err != nil {
+				return nil, false, fmt.Errorf("putting current delegator: %w", err)
+			}
 			changes.DeletePendingDelegator(stakerToRemove)
 
 		default:
@@ -217,7 +222,9 @@ func advanceTimeTo(
 			break
 		}
 
-		changes.DeleteCurrentValidator(stakerToRemove)
+		if err := changes.DeleteCurrentValidator(stakerToRemove); err != nil {
+			return nil, false, fmt.Errorf("deleting current validator: %w", err)
+		}
 		changed = true
 	}
 
@@ -260,7 +267,7 @@ func advanceTimeTo(
 // Ref: https://github.com/avalanche-foundation/ACPs/tree/e333b335c34c8692d84259d21bd07b2bb849dc2c/ACPs/77-reinventing-subnets#registerl1validatortx
 func removeStaleExpiries(
 	parentState state.Chain,
-	changes state.Diff,
+	changes *state.Diff,
 	newChainTimeUnix uint64,
 ) error {
 	// Invariant: It is not safe to modify the state while iterating over it, so
@@ -287,7 +294,7 @@ func removeStaleExpiries(
 
 func advanceDynamicFeeState(
 	config gas.Config,
-	changes state.Diff,
+	changes *state.Diff,
 	seconds uint64,
 ) {
 	dynamicFeeState := changes.GetFeeState()
@@ -306,7 +313,7 @@ func advanceDynamicFeeState(
 func advanceValidatorFeeState(
 	config fee.Config,
 	parentState state.Chain,
-	changes state.Diff,
+	changes *state.Diff,
 	seconds uint64,
 ) (bool, error) {
 	validatorFeeState := fee.State{

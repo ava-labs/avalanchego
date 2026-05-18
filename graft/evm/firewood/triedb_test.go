@@ -19,19 +19,22 @@ import (
 func newTestDatabase(t *testing.T) state.Database {
 	t.Helper()
 	fwConfig := DefaultConfig(t.TempDir())
-	triedbConfig := &triedb.Config{
-		DBOverride: fwConfig.BackendConstructor,
-	}
-	internalState := state.NewDatabaseWithConfig(
-		rawdb.NewMemoryDatabase(),
-		triedbConfig,
-	)
-	tdb := internalState.TrieDB().Backend().(*TrieDB)
+
+	return newTestDatabaseWithConfig(t, fwConfig)
+}
+
+func newTestDatabaseWithConfig(t *testing.T, cfg TrieDBConfig) state.Database {
+	t.Helper()
+
+	memdb := rawdb.NewMemoryDatabase()
+	tdb := triedb.NewDatabase(memdb, &triedb.Config{
+		DBOverride: cfg.BackendConstructor,
+	})
 	t.Cleanup(func() {
 		require.NoError(t, tdb.Close())
 	})
 
-	return NewStateAccessor(internalState, tdb)
+	return state.NewDatabaseWithNodeDB(memdb, tdb)
 }
 
 func TestCommitEmptyGenesis(t *testing.T) {
@@ -271,4 +274,20 @@ func TestUpdateWithWrongParameters(t *testing.T) {
 		"%T.Update()", triedb,
 	)
 	require.NoErrorf(t, triedb.Commit(root, true), "%T.Commit()", triedb)
+}
+
+// TestDeferredCommitInterval verifies that New sets DeferredCommitInterval to
+// be < RevisionsInMemory when the caller provides a value that violates the
+// invariant DeferredCommitInterval < RevisionsInMemory.
+func TestDeferredCommitInterval(t *testing.T) {
+	r := require.New(t)
+
+	cfg := DefaultConfig(t.TempDir())
+
+	// New ensures that RevisionsInMemory > DeferredCommitInterval
+	cfg.RevisionsInMemory = 10
+	cfg.DeferredCommitInterval = 11
+
+	_, err := New(cfg)
+	r.NoError(err)
 }

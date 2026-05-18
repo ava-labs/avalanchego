@@ -9,8 +9,8 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-    name: prometheus-agent
-    namespace: ci-monitoring
+  name: prometheus-agent
+  namespace: ci-monitoring
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -18,10 +18,10 @@ kind: ClusterRole
 metadata:
   name: prometheus-agent
 rules:
-- apiGroups: [""]
-  resources:
-    - pods
-  verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources:
+      - pods
+    verbs: ["get", "list", "watch"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -33,9 +33,9 @@ roleRef:
   kind: ClusterRole
   name: prometheus-agent
 subjects:
-- kind: ServiceAccount
-  name: prometheus-agent
-  namespace: ci-monitoring
+  - kind: ServiceAccount
+    name: prometheus-agent
+    namespace: ci-monitoring
 
 ---
 apiVersion: v1
@@ -110,6 +110,7 @@ data:
       basic_auth:
         username_file: /run/secrets/username
         password_file: /run/secrets/password
+      send_native_histograms: true
 
 ---
 apiVersion: apps/v1
@@ -134,59 +135,60 @@ spec:
       # Since prometheus doesn't support env substitution, an init container is required to
       # parameterize the config file with the prometheus URL.
       initContainers:
-      - name: init-prometheus-config
-        # Any image with sed will do
-        image: busybox
-        command: ["/bin/sh", "-c"]
-        args:
-        - |
-          sed 's|${PROMETHEUS_URL}|'"${PROMETHEUS_URL}"'|' /tmp/config-template/prometheus.yaml.template > /tmp/config/prometheus.yaml
-        env:
-        - name: PROMETHEUS_URL
-          valueFrom:
-            secretKeyRef:
-              name: prometheus-config
-              key: url
-        volumeMounts:
-        - name: config-template
-          mountPath: /tmp/config-template
-        - name: config
-          mountPath: /tmp/config
+        - name: init-prometheus-config
+          # Any image with sed will do
+          image: busybox
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              sed 's|${PROMETHEUS_URL}|'"${PROMETHEUS_URL}"'|' /tmp/config-template/prometheus.yaml.template > /tmp/config/prometheus.yaml
+          env:
+            - name: PROMETHEUS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: prometheus-config
+                  key: url
+          volumeMounts:
+            - name: config-template
+              mountPath: /tmp/config-template
+            - name: config
+              mountPath: /tmp/config
       containers:
-      - name: prometheus
-        # Latest stable LTS, released 2025-07-14, end of support 2026-07-31
-        image: prom/prometheus:v3.5.0
-        args:
-        - --config.file=/etc/prometheus/config/prometheus.yaml
-        - --storage.agent.path=/prometheus
-        - --agent
-        volumeMounts:
-        - name: config
-          mountPath: /etc/prometheus/config/prometheus.yaml
-          subPath: prometheus.yaml
-          readOnly: true
-        - name: prometheus-data
-          mountPath: /prometheus
-        - name: prometheus-config
-          mountPath: /run/secrets
-          readOnly: true
+        - name: prometheus
+          # Latest stable LTS, released 2025-07-14, end of support 2026-07-31
+          image: prom/prometheus:v3.5.0
+          args:
+            - --config.file=/etc/prometheus/config/prometheus.yaml
+            - --storage.agent.path=/prometheus
+            - --agent
+            - --enable-feature=native-histograms
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus/config/prometheus.yaml
+              subPath: prometheus.yaml
+              readOnly: true
+            - name: prometheus-data
+              mountPath: /prometheus
+            - name: prometheus-config
+              mountPath: /run/secrets
+              readOnly: true
       volumes:
-      - name: config-template
-        configMap:
-          name: prometheus-config-template
-      - name: config
-        # The config path doesn't need to be persistent since the config
-        # file will be written to the volume by the init container every
-        # time the pod starts.
-        emptyDir: {}
-      - name: prometheus-config
-        secret:
-          secretName: prometheus-config
+        - name: config-template
+          configMap:
+            name: prometheus-config-template
+        - name: config
+          # The config path doesn't need to be persistent since the config
+          # file will be written to the volume by the init container every
+          # time the pod starts.
+          emptyDir: {}
+        - name: prometheus-config
+          secret:
+            secretName: prometheus-config
   volumeClaimTemplates:
-  - metadata:
-      name: prometheus-data
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 1Gi
+    - metadata:
+        name: prometheus-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

@@ -35,8 +35,8 @@ func (b *Builder) BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (avalanc
 	if b.BuildStopVtxF != nil {
 		return b.BuildStopVtxF(ctx, parentIDs)
 	}
-	if b.CantBuildVtx && b.T != nil {
-		require.FailNow(b.T, errBuild.Error())
+	if b.T != nil {
+		require.False(b.T, b.CantBuildVtx, errBuild)
 	}
 	return nil, errBuild
 }

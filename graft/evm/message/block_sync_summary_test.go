@@ -17,7 +17,7 @@ import (
 )
 
 func TestMarshalBlockSyncSummary(t *testing.T) {
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		blockSyncSummary, err := message.NewBlockSyncSummary(c, common.Hash{1}, 2, common.Hash{3})
 		require.NoError(t, err)
 

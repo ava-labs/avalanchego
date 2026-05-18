@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
@@ -558,6 +559,9 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		return nil, err
 	}
 	defer release()
+	if _, ok := statedb.Database().TrieDB().Backend().(*firewood.TrieDB); ok {
+		return nil, errors.New("intermediate roots are not supported with firewood")
+	}
 
 	var (
 		roots              []common.Hash

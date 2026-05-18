@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "simplex",
+    srcs = ["parameters.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/consensus/simplex",
+    visibility = ["//visibility:public"],
+    deps = ["//ids"],
+)
+
+go_test(
+    name = "simplex_test",
+    srcs = ["parameters_test.go"],
+    embed = [":simplex"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "lock",
+    srcs = [
+        "cond.go",
+        "progress.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/lock",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "lock_test",
+    srcs = [
+        "cond_test.go",
+        "progress_test.go",
+    ],
+    embed = [":lock"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

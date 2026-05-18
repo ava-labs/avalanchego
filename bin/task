@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Repo-local `task` shim exposed via `.envrc`; lets contributors run `task`
+# directly and delegates to the real binary or the pinned Go tool fallback.
+REPO_ROOT="$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )"
+
+exec "${REPO_ROOT}"/scripts/run_task.sh "${@}"

@@ -39,25 +39,28 @@ type Comm struct {
 }
 
 func NewComm(config *Config) (*Comm, error) {
-	if _, ok := config.Validators[config.Ctx.NodeID]; !ok {
-		config.Log.Warn("Node is not a validator for the subnet",
+	broadcastNodes := set.NewSet[ids.NodeID](len(config.Params.InitialValidators) - 1)
+	allNodes := make([]simplex.NodeID, 0, len(config.Params.InitialValidators))
+
+	includesOurNodeID := false
+	// grab all the nodes that are validators for the subnet
+	for _, vd := range config.Params.InitialValidators {
+		allNodes = append(allNodes, vd.NodeID[:])
+		if vd.NodeID == config.Ctx.NodeID {
+			includesOurNodeID = true
+			continue // skip our own node ID
+		}
+
+		broadcastNodes.Add(vd.NodeID)
+	}
+
+	if !includesOurNodeID {
+		config.Log.Warn("Our node is not a validator for the subnet",
 			zap.Stringer("nodeID", config.Ctx.NodeID),
 			zap.Stringer("chainID", config.Ctx.ChainID),
 			zap.Stringer("subnetID", config.Ctx.SubnetID),
 		)
 		return nil, fmt.Errorf("our %w: %s", errNodeNotFound, config.Ctx.NodeID)
-	}
-
-	broadcastNodes := set.NewSet[ids.NodeID](len(config.Validators) - 1)
-	allNodes := make([]simplex.NodeID, 0, len(config.Validators))
-	// grab all the nodes that are validators for the subnet
-	for _, vd := range config.Validators {
-		allNodes = append(allNodes, vd.NodeID[:])
-		if vd.NodeID == config.Ctx.NodeID {
-			continue // skip our own node ID
-		}
-
-		broadcastNodes.Add(vd.NodeID)
 	}
 
 	return &Comm{

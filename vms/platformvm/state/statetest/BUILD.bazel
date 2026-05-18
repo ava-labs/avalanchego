@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "statetest",
+    srcs = ["state.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/state/statetest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//ids",
+        "//snow",
+        "//snow/validators",
+        "//upgrade",
+        "//upgrade/upgradetest",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/units",
+        "//vms/platformvm/config",
+        "//vms/platformvm/genesis/genesistest",
+        "//vms/platformvm/metrics",
+        "//vms/platformvm/reward",
+        "//vms/platformvm/state",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

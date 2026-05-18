@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "gwriter",
+    srcs = [
+        "writer_client.go",
+        "writer_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gwriter",
+    visibility = ["//visibility:public"],
+    deps = ["//proto/pb/io/writer"],
+)

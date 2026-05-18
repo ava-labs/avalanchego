@@ -63,10 +63,17 @@ func NewNodeStatefulSet(
 		objectMeta.Name = name
 	}
 
+	// The following sets of annotations can coexist safely since each
+	// collection agent only reads the annotations it recognizes.
 	podAnnotations := map[string]string{
+		// Configure collection by prometheus and promtail
 		"prometheus.io/scrape": "true",
 		"prometheus.io/path":   "/ext/metrics",
 		"promtail/collect":     "true",
+		// Configure collection by the grafana cloud agent
+		"k8s.grafana.com/metrics_path": "/ext/metrics",
+		"k8s.grafana.com/port":         "9650",
+		"k8s.grafana.com/scrape":       "true",
 	}
 
 	podLabels := map[string]string{

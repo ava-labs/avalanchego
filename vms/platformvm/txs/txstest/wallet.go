@@ -29,7 +29,7 @@ func NewWallet(
 	t testing.TB,
 	ctx *snow.Context,
 	config *config.Internal,
-	state state.State,
+	state *state.State,
 	kc *secp256k1fx.Keychain,
 	subnetIDs []ids.ID,
 	validationIDs []ids.ID,

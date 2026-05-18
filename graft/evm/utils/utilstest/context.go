@@ -8,8 +8,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
 )
 
 func WaitGroupWithContext(t *testing.T, ctx context.Context, wg *sync.WaitGroup) {
@@ -22,7 +20,7 @@ func WaitGroupWithContext(t *testing.T, ctx context.Context, wg *sync.WaitGroup)
 	select {
 	case <-ctx.Done():
 		// include context error for easier debugging
-		require.FailNow(t, "timeout waiting for response", "error", ctx.Err())
+		t.Fatalf("waiting for response: %v", ctx.Err())
 	case <-done:
 	}
 }

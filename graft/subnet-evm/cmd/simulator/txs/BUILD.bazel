@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+go_library(
+    name = "txs",
+    srcs = [
+        "agent.go",
+        "tx_generator.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/txs",
+    deps = [
+        "//graft/subnet-evm/cmd/simulator/metrics",
+        "//graft/subnet-evm/ethclient",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//log",
+    ],
+)

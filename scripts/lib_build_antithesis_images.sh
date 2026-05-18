@@ -117,7 +117,15 @@ function gen_antithesis_compose_config {
   # Define the env vars for the compose config generation
   local compose_env="TARGET_PATH=${target_path} IMAGE_TAG=${image_tag} ${extra_compose_args}"
 
-  # Generate compose config for copying into the config image
-  # shellcheck disable=SC2086
-  env ${compose_env} go run "${exe_path}"
+  # If the exe_path is in a graft module, cd to the module root before running
+  # go run to ensure the correct go.mod is used.
+  if [[ "${exe_path}" == */graft/subnet-evm/* ]]; then
+    local module_root="${exe_path%%/graft/subnet-evm/*}/graft/subnet-evm"
+    local relative_path="./${exe_path#*graft/subnet-evm/}"
+    # shellcheck disable=SC2086
+    (cd "${module_root}" && env ${compose_env} go run "${relative_path}")
+  else
+    # shellcheck disable=SC2086
+    env ${compose_env} go run "${exe_path}"
+  fi
 }

@@ -1,20 +1,19 @@
 {
   # To use:
   #  - install nix: `./scripts/run_task.sh install-nix`
-  #  - run `nix develop` or use direnv (https://direnv.net/)
-  #    - for quieter direnv output, set `export DIRENV_LOG_FORMAT=`
+  #    - see CONTRIBUTING.md#nix for setup details
+  #  - run `nix develop` or use direnv
+  #    - see CONTRIBUTING.md#direnv for how direnv enables flake usage
 
   description = "AvalancheGo development environment";
 
   # Flake inputs
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    go-flake.url = "path:./nix/go";
-    go-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   # Flake outputs
-  outputs = { self, nixpkgs, go-flake }:
+  outputs = { self, nixpkgs }:
     let
       # Systems supported
       allSystems = [
@@ -36,13 +35,15 @@
           # The Nix packages provided in the environment
           packages = with pkgs; [
             # Build requirements
+            bazelisk
+            (runCommand "bazel" {} ''mkdir -p $out/bin && ln -s ${bazelisk}/bin/bazelisk $out/bin/bazel'')
             git
 
             # Task runner
             go-task
 
-            # Local Go package from nested flake
-            go-flake.packages.${pkgs.stdenv.hostPlatform.system}.default
+            # Local Go package
+            (import ./nix/go { inherit pkgs; })
 
             # Monitoring tools
             promtail                                   # Loki log shipper
@@ -59,6 +60,8 @@
 
             # Linters
             shellcheck
+            buildifier
+            yamlfmt
 
             # Protobuf
             buf

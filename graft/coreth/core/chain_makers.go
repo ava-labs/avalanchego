@@ -32,7 +32,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -43,6 +42,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 )
@@ -273,6 +274,31 @@ func (b *BlockGen) SetOnBlockGenerated(onBlockGenerated func(*types.Block)) {
 // values. Inserting them into BlockChain requires use of FakePow or
 // a similar non-validating proof of work implementation.
 func GenerateChain(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, db ethdb.Database, n int, gap uint64, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts, error) {
+	stateCache := state.NewDatabase(db)
+	defer stateCache.TrieDB().Close()
+	return GenerateChainFromStateCache(config, parent, engine, stateCache, n, gap, gen)
+}
+
+type generateChainConfig struct {
+	commitToDisk bool
+}
+
+// GenerateChainOption configures [GenerateChainFromStateCache].
+type GenerateChainOption = options.Option[generateChainConfig]
+
+// WithoutDiskCommit skips persisting trie state to disk, allowing blocks
+// to be separately accepted by a VM on the same database.
+func WithoutDiskCommit() GenerateChainOption {
+	return options.Func[generateChainConfig](func(c *generateChainConfig) {
+		c.commitToDisk = false
+	})
+}
+
+// GenerateChainFromStateCache is exactly like [GenerateChain], except allows other [triedb.Database] implementations.
+func GenerateChainFromStateCache(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, stateCache state.Database, n int, gap uint64, gen func(int, *BlockGen), opts ...GenerateChainOption) ([]*types.Block, []types.Receipts, error) {
+	cfg := generateChainConfig{commitToDisk: true}
+	options.ApplyTo(&cfg, opts...)
+
 	if config == nil {
 		config = params.TestChainConfig
 	}
@@ -301,12 +327,15 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		}
 
 		// Write state changes to db
-		root, err := statedb.Commit(b.header.Number.Uint64(), config.IsEIP158(b.header.Number))
+		statedbOpts := stateconf.WithTrieDBUpdateOpts(stateconf.WithTrieDBUpdatePayload(block.ParentHash(), block.Hash()))
+		root, err := statedb.Commit(b.header.Number.Uint64(), config.IsEIP158(b.header.Number), statedbOpts)
 		if err != nil {
 			panic(fmt.Sprintf("state write error: %v", err))
 		}
-		if err = triedb.Commit(root, false); err != nil {
-			panic(fmt.Sprintf("trie write error: %v", err))
+		if cfg.commitToDisk {
+			if err = triedb.Commit(root, false); err != nil {
+				panic(fmt.Sprintf("trie write error: %v", err))
+			}
 		}
 		if b.onBlockGenerated != nil {
 			b.onBlockGenerated(block)
@@ -314,16 +343,12 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		return block, b.receipts, nil
 	}
 
-	// Forcibly use hash-based state scheme for retaining all nodes in disk.
-	triedb := triedb.NewDatabase(db, triedb.HashDefaults)
-	defer triedb.Close()
-
 	for i := 0; i < n; i++ {
-		statedb, err := state.New(parent.Root(), extstate.NewDatabaseWithNodeDB(db, triedb), nil)
+		statedb, err := state.New(parent.Root(), stateCache, nil)
 		if err != nil {
 			return nil, nil, err
 		}
-		block, receipts, err := genblock(i, parent, triedb, statedb)
+		block, receipts, err := genblock(i, parent, stateCache.TrieDB(), statedb)
 		if err != nil {
 			return nil, nil, err
 		}

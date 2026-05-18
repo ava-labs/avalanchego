@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "create",
+    srcs = [
+        "cmd.go",
+        "flags.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/chain/create",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//vms/example/xsvm/genesis",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+        "//wallet/subnet/primary/common",
+        "@com_github_spf13_cobra//:cobra",
+        "@com_github_spf13_pflag//:pflag",
+    ],
+)

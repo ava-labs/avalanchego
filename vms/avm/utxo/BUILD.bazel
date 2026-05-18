@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "utxo",
+    srcs = ["spender.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/utxo",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//ids",
+        "//utils/crypto/secp256k1",
+        "//utils/math",
+        "//utils/timer/mockable",
+        "//vms/avm/txs",
+        "//vms/components/avax",
+        "//vms/nftfx",
+        "//vms/secp256k1fx",
+    ],
+)

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "api",
+    srcs = [
+        "common_args_responses.go",
+        "traced_handler.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/api",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//trace",
+        "//utils/formatting",
+        "//utils/json",
+        "@io_opentelemetry_go_otel//attribute",
+        "@io_opentelemetry_go_otel_trace//:trace",
+    ],
+)

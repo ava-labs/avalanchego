@@ -78,7 +78,7 @@ func StandardTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	tx *txs.Tx,
-	state state.Diff,
+	state *state.Diff,
 ) (set.Set[ids.ID], map[ids.ID]*atomic.Requests, func(), error) {
 	standardExecutor := standardTxExecutor{
 		backend:       backend,
@@ -96,7 +96,7 @@ func StandardTx(
 type standardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
-	state         state.Diff // state is expected to be modified
+	state         *state.Diff // state is expected to be modified
 	feeCalculator fee.Calculator
 	tx            *txs.Tx
 
@@ -517,7 +517,9 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 	}
 
 	if isCurrentValidator {
-		e.state.DeleteCurrentValidator(staker)
+		if err := e.state.DeleteCurrentValidator(staker); err != nil {
+			return fmt.Errorf("deleting current validator: %w", err)
+		}
 	} else {
 		e.state.DeletePendingValidator(staker)
 	}
@@ -1427,7 +1429,9 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 			return err
 		}
 	case priority.IsCurrentDelegator():
-		e.state.PutCurrentDelegator(staker)
+		if err := e.state.PutCurrentDelegator(staker); err != nil {
+			return fmt.Errorf("putting current delegator: %w", err)
+		}
 	case priority.IsPendingValidator():
 		if err := e.state.PutPendingValidator(staker); err != nil {
 			return err

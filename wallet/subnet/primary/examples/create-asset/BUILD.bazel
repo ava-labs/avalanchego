@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "create-asset_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/create-asset",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//utils/units",
+        "//vms/components/verify",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "create-asset",
+    embed = [":create-asset_lib"],
+    visibility = ["//visibility:public"],
+)

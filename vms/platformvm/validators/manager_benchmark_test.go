@@ -4,6 +4,7 @@
 package validators
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -102,7 +103,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 }
 
 func addPrimaryValidator(
-	s state.State,
+	s *state.State,
 	startTime time.Time,
 	endTime time.Time,
 	height uint64,
@@ -139,7 +140,7 @@ func addPrimaryValidator(
 }
 
 func addSubnetValidator(
-	s state.State,
+	s *state.State,
 	subnetID ids.ID,
 	startTime time.Time,
 	endTime time.Time,
@@ -171,7 +172,7 @@ func addSubnetValidator(
 }
 
 func addSubnetDelegator(
-	s state.State,
+	s *state.State,
 	subnetID ids.ID,
 	startTime time.Time,
 	endTime time.Time,
@@ -180,7 +181,7 @@ func addSubnetDelegator(
 ) error {
 	i := rand.Intn(len(nodeIDs)) //#nosec G404
 	nodeID := nodeIDs[i]
-	s.PutCurrentDelegator(&state.Staker{
+	if err := s.PutCurrentDelegator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		SubnetID:        subnetID,
@@ -190,7 +191,9 @@ func addSubnetDelegator(
 		PotentialReward: 0,
 		NextTime:        endTime,
 		Priority:        txs.SubnetPermissionlessDelegatorCurrentPriority,
-	})
+	}); err != nil {
+		return fmt.Errorf("putting current delegator: %w", err)
+	}
 
 	blk, err := block.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {

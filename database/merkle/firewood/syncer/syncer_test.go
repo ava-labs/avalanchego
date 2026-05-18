@@ -13,12 +13,17 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func Test_Firewood_Sync(t *testing.T) {
 	tests := []struct {
@@ -173,8 +178,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	}
 	require.NoError(t, err)
 
-	gotRoot, err := clientDB.Root()
-	require.NoError(t, err)
+	gotRoot := clientDB.Root()
 	require.Equal(t, wantRoot, ids.ID(gotRoot))
 }
 
@@ -197,9 +201,7 @@ func generateDB(t *testing.T, r *rand.Rand, numKeys int) (*ffi.Database, ids.ID)
 // Note that each key/value pair may not be unique, so the resulting database may have fewer than [numKeys] entries.
 func fillDB(t *testing.T, r *rand.Rand, db *ffi.Database, numKeys int) ids.ID {
 	if numKeys == 0 {
-		root, err := db.Root()
-		require.NoError(t, err)
-		return ids.ID(root)
+		return ids.ID(db.Root())
 	}
 
 	var (

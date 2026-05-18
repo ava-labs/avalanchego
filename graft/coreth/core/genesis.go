@@ -34,10 +34,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
@@ -159,6 +159,15 @@ func SetupGenesisBlock(
 		if hash != stored {
 			return genesis.Config, common.Hash{}, &GenesisMismatchError{stored, hash}
 		}
+		if _, ok := triedb.Backend().(*firewood.TrieDB); ok {
+			// With Firewood's deferred persistence, a crash before the
+			// first persist leaves the trie database empty while LevelDB
+			// already has blocks beyond genesis. In this case, only recommit
+			// genesis state to the trieDB.
+			genesis.toBlock(db, triedb)
+			return genesis.Config, common.Hash{}, nil
+		}
+
 		_, err := genesis.Commit(db, triedb)
 		return genesis.Config, common.Hash{}, err
 	}
@@ -235,7 +244,7 @@ func (g *Genesis) trieConfig() *triedb.Config {
 
 // TODO: migrate this function to "flush" for more similarity with upstream.
 func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Block {
-	statedb, err := state.New(types.EmptyRootHash, extstate.NewDatabaseWithNodeDB(db, triedb), nil)
+	statedb, err := state.New(types.EmptyRootHash, state.NewDatabaseWithNodeDB(db, triedb), nil)
 	if err != nil {
 		panic(err)
 	}

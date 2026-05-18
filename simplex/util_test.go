@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -21,23 +22,58 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
+
+var (
+	cachedBLSKey       *localsigner.LocalSigner
+	cachedCompressedPK []byte
+)
+
+type keyReuseOption bool
+
+const (
+	noKeyReuse keyReuseOption = false
+	reuseKeys  keyReuseOption = true
+)
+
+func init() {
+	var err error
+	cachedBLSKey, err = localsigner.New()
+	if err != nil {
+		panic("failed to generate cached BLS key: " + err.Error())
+	}
+	cachedCompressedPK = cachedBLSKey.PublicKey().Compress()
+}
+
+type testNodeConfig struct {
+	reuseKeys keyReuseOption
+}
+
+type testNodeConfigOption func(*testNodeConfig)
+
+func testNodeConfigWithKeyReuse(cfg *testNodeConfig) {
+	cfg.reuseKeys = reuseKeys
+}
 
 type newBlockConfig struct {
 	// If prev is nil, newBlock will create the genesis block
 	prev *Block
 	// If round is 0, it will be set to one higher than the prev's round
 	round uint64
+	// genesis nodes
+	numNodes uint64
 }
 
 func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
 		vm := newTestVM()
 		block := &Block{
+			blacklist: simplex.NewBlacklist(uint16(config.numNodes)),
 			vmBlock: &wrappedBlock{
 				Block: snowmantest.Genesis,
 				vm:    vm,
@@ -50,7 +86,9 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 		digest := computeDigest(bytes)
 		block.digest = digest
 
-		block.blockTracker = newBlockTracker(block)
+		bt := newBlockTracker(vm)
+		bt.init(block)
+		block.blockTracker = bt
 		return block
 	}
 	if config.round == 0 {
@@ -81,33 +119,60 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 	return block
 }
 
-func newTestValidatorInfo(allNodes []*testNode) map[ids.NodeID]*validators.GetValidatorOutput {
-	vds := make(map[ids.NodeID]*validators.GetValidatorOutput, len(allNodes))
-	for _, node := range allNodes {
-		vds[node.validator.NodeID] = &node.validator
-	}
-
-	return vds
-}
-
 func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 	return newNetworkConfigs(t, numNodes)[0]
 }
 
 type testNode struct {
-	validator validators.GetValidatorOutput
-	signFunc  SignFunc
+	simplexparams.ValidatorInfo
+	signFunc SignFunc
 }
 
-// newNetworkConfigs creates a slice of Configs for testing purposes.
-// they are initialized with a common chainID and a set of validators.
+// newConfigsForQC builds a minimal set of configs sufficient for building a QC
+// (signers + validator membership). It avoids the heavier per-config setup
+// (mocks, WAL, message creator) so it can be called from f.Fuzz outer scope.
+func newConfigsForQC(t testing.TB) []*Config {
+	numNodes := 4
+	require.Positive(t, numNodes)
+
+	chainID := ids.GenerateTestID()
+	testNodes := generateTestNodes(t, uint64(numNodes), testNodeConfigWithKeyReuse)
+	chainParameters := newSimplexChainParams(testNodes)
+
+	configs := make([]*Config, 0, numNodes)
+	for _, node := range testNodes {
+		configs = append(configs, &Config{
+			Ctx: SimplexChainContext{
+				NodeID:    node.NodeID,
+				ChainID:   chainID,
+				NetworkID: constants.UnitTestID,
+			},
+			SignBLS: node.signFunc,
+			Params:  chainParameters,
+		})
+	}
+	return configs
+}
+
+// newNetworkConfigs creates a slice of Configs for testing purposes,
+// initialized with a common chainID and a set of validators each having
+// a freshly generated BLS key.
 func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
+	return newNetworkConfigsWithKeyReuse(t, numNodes, noKeyReuse)
+}
+
+// newNetworkConfigsWithKeyReuse is like newNetworkConfigs but allows the
+// caller to opt into reusing a single cached BLS key across all validators
+// (intended for fuzz tests where BLS key generation dominates setup cost).
+func newNetworkConfigsWithKeyReuse(t *testing.T, numNodes uint64, reuseKeys keyReuseOption) []*Config {
 	require.Positive(t, numNodes)
 
 	chainID := ids.GenerateTestID()
 
-	testNodes := generateTestNodes(t, numNodes)
-
+	testNodes := generateTestNodes(t, numNodes, func(cfg *testNodeConfig) {
+		cfg.reuseKeys = reuseKeys
+	})
+	chainParameters := newSimplexChainParams(testNodes)
 	configs := make([]*Config, 0, numNodes)
 
 	for _, node := range testNodes {
@@ -121,7 +186,7 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 		require.NoError(t, err)
 		config := &Config{
 			Ctx: SimplexChainContext{
-				NodeID:    node.validator.NodeID,
+				NodeID:    node.NodeID,
 				ChainID:   chainID,
 				NetworkID: constants.UnitTestID,
 			},
@@ -130,8 +195,9 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 			OutboundMsgBuilder: mc,
 			VM:                 newTestVM(),
 			DB:                 memdb.New(),
+			WAL:                wal.NewMemWAL(t),
 			SignBLS:            node.signFunc,
-			Validators:         newTestValidatorInfo(testNodes),
+			Params:             chainParameters,
 		}
 		configs = append(configs, config)
 	}
@@ -139,17 +205,46 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 	return configs
 }
 
-func generateTestNodes(t *testing.T, num uint64) []*testNode {
+// newSimplexChainParams creates simplex chain parameters with the given nodes as initial validators.
+func newSimplexChainParams(nodes []*testNode) *simplexparams.Parameters {
+	params := &simplexparams.Parameters{
+		MaxNetworkDelay:    1 * time.Second,
+		MaxRebroadcastWait: 1 * time.Second,
+	}
+	params.InitialValidators = make([]simplexparams.ValidatorInfo, len(nodes))
+	for i, node := range nodes {
+		params.InitialValidators[i] = node.ValidatorInfo
+	}
+	return params
+}
+
+func generateTestNodes(t testing.TB, num uint64, opts ...testNodeConfigOption) []*testNode {
+	var cfg testNodeConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	nodes := make([]*testNode, num)
 	for i := uint64(0); i < num; i++ {
-		ls, err := localsigner.New()
-		require.NoError(t, err)
+		var ls *localsigner.LocalSigner
+		var err error
+		var pk []byte
+
+		if cfg.reuseKeys {
+			ls = cachedBLSKey
+			require.NotNil(t, ls, "cached BLS key is not available")
+			pk = cachedCompressedPK
+		} else {
+			ls, err = localsigner.New()
+			require.NoError(t, err)
+			pk = ls.PublicKey().Compress()
+		}
 
 		nodeID := ids.GenerateTestNodeID()
 		nodes[i] = &testNode{
-			validator: validators.GetValidatorOutput{
+			ValidatorInfo: simplexparams.ValidatorInfo{
 				NodeID:    nodeID,
-				PublicKey: ls.PublicKey(),
+				PublicKey: pk,
 			},
 			signFunc: ls.Sign,
 		}
@@ -167,7 +262,8 @@ func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader
 		vote := simplex.ToBeSignedFinalization{
 			BlockHeader: bh,
 		}
-		signer, _ := NewBLSAuth(config)
+		signer, _, err := NewBLSAuth(config)
+		require.NoError(t, err)
 		sig, err := vote.Sign(&signer)
 		require.NoError(t, err)
 		finalizedVotes = append(finalizedVotes, &simplex.FinalizeVote{
@@ -179,7 +275,8 @@ func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader
 		})
 	}
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	sigAgg := &SignatureAggregator{verifier: &verifier}
 
 	finalization, err := simplex.NewFinalization(configs[0].Log, sigAgg, finalizedVotes)

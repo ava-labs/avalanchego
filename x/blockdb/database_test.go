@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -353,10 +354,12 @@ func TestFileCache_Eviction(t *testing.T) {
 			// Build error message if there were errors
 			var errorMsg string
 			if writeErrors.Load() > 0 {
-				errorMsg = fmt.Sprintf("concurrent writes had %d errors:\n", writeErrors.Load())
+				var b strings.Builder
+				fmt.Fprintf(&b, "concurrent writes had %d errors:\n", writeErrors.Load())
 				for _, msg := range errorMessages {
-					errorMsg += fmt.Sprintf("  %s\n", msg)
+					fmt.Fprintf(&b, "  %s\n", msg)
 				}
+				errorMsg = b.String()
 			}
 
 			// Verify no write errors and we have evictions

@@ -1,0 +1,37 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "block",
+    srcs = ["syncer.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/block",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/sync/client",
+        "//graft/evm/sync/types",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//log",
+    ],
+)
+
+graft_go_test(
+    name = "block_test",
+    srcs = ["syncer_test.go"],
+    embed = [":block"],
+    deps = [
+        "//codec",
+        "//graft/evm/message",
+        "//graft/evm/message/messagetest",
+        "//graft/evm/sync/client",
+        "//graft/evm/sync/handlers",
+        "//graft/evm/sync/handlers/stats",
+        "//graft/evm/sync/synctest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

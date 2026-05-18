@@ -5,6 +5,7 @@ package validators
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -20,6 +21,8 @@ const (
 var (
 	_ State = (*lockedState)(nil)
 	_ State = (*cachedState)(nil)
+
+	ErrUnfinalizedHeight = errors.New("validator set height not yet finalized")
 )
 
 // State allows the lookup of validator sets on specified subnets at the

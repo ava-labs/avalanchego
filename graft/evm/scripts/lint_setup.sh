@@ -105,7 +105,7 @@ function setup_lint {
   cp ../../.golangci.yml "$AVALANCHE_LINT_FILE"
 
   # Exclude all upstream files dynamically
-  echo "    paths-except:" >> "$AVALANCHE_LINT_FILE"
+  echo "    paths:" >> "$AVALANCHE_LINT_FILE"
   for f in "${UPSTREAM_FILES[@]}"; do
     # exclude pre-pended "./"
     echo "      - \"${f:2}\$\"" >> "$AVALANCHE_LINT_FILE"

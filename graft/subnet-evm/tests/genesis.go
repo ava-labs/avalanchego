@@ -9,5 +9,5 @@ import (
 
 // Genesis contains the embedded genesis.json file used by tests.
 //
-//go:embed load/genesis.json
+//go:embed genesis.json
 var Genesis []byte

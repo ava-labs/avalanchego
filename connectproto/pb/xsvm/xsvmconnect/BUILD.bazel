@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "xsvmconnect",
+    srcs = ["service.connect.go"],
+    importpath = "github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//connectproto/pb/xsvm",
+        "@com_connectrpc_connect//:connect",
+    ],
+)

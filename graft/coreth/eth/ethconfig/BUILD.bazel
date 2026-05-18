@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
+go_library(
+    name = "ethconfig",
+    srcs = [
+        "config.go",
+        "gen_config.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/eth/ethconfig",
+    deps = [
+        "//graft/coreth/core",
+        "//graft/coreth/core/txpool/blobpool",
+        "//graft/coreth/core/txpool/legacypool",
+        "//graft/coreth/eth/gasprice",
+        "//graft/coreth/internal/ethapi",
+        "//graft/coreth/miner",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)

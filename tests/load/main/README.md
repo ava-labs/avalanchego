@@ -4,7 +4,8 @@ This executable utilizes the `load` package to perform a load test against an in
 
 ## Prerequisites
 
-Using this executable requires `nix`: to install `nix`, please refer to the AvalancheGo [flake.nix](../../../flake.nix) file for installation instructions.
+Using this executable requires `nix`: for installation and repo dev shell setup, see
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#nix).
 Furthermore, utilization of any monitoring features requires credentials to the
 Avalanche monitoring stack.
 
@@ -33,7 +34,7 @@ wallets which will send transactions to the network for the lifetime of the test
 To enable viewing the state of the test network, `tmpnet` will log a Grafana URL:
 
 ```
-[07-25|13:47:36.137] INFO tmpnet/network.go:410 metrics and logs available via grafana (collectors must be running) {"url": "https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%7C%3D%7Ce1b9dd69-5204-4c24-8b98-d3aea14c0eeb&var-filter=is_ephemeral_node%7C%3D%7Cfalse&from=1753465644564&to=now"}
+[07-25|13:47:36.137] INFO tmpnet/network.go:410 metrics and logs available via grafana (collectors must be running) {"url": "https://avalabs.grafana.net/d/mabpvtq/avalanche-main-dashboard?&var-filter=network_uuid%7C%3D%7Ce1b9dd69-5204-4c24-8b98-d3aea14c0eeb&var-filter=is_ephemeral_node%7C%3D%7Cfalse&from=1753465644564&to=now"}
 ```
 
 Clicking on this link will open the main AvalancheGo dashboard in Grafana

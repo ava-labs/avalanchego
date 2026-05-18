@@ -1,0 +1,132 @@
+diff --git a/bindings/BUILD.bazel b/bindings/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/bindings/BUILD.bazel
+@@ -0,0 +1,9 @@
++# gazelle:ignore
++# Header library for blst C bindings
++
++cc_library(
++    name = "bindings",
++    hdrs = glob(["*.h"]),
++    includes = ["."],
++    visibility = ["//:__subpackages__"],
++)
+diff --git a/bindings/go/BUILD.bazel b/bindings/go/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/bindings/go/BUILD.bazel
+@@ -0,0 +1,60 @@
++# gazelle:ignore
++# Go bindings for blst library
++#
++# Compiler flags are derived from the CGO directives in blst.go:13-16.
++
++load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
++
++COPTS = [
++    "-O2",
++    "-D__BLST_PORTABLE__",
++    "-D__BLST_CGO__",
++    "-fno-builtin-memcpy",
++    "-fno-builtin-memset",
++] + select({
++    "@io_bazel_rules_go//go/platform:amd64": [
++        "-D__ADX__",
++        "-mno-avx",
++    ],
++    "//conditions:default": [],
++})
++
++cc_library(
++    name = "cgo",
++    srcs = [
++        "cgo_assembly.S",
++        "cgo_server.c",
++    ],
++    copts = COPTS,
++    visibility = ["//visibility:private"],
++    deps = [
++        "//bindings",
++        "//build:build_cc",
++        "//src",
++    ],
++)
++
++go_library(
++    name = "go",
++    srcs = glob(
++        ["*.go"],
++        exclude = ["*_test.go"],
++    ),
++    cdeps = [
++        ":cgo",
++        "//bindings",
++        "//build:build_cc",
++        "//src",
++    ],
++    cgo = True,
++    copts = COPTS,
++    importpath = "github.com/supranational/blst/bindings/go",
++    visibility = ["//visibility:public"],
++)
++
++go_test(
++    name = "go_test",
++    srcs = glob(["*_test.go"]),
++    data = ["//bindings/vectors"],
++    embed = [":go"],
++)
+diff --git a/bindings/vectors/BUILD.bazel b/bindings/vectors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/bindings/vectors/BUILD.bazel
+@@ -0,0 +1,8 @@
++# gazelle:ignore
++# Test vectors for blst
++
++filegroup(
++    name = "vectors",
++    srcs = glob(["hash_to_curve/*.json"]),
++    visibility = ["//:__subpackages__"],
++)
+diff --git a/build/BUILD.bazel b/build/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/build/BUILD.bazel
+@@ -0,0 +1,20 @@
++# gazelle:ignore
++# Assembly and build file library for blst
++#
++# assembly.S is #include'd by cgo_assembly.S and in turn
++# #include's platform-specific assembly from elf/, coff/, mach-o/.
++
++cc_library(
++    name = "build_cc",
++    hdrs = ["assembly.S"],
++    includes = ["."],
++    textual_hdrs = glob([
++        "elf/*.s",
++        "elf/*.S",
++        "coff/*.s",
++        "coff/*.S",
++        "mach-o/*.s",
++        "mach-o/*.S",
++    ]),
++    visibility = ["//:__subpackages__"],
++)
+diff --git a/src/BUILD.bazel b/src/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/src/BUILD.bazel
+@@ -0,0 +1,10 @@
++# gazelle:ignore
++# Source library for blst - headers and C files for unity build
++
++cc_library(
++    name = "src",
++    hdrs = glob(["*.h"]),
++    includes = ["."],
++    textual_hdrs = glob(["*.c"]),
++    visibility = ["//:__subpackages__"],
++)

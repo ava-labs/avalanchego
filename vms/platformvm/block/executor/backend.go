@@ -31,7 +31,7 @@ type backend struct {
 	// Note that Genesis block is a commit block so no need to update
 	// blkIDToState with it upon backend creation (Genesis is already accepted)
 	blkIDToState map[ids.ID]*blockState
-	state        state.State
+	state        *state.State
 
 	ctx *snow.Context
 }
@@ -51,7 +51,7 @@ func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
 	return b.state, blkID == b.state.GetLastAccepted()
 }
 
-func (b *backend) getOnAbortState(blkID ids.ID) (state.Diff, bool) {
+func (b *backend) getOnAbortState(blkID ids.ID) (*state.Diff, bool) {
 	state, ok := b.blkIDToState[blkID]
 	if !ok || state.onAbortState == nil {
 		return nil, false
@@ -59,7 +59,7 @@ func (b *backend) getOnAbortState(blkID ids.ID) (state.Diff, bool) {
 	return state.onAbortState, true
 }
 
-func (b *backend) getOnCommitState(blkID ids.ID) (state.Diff, bool) {
+func (b *backend) getOnCommitState(blkID ids.ID) (*state.Diff, bool) {
 	state, ok := b.blkIDToState[blkID]
 	if !ok || state.onCommitState == nil {
 		return nil, false

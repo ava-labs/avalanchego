@@ -25,7 +25,7 @@ func TestMarshalCodeRequest(t *testing.T) {
 
 	base64CodeRequest := "AAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAHNvbWUgY29kZSBwbHM="
 
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		codeRequestBytes, err := c.Marshal(message.Version, codeRequest)
 		require.NoError(t, err)
 		require.Equal(t, base64CodeRequest, base64.StdEncoding.EncodeToString(codeRequestBytes))
@@ -53,7 +53,7 @@ func TestMarshalCodeResponse(t *testing.T) {
 	}
 
 	base64CodeResponse := "AAAAAAABAAAAMlL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJgYVa2GgdDYbR6R4AFnk5y2aU"
-	messagetest.ForEachCodec(t, func(_ string, c codec.Manager) {
+	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
 		codeResponseBytes, err := c.Marshal(message.Version, codeResponse)
 		require.NoError(t, err)
 		require.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))

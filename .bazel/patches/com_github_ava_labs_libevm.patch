@@ -1,0 +1,46 @@
+diff --git a/crypto/secp256k1/BUILD.bazel b/crypto/secp256k1/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/crypto/secp256k1/BUILD.bazel
+@@ -0,0 +1,27 @@
++# gazelle:ignore
++load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
++
++go_library(
++    name = "secp256k1",
++    srcs = glob(
++        [
++            "*.go",
++            "*.h",
++        ],
++        exclude = ["*_test.go"],
++    ),
++    cdeps = ["//crypto/secp256k1/libsecp256k1"],
++    cgo = True,
++    copts = [
++        "-Icrypto/secp256k1/libsecp256k1",
++        "-Icrypto/secp256k1/libsecp256k1/src",
++    ],
++    importpath = "github.com/ava-labs/libevm/crypto/secp256k1",
++    visibility = ["//visibility:public"],
++)
++
++go_test(
++    name = "secp256k1_test",
++    srcs = glob(["*_test.go"]),
++    embed = [":secp256k1"],
++)
+diff --git a/crypto/secp256k1/libsecp256k1/BUILD.bazel b/crypto/secp256k1/libsecp256k1/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/crypto/secp256k1/libsecp256k1/BUILD.bazel
+@@ -0,0 +1,9 @@
++# gazelle:ignore
++cc_library(
++    name = "libsecp256k1",
++    hdrs = glob([
++        "**/*.c",
++        "**/*.h",
++    ]),
++    visibility = ["//crypto/secp256k1:__pkg__"],
++)

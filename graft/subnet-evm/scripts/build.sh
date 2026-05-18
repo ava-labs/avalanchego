@@ -24,6 +24,7 @@ fi
 # Build Subnet EVM, which is run as a subprocess
 # shellcheck disable=SC2154
 echo "Building Subnet EVM @ GitCommit: $git_commit at $BINARY_PATH"
+cd "$SUBNET_EVM_PATH"
 # shellcheck disable=SC2154
 go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$BINARY_PATH" "plugin/"*.go
 

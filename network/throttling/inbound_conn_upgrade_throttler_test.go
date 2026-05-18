@@ -85,7 +85,7 @@ func TestInboundConnUpgradeThrottler(t *testing.T) {
 	throttler := throttlerIntf.(*inboundConnUpgradeThrottler)
 	select {
 	case <-throttler.done:
-		require.FailNow("shouldn't be done")
+		t.Fatal("shouldn't be done")
 	default:
 	}
 
@@ -96,6 +96,6 @@ func TestInboundConnUpgradeThrottler(t *testing.T) {
 	case _, chanOpen := <-throttler.done:
 		require.False(chanOpen)
 	default:
-		require.FailNow("should be done")
+		t.Fatal("should be done")
 	}
 }

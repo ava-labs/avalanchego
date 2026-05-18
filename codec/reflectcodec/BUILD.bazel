@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "reflectcodec",
+    srcs = [
+        "struct_fielder.go",
+        "type_codec.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/codec/reflectcodec",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//utils/set",
+        "//utils/wrappers",
+    ],
+)

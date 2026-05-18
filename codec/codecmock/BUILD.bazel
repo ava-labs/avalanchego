@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "codecmock",
+    srcs = ["manager.go"],
+    importpath = "github.com/ava-labs/avalanchego/codec/codecmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "@org_uber_go_mock//gomock",
+    ],
+)

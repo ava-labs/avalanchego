@@ -15,11 +15,10 @@ See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
 
 ### Simplifying usage with direnv
 
-The repo includes a [.envrc](../../.envrc) that can be applied by
-[direnv](https://direnv.net/) when in a shell. This will enable
-`ginkgo` to be invoked directly (without a `./bin/` prefix ) and
-without having to specify the `--avalanchego-path` or `--plugin-dir`
-flags.
+For repo-level `direnv` setup and behavior, see [CONTRIBUTING.md](../../CONTRIBUTING.md#direnv).
+In this test workflow, the repo's [`.envrc`](../../.envrc) makes
+`ginkgo` available without a `./bin/` prefix and avoids having to
+specify the `--avalanchego-path` or `--plugin-dir` flags.
 
 ### Filtering test execution with labels
 
@@ -138,6 +137,6 @@ Once started, the collectors will continue to run in the background
 until stopped by `tmpnetctl stop-metrics-collector` and `tmpnetctl stop-logs-collector`.
 
 The results of collection will be viewable at
-https://grafana-poc.avax-dev.network.
+https://avalabs.grafana.net.
 
 For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).

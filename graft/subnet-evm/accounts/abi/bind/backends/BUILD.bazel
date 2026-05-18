@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+go_library(
+    name = "backends",
+    srcs = ["simulated.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind/backends",
+    deps = [
+        "//graft/subnet-evm/accounts/abi/bind",
+        "//graft/subnet-evm/ethclient/simulated",
+        "//graft/subnet-evm/interfaces",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)

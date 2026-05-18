@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/internal/ethapi"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -558,6 +559,9 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		return nil, err
 	}
 	defer release()
+	if _, ok := statedb.Database().TrieDB().Backend().(*firewood.TrieDB); ok {
+		return nil, errors.New("intermediate roots are not supported with firewood")
+	}
 
 	var (
 		roots              []common.Hash
