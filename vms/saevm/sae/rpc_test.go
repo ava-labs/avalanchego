@@ -139,12 +139,12 @@ func testRPCGetter[
 }
 
 func TestSubscriptions(t *testing.T) {
-	// TODO(JonathanOppenheimer): This test is flaky. [filters.FilterAPI.NewPendingTransactions]
-	// subscribes to the [txpool.TxPool] asynchronously, so if the
-	// goroutine is not scheduled before the first transaction is issued,
-	// the subscription will not receive the tx.
+	// TODO(JonathanOppenheimer): [filters.FilterAPI.NewPendingTransactions]
+	// subscribes to the [txpool.TxPool] asynchronously. If the goroutine is not
+	// scheduled before the first transaction is issued, the subscription will
+	// not receive the tx.
 	//
-	// This is not a production issue, because the subscription will be eventually created.
+	// Fixed by: https://github.com/ethereum/go-ethereum/pull/33990
 	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
 		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
 	}
