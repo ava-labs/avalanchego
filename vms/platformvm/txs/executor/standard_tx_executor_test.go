@@ -4448,10 +4448,10 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 
 	wantStakingInfo := state.StakingInfo{
 		DelegateeReward:          0,
-		AccruedRewards:           0,
+		AccruedValidationRewards: 0,
 		AccruedDelegateeRewards:  0,
 		AutoCompoundRewardShares: 200_000,
-		Period:                   uint64(continuationPeriod / time.Second),
+		NextPeriod:               uint64(continuationPeriod / time.Second),
 	}
 	require.Equal(t, wantStakingInfo, stakingInfo)
 
@@ -4631,10 +4631,10 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 	initialStakingInfo := state.StakingInfo{
 		DelegateeReward:          1,
-		AccruedRewards:           2,
+		AccruedValidationRewards: 2,
 		AccruedDelegateeRewards:  3,
 		AutoCompoundRewardShares: 100_000,
-		Period:                   validatorTx.Period,
+		NextPeriod:               validatorTx.Period,
 	}
 	require.NoError(t, env.state.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
 
@@ -4718,7 +4718,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 			wantStakingInfo := initialStakingInfo
 			wantStakingInfo.AutoCompoundRewardShares = tt.newAutoCompoundRewardShares
-			wantStakingInfo.Period = tt.newPeriod
+			wantStakingInfo.NextPeriod = tt.newPeriod
 			require.Equal(t, wantStakingInfo, stakingInfo)
 
 			inputIDs := setAutoRenewedValidatorConfigTx.InputIDs()
