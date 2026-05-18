@@ -1076,10 +1076,10 @@ func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 
 	require.NoError(t, env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
 		DelegateeReward:          5_000_000,
-		AccruedRewards:           1_000_000,
+		AccruedValidationRewards: 1_000_000,
 		AccruedDelegateeRewards:  500_000,
 		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
-		Period:                   0,
+		NextPeriod:               0,
 	}))
 
 	env.state.SetTimestamp(staker.EndTime)
@@ -1225,10 +1225,10 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 
 	require.NoError(t, env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
 		DelegateeReward:          5_000_000,
-		AccruedRewards:           1_000_000,
+		AccruedValidationRewards: 1_000_000,
 		AccruedDelegateeRewards:  500_000,
 		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
-		Period:                   validatorTx.Period,
+		NextPeriod:               validatorTx.Period,
 	}))
 
 	env.state.SetTimestamp(staker.EndTime)
@@ -1322,7 +1322,7 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 		wantAccruedRewards := uint64(5_000_000)
 		wantAccruedDelegateeRewards := uint64(2_500_000)
 		require.Equal(t, wantWeight, validator.Weight)
-		require.Equal(t, wantAccruedRewards, validatorMutables.AccruedRewards)
+		require.Equal(t, wantAccruedRewards, validatorMutables.AccruedValidationRewards)
 		require.Equal(t, wantAccruedDelegateeRewards, validatorMutables.AccruedDelegateeRewards)
 
 		// Check UTXOs for withdraws from auto-restake shares param
@@ -1425,10 +1425,10 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 
 	require.NoError(t, env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
 		DelegateeReward:          5_000_000,
-		AccruedRewards:           1_000_000,
+		AccruedValidationRewards: 1_000_000,
 		AccruedDelegateeRewards:  500_000,
 		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
-		Period:                   validatorTx.Period,
+		NextPeriod:               validatorTx.Period,
 	}))
 
 	env.state.SetTimestamp(staker.EndTime)
@@ -1519,7 +1519,7 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, env.config.MaxValidatorStake, validator.Weight)
-		require.Equal(t, uint64(2_333_333), validatorMutables.AccruedRewards)
+		require.Equal(t, uint64(2_333_333), validatorMutables.AccruedValidationRewards)
 		require.Equal(t, uint64(1_166_667), validatorMutables.AccruedDelegateeRewards)
 
 		// Check UTXOs for withdraws from auto-restake shares param
@@ -1655,7 +1655,7 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 
 	require.NoError(t, env.state.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
 		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
-		Period:                   validatorTx.Period,
+		NextPeriod:               validatorTx.Period,
 	}))
 
 	// Step 2: Create a delegator to this auto-renewed validator.
