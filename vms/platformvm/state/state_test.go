@@ -3454,21 +3454,6 @@ func testGetStakingInfo(t *testing.T, newCSF func(t *testing.T) CurrentStakers) 
 			nodeID:   defaultValidator.NodeID,
 			want:     StakingInfo{DelegateeReward: 123},
 		},
-		// TODO base does not allow updating staking info associated with a validator before it has been written
-		// {
-		// name: "validator_added_in_current_diff_and_staking_info_set",
-		// puts: []*Staker{validator},
-		// setStakingInfos: []setStakingInfoArgs{
-		// 	{
-		// 		SubnetID:    validator.SubnetID,
-		// 		NodeID:      validator.NodeID,
-		// 		StakingInfo: StakingInfo{DelegateeReward: 123},
-		// 	},
-		// },
-		// subnetID: ids.ID{1},
-		// nodeID:   ids.NodeID{2},
-		// want:     StakingInfo{DelegateeReward: 123},
-		// },
 		{
 			name: "staking_info_deleted_when_validator_deleted",
 			setStakingInfos: []setStakingInfoArgs{
@@ -3483,6 +3468,7 @@ func testGetStakingInfo(t *testing.T, newCSF func(t *testing.T) CurrentStakers) 
 			nodeID:   defaultValidator.NodeID,
 			wantErr:  database.ErrNotFound,
 		},
+		// TODO base does not allow updating staking info associated with a validator before it has been written
 	}
 
 	for _, tt := range tests {
@@ -3635,13 +3621,6 @@ func testPutCurrentDelegator(t *testing.T, csF func(t *testing.T) CurrentStakers
 			delegator:     delegator,
 		},
 		//	TODO currently we do not error if a duplicate delegator is added
-		// {
-		// 	name: "duplicate_put",
-		// 	putValidators: []*Staker{validator},
-		// 	putDelegators: []*Staker{delegator},
-		// 	delegator:     delegator,
-		// 	wantErr: errUnexpectedStaker,
-		// },
 	}
 
 	for _, tt := range tests {
@@ -3678,19 +3657,13 @@ func testDeleteCurrentDelegator(t *testing.T, csF func(t *testing.T) CurrentStak
 			delegator: delegator,
 			wantErr:   database.ErrNotFound,
 		},
-		// TODO currently we do not error when on deletions on delegators that do not exist
-		// {
-		// 	name: "delegator_does_not_exist",
-		// 	putValidators: []*Staker{validator},
-		// 	delegator: delegator,
-		// 	wantErr: database.ErrNotFound,
-		// },
 		{
 			name:          "delegator_deleted",
 			putValidators: []*Staker{validator},
 			putDelegators: []*Staker{delegator},
 			delegator:     delegator,
 		},
+		// TODO currently we do not error when on deletions on delegators that do not exist
 	}
 
 	for _, tt := range tests {
