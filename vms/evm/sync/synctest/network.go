@@ -1,7 +1,6 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package synctest provides test helpers shared across vms/evm/sync.
 package synctest
 
 import (
@@ -33,7 +32,7 @@ func EchoHandler(b []byte) p2p.Handler {
 }
 
 // NewPeerTracker returns a [p2p.PeerTracker] with peers pre-connected
-// at version 99, above any minVersion gate.
+// at a set version, above any minVersion gate.
 func NewPeerTracker(t *testing.T, peers ...ids.NodeID) *p2p.PeerTracker {
 	t.Helper()
 	tracker, err := p2p.NewPeerTracker(logging.NoLog{}, "test", prometheus.NewRegistry(), nil, nil)
