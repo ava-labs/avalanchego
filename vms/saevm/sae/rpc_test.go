@@ -135,9 +135,12 @@ func testRPCGetter[
 }
 
 func TestSubscriptions(t *testing.T) {
-	// TODO(JonathanOppenheimer): This test is flaky. After this test subscribes to
-	// newPendingTransactions, it immediately sends a transaction. If the goroutine
-	// setting up rpcSub in libevm hasn't completed yet, the mustSendTx notifification
+	// TODO(JonathanOppenheimer): This test is flaky. [filters.FiltersAPI.NewPendingTransactions]
+	// subscribes to the [txpool.Pool] asynchronously, so if the
+	// goroutine is not scheduled before the first transaction is issued,
+	// the subscription will not receive the tx.
+	//
+	// This is not a production issue, because the subscription will be eventually created.
 	// gets dropped and the test hangs.
 	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
 		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
