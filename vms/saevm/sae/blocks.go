@@ -140,8 +140,8 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 	// also provides a clearer failure message.
 	if reH, verH := rebuilt.Hash(), b.Hash(); reH != verH {
 		vm.log().Debug("block verification failed",
-			zap.String("block", fmt.Sprintf("%+v", b.Header())),
-			zap.String("rebuilt", fmt.Sprintf("%+v", rebuilt.Header())),
+			zap.Reflect("block", b.Header()),
+			zap.Reflect("rebuilt", rebuilt.Header()),
 		)
 		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", errHashMismatch, reH, verH)
 	}
