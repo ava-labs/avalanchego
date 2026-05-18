@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779125013719,
+  "lastUpdate": 1779133171889,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -23828,6 +23828,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_accept_ms/ggas",
             "value": 714.9977151232125,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Joshua Kim",
+            "username": "joshua-kim",
+            "email": "20001595+joshua-kim@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "ccc48c435eb6dc48e741472a9dbf0862c667e978",
+          "message": "Add coverage for `CurrentStakers` interface (#5040)\n\nSigned-off-by: Joshua Kim <20001595+joshua-kim@users.noreply.github.com>\nSigned-off-by: Joshua Kim <20001595+joshua-kim@users.noreply.ithub.com>\nCo-authored-by: Razvan <36448915+rrazvan1@users.noreply.github.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>\nCo-authored-by: Joshua Kim <20001595+joshua-kim@users.noreply.ithub.com>",
+          "timestamp": "2026-05-18T18:34:21Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/ccc48c435eb6dc48e741472a9dbf0862c667e978"
+        },
+        "date": 1779133166641,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - mgas/s",
+            "value": 28.06024326537935,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - ms/ggas",
+            "value": 35637.60978629138,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_parse_ms/ggas",
+            "value": 74.23807648232707,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_verify_ms/ggas",
+            "value": 35504.1203037602,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
+            "value": 56.441816539283174,
             "unit": "block_accept_ms/ggas"
           }
         ]
