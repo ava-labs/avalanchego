@@ -64,22 +64,42 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 
 	// Block body must match what is declared by the header.
 	hasher := trie.NewStackTrie(nil)
-	if types.DeriveSha(types.Transactions(b.Transactions()), hasher) != b.Header().TxHash {
+	hdr := b.Header()
+	if types.DeriveSha(b.Transactions(), hasher) != hdr.TxHash {
 		return nil, errTxHashMismatch
 	}
-	if types.CalcUncleHash(b.Uncles()) != b.Header().UncleHash {
+	if types.CalcUncleHash(b.Uncles()) != hdr.UncleHash {
 		return nil, errUncleHashMismatch
 	}
-	// If blob gas is set, withdrawals hash isn't nil.
-	if b.Header().WithdrawalsHash == nil {
-		if len(b.Withdrawals()) > 0 {
+	{
+		// The withdrawals hash being set depends on the Ethereum hard fork.
+		var want *common.Hash
+		switch w := b.Withdrawals(); {
+		case w == nil:
+			want = nil
+		case len(w) == 0:
+			want = &types.EmptyWithdrawalsHash
+		default:
+			h := types.DeriveSha(w, hasher)
+			want = &h
+		}
+		got := hdr.WithdrawalsHash
+		if !comparePtrs(want, got) {
 			return nil, errWithdrawalHashMismatch
 		}
-	} else if types.DeriveSha(types.Withdrawals(b.Withdrawals()), hasher) != *b.Header().WithdrawalsHash {
-		return nil, errWithdrawalHashMismatch
 	}
 
 	return vm.blockBuilder.new(b, nil, nil)
+}
+
+func comparePtrs[T comparable](a, b *T) bool {
+	if a == nil {
+		return b == nil
+	}
+	if b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 // BuildBlock builds a new block, using the last block passed to
