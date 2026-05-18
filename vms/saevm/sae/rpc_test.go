@@ -35,6 +35,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	_ "github.com/ava-labs/libevm/core/txpool"
+	_ "github.com/ava-labs/libevm/eth/filters"
+
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -135,8 +138,8 @@ func testRPCGetter[
 }
 
 func TestSubscriptions(t *testing.T) {
-	// TODO(JonathanOppenheimer): This test is flaky. [filters.FiltersAPI.NewPendingTransactions]
-	// subscribes to the [txpool.Pool] asynchronously, so if the
+	// TODO(JonathanOppenheimer): This test is flaky. [filters.FilterAPI.NewPendingTransactions]
+	// subscribes to the [txpool.TxPool] asynchronously, so if the
 	// goroutine is not scheduled before the first transaction is issued,
 	// the subscription will not receive the tx.
 	//
