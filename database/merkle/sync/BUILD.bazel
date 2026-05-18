@@ -21,6 +21,7 @@ go_library(
         "//utils/constants",
         "//utils/hashing",
         "//utils/heap",
+        "//utils/lock",
         "//utils/logging",
         "//utils/maybe",
         "//utils/set",
@@ -42,7 +43,13 @@ go_test(
     embed = [":sync"],
     deps = [
         "//ids",
+        "//network/p2p",
+        "//network/p2p/p2ptest",
+        "//snow/engine/common",
+        "//utils/logging",
         "//utils/maybe",
+        "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
     ],
 )

@@ -10,21 +10,18 @@ go_library(
     name = "network",
     srcs = [
         "network.go",
-        "peer_tracker.go",
         "waiting_handler.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/network",
     deps = [
         "//codec",
         "//graft/evm/message",
-        "//graft/evm/utils/rand",
         "//ids",
         "//network/p2p",
         "//snow",
         "//snow/engine/common",
         "//snow/validators",
         "//utils",
-        "//utils/math",
         "//utils/set",
         "//version",
         "@com_github_ava_labs_libevm//log",
@@ -38,7 +35,6 @@ graft_go_test(
     name = "network_test",
     srcs = [
         "network_test.go",
-        "peer_tracker_test.go",
     ],
     embed = [":network"],
     deps = [
