@@ -267,7 +267,7 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 
 	require.NoError(env.state.PutCurrentValidator(staker))
 	require.NoError(env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
-		Period: uint64(stakePeriod / time.Second),
+		NextPeriod: uint64(stakePeriod / time.Second),
 	}))
 	require.NoError(env.state.Commit())
 
