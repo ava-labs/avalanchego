@@ -50,12 +50,10 @@ func NewClient(p2pNet *p2p.Network, handlerID uint64) *p2p.Client {
 }
 
 // Send picks a peer via [p2p.PeerTracker.SelectPeer] and forwards req
-// to it. Returns the chosen nodeID and an [Outcome] for the caller to
-// score after content validation. On error, [Outcome] is nil and the
-// peer has already been scored.
-//
-// Selection is explicit (not [p2p.Client.AppRequestAny]) so the
-// [RegisterRequest] pairs with the eventual `Success` or `Failure` call.
+// to it. Returns the chosen nodeID and an [Outcome] (failures are
+// scored automatically). Selection is explicit (not
+// [p2p.Client.AppRequestAny]) so RegisterRequest pairs with the
+// eventual Success or Failure call.
 func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (ids.NodeID, *Outcome, error) {
 	nodeID, ok := d.peers.SelectPeer()
 	if !ok {
@@ -68,9 +66,8 @@ func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (i
 	return nodeID, outcome, nil
 }
 
-// SendTo sends req to nodeID. Returns an [Outcome] for the caller to
-// score after content validation. On error, Outcome is nil and the
-// peer has already been scored.
+// SendTo sends req to nodeID. Returns an [Outcome] (failures are
+// scored automatically).
 func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (*Outcome, error) {
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {
@@ -117,15 +114,12 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 	}
 }
 
-// Outcome is the caller's handle to score a peer after validating its
-// response. [Send] and [SendTo] return a non-nil Outcome only on
-// transport success. Transport failures are already scored by the
-// dispatcher.
-//
-// Call exactly one of Success or Failure. Both are idempotent, so the
-// canonical `defer outcome.Failure()` plus `outcome.Success()` happy
-// path is safe. Forgetting both leaves an unpaired [RegisterRequest] on
-// the [p2p.PeerTracker].
+// Outcome lets the caller score a peer after validating its response.
+// [Send] and [SendTo] return one only on transport success (failures
+// are scored automatically). Call exactly one of Success or Failure.
+// Both are idempotent, so `defer outcome.Failure()` plus
+// `outcome.Success()` is safe. Forgetting both leaves an unpaired
+// RegisterRequest on the [p2p.PeerTracker].
 type Outcome struct {
 	peers     *p2p.PeerTracker
 	nodeID    ids.NodeID
