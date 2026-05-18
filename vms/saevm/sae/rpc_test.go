@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"os"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -134,6 +135,14 @@ func testRPCGetter[
 }
 
 func TestSubscriptions(t *testing.T) {
+	// TODO(JonathanOppenheimer): This test is flaky. After this test subscribes to
+	// newPendingTransactions, it immediately sends a transaction. If the goroutine
+	// setting up rpcSub in libevm hasn't completed yet, the mustSendTx notifification
+	// gets dropped and the test hangs.
+	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
+		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
+	}
+
 	ctx, sut := newSUT(t, 1)
 
 	var (
