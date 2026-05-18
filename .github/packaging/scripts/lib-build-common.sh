@@ -9,6 +9,13 @@
 readonly PACKAGER_NAME="Ava Labs"
 readonly PACKAGER_EMAIL="security@avalabs.org"
 
+secret_key_file_is_usable() {
+    local key_file="${1:?key file required}"
+
+    gpg --batch --show-keys --with-colons "${key_file}" \
+        | awk -F: '$1 == "sec" && $2 !~ /e/ { found = 1 } END { exit found ? 0 : 1 }'
+}
+
 # Initialize the build environment inside the container.
 # Marks the bind-mounted source tree as git-safe, sources project
 # scripts (constants.sh, git_commit.sh), and disables Go VCS stamping.
@@ -65,11 +72,16 @@ build_binary() {
 # Resolve the subnet-evm VM ID from the canonical constants file.
 # Sets SUBNET_EVM_VM_ID (global) as a side effect.
 resolve_subnet_evm_vm_id() {
-    # shellcheck disable=SC1091
-    source "${REPO_ROOT}/graft/subnet-evm/scripts/default-vm-data.sh"
-    # shellcheck disable=SC2154
-    : "${DEFAULT_VM_ID:?DEFAULT_VM_ID must be set by default-vm-data.sh}"
-    export SUBNET_EVM_VM_ID="${DEFAULT_VM_ID}"
+    SUBNET_EVM_VM_ID="$(
+        (
+            # shellcheck disable=SC1091
+            source "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh"
+            # shellcheck disable=SC2154
+            : "${DEFAULT_VM_ID:?DEFAULT_VM_ID must be set by constants.sh}"
+            echo "${DEFAULT_VM_ID}"
+        )
+    )"
+    export SUBNET_EVM_VM_ID
 }
 
 # Generate the nfpm changelog file.
@@ -115,11 +127,15 @@ setup_gpg() {
         echo "Using provided GPG key for signing"
         gpg --batch --import "${gpg_key_file}"
         cp "${gpg_key_file}" "${NFPM_SIGNING_KEY}"
-    elif [[ -f "${NFPM_SIGNING_KEY}" ]]; then
+    elif [[ -f "${NFPM_SIGNING_KEY}" ]] && secret_key_file_is_usable "${NFPM_SIGNING_KEY}"; then
         echo "Reusing existing ephemeral GPG key"
         gpg --batch --import "${NFPM_SIGNING_KEY}"
     else
-        echo "Generating ephemeral GPG key for signing"
+        if [[ -f "${NFPM_SIGNING_KEY}" ]]; then
+            echo "Existing ephemeral GPG key is expired or unusable; generating a new key"
+        else
+            echo "Generating ephemeral GPG key for signing"
+        fi
         gpg --batch --gen-key <<GPGEOF
 %no-protection
 Key-Type: RSA
