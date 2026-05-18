@@ -421,6 +421,76 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return ErrShouldBePermissionlessStaker
 	}
 
+	return e.decreaseAbortStateCurrentSupply(stakerToReward)
+}
+
+func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRenewedValidatorTx) error {
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if tx.Timestamp != uint64(e.onCommitState.GetTimestamp().Unix()) {
+		return errInvalidTimestamp
+	}
+
+	stakerTx, stakerToReward, err := verifyRewardTx(e.onCommitState, e.tx, tx)
+	if err != nil {
+		return err
+	}
+
+	addAutoRenewedValidatorTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	if !ok {
+		return errShouldBeAutoRenewedStaker
+	}
+
+	stakingInfo, err := e.onCommitState.GetStakingInfo(stakerToReward.SubnetID, stakerToReward.NodeID)
+	if err != nil {
+		return fmt.Errorf("failed to get staking info: %w", err)
+	}
+
+	// In onAbortState the staker is always removed.
+	if err := e.onAbortState.DeleteCurrentValidator(stakerToReward); err != nil {
+		return fmt.Errorf("deleting current validator from abort state: %w", err)
+	}
+
+	if err := e.decreaseAbortStateCurrentSupply(stakerToReward); err != nil {
+		return err
+	}
+
+	if stakingInfo.NextPeriod > 0 {
+		// Running auto-renewed staker: validator will continue to the next cycle.
+		// On commit: restake rewards (based on AutoCompoundRewardShares) and start new cycle.
+		// On abort: return stake + accrued rewards, forfeit current cycle's rewards.
+
+		// Create UTXOs for onAbortState.
+		if err = e.createUTXOsAutoRenewedValidatorOnAbort(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
+			return fmt.Errorf("failed to create UTXO auto-renewed validator on abort: %w", err)
+		}
+
+		// Set onCommitState.
+		if err = e.setOnCommitStateAutoRenewedValidatorRestake(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
+			return err
+		}
+
+		// Early return because we don't need to do anything else.
+		return nil
+	}
+
+	// Graceful exit: validator requested to stop (Period == 0).
+	// Return stake + all rewards on both commit and abort paths.
+	if err := e.createUTXOsAutoRenewedValidatorOnGracefulExit(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
+		return err
+	}
+
+	// Handle staker lifecycle.
+	if err := e.onCommitState.DeleteCurrentValidator(stakerToReward); err != nil {
+		return fmt.Errorf("deleting current validator from commit state: %w", err)
+	}
+
+	return nil
+}
+
+func (e *proposalTxExecutor) decreaseAbortStateCurrentSupply(stakerToReward *state.Staker) error {
 	// If the reward is aborted, then the current supply should be decreased.
 	currentSupply, err := e.onAbortState.GetCurrentSupply(stakerToReward.SubnetID)
 	if err != nil {
@@ -432,10 +502,6 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 	return nil
-}
-
-func (*proposalTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
-	return ErrUnimplemented
 }
 
 func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {

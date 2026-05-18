@@ -930,7 +930,7 @@ func TestRewardValidatorStakerType(t *testing.T) {
 	require.NoError(t, env.state.Commit())
 
 	require.NoError(t, env.state.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
-		Period: validatorTx.Period,
+		NextPeriod: validatorTx.Period,
 	}))
 
 	env.state.SetTimestamp(vdrStaker.EndTime)
