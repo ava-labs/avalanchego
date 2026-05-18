@@ -911,20 +911,25 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	require.NoError(tx.Initialize(txs.Codec))
 
 	service.vm.ctx.Lock.Lock()
-	staker, err := state.NewStaker(
-		tx.ID(),
-		addAutoRenewedValidatorTx,
-		startTime,
-		endTime,
-		weight,
-		potentialReward,
-	)
+	staker := &state.Staker{
+		TxID:            tx.ID(),
+		NodeID:          addAutoRenewedValidatorTx.NodeID(),
+		PublicKey:       pop.Key(),
+		SubnetID:        addAutoRenewedValidatorTx.SubnetID(),
+		Weight:          weight,
+		StartTime:       startTime,
+		EndTime:         endTime,
+		PotentialReward: potentialReward,
+		NextTime:        endTime,
+		Priority:        addAutoRenewedValidatorTx.CurrentPriority(),
+	}
+
 	require.NoError(err)
 	require.NoError(service.vm.state.PutCurrentValidator(staker))
 	service.vm.state.AddTx(tx, status.Committed)
 	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
 		AutoCompoundRewardShares: autoCompoundRewardShares,
-		Period:                   periodSeconds,
+		NextPeriod:               periodSeconds,
 	}))
 	require.NoError(service.vm.state.Commit())
 	service.vm.ctx.Lock.Unlock()
