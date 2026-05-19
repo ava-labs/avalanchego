@@ -191,11 +191,13 @@ func advanceTimeTo(
 
 		// Buffer state changes so that we can perform validator updates before delegator updates to respect state's
 		// expected order of operations.
+		promotion := promotion{pending: stakerToRemove, current: &stakerToAdd}
+
 		switch {
 		case stakerToRemove.Priority.IsPendingValidator():
-			validatorPromotions = append(validatorPromotions, promotion{pending: stakerToRemove, current: &stakerToAdd})
+			validatorPromotions = append(validatorPromotions, promotion)
 		case stakerToRemove.Priority.IsPendingDelegator():
-			delegatorPromotions = append(delegatorPromotions, promotion{pending: stakerToRemove, current: &stakerToAdd})
+			delegatorPromotions = append(delegatorPromotions, promotion)
 		default:
 			return nil, false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
