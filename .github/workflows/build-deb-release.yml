@@ -97,14 +97,18 @@ jobs:
 
       - name: Upload DEBs to S3
         if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ steps.setup.outputs.tag }}
+          DEB_ARCH: ${{ matrix.deb_arch }}
+          BUCKET: ${{ secrets.BUCKET }}
         run: |
           for release in jammy noble; do
-            aws s3 cp "build/deb/avalanchego-${{ steps.setup.outputs.tag }}-${{ matrix.deb_arch }}.deb" \
-              "s3://${{ secrets.BUCKET }}/linux/debs/ubuntu/${release}/${{ matrix.deb_arch }}/"
-            aws s3 cp "build/deb/subnet-evm-${{ steps.setup.outputs.tag }}-${{ matrix.deb_arch }}.deb" \
-              "s3://${{ secrets.BUCKET }}/linux/debs/ubuntu/${release}/${{ matrix.deb_arch }}/"
+            aws s3 cp "build/deb/avalanchego-${TAG}-${DEB_ARCH}.deb" \
+              "s3://${BUCKET}/linux/debs/ubuntu/${release}/${DEB_ARCH}/"
+            aws s3 cp "build/deb/subnet-evm-${TAG}-${DEB_ARCH}.deb" \
+              "s3://${BUCKET}/linux/debs/ubuntu/${release}/${DEB_ARCH}/"
             aws s3 cp "build/deb/DEB-GPG-KEY-avalanchego" \
-              "s3://${{ secrets.BUCKET }}/linux/debs/ubuntu/${release}/"
+              "s3://${BUCKET}/linux/debs/ubuntu/${release}/"
           done
 
       - name: Cleanup
