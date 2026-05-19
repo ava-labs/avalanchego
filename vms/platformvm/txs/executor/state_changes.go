@@ -159,6 +159,7 @@ func advanceTimeTo(
 
 		stakerToAdd := newCurrentStakerFromPendingStaker(stakerToRemove)
 
+		// Only permissionless networks (including the primary network) are eligible for minting rewards
 		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorPendingPriority {
 			potentialReward, err := mintReward(backend, parentState, changes, stakerToRemove)
 			if err != nil {

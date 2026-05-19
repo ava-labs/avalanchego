@@ -388,6 +388,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		NodeID:    nodeID,
 		SubnetID:  constants.PrimaryNetworkID,
 		Weight:    units.MilliAvax,
+		// Both the validator and delegator share a start time to have their iteration order broken by their priority
 		StartTime: startTime,
 		EndTime:   endTime,
 		NextTime:  startTime,
@@ -399,21 +400,14 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		NodeID:    nodeID,
 		SubnetID:  constants.PrimaryNetworkID,
 		Weight:    units.MilliAvax,
+		// Both the validator and delegator share a start time to have their iteration order broken by their priority
 		StartTime: startTime,
 		EndTime:   endTime,
 		NextTime:  startTime,
 		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
 
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(
-		genesis.LocalParams.ValidatorFeeConfig,
-		s,
-		mockable.MaxTime,
-	)
-	require.NoError(t, err)
-	require.False(t, startTime.After(nextStakerChangeTime))
-
-	ok, err := AdvanceTimeTo(
+	updated, err := AdvanceTimeTo(
 		&Backend{
 			Config: &config.Internal{
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
@@ -431,7 +425,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		startTime,
 	)
 	require.NoError(t, err)
-	require.True(t, ok)
+	require.True(t, updated)
 
 	// Check that the stakers got promoted to current
 	gotValidator, err := s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
