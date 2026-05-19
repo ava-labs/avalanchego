@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
@@ -20,9 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
+	"github.com/ava-labs/avalanchego/database"
 )
 
 func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
@@ -365,4 +369,89 @@ func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
 			require.Equal(uint64(secondsToAdvance), s.GetAccruedFees())
 		})
 	}
+}
+
+// Regression test for a case where a pending delegator and validator are promoted to current stakers. Only Apricot can
+// trip this regression, because after Apricot pending validators always sort before pending delegators according to
+// txs.Priority.
+func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
+	s := statetest.New(t, statetest.Config{})
+
+	var (
+		startTime = s.GetTimestamp().Add(time.Second)
+		endTime   = startTime.Add(14 * 24 * time.Hour)
+		nodeID    = ids.GenerateTestNodeID()
+	)
+
+	require.NoError(t, s.PutPendingValidator(&state.Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    nodeID,
+		SubnetID:  constants.PrimaryNetworkID,
+		Weight:    units.MilliAvax,
+		StartTime: startTime,
+		EndTime:   endTime,
+		NextTime:  startTime,
+		Priority:  txs.PrimaryNetworkValidatorPendingPriority,
+	}))
+
+	s.PutPendingDelegator(&state.Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    nodeID,
+		SubnetID:  constants.PrimaryNetworkID,
+		Weight:    units.MilliAvax,
+		StartTime: startTime,
+		EndTime:   endTime,
+		NextTime:  startTime,
+		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
+	})
+
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+		genesis.LocalParams.ValidatorFeeConfig,
+		s,
+		mockable.MaxTime,
+	)
+	require.NoError(t, err)
+	require.False(t, startTime.After(nextStakerChangeTime))
+
+	ok, err := AdvanceTimeTo(
+		&Backend{
+			Config: &config.Internal{
+				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			},
+			Rewards: reward.NewCalculator(reward.Config{
+				MaxConsumptionRate: .12 * reward.PercentDenominator,
+				MinConsumptionRate: .1 * reward.PercentDenominator,
+				MintingPeriod:      365 * 24 * time.Hour,
+				SupplyCap:          720 * units.MegaAvax,
+			}),
+		},
+		s,
+		startTime,
+	)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// Check that the stakers got promoted to current
+	gotValidator, err := s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, txs.PrimaryNetworkValidatorCurrentPriority, gotValidator.Priority)
+
+	currentDelegatorItr, err := s.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	defer currentDelegatorItr.Release()
+
+	require.True(t, currentDelegatorItr.Next())
+	require.Equal(t, txs.PrimaryNetworkDelegatorCurrentPriority, currentDelegatorItr.Value().Priority)
+
+	// Check that they are no longer pending
+	_, err = s.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	require.Equal(t, database.ErrNotFound, err)
+
+	pendingDelegatorItr, err := s.GetPendingDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	defer pendingDelegatorItr.Release()
+
+	require.False(t, pendingDelegatorItr.Next())
 }
