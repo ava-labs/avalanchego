@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# Build and sign an RPM package inside the container.
+# Build and sign a Linux package inside the container.
+# PKG_FORMAT defaults to RPM and is retained for future (DEB and possibly other)
+# packaging formats reuse.
 #
 # Required env vars:
 #   PACKAGE        - "avalanchego" or "subnet-evm"
@@ -10,7 +12,7 @@
 #   OUTPUT_DIR     - Directory for the output package (bind-mounted from host)
 #
 # Optional env vars:
-#   PKG_FORMAT              - Package format identifier (default: RPM)
+#   PKG_FORMAT          - Package format identifier (default: RPM)
 #   RPM_GPG_KEY_FILE    - Path to GPG private key
 #   NFPM_RPM_PASSPHRASE - GPG passphrase
 #   AVALANCHEGO_COMMIT  - Git commit hash (auto-detected if not set)
