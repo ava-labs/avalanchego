@@ -52,7 +52,6 @@ go_library(
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
-        "@com_github_ava_labs_libevm//log",
         "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//trie",
         "@com_github_stretchr_testify//assert",

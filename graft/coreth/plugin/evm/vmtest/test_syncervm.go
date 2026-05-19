@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/assert"
@@ -296,7 +295,6 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 		Scheme:     test.StateScheme,
 	})
 	t.Cleanup(func() {
-		log.Info("Shutting down server VM")
 		require.NoError(serverVM.Shutdown(t.Context()))
 	})
 	serverVMSetup := SyncVMSetup{
@@ -385,7 +383,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	serverTest.AppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
 			go func() {
-				assert.NoErrorf(t, syncerVM.AppResponse(ctx, nodeID, requestID, response), "AppResponse(%d)", requestID)
+				assert.NoErrorf(t, syncerVM.AppResponse(ctx, nodeID, requestID, response), "server AppResponse(%d)", requestID)
 			}()
 		} else {
 			go test.responseIntercept(syncerVM, nodeID, requestID, response)
@@ -402,11 +400,11 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 		),
 	)
 
-	// override [syncerVM]'s SendAppRequest function to trigger AppRequest on [serverVM]
+	// override syncerVM's SendAppRequest function to trigger AppRequest on serverVM
 	syncerTest.AppSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
-		require.True(hasItem, "expected nodeSet to contain at least 1 nodeID")
-		require.NoError(serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request))
+		assert.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
+		assert.NoError(t, serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request), "syncer AppRequest()")
 		return nil
 	}
 
