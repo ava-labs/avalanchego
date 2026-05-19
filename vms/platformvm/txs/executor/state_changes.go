@@ -151,6 +151,8 @@ func advanceTimeTo(
 		if stakerToRemove.StartTime.After(newChainTime) {
 			break
 		}
+
+		// Iterate over validators first to preserve expected modification ordering for state
 		if !stakerToRemove.Priority.IsPendingValidator() {
 			continue
 		}
@@ -183,6 +185,8 @@ func advanceTimeTo(
 		if stakerToRemove.StartTime.After(newChainTime) {
 			break
 		}
+
+		// Iterate over delegators last to preserve expected modification ordering for state
 		if !stakerToRemove.Priority.IsPendingDelegator() {
 			continue
 		}
