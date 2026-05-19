@@ -197,12 +197,18 @@ func (s *SUT) balance(tb testing.TB, addr common.Address) uint256.Int {
 	return *state.GetBalance(addr)
 }
 
-// assertBalance asserts addr's balance at the last-executed state.
-func (s *SUT) assertBalance(tb testing.TB, addr common.Address, want uint256.Int) {
+// assertAccount asserts addr's nonce and balance at the last-executed state.
+func (s *SUT) assertAccount(tb testing.TB, addr common.Address, wantNonce uint64, wantBalance uint256.Int) {
 	tb.Helper()
 
-	got := s.balance(tb, addr)
-	assert.Equalf(tb, want, got, "balance of %s", addr)
+	state, err := s.LastExecutedState()
+	require.NoErrorf(tb, err, "%T.LastExecutedState()", s.VM)
+
+	gotNonce := state.GetNonce(addr)
+	assert.Equalf(tb, wantNonce, gotNonce, "nonce of %s", addr)
+
+	gotBalance := *state.GetBalance(addr)
+	assert.Equalf(tb, wantBalance, gotBalance, "balance of %s", addr)
 }
 
 // issueAndExecute submits t through [Client.IssueTx] and drives the consensus
@@ -486,7 +492,7 @@ func TestExport(t *testing.T) {
 	blk := sut.issueAndExecute(t, signedExport)
 	sut.assertTxAccepted(t, signedExport, blk.NumberU64())
 	const amountBurned = exportedAmount + txFee
-	sut.assertBalance(t, sender, addNAVAX(t, initialBalance, -amountBurned))
+	sut.assertAccount(t, sender, 1, addNAVAX(t, initialBalance, -amountBurned))
 	sut.assertUTXOsExist(t, sut.snowCtx.XChainID, txtest.ExportedUTXOs(signedExport.ID(), export)...)
 }
 
@@ -510,7 +516,7 @@ func TestImport(t *testing.T) {
 	blk := sut.issueAndExecute(t, signedImport)
 	sut.assertTxAccepted(t, signedImport, blk.NumberU64())
 	const amountMinted = utxoAmount - txFee
-	sut.assertBalance(t, receiver, tx.ScaleAVAX(amountMinted))
+	sut.assertAccount(t, receiver, 0, tx.ScaleAVAX(amountMinted))
 }
 
 // TestBuildBlockOnProcessing verifies that the block builder excludes a mempool
