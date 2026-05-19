@@ -184,8 +184,8 @@ func advanceTimeTo(
 			)
 			stakerToAdd.PotentialReward = potentialReward
 
-			// Invariant: [rewards.Calculate] can never return a [potentialReward]
-			//            such that [supply + potentialReward > maximumSupply].
+			// Invariant: reward.Calculator.Calculate can never return a potentialReward
+			//            such that supply + potentialReward > maximumSupply.
 			changes.SetCurrentSupply(stakerToRemove.SubnetID, supply+potentialReward)
 		}
 
