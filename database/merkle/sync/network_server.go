@@ -66,7 +66,7 @@ type GetProofHandler[R any, C any] struct {
 func (*GetProofHandler[_, _]) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (g *GetProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	req := &pb.GetProofRequest{}
+	req := &pb.ProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
@@ -79,9 +79,9 @@ func (g *GetProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 		err  error
 	)
 	switch r := req.Request.(type) {
-	case *pb.GetProofRequest_RangeProof:
+	case *pb.ProofRequest_RangeProof:
 		resp, err = g.handleRangeProofRequest(ctx, r.RangeProof)
-	case *pb.GetProofRequest_ChangeProof:
+	case *pb.ProofRequest_ChangeProof:
 		resp, err = g.handleChangeProofRequest(ctx, r.ChangeProof)
 	default:
 		err = fmt.Errorf("unknown request type: %T", r)
@@ -95,7 +95,7 @@ func (g *GetProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	return resp, nil
 }
 
-func (g *GetProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *pb.GetRangeProofRequest) ([]byte, error) {
+func (g *GetProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *pb.RangeProofRequest) ([]byte, error) {
 	if err := validateRangeProofRequest(req); err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (g *GetProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req
 	return nil, errMinProofSizeIsTooLarge
 }
 
-func (g *GetProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *pb.GetChangeProofRequest) ([]byte, error) {
+func (g *GetProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *pb.ChangeProofRequest) ([]byte, error) {
 	if err := validateChangeProofRequest(req); err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (g *GetProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, re
 			// Generate a range proof for the end root ID instead.
 			return g.handleRangeProofRequest(
 				ctx,
-				&pb.GetRangeProofRequest{
+				&pb.RangeProofRequest{
 					RootHash:   req.EndRootHash,
 					StartKey:   req.StartKey,
 					EndKey:     req.EndKey,
@@ -230,7 +230,7 @@ func (g *GetProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, re
 }
 
 // Returns nil iff [req] is well-formed.
-func validateChangeProofRequest(req *pb.GetChangeProofRequest) error {
+func validateChangeProofRequest(req *pb.ChangeProofRequest) error {
 	switch {
 	case req.BytesLimit == 0:
 		return errInvalidBytesLimit
@@ -250,7 +250,7 @@ func validateChangeProofRequest(req *pb.GetChangeProofRequest) error {
 }
 
 // Returns nil iff [req] is well-formed.
-func validateRangeProofRequest(req *pb.GetRangeProofRequest) error {
+func validateRangeProofRequest(req *pb.RangeProofRequest) error {
 	switch {
 	case req.BytesLimit == 0:
 		return errInvalidBytesLimit

@@ -399,7 +399,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	changeReq := &pb.GetChangeProofRequest{
+	changeReq := &pb.ChangeProofRequest{
 		StartRootHash: work.localRootID[:],
 		EndRootHash:   targetRootID[:],
 		StartKey:      protoutils.MaybeToProto(work.start),
@@ -407,8 +407,8 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		KeyLimit:      DefaultRequestKeyLimit,
 		BytesLimit:    DefaultRequestByteSizeLimit,
 	}
-	request := &pb.GetProofRequest{
-		Request: &pb.GetProofRequest_ChangeProof{ChangeProof: changeReq},
+	request := &pb.ProofRequest{
+		Request: &pb.ProofRequest_ChangeProof{ChangeProof: changeReq},
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -455,15 +455,15 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	rangeReq := &pb.GetRangeProofRequest{
+	rangeReq := &pb.RangeProofRequest{
 		RootHash:   targetRootID[:],
 		StartKey:   protoutils.MaybeToProto(work.start),
 		EndKey:     protoutils.MaybeToProto(work.end),
 		KeyLimit:   DefaultRequestKeyLimit,
 		BytesLimit: DefaultRequestByteSizeLimit,
 	}
-	request := &pb.GetProofRequest{
-		Request: &pb.GetProofRequest_RangeProof{RangeProof: rangeReq},
+	request := &pb.ProofRequest{
+		Request: &pb.ProofRequest_RangeProof{RangeProof: rangeReq},
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -554,7 +554,7 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
-	request *pb.GetRangeProofRequest,
+	request *pb.RangeProofRequest,
 	responseBytes []byte,
 	err error,
 ) error {
@@ -606,7 +606,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
-	request *pb.GetChangeProofRequest,
+	request *pb.ChangeProofRequest,
 	responseBytes []byte,
 	err error,
 ) error {
