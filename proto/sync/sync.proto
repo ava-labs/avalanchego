@@ -35,9 +35,9 @@ message GetLeafRequest {
   EVMNodeType node_type = 6;
 }
 
-// LeafResponse intentionally omits the legacy `More` field which is set
-// client-side after range-proof verification, never on the wire.
-message LeafResponse {
+// GetLeafResponse intentionally omits the legacy `More` field which is
+// set client-side after range-proof verification, never on the wire.
+message GetLeafResponse {
   repeated bytes keys = 1;
   repeated bytes values = 2;
   repeated bytes proof_vals = 3;
@@ -47,17 +47,18 @@ message GetCodeRequest {
   repeated bytes hashes = 1;
 }
 
-message CodeResponse {
+message GetCodeResponse {
   repeated bytes data = 1;
 }
 
+// GetBlockRequest identifies a canonical block by height. The response
+// walks up to `parents` ancestors back from that height.
 message GetBlockRequest {
-  bytes hash = 1;
-  uint64 height = 2;
-  uint32 parents = 3;
+  uint64 height = 1;
+  uint32 parents = 2;
 }
 
-message BlockResponse {
+message GetBlockResponse {
   // RLP-encoded blocks
   repeated bytes blocks = 1;
 }

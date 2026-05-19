@@ -12,12 +12,12 @@ import (
 
 // Client sends state-trie leaf-range requests. Range-proof verification
 // is the caller's responsibility.
-type Client = network.Dispatcher[*syncpb.GetLeafRequest, *syncpb.LeafResponse]
+type Client = network.Dispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
 
-// NewClient binds a [Client] at [p2p.EVMLeafsRequestHandlerID] on p2pNet.
-func NewClient(p2pNet *p2p.Network, peers *p2p.PeerTracker) *Client {
-	return network.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.LeafResponse](
-		network.NewClient(p2pNet, p2p.EVMLeafsRequestHandlerID),
+// NewClient binds a [Client] at [p2p.EVMLeafsRequestHandlerID] on n.
+func NewClient(n *p2p.Network, peers *p2p.PeerTracker) *Client {
+	return network.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+		network.NewClient(n, p2p.EVMLeafsRequestHandlerID),
 		peers,
 	)
 }

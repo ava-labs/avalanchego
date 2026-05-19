@@ -21,6 +21,21 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
 )
 
+// NewClient bundles the happy-path test setup: an [EchoHandler]
+// replying with resp, a [NewPeerTracker] with nodeID pre-connected, and
+// a [network.Dispatcher] wired over both.
+func NewClient[Req, Resp proto.Message](
+	t *testing.T,
+	ctx context.Context,
+	nodeID ids.NodeID,
+	resp Resp,
+) *network.Dispatcher[Req, Resp] {
+	t.Helper()
+	respBytes, err := proto.Marshal(resp)
+	require.NoError(t, err)
+	return NewDispatcher[Req, Resp](t, ctx, nodeID, EchoHandler(respBytes), NewPeerTracker(t, nodeID))
+}
+
 // EchoHandler returns a [p2p.Handler] that replies with b for every
 // AppRequest.
 func EchoHandler(b []byte) p2p.Handler {

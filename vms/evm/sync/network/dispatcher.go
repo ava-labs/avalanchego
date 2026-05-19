@@ -17,8 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-const epsilon = 1e-6
-
 var (
 	ErrNoPeers           = errors.New("no peers available")
 	ErrSendRequest       = errors.New("send request")
@@ -43,10 +41,10 @@ func NewDispatcher[Req, Resp proto.Message](
 	return &Dispatcher[Req, Resp]{client: client, peers: peers}
 }
 
-// NewClient returns a [p2p.Client] at handlerID on p2pNet. The sampler
-// is a no-op because [Dispatcher] always picks an explicit peer.
-func NewClient(p2pNet *p2p.Network, handlerID uint64) *p2p.Client {
-	return p2pNet.NewClient(handlerID, nopSampler{})
+// NewClient returns a [p2p.Client] at handlerID on n. The sampler is a
+// no-op because [Dispatcher] always picks an explicit peer.
+func NewClient(n *p2p.Network, handlerID uint64) *p2p.Client {
+	return n.NewClient(handlerID, noopSampler{})
 }
 
 // Send picks a peer via [p2p.PeerTracker.SelectPeer] and forwards req
@@ -101,6 +99,7 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 			return nil, fmt.Errorf("%w: %w", ErrHandlerFailed, r.err)
 		}
 
+		const epsilon = 1e-6
 		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
 		if err := proto.Unmarshal(r.bytes, resp); err != nil {
 			d.peers.RegisterFailure(nodeID)
@@ -138,11 +137,11 @@ func (o *Outcome) Failure() {
 	o.once.Do(func() { o.peers.RegisterFailure(o.nodeID) })
 }
 
-var _ p2p.NodeSampler = nopSampler{}
+var _ p2p.NodeSampler = noopSampler{}
 
-// nopSampler is a no-op [p2p.NodeSampler]. Required because
+// noopSampler is a no-op [p2p.NodeSampler]. Required because
 // [p2p.Network.NewClient] needs a non-nil sampler, but [Dispatcher]
 // always picks an explicit peer so [Sample] never runs.
-type nopSampler struct{}
+type noopSampler struct{}
 
-func (nopSampler) Sample(context.Context, int) []ids.NodeID { return nil }
+func (noopSampler) Sample(context.Context, int) []ids.NodeID { return nil }
