@@ -245,29 +245,26 @@ As of this writing:
 
 #### Canary Deployment
 
-1. Clone [external-plugins-builder](https://github.com/ava-labs/external-plugins-builder):
+Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
 
-   ```bash
-   git checkout main
-   git pull
-   git checkout -b "echo-dispatch-$VERSION_RC"
+1. In `devops-argocd`, update the Dispatch and Echo image tags to
+   `$VERSION_RC`:
+
+   - Echo: `base/subnet/testnet/echo/avalanchego/base/cornice.yaml`
+   - Dispatch: `base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`
+
+   ```yaml
+   - name: api.image.tag
+     value: "$VERSION_RC"
+   - name: validator.image.tag
+     value: "$VERSION_RC"
    ```
 
-1. Update `configs/dispatch.yml` and `configs/echo.yml`:
-   - Set `app_version` to `$VERSION_RC`
-   - Update `avalanchego_version` if needed
-   - Update `golang_version` if needed
+   The repository should already be `avaplatform/subnet-evm`, with
+   `global.vmAliases[0]` set to the standard Subnet-EVM VM ID:
+   `srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy`.
 
-1. Create PR and merge:
-
-   ```bash
-   git add .
-   git commit -m "Bump echo and dispatch to $VERSION_RC"
-   git push -u origin "echo-dispatch-$VERSION_RC"
-   gh pr create --repo github.com/ava-labs/external-plugins-builder --base main --title "Bump echo and dispatch to $VERSION_RC"
-   ```
-
-1. Monitor deployments after merge:
+1. Open and merge the deployment change for both L1s, then monitor deployments:
    - **Dispatch**: [Logs](https://app.datadoghq.com/logs?query=subnet%3Adispatch%20%40logger%3A%2A&live=true) | [Metrics](https://app.datadoghq.com/dashboard/jrv-mm2-vuc/dispatch-testnet-subnets?live=true)
    - **Echo**: [Logs](https://app.datadoghq.com/logs?query=subnet:echo%20@logger:*&live=true) | [Metrics](https://app.datadoghq.com/dashboard/jrv-mm2-vuc/echo-testnet-subnets?live=true)
 
