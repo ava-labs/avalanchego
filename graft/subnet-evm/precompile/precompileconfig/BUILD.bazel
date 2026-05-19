@@ -15,10 +15,10 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig",
     deps = [
+        "//graft/evm/precompileconfig",
         "//graft/evm/utils",
         "//graft/subnet-evm/commontype",
         "//snow",
-        "//snow/engine/snowman/block",
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "@com_github_ava_labs_libevm//common",
