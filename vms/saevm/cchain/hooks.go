@@ -70,9 +70,7 @@ func newHooks(
 		builder{
 			ctx,
 			time.Now,
-			func() iter.Seq[*hookTx] {
-				return poolTxs
-			},
+			poolTxs,
 		},
 		state,
 	}
@@ -94,15 +92,12 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 	}
 
 	now := h.BlockTime(b.Header())
-	potentialTxs := slices.Values(txs)
 	return &builder{
 		h.ctx,
 		func() time.Time {
 			return now
 		},
-		func() iter.Seq[*hookTx] {
-			return potentialTxs
-		},
+		slices.Values(txs),
 	}, nil
 }
 
@@ -189,7 +184,7 @@ var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 type builder struct {
 	ctx          *snow.Context
 	now          func() time.Time
-	potentialTxs func() iter.Seq[*hookTx]
+	potentialTxs iter.Seq[*hookTx]
 }
 
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
@@ -230,7 +225,6 @@ func (b *builder) PotentialEndOfBlockOps(
 	settledHash common.Hash,
 	source saetypes.BlockSource,
 ) iter.Seq[*hookTx] {
-	seq := b.potentialTxs()
 	return func(yield func(*hookTx) bool) {
 		// Transactions are verified against the last executed state. So, we
 		// must also verify that they don't conflict with any transactions in
@@ -243,7 +237,7 @@ func (b *builder) PotentialEndOfBlockOps(
 			return
 		}
 
-		for t := range seq {
+		for t := range b.potentialTxs {
 			if inputs.Overlaps(t.inputs) {
 				b.ctx.Log.Debug("tx consumes previously consumed inputs",
 					zap.Stringer("txID", t.id),
