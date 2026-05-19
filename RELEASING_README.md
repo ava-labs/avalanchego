@@ -250,8 +250,8 @@ Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
 1. In `devops-argocd`, update the Dispatch and Echo image tags to
    `$VERSION_RC`:
 
-   - Echo: `base/subnet/testnet/echo/avalanchego/base/cornice.yaml`
-   - Dispatch: `base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`
+   - Echo: [`base/subnet/testnet/echo/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/echo/avalanchego/base/cornice.yaml)
+   - Dispatch: [`base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml)
 
    ```yaml
    - name: api.image.tag
