@@ -51,7 +51,7 @@ func TestAncestorInputIDs(t *testing.T) {
 			exportedAmount = 50
 			txFee          = 0
 		)
-		signed, _ := w.newExportTx(
+		signedExport, _ := w.newExportTx(
 			t,
 			snowtest.XChainID,
 			[]*secp256k1fx.TransferOutput{
@@ -59,7 +59,7 @@ func TestAncestorInputIDs(t *testing.T) {
 			},
 			txFee,
 		)
-		return signed
+		return signedExport
 	}
 
 	var (

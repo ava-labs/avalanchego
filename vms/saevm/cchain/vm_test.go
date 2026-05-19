@@ -531,7 +531,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	}))
 
 	newExport := func(w *wallet) *tx.Tx {
-		signed, _ := w.newExportTx(
+		signedExport, _ := w.newExportTx(
 			t,
 			sut.snowCtx.XChainID,
 			[]*secp256k1fx.TransferOutput{
@@ -539,7 +539,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 			},
 			50,
 		)
-		return signed
+		return signedExport
 	}
 
 	ctx := t.Context()
