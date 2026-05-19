@@ -52,11 +52,14 @@ import (
 )
 
 const (
-	NumKeys = 5
+	numKeys = 5
 	// initialCChainFunding is the per-worker C-Chain top-up in wei (10 AVAX),
 	// enough for over 100k self-transfers at typical gas prices.
 	initialCChainFunding = 10 * params.Ether
 	cChainTransferAmount = 10_000 // wei
+	// txConfirmationTimeout bounds a single tx's confirmation across all nodes.
+	// Generous enough to tolerate Antithesis fault-injection slowdowns.
+	txConfirmationTimeout = 60 * time.Second
 )
 
 // TODO(marun) Extract the common elements of test execution for reuse across test setups
@@ -96,7 +99,7 @@ func main() {
 		cChainKey: genesis.EWOQKey.ToECDSA(),
 	}
 
-	workloads := make([]*workload, NumKeys)
+	workloads := make([]*workload, numKeys)
 	workloads[0] = genesisWorkload
 
 	var (
@@ -105,7 +108,7 @@ func main() {
 		genesisXContext = genesisXBuilder.Context()
 		avaxAssetID     = genesisXContext.AVAXAssetID
 	)
-	for i := 1; i < NumKeys; i++ {
+	for workerID := 1; workerID < numKeys; workerID++ {
 		key, err := secp256k1.NewPrivateKey()
 		require.NoError(err, "failed to generate key")
 
@@ -135,7 +138,7 @@ func main() {
 
 		require.NoError(genesisWorkload.confirmXChainTx(ctx, baseTx), "failed to confirm initial funding X-chain baseTx")
 
-		uri := c.URIs[i%len(c.URIs)]
+		uri := c.URIs[workerID%len(c.URIs)]
 		kc := secp256k1fx.NewKeychain(key)
 		walletSyncStartTime := time.Now()
 		wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: uri})
@@ -143,19 +146,19 @@ func main() {
 			zap.Duration("duration", time.Since(walletSyncStartTime)),
 		)
 
-		workloads[i] = &workload{
-			id:        i,
-			log:       tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
+		workloads[workerID] = &workload{
+			id:        workerID,
+			log:       tests.NewDefaultLogger(fmt.Sprintf("worker %d", workerID)),
 			wallet:    wallet,
 			addrs:     set.Of(addr),
 			uris:      c.URIs,
-			cChainKey: newFundedCChainKey(ctx, tc, i, genesisWorkload),
+			cChainKey: newFundedCChainKey(ctx, tc, workerID, genesisWorkload),
 		}
 	}
 
 	lifecycle.SetupComplete(map[string]any{
 		"msg":        "initialized workers",
-		"numWorkers": NumKeys,
+		"numWorkers": numKeys,
 	})
 
 	for _, w := range workloads[1:] {
@@ -252,36 +255,26 @@ func (w *workload) executeTest(ctx context.Context) {
 	defer tc.Recover()
 	require := require.New(tc)
 
-	// Ensure this value matches the number of tests + 1 to offset
-	// 0-based + 1 for sleep case in the switch statement for flowID
-	testCount := int64(7)
+	tests := []struct {
+		name string
+		fn   func(ctx context.Context)
+	}{
+		{"issueXChainBaseTx", w.issueXChainBaseTx},
+		{"issueXChainCreateAssetTx", w.issueXChainCreateAssetTx},
+		{"issueXChainOperationTx", w.issueXChainOperationTx},
+		{"issueXToPTransfer", w.issueXToPTransfer},
+		{"issuePToXTransfer", w.issuePToXTransfer},
+		{"issueCChainTransfer", w.issueCChainTransfer},
+		{"sleep", nil},
+	}
 
-	val, err := rand.Int(rand.Reader, big.NewInt(testCount))
+	val, err := rand.Int(rand.Reader, big.NewInt(int64(len(tests))))
 	require.NoError(err, "failed to read randomness")
 
-	flowID := val.Int64()
-	switch flowID {
-	case 0:
-		// TODO(marun) Create abstraction for a test that supports a name e.g. `aTest{name: "foo", mytestfunc}`
-		w.log.Info("executing issueXChainBaseTx")
-		w.issueXChainBaseTx(ctx)
-	case 1:
-		w.log.Info("executing issueXChainCreateAssetTx")
-		w.issueXChainCreateAssetTx(ctx)
-	case 2:
-		w.log.Info("executing issueXChainOperationTx")
-		w.issueXChainOperationTx(ctx)
-	case 3:
-		w.log.Info("executing issueXToPTransfer")
-		w.issueXToPTransfer(ctx)
-	case 4:
-		w.log.Info("executing issuePToXTransfer")
-		w.issuePToXTransfer(ctx)
-	case 5:
-		w.log.Info("executing issueCChainTransfer")
-		w.issueCChainTransfer(ctx)
-	case 6:
-		w.log.Info("sleeping")
+	test := tests[val.Int64()]
+	w.log.Info("executing " + test.name)
+	if test.fn != nil {
+		test.fn(ctx)
 	}
 
 	// TODO(marun) Enable execution of the banff e2e test as part of https://github.com/ava-labs/avalanchego/issues/4049
@@ -745,6 +738,9 @@ func (w *workload) makeOwner() secp256k1fx.OutputOwners {
 }
 
 func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) error {
+	ctx, cancel := context.WithTimeout(ctx, txConfirmationTimeout)
+	defer cancel()
+
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := avm.NewClient(uri, "X")
@@ -763,6 +759,9 @@ func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) error {
 }
 
 func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) error {
+	ctx, cancel := context.WithTimeout(ctx, txConfirmationTimeout)
+	defer cancel()
+
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
@@ -887,10 +886,10 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 	)
 }
 
-func newFundedCChainKey(ctx context.Context, tc *tests.SimpleTestContext, i int, funder *workload) *ecdsa.PrivateKey {
+func newFundedCChainKey(ctx context.Context, tc *tests.SimpleTestContext, workerID int, funder *workload) *ecdsa.PrivateKey {
 	require := require.New(tc)
 
-	key, err := crypto.ToECDSA(crypto.Keccak256([]byte("C-Chain worker"), []byte(strconv.Itoa(i))))
+	key, err := crypto.ToECDSA(crypto.Keccak256([]byte("C-Chain worker"), []byte(strconv.Itoa(workerID))))
 	require.NoError(err, "failed to generate C-Chain key")
 
 	require.NoError(
@@ -943,6 +942,9 @@ func (w *workload) issueCChainTransfer(ctx context.Context) {
 }
 
 func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) error {
+	ctx, cancel := context.WithTimeout(ctx, txConfirmationTimeout)
+	defer cancel()
+
 	txHash := tx.Hash()
 	for _, uri := range w.uris {
 		client, err := w.cChainClient(uri)
