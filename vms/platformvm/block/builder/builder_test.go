@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -493,7 +494,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				currentStakerIterator, err := s.GetCurrentStakerIterator()
 				require.NoError(t, err)
 				for _, staker := range iterator.ToSlice(currentStakerIterator) {
-					s.DeleteCurrentValidator(staker)
+					require.NoError(t, s.DeleteCurrentValidator(staker))
 				}
 				return s
 			}(),
@@ -515,7 +516,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 					NodeID:   staker1.NodeID,
 				}
 				require.NoError(t, s.PutCurrentValidator(staker1))
-				s.PutCurrentDelegator(staker2)
+				require.NoError(t, s.PutCurrentDelegator(staker2))
 				return s
 			}(),
 			expectedTxID:         txID,
@@ -561,7 +562,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 					NodeID:   staker1.NodeID,
 				}
 				require.NoError(t, s.PutCurrentValidator(staker1))
-				s.PutCurrentDelegator(staker2)
+				require.NoError(t, s.PutCurrentDelegator(staker2))
 				return s
 			}(),
 			expectedTxID:         txID,
@@ -572,11 +573,13 @@ func TestGetNextStakerToReward(t *testing.T) {
 			timestamp: now,
 			state: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
-				s.PutCurrentDelegator(&state.Staker{
+				require.NoError(t, s.PutCurrentDelegator(&state.Staker{
 					TxID:     txID,
+					NodeID:   genesistest.DefaultNodeIDs[0],
+					SubnetID: constants.PrimaryNetworkID,
 					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  now.Add(time.Second),
-				})
+				}))
 				return s
 			}(),
 			expectedTxID:         txID,
