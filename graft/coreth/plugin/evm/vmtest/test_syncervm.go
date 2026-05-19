@@ -161,7 +161,7 @@ func stateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 			if reqCount == maxRequestsBeforeShutdown {
 				assert.NoError(t, syncerVM.SyncerClient().Shutdown(), "Shutdown()")
 			} else if reqCount < maxRequestsBeforeShutdown {
-				assert.NoErrorf(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "AppResponse(%d)", requestID)
+				assert.NoErrorf(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "syncer AppResponse(%d)", requestID)
 			}
 		},
 		expectedErr: context.Canceled,
@@ -184,10 +184,10 @@ func stateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 			SendAppGossipF: func(context.Context, commonEng.SendConfig, []byte) error { return nil },
 			SendAppRequestF: func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 				nodeID, hasItem := nodeSet.Pop()
-				require.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
+				assert.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
 				go func() {
 					err := testSyncVMSetup.serverVM.VM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
-					assert.NoErrorf(t, err, "AppRequest(%d)", requestID)
+					assert.NoErrorf(t, err, "server AppRequest(%d)", requestID)
 				}()
 				return nil
 			},
@@ -262,7 +262,7 @@ func VMShutdownWhileSyncingTest(t *testing.T, testSetup *SyncTestSetup) {
 						// Note this verifies the VM shutdown does not time out while syncing.
 						assert.NoError(t, testSyncVMSetup.syncerVM.shutdownOnceSyncerVM.Shutdown(t.Context()), "Shutdown()")
 					} else if reqCount < maxRequests {
-						assert.NoErrorf(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "AppResponse(%d)", requestID)
+						assert.NoErrorf(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "syncer AppResponse(%d)", requestID)
 					}
 				},
 				expectedErr: context.Canceled,

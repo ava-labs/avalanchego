@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
@@ -126,7 +125,7 @@ func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 			if reqCount == maxRequestsBeforeShutdown {
 				assert.NoError(t, syncerVM.Client.Shutdown(), "Shutdown()")
 			} else if reqCount < maxRequestsBeforeShutdown {
-				assert.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "AppResponse()")
+				assert.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "syncer AppResponse()")
 			}
 		},
 		expectedErr: context.Canceled,
@@ -148,10 +147,10 @@ func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 			SendAppGossipF: func(context.Context, commonEng.SendConfig, []byte) error { return nil },
 			SendAppRequestF: func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 				nodeID, hasItem := nodeSet.Pop()
-				require.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
+				assert.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
 				go func() {
 					err := vmSetup.serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
-					assert.NoError(t, err, "AppRequest()")
+					assert.NoError(t, err, "server AppRequest()")
 				}()
 				return nil
 			},
@@ -226,7 +225,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 						// Note this verifies the VM shutdown does not time out while syncing.
 						assert.NoError(t, vmSetup.shutdownOnceSyncerVM.Shutdown(t.Context()), "Shutdown()")
 					} else if reqCount < numRequests {
-						assert.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "AppResponse()")
+						assert.NoError(t, syncerVM.AppResponse(t.Context(), nodeID, requestID, response), "syncer AppResponse()")
 					}
 				},
 				expectedErr: context.Canceled,
@@ -320,13 +319,10 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	require.True(enabled)
 
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
-	var atomicErr utils.Atomic[error]
 	serverVM.appSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
 			go func() {
-				if err := syncerVM.vm.AppResponse(ctx, nodeID, requestID, response); err != nil {
-					atomicErr.Set(err)
-				}
+				assert.NoError(t, syncerVM.vm.AppResponse(ctx, nodeID, requestID, response), "syncerVM AppResponse()")
 			}()
 		} else {
 			go test.responseIntercept(syncerVM.vm, nodeID, requestID, response)
@@ -334,9 +330,6 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 
 		return nil
 	}
-	t.Cleanup(func() {
-		require.NoError(atomicErr.Get())
-	})
 
 	// connect peer to [syncerVM]
 	require.NoError(
@@ -350,8 +343,8 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	// override [syncerVM]'s SendAppRequest function to trigger AppRequest on [serverVM]
 	syncerVM.appSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
-		require.True(hasItem, "expected nodeSet to contain at least 1 nodeID")
-		require.NoError(serverVM.vm.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request))
+		assert.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
+		assert.NoError(t, serverVM.vm.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request), "serverVM AppRequest()")
 		return nil
 	}
 
