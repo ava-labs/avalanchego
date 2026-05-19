@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -26,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
-	"github.com/ava-labs/avalanchego/database"
 )
 
 func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
@@ -384,10 +384,10 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 	)
 
 	require.NoError(t, s.PutPendingValidator(&state.Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    nodeID,
-		SubnetID:  constants.PrimaryNetworkID,
-		Weight:    units.MilliAvax,
+		TxID:     ids.GenerateTestID(),
+		NodeID:   nodeID,
+		SubnetID: constants.PrimaryNetworkID,
+		Weight:   units.MilliAvax,
 		// Both the validator and delegator share a start time to have their iteration order broken by their priority
 		StartTime: startTime,
 		EndTime:   endTime,
@@ -396,10 +396,10 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 	}))
 
 	s.PutPendingDelegator(&state.Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    nodeID,
-		SubnetID:  constants.PrimaryNetworkID,
-		Weight:    units.MilliAvax,
+		TxID:     ids.GenerateTestID(),
+		NodeID:   nodeID,
+		SubnetID: constants.PrimaryNetworkID,
+		Weight:   units.MilliAvax,
 		// Both the validator and delegator share a start time to have their iteration order broken by their priority
 		StartTime: startTime,
 		EndTime:   endTime,
