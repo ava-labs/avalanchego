@@ -8,6 +8,14 @@
 
 readonly PACKAGER_NAME="Ava Labs"
 readonly PACKAGER_EMAIL="security@avalabs.org"
+readonly EPHEMERAL_GPG_PASSPHRASE="avalanchego-ephemeral-gpg-passphrase"
+readonly EPHEMERAL_GPG_MARKER_SUFFIX=".ephemeral-passphrase-v1"
+
+use_ephemeral_gpg_passphrase() {
+    local passphrase_env="${1:?passphrase env var required}"
+
+    declare -gx "${passphrase_env}=${EPHEMERAL_GPG_PASSPHRASE}"
+}
 
 secret_key_file_is_usable() {
     local key_file="${1:?key file required}"
@@ -122,22 +130,24 @@ setup_gpg() {
     : "${NFPM_SIGNING_KEY:?NFPM_SIGNING_KEY must be set by the caller}"
 
     mkdir -p "$(dirname "${NFPM_SIGNING_KEY}")"
+    local ephemeral_marker="${NFPM_SIGNING_KEY}${EPHEMERAL_GPG_MARKER_SUFFIX}"
 
     if [[ -n "${gpg_key_file}" ]]; then
         echo "Using provided GPG key for signing"
         gpg --batch --import "${gpg_key_file}"
         cp "${gpg_key_file}" "${NFPM_SIGNING_KEY}"
-    elif [[ -f "${NFPM_SIGNING_KEY}" ]] && secret_key_file_is_usable "${NFPM_SIGNING_KEY}"; then
-        echo "Reusing existing ephemeral GPG key"
+        rm -f "${ephemeral_marker}"
+    elif [[ -f "${NFPM_SIGNING_KEY}" && -f "${ephemeral_marker}" ]] \
+        && secret_key_file_is_usable "${NFPM_SIGNING_KEY}"; then
+        echo "Reusing existing passphrase-protected ephemeral GPG key"
         gpg --batch --import "${NFPM_SIGNING_KEY}"
     else
         if [[ -f "${NFPM_SIGNING_KEY}" ]]; then
-            echo "Existing ephemeral GPG key is expired or unusable; generating a new key"
+            echo "Existing ephemeral GPG key is missing passphrase marker, expired, or unusable; generating a new key"
         else
-            echo "Generating ephemeral GPG key for signing"
+            echo "Generating passphrase-protected ephemeral GPG key for signing"
         fi
-        gpg --batch --gen-key <<GPGEOF
-%no-protection
+        gpg --batch --pinentry-mode loopback --gen-key <<GPGEOF
 Key-Type: RSA
 Key-Length: 4096
 Subkey-Type: RSA
@@ -145,9 +155,12 @@ Subkey-Length: 4096
 Name-Real: AvalancheGo ${key_label} Signing (ephemeral)
 Name-Email: ${PACKAGER_EMAIL}
 Expire-Date: 1d
+Passphrase: ${EPHEMERAL_GPG_PASSPHRASE}
 %commit
 GPGEOF
-        gpg --batch --armor --export-secret-keys "${PACKAGER_EMAIL}" > "${NFPM_SIGNING_KEY}"
+        gpg --batch --pinentry-mode loopback --passphrase "${EPHEMERAL_GPG_PASSPHRASE}" \
+            --armor --export-secret-keys "${PACKAGER_EMAIL}" > "${NFPM_SIGNING_KEY}"
+        printf "passphrase-protected\n" > "${ephemeral_marker}"
     fi
 
     gpg --batch --armor --export "${PACKAGER_EMAIL}" > "${public_key_out}"

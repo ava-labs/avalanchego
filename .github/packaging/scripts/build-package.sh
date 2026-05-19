@@ -49,12 +49,13 @@ generate_changelog "${VERSION}"
 GPG_KEY_FILE="${RPM_GPG_KEY_FILE:-}"
 GPG_PUBLIC_KEY="${OUTPUT_DIR}/${PKG_FORMAT}-GPG-KEY-avalanchego"
 
-setup_gpg "${GPG_KEY_FILE}" "${GPG_PUBLIC_KEY}" "${PKG_FORMAT}"
-
-# Ephemeral keys have no passphrase; nfpm needs the variable set empty
+# Ephemeral keys use a known throwaway passphrase so local and CI builds
+# exercise passphrase handling without release credentials.
 if [[ -z "${GPG_KEY_FILE}" ]]; then
-    export NFPM_RPM_PASSPHRASE=""
+    use_ephemeral_gpg_passphrase NFPM_RPM_PASSPHRASE
 fi
+
+setup_gpg "${GPG_KEY_FILE}" "${GPG_PUBLIC_KEY}" "${PKG_FORMAT}"
 
 # ── Package with nfpm ─────────────────────────────────────────────
 
