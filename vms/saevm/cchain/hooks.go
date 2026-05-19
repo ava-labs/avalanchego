@@ -34,7 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
-	saestate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
+	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -43,12 +43,12 @@ var _ hook.PointsG[*hookTx] = (*hooks)(nil)
 
 type hooks struct {
 	builder
-	state *saestate.State
+	state *cchainstate.State
 }
 
 func newHooks(
 	ctx *snow.Context,
-	state *saestate.State,
+	state *cchainstate.State,
 	pool *txpool.Pending,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
