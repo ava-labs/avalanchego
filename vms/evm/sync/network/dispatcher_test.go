@@ -79,7 +79,7 @@ func TestDispatcher_FailurePaths(t *testing.T) {
 			c := synctest.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, synctest.NewPeerTracker(t, tt.peers...),
 			)
-			_, outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+			outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 			require.ErrorIs(t, err, tt.wantErr)
 			// Transport failures auto-register, caller gets no Outcome.
 			require.Nil(t, outcome)
@@ -105,7 +105,7 @@ func TestDispatcher_ContextCancelled(t *testing.T) {
 	c := synctest.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
 		t, ctx, nodeID, handler, synctest.NewPeerTracker(t, nodeID),
 	)
-	_, outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, outcome)
 }
@@ -130,7 +130,7 @@ func TestOutcome_DeferFailureAndSuccess(t *testing.T) {
 		t, ctx, nodeID, synctest.EchoHandler(wantBytes), tracker,
 	)
 
-	_, outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 	require.NoError(t, err)
 	require.NotNil(t, outcome)
 
@@ -154,7 +154,7 @@ func TestOutcome_DeferFailureOnly(t *testing.T) {
 		t, ctx, nodeID, synctest.EchoHandler(wantBytes), tracker,
 	)
 
-	_, outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 	require.NoError(t, err)
 	require.NotNil(t, outcome)
 

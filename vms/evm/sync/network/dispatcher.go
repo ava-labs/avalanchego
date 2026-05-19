@@ -48,20 +48,15 @@ func NewClient(n *p2p.Network, handlerID uint64) *p2p.Client {
 }
 
 // Send picks a peer via [p2p.PeerTracker.SelectPeer] and forwards req
-// to it. Returns the chosen nodeID and an [Outcome] (failures are
-// scored automatically). Selection is explicit (not
-// [p2p.Client.AppRequestAny]) so RegisterRequest pairs with the
-// eventual Success or Failure call.
-func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (ids.NodeID, *Outcome, error) {
+// to it. Returns an [Outcome] (failures are scored automatically).
+// Selection is explicit (not [p2p.Client.AppRequestAny]) so
+// RegisterRequest pairs with the eventual Success or Failure call.
+func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*Outcome, error) {
 	nodeID, ok := d.peers.SelectPeer()
 	if !ok {
-		return ids.EmptyNodeID, nil, ErrNoPeers
+		return nil, ErrNoPeers
 	}
-	outcome, err := d.SendTo(ctx, nodeID, req, resp)
-	if err != nil {
-		return ids.EmptyNodeID, nil, err
-	}
-	return nodeID, outcome, nil
+	return d.SendTo(ctx, nodeID, req, resp)
 }
 
 // SendTo sends req to nodeID. Returns an [Outcome] (failures are

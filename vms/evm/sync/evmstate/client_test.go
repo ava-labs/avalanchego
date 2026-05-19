@@ -28,7 +28,7 @@ func TestClient_Send(t *testing.T) {
 	c := synctest.NewClient[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](t, ctx, nodeID, wantResp)
 
 	resp := &syncpb.GetLeafResponse{}
-	gotNodeID, outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{
+	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{
 		RootHash: []byte{0xab},
 		KeyLimit: 1024,
 		NodeType: syncpb.EVMNodeType_EVM_NODE_TYPE_STATE_TRIE,
@@ -36,6 +36,5 @@ func TestClient_Send(t *testing.T) {
 	require.NoError(t, err)
 	outcome.Success()
 
-	require.Equal(t, nodeID, gotNodeID)
 	require.Empty(t, cmp.Diff(wantResp, resp, protocmp.Transform()))
 }

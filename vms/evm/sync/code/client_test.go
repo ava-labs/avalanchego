@@ -24,10 +24,9 @@ func TestClient_Send(t *testing.T) {
 	c := synctest.NewClient[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse](t, ctx, nodeID, wantResp)
 
 	resp := &syncpb.GetCodeResponse{}
-	gotNodeID, outcome, err := c.Send(ctx, &syncpb.GetCodeRequest{Hashes: [][]byte{{1}, {2}}}, resp)
+	outcome, err := c.Send(ctx, &syncpb.GetCodeRequest{Hashes: [][]byte{{1}, {2}}}, resp)
 	require.NoError(t, err)
 	outcome.Success()
 
-	require.Equal(t, nodeID, gotNodeID)
 	require.Empty(t, cmp.Diff(wantResp, resp, protocmp.Transform()))
 }
