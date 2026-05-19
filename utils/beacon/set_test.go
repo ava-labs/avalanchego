@@ -77,5 +77,5 @@ func TestSet(t *testing.T) {
 
 	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", s.IDsArg())
 	require.Equal("0.0.0.0:2", s.IPsArg())
-	require.Equal(1, s.Len())
+	require.Equal(2, s.Len())
 }
