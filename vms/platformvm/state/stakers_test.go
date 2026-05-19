@@ -421,19 +421,13 @@ func TestDiffStakersDelegator(t *testing.T) {
 func TestDiffStakersDelegatorCancelOut(t *testing.T) {
 	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
 
-	verify := func(t *testing.T, diff *diffStakers, parent iterator.Iterator[*Staker], want []*Staker) {
-		t.Helper()
-
-		iter := diff.GetDelegatorIterator(parent, delegator.SubnetID, delegator.NodeID)
-		require.Equal(t, want, iterator.ToSlice(iter))
-	}
-
 	t.Run("delete then put same persisted delegator", func(t *testing.T) {
 		diff := &diffStakers{}
 		diff.DeleteDelegator(delegator)
 		diff.PutDelegator(delegator)
 
-		verify(t, diff, iterator.FromSlice(delegator), []*Staker{delegator})
+		delegatorIter := diff.GetDelegatorIterator(iterator.FromSlice(delegator), delegator.SubnetID, delegator.NodeID)
+		require.Equal(t, []*Staker{delegator}, iterator.ToSlice(delegatorIter))
 
 		iter := diff.GetStakerIterator(iterator.FromSlice(delegator))
 		require.Equal(t, []*Staker{delegator}, iterator.ToSlice(iter))
@@ -444,7 +438,8 @@ func TestDiffStakersDelegatorCancelOut(t *testing.T) {
 		diff.PutDelegator(delegator)
 		diff.DeleteDelegator(delegator)
 
-		verify(t, diff, iterator.Empty[*Staker]{}, nil)
+		delegatorIter := diff.GetDelegatorIterator(iterator.Empty[*Staker]{}, delegator.SubnetID, delegator.NodeID)
+		require.Empty(t, iterator.ToSlice(delegatorIter))
 
 		iter := diff.GetStakerIterator(iterator.Empty[*Staker]{})
 		require.Empty(t, iterator.ToSlice(iter))
