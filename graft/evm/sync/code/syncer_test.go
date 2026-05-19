@@ -205,7 +205,7 @@ func TestCodeSyncerCleansMarkerRewrittenMidCleanup(t *testing.T) {
 		ch <- codeHash
 		<-clientDB.blocked
 
-		// Rewrite the marker (modelling a concurrent AddCode) and enqueue
+		// Rewrite the marker (modelling a concurrent [Queue.AddCode]) and enqueue
 		// a duplicate for a sibling worker.
 		require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
 		ch <- codeHash
