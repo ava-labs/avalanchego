@@ -1,10 +1,12 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package s
+package simplex
 
 import (
+	"bytes"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -24,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 
-var simplexSubnetName = "simplex"
+const simplexSubnetName = "simplex"
 
 func NewSimplexSubnetOrPanic(nodes ...*tmpnet.Node) *tmpnet.Subnet {
 	key, err := secp256k1.NewPrivateKey()
@@ -96,8 +98,7 @@ var _ = e2e.DescribeSimplex("Create a Simplex [L1]", func() {
 		simplexValidators := getNodesWithIDs(network.Nodes, set.Of(simplexSubnet.ValidatorIDs...))
 		require.NotEmpty(simplexValidators)
 
-		// Sort the tmpNodes in the same ordering as the Simplex leader rotation.
-		sortNodes(simplexValidators)
+		sortSimplexNodesInLeaderOrder(simplexValidators)
 
 		// Advance two rounds
 		issueAndConfirmTx(tc, simplexChain, simplexValidators)
@@ -141,6 +142,7 @@ func issueAndConfirmTx(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*
 		zap.String("leaderURI", leaderURI),
 	)
 	recipientKey := e2e.NewPrivateKey(tc)
+	transferAmount := units.Schmeckle
 
 	// create and sign the transaction
 	utx := &tx.Transfer{
@@ -148,7 +150,7 @@ func issueAndConfirmTx(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*
 		Nonce:   nonces[leader.NodeID],
 		MaxFee:  0,
 		AssetID: chain.ChainID,
-		Amount:  units.Schmeckle,
+		Amount:  transferAmount,
 		To:      recipientKey.Address(),
 	}
 	stx, err := tx.Sign(utx, chain.PreFundedKey)
@@ -177,7 +179,7 @@ func issueAndConfirmTx(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*
 
 		balance, err := client.Balance(tc.DefaultContext(), recipientKey.Address(), chain.ChainID)
 		require.NoError(err)
-		require.Equal(units.Schmeckle, balance)
+		require.Equal(transferAmount, balance)
 
 		_, statelessBlock, err := client.LastAccepted(tc.DefaultContext())
 		require.NoError(err)
@@ -203,4 +205,14 @@ func getNodesWithIDs(nodes []*tmpnet.Node, nodeIDs set.Set[ids.NodeID]) []*tmpne
 		}
 	}
 	return desiredNodes
+}
+
+func getLeaderForRound(nodes []*tmpnet.Node, round uint64) *tmpnet.Node {
+	return nodes[round%uint64(len(nodes))]
+}
+
+func sortSimplexNodesInLeaderOrder(nodes []*tmpnet.Node) {
+	slices.SortFunc(nodes, func(a, b *tmpnet.Node) int {
+		return bytes.Compare(a.NodeID[:], b.NodeID[:])
+	})
 }

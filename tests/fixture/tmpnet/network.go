@@ -615,6 +615,7 @@ func (n *Network) GetSubnet(name string) *Subnet {
 // subnet creation so that they can be restarted if already running.
 func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node) (set.Set[ids.NodeID], error) {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
+	apiURI := apiNode.GetAccessibleURI()
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
 			return nil, stacktrace.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
@@ -639,7 +640,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		// Create the subnet on the network
-		if err := subnet.Create(ctx, apiNode.GetAccessibleURI()); err != nil {
+		if err := subnet.Create(ctx, apiURI); err != nil {
 			return nil, stacktrace.Wrap(err)
 		}
 
@@ -700,20 +701,20 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 			validatorNodes = append(validatorNodes, node)
 		}
 
-		if err := subnet.AddValidators(ctx, log, apiNode.URI, validatorNodes...); err != nil {
+		if err := subnet.AddValidators(ctx, log, apiURI, validatorNodes...); err != nil {
 			return nil, stacktrace.Wrap(err)
 		}
 	}
 
 	// Wait for nodes to become subnet validators
-	pChainClient := platformvm.NewClient(apiNode.URI)
+	pChainClient := platformvm.NewClient(apiURI)
 	for _, subnet := range createdSubnets {
 		if err := WaitForActiveValidators(ctx, log, pChainClient, subnet); err != nil {
 			return nil, stacktrace.Wrap(err)
 		}
 
 		// It should now be safe to create chains for the subnet
-		if err := subnet.CreateChains(ctx, log, apiNode.URI); err != nil {
+		if err := subnet.CreateChains(ctx, log, apiURI); err != nil {
 			return nil, stacktrace.Wrap(err)
 		}
 
