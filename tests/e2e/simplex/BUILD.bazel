@@ -25,3 +25,25 @@ go_library(
         "@org_uber_go_zap//:zap",
     ],
 )
+
+go_library(
+    name = "simplex",
+    srcs = ["simplex.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/e2e/simplex",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/consensus/simplex",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//utils/units",
+        "//vms/example/xsvm/api",
+        "//vms/example/xsvm/genesis",
+        "//vms/example/xsvm/tx",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)

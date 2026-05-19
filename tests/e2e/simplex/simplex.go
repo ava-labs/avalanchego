@@ -1,6 +1,18 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package simplex contains end-to-end tests that exercise the simplex
+// consensus engine. The chain VM used is XSVM. The test focuses on consensus behavior
+// rather than VM-specific logic. XSVM is convenient because it has a simple
+// transfer transaction and a public API for issuing and querying state.
+//
+// The test creates a simplex subnet validated by every node in the network,
+// determines the leader for the next round from the deterministic
+// node-ID-sorted validator order, issues an XSVM transfer through that
+// leader (and to every other node, since XSVM has no mempool gossip), and
+// then verifies that every node accepts the resulting block and observes
+// the new balance. Two rounds are exercised to confirm the engine advances
+// past its initial state.
 package simplex
 
 import (
@@ -19,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
@@ -95,7 +106,7 @@ var _ = e2e.DescribeSimplex("Create a Simplex [L1]", func() {
 		require.NotNil(simplexSubnet)
 
 		simplexChain := simplexSubnet.Chains[0]
-		simplexValidators := getNodesWithIDs(network.Nodes, set.Of(simplexSubnet.ValidatorIDs...))
+		simplexValidators := tmpnet.NodesForIDs(network.Nodes, simplexSubnet.ValidatorIDs)
 		require.NotEmpty(simplexValidators)
 
 		sortSimplexNodesInLeaderOrder(simplexValidators)
@@ -194,17 +205,6 @@ func issueAndConfirmTx(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*
 			zap.Uint64("round", round),
 		)
 	}
-}
-
-// Retrieve the nodes corresponding to the provided IDs
-func getNodesWithIDs(nodes []*tmpnet.Node, nodeIDs set.Set[ids.NodeID]) []*tmpnet.Node {
-	desiredNodes := make([]*tmpnet.Node, 0, len(nodeIDs))
-	for _, node := range nodes {
-		if nodeIDs.Contains(node.NodeID) {
-			desiredNodes = append(desiredNodes, node)
-		}
-	}
-	return desiredNodes
 }
 
 func getLeaderForRound(nodes []*tmpnet.Node, round uint64) *tmpnet.Node {

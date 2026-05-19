@@ -23,7 +23,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
-	"github.com/ava-labs/avalanchego/tests/e2e/s"
+	"github.com/ava-labs/avalanchego/tests/e2e/simplex"
 	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -50,7 +50,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	require.NoError(tc, err)
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	xsvmSubnets := vms.XSVMSubnetsOrPanic(nodes...)
-	simplexSubnet := s.NewSimplexSubnetOrPanic(nodes...)
+	simplexSubnet := simplex.NewSimplexSubnetOrPanic(nodes...)
 	subnets := append(xsvmSubnets, simplexSubnet)
 
 	upgradeToActivate := upgradetest.Latest
