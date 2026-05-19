@@ -191,10 +191,13 @@ func advanceTimeTo(
 
 		// Buffer state changes so that we can perform validator updates before delegator updates to respect state's
 		// expected order of operations.
-		if stakerToRemove.Priority.IsPendingValidator() {
+		switch stakerToRemove.Priority {
+		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
 			validatorPromotions = append(validatorPromotions, promotion{pending: stakerToRemove, current: &stakerToAdd})
-		} else {
+		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
 			delegatorPromotions = append(delegatorPromotions, promotion{pending: stakerToRemove, current: &stakerToAdd})
+		default:
+			return nil, false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
 	}
 
