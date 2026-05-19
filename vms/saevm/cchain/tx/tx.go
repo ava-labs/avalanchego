@@ -199,15 +199,15 @@ func gasUsed(t Unsigned) (gas.Gas, error) {
 	return math.Add(intrinsicGas, dynamicGas)
 }
 
-const _x2cRate = 1_000_000_000
+// X2CRate is the conversion rate between the smallest denomination on the
+// X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain, 1 aAVAX.
+const X2CRate = 1_000_000_000
 
-// x2cRate is the conversion rate between the smallest denomination on the
-// X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain 1 aAVAX.
-var x2cRate = uint256.NewInt(_x2cRate)
+var x2cRate = uint256.NewInt(X2CRate)
 
-// scaleAVAX converts an amount denominated in nAVAX into the C-Chain's aAVAX
+// ScaleAVAX converts an amount denominated in nAVAX into the C-Chain's aAVAX
 // denomination.
-func scaleAVAX(nAVAX uint64) uint256.Int {
+func ScaleAVAX(nAVAX uint64) uint256.Int {
 	var aAVAX uint256.Int
 	aAVAX.SetUint64(nAVAX)
 	aAVAX.Mul(&aAVAX, x2cRate)
@@ -222,7 +222,7 @@ func gasPrice(cost uint64, gas gas.Gas) uint256.Int {
 	var u uint256.Int
 	u.SetUint64(uint64(gas))
 
-	p := scaleAVAX(cost)
+	p := ScaleAVAX(cost)
 	p.Div(&p, &u)
 	return p
 }
