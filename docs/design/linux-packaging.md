@@ -65,8 +65,9 @@ dedicated data file).
 
 RPMs and DEBs are always signed. In CI release builds, a real GPG key is
 provided by GitHub Actions secrets. For local builds and PR validation,
-an ephemeral GPG key (RSA 4096, no passphrase, 1-day expiry) is
-generated to exercise the signing pipeline without requiring a real key.
+an ephemeral GPG key (RSA 4096, known throwaway passphrase, 1-day
+expiry) is generated to exercise the same passphrase-protected signing
+path without requiring a real key.
 Release events (tag push and `workflow_dispatch`) fail fast in
 `workflow-setup-packaging.sh` if no signing-key secret is configured, so
 a misconfigured release cannot silently fall back to the ephemeral key.
