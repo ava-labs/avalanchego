@@ -74,26 +74,16 @@ func (f *FirewoodSyncer) Finalize() error {
 
 // finish performs the finalization logic for the FirewoodSyncer inside a [sync.Once].
 // This is linked to the [sync.Once] in the constructor, and should not be called directly.
-func (f *FirewoodSyncer) finish() (err error) {
-	defer func() {
-		// Ensure the code queue closes on exit, regardless of other errors.
-		err = errors.Join(err, f.codeQueue.Finalize())
-	}()
-
-	// Cancel any ongoing sync.
+func (f *FirewoodSyncer) finish() error {
 	f.cancel()
 
-	// Firewood cannot yet resume a previous sync.
-	// TODO(alarso16): This check assumes that if the root hash doesn't matche the target,
-	// state syncing must have completed successfully. This may not be the case if other
-	// syncers are didn't finish.
+	var errWipe error
 	if common.Hash(f.db.Root()) != f.target {
 		if _, err := f.db.Update([]ffi.BatchOp{ffi.PrefixDelete([]byte{})}); err != nil {
-			return fmt.Errorf("deleting invalid state: %w", err)
+			errWipe = fmt.Errorf("deleting invalid state: %w", err)
 		}
 	}
-
-	return nil
+	return errors.Join(errWipe, f.codeQueue.Finalize())
 }
 
 func (*FirewoodSyncer) ID() string {
