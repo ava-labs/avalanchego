@@ -192,7 +192,6 @@ func TestCreateSimplexChain(t *testing.T) {
 		TimeoutManager: tm,
 		Router:         router,
 
-		FrontierPollFrequency:   constants.DefaultFrontierPollFrequency,
 		ConsensusAppConcurrency: constants.DefaultConsensusAppConcurrency,
 	}
 
