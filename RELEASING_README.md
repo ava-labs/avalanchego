@@ -261,7 +261,7 @@ Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
    ```
 
    The repository should already be `avaplatform/subnet-evm`, with
-   `global.vmAliases[0]` set to the standard Subnet-EVM VM ID:
+   `global.vmAliases` containing the standard Subnet-EVM VM ID:
    `srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy`.
 
 1. Open and merge the deployment change for both L1s, then monitor deployments:
