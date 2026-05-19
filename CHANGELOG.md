@@ -2,7 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.4.0] - 2026-04-28
+## [0.5.0] - 2026-05-19
+
+### 🚀 Features
+
+- Add pathdb config + 33m block option ([#1959](https://github.com/ava-labs/firewood/pull/1959))
+- *(ffi)* Implement range proof verification (Trail of Bits finding TOB-FIREWOOD-2) ([#1971](https://github.com/ava-labs/firewood/pull/1971))
+- Add ability to clone reconstructed revisions ([#1991](https://github.com/ava-labs/firewood/pull/1991))
+
+### 🐛 Bug Fixes
+
+- Resolve false rejection at straddling nibbles in collapse_strip ([#1952](https://github.com/ava-labs/firewood/pull/1952))
+- Remove duplicate children loop in compute_root_hash_with_proofs ([#1948](https://github.com/ava-labs/firewood/pull/1948))
+- *(fwdctl)* Drop legacy rustls feature to clear GHSA-82j2-j2ch-gfr8 ([#1956](https://github.com/ava-labs/firewood/pull/1956))
+- *(manager)* Resolve empty-trie revision under ethhash without RootStore (TOB-FIREWOOD-7) ([#1982](https://github.com/ava-labs/firewood/pull/1982))
+- *(range-proof)* Use last_kv_key as right-edge anchor for inclusion-style end_proofs ([#1970](https://github.com/ava-labs/firewood/pull/1970))
+- *(manager)* Hold proposals lock across cleanup and reparent (TOB-FIREWOOD-6) ([#1981](https://github.com/ava-labs/firewood/pull/1981))
+- *(manager)* Use CommittedId for parent identity, skip trivial commits ([#1987](https://github.com/ava-labs/firewood/pull/1987))
+- *(storage)* Pin committed parent in Reconstructed to prevent reaping ([#2000](https://github.com/ava-labs/firewood/pull/2000))
+
+### 🚜 Refactor
+
+- *(ffi)* Simplify change proof interface with unified Proposal type ([#1966](https://github.com/ava-labs/firewood/pull/1966))
+- *(proofs)* Move range/change proof verification helpers from FFI to firewood ([#1990](https://github.com/ava-labs/firewood/pull/1990))
+- *(storage)* Lift nibbles_to_eth_compact into eth_encoding module ([#2003](https://github.com/ava-labs/firewood/pull/2003))
+
+### ⚡ Performance
+
+- *(storage)* Add in-tree `crate::rlp` module + benchmark ([#1957](https://github.com/ava-labs/firewood/pull/1957))
+- Migrate firewood off the upstream `rlp` crate ([#1958](https://github.com/ava-labs/firewood/pull/1958))
+- *(storage)* Retain hashed root in Reconstructed for cheap forks ([#1999](https://github.com/ava-labs/firewood/pull/1999))
+
+### 🧪 Testing
+
+- Add edge case tests for change proof verification ([#1946](https://github.com/ava-labs/firewood/pull/1946))
+- Add adversarial attack tests for change proof verification ([#1947](https://github.com/ava-labs/firewood/pull/1947))
+
+### ⚙️ Miscellaneous Tasks
+
+- *(deps)* Bump DavidAnson/markdownlint-cli2-action from 23.0.0 to 23.1.0 in the github-actions group ([#1954](https://github.com/ava-labs/firewood/pull/1954))
+- *(deps)* Bump the github-actions group with 2 updates ([#1977](https://github.com/ava-labs/firewood/pull/1977))
+- Remove weekly 50m-60m job ([#1983](https://github.com/ava-labs/firewood/pull/1983))
+- Export errRevisionNotFound ([#1955](https://github.com/ava-labs/firewood/pull/1955))
+- Update workflow to use macOS 26, drop x86_64 mac target ([#1996](https://github.com/ava-labs/firewood/pull/1996))
+- *(deps)* Bump cachix/cachix-action from 1eb2ef646ac0255473d23a5907ad7b04ce94065c to 5f2d7c5294214f71b873db4b969586b980625e71 in the github-actions group ([#1995](https://github.com/ava-labs/firewood/pull/1995))
+- Use deploy key instead of pat ([#2002](https://github.com/ava-labs/firewood/pull/2002))
+
+## [0.4.0] - 2026-04-29
 
 ### 🚀 Features
 
