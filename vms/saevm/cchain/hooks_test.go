@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // newBlock returns a minimal [*types.Block] whose ExtData encodes txs and
@@ -48,16 +47,14 @@ func TestAncestorInputIDs(t *testing.T) {
 	w := newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
 	export := func() *tx.Tx {
 		const (
-			exportedAmount = 50
 			txFee          = 0
+			exportedAmount = 50
 		)
 		signedExport, _ := w.newExportTx(
 			t,
 			snowtest.XChainID,
-			[]*secp256k1fx.TransferOutput{
-				txtest.NewTransferOutput(exportedAmount, w.sk.Address()),
-			},
 			txFee,
+			txtest.NewTransferOutput(exportedAmount, w.sk.Address()),
 		)
 		return signedExport
 	}

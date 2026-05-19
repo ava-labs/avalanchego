@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // TestIssueTxRejectsInvalidTransaction asserts that [Client.IssueTx] surfaces
@@ -24,16 +23,14 @@ func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
 	sk := txtest.NewKey(t) // sk is NOT funded.
 	w := newWallet(sk, sut.snowCtx, sut.Client)
 	const (
-		exportedAmount = 50
 		txFee          = 50
+		exportedAmount = 50
 	)
 	tx, _ := w.newExportTx(
 		t,
 		sut.snowCtx.XChainID,
-		[]*secp256k1fx.TransferOutput{
-			txtest.NewTransferOutput(exportedAmount, sk.Address()),
-		},
 		txFee,
+		txtest.NewTransferOutput(exportedAmount, sk.Address()),
 	)
 
 	err := sut.IssueTx(t.Context(), tx)

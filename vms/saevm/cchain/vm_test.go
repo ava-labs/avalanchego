@@ -301,8 +301,8 @@ func newWallet(sk *secp256k1.PrivateKey, snowCtx *snow.Context, client *Client) 
 func (w *wallet) newExportTx(
 	tb testing.TB,
 	destinationChain ids.ID,
-	outputs []*secp256k1fx.TransferOutput,
 	fee uint64,
+	outputs ...*secp256k1fx.TransferOutput,
 ) (*tx.Tx, *tx.Export) {
 	tb.Helper()
 
@@ -470,19 +470,16 @@ func TestExport(t *testing.T) {
 		c.genesis.Alloc = saetest.MaxAllocFor(sender)
 	}))
 
-	const (
-		exportedAmount = 50
-		txFee          = 50
-	)
-
 	w := newWallet(sk, sut.snowCtx, sut.Client)
+	const (
+		txFee          = 50
+		exportedAmount = 50
+	)
 	signedExport, export := w.newExportTx(
 		t,
 		sut.snowCtx.XChainID,
-		[]*secp256k1fx.TransferOutput{
-			txtest.NewTransferOutput(exportedAmount, sk.Address()),
-		},
 		txFee,
+		txtest.NewTransferOutput(exportedAmount, sk.Address()),
 	)
 
 	initialBalance := sut.balance(t, sender)
@@ -531,13 +528,15 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	}))
 
 	newExport := func(w *wallet) *tx.Tx {
+		const (
+			txFee          = 50
+			exportedAmount = 50
+		)
 		signedExport, _ := w.newExportTx(
 			t,
 			sut.snowCtx.XChainID,
-			[]*secp256k1fx.TransferOutput{
-				txtest.NewTransferOutput(50, w.sk.Address()),
-			},
-			50,
+			txFee,
+			txtest.NewTransferOutput(exportedAmount, w.sk.Address()),
 		)
 		return signedExport
 	}
