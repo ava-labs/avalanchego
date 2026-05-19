@@ -423,7 +423,7 @@ func getUTXOs(
 		)
 		require.NoErrorf(tb, err, "%T.GetUTXOs()", client)
 		utxos = append(utxos, page...)
-		if uint32(len(page)) < limit {
+		if uint64(len(page)) < uint64(limit) {
 			return utxos
 		}
 		startAddr, startUTXOID = endAddr, endUTXOID
