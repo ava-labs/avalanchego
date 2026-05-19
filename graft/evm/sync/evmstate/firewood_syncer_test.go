@@ -106,15 +106,19 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 			r := rand.New(rand.NewSource(1))
 
 			clientState := createDB(t)
-			_, _ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, types.EmptyRootHash, 10)
+			_, _ = synctest.FillAccountsWithStorageAndCode(t, r, clientState, types.EmptyRootHash, 0)
 
 			serverState := createDB(t)
 			root, _ := synctest.FillAccountsWithStorageAndCode(t, r, serverState, types.EmptyRootHash, 10)
 
 			firewoodSyncer, codeSyncer, codeQueue := createSyncers(t, clientState, serverState, root)
 
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
+			ctx := t.Context()
+			var cancel context.CancelFunc
+			if tt.cancel {
+				ctx, cancel = context.WithCancel(ctx)
+				t.Cleanup(cancel)
+			}
 
 			if tt.cancel {
 				// Trigger cancellation and wait for both syncers to exit.
@@ -132,13 +136,6 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 			// After finalize, the queue should reject new code additions.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
 			require.ErrorIs(t, err, code.ErrQueueClosed)
-
-			if tt.cancel {
-				// Note that the existing database was non-empty when the sync started
-				// If the sync was canceled, the database should be cleared.
-				fw := clientState.TrieDB().Backend().(*firewood.TrieDB).Firewood
-				require.Equalf(t, types.EmptyRootHash, common.Hash(fw.Root()), "%T.Root(): expected empty root after cancellation", fw)
-			}
 		})
 	}
 }

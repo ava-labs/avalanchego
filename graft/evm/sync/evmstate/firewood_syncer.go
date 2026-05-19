@@ -5,7 +5,6 @@ package evmstate
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -30,8 +29,6 @@ type FirewoodSyncer struct {
 	s         *merklesync.Syncer[*syncer.RangeProof, struct{}]
 	cancel    context.CancelFunc
 	codeQueue *code.Queue
-	db        *ffi.Database
-	target    common.Hash
 	// finalizeOnce is initialized in the constructor to make Finalize idempotent.
 	finalizeOnce func() error
 }
@@ -52,8 +49,6 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 		s:         s,
 		cancel:    func() {}, // overwritten in Sync
 		codeQueue: codeQueue,
-		db:        db,
-		target:    target,
 	}
 	f.finalizeOnce = sync.OnceValue(f.finish)
 	return f, nil
@@ -75,15 +70,12 @@ func (f *FirewoodSyncer) Finalize() error {
 // finish performs the finalization logic for the FirewoodSyncer inside a [sync.Once].
 // This is linked to the [sync.Once] in the constructor, and should not be called directly.
 func (f *FirewoodSyncer) finish() error {
+	// Ensure the syncer stops work and the code queue closes on exit.
 	f.cancel()
-
-	var errWipe error
-	if common.Hash(f.db.Root()) != f.target {
-		if _, err := f.db.Update([]ffi.BatchOp{ffi.PrefixDelete([]byte{})}); err != nil {
-			errWipe = fmt.Errorf("deleting invalid state: %w", err)
-		}
+	if err := f.codeQueue.Finalize(); err != nil {
+		return fmt.Errorf("finalizing code queue: %w", err)
 	}
-	return errors.Join(errWipe, f.codeQueue.Finalize())
+	return nil
 }
 
 func (*FirewoodSyncer) ID() string {
