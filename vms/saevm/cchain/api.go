@@ -122,6 +122,7 @@ func (s *service) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOs
 		}
 		if startAddr == termAddr && startUTXO == termUTXOID {
 			// Client provided the terminal index, so there are no more results.
+			r.UTXOs = []string{}
 			r.EndIndex.Address = s.zeroAddress
 			r.EndIndex.UTXO = ids.Empty.String()
 			return nil
