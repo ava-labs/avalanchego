@@ -49,7 +49,7 @@ func TestAncestorInputIDs(t *testing.T) {
 	export := func() *tx.Tx {
 		const (
 			exportedAmount = 50
-			txFee          = 50
+			txFee          = 0
 		)
 		signed, _ := w.newExportTx(
 			t,
