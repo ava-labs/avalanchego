@@ -9,9 +9,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
@@ -20,8 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -365,4 +369,161 @@ func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
 			require.Equal(uint64(secondsToAdvance), s.GetAccruedFees())
 		})
 	}
+}
+
+// Regression test for a case where a pending delegator and validator are promoted to current stakers. Only Apricot can
+// trip this regression, because after Apricot pending validators always sort before pending delegators according to
+// txs.Priority.
+func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
+	s := statetest.New(t, statetest.Config{})
+
+	var (
+		startTime = s.GetTimestamp().Add(time.Second)
+		endTime   = startTime.Add(14 * 24 * time.Hour)
+		nodeID    = ids.GenerateTestNodeID()
+	)
+
+	require.NoError(t, s.PutPendingValidator(&state.Staker{
+		TxID:     ids.GenerateTestID(),
+		NodeID:   nodeID,
+		SubnetID: constants.PrimaryNetworkID,
+		Weight:   units.MilliAvax,
+		// Both the validator and delegator share a start time to have their iteration order broken by their priority
+		StartTime: startTime,
+		EndTime:   endTime,
+		NextTime:  startTime,
+		Priority:  txs.PrimaryNetworkValidatorPendingPriority,
+	}))
+
+	s.PutPendingDelegator(&state.Staker{
+		TxID:     ids.GenerateTestID(),
+		NodeID:   nodeID,
+		SubnetID: constants.PrimaryNetworkID,
+		Weight:   units.MilliAvax,
+		// Both the validator and delegator share a start time to have their iteration order broken by their priority
+		StartTime: startTime,
+		EndTime:   endTime,
+		NextTime:  startTime,
+		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
+	})
+
+	updated, err := AdvanceTimeTo(
+		&Backend{
+			Config: &config.Internal{
+				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			},
+			Rewards: reward.NewCalculator(reward.Config{
+				MaxConsumptionRate: .12 * reward.PercentDenominator,
+				MinConsumptionRate: .1 * reward.PercentDenominator,
+				MintingPeriod:      365 * 24 * time.Hour,
+				SupplyCap:          720 * units.MegaAvax,
+			}),
+		},
+		s,
+		startTime,
+	)
+	require.NoError(t, err)
+	require.True(t, updated)
+
+	// Check that the stakers got promoted to current
+	gotValidator, err := s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, txs.PrimaryNetworkValidatorCurrentPriority, gotValidator.Priority)
+
+	currentDelegatorItr, err := s.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	defer currentDelegatorItr.Release()
+
+	require.True(t, currentDelegatorItr.Next())
+	require.Equal(t, txs.PrimaryNetworkDelegatorCurrentPriority, currentDelegatorItr.Value().Priority)
+
+	// Check that they are no longer pending
+	_, err = s.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	require.Equal(t, database.ErrNotFound, err)
+
+	pendingDelegatorItr, err := s.GetPendingDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	defer pendingDelegatorItr.Release()
+
+	require.False(t, pendingDelegatorItr.Next())
+}
+
+// TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder tests that promoting pending stakers mints
+// rewards in the historical pending staking iterator order.
+func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(t *testing.T) {
+	s := statetest.New(t, statetest.Config{})
+
+	var (
+		startTime       = s.GetTimestamp().Add(time.Second)
+		endTime         = startTime.Add(14 * 24 * time.Hour)
+		nodeID          = ids.GenerateTestNodeID()
+		validatorWeight = 2 * units.MegaAvax
+		delegatorWeight = units.KiloAvax
+	)
+
+	require.NoError(t, s.PutPendingValidator(&state.Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    nodeID,
+		SubnetID:  constants.PrimaryNetworkID,
+		Weight:    validatorWeight,
+		StartTime: startTime,
+		EndTime:   endTime,
+		NextTime:  startTime,
+		Priority:  txs.PrimaryNetworkValidatorPendingPriority,
+	}))
+
+	s.PutPendingDelegator(&state.Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    nodeID,
+		SubnetID:  constants.PrimaryNetworkID,
+		Weight:    delegatorWeight,
+		StartTime: startTime,
+		EndTime:   endTime,
+		NextTime:  startTime,
+		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
+	})
+
+	rewards := reward.NewCalculator(reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .1 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	})
+
+	initialSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	duration := endTime.Sub(startTime)
+	wantDelegatorReward := rewards.Calculate(duration, delegatorWeight, initialSupply)
+	wantValidatorReward := rewards.Calculate(duration, validatorWeight, initialSupply+wantDelegatorReward)
+
+	_, err = AdvanceTimeTo(
+		&Backend{
+			Config: &config.Internal{
+				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			},
+			Rewards: rewards,
+		},
+		s,
+		startTime,
+	)
+	require.NoError(t, err)
+
+	gotValidator, err := s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantValidatorReward, gotValidator.PotentialReward)
+
+	delegatorItr, err := s.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	defer delegatorItr.Release()
+	require.True(t, delegatorItr.Next())
+	require.Equal(t, wantDelegatorReward, delegatorItr.Value().PotentialReward)
+
+	gotSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+	require.Equal(t, initialSupply+wantDelegatorReward+wantValidatorReward, gotSupply)
 }
