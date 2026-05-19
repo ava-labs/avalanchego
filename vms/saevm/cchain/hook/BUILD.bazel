@@ -15,8 +15,6 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/hook",
     deps = [
-        "//chains/atomic",
-        "//database",
         "//graft/coreth/core/extstate",
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customheader",
