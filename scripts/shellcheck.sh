@@ -20,5 +20,4 @@ fi
 # avoid linting files that should be run from a different location 
 # within the repo, as there are false positives.
 #
-# shellcheck disable=SC2035
-find * \( -path 'graft/coreth' -o -path 'graft/subnet-evm' \) -prune -o -name '*.sh' -type f -print0 | xargs -0 shellcheck "${@}"
+find .github ./* \( -path 'graft/coreth' -o -path 'graft/subnet-evm' \) -prune -o -name '*.sh' -type f -print0 | xargs -0 shellcheck "${@}"

@@ -36,11 +36,7 @@ jobs:
         shell: bash
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
-        run: |
-          echo "$NEEDS_JSON" | jq -e '
-            to_entries
-            | all(.value.result == "success")
-          ' >/dev/null
+        run: ./.github/workflows/check-required-jobs.sh
 
   # Check Bazel metadata first so stale generated files fail with one
   # actionable error instead of cascading into multiple Bazel build/test
