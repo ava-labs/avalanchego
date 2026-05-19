@@ -265,8 +265,13 @@ Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
    `srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy`.
 
 1. Open and merge the deployment change for both L1s, then monitor deployments:
-   - **Dispatch**: [Logs](https://app.datadoghq.com/logs?query=subnet%3Adispatch%20%40logger%3A%2A&live=true) | [Metrics](https://app.datadoghq.com/dashboard/jrv-mm2-vuc/dispatch-testnet-subnets?live=true)
-   - **Echo**: [Logs](https://app.datadoghq.com/logs?query=subnet:echo%20@logger:*&live=true) | [Metrics](https://app.datadoghq.com/dashboard/jrv-mm2-vuc/echo-testnet-subnets?live=true)
+   - **Dispatch**: [Logs][dispatch-logs] | [Dashboard][dispatch-dashboard]
+   - **Echo**: [Logs][echo-logs] | [Dashboard][echo-dashboard]
+
+[dispatch-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22dispatch%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
+[dispatch-dashboard]: https://avalabs.grafana.net/d/12154d054f846686fc46ad306e451c30/dispatch-testnet-subnets
+[echo-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22echo%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
+[echo-dashboard]: https://avalabs.grafana.net/d/87d80a2c2c15b54189eac1ae9c0241e4/echo-testnet-subnets
 
 1. Test transactions:
    1. If you have no wallet setup, create a new one using the [Core wallet](https://core.app/)
