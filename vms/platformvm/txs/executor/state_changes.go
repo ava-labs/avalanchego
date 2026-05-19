@@ -133,80 +133,86 @@ func advanceTimeTo(
 	//
 	// Pending stakers are ordered such that ties in Staker.NextTime are broken by Staker.Priority. It is possible for a
 	// tie to result in an Apricot pending delegator being ordered before a pending validator, so we must do two passes
-	// to promote pending validators before pending delegators to respect the expected ordering.
+	// to promote pending validators before pending delegators to respect the expected ordering. Rewards however must be
+	// performed in the original staker iterator ordering to respect the historical ordering.
 	//
 	// Invariant: It is not safe to modify the state while iterating over it,
 	// so we use the parentState's iterator rather than the changes iterator.
-	// ParentState must not be modified before each iterator is released.
-	var changed bool
+	// ParentState must not be modified before this iterator is released.
+	type promotion struct {
+		pending *state.Staker
+		current *state.Staker
+	}
 
-	pendingValidatorIterator, err := parentState.GetPendingStakerIterator()
+	var (
+		validatorPromotions []promotion
+		delegatorPromotions []promotion
+	)
+
+	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
 		return nil, false, err
 	}
+	defer pendingStakerIterator.Release()
 
-	defer pendingValidatorIterator.Release()
-	for pendingValidatorIterator.Next() {
-		stakerToRemove := pendingValidatorIterator.Value()
+	for pendingStakerIterator.Next() {
+		stakerToRemove := pendingStakerIterator.Value()
 		if stakerToRemove.StartTime.After(newChainTime) {
 			break
 		}
 
-		// Iterate over validators first to preserve expected modification ordering for state
-		if !stakerToRemove.Priority.IsPendingValidator() {
-			continue
-		}
+		stakerToAdd := *stakerToRemove
+		stakerToAdd.NextTime = stakerToRemove.EndTime
+		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
-		stakerToAdd := newCurrentStakerFromPendingStaker(stakerToRemove)
-
-		// Only permissionless networks (including the primary network) are eligible for minting rewards
+		// Only permissionless networks (including the primary network) are eligible for rewards
 		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorPendingPriority {
-			potentialReward, err := mintReward(backend, parentState, changes, stakerToRemove)
+			supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
 			if err != nil {
 				return nil, false, err
 			}
+
+			rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
+			if err != nil {
+				return nil, false, err
+			}
+
+			potentialReward := rewards.Calculate(
+				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
+				stakerToRemove.Weight,
+				supply,
+			)
 			stakerToAdd.PotentialReward = potentialReward
+
+			// Invariant: [rewards.Calculate] can never return a [potentialReward]
+			//            such that [supply + potentialReward > maximumSupply].
+			changes.SetCurrentSupply(stakerToRemove.SubnetID, supply+potentialReward)
 		}
 
-		if err := changes.PutCurrentValidator(stakerToAdd); err != nil {
-			return nil, false, err
+		// Buffer state changes so that we can perform validator updates before delegator updates to respect state's
+		// expected order of operations.
+		if stakerToRemove.Priority.IsPendingValidator() {
+			validatorPromotions = append(validatorPromotions, promotion{pending: stakerToRemove, current: &stakerToAdd})
+		} else {
+			delegatorPromotions = append(delegatorPromotions, promotion{pending: stakerToRemove, current: &stakerToAdd})
 		}
-		changes.DeletePendingValidator(stakerToRemove)
-		changed = true
 	}
 
-	pendingDelegatorIterator, err := parentState.GetPendingStakerIterator()
-	if err != nil {
-		return nil, false, err
+	for _, p := range validatorPromotions {
+		if err := changes.PutCurrentValidator(p.current); err != nil {
+			return nil, false, fmt.Errorf("putting current validator: %w", err)
+		}
+		changes.DeletePendingValidator(p.pending)
 	}
 
-	defer pendingDelegatorIterator.Release()
-	for pendingDelegatorIterator.Next() {
-		stakerToRemove := pendingDelegatorIterator.Value()
-		if stakerToRemove.StartTime.After(newChainTime) {
-			break
-		}
-
-		// Iterate over delegators last to preserve expected modification ordering for state
-		if !stakerToRemove.Priority.IsPendingDelegator() {
-			continue
-		}
-
-		stakerToAdd := newCurrentStakerFromPendingStaker(stakerToRemove)
-
-		potentialReward, err := mintReward(backend, parentState, changes, stakerToRemove)
-		if err != nil {
-			return nil, false, err
-		}
-		stakerToAdd.PotentialReward = potentialReward
-
-		if err := changes.PutCurrentDelegator(stakerToAdd); err != nil {
+	for _, p := range delegatorPromotions {
+		if err := changes.PutCurrentDelegator(p.current); err != nil {
 			return nil, false, fmt.Errorf("putting current delegator: %w", err)
 		}
-
-		changes.DeletePendingDelegator(stakerToRemove)
-		changed = true
+		changes.DeletePendingDelegator(p.pending)
 	}
+
+	changed := len(validatorPromotions) > 0 || len(delegatorPromotions) > 0
 
 	// Remove any current stakers whose [EndTime] <= [newChainTime].
 	//
@@ -267,45 +273,6 @@ func advanceTimeTo(
 
 	changes.SetTimestamp(newChainTime)
 	return changes, changed, nil
-}
-
-// newCurrentStakerFromPendingStaker returns a copy of pending as a current staker.
-func newCurrentStakerFromPendingStaker(pending *state.Staker) *state.Staker {
-	current := *pending
-	current.NextTime = pending.EndTime
-	current.Priority = txs.PendingToCurrentPriorities[pending.Priority]
-
-	return &current
-}
-
-// mintReward calculates the potential reward for a pending staker being promoted to current and applies the resulting
-// supply update to changes.
-func mintReward(
-	backend *Backend,
-	parentState state.Chain,
-	changes *state.Diff,
-	staker *state.Staker,
-) (uint64, error) {
-	supply, err := changes.GetCurrentSupply(staker.SubnetID)
-	if err != nil {
-		return 0, err
-	}
-
-	rewards, err := GetRewardsCalculator(backend, parentState, staker.SubnetID)
-	if err != nil {
-		return 0, err
-	}
-
-	potentialReward := rewards.Calculate(
-		staker.EndTime.Sub(staker.StartTime),
-		staker.Weight,
-		supply,
-	)
-
-	// Invariant: rewards.Calculate can never return a potentialReward such that
-	// supply + potentialReward > maximumSupply.
-	changes.SetCurrentSupply(staker.SubnetID, supply+potentialReward)
-	return potentialReward, nil
 }
 
 // Remove all expiries whose timestamp now implies they can never be re-issued.

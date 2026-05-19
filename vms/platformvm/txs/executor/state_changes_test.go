@@ -449,3 +449,81 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 
 	require.False(t, pendingDelegatorItr.Next())
 }
+
+// TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder tests that promoting pending stakers mints
+// rewards in the historical pending staking iterator order.
+func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(t *testing.T) {
+	s := statetest.New(t, statetest.Config{})
+
+	var (
+		startTime       = s.GetTimestamp().Add(time.Second)
+		endTime         = startTime.Add(14 * 24 * time.Hour)
+		nodeID          = ids.GenerateTestNodeID()
+		validatorWeight = 2 * units.MegaAvax
+		delegatorWeight = units.KiloAvax
+	)
+
+	require.NoError(t, s.PutPendingValidator(&state.Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    nodeID,
+		SubnetID:  constants.PrimaryNetworkID,
+		Weight:    validatorWeight,
+		StartTime: startTime,
+		EndTime:   endTime,
+		NextTime:  startTime,
+		Priority:  txs.PrimaryNetworkValidatorPendingPriority,
+	}))
+
+	s.PutPendingDelegator(&state.Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    nodeID,
+		SubnetID:  constants.PrimaryNetworkID,
+		Weight:    delegatorWeight,
+		StartTime: startTime,
+		EndTime:   endTime,
+		NextTime:  startTime,
+		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
+	})
+
+	rewards := reward.NewCalculator(reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .1 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	})
+
+	initialSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	duration := endTime.Sub(startTime)
+	wantDelegatorReward := rewards.Calculate(duration, delegatorWeight, initialSupply)
+	wantValidatorReward := rewards.Calculate(duration, validatorWeight, initialSupply+wantDelegatorReward)
+
+	_, err = AdvanceTimeTo(
+		&Backend{
+			Config: &config.Internal{
+				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			},
+			Rewards: rewards,
+		},
+		s,
+		startTime,
+	)
+	require.NoError(t, err)
+
+	gotValidator, err := s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantValidatorReward, gotValidator.PotentialReward)
+
+	delegatorItr, err := s.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	defer delegatorItr.Release()
+	require.True(t, delegatorItr.Next())
+	require.Equal(t, wantDelegatorReward, delegatorItr.Value().PotentialReward)
+
+	gotSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+	require.Equal(t, initialSupply+wantDelegatorReward+wantValidatorReward, gotSupply)
+}
