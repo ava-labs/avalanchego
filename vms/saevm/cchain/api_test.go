@@ -51,11 +51,11 @@ func TestGetTxNotFound(t *testing.T) {
 func TestGetUTXOsPagination(t *testing.T) {
 	sut := newSUT(t)
 
-	const numUTXOs = 5
+	const numUTXOs uint64 = 5
 	want := make([]*avax.UTXO, numUTXOs)
 	addr := txtest.NewKey(t).Address()
-	for i := range want {
-		want[i] = txtest.NewUTXO(uint64(i+1), sut.snowCtx.AVAXAssetID, addr)
+	for i := range numUTXOs {
+		want[i] = txtest.NewUTXO(i+1, sut.snowCtx.AVAXAssetID, addr)
 	}
 	sut.addUTXOs(t, snowtest.XChainID, want...)
 
