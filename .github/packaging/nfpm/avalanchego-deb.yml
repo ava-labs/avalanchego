@@ -10,7 +10,6 @@ depends:
 contents:
   - src: "${BINARY_PATH}"
     dst: /usr/local/bin/avalanchego
-    expand: true
     file_info:
       mode: 0755
 changelog: "${NFPM_CHANGELOG}"
