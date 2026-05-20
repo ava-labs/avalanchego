@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "synctest",
+    srcs = ["proto.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/synctest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//proto/pb/sync",
+        "//vms/evm/sync/handlers",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
