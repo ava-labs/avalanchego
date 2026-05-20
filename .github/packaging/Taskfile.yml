@@ -157,7 +157,6 @@ tasks:
       - cmd: mkdir -p {{.PACKAGING_TGZ_OUTPUT_DIR}}
       - cmd: >-
           docker run --rm
-          --platform linux/{{.PACKAGING_TGZ_HOST_ARCH}}
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_TGZ_OUTPUT_DIR}}:/output
           {{if .GPG_KEY_FILE}}-v {{.GPG_KEY_FILE}}:{{.GPG_KEY_FILE}}:ro{{end}}
