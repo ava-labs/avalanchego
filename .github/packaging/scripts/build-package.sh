@@ -34,7 +34,7 @@ generate_changelog "${VERSION}"
 # ── GPG signing ───────────────────────────────────────────────────
 
 GPG_KEY_FILE="${GPG_KEY_FILE:-}"
-GPG_PUBLIC_KEY="${OUTPUT_DIR}/${PKG_FORMAT}-GPG-KEY-avalanchego"
+GPG_PUBLIC_KEY="${OUTPUT_DIR}/GPG-KEY-avalanchego"
 
 # nfpm reads the signing passphrase from a packager-specific env var
 # (NFPM_RPM_PASSPHRASE, NFPM_DEB_PASSPHRASE, ...); mirror our format-
