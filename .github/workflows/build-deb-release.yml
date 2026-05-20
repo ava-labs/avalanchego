@@ -27,8 +27,9 @@ jobs:
             deb_arch: arm64
     runs-on: ${{ matrix.runner }}
     permissions:
-      id-token: write
       contents: read
+    outputs:
+      tag: ${{ steps.setup.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v4
@@ -80,8 +81,37 @@ jobs:
             build/deb/subnet-evm-${{ steps.setup.outputs.tag }}-${{ matrix.deb_arch }}.deb
             build/deb/DEB-GPG-KEY-avalanchego
 
+      - name: Cleanup
+        if: always()
+        run: |
+          if [[ -n "${{ steps.setup.outputs.gpg-key-file }}" ]]; then
+            rm -f "${{ steps.setup.outputs.gpg-key-file }}"
+          fi
+          sudo rm -rf build/deb build/gpg
+        shell: bash
+
+  # Release-only S3 upload. Runs in its own job so id-token: write is
+  # never granted to a job that checks out and executes PR-controlled
+  # packaging scripts.
+  upload-debs-s3:
+    needs: build-deb
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        deb_arch: [amd64, arm64]
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download DEB artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: debs-${{ matrix.deb_arch }}
+          path: build/deb
+
       - name: Configure AWS credentials
-        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
@@ -89,16 +119,14 @@ jobs:
           aws-region: us-east-1
 
       - name: Install aws cli
-        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
         run: |
           if ! command -v aws &>/dev/null; then
             sudo snap install aws-cli --classic
           fi
 
       - name: Upload DEBs to S3
-        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch'
         env:
-          TAG: ${{ steps.setup.outputs.tag }}
+          TAG: ${{ needs.build-deb.outputs.tag }}
           DEB_ARCH: ${{ matrix.deb_arch }}
           BUCKET: ${{ secrets.BUCKET }}
         run: |
@@ -110,12 +138,3 @@ jobs:
             aws s3 cp "build/deb/DEB-GPG-KEY-avalanchego" \
               "s3://${BUCKET}/linux/debs/ubuntu/${release}/"
           done
-
-      - name: Cleanup
-        if: always()
-        run: |
-          if [[ -n "${{ steps.setup.outputs.gpg-key-file }}" ]]; then
-            rm -f "${{ steps.setup.outputs.gpg-key-file }}"
-          fi
-          sudo rm -rf build/deb build/gpg
-        shell: bash
