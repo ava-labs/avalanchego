@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -59,6 +60,14 @@ func (o Output) Compare(other Output) int {
 	return o.AssetID.Compare(other.AssetID)
 }
 
+func (i *Import) inputIDs() set.Set[ids.ID] {
+	s := set.NewSet[ids.ID](len(i.ImportedInputs))
+	for _, in := range i.ImportedInputs {
+		s.Add(in.InputID())
+	}
+	return s
+}
+
 // Like [atomic.UnsignedImportTx.Burned], burned will error if the sum of the
 // inputs exceeds MaxUint64, even if the total amount burned could be
 // represented as a uint64.
@@ -91,10 +100,7 @@ func (i *Import) burned(assetID ids.ID) (uint64, error) {
 
 var errOutputsNotSortedUnique = errors.New("outputs not sorted and unique")
 
-// SanityCheck verifies that the transaction's structural invariants hold
-// against the chain's context and that it does not produce more funds than it
-// consumes.
-func (i *Import) SanityCheck(ctx *snow.Context) error {
+func (i *Import) sanityCheck(ctx *snow.Context) error {
 	switch {
 	case i.NetworkID != ctx.NetworkID:
 		return fmt.Errorf("%w: want %d, got %d", errWrongNetworkID, ctx.NetworkID, i.NetworkID)
@@ -138,6 +144,53 @@ func (i *Import) SanityCheck(ctx *snow.Context) error {
 		return errOutputsNotSortedUnique
 	}
 
+	return nil
+}
+
+var (
+	errFetchingUTXOs      = errors.New("fetching UTXOs")
+	errUnmarshallingUTXO  = errors.New("unmarshalling UTXO")
+	errMismatchedAssetIDs = errors.New("mismatched asset IDs")
+	errVerifyingTransfer  = errors.New("verifying transfer")
+)
+
+func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credential) error {
+	if len(i.ImportedInputs) != len(creds) {
+		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(i.ImportedInputs), len(creds))
+	}
+
+	fxTx, err := toFxTx(i)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
+	}
+
+	utxoIDs := make([][]byte, len(i.ImportedInputs))
+	for j, in := range i.ImportedInputs {
+		inputID := in.InputID()
+		utxoIDs[j] = inputID[:]
+	}
+
+	utxoBytes, err := sm.Get(i.SourceChain, utxoIDs)
+	if err != nil {
+		return fmt.Errorf("%w from %s: %w", errFetchingUTXOs, i.SourceChain, err)
+	}
+
+	for j, in := range i.ImportedInputs {
+		// TODO(StephenButtolph): Parallelize transfer verification, which
+		// includes signature verification. This is non-trivial, because
+		// transactions frequently contain duplicate signatures, which are
+		// currently being cached.
+		utxo := new(avax.UTXO)
+		if _, err := c.Unmarshal(utxoBytes[j], utxo); err != nil {
+			return fmt.Errorf("%w (%d): %w", errUnmarshallingUTXO, j, err)
+		}
+		if utxo.Asset.ID != in.Asset.ID {
+			return fmt.Errorf("%w (%d): input asset %s does not match UTXO asset %s", errMismatchedAssetIDs, j, in.Asset.ID, utxo.Asset.ID)
+		}
+		if err := fx.VerifyTransfer(fxTx, in.In, creds[j], utxo.Out); err != nil {
+			return fmt.Errorf("%w (%d): %w", errVerifyingTransfer, j, err)
+		}
+	}
 	return nil
 }
 
@@ -185,8 +238,8 @@ func (i *Import) atomicRequests(ids.ID) (ids.ID, *chainsatomic.Requests, error) 
 	return i.SourceChain, &chainsatomic.Requests{RemoveRequests: utxoIDs}, nil
 }
 
-// TransferNonAVAX adds the non-AVAX balances to the statedb.
-func (i *Import) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+// transferNonAVAX adds the non-AVAX balances to the statedb.
+func (i *Import) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
 	for _, out := range i.Outs {
 		if out.AssetID == avaxAssetID {
 			continue

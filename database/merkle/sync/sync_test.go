@@ -5,13 +5,120 @@ package sync
 
 import (
 	"bytes"
+	"context"
 	"math/rand"
 	"testing"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
+
+type marshaler struct{}
+
+var _ Marshaler[struct{}] = marshaler{}
+
+func (marshaler) Marshal(struct{}) ([]byte, error) {
+	return []byte{1}, nil
+}
+
+func (marshaler) Unmarshal([]byte) (struct{}, error) {
+	return struct{}{}, nil
+}
+
+type db struct {
+	id ids.ID
+}
+
+var _ DB[struct{}, struct{}] = (*db)(nil)
+
+func (db *db) GetMerkleRoot(context.Context) (ids.ID, error) {
+	return db.id, nil
+}
+
+func (*db) Clear() error {
+	return nil
+}
+
+//nolint:revive // unused parameter clarifies method signature
+func (*db) CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byte], proof struct{}) (maybe.Maybe[[]byte], error) {
+	return maybe.Nothing[[]byte](), nil
+}
+
+//nolint:revive // unused parameter clarifies method signature
+func (*db) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], proof struct{}) (maybe.Maybe[[]byte], error) {
+	return maybe.Nothing[[]byte](), nil
+}
+
+//nolint:revive // unused parameter clarifies method signature
+func (*db) GetChangeProof(ctx context.Context, startRootID ids.ID, endRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (struct{}, error) {
+	return struct{}{}, nil
+}
+
+//nolint:revive // unused parameter clarifies method signature
+func (*db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (struct{}, error) {
+	return struct{}{}, nil
+}
+
+//nolint:revive // unused parameter clarifies method signature
+func (*db) VerifyChangeProof(ctx context.Context, proof struct{}, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+	return nil
+}
+
+//nolint:revive // unused parameter clarifies method signature
+func (*db) VerifyRangeProof(ctx context.Context, proof struct{}, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+	return nil
+}
+
+func Test_Sync_BusyContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	clientDB := &db{id: ids.Empty}
+
+	// Ensure the single thread doing work is blocked.
+	// This will cause the syncer to wait for more incoming work on the cond var,
+	// testing a path where the response handler is never called.
+	ch := make(chan struct{})
+	defer close(ch) // avoid leaking the goroutine
+	blockingHandler := p2p.TestHandler{
+		AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
+			cancel()
+			<-ch
+			return nil, nil
+		},
+	}
+
+	syncer, err := NewSyncer(
+		clientDB,
+		Config[struct{}, struct{}]{
+			TargetRoot:            ids.GenerateTestID(), // must be different from clientDB's root and [ids.Empty]
+			RangeProofMarshaler:   marshaler{},
+			ChangeProofMarshaler:  marshaler{},
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, blockingHandler),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, blockingHandler),
+			Log:                   logging.NoLog{},
+			SimultaneousWorkLimit: 1, // ensures synchronous event handling
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+
+	err = syncer.Sync(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+}
 
 func Test_Midpoint(t *testing.T) {
 	require := require.New(t)

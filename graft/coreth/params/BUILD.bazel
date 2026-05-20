@@ -24,6 +24,7 @@ go_library(
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/precompileconfig",
         "//snow",
         "//upgrade",
         "//utils",

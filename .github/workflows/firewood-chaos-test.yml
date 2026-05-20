@@ -38,13 +38,16 @@ on:
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   define-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
@@ -79,7 +82,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
     timeout-minutes: ${{ matrix.timeout-minutes || 60 }}
-    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
+    runs-on: ${{ matrix.runner || 'ubuntu-24.04' }}
     permissions:
       id-token: write
       contents: read
@@ -88,12 +91,12 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           role-duration-seconds: '43200'
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run chaos test with Firewood
         shell: nix develop --impure --command bash -x {0}
         run: ./scripts/run_task.sh test-cchain-reexecution -- "${{ matrix.test || '' }}"

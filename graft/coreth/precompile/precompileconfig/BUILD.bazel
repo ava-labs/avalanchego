@@ -15,9 +15,9 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig",
     deps = [
+        "//graft/evm/precompileconfig",
         "//graft/evm/utils",
         "//snow",
-        "//snow/engine/snowman/block",
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "@com_github_ava_labs_libevm//common",

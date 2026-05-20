@@ -283,6 +283,12 @@ func (a AvalancheRules) IsGraniteActivated() bool {
 	return a.IsGranite
 }
 
+// IsDurangoActivated is used by the precompileconfig to determine if the Durango upgrade is activated.
+// For Coreth we don't really need this, but need to implement it to satisfy the interface.
+func (a AvalancheRules) IsDurangoActivated() bool {
+	return a.IsDurango
+}
+
 func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
 	return AvalancheRules{
 		IsApricotPhase1:     n.IsApricotPhase1(timestamp),
