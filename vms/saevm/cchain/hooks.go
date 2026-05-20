@@ -62,20 +62,18 @@ func newHooks(
 	pool *txpool.Pending,
 	warpStorage *warp.Storage,
 ) *hooks {
-	poolTxs := func() iter.Seq[*hookTx] {
-		return func(yield func(*hookTx) bool) {
-			for t := range pool.Iter() {
-				ht, err := newHookTx(t, ctx.AVAXAssetID)
-				if err != nil {
-					ctx.Log.Warn("failed to convert tx",
-						zap.Stringer("txID", t.ID()),
-						zap.Error(err),
-					)
-					continue
-				}
-				if !yield(ht) {
-					return
-				}
+	poolTxs := func(yield func(*hookTx) bool) {
+		for t := range pool.Iter() {
+			ht, err := newHookTx(t, ctx.AVAXAssetID)
+			if err != nil {
+				ctx.Log.Warn("failed to convert tx",
+					zap.Stringer("txID", t.ID()),
+					zap.Error(err),
+				)
+				continue
+			}
+			if !yield(ht) {
+				return
 			}
 		}
 	}
@@ -123,9 +121,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			delayExcess:  headerExtra.MinDelayExcess,
 			targetExcess: headerExtra.TargetExcess,
 		},
-		potentialTxs: func() iter.Seq[*hookTx] {
-			return slices.Values(txs)
-		},
+		potentialTxs: slices.Values(txs),
 	}, nil
 }
 
@@ -241,7 +237,7 @@ type builder struct {
 	// When fields in [desiredParams] are set, the builder produces headers
 	// that move the corresponding network value toward the desired value.
 	desired      desiredParams
-	potentialTxs func() iter.Seq[*hookTx]
+	potentialTxs iter.Seq[*hookTx]
 }
 
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
@@ -309,7 +305,6 @@ func (b *builder) PotentialEndOfBlockOps(
 	settledHash common.Hash,
 	source saetypes.BlockSource,
 ) iter.Seq[*hookTx] {
-	seq := b.potentialTxs()
 	return func(yield func(*hookTx) bool) {
 		// Transactions are verified against the last executed state. We must
 		// also verify that they don't conflict with any transactions in blocks
@@ -322,7 +317,7 @@ func (b *builder) PotentialEndOfBlockOps(
 			return
 		}
 
-		for t := range seq {
+		for t := range b.potentialTxs {
 			if inputs.Overlaps(t.inputs) {
 				b.ctx.Log.Debug("tx consumes previously consumed inputs",
 					zap.Stringer("txID", t.id),

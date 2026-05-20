@@ -132,6 +132,7 @@ go_test(
         "//utils/crypto/secp256k1",
         "//utils/formatting",
         "//utils/logging",
+        "//utils/rpc",
         "//utils/set",
         "//vms/components/avax",
         "//vms/evm/predicate",

@@ -254,7 +254,7 @@ type TxStatus struct {
 // been written to state, which can briefly precede the corresponding block
 // being fully executed.
 func (s *service) GetAtomicTxStatus(_ *http.Request, a *api.JSONTxID, r *TxStatus) error {
-	s.ctx.Log.Debug("API called",
+	s.ctx.Log.Debug("deprecated API called",
 		zap.String("service", "avax"),
 		zap.String("method", "getAtomicTxStatus"),
 		zap.Stringer("txID", a.TxID),
