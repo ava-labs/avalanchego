@@ -82,7 +82,8 @@ func WaitForCompletion(
 
 	log.Info("Waiting for node to report healthy")
 	var (
-		bootstrapped       bool
+		bootstrapped bool
+		// Defer the first check as the node hasn't begun bootstrapping yet.
 		nextImageCheckTime = time.Now().Add(imageCheckInterval)
 	)
 	if err := wait.PollUntilContextCancel(context.Background(), healthCheckInterval, true, func(pollCtx context.Context) (bool, error) {
@@ -104,11 +105,15 @@ func WaitForCompletion(
 					append(commonFields, zap.Reflect("testConfig", testConfig))...,
 				)
 				log.Info("Waiting for new image to test")
+				// Check immediately in case `master` is already updated.
+				nextImageCheckTime = time.Now()
 			default:
 				log.Info("Node reported unhealthy", commonFields...)
 			}
 		}
 
+		// Assumes imageCheckInterval >= healthCheckInterval (the outer poll
+		// cadence). The defaults of 5m / 1m satisfy this.
 		if time.Now().Before(nextImageCheckTime) {
 			return false, nil
 		}

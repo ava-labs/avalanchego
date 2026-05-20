@@ -39,7 +39,7 @@ processed. This is configured by including
 
 ## Overview
 
-The intention of `bootstrap-monitor` is to enable a Kubernetes [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) to perform continuous bootstrap testing for a given avalanchego configuration. It ensures that a testing pod either starts or resume a test, polls for a new image while the test is running, and initiates a new test when one is found.
+The intention of `bootstrap-monitor` is to enable a Kubernetes [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) to perform continuous bootstrap testing for a given avalanchego configuration. It ensures that a testing pod either starts or resumes a test, polls for a new image while the test is running, and initiates a new test when one is found.
 
  - Both the `init` and `wait-for-completion` commands of the
    `bootstrap-monitor` binary are intended to run as containers of a
