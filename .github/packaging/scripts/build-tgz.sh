@@ -12,6 +12,19 @@ set -euo pipefail
 : "${PACKAGING_TAG:?PACKAGING_TAG must be set}"
 : "${OUTPUT_DIR:?OUTPUT_DIR must be set}"
 
+# Accumulate cleanup state. The EXIT trap evaluates these by name at
+# exit time, so the assignments below can happen anywhere in the script.
+STAGE_DIR=""
+SIGN_GNUPGHOME=""
+cleanup_on_exit() {
+    [[ -n "${STAGE_DIR}" ]] && rm -rf "${STAGE_DIR}"
+    if [[ -n "${SIGN_GNUPGHOME}" ]]; then
+        gpgconf --kill gpg-agent 2>/dev/null || true
+        rm -rf "${SIGN_GNUPGHOME}"
+    fi
+}
+trap cleanup_on_exit EXIT
+
 REPO_ROOT="/build"
 TAG="${PACKAGING_TAG}"
 
@@ -92,9 +105,8 @@ elif [[ ! -s "${GPG_KEY_FILE}" ]]; then
     echo "       Verify that the GPG signing secret is configured." >&2
     exit 1
 else
-    GNUPGHOME=$(mktemp -d)
-    export GNUPGHOME
-    trap 'gpgconf --kill gpg-agent 2>/dev/null || true; rm -rf "${GNUPGHOME}"' EXIT
+    SIGN_GNUPGHOME=$(mktemp -d)
+    export GNUPGHOME="${SIGN_GNUPGHOME}"
 
     echo "Importing GPG key for tarball signing..."
     gpg --batch --import "${GPG_KEY_FILE}"
@@ -133,8 +145,6 @@ stage_and_tar() {
 
 stage_and_tar "avalanchego" "${AVALANCHEGO_BINARY}"
 stage_and_tar "subnet-evm" "${SUBNET_EVM_BINARY}"
-
-rm -rf "${STAGE_DIR}"
 
 # ── Step 4: Export public key for validate-tgz.sh ─────────────────
 
