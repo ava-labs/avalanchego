@@ -93,6 +93,7 @@ go_library(
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//eth/tracers/js",

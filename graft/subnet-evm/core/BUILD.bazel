@@ -156,6 +156,7 @@ graft_go_test(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//consensus/misc/eip4844",
+        "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
