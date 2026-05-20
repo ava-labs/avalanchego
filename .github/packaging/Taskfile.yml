@@ -59,6 +59,8 @@ tasks:
     vars:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_HOST_ARCH}}'
       RPM_TAG: '{{.PACKAGING_TAG}}'
+    env:
+      GPG_KEY_PASSPHRASE: '{{.GPG_KEY_PASSPHRASE}}'
     deps: [build-builder-docker-image]
     cmds:
       - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
@@ -75,7 +77,7 @@ tasks:
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
           {{if .GPG_KEY_FILE}}-e GPG_KEY_FILE={{.GPG_KEY_FILE}}{{end}}
-          {{if .GPG_KEY_PASSPHRASE}}-e GPG_KEY_PASSPHRASE={{.GPG_KEY_PASSPHRASE}}{{end}}
+          {{if .GPG_KEY_PASSPHRASE}}-e GPG_KEY_PASSPHRASE{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
           .github/packaging/scripts/build-package.sh
 
@@ -84,6 +86,8 @@ tasks:
     vars:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_HOST_ARCH}}'
       RPM_TAG: '{{.PACKAGING_TAG}}'
+    env:
+      GPG_KEY_PASSPHRASE: '{{.GPG_KEY_PASSPHRASE}}'
     deps: [build-builder-docker-image]
     cmds:
       - cmd: mkdir -p {{.PACKAGING_OUTPUT_DIR}}
@@ -100,7 +104,7 @@ tasks:
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
           {{if .GPG_KEY_FILE}}-e GPG_KEY_FILE={{.GPG_KEY_FILE}}{{end}}
-          {{if .GPG_KEY_PASSPHRASE}}-e GPG_KEY_PASSPHRASE={{.GPG_KEY_PASSPHRASE}}{{end}}
+          {{if .GPG_KEY_PASSPHRASE}}-e GPG_KEY_PASSPHRASE{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
           .github/packaging/scripts/build-package.sh
 
