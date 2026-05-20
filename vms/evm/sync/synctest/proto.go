@@ -12,6 +12,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 // FakeResponder records the last request in GotReq.
@@ -20,6 +22,9 @@ type FakeResponder[Req, Resp proto.Message] struct {
 	Err    *common.AppError
 	GotReq Req
 }
+
+// FakeBlockResponder is the [FakeResponder] bound to the block-batch RPC.
+type FakeBlockResponder = FakeResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
 
 func (f *FakeResponder[Req, Resp]) Respond(_ context.Context, _ ids.NodeID, req Req) (Resp, *common.AppError) {
 	f.GotReq = req
