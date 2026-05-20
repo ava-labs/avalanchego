@@ -16,6 +16,9 @@
 #   GITHUB_OUTPUT   - Path to step output file (CI only; omit for stdout)
 #   TAG_INPUT       - Explicit tag from workflow_dispatch (empty for auto-detect)
 #   GPG_PRIVATE_KEY - GPG private key content (empty for unsigned PR builds)
+#   RELEASE         - Non-empty marks the run as a release build; missing
+#                     GPG_PRIVATE_KEY is then fatal (instead of falling back
+#                     to ephemeral signing as for PR/local).
 
 set -euo pipefail
 
@@ -39,6 +42,7 @@ echo "Resolved tag: ${TAG}" >&2
 # ── Import GPG key ───────────────────────────────────────────────
 
 GPG_PRIVATE_KEY="${GPG_PRIVATE_KEY:-}"
+RELEASE="${RELEASE:-}"
 
 if [[ -n "${GPG_PRIVATE_KEY}" ]]; then
     GPG_KEY_FILE="$(mktemp)"
@@ -46,6 +50,9 @@ if [[ -n "${GPG_PRIVATE_KEY}" ]]; then
     printf '%s' "${GPG_PRIVATE_KEY}" > "${GPG_KEY_FILE}"
     echo "gpg-key-file=${GPG_KEY_FILE}" >> "${OUTPUT}"
     echo "GPG key written to temporary file" >&2
+elif [[ -n "${RELEASE}" ]]; then
+    echo "ERROR: release build requires GPG_PRIVATE_KEY but none was provided" >&2
+    exit 1
 else
     echo "gpg-key-file=" >> "${OUTPUT}"
 fi

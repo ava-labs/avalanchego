@@ -67,6 +67,7 @@ jobs:
         env:
           TAG_INPUT: ${{ github.event.inputs.tag }}
           GPG_PRIVATE_KEY: ${{ github.event_name != 'pull_request' && secrets.RPM_GPG_PRIVATE_KEY || '' }}
+          RELEASE: ${{ github.event_name != 'pull_request' && 'true' || '' }}
 
       - name: Build and validate RPMs
         run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-rpms
