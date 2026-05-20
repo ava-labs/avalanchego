@@ -470,6 +470,18 @@ task bazel-clean-all              # or: bazel clean --expunge
 task bazel-check-metadata
 ```
 
+As part of `bazel-check-metadata`, package-local `BUILD.bazel` files are
+expected to define at most one `go_library` rule. Multiple
+`go_library` rules in one directory are usually stale metadata left
+behind by a package rename or move, where Gazelle added the new rule
+without removing the old checked-in one.
+
+This repo prefers linting for that stale-rule pattern rather than
+deleting and regenerating all non-curated `BUILD.bazel` files. The lint
+is narrower and safer: it fails on the specific suspicious state we want
+to prevent, without relying on a maintained list of which BUILD files
+are safe to destroy and recreate from scratch.
+
 In CI, the Bazel workflow runs `bazel-check-metadata` before Bazel build
 and test jobs. This makes stale metadata fail with a single actionable
 error instead of surfacing later as multiple downstream Bazel failures.

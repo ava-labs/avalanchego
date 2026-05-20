@@ -185,6 +185,10 @@ tasks:
     desc: Check that generated BUILD files are up-to-date
     cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
 
+  check-bazel-multiple-go-libraries:
+    desc: Check that each BUILD.bazel defines at most one go_library
+    cmd: '{{.NIX_RUN}} ./scripts/check_bazel_multiple_go_libraries.sh'
+
   check-clean-branch:
     desc: Checks that the git working tree is clean
     cmd: '{{.NIX_RUN}} .github/workflows/check-clean-branch.sh'
