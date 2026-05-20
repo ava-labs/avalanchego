@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "network.go",
         "proto.go",
+        "stats.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/synctest",
     visibility = ["//visibility:public"],
@@ -13,6 +14,7 @@ go_library(
         "//ids",
         "//network/p2p",
         "//snow/engine/common",
+        "//vms/evm/sync/code",
         "//vms/evm/sync/handlers",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
