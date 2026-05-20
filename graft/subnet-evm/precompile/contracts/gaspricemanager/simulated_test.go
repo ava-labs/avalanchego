@@ -151,18 +151,11 @@ func TestGasPriceManager(t *testing.T) {
 			},
 		},
 		{
-			name: "contract should be added to enabled list",
-			test: func(t *testing.T, backend *sim.Backend, gasPriceManager *bindings.IGasPriceManager) {
-				testContractAddr, _ := deployTestContract(t, backend, admin)
-				allowlisttest.SetAsEnabled(t, backend, gasPriceManager, admin, testContractAddr)
-				allowlisttest.VerifyRole(t, gasPriceManager, testContractAddr, allowlist.EnabledRole)
-			},
-		},
-		{
-			name: "enabled contract should set and read gas price config",
+			name: "enabled contract should set and modify gas price config",
 			test: func(t *testing.T, backend *sim.Backend, gasPriceManager *bindings.IGasPriceManager) {
 				testContractAddr, testContract := deployTestContract(t, backend, admin)
 				allowlisttest.SetAsEnabled(t, backend, gasPriceManager, admin, testContractAddr)
+				allowlisttest.VerifyRole(t, gasPriceManager, testContractAddr, allowlist.EnabledRole)
 
 				got, err := testContract.GetGasPriceConfig(nil)
 				require.NoError(t, err, "GetGasPriceConfig() before set")
