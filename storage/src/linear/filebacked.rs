@@ -290,15 +290,11 @@ impl Drop for PredictiveReader<'_> {
 impl Read for PredictiveReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
         if self.len == self.pos {
-            let bytes_left_in_page = PREDICTIVE_READ_BUFFER_SIZE
-                - (self.offset % PREDICTIVE_READ_BUFFER_SIZE as u64) as usize;
             // BLOCKING: `read_at` is a blocking pread(2) syscall. Every cache miss on the read
             // path goes through here. On warm page cache this is sub-microsecond; on cold cache
             // or slow storage this can be many milliseconds. Called on any trie traversal that
             // encounters a node not in the in-memory cache.
-            let read = self
-                .fd
-                .read_at(&mut self.buffer[..bytes_left_in_page], self.offset)?;
+            let read = self.fd.read_at(&mut self.buffer, self.offset)?;
             self.offset += read as u64;
             self.len = read;
             self.pos = 0;
