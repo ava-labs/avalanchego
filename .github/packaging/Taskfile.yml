@@ -184,6 +184,6 @@ tasks:
       - task: validate-tarballs
 
   upload-tarballs:
-    desc: Uploads built tarballs and signatures to S3 (requires BUCKET, TGZ_ARCH, AWS creds)
+    desc: Uploads built tarballs and signatures to S3
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/upload-tgz.sh'
