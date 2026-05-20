@@ -73,13 +73,13 @@ build_binary() {
 # Sets SUBNET_EVM_VM_ID (global) as a side effect.
 resolve_subnet_evm_vm_id() {
     SUBNET_EVM_VM_ID="$(
-        (
+        {
             # shellcheck disable=SC1091
             source "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh"
             # shellcheck disable=SC2154
             : "${DEFAULT_VM_ID:?DEFAULT_VM_ID must be set by constants.sh}"
-            echo "${DEFAULT_VM_ID}"
-        )
+        } >&2
+        echo "${DEFAULT_VM_ID}"
     )"
     export SUBNET_EVM_VM_ID
 }
