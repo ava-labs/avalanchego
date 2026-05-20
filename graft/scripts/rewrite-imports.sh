@@ -41,8 +41,11 @@ echo "rewriting ${ORIGINAL_IMPORT} imports to ${TARGET_IMPORT} in all golang fil
 # Escape dots in the original import path for regex use
 ESCAPED_ORIGINAL="${ORIGINAL_IMPORT//./\\.}"
 
+# The negative lookbehind (?<!://) ensures we only rewrite Go import paths
+# and not GitHub URLs (e.g. https://github.com/.../issues/123) in comments
+# or string literals.
 rg "${ESCAPED_ORIGINAL}" -t go --files-with-matches --null | \
-  xargs -0 perl -i -pe "s|\\Q${ORIGINAL_IMPORT}\\E|${TARGET_IMPORT}|g"
+  xargs -0 perl -i -pe "s|(?<!://)\\Q${ORIGINAL_IMPORT}\\E|${TARGET_IMPORT}|g"
 
 echo "import rewrite completed successfully"
 

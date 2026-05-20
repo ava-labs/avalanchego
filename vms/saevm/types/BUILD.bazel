@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "types",
+    srcs = ["types.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/types",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)

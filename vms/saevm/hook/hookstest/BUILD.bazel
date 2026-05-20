@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "hookstest",
+    srcs = [
+        "stub.canoto.go",
+        "stub.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/engine/snowman/block",
+        "//utils/set",
+        "//vms/components/gas",
+        "//vms/saevm/gastime",
+        "//vms/saevm/hook",
+        "//vms/saevm/saetest",
+        "//vms/saevm/types",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stephenbuttolph_canoto//:canoto",
+    ],
+)

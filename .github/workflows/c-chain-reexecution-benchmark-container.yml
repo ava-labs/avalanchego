@@ -30,7 +30,7 @@ on:
         default: ''
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
-        default: 30
+        default: '30'
       with-dependencies:
         description: 'Dependencies to use (e.g., "firewood=abc123" or "firewood=abc,libevm=xyz")'
         default: ''
@@ -104,7 +104,7 @@ jobs:
       # c-chain-reexecution-benchmark's Nix install will be skipped; installation is idempotent.
       - name: Install Nix
         if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
-        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Configure dependency versions

@@ -193,7 +193,7 @@ type ManagerConfig struct {
 	Tracer                    trace.Tracer
 	Log                       logging.Logger
 	LogFactory                logging.Factory
-	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
+	VMManager                 *vms.Manager // Manage mappings from vm ID --> vm
 	BlockAcceptorGroup        snow.AcceptorGroup
 	TxAcceptorGroup           snow.AcceptorGroup
 	VertexAcceptorGroup       snow.AcceptorGroup
@@ -208,10 +208,10 @@ type ManagerConfig struct {
 	Server                    server.Server // Handles HTTP API calls
 	AtomicMemory              *atomic.Memory
 	AVAXAssetID               ids.ID
-	XChainID                  ids.ID          // ID of the X-Chain,
-	CChainID                  ids.ID          // ID of the C-Chain,
-	CriticalChains            set.Set[ids.ID] // Chains that can't exit gracefully
-	TimeoutManager            timeout.Manager // Manages request timeouts when sending messages to other validators
+	XChainID                  ids.ID           // ID of the X-Chain,
+	CChainID                  ids.ID           // ID of the C-Chain,
+	CriticalChains            set.Set[ids.ID]  // Chains that can't exit gracefully
+	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
 	Health                    health.Registerer
 	ProposerMinBlockDelay     time.Duration
 	SubnetConfigs             map[ids.ID]subnets.Config // ID -> SubnetConfig

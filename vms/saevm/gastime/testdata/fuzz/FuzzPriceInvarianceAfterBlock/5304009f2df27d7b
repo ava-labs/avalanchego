@@ -1,0 +1,10 @@
+go test fuzz v1
+uint64(1000000)
+uint64(1000068)
+uint64(26)
+uint64(9223372036854775639)
+bool(false)
+uint64(1000000)
+uint64(3)
+uint64(9223372036854775797)
+bool(false)

@@ -14,11 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install qemu (required for cross-platform builds)
-        run: |
-          sudo apt update
-          sudo apt -y install qemu-system qemu-user-static
-          sudo systemctl restart docker
+      - name: Set up QEMU (required for cross-platform builds)
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
       - name: Create multiplatform docker builder
         run: docker buildx create --use
       - name: Build and publish images to DockerHub

@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "escrow",
+    srcs = ["escrow.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)

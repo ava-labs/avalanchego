@@ -33,6 +33,9 @@ var (
 	errUnexpectedSeq    = errors.New("unexpected sequence number")
 	errInvalidQC        = errors.New("invalid quorum certificate")
 	errMismatchedDigest = errors.New("mismatched digest in finalization")
+
+	finalizationPrefix = []byte("f")
+	blacklistPrefix    = []byte("b")
 )
 
 type Storage struct {
@@ -111,7 +114,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 
 	block, err := getBlock(context.TODO(), s.vm, seq)
 	if err != nil {
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			return nil, simplex.Finalization{}, simplex.ErrBlockNotFound
 		}
 		s.log.Error("Error retrieving block from storage", zap.Uint64("seq", seq), zap.Error(err))
@@ -123,7 +126,12 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 		return nil, simplex.Finalization{}, err
 	}
 
-	vb, err := newBlock(finalization.Finalization.ProtocolMetadata, block, s.blockTracker)
+	blacklist, err := s.retrieveBlacklist(seq)
+	if err != nil {
+		return nil, simplex.Finalization{}, err
+	}
+
+	vb, err := newBlock(finalization.Finalization.ProtocolMetadata, blacklist, block, s.blockTracker)
 	if err != nil {
 		s.log.Error("failed to create simplex block", zap.Uint64("seq", seq), zap.Error(err))
 		return nil, simplex.Finalization{}, err
@@ -169,6 +177,11 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 		return fmt.Errorf("failed to store finalization: %w", err)
 	}
 
+	bl := block.Blacklist()
+	if err := s.db.Put(blacklistKey(bh.Seq), bl.Bytes()); err != nil {
+		return fmt.Errorf("failed to store blacklist: %w", err)
+	}
+
 	err := s.blockTracker.indexBlock(ctx, bh.Digest)
 	if err != nil {
 		return fmt.Errorf("failed to index block: %w", err)
@@ -180,8 +193,16 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 }
 
 func finalizationKey(seq uint64) []byte {
-	seqBuff := make([]byte, 8)
-	binary.BigEndian.PutUint64(seqBuff, seq)
+	seqBuff := make([]byte, len(finalizationPrefix)+8)
+	copy(seqBuff, finalizationPrefix)
+	binary.BigEndian.PutUint64(seqBuff[len(finalizationPrefix):], seq)
+	return seqBuff
+}
+
+func blacklistKey(seq uint64) []byte {
+	seqBuff := make([]byte, len(blacklistPrefix)+8)
+	copy(seqBuff, blacklistPrefix)
+	binary.BigEndian.PutUint64(seqBuff[len(blacklistPrefix):], seq)
 	return seqBuff
 }
 
@@ -226,6 +247,23 @@ func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, error)
 	}
 
 	return canotoFinalization.toFinalization(s.deserializer)
+}
+
+func (s *Storage) retrieveBlacklist(seq uint64) (simplex.Blacklist, error) {
+	blacklistBytes, err := s.db.Get(blacklistKey(seq))
+	if err != nil {
+		if err == database.ErrNotFound {
+			return simplex.Blacklist{}, nil
+		}
+		s.log.Debug("Failed to retrieve blacklist", zap.Uint64("seq", seq), zap.Error(err))
+		return simplex.Blacklist{}, err
+	}
+
+	var blacklist simplex.Blacklist
+	if err := blacklist.FromBytes(blacklistBytes); err != nil {
+		return simplex.Blacklist{}, fmt.Errorf("failed to parse blacklist: %w", err)
+	}
+	return blacklist, nil
 }
 
 func getBlock(ctx context.Context, vm block.ChainVM, height uint64) (snowman.Block, error) {

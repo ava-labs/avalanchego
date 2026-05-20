@@ -84,7 +84,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
+      - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Configure AWS Credentials
@@ -106,4 +106,3 @@ jobs:
           CONFIG: ${{ matrix.config }}
           MIN_WAIT_TIME: ${{ matrix.min-wait-time }}
           MAX_WAIT_TIME: ${{ matrix.max-wait-time }}
-
