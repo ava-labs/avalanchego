@@ -36,6 +36,10 @@ type BlockChain interface {
 
 	// TrieDB returns the database used for storing the state trie.
 	TrieDB() *triedb.Database
+
+	// DrainAcceptorQueue blocks until all pending accepted blocks have been
+	// fully processed by the async acceptor.
+	DrainAcceptorQueue()
 }
 
 // SummaryProvider provides state summaries for blocks.

@@ -31,7 +31,7 @@ type blockRequestTest struct {
 	startBlockHeight uint64
 
 	requestedParents  uint16
-	expectedBlocks    int
+	wantBlocks        int
 	expectNilResponse bool
 	requireResponse   func(t testing.TB, stats *statstest.TestHandlerStats, b []byte)
 }
@@ -79,7 +79,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 	var response message.BlockResponse
 	_, err = c.Unmarshal(responseBytes, &response)
 	require.NoError(t, err)
-	require.Len(t, response.Blocks, test.expectedBlocks)
+	require.Len(t, response.Blocks, test.wantBlocks)
 
 	for _, blockBytes := range response.Blocks {
 		block := new(types.Block)
@@ -101,19 +101,19 @@ func TestBlockRequestHandler(t *testing.T) {
 			name:             "handler_returns_blocks_as_requested",
 			startBlockIndex:  64,
 			requestedParents: 32,
-			expectedBlocks:   32,
+			wantBlocks:       32,
 		},
 		{
 			name:             "handler_caps_blocks_parent_limit",
 			startBlockIndex:  95,
 			requestedParents: 96,
-			expectedBlocks:   64,
+			wantBlocks:       64,
 		},
 		{
 			name:             "handler_handles_genesis",
 			startBlockIndex:  0,
 			requestedParents: 64,
-			expectedBlocks:   1,
+			wantBlocks:       1,
 		},
 		{
 			name:              "handler_unknown_block",
@@ -158,19 +158,19 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 			name:             "handler_returns_blocks_as_requested",
 			startBlockIndex:  64,
 			requestedParents: 10,
-			expectedBlocks:   10,
+			wantBlocks:       10,
 		},
 		{
 			name:             "handler_caps_blocks_size_limit",
 			startBlockIndex:  64,
 			requestedParents: 16,
-			expectedBlocks:   15,
+			wantBlocks:       15,
 		},
 		{
 			name:             "handler_caps_blocks_size_limit_on_first_block",
 			startBlockIndex:  32,
 			requestedParents: 10,
-			expectedBlocks:   1,
+			wantBlocks:       1,
 		},
 	}
 	for _, test := range tests {

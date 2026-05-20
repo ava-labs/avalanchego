@@ -27,9 +27,10 @@ func NewTrieQueue(db ethdb.Database) *trieQueue {
 	}
 }
 
-// clearIfRootDoesNotMatch clears progress and segment markers if
-// the persisted root does not match the root we are syncing to.
-func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash) error {
+// clearIfRootDoesNotMatch clears sync progress when the root changes.
+// When preserveSegments is true, segment markers are kept so unchanged
+// storage tries can resume.
+func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash, preserveSegments bool) error {
 	persistedRoot, err := customrawdb.ReadSyncRoot(t.db)
 	// If no sync root exists, treat it as empty hash (no previous sync).
 	switch {
@@ -39,14 +40,22 @@ func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash) error {
 		return err
 	}
 
-	if persistedRoot != (common.Hash{}) && persistedRoot != root {
-		// if not resuming, clear all progress markers
-		if err := customrawdb.ClearAllSyncStorageTries(t.db); err != nil {
-			return err
-		}
-		if err := customrawdb.ClearAllSyncSegments(t.db); err != nil {
-			return err
-		}
+	if persistedRoot == (common.Hash{}) || persistedRoot == root {
+		return customrawdb.WriteSyncRoot(t.db, root)
+	}
+	if err := customrawdb.ClearAllSyncStorageTries(t.db); err != nil {
+		return err
+	}
+	switch {
+	case preserveSegments:
+		// Only clear the old main trie segments. Storage trie segments
+		// are keyed by their own root and stay valid for unchanged tries.
+		err = customrawdb.ClearSyncSegments(t.db, persistedRoot)
+	default:
+		err = customrawdb.ClearAllSyncSegments(t.db)
+	}
+	if err != nil {
+		return err
 	}
 
 	return customrawdb.WriteSyncRoot(t.db, root)

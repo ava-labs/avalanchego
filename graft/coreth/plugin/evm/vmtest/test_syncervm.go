@@ -68,8 +68,8 @@ var SyncerVMTests = []SyncerVMTest{
 		TestFunc: SkipStateSyncTest,
 	},
 	{
-		Name:     "StateSyncFromScratchTest",
-		TestFunc: StateSyncFromScratchTest,
+		Name:     "StateSyncFromScratchModesTest",
+		TestFunc: StateSyncFromScratchModesTest,
 	},
 	{
 		Name:     "StateSyncFromScratchExceedParentTest",
@@ -82,6 +82,10 @@ var SyncerVMTests = []SyncerVMTest{
 	{
 		Name:     "VMShutdownWhileSyncingTest",
 		TestFunc: VMShutdownWhileSyncingTest,
+	},
+	{
+		Name:     "DynamicSyncWithBlockInjectionTest",
+		TestFunc: DynamicSyncWithBlockInjectionTest,
 	},
 }
 
@@ -101,18 +105,33 @@ func SkipStateSyncTest(t *testing.T, testSetup *SyncTestSetup) {
 	}
 }
 
-func StateSyncFromScratchTest(t *testing.T, testSetup *SyncTestSetup) {
-	test := SyncTestParams{
-		SyncableInterval:   256,
-		StateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
-		SyncMode:           block.StateSyncStatic,
+func StateSyncFromScratchModesTest(t *testing.T, testSetup *SyncTestSetup) {
+	modes := []struct {
+		name                    string
+		syncMode                block.StateSyncMode
+		dynamicStateSyncEnabled bool
+		stateSyncPivotInterval  uint64
+	}{
+		{"static", block.StateSyncStatic, false, 0},
+		{"dynamic", block.StateSyncDynamic, true, 1},
 	}
 
-	for _, scheme := range schemes {
-		test.StateScheme = scheme
-		t.Run(scheme, func(t *testing.T) {
-			testSyncVMSetup := initSyncServerAndClientVMs(t, test, engine.BlocksToFetch, testSetup)
-			testSyncerVM(t, testSyncVMSetup, test, testSetup.ExtraSyncerVMTest)
+	for _, mode := range modes {
+		t.Run(mode.name, func(t *testing.T) {
+			test := SyncTestParams{
+				SyncableInterval:        256,
+				StateSyncMinBlocks:      50, // must be less than [syncableInterval] to perform sync
+				SyncMode:                mode.syncMode,
+				DynamicStateSyncEnabled: mode.dynamicStateSyncEnabled,
+				StateSyncPivotInterval:  mode.stateSyncPivotInterval,
+			}
+			for _, scheme := range schemes {
+				test.StateScheme = scheme
+				t.Run(scheme, func(t *testing.T) {
+					testSyncVMSetup := initSyncServerAndClientVMs(t, test, engine.BlocksToFetch, testSetup)
+					testSyncerVM(t, testSyncVMSetup, test, testSetup.ExtraSyncerVMTest)
+				})
+			}
 		})
 	}
 }
@@ -307,6 +326,137 @@ func VMShutdownWhileSyncingTest(t *testing.T, testSetup *SyncTestSetup) {
 	testSyncerVM(t, testSyncVMSetup, test, testSetup.ExtraSyncerVMTest)
 }
 
+// DynamicSyncWithBlockInjectionTest verifies that blocks injected during
+// dynamic state sync trigger coordinator pivots and that blocks above the
+// commit target are batch-replayed after sync completes.
+func DynamicSyncWithBlockInjectionTest(t *testing.T, testSetup *SyncTestSetup) {
+	const (
+		syncableInterval = 256
+		extraBlockCount  = 12
+	)
+
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			var (
+				extraBlockBytes [][]byte
+				mu              sync.Mutex
+				injected        bool
+			)
+			fork := upgradetest.Latest
+
+			serverConfig := fmt.Sprintf(`{"commit-interval": %d, "state-history": %d, "state-sync-commit-interval": %d}`,
+				syncableInterval, syncableInterval, syncableInterval)
+			serverVM, serverCB := testSetup.NewVM()
+			serverTest := SetupTestVM(t, serverVM, TestVMConfig{
+				Fork: &fork, ConfigJSON: serverConfig, Scheme: scheme,
+			})
+			t.Cleanup(func() { require.NoError(t, serverVM.Shutdown(t.Context())) })
+			if testSetup.AfterInit != nil {
+				testSetup.AfterInit(t,
+					SyncTestParams{
+						SyncableInterval: syncableInterval,
+						StateScheme:      scheme,
+					},
+					SyncVMSetup{
+						VM:                 serverVM,
+						AppSender:          serverTest.AppSender,
+						SnowCtx:            serverTest.Ctx,
+						ConsensusCallbacks: serverCB,
+						DB:                 serverTest.DB,
+						AtomicMemory:       serverTest.AtomicMemory,
+					},
+					true,
+				)
+			}
+
+			// Separate key to avoid exhausting the primary key's balance.
+			extraBlockGen := func(_ int, vm extension.InnerVM, gen *core.BlockGen) {
+				br := predicate.BlockResults{}
+				b, err := br.Bytes()
+				require.NoError(t, err)
+				gen.AppendExtra(b)
+
+				tx := types.NewTransaction(gen.TxNonce(TestEthAddrs[1]), TestEthAddrs[0], common.Big1, 21000, InitialBaseFee, nil)
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.Ethereum().BlockChain().Config().ChainID), TestKeys[1].ToECDSA())
+				require.NoError(t, err)
+				gen.AddTx(signedTx)
+			}
+
+			generateAndAcceptBlocks(t, serverVM, syncableInterval, testSetup.GenFn, nil, serverCB)
+			generateAndAcceptBlocks(t, serverVM, extraBlockCount, extraBlockGen,
+				func(blk *types.Block) {
+					b, err := rlp.EncodeToBytes(blk)
+					require.NoError(t, err)
+					extraBlockBytes = append(extraBlockBytes, b)
+				},
+				serverCB,
+			)
+			serverHeight := serverVM.LastAcceptedExtendedBlock().Height()
+
+			syncerConfig := fmt.Sprintf(
+				`{"state-sync-enabled":true, "state-sync-min-blocks": 50, "tx-lookup-limit": 4, "commit-interval": %d, "state-sync-dynamic-enabled": true, "state-sync-pivot-interval": 1000}`,
+				syncableInterval)
+			syncerVM, syncerCB := testSetup.NewVM()
+			syncerTest := SetupTestVM(t, syncerVM, TestVMConfig{
+				Fork: &fork, ConfigJSON: syncerConfig, Scheme: scheme, IsSyncing: true,
+			})
+			t.Cleanup(func() { require.NoError(t, syncerVM.Shutdown(t.Context())) })
+			require.NoError(t, syncerVM.SetState(t.Context(), snow.StateSyncing))
+
+			deadline, _ := t.Deadline()
+			serverTest.AppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+				// Inject before the first response. The mutex serializes all
+				// interceptors so no response flows until injection completes.
+				go func() {
+					mu.Lock()
+					if !injected {
+						injected = true
+						for _, blkBytes := range extraBlockBytes {
+							blk, err := syncerVM.ParseBlock(t.Context(), blkBytes)
+							require.NoError(t, err)
+							require.NoError(t, blk.Verify(t.Context()))
+							require.NoError(t, blk.Accept(t.Context()))
+						}
+					}
+					mu.Unlock()
+					require.NoError(t, syncerVM.AppResponse(ctx, nodeID, requestID, response))
+				}()
+				return nil
+			}
+			require.NoError(t, syncerVM.Connected(t.Context(), serverTest.Ctx.NodeID, client.StateSyncVersion))
+			syncerTest.AppSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
+				nodeID, hasItem := nodeSet.Pop()
+				require.True(t, hasItem)
+				require.NoError(t, serverVM.AppRequest(ctx, nodeID, requestID, deadline, request))
+				return nil
+			}
+
+			summary, err := serverVM.GetLastStateSummary(t.Context())
+			require.NoError(t, err)
+			parsedSummary, err := syncerVM.ParseStateSummary(t.Context(), summary.Bytes())
+			require.NoError(t, err)
+
+			syncMode, err := parsedSummary.Accept(t.Context())
+			require.NoError(t, err)
+			require.Equal(t, block.StateSyncDynamic, syncMode)
+
+			msg, err := syncerVM.WaitForEvent(t.Context())
+			require.NoError(t, err)
+			require.Equal(t, commonEng.StateSyncDone, msg)
+			require.NoError(t, syncerVM.SyncerClient().Error())
+
+			require.NoError(t, syncerVM.SetState(t.Context(), snow.Bootstrapping))
+			// Verify both chain.State and the blockchain agree on the height.
+			require.Equal(t, serverHeight, syncerVM.LastAcceptedExtendedBlock().Height(), "chain.State height mismatch after block injection")
+			syncerChain := syncerVM.Ethereum().BlockChain()
+			require.Equal(t, serverHeight, syncerChain.LastAcceptedBlock().NumberU64(), "blockchain height mismatch after block injection")
+			require.True(t, syncerChain.HasState(syncerChain.LastAcceptedBlock().Root()), "state unavailable for last accepted block")
+
+			generateAndAcceptBlocks(t, syncerVM, 5, extraBlockGen, nil, syncerCB)
+		})
+	}
+}
+
 type SyncTestSetup struct {
 	NewVM             func() (extension.InnerVM, dummy.ConsensusCallbacks) // should not be initialized
 	AfterInit         func(t *testing.T, testParams SyncTestParams, vmSetup SyncVMSetup, isServer bool)
@@ -382,7 +532,14 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 
 	// initialise [syncerVM] with blank genesis state
 	// we also override [syncerVM]'s commit interval so the atomic trie works correctly.
-	stateSyncEnabledJSON := fmt.Sprintf(`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "commit-interval": %d}`, test.StateSyncMinBlocks, 4, test.SyncableInterval)
+	stateSyncEnabledJSON := fmt.Sprintf(
+		`{"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "commit-interval": %d, "state-sync-dynamic-enabled": %t, "state-sync-pivot-interval": %d}`,
+		test.StateSyncMinBlocks,
+		4,
+		test.SyncableInterval,
+		test.DynamicStateSyncEnabled,
+		test.StateSyncPivotInterval,
+	)
 
 	syncerVM, syncerCB := testSetup.NewVM()
 	syncerTest := SetupTestVM(t, syncerVM, TestVMConfig{
@@ -495,12 +652,14 @@ func (vm *shutdownOnceVM) Shutdown(ctx context.Context) error {
 
 // SyncTestParams contains both the actual VMs as well as the parameters with the expected output.
 type SyncTestParams struct {
-	responseIntercept  func(vm extension.InnerVM, nodeID ids.NodeID, requestID uint32, response []byte)
-	StateSyncMinBlocks uint64
-	SyncableInterval   uint64
-	SyncMode           block.StateSyncMode
-	StateScheme        string
-	expectedErr        error
+	responseIntercept       func(vm extension.InnerVM, nodeID ids.NodeID, requestID uint32, response []byte)
+	StateSyncMinBlocks      uint64
+	SyncableInterval        uint64
+	SyncMode                block.StateSyncMode
+	DynamicStateSyncEnabled bool
+	StateSyncPivotInterval  uint64
+	StateScheme             string
+	expectedErr             error
 }
 
 func testSyncerVM(t *testing.T, testSyncVMSetup *testSyncVMSetup, test SyncTestParams, extraSyncerVMTest func(t *testing.T, syncerVMSetup SyncVMSetup)) {

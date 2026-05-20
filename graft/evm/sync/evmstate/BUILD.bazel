@@ -5,7 +5,8 @@ go_library(
     name = "evmstate",
     srcs = [
         "firewood_syncer.go",
-        "state_syncer.go",
+        "hashdb_dynamic_syncer.go",
+        "hashdb_syncer.go",
         "sync_helpers.go",
         "trie_queue.go",
         "trie_segments.go",
@@ -51,7 +52,8 @@ graft_go_test(
     name = "evmstate_test",
     srcs = [
         "firewood_syncer_test.go",
-        "sync_test.go",
+        "hashdb_dynamic_syncer_test.go",
+        "hashdb_syncer_test.go",
         "trie_sync_stats_test.go",
     ],
     embed = [":evmstate"],

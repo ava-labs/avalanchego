@@ -23,6 +23,7 @@ var (
 type waitingResponseHandler struct {
 	responseChan chan []byte // blocking channel with response bytes
 	failed       bool        // whether the original request is failed
+	requestID    uint32      // set by sendAppRequest, read by abandonRequest
 }
 
 // newWaitingResponseHandler returns new instance of the waitingResponseHandler

@@ -37,10 +37,10 @@ const (
 )
 
 type atomicSyncTestCheckpoint struct {
-	expectedNumLeavesSynced int64       // expected number of leaves to have synced at this checkpoint
-	leafCutoff              int         // Number of leafs to sync before cutting off responses
-	targetRoot              common.Hash // Root of trie to resume syncing from after stopping
-	targetHeight            uint64      // Height to sync to after stopping
+	wantNumLeavesSynced int64       // expected number of leaves to have synced at this checkpoint
+	leafCutoff          int         // Number of leafs to sync before cutting off responses
+	targetRoot          common.Hash // Root of trie to resume syncing from after stopping
+	targetHeight        uint64      // Height to sync to after stopping
 }
 
 // TestSyncerScenarios is a parameterized test that covers basic syncing scenarios with different worker configurations.
@@ -113,10 +113,10 @@ func TestSyncerResumeScenarios(t *testing.T) {
 
 			testSyncer(t, serverTrieDB, targetHeight, root, []atomicSyncTestCheckpoint{
 				{
-					targetRoot:              root,
-					targetHeight:            targetHeight,
-					leafCutoff:              testCommitInterval*5 - 1,
-					expectedNumLeavesSynced: testCommitInterval * 4,
+					targetRoot:          root,
+					targetHeight:        targetHeight,
+					leafCutoff:          testCommitInterval*5 - 1,
+					wantNumLeavesSynced: testCommitInterval * 4,
 				},
 			}, int64(targetHeight)+testCommitInterval-1, tt.numWorkers) // we will resync the last commitInterval - 1 leafs
 		})
@@ -163,10 +163,10 @@ func TestSyncerResumeNewRootCheckpointScenarios(t *testing.T) {
 
 			testSyncer(t, serverTrieDB, targetHeight1, root1, []atomicSyncTestCheckpoint{
 				{
-					targetRoot:              root2,
-					targetHeight:            targetHeight2,
-					leafCutoff:              testCommitInterval*5 - 1,
-					expectedNumLeavesSynced: testCommitInterval * 4,
+					targetRoot:          root2,
+					targetHeight:        targetHeight2,
+					leafCutoff:          testCommitInterval*5 - 1,
+					wantNumLeavesSynced: testCommitInterval * 4,
 				},
 			}, int64(targetHeight2)+testCommitInterval-1, tt.numWorkers) // we will resync the last commitInterval - 1 leafs
 		})
@@ -277,7 +277,7 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 		err = syncer.Sync(ctx)
 		require.ErrorIs(t, err, leaf.ErrFailedToFetchLeafs)
 
-		require.Equal(t, checkpoint.expectedNumLeavesSynced, int64(numLeaves), "unexpected number of leaves received at checkpoint %d", i)
+		require.Equal(t, checkpoint.wantNumLeavesSynced, int64(numLeaves), "unexpected number of leaves received at checkpoint %d", i)
 		// Replace the target root and height for the next checkpoint
 		targetRoot = checkpoint.targetRoot
 		targetHeight = checkpoint.targetHeight
@@ -334,10 +334,10 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 		require.NoErrorf(t, addAllKeysWithPrefix(database.PackUInt64(height)), "failed to add keys for height %d", height)
 
 		if height%testCommitInterval == 0 {
-			expected := hasher.Hash()
+			want := hasher.Hash()
 			root, err := atomicTrie.Root(height)
 			require.NoError(t, err)
-			require.Equal(t, expected, root)
+			require.Equal(t, want, root)
 		}
 	}
 }

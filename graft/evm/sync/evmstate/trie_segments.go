@@ -54,7 +54,7 @@ type trieToSync struct {
 	// We keep a pointer to the overall sync operation,
 	// used to add segments to the work queue and to
 	// update the eta.
-	sync *stateSync
+	sync *HashDBSyncer
 
 	// task implements the syncTask interface with methods
 	// containing logic specific to the main trie or storage
@@ -64,7 +64,7 @@ type trieToSync struct {
 }
 
 // NewTrieToSync initializes a trieToSync and restores any previously started segments.
-func NewTrieToSync(sync *stateSync, root common.Hash, account common.Hash, syncTask syncTask) (*trieToSync, error) {
+func NewTrieToSync(sync *HashDBSyncer, root common.Hash, account common.Hash, syncTask syncTask) (*trieToSync, error) {
 	batch := sync.db.NewBatch() // TODO: migrate state sync to use database schemes.
 	writeFn := func(path []byte, hash common.Hash, blob []byte) {
 		rawdb.WriteTrieNode(batch, account, path, hash, blob, rawdb.HashScheme)

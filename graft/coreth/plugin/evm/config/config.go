@@ -133,8 +133,10 @@ type Config struct {
 	MaxOutboundActiveRequests int64 `json:"max-outbound-active-requests"`
 
 	// Sync settings
-	StateSyncEnabled         *bool  `json:"state-sync-enabled"`     // Pointer distinguishes false (no state sync) and not set (state sync only at genesis).
-	StateSyncSkipResume      bool   `json:"state-sync-skip-resume"` // Forces state sync to use the highest available summary block
+	StateSyncEnabled         *bool  `json:"state-sync-enabled"`         // Pointer distinguishes false (no state sync) and not set (state sync only at genesis).
+	StateSyncSkipResume      bool   `json:"state-sync-skip-resume"`     // Forces state sync to use the highest available summary block
+	StateSyncDynamicEnabled  bool   `json:"state-sync-dynamic-enabled"` // Enables dynamic state sync orchestration.
+	StateSyncPivotInterval   uint64 `json:"state-sync-pivot-interval"`  // Block interval for forwarding dynamic sync target updates.
 	StateSyncServerTrieCache int    `json:"state-sync-server-trie-cache"`
 	StateSyncIDs             string `json:"state-sync-ids"`
 	StateSyncCommitInterval  uint64 `json:"state-sync-commit-interval"`

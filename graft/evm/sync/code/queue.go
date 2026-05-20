@@ -21,7 +21,7 @@ import (
 const defaultQueueCapacity = 5000
 
 var (
-	_ types.Finalizer = (*Queue)(nil)
+	_ types.CodeRequestQueue = (*Queue)(nil)
 
 	ErrQueueClosed = errors.New("code queue is closed")
 )

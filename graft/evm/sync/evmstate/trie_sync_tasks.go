@@ -37,10 +37,10 @@ type syncTask interface {
 }
 
 type mainTrieTask struct {
-	sync *stateSync
+	sync *HashDBSyncer
 }
 
-func NewMainTrieTask(sync *stateSync) syncTask {
+func NewMainTrieTask(sync *HashDBSyncer) syncTask {
 	return &mainTrieTask{
 		sync: sync,
 	}
@@ -76,8 +76,15 @@ func (m *mainTrieTask) OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, key
 
 		// check if this account has storage root that we need to fetch
 		if acc.Root != (common.Hash{}) && acc.Root != types.EmptyRootHash {
-			if err := m.sync.trieQueue.RegisterStorageTrie(acc.Root, accountHash); err != nil {
-				return err
+			hasFilter := m.sync.storageTrieFilter != nil
+			skip := hasFilter && m.sync.storageTrieFilter(m.sync.db, accountHash, acc.Root)
+			if i == 0 {
+				log.Info("OnLeafs first account with storage", "hasFilter", hasFilter, "skip", skip, "accountHash", accountHash, "storageRoot", acc.Root)
+			}
+			if !skip {
+				if err := m.sync.trieQueue.RegisterStorageTrie(acc.Root, accountHash); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -93,12 +100,12 @@ func (m *mainTrieTask) OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, key
 }
 
 type storageTrieTask struct {
-	sync     *stateSync
+	sync     *HashDBSyncer
 	root     common.Hash
 	accounts []common.Hash
 }
 
-func NewStorageTrieTask(sync *stateSync, root common.Hash, accounts []common.Hash) syncTask {
+func NewStorageTrieTask(sync *HashDBSyncer, root common.Hash, accounts []common.Hash) syncTask {
 	return &storageTrieTask{
 		sync:     sync,
 		root:     root,

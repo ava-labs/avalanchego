@@ -4,10 +4,15 @@ load("//.bazel:defs.bzl", "graft_go_test")
 go_library(
     name = "engine",
     srcs = [
+        "block_queue.go",
         "client.go",
+        "coordinator.go",
+        "executor_dynamic.go",
         "executor_static.go",
+        "pivot_policy.go",
         "registry.go",
         "server.go",
+        "sync_target.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/engine",
     visibility = ["//visibility:public"],
@@ -32,6 +37,7 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//log",
         "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//triedb",
@@ -42,7 +48,11 @@ go_library(
 graft_go_test(
     name = "engine_test",
     srcs = [
+        "block_queue_test.go",
+        "coordinator_test.go",
         "doubles_test.go",
+        "executor_dynamic_test.go",
+        "pivot_policy_test.go",
         "registry_test.go",
     ],
     embed = [":engine"],
@@ -53,6 +63,7 @@ graft_go_test(
         "//graft/evm/sync/types",
         "//graft/evm/utils/utilstest",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",
     ],
 )
