@@ -23,36 +23,28 @@ DOCKERFILE="${DOCKERFILE:-Dockerfile}"
 
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required but not found on PATH" >&2; exit 1; }
 
-# Resolve the target arch for the builder image. Default: host arch.
-# When DOCKER_DEFAULT_PLATFORM is set to a non-host arch (a common
-# Apple Silicon setup), require an explicit ALLOW_CROSS_BUILD=1 opt-in
-# rather than silently cross-building under qemu emulation.
+# Resolve the target arch for the builder image. The whole packaging
+# pipeline only supports host-arch builds: the Taskfile's RPM_ARCH
+# defaults to host uname, validate-tgz.sh derives its arch from host
+# uname, and so on. Cross-arch builds would produce mislabeled or
+# unvalidatable artifacts, so we reject any divergence between the
+# host arch and DOCKER_DEFAULT_PLATFORM up front.
 case "$(uname -m)" in
-    x86_64)        host_goarch="amd64" ;;
-    aarch64|arm64) host_goarch="arm64" ;;
+    x86_64)        goarch="amd64" ;;
+    aarch64|arm64) goarch="arm64" ;;
     *) echo "Unsupported host arch: $(uname -m)" >&2; exit 1 ;;
 esac
-goarch="${host_goarch}"
-if [[ -n "${DOCKER_DEFAULT_PLATFORM:-}" ]]; then
-    case "${DOCKER_DEFAULT_PLATFORM}" in
-        linux/amd64) ddp_goarch="amd64" ;;
-        linux/arm64) ddp_goarch="arm64" ;;
-        *) echo "Unsupported DOCKER_DEFAULT_PLATFORM: ${DOCKER_DEFAULT_PLATFORM}" >&2; exit 1 ;;
-    esac
-    if [[ "${ddp_goarch}" != "${host_goarch}" ]]; then
-        if [[ "${ALLOW_CROSS_BUILD:-}" != "1" ]]; then
-            cat >&2 <<MSG
+if [[ -n "${DOCKER_DEFAULT_PLATFORM:-}" && "${DOCKER_DEFAULT_PLATFORM}" != "linux/${goarch}" ]]; then
+    cat >&2 <<MSG
 ERROR: DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM} differs from
-       the host arch (linux/${host_goarch}). Cross-building via qemu
-       is slow and produces binaries that don't run on the host.
+       the host arch (linux/${goarch}). The packaging pipeline does
+       not support cross-arch builds — downstream tasks derive their
+       arch from host uname and would produce mislabeled artifacts.
 
-       To proceed anyway, re-run with ALLOW_CROSS_BUILD=1.
+       Unset DOCKER_DEFAULT_PLATFORM (or align it with the host arch)
+       and re-run.
 MSG
-            exit 1
-        fi
-        echo "ALLOW_CROSS_BUILD=1: cross-building for ${DOCKER_DEFAULT_PLATFORM}."
-        goarch="${ddp_goarch}"
-    fi
+    exit 1
 fi
 
 # Fetch SHA256 checksum from go.dev release metadata
