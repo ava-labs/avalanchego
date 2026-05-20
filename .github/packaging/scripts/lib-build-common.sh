@@ -172,16 +172,14 @@ GPGEOF
 # nfpm does not expand env vars in top-level fields (changelog,
 # signature.key_file). Preprocess the config template with envsubst
 # so all ${VAR} references resolve before nfpm sees them.
-#
-# Args:
-#   config_template - path to nfpm YAML template (with ${VAR} placeholders)
-#   resolved_path   - output path for the preprocessed config
-#   packager        - nfpm packager name ("rpm" or "deb")
-#   target_path     - output path for the built package
 run_nfpm_package() {
+    # path to nfpm YAML template (with ${VAR} placeholders)
     local config_template="${1:?config template path required}"
+    # output path for the preprocessed config
     local resolved_path="${2:?resolved config path required}"
+    # nfpm packager name ("rpm" or "deb")
     local packager="${3:?packager name required}"
+    # output path for the built package
     local target_path="${4:?target path required}"
 
     mkdir -p "$(dirname "${target_path}")"

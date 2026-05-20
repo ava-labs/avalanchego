@@ -1,30 +1,17 @@
 #!/usr/bin/env bash
 
 # Build and sign a Linux package inside the container.
-# PKG_FORMAT defaults to RPM and is retained for future (DEB and possibly other)
-# packaging formats reuse.
-#
-# Required env vars:
-#   PACKAGE        - "avalanchego" or "subnet-evm"
-#   VERSION        - Semantic version without "v" prefix (e.g., "1.14.1")
-#   TAG            - Git tag (e.g., "v1.14.1")
-#   PACKAGE_ARCH   - Architecture (x86_64 or aarch64)
-#   OUTPUT_DIR     - Directory for the output package (bind-mounted from host)
-#
-# Optional env vars:
-#   PKG_FORMAT          - Package format identifier (default: RPM)
-#   GPG_KEY_FILE    - Path to GPG private key
-#   GPG_KEY_PASSPHRASE - GPG passphrase
-#   AVALANCHEGO_COMMIT  - Git commit hash (auto-detected if not set)
 
 set -euo pipefail
 
 : "${PACKAGE:?PACKAGE must be set (avalanchego or subnet-evm)}"
-: "${VERSION:?VERSION must be set}"
-: "${TAG:?TAG must be set}"
-: "${PACKAGE_ARCH:?PACKAGE_ARCH must be set}"
-: "${OUTPUT_DIR:?OUTPUT_DIR must be set}"
+: "${VERSION:?VERSION must be set (semver without v prefix, e.g. 1.14.1)}"
+: "${TAG:?TAG must be set (git tag, e.g. v1.14.1)}"
+: "${PACKAGE_ARCH:?PACKAGE_ARCH must be set (x86_64 or aarch64)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR must be set (bind-mounted output dir)}"
 
+# Package format identifier; defaults to RPM and is retained for
+# future (DEB and possibly other) packaging formats reuse.
 PKG_FORMAT="${PKG_FORMAT:-RPM}"
 pkg_format_lower="${PKG_FORMAT,,}"
 
