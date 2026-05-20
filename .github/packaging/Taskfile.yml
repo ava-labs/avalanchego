@@ -268,4 +268,6 @@ tasks:
   upload-tarballs:
     desc: Uploads built tarballs and signatures to S3
     cmds:
-      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/upload-tgz.sh'
+      - cmd: >-
+          TAG={{.PACKAGING_TAG}}
+          {{.REPO_ROOT}}/.github/packaging/scripts/upload-tgz.sh

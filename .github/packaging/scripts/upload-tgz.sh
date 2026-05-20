@@ -11,12 +11,26 @@ set -euo pipefail
 
 : "${BUCKET:?BUCKET must be set}"
 : "${TGZ_ARCH:?TGZ_ARCH must be set}"
+: "${TAG:?TAG must be set}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 TGZ_DIR="${REPO_ROOT}/build/tgz"
 S3_DEST="s3://${BUCKET}/linux/binaries/ubuntu/jammy/${TGZ_ARCH}/"
 
 echo "=== Uploading tarballs from ${TGZ_DIR} to ${S3_DEST} ==="
-find "${TGZ_DIR}" -maxdepth 1 \
-    \( -name '*.tar.gz' -o -name '*.tar.gz.sig' \) \
-    -exec aws s3 cp {} "${S3_DEST}" \;
+
+upload_if_exists() {
+    local f="$1"
+    if [[ -f "${f}" ]]; then
+        aws s3 cp "${f}" "${S3_DEST}"
+    else
+        echo "Skipping ${f##*/} (not present — unsigned build)"
+    fi
+}
+
+# Tarballs are required.
+aws s3 cp "${TGZ_DIR}/avalanchego-linux-${TGZ_ARCH}-${TAG}.tar.gz" "${S3_DEST}"
+aws s3 cp "${TGZ_DIR}/subnet-evm-linux-${TGZ_ARCH}-${TAG}.tar.gz"   "${S3_DEST}"
+# Signatures are present only when build-tgz.sh ran with a signing key.
+upload_if_exists "${TGZ_DIR}/avalanchego-linux-${TGZ_ARCH}-${TAG}.tar.gz.sig"
+upload_if_exists "${TGZ_DIR}/subnet-evm-linux-${TGZ_ARCH}-${TAG}.tar.gz.sig"

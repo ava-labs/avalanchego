@@ -76,6 +76,7 @@ jobs:
       - name: Upload tarballs to S3
         run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml upload-tarballs
         env:
+          PACKAGING_TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           TGZ_ARCH: ${{ matrix.arch }}
 
