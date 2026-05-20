@@ -23,8 +23,8 @@ import (
 	"github.com/ava-labs/libevm/libevm/ethtest"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rpc"
-	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -63,8 +63,8 @@ import (
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 type SUT2 struct {

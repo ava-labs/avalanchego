@@ -39,8 +39,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
-	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )
