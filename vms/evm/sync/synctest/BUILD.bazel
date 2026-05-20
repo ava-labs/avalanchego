@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "network.go",
         "proto.go",
+        "stats.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/synctest",
     visibility = ["//visibility:public"],
@@ -16,6 +17,7 @@ go_library(
         "//snow/engine/common",
         "//utils/logging",
         "//version",
+        "//vms/evm/sync/code",
         "//vms/evm/sync/handlers",
         "//vms/evm/sync/network",
         "@com_github_prometheus_client_golang//prometheus",
