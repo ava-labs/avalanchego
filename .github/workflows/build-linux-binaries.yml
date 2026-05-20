@@ -79,6 +79,7 @@ jobs:
           PACKAGING_TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           TGZ_ARCH: ${{ matrix.arch }}
+          TGZ_RELEASE: jammy
 
       - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v6
