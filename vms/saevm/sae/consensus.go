@@ -140,12 +140,13 @@ func (vm *VM) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscriptio
 }
 
 // SubscribeChainHeadEvent returns a new subscription for each
-// [core.ChainHeadEvent] emitted after execution of a [blocks.Block].
+// [core.ChainHeadEvent] emitted after a block has been executed.
 func (vm *VM) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
 	return vm.exec.SubscribeChainHeadEvent(ch)
 }
 
-// LastExecutedState returns the last executed state of the chain.
+// LastExecutedState returns a [libevm.StateReader] backed by the post-execution
+// state of the last-executed block.
 func (vm *VM) LastExecutedState() (libevm.StateReader, error) {
 	return vm.exec.StateDB(vm.exec.LastExecuted().PostExecutionStateRoot())
 }

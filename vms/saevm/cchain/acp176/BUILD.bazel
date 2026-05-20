@@ -8,7 +8,7 @@ package(default_visibility = [
 go_library(
     name = "acp176",
     srcs = ["acp176.go"],
-    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/hook/acp176",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/acp176",
     deps = [
         "//utils/math",
         "//vms/components/gas",

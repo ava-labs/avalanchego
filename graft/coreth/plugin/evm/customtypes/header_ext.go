@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/hook/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp176"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )

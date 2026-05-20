@@ -1,0 +1,452 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package cchain
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"iter"
+	"math/big"
+	"slices"
+	"time"
+
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/libevm/trie"
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/x/blockdb"
+
+	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	ethparams "github.com/ava-labs/libevm/params"
+)
+
+var _ hook.PointsG[*hookTx] = (*hooks)(nil)
+
+type hooks struct {
+	builder
+	state       *cchainstate.State
+	warpStorage *warp.Storage
+}
+
+func newHooks(
+	ctx *snow.Context,
+	state *cchainstate.State,
+	chainConfig *ethparams.ChainConfig,
+	desiredDelayExcess *acp226.DelayExcess,
+	desiredTargetExcess *acp176.TargetExcess,
+	pool *txpool.Pending,
+	warpStorage *warp.Storage,
+) *hooks {
+	poolTxs := func() iter.Seq[*hookTx] {
+		return func(yield func(*hookTx) bool) {
+			for t := range pool.Iter() {
+				ht, err := newHookTx(t, ctx.AVAXAssetID)
+				if err != nil {
+					ctx.Log.Warn("failed to convert tx",
+						zap.Stringer("txID", t.ID()),
+						zap.Error(err),
+					)
+					continue
+				}
+				if !yield(ht) {
+					return
+				}
+			}
+		}
+	}
+	return &hooks{
+		builder: builder{
+			ctx:         ctx,
+			chainConfig: chainConfig,
+			now:         time.Now,
+			desired: desiredParams{
+				delayExcess:  desiredDelayExcess,
+				targetExcess: desiredTargetExcess,
+			},
+			potentialTxs: poolTxs,
+		},
+		state:       state,
+		warpStorage: warpStorage,
+	}
+}
+
+func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], error) {
+	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	if err != nil {
+		return nil, fmt.Errorf("parsing txs: %w", err)
+	}
+
+	txs := make([]*hookTx, len(rawTxs))
+	for i, t := range rawTxs {
+		ht, err := newHookTx(t, h.ctx.AVAXAssetID)
+		if err != nil {
+			return nil, fmt.Errorf("converting tx %s (%d): %w", t.ID(), i, err)
+		}
+		txs[i] = ht
+	}
+
+	header := b.Header()
+	headerExtra := customtypes.GetHeaderExtra(header)
+	now := h.BlockTime(header)
+	return &builder{
+		ctx:         h.ctx,
+		chainConfig: h.chainConfig,
+		now: func() time.Time {
+			return now
+		},
+		desired: desiredParams{
+			delayExcess:  headerExtra.MinDelayExcess,
+			targetExcess: headerExtra.TargetExcess,
+		},
+		potentialTxs: func() iter.Seq[*hookTx] {
+			return slices.Values(txs)
+		},
+	}, nil
+}
+
+func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
+	db, err := blockdb.New(
+		blockdb.DefaultConfig().WithDir(dataDir),
+		h.ctx.Log,
+	)
+	if err != nil {
+		return saetypes.ExecutionResults{}, fmt.Errorf("creating execution results db: %w", err)
+	}
+	return saetypes.ExecutionResults{
+		HeightIndex: db,
+	}, nil
+}
+
+func (*hooks) GasConfigAfter(h *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+	return targetExcess(h).Target(), gastime.GasPriceConfig{
+		TargetToExcessScaling: acp176.TargetToExcessScaling,
+		MinPrice:              acp176.MinPrice,
+	}
+}
+
+func targetExcess(h *types.Header) acp176.TargetExcess {
+	if te := customtypes.GetHeaderExtra(h).TargetExcess; te != nil {
+		return *te
+	}
+	return 0
+}
+
+func (*hooks) SettledHeight(h *types.Header) uint64 {
+	if s := customtypes.GetHeaderExtra(h).SettledHeight; s != nil {
+		return *s
+	}
+	return 0
+}
+
+func (*hooks) BlockTime(h *types.Header) time.Time {
+	var ns int64
+	if msp := customtypes.GetHeaderExtra(h).TimeMilliseconds; msp != nil {
+		ms := *msp % 1000
+		frac := time.Duration(ms) * time.Millisecond //#nosec G115 -- ms is bounded to [0, 1000)
+		ns = frac.Nanoseconds()
+	}
+	return time.Unix(int64(h.Time), ns) //#nosec G115 -- Won't overflow for a few millennia
+}
+
+func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
+	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	if err != nil {
+		return nil, fmt.Errorf("parsing txs: %w", err)
+	}
+
+	ops := make([]hook.Op, len(txs))
+	for i, t := range txs {
+		op, err := t.AsOp(h.ctx.AVAXAssetID)
+		if err != nil {
+			return nil, fmt.Errorf("converting tx %s (%d): %w", t.ID(), i, err)
+		}
+		ops[i] = op
+	}
+	return ops, nil
+}
+
+func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
+	return nil
+}
+
+func (*hooks) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
+	return nil
+}
+
+func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
+	rules := h.chainConfig.Rules(b.Number(), corethparams.IsMergeTODO, b.Time())
+	acceptCtx := &precompileconfig.AcceptContext{
+		SnowCtx: h.ctx,
+		Warp:    h.warpStorage,
+	}
+	if err := warp.HandlePrecompileAccept(rules, acceptCtx, receipts); err != nil {
+		return fmt.Errorf("handling precompile accept for block %s (%d): %w", b.Hash(), b.NumberU64(), err)
+	}
+
+	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	if err != nil {
+		return fmt.Errorf("parsing txs: %w", err)
+	}
+
+	extstatedb := extstate.New(statedb)
+	for i, t := range txs {
+		if err := t.TransferNonAVAX(h.ctx.AVAXAssetID, extstatedb); err != nil {
+			return fmt.Errorf("transferring non-AVAX assets of tx %s (%d): %w", t.ID(), i, err)
+		}
+	}
+
+	if err := h.state.Apply(b.NumberU64(), txs); err != nil {
+		return fmt.Errorf("applying cross-chain state: %w", err)
+	}
+	return nil
+}
+
+var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
+
+type desiredParams struct {
+	delayExcess  *acp226.DelayExcess
+	targetExcess *acp176.TargetExcess
+}
+
+type builder struct {
+	ctx         *snow.Context
+	chainConfig *ethparams.ChainConfig
+
+	now func() time.Time
+	// When fields in [desiredParams] are set, the builder produces headers
+	// that move the corresponding network value toward the desired value.
+	desired      desiredParams
+	potentialTxs func() iter.Seq[*hookTx]
+}
+
+func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
+	now := b.now()
+	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
+
+	mde := acp226.InitialDelayExcess
+	if pmde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pmde != nil {
+		mde = *pmde
+	}
+
+	// Enforce block-building separation against the parent's MinDelayExcess.
+	{
+		parentTimeMS := customtypes.HeaderTimeMilliseconds(parent)
+		if nowMS < parentTimeMS {
+			return nil, fmt.Errorf("current time is before parent timestamp: now=%d parentTime=%d", nowMS, parentTimeMS)
+		}
+
+		delay := nowMS - parentTimeMS
+		minDelay := mde.Delay()
+		if delay < minDelay {
+			return nil, fmt.Errorf("block building separation not satisfied: delay=%d minDelay=%d", delay, minDelay)
+		}
+	}
+
+	if b.desired.delayExcess != nil {
+		mde.UpdateDelayExcess(*b.desired.delayExcess)
+	}
+
+	te := targetExcess(parent)
+	if b.desired.targetExcess != nil {
+		te.UpdateTargetExcess(*b.desired.targetExcess)
+	}
+
+	return customtypes.WithHeaderExtra(
+		&types.Header{
+			ParentHash:       parent.Hash(),
+			Coinbase:         constants.BlackholeAddr,
+			Difficulty:       big.NewInt(1),
+			Number:           new(big.Int).Add(parent.Number, common.Big1),
+			Time:             uint64(now.Unix()), //#nosec G115 -- Known non-negative
+			BlobGasUsed:      utils.PointerTo[uint64](0),
+			ExcessBlobGas:    utils.PointerTo[uint64](0),
+			ParentBeaconRoot: &common.Hash{},
+		},
+		&customtypes.HeaderExtra{
+			// Prior to SAE, ExtDataGasUsed included the gas cost of the
+			// cross-chain transactions to advance the ACP-176 fee state. After
+			// SAE, the gas cost is accounted for in the executor via
+			// [hook.Op.Gas].
+			ExtDataGasUsed: big.NewInt(0),
+			// BlockGasCost has been set to 0 since the Granite upgrade.
+			BlockGasCost:     big.NewInt(0),
+			TimeMilliseconds: &nowMS,
+			MinDelayExcess:   &mde,
+			TargetExcess:     &te,
+			SettledHeight:    utils.PointerTo[uint64](0), // Populated in BuildBlock.
+		},
+	), nil
+}
+
+func (b *builder) PotentialEndOfBlockOps(
+	_ context.Context,
+	header *types.Header,
+	settledHash common.Hash,
+	source saetypes.BlockSource,
+) iter.Seq[*hookTx] {
+	seq := b.potentialTxs()
+	return func(yield func(*hookTx) bool) {
+		// Transactions are verified against the last executed state. We must
+		// also verify that they don't conflict with any transactions in blocks
+		// between the block we are building and the last executed block.
+		inputs, err := ancestorInputIDs(header, settledHash, source)
+		if err != nil {
+			b.ctx.Log.Error("failed to get ancestor input IDs",
+				zap.Error(err),
+			)
+			return
+		}
+
+		for t := range seq {
+			if inputs.Overlaps(t.inputs) {
+				b.ctx.Log.Debug("tx consumes previously consumed inputs",
+					zap.Stringer("txID", t.id),
+				)
+				continue
+			}
+			if err := t.tx.SanityCheck(b.ctx); err != nil {
+				b.ctx.Log.Debug("tx failed sanity check",
+					zap.Stringer("txID", t.id),
+					zap.Error(err),
+				)
+				continue
+			}
+			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory); err != nil {
+				b.ctx.Log.Debug("tx failed credential verification",
+					zap.Stringer("txID", t.id),
+					zap.Error(err),
+				)
+				continue
+			}
+
+			if !yield(t) {
+				return
+			}
+			inputs.Union(t.inputs)
+		}
+	}
+}
+
+var (
+	errMissingBlock = errors.New("missing block")
+	errEmptyBlock   = errors.New("empty block")
+)
+
+// ancestorInputIDs returns the set of input IDs of all cross-chain transactions
+// in the block range (h, settled), both exclusive.
+func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
+	var s set.Set[ids.ID]
+	for h.ParentHash != settled {
+		parentNumber := h.Number.Uint64() - 1
+		p, ok := source(h.ParentHash, parentNumber)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
+		}
+
+		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
+		if err != nil {
+			return nil, fmt.Errorf("parsing txs of %s (%d): %w", h.ParentHash, parentNumber, err)
+		}
+		for _, t := range txs {
+			s.Union(t.InputIDs())
+		}
+		h = p.Header()
+	}
+	return s, nil
+}
+
+func (b *builder) BuildBlock(
+	header *types.Header,
+	blockCtx *block.Context,
+	ethTxs []*types.Transaction,
+	receipts []*types.Receipt,
+	avaxTxs []*hookTx,
+	settledHeight uint64,
+) (*types.Block, error) {
+	if len(ethTxs) == 0 && len(avaxTxs) == 0 {
+		return nil, errEmptyBlock
+	}
+
+	txs := make([]*tx.Tx, len(avaxTxs))
+	for i, avaxTx := range avaxTxs {
+		txs[i] = avaxTx.tx
+	}
+	extData, err := tx.MarshalSlice(txs)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling txs: %w", err)
+	}
+
+	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
+	rulesExtra := corethparams.GetRulesExtra(rules)
+	predicateBytes, err := warp.PredicateBytes(b.ctx, blockCtx, rulesExtra, ethTxs)
+	if err != nil {
+		return nil, fmt.Errorf("generating predicates: %w", err)
+	}
+	// TODO(StephenButtolph): [customheader.SetPredicateBytesInExtra] assumes
+	// fee information is also encoded in [types.Header.Extra]. Replace this
+	// once predicate bytes have a dedicated extra field.
+	header.Extra = customheader.SetPredicateBytesInExtra(rulesExtra.AvalancheRules, header.Extra, predicateBytes)
+
+	headerExtra := customtypes.GetHeaderExtra(header)
+	headerExtra.SettledHeight = &settledHeight
+	return customtypes.NewBlockWithExtData(
+		header,
+		ethTxs,
+		nil, // uncles
+		receipts,
+		trie.NewStackTrie(nil),
+		extData,
+		true, // update [customtypes.HeaderExtra.ExtDataHash]
+	), nil
+}
+
+var _ hook.Transaction = (*hookTx)(nil)
+
+// hookTx adapts a [tx.Tx] to the [hook.Transaction] interface. The [hook.Op]
+// is precomputed at construction to bind the configured AVAX asset ID.
+type hookTx struct {
+	id     ids.ID
+	tx     *tx.Tx
+	inputs set.Set[ids.ID]
+	op     hook.Op
+}
+
+func newHookTx(t *tx.Tx, avaxAssetID ids.ID) (*hookTx, error) {
+	op, err := t.AsOp(avaxAssetID)
+	if err != nil {
+		return nil, err
+	}
+	return &hookTx{
+		id:     op.ID,
+		tx:     t,
+		inputs: t.InputIDs(),
+		op:     op,
+	}, nil
+}
+
+func (t *hookTx) AsOp() hook.Op { return t.op }

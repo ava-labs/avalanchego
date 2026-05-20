@@ -26,7 +26,6 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100
 	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
-	github.com/ava-labs/avalanchego/graft/evm v1.14.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
 	github.com/ava-labs/libevm v1.13.15-0.20260430210457-c891ff86e981
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -95,6 +94,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
+	github.com/ava-labs/avalanchego/graft/evm v1.14.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.5.0
 	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -211,14 +211,14 @@ tool (
 	go.uber.org/mock/mockgen
 )
 
-replace (
-	github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
-	github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
-	github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
+replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
 
-	// Workaround for genproto ambiguous import conflict.
-	// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
-	// Modern packages use split modules (genproto/googleapis/rpc, etc.).
-	// Force use of newer split genproto to resolve ambiguity.
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1
-)
+replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
+
+replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
+
+// Workaround for genproto ambiguous import conflict.
+// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
+// Modern packages use split modules (genproto/googleapis/rpc, etc.).
+// Force use of newer split genproto to resolve ambiguity.
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1

@@ -19,7 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/hook/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp176"
 )
 
 func TestHeaderRLP(t *testing.T) {

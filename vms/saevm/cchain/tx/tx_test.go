@@ -1774,7 +1774,7 @@ func TestVerifyCredentials(t *testing.T) {
 		validInputID = validUTXOID.InputID()
 		validUTXOs   = []*chainsatomic.Element{{
 			Key:   validInputID[:],
-			Value: MarshalUTXO(t, validUTXO),
+			Value: txtest.MustMarshalUTXO(t, validUTXO),
 		}}
 
 		validImportTx = func() *Tx {
