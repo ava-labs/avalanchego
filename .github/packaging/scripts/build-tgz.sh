@@ -1,19 +1,11 @@
 #!/usr/bin/env bash
 
-# Build and sign linux tarballs for avalanchego and subnet-evm inside the container.
-#
-# Required env vars:
-#   PACKAGING_TAG       - Git tag (e.g., "v1.14.1")
-#   OUTPUT_DIR          - Directory for the output tarballs (bind-mounted from host)
-#
-# Optional env vars:
-#   GPG_KEY_FILE          - Path to GPG private key for signing
-#   GPG_PASSPHRASE        - Passphrase for the GPG key
-#   AVALANCHEGO_COMMIT    - Git commit hash (auto-detected if not set)
-#
-# Target architecture is derived from `uname -m` inside the container.
-# The container runs at the platform pinned by the docker run --platform
-# flag (host arch), so the produced filenames always match the binaries.
+# e.g.,
+# PACKAGING_TAG=v1.14.1 OUTPUT_DIR=$(pwd)/build/tgz ./.github/packaging/scripts/build-tgz.sh
+# (add GPG_KEY_FILE=<path> GPG_PASSPHRASE=<pass> to also sign each tarball;
+#  AVALANCHEGO_COMMIT=<sha> avoids the in-container git lookup)
+
+# Builds and optionally signs linux tarballs for avalanchego and subnet-evm.
 
 set -euo pipefail
 
@@ -23,9 +15,7 @@ set -euo pipefail
 REPO_ROOT="/build"
 TAG="${PACKAGING_TAG}"
 
-# Map uname -m to deb-style arch (aarch64 -> arm64). Computed inside the
-# container, so it reflects the actual platform the binaries are built
-# for, regardless of any caller-supplied env vars.
+# Map uname -m to deb-style arch (aarch64 -> arm64).
 host_arch=$(uname -m)
 case "${host_arch}" in
     x86_64)        ARCH="amd64" ;;
@@ -47,10 +37,13 @@ echo "=== Building tarballs for ${ARCH} (tag: ${TAG}) ==="
 
 # ── Step 1: Build binaries ────────────────────────────────────────
 
-# In CI, the bind-mounted source tree is owned by the host user. Mark it
-# as safe so that git works inside the container (needed by older build
-# scripts that resolve the commit hash via git rather than AVALANCHEGO_COMMIT).
-if ! git -C "${REPO_ROOT}" rev-parse HEAD &>/dev/null; then
+# When AVALANCHEGO_COMMIT is unset, scripts/git_commit.sh falls back to
+# `git rev-parse HEAD`. Mark the bind-mounted source tree as safe so
+# that git can read .git/ across the UID boundary of the container.
+# Skip the dance when AVALANCHEGO_COMMIT is set — the rev-parse won't
+# run, and a worktree's gitfile pointing outside the bind-mount would
+# make `git config` itself fail when it tries to resolve the gitdir.
+if [[ -z "${AVALANCHEGO_COMMIT:-}" ]] && ! git -C "${REPO_ROOT}" rev-parse HEAD &>/dev/null; then
     git config --global --add safe.directory "${REPO_ROOT}"
 fi
 
@@ -62,8 +55,8 @@ source "${REPO_ROOT}/scripts/git_commit.sh"
 # shellcheck disable=SC2154
 echo "Git commit: ${git_commit}"
 
-# Disable Go's automatic VCS stamping — the commit hash is passed
-# explicitly via AVALANCHEGO_COMMIT and -ldflags instead.
+# Disable Go's VCS auto-stamping — the commit hash is set explicitly via
+# -ldflags inside scripts/build.sh.
 export GOFLAGS="${GOFLAGS:-} -buildvcs=false"
 
 echo "Building avalanchego..."
@@ -96,7 +89,7 @@ if [[ -z "${GPG_KEY_FILE:-}" ]]; then
 elif [[ ! -s "${GPG_KEY_FILE}" ]]; then
     echo "ERROR: GPG_KEY_FILE is set (${GPG_KEY_FILE}) but the file is empty." >&2
     echo "       Refusing to produce unsigned release artifacts." >&2
-    echo "       Verify that the GPG signing secret (e.g. RPM_GPG_PRIVATE_KEY) is configured." >&2
+    echo "       Verify that the GPG signing secret is configured." >&2
     exit 1
 else
     GNUPGHOME=$(mktemp -d)
@@ -143,16 +136,12 @@ stage_and_tar "subnet-evm" "${SUBNET_EVM_BINARY}"
 
 rm -rf "${STAGE_DIR}"
 
-# ── Step 4: Export public key (for validation container only) ─────
-#
-# The public key is used by validate-tgz.sh to verify signatures in a
-# fresh container. It is NOT uploaded to S3 or as a GitHub artifact —
-# the public key is distributed via the existing S3 location only.
+# ── Step 4: Export public key for validate-tgz.sh ─────────────────
 
 if [[ "${GPG_SIGNING_ENABLED}" == "true" ]]; then
     PUB_KEY_FILE="${OUTPUT_DIR}/GPG-KEY-avalanchego"
     gpg --batch --armor --export "security@avalabs.org" > "${PUB_KEY_FILE}"
-    echo "GPG public key exported to: ${PUB_KEY_FILE} (validation use only)"
+    echo "GPG public key exported to: ${PUB_KEY_FILE}"
 fi
 
 echo "=== Tarball build complete ==="

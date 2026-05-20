@@ -1,18 +1,11 @@
 #!/usr/bin/env bash
 
-# Post-build validation of linux tarballs.
-#
-# Verifies detached signatures and runs smoke tests in a fresh Ubuntu
-# container, mirroring how a downstream consumer would verify and use
-# the released artifacts.
-#
-# Required env vars:
-#   TAG            - Git tag (e.g., "v1.14.1")
-#   GIT_COMMIT     - Full git commit hash used to build the binaries
-#
-# Target architecture is derived from `uname -m`. The validation
-# container is launched with --platform pinned to host arch, matching
-# the arch the tarballs were built for, so this always lines up.
+# e.g.,
+# TAG=v1.14.1 GIT_COMMIT=abc123def... ./.github/packaging/scripts/validate-tgz.sh
+
+# Verifies detached signatures (when a public key is present) and runs
+# `--version` smoke tests on the built tarballs in a fresh ubuntu:22.04
+# container, mirroring how a downstream consumer would use the artifacts.
 
 set -euo pipefail
 
