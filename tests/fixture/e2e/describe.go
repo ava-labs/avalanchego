@@ -37,3 +37,9 @@ func DescribeCChain(text string, args ...interface{}) bool {
 	args = append(args, ginkgo.Label("c"))
 	return ginkgo.Describe("[C-Chain] "+text, args...)
 }
+
+// DescribeSimplex annotates the tests for Simplex.
+func DescribeSimplex(text string, args ...interface{}) bool {
+	args = append(args, ginkgo.Label("s"))
+	return ginkgo.Describe("[Simplex] "+text, args...)
+}
