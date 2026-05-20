@@ -3,7 +3,11 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - "firewood/**"
   pull_request:
+    paths-ignore:
+      - "firewood/**"
   merge_group:
     types: [checks_requested]
 

@@ -2,7 +2,10 @@ name: firewood-benchmarks
 
 on:
   push:
-    branches: [main]
+    branches: [master]
+    paths:
+      - "firewood/**"
+      - ".github/workflows/firewood-benchmarks.yml"
   workflow_dispatch:
 
 env:
@@ -12,6 +15,9 @@ env:
 jobs:
   bench:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firewood
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -20,6 +26,7 @@ jobs:
           shared-key: "maxperf-ethhash-logger"
           cache-all-crates: true
           cache-workspace-crates: true
+          workspaces: "firewood -> target"
       - name: Cargo Fetch (run `cargo generate-lockfile` if this fails)
         run: cargo fetch --locked --verbose
       - name: Build
@@ -34,4 +41,4 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: benchmark-results
-          path: target/criterion
+          path: firewood/target/criterion

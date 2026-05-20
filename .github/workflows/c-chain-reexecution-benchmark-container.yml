@@ -2,6 +2,8 @@ name: C-Chain Re-Execution Benchmark w/ Container
 
 on:
   pull_request:
+    paths-ignore:
+      - "firewood/**"
   workflow_dispatch:
     inputs:
       test:
