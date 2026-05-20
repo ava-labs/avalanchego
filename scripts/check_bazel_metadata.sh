@@ -35,10 +35,10 @@ if ! ./scripts/run_task.sh check-bazel-generate-patches; then
   exit 1
 fi
 
-# Keep the committed module lock in the same post-module-extension state that
-# normal Bazel module resolution can materialize, so CI catches drift before
-# later commands rewrite MODULE.bazel.lock opportunistically.
-if ! ./scripts/run_task.sh check-bazel-module-lock; then
+# Refresh Bazel module metadata here because `bazel mod tidy` alone may not
+# fully update MODULE.bazel.lock. This keeps later Bazel commands from
+# rewriting the lockfile unexpectedly.
+if ! ./scripts/run_task.sh check-bazel-module-metadata; then
   print_help
   exit 1
 fi

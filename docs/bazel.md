@@ -171,12 +171,10 @@ Run `task bazel-generate-metadata` after:
 - Modifying `MODULE.bazel`
 
 `task bazel-generate-metadata` also refreshes `MODULE.bazel.lock` into the
-same post-module-extension steady state that normal Bazel module resolution can
-materialize. This avoids a class of drift where `bazel mod tidy` alone leaves
-the lockfile under-materialized and a later Bazel invocation rewrites it
-opportunistically. In practice, `bazelisk mod deps --lockfile_mode=update`
-materializes module-extension state more completely than a narrow
-`bazel build --nobuild //main:avalanchego` normalization step.
+same state later Bazel module commands expect. `bazel mod tidy` alone does not
+always fully refresh `MODULE.bazel.lock`, so a later Bazel command may rewrite
+it. Running the lockfile refresh as part of metadata generation makes that
+update happen in one predictable place instead of as a later surprise.
 
 ### How Gazelle Handles Multiple Modules
 
@@ -475,8 +473,8 @@ task bazel-generate-metadata
 # Update MODULE.bazel use_repo calls
 task bazel-mod-tidy               # or: bazel mod tidy
 
-# Refresh MODULE.bazel.lock in its post-module-extension steady state
-task bazel-sync-module-lock
+# Refresh Bazel module metadata files
+task bazel-sync-module-metadata
 
 # Clean build outputs
 task bazel-clean                  # or: bazel clean
@@ -495,9 +493,9 @@ This is especially useful for pull requests tested against a moving base
 branch, where the metadata included in the PR may be stale relative to
 the current merge target.
 
-That check includes `MODULE.bazel.lock`, so lockfile drift caused by Bazel
-module resolution or analysis is caught in the metadata phase rather than
-showing up later as a surprising working-tree mutation.
+That check includes the Bazel module metadata files, so lockfile drift is
+caught in the metadata phase rather than showing up later as a surprising
+working-tree mutation.
 
 The GitHub Actions Bazel workflow also defines a single aggregate job,
 `bazel-required`, that depends on the other jobs in the workflow via
