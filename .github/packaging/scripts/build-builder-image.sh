@@ -9,15 +9,14 @@
 #   GO_VERSION    - Go version to install (e.g., "1.24.12")
 #   DOCKER_IMAGE  - Name for the built Docker image
 #   CONTEXT_DIR   - Path to the Dockerfile directory
-#
-# Optional env vars:
-#   DOCKERFILE    - Dockerfile name (default: "Dockerfile.rpm")
+#   DOCKERFILE    - Dockerfile name (e.g., "Dockerfile.rpm")
 
 set -euo pipefail
 
 : "${GO_VERSION:?GO_VERSION must be set}"
 : "${DOCKER_IMAGE:?DOCKER_IMAGE must be set}"
 : "${CONTEXT_DIR:?CONTEXT_DIR must be set}"
+: "${DOCKERFILE:?DOCKERFILE must be set (e.g. Dockerfile.rpm)}"
 
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required but not found on PATH" >&2; exit 1; }
 
@@ -56,6 +55,6 @@ fi
 docker build "${build_flags[@]}" \
     --build-arg GO_VERSION="${GO_VERSION}" \
     --build-arg GO_CHECKSUM="${checksum}" \
-    -f "${CONTEXT_DIR}/${DOCKERFILE:-Dockerfile.rpm}" \
+    -f "${CONTEXT_DIR}/${DOCKERFILE}" \
     -t "${DOCKER_IMAGE}" \
     "${CONTEXT_DIR}"
