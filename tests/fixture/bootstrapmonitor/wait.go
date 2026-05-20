@@ -26,6 +26,10 @@ import (
 const (
 	contextDuration = 30 * time.Second
 
+	// Block until the StatefulSet recreates the pod, as exiting sooner
+	// would let the kubelet restart the container with the old image.
+	postUpdateGracePeriod = 5 * time.Minute
+
 	ImageUnchanged = "Image unchanged"
 )
 
@@ -77,42 +81,38 @@ func WaitForCompletion(
 	}
 
 	log.Info("Waiting for node to report healthy")
-	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
+	var (
+		bootstrapped       bool
+		nextImageCheckTime = time.Now().Add(imageCheckInterval)
+	)
+	if err := wait.PollUntilContextCancel(context.Background(), healthCheckInterval, true, func(pollCtx context.Context) (bool, error) {
+		ctx, cancel := context.WithTimeout(pollCtx, contextDuration)
 		defer cancel()
 
-		// Define common fields for logging
-		diskUsage := getDiskUsage(log, dataDir)
-		commonFields := []zap.Field{
-			zap.String("diskUsage", diskUsage),
-			zap.Duration("duration", time.Since(testDetails.StartTime)),
-		}
-
-		// Check whether the node is reporting healthy which indicates that bootstrap is complete
-		if healthy, err := tmpnet.CheckNodeHealth(ctx, nodeURL); err != nil {
-			log.Error("failed to check node health", zap.Error(err))
-			return false, nil
-		} else {
-			if !healthy.Healthy {
-				log.Info("Node reported unhealthy", commonFields...)
-				return false, nil
+		if !bootstrapped {
+			commonFields := []zap.Field{
+				zap.String("diskUsage", getDiskUsage(log, dataDir)),
+				zap.Duration("duration", time.Since(testDetails.StartTime)),
 			}
-
-			log.Info("Node reported healthy")
+			healthy, err := tmpnet.CheckNodeHealth(ctx, nodeURL)
+			switch {
+			case err != nil:
+				log.Error("failed to check node health", zap.Error(err))
+			case healthy.Healthy:
+				bootstrapped = true
+				log.Info("Bootstrap completed successfully",
+					append(commonFields, zap.Reflect("testConfig", testConfig))...,
+				)
+				log.Info("Waiting for new image to test")
+			default:
+				log.Info("Node reported unhealthy", commonFields...)
+			}
 		}
 
-		commonFields = append(commonFields, zap.Reflect("testConfig", testConfig))
-		log.Info("Bootstrap completed successfully", commonFields...)
-
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("failed to wait for node to report healthy: %w", err)
-	}
-
-	log.Info("Waiting for new image to test")
-	if err := wait.PollImmediateInfinite(imageCheckInterval, func() (bool, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
-		defer cancel()
+		if time.Now().Before(nextImageCheckTime) {
+			return false, nil
+		}
+		nextImageCheckTime = time.Now().Add(imageCheckInterval)
 
 		log.Info("Starting pod to get the image id for the `master` tag")
 		masterImageDetails, err := getMasterImageDetails(ctx, log, clientset, namespace, testConfig.Image, nodeContainerName)
@@ -136,15 +136,12 @@ func WaitForCompletion(
 			log.Error("failed to set container image", zap.Error(err))
 			return false, nil
 		}
-
-		// Statefulset will restart the pod with the new image
 		return true, nil
 	}); err != nil {
-		return fmt.Errorf("failed to wait for new image to test: %w", err)
+		return fmt.Errorf("failed to wait for completion: %w", err)
 	}
 
-	// Avoid exiting immediately to avoid container restart before the pod is recreated with the new image
-	time.Sleep(5 * time.Minute)
+	time.Sleep(postUpdateGracePeriod)
 	return nil
 }
 
