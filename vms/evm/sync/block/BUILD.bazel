@@ -1,13 +1,42 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "block",
-    srcs = ["client.go"],
+    srcs = [
+        "client.go",
+        "handler.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/block",
     visibility = ["//visibility:public"],
     deps = [
+        "//ids",
         "//network/p2p",
         "//proto/pb/sync",
+        "//utils/logging",
+        "//utils/units",
+        "//vms/evm/sync/handlers",
         "//vms/evm/sync/network",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//log",
+    ],
+)
+
+go_test(
+    name = "block_test",
+    srcs = ["handler_test.go"],
+    deps = [
+        ":block",
+        "//ids",
+        "//proto/pb/sync",
+        "//utils/logging",
+        "//vms/evm/sync/synctest",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//testing/protocmp",
     ],
 )
