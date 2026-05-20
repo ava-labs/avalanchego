@@ -17,7 +17,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
@@ -28,6 +27,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
@@ -67,7 +67,9 @@ type VM struct {
 	state        *state.State
 	txpool       *txpool.Txpool
 	pushGossiper *gossip.PushGossiper[*tx.Tx]
-	hooks        *hooks
+
+	// TODO: Remove this.
+	hooks *hooks
 
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
@@ -129,7 +131,7 @@ func (v *VM) Initialize(
 		zap.Stringer("lastID", ids.ID(lastSync.Hash())),
 		zap.Uint64("lastHeight", lastSync.NumberU64()),
 	)
-	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis)
+	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis, lastSync.Hash(), false)
 	if err != nil {
 		return fmt.Errorf("setting up genesis block: %w", err)
 	}
