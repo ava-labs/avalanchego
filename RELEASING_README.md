@@ -245,31 +245,33 @@ As of this writing:
 
 #### Canary Deployment
 
-1. Clone [external-plugins-builder](https://github.com/ava-labs/external-plugins-builder):
+Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
 
-   ```bash
-   git checkout main
-   git pull
-   git checkout -b "echo-dispatch-$VERSION_RC"
+1. In `devops-argocd`, update the Dispatch and Echo image tags to
+   `$VERSION_RC`:
+
+   - Echo: [`base/subnet/testnet/echo/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/echo/avalanchego/base/cornice.yaml)
+   - Dispatch: [`base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml)
+
+   ```yaml
+   - name: api.image.tag
+     value: "$VERSION_RC"
+   - name: validator.image.tag
+     value: "$VERSION_RC"
    ```
 
-1. Update `configs/dispatch.yml` and `configs/echo.yml`:
-   - Set `app_version` to `$VERSION_RC`
-   - Update `avalanchego_version` if needed
-   - Update `golang_version` if needed
+   The repository should already be `avaplatform/subnet-evm`, with
+   `global.vmAliases` containing the standard Subnet-EVM VM ID:
+   `srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy`.
 
-1. Create PR and merge:
+1. Open and merge the deployment change for both L1s, then monitor deployments:
+   - **Dispatch**: [Logs][dispatch-logs] | [Dashboard][dispatch-dashboard]
+   - **Echo**: [Logs][echo-logs] | [Dashboard][echo-dashboard]
 
-   ```bash
-   git add .
-   git commit -m "Bump echo and dispatch to $VERSION_RC"
-   git push -u origin "echo-dispatch-$VERSION_RC"
-   gh pr create --repo github.com/ava-labs/external-plugins-builder --base main --title "Bump echo and dispatch to $VERSION_RC"
-   ```
-
-1. Monitor deployments after merge:
-   - **Dispatch**: [Logs](https://app.datadoghq.com/logs?query=subnet%3Adispatch%20%40logger%3A%2A&live=true) | [Metrics](https://app.datadoghq.com/dashboard/jrv-mm2-vuc/dispatch-testnet-subnets?live=true)
-   - **Echo**: [Logs](https://app.datadoghq.com/logs?query=subnet:echo%20@logger:*&live=true) | [Metrics](https://app.datadoghq.com/dashboard/jrv-mm2-vuc/echo-testnet-subnets?live=true)
+[dispatch-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22dispatch%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
+[dispatch-dashboard]: https://avalabs.grafana.net/d/12154d054f846686fc46ad306e451c30/dispatch-testnet-subnets
+[echo-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22echo%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
+[echo-dashboard]: https://avalabs.grafana.net/d/87d80a2c2c15b54189eac1ae9c0241e4/echo-testnet-subnets
 
 1. Test transactions:
    1. If you have no wallet setup, create a new one using the [Core wallet](https://core.app/)

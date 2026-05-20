@@ -2,7 +2,15 @@
 
 ## Pending (v1.14.3)
 
-- None.
+### Metrics
+
+- Renamed Coreth and Subnet-EVM state-sync p2p metrics (`{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains):
+  - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
+  - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
+  - `avalanche_{vmName}_eth_net_average_bandwidth` -> `avalanche_{vmName}_sdk_sync_peer_tracker_average_bandwidth`
+
+### Fixes
+- Updated minimum Go version from `v1.25.8` to `v1.25.10`.
 
 ## [v1.14.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.2)
 

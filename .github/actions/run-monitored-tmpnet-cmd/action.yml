@@ -103,14 +103,8 @@ runs:
       uses: ./.github/actions/upload-tmpnet-artifact
       with:
         name: ${{ inputs.artifact_prefix }}-tmpnet-data
-    - name: Export kind logs
+    - name: Collect kind diagnostics
       if: always() && (inputs.runtime == 'kube')
-      shell: bash
-      run: kind export logs /tmp/kind-logs
-    - name: Upload kind logs
-      if: always() && (inputs.runtime == 'kube')
-      uses: actions/upload-artifact@v6
+      uses: ./.github/actions/collect-kind-diagnostics
       with:
-        name: ${{ inputs.artifact_prefix }}-kind-logs
-        path: /tmp/kind-logs
-        if-no-files-found: error
+        artifact_name: ${{ inputs.artifact_prefix }}-kind-diagnostics

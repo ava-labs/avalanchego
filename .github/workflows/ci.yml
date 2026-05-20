@@ -279,6 +279,11 @@ jobs:
       - name: Run e2e tests
         shell: bash
         run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
+      - name: Collect kind diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-kind-diagnostics
+        with:
+          artifact_name: bootstrap-monitor-kind-diagnostics
   load:
     name: Run process-based load test
     runs-on: ubuntu-24.04
@@ -323,3 +328,8 @@ jobs:
       - name: Deploy kind with chaos mesh
         shell: bash
         run: ./scripts/run_task.sh test-robustness
+      - name: Collect kind diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-kind-diagnostics
+        with:
+          artifact_name: robustness-kind-diagnostics
