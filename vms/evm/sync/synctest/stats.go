@@ -3,7 +3,10 @@
 
 package synctest
 
-import "github.com/ava-labs/avalanchego/vms/evm/sync/code"
+import (
+	"github.com/ava-labs/avalanchego/vms/evm/sync/block"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
+)
 
 // CodeRecorder counts [code.Stats] invocations.
 type CodeRecorder struct {
@@ -20,3 +23,15 @@ func (s *CodeRecorder) IncMissingCodeHash()              { s.MissingHash++ }
 func (s *CodeRecorder) IncTooManyHashesRequested()       { s.TooManyHashes++ }
 func (s *CodeRecorder) IncDuplicateHashesRequested()     { s.DuplicateHashes++ }
 func (s *CodeRecorder) UpdateCodeBytesReturned(b uint32) { s.CodeBytesReturned += b }
+
+// BlockRecorder counts [block.Stats] invocations.
+type BlockRecorder struct {
+	block.NoopStats
+	Requests       uint32
+	MissingHash    uint32
+	BlocksReturned uint16
+}
+
+func (s *BlockRecorder) IncBlockRequest()              { s.Requests++ }
+func (s *BlockRecorder) IncMissingBlockHash()          { s.MissingHash++ }
+func (s *BlockRecorder) UpdateBlocksReturned(n uint16) { s.BlocksReturned = n }
