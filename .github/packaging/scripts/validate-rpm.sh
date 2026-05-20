@@ -16,6 +16,7 @@ set -euo pipefail
 
 : "${TAG:?TAG must be set}"
 : "${GIT_COMMIT:?GIT_COMMIT must be set}"
+: "${PACKAGE_ARCH:?PACKAGE_ARCH must be set (x86_64 or aarch64)}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RPM_DIR="${REPO_ROOT}/build/rpm"
@@ -27,7 +28,6 @@ source "${SCRIPTS_DIR}/lib-build-common.sh"
 source "${SCRIPTS_DIR}/lib-validate-common.sh"
 
 resolve_subnet_evm_vm_id
-detect_host_arch RPM
 
 assert_files_exist "${RPM_DIR}" \
     "avalanchego-${TAG}-${PACKAGE_ARCH}.rpm" \
