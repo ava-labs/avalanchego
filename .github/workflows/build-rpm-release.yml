@@ -85,7 +85,7 @@ jobs:
           path: |
             build/rpm/avalanchego-${{ steps.setup.outputs.tag }}-${{ matrix.rpm_arch }}.rpm
             build/rpm/subnet-evm-${{ steps.setup.outputs.tag }}-${{ matrix.rpm_arch }}.rpm
-            build/rpm/GPG-KEY-avalanchego
+            build/rpm/RPM-GPG-KEY-avalanchego
 
       - name: Cleanup
         if: always()

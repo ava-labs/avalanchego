@@ -31,11 +31,11 @@ docker run --rm \
     rockylinux:9 \
     bash -euxc '
         # Import GPG key and verify signatures (always produced by the build).
-        if [[ ! -f /rpms/GPG-KEY-avalanchego ]]; then
-            echo "ERROR: GPG-KEY-avalanchego not found; build did not export a key" >&2
+        if [[ ! -f /rpms/RPM-GPG-KEY-avalanchego ]]; then
+            echo "ERROR: RPM-GPG-KEY-avalanchego not found; build did not export a key" >&2
             exit 1
         fi
-        rpm --import /rpms/GPG-KEY-avalanchego
+        rpm --import /rpms/RPM-GPG-KEY-avalanchego
         rpm -K "/rpms/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
         rpm -K "/rpms/subnet-evm-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
 
