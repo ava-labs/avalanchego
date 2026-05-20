@@ -27,6 +27,10 @@ if ! ./scripts/run_task.sh check-bazel-gazelle-generate; then
   exit 1
 fi
 
+if ! ./scripts/run_task.sh check-bazel-multiple-go-libraries; then
+  exit 1
+fi
+
 # Must run after fmt and gazelle since either could modify source BUILD
 # files in .bazel/patches/build_files/. In practice gazelle skips them
 # (they have `# gazelle:ignore`) but buildifier will reformat them.
