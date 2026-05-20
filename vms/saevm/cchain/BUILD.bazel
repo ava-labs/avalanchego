@@ -1,6 +1,20 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
+# gazelle:default_visibility //vms/saevm/cchain:__subpackages__,//vms/saevm/cchain:external_consumers
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
+package_group(
+    name = "external_consumers",
+    packages = [
+        "//node",
+    ],
+)
+
 go_library(
     name = "cchain",
     srcs = [
@@ -11,7 +25,6 @@ go_library(
         "vm.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain",
-    visibility = ["//visibility:public"],
     deps = [
         "//api",
         "//cache/lru",
