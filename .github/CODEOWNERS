@@ -6,7 +6,9 @@
 # merging.
 
 * @ava-labs/platform-avalanchego
+/RELEASES.md @ava-labs/platform-avalanchego @ava-labs/platform-evm
 /graft/coreth @ava-labs/platform-evm
 /graft/evm @ava-labs/platform-evm
 /graft/subnet-evm @ava-labs/platform-evm
 /vms/saevm @ARR4N @StephenButtolph
+/vms/saevm/cchain @StephenButtolph

@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client/stats"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/version"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -39,11 +38,6 @@ const (
 )
 
 var (
-	StateSyncVersion = &version.Application{
-		Major: 1,
-		Minor: 7,
-		Patch: 13,
-	}
 	errEmptyResponse          = errors.New("empty response")
 	errTooManyBlocks          = errors.New("response contains more blocks than requested")
 	errHashMismatch           = errors.New("hash does not match expected value")
@@ -55,24 +49,28 @@ var (
 )
 var _ Client = (*client)(nil)
 
-// Network defines the interface for sending sync requests over the network.
-// This interface is implemented by the network layer in coreth and subnet-evm.
+// Network is a transitional facade for the state-sync client over the
+// underlying p2p primitives, implemented by the graft coreth and subnet-evm
+// network packages. New consumers should hold a [p2p.PeerTracker] and
+// construct each [p2p.Client] directly rather than extending this interface.
 type Network interface {
 	p2p.NodeSampler
 
-	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer with a
-	// node version greater than or equal to minVersion.
+	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 	// the request should be retried.
-	SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
+	SendSyncedAppRequestAny(ctx context.Context, request []byte) ([]byte, ids.NodeID, error)
 
 	// SendSyncedAppRequest synchronously sends request to the selected nodeID
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
 	SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// TrackBandwidth should be called after receiving a response from a peer to
-	// track performance. This is used to prioritize peers that are more responsive.
-	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
+	// RegisterResponse records a successful response from nodeID with the
+	// observed bandwidth. Used to prioritize more responsive peers.
+	RegisterResponse(nodeID ids.NodeID, bandwidth float64)
+
+	// RegisterFailure records a failed response from nodeID.
+	RegisterFailure(nodeID ids.NodeID)
 
 	// P2PNetwork returns the unabstracted [p2p.Network].
 	P2PNetwork() *p2p.Network
@@ -361,7 +359,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		)
 		reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 		if len(c.stateSyncNodes) == 0 {
-			response, nodeID, err = c.network.SendSyncedAppRequestAny(reqCtx, StateSyncVersion, requestBytes)
+			response, nodeID, err = c.network.SendSyncedAppRequestAny(reqCtx, requestBytes)
 		} else {
 			// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
 			// we do this every attempt to ensure we get a different node each time if possible.
@@ -381,7 +379,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			logCtx = append(logCtx, "attempt", attempt, "request", request, "err", err)
 			log.Debug("request failed, retrying", logCtx...)
 			metric.IncFailed()
-			c.network.TrackBandwidth(nodeID, 0)
+			c.network.RegisterFailure(nodeID)
 			time.Sleep(failedRequestSleepInterval)
 			continue
 		} else {
@@ -389,14 +387,14 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			if err != nil {
 				lastErr = err
 				log.Debug("could not validate response, retrying", "nodeID", nodeID, "attempt", attempt, "request", request, "err", err)
-				c.network.TrackBandwidth(nodeID, 0)
+				c.network.RegisterFailure(nodeID)
 				metric.IncFailed()
 				metric.IncInvalidResponse()
 				continue
 			}
 
 			bandwidth := float64(len(response)) / (time.Since(start).Seconds() + epsilon)
-			c.network.TrackBandwidth(nodeID, bandwidth)
+			c.network.RegisterResponse(nodeID, bandwidth)
 			metric.IncSucceeded()
 			metric.IncReceived(int64(numElements))
 			return responseIntf, nil

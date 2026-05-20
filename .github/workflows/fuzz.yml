@@ -3,17 +3,36 @@ name: Run fuzz tests
 on:
   schedule:
     - cron: "0 0 * * *" # Once a day at midnight UTC
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
 
 jobs:
   fuzz:
-    runs-on: ubuntu-latest
+    name: fuzz (${{ matrix.shard }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - database
+          - codec
+          - utils
+          - x/archivedb
+          - x/merkledb
+          - vms/platformvm
+          - vms/evm
+          - vms/saevm
+          - simplex
+          - graft
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Go
         uses: ./.github/actions/setup-go-for-project
       - name: Run fuzz tests
-        run: ./scripts/run_task.sh test-fuzz-long
+        run: ./scripts/run_task.sh test-fuzz-long -- ./${{ matrix.shard }}

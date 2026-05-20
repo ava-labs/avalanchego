@@ -27,6 +27,7 @@ func (b *backend) TxPoolContentFrom(addr common.Address) ([]*types.Transaction, 
 	return b.Set.Pool.ContentFrom(addr)
 }
 
+// GetPoolTransactions returns only pending transactions from the mempool.
 func (b *backend) GetPoolTransactions() (types.Transactions, error) {
 	pending := b.Pool.Pending(txpool.PendingFilter{})
 

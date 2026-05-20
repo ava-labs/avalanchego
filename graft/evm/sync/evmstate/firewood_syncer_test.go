@@ -188,14 +188,12 @@ func createDB(t *testing.T) state.Database {
 	triedbConfig := &triedb.Config{
 		DBOverride: config.BackendConstructor,
 	}
-	// Create the state database using libevm's state package, then wrap it with
-	// firewood.NewStateAccessor to avoid an import cycle between firewood and state packages.
-	internalState := state.NewDatabaseWithConfig(diskdb, triedbConfig)
-	tdb := internalState.TrieDB().Backend().(*firewood.TrieDB)
+
+	cache := state.NewDatabaseWithConfig(diskdb, triedbConfig)
 	t.Cleanup(func() {
-		require.NoError(t, tdb.Close())
+		require.NoError(t, cache.TrieDB().Close())
 	})
-	return firewood.NewStateAccessor(internalState, tdb)
+	return cache
 }
 
 func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database, accounts map[*utilstest.Key]*types.StateAccount) {
