@@ -44,6 +44,7 @@ export NFPM_CHANGELOG="${REPO_ROOT}/build/nfpm-changelog.yml"
 export NFPM_SIGNING_KEY="${REPO_ROOT}/build/gpg/signing-key.asc"
 export NFPM_RPM_PASSPHRASE="${NFPM_RPM_PASSPHRASE:-}"
 export NFPM_DEB_PASSPHRASE="${NFPM_DEB_PASSPHRASE:-}"
+GPG_KEY_FILE="${GPG_KEY_FILE:-}"
 
 echo "=== Building ${PACKAGE} ${pkg_format_upper} for ${PACKAGE_ARCH} (tag: ${TAG}) ==="
 
