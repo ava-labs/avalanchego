@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -19,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/avax/avaxmock"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -29,12 +26,20 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
-	dummyErr := errors.New("dummy error")
+var errInvalidOwner = errors.New("invalid owner")
 
+type invalidOwner struct {
+	secp256k1fx.OutputOwners
+}
+
+func (*invalidOwner) Verify() error {
+	return errInvalidOwner
+}
+
+func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 	type test struct {
 		name    string
-		txFunc  func(*gomock.Controller) *AddAutoRenewedValidatorTx
+		txFunc  func() *AddAutoRenewedValidatorTx
 		wantErr error
 	}
 
@@ -75,14 +80,14 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 	tests := []test{
 		{
 			name: "nil tx",
-			txFunc: func(*gomock.Controller) *AddAutoRenewedValidatorTx {
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return nil
 			},
 			wantErr: ErrNilTx,
 		},
 		{
 			name: "already verified",
-			txFunc: func(*gomock.Controller) *AddAutoRenewedValidatorTx {
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx: verifiedBaseTx,
 				}
@@ -91,7 +96,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 		},
 		{
 			name: "empty nodeID",
-			txFunc: func(*gomock.Controller) *AddAutoRenewedValidatorTx {
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.EmptyNodeID,
@@ -101,7 +106,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 		},
 		{
 			name: "no provided stake",
-			txFunc: func(*gomock.Controller) *AddAutoRenewedValidatorTx {
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -112,10 +117,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 		},
 		{
 			name: "missing period",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -130,14 +132,17 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 						},
 					},
 					DelegationShares: reward.PercentDenominator,
-					Owner:            configOwner,
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
 				}
 			},
 			wantErr: errMissingPeriod,
 		},
 		{
 			name: "too many shares",
-			txFunc: func(*gomock.Controller) *AddAutoRenewedValidatorTx {
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -159,10 +164,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 		},
 		{
 			name: "too many auto compound reward shares",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -179,17 +181,17 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					DelegationShares:         reward.PercentDenominator,
 					AutoCompoundRewardShares: reward.PercentDenominator + 1,
-					Owner:                    configOwner,
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
 				}
 			},
 			wantErr: errTooManyAutoCompoundRewardShares,
 		},
 		{
 			name: "invalid BaseTx",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          invalidBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -205,23 +207,17 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 						},
 					},
 					DelegationShares: reward.PercentDenominator,
-					Owner:            configOwner,
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
 				}
 			},
 			wantErr: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "invalid validator rewards owner",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				invalidRewardsOwner := fxmock.NewOwner(ctrl)
-				invalidRewardsOwner.EXPECT().Verify().Return(dummyErr)
-
-				rewardsOwner := fxmock.NewOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).MaxTimes(1)
-
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -238,26 +234,23 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					ValidatorRewardsOwner: invalidRewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					Owner:                 configOwner,
-					DelegationShares:      reward.PercentDenominator,
+					ValidatorRewardsOwner: &invalidOwner{},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
 				}
 			},
-			wantErr: dummyErr,
+			wantErr: errInvalidOwner,
 		},
 		{
 			name: "invalid delegator rewards owner",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				invalidRewardsOwner := fxmock.NewOwner(ctrl)
-				invalidRewardsOwner.EXPECT().Verify().Return(dummyErr)
-
-				rewardsOwner := fxmock.NewOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil)
-
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -274,22 +267,56 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: invalidRewardsOwner,
-					Owner:                 configOwner,
-					DelegationShares:      reward.PercentDenominator,
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &invalidOwner{},
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
 				}
 			},
-			wantErr: dummyErr,
+			wantErr: errInvalidOwner,
+		},
+		{
+			name: "invalid owner",
+			txFunc: func() *AddAutoRenewedValidatorTx {
+				return &AddAutoRenewedValidatorTx{
+					BaseTx:          validBaseTx,
+					ValidatorNodeID: ids.GenerateTestNodeID(),
+					Period:          1,
+					Wght:            1,
+					Signer:          &signer.Empty{},
+					StakeOuts: []*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{
+								ID: avaxAssetID,
+							},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 1,
+							},
+						},
+					},
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					Owner:            &invalidOwner{},
+					DelegationShares: reward.PercentDenominator,
+				}
+			},
+			wantErr: errInvalidOwner,
 		},
 		{
 			name: "wrong signer",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				rewardsOwner := fxmock.NewOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -306,26 +333,26 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					Owner:                 configOwner,
-					DelegationShares:      reward.PercentDenominator,
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
 				}
 			},
 			wantErr: errMissingSigner,
 		},
 		{
 			name: "invalid stake output",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				rewardsOwner := fxmock.NewOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
-				stakeOut := avaxmock.NewTransferableOut(ctrl)
-				stakeOut.EXPECT().Verify().Return(dummyErr)
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -337,26 +364,29 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 							Asset: avax.Asset{
 								ID: avaxAssetID,
 							},
-							Out: stakeOut,
+							Out: nil, // triggers ErrNilTransferableFxOutput
 						},
 					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					Owner:                 configOwner,
-					DelegationShares:      reward.PercentDenominator,
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
 				}
 			},
-			wantErr: dummyErr,
+			wantErr: avax.ErrNilTransferableFxOutput,
 		},
 		{
 			name: "stake overflow",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				rewardsOwner := fxmock.NewOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -381,23 +411,26 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					Owner:                 configOwner,
-					DelegationShares:      reward.PercentDenominator,
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
 				}
 			},
 			wantErr: safemath.ErrOverflow,
 		},
 		{
 			name: "invalid staked asset",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				rewardsOwner := fxmock.NewOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -422,23 +455,26 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					Owner:                 configOwner,
-					DelegationShares:      reward.PercentDenominator,
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
 				}
 			},
 			wantErr: errInvalidStakedAsset,
 		},
 		{
 			name: "stake not sorted",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				rewardsOwner := fxmock.NewOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -463,23 +499,26 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					Owner:                 configOwner,
-					DelegationShares:      reward.PercentDenominator,
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
 				}
 			},
 			wantErr: errOutputsNotSorted,
 		},
 		{
 			name: "weight mismatch",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				rewardsOwner := fxmock.NewOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -504,23 +543,26 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					Owner:                 configOwner,
-					DelegationShares:      reward.PercentDenominator,
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
 				}
 			},
 			wantErr: errValidatorWeightMismatch,
 		},
 		{
 			name: "valid auto-renewed validator",
-			txFunc: func(ctrl *gomock.Controller) *AddAutoRenewedValidatorTx {
-				rewardsOwner := fxmock.NewOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
-				configOwner := fxmock.NewOwner(ctrl)
-				configOwner.EXPECT().Verify().Return(nil).AnyTimes()
-
+			txFunc: func() *AddAutoRenewedValidatorTx {
 				return &AddAutoRenewedValidatorTx{
 					BaseTx:          validBaseTx,
 					ValidatorNodeID: ids.GenerateTestNodeID(),
@@ -545,10 +587,19 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					DelegationShares:      reward.PercentDenominator,
-					Owner:                 configOwner,
+					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+					DelegationShares: reward.PercentDenominator,
+					Owner: &secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
 				}
 			},
 			wantErr: nil,
@@ -557,9 +608,7 @@ func TestAddAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-
-			tx := tt.txFunc(ctrl)
+			tx := tt.txFunc()
 			gotErr := tx.SyntacticVerify(ctx)
 			require.ErrorIs(t, gotErr, tt.wantErr)
 
