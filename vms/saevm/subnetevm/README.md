@@ -201,11 +201,9 @@ resolved. `MarkSynchronous` currently opens state directly before the production
 chains can materialize old synchronous blocks whose state may no longer be
 available. See the `Synchronous-block state opener` TODO below.
 
-Alternative considered: add a `GasConfigNeedsState` gate so chains without
-`gaspricemanager` avoid the state read. The estimated hot-path saving was small,
-and the artifact design made the gate unnecessary for the recovery concern. If
-profiling later shows the artifact path is still too expensive, the gate can be
-added as an interface extension.
+Alternative considered: encode the effective gas-pricing configuration in the
+Subnet-EVM header. That would make recovery and rebuilds self-contained at the
+header level.
 
 ### Legacy Fee Controls
 
