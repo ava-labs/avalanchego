@@ -125,7 +125,7 @@ The intention of `bootstrap-monitor` is to enable a Kubernetes [StatefulSet](htt
          serialized to a file on the data volume
      - If the images are the same, the data volume is used as-is to
        enable resuming an in-progress test.
- - `bootstrap-monitor wait-for-completion` is intended to run as a sidecar of the avalanchego container. It polls the health of the node container to detect when a bootstrap test has completed successfully, and it also polls for a new image while waiting. When a new image is found, the managing `StatefulSet` is updated with    the details of the image to trigger a new test. The process to detect a new image is the same as was described for the `init` command.
+ - `bootstrap-monitor wait-for-completion` is intended to run as a sidecar of the avalanchego container. It polls the health of the node container to detect when a bootstrap test has completed successfully, and it also polls for a new image while waiting. When a new image is found, the managing `StatefulSet` is updated with the details of the image to trigger a new test. The process to detect a new image is the same as was described for the `init` command.
 
 ## Package details
 
