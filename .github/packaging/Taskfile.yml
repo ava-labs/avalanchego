@@ -56,7 +56,7 @@ tasks:
       - task: build-avalanchego-rpm
       - task: build-subnet-evm-rpm
 
-  build-builder-docker-image:
+  build-rpm-builder-docker-image:
     desc: Builds the RPM builder Docker image
     internal: true
     env:
@@ -99,7 +99,7 @@ tasks:
     desc: Builds RPM for avalanchego
     vars:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .RPM_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
-    deps: [build-builder-docker-image]
+    deps: [build-rpm-builder-docker-image]
     cmds:
       - task: build-package
         vars:
@@ -115,7 +115,7 @@ tasks:
     desc: Builds RPM for subnet-evm
     vars:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .RPM_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
-    deps: [build-builder-docker-image]
+    deps: [build-rpm-builder-docker-image]
     cmds:
       - task: build-package
         vars:
