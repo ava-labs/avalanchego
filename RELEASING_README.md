@@ -354,7 +354,7 @@ Create a release at [github.com/ava-labs/avalanchego/releases/new](https://githu
 
 The tag push triggers these workflows automatically:
 
-- `build-linux-binaries.yml` - Linux amd64/arm64 tarballs
+- `build-linux-binaries.yml` - signed Linux amd64/arm64 tarballs
 - `build-macos-release.yml` - macOS zip
 - `build-ubuntu-amd64-release.yml` / `build-ubuntu-arm64-release.yml` - Debian packages
 - `publish_docker_image.yml` - Docker images
@@ -364,11 +364,23 @@ Artifacts produced:
 **Binaries:**
 
 - `avalanchego-linux-amd64-$VERSION.tar.gz`
+- `avalanchego-linux-amd64-$VERSION.tar.gz.sig`
 - `avalanchego-linux-arm64-$VERSION.tar.gz`
+- `avalanchego-linux-arm64-$VERSION.tar.gz.sig`
 - `avalanchego-macos-$VERSION.zip`
 - `subnet-evm-linux-amd64-$VERSION.tar.gz`
+- `subnet-evm-linux-amd64-$VERSION.tar.gz.sig`
 - `subnet-evm-linux-arm64-$VERSION.tar.gz`
+- `subnet-evm-linux-arm64-$VERSION.tar.gz.sig`
 - `subnet-evm-macos-$VERSION.zip`
+
+Linux tarball signing is handled by `.github/packaging/Taskfile.yml` and
+the scripts under `.github/packaging/scripts/`. The workflow imports
+`secrets.RPM_GPG_PRIVATE_KEY` into a temporary key file and passes it with
+`secrets.RPM_GPG_PASSPHRASE` to the tarball build. Validation and upload
+require the exact tarballs, their `.sig` files, and `GPG-KEY-avalanchego`;
+upload verifies signatures before copying artifacts to S3. See
+[`docs/design/linux-binary-signing.md`](docs/design/linux-binary-signing.md).
 
 **Docker Images:**
 

@@ -3,8 +3,8 @@
 # e.g.,
 # TAG=v1.14.1 GIT_COMMIT=abc123def... ./.github/packaging/scripts/validate-tgz.sh
 
-# Verifies detached signatures (when a public key is present) and runs
-# `--version` smoke tests on the built tarballs in a fresh ubuntu:22.04
+# Verifies detached signatures and runs `--version` smoke tests on the
+# built tarballs in a fresh ubuntu:22.04
 # container, mirroring how a downstream consumer would use the artifacts.
 
 set -euo pipefail
@@ -28,15 +28,23 @@ export TGZ_ARCH
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 TGZ_DIR="${REPO_ROOT}/build/tgz"
 
+require_file() {
+    local f="$1"
+    if [[ ! -f "${f}" ]]; then
+        echo "ERROR: expected file not found: ${f}" >&2
+        exit 1
+    fi
+}
+
 # Verify expected files exist
 for f in \
     "avalanchego-linux-${TGZ_ARCH}-${TAG}.tar.gz" \
+    "avalanchego-linux-${TGZ_ARCH}-${TAG}.tar.gz.sig" \
     "subnet-evm-linux-${TGZ_ARCH}-${TAG}.tar.gz" \
+    "subnet-evm-linux-${TGZ_ARCH}-${TAG}.tar.gz.sig" \
+    "GPG-KEY-avalanchego" \
 ; do
-    if [[ ! -f "${TGZ_DIR}/${f}" ]]; then
-        echo "ERROR: expected file not found: ${TGZ_DIR}/${f}" >&2
-        exit 1
-    fi
+    require_file "${TGZ_DIR}/${f}"
 done
 
 echo "=== Validating tarballs in fresh Ubuntu 22.04 container ==="
@@ -55,16 +63,12 @@ docker run --rm \
         apt-get update
         apt-get install -y --no-install-recommends gnupg2 ca-certificates
 
-        # Verify signatures if public key available
-        if [[ -f /tgz/GPG-KEY-avalanchego ]]; then
-            gpg --batch --import /tgz/GPG-KEY-avalanchego
-            gpg --batch --verify "/tgz/avalanchego-linux-${TGZ_ARCH}-${TAG}.tar.gz.sig" \
-                                  "/tgz/avalanchego-linux-${TGZ_ARCH}-${TAG}.tar.gz"
-            gpg --batch --verify "/tgz/subnet-evm-linux-${TGZ_ARCH}-${TAG}.tar.gz.sig" \
-                                  "/tgz/subnet-evm-linux-${TGZ_ARCH}-${TAG}.tar.gz"
-        else
-            echo "Skipping GPG verification (unsigned build)"
-        fi
+        # Verify signatures
+        gpg --batch --import /tgz/GPG-KEY-avalanchego
+        gpg --batch --verify "/tgz/avalanchego-linux-${TGZ_ARCH}-${TAG}.tar.gz.sig" \
+                              "/tgz/avalanchego-linux-${TGZ_ARCH}-${TAG}.tar.gz"
+        gpg --batch --verify "/tgz/subnet-evm-linux-${TGZ_ARCH}-${TAG}.tar.gz.sig" \
+                              "/tgz/subnet-evm-linux-${TGZ_ARCH}-${TAG}.tar.gz"
 
         # Extract both tarballs
         mkdir -p /work

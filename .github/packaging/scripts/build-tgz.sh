@@ -40,6 +40,26 @@ mkdir -p "${OUTPUT_DIR}"
 
 echo "=== Building tarballs for ${ARCH} (tag: ${TAG}) ==="
 
+# Tri-state behavior:
+#   - GPG_KEY_FILE unset             -> unsigned build (local dev OK)
+#   - GPG_KEY_FILE set but empty     -> CI signing secret missing/blank,
+#                                       fail closed (no silent unsigned
+#                                       release artifacts)
+#   - GPG_KEY_FILE set and non-empty -> require passphrase and sign archives
+if [[ -n "${GPG_KEY_FILE:-}" ]]; then
+    if [[ ! -s "${GPG_KEY_FILE}" ]]; then
+        echo "ERROR: GPG_KEY_FILE is set (${GPG_KEY_FILE}) but the file is empty." >&2
+        echo "       Refusing to produce unsigned release artifacts." >&2
+        echo "       Verify that the GPG signing secret is configured." >&2
+        exit 1
+    fi
+    if [[ -z "${GPG_PASSPHRASE:-}" ]]; then
+        echo "ERROR: GPG_PASSPHRASE must be set when GPG_KEY_FILE is provided." >&2
+        echo "       Refusing to sign release artifacts without the signing passphrase secret." >&2
+        exit 1
+    fi
+fi
+
 # ── Step 1: Build binaries ────────────────────────────────────────
 
 # When AVALANCHEGO_COMMIT is unset, scripts/git_commit.sh falls back to
@@ -80,22 +100,10 @@ echo "  subnet-evm:  ${SUBNET_EVM_BINARY}"
 
 # ── Step 2: GPG setup ─────────────────────────────────────────────
 
-# Tri-state behavior:
-#   - GPG_KEY_FILE unset             → unsigned build (local dev OK)
-#   - GPG_KEY_FILE set but empty     → CI signing secret missing/blank,
-#                                       fail closed (no silent unsigned
-#                                       release artifacts)
-#   - GPG_KEY_FILE set and non-empty → sign each archive
-
 if [[ -z "${GPG_KEY_FILE:-}" ]]; then
     echo "No GPG key provided, skipping tarball signing."
     sign_archive() { :; }
     GPG_SIGNING_ENABLED=false
-elif [[ ! -s "${GPG_KEY_FILE}" ]]; then
-    echo "ERROR: GPG_KEY_FILE is set (${GPG_KEY_FILE}) but the file is empty." >&2
-    echo "       Refusing to produce unsigned release artifacts." >&2
-    echo "       Verify that the GPG signing secret is configured." >&2
-    exit 1
 else
     SIGN_GNUPGHOME=$(mktemp -d)
     export GNUPGHOME="${SIGN_GNUPGHOME}"
@@ -106,7 +114,7 @@ else
     sign_archive() {
         local archive="$1"
         echo "Signing ${archive}..."
-        printf '%s' "${GPG_PASSPHRASE:-}" | gpg --batch --yes --detach-sign \
+        printf '%s' "${GPG_PASSPHRASE}" | gpg --batch --yes --detach-sign \
             --pinentry-mode loopback \
             --passphrase-fd 0 \
             "${archive}"
@@ -131,6 +139,7 @@ stage_and_tar() {
     cp "${binary}" "${stage}/"
 
     echo "Creating ${archive}..."
+    rm -f "${archive}" "${archive}.sig"
     (cd "${STAGE_DIR}" && tar -czvf "${archive}" "${package}-${TAG}")
     sign_archive "${archive}"
 }
