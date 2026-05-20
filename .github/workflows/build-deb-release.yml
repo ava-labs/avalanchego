@@ -67,8 +67,8 @@ jobs:
         run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-debs
         env:
           PACKAGING_TAG: ${{ steps.setup.outputs.tag }}
-          DEB_GPG_KEY_FILE: ${{ steps.setup.outputs.gpg-key-file }}
-          NFPM_DEB_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+          GPG_KEY_FILE: ${{ steps.setup.outputs.gpg-key-file }}
+          GPG_KEY_PASSPHRASE: ${{ github.event_name != 'pull_request' && secrets.RPM_GPG_PASSPHRASE || '' }}
 
       - name: Upload DEBs as artifacts
         if: github.event_name != 'pull_request'
