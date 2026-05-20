@@ -38,14 +38,6 @@ esac
 
 mkdir -p "${OUTPUT_DIR}"
 
-# Remove stale tarballs, signatures, and the exported public key from
-# any previous run. Tar would overwrite same-tag tarballs, but on
-# persistent runners or after a failed cleanup, build/tgz can carry
-# over tarballs from a different tag — and the workflow's S3 upload
-# step matches *.tar.gz with a wildcard, so stale archives would be
-# republished alongside the current release.
-rm -f "${OUTPUT_DIR}"/*.tar.gz "${OUTPUT_DIR}"/*.tar.gz.sig "${OUTPUT_DIR}/GPG-KEY-avalanchego"
-
 echo "=== Building tarballs for ${ARCH} (tag: ${TAG}) ==="
 
 # ── Step 1: Build binaries ────────────────────────────────────────
