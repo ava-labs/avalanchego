@@ -4,6 +4,7 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "tmpnet",
     srcs = [
+        "archive.go",
         "check_monitoring.go",
         "defaults.go",
         "detached_process_default.go",
@@ -94,6 +95,7 @@ go_test(
     srcs = ["network_test.go"],
     embed = [":tmpnet"],
     deps = [
+        "//config",
         "//utils/logging",
         "@com_github_stretchr_testify//require",
     ],

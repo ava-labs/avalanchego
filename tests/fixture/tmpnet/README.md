@@ -68,6 +68,7 @@ the following non-test files:
 | flags/start_network.go      |                | Defines flags configuring network start                                |
 | tmpnetctl/                  |                | Directory containing main entrypoint for tmpnetctl command             |
 | yaml/                       |                | Directory defining kubernetes resources in yaml format                 |
+| archive.go                  |                | Exports and imports restartable tmpnet network archives                |
 | check_monitoring.go         |                | Enables checking if logs and metrics were collected                    |
 | defaults.go                 |                | Defines common default configuration                                   |
 | detached_process_default.go |                | Configures detached processes for darwin and linux                     |
@@ -80,7 +81,7 @@ the following non-test files:
 | monitor_processes.go        |                | Enables collection of logs and metrics from local processes            |
 | network.go                  | Network        | Orchestrates and configures temporary networks                         |
 | network_config.go           | Network        | Reads and writes network configuration                                 |
-| network_test.go             |                | Simple test round-tripping Network serialization                       |
+| network_test.go             |                | Tests serialization and archive import/export invariants               |
 | node.go                     | Node           | Orchestrates and configures nodes                                      |
 | node_config.go              | Node           | Reads and writes node configuration                                    |
 | process_runtime.go          | ProcessRuntime | Orchestrates node processes                                            |
@@ -113,10 +114,65 @@ $ ./bin/tmpnetctl stop-network --network-dir=/path/to/network
 ```
 
 Note the export of the path ending in `latest`. This is a symlink that
-is set to the last network created by `tmpnetctl start-network`. Setting
+is set to the last network created or imported by `tmpnetctl`. Setting
 the `TMPNET_NETWORK_DIR` env var to this symlink ensures that
-`tmpnetctl` commands target the most recently deployed temporary
+`tmpnetctl` commands target the most recently materialized temporary
 network.
+
+#### Archive import/export
+[Top](#table-of-contents)
+
+`tmpnetctl` can export a restartable archive of an existing stopped local
+tmpnet network and import it as a fresh network instance. Archived persistent
+nodes must be process-backed; ephemeral nodes are excluded from the archive:
+
+```bash
+# Export the persistent network state for a network
+$ ./bin/tmpnetctl export-network \
+    --network-dir=/path/to/network \
+    --archive-path=/tmp/tmpnet-network.tar.gz
+
+# Import the archive as a fresh tmpnet network on disk, binding it to local runtime config
+$ ./bin/tmpnetctl import-network \
+    --archive-path=/tmp/tmpnet-network.tar.gz \
+    --root-network-dir=/path/to/root/network/dir \
+    --avalanchego-path=/path/to/avalanchego \
+    --plugin-dir=/path/to/plugins
+```
+
+The imported network is created under the configured tmpnet root network
+directory, either via `--root-network-dir` or `TMPNET_ROOT_NETWORK_DIR`.
+If neither is provided, tmpnet uses the default root network directory
+(`~/.tmpnet/networks`). Import materializes the network on disk but does not
+start any nodes. Import also requires local runtime configuration so the
+portable archive can be rebound to the current host and environment. Imported
+archives intentionally omit `process.json`, so `tmpnetctl restart-network` is
+not sufficient for a freshly imported network. Starting an imported network is
+currently exposed via the Go API (`Bootstrap`), not a dedicated `tmpnetctl`
+command.
+
+Archive/import behavior is intentionally constrained:
+- the network must be stopped before export
+- archived persistent nodes must be local and process-backed
+- archive contents do not include runtime configuration; import binds the archive to locally supplied runtime settings
+- export requires at least one non-ephemeral node
+- only non-ephemeral nodes are included in the archive
+- import creates a fresh tmpnet UUID and a fresh network directory
+- imported persistent nodes retain their node identities and staking material
+- import recreates tmpnet-managed node directories under that new network directory and then copies persistent node contents into them
+- import does not preserve source `--data-dir` paths; explicit archived data-dir flags are cleared so the imported network uses freshly derived tmpnet-managed paths
+- transient runtime artifacts such as `process.json`, logs, and metrics snapshots are excluded
+- `tmpnetctl import-network` updates the `latest` symlink just like `start-network`
+
+This makes archive import/export suitable for restoring a restartable serving
+network without carrying forward ephemeral test machinery, stale runtime state,
+or source-path assumptions. Attempting to export a running network is rejected.
+
+The archive layout is currently a tmpnet fixture format for in-repo workflows.
+It does not yet have a formal compatibility or versioning guarantee across
+future tmpnet changes. Imported archives also assume that locally supplied
+runtime configuration makes sense in the target environment, including the
+binary and plugin paths used to start nodes after import.
 
 #### Deprecated usage with e2e suite
 [Top](#table-of-contents)
@@ -139,54 +195,78 @@ specify the `--avalanchego-path` or `--plugin-dir` flags.
 ### Via code
 [Top](#table-of-contents)
 
-A temporary network can be managed in code:
+A temporary network can be managed in code. In addition to direct lifecycle
+management, tmpnet also exposes `ExportNetworkArchive(...)` and
+`ImportNetworkArchive(...)` for archiving a stopped serving network and
+materializing it as a fresh tmpnet network instance. The same archive
+constraints described for `tmpnetctl` apply to the Go APIs as well: archive
+export/import is for local, process-backed persistent nodes, requires at least
+one non-ephemeral node, rejects running networks, preserves archived persistent
+node identities, omits runtime configuration from the archive, and imports into
+a fresh tmpnet network directory with freshly derived node data dirs.
+
+For archive behavior, distinguish between:
+- the tmpnet-managed node directory (`Node.DataDir`) used for the temporary network fixture
+- an explicit avalanchego `--data-dir` runtime flag stored in node flags
+
+Import recreates the tmpnet-managed node directories under the new network path
+and clears archived explicit `--data-dir` flags so imported nodes use fresh
+fixture-managed paths rather than source absolute paths.
 
 ```golang
 network := &tmpnet.Network{                         // Configure non-default values for the new network
     DefaultRuntimeConfig: tmpnet.NodeRuntimeConfig{
         Process: &tmpnet.ProcessRuntimeConfig{
-            ReuseDynamicPorts: true,                // Configure process-based nodes to reuse a dynamically allocated API port when restarting
+            AvalancheGoPath: "/path/to/avalanchego",
+            PluginDir:       "/path/to/plugins",   // Suggested value: ~/.avalanchego/plugins
+            ReuseDynamicPorts: true,                // Reuse a dynamically allocated API port when restarting
         },
-    }
-    DefaultFlags: tmpnet.FlagsMap{
-        config.LogLevelKey: "INFO",                 // Change one of the network's defaults
     },
-    Nodes: tmpnet.NewNodesOrPanic(5),               // Number of initial validating nodes
-    Subnets: []*tmpnet.Subnet{                      // Subnets to create on the new network once it is running
+    DefaultFlags: tmpnet.FlagsMap{
+        config.LogLevelKey: "INFO",               // Change one of the network's defaults
+    },
+    Nodes: tmpnet.NewNodesOrPanic(5),              // Number of initial validating nodes
+    Subnets: []*tmpnet.Subnet{                     // Subnets to create on the new network once it is running
         {
-            Name: "xsvm-a",                         // User-defined name used to reference subnet in code and on disk
+            Name: "xsvm-a",                        // User-defined name used to reference subnet in code and on disk
             Chains: []*tmpnet.Chain{
                 {
-                    VMName: "xsvm",              // Name of the VM the chain will run, will be used to derive the name of the VM binary
-                    Genesis: <genesis bytes>,    // Genesis bytes used to initialize the custom chain
-                    PreFundedKey: <key>,         // (Optional) A private key that is funded in the genesis bytes
-                    VersionArgs: "version-json", // (Optional) Arguments that prompt the VM binary to output version details in json format.
-                                                 // If one or more arguments are provided, the resulting json output should include a field
-                                                 // named `rpcchainvm` of type uint64 containing the rpc version supported by the VM binary.
-                                                 // The version will be checked against the version reported by the configured avalanchego
-                                                 // binary before network and node start.
+                    VMName:       "xsvm",         // Name of the VM the chain will run
+                    Genesis:      <genesis bytes>,
+                    PreFundedKey: <key>,
+                    VersionArgs:  "version-json", // Version output should include a `rpcchainvm` field
                 },
             },
-            ValidatorIDs: <node ids>,         // The IDs of nodes that validate the subnet
+            ValidatorIDs: <node ids>,
         },
     },
 }
 
-_ := tmpnet.BootstrapNewNetwork(          // Bootstrap the network
-    ctx,                                  // Context used to limit duration of waiting for network health
-    ginkgo.GinkgoWriter,                  // Writer to report progress of initialization
+_ := tmpnet.BootstrapNewNetwork(
+    ctx,      // Context used to limit duration of waiting for network health
+    log,      // Logger used to report network startup progress
     network,
-    "",                                   // Empty string uses the default network path (~/tmpnet/networks)
-    "/path/to/avalanchego",               // The path to the binary that nodes will execute
-    "/path/to/plugins",                   // The path nodes will use for plugin binaries (suggested value ~/.avalanchego/plugins)
+    "",       // Empty string uses the default network path (~/.tmpnet/networks)
 )
 
-uris := network.GetNodeURIs()
+archivePath := "/tmp/tmpnet-network.tar.gz"
+_ = network.Stop(context.Background())
+_ = tmpnet.ExportNetworkArchive(ctx, log, network.Dir, archivePath)
+
+runtimeConfig := tmpnet.NodeRuntimeConfig{
+    Process: &tmpnet.ProcessRuntimeConfig{
+        AvalancheGoPath: "/path/to/avalanchego",
+        PluginDir:       "/path/to/plugins",
+    },
+}
+importedNetwork, _ := tmpnet.ImportNetworkArchive(ctx, log, archivePath, "", &runtimeConfig)
+_ = importedNetwork.Bootstrap(ctx, log)
+
+uris := importedNetwork.GetNodeURIs()
 
 // Use URIs to interact with the network
 
-// Stop all nodes in the network
-network.Stop(context.Background())
+_ = importedNetwork.Stop(context.Background())
 ```
 
 ### Enabling errors with stack traces
@@ -300,7 +380,7 @@ the env var.
 Set `TMPNET_ROOT_NETWORK_DIR` to specify the root network directory in
 which to create the configuration directory of new networks
 (e.g. `TMPNET_ROOT_NETWORK_DIR/[network-dir]`). The default network
-root directory is `~/.tmpdir/networks`. Configuring the network root
+root directory is `~/.tmpnet/networks`. Configuring the network root
 directory is only relevant when creating new networks as the path of
 existing networks will already have been set.
 

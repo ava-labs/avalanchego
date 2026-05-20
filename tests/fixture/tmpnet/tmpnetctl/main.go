@@ -35,6 +35,14 @@ var (
 	errKubeconfigRequired = errors.New("--kubeconfig is required")
 )
 
+func logNetworkTargetingInstructions(log logging.Logger, network *tmpnet.Network, latestSymlinkPath string) {
+	log.Info("configure tmpnetctl to target this network by default",
+		zap.String("sourceCommand", "source "+network.EnvFilePath()),
+		zap.String("envCommand", network.EnvFileContents()),
+		zap.String("latestCommand", fmt.Sprintf("export %s=%s", tmpnet.NetworkDirEnvName, latestSymlinkPath)),
+	)
+}
+
 func main() {
 	var (
 		networkDir   string
@@ -118,11 +126,7 @@ func main() {
 				return stacktrace.Wrap(err)
 			}
 
-			fmt.Fprintln(os.Stdout, "\nConfigure tmpnetctl to target this network by default with one of the following statements:")
-			fmt.Fprintf(os.Stdout, " - source %s\n", network.EnvFilePath())
-			fmt.Fprintf(os.Stdout, " - %s\n", network.EnvFileContents())
-			fmt.Fprintf(os.Stdout, " - export %s=%s\n", tmpnet.NetworkDirEnvName, latestSymlinkPath)
-
+			logNetworkTargetingInstructions(log, network, latestSymlinkPath)
 			return nil
 		},
 	}
@@ -149,7 +153,9 @@ func main() {
 			if err := tmpnet.StopNetwork(ctx, log, networkDir); err != nil {
 				return stacktrace.Wrap(err)
 			}
-			fmt.Fprintf(os.Stdout, "Stopped network configured at: %s\n", networkDir)
+			log.Info("stopped network",
+				zap.String("networkDir", networkDir),
+			)
 			return nil
 		},
 	}
@@ -172,6 +178,85 @@ func main() {
 		},
 	}
 	rootCmd.AddCommand(restartNetworkCmd)
+
+	var (
+		archivePath             string
+		importRootNetworkDir    string
+		importRuntimeConfigVars *flags.RuntimeConfigVars
+	)
+
+	exportNetworkCmd := &cobra.Command{
+		Use:   "export-network",
+		Short: "Export a stopped process-backed network with non-ephemeral nodes as a restartable archive",
+		RunE: func(*cobra.Command, []string) error {
+			if len(networkDir) == 0 {
+				return stacktrace.Wrap(errNetworkDirRequired)
+			}
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return stacktrace.Wrap(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			if err := tmpnet.ExportNetworkArchive(ctx, log, networkDir, archivePath); err != nil {
+				return stacktrace.Wrap(err)
+			}
+			log.Info("exported network archive",
+				zap.String("networkDir", networkDir),
+				zap.String("archivePath", archivePath),
+			)
+			return nil
+		},
+	}
+	exportNetworkCmd.PersistentFlags().StringVar(&archivePath, "archive-path", "", "The path to write the exported network archive")
+	if err := exportNetworkCmd.MarkPersistentFlagRequired("archive-path"); err != nil {
+		panic(err)
+	}
+	rootCmd.AddCommand(exportNetworkCmd)
+
+	importNetworkCmd := &cobra.Command{
+		Use:   "import-network",
+		Short: "Import a temporary network archive as a fresh stopped on-disk network bound to local runtime config",
+		RunE: func(*cobra.Command, []string) error {
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return stacktrace.Wrap(err)
+			}
+			runtimeConfig, err := importRuntimeConfigVars.GetNodeRuntimeConfig()
+			if err != nil {
+				return stacktrace.Wrap(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			network, err := tmpnet.ImportNetworkArchive(ctx, log, archivePath, importRootNetworkDir, runtimeConfig)
+			if err != nil {
+				return stacktrace.Wrap(err)
+			}
+
+			latestSymlinkPath := filepath.Join(filepath.Dir(network.Dir), "latest")
+			if err := os.Remove(latestSymlinkPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return stacktrace.Wrap(err)
+			}
+			if err := os.Symlink(filepath.Base(network.Dir), latestSymlinkPath); err != nil {
+				return stacktrace.Wrap(err)
+			}
+
+			log.Info("imported network archive",
+				zap.String("networkDir", network.Dir),
+				zap.String("networkUUID", network.UUID),
+				zap.String("archivePath", archivePath),
+			)
+			logNetworkTargetingInstructions(log, network, latestSymlinkPath)
+			return nil
+		},
+	}
+	importNetworkCmd.PersistentFlags().StringVar(&archivePath, "archive-path", "", "The path to the exported network archive")
+	importNetworkCmd.PersistentFlags().StringVar(&importRootNetworkDir, "root-network-dir", os.Getenv(tmpnet.RootNetworkDirEnvName), fmt.Sprintf("The directory in which to create the imported network directory. Also possible to configure via the %s env variable.", tmpnet.RootNetworkDirEnvName))
+	importRuntimeConfigVars = flags.NewRuntimeConfigFlagSetVars(importNetworkCmd.PersistentFlags())
+	if err := importNetworkCmd.MarkPersistentFlagRequired("archive-path"); err != nil {
+		panic(err)
+	}
+	rootCmd.AddCommand(importNetworkCmd)
 
 	startMetricsCollectorCmd := &cobra.Command{
 		Use:   "start-metrics-collector",
