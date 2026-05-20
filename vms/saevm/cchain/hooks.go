@@ -294,7 +294,6 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			TimeMilliseconds: &nowMS,
 			MinDelayExcess:   &mde,
 			TargetExcess:     &te,
-			SettledHeight:    utils.PointerTo[uint64](0), // Populated in BuildBlock.
 		},
 	), nil
 }
@@ -365,7 +364,7 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 
 		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
 		if err != nil {
-			return nil, fmt.Errorf("parsing txs of %s (%d): %w", h.ParentHash, parentNumber, err)
+			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}
 		for _, t := range txs {
 			s.Union(t.InputIDs())
@@ -422,8 +421,7 @@ func (b *builder) BuildBlock(
 
 var _ hook.Transaction = (*hookTx)(nil)
 
-// hookTx adapts a [tx.Tx] to the [hook.Transaction] interface. The [hook.Op]
-// is precomputed at construction to bind the configured AVAX asset ID.
+// hookTx adapts a [tx.Tx] to the [hook.Transaction] interface.
 type hookTx struct {
 	id     ids.ID
 	tx     *tx.Tx
