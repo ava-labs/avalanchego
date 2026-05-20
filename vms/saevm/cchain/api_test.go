@@ -18,12 +18,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 )
 
-// getAtomicTxStatus exposes the deprecated [service.GetAtomicTxStatus]
+// GetTxStatus exposes the deprecated [service.GetAtomicTxStatus]
 // endpoint to tests in this package only. It is intentionally not part of
 // [Client]'s production surface: new code should call [Client.GetTx], which
 // returns the tx and its block height in a single call. Defined here so the
 // deprecated endpoint stays exercisable without inviting external use.
-func (c *Client) getAtomicTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (TxStatus, error) {
+func (c *Client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (TxStatus, error) {
 	res := TxStatus{}
 	err := c.r.SendRequest(ctx, "avax.getAtomicTxStatus", &api.JSONTxID{
 		TxID: txID,
@@ -68,7 +68,7 @@ func TestGetAtomicTxStatus(t *testing.T) {
 	sut := newSUT(t)
 
 	// Unknown: a freshly-generated txID has never been seen.
-	status, err := sut.getAtomicTxStatus(t.Context(), ids.GenerateTestID())
+	status, err := sut.GetTxStatus(t.Context(), ids.GenerateTestID())
 	require.NoError(t, err)
 	require.Equal(t, Unknown, status.Status)
 	require.Nil(t, status.Height)
@@ -87,7 +87,7 @@ func TestGetAtomicTxStatus(t *testing.T) {
 	signedImport, _ := w.newImportTx(t, sut.snowCtx.XChainID, receiver, txFee)
 	blk := sut.issueAndExecute(t, signedImport)
 
-	status, err = sut.getAtomicTxStatus(t.Context(), signedImport.ID())
+	status, err = sut.GetTxStatus(t.Context(), signedImport.ID())
 	require.NoError(t, err)
 	require.Equal(t, Accepted, status.Status)
 	require.NotNil(t, status.Height)
