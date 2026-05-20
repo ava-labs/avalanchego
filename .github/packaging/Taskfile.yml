@@ -66,7 +66,7 @@ tasks:
           docker run --rm
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
-          {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          {{if .GPG_KEY_FILE}}-v {{.GPG_KEY_FILE}}:{{.GPG_KEY_FILE}}:ro{{end}}
           -e PKG_FORMAT=RPM
           -e PACKAGE=avalanchego
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
@@ -74,8 +74,8 @@ tasks:
           -e PACKAGE_ARCH={{.PACKAGE_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
-          {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
-          {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          {{if .GPG_KEY_FILE}}-e GPG_KEY_FILE={{.GPG_KEY_FILE}}{{end}}
+          {{if .GPG_KEY_PASSPHRASE}}-e GPG_KEY_PASSPHRASE={{.GPG_KEY_PASSPHRASE}}{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
           .github/packaging/scripts/build-package.sh
 
@@ -91,7 +91,7 @@ tasks:
           docker run --rm
           -v {{.REPO_ROOT}}:/build
           -v {{.PACKAGING_OUTPUT_DIR}}:/output
-          {{if .RPM_GPG_KEY_FILE}}-v {{.RPM_GPG_KEY_FILE}}:{{.RPM_GPG_KEY_FILE}}:ro{{end}}
+          {{if .GPG_KEY_FILE}}-v {{.GPG_KEY_FILE}}:{{.GPG_KEY_FILE}}:ro{{end}}
           -e PKG_FORMAT=RPM
           -e PACKAGE=subnet-evm
           -e VERSION={{trimPrefix "v" .RPM_TAG}}
@@ -99,8 +99,8 @@ tasks:
           -e PACKAGE_ARCH={{.PACKAGE_ARCH}}
           -e OUTPUT_DIR=/output
           -e AVALANCHEGO_COMMIT={{.PACKAGING_GIT_COMMIT}}
-          {{if .RPM_GPG_KEY_FILE}}-e RPM_GPG_KEY_FILE={{.RPM_GPG_KEY_FILE}}{{end}}
-          {{if .NFPM_RPM_PASSPHRASE}}-e NFPM_RPM_PASSPHRASE={{.NFPM_RPM_PASSPHRASE}}{{end}}
+          {{if .GPG_KEY_FILE}}-e GPG_KEY_FILE={{.GPG_KEY_FILE}}{{end}}
+          {{if .GPG_KEY_PASSPHRASE}}-e GPG_KEY_PASSPHRASE={{.GPG_KEY_PASSPHRASE}}{{end}}
           {{.PACKAGING_DOCKER_IMAGE}}
           .github/packaging/scripts/build-package.sh
 

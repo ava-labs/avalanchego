@@ -13,8 +13,8 @@
 #
 # Optional env vars:
 #   PKG_FORMAT          - Package format identifier (default: RPM)
-#   RPM_GPG_KEY_FILE    - Path to GPG private key
-#   NFPM_RPM_PASSPHRASE - GPG passphrase
+#   GPG_KEY_FILE    - Path to GPG private key
+#   GPG_KEY_PASSPHRASE - GPG passphrase
 #   AVALANCHEGO_COMMIT  - Git commit hash (auto-detected if not set)
 
 set -euo pipefail
@@ -46,13 +46,19 @@ generate_changelog "${VERSION}"
 
 # ── GPG signing ───────────────────────────────────────────────────
 
-GPG_KEY_FILE="${RPM_GPG_KEY_FILE:-}"
+GPG_KEY_FILE="${GPG_KEY_FILE:-}"
 GPG_PUBLIC_KEY="${OUTPUT_DIR}/${PKG_FORMAT}-GPG-KEY-avalanchego"
+
+# nfpm reads the signing passphrase from a packager-specific env var
+# (NFPM_RPM_PASSPHRASE, NFPM_DEB_PASSPHRASE, ...); mirror our format-
+# agnostic GPG_KEY_PASSPHRASE into the name nfpm expects.
+nfpm_passphrase_var="NFPM_${PKG_FORMAT}_PASSPHRASE"
+export "${nfpm_passphrase_var}=${GPG_KEY_PASSPHRASE:-}"
 
 # Ephemeral keys use a known throwaway passphrase so local and CI builds
 # exercise passphrase handling without release credentials.
 if [[ -z "${GPG_KEY_FILE}" ]]; then
-    use_ephemeral_gpg_passphrase NFPM_RPM_PASSPHRASE
+    use_ephemeral_gpg_passphrase "${nfpm_passphrase_var}"
 fi
 
 setup_gpg "${GPG_KEY_FILE}" "${GPG_PUBLIC_KEY}" "${PKG_FORMAT}"
