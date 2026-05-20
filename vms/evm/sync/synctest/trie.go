@@ -31,9 +31,8 @@ func NewTrieDBWithDisk() (*triedb.Database, ethdb.Database) {
 	return triedb.NewDatabase(db, nil), db
 }
 
-// FillTrie writes numKeys deterministic 32-byte pairs into a fresh
-// [trie.Trie] under trieDB and returns the committed root plus the
-// inserted keys and values in lexicographic order.
+// FillTrie writes numKeys deterministic 32-byte pairs into trieDB and
+// returns the committed root with keys and values sorted ascending.
 func FillTrie(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, [][]byte, [][]byte) {
 	t.Helper()
 	tr, err := trie.New(trie.TrieID(types.EmptyRootHash), trieDB)
@@ -68,7 +67,7 @@ func FillTrie(t *testing.T, trieDB *triedb.Database, numKeys int) (common.Hash, 
 	return root, keys, vals
 }
 
-// CorruptTrie deletes every nth node of tr from diskdb, to exercise
+// CorruptTrie deletes every nth node of tr from diskdb to exercise
 // proof-generation error paths.
 func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
 	t.Helper()

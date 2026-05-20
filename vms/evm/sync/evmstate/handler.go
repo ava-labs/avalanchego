@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package handlers
+package evmstate
 
 import (
 	"bytes"
@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -36,42 +37,40 @@ const (
 	snapshotSegmentLen = 64
 )
 
-// LeafHandler serves [syncpb.GetLeafRequest] over [p2p.EVMLeafsRequestHandlerID].
-type LeafHandler = Handler[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
+// Handler serves [syncpb.GetLeafRequest] over [p2p.EVMLeafsRequestHandlerID].
+type Handler = handlers.Handler[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
 
-// LeafResponder is the inner contract for leaf-range requests.
-type LeafResponder = Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
+// Responder serves leaf-range requests.
+type Responder = handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
 
-// NewLeafHandler wires resp into a [LeafHandler].
-func NewLeafHandler(resp LeafResponder) *LeafHandler {
-	return NewHandler(func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} }, resp)
+// NewHandler wires resp into a [Handler].
+func NewHandler(resp Responder) *Handler {
+	return handlers.NewHandler(func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} }, resp)
 }
 
-// SnapshotProvider exposes snapshot iterators for the leaf responder's
-// fast path.
+// SnapshotProvider exposes snapshot iterators for the fast path.
 type SnapshotProvider interface {
 	AccountIterator(start common.Hash) ethdb.Iterator
 	StorageIterator(account, start common.Hash) ethdb.Iterator
 }
 
-var _ LeafResponder = (*leafResponder)(nil)
+var _ Responder = (*responder)(nil)
 
-// leafResponder is bound to one (trieDB, key-length, snapshot) tuple.
-// Use one per trie kind.
-type leafResponder struct {
+// responder is bound to one (trieDB, key-length, snapshot) tuple.
+type responder struct {
 	trieDB        *triedb.Database
 	snapshot      SnapshotProvider // optional
-	stats         LeafStats
+	stats         Stats
 	trieKeyLength int
 }
 
-func NewLeafResponder(
+func NewResponder(
 	trieDB *triedb.Database,
 	trieKeyLength int,
 	snapshot SnapshotProvider,
-	stats LeafStats,
-) LeafResponder {
-	return &leafResponder{
+	stats Stats,
+) Responder {
+	return &responder{
 		trieDB:        trieDB,
 		snapshot:      snapshot,
 		stats:         stats,
@@ -79,21 +78,21 @@ func NewLeafResponder(
 	}
 }
 
-func (r *leafResponder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, error) {
-	if !validateLeafRequest(req, r.trieKeyLength) {
+func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.GetLeafRequest) (*syncpb.GetLeafResponse, error) {
+	if !validateRequest(req, r.trieKeyLength) {
 		log.Debug("invalid leaf request, dropping", "nodeID", nodeID, "request", req)
 		r.stats.IncInvalidLeafRequest()
 		return nil, nil
 	}
-	b := newLeafBuild(r, nodeID, req)
+	b := newBuild(r, nodeID, req)
 	if b == nil {
 		return nil, nil
 	}
 	return b.run(ctx, nodeID)
 }
 
-// validateLeafRequest reports whether req has a valid shape.
-func validateLeafRequest(req *syncpb.GetLeafRequest, trieKeyLength int) bool {
+// validateRequest reports whether req has a valid shape.
+func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) bool {
 	if req.GetNodeType() != syncpb.EVMNodeType_EVM_NODE_TYPE_STATE_TRIE {
 		return false
 	}
@@ -115,10 +114,8 @@ func validateLeafRequest(req *syncpb.GetLeafRequest, trieKeyLength int) bool {
 	return true
 }
 
-// leafBuild owns one in-flight leaf request: pulls leaves from the
-// snapshot fast path (when available), falls back to trie iteration,
-// and emits the range proof.
-type leafBuild struct {
+// build holds one in-flight leaf request.
+type build struct {
 	startTime time.Time
 
 	startKey []byte
@@ -133,14 +130,14 @@ type leafBuild struct {
 
 	resp *syncpb.GetLeafResponse
 
-	stats        LeafStats
+	stats        Stats
 	trieReadTime time.Duration
 	proofTime    time.Duration
 }
 
-// newLeafBuild opens the trie and returns a per-request build, or nil
+// newBuild opens the trie and returns a per-request build, or nil
 // if the trie root is missing.
-func newLeafBuild(r *leafResponder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *leafBuild {
+func newBuild(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *build {
 	startTime := time.Now()
 	r.stats.IncLeafRequest()
 
@@ -156,7 +153,7 @@ func newLeafBuild(r *leafResponder, nodeID ids.NodeID, req *syncpb.GetLeafReques
 	}
 
 	limit := min(uint16(req.GetKeyLimit()), MaxLeavesLimit)
-	return &leafBuild{
+	return &build{
 		startTime: startTime,
 		startKey:  req.GetStartKey(),
 		endKey:    req.GetEndKey(),
@@ -174,9 +171,9 @@ func newLeafBuild(r *leafResponder, nodeID ids.NodeID, req *syncpb.GetLeafReques
 	}
 }
 
-// build runs the response pipeline: snapshot fast path (if available),
-// then trie fill-in, then range proof. Mutates [leafBuild.resp].
-func (b *leafBuild) build(ctx context.Context) error {
+// build runs the response pipeline (snapshot fast path, trie fill-in,
+// range proof) and mutates [build.resp].
+func (b *build) build(ctx context.Context) error {
 	if b.snapshot != nil {
 		done, err := b.fillFromSnapshot(ctx)
 		if err != nil {
@@ -219,7 +216,7 @@ func (b *leafBuild) build(ctx context.Context) error {
 
 // run executes the build pipeline. Returns nil to signal a late drop
 // (pipeline error or ctx cancelled before any leaves were read).
-func (b *leafBuild) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, error) {
+func (b *build) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, error) {
 	defer func() {
 		b.stats.UpdateLeafRequestProcessingTime(time.Since(b.startTime))
 		b.stats.UpdateLeafReturned(uint16(len(b.resp.Keys)))
@@ -241,7 +238,7 @@ func (b *leafBuild) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeaf
 
 // fillFromSnapshot reads from the snapshot. Returns true if the
 // response is complete.
-func (b *leafBuild) fillFromSnapshot(ctx context.Context) (bool, error) {
+func (b *build) fillFromSnapshot(ctx context.Context) (bool, error) {
 	snapshotReadStart := time.Now()
 	b.stats.IncSnapshotReadAttempt()
 
@@ -342,8 +339,8 @@ func (b *leafBuild) fillFromSnapshot(ctx context.Context) (bool, error) {
 }
 
 // readFromSnapshot pulls leaves in [startKey, endKey], capped at
-// [leafBuild.limit]. Storage reads scope to [leafBuild.account].
-func (b *leafBuild) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte, error) {
+// [build.limit]. Storage reads scope to [build.account].
+func (b *build) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte, error) {
 	startHash := common.BytesToHash(b.startKey)
 	var snapIt ethdb.Iterator
 	if b.account == (common.Hash{}) {
@@ -368,9 +365,9 @@ func (b *leafBuild) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte, e
 	return keys, vals, snapIt.Error()
 }
 
-// fillFromTrie iterates the trie from [leafBuild.nextKey] up to end
+// fillFromTrie iterates the trie from [build.nextKey] up to end
 // (exclusive). Returns true if the trie has more keys past the response.
-func (b *leafBuild) fillFromTrie(ctx context.Context, end []byte) (bool, error) {
+func (b *build) fillFromTrie(ctx context.Context, end []byte) (bool, error) {
 	startTime := time.Now()
 	defer func() { b.trieReadTime += time.Since(startTime) }()
 
@@ -398,7 +395,7 @@ func (b *leafBuild) fillFromTrie(ctx context.Context, end []byte) (bool, error) 
 
 // nextKey returns the trie iteration start: a byte-incremented copy
 // of the last response key, or the request start when empty.
-func (b *leafBuild) nextKey() []byte {
+func (b *build) nextKey() []byte {
 	if len(b.resp.Keys) == 0 {
 		return b.startKey
 	}
@@ -409,7 +406,7 @@ func (b *leafBuild) nextKey() []byte {
 
 // generateRangeProof returns a Merkle range proof for [start, last].
 // Empty start substitutes the cached zero-key.
-func (b *leafBuild) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
+func (b *build) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
 	startTime := time.Now()
 	defer func() { b.proofTime += time.Since(startTime) }()
 
@@ -433,7 +430,7 @@ func (b *leafBuild) generateRangeProof(start []byte, keys [][]byte) (*memorydb.D
 
 // verifyRangeProof returns whether the trie has more keys past the
 // last verified key.
-func (b *leafBuild) verifyRangeProof(keys, vals [][]byte, start []byte, proof *memorydb.Database) (bool, error) {
+func (b *build) verifyRangeProof(keys, vals [][]byte, start []byte, proof *memorydb.Database) (bool, error) {
 	startTime := time.Now()
 	defer func() { b.proofTime += time.Since(startTime) }()
 
@@ -447,7 +444,7 @@ func (b *leafBuild) verifyRangeProof(keys, vals [][]byte, start []byte, proof *m
 // keys/vals. With hasGap=true the proof validates standalone starting
 // at keys[0]. With hasGap=false the proof starts at nextKey(), so the
 // keys can be appended to the response directly.
-func (b *leafBuild) isRangeValid(keys, vals [][]byte, hasGap bool) (*memorydb.Database, bool, bool, error) {
+func (b *build) isRangeValid(keys, vals [][]byte, hasGap bool) (*memorydb.Database, bool, bool, error) {
 	var startKey []byte
 	if hasGap {
 		startKey = keys[0]
@@ -490,3 +487,43 @@ func incrementBytes(b []byte) {
 		b[i] = 0
 	}
 }
+
+// Stats reports [responder] metrics.
+type Stats interface {
+	IncLeafRequest()
+	IncInvalidLeafRequest()
+	IncMissingRoot()
+	IncTrieError()
+	IncProofError()
+	IncSnapshotReadAttempt()
+	IncSnapshotReadSuccess()
+	IncSnapshotReadError()
+	IncSnapshotSegmentValid()
+	IncSnapshotSegmentInvalid()
+	UpdateSnapshotReadTime(time.Duration)
+	UpdateLeafRequestProcessingTime(time.Duration)
+	UpdateLeafReturned(uint16)
+	UpdateRangeProofValsReturned(int64)
+	UpdateGenerateRangeProofTime(time.Duration)
+	UpdateReadLeafTime(time.Duration)
+}
+
+// NoopStats discards every [Stats] event.
+type NoopStats struct{}
+
+func (NoopStats) IncLeafRequest()                               {}
+func (NoopStats) IncInvalidLeafRequest()                        {}
+func (NoopStats) IncMissingRoot()                               {}
+func (NoopStats) IncTrieError()                                 {}
+func (NoopStats) IncProofError()                                {}
+func (NoopStats) IncSnapshotReadAttempt()                       {}
+func (NoopStats) IncSnapshotReadSuccess()                       {}
+func (NoopStats) IncSnapshotReadError()                         {}
+func (NoopStats) IncSnapshotSegmentValid()                      {}
+func (NoopStats) IncSnapshotSegmentInvalid()                    {}
+func (NoopStats) UpdateSnapshotReadTime(time.Duration)          {}
+func (NoopStats) UpdateLeafRequestProcessingTime(time.Duration) {}
+func (NoopStats) UpdateLeafReturned(uint16)                     {}
+func (NoopStats) UpdateRangeProofValsReturned(int64)            {}
+func (NoopStats) UpdateGenerateRangeProofTime(time.Duration)    {}
+func (NoopStats) UpdateReadLeafTime(time.Duration)              {}

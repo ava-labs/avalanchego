@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package handlers_test
+package code_test
 
 import (
 	"crypto/rand"
@@ -19,18 +19,18 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func TestCodeHandler_RoundTrip(t *testing.T) {
+func TestHandler_RoundTrip(t *testing.T) {
 	wantResp := &syncpb.GetCodeResponse{
 		Data: [][]byte{{0xaa, 0xbb}, {0xcc, 0xdd}},
 	}
 	responder := &synctest.FakeCodeResponder{Resp: wantResp}
-	h := handlers.NewCodeHandler(responder)
+	h := code.NewHandler(responder)
 
 	req := &syncpb.GetCodeRequest{
 		Hashes: [][]byte{{0x01}, {0x02}},
@@ -44,7 +44,7 @@ func TestCodeHandler_RoundTrip(t *testing.T) {
 	require.Empty(t, cmp.Diff(req, responder.GotReq, protocmp.Transform()))
 }
 
-func TestCodeHandler_FailurePaths(t *testing.T) {
+func TestHandler_FailurePaths(t *testing.T) {
 	tests := []struct {
 		name       string
 		resp       *syncpb.GetCodeResponse
@@ -64,7 +64,7 @@ func TestCodeHandler_FailurePaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			responder := &synctest.FakeCodeResponder{Resp: tt.resp, Err: tt.err}
-			h := handlers.NewCodeHandler(responder)
+			h := code.NewHandler(responder)
 
 			respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, synctest.MustMarshal(t, &syncpb.GetCodeRequest{}))
 			if tt.wantAppErr {
@@ -77,9 +77,9 @@ func TestCodeHandler_FailurePaths(t *testing.T) {
 	}
 }
 
-func TestCodeHandler_MalformedRequestBytes(t *testing.T) {
+func TestHandler_MalformedRequestBytes(t *testing.T) {
 	responder := &synctest.FakeCodeResponder{}
-	h := handlers.NewCodeHandler(responder)
+	h := code.NewHandler(responder)
 
 	respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, []byte{0xff, 0xff})
 	require.Nil(t, respBytes)
@@ -87,7 +87,7 @@ func TestCodeHandler_MalformedRequestBytes(t *testing.T) {
 	require.Nil(t, responder.GotReq, "responder must not be invoked on malformed request")
 }
 
-func TestCodeResponder(t *testing.T) {
+func TestResponder(t *testing.T) {
 	t.Parallel()
 
 	db := memorydb.New()
@@ -144,7 +144,7 @@ func TestCodeResponder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stats := &synctest.CodeRecorder{}
-			r := handlers.NewCodeResponder(db, stats)
+			r := code.NewResponder(db, stats)
 
 			rawHashes := make([][]byte, len(tt.hashes))
 			for i, h := range tt.hashes {

@@ -16,9 +16,8 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// FakeResponder is a generic [handlers.Responder] fake that returns
-// [FakeResponder.Resp] / [FakeResponder.Err] and captures the last
-// request in [FakeResponder.GotReq].
+// FakeResponder is a programmable [handlers.Responder] fake. It
+// returns Resp/Err and records the last request in GotReq.
 type FakeResponder[Req, Resp handlers.ProtoMessage] struct {
 	Resp   Resp
 	Err    error

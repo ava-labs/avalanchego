@@ -25,14 +25,14 @@ var (
 	}
 )
 
-// ProtoMessage constrains per-RPC types to [proto.Message] + comparable,
-// so a responder can return the zero value to signal "drop".
+// ProtoMessage is [proto.Message] plus comparable so the zero value
+// signals "drop".
 type ProtoMessage interface {
 	proto.Message
 	comparable
 }
 
-// Responder is the inner contract [Handler] depends on. Return values:
+// Responder is the per-RPC contract behind [Handler]. Return values:
 //
 //	(resp, nil) deliver resp to the peer
 //	(zero, nil) drop (application-level reject)
@@ -48,7 +48,7 @@ type Handler[Req, Resp ProtoMessage] struct {
 	responder Responder[Req, Resp]
 }
 
-// NewHandler binds a [Responder] and a per-request factory.
+// NewHandler binds a [Responder] and a request constructor.
 func NewHandler[Req, Resp ProtoMessage](newReq func() Req, inner Responder[Req, Resp]) *Handler[Req, Resp] {
 	return &Handler[Req, Resp]{newReq: newReq, responder: inner}
 }

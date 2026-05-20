@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package handlers
+package code
 
 import (
 	"context"
@@ -13,43 +13,44 @@ import (
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// MaxCodeHashesPerRequest caps the hashes per request.
-const MaxCodeHashesPerRequest = 5
+// MaxHashesPerRequest caps the hashes per request.
+const MaxHashesPerRequest = 5
 
-// CodeHandler serves [syncpb.GetCodeRequest] over [p2p.EVMCodeRequestHandlerID].
-type CodeHandler = Handler[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
+// Handler serves [syncpb.GetCodeRequest] over [p2p.EVMCodeRequestHandlerID].
+type Handler = handlers.Handler[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
 
-// CodeResponder is the inner contract for code-by-hash requests.
-type CodeResponder = Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
+// Responder serves code-by-hash requests.
+type Responder = handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
 
-// NewCodeHandler wires resp into a [CodeHandler].
-func NewCodeHandler(resp CodeResponder) *CodeHandler {
-	return NewHandler(func() *syncpb.GetCodeRequest { return &syncpb.GetCodeRequest{} }, resp)
+// NewHandler wires resp into a [Handler].
+func NewHandler(resp Responder) *Handler {
+	return handlers.NewHandler(func() *syncpb.GetCodeRequest { return &syncpb.GetCodeRequest{} }, resp)
 }
 
-var _ CodeResponder = (*codeResponder)(nil)
+var _ Responder = (*responder)(nil)
 
-// codeResponder reads code by hash via [rawdb.ReadCode].
-type codeResponder struct {
+// responder reads code by hash via [rawdb.ReadCode].
+type responder struct {
 	codeReader ethdb.KeyValueReader
-	stats      CodeStats
+	stats      Stats
 }
 
-func NewCodeResponder(codeReader ethdb.KeyValueReader, stats CodeStats) CodeResponder {
-	return &codeResponder{codeReader: codeReader, stats: stats}
+func NewResponder(codeReader ethdb.KeyValueReader, stats Stats) Responder {
+	return &responder{codeReader: codeReader, stats: stats}
 }
 
-func (r *codeResponder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, error) {
+func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.GetCodeRequest) (*syncpb.GetCodeResponse, error) {
 	startTime := time.Now()
 	r.stats.IncCodeRequest()
 	defer func() { r.stats.UpdateCodeReadTime(time.Since(startTime)) }()
 
 	hashes := req.GetHashes()
-	if len(hashes) > MaxCodeHashesPerRequest {
+	if len(hashes) > MaxHashesPerRequest {
 		r.stats.IncTooManyHashesRequested()
 		log.Debug("too many hashes requested, dropping request", "nodeID", nodeID, "numHashes", len(hashes))
 		return nil, nil
@@ -92,3 +93,23 @@ func uniqueHashes(hashes [][]byte) bool {
 	}
 	return true
 }
+
+// Stats reports [responder] metrics.
+type Stats interface {
+	IncCodeRequest()
+	IncMissingCodeHash()
+	IncTooManyHashesRequested()
+	IncDuplicateHashesRequested()
+	UpdateCodeReadTime(time.Duration)
+	UpdateCodeBytesReturned(uint32)
+}
+
+// NoopStats discards every [Stats] event.
+type NoopStats struct{}
+
+func (NoopStats) IncCodeRequest()                  {}
+func (NoopStats) IncMissingCodeHash()              {}
+func (NoopStats) IncTooManyHashesRequested()       {}
+func (NoopStats) IncDuplicateHashesRequested()     {}
+func (NoopStats) UpdateCodeReadTime(time.Duration) {}
+func (NoopStats) UpdateCodeBytesReturned(uint32)   {}

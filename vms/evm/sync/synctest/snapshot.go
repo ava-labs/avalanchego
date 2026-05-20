@@ -15,9 +15,9 @@ type StaticPair struct {
 	K, V []byte
 }
 
-// StaticSnapshot is an in-memory handlers.SnapshotProvider.
-// [StaticSnapshot.Pairs] is keyed by account ([common.Hash]{} for the
-// account trie) and each slice MUST be sorted ascending by K.
+// StaticSnapshot is an in-memory [evmstate.SnapshotProvider]. Pairs is
+// keyed by account ([common.Hash]{} for the account trie) and each
+// slice must be sorted ascending by K.
 type StaticSnapshot struct {
 	Pairs map[common.Hash][]StaticPair
 }

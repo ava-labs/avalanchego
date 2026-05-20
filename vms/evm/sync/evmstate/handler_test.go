@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package handlers_test
+package evmstate_test
 
 import (
 	"bytes"
@@ -18,20 +18,20 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func TestLeafHandler_RoundTrip(t *testing.T) {
+func TestHandler_RoundTrip(t *testing.T) {
 	wantResp := &syncpb.GetLeafResponse{
 		Keys:      [][]byte{{0x01}, {0x02}},
 		Values:    [][]byte{{0xaa}, {0xbb}},
 		ProofVals: [][]byte{{0xcc}},
 	}
 	responder := &synctest.FakeLeafResponder{Resp: wantResp}
-	h := handlers.NewLeafHandler(responder)
+	h := evmstate.NewHandler(responder)
 
 	req := &syncpb.GetLeafRequest{
 		RootHash:    []byte{0xde, 0xad},
@@ -50,7 +50,7 @@ func TestLeafHandler_RoundTrip(t *testing.T) {
 	require.Empty(t, cmp.Diff(req, responder.GotReq, protocmp.Transform()))
 }
 
-func TestLeafHandler_FailurePaths(t *testing.T) {
+func TestHandler_FailurePaths(t *testing.T) {
 	tests := []struct {
 		name       string
 		resp       *syncpb.GetLeafResponse
@@ -70,7 +70,7 @@ func TestLeafHandler_FailurePaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			responder := &synctest.FakeLeafResponder{Resp: tt.resp, Err: tt.err}
-			h := handlers.NewLeafHandler(responder)
+			h := evmstate.NewHandler(responder)
 
 			respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, synctest.MustMarshal(t, &syncpb.GetLeafRequest{}))
 			if tt.wantAppErr {
@@ -83,9 +83,9 @@ func TestLeafHandler_FailurePaths(t *testing.T) {
 	}
 }
 
-func TestLeafHandler_MalformedRequestBytes(t *testing.T) {
+func TestHandler_MalformedRequestBytes(t *testing.T) {
 	responder := &synctest.FakeLeafResponder{}
-	h := handlers.NewLeafHandler(responder)
+	h := evmstate.NewHandler(responder)
 
 	respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, []byte{0xff, 0xff})
 	require.Nil(t, respBytes)
@@ -93,7 +93,7 @@ func TestLeafHandler_MalformedRequestBytes(t *testing.T) {
 	require.Nil(t, responder.GotReq, "responder must not be invoked on malformed request")
 }
 
-func TestLeafResponder_ValidationDrops(t *testing.T) {
+func TestResponder_ValidationDrops(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 10)
@@ -166,7 +166,7 @@ func TestLeafResponder_ValidationDrops(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stats := &synctest.LeafRecorder{}
-			r := handlers.NewLeafResponder(trieDB, common.HashLength, nil, stats)
+			r := evmstate.NewResponder(trieDB, common.HashLength, nil, stats)
 			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), tt.req)
 			require.NoError(t, err)
 			require.Nil(t, resp)
@@ -175,11 +175,11 @@ func TestLeafResponder_ValidationDrops(t *testing.T) {
 	}
 }
 
-func TestLeafResponder_MissingRootDrops(t *testing.T) {
+func TestResponder_MissingRootDrops(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	stats := &synctest.LeafRecorder{}
-	r := handlers.NewLeafResponder(trieDB, common.HashLength, nil, stats)
+	r := evmstate.NewResponder(trieDB, common.HashLength, nil, stats)
 
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: bytes.Repeat([]byte{0xab}, common.HashLength),
@@ -191,13 +191,13 @@ func TestLeafResponder_MissingRootDrops(t *testing.T) {
 	require.Equal(t, uint32(1), stats.MissingRoot)
 }
 
-func TestLeafResponder_TrieRoundTrip(t *testing.T) {
+func TestResponder_TrieRoundTrip(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
 
 	stats := &synctest.LeafRecorder{}
-	r := handlers.NewLeafResponder(trieDB, common.HashLength, nil, stats)
+	r := evmstate.NewResponder(trieDB, common.HashLength, nil, stats)
 
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
@@ -214,12 +214,12 @@ func TestLeafResponder_TrieRoundTrip(t *testing.T) {
 	require.Equal(t, uint16(len(keys)), stats.LeafReturned)
 }
 
-func TestLeafResponder_PartialRangeIncludesProof(t *testing.T) {
+func TestResponder_PartialRangeIncludesProof(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
 
-	r := handlers.NewLeafResponder(trieDB, common.HashLength, nil, &synctest.LeafRecorder{})
+	r := evmstate.NewResponder(trieDB, common.HashLength, nil, &synctest.LeafRecorder{})
 	limit := uint32(20)
 
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
@@ -238,7 +238,7 @@ func TestLeafResponder_PartialRangeIncludesProof(t *testing.T) {
 	require.Equal(t, vals[:limit], resp.Values)
 }
 
-func TestLeafResponder_SnapshotFastPathSucceeds(t *testing.T) {
+func TestResponder_SnapshotFastPathSucceeds(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := synctest.FillTrie(t, trieDB, 30)
@@ -254,7 +254,7 @@ func TestLeafResponder_SnapshotFastPathSucceeds(t *testing.T) {
 	}}
 
 	stats := &synctest.LeafRecorder{}
-	r := handlers.NewLeafResponder(trieDB, common.HashLength, snap, stats)
+	r := evmstate.NewResponder(trieDB, common.HashLength, snap, stats)
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		KeyLimit: uint32(len(keys)),
@@ -268,7 +268,7 @@ func TestLeafResponder_SnapshotFastPathSucceeds(t *testing.T) {
 	require.Equal(t, uint32(1), stats.SnapSuccess)
 }
 
-func TestLeafResponder_SnapshotFallsBackToTrie(t *testing.T) {
+func TestResponder_SnapshotFallsBackToTrie(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := synctest.FillTrie(t, trieDB, 30)
@@ -281,7 +281,7 @@ func TestLeafResponder_SnapshotFallsBackToTrie(t *testing.T) {
 	}}
 
 	stats := &synctest.LeafRecorder{}
-	r := handlers.NewLeafResponder(trieDB, common.HashLength, snap, stats)
+	r := evmstate.NewResponder(trieDB, common.HashLength, snap, stats)
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		KeyLimit: uint32(len(keys)),
@@ -297,7 +297,7 @@ func TestLeafResponder_SnapshotFallsBackToTrie(t *testing.T) {
 	require.Equal(t, uint32(1), stats.SnapAttempts)
 }
 
-func TestLeafResponder_CorruptedTrieDrops(t *testing.T) {
+func TestResponder_CorruptedTrieDrops(t *testing.T) {
 	t.Parallel()
 	trieDB, disk := synctest.NewTrieDBWithDisk()
 	root, keys, _ := synctest.FillTrie(t, trieDB, 50)
@@ -309,7 +309,7 @@ func TestLeafResponder_CorruptedTrieDrops(t *testing.T) {
 	synctest.CorruptTrie(t, disk, tr, 2)
 
 	stats := &synctest.LeafRecorder{}
-	r := handlers.NewLeafResponder(trieDB, common.HashLength, nil, stats)
+	r := evmstate.NewResponder(trieDB, common.HashLength, nil, stats)
 
 	// Request a partial range so the responder is forced to generate a
 	// proof (which will fail because trie nodes are missing).
@@ -323,7 +323,7 @@ func TestLeafResponder_CorruptedTrieDrops(t *testing.T) {
 	require.Positive(t, stats.ProofErrors+stats.TrieErrors, "expected a trie or proof error to be recorded")
 }
 
-func TestLeafResponder_CtxCancelledDrops(t *testing.T) {
+func TestResponder_CtxCancelledDrops(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 10)
@@ -331,7 +331,7 @@ func TestLeafResponder_CtxCancelledDrops(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	r := handlers.NewLeafResponder(trieDB, common.HashLength, nil, &synctest.LeafRecorder{})
+	r := evmstate.NewResponder(trieDB, common.HashLength, nil, &synctest.LeafRecorder{})
 	resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		KeyLimit: 10,

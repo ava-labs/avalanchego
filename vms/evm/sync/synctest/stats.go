@@ -3,13 +3,15 @@
 
 package synctest
 
-import "github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+import (
+	"github.com/ava-labs/avalanchego/vms/evm/sync/block"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
+)
 
-// LeafRecorder counts [handlers.LeafStats] invocations. Fields are
-// exported for assertion. Methods not captured here are no-ops via the
-// embedded [handlers.NoopLeafStats].
+// LeafRecorder counts [evmstate.Stats] invocations.
 type LeafRecorder struct {
-	handlers.NoopLeafStats
+	evmstate.NoopStats
 	Requests       uint32
 	Invalid        uint32
 	MissingRoot    uint32
@@ -35,9 +37,9 @@ func (s *LeafRecorder) IncSnapshotSegmentValid()    { s.SegmentValid++ }
 func (s *LeafRecorder) IncSnapshotSegmentInvalid()  { s.SegmentInvalid++ }
 func (s *LeafRecorder) UpdateLeafReturned(n uint16) { s.LeafReturned = n }
 
-// CodeRecorder counts [handlers.CodeStats] invocations.
+// CodeRecorder counts [code.Stats] invocations.
 type CodeRecorder struct {
-	handlers.NoopCodeStats
+	code.NoopStats
 	Requests          uint32
 	MissingHash       uint32
 	TooManyHashes     uint32
@@ -51,9 +53,9 @@ func (s *CodeRecorder) IncTooManyHashesRequested()       { s.TooManyHashes++ }
 func (s *CodeRecorder) IncDuplicateHashesRequested()     { s.DuplicateHashes++ }
 func (s *CodeRecorder) UpdateCodeBytesReturned(b uint32) { s.CodeBytesReturned += b }
 
-// BlockRecorder counts [handlers.BlockStats] invocations.
+// BlockRecorder counts [block.Stats] invocations.
 type BlockRecorder struct {
-	handlers.NoopBlockStats
+	block.NoopStats
 	Requests       uint32
 	MissingHash    uint32
 	BlocksReturned uint16

@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package handlers_test
+package block_test
 
 import (
 	"context"
@@ -17,18 +17,18 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/block"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func TestBlockHandler_RoundTrip(t *testing.T) {
+func TestHandler_RoundTrip(t *testing.T) {
 	wantResp := &syncpb.GetBlockResponse{
 		Blocks: [][]byte{{0xaa}, {0xbb}, {0xcc}},
 	}
 	responder := &synctest.FakeBlockResponder{Resp: wantResp}
-	h := handlers.NewBlockHandler(responder)
+	h := block.NewHandler(responder)
 
 	req := &syncpb.GetBlockRequest{
 		Height:  42,
@@ -43,7 +43,7 @@ func TestBlockHandler_RoundTrip(t *testing.T) {
 	require.Empty(t, cmp.Diff(req, responder.GotReq, protocmp.Transform()))
 }
 
-func TestBlockHandler_FailurePaths(t *testing.T) {
+func TestHandler_FailurePaths(t *testing.T) {
 	tests := []struct {
 		name       string
 		resp       *syncpb.GetBlockResponse
@@ -63,7 +63,7 @@ func TestBlockHandler_FailurePaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			responder := &synctest.FakeBlockResponder{Resp: tt.resp, Err: tt.err}
-			h := handlers.NewBlockHandler(responder)
+			h := block.NewHandler(responder)
 
 			respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, synctest.MustMarshal(t, &syncpb.GetBlockRequest{}))
 			if tt.wantAppErr {
@@ -76,9 +76,9 @@ func TestBlockHandler_FailurePaths(t *testing.T) {
 	}
 }
 
-func TestBlockHandler_MalformedRequestBytes(t *testing.T) {
+func TestHandler_MalformedRequestBytes(t *testing.T) {
 	responder := &synctest.FakeBlockResponder{}
-	h := handlers.NewBlockHandler(responder)
+	h := block.NewHandler(responder)
 
 	respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, []byte{0xff, 0xff})
 	require.Nil(t, respBytes)
@@ -86,11 +86,11 @@ func TestBlockHandler_MalformedRequestBytes(t *testing.T) {
 	require.Nil(t, responder.GotReq, "responder must not be invoked on malformed request")
 }
 
-func TestBlockResponder_ReturnsRequestedParents(t *testing.T) {
+func TestResponder_ReturnsRequestedParents(t *testing.T) {
 	blocks := synctest.MakeChain(t, 10)
 	provider := synctest.NewBlockMap(blocks)
 	stats := &synctest.BlockRecorder{}
-	r := handlers.NewBlockResponder(provider, stats)
+	r := block.NewResponder(provider, stats)
 
 	tip := blocks[len(blocks)-1]
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
@@ -112,10 +112,10 @@ func TestBlockResponder_ReturnsRequestedParents(t *testing.T) {
 	require.Equal(t, uint16(5), stats.BlocksReturned)
 }
 
-func TestBlockResponder_StopsAtGenesis(t *testing.T) {
+func TestResponder_StopsAtGenesis(t *testing.T) {
 	blocks := synctest.MakeChain(t, 5)
 	provider := synctest.NewBlockMap(blocks)
-	r := handlers.NewBlockResponder(provider, &synctest.BlockRecorder{})
+	r := block.NewResponder(provider, &synctest.BlockRecorder{})
 
 	tip := blocks[len(blocks)-1]
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
@@ -129,10 +129,10 @@ func TestBlockResponder_StopsAtGenesis(t *testing.T) {
 	require.Len(t, resp.Blocks, 6)
 }
 
-func TestBlockResponder_MissingBlockDrops(t *testing.T) {
+func TestResponder_MissingBlockDrops(t *testing.T) {
 	provider := synctest.NewBlockMap(nil)
 	stats := &synctest.BlockRecorder{}
-	r := handlers.NewBlockResponder(provider, stats)
+	r := block.NewResponder(provider, stats)
 
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
 		Height:  10,
@@ -143,26 +143,26 @@ func TestBlockResponder_MissingBlockDrops(t *testing.T) {
 	require.Equal(t, uint32(1), stats.MissingHash)
 }
 
-func TestBlockResponder_ParentsCappedAtMax(t *testing.T) {
-	blocks := synctest.MakeChain(t, int(handlers.MaxParentsPerRequest)+10)
+func TestResponder_ParentsCappedAtMax(t *testing.T) {
+	blocks := synctest.MakeChain(t, int(block.MaxParentsPerRequest)+10)
 	provider := synctest.NewBlockMap(blocks)
 	stats := &synctest.BlockRecorder{}
-	r := handlers.NewBlockResponder(provider, stats)
+	r := block.NewResponder(provider, stats)
 
 	tip := blocks[len(blocks)-1]
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
 		Height:  tip.NumberU64(),
-		Parents: uint32(handlers.MaxParentsPerRequest) + 50,
+		Parents: uint32(block.MaxParentsPerRequest) + 50,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.Len(t, resp.Blocks, int(handlers.MaxParentsPerRequest))
+	require.Len(t, resp.Blocks, int(block.MaxParentsPerRequest))
 }
 
-func TestBlockResponder_CtxCancelledDrops(t *testing.T) {
+func TestResponder_CtxCancelledDrops(t *testing.T) {
 	blocks := synctest.MakeChain(t, 50)
 	provider := synctest.NewBlockMap(blocks)
-	r := handlers.NewBlockResponder(provider, &synctest.BlockRecorder{})
+	r := block.NewResponder(provider, &synctest.BlockRecorder{})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // cancel before the responder runs

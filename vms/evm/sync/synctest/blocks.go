@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/libevm/trie"
 )
 
-// MakeChain builds n+1 empty-body blocks of type [types.Block], linked
-// by ParentHash. blocks[0] is the genesis.
+// MakeChain builds n+1 empty-body blocks linked by ParentHash.
+// blocks[0] is the genesis.
 func MakeChain(t *testing.T, n int) []*types.Block {
 	t.Helper()
 	out := make([]*types.Block, n+1)
@@ -46,9 +46,9 @@ func MakeChain(t *testing.T, n int) []*types.Block {
 	return out
 }
 
-// BlockMap is an in-memory handlers.BlockProvider keyed by hash and
-// by canonical height. [BlockMap.GetBlock] returns nil if hash is
-// missing or its height doesn't match.
+// BlockMap is an in-memory [block.Provider] keyed by hash and
+// canonical height. [BlockMap.GetBlock] returns nil if the hash is
+// missing or the height doesn't match.
 type BlockMap struct {
 	byHash   map[common.Hash]*types.Block
 	byHeight map[uint64]*types.Block
