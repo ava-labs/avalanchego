@@ -34,3 +34,11 @@ if ! ./scripts/run_task.sh check-bazel-generate-patches; then
   print_help
   exit 1
 fi
+
+# Refresh Bazel module metadata here because `bazel mod tidy` alone may not
+# fully update MODULE.bazel.lock. This keeps later Bazel commands from
+# rewriting the lockfile unexpectedly.
+if ! ./scripts/run_task.sh check-bazel-module-metadata; then
+  print_help
+  exit 1
+fi
