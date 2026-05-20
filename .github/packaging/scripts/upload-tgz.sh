@@ -11,11 +11,12 @@ set -euo pipefail
 
 : "${BUCKET:?BUCKET must be set}"
 : "${TGZ_ARCH:?TGZ_ARCH must be set}"
+: "${TGZ_RELEASE:?TGZ_RELEASE must be set (e.g. jammy)}"
 : "${TAG:?TAG must be set}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 TGZ_DIR="${REPO_ROOT}/build/tgz"
-S3_DEST="s3://${BUCKET}/linux/binaries/ubuntu/jammy/${TGZ_ARCH}/"
+S3_DEST="s3://${BUCKET}/linux/binaries/ubuntu/${TGZ_RELEASE}/${TGZ_ARCH}/"
 
 echo "=== Uploading tarballs from ${TGZ_DIR} to ${S3_DEST} ==="
 
