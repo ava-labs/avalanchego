@@ -182,6 +182,11 @@ to SAE at build time. Rebuild/verification is deterministic because rebuilder
 instances use the received header's coinbase where legacy rules allow the
 operator to choose a recipient.
 
+**Breaking Change**: The routed amount follows libevm semantics: after London, `header.Coinbase`
+receives only `gasUsed * effectiveTip`, and the base-fee component is burned.
+Legacy `graft/subnet-evm` credited `gasUsed * effectiveGasPrice` to coinbase,
+so this is an intentional semantic difference in the SAE port.
+
 ### Gas Price Manager Runtime
 
 The first ACP-224 design passed a settled `StateDB` into `GasConfigAfter` so
