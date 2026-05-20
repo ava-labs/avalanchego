@@ -59,6 +59,7 @@ tasks:
       - task: bazel-gazelle-generate
       - task: bazel-fmt
       - task: bazel-generate-patches
+      - task: bazel-sync-module-metadata
 
   bazel-generate-patches:
     desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
@@ -71,6 +72,12 @@ tasks:
   bazel-mod-tidy:
     desc: Update use_repo() in MODULE.bazel from go.mod
     cmd: '{{.NIX_RUN}} bazelisk mod tidy'
+
+  bazel-sync-module-metadata:
+    desc: Refresh Bazel module metadata files (MODULE.bazel and MODULE.bazel.lock)
+    cmds:
+      - task: bazel-mod-tidy
+      - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
   bazel-test:
     desc: Run unit tests with Bazel (shuffle on, race on)
@@ -184,6 +191,12 @@ tasks:
   check-bazel-gazelle-generate:
     desc: Check that generated BUILD files are up-to-date
     cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
+
+  check-bazel-module-metadata:
+    desc: Checks that Bazel module metadata is up-to-date (requires a clean working tree)
+    cmds:
+      - task: bazel-sync-module-metadata
+      - task: check-clean-branch
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
