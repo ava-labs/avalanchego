@@ -9,12 +9,22 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	syncatomic "sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
+	ethstate "github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
+	ethparams "github.com/ava-labs/libevm/params"
+	ethrpc "github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +32,7 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
@@ -34,9 +45,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	cchaintxpool "github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -54,6 +71,7 @@ func TestMain(m *testing.M) {
 type SUT struct {
 	*VM
 	*Client
+	rpcClient *ethrpc.Client
 
 	snowCtx *snow.Context
 	memory  *atomic.Memory
@@ -62,6 +80,7 @@ type SUT struct {
 type (
 	sutConfig struct {
 		genesis core.Genesis
+		hooks   func(*hooks) hook.PointsG[*hookTx]
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -105,16 +124,20 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 		},
 	}
 
-	require.NoErrorf(tb, vm.Initialize(
-		ctx,
-		snowCtx,
-		chainDB,
-		genesisBytes,
-		nil, // upgradeBytes
-		nil, // configBytes
-		nil, // fxs
-		appSender,
-	), "%T.Initialize()", vm)
+	if cfg.hooks == nil {
+		require.NoErrorf(tb, vm.Initialize(
+			ctx,
+			snowCtx,
+			chainDB,
+			genesisBytes,
+			nil, // upgradeBytes
+			nil, // configBytes
+			nil, // fxs
+			appSender,
+		), "%T.Initialize()", vm)
+	} else {
+		initializeWithHooks(tb, vm, ctx, snowCtx, chainDB, genesisBytes, appSender, cfg.hooks)
+	}
 	tb.Cleanup(func() {
 		// The context is cancelled before cleanup is called, so we strip the
 		// cancellation.
@@ -133,11 +156,133 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 	server := httptest.NewServer(mux)
 	tb.Cleanup(server.Close)
 
+	rpcClient, err := ethrpc.DialHTTP(server.URL + cchainHTTPPrefix + "/rpc")
+	require.NoErrorf(tb, err, "%T.DialHTTP(...)", rpcClient)
+	tb.Cleanup(rpcClient.Close)
+
 	return &SUT{
-		VM:      vm,
-		Client:  NewClient(server.URL),
-		snowCtx: snowCtx,
-		memory:  memory,
+		VM:        vm,
+		Client:    NewClient(server.URL),
+		rpcClient: rpcClient,
+		snowCtx:   snowCtx,
+		memory:    memory,
+	}
+}
+
+func initializeWithHooks(
+	tb testing.TB,
+	v *VM,
+	ctx context.Context,
+	snowCtx *snow.Context,
+	db database.Database,
+	genesisBytes []byte,
+	appSender snowcommon.AppSender,
+	wrapHooks func(*hooks) hook.PointsG[*hookTx],
+) {
+	tb.Helper()
+
+	v.ctx = snowCtx
+
+	ethDB := rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(ethDBPrefix, db)))
+	trieDBConfig := triedb.HashDefaults
+	trieDB := triedb.NewDatabase(ethDB, trieDBConfig)
+
+	genesis := new(core.Genesis)
+	require.NoErrorf(tb, json.Unmarshal(genesisBytes, genesis), "json.Unmarshal(%T)", genesis)
+	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis)
+	require.NoErrorf(tb, err, "core.SetupGenesisBlock(...)")
+
+	var stateErr error
+	v.state, stateErr = cchainstate.New(snowCtx, db)
+	require.NoErrorf(tb, stateErr, "cchainstate.New(...)")
+	v.onClose = append(v.onClose, func(context.Context) error {
+		return v.state.Close()
+	})
+
+	pendingTxs := cchaintxpool.NewPending()
+	hooks := wrapHooks(newHooks(
+		snowCtx,
+		v.state,
+		pendingTxs,
+	))
+
+	mempoolConfig := legacypool.DefaultConfig
+	mempoolConfig.NoLocals = true
+	saeConfig := sae.Config{
+		MempoolConfig: mempoolConfig,
+		DBConfig: saedb.Config{
+			TrieDBConfig: trieDBConfig,
+		},
+	}
+	var vmErr error
+	v.VM, vmErr = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
+	require.NoErrorf(tb, vmErr, "sae.NewVM(...)")
+	v.onClose = append(v.onClose, v.VM.Shutdown)
+
+	const maxTxPoolSize = 1024
+	var txpoolErr error
+	v.txpool, txpoolErr = cchaintxpool.New(snowCtx, chainConfig, pendingTxs, v.VM, maxTxPoolSize)
+	require.NoErrorf(tb, txpoolErr, "txpool.New(...)")
+	v.onClose = append(v.onClose, func(context.Context) error {
+		v.txpool.Close()
+		return nil
+	})
+}
+
+// CallContext propagates its arguments to and from the Ethereum JSON-RPC client.
+func (s *SUT) CallContext(ctx context.Context, result any, method string, args ...any) error {
+	return s.rpcClient.CallContext(ctx, result, method, args...)
+}
+
+type afterBlockGate struct {
+	hook.PointsG[*hookTx]
+
+	enabled syncatomic.Bool
+	once    sync.Once
+	entered chan struct{}
+	release chan struct{}
+}
+
+func newAfterBlockGate() *afterBlockGate {
+	return &afterBlockGate{
+		entered: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+}
+
+func (g *afterBlockGate) AfterExecutingBlock(statedb *ethstate.StateDB, b *types.Block, receipts types.Receipts) error {
+	block := false
+	if g.enabled.Load() {
+		g.once.Do(func() {
+			block = true
+		})
+	}
+	if block {
+		close(g.entered)
+		<-g.release
+	}
+	return g.PointsG.AfterExecutingBlock(statedb, b, receipts)
+}
+
+func (g *afterBlockGate) enable() {
+	g.enabled.Store(true)
+}
+
+func (g *afterBlockGate) waitEntered(tb testing.TB) {
+	tb.Helper()
+
+	select {
+	case <-g.entered:
+	case <-time.After(time.Second):
+		tb.Fatal("canonical execution did not enter the after-block hook")
+	}
+}
+
+func (g *afterBlockGate) unblock() {
+	select {
+	case <-g.release:
+	default:
+		close(g.release)
 	}
 }
 
@@ -517,6 +662,117 @@ func TestImport(t *testing.T) {
 	sut.assertTxAccepted(t, signedImport, blk.NumberU64())
 	const amountMinted = utxoAmount - txFee
 	sut.assertAccount(t, receiver, 0, tx.ScaleAVAX(amountMinted))
+}
+
+func TestDebugTraceCallDoesNotApplyAtomicStateBeforeBlockExecution(t *testing.T) {
+	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	ethSender := ethWallet.Addresses()[0]
+	exportKey := txtest.NewKey(t)
+	gate := newAfterBlockGate()
+	sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc = saetest.MaxAllocFor(
+			ethSender,
+			exportKey.EthAddress(),
+		)
+		c.hooks = func(h *hooks) hook.PointsG[*hookTx] {
+			gate.PointsG = h
+			return gate
+		}
+	}))
+
+	assertAtomicStateMissing := func(exportTx *tx.Tx, exportedUTXOs ...*avax.UTXO) {
+		t.Helper()
+
+		require.Equalf(t, uint64(0), sut.state.CurrentHeight(), "%T.CurrentHeight()", sut.state)
+		_, _, err := sut.state.GetTx(exportTx.ID())
+		require.ErrorIsf(t, err, database.ErrNotFound, "%T.GetTx(%s)", sut.state, exportTx.ID())
+
+		keys := make([][]byte, len(exportedUTXOs))
+		for i, utxo := range exportedUTXOs {
+			inputID := utxo.InputID()
+			keys[i] = inputID[:]
+		}
+		peerMemory := sut.memory.NewSharedMemory(sut.snowCtx.XChainID)
+		_, err = peerMemory.Get(snowtest.CChainID, keys)
+		require.ErrorIsf(t, err, database.ErrNotFound, "%T.Get()", peerMemory)
+	}
+
+	// Tracing needs an EVM transaction target.
+	recipient := common.Address{'r', 'e', 'c', 'v'}
+	tracedTx := ethWallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &recipient,
+		Gas:      ethparams.TxGas,
+		GasPrice: big.NewInt(1),
+	})
+	rawTracedTx, err := tracedTx.MarshalBinary()
+	require.NoErrorf(t, err, "%T.MarshalBinary()", tracedTx)
+	var sentTx common.Hash
+	require.NoErrorf(t, sut.CallContext(t.Context(), &sentTx, "eth_sendRawTransaction", hexutil.Encode(rawTracedTx)), "%T.CallContext(..., %q)", sut.rpcClient, "eth_sendRawTransaction")
+	require.Equalf(t, tracedTx.Hash(), sentTx, "%T.CallContext(..., %q)", sut.rpcClient, "eth_sendRawTransaction")
+
+	// Export gives us observable external state: the tx index and shared-memory UTXOs.
+	w := newWallet(exportKey, sut.snowCtx, sut.Client)
+	const (
+		txFee          = 50
+		exportedAmount = 50
+	)
+	signedExport, export := w.newExportTx(
+		t,
+		sut.snowCtx.XChainID,
+		txFee,
+		txtest.NewTransferOutput(exportedAmount, exportKey.Address()),
+	)
+	require.NoErrorf(t, sut.IssueTx(t.Context(), signedExport), "%T.IssueTx()", sut.Client)
+	exportedUTXOs := txtest.ExportedUTXOs(signedExport.ID(), export)
+
+	// Build+verify only. Atomic state is still unmodified before acceptance.
+	blk := sut.buildVerify(t, sut.lastAccepted(t))
+	require.Lenf(t, blk.Transactions(), 1, "%T.Transactions()", blk)
+	require.Equalf(t, tracedTx.Hash(), blk.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", blk)
+	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
+		t.Errorf("%T txs (-want +got):\n%s", blk, diff)
+	}
+
+	require.Falsef(t, blk.Executed(), "%T.Executed()", blk)
+	assertAtomicStateMissing(signedExport, exportedUTXOs...)
+
+	// AcceptBlock makes the block visible to public debug RPCs before canonical
+	// execution has completed. The gate does not model a special production
+	// behavior; it makes that real asynchronous interleaving deterministic for
+	// the test. Pausing canonical execution at AfterExecutingBlock pins it just
+	// before C-Chain atomic state is published, so any atomic state observed
+	// after the public debug_traceCall below must have been written by replay.
+	gate.enable()
+	require.NoErrorf(t, sut.AcceptBlock(t.Context(), blk), "%T.AcceptBlock()", sut.VM)
+	defer gate.unblock()
+	gate.waitEntered(t)
+	require.Falsef(t, blk.Executed(), "%T.Executed()", blk)
+	assertAtomicStateMissing(signedExport, exportedUTXOs...)
+
+	// This is the public RPC path: debug_traceCall finds the accepted block by
+	// hash, then replays it through StateAtTransaction because txIndex is set.
+	blockNrOrHash := ethrpc.BlockNumberOrHashWithHash(blk.Hash(), false)
+	traceCall := map[string]any{
+		"from":     ethSender,
+		"to":       recipient,
+		"gas":      hexutil.Uint64(ethparams.TxGas),
+		"gasPrice": (*hexutil.Big)(big.NewInt(1)),
+	}
+	traceConfig := map[string]any{
+		"txIndex": hexutil.Uint(0),
+	}
+	var trace json.RawMessage
+	require.NoErrorf(t, sut.CallContext(t.Context(), &trace, "debug_traceCall", traceCall, blockNrOrHash, traceConfig), "%T.CallContext(..., %q)", sut.rpcClient, "debug_traceCall")
+
+	// Replay must not publish C-Chain atomic state; only canonical execution should.
+	require.Falsef(t, blk.Executed(), "%T.Executed()", blk)
+	assertAtomicStateMissing(signedExport, exportedUTXOs...)
+
+	// Canonical execution runs the C-Chain after-block hook, which applies the export.
+	gate.unblock()
+	require.NoErrorf(t, blk.WaitUntilExecuted(t.Context()), "%T.WaitUntilExecuted()", blk)
+	sut.assertTxAccepted(t, signedExport, blk.NumberU64())
+	sut.assertUTXOsExist(t, sut.snowCtx.XChainID, exportedUTXOs...)
 }
 
 // TestBuildBlockOnProcessing verifies that the block builder excludes a mempool
