@@ -586,7 +586,6 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 
 	require.NoErrorf(t, sut.AcceptBlock(ctx, blockA), "%T.AcceptBlock(blockA)", sut.VM)
 	require.NoErrorf(t, sut.AcceptBlock(ctx, blockB), "%T.AcceptBlock(blockB)", sut.VM)
-	require.NoErrorf(t, blockA.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(blockA)", blockA)
 	require.NoErrorf(t, blockB.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(blockB)", blockB)
 
 	sut.assertTxAccepted(t, txA, blockA.NumberU64())

@@ -115,7 +115,7 @@ func TestAncestorInputIDs(t *testing.T) {
 			}
 
 			got, err := ancestorInputIDs(tt.header, tt.settled, source)
-			require.ErrorIs(t, err, tt.wantErr, "ancestorInputIDs()")
+			assert.ErrorIs(t, err, tt.wantErr, "ancestorInputIDs()")
 			assert.Equal(t, tt.want, got, "ancestorInputIDs()")
 		})
 	}
