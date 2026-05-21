@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "context.go",
         "execution.go",
+        "metrics.go",
         "receipts.go",
         "saexec.go",
         "subscription.go",
@@ -19,7 +20,6 @@ go_library(
         "//vms/saevm/blocks",
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
-        "//vms/saevm/metrics",
         "//vms/saevm/saedb",
         "//vms/saevm/types",
         "@com_github_ava_labs_libevm//common",
@@ -33,6 +33,7 @@ go_library(
         "@com_github_ava_labs_libevm//libevm/eventual",
         "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
+        "@com_github_prometheus_client_golang//prometheus",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -50,7 +51,6 @@ go_test(
         "//vms/saevm/cmputils",
         "//vms/saevm/gastime",
         "//vms/saevm/hook/hookstest",
-        "//vms/saevm/metrics",
         "//vms/saevm/proxytime",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",

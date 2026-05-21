@@ -302,7 +302,7 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
-	e.metrics.MarkBlockExecuted(b.Height())             // (3)
+	e.metrics.markExecuted(b.Height())                  // (3)
 	e.sendPostExecutionEvents(b.EthBlock(), r.Receipts) // (4)
 	return nil
 }

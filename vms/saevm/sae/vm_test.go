@@ -32,7 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
-	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -919,7 +920,6 @@ func TestGossip(t *testing.T) {
 func TestSettlementMetric(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, 1, opt)
-	metrics := sut.rawVM.metrics
 
 	executed := sut.runConsensusLoop(t)
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
@@ -927,7 +927,25 @@ func TestSettlementMetric(t *testing.T) {
 	vmTime.advanceToSettle(ctx, t, executed)
 	settledBy := sut.runConsensusLoop(t)
 	require.NoErrorf(t, settledBy.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", settledBy)
-	require.Equal(t, float64(executed.Height()), testutil.ToFloat64(metrics.LastSettledHeight), "last settled height")
+	require.Equal(t, float64(executed.Height()), gaugeValue(t, sut.rawVM.metricRegistry, saexec.LastSettledHeightName), "last settled height")
+}
+
+// gaugeValue returns the current value of a single-series gauge from `g` by
+// name, failing the test if it is missing or has more than one series.
+func gaugeValue(t *testing.T, g prometheus.Gatherer, name string) float64 {
+	t.Helper()
+	mfs, err := g.Gather()
+	require.NoError(t, err, "Gather()")
+	for _, mf := range mfs {
+		if mf.GetName() != name {
+			continue
+		}
+		series := mf.GetMetric()
+		require.Lenf(t, series, 1, "metric %q series count", name)
+		return series[0].GetGauge().GetValue()
+	}
+	t.Fatalf("metric %q not found", name)
+	return 0
 }
 
 func TestBlockSources(t *testing.T) {

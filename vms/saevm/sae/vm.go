@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	saemetrics "github.com/ava-labs/avalanchego/vms/saevm/metrics"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -58,7 +57,6 @@ type VM struct {
 	config         Config
 	snowCtx        *snow.Context
 	metricRegistry *prometheus.Registry
-	metrics        *saemetrics.Metrics
 
 	db  ethdb.Database
 	xdb saetypes.ExecutionResults
@@ -143,11 +141,6 @@ func NewVM[T hook.Transaction](
 		}
 	}()
 
-	vm.metrics, err = saemetrics.New(vm.metricRegistry)
-	if err != nil {
-		return nil, fmt.Errorf("new metrics: %w", err)
-	}
-
 	xdb, err := hooks.ExecutionResultsDB(
 		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
 	)
@@ -188,7 +181,7 @@ func NewVM[T hook.Transaction](
 			cfg.DBConfig,
 			hooks,
 			snowCtx.Log,
-			vm.metrics,
+			vm.metricRegistry,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("saexec.New(...): %v", err)
@@ -210,8 +203,8 @@ func NewVM[T hook.Transaction](
 		vm.last.settled.Store(lastSettled)
 		vm.last.accepted.Store(head)
 		vm.preference.Store(head)
-		vm.metrics.MarkBlockExecuted(head.Height())
-		vm.metrics.MarkBlockSettled(lastSettled.Height())
+		// [saexec.New] already records the initial executed height.
+		vm.exec.MarkSettled(lastSettled.Height())
 	}
 
 	{ // ==========  Mempool  ==========

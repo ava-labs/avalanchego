@@ -8,6 +8,7 @@
 package saexec
 
 import (
+	"fmt"
 	"io"
 	"sync/atomic"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm/eventual"
 	"github.com/ava-labs/libevm/params"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -25,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
-	saemetrics "github.com/ava-labs/avalanchego/vms/saevm/metrics"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
@@ -50,7 +51,7 @@ type Executor struct {
 	chainConfig  *params.ChainConfig
 	db           ethdb.Database
 	xdb          saetypes.ExecutionResults
-	metrics      *saemetrics.Metrics
+	metrics      *metrics
 }
 
 // New constructs and starts a new [Executor]. Call [Executor.Close] to release
@@ -68,11 +69,16 @@ func New(
 	saedbConfig saedb.Config,
 	hooks hook.Points,
 	log logging.Logger,
-	metrics *saemetrics.Metrics,
+	reg prometheus.Registerer,
 ) (*Executor, error) {
 	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), log)
 	if err != nil {
 		return nil, err
+	}
+
+	m, err := newMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering saexec metrics: %w", err)
 	}
 
 	e := &Executor{
@@ -93,13 +99,20 @@ func New(
 		chainConfig: chainConfig,
 		db:          db,
 		xdb:         xdb,
-		metrics:     metrics,
+		metrics:     m,
 		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)
+	e.metrics.markExecuted(lastExecuted.Height())
 
 	go e.processQueue()
 	return e, nil
+}
+
+// MarkSettled records height as the latest settled height. See [metrics]
+// for why the lifecycle gauge is colocated in this package.
+func (e *Executor) MarkSettled(height uint64) {
+	e.metrics.markSettled(height)
 }
 
 var _ io.Closer = (*Executor)(nil)
