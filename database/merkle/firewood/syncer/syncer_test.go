@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestMain(m *testing.M) {
@@ -89,7 +90,7 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 		Config{},
 		clientDB,
 		root,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetProofHandler(serverDB)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetProofHandler(serverDB, logging.NoLog{})),
 	)
 	require.NoError(t, err)
 
@@ -155,7 +156,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
 
-	proofHandler := synctest.NewCounterHandler(NewGetProofHandler(serverDB), func() {
+	proofHandler := synctest.NewCounterHandler(NewGetProofHandler(serverDB, logging.NoLog{}), func() {
 		err := syncer.UpdateSyncTarget(wantRoot)
 		if err != nil {
 			cancel(err)

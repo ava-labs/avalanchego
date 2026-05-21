@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
@@ -149,7 +150,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
 		serverDB           = dbFromState(t, serverState)
 		mockClient         = client.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
-		proofClient        = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetProofHandler(serverDB))
+		proofClient        = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetProofHandler(serverDB, logging.NoLog{}))
 	)
 
 	// Create the producer code queue.
