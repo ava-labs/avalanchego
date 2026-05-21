@@ -63,7 +63,6 @@ pub use hashtype::{HashType, IntoHashType, InvalidTrieHashLength, TrieHash};
 pub use linear::{FileIoError, ReadableStorage, WritableStorage};
 pub use node::path::{NibblesIterator, Path};
 pub use node::{BranchNode, Child, Children, ChildrenSlots, LeafNode, Node, PathIterItem};
-#[cfg(feature = "ethhash")]
 pub use nodestore::fix_account_storage_root_value;
 pub use nodestore::{
     AreaIndex, Committed, CommittedId, CommittedParentHash, HashedNodeReader, ImmutableProposal,
@@ -85,9 +84,7 @@ pub use u4::{TryFromIntError, U4};
 pub use linear::filebacked::FileBacked;
 pub use linear::memory::MemStore;
 pub use node::persist::MaybePersistedNode;
-pub use rlp::{NULL_RLP, RlpError, RlpList};
-#[cfg(any(test, feature = "test_utils"))]
-pub use rlp::{RlpItem, encode_list, replace_list_field};
+pub use rlp::{NULL_RLP, RlpError, RlpItem, RlpList, encode_list, replace_list_field};
 pub use root_store::RootStore;
 #[cfg(any(test, feature = "test_utils"))]
 pub use test_utils::SeededRng;

@@ -287,6 +287,7 @@
 
 pub(crate) mod change;
 pub(super) mod de;
+pub mod eth;
 pub(crate) mod header;
 pub(crate) mod range;
 pub(crate) mod reader;

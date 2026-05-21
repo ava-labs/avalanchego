@@ -66,7 +66,6 @@ pub use alloc::NodeAllocator;
 pub use hash_algo::{NodeHashAlgorithm, NodeHashAlgorithmTryFromIntError};
 pub use primitives::{AreaIndex, LinearAddress};
 // Re-export types from header module
-#[cfg(feature = "ethhash")]
 pub use hash::fix_account_storage_root_value;
 pub use header::NodeStoreHeader;
 

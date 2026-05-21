@@ -1770,6 +1770,7 @@ dependencies = [
  "rayon",
  "rlp",
  "sha3",
+ "smallvec",
  "tempfile",
  "test-case",
  "thiserror",

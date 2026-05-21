@@ -40,6 +40,8 @@ rayon = "1.12.0"
 parking_lot.workspace = true
 lender = "0.6.2"
 nonzero_ext = "0.3.0"
+sha3 = "0.10.9"
+smallvec.workspace = true
 
 [features]
 default = []

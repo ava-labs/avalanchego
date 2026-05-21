@@ -48,7 +48,7 @@ weak-table = "0.3.2"
 # Optional dependencies
 io-uring = { version = "0.7.12", optional = true }
 log = { version = "0.4.29", optional = true }
-sha3 = { version = "0.10.9", optional = true }
+sha3 = "0.10.9"
 bumpalo = { version = "3.20.2", features = ["collections", "std"] }
 arc-swap = "1.9.1"
 
@@ -70,7 +70,7 @@ sha2.workspace = true
 [features]
 logger = ["log"]
 io-uring = ["dep:io-uring"]
-ethhash = ["dep:sha3"]
+ethhash = []
 test_utils = ["dep:metrics-util", "dep:rand"]
 
 [[bench]]
