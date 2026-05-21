@@ -45,7 +45,7 @@ func Test_Creation(t *testing.T) {
 		sync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler)),
+			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(db, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler)),
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
 		},
@@ -164,7 +164,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "range proof server flake",
 			proofClient: func(db MerkleDB) *p2p.Client {
 				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
-					Handler: sync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler),
+					Handler: sync.NewProofHandler(db, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler),
 					c:       &counter{m: 2},
 				})
 			},
@@ -215,7 +215,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "change proof flaky server",
 			proofClient: func(db MerkleDB) *p2p.Client {
 				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
-					Handler: sync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler),
+					Handler: sync.NewProofHandler(db, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler),
 					c:       &counter{m: 2},
 				})
 			},
@@ -240,7 +240,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			)
 			require.NoError(err)
 
-			proofClient := p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler))
+			proofClient := p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(dbToSync, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler))
 			if tt.proofClient != nil {
 				proofClient = tt.proofClient(dbToSync)
 			}
@@ -329,7 +329,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		sync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
+			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(dbToSync, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -358,7 +358,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		sync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
+			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(dbToSync, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -428,7 +428,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	defer cancel(nil)
 
 	// Allow 1 request to go through before blocking
-	actionHandler := synctest.NewCounterHandler(sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler), func() {
+	actionHandler := synctest.NewCounterHandler(sync.NewProofHandler(dbToSync, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler), func() {
 		err := syncer.UpdateSyncTarget(secondSyncRoot)
 		if err != nil {
 			cancel(err)
@@ -485,7 +485,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.NoError(err)
 
 	var syncer *sync.Syncer[*RangeProof, *ChangeProof]
-	actionHandler := synctest.NewCounterHandler(sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler), func() {
+	actionHandler := synctest.NewCounterHandler(sync.NewProofHandler(dbToSync, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler), func() {
 		err := syncer.UpdateSyncTarget(root1)
 		if err != nil {
 			cancel(err)

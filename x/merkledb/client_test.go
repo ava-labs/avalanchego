@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	merklesync "github.com/ava-labs/avalanchego/database/merkle/sync"
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -47,7 +48,7 @@ func newFlakyRangeProofHandler(
 ) p2p.Handler {
 	var (
 		c       = counter{m: 2}
-		handler = merklesync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
+		handler = merklesync.NewProofHandler(db, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler)
 	)
 
 	return &p2p.TestHandler{
@@ -95,7 +96,7 @@ func newFlakyChangeProofHandler(
 		c                    = counter{m: 2}
 		rangeProofMarshaler  = rangeProofMarshaler
 		changeProofMarshaler = changeProofMarshaler
-		handler              = merklesync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
+		handler              = merklesync.NewProofHandler(db, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler)
 	)
 
 	return &p2p.TestHandler{

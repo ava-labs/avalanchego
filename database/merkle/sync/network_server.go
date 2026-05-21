@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync/protoutils"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -27,7 +29,7 @@ const (
 	// Maximum number of key-value pairs to return in a proof.
 	// This overrides any other Limit specified in a RangeProofRequest
 	// or ChangeProofRequest if the given Limit is greater.
-	MaxKeyValuesLimit = 2048
+	MaxKeyValuesLimit = 16384
 	// Estimated max overhead, in bytes, of putting a proof into a message.
 	// We use this to ensure that the proof we generate is not too large to fit in a message.
 	// TODO: refine this estimate. This is almost certainly a large overestimate.
@@ -49,9 +51,10 @@ var (
 	errEmptyProof           = errors.New("proof for empty trie requested")
 )
 
-func NewProofHandler[R any, C any](db DB[R, C], rangeProofMarshaler Marshaler[R], changeProofMarshaler Marshaler[C]) *ProofHandler[R, C] {
+func NewProofHandler[R any, C any](db DB[R, C], log logging.Logger, rangeProofMarshaler Marshaler[R], changeProofMarshaler Marshaler[C]) *ProofHandler[R, C] {
 	return &ProofHandler[R, C]{
 		db:                   db,
+		log:                  log,
 		rangeProofMarshaler:  rangeProofMarshaler,
 		changeProofMarshaler: changeProofMarshaler,
 	}
@@ -59,6 +62,7 @@ func NewProofHandler[R any, C any](db DB[R, C], rangeProofMarshaler Marshaler[R]
 
 type ProofHandler[R any, C any] struct {
 	db                   DB[R, C]
+	log                  logging.Logger
 	rangeProofMarshaler  Marshaler[R]
 	changeProofMarshaler Marshaler[C]
 }
@@ -146,7 +150,9 @@ func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *p
 			return proofBytes, nil
 		}
 		// The proof was too large. Try to shrink it.
-		keyLimit /= 2
+		keyLimit *= 4
+		keyLimit /= 5
+		h.log.Debug("shrinking proof", zap.Int("newKeyLimit", keyLimit))
 	}
 
 	return nil, errMinProofSizeIsTooLarge
@@ -223,7 +229,9 @@ func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *
 		}
 
 		// The proof was too large. Try to shrink it.
-		keyLimit /= 2
+		keyLimit *= 4
+		keyLimit /= 5
+		h.log.Debug("shrinking proof", zap.Uint32("newKeyLimit", keyLimit))
 	}
 
 	return nil, errMinProofSizeIsTooLarge

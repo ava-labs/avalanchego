@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -116,7 +117,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := sync.NewProofHandler(smallTrieDB, rangeProofMarshaler, changeProofMarshaler)
+			handler := sync.NewProofHandler(smallTrieDB, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler)
 			requestBytes, err := proto.Marshal(&pb.ProofRequest{
 				Request: &pb.ProofRequest_RangeProof{RangeProof: test.request},
 			})
@@ -340,7 +341,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := sync.NewProofHandler(serverDB, rangeProofMarshaler, changeProofMarshaler)
+			handler := sync.NewProofHandler(serverDB, logging.NoLog{}, rangeProofMarshaler, changeProofMarshaler)
 
 			requestBytes, err := proto.Marshal(&pb.ProofRequest{
 				Request: &pb.ProofRequest_ChangeProof{ChangeProof: test.request},
