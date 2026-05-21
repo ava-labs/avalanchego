@@ -83,8 +83,7 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 			h := types.DeriveSha(w, hasher)
 			want = &h
 		}
-		got := hdr.WithdrawalsHash
-		if !comparePtrs(want, got) {
+		if !compareHashPtrs(want, hdr.WithdrawalsHash) {
 			return nil, errWithdrawalHashMismatch
 		}
 	}
@@ -92,14 +91,15 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 	return vm.blockBuilder.new(b, nil, nil)
 }
 
-func comparePtrs[T comparable](a, b *T) bool {
-	if a == nil {
-		return b == nil
-	}
-	if b == nil {
+func compareHashPtrs(a, b *common.Hash) bool {
+	switch an, bn := a == nil, b == nil; {
+	case an && bn:
+		return true
+	case an || bn:
 		return false
+	default:
+		return *a == *b
 	}
-	return *a == *b
 }
 
 // BuildBlock builds a new block, using the last block passed to
