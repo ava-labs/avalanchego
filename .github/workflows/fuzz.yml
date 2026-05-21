@@ -23,7 +23,6 @@ jobs:
           - codec
           - utils
           - x/archivedb
-          - x/merkledb
           - vms/platformvm
           - vms/evm
           - vms/saevm
