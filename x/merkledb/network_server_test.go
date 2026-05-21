@@ -116,7 +116,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := sync.NewGetProofHandler(smallTrieDB, rangeProofMarshaler, changeProofMarshaler)
+			handler := sync.NewProofHandler(smallTrieDB, rangeProofMarshaler, changeProofMarshaler)
 			requestBytes, err := proto.Marshal(&pb.ProofRequest{
 				Request: &pb.ProofRequest_RangeProof{RangeProof: test.request},
 			})
@@ -131,7 +131,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				return
 			}
 
-			var proofResp pb.GetProofResponse
+			var proofResp pb.ProofResponse
 			require.NoError(proto.Unmarshal(responseBytes, &proofResp))
 			proof, err := rangeProofMarshaler.Unmarshal(proofResp.GetRangeProof())
 			require.NoError(err)
@@ -340,7 +340,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := sync.NewGetProofHandler(serverDB, rangeProofMarshaler, changeProofMarshaler)
+			handler := sync.NewProofHandler(serverDB, rangeProofMarshaler, changeProofMarshaler)
 
 			requestBytes, err := proto.Marshal(&pb.ProofRequest{
 				Request: &pb.ProofRequest_ChangeProof{ChangeProof: test.request},
@@ -354,7 +354,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				return
 			}
 
-			proofResult := &pb.GetProofResponse{}
+			proofResult := &pb.ProofResponse{}
 			require.NoError(proto.Unmarshal(proofBytes, proofResult))
 
 			if test.expectRangeProof {

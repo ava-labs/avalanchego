@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	_ p2p.Handler = (*merklesync.GetProofHandler[*RangeProof, *ChangeProof])(nil)
+	_ p2p.Handler = (*merklesync.ProofHandler[*RangeProof, *ChangeProof])(nil)
 	_ p2p.Handler = (*flakyHandler)(nil)
 )
 
@@ -47,7 +47,7 @@ func newFlakyRangeProofHandler(
 ) p2p.Handler {
 	var (
 		c       = counter{m: 2}
-		handler = merklesync.NewGetProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
+		handler = merklesync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
 	)
 
 	return &p2p.TestHandler{
@@ -57,7 +57,7 @@ func newFlakyRangeProofHandler(
 				return nil, appErr
 			}
 
-			response := &pb.GetProofResponse{}
+			response := &pb.ProofResponse{}
 			require.NoError(t, proto.Unmarshal(responseBytes, response))
 			proof, err := rangeProofMarshaler.Unmarshal(response.GetRangeProof())
 			require.NoError(t, err)
@@ -72,8 +72,8 @@ func newFlakyRangeProofHandler(
 				return nil, &common.AppError{Code: 123, Message: err.Error()}
 			}
 
-			responseBytes, err = proto.Marshal(&pb.GetProofResponse{
-				Response: &pb.GetProofResponse_RangeProof{
+			responseBytes, err = proto.Marshal(&pb.ProofResponse{
+				Response: &pb.ProofResponse_RangeProof{
 					RangeProof: responseBytes,
 				},
 			})
@@ -95,7 +95,7 @@ func newFlakyChangeProofHandler(
 		c                    = counter{m: 2}
 		rangeProofMarshaler  = rangeProofMarshaler
 		changeProofMarshaler = changeProofMarshaler
-		handler              = merklesync.NewGetProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
+		handler              = merklesync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
 	)
 
 	return &p2p.TestHandler{
@@ -105,7 +105,7 @@ func newFlakyChangeProofHandler(
 				return nil, appErr
 			}
 
-			response := &pb.GetProofResponse{}
+			response := &pb.ProofResponse{}
 			require.NoError(t, proto.Unmarshal(responseBytes, response))
 
 			proof, err := changeProofMarshaler.Unmarshal(response.GetChangeProof())
@@ -118,8 +118,8 @@ func newFlakyChangeProofHandler(
 
 			proofBytes, err := changeProofMarshaler.Marshal(proof)
 			require.NoError(t, err)
-			responseBytes, err = proto.Marshal(&pb.GetProofResponse{
-				Response: &pb.GetProofResponse_ChangeProof{
+			responseBytes, err = proto.Marshal(&pb.ProofResponse{
+				Response: &pb.ProofResponse_ChangeProof{
 					ChangeProof: proofBytes,
 				},
 			})

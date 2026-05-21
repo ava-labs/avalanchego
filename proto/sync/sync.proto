@@ -28,7 +28,7 @@ message RangeProofRequest {
   uint32 bytes_limit = 5;
 }
 
-message GetProofResponse {
+message ProofResponse {
   oneof response {
     bytes change_proof = 1;
     bytes range_proof = 2;

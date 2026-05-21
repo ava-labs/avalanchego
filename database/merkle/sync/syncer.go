@@ -562,15 +562,13 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	var rangeProofResp pb.GetProofResponse
-	if err := proto.Unmarshal(responseBytes, &rangeProofResp); err != nil {
+	var response pb.ProofResponse
+	if err := proto.Unmarshal(responseBytes, &response); err != nil {
 		return err
 	}
-	if _, ok := rangeProofResp.Response.(*pb.GetProofResponse_RangeProof); !ok {
-		return fmt.Errorf("%w: expected RangeProof, got %T", errUnexpectedResponseType, rangeProofResp.Response)
-	}
 
-	rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(rangeProofResp.GetRangeProof())
+	// A change proof returned is unexpected.
+	rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(response.GetRangeProof())
 	if err != nil {
 		return err
 	}
@@ -614,8 +612,8 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		return err
 	}
 
-	var changeProofResp pb.GetProofResponse
-	if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
+	var response pb.ProofResponse
+	if err := proto.Unmarshal(responseBytes, &response); err != nil {
 		return err
 	}
 
@@ -626,10 +624,10 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		return err
 	}
 
-	switch changeProofResp := changeProofResp.Response.(type) {
-	case *pb.GetProofResponse_ChangeProof:
+	switch response := response.Response.(type) {
+	case *pb.ProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
-		changeProof, err := s.config.ChangeProofMarshaler.Unmarshal(changeProofResp.ChangeProof)
+		changeProof, err := s.config.ChangeProofMarshaler.Unmarshal(response.ChangeProof)
 		if err != nil {
 			return err
 		}
@@ -652,8 +650,8 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		}
 
 		s.completeWorkItem(work, nextKey, targetRootID)
-	case *pb.GetProofResponse_RangeProof:
-		rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(changeProofResp.RangeProof)
+	case *pb.ProofResponse_RangeProof:
+		rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(response.RangeProof)
 		if err != nil {
 			return err
 		}
@@ -682,7 +680,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 	default:
 		return fmt.Errorf(
 			"%w: %T",
-			errUnexpectedResponseType, changeProofResp,
+			errUnexpectedResponseType, response,
 		)
 	}
 

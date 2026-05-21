@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	_ p2p.Handler = (*GetProofHandler[any, any])(nil)
+	_ p2p.Handler = (*ProofHandler[any, any])(nil)
 
 	errMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the requested limit")
 
@@ -49,23 +49,23 @@ var (
 	errEmptyProof           = errors.New("proof for empty trie requested")
 )
 
-func NewGetProofHandler[R any, C any](db DB[R, C], rangeProofMarshaler Marshaler[R], changeProofMarshaler Marshaler[C]) *GetProofHandler[R, C] {
-	return &GetProofHandler[R, C]{
+func NewProofHandler[R any, C any](db DB[R, C], rangeProofMarshaler Marshaler[R], changeProofMarshaler Marshaler[C]) *ProofHandler[R, C] {
+	return &ProofHandler[R, C]{
 		db:                   db,
 		rangeProofMarshaler:  rangeProofMarshaler,
 		changeProofMarshaler: changeProofMarshaler,
 	}
 }
 
-type GetProofHandler[R any, C any] struct {
+type ProofHandler[R any, C any] struct {
 	db                   DB[R, C]
 	rangeProofMarshaler  Marshaler[R]
 	changeProofMarshaler Marshaler[C]
 }
 
-func (*GetProofHandler[_, _]) AppGossip(context.Context, ids.NodeID, []byte) {}
+func (*ProofHandler[_, _]) AppGossip(context.Context, ids.NodeID, []byte) {}
 
-func (g *GetProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (h *ProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	req := &pb.ProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
@@ -80,9 +80,9 @@ func (g *GetProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	)
 	switch r := req.Request.(type) {
 	case *pb.ProofRequest_RangeProof:
-		resp, err = g.handleRangeProofRequest(ctx, r.RangeProof)
+		resp, err = h.handleRangeProofRequest(ctx, r.RangeProof)
 	case *pb.ProofRequest_ChangeProof:
-		resp, err = g.handleChangeProofRequest(ctx, r.ChangeProof)
+		resp, err = h.handleChangeProofRequest(ctx, r.ChangeProof)
 	default:
 		err = fmt.Errorf("unknown request type: %T", r)
 	}
@@ -95,7 +95,7 @@ func (g *GetProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	return resp, nil
 }
 
-func (g *GetProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *pb.RangeProofRequest) ([]byte, error) {
+func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *pb.RangeProofRequest) ([]byte, error) {
 	if err := validateRangeProofRequest(req); err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (g *GetProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req
 	}
 
 	for keyLimit > 0 {
-		rangeProof, err := g.db.GetRangeProofAtRoot(
+		rangeProof, err := h.db.GetRangeProofAtRoot(
 			ctx,
 			root,
 			startKey,
@@ -128,13 +128,13 @@ func (g *GetProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req
 			return nil, err
 		}
 
-		innerBytes, err := g.rangeProofMarshaler.Marshal(rangeProof)
+		innerBytes, err := h.rangeProofMarshaler.Marshal(rangeProof)
 		if err != nil {
 			return nil, err
 		}
 
-		proofBytes, err := proto.Marshal(&pb.GetProofResponse{
-			Response: &pb.GetProofResponse_RangeProof{
+		proofBytes, err := proto.Marshal(&pb.ProofResponse{
+			Response: &pb.ProofResponse_RangeProof{
 				RangeProof: innerBytes,
 			},
 		})
@@ -152,7 +152,7 @@ func (g *GetProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req
 	return nil, errMinProofSizeIsTooLarge
 }
 
-func (g *GetProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *pb.ChangeProofRequest) ([]byte, error) {
+func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *pb.ChangeProofRequest) ([]byte, error) {
 	if err := validateChangeProofRequest(req); err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (g *GetProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, re
 	}
 
 	for keyLimit > 0 {
-		changeProof, err := g.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
+		changeProof, err := h.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
 		if err != nil {
 			if !errors.Is(err, ErrInsufficientHistory) {
 				// We should only fail to get a change proof if we have insufficient history.
@@ -192,7 +192,7 @@ func (g *GetProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, re
 
 			// g.db doesn't have sufficient history to generate change proof.
 			// Generate a range proof for the end root ID instead.
-			return g.handleRangeProofRequest(
+			return h.handleRangeProofRequest(
 				ctx,
 				&pb.RangeProofRequest{
 					RootHash:   req.EndRootHash,
@@ -205,12 +205,12 @@ func (g *GetProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, re
 		}
 
 		// We generated a change proof. See if it's small enough.
-		changeProofBytes, err := g.changeProofMarshaler.Marshal(changeProof)
+		changeProofBytes, err := h.changeProofMarshaler.Marshal(changeProof)
 		if err != nil {
 			return nil, err
 		}
-		responseBytes, err := proto.Marshal(&pb.GetProofResponse{
-			Response: &pb.GetProofResponse_ChangeProof{
+		responseBytes, err := proto.Marshal(&pb.ProofResponse{
+			Response: &pb.ProofResponse_ChangeProof{
 				ChangeProof: changeProofBytes,
 			},
 		})

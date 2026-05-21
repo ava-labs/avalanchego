@@ -107,8 +107,8 @@ func marshalRangeProofResponse(t *testing.T, p *proofDouble) []byte {
 
 	inner, err := marshaler{}.Marshal(p)
 	require.NoError(t, err)
-	b, err := proto.Marshal(&pb.GetProofResponse{
-		Response: &pb.GetProofResponse_RangeProof{RangeProof: inner},
+	b, err := proto.Marshal(&pb.ProofResponse{
+		Response: &pb.ProofResponse_RangeProof{RangeProof: inner},
 	})
 	require.NoError(t, err)
 	return b
@@ -119,8 +119,8 @@ func marshalChangeProofResponse(t *testing.T, p *proofDouble) []byte {
 
 	inner, err := marshaler{}.Marshal(p)
 	require.NoError(t, err)
-	b, err := proto.Marshal(&pb.GetProofResponse{
-		Response: &pb.GetProofResponse_ChangeProof{ChangeProof: inner},
+	b, err := proto.Marshal(&pb.ProofResponse{
+		Response: &pb.ProofResponse_ChangeProof{ChangeProof: inner},
 	})
 	require.NoError(t, err)
 	return b
@@ -128,7 +128,7 @@ func marshalChangeProofResponse(t *testing.T, p *proofDouble) []byte {
 
 func marshalNilProofResponse(t *testing.T, _ *proofDouble) []byte {
 	t.Helper()
-	b, err := proto.Marshal(&pb.GetProofResponse{})
+	b, err := proto.Marshal(&pb.ProofResponse{})
 	require.NoError(t, err)
 	return b
 }
