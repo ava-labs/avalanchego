@@ -344,7 +344,9 @@ impl From<PathIterItem> for ProofNode {
             .map(|value| ValueDigest::Value(Box::from(value)));
 
         // For account-depth nodes on databases that need storageRoot
-        // recomputation, fix the value from the node's children.
+        // recomputation, fix the value from the node's children. Newer
+        // databases (firewood-v1-hfix) persist the correct storageRoot during
+        // hashing, so we skip the RLP decode/re-encode on those.
         #[cfg(feature = "ethhash")]
         let value_digest = if item.must_recompute_storage_hash {
             fix_account_storage_root(value_digest, &item.key_nibbles, &child_hashes)
@@ -363,7 +365,7 @@ impl From<PathIterItem> for ProofNode {
 
 /// For account-depth nodes (64 nibbles), replace the storageRoot field in the
 /// value with the hash computed from the node's children. This ensures proofs
-/// from older databases contain a valid storageRoot.
+/// from older databases (before firewood-v1-hfix) contain a valid storageRoot.
 #[cfg(feature = "ethhash")]
 fn fix_account_storage_root(
     value_digest: Option<ValueDigest<Box<[u8]>>>,

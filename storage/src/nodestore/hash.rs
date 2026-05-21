@@ -139,9 +139,10 @@ where
         trace!("hashing {node:?} at {path_prefix:?}");
         if let Node::Branch(ref mut b) = node {
             // special case code for ethereum hashes at the account level
+            // Both lengths are usize counts of nibbles in a trie path, so their
+            // sum cannot overflow on any platform firewood targets.
             #[cfg(feature = "ethhash")]
-            let make_fake_root = if path_prefix.0.len().saturating_add(b.partial_path.0.len()) == 64
-            {
+            let make_fake_root = if path_prefix.0.len().wrapping_add(b.partial_path.0.len()) == 64 {
                 // looks like we're at an account branch
                 // tally up how many hashes we need to deal with
                 let ClassifiedChildren {
@@ -225,6 +226,12 @@ where
                 trace!("child now {child:?}");
             }
         }
+
+        // For account-depth nodes (branch or leaf), persist the computed
+        // storageRoot into the node's RLP-encoded value.
+        #[cfg(feature = "ethhash")]
+        update_account_storage_root(&mut node, &path_prefix);
+
         // At this point, we either have a leaf or a branch with all children hashed.
         // if the encoded child hash <32 bytes then we use that RLP
 
@@ -281,6 +288,10 @@ where
 /// For branch accounts, the storage root is computed from the children's hashes.
 ///
 /// Returns `None` if the value is not well-formed account RLP.
+///
+/// At account depth (64 nibbles), storage keys are 32 bytes, so every child
+/// encoding exceeds 32 bytes and is stored as a `HashType::Hash` — `Rlp`
+/// children are impossible here.
 #[must_use]
 pub fn fix_account_storage_root_value(
     value: &[u8],
@@ -307,6 +318,43 @@ pub fn fix_account_storage_root_value(
     };
 
     replace_list_field(value, 2, storage_root.as_slice()).ok()
+}
+
+/// Persist the computed storageRoot into an account node's RLP-encoded value,
+/// in place. Only acts on nodes at account depth (64 nibbles) whose values are
+/// well-formed Ethereum account RLP.
+///
+/// For branch accounts, the storage root is computed from the children's hashes.
+/// For leaf accounts (no storage sub-trie), the storage root is the empty trie hash.
+#[cfg(feature = "ethhash")]
+fn update_account_storage_root(node: &mut Node, path_prefix: &Path) {
+    // Both lengths are usize counts of nibbles in a trie path, so their
+    // sum cannot overflow on any platform firewood targets.
+    let total_depth = path_prefix
+        .0
+        .len()
+        .wrapping_add(node.partial_path().0.len());
+    if total_depth != 64 {
+        return;
+    }
+
+    match node {
+        Node::Branch(b) => {
+            let Some(old_value) = b.value.as_ref() else {
+                return;
+            };
+            let child_hashes = b.children_hashes();
+            if let Some(new_value) = fix_account_storage_root_value(old_value, &child_hashes) {
+                b.value = Some(new_value);
+            }
+        }
+        Node::Leaf(l) => {
+            let empty_children: Children<Option<HashType>> = Children::new();
+            if let Some(new_value) = fix_account_storage_root_value(&l.value, &empty_children) {
+                l.value = new_value;
+            }
+        }
+    }
 }
 
 /// Extract the `TrieHash` for the single-storage-child case. At account

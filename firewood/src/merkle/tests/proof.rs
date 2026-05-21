@@ -125,20 +125,15 @@ fn test_proof() {
 
     let root_hash = merkle.nodestore().root_hash().unwrap();
 
-    // Build expected values from the key-value iterator, which applies the
-    // same storageRoot fixups as proof generation.
-    let expected: std::collections::HashMap<_, _> = merkle
-        .key_value_iter_from_key(b"")
-        .map(|r| r.unwrap())
-        .collect();
-
     for (key, _val) in items {
         let proof = merkle.prove(key).unwrap();
         assert!(!proof.is_empty());
-        let value = expected.get(key.as_ref()).unwrap_or_else(|| {
-            panic!("key {key:?} missing from iterator");
-        });
-        proof.verify(key, Some(value.as_ref()), &root_hash).unwrap();
+        // Read the stored value rather than using the original input because
+        // ethhash mode rewrites the storageRoot field in account-depth values
+        // during hashing. The proof must be verified against what was actually
+        // committed, not what was originally inserted.
+        let stored_val = merkle.get_value(key).unwrap().expect("key should exist");
+        proof.verify(key, Some(&stored_val), &root_hash).unwrap();
     }
 }
 

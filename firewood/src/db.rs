@@ -1808,7 +1808,7 @@ mod test {
 
         let mut version = [0_u8; 16];
         file.read_exact_at(&mut version, 0).unwrap();
-        assert_eq!(&version, b"firewood-v1\0\0\0\0\0");
+        assert_eq!(&version, b"firewood-v1-hfix");
 
         // overwrite the magic string to simulate an older version
         file.write_all_at(b"firewood 0.0.18\0", 0).unwrap();

@@ -105,17 +105,20 @@ impl Version {
         u128::from_ne_bytes(self.bytes)
     }
 
-    const fn is_firewood_v1(self) -> bool {
+    const fn has_extended_header_fields(self) -> bool {
+        // Check against both the current and previous version strings
         self.as_u128() == const { Self::VALID_V1_VERSIONS[0].as_u128() }
+            || self.as_u128() == const { Self::VALID_V1_VERSIONS[1].as_u128() }
     }
 
     /// Returns `true` if databases written by this version need their account
     /// storage-root hashes recomputed at proof-generation time.
     ///
-    /// All existing versions predate the fix, so this currently returns `true`
-    /// unconditionally. A future `firewood-v1-hfix` version will return `false`.
+    /// The `firewood-v1-hfix` version persists correct storageRoot values
+    /// during hashing, so recomputation is not needed. All older versions
+    /// require it.
     pub const fn must_recompute_storage_hash(self) -> bool {
-        true
+        self.as_u128() != const { Self::VALID_V1_VERSIONS[0].as_u128() }
     }
 
     const fn from_static(bytes: &'static [u8; 16]) -> Self {
@@ -125,7 +128,8 @@ impl Version {
     /// After making the version a static string, there is no need to use semver
     /// to parse the valid version strings since there are a finite set of valid
     /// strings.
-    const VALID_V1_VERSIONS: [Version; 16] = [
+    const VALID_V1_VERSIONS: [Version; 17] = [
+        Version::from_static(b"firewood-v1-hfix"),
         Version::from_static(b"firewood-v1\0\0\0\0\0"),
         Version::from_static(b"firewood 0.0.18\0"),
         Version::from_static(b"firewood 0.0.17\0"),
@@ -393,7 +397,7 @@ impl NodeStoreHeader {
         trace!("Checking if node hash algorithm flag matches storage...");
         self.validate_node_hash_algorithm(expected_node_hash_algorithm)?;
 
-        if self.version == Version::VALID_V1_VERSIONS[0] {
+        if self.version.has_extended_header_fields() {
             debug!(
                 "Database was created with firewood version {}",
                 self.firewood_version_str()
@@ -438,7 +442,7 @@ impl NodeStoreHeader {
     /// This is None if the database was created before v0.1.0.
     #[must_use]
     pub(crate) fn root_hash(&self) -> Option<TrieHash> {
-        if self.version.is_firewood_v1() && self.root_address.is_some() {
+        if self.version.has_extended_header_fields() && self.root_address.is_some() {
             Some(TrieHash::from(self.root_hash))
         } else {
             None
@@ -472,7 +476,7 @@ impl NodeStoreHeader {
     /// if available.
     #[must_use]
     pub const fn cargo_version(&self) -> Option<&CargoVersion> {
-        if self.version.is_firewood_v1() {
+        if self.version.has_extended_header_fields() {
             Some(&self.cargo_version)
         } else {
             None
@@ -482,7 +486,7 @@ impl NodeStoreHeader {
     /// Get the git describe string of `firewood` used to create this database,
     #[must_use]
     pub const fn git_describe(&self) -> Option<&GitDescribe> {
-        if self.version.is_firewood_v1() {
+        if self.version.has_extended_header_fields() {
             Some(&self.git_describe)
         } else {
             None

@@ -313,13 +313,13 @@ impl<T: TrieReader> Iterator for MerkleKeyValueIter<'_, T> {
         self.iter.find_map(|result| {
             result
                 .map(|(key, node)| {
+                    let must_recompute = self.iter.merkle.must_recompute_storage_hash();
                     match &*node {
                         Node::Branch(branch) => {
                             let Some(value) = branch.value.as_ref() else {
                                 // no value, continue to next node
                                 return None;
                             };
-                            let must_recompute = self.iter.merkle.must_recompute_storage_hash();
                             let child_hashes = if must_recompute && key.len() == 32 {
                                 branch.children_hashes()
                             } else {
@@ -331,7 +331,7 @@ impl<T: TrieReader> Iterator for MerkleKeyValueIter<'_, T> {
                             key,
                             &leaf.value,
                             &firewood_storage::Children::new(),
-                            self.iter.merkle.must_recompute_storage_hash(),
+                            must_recompute,
                         ),
                     }
                 })
@@ -417,7 +417,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
     type Item = Result<PathIterItem, FileIoError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let must_recompute = self.merkle.must_recompute_storage_hash();
+        let must_recompute_storage_hash = self.merkle.must_recompute_storage_hash();
         // destructuring is necessary here because we need mutable access to `state`
         // at the same time as immutable access to `merkle`.
         let Self { state, merkle } = &mut *self;
@@ -451,7 +451,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                         key_nibbles: node_key,
                         node,
                         next_nibble: None,
-                        must_recompute_storage_hash: must_recompute,
+                        must_recompute_storage_hash,
                     }));
                 }
 
@@ -468,7 +468,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                         key_nibbles: node_key,
                         node: saved_node,
                         next_nibble: None,
-                        must_recompute_storage_hash: must_recompute,
+                        must_recompute_storage_hash,
                     }));
                 };
                 let next_unmatched_key_nibble =
@@ -484,7 +484,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                             key_nibbles: node_key,
                             node: saved_node,
                             next_nibble: None,
-                            must_recompute_storage_hash: must_recompute,
+                            must_recompute_storage_hash,
                         }))
                     }
                     Some(Child::AddressWithHash(child_addr, _)) => {
@@ -500,7 +500,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                             key_nibbles: node_key,
                             node: saved_node,
                             next_nibble: Some(next_unmatched_key_nibble),
-                            must_recompute_storage_hash: must_recompute,
+                            must_recompute_storage_hash,
                         }))
                     }
                     Some(Child::Node(child)) => {
@@ -511,7 +511,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                             key_nibbles: node_key,
                             node: saved_node,
                             next_nibble: Some(next_unmatched_key_nibble),
-                            must_recompute_storage_hash: must_recompute,
+                            must_recompute_storage_hash,
                         }))
                     }
                     Some(Child::MaybePersisted(maybe_persisted, _)) => {
@@ -527,7 +527,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                             key_nibbles: node_key,
                             node: saved_node,
                             next_nibble: Some(next_unmatched_key_nibble),
-                            must_recompute_storage_hash: must_recompute,
+                            must_recompute_storage_hash,
                         }))
                     }
                 }

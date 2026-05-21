@@ -489,8 +489,10 @@ pub struct PathIterItem {
     /// children array.
     /// None if `node` is the last node in the path.
     pub next_nibble: Option<PathComponent>,
-    /// Whether account storageRoot values need recomputation during proof
-    /// generation. Set from the database version.
+    /// Whether the source database requires storageRoot recomputation at
+    /// proof-generation time. Older databases (pre-`firewood-v1-hfix`) stored
+    /// caller-supplied account bytes verbatim and need the splice; newer
+    /// databases persist the correct value during hashing.
     pub must_recompute_storage_hash: bool,
 }
 
