@@ -42,29 +42,15 @@ type Time struct {
 // New returns a new [Time], derived from a [time.Time]. The consumption of
 // `target` * [TargetToRate] units of [gas.Gas] is equivalent to a tick of 1
 // second.
+//
+// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
+// meaningfully provide. We should instead take in startingPrice.
 func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time, error) {
-	if err := c.Validate(); err != nil {
-		return nil, err
-	}
-
 	tm := proxytime.Of[gas.Gas](at)
 	target = clampTarget(target)
 	tm.SetRate(rateOf(target))
 
-	// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
-	// meaningfully provide. We should instead take in startingPrice.
-	if c.StaticPricing {
-		startingExcess = 0
-	}
-
-	t := &Time{
-		Time:   tm,
-		target: target,
-		excess: startingExcess,
-		config: c,
-	}
-	t.enforceMinExcess()
-	return t, nil
+	return FromProxyTime(tm, startingExcess, c)
 }
 
 // FromProxyTime returns a new [Time] derived from the provided [proxytime.Time].

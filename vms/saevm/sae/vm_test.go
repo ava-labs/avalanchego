@@ -1017,7 +1017,7 @@ func TestSettledGasTime(t *testing.T) {
 		if i == 0 {
 			continue // genesis block has no [hook.Settled] struct.
 		}
-		settledHeight := sut.hooks.Settled(b.Header()).Height
+		settledHeight := sut.hooks.SettledBy(b.Header()).Height
 		settledBlock := bs[settledHeight]
 
 		want := settledBlock.ExecutedByGasTime()

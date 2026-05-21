@@ -206,9 +206,9 @@ func (*Stub) BlockTime(hdr *types.Header) time.Time {
 	return time.Unix(int64(hdr.Time), int64(subSec)) //#nosec G115 -- Won't overflow for a few millennia
 }
 
-// Settled returns the settled information encoded in the Header by [Stub.BuildBlock]
+// SettledBy returns the settled information encoded in the Header by [Stub.BuildBlock]
 // or [BuildBlock].
-func (*Stub) Settled(hdr *types.Header) hook.Settled {
+func (*Stub) SettledBy(hdr *types.Header) hook.Settled {
 	return getHeaderExtra(hdr).settled.toHook()
 }
 

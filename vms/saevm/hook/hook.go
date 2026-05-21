@@ -66,10 +66,10 @@ type Points interface {
 	// ([time.Time.Unix] == [types.Header.Time]) and MAY include a sub-second
 	// component.
 	BlockTime(h *types.Header) time.Time
-	// Settled returns the extra information for the settled block of the
+	// SettledBy returns the extra information for the settled block of the
 	// provided header. It MUST match the value passed to
 	// [BlockBuilder.BuildBlock].
-	Settled(*types.Header) Settled
+	SettledBy(*types.Header) Settled
 	// EndOfBlockOps returns operations outside of the normal EVM state changes
 	// to perform while executing the block, after regular EVM transactions.
 	// These operations will be performed during both worst-case and actual
@@ -206,6 +206,7 @@ func MinimumGasConsumption(txLimit uint64) uint64 {
 }
 
 // Settled includes information about the block that is settled by a header.
+// Fields refer to post-execution state.
 type Settled struct {
 	Height       uint64
 	GasUnix      uint64
@@ -219,7 +220,7 @@ type Settled struct {
 // TODO(alarso16): This should be moved to the state sync logic once implemented.
 func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
 	target, cfg := h.GasConfigAfter(settled)
-	s := h.Settled(settler)
+	s := h.SettledBy(settler)
 
 	pt := proxytime.New(s.GasUnix, s.GasNumerator, gastime.SafeRateOfTarget(target))
 	return gastime.FromProxyTime(pt, s.Excess, cfg)
