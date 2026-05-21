@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txstest
 
 import (
-	"context"
 	"math"
 	"testing"
 
@@ -30,7 +29,7 @@ func NewWallet(
 	t testing.TB,
 	ctx *snow.Context,
 	config *config.Internal,
-	state state.State,
+	state *state.State,
 	kc *secp256k1fx.Keychain,
 	subnetIDs []ids.ID,
 	validationIDs []ids.ID,
@@ -47,7 +46,7 @@ func NewWallet(
 
 	for _, utxo := range pChainUTXOs {
 		require.NoError(utxos.AddUTXO(
-			context.Background(),
+			t.Context(),
 			constants.PlatformChainID,
 			constants.PlatformChainID,
 			utxo,
@@ -68,7 +67,7 @@ func NewWallet(
 
 		for _, utxo := range remoteChainUTXOs {
 			require.NoError(utxos.AddUTXO(
-				context.Background(),
+				t.Context(),
 				chainID,
 				constants.PlatformChainID,
 				utxo,

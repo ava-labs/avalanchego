@@ -1,0 +1,51 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "simulated",
+    srcs = [
+        "backend.go",
+        "options.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/constants",
+        "//graft/evm/rpc",
+        "//graft/subnet-evm/consensus/dummy",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/eth",
+        "//graft/subnet-evm/eth/ethconfig",
+        "//graft/subnet-evm/ethclient",
+        "//graft/subnet-evm/interfaces",
+        "//graft/subnet-evm/node",
+        "//graft/subnet-evm/params",
+        "//utils/timer/mockable",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)
+
+graft_go_test(
+    name = "simulated_test",
+    srcs = [
+        "backend_test.go",
+        "options_test.go",
+    ],
+    embed = [":simulated"],
+    deps = [
+        "//graft/evm/rpc",
+        "//graft/subnet-evm/accounts/abi/bind",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)

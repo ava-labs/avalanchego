@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "consensus",
+    srcs = [
+        "consensus.go",
+        "errors.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/consensus",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/params",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package filesystem
@@ -15,7 +15,7 @@ func TestRenameIfExists(t *testing.T) {
 
 	t.Parallel()
 
-	f, err := os.CreateTemp(os.TempDir(), "test-rename")
+	f, err := os.CreateTemp(t.TempDir(), "test-rename")
 	require.NoError(err)
 
 	a := f.Name()

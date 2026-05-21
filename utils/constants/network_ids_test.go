@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package constants
@@ -17,6 +17,10 @@ func TestGetHRP(t *testing.T) {
 		{
 			id:  MainnetID,
 			hrp: MainnetHRP,
+		},
+		{
+			id:  TestnetID,
+			hrp: TahoeHRP,
 		},
 		{
 			id:  TahoeID,
@@ -48,8 +52,12 @@ func TestNetworkName(t *testing.T) {
 			name: MainnetName,
 		},
 		{
+			id:   TestnetID,
+			name: TahoeName,
+		},
+		{
 			id:   TahoeID,
-			name: TahoeHRP,
+			name: TahoeName,
 		},
 		{
 			id:   LocalID,
@@ -80,6 +88,10 @@ func TestNetworkID(t *testing.T) {
 		{
 			name: "MaInNeT",
 			id:   MainnetID,
+		},
+		{
+			name: TestnetName,
+			id:   TestnetID,
 		},
 		{
 			name: TahoeName,

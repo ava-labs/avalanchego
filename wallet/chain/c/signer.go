@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
@@ -8,14 +8,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/MetalBlockchain/coreth/plugin/evm/atomic"
 	"github.com/MetalBlockchain/libevm/common"
 
 	"github.com/MetalBlockchain/metalgo/database"
+	"github.com/MetalBlockchain/metalgo/graft/coreth/plugin/evm/atomic"
 	"github.com/MetalBlockchain/metalgo/ids"
 	"github.com/MetalBlockchain/metalgo/utils/crypto/keychain"
 	"github.com/MetalBlockchain/metalgo/utils/crypto/secp256k1"
-	"github.com/MetalBlockchain/metalgo/utils/hashing"
 	"github.com/MetalBlockchain/metalgo/utils/set"
 	"github.com/MetalBlockchain/metalgo/vms/components/avax"
 	"github.com/MetalBlockchain/metalgo/vms/components/verify"
@@ -80,10 +79,10 @@ func (s *txSigner) SignAtomic(ctx context.Context, tx *atomic.Tx) error {
 		if err != nil {
 			return err
 		}
-		return sign(tx, true, signers)
+		return sign(tx, signers)
 	case *atomic.UnsignedExportTx:
 		signers := s.getExportSigners(utx.Ins)
-		return sign(tx, true, signers)
+		return sign(tx, signers)
 	default:
 		return fmt.Errorf("%w: %T", errUnknownTxType, tx)
 	}
@@ -156,13 +155,11 @@ func SignUnsignedAtomic(ctx context.Context, signer Signer, utx atomic.UnsignedA
 	return tx, signer.SignAtomic(ctx, tx)
 }
 
-// TODO: remove [signHash] after the ledger supports signing all transactions.
-func sign(tx *atomic.Tx, signHash bool, txSigners [][]keychain.Signer) error {
+func sign(tx *atomic.Tx, txSigners [][]keychain.Signer) error {
 	unsignedBytes, err := atomic.Codec.Marshal(version, &tx.UnsignedAtomicTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}
-	unsignedHash := hashing.ComputeHash256(unsignedBytes)
 
 	if expectedLen := len(txSigners); expectedLen != len(tx.Creds) {
 		tx.Creds = make([]verify.Verifiable, expectedLen)
@@ -205,12 +202,7 @@ func sign(tx *atomic.Tx, signHash bool, txSigners [][]keychain.Signer) error {
 				continue
 			}
 
-			var sig []byte
-			if signHash {
-				sig, err = signer.SignHash(unsignedHash)
-			} else {
-				sig, err = signer.Sign(unsignedBytes)
-			}
+			sig, err := signer.Sign(unsignedBytes)
 			if err != nil {
 				return fmt.Errorf("problem signing tx: %w", err)
 			}

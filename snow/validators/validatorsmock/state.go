@@ -117,3 +117,18 @@ func (mr *StateMockRecorder) GetValidatorSet(ctx, height, subnetID any) *gomock.
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorSet", reflect.TypeOf((*State)(nil).GetValidatorSet), ctx, height, subnetID)
 }
+
+// GetWarpValidatorSets mocks base method.
+func (m *State) GetWarpValidatorSets(ctx context.Context, height uint64) (map[ids.ID]validators.WarpSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWarpValidatorSets", ctx, height)
+	ret0, _ := ret[0].(map[ids.ID]validators.WarpSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetWarpValidatorSets indicates an expected call of GetWarpValidatorSets.
+func (mr *StateMockRecorder) GetWarpValidatorSets(ctx, height any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWarpValidatorSets", reflect.TypeOf((*State)(nil).GetWarpValidatorSets), ctx, height)
+}

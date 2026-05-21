@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "registrymock",
+    srcs = [
+        "vm_getter.go",
+        "vm_registry.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/registry/registrymock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//vms",
+        "@org_uber_go_mock//gomock",
+    ],
+)

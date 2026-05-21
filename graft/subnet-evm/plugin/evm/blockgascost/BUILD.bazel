@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "blockgascost",
+    srcs = ["cost.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/blockgascost",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/commontype",
+        "//utils/math",
+    ],
+)
+
+graft_go_test(
+    name = "blockgascost_test",
+    srcs = ["cost_test.go"],
+    embed = [":blockgascost"],
+    deps = [
+        "//graft/subnet-evm/commontype",
+        "@com_github_stretchr_testify//require",
+    ],
+)

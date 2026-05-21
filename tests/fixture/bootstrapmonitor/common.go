@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrapmonitor
@@ -127,8 +127,8 @@ type ImageDetails struct {
 	Versions *version.Versions
 }
 
-// GetLatestImageDetails retrieves the image details for the avalanchego image with tag `latest`.
-func getLatestImageDetails(
+// getMasterImageDetails retrieves the image details for the avalanchego image with tag `master`.
+func getMasterImageDetails(
 	ctx context.Context,
 	log logging.Logger,
 	clientset *kubernetes.Clientset,
@@ -141,7 +141,7 @@ func getLatestImageDetails(
 		return nil, err
 	}
 
-	// Start a new pod with the `latest`-tagged avalanchego image to discover its image ID
+	// Start a new pod with the `master`-tagged avalanchego image to discover its image ID
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "avalanchego-version-check-",
@@ -152,7 +152,9 @@ func getLatestImageDetails(
 					Name:    containerName,
 					Command: []string{"./avalanchego"},
 					Args:    []string{"--version-json"},
-					Image:   baseImageName + ":latest",
+					Image:   baseImageName + ":master",
+					// Ensure the latest image is always pulled for a tag other than `latest`
+					ImagePullPolicy: corev1.PullAlways,
 				},
 			},
 			RestartPolicy: corev1.RestartPolicyNever,

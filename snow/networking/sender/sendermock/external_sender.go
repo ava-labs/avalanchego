@@ -45,7 +45,7 @@ func (m *ExternalSender) EXPECT() *ExternalSenderMockRecorder {
 }
 
 // Send mocks base method.
-func (m *ExternalSender) Send(msg message.OutboundMessage, config common.SendConfig, subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID] {
+func (m *ExternalSender) Send(msg *message.OutboundMessage, config common.SendConfig, subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Send", msg, config, subnetID, allower)
 	ret0, _ := ret[0].(set.Set[ids.NodeID])

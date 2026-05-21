@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -7,14 +7,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
+	"connectrpc.com/grpcreflect"
+	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/MetalBlockchain/metalgo/api/server"
 	"github.com/MetalBlockchain/metalgo/cache"
 	"github.com/MetalBlockchain/metalgo/cache/lru"
 	"github.com/MetalBlockchain/metalgo/cache/metercacher"
+	"github.com/MetalBlockchain/metalgo/connectproto/pb/proposervm/proposervmconnect"
 	"github.com/MetalBlockchain/metalgo/database"
 	"github.com/MetalBlockchain/metalgo/database/prefixdb"
 	"github.com/MetalBlockchain/metalgo/database/versiondb"
@@ -24,10 +29,13 @@ import (
 	"github.com/MetalBlockchain/metalgo/snow/engine/common"
 	"github.com/MetalBlockchain/metalgo/snow/engine/snowman/block"
 	"github.com/MetalBlockchain/metalgo/utils/constants"
+	"github.com/MetalBlockchain/metalgo/utils/json"
 	"github.com/MetalBlockchain/metalgo/utils/math"
+	"github.com/MetalBlockchain/metalgo/utils/metric"
 	"github.com/MetalBlockchain/metalgo/utils/timer/mockable"
 	"github.com/MetalBlockchain/metalgo/utils/tree"
 	"github.com/MetalBlockchain/metalgo/utils/units"
+	"github.com/MetalBlockchain/metalgo/vms/proposervm/acp181"
 	"github.com/MetalBlockchain/metalgo/vms/proposervm/proposer"
 	"github.com/MetalBlockchain/metalgo/vms/proposervm/state"
 
@@ -35,6 +43,9 @@ import (
 )
 
 const (
+	httpPathEndpoint = "/proposervm"
+	HTTPHeaderRoute  = "proposervm"
+
 	// DefaultMinBlockDelay should be kept as whole seconds because block
 	// timestamps are only specific to the second.
 	DefaultMinBlockDelay = time.Second
@@ -60,15 +71,17 @@ func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 type VM struct {
 	block.ChainVM
 	Config
-	blockBuilderVM block.BuildBlockWithContextChainVM
-	batchedVM      block.BatchedChainVM
-	ssVM           block.StateSyncableVM
+	blockBuilderVM  block.BuildBlockWithContextChainVM
+	setPreferenceVM block.SetPreferenceWithContextChainVM
+	batchedVM       block.BatchedChainVM
+	ssVM            block.StateSyncableVM
 
 	state.State
 
 	proposer.Windower
 	tree.Tree
 	mockable.Clock
+	finishedBootstrappingAt time.Time
 
 	ctx *snow.Context
 	db  *versiondb.Database
@@ -113,14 +126,16 @@ func New(
 	config Config,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
+	setPreferenceVM, _ := vm.(block.SetPreferenceWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
-		ChainVM:        vm,
-		Config:         config,
-		blockBuilderVM: blockBuilderVM,
-		batchedVM:      batchedVM,
-		ssVM:           ssVM,
+		ChainVM:         vm,
+		Config:          config,
+		blockBuilderVM:  blockBuilderVM,
+		setPreferenceVM: setPreferenceVM,
+		batchedVM:       batchedVM,
+		ssVM:            ssVM,
 	}
 }
 
@@ -141,7 +156,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
-	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
+	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -236,12 +251,77 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return vm.ChainVM.Shutdown(ctx)
 }
 
+func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	handlers, err := vm.ChainVM.CreateHandlers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create inner VM handlers: %w", err)
+	}
+
+	metrics, err := metric.NewAPIInterceptor(vm.Config.Registerer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
+	server := rpc.NewServer()
+	server.RegisterCodec(json.NewCodec(), "application/json")
+	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
+	server.RegisterInterceptFunc(metrics.InterceptRequest)
+	server.RegisterAfterFunc(metrics.AfterRequest)
+	err = server.RegisterService(&jsonrpcService{vm: vm}, "proposervm")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register proposervm service: %w", err)
+	}
+
+	if handlers == nil {
+		handlers = make(map[string]http.Handler)
+	}
+	handlers[httpPathEndpoint] = server
+	return handlers, nil
+}
+
+func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	innerHandler, err := vm.ChainVM.NewHTTPHandler(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	proposerMux := http.NewServeMux()
+	proposerMux.Handle(proposervmconnect.NewProposerVMHandler(
+		&connectrpcService{vm: vm},
+	))
+	proposerMux.Handle(grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
+	))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		route := r.Header[server.HTTPHeaderRoute]
+		vm.ctx.Log.Debug("routing request",
+			zap.String("method", r.Method),
+			zap.String("path", r.URL.Path),
+			zap.Strings("header", route),
+		)
+		switch {
+		case len(route) < 2 && innerHandler != nil:
+			innerHandler.ServeHTTP(w, r)
+		case len(route) == 2 && route[1] == HTTPHeaderRoute:
+			proposerMux.ServeHTTP(w, r)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}), nil
+}
+
 func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	if err := vm.ChainVM.SetState(ctx, newState); err != nil {
 		return err
 	}
 
 	oldState := vm.consensusState
+
+	if newState == snow.NormalOp && oldState != snow.NormalOp {
+		vm.finishedBootstrappingAt = vm.Clock.Time()
+	}
+
 	vm.consensusState = newState
 	if oldState != snow.StateSyncing {
 		return nil
@@ -300,7 +380,51 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return vm.ChainVM.SetPreference(ctx, preferred)
 	}
 
+	preferredEpoch, err := blk.pChainEpoch(ctx)
+	if err != nil {
+		return err
+	}
+
 	innerBlkID := blk.getInnerBlk().ID()
+
+	// If the inner VM implements SetPreferenceWithContext, use it to set the
+	// preference with the P-Chain height to be used to verify a child of the
+	// preferred block.
+	if vm.setPreferenceVM != nil && preferredEpoch != (statelessblock.Epoch{}) {
+		// The P-Chain height used to verify a child of the preferred block will
+		// potentially be different than the P-Chain height used to verify the
+		// preferred block if the preferred block seals the current epoch.
+		preferredPChainHeight, err := blk.pChainHeight(ctx)
+		if err != nil {
+			return err
+		}
+
+		// The exact child timestamp doesn't matter here because we know Granite
+		// is already activated.
+		timestamp := blk.Timestamp()
+		nextEpoch := acp181.NewEpoch(
+			vm.Upgrades,
+			preferredPChainHeight,
+			preferredEpoch,
+			timestamp,
+			timestamp,
+		)
+		nextPChainHeight := nextEpoch.PChainHeight
+
+		if err := vm.setPreferenceVM.SetPreferenceWithContext(ctx, innerBlkID, &block.Context{
+			PChainHeight: nextPChainHeight,
+		}); err != nil {
+			return err
+		}
+
+		vm.ctx.Log.Debug("set preference with context",
+			zap.Stringer("blkID", preferred),
+			zap.Stringer("innerBlkID", innerBlkID),
+			zap.Uint64("pChainHeight", nextPChainHeight),
+		)
+		return nil
+	}
+
 	if err := vm.ChainVM.SetPreference(ctx, innerBlkID); err != nil {
 		return err
 	}
@@ -332,7 +456,8 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 			return vm.ChainVM.WaitForEvent(ctx)
 		}
 
-		duration := time.Until(timeToBuild)
+		now := vm.Clock.Time()
+		duration := timeToBuild.Sub(now)
 		if duration <= 0 {
 			vm.ctx.Log.Debug("Can build a block without waiting")
 			return vm.ChainVM.WaitForEvent(ctx)
@@ -434,7 +559,7 @@ func (vm *VM) getPreDurangoSlotTime(
 	// avoid fast runs of blocks there is an additional minimum delay that
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
-	// time, ProposerMinBlockDelay can be configured in the subnet config.
+	// time, ProposerMinBlockDelay can be configured in the node config.
 	delay = max(delay, vm.MinBlkDelay)
 	return parentTimestamp.Add(delay), nil
 }
@@ -458,14 +583,18 @@ func (vm *VM) getPostDurangoSlotTime(
 	// avoid fast runs of blocks there is an additional minimum delay that
 	// validators can specify. This delay may be an issue for high performance,
 	// custom VMs. Until the P-chain is modified to target a specific block
-	// time, ProposerMinBlockDelay can be configured in the subnet config.
+	// time, ProposerMinBlockDelay can be configured in the node config.
+
 	switch {
 	case err == nil:
+		vm.ctx.Log.Debug("slot time", zap.Duration("delay", delay), zap.Duration("min block delay", vm.MinBlkDelay))
 		delay = max(delay, vm.MinBlkDelay)
 		return parentTimestamp.Add(delay), nil
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
+		vm.ctx.Log.Debug("anyone can propose", zap.Duration("min block delay", vm.MinBlkDelay), zap.Time("parent timestamp", parentTimestamp))
 		return parentTimestamp.Add(vm.MinBlkDelay), nil
 	default:
+		vm.ctx.Log.Debug("failed fetching the expected delay", zap.Error(err))
 		return time.Time{}, err
 	}
 }
@@ -758,7 +887,26 @@ func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Conte
 	return nil
 }
 
+// tahoeOverridePChainHeightUntilHeight is the P-chain height at which the
+// proposervm will no longer attempt to keep the P-chain height the same.
+const tahoeOverridePChainHeightUntilHeight = 200041
+
+// tahoeOverridePChainHeightUntilTimestamp is the timestamp at which the
+// proposervm will no longer attempt to keep the P-chain height the same.
+var tahoeOverridePChainHeightUntilTimestamp = time.Date(2025, time.March, 7, 17, 0, 0, 0, time.UTC) // noon ET
+
 func (vm *VM) selectChildPChainHeight(ctx context.Context, minPChainHeight uint64) (uint64, error) {
+	var (
+		now            = vm.Clock.Time()
+		shouldOverride = vm.ctx.NetworkID == constants.TahoeID &&
+			vm.ctx.SubnetID != constants.PrimaryNetworkID &&
+			now.Before(tahoeOverridePChainHeightUntilTimestamp) &&
+			minPChainHeight < tahoeOverridePChainHeightUntilHeight
+	)
+	if shouldOverride {
+		return minPChainHeight, nil
+	}
+
 	recommendedHeight, err := vm.ctx.ValidatorState.GetMinimumHeight(ctx)
 	if err != nil {
 		return 0, err

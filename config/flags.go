@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -17,7 +17,9 @@ import (
 	"github.com/MetalBlockchain/metalgo/database/memdb"
 	"github.com/MetalBlockchain/metalgo/database/pebbledb"
 	"github.com/MetalBlockchain/metalgo/genesis"
+	"github.com/MetalBlockchain/metalgo/snow/consensus/simplex"
 	"github.com/MetalBlockchain/metalgo/snow/consensus/snowball"
+	"github.com/MetalBlockchain/metalgo/snow/networking/benchlist"
 	"github.com/MetalBlockchain/metalgo/trace"
 	"github.com/MetalBlockchain/metalgo/utils/compression"
 	"github.com/MetalBlockchain/metalgo/utils/constants"
@@ -192,9 +194,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(NetworkTLSKeyLogFileKey, "", "TLS key log file path. Should only be specified for debugging")
 
 	// Benchlist
-	fs.Int(BenchlistFailThresholdKey, constants.DefaultBenchlistFailThreshold, "Number of consecutive failed queries before benchlisting a node")
-	fs.Duration(BenchlistDurationKey, constants.DefaultBenchlistDuration, "Max amount of time a peer is benchlisted after surpassing the threshold")
-	fs.Duration(BenchlistMinFailingDurationKey, constants.DefaultBenchlistMinFailingDuration, "Minimum amount of time messages to a peer must be failing before the peer is benched")
+	fs.Duration(BenchlistHalflifeKey, benchlist.DefaultHalflife, "Halflife of the EWMA averager used for benchlisting")
+	fs.Float64(BenchlistUnbenchProbabilityKey, benchlist.DefaultUnbenchProbability, "EWMA failure probability below which a node is unbenched")
+	fs.Float64(BenchlistBenchProbabilityKey, benchlist.DefaultBenchProbability, "EWMA failure probability above which a node is benched")
+	fs.Duration(BenchlistDurationKey, benchlist.DefaultBenchDuration, "Max amount of time a peer is benchlisted")
 
 	// Router
 	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
@@ -302,7 +305,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint(BootstrapAncestorsMaxContainersSentKey, 2000, "Max number of containers in an Ancestors message sent by this node")
 	fs.Uint(BootstrapAncestorsMaxContainersReceivedKey, 2000, "This node reads at most this many containers from an incoming Ancestors message")
 
-	// Consensus
+	// Snow Consensus
 	fs.Int(SnowSampleSizeKey, snowball.DefaultParameters.K, "Number of nodes to query for each network poll")
 	fs.Int(SnowQuorumSizeKey, snowball.DefaultParameters.AlphaConfidence, "Threshold of nodes required to update this node's preference and increase its confidence in a network poll")
 	fs.Int(SnowPreferenceQuorumSizeKey, snowball.DefaultParameters.AlphaPreference, fmt.Sprintf("Threshold of nodes required to update this node's preference in a network poll. Ignored if %s is provided", SnowQuorumSizeKey))
@@ -315,9 +318,13 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Int(SnowMaxProcessingKey, snowball.DefaultParameters.MaxOutstandingItems, "Maximum number of processing items to be considered healthy")
 	fs.Duration(SnowMaxTimeProcessingKey, snowball.DefaultParameters.MaxItemProcessingTime, "Maximum amount of time an item should be processing and still be healthy")
 
+	// Simplex Consensus
+	fs.Duration(SimplexMaxNetworkDelayKey, simplex.DefaultParameters.MaxNetworkDelay, "Maximum expected network delay for message transmission in Simplex consensus")
+	fs.Duration(SimplexMaxRebroadcastWaitKey, simplex.DefaultParameters.MaxRebroadcastWait, "Time to retry message transmission in case of network instability")
+
 	// ProposerVM
 	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")
-	fs.Duration(ProposerVMMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the primary network chains and the default minimum delay for subnets")
+	fs.Duration(ProposerVMMinBlockDelayKey, proposervm.DefaultMinBlockDelay, "Minimum delay to enforce when building a snowman++ block for the P-chain and X-chain")
 
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
@@ -357,8 +364,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(SystemTrackerProcessingHalflifeKey, 15*time.Second, "Halflife to use for the processing requests tracker. Larger halflife --> usage metrics change more slowly")
 	fs.Duration(SystemTrackerCPUHalflifeKey, 15*time.Second, "Halflife to use for the cpu tracker. Larger halflife --> cpu usage metrics change more slowly")
 	fs.Duration(SystemTrackerDiskHalflifeKey, time.Minute, "Halflife to use for the disk tracker. Larger halflife --> disk usage metrics change more slowly")
-	fs.Uint64(SystemTrackerRequiredAvailableDiskSpaceKey, units.GiB/2, "Minimum number of available bytes on disk, under which the node will shutdown.")
-	fs.Uint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey, units.GiB, fmt.Sprintf("Warning threshold for the number of available bytes on disk, under which the node will be considered unhealthy.  Must be >= [%s]", SystemTrackerRequiredAvailableDiskSpaceKey))
+	fs.Uint64(SystemTrackerRequiredAvailableDiskSpaceKey, 0, "DEPRECATED: Minimum number of available bytes on disk, under which the node will shutdown.")
+	fs.Uint64(SystemTrackerRequiredAvailableDiskSpacePercentageKey, 3, "Minimum percentage (between 0 and 50) of available disk space, under which the node will shutdown.")
+	fs.Uint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey, 0, fmt.Sprintf("DEPRECATED: Warning threshold for the number of available bytes on disk, under which the node will be considered unhealthy.  Must be >= [%s]", SystemTrackerRequiredAvailableDiskSpaceKey))
+	fs.Uint64(SystemTrackerWarningAvailableDiskSpacePercentageKey, 10, fmt.Sprintf("Warning threshold for the percentage (between 0 and 50) of available disk space, under which the node will be considered unhealthy. Must be >= [%s]", SystemTrackerRequiredAvailableDiskSpacePercentageKey))
 
 	// CPU management
 	fs.Float64(CPUVdrAllocKey, float64(runtime.NumCPU()), "Maximum number of CPUs to allocate for use by validators. Value should be in range [0, total core count]")

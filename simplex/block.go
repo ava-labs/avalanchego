@@ -1,9 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+//go:generate go tool canoto $GOFILE
 
 import (
 	"context"
@@ -24,9 +24,10 @@ var (
 	_ simplex.Block             = (*Block)(nil)
 	_ simplex.VerifiedBlock     = (*Block)(nil)
 
-	errDigestNotFound       = errors.New("digest not found in block tracker")
-	errMismatchedPrevDigest = errors.New("prev digest does not match block parent")
-	errGenesisVerification  = errors.New("genesis block should not be verified")
+	errDigestNotFound        = errors.New("digest not found in block tracker")
+	errMismatchedPrevDigest  = errors.New("prev digest does not match block parent")
+	errGenesisVerification   = errors.New("genesis block should not be verified")
+	errFailedToParseMetadata = errors.New("failed to parse protocol metadata")
 )
 
 type Block struct {
@@ -39,6 +40,20 @@ type Block struct {
 	vmBlock snowman.Block
 
 	blockTracker *blockTracker
+}
+
+func newBlock(metadata simplex.ProtocolMetadata, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
+	block := &Block{
+		metadata:     metadata,
+		vmBlock:      vmBlock,
+		blockTracker: blockTracker,
+	}
+	bytes, err := block.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize block: %w", err)
+	}
+	block.digest = computeDigest(bytes)
+	return block, nil
 }
 
 // CanotoSimplexBlock is the Canoto representation of a block
@@ -105,7 +120,8 @@ func computeDigest(bytes []byte) simplex.Digest {
 }
 
 type blockDeserializer struct {
-	parser block.Parser
+	parser       block.Parser
+	blockTracker *blockTracker
 }
 
 func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) (simplex.Block, error) {
@@ -117,7 +133,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 
 	md, err := simplex.ProtocolMetadataFromBytes(canotoBlock.Metadata)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
+		return nil, fmt.Errorf("%w: %w", errFailedToParseMetadata, err)
 	}
 
 	vmblock, err := d.parser.ParseBlock(ctx, canotoBlock.InnerBlock)
@@ -125,11 +141,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 		return nil, err
 	}
 
-	return &Block{
-		metadata: *md,
-		vmBlock:  vmblock,
-		digest:   computeDigest(bytes),
-	}, nil
+	return newBlock(*md, vmblock, d.blockTracker)
 }
 
 // blockTracker is used to ensure that blocks are properly rejected, if competing blocks are accepted.
@@ -143,13 +155,17 @@ type blockTracker struct {
 	tree tree.Tree
 }
 
-func newBlockTracker(latestBlock *Block) *blockTracker {
+func newBlockTracker() *blockTracker {
 	return &blockTracker{
-		tree: tree.New(),
-		simplexDigestsToBlock: map[simplex.Digest]*Block{
-			latestBlock.digest: latestBlock,
-		},
+		tree:                  tree.New(),
+		simplexDigestsToBlock: make(map[simplex.Digest]*Block),
 	}
+}
+
+// init sets the latest block in the tracker.
+// This should only be called once, with the genesis or latest block.
+func (bt *blockTracker) init(latestBlock *Block) {
+	bt.simplexDigestsToBlock[latestBlock.digest] = latestBlock
 }
 
 func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) (*Block, bool) {

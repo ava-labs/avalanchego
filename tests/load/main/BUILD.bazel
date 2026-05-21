@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "main_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/load/main",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//tests",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//tests/load",
+        "//tests/load/contracts",
+        "@com_github_ava_labs_libevm//accounts/abi/bind",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethclient",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_exp//maps",
+    ],
+)
+
+go_binary(
+    name = "main",
+    embed = [":main_lib"],
+    visibility = ["//visibility:public"],
+)

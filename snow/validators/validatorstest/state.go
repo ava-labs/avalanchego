@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validatorstest
@@ -18,6 +18,7 @@ var (
 	errMinimumHeight          = errors.New("unexpectedly called GetMinimumHeight")
 	errCurrentHeight          = errors.New("unexpectedly called GetCurrentHeight")
 	errSubnetID               = errors.New("unexpectedly called GetSubnetID")
+	errGetWarpValidatorSets   = errors.New("unexpectedly called GetWarpValidatorSets")
 	errGetValidatorSet        = errors.New("unexpectedly called GetValidatorSet")
 	errGetCurrentValidatorSet = errors.New("unexpectedly called GetCurrentValidatorSet")
 )
@@ -30,12 +31,14 @@ type State struct {
 	CantGetMinimumHeight,
 	CantGetCurrentHeight,
 	CantGetSubnetID,
-	CantGetValidatorSet bool
+	CantGetWarpValidatorSets,
+	CantGetValidatorSet,
 	CantGetCurrentValidatorSet bool
 
 	GetMinimumHeightF       func(ctx context.Context) (uint64, error)
 	GetCurrentHeightF       func(ctx context.Context) (uint64, error)
 	GetSubnetIDF            func(ctx context.Context, chainID ids.ID) (ids.ID, error)
+	GetWarpValidatorSetsF   func(ctx context.Context, height uint64) (map[ids.ID]validators.WarpSet, error)
 	GetValidatorSetF        func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	GetCurrentValidatorSetF func(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
 }
@@ -68,6 +71,19 @@ func (vm *State) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 		require.FailNow(vm.T, errSubnetID.Error())
 	}
 	return ids.Empty, errSubnetID
+}
+
+func (vm *State) GetWarpValidatorSets(
+	ctx context.Context,
+	height uint64,
+) (map[ids.ID]validators.WarpSet, error) {
+	if vm.GetWarpValidatorSetsF != nil {
+		return vm.GetWarpValidatorSetsF(ctx, height)
+	}
+	if vm.CantGetWarpValidatorSets && vm.T != nil {
+		require.FailNow(vm.T, errGetWarpValidatorSets.Error())
+	}
+	return nil, errGetWarpValidatorSets
 }
 
 func (vm *State) GetValidatorSet(

@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -75,7 +74,13 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 		c.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
 	}
 
-	mempool, err := mempool.New("", prometheus.NewRegistry())
+	mempool, err := mempool.New(
+		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 
 	var (
@@ -453,14 +458,25 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
-	mempool, err := mempool.New("", prometheus.NewRegistry())
+	s := statetest.New(t, statetest.Config{})
+	mempool, err := mempool.New(
+		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnDecisionState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
+	timestamp := time.Now()
+	s.SetTimestamp(timestamp)
+	parentOnDecisionState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -496,30 +512,19 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Set expectations for dependencies.
-	timestamp := time.Now()
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
-		// Allow metrics to be calculated.
-		parentOnCommitState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
-		parentOnCommitState.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1),
-		parentOnCommitState.EXPECT().NumActiveL1Validators().Return(0).Times(1),
-		parentOnCommitState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
-	)
-
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
 	// Assert expected state.
 	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
 	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
-	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
+	require.Equal(parentOnCommitState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 }
 
 func TestVerifierVisitAbortBlock(t *testing.T) {
@@ -527,14 +532,25 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
-	mempool, err := mempool.New("", prometheus.NewRegistry())
+	s := statetest.New(t, statetest.Config{})
+	mempool, err := mempool.New(
+		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnDecisionState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
+	timestamp := time.Now()
+	s.SetTimestamp(timestamp)
+	parentOnDecisionState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -569,22 +585,11 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		2,
 	)
 	require.NoError(err)
-
-	// Set expectations for dependencies.
-	timestamp := time.Now()
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
-		// Allow metrics to be calculated.
-		parentOnAbortState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
-		parentOnAbortState.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1),
-		parentOnAbortState.EXPECT().NumActiveL1Validators().Return(0).Times(1),
-		parentOnAbortState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
-	)
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
 	// Assert expected state.
 	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
@@ -593,17 +598,22 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 }
 
 // Assert that a block with an unverified parent fails verification.
 func TestVerifyUnverifiedParent(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
-	mempool, err := mempool.New("", prometheus.NewRegistry())
+	s := statetest.New(t, statetest.Config{})
+	mempool, err := mempool.New(
+		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
 
@@ -627,10 +637,6 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 	blk, err := block.NewApricotAbortBlock(parentID /*not in memory or persisted state*/, 2 /*height*/)
 	require.NoError(err)
-
-	// Set expectations for dependencies.
-	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	s.EXPECT().GetStatelessBlock(parentID).Return(nil, database.ErrNotFound).Times(1)
 
 	// Verify the block.
 	err = blk.Visit(verifier)
@@ -673,8 +679,14 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			require := require.New(t)
 
 			// Create mocked dependencies.
-			s := state.NewMockState(ctrl)
-			mempool, err := mempool.New("", prometheus.NewRegistry())
+			s := statetest.New(t, statetest.Config{})
+			mempool, err := mempool.New(
+				"",
+				gas.Dimensions{},
+				1_000_000,
+				ids.ID{},
+				prometheus.NewRegistry(),
+			)
 			require.NoError(err)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -705,18 +717,14 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 
 			// setup parent state
 			parentTime := genesistest.DefaultValidatorStartTime
-			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
-			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
-			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(3)
-			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
-			s.EXPECT().NumActiveL1Validators().Return(0).Times(3)
+			s.SetTimestamp(parentTime)
+			s.SetLastAccepted(parentID)
 
-			onDecisionState, err := state.NewDiff(parentID, backend)
+			onDecisionState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
-			onCommitState, err := state.NewDiff(parentID, backend)
+			onCommitState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
-			onAbortState, err := state.NewDiff(parentID, backend)
+			onAbortState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 			backend.blkIDToState[parentID] = &blockState{
 				timestamp:      test.parentTime,
@@ -774,8 +782,14 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			require := require.New(t)
 
 			// Create mocked dependencies.
-			s := state.NewMockState(ctrl)
-			mempool, err := mempool.New("", prometheus.NewRegistry())
+			s := statetest.New(t, statetest.Config{})
+			mempool, err := mempool.New(
+				"",
+				gas.Dimensions{},
+				1_000_000,
+				ids.ID{},
+				prometheus.NewRegistry(),
+			)
 			require.NoError(err)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -806,18 +820,14 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 
 			// setup parent state
 			parentTime := genesistest.DefaultValidatorStartTime
-			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
-			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
-			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(3)
-			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
-			s.EXPECT().NumActiveL1Validators().Return(0).Times(3)
+			s.SetTimestamp(parentTime)
+			s.SetLastAccepted(parentID)
 
-			onDecisionState, err := state.NewDiff(parentID, backend)
+			onDecisionState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
-			onCommitState, err := state.NewDiff(parentID, backend)
+			onCommitState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
-			onAbortState, err := state.NewDiff(parentID, backend)
+			onAbortState, err := state.NewDiff(parentID, backend, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 			backend.blkIDToState[parentID] = &blockState{
 				timestamp:      test.parentTime,
@@ -843,13 +853,21 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
-	mempool, err := mempool.New("", prometheus.NewRegistry())
+	s := statetest.New(t, statetest.Config{})
+	mempool, err := mempool.New(
+		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -900,14 +918,22 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
-	mempool, err := mempool.New("", prometheus.NewRegistry())
+	s := statetest.New(t, statetest.Config{})
+	mempool, err := mempool.New(
+		"",
+		gas.Dimensions{},
+		1_000_000,
+		ids.ID{},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentTime := time.Now()
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -959,7 +985,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
@@ -1001,7 +1027,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	timestamp := time.Unix(12345, 0)
@@ -1046,7 +1072,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
@@ -1088,7 +1114,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
+	s := statetest.New(t, statetest.Config{})
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	timestamp := time.Unix(12345, 0)
@@ -1303,7 +1329,7 @@ func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 				require.NoError(s.PutL1Validator(l1Validator))
 			}
 
-			diff, err := state.NewDiffOn(s)
+			diff, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionAllowed)
 			require.NoError(err)
 
 			config := validatorfee.Config{

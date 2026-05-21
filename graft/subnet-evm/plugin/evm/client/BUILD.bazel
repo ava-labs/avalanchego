@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "client",
+    srcs = ["client.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/client",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api",
+        "//graft/subnet-evm/plugin/evm/config",
+        "//ids",
+        "//utils/rpc",
+        "@org_golang_x_exp//slog",
+    ],
+)

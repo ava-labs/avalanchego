@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "perms",
+    srcs = [
+        "chmod.go",
+        "create.go",
+        "perms.go",
+        "write_file.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/perms",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_google_renameio_v2//maybe"],
+)

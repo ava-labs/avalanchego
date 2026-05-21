@@ -1,0 +1,68 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package evm
+
+import (
+	"context"
+
+	"github.com/MetalBlockchain/libevm/ethdb"
+	"github.com/MetalBlockchain/libevm/log"
+	"github.com/MetalBlockchain/libevm/triedb"
+
+	"github.com/MetalBlockchain/metalgo/codec"
+	"github.com/MetalBlockchain/metalgo/graft/evm/message"
+	"github.com/MetalBlockchain/metalgo/graft/evm/sync/handlers"
+	"github.com/MetalBlockchain/metalgo/graft/evm/sync/handlers/stats"
+	"github.com/MetalBlockchain/metalgo/ids"
+)
+
+var _ message.RequestHandler = (*networkHandler)(nil)
+
+type LeafHandlers map[message.NodeType]handlers.LeafRequestHandler
+
+type networkHandler struct {
+	leafRequestHandlers LeafHandlers
+	blockRequestHandler *handlers.BlockRequestHandler
+	codeRequestHandler  *handlers.CodeRequestHandler
+}
+
+type LeafRequestTypeConfig struct {
+	NodeType     message.NodeType
+	NodeKeyLen   int
+	TrieDB       *triedb.Database
+	UseSnapshots bool
+	MetricName   string
+}
+
+// newNetworkHandler constructs the handler for serving network requests.
+func newNetworkHandler(
+	provider handlers.SyncDataProvider,
+	diskDB ethdb.KeyValueReader,
+	networkCodec codec.Manager,
+	leafRequestHandlers LeafHandlers,
+	syncStats stats.HandlerStats,
+) *networkHandler {
+	return &networkHandler{
+		leafRequestHandlers: leafRequestHandlers,
+		blockRequestHandler: handlers.NewBlockRequestHandler(provider, networkCodec, syncStats),
+		codeRequestHandler:  handlers.NewCodeRequestHandler(diskDB, networkCodec, syncStats),
+	}
+}
+
+func (n networkHandler) HandleLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
+	handler, ok := n.leafRequestHandlers[leafsRequest.LeafType()]
+	if !ok {
+		log.Debug("node type is not recognised, dropping request", "nodeID", nodeID, "requestID", requestID, "nodeType", leafsRequest.LeafType())
+		return nil, nil
+	}
+	return handler.OnLeafsRequest(ctx, nodeID, requestID, leafsRequest)
+}
+
+func (n networkHandler) HandleBlockRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, blockRequest message.BlockRequest) ([]byte, error) {
+	return n.blockRequestHandler.OnBlockRequest(ctx, nodeID, requestID, blockRequest)
+}
+
+func (n networkHandler) HandleCodeRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, codeRequest message.CodeRequest) ([]byte, error) {
+	return n.codeRequestHandler.OnCodeRequest(ctx, nodeID, requestID, codeRequest)
+}

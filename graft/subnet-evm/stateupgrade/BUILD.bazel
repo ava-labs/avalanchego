@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "stateupgrade",
+    srcs = [
+        "interfaces.go",
+        "state_upgrade.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/params/extras",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)

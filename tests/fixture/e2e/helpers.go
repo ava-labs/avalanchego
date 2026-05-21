@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e
@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MetalBlockchain/coreth/ethclient"
 	"github.com/MetalBlockchain/libevm/core/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/MetalBlockchain/metalgo/config"
+	"github.com/MetalBlockchain/metalgo/graft/coreth/ethclient"
 	"github.com/MetalBlockchain/metalgo/tests"
 	"github.com/MetalBlockchain/metalgo/tests/fixture/tmpnet"
 	"github.com/MetalBlockchain/metalgo/utils/crypto/secp256k1"
@@ -209,7 +209,7 @@ func SuggestGasPrice(tc tests.TestContext, ethClient *ethclient.Client) *big.Int
 
 	// Double the suggested gas price to maximize the chances of
 	// acceptance. Maybe this can be revisited pending resolution of
-	// https://github.com/MetalBlockchain/coreth/issues/314.
+	// https://github.com/MetalBlockchain/metalgo/graft/coreth/issues/314.
 	gasPrice.Add(gasPrice, gasPrice)
 	return gasPrice
 }

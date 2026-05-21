@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "nat",
+    srcs = [
+        "nat.go",
+        "no_router.go",
+        "pmp.go",
+        "upnp.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/nat",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/ips",
+        "//utils/logging",
+        "@com_github_huin_goupnp//:goupnp",
+        "@com_github_huin_goupnp//dcps/internetgateway1",
+        "@com_github_huin_goupnp//dcps/internetgateway2",
+        "@com_github_jackpal_gateway//:gateway",
+        "@com_github_jackpal_go_nat_pmp//:go-nat-pmp",
+        "@org_uber_go_zap//:zap",
+    ],
+)

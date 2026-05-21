@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "set-l1-validator-weight_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/set-l1-validator-weight",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/set",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/message",
+        "//vms/platformvm/warp/payload",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "set-l1-validator-weight",
+    embed = [":set-l1-validator-weight_lib"],
+    visibility = ["//visibility:public"],
+)

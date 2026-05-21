@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -25,7 +25,7 @@ import (
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/status"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/txs"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/txs/fee"
-	"github.com/MetalBlockchain/metalgo/vms/txs/mempool"
+	"github.com/MetalBlockchain/metalgo/vms/platformvm/txs/mempool"
 
 	smblock "github.com/MetalBlockchain/metalgo/snow/engine/snowman/block"
 	blockexecutor "github.com/MetalBlockchain/metalgo/vms/platformvm/block/executor"
@@ -53,7 +53,15 @@ var (
 
 type Builder interface {
 	smblock.BuildBlockWithContextChainVM
-	mempool.Mempool[*txs.Tx]
+	// Add adds `tx` to the mempool and clears its dropped status.
+	Add(tx *txs.Tx) error
+	// Get returns the tx corresponding to `txID` and if it was present
+	Get(txID ids.ID) (*txs.Tx, bool)
+	// GetDropReason returns why `txID` was dropped
+	GetDropReason(txID ids.ID) error
+	// WaitForEvent blocks until the mempool has txs that are ready to build into
+	// a block.
+	WaitForEvent(ctx context.Context) (common.Message, error)
 
 	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
@@ -68,14 +76,14 @@ type Builder interface {
 
 // builder implements a simple builder to convert txs into valid blocks
 type builder struct {
-	mempool.Mempool[*txs.Tx]
+	*mempool.Mempool
 
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 }
 
 func New(
-	mempool mempool.Mempool[*txs.Tx],
+	mempool *mempool.Mempool,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
@@ -348,14 +356,17 @@ func packDurangoBlockTxs(
 	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool[*txs.Tx],
+	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
 	pChainHeight uint64,
 	remainingSize int,
 ) ([]*txs.Tx, error) {
-	stateDiff, err := state.NewDiffOn(parentState)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		backend.Config.UpgradeConfig.IsHeliconActivated(timestamp),
+	)
+	stateDiff, err := state.NewDiffOn(parentState, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return nil, err
 	}
@@ -409,14 +420,17 @@ func packEtnaBlockTxs(
 	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool[*txs.Tx],
+	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
 	pChainHeight uint64,
 	minCapacity gas.Gas,
 ) ([]*txs.Tx, error) {
-	stateDiff, err := state.NewDiffOn(parentState)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		backend.Config.UpgradeConfig.IsHeliconActivated(timestamp),
+	)
+	stateDiff, err := state.NewDiffOn(parentState, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return nil, err
 	}
@@ -508,8 +522,8 @@ func packEtnaBlockTxs(
 func executeTx(
 	ctx context.Context,
 	parentID ids.ID,
-	stateDiff state.Diff,
-	mempool mempool.Mempool[*txs.Tx],
+	stateDiff *state.Diff,
+	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	pChainHeight uint64,
@@ -517,7 +531,7 @@ func executeTx(
 	feeCalculator fee.Calculator,
 	tx *txs.Tx,
 ) (bool, error) {
-	mempool.Remove(tx)
+	mempool.Remove(tx.ID())
 
 	// Invariant: [tx] has already been syntactically verified.
 
@@ -539,7 +553,10 @@ func executeTx(
 		return false, nil
 	}
 
-	txDiff, err := state.NewDiffOn(stateDiff)
+	isAddingStakerAfterDeletionAllowed := state.StakerAdditionAfterDeletionLegality(
+		backend.Config.UpgradeConfig.IsHeliconActivated(stateDiff.GetTimestamp()),
+	)
+	txDiff, err := state.NewDiffOn(stateDiff, isAddingStakerAfterDeletionAllowed)
 	if err != nil {
 		return false, err
 	}

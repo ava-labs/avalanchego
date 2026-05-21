@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -21,6 +21,7 @@ type tracedState struct {
 	getMinimumHeightTag       string
 	getCurrentHeightTag       string
 	getSubnetIDTag            string
+	getWarpValidatorSetsTag   string
 	getValidatorSetTag        string
 	getCurrentValidatorSetTag string
 	tracer                    trace.Tracer
@@ -32,6 +33,7 @@ func Trace(s State, name string, tracer trace.Tracer) State {
 		getMinimumHeightTag:       name + ".GetMinimumHeight",
 		getCurrentHeightTag:       name + ".GetCurrentHeight",
 		getSubnetIDTag:            name + ".GetSubnetID",
+		getWarpValidatorSetsTag:   name + ".GetWarpValidatorSets",
 		getValidatorSetTag:        name + ".GetValidatorSet",
 		getCurrentValidatorSetTag: name + ".GetCurrentValidatorSet",
 		tracer:                    tracer,
@@ -59,6 +61,18 @@ func (s *tracedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, 
 	defer span.End()
 
 	return s.s.GetSubnetID(ctx, chainID)
+}
+
+func (s *tracedState) GetWarpValidatorSets(
+	ctx context.Context,
+	height uint64,
+) (map[ids.ID]WarpSet, error) {
+	ctx, span := s.tracer.Start(ctx, s.getWarpValidatorSetsTag, oteltrace.WithAttributes(
+		attribute.Int64("height", int64(height)),
+	))
+	defer span.End()
+
+	return s.s.GetWarpValidatorSets(ctx, height)
 }
 
 func (s *tracedState) GetValidatorSet(

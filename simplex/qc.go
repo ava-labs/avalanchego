@@ -1,9 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+//go:generate go tool canoto $GOFILE
 
 import (
 	"bytes"
@@ -212,7 +212,7 @@ func (d *QCDeserializer) signersFromBytes(signerBytes []byte) ([]ids.NodeID, err
 	return signers, nil
 }
 
-// filterNodeIDS returns the nodeIDs in nodeIDs whose
+// filterNodes returns the nodeIDs in nodeIDs whose
 // bit is set to 1 in indices.
 //
 // Returns an error if indices references an unknown node.

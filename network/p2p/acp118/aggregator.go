@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package acp118
@@ -15,6 +15,7 @@ import (
 	"github.com/MetalBlockchain/metalgo/ids"
 	"github.com/MetalBlockchain/metalgo/network/p2p"
 	"github.com/MetalBlockchain/metalgo/proto/pb/sdk"
+	"github.com/MetalBlockchain/metalgo/snow/validators"
 	"github.com/MetalBlockchain/metalgo/utils/crypto/bls"
 	"github.com/MetalBlockchain/metalgo/utils/logging"
 	"github.com/MetalBlockchain/metalgo/utils/set"
@@ -24,7 +25,7 @@ import (
 var errFailedVerification = errors.New("failed verification")
 
 type indexedValidator struct {
-	*warp.Validator
+	*validators.Warp
 	Index int
 }
 
@@ -58,7 +59,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 	ctx context.Context,
 	message *warp.Message,
 	justification []byte,
-	validators []*warp.Validator,
+	validators []*validators.Warp,
 	quorumNum uint64,
 	quorumDen uint64,
 ) (
@@ -100,8 +101,8 @@ func (s *SignatureAggregator) AggregateSignatures(
 		}
 
 		v := indexedValidator{
-			Index:     i,
-			Validator: validator,
+			Index: i,
+			Warp:  validator,
 		}
 
 		for _, nodeID := range v.NodeIDs {

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "genesis",
+    srcs = [
+        "cmd.go",
+        "flags.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/chain/genesis",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//utils/formatting",
+        "//vms/example/xsvm/genesis",
+        "@com_github_spf13_cobra//:cobra",
+        "@com_github_spf13_pflag//:pflag",
+    ],
+)

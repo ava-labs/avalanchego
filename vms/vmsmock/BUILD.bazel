@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "vmsmock",
+    srcs = [
+        "factory.go",
+        "manager.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/vmsmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/logging",
+        "//vms",
+        "@org_uber_go_mock//gomock",
+    ],
+)

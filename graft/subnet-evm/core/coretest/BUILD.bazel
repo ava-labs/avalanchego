@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "coretest",
+    srcs = ["test_indices.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/core/coretest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

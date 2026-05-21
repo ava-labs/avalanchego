@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "trackermock",
+    srcs = [
+        "targeter.go",
+        "tracker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/networking/tracker/trackermock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "@org_uber_go_mock//gomock",
+    ],
+)

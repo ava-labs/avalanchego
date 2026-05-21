@@ -1,11 +1,12 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package benchlist
 
 import "github.com/MetalBlockchain/metalgo/ids"
 
-// Benchable is notified when a validator is benched or unbenched from a given chain
+// Benchable is notified when a validator is benched or unbenched from a given
+// chain
 type Benchable interface {
 	// Mark that [validatorID] has been benched on the given chain
 	Benched(chainID ids.ID, validatorID ids.NodeID)

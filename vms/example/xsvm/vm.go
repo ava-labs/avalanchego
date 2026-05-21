@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package xsvm
@@ -62,7 +62,7 @@ func (vm *VM) Initialize(
 	appSender common.AppSender,
 ) error {
 	chainContext.Log.Info("initializing xsvm",
-		zap.Stringer("version", Version),
+		zap.String("version", Version),
 	)
 
 	metrics := prometheus.NewRegistry()
@@ -134,7 +134,7 @@ func (vm *VM) Shutdown(context.Context) error {
 }
 
 func (*VM) Version(context.Context) (string, error) {
-	return Version.String(), nil
+	return Version, nil
 }
 
 func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "txs",
+    srcs = [
+        "agent.go",
+        "tx_generator.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/txs",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/cmd/simulator/metrics",
+        "//graft/coreth/ethclient",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//log",
+    ],
+)

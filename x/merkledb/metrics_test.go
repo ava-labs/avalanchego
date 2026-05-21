@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,7 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 	config.Reg = nil
 
 	db, err := newDB(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		config,
 	)
@@ -52,7 +51,7 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 
 func Test_Metrics_Initialize(t *testing.T) {
 	db, err := New(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		NewConfig(),
 	)

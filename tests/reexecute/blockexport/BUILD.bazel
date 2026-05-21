@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "blockexport_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/reexecute/blockexport",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//database/leveldb",
+        "//tests",
+        "//tests/reexecute",
+        "//utils/logging",
+        "//utils/units",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_binary(
+    name = "blockexport",
+    embed = [":blockexport_lib"],
+    visibility = ["//visibility:public"],
+)

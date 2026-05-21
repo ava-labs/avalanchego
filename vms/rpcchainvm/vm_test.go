@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -26,7 +26,9 @@ import (
 	"github.com/MetalBlockchain/metalgo/snow/engine/snowman/block"
 	"github.com/MetalBlockchain/metalgo/snow/engine/snowman/block/blockmock"
 	"github.com/MetalBlockchain/metalgo/snow/engine/snowman/block/blocktest"
+	"github.com/MetalBlockchain/metalgo/upgrade"
 	"github.com/MetalBlockchain/metalgo/utils"
+	"github.com/MetalBlockchain/metalgo/utils/constants"
 	"github.com/MetalBlockchain/metalgo/utils/logging"
 	"github.com/MetalBlockchain/metalgo/vms/rpcchainvm/grpcutils"
 	"github.com/MetalBlockchain/metalgo/vms/rpcchainvm/runtime"
@@ -100,7 +102,7 @@ func TestHelperProcess(t *testing.T) {
 	}
 
 	mockedVM := TestServerPluginMap[testKey](t, true /*loadExpectations*/)
-	err := Serve(context.Background(), mockedVM)
+	err := Serve(t.Context(), mockedVM)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -112,13 +114,13 @@ func TestHelperProcess(t *testing.T) {
 // interface are implemented.
 func TestVMServerInterface(t *testing.T) {
 	var wantMethods, gotMethods []string
-	pb := reflect.TypeOf((*vmpb.VMServer)(nil)).Elem()
+	pb := reflect.TypeFor[vmpb.VMServer]()
 	for i := 0; i < pb.NumMethod()-1; i++ {
 		wantMethods = append(wantMethods, pb.Method(i).Name)
 	}
 	slices.Sort(wantMethods)
 
-	impl := reflect.TypeOf(&VMServer{})
+	impl := reflect.TypeFor[*VMServer]()
 	for i := 0; i < impl.NumMethod(); i++ {
 		gotMethods = append(gotMethods, impl.Method(i).Name)
 	}
@@ -184,11 +186,9 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			listener, err := grpcutils.NewListener()
 			require.NoError(err)
 
-			require.NoError(os.Setenv(runtime.EngineAddressKey, listener.Addr().String()))
+			t.Setenv(runtime.EngineAddressKey, listener.Addr().String())
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
+			ctx := t.Context()
 			if test.serveVM {
 				go func() {
 					_ = Serve(ctx, vm)
@@ -196,7 +196,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			}
 
 			status, stopper, err := subprocess.Bootstrap(
-				context.Background(),
+				t.Context(),
 				listener,
 				helperProcess("dummy"),
 				test.config,
@@ -233,7 +233,7 @@ func TestNewHTTPHandler(t *testing.T) {
 		_ = grpcServer.Serve(listener)
 	}()
 
-	cc, err := grpc.DialContext(context.Background(), "bufnet",
+	cc, err := grpc.DialContext(t.Context(), "bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return listener.Dial()
 		}),
@@ -250,10 +250,48 @@ func TestNewHTTPHandler(t *testing.T) {
 		logging.NoLog{},
 	)
 
-	handler, err := client.NewHTTPHandler(context.Background())
+	handler, err := client.NewHTTPHandler(t.Context())
 	require.NoError(err)
 
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 	require.Equal(http.StatusOK, w.Code)
+}
+
+// TestConvertNetworkUpgrades_AllFieldsHandled ensures that all fields in
+// upgrade.Config are properly handled when converting from the gRPC protobuf message.
+func TestConvertNetworkUpgrades_AllFieldsHandled(t *testing.T) {
+	type networks struct {
+		name      string
+		networkID uint32
+	}
+
+	tests := []networks{
+		{
+			name:      "Mainnet",
+			networkID: constants.MainnetID,
+		},
+		{
+			name:      "Tahoe",
+			networkID: constants.TahoeID,
+		},
+		{
+			name:      "Local",
+			networkID: constants.LocalID,
+		},
+		{
+			name:      "UnitTest",
+			networkID: constants.UnitTestID,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			wantConfig := upgrade.GetConfig(test.networkID)
+			networkUpgrades := getNetworkUpgrades(wantConfig)
+			gotConfig, err := convertNetworkUpgrades(networkUpgrades)
+			require.NoError(t, err)
+			require.Equal(t, wantConfig, gotConfig, "convertNetworkUpgrades did not return expected config. Update grpcutils! (convertNetworkUpgrades and vm_client.go)")
+		})
+	}
 }

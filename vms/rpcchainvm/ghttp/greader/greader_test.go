@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package greader
@@ -32,7 +32,7 @@ func TestErrIOEOF(t *testing.T) {
 		_ = server.Serve(listener)
 	}()
 
-	conn, err := grpc.DialContext(context.Background(), "bufnet",
+	conn, err := grpc.DialContext(t.Context(), "bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return listener.Dial()
 		}),

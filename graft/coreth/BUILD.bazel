@@ -1,0 +1,2 @@
+# gazelle:prefix github.com/ava-labs/avalanchego/graft/coreth
+# gazelle:map_kind go_test graft_go_test //.bazel:defs.bzl

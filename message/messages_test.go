@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -658,16 +658,16 @@ func TestMessage(t *testing.T) {
 			encodedMsg, err := mb.createOutbound(tv.msg, tv.compressionType, tv.bypassThrottling)
 			require.NoError(err)
 
-			require.Equal(tv.bypassThrottling, encodedMsg.BypassThrottling())
-			require.Equal(tv.op, encodedMsg.Op())
+			require.Equal(tv.bypassThrottling, encodedMsg.BypassThrottling)
+			require.Equal(tv.op, encodedMsg.Op)
 
-			if bytesSaved := encodedMsg.BytesSavedCompression(); tv.bytesSaved {
+			if bytesSaved := encodedMsg.BytesSavedCompression; tv.bytesSaved {
 				require.Positive(bytesSaved)
 			}
 
-			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes(), ids.EmptyNodeID, func() {})
+			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes, ids.EmptyNodeID, func() {})
 			require.NoError(err)
-			require.Equal(tv.op, parsedMsg.Op())
+			require.Equal(tv.op, parsedMsg.Op)
 		})
 	}
 }
@@ -743,7 +743,7 @@ func TestNilInboundMessage(t *testing.T) {
 	parsedMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
-	require.IsType(&p2p.Ping{}, parsedMsg.message)
-	pingMsg := parsedMsg.message.(*p2p.Ping)
+	require.IsType(&p2p.Ping{}, parsedMsg.Message)
+	pingMsg := parsedMsg.Message.(*p2p.Ping)
 	require.NotNil(pingMsg)
 }

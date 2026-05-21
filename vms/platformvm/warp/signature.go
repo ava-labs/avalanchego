@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/MetalBlockchain/metalgo/snow/validators"
 	"github.com/MetalBlockchain/metalgo/utils/crypto/bls"
 	"github.com/MetalBlockchain/metalgo/utils/set"
 )
@@ -37,7 +38,7 @@ type Signature interface {
 	Verify(
 		msg *UnsignedMessage,
 		networkID uint32,
-		validators CanonicalValidatorSet,
+		validators validators.WarpSet,
 		quorumNum uint64,
 		quorumDen uint64,
 	) error
@@ -66,7 +67,7 @@ func (s *BitSetSignature) NumSigners() (int, error) {
 func (s *BitSetSignature) Verify(
 	msg *UnsignedMessage,
 	networkID uint32,
-	validators CanonicalValidatorSet,
+	validators validators.WarpSet,
 	quorumNum uint64,
 	quorumDen uint64,
 ) error {

@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,6 +43,7 @@ import (
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/genesis/genesistest"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/signer"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/state"
+	"github.com/MetalBlockchain/metalgo/vms/platformvm/state/statetest"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/status"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/txs"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/validators/fee"
@@ -79,7 +79,7 @@ func TestGetProposedHeight(t *testing.T) {
 	reply := api.GetHeightResponse{}
 	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
 
-	minHeight, err := service.vm.GetMinimumHeight(context.Background())
+	minHeight, err := service.vm.GetMinimumHeight(t.Context())
 	require.NoError(err)
 	require.Equal(minHeight, uint64(reply.Height))
 
@@ -109,13 +109,13 @@ func TestGetProposedHeight(t *testing.T) {
 	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
 	service.vm.ctx.Lock.Lock()
 
-	block, err := service.vm.BuildBlock(context.Background())
+	block, err := service.vm.BuildBlock(t.Context())
 	require.NoError(err)
 
 	blk := block.(*blockexecutor.Block)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
 
 	service.vm.ctx.Lock.Unlock()
 
@@ -213,13 +213,13 @@ func TestGetTxStatus(t *testing.T) {
 	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
 	service.vm.ctx.Lock.Lock()
 
-	block, err := service.vm.BuildBlock(context.Background())
+	block, err := service.vm.BuildBlock(t.Context())
 	require.NoError(err)
 
 	blk := block.(*blockexecutor.Block)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
 
 	service.vm.ctx.Lock.Unlock()
 
@@ -343,22 +343,22 @@ func TestGetTx(t *testing.T) {
 				require.NoError(service.vm.Network.IssueTxFromRPC(tx))
 				service.vm.ctx.Lock.Lock()
 
-				blk, err := service.vm.BuildBlock(context.Background())
+				blk, err := service.vm.BuildBlock(t.Context())
 				require.NoError(err)
 
-				require.NoError(blk.Verify(context.Background()))
+				require.NoError(blk.Verify(t.Context()))
 
-				require.NoError(blk.Accept(context.Background()))
+				require.NoError(blk.Accept(t.Context()))
 
 				if blk, ok := blk.(snowman.OracleBlock); ok { // For proposal blocks, commit them
-					options, err := blk.Options(context.Background())
+					options, err := blk.Options(t.Context())
 					if !errors.Is(err, snowman.ErrNotOracle) {
 						require.NoError(err)
 
 						commit := options[0].(*blockexecutor.Block)
 						require.IsType(&block.BanffCommitBlock{}, commit.Block)
-						require.NoError(commit.Verify(context.Background()))
-						require.NoError(commit.Accept(context.Background()))
+						require.NoError(commit.Verify(t.Context()))
+						require.NoError(commit.Accept(t.Context()))
 					}
 				}
 
@@ -640,7 +640,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	for _, validatorTx := range genesis.Validators[:len(genesis.Validators)-1] {
 		validator := validatorTx.Unsigned.(*txs.AddValidatorTx)
 		connectedIDs.Add(validator.NodeID())
-		require.NoError(service.vm.Connected(context.Background(), validator.NodeID(), version.CurrentApp))
+		require.NoError(service.vm.Connected(t.Context(), validator.NodeID(), version.Current))
 	}
 
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
@@ -660,7 +660,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			require.Equal(validator.EndTime().Unix(), int64(gotVdr.EndTime))
 			require.Equal(validator.StartTime().Unix(), int64(gotVdr.StartTime))
 			require.Equal(connectedIDs.Contains(validator.NodeID()), *gotVdr.Connected)
-			require.InDelta(float32(avajson.Float32(100)), float32(*gotVdr.Uptime), 0)
+			require.Equal(float32(avajson.Float32(100)), float32(*gotVdr.Uptime))
 			found = true
 			break
 		}
@@ -752,7 +752,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
 	service.vm.state.DeleteCurrentDelegator(staker)
-	require.NoError(service.vm.state.SetDelegateeReward(staker.SubnetID, staker.NodeID, 100000))
+	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{DelegateeReward: 100000}))
 	require.NoError(service.vm.state.Commit())
 
 	service.vm.ctx.Lock.Unlock()
@@ -829,13 +829,13 @@ func TestGetValidatorsAt(t *testing.T) {
 	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
 	service.vm.ctx.Lock.Lock()
 
-	block, err := service.vm.BuildBlock(context.Background())
+	block, err := service.vm.BuildBlock(t.Context())
 	require.NoError(err)
 
 	blk := block.(*blockexecutor.Block)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
 	service.vm.ctx.Lock.Unlock()
 
 	newLastAccepted := service.vm.manager.LastAccepted()
@@ -978,8 +978,8 @@ func TestGetBlock(t *testing.T) {
 
 			blk := service.vm.manager.NewBlock(statelessBlock)
 
-			require.NoError(blk.Verify(context.Background()))
-			require.NoError(blk.Accept(context.Background()))
+			require.NoError(blk.Verify(t.Context()))
+			require.NoError(blk.Accept(t.Context()))
 
 			service.vm.ctx.Lock.Unlock()
 
@@ -1058,9 +1058,8 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 	tests := []test{
 		{
 			name: "block height not found",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(ids.Empty, database.ErrNotFound)
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+				state := statetest.New(t, statetest.Config{})
 
 				manager := executormock.NewManager(ctrl)
 				return &Service{
@@ -1078,12 +1077,20 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "block not found",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+				block, err := block.NewBanffStandardBlock(
+					time.Now(),
+					blockID,
+					blockHeight,
+					nil,
+				)
+				require.NoError(t, err)
+
+				state := statetest.New(t, statetest.Config{})
+				state.AddStatelessBlock(block)
 
 				manager := executormock.NewManager(ctrl)
-				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
+				manager.EXPECT().GetStatelessBlock(block.ID()).Return(nil, database.ErrNotFound)
 				return &Service{
 					vm: &VM{
 						state:   state,
@@ -1099,12 +1106,14 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "JSON format",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := block.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
+				block.EXPECT().ID().Return(blockID).Times(1)
+				block.EXPECT().Height().Return(blockHeight).Times(1)
 
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+				state := statetest.New(t, statetest.Config{})
+				state.AddStatelessBlock(block)
 
 				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -1127,9 +1136,11 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
+				block.EXPECT().ID().Return(blockID).Times(1)
+				block.EXPECT().Height().Return(blockHeight).Times(1)
 
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+				state := statetest.New(t, statetest.Config{})
+				state.AddStatelessBlock(block)
 
 				expected, err := formatting.Encode(formatting.Hex, blockBytes)
 				require.NoError(t, err)
@@ -1155,9 +1166,11 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
+				block.EXPECT().ID().Return(blockID).Times(1)
+				block.EXPECT().Height().Return(blockHeight).Times(1)
 
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+				state := statetest.New(t, statetest.Config{})
+				state.AddStatelessBlock(block)
 
 				expected, err := formatting.Encode(formatting.HexC, blockBytes)
 				require.NoError(t, err)
@@ -1183,9 +1196,11 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
+				block.EXPECT().ID().Return(blockID).Times(1)
+				block.EXPECT().Height().Return(blockHeight).Times(1)
 
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+				state := statetest.New(t, statetest.Config{})
+				state.AddStatelessBlock(block)
 
 				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
 				require.NoError(t, err)

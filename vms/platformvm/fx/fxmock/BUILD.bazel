@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "fxmock",
+    srcs = [
+        "fx.go",
+        "owner.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//snow",
+        "//vms/components/verify",
+        "@org_uber_go_mock//gomock",
+    ],
+)

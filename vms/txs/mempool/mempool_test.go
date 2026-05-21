@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mempool
@@ -303,7 +303,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 func TestWaitForEventCancelled(t *testing.T) {
 	m := newMempool()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := m.WaitForEvent(ctx)
@@ -320,7 +320,7 @@ func TestWaitForEventWithTx(t *testing.T) {
 		errs <- m.Add(tx)
 	}()
 
-	msg, err := m.WaitForEvent(context.Background())
+	msg, err := m.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
 	require.NoError(<-errs)

@@ -1,0 +1,15 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package bindings
+
+// Step 1: Compile interface to generate ABI at top level
+//go:generate solc -o ../.. --overwrite --abi --base-path ../../../../.. --pretty-json --evm-version cancun ../../IFeeManager.sol
+// Step 2: Compile test contracts to generate ABI and bin files
+//go:generate solc -o artifacts --overwrite --abi --bin --base-path ../../../../.. --metadata-hash none  --evm-version cancun FeeManagerTest.sol
+// Step 3: Generate Go bindings from the compiled artifacts
+//go:generate go run github.com/MetalBlockchain/libevm/cmd/abigen --pkg bindings --type IFeeManager --abi ../../IFeeManager.abi --out gen_ifeemanager_binding.go
+//go:generate go run github.com/MetalBlockchain/libevm/cmd/abigen --pkg bindings --type FeeManagerTest --abi artifacts/FeeManagerTest.abi --bin artifacts/FeeManagerTest.bin --out gen_feemanagertest_binding.go
+// Step 4: Replace import paths in generated binding to use subnet-evm instead of libevm
+// This is necessary because the libevm bindings package is not compatible with the subnet-evm simulated backend, which is used for testing.
+//go:generate sh -c "sed -i.bak -e 's|github.com/MetalBlockchain/libevm/accounts/abi/bind|github.com/MetalBlockchain/metalgo/graft/subnet-evm/accounts/abi/bind|g' gen_ifeemanager_binding.go gen_feemanagertest_binding.go && rm -f gen_ifeemanager_binding.go.bak gen_feemanagertest_binding.go.bak"

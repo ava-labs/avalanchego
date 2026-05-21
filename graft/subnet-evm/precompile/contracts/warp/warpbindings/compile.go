@@ -1,0 +1,12 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package warpbindings
+
+// Step 1: Compile interface to generate ABI at top level
+//go:generate solc -o .. --overwrite --abi --pretty-json --evm-version cancun IWarpMessenger.sol
+// Step 2: Generate Go bindings from the compiled artifacts
+//go:generate go run github.com/MetalBlockchain/libevm/cmd/abigen --pkg warpbindings --type IWarpMessenger --abi ../IWarpMessenger.abi --out gen_iwarpmessenger_binding.go
+// Step 3: Replace import paths in generated binding to use subnet-evm instead of libevm
+// This is necessary because the libevm bindings package is not compatible with the subnet-evm simulated backend, which is used for testing.
+//go:generate sh -c "sed -i.bak -e 's|github.com/MetalBlockchain/libevm/accounts/abi/bind|github.com/MetalBlockchain/metalgo/graft/subnet-evm/accounts/abi/bind|g' gen_iwarpmessenger_binding.go && rm -f gen_iwarpmessenger_binding.go.bak"

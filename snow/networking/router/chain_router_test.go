@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -29,11 +29,13 @@ import (
 	"github.com/MetalBlockchain/metalgo/snow/validators"
 	"github.com/MetalBlockchain/metalgo/subnets"
 	"github.com/MetalBlockchain/metalgo/tests"
+	"github.com/MetalBlockchain/metalgo/utils/constants"
 	"github.com/MetalBlockchain/metalgo/utils/logging"
 	"github.com/MetalBlockchain/metalgo/utils/math/meter"
 	"github.com/MetalBlockchain/metalgo/utils/resource"
 	"github.com/MetalBlockchain/metalgo/utils/set"
 	"github.com/MetalBlockchain/metalgo/utils/timer"
+	"github.com/MetalBlockchain/metalgo/utils/timer/mockable"
 	"github.com/MetalBlockchain/metalgo/version"
 
 	p2ppb "github.com/MetalBlockchain/metalgo/proto/pb/p2p"
@@ -43,6 +45,7 @@ import (
 const (
 	engineType         = p2ppb.EngineType_ENGINE_TYPE_DAG
 	testThreadPoolSize = 2
+	defaultTestTimeout = 500 * time.Millisecond
 )
 
 // TODO refactor tests in this file
@@ -101,7 +104,7 @@ func TestShutdown(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
@@ -171,16 +174,16 @@ func TestShutdown(t *testing.T) {
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
-	chainRouter.Shutdown(context.Background())
+	chainRouter.Shutdown(t.Context())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 250*time.Millisecond)
 	defer cancel()
 
 	select {
@@ -228,7 +231,7 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
@@ -289,20 +292,20 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
-	chainRouter.Shutdown(context.Background())
+	chainRouter.Shutdown(t.Context())
 
-	shutdownDuration, err := h.AwaitStopped(context.Background())
+	shutdownDuration, err := h.AwaitStopped(t.Context())
 	require.NoError(err)
 	require.GreaterOrEqual(shutdownDuration, time.Duration(0))
 
 	// Calling connected after shutdown should result in an error log.
 	chainRouter.Connected(
 		ids.GenerateTestNodeID(),
-		version.CurrentApp,
+		version.Current,
 		ids.GenerateTestID(),
 	)
 }
@@ -362,7 +365,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
@@ -431,12 +434,12 @@ func TestShutdownTimesOut(t *testing.T) {
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	shutdownFinished := make(chan struct{}, 1)
 
@@ -446,11 +449,11 @@ func TestShutdownTimesOut(t *testing.T) {
 			InboundMessage: message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), 0, nodeID),
 			EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		}
-		h.Push(context.Background(), msg)
+		h.Push(t.Context(), msg)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
-		chainRouter.Shutdown(context.Background())
+		chainRouter.Shutdown(t.Context())
 		shutdownFinished <- struct{}{}
 	}()
 
@@ -498,7 +501,7 @@ func TestRouterTimeout(t *testing.T) {
 		HealthConfig{},
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	// Create bootstrapper, engine and handler
 	var (
@@ -532,7 +535,7 @@ func TestRouterTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
@@ -613,7 +616,7 @@ func TestRouterTimeout(t *testing.T) {
 		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -630,14 +633,14 @@ func TestRouterTimeout(t *testing.T) {
 			Consensus:    nil,
 		},
 	})
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	nodeID := ids.GenerateTestNodeID()
 	requestID := uint32(0)
 	{
 		wg.Add(1)
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -655,7 +658,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -673,7 +676,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -691,7 +694,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -709,7 +712,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -728,7 +731,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -746,7 +749,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -764,7 +767,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -831,7 +834,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		HealthConfig{},
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	h := handlermock.NewHandler(ctrl)
 
@@ -843,7 +846,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	h.EXPECT().AwaitStopped(gomock.Any()).AnyTimes()
 
 	h.EXPECT().Push(gomock.Any(), gomock.Any()).Times(1)
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	h.EXPECT().ShouldHandle(gomock.Any()).Return(true).AnyTimes()
 
@@ -851,7 +854,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	requestID := uint32(0)
 	{
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -873,13 +876,13 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
 			require.Equal(p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED, msg.EngineType)
 		})
-		chainRouter.HandleInbound(context.Background(), msg)
+		chainRouter.HandleInbound(t.Context(), msg)
 	}
 
 	{
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -901,7 +904,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
 			require.Equal(engineType, msg.EngineType)
 		})
-		chainRouter.HandleInbound(context.Background(), msg)
+		chainRouter.HandleInbound(t.Context(), msg)
 	}
 
 	{
@@ -918,7 +921,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
 			require.Equal(p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED, msg.EngineType)
 		})
-		chainRouter.HandleInbound(context.Background(), msg)
+		chainRouter.HandleInbound(t.Context(), msg)
 	}
 
 	chainRouter.lock.Lock()
@@ -932,8 +935,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 	tests := []struct {
 		name        string
 		responseOp  message.Op
-		responseMsg message.InboundMessage
-		timeoutMsg  message.InboundMessage
+		responseMsg *message.InboundMessage
+		timeoutMsg  *message.InboundMessage
 	}{
 		{
 			name:        "StateSummaryFrontier",
@@ -986,7 +989,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			chainRouter, _ := newChainRouterTest(t)
 
 			chainRouter.RegisterRequest(
-				context.Background(),
+				t.Context(),
 				ids.EmptyNodeID,
 				ids.Empty,
 				requestID,
@@ -995,7 +998,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				engineType,
 			)
 
-			chainRouter.HandleInbound(context.Background(), tt.responseMsg)
+			chainRouter.HandleInbound(t.Context(), tt.responseMsg)
 
 			chainRouter.lock.Lock()
 			require.Zero(chainRouter.timedRequests.Len())
@@ -1040,7 +1043,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		HealthConfig{},
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	// Create bootstrapper, engine and handler
 	calledF := false
@@ -1065,7 +1068,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
@@ -1122,14 +1125,14 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		},
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
-	var inMsg message.InboundMessage
+	var inMsg *message.InboundMessage
 	dummyContainerID := ids.GenerateTestID()
 	reqID := uint32(0)
 
@@ -1145,7 +1148,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		0,
 		nID,
 	)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	require.False(calledF) // should not be called
 
@@ -1161,7 +1164,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		vID,
 	)
 	wg.Add(1)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	wg.Wait()
 	require.True(calledF) // should be called since this is a validator request
@@ -1203,7 +1206,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		HealthConfig{},
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	// Create bootstrapper, engine and handler
 	calledF := false
@@ -1232,7 +1235,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
@@ -1283,14 +1286,14 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		},
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
-	var inMsg message.InboundMessage
+	var inMsg *message.InboundMessage
 	dummyContainerID := ids.GenerateTestID()
 	reqID := uint32(0)
 
@@ -1306,7 +1309,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		0,
 		nID,
 	)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	require.False(calledF) // should not be called for unallowed node ID
 
@@ -1322,7 +1325,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		allowedID,
 	)
 	wg.Add(1)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	wg.Wait()
 	require.True(calledF) // should be called since this is a allowed node request
@@ -1339,7 +1342,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		vID,
 	)
 	wg.Add(1)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	wg.Wait()
 	require.True(calledF) // should be called since this is a validator request
@@ -1359,8 +1362,8 @@ func TestAppRequest(t *testing.T) {
 	tests := []struct {
 		name       string
 		responseOp message.Op
-		timeoutMsg message.InboundMessage
-		inboundMsg message.InboundMessage
+		timeoutMsg *message.InboundMessage
+		inboundMsg *message.InboundMessage
 	}{
 		{
 			name:       "AppRequest - chain response",
@@ -1389,7 +1392,7 @@ func TestAppRequest(t *testing.T) {
 			chainRouter, engine := newChainRouterTest(t)
 
 			wg.Add(1)
-			if tt.inboundMsg == nil || tt.inboundMsg.Op() == message.AppErrorOp {
+			if tt.inboundMsg == nil || tt.inboundMsg.Op == message.AppErrorOp {
 				engine.AppRequestFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
 					defer wg.Done()
 					chainRouter.lock.Lock()
@@ -1403,7 +1406,7 @@ func TestAppRequest(t *testing.T) {
 
 					return nil
 				}
-			} else if tt.inboundMsg.Op() == message.AppResponseOp {
+			} else if tt.inboundMsg.Op == message.AppResponseOp {
 				engine.AppResponseF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error {
 					defer wg.Done()
 					chainRouter.lock.Lock()
@@ -1418,7 +1421,7 @@ func TestAppRequest(t *testing.T) {
 				}
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			chainRouter.RegisterRequest(ctx, ids.EmptyNodeID, ids.Empty, wantRequestID, tt.responseOp, tt.timeoutMsg, engineType)
 			chainRouter.lock.Lock()
 			require.Equal(1, chainRouter.timedRequests.Len())
@@ -1433,13 +1436,229 @@ func TestAppRequest(t *testing.T) {
 	}
 }
 
+func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
+	var (
+		nodeID  = ids.GenerateTestNodeID()
+		chainID = snowtest.PChainID
+	)
+	const requestID uint32 = 1
+	tests := []struct {
+		timeout    *message.InboundMessage
+		response   *message.InboundMessage
+		setHandler func(*testing.T, *enginetest.Engine, chan<- struct{})
+	}{
+		{
+			timeout:  message.InternalGetStateSummaryFrontierFailed(nodeID, chainID, requestID),
+			response: message.InboundStateSummaryFrontier(chainID, requestID, []byte("summary"), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetStateSummaryFrontierFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InternalGetAcceptedStateSummaryFailed(nodeID, chainID, requestID),
+			response: message.InboundAcceptedStateSummary(chainID, requestID, []ids.ID{ids.GenerateTestID()}, nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetAcceptedStateSummaryFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InternalGetAcceptedFrontierFailed(nodeID, chainID, requestID),
+			response: message.InboundAcceptedFrontier(chainID, requestID, ids.GenerateTestID(), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetAcceptedFrontierFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InternalGetAcceptedFailed(nodeID, chainID, requestID),
+			response: message.InboundAccepted(chainID, requestID, []ids.ID{ids.GenerateTestID()}, nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetAcceptedFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout: message.InternalGetAncestorsFailed(nodeID, chainID, requestID, engineType),
+			response: &message.InboundMessage{
+				NodeID: nodeID,
+				Op:     message.AncestorsOp,
+				Message: &p2ppb.Ancestors{
+					ChainId:    chainID[:],
+					RequestId:  requestID,
+					Containers: [][]byte{[]byte("a")},
+				},
+				Expiration: mockable.MaxTime,
+			},
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetAncestorsFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout: message.InternalGetFailed(nodeID, chainID, requestID),
+			response: &message.InboundMessage{
+				NodeID: nodeID,
+				Op:     message.PutOp,
+				Message: &p2ppb.Put{
+					ChainId:   chainID[:],
+					RequestId: requestID,
+					Container: []byte("container"),
+				},
+				Expiration: mockable.MaxTime,
+			},
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.GetFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InternalQueryFailed(nodeID, chainID, requestID),
+			response: message.InboundChits(chainID, requestID, ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID(), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.QueryFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					close(call)
+					return nil
+				}
+			},
+		},
+		{
+			timeout:  message.InboundAppError(nodeID, chainID, requestID, common.ErrTimeout.Code, common.ErrTimeout.Message),
+			response: message.InboundAppResponse(chainID, requestID, []byte("response"), nodeID),
+			setHandler: func(t *testing.T, engine *enginetest.Engine, call chan<- struct{}) {
+				engine.AppRequestFailedF = func(_ context.Context, gotNodeID ids.NodeID, gotRequestID uint32, appErr *common.AppError) error {
+					require.Equal(t, nodeID, gotNodeID)
+					require.Equal(t, requestID, gotRequestID)
+					require.Equal(t, common.ErrTimeout.Code, appErr.Code)
+					require.Equal(t, common.ErrTimeout.Message, appErr.Message)
+					close(call)
+					return nil
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		op := tt.response.Op
+		t.Run(op.String(), func(t *testing.T) {
+			test := func(t *testing.T, handle func(cr *ChainRouter)) {
+				chainRouter, engine := newChainRouterTest(t)
+
+				unwantedCall := make(chan struct{})
+				engine.StateSummaryFrontierF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
+				engine.AcceptedFrontierF = func(context.Context, ids.NodeID, uint32, ids.ID) error { close(unwantedCall); return nil }
+				engine.AcceptedF = func(context.Context, ids.NodeID, uint32, set.Set[ids.ID]) error { close(unwantedCall); return nil }
+				engine.AncestorsF = func(context.Context, ids.NodeID, uint32, [][]byte) error { close(unwantedCall); return nil }
+				engine.PutF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
+				engine.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
+				engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) error {
+					close(unwantedCall)
+					return nil
+				}
+
+				call := make(chan struct{})
+				tt.setHandler(t, engine, call)
+
+				ctx := t.Context()
+				chainRouter.RegisterRequest(ctx, nodeID, chainID, requestID, op, tt.timeout, engineType)
+
+				require := require.New(t)
+				chainRouter.lock.Lock()
+				require.Equal(1, chainRouter.timedRequests.Len())
+				chainRouter.lock.Unlock()
+
+				chainRouter.HandleInternal(ctx, tt.timeout)
+				<-call
+
+				chainRouter.lock.Lock()
+				require.Equal(1, chainRouter.timedRequests.Len())
+				chainRouter.lock.Unlock()
+
+				handle(chainRouter)
+
+				chainRouter.lock.Lock()
+				require.Equal(0, chainRouter.timedRequests.Len())
+				chainRouter.lock.Unlock()
+
+				select {
+				case <-unwantedCall:
+					require.FailNow("unexpected duplicate failure message")
+				case <-time.After(50 * time.Millisecond):
+				}
+			}
+
+			// Timeout path: early internal failure is handled once, then the
+			// timeout clears the outstanding request without invoking the
+			// response handler.
+			t.Run("timeout", func(t *testing.T) {
+				test(t, func(cr *ChainRouter) {
+					// Wait for the timeout manager to fire and clear the
+					// request.
+					// Note: relying on the timeout manager to fire results in
+					// longer running tests. The alternative not chosen here is
+					// to send a mock timeout message early rather than relying
+					// on the production code, which tests both the timeout
+					// manager and its integration with the chain router.
+					require.Eventually(
+						t,
+						func() bool {
+							cr.lock.Lock()
+							defer cr.lock.Unlock()
+							return cr.timedRequests.Len() == 0
+						},
+						constants.DefaultNetworkInitialTimeout,
+						100*time.Millisecond,
+						"timed out waiting for timeout to clear request",
+					)
+				})
+			})
+
+			// Response path: early internal failure is handled once, then the
+			// actual response clears the outstanding request without invoking
+			// the response handler.
+			t.Run("response", func(t *testing.T) {
+				test(t, func(cr *ChainRouter) {
+					cr.HandleInbound(t.Context(), tt.response)
+				})
+			})
+		})
+	}
+}
+
 func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	// Create a timeout manager
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     3 * time.Second,
-			MinimumTimeout:     3 * time.Second,
-			MaximumTimeout:     5 * time.Minute,
+			InitialTimeout:     defaultTestTimeout,
+			MinimumTimeout:     defaultTestTimeout,
+			MaximumTimeout:     defaultTestTimeout,
 			TimeoutCoefficient: 1,
 			TimeoutHalflife:    5 * time.Minute,
 		},
@@ -1485,7 +1704,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(t, err)
 
@@ -1537,17 +1756,17 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
 
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	t.Cleanup(func() {
 		tm.Stop()
-		chainRouter.Shutdown(context.Background())
+		chainRouter.Shutdown(t.Context())
 	})
 
 	return chainRouter, engine
@@ -1571,7 +1790,7 @@ func TestHandleSimplexMessage(t *testing.T) {
 			HealthConfig{},
 			prometheus.NewRegistry(),
 		))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	chainRouter.log = log
 	testID := ids.GenerateTestID()
@@ -1600,15 +1819,15 @@ func TestHandleSimplexMessage(t *testing.T) {
 
 	var receivedMsg bool
 	h.EXPECT().Push(gomock.Any(), gomock.Any()).
-		Do(func(_ context.Context, msg message.InboundMessage) {
-			if msg.Op() == message.SimplexOp {
+		Do(func(_ context.Context, msg handler.Message) {
+			if msg.Op == message.SimplexOp {
 				receivedMsg = true
 			}
 		}).AnyTimes()
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 	h.EXPECT().ShouldHandle(gomock.Any()).Return(true).Times(1)
-	chainRouter.HandleInbound(context.Background(), inboundMsg)
+	chainRouter.HandleInbound(t.Context(), inboundMsg)
 	require.True(t, receivedMsg)
 }
 

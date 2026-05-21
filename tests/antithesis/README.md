@@ -18,6 +18,7 @@ enables discovery and reproduction of anomalous behavior.
 | init_db.go                        | Initializes initial db state for subnet testing.                                   |
 | node_health.go                    | Helper to check node health.                                                       |
 | avalanchego/                      | Defines an antithesis test setup for avalanchego's primary chains.                 |
+| subnet-evm/                       | Defines Dockerfiles for the subnet-evm test setup (Go source in graft/subnet-evm). |
 | xsvm/                             | Defines an antithesis test setup for the xsvm VM.                                  |
 
 ## Instrumentation
@@ -51,6 +52,10 @@ a test setup:
 In addition, github workflows are suggested to ensure
 `scripts/tests.build_antithesis_images.sh` runs against PRs and
 `scripts/build_antithesis_images.sh` runs against pushes.
+
+**Note on subnet-evm**: The subnet-evm test setup has a hybrid structure, where the Go code is kept in subnet-evm, while the testing scripts are at the root level, to respect module import rules. More specifically, The Dockerfiles are located in `tests/antithesis/subnet-evm/`, but the Go source code (`main.go` and `gencomposeconfig/main.go`) remains in `graft/subnet-evm/tests/antithesis/` because it needs to import from `graft/subnet-evm` packages, which are forbidden from being imported cross module. The root-level build scripts build the binaries from their graft location.
+
+// TODO(JonathanOppenheimer) Once the graft folder has been fully subsumed into `vms/evm`, we can move all the files properly.
 
 ### Use of a builder image
 

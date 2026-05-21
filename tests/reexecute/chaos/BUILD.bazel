@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "chaos_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/reexecute/chaos",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api/metrics",
+        "//database",
+        "//database/leveldb",
+        "//graft/coreth/plugin/evm",
+        "//tests",
+        "//tests/reexecute",
+        "//utils/logging",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_binary(
+    name = "chaos",
+    embed = [":chaos_lib"],
+    visibility = ["//visibility:public"],
+)

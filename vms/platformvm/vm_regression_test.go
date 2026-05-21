@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -80,17 +80,26 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// trigger block creation
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addValidatorTx))
-	vm.ctx.Lock.Lock()
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+	require.NoError(err)
 
-	// Accept addValidatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	statelessBlk0, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
+		[]*txs.Tx{addValidatorTx},
+	)
+	require.NoError(err)
+
+	blk0, err := vm.ParseBlock(t.Context(), statelessBlk0.Bytes())
+	require.NoError(err)
+	require.NoError(blk0.Verify(t.Context()))
+	require.NoError(blk0.Accept(t.Context()))
 
 	// Advance the time
 	vm.clock.Set(validatorStartTime)
-	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -107,17 +116,21 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// trigger block creation
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addFirstDelegatorTx))
-	vm.ctx.Lock.Lock()
+	statelessBlk1, err := block.NewBanffStandardBlock(
+		blk0.Timestamp().Add(time.Second),
+		blk0.ID(),
+		blk0.Height()+1,
+		[]*txs.Tx{addFirstDelegatorTx},
+	)
+	require.NoError(err)
 
-	// Accept addFirstDelegatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	blk1, err := vm.ParseBlock(t.Context(), statelessBlk1.Bytes())
+	require.NoError(err)
+	require.NoError(blk1.Verify(t.Context()))
+	require.NoError(blk1.Accept(t.Context()))
 
 	// Advance the time
 	vm.clock.Set(firstDelegatorStartTime)
-	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -136,13 +149,18 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// trigger block creation
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addSecondDelegatorTx))
-	vm.ctx.Lock.Lock()
+	statelessBlk2, err := block.NewBanffStandardBlock(
+		blk1.Timestamp().Add(time.Second),
+		blk1.ID(),
+		blk1.Height()+1,
+		[]*txs.Tx{addSecondDelegatorTx},
+	)
+	require.NoError(err)
 
-	// Accept addSecondDelegatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	blk2, err := vm.ParseBlock(t.Context(), statelessBlk2.Bytes())
+	require.NoError(err)
+	require.NoError(blk2.Verify(t.Context()))
+	require.NoError(blk2.Accept(t.Context()))
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -159,11 +177,18 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// trigger block creation
-	vm.ctx.Lock.Unlock()
-	err = vm.issueTxFromRPC(addThirdDelegatorTx)
+	statelessBlk3, err := block.NewBanffStandardBlock(
+		blk2.Timestamp().Add(time.Second),
+		blk2.ID(),
+		blk2.Height()+1,
+		[]*txs.Tx{addThirdDelegatorTx},
+	)
+	require.NoError(err)
+
+	blk3, err := vm.ParseBlock(t.Context(), statelessBlk3.Bytes())
+	require.NoError(err)
+	err = blk3.Verify(t.Context())
 	require.ErrorIs(err, executor.ErrOverDelegated)
-	vm.ctx.Lock.Lock()
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
@@ -232,13 +257,23 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			// issue the add validator tx
-			vm.ctx.Lock.Unlock()
-			require.NoError(vm.issueTxFromRPC(addValidatorTx))
-			vm.ctx.Lock.Lock()
+			lastAcceptedID, err := vm.LastAccepted(t.Context())
+			require.NoError(err)
+			lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+			require.NoError(err)
 
-			// Accept addValidatorTx
-			require.NoError(buildAndAcceptStandardBlock(vm))
+			statelessBlk0, err := block.NewBanffStandardBlock(
+				lastAccepted.Timestamp().Add(time.Second),
+				lastAccepted.ID(),
+				lastAccepted.Height()+1,
+				[]*txs.Tx{addValidatorTx},
+			)
+			require.NoError(err)
+
+			blk0, err := vm.ParseBlock(t.Context(), statelessBlk0.Bytes())
+			require.NoError(err)
+			require.NoError(blk0.Verify(t.Context()))
+			require.NoError(blk0.Accept(t.Context()))
 
 			// create valid tx
 			addFirstDelegatorTx, err := wallet.IssueAddDelegatorTx(
@@ -252,13 +287,18 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			// issue the first add delegator tx
-			vm.ctx.Lock.Unlock()
-			require.NoError(vm.issueTxFromRPC(addFirstDelegatorTx))
-			vm.ctx.Lock.Lock()
+			statelessBlk1, err := block.NewBanffStandardBlock(
+				blk0.Timestamp().Add(time.Second),
+				blk0.ID(),
+				blk0.Height()+1,
+				[]*txs.Tx{addFirstDelegatorTx},
+			)
+			require.NoError(err)
 
-			// Accept addFirstDelegatorTx
-			require.NoError(buildAndAcceptStandardBlock(vm))
+			blk1, err := vm.ParseBlock(t.Context(), statelessBlk1.Bytes())
+			require.NoError(err)
+			require.NoError(blk1.Verify(t.Context()))
+			require.NoError(blk1.Accept(t.Context()))
 
 			// create valid tx
 			addSecondDelegatorTx, err := wallet.IssueAddDelegatorTx(
@@ -272,13 +312,18 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			// issue the second add delegator tx
-			vm.ctx.Lock.Unlock()
-			require.NoError(vm.issueTxFromRPC(addSecondDelegatorTx))
-			vm.ctx.Lock.Lock()
+			statelessBlk2, err := block.NewBanffStandardBlock(
+				blk1.Timestamp().Add(time.Second),
+				blk1.ID(),
+				blk1.Height()+1,
+				[]*txs.Tx{addSecondDelegatorTx},
+			)
+			require.NoError(err)
 
-			// Accept addSecondDelegatorTx
-			require.NoError(buildAndAcceptStandardBlock(vm))
+			blk2, err := vm.ParseBlock(t.Context(), statelessBlk2.Bytes())
+			require.NoError(err)
+			require.NoError(blk2.Verify(t.Context()))
+			require.NoError(blk2.Accept(t.Context()))
 
 			// create valid tx
 			addThirdDelegatorTx, err := wallet.IssueAddDelegatorTx(
@@ -292,13 +337,18 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			// issue the third add delegator tx
-			vm.ctx.Lock.Unlock()
-			require.NoError(vm.issueTxFromRPC(addThirdDelegatorTx))
-			vm.ctx.Lock.Lock()
+			statelessBlk3, err := block.NewBanffStandardBlock(
+				blk2.Timestamp().Add(time.Second),
+				blk2.ID(),
+				blk2.Height()+1,
+				[]*txs.Tx{addThirdDelegatorTx},
+			)
+			require.NoError(err)
 
-			// Accept addThirdDelegatorTx
-			require.NoError(buildAndAcceptStandardBlock(vm))
+			blk3, err := vm.ParseBlock(t.Context(), statelessBlk3.Bytes())
+			require.NoError(err)
+			require.NoError(blk3.Verify(t.Context()))
+			require.NoError(blk3.Accept(t.Context()))
 
 			// create valid tx
 			addFourthDelegatorTx, err := wallet.IssueAddDelegatorTx(
@@ -312,13 +362,18 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			// issue the fourth add delegator tx
-			vm.ctx.Lock.Unlock()
-			require.NoError(vm.issueTxFromRPC(addFourthDelegatorTx))
-			vm.ctx.Lock.Lock()
+			statelessBlk4, err := block.NewBanffStandardBlock(
+				blk3.Timestamp().Add(time.Second),
+				blk3.ID(),
+				blk3.Height()+1,
+				[]*txs.Tx{addFourthDelegatorTx},
+			)
+			require.NoError(err)
 
-			// Accept addFourthDelegatorTx
-			require.NoError(buildAndAcceptStandardBlock(vm))
+			blk4, err := vm.ParseBlock(t.Context(), statelessBlk4.Bytes())
+			require.NoError(err)
+			require.NoError(blk4.Verify(t.Context()))
+			require.NoError(blk4.Accept(t.Context()))
 		})
 	}
 }
@@ -344,12 +399,12 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.PChainID)
 	ctx.Lock.Lock()
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 		ctx.Lock.Unlock()
 	}()
 
 	require.NoError(vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,
 		baseDB,
 		genesistest.NewBytes(t, genesistest.Config{}),
@@ -442,20 +497,20 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(err)
 	addSubnetBlk2 := vm.manager.NewBlock(statelessStandardBlk)
 
-	_, err = vm.ParseBlock(context.Background(), addSubnetBlk0.Bytes())
+	_, err = vm.ParseBlock(t.Context(), addSubnetBlk0.Bytes())
 	require.NoError(err)
 
-	_, err = vm.ParseBlock(context.Background(), addSubnetBlk1.Bytes())
+	_, err = vm.ParseBlock(t.Context(), addSubnetBlk1.Bytes())
 	require.NoError(err)
 
-	_, err = vm.ParseBlock(context.Background(), addSubnetBlk2.Bytes())
+	_, err = vm.ParseBlock(t.Context(), addSubnetBlk2.Bytes())
 	require.NoError(err)
 
-	require.NoError(addSubnetBlk0.Verify(context.Background()))
-	require.NoError(addSubnetBlk0.Accept(context.Background()))
+	require.NoError(addSubnetBlk0.Verify(t.Context()))
+	require.NoError(addSubnetBlk0.Accept(t.Context()))
 
 	// Doesn't matter what verify returns as long as it's not panicking.
-	_ = addSubnetBlk2.Verify(context.Background())
+	_ = addSubnetBlk2.Verify(t.Context())
 }
 
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
@@ -503,7 +558,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	addValidatorStandardBlk := vm.manager.NewBlock(statelessBlk)
-	require.NoError(addValidatorStandardBlk.Verify(context.Background()))
+	require.NoError(addValidatorStandardBlk.Verify(t.Context()))
 
 	// Verify that the new validator now in pending validator set
 	{
@@ -568,7 +623,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Because the shared memory UTXO hasn't been populated, this block is
 	// currently invalid.
-	err = importBlk.Verify(context.Background())
+	err = importBlk.Verify(t.Context())
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Populate the shared memory UTXO.
@@ -596,7 +651,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
-	require.NoError(importBlk.Verify(context.Background()))
+	require.NoError(importBlk.Verify(t.Context()))
 
 	// Move chain time ahead to bring the new validator from the pending
 	// validator set into the current validator set.
@@ -616,7 +671,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	advanceTimeStandardBlk := vm.manager.NewBlock(statelessAdvanceTimeStandardBlk)
-	require.NoError(advanceTimeStandardBlk.Verify(context.Background()))
+	require.NoError(advanceTimeStandardBlk.Verify(t.Context()))
 
 	// Accept all the blocks
 	allBlocks := []snowman.Block{
@@ -625,7 +680,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		advanceTimeStandardBlk,
 	}
 	for _, blk := range allBlocks {
-		require.NoError(blk.Accept(context.Background()))
+		require.NoError(blk.Accept(t.Context()))
 	}
 
 	// Force a reload of the state from the database.
@@ -700,7 +755,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	addValidatorStandardBlk0 := vm.manager.NewBlock(statelessAddValidatorStandardBlk0)
-	require.NoError(addValidatorStandardBlk0.Verify(context.Background()))
+	require.NoError(addValidatorStandardBlk0.Verify(t.Context()))
 
 	// Verify that first new validator now in pending validator set
 	{
@@ -729,7 +784,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	advanceTimeStandardBlk0 := vm.manager.NewBlock(statelessAdvanceTimeStandardBlk0)
-	require.NoError(advanceTimeStandardBlk0.Verify(context.Background()))
+	require.NoError(advanceTimeStandardBlk0.Verify(t.Context()))
 
 	// Verify that the first new validator is now in the current validator set.
 	{
@@ -799,7 +854,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	importBlk := vm.manager.NewBlock(statelessImportBlk)
 	// Because the shared memory UTXO hasn't been populated, this block is
 	// currently invalid.
-	err = importBlk.Verify(context.Background())
+	err = importBlk.Verify(t.Context())
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Populate the shared memory UTXO.
@@ -827,7 +882,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
-	require.NoError(importBlk.Verify(context.Background()))
+	require.NoError(importBlk.Verify(t.Context()))
 
 	newValidatorStartTime1 := newValidatorStartTime0.Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime1 := newValidatorStartTime1.Add(defaultMaxStakingDuration)
@@ -862,7 +917,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	addValidatorStandardBlk1 := vm.manager.NewBlock(statelessAddValidatorStandardBlk1)
 
-	require.NoError(addValidatorStandardBlk1.Verify(context.Background()))
+	require.NoError(addValidatorStandardBlk1.Verify(t.Context()))
 
 	// Verify that the second new validator now in pending validator set
 	{
@@ -891,7 +946,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	advanceTimeStandardBlk1 := vm.manager.NewBlock(statelessAdvanceTimeStandardBlk1)
-	require.NoError(advanceTimeStandardBlk1.Verify(context.Background()))
+	require.NoError(advanceTimeStandardBlk1.Verify(t.Context()))
 
 	// Verify that the second new validator is now in the current validator set.
 	{
@@ -917,7 +972,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		advanceTimeStandardBlk1,
 	}
 	for _, blk := range allBlocks {
-		require.NoError(blk.Accept(context.Background()))
+		require.NoError(blk.Accept(t.Context()))
 	}
 
 	// Force a reload of the state from the database.
@@ -959,7 +1014,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	currentHeight, err := vm.GetCurrentHeight(context.Background())
+	currentHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 	require.Equal(uint64(1), currentHeight)
 
@@ -970,7 +1025,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		genesistest.DefaultNodeIDs[3]: genesistest.DefaultValidatorWeight,
 		genesistest.DefaultNodeIDs[4]: genesistest.DefaultValidatorWeight,
 	}
-	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
+	validators, err := vm.GetValidatorSet(t.Context(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
 	for nodeID, weight := range expectedValidators1 {
 		require.Equal(weight, validators[nodeID].Weight)
@@ -1014,16 +1069,16 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	)
 	require.NoError(err)
 	addValidatorProposalBlk0 := vm.manager.NewBlock(statelessStandardBlk)
-	require.NoError(addValidatorProposalBlk0.Verify(context.Background()))
-	require.NoError(addValidatorProposalBlk0.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(addValidatorProposalBlk0.Verify(t.Context()))
+	require.NoError(addValidatorProposalBlk0.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
 
-	currentHeight, err = vm.GetCurrentHeight(context.Background())
+	currentHeight, err = vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 	require.Equal(uint64(2), currentHeight)
 
 	for i := uint64(1); i <= 2; i++ {
-		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
+		validators, err = vm.GetValidatorSet(t.Context(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
 		for nodeID, weight := range expectedValidators1 {
 			require.Equal(weight, validators[nodeID].Weight)
@@ -1050,16 +1105,16 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	)
 	require.NoError(err)
 	advanceTimeProposalBlk0 := vm.manager.NewBlock(statelessStandardBlk)
-	require.NoError(advanceTimeProposalBlk0.Verify(context.Background()))
-	require.NoError(advanceTimeProposalBlk0.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(advanceTimeProposalBlk0.Verify(t.Context()))
+	require.NoError(advanceTimeProposalBlk0.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
 
-	currentHeight, err = vm.GetCurrentHeight(context.Background())
+	currentHeight, err = vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 	require.Equal(uint64(3), currentHeight)
 
 	for i := uint64(1); i <= 2; i++ {
-		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
+		validators, err = vm.GetValidatorSet(t.Context(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
 		for nodeID, weight := range expectedValidators1 {
 			require.Equal(weight, validators[nodeID].Weight)
@@ -1074,7 +1129,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		genesistest.DefaultNodeIDs[4]: genesistest.DefaultValidatorWeight,
 		extraNodeID:                   vm.MaxValidatorStake,
 	}
-	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
+	validators, err = vm.GetValidatorSet(t.Context(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
 	for nodeID, weight := range expectedValidators2 {
 		require.Equal(weight, validators[nodeID].Weight)
@@ -1121,13 +1176,23 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// issue the add validator tx
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addValidatorTx))
-	vm.ctx.Lock.Lock()
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+	require.NoError(err)
 
-	// Accept addValidatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	statelessBlk0, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
+		[]*txs.Tx{addValidatorTx},
+	)
+	require.NoError(err)
+
+	blk0, err := vm.ParseBlock(t.Context(), statelessBlk0.Bytes())
+	require.NoError(err)
+	require.NoError(blk0.Verify(t.Context()))
+	require.NoError(blk0.Accept(t.Context()))
 
 	// create valid tx
 	addFirstDelegatorTx, err := wallet.IssueAddDelegatorTx(
@@ -1141,13 +1206,18 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// issue the first add delegator tx
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addFirstDelegatorTx))
-	vm.ctx.Lock.Lock()
+	statelessBlk1, err := block.NewBanffStandardBlock(
+		blk0.Timestamp().Add(time.Second),
+		blk0.ID(),
+		blk0.Height()+1,
+		[]*txs.Tx{addFirstDelegatorTx},
+	)
+	require.NoError(err)
 
-	// Accept addFirstDelegatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	blk1, err := vm.ParseBlock(t.Context(), statelessBlk1.Bytes())
+	require.NoError(err)
+	require.NoError(blk1.Verify(t.Context()))
+	require.NoError(blk1.Accept(t.Context()))
 
 	// create invalid tx
 	addSecondDelegatorTx, err := wallet.IssueAddDelegatorTx(
@@ -1161,12 +1231,20 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// attempting to issue the second add delegator tx should fail because the
+	statelessBlk2, err := block.NewBanffStandardBlock(
+		blk1.Timestamp().Add(time.Second),
+		blk1.ID(),
+		blk1.Height()+1,
+		[]*txs.Tx{addSecondDelegatorTx},
+	)
+	require.NoError(err)
+
+	blk2, err := vm.ParseBlock(t.Context(), statelessBlk2.Bytes())
+	require.NoError(err)
+	// attempting to verify the second add delegator tx should fail because the
 	// total stake weight would go over the limit.
-	vm.ctx.Lock.Unlock()
-	err = vm.issueTxFromRPC(addSecondDelegatorTx)
+	err = blk2.Verify(t.Context())
 	require.ErrorIs(err, executor.ErrOverDelegated)
-	vm.ctx.Lock.Lock()
 }
 
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t *testing.T) {
@@ -1197,12 +1275,23 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addValidatorTx))
-	vm.ctx.Lock.Lock()
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+	require.NoError(err)
 
-	// Accept addValidatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	statelessBlk0, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
+		[]*txs.Tx{addValidatorTx},
+	)
+	require.NoError(err)
+
+	blk0, err := vm.ParseBlock(t.Context(), statelessBlk0.Bytes())
+	require.NoError(err)
+	require.NoError(blk0.Verify(t.Context()))
+	require.NoError(blk0.Accept(t.Context()))
 
 	createSubnetTx, err := wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
@@ -1212,12 +1301,18 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(createSubnetTx))
-	vm.ctx.Lock.Lock()
+	statelessBlk1, err := block.NewBanffStandardBlock(
+		blk0.Timestamp().Add(time.Second),
+		blk0.ID(),
+		blk0.Height()+1,
+		[]*txs.Tx{createSubnetTx},
+	)
+	require.NoError(err)
 
-	// Accept createSubnetTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	blk1, err := vm.ParseBlock(t.Context(), statelessBlk1.Bytes())
+	require.NoError(err)
+	require.NoError(blk1.Verify(t.Context()))
+	require.NoError(blk1.Accept(t.Context()))
 
 	subnetID := createSubnetTx.ID()
 	addSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
@@ -1233,18 +1328,24 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addSubnetValidatorTx))
-	vm.ctx.Lock.Lock()
+	statelessBlk2, err := block.NewBanffStandardBlock(
+		blk1.Timestamp().Add(time.Second),
+		blk1.ID(),
+		blk1.Height()+1,
+		[]*txs.Tx{addSubnetValidatorTx},
+	)
+	require.NoError(err)
 
-	// Accept addSubnetValidatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	blk2, err := vm.ParseBlock(t.Context(), statelessBlk2.Bytes())
+	require.NoError(err)
+	require.NoError(blk2.Verify(t.Context()))
+	require.NoError(blk2.Accept(t.Context()))
 
-	addSubnetValidatorHeight, err := vm.GetCurrentHeight(context.Background())
+	addSubnetValidatorHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 
 	emptyValidatorSet, err := vm.GetValidatorSet(
-		context.Background(),
+		t.Context(),
 		addSubnetValidatorHeight,
 		subnetID,
 	)
@@ -1261,15 +1362,21 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	// validator set into the current validator set.
 	vm.clock.Set(validatorStartTime)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(removeSubnetValidatorTx))
-	vm.ctx.Lock.Lock()
+	statelessBlk3, err := block.NewBanffStandardBlock(
+		blk2.Timestamp().Add(time.Second),
+		blk2.ID(),
+		blk2.Height()+1,
+		[]*txs.Tx{removeSubnetValidatorTx},
+	)
+	require.NoError(err)
 
-	// Accept removeSubnetValidatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	blk3, err := vm.ParseBlock(t.Context(), statelessBlk3.Bytes())
+	require.NoError(err)
+	require.NoError(blk3.Verify(t.Context()))
+	require.NoError(blk3.Accept(t.Context()))
 
 	emptyValidatorSet, err = vm.GetValidatorSet(
-		context.Background(),
+		t.Context(),
 		addSubnetValidatorHeight,
 		subnetID,
 	)
@@ -1305,12 +1412,23 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addValidatorTx))
-	vm.ctx.Lock.Lock()
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+	require.NoError(err)
 
-	// Accept addValidatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	statelessBlk0, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
+		[]*txs.Tx{addValidatorTx},
+	)
+	require.NoError(err)
+
+	blk0, err := vm.ParseBlock(t.Context(), statelessBlk0.Bytes())
+	require.NoError(err)
+	require.NoError(blk0.Verify(t.Context()))
+	require.NoError(blk0.Accept(t.Context()))
 
 	createSubnetTx, err := wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
@@ -1320,12 +1438,18 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(createSubnetTx))
-	vm.ctx.Lock.Lock()
+	statelessBlk1, err := block.NewBanffStandardBlock(
+		blk0.Timestamp().Add(time.Second),
+		blk0.ID(),
+		blk0.Height()+1,
+		[]*txs.Tx{createSubnetTx},
+	)
+	require.NoError(err)
 
-	// Accept createSubnetTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	blk1, err := vm.ParseBlock(t.Context(), statelessBlk1.Bytes())
+	require.NoError(err)
+	require.NoError(blk1.Verify(t.Context()))
+	require.NoError(blk1.Accept(t.Context()))
 
 	subnetID := createSubnetTx.ID()
 	addSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
@@ -1341,12 +1465,18 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(addSubnetValidatorTx))
-	vm.ctx.Lock.Lock()
+	statelessBlk2, err := block.NewBanffStandardBlock(
+		blk1.Timestamp().Add(time.Second),
+		blk1.ID(),
+		blk1.Height()+1,
+		[]*txs.Tx{addSubnetValidatorTx},
+	)
+	require.NoError(err)
 
-	// Accept addSubnetValidatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	blk2, err := vm.ParseBlock(t.Context(), statelessBlk2.Bytes())
+	require.NoError(err)
+	require.NoError(blk2.Verify(t.Context()))
+	require.NoError(blk2.Accept(t.Context()))
 
 	removeSubnetValidatorTx, err := wallet.IssueRemoveSubnetValidatorTx(
 		nodeID,
@@ -1358,15 +1488,87 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	// validator set into the current validator set.
 	vm.clock.Set(validatorStartTime)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(removeSubnetValidatorTx))
-	vm.ctx.Lock.Lock()
+	statelessBlk3, err := block.NewBanffStandardBlock(
+		blk2.Timestamp().Add(time.Second),
+		blk2.ID(),
+		blk2.Height()+1,
+		[]*txs.Tx{removeSubnetValidatorTx},
+	)
+	require.NoError(err)
 
-	// Accept removeSubnetValidatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	blk3, err := vm.ParseBlock(t.Context(), statelessBlk3.Bytes())
+	require.NoError(err)
+	require.NoError(blk3.Verify(t.Context()))
+	require.NoError(blk3.Accept(t.Context()))
 }
 
-func TestAddValidatorDuringRemoval(t *testing.T) {
+func TestAddValidatorDuringRemovalPostHelicon(t *testing.T) {
+	require := require.New(t)
+
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	var (
+		nodeID   = genesistest.DefaultNodeIDs[0]
+		subnetID = testSubnet1.ID()
+		wallet   = newWallet(t, vm, walletConfig{
+			subnetIDs: []ids.ID{subnetID},
+		})
+
+		duration     = defaultMinStakingDuration
+		firstEndTime = latestForkTime.Add(duration)
+	)
+
+	firstAddSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(firstEndTime.Unix()),
+			Wght:   1,
+		},
+		Subnet: subnetID,
+	})
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(firstAddSubnetValidatorTx))
+	vm.ctx.Lock.Lock()
+
+	// Accept firstAddSubnetValidatorTx
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	// Verify that the validator was added
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+
+	secondEndTime := firstEndTime.Add(duration)
+	secondSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(secondEndTime.Unix()),
+			Wght:   1,
+		},
+		Subnet: subnetID,
+	})
+	require.NoError(err)
+
+	vm.clock.Set(firstEndTime)
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(secondSubnetValidatorTx))
+	vm.ctx.Lock.Lock()
+
+	// Replace the subnet validator
+	require.NoError(buildAndAcceptStandardBlock(vm))
+	// Verify that the validator exists
+	validator, err := vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(uint64(1), validator.Weight)
+	// Verify that the transaction was executed
+	_, _, err = vm.state.GetTx(secondSubnetValidatorTx.ID())
+	require.NoError(err)
+}
+
+func TestAddValidatorDuringRemovalPreHelicon(t *testing.T) {
 	require := require.New(t)
 
 	vm, _, _ := defaultVM(t, upgradetest.Durango)
@@ -1512,7 +1714,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 
-	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
+	primaryStartHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(t, err)
 	t.Logf("primaryStartHeight: %d", primaryStartHeight)
 
@@ -1542,7 +1744,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(t, err)
 
-	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
+	subnetStartHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(t, err)
 	t.Logf("subnetStartHeight: %d", subnetStartHeight)
 
@@ -1553,32 +1755,32 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(t, err, database.ErrNotFound)
 
-	subnetEndHeight, err := vm.GetCurrentHeight(context.Background())
+	subnetEndHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(t, err)
 	t.Logf("subnetEndHeight: %d", subnetEndHeight)
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime)
-	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk, err := vm.Builder.BuildBlock(t.Context()) // must be a proposal block rewarding the primary validator
 	require.NoError(t, err)
-	require.NoError(t, blk.Verify(context.Background()))
+	require.NoError(t, blk.Verify(t.Context()))
 
 	proposalBlk := blk.(snowman.OracleBlock)
-	options, err := proposalBlk.Options(context.Background())
+	options, err := proposalBlk.Options(t.Context())
 	require.NoError(t, err)
 
 	commit := options[0].(*blockexecutor.Block)
 	require.IsType(t, &block.BanffCommitBlock{}, commit.Block)
 
-	require.NoError(t, blk.Accept(context.Background()))
-	require.NoError(t, commit.Verify(context.Background()))
-	require.NoError(t, commit.Accept(context.Background()))
-	require.NoError(t, vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(t, blk.Accept(t.Context()))
+	require.NoError(t, commit.Verify(t.Context()))
+	require.NoError(t, commit.Accept(t.Context()))
+	require.NoError(t, vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(t, err, database.ErrNotFound)
 
-	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
+	primaryEndHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(t, err)
 	t.Logf("primaryEndHeight: %d", primaryEndHeight)
 
@@ -1619,7 +1821,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 
-	primaryRestartHeight, err := vm.GetCurrentHeight(context.Background())
+	primaryRestartHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(t, err)
 	t.Logf("primaryRestartHeight: %d", primaryRestartHeight)
 
@@ -1711,10 +1913,24 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(primaryTx1))
-	vm.ctx.Lock.Lock()
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+	require.NoError(err)
+
+	statelessBlk0, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
+		[]*txs.Tx{primaryTx1},
+	)
+	require.NoError(err)
+
+	blk0, err := vm.ParseBlock(t.Context(), statelessBlk0.Bytes())
+	require.NoError(err)
+	require.NoError(blk0.Verify(t.Context()))
+	require.NoError(blk0.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), blk0.ID()))
 
 	// move time ahead, promoting primary validator to current
 	vm.clock.Set(primaryStartTime1)
@@ -1723,31 +1939,31 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
-	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
+	primaryStartHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime1)
-	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk1, err := vm.Builder.BuildBlock(t.Context()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk1.Verify(t.Context()))
 
-	proposalBlk := blk.(snowman.OracleBlock)
-	options, err := proposalBlk.Options(context.Background())
+	proposalBlk := blk1.(snowman.OracleBlock)
+	options, err := proposalBlk.Options(t.Context())
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
 	require.IsType(&block.BanffCommitBlock{}, commit.Block)
 
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(commit.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(blk1.Accept(t.Context()))
+	require.NoError(commit.Verify(t.Context()))
+	require.NoError(commit.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
+	primaryEndHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
@@ -1843,10 +2059,24 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(primaryTx1))
-	vm.ctx.Lock.Lock()
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+	require.NoError(err)
+
+	statelessBlk0, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
+		[]*txs.Tx{primaryTx1},
+	)
+	require.NoError(err)
+
+	blk0, err := vm.ParseBlock(t.Context(), statelessBlk0.Bytes())
+	require.NoError(err)
+	require.NoError(blk0.Verify(t.Context()))
+	require.NoError(blk0.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), blk0.ID()))
 
 	// move time ahead, promoting primary validator to current
 	vm.clock.Set(primaryStartTime1)
@@ -1855,7 +2085,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
-	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
+	primaryStartHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 
 	// insert the subnet validator
@@ -1884,7 +2114,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 
-	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
+	subnetStartHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 
 	// move time ahead, terminating the subnet validator
@@ -1894,31 +2124,31 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	subnetEndHeight, err := vm.GetCurrentHeight(context.Background())
+	subnetEndHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime1)
-	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk1, err := vm.Builder.BuildBlock(t.Context()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk1.Verify(t.Context()))
 
-	proposalBlk := blk.(snowman.OracleBlock)
-	options, err := proposalBlk.Options(context.Background())
+	proposalBlk := blk1.(snowman.OracleBlock)
+	options, err := proposalBlk.Options(t.Context())
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
 	require.IsType(&block.BanffCommitBlock{}, commit.Block)
 
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(commit.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(blk1.Accept(t.Context()))
+	require.NoError(commit.Verify(t.Context()))
+	require.NoError(commit.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
+	primaryEndHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
@@ -1982,10 +2212,10 @@ func TestValidatorSetReturnsCopy(t *testing.T) {
 
 	vm, _, _ := defaultVM(t, upgradetest.Latest)
 
-	validators1, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
+	validators1, err := vm.GetValidatorSet(t.Context(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
 
-	validators2, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
+	validators2, err := vm.GetValidatorSet(t.Context(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
 
 	require.NotNil(validators1[genesistest.DefaultNodeIDs[0]])
@@ -2036,10 +2266,24 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(primaryTx1))
-	vm.ctx.Lock.Lock()
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+	require.NoError(err)
+
+	statelessBlk0, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
+		[]*txs.Tx{primaryTx1},
+	)
+	require.NoError(err)
+
+	blk0, err := vm.ParseBlock(t.Context(), statelessBlk0.Bytes())
+	require.NoError(err)
+	require.NoError(blk0.Verify(t.Context()))
+	require.NoError(blk0.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), blk0.ID()))
 
 	// move time ahead, promoting primary validator to current
 	vm.clock.Set(primaryStartTime1)
@@ -2074,7 +2318,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 
-	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
+	subnetStartHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 
 	// move time ahead, terminating the subnet validator
@@ -2086,28 +2330,28 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime1)
-	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk1, err := vm.Builder.BuildBlock(t.Context()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk1.Verify(t.Context()))
 
-	proposalBlk := blk.(snowman.OracleBlock)
-	options, err := proposalBlk.Options(context.Background())
+	proposalBlk := blk1.(snowman.OracleBlock)
+	options, err := proposalBlk.Options(t.Context())
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
 	require.IsType(&block.BanffCommitBlock{}, commit.Block)
 
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(commit.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(blk1.Accept(t.Context()))
+	require.NoError(commit.Verify(t.Context()))
+	require.NoError(commit.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Generating the validator set should not error when re-introducing a
 	// subnet validator whose primary network validator was also removed.
-	_, err = vm.State.GetValidatorSet(context.Background(), subnetStartHeight, subnetID)
+	_, err = vm.State.GetValidatorSet(t.Context(), subnetStartHeight, subnetID)
 	require.NoError(err)
 }
 
@@ -2118,7 +2362,7 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	nodeID := ids.GenerateTestNodeID()
-	require.NoError(vm.Connected(context.Background(), nodeID, version.CurrentApp))
+	require.NoError(vm.Connected(t.Context(), nodeID, version.Current))
 
 	protocolAppRequestBytest, err := gossip.MarshalAppRequest(
 		bloom.EmptyFilter.Marshal(),
@@ -2133,14 +2377,14 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 
 	var (
 		eg          errgroup.Group
-		ctx, cancel = context.WithCancel(context.Background())
+		ctx, cancel = context.WithCancel(t.Context())
 	)
 	// keep 10 workers running
 	for i := 0; i < 10; i++ {
 		eg.Go(func() error {
 			for ctx.Err() == nil {
 				err := vm.AppRequest(
-					context.Background(),
+					t.Context(),
 					nodeID,
 					0,
 					time.Now().Add(time.Hour),
@@ -2183,10 +2427,10 @@ func TestBanffStandardBlockWithNoChangesRemainsInvalid(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 
-	lastAccepted, err := vm.GetBlock(context.Background(), lastAcceptedID)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
 	statelessBlk, err := block.NewBanffStandardBlock(
@@ -2197,13 +2441,699 @@ func TestBanffStandardBlockWithNoChangesRemainsInvalid(t *testing.T) {
 	)
 	require.NoError(err)
 
-	blk, err := vm.ParseBlock(context.Background(), statelessBlk.Bytes())
+	blk, err := vm.ParseBlock(t.Context(), statelessBlk.Bytes())
 	require.NoError(err)
 
 	for range 2 {
-		err = blk.Verify(context.Background())
+		err = blk.Verify(t.Context())
 		require.ErrorIs(err, blockexecutor.ErrStandardBlockWithoutChanges)
 	}
+}
+
+func TestSubnetValidatorManagerAfterMultipleExpiration(t *testing.T) {
+	// Verifies that the validator manager is correctly updated across two consecutive
+	// subnet validator replacements (V1→V2→V3). Replacements are done via expiry of validator end times.
+
+	require := require.New(t)
+
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	var (
+		nodeID   = genesistest.DefaultNodeIDs[0]
+		subnetID = testSubnet1.ID()
+		wallet   = newWallet(t, vm, walletConfig{
+			subnetIDs: []ids.ID{subnetID},
+		})
+
+		duration     = defaultMinStakingDuration
+		firstEndTime = latestForkTime.Add(duration)
+	)
+
+	// Add subnet validator V1 (weight 10).
+	firstTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(firstEndTime.Unix()),
+			Wght:   10,
+		},
+		Subnet: subnetID,
+	})
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(firstTx))
+	vm.ctx.Lock.Lock()
+
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	firstActiveHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	vdrSet, err := vm.GetValidatorSet(t.Context(), firstActiveHeight, subnetID)
+	require.NoError(err)
+	require.Equal(uint64(10), vdrSet[nodeID].Weight)
+
+	// Replace V1 → V2 (weight 20): advance clock to V1's end time so the
+	// next block removes V1 and includes the AddSubnetValidator for V2.
+	secondEndTime := firstEndTime.Add(duration)
+	secondTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(secondEndTime.Unix()),
+			Wght:   20,
+		},
+		Subnet: subnetID,
+	})
+	require.NoError(err)
+
+	vm.clock.Set(firstEndTime)
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(secondTx))
+	vm.ctx.Lock.Lock()
+
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	secondActiveHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	vdrSet, err = vm.GetValidatorSet(t.Context(), secondActiveHeight, subnetID)
+	require.NoError(err)
+	require.Equal(uint64(20), vdrSet[nodeID].Weight)
+
+	// Replace V2 → V3 (weight 30): same pattern, advance clock to V2's end
+	// time so the next block removes V2 and includes V3.
+	thirdEndTime := secondEndTime.Add(duration)
+	thirdTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(thirdEndTime.Unix()),
+			Wght:   30,
+		},
+		Subnet: subnetID,
+	})
+	require.NoError(err)
+
+	vm.clock.Set(secondEndTime)
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(thirdTx))
+	vm.ctx.Lock.Lock()
+
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	thirdActiveHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	// Current validator set must reflect V3's weight.
+	vdrSet, err = vm.GetValidatorSet(t.Context(), thirdActiveHeight, subnetID)
+	require.NoError(err)
+	require.Equal(uint64(30), vdrSet[nodeID].Weight)
+
+	// Historical queries must return the correct weight at each prior height.
+	vdrSet, err = vm.GetValidatorSet(t.Context(), secondActiveHeight, subnetID)
+	require.NoError(err)
+	require.Equal(uint64(20), vdrSet[nodeID].Weight)
+
+	vdrSet, err = vm.GetValidatorSet(t.Context(), firstActiveHeight, subnetID)
+	require.NoError(err)
+	require.Equal(uint64(10), vdrSet[nodeID].Weight)
+}
+
+func TestSubnetValidatorRemoveAddRemoveInSingleBlock(t *testing.T) {
+	// First, add a subnet validator via IssueAddSubnetValidatorTx and accept
+	// it in its own block. Then build a second block manually containing 3
+	// transactions: remove the validator, add a new one with the same node
+	// but different weight, and remove that one too.
+
+	require := require.New(t)
+
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	var (
+		nodeID   = genesistest.DefaultNodeIDs[0]
+		subnetID = testSubnet1.ID()
+		wallet   = newWallet(t, vm, walletConfig{
+			subnetIDs: []ids.ID{subnetID},
+		})
+
+		duration      = defaultMinStakingDuration
+		firstEndTime  = latestForkTime.Add(duration)
+		secondEndTime = firstEndTime.Add(duration)
+	)
+
+	// Step 1: Add subnet validator V1 (weight 10) via the wallet and accept
+	// it in its own block.
+	addTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(firstEndTime.Unix()),
+			Wght:   10,
+		},
+		Subnet: subnetID,
+	})
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(addTx))
+	vm.ctx.Lock.Lock()
+
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	vdrSet, err := vm.GetValidatorSet(t.Context(), 2, subnetID)
+	require.NoError(err)
+	require.NotEmpty(vdrSet)
+
+	vdr, err := vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(nodeID, vdr.NodeID)
+	require.Equal(uint64(10), vdr.Weight)
+	require.Equal(addTx.ID(), vdr.TxID)
+
+	// Step 2: Build 3 transactions without issuing them to the VM.
+	// Tx 1: Remove subnet validator V1.
+	removeTx1, err := wallet.IssueRemoveSubnetValidatorTx(nodeID, subnetID)
+	require.NoError(err)
+
+	// Tx 2: Add subnet validator V2 (same node, weight 20, different end time).
+	addTx2, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(secondEndTime.Unix()),
+			Wght:   20,
+		},
+		Subnet: subnetID,
+	})
+	require.NoError(err)
+
+	// Tx 3: Remove subnet validator V2.
+	removeTx2, err := wallet.IssueRemoveSubnetValidatorTx(nodeID, subnetID)
+	require.NoError(err)
+
+	// Step 3: Build a single block containing all 3 transactions.
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+	require.NoError(err)
+
+	statelessBlk, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
+		[]*txs.Tx{removeTx1, addTx2, removeTx2},
+	)
+	require.NoError(err)
+
+	blk, err := vm.ParseBlock(t.Context(), statelessBlk.Bytes())
+	require.NoError(err)
+
+	// Verify and accept the block containing all 3 transactions.
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
+
+	// After the block is accepted, the node should no longer be a subnet
+	// validator because both V1 and V2 were removed.
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	currentHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	vdrSet, err = vm.GetValidatorSet(t.Context(), currentHeight, subnetID)
+	require.NoError(err)
+	require.Empty(vdrSet)
+}
+
+func TestSubnetValidatorRemoveAndReplaceInSingleBlock(t *testing.T) {
+	// First, add a subnet validator (weight 10) and accept it in its own
+	// block. Then build a second block with 2 transactions: remove the
+	// original validator and add a replacement with the same node but
+	// different weight. After accepting, the replacement validator should
+	// be in the validator set. The sub-tests cover net weight decrease,
+	// increase, and no change respectively.
+
+	tests := []struct {
+		name           string
+		replacedWeight uint64
+	}{
+		{name: "lower weight", replacedWeight: 8},
+		{name: "higher weight", replacedWeight: 12},
+		{name: "same weight", replacedWeight: 10},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			vm, _, _ := defaultVM(t, upgradetest.Latest)
+			vm.ctx.Lock.Lock()
+			defer vm.ctx.Lock.Unlock()
+
+			var (
+				nodeID   = genesistest.DefaultNodeIDs[0]
+				subnetID = testSubnet1.ID()
+				wallet   = newWallet(t, vm, walletConfig{
+					subnetIDs: []ids.ID{subnetID},
+				})
+
+				duration      = defaultMinStakingDuration
+				firstEndTime  = latestForkTime.Add(duration)
+				secondEndTime = firstEndTime.Add(duration)
+			)
+
+			// Step 1: Add subnet validator V1 (weight 10) and accept it.
+			addTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					End:    uint64(firstEndTime.Unix()),
+					Wght:   10,
+				},
+				Subnet: subnetID,
+			})
+			require.NoError(err)
+
+			vm.ctx.Lock.Unlock()
+			require.NoError(vm.issueTxFromRPC(addTx))
+			vm.ctx.Lock.Lock()
+
+			require.NoError(buildAndAcceptStandardBlock(vm))
+
+			vdr, err := vm.state.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(err)
+			require.Equal(uint64(10), vdr.Weight)
+
+			// Step 2: Build 2 transactions — remove V1, then add V2.
+			removeTx, err := wallet.IssueRemoveSubnetValidatorTx(nodeID, subnetID)
+			require.NoError(err)
+
+			addTx2, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					End:    uint64(secondEndTime.Unix()),
+					Wght:   tt.replacedWeight,
+				},
+				Subnet: subnetID,
+			})
+			require.NoError(err)
+
+			// Step 3: Build a single block containing both transactions.
+			lastAcceptedID, err := vm.LastAccepted(t.Context())
+			require.NoError(err)
+			lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+			require.NoError(err)
+
+			statelessBlk, err := block.NewBanffStandardBlock(
+				lastAccepted.Timestamp().Add(time.Second),
+				lastAccepted.ID(),
+				lastAccepted.Height()+1,
+				[]*txs.Tx{removeTx, addTx2},
+			)
+			require.NoError(err)
+
+			blk, err := vm.ParseBlock(t.Context(), statelessBlk.Bytes())
+			require.NoError(err)
+
+			require.NoError(blk.Verify(t.Context()))
+			require.NoError(blk.Accept(t.Context()))
+			require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
+
+			// After accepting, V2 should be the current validator.
+			vdr, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(err)
+			require.Equal(tt.replacedWeight, vdr.Weight)
+			require.Equal(addTx2.ID(), vdr.TxID)
+			require.True(secondEndTime.Equal(vdr.EndTime))
+
+			// Verify that the validator manager also reflects the replacement.
+			// In particular, the TxID must be from the new validator (addTx2),
+			// not the old one (addTx).
+			managerVdr, exists := vm.Validators.GetValidator(subnetID, nodeID)
+			require.True(exists)
+			require.Equal(tt.replacedWeight, managerVdr.Weight)
+			require.Equal(addTx2.ID(), managerVdr.TxID)
+
+			currentHeight, err := vm.GetCurrentHeight(t.Context())
+			require.NoError(err)
+
+			vdrSet, err := vm.GetValidatorSet(t.Context(), currentHeight, subnetID)
+			require.NoError(err)
+			require.Contains(vdrSet, nodeID)
+			require.Equal(tt.replacedWeight, vdrSet[nodeID].Weight)
+		})
+	}
+}
+
+func TestDelegatorWeightAfterMultipleExpiration(t *testing.T) {
+	// Verifies that the validator manager correctly tracks combined
+	// validator+delegator weight across three consecutive delegator
+	// replacements (D1→D2→D3). Each delegator is removed via proposal block
+	// reward and replaced by a new delegator issued to the mempool before
+	// building the proposal block.
+
+	require := require.New(t)
+
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	var (
+		nodeID       = genesistest.DefaultNodeIDs[0]
+		wallet       = newWallet(t, vm, walletConfig{})
+		rewardsOwner = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		}
+
+		duration     = defaultMinStakingDuration
+		firstEndTime = latestForkTime.Add(duration)
+	)
+
+	// Add delegator D1 (weight defaultMinDelegatorStake).
+	firstTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				End:    uint64(firstEndTime.Unix()),
+				Wght:   defaultMinDelegatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		vm.ctx.AVAXAssetID,
+		rewardsOwner,
+	)
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(firstTx))
+	vm.ctx.Lock.Lock()
+
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	firstActiveHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	vdrSet, err := vm.GetValidatorSet(t.Context(), firstActiveHeight, constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(genesistest.DefaultValidatorWeight+defaultMinDelegatorStake, vdrSet[nodeID].Weight)
+
+	// Replace D1 → D2 (weight 2*defaultMinDelegatorStake): advance clock to
+	// D1's end time so the next block rewards D1 and includes D2 from the mempool.
+	secondEndTime := firstEndTime.Add(duration)
+	secondTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				End:    uint64(secondEndTime.Unix()),
+				Wght:   2 * defaultMinDelegatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		vm.ctx.AVAXAssetID,
+		rewardsOwner,
+	)
+	require.NoError(err)
+
+	vm.clock.Set(firstEndTime)
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(secondTx))
+	vm.ctx.Lock.Lock()
+
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
+
+	secondActiveHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	vdrSet, err = vm.GetValidatorSet(t.Context(), secondActiveHeight, constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(genesistest.DefaultValidatorWeight+2*defaultMinDelegatorStake, vdrSet[nodeID].Weight)
+
+	// Replace D2 → D3 (weight 3*defaultMinDelegatorStake).
+	thirdEndTime := secondEndTime.Add(duration)
+	thirdTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				End:    uint64(thirdEndTime.Unix()),
+				Wght:   3 * defaultMinDelegatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		vm.ctx.AVAXAssetID,
+		rewardsOwner,
+	)
+	require.NoError(err)
+
+	vm.clock.Set(secondEndTime)
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(thirdTx))
+	vm.ctx.Lock.Lock()
+
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
+
+	thirdActiveHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	// Current validator set must reflect D3's weight.
+	vdrSet, err = vm.GetValidatorSet(t.Context(), thirdActiveHeight, constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(genesistest.DefaultValidatorWeight+3*defaultMinDelegatorStake, vdrSet[nodeID].Weight)
+
+	// Historical queries must return the correct weight at each prior height.
+	vdrSet, err = vm.GetValidatorSet(t.Context(), secondActiveHeight, constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(genesistest.DefaultValidatorWeight+2*defaultMinDelegatorStake, vdrSet[nodeID].Weight)
+
+	vdrSet, err = vm.GetValidatorSet(t.Context(), firstActiveHeight, constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(genesistest.DefaultValidatorWeight+defaultMinDelegatorStake, vdrSet[nodeID].Weight)
+}
+
+func TestDelegatorReplacementWeight(t *testing.T) {
+	// Add a delegator D1 (weight 2*defaultMinDelegatorStake) and accept it.
+	// Then build a proposal block that rewards D1 and adds a replacement D2
+	// with varying weight. After accepting, verify the combined weight.
+	// The sub-tests cover net delegation decrease, increase, and no change.
+
+	tests := []struct {
+		name           string
+		replacedWeight uint64
+	}{
+		{name: "lower weight", replacedWeight: defaultMinDelegatorStake},
+		{name: "higher weight", replacedWeight: 3 * defaultMinDelegatorStake},
+		{name: "same weight", replacedWeight: 2 * defaultMinDelegatorStake},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			vm, _, _ := defaultVM(t, upgradetest.Latest)
+			vm.ctx.Lock.Lock()
+			defer vm.ctx.Lock.Unlock()
+
+			var (
+				nodeID       = genesistest.DefaultNodeIDs[0]
+				wallet       = newWallet(t, vm, walletConfig{})
+				rewardsOwner = &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+				}
+
+				duration      = defaultMinStakingDuration
+				firstEndTime  = latestForkTime.Add(duration)
+				secondEndTime = firstEndTime.Add(duration)
+			)
+
+			// Step 1: Add delegator D1 (weight 2*defaultMinDelegatorStake) and accept.
+			addTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						End:    uint64(firstEndTime.Unix()),
+						Wght:   2 * defaultMinDelegatorStake,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
+				vm.ctx.AVAXAssetID,
+				rewardsOwner,
+			)
+			require.NoError(err)
+
+			vm.ctx.Lock.Unlock()
+			require.NoError(vm.issueTxFromRPC(addTx))
+			vm.ctx.Lock.Lock()
+
+			require.NoError(buildAndAcceptStandardBlock(vm))
+
+			stake := vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
+			require.Equal(genesistest.DefaultValidatorWeight+2*defaultMinDelegatorStake, stake)
+
+			// Step 2: Issue replacement D2 to mempool, advance time, build proposal block.
+			addTx2, err := wallet.IssueAddPermissionlessDelegatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						End:    uint64(secondEndTime.Unix()),
+						Wght:   tt.replacedWeight,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
+				vm.ctx.AVAXAssetID,
+				rewardsOwner,
+			)
+			require.NoError(err)
+
+			vm.clock.Set(firstEndTime)
+			vm.ctx.Lock.Unlock()
+			require.NoError(vm.issueTxFromRPC(addTx2))
+			vm.ctx.Lock.Lock()
+
+			require.NoError(buildAndAcceptPreferredOracleBlock(vm))
+
+			// After accepting, D2 should be active with the replacement weight.
+			stake = vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
+			require.Equal(genesistest.DefaultValidatorWeight+tt.replacedWeight, stake)
+
+			// Verify via GetValidatorSet as well.
+			currentHeight, err := vm.GetCurrentHeight(t.Context())
+			require.NoError(err)
+
+			vdrSet, err := vm.GetValidatorSet(t.Context(), currentHeight, constants.PrimaryNetworkID)
+			require.NoError(err)
+			require.Equal(genesistest.DefaultValidatorWeight+tt.replacedWeight, vdrSet[nodeID].Weight)
+
+			// Step 3: Advance time to D2's end and accept the proposal block to
+			// remove D2.
+			vm.clock.Set(secondEndTime)
+			require.NoError(buildAndAcceptPreferredOracleBlock(vm))
+
+			// After D2 is removed, only the genesis validator weight remains.
+			stake = vm.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
+			require.Equal(genesistest.DefaultValidatorWeight, stake)
+
+			currentHeight, err = vm.GetCurrentHeight(t.Context())
+			require.NoError(err)
+
+			vdrSet, err = vm.GetValidatorSet(t.Context(), currentHeight, constants.PrimaryNetworkID)
+			require.NoError(err)
+			require.Equal(genesistest.DefaultValidatorWeight, vdrSet[nodeID].Weight)
+		})
+	}
+}
+
+func TestDelegatorAndValidatorExpireTogether(t *testing.T) {
+	// Create a new permissionless primary network validator and add a
+	// delegator to it, both with the same EndTime. Advance time to expire
+	// them.
+
+	require := require.New(t)
+
+	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	var (
+		nodeID       = ids.GenerateTestNodeID()
+		wallet       = newWallet(t, vm, walletConfig{})
+		rewardsOwner = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		}
+
+		endTime = latestForkTime.Add(defaultMinStakingDuration)
+	)
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	// Add a permissionless primary network validator.
+	validatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				End:    uint64(endTime.Unix()),
+				Wght:   vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		pop,
+		vm.ctx.AVAXAssetID,
+		rewardsOwner,
+		rewardsOwner,
+		reward.PercentDenominator,
+	)
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(validatorTx))
+	vm.ctx.Lock.Lock()
+
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	// Add a delegator with the same EndTime as the validator.
+	delegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				End:    uint64(endTime.Unix()),
+				Wght:   defaultMinDelegatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		vm.ctx.AVAXAssetID,
+		rewardsOwner,
+	)
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(delegatorTx))
+	vm.ctx.Lock.Lock()
+
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	activeHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	// Verify combined weight.
+	vdrSet, err := vm.GetValidatorSet(t.Context(), activeHeight, constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.NotZero(vdrSet[nodeID].Weight)
+
+	// Advance time to the shared EndTime.
+	vm.clock.Set(endTime)
+
+	// First proposal block: rewards the delegator
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
+
+	afterDelegatorHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	// Delegator removed; validator still present with its own weight.
+	vdrSet, err = vm.GetValidatorSet(t.Context(), afterDelegatorHeight, constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(vm.MinValidatorStake, vdrSet[nodeID].Weight)
+
+	// Second proposal block: rewards the validator.
+	require.NoError(buildAndAcceptPreferredOracleBlock(vm))
+
+	afterValidatorHeight, err := vm.GetCurrentHeight(t.Context())
+	require.NoError(err)
+
+	// Both removed; node should no longer be in the validator set.
+	vdrSet, err = vm.GetValidatorSet(t.Context(), afterValidatorHeight, constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.NotContains(vdrSet, nodeID)
+
+	// Historical query: the height when both were active should still
+	// reflect the combined weight.
+	vdrSet, err = vm.GetValidatorSet(t.Context(), activeHeight, constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(vm.MinValidatorStake+defaultMinDelegatorStake, vdrSet[nodeID].Weight)
 }
 
 func buildAndAcceptStandardBlock(vm *VM) error {
@@ -2217,6 +3147,43 @@ func buildAndAcceptStandardBlock(vm *VM) error {
 	}
 
 	if err := blk.Accept(context.Background()); err != nil {
+		return err
+	}
+
+	return vm.SetPreference(context.Background(), vm.manager.LastAccepted())
+}
+
+func buildAndAcceptPreferredOracleBlock(vm *VM) error {
+	blk, err := vm.Builder.BuildBlock(context.Background())
+	if err != nil {
+		return err
+	}
+
+	if err := blk.Verify(context.Background()); err != nil {
+		return err
+	}
+
+	proposalBlk, ok := blk.(snowman.OracleBlock)
+	if !ok {
+		return errors.New("expected proposal block")
+	}
+
+	options, err := proposalBlk.Options(context.Background())
+	if err != nil {
+		return err
+	}
+
+	prefOption := options[0]
+
+	if err := blk.Accept(context.Background()); err != nil {
+		return err
+	}
+
+	if err := prefOption.Verify(context.Background()); err != nil {
+		return err
+	}
+
+	if err := prefOption.Accept(context.Background()); err != nil {
 		return err
 	}
 

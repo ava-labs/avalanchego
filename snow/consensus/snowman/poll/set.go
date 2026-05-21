@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
@@ -152,7 +152,7 @@ func (s *set) processFinishedPolls() []bag.Bag[ids.ID] {
 			break
 		}
 
-		s.log.Verbo("poll finished",
+		s.log.Debug("poll finished",
 			zap.Uint32("requestID", iter.Key()),
 			zap.Stringer("poll", holder.GetPoll()),
 		)

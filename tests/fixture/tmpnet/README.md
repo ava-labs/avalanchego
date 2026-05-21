@@ -16,6 +16,8 @@ orchestrate the same temporary networks without the use of an rpc daemon.
   - [Simplifying usage with direnv](#simplifying-usage-with-direnv)
     - [Deprecated usage with e2e suite](#deprecated-usage-with-e2e-suite)
   - [Via code](#via-code)
+  - [Enabling errors with stack traces](#enabling-errors-with-stack-traces)
+    - [Ensuring stack trace support](#ensuring-stack-trace-support)
 - [Networking configuration](#networking-configuration)
 - [Configuration on disk](#configuration-on-disk)
   - [Common networking configuration](#common-networking-configuration)
@@ -188,6 +190,30 @@ uris := network.GetNodeURIs()
 network.Stop(context.Background())
 ```
 
+### Enabling errors with stack traces
+[Top](#table-of-contents)
+
+By default, errors originating from tmpnet will be standard golang
+errors. Setting `STACK_TRACE_ERRORS=1` in the environment in which
+tmpnet is run will ensure that such errors also include the stack trace
+from the point of failure. While there is some overhead associated
+with collecting and storing a stack trace, a testing tool like tmpnet
+is not performance critical.
+
+#### Ensuring stack trace support
+[Top](#table-of-contents)
+
+For an error originating from tmpnet to have a stack trace, the error
+must pass through one of the methods of the
+`github.com/ava-labs/avalanchego/tests/fixture/stacktrace`
+package. The following alternatives to stdlib functions are supported:
+
+| stdlib       | stacktrace             |
+|:-------------|:-----------------------|
+| `err`        | `stacktrace.Wrap(err)` |
+| `errors.New` | `stacktrace.New`       |
+| `fmt.Errorf` | `stacktrace.Errorf`    |
+
 ## Networking configuration
 [Top](#table-of-contents)
 
@@ -330,8 +356,12 @@ shared.
 nix develop
 
 # Enable collection of logs and metrics
+PROMETHEUS_URL=<url> \
+PROMETHEUS_PUSH_URL=<push url> \
 PROMETHEUS_USERNAME=<username> \
 PROMETHEUS_PASSWORD=<password> \
+LOKI_URL=<url> \
+LOKI_PUSH_URL=<push url> \
 LOKI_USERNAME=<username> \
 LOKI_PASSWORD=<password> \
 ./bin/tmpnetctl start-metrics-collector
@@ -352,7 +382,9 @@ LOKI_PASSWORD=<password> \
    configured to scrape metrics from configured nodes and forward
    them to https://prometheus-poc.avax-dev.network.
    - Requires:
-     - Credentials supplied as env vars:
+     - Config supplied as env vars:
+       - `PROMETHEUS_URL`
+       - `PROMETHEUS_PUSH_URL`
        - `PROMETHEUS_USERNAME`
        - `PROMETHEUS_PASSWORD`
      - A `prometheus` binary available in the path
@@ -361,7 +393,9 @@ LOKI_PASSWORD=<password> \
    from configured nodes and forward them to
    https://loki-poc.avax-dev.network.
    - Requires:
-     - Credentials supplied as env vars:
+     - Config supplied as env vars:
+       - `LOKI_URL`
+       - `LOKI_PUSH_URL`
        - `LOKI_USERNAME`
        - `LOKI_PASSWORD`
      - A `promtail` binary available in the path
@@ -433,27 +467,26 @@ Example usage:
 ```yaml
 - name: Run e2e tests
 
-  # A qualified path is required for use outside of avalanchego
-  # e.g. `ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@[sha or tag]`
-  uses: ./.github/actions/run-monitored-tmpnet-cmd #
+  uses: ./.github/actions/run-monitored-tmpnet-cmd
 
   with:
-    # This needs to be the path to a bash script
-    run: ./scripts/tests.e2e.sh
-
-    # Env vars for the script need to be provided via run_env as a space-separated string
-    # e.g. `MY_VAR1=foo MY_VAR2=bar`
-    run_env: E2E_SERIAL=1
+    # This should be a task invocation, not a script. The task should internalize arguments and env
+    # vars to ensure that the job can be reproduced locally with minimal expertise.
+    run: ./scripts/run_task.sh test-e2e-ci
 
     # Sets the prefix of the artifact containing the tmpnet network dir for this job.
     # Only required if a workflow uses this action more than once so that each artifact
     # will have a unique name.
     artifact_prefix: e2e
 
-    # These credentials are mandatory
-    prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+    # This configuration is mandatory
+    prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+    prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+    prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
     prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-    loki_username: ${{ secrets.LOKI_ID || '' }}
+    loki_url: ${{ secrets.LOKI_URL || '' }}
+    loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+    loki_username: ${{ secrets.LOKI_USERNAME || '' }}
     loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 ```
 
@@ -463,10 +496,15 @@ Example usage:
 [Top](#table-of-contents)
 
 When a network is started with tmpnet, a link to the [default grafana
-instance](https://grafana-poc.avax-dev.network) will be
+instance](https://avalabs.grafana.net) will be
 emitted. The dashboards will only be populated if prometheus and
 promtail are running locally (as per previous sections) to collect
 metrics and logs.
+
+If using a non-default grafana instance, set
+`GRAFANA_URI=https://<non-default server name>/d/<dashboard id>` as an
+env var in the shell to ensure the emitted link points to the desired
+instance.
 
 #### CI
 [Top](#table-of-contents)

@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "subnetevmclient",
+    srcs = ["subnet_evm_client.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/subnetevmclient",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/rpc",
+        "//graft/subnet-evm/ethclient",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)

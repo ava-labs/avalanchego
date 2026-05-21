@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
 
 import (
-	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -87,7 +86,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(addSubnetDelegator(s, subnetID, genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime, nodeIDs, currentHeight))
 	}
 
-	ctx := context.Background()
+	ctx := b.Context()
 	height, err := m.GetCurrentHeight(ctx)
 	require.NoError(err)
 	require.Equal(currentHeight, height)
@@ -103,7 +102,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 }
 
 func addPrimaryValidator(
-	s state.State,
+	s *state.State,
 	startTime time.Time,
 	endTime time.Time,
 	height uint64,
@@ -140,7 +139,7 @@ func addPrimaryValidator(
 }
 
 func addSubnetValidator(
-	s state.State,
+	s *state.State,
 	subnetID ids.ID,
 	startTime time.Time,
 	endTime time.Time,
@@ -172,7 +171,7 @@ func addSubnetValidator(
 }
 
 func addSubnetDelegator(
-	s state.State,
+	s *state.State,
 	subnetID ids.ID,
 	startTime time.Time,
 	endTime time.Time,

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package constants
@@ -15,17 +15,29 @@ import (
 
 // Const variables to be exported
 const (
-	MainnetID  uint32 = 1
-	TahoeID    uint32 = 5
+	MainnetID uint32 = 1
+	CascadeID uint32 = 2
+	DenaliID  uint32 = 3
+	EverestID uint32 = 4
+	TahoeID   uint32 = 5
+
+	TestnetID  uint32 = TahoeID
 	UnitTestID uint32 = 10
 	LocalID    uint32 = 12345
 
 	MainnetName  = "mainnet"
+	CascadeName  = "cascade"
+	DenaliName   = "denali"
+	EverestName  = "everest"
 	TahoeName    = "tahoe"
+	TestnetName  = "testnet"
 	UnitTestName = "testing"
 	LocalName    = "local"
 
 	MainnetHRP  = "metal"
+	CascadeHRP  = "cascade"
+	DenaliHRP   = "denali"
+	EverestHRP  = "everest"
 	TahoeHRP    = "tahoe"
 	UnitTestHRP = "testing"
 	LocalHRP    = "local"
@@ -39,25 +51,38 @@ var (
 
 	NetworkIDToNetworkName = map[uint32]string{
 		MainnetID:  MainnetName,
+		CascadeID:  CascadeName,
+		DenaliID:   DenaliName,
+		EverestID:  EverestName,
 		TahoeID:    TahoeName,
 		UnitTestID: UnitTestName,
 		LocalID:    LocalName,
 	}
 	NetworkNameToNetworkID = map[string]uint32{
 		MainnetName:  MainnetID,
+		CascadeName:  CascadeID,
+		DenaliName:   DenaliID,
+		EverestName:  EverestID,
 		TahoeName:    TahoeID,
+		TestnetName:  TestnetID,
 		UnitTestName: UnitTestID,
 		LocalName:    LocalID,
 	}
 
 	NetworkIDToHRP = map[uint32]string{
 		MainnetID:  MainnetHRP,
+		CascadeID:  CascadeHRP,
+		DenaliID:   DenaliHRP,
+		EverestID:  EverestHRP,
 		TahoeID:    TahoeHRP,
 		UnitTestID: UnitTestHRP,
 		LocalID:    LocalHRP,
 	}
 	NetworkHRPToNetworkID = map[string]uint32{
 		MainnetHRP:  MainnetID,
+		CascadeHRP:  CascadeID,
+		DenaliHRP:   DenaliID,
+		EverestHRP:  EverestID,
 		TahoeHRP:    TahoeID,
 		UnitTestHRP: UnitTestID,
 		LocalHRP:    LocalID,

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
@@ -6,8 +6,7 @@ package c
 import (
 	"math/big"
 
-	"github.com/MetalBlockchain/coreth/plugin/evm/atomic"
-
+	"github.com/MetalBlockchain/metalgo/graft/coreth/plugin/evm/atomic"
 	"github.com/MetalBlockchain/metalgo/ids"
 	"github.com/MetalBlockchain/metalgo/vms/secp256k1fx"
 	"github.com/MetalBlockchain/metalgo/wallet/subnet/primary/common"

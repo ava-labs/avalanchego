@@ -33,7 +33,7 @@ wallets which will send transactions to the network for the lifetime of the test
 To enable viewing the state of the test network, `tmpnet` will log a Grafana URL:
 
 ```
-[07-25|13:47:36.137] INFO tmpnet/network.go:410 metrics and logs available via grafana (collectors must be running) {"url": "https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%7C%3D%7Ce1b9dd69-5204-4c24-8b98-d3aea14c0eeb&var-filter=is_ephemeral_node%7C%3D%7Cfalse&from=1753465644564&to=now"}
+[07-25|13:47:36.137] INFO tmpnet/network.go:410 metrics and logs available via grafana (collectors must be running) {"url": "https://avalabs.grafana.net/d/mabpvtq/avalanche-main-dashboard?&var-filter=network_uuid%7C%3D%7Ce1b9dd69-5204-4c24-8b98-d3aea14c0eeb&var-filter=is_ephemeral_node%7C%3D%7Cfalse&from=1753465644564&to=now"}
 ```
 
 Clicking on this link will open the main AvalancheGo dashboard in Grafana
@@ -114,6 +114,8 @@ updated by the generator/wallets. The server is configured to be targeted by
 ### Load Test Flags
 
 - `--load-timeout`: Maximum duration to run the load test (default: unlimited)
+- `--firewood`: Whether to use Firewood in Coreth (default: false)
+- `--num-workers`: The number of workers to use for the load test (default: 5)
 
 ### Network Configuration (`tmpnet` Flags)
 

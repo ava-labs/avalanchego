@@ -100,7 +100,7 @@ func (mr *RouterMockRecorder) Disconnected(nodeID any) *gomock.Call {
 }
 
 // HandleInbound mocks base method.
-func (m *Router) HandleInbound(arg0 context.Context, arg1 message.InboundMessage) {
+func (m *Router) HandleInbound(arg0 context.Context, arg1 *message.InboundMessage) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "HandleInbound", arg0, arg1)
 }
@@ -112,7 +112,7 @@ func (mr *RouterMockRecorder) HandleInbound(arg0, arg1 any) *gomock.Call {
 }
 
 // HandleInternal mocks base method.
-func (m *Router) HandleInternal(arg0 context.Context, arg1 message.InboundMessage) {
+func (m *Router) HandleInternal(arg0 context.Context, arg1 *message.InboundMessage) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "HandleInternal", arg0, arg1)
 }
@@ -153,7 +153,7 @@ func (mr *RouterMockRecorder) Initialize(nodeID, log, timeouts, shutdownTimeout,
 }
 
 // RegisterRequest mocks base method.
-func (m *Router) RegisterRequest(ctx context.Context, nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op, failedMsg message.InboundMessage, engineType p2p.EngineType) {
+func (m *Router) RegisterRequest(ctx context.Context, nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op, failedMsg *message.InboundMessage, engineType p2p.EngineType) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "RegisterRequest", ctx, nodeID, chainID, requestID, op, failedMsg, engineType)
 }

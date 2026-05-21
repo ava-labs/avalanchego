@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "metervm",
+    srcs = [
+        "batched_vm.go",
+        "block.go",
+        "block_metrics.go",
+        "block_vm.go",
+        "build_block_with_context_vm.go",
+        "metrics.go",
+        "set_preference_with_context_vm.go",
+        "state_syncable_vm.go",
+        "vertex_metrics.go",
+        "vertex_vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/metervm",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/consensus/snowman",
+        "//snow/consensus/snowstorm",
+        "//snow/engine/avalanche/vertex",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//utils/metric",
+        "//utils/wrappers",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)

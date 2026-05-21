@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ava-labs/simplex"
@@ -18,7 +17,7 @@ import (
 )
 
 func TestStorageNew(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	child := snowmantest.BuildChild(snowmantest.Genesis)
 	tests := []struct {
 		name           string
@@ -57,7 +56,8 @@ func TestStorageNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := newEngineConfig(t, 1)
-			_, verifier := NewBLSAuth(config)
+			_, verifier, err := NewBLSAuth(config)
+			require.NoError(t, err)
 			qc := QCDeserializer{
 				verifier: &verifier,
 			}
@@ -72,15 +72,16 @@ func TestStorageNew(t *testing.T) {
 }
 
 func TestStorageRetrieve(t *testing.T) {
-	genesis := newBlock(t, newBlockConfig{})
+	genesis := newTestBlock(t, newBlockConfig{})
 	genesisBytes, err := genesis.Bytes()
 	require.NoError(t, err)
 
 	vm := newTestVM()
-	ctx := context.Background()
+	ctx := t.Context()
 	config := newEngineConfig(t, 4)
 	config.VM = vm
-	_, verifier := NewBLSAuth(config)
+	_, verifier, err := NewBLSAuth(config)
+	require.NoError(t, err)
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
@@ -130,15 +131,16 @@ func TestStorageRetrieve(t *testing.T) {
 }
 
 func TestStorageIndexFails(t *testing.T) {
-	ctx := context.Background()
-	genesis := newBlock(t, newBlockConfig{})
-	child1 := newBlock(t, newBlockConfig{prev: genesis})
-	child2 := newBlock(t, newBlockConfig{prev: child1})
+	ctx := t.Context()
+	genesis := newTestBlock(t, newBlockConfig{})
+	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
+	child2 := newTestBlock(t, newBlockConfig{prev: child1})
 
 	configs := newNetworkConfigs(t, 4)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
@@ -215,16 +217,17 @@ func TestStorageIndexFails(t *testing.T) {
 // TestIndexMismatchedChild tests that the previously indexed digest matches the
 // previous digest of the block being indexed.
 func TestIndexMismatchedChild(t *testing.T) {
-	ctx := context.Background()
-	genesis := newBlock(t, newBlockConfig{})
-	child1 := newBlock(t, newBlockConfig{prev: genesis})
-	child1Sibling := newBlock(t, newBlockConfig{prev: genesis})
-	child2Nephew := newBlock(t, newBlockConfig{prev: child1Sibling})
+	ctx := t.Context()
+	genesis := newTestBlock(t, newBlockConfig{})
+	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
+	child1Sibling := newTestBlock(t, newBlockConfig{prev: genesis})
+	child2Nephew := newTestBlock(t, newBlockConfig{prev: child1Sibling})
 
 	configs := newNetworkConfigs(t, 4)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
@@ -250,11 +253,12 @@ func TestIndexMismatchedChild(t *testing.T) {
 
 // TestStorageIndexSuccess indexes 10 blocks and verifies that they can be retrieved.
 func TestStorageIndexSuccess(t *testing.T) {
-	ctx := context.Background()
-	genesis := newBlock(t, newBlockConfig{})
+	ctx := t.Context()
+	genesis := newTestBlock(t, newBlockConfig{})
 	configs := newNetworkConfigs(t, 4)
 
-	_, verifier := NewBLSAuth(configs[0])
+	_, verifier, err := NewBLSAuth(configs[0])
+	require.NoError(t, err)
 	qc := QCDeserializer{verifier: &verifier}
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
@@ -270,7 +274,7 @@ func TestStorageIndexSuccess(t *testing.T) {
 
 	prev := genesis
 	for i := 0; i < numBlocks; i++ {
-		child := newBlock(t, newBlockConfig{prev: prev})
+		child := newTestBlock(t, newBlockConfig{prev: prev})
 		_, err := child.Verify(ctx)
 		require.NoError(t, err)
 

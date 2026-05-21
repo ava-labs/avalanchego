@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package syncer
@@ -191,16 +191,11 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 			ss.uniqueSummariesHeights = append(ss.uniqueSummariesHeights, height)
 		}
 	} else {
+		fields := []zap.Field{zap.Error(err)}
 		if ss.Ctx.Log.Enabled(logging.Verbo) {
-			ss.Ctx.Log.Verbo("failed to parse summary",
-				zap.Binary("summary", summaryBytes),
-				zap.Error(err),
-			)
-		} else {
-			ss.Ctx.Log.Debug("failed to parse summary",
-				zap.Error(err),
-			)
+			fields = append(fields, zap.Binary("summary", summaryBytes))
 		}
+		ss.Ctx.Log.Debug("failed to parse summary", fields...)
 	}
 
 	return ss.receivedStateSummaryFrontier(ctx)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e_test
@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -21,13 +22,15 @@ import (
 	_ "github.com/MetalBlockchain/metalgo/tests/e2e/x/transfer"
 
 	"github.com/MetalBlockchain/metalgo/config"
+	"github.com/MetalBlockchain/metalgo/graft/coreth/plugin/evm"
 	"github.com/MetalBlockchain/metalgo/tests/e2e/vms"
 	"github.com/MetalBlockchain/metalgo/tests/fixture/e2e"
 	"github.com/MetalBlockchain/metalgo/tests/fixture/tmpnet"
-	"github.com/MetalBlockchain/metalgo/upgrade"
+	"github.com/MetalBlockchain/metalgo/upgrade/upgradetest"
 )
 
 func TestE2E(t *testing.T) {
+	evm.RegisterAllLibEVMExtras()
 	ginkgo.RunSpecs(t, "e2e test suites")
 }
 
@@ -47,12 +50,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
-	upgrades := upgrade.Default
-	if flagVars.ActivateGranite() {
-		upgrades.GraniteTime = upgrade.InitiallyActiveTime
-	} else {
-		upgrades.GraniteTime = upgrade.UnscheduledActivationTime
+	upgradeToActivate := upgradetest.Latest
+	if !flagVars.ActivateLatest() {
+		upgradeToActivate--
 	}
+	upgrades := upgradetest.GetConfig(upgradeToActivate)
+	upgrades.GraniteEpochDuration = 4 * time.Second
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
 	)

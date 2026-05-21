@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package upgrade
@@ -37,6 +37,8 @@ var (
 		EtnaTime:                  time.Date(2025, time.February, 25, 10, 0, 0, 0, time.UTC),
 		FortunaTime:               time.Date(2026, time.May, 25, 15, 0, 0, 0, time.UTC),
 		GraniteTime:               UnscheduledActivationTime,
+		GraniteEpochDuration:      5 * time.Minute,
+		HeliconTime:               UnscheduledActivationTime,
 	}
 	Tahoe = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -59,6 +61,8 @@ var (
 		EtnaTime:                  time.Date(2025, time.January, 9, 21, 0, 0, 0, time.UTC),
 		FortunaTime:               time.Date(2026, time.April, 1, 15, 0, 0, 0, time.UTC),
 		GraniteTime:               UnscheduledActivationTime,
+		GraniteEpochDuration:      5 * time.Minute,
+		HeliconTime:               UnscheduledActivationTime,
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -76,29 +80,33 @@ var (
 		DurangoTime:                  InitiallyActiveTime,
 		EtnaTime:                     InitiallyActiveTime,
 		FortunaTime:                  InitiallyActiveTime,
-		GraniteTime:                  UnscheduledActivationTime,
+		GraniteTime:                  InitiallyActiveTime,
+		GraniteEpochDuration:         30 * time.Second,
+		HeliconTime:                  UnscheduledActivationTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
 )
 
 type Config struct {
-	ApricotPhase1Time            time.Time `json:"apricotPhase1Time"`
-	ApricotPhase2Time            time.Time `json:"apricotPhase2Time"`
-	ApricotPhase3Time            time.Time `json:"apricotPhase3Time"`
-	ApricotPhase4Time            time.Time `json:"apricotPhase4Time"`
-	ApricotPhase4MinPChainHeight uint64    `json:"apricotPhase4MinPChainHeight"`
-	ApricotPhase5Time            time.Time `json:"apricotPhase5Time"`
-	ApricotPhasePre6Time         time.Time `json:"apricotPhasePre6Time"`
-	ApricotPhase6Time            time.Time `json:"apricotPhase6Time"`
-	ApricotPhasePost6Time        time.Time `json:"apricotPhasePost6Time"`
-	BanffTime                    time.Time `json:"banffTime"`
-	CortinaTime                  time.Time `json:"cortinaTime"`
-	CortinaXChainStopVertexID    ids.ID    `json:"cortinaXChainStopVertexID"`
-	DurangoTime                  time.Time `json:"durangoTime"`
-	EtnaTime                     time.Time `json:"etnaTime"`
-	FortunaTime                  time.Time `json:"fortunaTime"`
-	GraniteTime                  time.Time `json:"graniteTime"`
+	ApricotPhase1Time            time.Time     `json:"apricotPhase1Time"`
+	ApricotPhase2Time            time.Time     `json:"apricotPhase2Time"`
+	ApricotPhase3Time            time.Time     `json:"apricotPhase3Time"`
+	ApricotPhase4Time            time.Time     `json:"apricotPhase4Time"`
+	ApricotPhase4MinPChainHeight uint64        `json:"apricotPhase4MinPChainHeight"`
+	ApricotPhase5Time            time.Time     `json:"apricotPhase5Time"`
+	ApricotPhasePre6Time         time.Time     `json:"apricotPhasePre6Time"`
+	ApricotPhase6Time            time.Time     `json:"apricotPhase6Time"`
+	ApricotPhasePost6Time        time.Time     `json:"apricotPhasePost6Time"`
+	BanffTime                    time.Time     `json:"banffTime"`
+	CortinaTime                  time.Time     `json:"cortinaTime"`
+	CortinaXChainStopVertexID    ids.ID        `json:"cortinaXChainStopVertexID"`
+	DurangoTime                  time.Time     `json:"durangoTime"`
+	EtnaTime                     time.Time     `json:"etnaTime"`
+	FortunaTime                  time.Time     `json:"fortunaTime"`
+	GraniteTime                  time.Time     `json:"graniteTime"`
+	GraniteEpochDuration         time.Duration `json:"graniteEpochDuration"`
+	HeliconTime                  time.Time     `json:"heliconTime"`
 }
 
 func (c *Config) Validate() error {
@@ -117,6 +125,7 @@ func (c *Config) Validate() error {
 		c.EtnaTime,
 		c.FortunaTime,
 		c.GraniteTime,
+		c.HeliconTime,
 	}
 	for i := 0; i < len(upgrades)-1; i++ {
 		if upgrades[i].After(upgrades[i+1]) {
@@ -186,6 +195,10 @@ func (c *Config) IsFortunaActivated(t time.Time) bool {
 
 func (c *Config) IsGraniteActivated(t time.Time) bool {
 	return !t.Before(c.GraniteTime)
+}
+
+func (c *Config) IsHeliconActivated(t time.Time) bool {
+	return !t.Before(c.HeliconTime)
 }
 
 func GetConfig(networkID uint32) Config {

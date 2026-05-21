@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "signermock",
+    srcs = ["signer.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/signer/signermock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/crypto/bls",
+        "@org_uber_go_mock//gomock",
+    ],
+)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowmantest
@@ -10,19 +10,19 @@ import (
 
 	"github.com/MetalBlockchain/metalgo/ids"
 	"github.com/MetalBlockchain/metalgo/snow/snowtest"
+	"github.com/MetalBlockchain/metalgo/upgrade"
 	"github.com/MetalBlockchain/metalgo/utils"
 )
 
 const (
-	GenesisHeight        uint64 = 0
-	GenesisUnixTimestamp int64  = 1
+	GenesisHeight uint64 = 0
 )
 
 var (
 	_ utils.Sortable[*Block] = (*Block)(nil)
 
 	GenesisID        = ids.GenerateTestID()
-	GenesisTimestamp = time.Unix(GenesisUnixTimestamp, 0)
+	GenesisTimestamp = upgrade.InitiallyActiveTime
 	GenesisBytes     = GenesisID[:]
 	Genesis          = BuildChain(1)[0]
 )

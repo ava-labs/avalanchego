@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "log",
+    srcs = [
+        "format.go",
+        "handler.go",
+        "logger.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/log",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_holiman_uint256//:uint256",
+        "@org_golang_x_exp//slog",
+    ],
+)

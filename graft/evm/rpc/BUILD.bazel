@@ -1,0 +1,60 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "rpc",
+    srcs = [
+        "client.go",
+        "client_opt.go",
+        "context_headers.go",
+        "doc.go",
+        "errors.go",
+        "handler.go",
+        "http.go",
+        "inproc.go",
+        "json.go",
+        "metrics.go",
+        "server.go",
+        "service.go",
+        "subscription.go",
+        "testing.go",
+        "types.go",
+        "websocket.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/evm/rpc",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_ava_labs_libevm//rpc",
+        "@com_github_deckarep_golang_set_v2//:golang-set",
+        "@com_github_gorilla_websocket//:websocket",
+        "@org_golang_x_time//rate",
+    ],
+)
+
+graft_go_test(
+    name = "rpc_test",
+    srcs = [
+        "client_opt_test.go",
+        "client_test.go",
+        "http_test.go",
+        "server_test.go",
+        "subscription_test.go",
+        "testservice_test.go",
+        "types_test.go",
+        "websocket_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":rpc"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_davecgh_go_spew//spew",
+        "@com_github_gorilla_websocket//:websocket",
+    ],
+)

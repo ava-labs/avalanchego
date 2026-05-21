@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -41,7 +40,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgradetest.ApricotPhase5)
 
 	// create apricotParentBlk. It's a standard one for simplicity
 	parentHeight := uint64(2022)
@@ -55,12 +54,6 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	parentID := apricotParentBlk.ID()
 
 	// store parent block, with relevant quantities
-	onParentAccept := state.NewMockDiff(ctrl)
-	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
-		statelessBlock: apricotParentBlk,
-		onAcceptState:  onParentAccept,
-	}
-	env.blkManager.(*manager).lastAccepted = parentID
 	chainTime := env.clk.Time().Truncate(time.Second)
 
 	// create a proposal transaction to be included into proposal block
@@ -89,13 +82,13 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}
 
 	// setup state to validate proposal block transaction
-	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
-	onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
-	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
-	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
-
-	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(
+	mockParent := state.NewMockChain(ctrl)
+	mockParent.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	mockParent.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
+	mockParent.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
+	mockParent.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	mockParent.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
+	mockParent.EXPECT().GetCurrentStakerIterator().Return(
 		iterator.FromSlice(&state.Staker{
 			TxID:      addValTx.ID(),
 			NodeID:    utx.NodeID(),
@@ -106,15 +99,16 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		}),
 		nil,
 	)
-	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
-	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
-
-	env.mockedState.EXPECT().GetUptime(gomock.Any()).Return(
-		time.Microsecond, /*upDuration*/
-		time.Time{},      /*lastUpdated*/
-		nil,              /*err*/
-	).AnyTimes()
+	mockParent.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
+	mockParent.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
+	mockParent.EXPECT().GetStakingInfo(constants.PrimaryNetworkID, utx.NodeID()).Return(state.StakingInfo{}, nil).AnyTimes()
+	onParentAccept, err := state.NewDiffOn(mockParent, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
+		statelessBlock: apricotParentBlk,
+		onAcceptState:  onParentAccept,
+	}
+	env.blkManager.(*manager).lastAccepted = parentID
 
 	// wrong height
 	statelessProposalBlock, err := block.NewApricotProposalBlock(
@@ -126,7 +120,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	proposalBlock := env.blkManager.NewBlock(statelessProposalBlock)
 
-	err = proposalBlock.Verify(context.Background())
+	err = proposalBlock.Verify(t.Context())
 	require.ErrorIs(err, errIncorrectBlockHeight)
 
 	// valid
@@ -138,14 +132,14 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require.NoError(err)
 
 	proposalBlock = env.blkManager.NewBlock(statelessProposalBlock)
-	require.NoError(proposalBlock.Verify(context.Background()))
+	require.NoError(proposalBlock.Verify(t.Context()))
 }
 
 func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	env := newEnvironment(t, ctrl, upgradetest.Banff)
+	env := newEnvironment(t, upgradetest.Banff)
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := genesistest.DefaultValidatorStartTime
@@ -161,28 +155,6 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	// store parent block, with relevant quantities
 	chainTime := parentTime
-	onParentAccept := state.NewMockDiff(ctrl)
-	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
-	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
-	onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
-	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
-	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
-	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-
-	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
-		statelessBlock: banffParentBlk,
-		onAcceptState:  onParentAccept,
-		timestamp:      parentTime,
-	}
-	env.blkManager.(*manager).lastAccepted = parentID
-	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
-	env.mockedState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
-		func(blockID ids.ID) (block.Block, error) {
-			if blockID == parentID {
-				return banffParentBlk, nil
-			}
-			return nil, database.ErrNotFound
-		}).AnyTimes()
 
 	// setup state to validate proposal block transaction
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
@@ -204,11 +176,17 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	}
 	nextStakerTx := &txs.Tx{Unsigned: unsignedNextStakerTx}
 	require.NoError(nextStakerTx.Initialize(txs.Codec))
-
 	nextStakerTxID := nextStakerTx.ID()
-	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
-	onParentAccept.EXPECT().GetCurrentStakerIterator().DoAndReturn(func() (iterator.Iterator[*state.Staker], error) {
+	mockParent := state.NewMockChain(ctrl)
+	mockParent.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
+	mockParent.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
+	mockParent.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
+	mockParent.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	mockParent.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
+	mockParent.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
+	mockParent.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
+	mockParent.EXPECT().GetCurrentStakerIterator().DoAndReturn(func() (iterator.Iterator[*state.Staker], error) {
 		return iterator.FromSlice(
 			&state.Staker{
 				TxID:     nextStakerTxID,
@@ -218,17 +196,20 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 			},
 		), nil
 	}).AnyTimes()
-	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
-	onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().Return(iterator.Empty[state.L1Validator]{}, nil).AnyTimes()
-	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
-
-	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
-
-	env.mockedState.EXPECT().GetUptime(gomock.Any).Return(
-		time.Microsecond, /*upDuration*/
-		time.Time{},      /*lastUpdated*/
-		nil,              /*err*/
-	).AnyTimes()
+	mockParent.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
+	mockParent.EXPECT().GetActiveL1ValidatorsIterator().Return(iterator.Empty[state.L1Validator]{}, nil).AnyTimes()
+	mockParent.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
+	mockParent.EXPECT().GetStakingInfo(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(state.StakingInfo{}, nil).AnyTimes()
+	onParentAccept, err := state.NewDiffOn(mockParent, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
+		statelessBlock: banffParentBlk,
+		onAcceptState:  onParentAccept,
+		timestamp:      parentTime,
+	}
+	env.blkManager.(*manager).lastAccepted = parentID
+	env.state.SetLastAccepted(parentID)
+	env.state.AddStatelessBlock(banffParentBlk)
 
 	// create proposal tx to be included in the proposal block
 	blkTx := &txs.Tx{
@@ -250,7 +231,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, errIncorrectBlockHeight)
 	}
 
@@ -264,7 +245,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, errApricotBlockIssuedAfterFork)
 	}
 
@@ -280,7 +261,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, executor.ErrChildBlockEarlierThanParent)
 	}
 
@@ -298,7 +279,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, executor.ErrChildBlockBeyondSyncBound)
 		env.clk.Set(initClkTime)
 	}
@@ -316,7 +297,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, executor.ErrChildBlockAfterStakerChangeTime)
 	}
 
@@ -338,7 +319,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		err = block.Verify(context.Background())
+		err = block.Verify(t.Context())
 		require.ErrorIs(err, executor.ErrAdvanceTimeTxIssuedAfterBanff)
 	}
 
@@ -354,7 +335,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		require.NoError(err)
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		require.NoError(block.Verify(context.Background()))
+		require.NoError(block.Verify(t.Context()))
 	}
 }
 
@@ -518,7 +499,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, upgradetest.Banff)
+			env := newEnvironment(t, upgradetest.Banff)
 
 			subnetID := testSubnet1.ID()
 			env.config.TrackedSubnets.Add(subnetID)
@@ -642,14 +623,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 				// verify and accept the block
 				block := env.blkManager.NewBlock(statelessProposalBlock)
-				require.NoError(block.Verify(context.Background()))
-				options, err := block.(snowman.OracleBlock).Options(context.Background())
+				require.NoError(block.Verify(t.Context()))
+				options, err := block.(snowman.OracleBlock).Options(t.Context())
 				require.NoError(err)
 
-				require.NoError(options[0].Verify(context.Background()))
+				require.NoError(options[0].Verify(t.Context()))
 
-				require.NoError(block.Accept(context.Background()))
-				require.NoError(options[0].Accept(context.Background()))
+				require.NoError(block.Accept(t.Context()))
+				require.NoError(options[0].Accept(t.Context()))
 			}
 			require.NoError(env.state.Commit())
 
@@ -684,7 +665,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, upgradetest.Banff)
+	env := newEnvironment(t, upgradetest.Banff)
 
 	subnetID := testSubnet1.ID()
 	wallet := newWallet(t, env, walletConfig{
@@ -811,12 +792,12 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 	propBlk := env.blkManager.NewBlock(statelessProposalBlock)
-	require.NoError(propBlk.Verify(context.Background())) // verify and update staker set
+	require.NoError(propBlk.Verify(t.Context())) // verify and update staker set
 
-	options, err := propBlk.(snowman.OracleBlock).Options(context.Background())
+	options, err := propBlk.(snowman.OracleBlock).Options(t.Context())
 	require.NoError(err)
 	commitBlk := options[0]
-	require.NoError(commitBlk.Verify(context.Background()))
+	require.NoError(commitBlk.Verify(t.Context()))
 
 	blkStateMap := env.blkManager.(*manager).blkIDToState
 	updatedState := blkStateMap[commitBlk.ID()].onAcceptState
@@ -824,8 +805,8 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Check VM Validators are removed successfully
-	require.NoError(propBlk.Accept(context.Background()))
-	require.NoError(commitBlk.Accept(context.Background()))
+	require.NoError(propBlk.Accept(t.Context()))
+	require.NoError(commitBlk.Accept(t.Context()))
 	_, ok := env.config.Validators.GetValidator(subnetID, subnetVdr2NodeID)
 	require.False(ok)
 	_, ok = env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
@@ -836,7 +817,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, nil, upgradetest.Banff)
+			env := newEnvironment(t, upgradetest.Banff)
 
 			subnetID := testSubnet1.ID()
 			if tracked {
@@ -933,14 +914,14 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 			propBlk := env.blkManager.NewBlock(statelessProposalBlock)
-			require.NoError(propBlk.Verify(context.Background())) // verify update staker set
-			options, err := propBlk.(snowman.OracleBlock).Options(context.Background())
+			require.NoError(propBlk.Verify(t.Context())) // verify update staker set
+			options, err := propBlk.(snowman.OracleBlock).Options(t.Context())
 			require.NoError(err)
 			commitBlk := options[0]
-			require.NoError(commitBlk.Verify(context.Background()))
+			require.NoError(commitBlk.Verify(t.Context()))
 
-			require.NoError(propBlk.Accept(context.Background()))
-			require.NoError(commitBlk.Accept(context.Background()))
+			require.NoError(propBlk.Accept(t.Context()))
+			require.NoError(commitBlk.Accept(t.Context()))
 			_, ok := env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
 			require.True(ok)
 		})
@@ -949,7 +930,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, upgradetest.Banff)
+	env := newEnvironment(t, upgradetest.Banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1025,15 +1006,15 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 	propBlk := env.blkManager.NewBlock(statelessProposalBlock)
-	require.NoError(propBlk.Verify(context.Background()))
+	require.NoError(propBlk.Verify(t.Context()))
 
-	options, err := propBlk.(snowman.OracleBlock).Options(context.Background())
+	options, err := propBlk.(snowman.OracleBlock).Options(t.Context())
 	require.NoError(err)
 	commitBlk := options[0]
-	require.NoError(commitBlk.Verify(context.Background()))
+	require.NoError(commitBlk.Verify(t.Context()))
 
-	require.NoError(propBlk.Accept(context.Background()))
-	require.NoError(commitBlk.Accept(context.Background()))
+	require.NoError(propBlk.Accept(t.Context()))
+	require.NoError(commitBlk.Accept(t.Context()))
 
 	// Test validator weight before delegation
 	vdrWeight := env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
@@ -1115,15 +1096,15 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	propBlk = env.blkManager.NewBlock(statelessProposalBlock)
-	require.NoError(propBlk.Verify(context.Background()))
+	require.NoError(propBlk.Verify(t.Context()))
 
-	options, err = propBlk.(snowman.OracleBlock).Options(context.Background())
+	options, err = propBlk.(snowman.OracleBlock).Options(t.Context())
 	require.NoError(err)
 	commitBlk = options[0]
-	require.NoError(commitBlk.Verify(context.Background()))
+	require.NoError(commitBlk.Verify(t.Context()))
 
-	require.NoError(propBlk.Accept(context.Background()))
-	require.NoError(commitBlk.Accept(context.Background()))
+	require.NoError(propBlk.Accept(t.Context()))
+	require.NoError(commitBlk.Accept(t.Context()))
 
 	// Test validator weight after delegation
 	vdrWeight = env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
@@ -1132,7 +1113,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, upgradetest.Banff)
+	env := newEnvironment(t, upgradetest.Banff)
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1210,15 +1191,15 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	)
 	require.NoError(err)
 	propBlk := env.blkManager.NewBlock(statelessProposalBlock)
-	require.NoError(propBlk.Verify(context.Background()))
+	require.NoError(propBlk.Verify(t.Context()))
 
-	options, err := propBlk.(snowman.OracleBlock).Options(context.Background())
+	options, err := propBlk.(snowman.OracleBlock).Options(t.Context())
 	require.NoError(err)
 	commitBlk := options[0]
-	require.NoError(commitBlk.Verify(context.Background()))
+	require.NoError(commitBlk.Verify(t.Context()))
 
-	require.NoError(propBlk.Accept(context.Background()))
-	require.NoError(commitBlk.Accept(context.Background()))
+	require.NoError(propBlk.Accept(t.Context()))
+	require.NoError(commitBlk.Accept(t.Context()))
 
 	// Test validator weight before delegation
 	vdrWeight := env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
@@ -1299,15 +1280,15 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	)
 	require.NoError(err)
 	propBlk = env.blkManager.NewBlock(statelessProposalBlock)
-	require.NoError(propBlk.Verify(context.Background()))
+	require.NoError(propBlk.Verify(t.Context()))
 
-	options, err = propBlk.(snowman.OracleBlock).Options(context.Background())
+	options, err = propBlk.(snowman.OracleBlock).Options(t.Context())
 	require.NoError(err)
 	commitBlk = options[0]
-	require.NoError(commitBlk.Verify(context.Background()))
+	require.NoError(commitBlk.Verify(t.Context()))
 
-	require.NoError(propBlk.Accept(context.Background()))
-	require.NoError(commitBlk.Accept(context.Background()))
+	require.NoError(propBlk.Accept(t.Context()))
+	require.NoError(commitBlk.Accept(t.Context()))
 
 	// Test validator weight after delegation
 	vdrWeight = env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
@@ -1316,7 +1297,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 func TestAddValidatorProposalBlock(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, nil, upgradetest.Durango)
+	env := newEnvironment(t, upgradetest.Durango)
 
 	wallet := newWallet(t, env, walletConfig{})
 
@@ -1370,9 +1351,9 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	)
 	require.NoError(err)
 	blk := env.blkManager.NewBlock(statelessBlk)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	env.blkManager.SetPreference(statelessBlk.ID())
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
+	env.blkManager.SetPreference(statelessBlk.ID(), nil)
 
 	// Should be current
 	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -1403,9 +1384,9 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		)
 		require.NoError(err)
 		blk = env.blkManager.NewBlock(statelessBlk)
-		require.NoError(blk.Verify(context.Background()))
-		require.NoError(blk.Accept(context.Background()))
-		env.blkManager.SetPreference(statelessBlk.ID())
+		require.NoError(blk.Verify(t.Context()))
+		require.NoError(blk.Accept(t.Context()))
+		env.blkManager.SetPreference(statelessBlk.ID(), nil)
 	}
 
 	env.clk.Set(validatorEndTime)
@@ -1456,15 +1437,15 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	)
 	require.NoError(err)
 	blk = env.blkManager.NewBlock(statelessProposalBlk)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
-	options, err := blk.(snowman.OracleBlock).Options(context.Background())
+	options, err := blk.(snowman.OracleBlock).Options(t.Context())
 	require.NoError(err)
 	commitBlk := options[0]
-	require.NoError(commitBlk.Verify(context.Background()))
+	require.NoError(commitBlk.Verify(t.Context()))
 
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(commitBlk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
+	require.NoError(commitBlk.Accept(t.Context()))
 
 	// Should be current
 	staker, err = env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)

@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "extrastest",
+    srcs = ["rules.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/params/extras",
+        "//upgrade",
+        "//upgrade/upgradetest",
+    ],
+)

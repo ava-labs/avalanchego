@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -9,14 +9,14 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/MetalBlockchain/metalgo/ids"
 	"github.com/MetalBlockchain/metalgo/snow"
 	"github.com/MetalBlockchain/metalgo/utils/logging"
+	"github.com/MetalBlockchain/metalgo/vms/components/gas"
 	"github.com/MetalBlockchain/metalgo/vms/components/verify"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/block"
-	"github.com/MetalBlockchain/metalgo/vms/platformvm/state"
+	"github.com/MetalBlockchain/metalgo/vms/platformvm/state/statetest"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/txs"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/txs/mempool"
 	"github.com/MetalBlockchain/metalgo/vms/secp256k1fx"
@@ -115,14 +115,19 @@ func TestRejectBlock(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
 
 			blk, err := tt.newBlockFunc()
 			require.NoError(err)
 
-			mempool, err := mempool.New("", prometheus.NewRegistry())
+			mempool, err := mempool.New(
+				"",
+				gas.Dimensions{},
+				1_000_000,
+				ids.ID{},
+				prometheus.NewRegistry(),
+			)
 			require.NoError(err)
-			state := state.NewMockState(ctrl)
+			state := statetest.New(t, statetest.Config{})
 			blkIDToState := map[ids.ID]*blockState{
 				blk.Parent(): nil,
 				blk.ID():     nil,

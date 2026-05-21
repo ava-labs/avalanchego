@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "fxs",
+    srcs = ["fx.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/fxs",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/nftfx",
+        "//vms/propertyfx",
+        "//vms/secp256k1fx",
+    ],
+)

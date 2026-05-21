@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "vms",
+    srcs = ["xsvm.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/e2e/vms",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/connectclient",
+        "//connectproto/pb/xsvm",
+        "//connectproto/pb/xsvm/xsvmconnect",
+        "//ids",
+        "//tests/fixture/e2e",
+        "//tests/fixture/subnet",
+        "//tests/fixture/tmpnet",
+        "//utils/crypto/secp256k1",
+        "//utils/units",
+        "//vms/example/xsvm/api",
+        "//vms/example/xsvm/cmd/issue/export",
+        "//vms/example/xsvm/cmd/issue/importtx",
+        "//vms/example/xsvm/cmd/issue/transfer",
+        "@com_connectrpc_connect//:connect",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_sync//errgroup",
+        "@org_uber_go_zap//:zap",
+    ],
+)

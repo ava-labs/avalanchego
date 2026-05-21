@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "sendermock",
+    srcs = ["external_sender.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/networking/sender/sendermock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//message",
+        "//snow/engine/common",
+        "//subnets",
+        "//utils/set",
+        "@org_uber_go_mock//gomock",
+    ],
+)

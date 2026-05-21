@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "add-permissioned-subnet-validator_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/add-permissioned-subnet-validator",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api/info",
+        "//genesis",
+        "//ids",
+        "//utils/units",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "add-permissioned-subnet-validator",
+    embed = [":add-permissioned-subnet-validator_lib"],
+    visibility = ["//visibility:public"],
+)

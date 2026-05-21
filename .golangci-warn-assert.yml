@@ -1,0 +1,18 @@
+# Minimal config for advisory testify/assert warnings.
+# Used by test_warn_testify_assert in scripts/lint.sh.
+# This check warns but doesn't fail the build.
+version: "2"
+linters:
+  default: none
+  enable:
+    - forbidigo
+  settings:
+    forbidigo:
+      forbid:
+        - pattern: ^assert\.(# continues on failure; consider require for fail-fast)?
+  exclusions:
+    rules:
+      # Exclude antithesis tests which use a different assert package
+      - path: "^tests/antithesis/"
+        linters:
+          - forbidigo

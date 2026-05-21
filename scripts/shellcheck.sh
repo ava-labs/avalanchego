@@ -16,6 +16,9 @@ fi
 # leading `.` in filenames it emits. A leading `.` will prevent the
 # use of `git apply` to fix reported shellcheck issues. This is
 # compatible with both macos and linux (unlike the use of -printf).
+# We exclude the graft/coreth and graft/subnet-evm directories to 
+# avoid linting files that should be run from a different location 
+# within the repo, as there are false positives.
 #
 # shellcheck disable=SC2035
-find * -name "*.sh" -type f -print0 | xargs -0 shellcheck "${@}"
+find * \( -path 'graft/coreth' -o -path 'graft/subnet-evm' \) -prune -o -name '*.sh' -type f -print0 | xargs -0 shellcheck "${@}"

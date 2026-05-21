@@ -1,25 +1,20 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"slices"
 
 	"golang.org/x/exp/maps"
 
+	"github.com/MetalBlockchain/metalgo/database/merkle/sync"
 	"github.com/MetalBlockchain/metalgo/ids"
 	"github.com/MetalBlockchain/metalgo/utils/buffer"
 	"github.com/MetalBlockchain/metalgo/utils/heap"
 	"github.com/MetalBlockchain/metalgo/utils/maybe"
-)
-
-var (
-	ErrInsufficientHistory = errors.New("insufficient history to generate proof")
-	ErrNoEndRoot           = fmt.Errorf("%w: end root not found", ErrInsufficientHistory)
 )
 
 // stores previous trie states
@@ -122,10 +117,9 @@ type valueChange struct {
 // [start, end] that occurred between [startRoot] and [endRoot].
 // If [start] is Nothing, there's no lower bound on the range.
 // If [end] is Nothing, there's no upper bound on the range.
-// Returns [ErrInsufficientHistory] if the history is insufficient
+// Returns [sync.ErrInsufficientHistory] if the history is insufficient
 // to generate the proof.
-// Returns [ErrNoEndRoot], which wraps [ErrInsufficientHistory], if
-// the [endRoot] isn't in the history.
+// Returns [sync.ErrNoEndRoot], if the history doesn't contain the [endRootID].
 func (th *trieHistory) getValueChanges(
 	startRoot ids.ID,
 	endRoot ids.ID,
@@ -144,7 +138,7 @@ func (th *trieHistory) getValueChanges(
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
 	endRootChanges, ok := th.getRootChanges(endRoot)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrNoEndRoot, endRoot)
+		return nil, fmt.Errorf("%w: %s", sync.ErrNoEndRoot, endRoot)
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
@@ -152,7 +146,7 @@ func (th *trieHistory) getValueChanges(
 	// [startRootChanges] is the last appearance of [startRoot].
 	startRootChanges, ok := th.getRootChanges(startRoot)
 	if !ok {
-		return nil, fmt.Errorf("%w: start root %s not found", ErrInsufficientHistory, startRoot)
+		return nil, fmt.Errorf("%w: start root %s not found", sync.ErrInsufficientHistory, startRoot)
 	}
 
 	var (
@@ -189,7 +183,7 @@ func (th *trieHistory) getValueChanges(
 			if i == 0 {
 				return nil, fmt.Errorf(
 					"%w: start root %s not found before end root %s",
-					ErrInsufficientHistory, startRoot, endRoot,
+					sync.ErrInsufficientHistory, startRoot, endRoot,
 				)
 			}
 		}
@@ -331,7 +325,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.getRootChanges(rootID)
 	if !ok {
-		return nil, ErrInsufficientHistory
+		return nil, sync.ErrInsufficientHistory
 	}
 
 	var (

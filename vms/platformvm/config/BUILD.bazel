@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "config",
+    srcs = [
+        "config.go",
+        "internal.go",
+        "network.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/config",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chains",
+        "//ids",
+        "//snow/uptime",
+        "//snow/validators",
+        "//upgrade",
+        "//utils/constants",
+        "//utils/set",
+        "//utils/units",
+        "//vms/components/gas",
+        "//vms/platformvm/reward",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/validators/fee",
+    ],
+)
+
+go_test(
+    name = "config_test",
+    srcs = ["config_test.go"],
+    embed = [":config"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

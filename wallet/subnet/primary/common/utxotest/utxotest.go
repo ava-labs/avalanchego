@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utxotest
@@ -21,7 +21,7 @@ func NewDeterministicChainUTXOs(t *testing.T, utxoSets map[ids.ID][]*avax.UTXO) 
 	for subnetID, utxos := range utxoSets {
 		for _, utxo := range utxos {
 			require.NoError(
-				t, globalUTXOs.AddUTXO(context.Background(), subnetID, constants.PlatformChainID, utxo),
+				t, globalUTXOs.AddUTXO(t.Context(), subnetID, constants.PlatformChainID, utxo),
 			)
 		}
 	}

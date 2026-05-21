@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ethclient",
+    srcs = [
+        "ethclient.go",
+        "ethclient_ext.go",
+        "signer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/ethclient",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/accounts/abi/bind",
+        "//graft/coreth/interfaces",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/precompile/registry",
+        "//graft/evm/rpc",
+        "@com_github_ava_labs_libevm//:libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)

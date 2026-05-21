@@ -1,0 +1,50 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "txallowlist",
+    srcs = [
+        "config.go",
+        "contract.go",
+        "module.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/precompile/allowlist",
+        "//graft/subnet-evm/precompile/contract",
+        "//graft/subnet-evm/precompile/modules",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "@com_github_ava_labs_libevm//common",
+    ],
+)
+
+graft_go_test(
+    name = "txallowlist_test",
+    srcs = [
+        "config_test.go",
+        "contract_test.go",
+        "simulated_test.go",
+    ],
+    deps = [
+        ":txallowlist",
+        "//graft/subnet-evm/accounts/abi/bind",
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/ethclient/simulated",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "//graft/subnet-evm/plugin/evm/vmerrors",
+        "//graft/subnet-evm/precompile/allowlist",
+        "//graft/subnet-evm/precompile/allowlist/allowlisttest",
+        "//graft/subnet-evm/precompile/allowlist/allowlisttest/bindings",
+        "//graft/subnet-evm/precompile/contracts/utilstest",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "//graft/subnet-evm/precompile/precompiletest",
+        "//utils",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

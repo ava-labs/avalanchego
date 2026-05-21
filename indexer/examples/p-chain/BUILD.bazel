@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "p-chain_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/indexer/examples/p-chain",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//indexer",
+        "//utils/constants",
+        "//vms/platformvm/block",
+        "//vms/proposervm/block",
+        "//wallet/subnet/primary",
+    ],
+)
+
+go_binary(
+    name = "p-chain",
+    embed = [":p-chain_lib"],
+    visibility = ["//visibility:public"],
+)

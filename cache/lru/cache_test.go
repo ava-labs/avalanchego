@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package lru
@@ -88,8 +88,10 @@ func TestCacheOnEvict(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			evictedKeys := make([]int, 0)
-			evictedValues := make([]int, 0)
+			var (
+				evictedKeys   []int
+				evictedValues []int
+			)
 			c := NewCacheWithOnEvict(tt.cacheSize, func(key, value int) {
 				evictedKeys = append(evictedKeys, key)
 				evictedValues = append(evictedValues, value)

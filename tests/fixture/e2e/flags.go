@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e
@@ -40,7 +40,7 @@ type FlagVars struct {
 	stopNetwork    bool
 	restartNetwork bool
 
-	activateGranite bool
+	activateLatest bool
 }
 
 func (v *FlagVars) NetworkCmd() (NetworkCmd, error) {
@@ -120,8 +120,8 @@ func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	return 0
 }
 
-func (v *FlagVars) ActivateGranite() bool {
-	return v.activateGranite
+func (v *FlagVars) ActivateLatest() bool {
+	return v.activateLatest
 }
 
 type DefaultOption func(*DefaultOptions)
@@ -215,10 +215,10 @@ func RegisterFlags(ops ...DefaultOption) *FlagVars {
 	)
 
 	flag.BoolVar(
-		&vars.activateGranite,
-		"activate-granite",
+		&vars.activateLatest,
+		"activate-latest",
 		false,
-		"[optional] activate the granite upgrade",
+		"[optional] activate all upgrades up to and including the latest upgrade",
 	)
 
 	return &vars

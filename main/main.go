@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -14,10 +14,13 @@ import (
 
 	"github.com/MetalBlockchain/metalgo/app"
 	"github.com/MetalBlockchain/metalgo/config"
+	"github.com/MetalBlockchain/metalgo/graft/coreth/plugin/evm"
 	"github.com/MetalBlockchain/metalgo/version"
 )
 
 func main() {
+	evm.RegisterAllLibEVMExtras()
+
 	fs := config.BuildFlagSet()
 	v, err := config.BuildViper(fs, os.Args[1:])
 

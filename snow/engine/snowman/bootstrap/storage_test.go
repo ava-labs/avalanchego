@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -91,7 +91,7 @@ func TestGetMissingBlockIDs(t *testing.T) {
 			}
 
 			missingBlockIDs, err := getMissingBlockIDs(
-				context.Background(),
+				t.Context(),
 				db,
 				parser,
 				tree,
@@ -268,7 +268,7 @@ func TestExecute(t *testing.T) {
 			}
 
 			require.NoError(execute(
-				context.Background(),
+				t.Context(),
 				test.haltable.Halted,
 				logging.NoLog{}.Info,
 				db,

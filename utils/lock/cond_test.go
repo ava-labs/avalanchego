@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package lock
@@ -13,7 +13,7 @@ import (
 )
 
 func TestCond(t *testing.T) {
-	cancelled, cancel := context.WithCancel(context.Background())
+	cancelled, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	var (
@@ -35,7 +35,7 @@ func TestCond(t *testing.T) {
 		}{
 			{
 				name:           "signal_once",
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				expectedErrors: make([]error, 1),
 				next: []func(*Cond){
 					signal,
@@ -43,7 +43,7 @@ func TestCond(t *testing.T) {
 			},
 			{
 				name:           "signal_twice",
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				expectedErrors: make([]error, 1),
 				next: []func(*Cond){
 					merge(
@@ -54,7 +54,7 @@ func TestCond(t *testing.T) {
 			},
 			{
 				name:           "signal_both_once",
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				expectedErrors: make([]error, 2),
 				next: []func(*Cond){
 					signal,
@@ -63,7 +63,7 @@ func TestCond(t *testing.T) {
 			},
 			{
 				name:           "signal_both_once_atomically",
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				expectedErrors: make([]error, 2),
 				next: []func(*Cond){
 					merge(
@@ -75,7 +75,7 @@ func TestCond(t *testing.T) {
 			},
 			{
 				name:           "broadcast_once",
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				expectedErrors: make([]error, 2),
 				next: []func(*Cond){
 					broadcast,
@@ -84,7 +84,7 @@ func TestCond(t *testing.T) {
 			},
 			{
 				name:           "broadcast_twice",
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				expectedErrors: make([]error, 2),
 				next: []func(*Cond){
 					broadcast,

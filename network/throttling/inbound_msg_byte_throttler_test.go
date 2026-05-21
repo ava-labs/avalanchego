@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -36,7 +36,7 @@ func TestInboundMsgByteThrottlerCancelContextDeadlock(t *testing.T) {
 	)
 	require.NoError(err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	nodeID := ids.GenerateTestNodeID()
@@ -65,11 +65,11 @@ func TestInboundMsgByteThrottlerCancelContext(t *testing.T) {
 	)
 	require.NoError(err)
 
-	throttler.Acquire(context.Background(), config.VdrAllocSize, vdr1ID)
+	throttler.Acquire(t.Context(), config.VdrAllocSize, vdr1ID)
 
 	// Trying to take more bytes for node should block
 	vdr2Done := make(chan struct{})
-	vdr2Context, vdr2ContextCancelFunction := context.WithCancel(context.Background())
+	vdr2Context, vdr2ContextCancelFunction := context.WithCancel(t.Context())
 	go func() {
 		throttler.Acquire(vdr2Context, config.VdrAllocSize, vdr2ID)
 		vdr2Done <- struct{}{}
@@ -133,7 +133,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// Take from at-large allocation.
 	// Should return immediately.
-	throttler.Acquire(context.Background(), 1, vdr1ID)
+	throttler.Acquire(t.Context(), 1, vdr1ID)
 	require.Equal(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
 	require.Empty(throttler.nodeToVdrBytesUsed)
@@ -149,7 +149,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// Use all the at-large allocation bytes and 1 of the validator allocation bytes
 	// Should return immediately.
-	throttler.Acquire(context.Background(), config.AtLargeAllocSize+1, vdr1ID)
+	throttler.Acquire(t.Context(), config.AtLargeAllocSize+1, vdr1ID)
 	// vdr1 at-large bytes used: 1024. Validator bytes used: 1
 	require.Zero(throttler.remainingAtLargeBytes)
 	require.Equal(config.VdrAllocSize-1, throttler.remainingVdrBytes)
@@ -160,7 +160,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// The other validator should be able to acquire half the validator allocation.
 	// Should return immediately.
-	throttler.Acquire(context.Background(), config.AtLargeAllocSize/2, vdr2ID)
+	throttler.Acquire(t.Context(), config.AtLargeAllocSize/2, vdr2ID)
 	// vdr2 at-large bytes used: 0. Validator bytes used: 512
 	require.Equal(config.VdrAllocSize/2-1, throttler.remainingVdrBytes)
 	require.Equal(uint64(1), throttler.nodeToVdrBytesUsed[vdr1ID])
@@ -172,7 +172,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// vdr1 should be able to acquire the rest of the validator allocation
 	// Should return immediately.
-	throttler.Acquire(context.Background(), config.VdrAllocSize/2-1, vdr1ID)
+	throttler.Acquire(t.Context(), config.VdrAllocSize/2-1, vdr1ID)
 	// vdr1 at-large bytes used: 1024. Validator bytes used: 512
 	require.Equal(config.VdrAllocSize/2, throttler.nodeToVdrBytesUsed[vdr1ID])
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1)
@@ -181,7 +181,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	// Trying to take more bytes for either node should block
 	vdr1Done := make(chan struct{})
 	go func() {
-		throttler.Acquire(context.Background(), 1, vdr1ID)
+		throttler.Acquire(t.Context(), 1, vdr1ID)
 		vdr1Done <- struct{}{}
 	}()
 	select {
@@ -199,7 +199,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	vdr2Done := make(chan struct{})
 	go func() {
-		throttler.Acquire(context.Background(), 1, vdr2ID)
+		throttler.Acquire(t.Context(), 1, vdr2ID)
 		vdr2Done <- struct{}{}
 	}()
 	select {
@@ -219,7 +219,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	nonVdrID := ids.GenerateTestNodeID()
 	nonVdrDone := make(chan struct{})
 	go func() {
-		throttler.Acquire(context.Background(), 1, nonVdrID)
+		throttler.Acquire(t.Context(), 1, nonVdrID)
 		nonVdrDone <- struct{}{}
 	}()
 	select {
@@ -257,7 +257,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	require.Zero(throttler.waitingToAcquire.Len())
 
 	// Non-validator should be able to take the rest of the at-large bytes
-	throttler.Acquire(context.Background(), config.AtLargeAllocSize/2-2, nonVdrID)
+	throttler.Acquire(t.Context(), config.AtLargeAllocSize/2-2, nonVdrID)
 	require.Zero(throttler.remainingAtLargeBytes)
 	require.Equal(config.AtLargeAllocSize/2-1, throttler.nodeToAtLargeBytesUsed[nonVdrID])
 	require.Empty(throttler.nodeToWaitingMsgID)
@@ -265,7 +265,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	// But should block on subsequent Acquires
 	go func() {
-		throttler.Acquire(context.Background(), 1, nonVdrID)
+		throttler.Acquire(t.Context(), 1, nonVdrID)
 		nonVdrDone <- struct{}{}
 	}()
 	select {
@@ -336,12 +336,12 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	)
 	require.NoError(err)
 	nonVdrNodeID1 := ids.GenerateTestNodeID()
-	throttler.Acquire(context.Background(), config.NodeMaxAtLargeBytes, nonVdrNodeID1)
+	throttler.Acquire(t.Context(), config.NodeMaxAtLargeBytes, nonVdrNodeID1)
 
 	// Acquiring more should block
 	nonVdrDone := make(chan struct{})
 	go func() {
-		throttler.Acquire(context.Background(), 1, nonVdrNodeID1)
+		throttler.Acquire(t.Context(), 1, nonVdrNodeID1)
 		nonVdrDone <- struct{}{}
 	}()
 	select {
@@ -352,10 +352,10 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 
 	// A different non-validator should be able to acquire
 	nonVdrNodeID2 := ids.GenerateTestNodeID()
-	throttler.Acquire(context.Background(), config.NodeMaxAtLargeBytes, nonVdrNodeID2)
+	throttler.Acquire(t.Context(), config.NodeMaxAtLargeBytes, nonVdrNodeID2)
 
 	// Validator should only be able to take [MaxAtLargeBytes]
-	throttler.Acquire(context.Background(), config.NodeMaxAtLargeBytes+1, vdr1ID)
+	throttler.Acquire(t.Context(), config.NodeMaxAtLargeBytes+1, vdr1ID)
 	require.Equal(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 	require.Equal(uint64(1), throttler.nodeToVdrBytesUsed[vdr1ID])
 	require.Equal(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[nonVdrNodeID1])
@@ -387,14 +387,14 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 	require.NoError(err)
 
 	// validator uses up all but 1 byte
-	throttler.Acquire(context.Background(), maxBytes-1, vdr1ID)
+	throttler.Acquire(t.Context(), maxBytes-1, vdr1ID)
 	// validator uses the last byte
-	throttler.Acquire(context.Background(), 1, vdr1ID)
+	throttler.Acquire(t.Context(), 1, vdr1ID)
 
 	// validator wants to acquire a lot of bytes
 	doneVdr := make(chan struct{})
 	go func() {
-		throttler.Acquire(context.Background(), maxBytes-1, vdr1ID)
+		throttler.Acquire(t.Context(), maxBytes-1, vdr1ID)
 		doneVdr <- struct{}{}
 	}()
 	select {
@@ -406,7 +406,7 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 	// nonvalidator tries to acquire more bytes
 	done := make(chan struct{})
 	go func() {
-		throttler.Acquire(context.Background(), 1, nonVdrNodeID)
+		throttler.Acquire(t.Context(), 1, nonVdrNodeID)
 		done <- struct{}{}
 	}()
 	select {

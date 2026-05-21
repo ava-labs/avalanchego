@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -18,11 +18,9 @@ import (
 	"github.com/MetalBlockchain/metalgo/utils/crypto/bls"
 	"github.com/MetalBlockchain/metalgo/utils/timer/mockable"
 	"github.com/MetalBlockchain/metalgo/utils/window"
-	"github.com/MetalBlockchain/metalgo/vms/platformvm/block"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/config"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/metrics"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/state"
-	"github.com/MetalBlockchain/metalgo/vms/platformvm/status"
 	"github.com/MetalBlockchain/metalgo/vms/platformvm/txs"
 )
 
@@ -42,73 +40,18 @@ const (
 )
 
 var (
-	_ validators.State = (*manager)(nil)
+	_ validators.State = (*Manager)(nil)
 
 	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
 )
 
-// Manager adds the ability to introduce newly accepted blocks IDs to the State
-// interface.
-type Manager interface {
-	validators.State
-
-	// OnAcceptedBlockID registers the ID of the latest accepted block.
-	// It is used to update the [recentlyAccepted] sliding window.
-	OnAcceptedBlockID(blkID ids.ID)
-}
-
-type State interface {
-	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
-
-	GetLastAccepted() ids.ID
-	GetStatelessBlock(blockID ids.ID) (block.Block, error)
-
-	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyValidatorWeightDiffs(
-		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-		subnetID ids.ID,
-	) error
-
-	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs up to and including
-	// [endHeight]. Applying the diffs modifies [validators].
-	//
-	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] must initially contain the validator
-	// weights for [startHeight].
-	//
-	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
-	ApplyValidatorPublicKeyDiffs(
-		ctx context.Context,
-		validators map[ids.NodeID]*validators.GetValidatorOutput,
-		startHeight uint64,
-		endHeight uint64,
-		subnetID ids.ID,
-	) error
-
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*state.Staker, []state.L1Validator, uint64, error)
-}
-
 func NewManager(
 	cfg config.Internal,
-	state State,
+	state *state.State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
-) Manager {
-	return &manager{
+) *Manager {
+	return &Manager{
 		cfg:     cfg,
 		state:   state,
 		metrics: metrics,
@@ -125,11 +68,12 @@ func NewManager(
 	}
 }
 
+// Manager implements [validators.State] and additionally tracks recently accepted block IDs via OnAcceptedBlockID.
 // TODO: Remove requirement for the P-chain's context lock to be held when
 // calling exported functions.
-type manager struct {
+type Manager struct {
 	cfg     config.Internal
-	state   State
+	state   *state.State
 	metrics metrics.Metrics
 	clk     *mockable.Clock
 
@@ -159,7 +103,7 @@ type manager struct {
 // If [UseCurrentHeight] is true, we override the block selection policy
 // described above and we will always return the last accepted block height
 // as the minimum.
-func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
+func (m *Manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	if m.cfg.UseCurrentHeight {
 		return m.getCurrentHeight(ctx)
 	}
@@ -182,12 +126,12 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	return blk.Height() - 1, nil
 }
 
-func (m *manager) GetCurrentHeight(ctx context.Context) (uint64, error) {
+func (m *Manager) GetCurrentHeight(ctx context.Context) (uint64, error) {
 	return m.getCurrentHeight(ctx)
 }
 
 // TODO: Pass the context into the state.
-func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
+func (m *Manager) getCurrentHeight(context.Context) (uint64, error) {
 	lastAcceptedID := m.state.GetLastAccepted()
 	lastAccepted, err := m.state.GetStatelessBlock(lastAcceptedID)
 	if err != nil {
@@ -196,7 +140,29 @@ func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
 	return lastAccepted.Height(), nil
 }
 
-func (m *manager) GetValidatorSet(
+func (m *Manager) GetWarpValidatorSets(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.ID]validators.WarpSet, error) {
+	allValidators, err := m.makeAllValidatorSets(ctx, targetHeight)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorSets := make(map[ids.ID]validators.WarpSet, len(allValidators))
+	for subnetID, vdrSet := range allValidators {
+		ws, err := validators.FlattenValidatorSet(vdrSet)
+		if err != nil {
+			// If we can't flatten the validator set, skip it and disallow warp
+			// message verification from this subnet.
+			continue
+		}
+		validatorSets[subnetID] = ws
+	}
+	return validatorSets, nil
+}
+
+func (m *Manager) GetValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
 	subnetID ids.ID,
@@ -226,7 +192,7 @@ func (m *manager) GetValidatorSet(
 	return maps.Clone(validatorSet), nil
 }
 
-func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
+func (m *Manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
 	// Only cache tracked subnets
 	if subnetID != constants.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
 		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
@@ -242,7 +208,49 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 	return validatorSetsCache
 }
 
-func (m *manager) makeValidatorSet(
+func (m *Manager) makeAllValidatorSets(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	allValidators, currentHeight, err := m.getAllCurrentValidatorSets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if currentHeight < targetHeight {
+		return nil, fmt.Errorf("%w: current P-chain height (%d) < requested P-Chain height (%d)",
+			errUnfinalizedHeight,
+			currentHeight,
+			targetHeight,
+		)
+	}
+
+	// Rebuild subnet validators at [targetHeight]
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
+	err = m.state.ApplyAllValidatorWeightDiffs(
+		ctx,
+		allValidators,
+		currentHeight,
+		lastDiffHeight,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.state.ApplyAllValidatorPublicKeyDiffs(
+		ctx,
+		allValidators,
+		currentHeight,
+		lastDiffHeight,
+	)
+	return allValidators, err
+}
+
+func (m *Manager) makeValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
 	subnetID ids.ID,
@@ -288,7 +296,15 @@ func (m *manager) makeValidatorSet(
 	return validatorSet, currentHeight, err
 }
 
-func (m *manager) getCurrentValidatorSet(
+func (m *Manager) getAllCurrentValidatorSets(
+	ctx context.Context,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	subnetsMap := m.cfg.Validators.GetAllMaps()
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return subnetsMap, currentHeight, err
+}
+
+func (m *Manager) getCurrentValidatorSet(
 	ctx context.Context,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
@@ -297,7 +313,7 @@ func (m *manager) getCurrentValidatorSet(
 	return subnetMap, currentHeight, err
 }
 
-func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
+func (m *Manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
 	if chainID == constants.PlatformChainID {
 		return constants.PrimaryNetworkID, nil
 	}
@@ -317,11 +333,13 @@ func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 	return chain.SubnetID, nil
 }
 
-func (m *manager) OnAcceptedBlockID(blkID ids.ID) {
+// OnAcceptedBlockID registers the ID of the latest accepted block.
+// It is used to update the recentlyAccepted sliding window.
+func (m *Manager) OnAcceptedBlockID(blkID ids.ID) {
 	m.recentlyAccepted.Add(blkID)
 }
 
-func (m *manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+func (m *Manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
 	baseStakers, l1Validators, height, err := m.state.GetCurrentValidators(ctx, subnetID)
 	if err != nil {

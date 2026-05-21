@@ -8,7 +8,7 @@
 
   # Flake inputs
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2505.*.tar.gz";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
   };
 
   # Flake outputs
@@ -34,10 +34,15 @@
           # The Nix packages provided in the environment
           packages = with pkgs; [
             # Build requirements
+            bazelisk
+            (runCommand "bazel" {} ''mkdir -p $out/bin && ln -s ${bazelisk}/bin/bazelisk $out/bin/bazel'')
             git
 
             # Task runner
             go-task
+
+            # Local Go package
+            (import ./nix/go { inherit pkgs; })
 
             # Monitoring tools
             promtail                                   # Loki log shipper
@@ -49,8 +54,12 @@
             kind                                       # Kubernetes-in-Docker
             kubernetes-helm                            # Helm CLI (Kubernetes package manager)
 
+            # JSON processing
+            jq
+
             # Linters
             shellcheck
+            buildifier
 
             # Protobuf
             buf
@@ -58,19 +67,25 @@
             protoc-gen-go-grpc
             protoc-gen-connect-go
 
+            # Line-oriented search tool
+            ripgrep
+
             # Solidity compiler
             solc
 
             # s5cmd for rapid s3 interactions
             s5cmd
-          ] ++ lib.optionals stdenv.isDarwin [
-            # macOS-specific frameworks
-            darwin.apple_sdk.frameworks.Security
           ];
 
           # Add scripts/ directory to PATH so kind-with-registry.sh is accessible
           shellHook = ''
             export PATH="$PWD/scripts:$PATH"
+
+            # Ensure golang bin is in the path
+            GOBIN="$(go env GOPATH)/bin"
+            if [[ ":$PATH:" != *":$GOBIN:"* ]]; then
+              export PATH="$GOBIN:$PATH"
+            fi
           '';
         };
       });

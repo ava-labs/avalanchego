@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -26,7 +26,7 @@ var _ MessageQueue = (*messageQueue)(nil)
 // and are now pending execution from the chain.
 type Message struct {
 	// The original message from the peer
-	message.InboundMessage
+	*message.InboundMessage
 	// The desired engine type to execute this message. If not specified,
 	// the current executing engine type is used.
 	EngineType p2p.EngineType
@@ -109,11 +109,11 @@ func (m *messageQueue) Push(ctx context.Context, msg Message) {
 		msg: msg,
 		ctx: ctx,
 	})
-	m.nodeToUnprocessedMsgs[msg.NodeID()]++
+	m.nodeToUnprocessedMsgs[msg.NodeID]++
 
 	// Update metrics
 	m.metrics.count.With(prometheus.Labels{
-		opLabel: msg.Op().String(),
+		opLabel: msg.Op.String(),
 	}).Inc()
 	m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
 
@@ -150,17 +150,17 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 			msgAndCtx, _ = m.msgAndCtxs.PopLeft()
 			msg          = msgAndCtx.msg
 			ctx          = msgAndCtx.ctx
-			nodeID       = msg.NodeID()
+			nodeID       = msg.NodeID
 		)
 
 		// See if it's OK to process [msg] next
-		if m.canPop(msg) || i == n { // i should never == n but handle anyway as a fail-safe
+		if m.canPop(msg.InboundMessage) || i == n { // i should never == n but handle anyway as a fail-safe
 			m.nodeToUnprocessedMsgs[nodeID]--
 			if m.nodeToUnprocessedMsgs[nodeID] == 0 {
 				delete(m.nodeToUnprocessedMsgs, nodeID)
 			}
 			m.metrics.count.With(prometheus.Labels{
-				opLabel: msg.Op().String(),
+				opLabel: msg.Op.String(),
 			}).Dec()
 			m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
 			return ctx, msg, true
@@ -201,21 +201,21 @@ func (m *messageQueue) Shutdown() {
 }
 
 // canPop will return true for at least one message in [m.msgs]
-func (m *messageQueue) canPop(msg message.InboundMessage) bool {
+func (m *messageQueue) canPop(msg *message.InboundMessage) bool {
 	// Always pop connected and disconnected messages.
-	if op := msg.Op(); op == message.ConnectedOp || op == message.DisconnectedOp {
+	if op := msg.Op; op == message.ConnectedOp || op == message.DisconnectedOp {
 		return true
 	}
 
 	// If the deadline to handle [msg] has passed, always pop it.
 	// It will be dropped immediately.
-	if expiration := msg.Expiration(); m.clock.Time().After(expiration) {
+	if expiration := msg.Expiration; m.clock.Time().After(expiration) {
 		return true
 	}
 	// Every node has some allowed CPU allocation depending on
 	// the number of nodes with unprocessed messages.
 	baseMaxCPU := 1 / float64(len(m.nodeToUnprocessedMsgs))
-	nodeID := msg.NodeID()
+	nodeID := msg.NodeID
 	weight := m.vdrs.GetWeight(m.subnetID, nodeID)
 
 	var portionWeight float64

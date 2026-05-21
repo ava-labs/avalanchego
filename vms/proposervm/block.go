@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -14,6 +14,8 @@ import (
 	"github.com/MetalBlockchain/metalgo/ids"
 	"github.com/MetalBlockchain/metalgo/snow"
 	"github.com/MetalBlockchain/metalgo/snow/consensus/snowman"
+	"github.com/MetalBlockchain/metalgo/snow/validators"
+	"github.com/MetalBlockchain/metalgo/vms/proposervm/acp181"
 	"github.com/MetalBlockchain/metalgo/vms/proposervm/block"
 	"github.com/MetalBlockchain/metalgo/vms/proposervm/proposer"
 
@@ -22,7 +24,8 @@ import (
 
 const (
 	// allowable block issuance in the future
-	maxSkew = 10 * time.Second
+	maxSkew                         = 10 * time.Second
+	bootstrappingWarningGracePeriod = 5 * time.Minute
 )
 
 var (
@@ -33,11 +36,13 @@ var (
 	errPChainHeightNotMonotonic = errors.New("non monotonically increasing P-chain height")
 	errPChainHeightNotReached   = errors.New("block P-chain height larger than current P-chain height")
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
+	errEpochMismatch            = errors.New("epoch mismatch")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
 	errUnexpectedProposer       = errors.New("unexpected proposer for current window")
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
+	errEpochNotZero             = errors.New("epoch must not be provided prior to granite")
 )
 
 type Block interface {
@@ -59,6 +64,8 @@ type Block interface {
 	buildChild(context.Context) (Block, error)
 
 	pChainHeight(context.Context) (uint64, error)
+	pChainEpoch(context.Context) (block.Epoch, error)
+	selectChildPChainHeight(context.Context) (uint64, error)
 }
 
 type PostForkBlock interface {
@@ -89,10 +96,12 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 7) [child]'s timestamp is within its proposer's window
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
+// 10) [child] has the expected epoch
 func (p *postForkCommonComponents) Verify(
 	ctx context.Context,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentEpoch block.Epoch,
 	child *postForkBlock,
 ) error {
 	if err := verifyIsNotOracleBlock(ctx, p.innerBlk); err != nil {
@@ -120,9 +129,17 @@ func (p *postForkCommonComponents) Verify(
 		return errTimeTooAdvanced
 	}
 
-	// If the node is currently syncing - we don't assume that the P-chain has
-	// been synced up to this point yet.
+	childEpoch := child.PChainEpoch()
 	if p.vm.consensusState == snow.NormalOp {
+		// Some L1s that missed the Granite upgrade accepted blocks without
+		// epochs enabled. By enforcing this check only after syncing, new nodes
+		// are able to join the network.
+		if expected := acp181.NewEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
+			return fmt.Errorf("%w: epoch %v != expected %v", errEpochMismatch, childEpoch, expected)
+		}
+
+		// If the node is currently syncing - we don't assume that the P-chain
+		// has been synced up to this point yet.
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 		if err != nil {
 			p.vm.ctx.Log.Error("block verification failed",
@@ -163,9 +180,12 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
+	switch {
+	case p.vm.Upgrades.IsGraniteActivated(childTimestamp):
+		contextPChainHeight = childEpoch.PChainHeight
+	case p.vm.Upgrades.IsEtnaActivated(childTimestamp):
 		contextPChainHeight = childPChainHeight
-	} else {
+	default:
 		contextPChainHeight = parentPChainHeight
 	}
 
@@ -184,6 +204,7 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentEpoch block.Epoch,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
 	newTimestamp := p.vm.Time().Truncate(time.Second)
@@ -225,10 +246,15 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
+	epoch := acp181.NewEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, newTimestamp)
+
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
+	switch {
+	case p.vm.Upgrades.IsGraniteActivated(newTimestamp):
+		contextPChainHeight = epoch.PChainHeight
+	case p.vm.Upgrades.IsEtnaActivated(newTimestamp):
 		contextPChainHeight = pChainHeight
-	} else {
+	default:
 		contextPChainHeight = parentPChainHeight
 	}
 
@@ -251,6 +277,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			epoch,
 			p.vm.StakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
@@ -261,6 +288,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			epoch,
 			innerBlock.Bytes(),
 		)
 	}
@@ -289,6 +317,7 @@ func (p *postForkCommonComponents) buildChild(
 		zap.Uint64("pChainHeight", pChainHeight),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),
+		zap.Reflect("epoch", epoch),
 	)
 	return child, nil
 }
@@ -424,6 +453,14 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	switch {
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
 		return false, nil // build an unsigned block
+	case errors.Is(err, validators.ErrUnfinalizedHeight):
+		p.logWarnOrError()("build block failed, validator set not yet finalized",
+			zap.String("reason", "failed to calculate expected proposer"),
+			zap.Uint64("parentPChainHeight", parentPChainHeight),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
+		return false, err
 	case err != nil:
 		p.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate expected proposer"),
@@ -486,4 +523,12 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 		zap.Time("blockTimestamp", newTimestamp),
 	)
 	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
+}
+
+func (p *postForkCommonComponents) logWarnOrError() func(msg string, fields ...zap.Field) {
+	timeSinceBootstrapping := p.vm.Clock.Time().Sub(p.vm.finishedBootstrappingAt)
+	if p.vm.finishedBootstrappingAt.IsZero() || timeSinceBootstrapping < bootstrappingWarningGracePeriod {
+		return p.vm.ctx.Log.Warn
+	}
+	return p.vm.ctx.Log.Error
 }

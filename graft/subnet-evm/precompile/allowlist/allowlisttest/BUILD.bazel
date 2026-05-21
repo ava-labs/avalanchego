@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "allowlisttest",
+    srcs = [
+        "test_allowlist.go",
+        "test_allowlist_config.go",
+        "test_allowlist_events.go",
+        "test_allowlist_helpers.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/subnet-evm/accounts/abi/bind",
+        "//graft/subnet-evm/core/extstate",
+        "//graft/subnet-evm/ethclient/simulated",
+        "//graft/subnet-evm/precompile/allowlist",
+        "//graft/subnet-evm/precompile/allowlist/allowlisttest/bindings",
+        "//graft/subnet-evm/precompile/contract",
+        "//graft/subnet-evm/precompile/contracts/utilstest",
+        "//graft/subnet-evm/precompile/modules",
+        "//graft/subnet-evm/precompile/precompileconfig",
+        "//graft/subnet-evm/precompile/precompiletest",
+        "//utils",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

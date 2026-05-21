@@ -1,9 +1,9 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+//go:generate go tool canoto $GOFILE
 
 import (
 	"context"
@@ -104,7 +104,7 @@ func (s *Storage) NumBlocks() uint64 {
 // Retrieve returns the block and finalization at [seq].
 // If [seq] is not found, returns simplex.ErrBlockNotFound.
 func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, error) {
-	// THe genesis block doesn't have a finalization, so we need to handle it specifically.
+	// The genesis block doesn't have a finalization, so we need to handle it specifically.
 	if seq == 0 {
 		return s.genesisBlock, simplex.Finalization{}, nil
 	}
@@ -123,13 +123,11 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 		return nil, simplex.Finalization{}, err
 	}
 
-	vb := &Block{vmBlock: block, metadata: finalization.Finalization.ProtocolMetadata, blockTracker: s.blockTracker}
-	bytes, err := vb.Bytes()
+	vb, err := newBlock(finalization.Finalization.ProtocolMetadata, block, s.blockTracker)
 	if err != nil {
-		s.log.Error("Failed to serialize block", zap.Error(err))
+		s.log.Error("failed to create simplex block", zap.Uint64("seq", seq), zap.Error(err))
 		return nil, simplex.Finalization{}, err
 	}
-	vb.digest = computeDigest(bytes)
 
 	return vb, finalization, nil
 }

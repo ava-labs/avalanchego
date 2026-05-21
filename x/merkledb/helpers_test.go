@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -51,23 +51,23 @@ func writeBasicBatch(t *testing.T, db *merkleDB) {
 }
 
 func newRandomProofNode(r *rand.Rand) ProofNode {
-	key := make([]byte, r.Intn(32)) // #nosec G404
-	_, _ = r.Read(key)              // #nosec G404
+	key := make([]byte, r.Intn(32))
+	_, _ = r.Read(key)
 	serializedKey := ToKey(key)
 
-	val := make([]byte, r.Intn(64)) // #nosec G404
-	_, _ = r.Read(val)              // #nosec G404
+	val := make([]byte, r.Intn(64))
+	_, _ = r.Read(val)
 
 	children := map[byte]ids.ID{}
 	for j := 0; j < 16; j++ {
 		if r.Float64() < 0.5 {
 			var childID ids.ID
-			_, _ = r.Read(childID[:]) // #nosec G404
+			_, _ = r.Read(childID[:])
 			children[byte(j)] = childID
 		}
 	}
 
-	hasValue := rand.Intn(2) == 1 // #nosec G404
+	hasValue := rand.Intn(2) == 1
 	var valueOrHash maybe.Maybe[[]byte]
 	if hasValue {
 		// use the hash instead when length is greater than the hash length

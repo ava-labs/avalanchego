@@ -41,10 +41,9 @@ subjects:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: prometheus-config
-  namespace: ci-monitoring
+  name: prometheus-config-template
 data:
-  # This template needs to have PROMETHEUS_USERNAME and PROMETHEUS_PASSWORD substituted before use
+  # This template needs to have PROMETHEUS_URL substituted before use
   prometheus.yaml.template: |
     global:
       # Make sure this value takes into account the network-shutdown-delay in tests/fixture/e2e/env.go
@@ -107,10 +106,10 @@ data:
           # TODO(marun) Add kube cluster identifier as a label
 
     remote_write:
-    - url: "https://prometheus-poc.avax-dev.network/api/v1/write"
+    - url: "${PROMETHEUS_URL}"
       basic_auth:
-        username: "${PROMETHEUS_USERNAME}"
-        password: "${PROMETHEUS_PASSWORD}"
+        username_file: /run/secrets/username
+        password_file: /run/secrets/password
 
 ---
 apiVersion: apps/v1
@@ -132,29 +131,22 @@ spec:
         app: prometheus-agent
     spec:
       serviceAccountName: prometheus-agent
-      # Since prometheus doesn't support env substitution, an init
-      # container is required to parameterize the config file with
-      # auth credentials.
+      # Since prometheus doesn't support env substitution, an init container is required to
+      # parameterize the config file with the prometheus URL.
       initContainers:
       - name: init-prometheus-config
-        # This is one of the few published images that includes
-        # envsubst. Simpler than having to maintain our own image.
-        image: bitnami/nginx:1.27.3
+        # Any image with sed will do
+        image: busybox
         command: ["/bin/sh", "-c"]
         args:
         - |
-          envsubst < /tmp/config-template/prometheus.yaml.template > /tmp/config/prometheus.yaml
+          sed 's|${PROMETHEUS_URL}|'"${PROMETHEUS_URL}"'|' /tmp/config-template/prometheus.yaml.template > /tmp/config/prometheus.yaml
         env:
-        - name: PROMETHEUS_USERNAME
+        - name: PROMETHEUS_URL
           valueFrom:
             secretKeyRef:
-              name: prometheus-credentials
-              key: username
-        - name: PROMETHEUS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: prometheus-credentials
-              key: password
+              name: prometheus-config
+              key: url
         volumeMounts:
         - name: config-template
           mountPath: /tmp/config-template
@@ -162,12 +154,12 @@ spec:
           mountPath: /tmp/config
       containers:
       - name: prometheus
-        # For consistency use the same minor version as the scripts/run_prometheus.sh
-        image: prom/prometheus:v2.45.6
+        # Latest stable LTS, released 2025-07-14, end of support 2026-07-31
+        image: prom/prometheus:v3.5.0
         args:
         - --config.file=/etc/prometheus/config/prometheus.yaml
         - --storage.agent.path=/prometheus
-        - --enable-feature=agent
+        - --agent
         volumeMounts:
         - name: config
           mountPath: /etc/prometheus/config/prometheus.yaml
@@ -175,15 +167,21 @@ spec:
           readOnly: true
         - name: prometheus-data
           mountPath: /prometheus
+        - name: prometheus-config
+          mountPath: /run/secrets
+          readOnly: true
       volumes:
       - name: config-template
         configMap:
-          name: prometheus-config
+          name: prometheus-config-template
       - name: config
         # The config path doesn't need to be persistent since the config
         # file will be written to the volume by the init container every
         # time the pod starts.
         emptyDir: {}
+      - name: prometheus-config
+        secret:
+          secretName: prometheus-config
   volumeClaimTemplates:
   - metadata:
       name: prometheus-data
