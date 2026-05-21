@@ -43,6 +43,10 @@ on:
 
 jobs:
   configure-benchmark:
+    # Triggers AvalancheGo workflows and pushes to benchmark-data —
+    # both require secrets and a repo state that only the canonical
+    # repo has. Skip on forks.
+    if: github.repository == 'ava-labs/firewood'
     runs-on: ubuntu-latest
     outputs:
       name: ${{ steps.resolve.outputs.name }}

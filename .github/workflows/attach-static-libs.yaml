@@ -29,9 +29,30 @@ concurrency:
 # - aarch64-unknown-linux-gnu
 # - aarch64-apple-darwin
 jobs:
+  # Detect whether the deploy key is configured. On forks without the
+  # secret, the downstream push step cannot run and the multi-arch build
+  # is wasted CI time — so skip the entire workflow there.
+  check-secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      has_secrets: ${{ steps.check.outputs.has_secrets }}
+    steps:
+      - name: Check if FIREWOOD_GO_DEPLOY_KEY is set
+        id: check
+        run: |
+          if [ -z "${{ secrets.FIREWOOD_GO_DEPLOY_KEY }}" ]; then
+            echo "FIREWOOD_GO_DEPLOY_KEY is not set"
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "FIREWOOD_GO_DEPLOY_KEY is set"
+            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
+          fi
+
   # Build the static libraries for each target architecture and upload
   # them as artifacts to collect and attach in the next job.
   build-firewood-ffi-libs:
+    needs: check-secrets
+    if: needs.check-secrets.outputs.has_secrets == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -43,8 +64,6 @@ jobs:
           - os: macos-26
             target: aarch64-apple-darwin
             pre-build-cmd: echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
-    outputs:
-      has_secrets: ${{ steps.check_secrets.outputs.has_secrets }}
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
@@ -73,24 +92,12 @@ jobs:
           path: target/${{ matrix.target }}/maxperf/libfirewood_ffi.a
           if-no-files-found: error
 
-      - name: Check if FIREWOOD_GO_DEPLOY_KEY is set
-        id: check_secrets
-        run: |
-          if [ -z "${{ secrets.FIREWOOD_GO_DEPLOY_KEY }}" ]; then
-            echo "FIREWOOD_GO_DEPLOY_KEY is not set"
-            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "FIREWOOD_GO_DEPLOY_KEY is set"
-            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
-          fi
-
   # Collect all the static libraries built on the previous matrix of jobs
   # and add them into ffi/libs directory.
   # We commit and push this as a new branch with "--force" to overwrite
   # the previous static libs that will not be on our branch.
   push-firewood-ffi-libs:
     needs: build-firewood-ffi-libs
-    if: needs.build-firewood-ffi-libs.outputs.has_secrets == 'true'
     runs-on: ubuntu-24.04
     outputs:
       target_branch: ${{ steps.determine_branch.outputs.target_branch }}

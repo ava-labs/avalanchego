@@ -24,8 +24,12 @@ env:
 
 jobs:
   build:
-    # Skip if triggered by failed workflow_run
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # Only run on the canonical repo — forks don't have GitHub Pages
+    # configured and the deploy step fails.
+    # Also skip if triggered by failed workflow_run.
+    if: |
+      github.repository == 'ava-labs/firewood' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -78,8 +82,9 @@ jobs:
           overwrite: true
           include-hidden-files: true
   deploy:
-    # Pull requests only validates the build step but does not actually deploy
-    if: github.event_name != 'pull_request'
+    # Pull requests only validates the build step but does not actually deploy.
+    # Forks don't have Pages configured, so restrict to the canonical repo.
+    if: github.repository == 'ava-labs/firewood' && github.event_name != 'pull_request'
     needs: build
     permissions:
       pages: write

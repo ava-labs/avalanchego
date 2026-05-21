@@ -9,7 +9,8 @@ jobs:
   publish-firewood-crate:
     name: firewood-lib
     runs-on: ubuntu-latest
-    if: startsWith(github.event.release.tag_name, 'v')
+    # Publishing requires CARGO_TOKEN which only the canonical repo has.
+    if: github.repository == 'ava-labs/firewood' && startsWith(github.event.release.tag_name, 'v')
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
