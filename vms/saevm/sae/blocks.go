@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -37,6 +38,10 @@ const (
 var (
 	errBlockHeightNotUint64 = errors.New("block height not uint64")
 	errBlockTooFarInFuture  = errors.New("block too far in the future")
+
+	errTxHashMismatch         = errors.New("transaction hash mismatch")
+	errUncleHashMismatch      = errors.New("uncle hash mismatch")
+	errWithdrawalHashMismatch = errors.New("withdrawals hash mismatch")
 )
 
 // ParseBlock parses the buffer as [rlp] encoding of a [types.Block]. It does
@@ -57,7 +62,44 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 		return nil, fmt.Errorf("%w: >%s", errBlockTooFarInFuture, maxFutureBlockDuration)
 	}
 
+	// Block body must match what is declared by the header.
+	hasher := trie.NewStackTrie(nil)
+	hdr := b.Header()
+	if types.DeriveSha(b.Transactions(), hasher) != hdr.TxHash {
+		return nil, errTxHashMismatch
+	}
+	if types.CalcUncleHash(b.Uncles()) != hdr.UncleHash {
+		return nil, errUncleHashMismatch
+	}
+	{
+		// The withdrawals hash being set depends on the Ethereum hard fork.
+		var want *common.Hash
+		switch w := b.Withdrawals(); {
+		case w == nil:
+			want = nil
+		case len(w) == 0:
+			want = &types.EmptyWithdrawalsHash
+		default:
+			h := types.DeriveSha(w, hasher)
+			want = &h
+		}
+		if !compareHashPtrs(want, hdr.WithdrawalsHash) {
+			return nil, errWithdrawalHashMismatch
+		}
+	}
+
 	return vm.blockBuilder.new(b, nil, nil)
+}
+
+func compareHashPtrs(a, b *common.Hash) bool {
+	switch an, bn := a == nil, b == nil; {
+	case an && bn:
+		return true
+	case an || bn:
+		return false
+	default:
+		return *a == *b
+	}
 }
 
 // BuildBlock builds a new block, using the last block passed to
