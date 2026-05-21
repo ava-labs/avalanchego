@@ -89,8 +89,7 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 		Config{},
 		clientDB,
 		root,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(serverDB)),
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetProofHandler(serverDB)),
 	)
 	require.NoError(t, err)
 
@@ -156,7 +155,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
 
-	rangeProofHandler := synctest.NewCounterHandler(NewGetRangeProofHandler(serverDB), func() {
+	proofHandler := synctest.NewCounterHandler(NewGetProofHandler(serverDB), func() {
 		err := syncer.UpdateSyncTarget(wantRoot)
 		if err != nil {
 			cancel(err)
@@ -166,8 +165,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 		Config{},
 		clientDB,
 		firstRoot,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(serverDB)),
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, proofHandler),
 	)
 	require.NoError(t, err)
 

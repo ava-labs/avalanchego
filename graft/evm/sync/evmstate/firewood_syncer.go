@@ -33,14 +33,13 @@ type FirewoodSyncer struct {
 	finalizeOnce func() error
 }
 
-func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, rpClient, cpClient *p2p.Client) (*FirewoodSyncer, error) {
+func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, client *p2p.Client) (*FirewoodSyncer, error) {
 	s, err := syncer.NewEVM(
 		config,
 		db,
 		codeQueue,
 		ids.ID(target),
-		rpClient,
-		cpClient,
+		client,
 	)
 	if err != nil {
 		return nil, err
