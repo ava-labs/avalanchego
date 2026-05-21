@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -62,6 +63,7 @@ import (
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
+	dto "github.com/prometheus/client_model/go"
 )
 
 func TestMain(m *testing.M) {
@@ -936,16 +938,13 @@ func gaugeValue(t *testing.T, g prometheus.Gatherer, name string) float64 {
 	t.Helper()
 	mfs, err := g.Gather()
 	require.NoError(t, err, "Gather()")
-	for _, mf := range mfs {
-		if mf.GetName() != name {
-			continue
-		}
-		series := mf.GetMetric()
-		require.Lenf(t, series, 1, "metric %q series count", name)
-		return series[0].GetGauge().GetValue()
-	}
-	t.Fatalf("metric %q not found", name)
-	return 0
+	i := slices.IndexFunc(mfs, func(mf *dto.MetricFamily) bool {
+		return mf.GetName() == name
+	})
+	require.GreaterOrEqualf(t, i, 0, "metric %q not found", name)
+	series := mfs[i].GetMetric()
+	require.Lenf(t, series, 1, "metric %q series count", name)
+	return series[0].GetGauge().GetValue()
 }
 
 func TestBlockSources(t *testing.T) {
