@@ -4,18 +4,11 @@
 #
 # Validates locally-built RPMs by running a fresh rockylinux:9
 # container to verify signature, install, and smoke test.
-#
-# Required env vars:
-#   TAG            - Git tag (e.g., "v1.14.1")
-#   GIT_COMMIT     - Full git commit hash used to build the binaries
-#
-# Optional env vars:
-#   PACKAGE_ARCH   - RPM architecture ("x86_64" or "aarch64"), defaults to host
 
 set -euo pipefail
 
-: "${TAG:?TAG must be set}"
-: "${GIT_COMMIT:?GIT_COMMIT must be set}"
+: "${TAG:?TAG must be set (Git tag, e.g. v1.14.1)}"
+: "${GIT_COMMIT:?GIT_COMMIT must be set (full git commit hash used to build the binaries)}"
 : "${PACKAGE_ARCH:?PACKAGE_ARCH must be set (x86_64 or aarch64)}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -37,14 +30,14 @@ docker run --rm \
     -v "${SCRIPTS_DIR}/smoke-test.sh:/smoke-test.sh:ro" \
     rockylinux:9 \
     bash -euxc '
-        # Import GPG key and verify signatures if available
-        if [[ -f /rpms/GPG-KEY-avalanchego ]]; then
-            rpm --import /rpms/GPG-KEY-avalanchego
-            rpm -K "/rpms/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
-            rpm -K "/rpms/subnet-evm-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
-        else
-            echo "Skipping GPG verification (unsigned build)"
+        # Import GPG key and verify signatures (always produced by the build).
+        if [[ ! -f /rpms/GPG-KEY-avalanchego ]]; then
+            echo "ERROR: GPG-KEY-avalanchego not found; build did not export a key" >&2
+            exit 1
         fi
+        rpm --import /rpms/GPG-KEY-avalanchego
+        rpm -K "/rpms/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
+        rpm -K "/rpms/subnet-evm-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
 
         # Install both packages
         rpm -ivh "/rpms/avalanchego-'"${TAG}"'-'"${PACKAGE_ARCH}"'.rpm"
