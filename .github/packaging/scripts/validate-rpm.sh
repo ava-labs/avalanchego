@@ -46,9 +46,8 @@ docker run --rm \
         # Run shared smoke test
         bash /smoke-test.sh \
             /var/opt/avalanchego/bin/avalanchego \
-            /var/opt/avalanchego/plugins \
-            "'"${GIT_COMMIT}"'" \
-            "'"${SUBNET_EVM_VM_ID}"'"
+            "/var/opt/avalanchego/plugins/'"${SUBNET_EVM_VM_ID}"'" \
+            "'"${GIT_COMMIT}"'"
     '
 
 echo "=== RPM validation complete ==="

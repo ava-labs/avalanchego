@@ -5,19 +5,12 @@
 # Runs inside a validation container after packages have been installed.
 # Verifies that binaries are present, executable, and report the expected
 # version/commit information.
-#
-# Args:
-#   $1 - path to avalanchego binary
-#   $2 - plugin directory path (subnet-evm VM ID appended by this script)
-#   $3 - expected full git commit hash
-#   $4 - subnet-evm VM ID
 
 set -euxo pipefail
 
 AVAGO_BIN="${1:?avalanchego binary path required}"
-PLUGIN_DIR="${2:?plugin directory path required}"
-GIT_COMMIT="${3:?git commit hash required}"
-SUBNET_EVM_VM_ID="${4:?subnet-evm VM ID required}"
+SUBNET_EVM_BIN="${2:?subnet-evm plugin binary path required}"
+GIT_COMMIT="${3:?expected full git commit hash required}"
 
 # ── Smoke test avalanchego ────────────────────────────────────────
 
@@ -35,13 +28,12 @@ fi
 
 # ── Verify subnet-evm plugin ─────────────────────────────────────
 
-plugin="${PLUGIN_DIR}/${SUBNET_EVM_VM_ID}"
-if [[ ! -x "${plugin}" ]]; then
-    echo "ERROR: subnet-evm plugin not found or not executable at ${plugin}" >&2
+if [[ ! -x "${SUBNET_EVM_BIN}" ]]; then
+    echo "ERROR: subnet-evm plugin not found or not executable at ${SUBNET_EVM_BIN}" >&2
     exit 1
 fi
 
-evm_output=$("${plugin}" --version)
+evm_output=$("${SUBNET_EVM_BIN}" --version)
 echo "subnet-evm --version: ${evm_output}"
 if [[ "${evm_output}" != *"${GIT_COMMIT}"* ]]; then
     echo "ERROR: subnet-evm --version output does not contain expected commit ${GIT_COMMIT}" >&2
