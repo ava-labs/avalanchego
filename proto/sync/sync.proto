@@ -35,8 +35,8 @@ message GetCodeResponse {
   repeated bytes data = 1;
 }
 
-// GetBlockRequest returns the block at height plus num_parents
-// ancestors: [height, height-1, ..., height-num_parents].
+// GetBlockRequest requests the block accepted at height along with 
+// numParents of its ancestors.
 message GetBlockRequest {
   uint64 height = 1;
   uint32 num_parents = 2;
