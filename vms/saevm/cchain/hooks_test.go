@@ -94,7 +94,7 @@ func TestAncestorInputIDs(t *testing.T) {
 			name:    "multiple ancestors",
 			header:  block4.Header(),
 			settled: settled,
-			want:    union(tx1.InputIDs(), tx2.InputIDs(), tx3.InputIDs()),
+			want:    set.UnionOf(tx1.InputIDs(), tx2.InputIDs(), tx3.InputIDs()),
 		},
 		{
 			name:    "missing block",
@@ -119,12 +119,4 @@ func TestAncestorInputIDs(t *testing.T) {
 			assert.Equal(t, tt.want, got, "ancestorInputIDs()")
 		})
 	}
-}
-
-func union[T comparable](sets ...set.Set[T]) set.Set[T] {
-	var out set.Set[T]
-	for _, s := range sets {
-		out.Union(s)
-	}
-	return out
 }
