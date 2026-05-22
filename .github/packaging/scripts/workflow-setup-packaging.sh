@@ -7,21 +7,18 @@
 #
 # Writes key=value outputs to $GITHUB_OUTPUT when running in CI, or to
 # stdout when running locally (for inspection / testing).
-#
-# Required env vars:
-#   GITHUB_REF     - Git ref (set by GitHub Actions; locally: any ref string)
-#   GITHUB_SHA     - Git commit SHA (set by GitHub Actions; locally: any SHA)
-#
-# Optional env vars:
-#   GITHUB_OUTPUT   - Path to step output file (CI only; omit for stdout)
-#   TAG_INPUT       - Explicit tag from workflow_dispatch (empty for auto-detect)
-#   GPG_PRIVATE_KEY - GPG private key content (empty for unsigned PR builds)
-#   RELEASE         - Non-empty marks the run as a release build; missing
-#                     GPG_PRIVATE_KEY is then fatal (instead of falling back
-#                     to ephemeral signing as for PR/local).
 
 set -euo pipefail
 
+: "${GITHUB_REF:?GITHUB_REF must be set (Git ref, e.g. refs/tags/v1.14.1; locally: any ref string)}"
+: "${GITHUB_SHA:?GITHUB_SHA must be set (Git commit SHA; locally: any SHA)}"
+
+# Optional env vars (defaulted below):
+#   GITHUB_OUTPUT   - step-output file path; empty/unset writes to stdout
+#   TAG_INPUT       - explicit tag from workflow_dispatch (empty: auto-detect)
+#   GPG_PRIVATE_KEY - signing key content (empty: ephemeral PR/local signing)
+#   RELEASE         - non-empty marks a release build (missing key is then
+#                     fatal instead of falling back to ephemeral signing)
 OUTPUT="${GITHUB_OUTPUT:-/dev/stdout}"
 
 # ── Resolve tag ──────────────────────────────────────────────────
