@@ -1,5 +1,4 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "code",
@@ -10,18 +9,5 @@ go_library(
         "//network/p2p",
         "//proto/pb/sync",
         "//vms/evm/sync/network",
-    ],
-)
-
-go_test(
-    name = "code_test",
-    srcs = ["client_test.go"],
-    deps = [
-        "//ids",
-        "//proto/pb/sync",
-        "//vms/evm/sync/synctest",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_stretchr_testify//require",
-        "@org_golang_google_protobuf//testing/protocmp",
     ],
 )
