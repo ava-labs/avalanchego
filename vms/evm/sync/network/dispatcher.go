@@ -48,8 +48,8 @@ func NewClient(n *p2p.Network, handlerID uint64) *p2p.Client {
 }
 
 // Send picks a peer via [p2p.PeerTracker.SelectPeer] and forwards req
-// to it. Returns an [Outcome] (failures are scored automatically).
-// Selection is explicit (not [p2p.Client.AppRequestAny]) so
+// to it. On error, Outcome is nil and the peer has already been
+// scored. Selection is explicit (not [p2p.Client.AppRequestAny]) so
 // RegisterRequest pairs with the eventual Success or Failure call.
 func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*Outcome, error) {
 	nodeID, ok := d.peers.SelectPeer()
@@ -59,15 +59,20 @@ func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*
 	return d.SendTo(ctx, nodeID, req, resp)
 }
 
-// SendTo sends req to nodeID. Returns an [Outcome] (failures are
-// scored automatically).
-func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (*Outcome, error) {
+// SendTo sends req to nodeID. On error, Outcome is nil and the peer
+// has already been scored.
+func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrMarshalRequest, err)
 	}
 
 	d.peers.RegisterRequest(nodeID)
+	defer func() {
+		if retErr != nil {
+			d.peers.RegisterFailure(nodeID)
+		}
+	}()
 
 	type result struct {
 		bytes []byte
@@ -80,24 +85,20 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 
 	start := time.Now()
 	if err := d.client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
-		d.peers.RegisterFailure(nodeID)
 		return nil, fmt.Errorf("%w: %w", ErrSendRequest, err)
 	}
 
 	select {
 	case <-ctx.Done():
-		d.peers.RegisterFailure(nodeID)
 		return nil, ctx.Err()
 	case r := <-resultCh:
 		if r.err != nil {
-			d.peers.RegisterFailure(nodeID)
 			return nil, fmt.Errorf("%w: %w", ErrHandlerFailed, r.err)
 		}
 
 		const epsilon = 1e-6
 		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
 		if err := proto.Unmarshal(r.bytes, resp); err != nil {
-			d.peers.RegisterFailure(nodeID)
 			return nil, fmt.Errorf("%w: %w", ErrUnmarshalResponse, err)
 		}
 		return &Outcome{
@@ -109,11 +110,12 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 }
 
 // Outcome lets the caller score a peer after validating its response.
-// [Send] and [SendTo] return one only on transport success (failures
-// are scored automatically). Call exactly one of Success or Failure.
-// Both are idempotent, so `defer outcome.Failure()` plus
-// `outcome.Success()` is safe. Forgetting both leaves an unpaired
-// RegisterRequest on the [p2p.PeerTracker].
+// At least one of Success or Failure must be called. Both are
+// idempotent, so `defer outcome.Failure()` plus `outcome.Success()` is
+// the canonical happy-path pattern.
+//
+// Forgetting both leaves an unpaired RegisterRequest on the
+// [p2p.PeerTracker].
 type Outcome struct {
 	peers     *p2p.PeerTracker
 	nodeID    ids.NodeID
@@ -121,8 +123,7 @@ type Outcome struct {
 	once      sync.Once
 }
 
-// Success records the response as semantically valid, using the
-// bandwidth measured at dispatch time.
+// Success records the response as semantically valid.
 func (o *Outcome) Success() {
 	o.once.Do(func() { o.peers.RegisterResponse(o.nodeID, o.bandwidth) })
 }
