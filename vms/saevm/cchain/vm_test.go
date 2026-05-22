@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
@@ -41,12 +42,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
+	ethrpc "github.com/ava-labs/libevm/rpc"
 )
 
 func TestMain(m *testing.M) {
@@ -60,9 +63,10 @@ type SUT struct {
 	*VM
 	*Client
 
-	snowCtx *snow.Context
-	memory  *atomic.Memory
-	sender  *saetest.Sender
+	snowCtx   *snow.Context
+	memory    *atomic.Memory
+	sender    *saetest.Sender
+	ethclient *ethclient.Client
 }
 
 // Implements [saetest.Peer]
@@ -174,12 +178,19 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	server := httptest.NewServer(mux)
 	tb.Cleanup(server.Close)
 
+	const wsHTTPPath = cchainHTTPPrefix + "/ws"
+	wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
+	ethRPCClient, err := ethrpc.Dial(wsURI)
+	require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
+	tb.Cleanup(ethRPCClient.Close)
+
 	sut := &SUT{
-		VM:      vm,
-		Client:  NewClient(server.URL),
-		snowCtx: snowCtx,
-		memory:  memory,
-		sender:  appSender,
+		VM:        vm,
+		Client:    NewClient(server.URL),
+		snowCtx:   snowCtx,
+		memory:    memory,
+		sender:    appSender,
+		ethclient: ethclient.NewClient(ethRPCClient),
 	}
 	appSender.SetSelf(sut)
 	return ctx, sut
@@ -630,8 +641,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		Gas:      ethparams.TxGas,
 		GasPrice: big.NewInt(1),
 	})
-	rpc := sut.GethRPCBackends()
-	require.NoErrorf(t, rpc.SendTx(ctx, tracedTx), "%T.SendTx(%#x)", rpc, tracedTx.Hash())
+	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.ethclient, tracedTx.Hash())
 
 	// Export gives us observable external state.
 	w := newWallet(exportKey, sut.snowCtx, sut.Client)
@@ -648,11 +658,14 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
 
 	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-	require.Equalf(t, types.Transactions{tracedTx}, blk.Transactions(), "%T.Transactions()", blk)
+	if diff := cmp.Diff(types.Transactions{tracedTx}, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
+		t.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
+	}
 	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T txs (-want +got):\n%s", blk, diff)
+		t.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
 	}
 
+	rpc := sut.GethRPCBackends()
 	_, _, _, release, err := rpc.StateAtTransaction(ctx, blk.EthBlock(), 0, 0)
 	require.NoErrorf(t, err, "%T.StateAtTransaction(...)", rpc)
 	defer release()
