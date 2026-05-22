@@ -33,21 +33,11 @@ func TestPushGossip(t *testing.T) {
 	saetest.Connect(t, api, vdr)
 
 	w := newWallet(sk, api.snowCtx, api.Client)
-	const (
-		txFee          = 50
-		exportedAmount = 50
-	)
-	signedExport, _ := w.newExportTx(
-		t,
-		api.snowCtx.XChainID,
-		txFee,
-		txtest.NewTransferOutput(exportedAmount, sk.Address()),
-	)
-
-	require.NoErrorf(t, api.IssueTx(t.Context(), signedExport), "%T.IssueTx()", api.Client)
+	stx := w.newMinimalTx(t, api.snowCtx.XChainID)
+	require.NoErrorf(t, api.IssueTx(t.Context(), stx), "%T.IssueTx()", api.Client)
 
 	blk := vdr.runConsensusLoop(t)
-	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
+	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by validator after gossip (-want +got):\n%s", blk, diff)
 	}
 }
@@ -74,21 +64,11 @@ func TestPullGossip(t *testing.T) {
 	saetest.Connect(t, vdrA, vdrB)
 
 	w := newWallet(sk, api.snowCtx, api.Client)
-	const (
-		txFee          = 50
-		exportedAmount = 50
-	)
-	signedExport, _ := w.newExportTx(
-		t,
-		api.snowCtx.XChainID,
-		txFee,
-		txtest.NewTransferOutput(exportedAmount, sk.Address()),
-	)
-
-	require.NoErrorf(t, api.IssueTx(t.Context(), signedExport), "%T.IssueTx()", api.Client)
+	stx := w.newMinimalTx(t, api.snowCtx.XChainID)
+	require.NoErrorf(t, api.IssueTx(t.Context(), stx), "%T.IssueTx()", api.Client)
 
 	blk := vdrB.runConsensusLoop(t)
-	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
+	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
 	}
 }
