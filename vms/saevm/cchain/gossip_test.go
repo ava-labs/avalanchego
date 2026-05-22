@@ -28,15 +28,15 @@ func TestPushGossip(t *testing.T) {
 		vdrID = ids.GenerateTestNodeID()
 		vdrs  = set.Of(vdrID)
 	)
-	api := newSUT(t, withAlloc, withValidators(vdrs))
-	vdr := newSUT(t, withAlloc, withNodeID(vdrID), withValidators(vdrs))
+	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
+	vdrCtx, vdr := newSUT(t, withAlloc, withNodeID(vdrID), withValidators(vdrs))
 	saetest.Connect(t, api, vdr)
 
 	w := newWallet(sk, api.snowCtx, api.Client)
 	stx := w.newMinimalTx(t)
-	require.NoErrorf(t, api.IssueTx(t.Context(), stx), "%T.IssueTx()", api.Client)
+	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
 
-	blk := vdr.runConsensusLoop(t)
+	blk := vdr.runConsensusLoop(vdrCtx, t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by validator after gossip (-want +got):\n%s", blk, diff)
 	}
@@ -57,17 +57,17 @@ func TestPullGossip(t *testing.T) {
 		vdrIDB = ids.GenerateTestNodeID()
 		vdrs   = set.Of(vdrIDA, vdrIDB)
 	)
-	api := newSUT(t, withAlloc, withValidators(vdrs))
-	vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
-	vdrB := newSUT(t, withAlloc, withNodeID(vdrIDB), withValidators(vdrs))
+	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
+	_, vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
+	vdrBCtx, vdrB := newSUT(t, withAlloc, withNodeID(vdrIDB), withValidators(vdrs))
 	saetest.Connect(t, api, vdrA)
 	saetest.Connect(t, vdrA, vdrB)
 
 	w := newWallet(sk, api.snowCtx, api.Client)
 	stx := w.newMinimalTx(t)
-	require.NoErrorf(t, api.IssueTx(t.Context(), stx), "%T.IssueTx()", api.Client)
+	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
 
-	blk := vdrB.runConsensusLoop(t)
+	blk := vdrB.runConsensusLoop(vdrBCtx, t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
 	}
