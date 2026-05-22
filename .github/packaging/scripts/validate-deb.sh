@@ -80,9 +80,8 @@ for UBUNTU_IMAGE in ubuntu:22.04 ubuntu:24.04; do
 
             bash /smoke-test.sh \
                 /usr/local/bin/avalanchego \
-                /usr/local/lib/avalanchego/plugins \
-                "${GIT_COMMIT}" \
-                "${SUBNET_EVM_VM_ID}"
+                "/usr/local/lib/avalanchego/plugins/${SUBNET_EVM_VM_ID}" \
+                "${GIT_COMMIT}"
         '
 done
 
