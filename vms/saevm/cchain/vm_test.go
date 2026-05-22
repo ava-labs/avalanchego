@@ -524,41 +524,36 @@ func TestImport(t *testing.T) {
 // TestBuildBlockOnProcessing verifies that the block builder excludes a mempool
 // candidate whose inputs were already consumed by an unsettled ancestor block.
 func TestBuildBlockOnProcessing(t *testing.T) {
-	var (
-		skA = txtest.NewKey(t)
-		skB = txtest.NewKey(t)
-	)
+	keys := make([]*secp256k1.PrivateKey, 2)
+	for i := range keys {
+		keys[i] = txtest.NewKey(t)
+	}
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(
-			skA.EthAddress(),
-			skB.EthAddress(),
-		)
+		addrs := make([]common.Address, len(keys))
+		for i, sk := range keys {
+			addrs[i] = sk.EthAddress()
+		}
+		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
 	}))
 
-	wA := newWallet(skA, sut.snowCtx, sut.Client)
-	txA := wA.newMinimalTx(t)
-	require.NoErrorf(t, sut.IssueTx(ctx, txA), "%T.IssueTx(txA)", sut.Client)
-	blockA := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-	if diff := cmp.Diff([]*tx.Tx{txA}, blockTxs(t, blockA), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T txs (-want +got):\n%s", blockA, diff)
+	blocks := make([]*blocks.Block, len(keys))
+	for i, sk := range keys {
+		stx := newWallet(sk, sut.snowCtx, sut.Client).newMinimalTx(t)
+		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(tx)", sut.Client)
+
+		block := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+		if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, block), txtest.CmpOpt()); diff != "" {
+			t.Errorf("%T txs (-want +got):\n%s", block, diff)
+		}
+		blocks[i] = block
 	}
-
-	// blockA is verified but not accepted, so txA stays in the mempool and
-	// is presented to blockB's builder as a candidate.
-	wB := newWallet(skB, sut.snowCtx, sut.Client)
-	txB := wB.newMinimalTx(t)
-	require.NoErrorf(t, sut.IssueTx(ctx, txB), "%T.IssueTx(txB)", sut.Client)
-	blockB := sut.buildVerify(ctx, t, blockA.ID())
-	if diff := cmp.Diff([]*tx.Tx{txB}, blockTxs(t, blockB), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T txs (-want +got):\n%s", blockB, diff)
+	for i, block := range blocks {
+		require.NoErrorf(t, sut.AcceptBlock(ctx, block), "%T.AcceptBlock(%d)", sut.VM, i)
+		require.NoErrorf(t, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(%d)", block, i)
+		for _, tx := range blockTxs(t, block) {
+			sut.assertTxAccepted(ctx, t, tx, block.NumberU64())
+		}
 	}
-
-	require.NoErrorf(t, sut.AcceptBlock(ctx, blockA), "%T.AcceptBlock(blockA)", sut.VM)
-	require.NoErrorf(t, sut.AcceptBlock(ctx, blockB), "%T.AcceptBlock(blockB)", sut.VM)
-	require.NoErrorf(t, blockB.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(blockB)", blockB)
-
-	sut.assertTxAccepted(ctx, t, txA, blockA.NumberU64())
-	sut.assertTxAccepted(ctx, t, txB, blockB.NumberU64())
 }
 
 // blockTxs returns every cross-chain tx encoded in the block.
