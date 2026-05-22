@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network_test
+package network
 
 import (
 	"context"
@@ -17,11 +17,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -31,7 +30,7 @@ func TestDispatcher_SendTo(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1, 2, 3}}}
-	c := synctest.NewClient[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](t, ctx, nodeID, want)
+	c := newTestClient[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](t, ctx, nodeID, want)
 
 	got := &syncpb.GetLeafResponse{}
 	outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, got)
@@ -53,7 +52,7 @@ func TestDispatcher_FailurePaths(t *testing.T) {
 		{
 			name:    "no peer to send to",
 			handler: p2p.NoOpHandler{},
-			wantErr: network.ErrNoPeers,
+			wantErr: errNoPeers,
 		},
 		{
 			name:  "handler returns AppError",
@@ -63,21 +62,21 @@ func TestDispatcher_FailurePaths(t *testing.T) {
 					return nil, &common.AppError{Code: 42, Message: "boom"}
 				},
 			},
-			wantErr: network.ErrHandlerFailed,
+			wantErr: errHandlerFailed,
 		},
 		{
 			name:    "response bytes are not valid proto",
 			peers:   []ids.NodeID{nodeID},
-			handler: synctest.EchoHandler([]byte{0xff, 0xff, 0xff}),
-			wantErr: network.ErrUnmarshalResponse,
+			handler: echoHandler([]byte{0xff, 0xff, 0xff}),
+			wantErr: errUnmarshalResponse,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			c := synctest.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-				t, ctx, nodeID, tt.handler, synctest.NewPeerTracker(t, tt.peers...),
+			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+				t, ctx, nodeID, tt.handler, newTestPeerTracker(t, tt.peers...),
 			)
 			outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 			require.ErrorIs(t, err, tt.wantErr)
@@ -102,8 +101,8 @@ func TestDispatcher_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	c := synctest.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		t, ctx, nodeID, handler, synctest.NewPeerTracker(t, nodeID),
+	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+		t, ctx, nodeID, handler, newTestPeerTracker(t, nodeID),
 	)
 	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 	require.ErrorIs(t, err, context.Canceled)
@@ -116,7 +115,7 @@ func TestDispatcher_ContextCancelled(t *testing.T) {
 // afterward is a no-op, and the peer stays in responsivePeers.
 //
 // NOTE: Builds its own [p2p.PeerTracker] (instead of using
-// [synctest.NewPeerTracker]) so the test can read the responsive-peers
+// [newTestPeerTracker]) so the test can read the responsive-peers
 // gauge from the registry.
 func TestOutcome_DeferFailureAndSuccess(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
@@ -126,8 +125,8 @@ func TestOutcome_DeferFailureAndSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	reg, tracker := newRegisteredTracker(t, nodeID)
-	c := synctest.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		t, ctx, nodeID, synctest.EchoHandler(wantBytes), tracker,
+	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+		t, ctx, nodeID, echoHandler(wantBytes), tracker,
 	)
 
 	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
@@ -150,8 +149,8 @@ func TestOutcome_DeferFailureOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	reg, tracker := newRegisteredTracker(t, nodeID)
-	c := synctest.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		t, ctx, nodeID, synctest.EchoHandler(wantBytes), tracker,
+	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+		t, ctx, nodeID, echoHandler(wantBytes), tracker,
 	)
 
 	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
@@ -168,6 +167,47 @@ func TestOutcome_DeferFailureOnly(t *testing.T) {
 	}()
 
 	require.Equal(t, 0.0, gaugeValue(t, reg, "test_peer_tracker_num_responsive_peers"))
+}
+
+func echoHandler(b []byte) p2p.Handler {
+	return p2p.TestHandler{
+		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+			return b, nil
+		},
+	}
+}
+
+func newTestPeerTracker(t *testing.T, peers ...ids.NodeID) *p2p.PeerTracker {
+	t.Helper()
+	tracker, err := p2p.NewPeerTracker(logging.NoLog{}, "test", prometheus.NewRegistry(), nil, nil)
+	require.NoError(t, err)
+	for _, nodeID := range peers {
+		tracker.Connected(nodeID, &version.Application{Major: 99})
+	}
+	return tracker
+}
+
+func newTestDispatcher[Req, Resp proto.Message](
+	t *testing.T,
+	ctx context.Context,
+	nodeID ids.NodeID,
+	h p2p.Handler,
+	peers *p2p.PeerTracker,
+) *Dispatcher[Req, Resp] {
+	t.Helper()
+	return NewDispatcher[Req, Resp](p2ptest.NewSelfClient(t, ctx, nodeID, h), peers)
+}
+
+func newTestClient[Req, Resp proto.Message](
+	t *testing.T,
+	ctx context.Context,
+	nodeID ids.NodeID,
+	resp Resp,
+) *Dispatcher[Req, Resp] {
+	t.Helper()
+	respBytes, err := proto.Marshal(resp)
+	require.NoError(t, err)
+	return newTestDispatcher[Req, Resp](t, ctx, nodeID, echoHandler(respBytes), newTestPeerTracker(t, nodeID))
 }
 
 func newRegisteredTracker(t *testing.T, nodeID ids.NodeID) (*prometheus.Registry, *p2p.PeerTracker) {

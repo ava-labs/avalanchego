@@ -18,11 +18,11 @@ import (
 )
 
 var (
-	ErrNoPeers           = errors.New("no peers available")
-	ErrSendRequest       = errors.New("send request")
-	ErrHandlerFailed     = errors.New("handler request failed")
-	ErrMarshalRequest    = errors.New("marshal request")
-	ErrUnmarshalResponse = errors.New("unmarshal response")
+	errNoPeers           = errors.New("no peers available")
+	errSendRequest       = errors.New("send request")
+	errHandlerFailed     = errors.New("handler request failed")
+	errMarshalRequest    = errors.New("marshal request")
+	errUnmarshalResponse = errors.New("unmarshal response")
 )
 
 // Dispatcher is a typed synchronous client bound to one handler ID.
@@ -54,7 +54,7 @@ func NewClient(n *p2p.Network, handlerID uint64) *p2p.Client {
 func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*Outcome, error) {
 	nodeID, ok := d.peers.SelectPeer()
 	if !ok {
-		return nil, ErrNoPeers
+		return nil, errNoPeers
 	}
 	return d.SendTo(ctx, nodeID, req, resp)
 }
@@ -64,7 +64,7 @@ func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*
 func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrMarshalRequest, err)
+		return nil, fmt.Errorf("%w: %w", errMarshalRequest, err)
 	}
 
 	d.peers.RegisterRequest(nodeID)
@@ -85,7 +85,7 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 
 	start := time.Now()
 	if err := d.client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrSendRequest, err)
+		return nil, fmt.Errorf("%w: %w", errSendRequest, err)
 	}
 
 	select {
@@ -93,13 +93,13 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 		return nil, ctx.Err()
 	case r := <-resultCh:
 		if r.err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrHandlerFailed, r.err)
+			return nil, fmt.Errorf("%w: %w", errHandlerFailed, r.err)
 		}
 
 		const epsilon = 1e-6
 		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
 		if err := proto.Unmarshal(r.bytes, resp); err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrUnmarshalResponse, err)
+			return nil, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
 		}
 		return &Outcome{
 			peers:     d.peers,
