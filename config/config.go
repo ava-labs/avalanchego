@@ -522,10 +522,10 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	case config.DialerConfig.ConnectionTimeout < 0:
 		return network.Config{}, fmt.Errorf("%q must be >= 0", NetworkOutboundConnectionTimeoutKey)
-	case config.PeerListPullGossipFreq < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListPullGossipFreqKey)
-	case config.PeerListBloomResetFreq < 0:
-		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListBloomResetFreqKey)
+	case config.PeerListPullGossipFreq <= 0:
+		return network.Config{}, fmt.Errorf("%s must be > 0", NetworkPeerListPullGossipFreqKey)
+	case config.PeerListBloomResetFreq <= 0:
+		return network.Config{}, fmt.Errorf("%s must be > 0", NetworkPeerListBloomResetFreqKey)
 	case config.ThrottlerConfig.InboundMsgThrottlerConfig.CPUThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
 		return network.Config{}, fmt.Errorf("%s must be >= %d", InboundThrottlerCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
 	case config.ThrottlerConfig.InboundMsgThrottlerConfig.DiskThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
@@ -546,6 +546,8 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkReadHandshakeTimeoutKey)
 	case config.MaxClockDifference < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
+	case config.UptimeMetricFreq <= 0:
+		return network.Config{}, fmt.Errorf("%s must be > 0", UptimeMetricFreqKey)
 	}
 	return config, nil
 }

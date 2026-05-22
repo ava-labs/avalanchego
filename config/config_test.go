@@ -970,6 +970,54 @@ func TestGetDiskSpaceConfig(t *testing.T) {
 	}
 }
 
+func TestGetNetworkConfigRejectsNonPositiveTickerFrequencies(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   string
+		value time.Duration
+	}{
+		{
+			name: "zero peer list pull gossip frequency",
+			key:  NetworkPeerListPullGossipFreqKey,
+		},
+		{
+			name:  "negative peer list pull gossip frequency",
+			key:   NetworkPeerListPullGossipFreqKey,
+			value: -time.Second,
+		},
+		{
+			name: "zero peer list bloom reset frequency",
+			key:  NetworkPeerListBloomResetFreqKey,
+		},
+		{
+			name:  "negative peer list bloom reset frequency",
+			key:   NetworkPeerListBloomResetFreqKey,
+			value: -time.Second,
+		},
+		{
+			name: "zero uptime metric frequency",
+			key:  UptimeMetricFreqKey,
+		},
+		{
+			name:  "negative uptime metric frequency",
+			key:   UptimeMetricFreqKey,
+			value: -time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+			v.Set(tt.key, tt.value)
+
+			_, err := getNetworkConfig(v, constants.UnitTestID, false, time.Second)
+
+			require.ErrorContains(err, fmt.Sprintf("%s must be > 0", tt.key))
+		})
+	}
+}
+
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := filepath.Join(rootPath, "config.json")
