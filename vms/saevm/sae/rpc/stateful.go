@@ -27,14 +27,19 @@ import (
 var noopRelease tracers.StateReleaseFunc = func() {}
 
 // noEndOfBlockOps wraps [hook.Points] to suppress
-// [hook.Points.EndOfBlockOps], used by the tracer to skip end-of-block
-// operations during partial replay.
+// [hook.Points.EndOfBlockOps] and [hook.Points.AfterExecutingBlock], used by
+// the tracer to skip end-of-block operations during partial replay.
 type noEndOfBlockOps struct {
 	hook.Points
 }
 
 // EndOfBlockOps always returns nil.
 func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return nil, nil }
+
+// AfterExecutingBlock always returns nil.
+func (noEndOfBlockOps) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+	return nil
+}
 
 func (b *backend) RPCEVMTimeout() time.Duration {
 	return b.config.EVMTimeout
@@ -195,7 +200,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		block,
 		b,
 		txIndex,
-		noEndOfBlockOps{Points: b.Hooks()},
+		noEndOfBlockOps{b.Hooks()},
 		b.ChainConfig(),
 		b.ChainContext(),
 		&saexec.NullReceiptStore{},

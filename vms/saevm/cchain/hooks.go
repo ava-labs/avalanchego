@@ -298,6 +298,14 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	), nil
 }
 
+// PotentialEndOfBlockOps returns the cross-chain transactions that should be
+// considered for inclusion in the block being built.
+//
+// This method MUST only return transactions that are valid to be accepted with
+// respect to shared memory.
+//
+// SAE will perform additional checks on the transactions to ensure they are
+// valid with respect to the worst-case state.
 func (b *builder) PotentialEndOfBlockOps(
 	_ context.Context,
 	header *types.Header,
@@ -307,7 +315,9 @@ func (b *builder) PotentialEndOfBlockOps(
 	return func(yield func(*hookTx) bool) {
 		// Transactions are verified against the last executed state. We must
 		// also verify that they don't conflict with any transactions in blocks
-		// between the block we are building and the last executed block.
+		// between the block we are building and the last executed block. Since
+		// we know the settled block has been executed, we use that as our
+		// reference point.
 		inputs, err := ancestorInputIDs(header, settledHash, source)
 		if err != nil {
 			b.ctx.Log.Error("failed to get ancestor input IDs",
@@ -323,6 +333,10 @@ func (b *builder) PotentialEndOfBlockOps(
 				)
 				continue
 			}
+
+			// Transactions in the txpool have already been sanity checked and
+			// had their credentials verified, but we also process transactions
+			// from blocks provided by peers here.
 			if err := t.tx.SanityCheck(b.ctx); err != nil {
 				b.ctx.Log.Debug("tx failed sanity check",
 					zap.Stringer("txID", t.id),
@@ -330,6 +344,10 @@ func (b *builder) PotentialEndOfBlockOps(
 				)
 				continue
 			}
+
+			// Even for transactions from the txpool, we need to ensure that
+			// Import txs are consuming UTXOs that still exist so that our
+			// in-memory UTXO conflict checks are sufficient.
 			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory); err != nil {
 				b.ctx.Log.Debug("tx failed credential verification",
 					zap.Stringer("txID", t.id),

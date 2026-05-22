@@ -103,6 +103,7 @@ go_test(
     deps = [
         "//api",
         "//chains/atomic",
+        "//database",
         "//database/memdb",
         "//database/prefixdb",
         "//graft/coreth/core/extstate",
@@ -154,6 +155,7 @@ go_test(
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//log",
         "@com_github_ava_labs_libevm//rpc",
+        "@com_github_ava_labs_libevm//params",
         "@com_github_google_go_cmp//cmp",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_stretchr_testify//assert",

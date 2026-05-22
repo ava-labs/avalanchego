@@ -22,6 +22,7 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
@@ -42,6 +43,7 @@ import (
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestMain(m *testing.M) {
@@ -161,6 +163,22 @@ func (s *SUT) assertUTXOsExist(tb testing.TB, peerChainID ids.ID, want ...*avax.
 	}
 	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
 		tb.Errorf("UTXOs in shared memory with %s (-want +got):\n%s", peerChainID, diff)
+	}
+}
+
+// assertUTXOsMissing asserts that the shared memory between peerChainID and the
+// C-Chain does not contain any of the expected UTXOs.
+func (s *SUT) assertUTXOsMissing(tb testing.TB, peerChainID ids.ID, unwanted ...*avax.UTXO) {
+	tb.Helper()
+
+	peerMemory := s.memory.NewSharedMemory(peerChainID)
+	for i, utxo := range unwanted {
+		inputID := utxo.InputID()
+		key := inputID[:]
+
+		keys := [][]byte{key}
+		_, err := peerMemory.Get(snowtest.CChainID, keys)
+		assert.ErrorIsf(tb, err, database.ErrNotFound, "%T.Get(utxo %d)", peerMemory, i)
 	}
 }
 
@@ -568,7 +586,6 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 
 	require.NoErrorf(t, sut.AcceptBlock(ctx, blockA), "%T.AcceptBlock(blockA)", sut.VM)
 	require.NoErrorf(t, sut.AcceptBlock(ctx, blockB), "%T.AcceptBlock(blockB)", sut.VM)
-	require.NoErrorf(t, blockA.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(blockA)", blockA)
 	require.NoErrorf(t, blockB.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(blockB)", blockB)
 
 	sut.assertTxAccepted(t, txA, blockA.NumberU64())
@@ -582,4 +599,57 @@ func blockTxs(tb testing.TB, blk *blocks.Block) []*tx.Tx {
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(blk.EthBlock()))
 	require.NoErrorf(tb, err, "tx.ParseSlice()")
 	return txs
+}
+
+// TestDebugTraceDoesNotApplyAtomicState asserts that executing a debug trace
+// does not apply atomic state changes before the block is accepted.
+func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
+	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	ethSender := ethWallet.Addresses()[0]
+	exportKey := txtest.NewKey(t)
+	sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc = saetest.MaxAllocFor(
+			ethSender,
+			exportKey.EthAddress(),
+		)
+	}))
+
+	// Tracing will error if there isn't at least one ethereum transaction in
+	// the block.
+	tracedTx := ethWallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &ethSender,
+		Gas:      ethparams.TxGas,
+		GasPrice: big.NewInt(1),
+	})
+	rpc := sut.GethRPCBackends()
+	require.NoErrorf(t, rpc.SendTx(t.Context(), tracedTx), "%T.SendTx(%#x)", rpc, tracedTx.Hash())
+
+	// Export gives us observable external state.
+	w := newWallet(exportKey, sut.snowCtx, sut.Client)
+	const (
+		txFee          = 50
+		exportedAmount = 50
+	)
+	signedExport, export := w.newExportTx(
+		t,
+		sut.snowCtx.XChainID,
+		txFee,
+		txtest.NewTransferOutput(exportedAmount, exportKey.Address()),
+	)
+	require.NoErrorf(t, sut.IssueTx(t.Context(), signedExport), "%T.IssueTx()", sut.Client)
+
+	blk := sut.buildVerify(t, sut.lastAccepted(t))
+	require.Equalf(t, types.Transactions{tracedTx}, blk.Transactions(), "%T.Transactions()", blk)
+	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
+		t.Errorf("%T txs (-want +got):\n%s", blk, diff)
+	}
+
+	_, _, _, release, err := rpc.StateAtTransaction(t.Context(), blk.EthBlock(), 0, 0)
+	require.NoErrorf(t, err, "%T.StateAtTransaction(...)", rpc)
+	defer release()
+
+	// We haven't accepted the block yet, so it should be impossible for the
+	// execution results to have been applied.
+	exportedUTXOs := txtest.ExportedUTXOs(signedExport.ID(), export)
+	sut.assertUTXOsMissing(t, sut.snowCtx.XChainID, exportedUTXOs...)
 }
