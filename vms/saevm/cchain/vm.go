@@ -63,8 +63,9 @@ var ethDBPrefix = []byte("ethdb")
 type VM struct {
 	*sae.VM // created by [VM.Initialize]
 
-	pullGossipPeriod time.Duration
-	pushGossipPeriod time.Duration
+	pullGossipPeriod      time.Duration
+	pushGossipPeriod      time.Duration
+	initialMinDelayExcess acp226.DelayExcess
 
 	ctx          *snow.Context
 	state        *state.State
@@ -177,6 +178,7 @@ func (v *VM) Initialize(
 		snowCtx,
 		v.state,
 		chainConfig,
+		v.initialMinDelayExcess,
 		desiredDelayExcess,
 		desiredTargetExcess,
 		pendingTxs,

@@ -57,6 +57,7 @@ func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
 	chainConfig *ethparams.ChainConfig,
+	initialMinDelayExcess acp226.DelayExcess,
 	desiredDelayExcess *acp226.DelayExcess,
 	desiredTargetExcess *acp176.TargetExcess,
 	pool *txpool.Pending,
@@ -79,9 +80,10 @@ func newHooks(
 	}
 	return &hooks{
 		builder: builder{
-			ctx:         ctx,
-			chainConfig: chainConfig,
-			now:         time.Now,
+			ctx:                   ctx,
+			chainConfig:           chainConfig,
+			initialMinDelayExcess: initialMinDelayExcess,
+			now:                   time.Now,
 			desired: desiredParams{
 				delayExcess:  desiredDelayExcess,
 				targetExcess: desiredTargetExcess,
@@ -112,8 +114,9 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 	headerExtra := customtypes.GetHeaderExtra(header)
 	now := h.BlockTime(header)
 	return &builder{
-		ctx:         h.ctx,
-		chainConfig: h.chainConfig,
+		ctx:                   h.ctx,
+		chainConfig:           h.chainConfig,
+		initialMinDelayExcess: h.initialMinDelayExcess,
 		now: func() time.Time {
 			return now
 		},
@@ -230,8 +233,9 @@ type desiredParams struct {
 }
 
 type builder struct {
-	ctx         *snow.Context
-	chainConfig *ethparams.ChainConfig
+	ctx                   *snow.Context
+	chainConfig           *ethparams.ChainConfig
+	initialMinDelayExcess acp226.DelayExcess
 
 	now func() time.Time
 	// When fields in [desiredParams] are set, the builder produces headers
@@ -246,7 +250,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 
-	mde := acp226.InitialDelayExcess
+	mde := b.initialMinDelayExcess
 	if pmde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pmde != nil {
 		mde = *pmde
 	}
