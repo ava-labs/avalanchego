@@ -221,6 +221,15 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	t.tree.root = common.Hash(t.Firewood.Root())
 }
 
+// ClearAll resets the database to an empty state, without a genesis block committed.
+func (t *TrieDB) ClearAll() error {
+	if _, err := t.Firewood.Update([]ffi.BatchOp{ffi.PrefixDelete(nil)}); err != nil {
+		return fmt.Errorf("clearing database: %w", err)
+	}
+	t.SetHashAndHeight(common.Hash{}, 0)
+	return nil
+}
+
 // Scheme returns the scheme of the database.
 // However, to avoid a slow deletion in `libevm` `StateDB`, it returns [rawdb.HashScheme].
 func (*TrieDB) Scheme() string {

@@ -10,7 +10,7 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 // trie directly from peers instead of replaying every historical block. Each
 // request type asks for one slice of that state (a leaf range, contract code
 // for a set of hashes, or a batch of blocks) and is served by a dedicated
-// p2p handler ID in network/p2p/handler.go).
+// p2p handler ID in network/p2p/handler.go.
 
 message GetLeafRequest {
   bytes root_hash = 1;
@@ -35,8 +35,8 @@ message GetCodeResponse {
   repeated bytes data = 1;
 }
 
-// GetBlockRequest requests the block accepted at height along with 
-// numParents of its ancestors.
+// GetBlockRequest returns the block at height plus num_parents
+// ancestors: [height, height-1, ..., height-num_parents].
 message GetBlockRequest {
   uint64 height = 1;
   uint32 num_parents = 2;
@@ -47,7 +47,14 @@ message GetBlockResponse {
   repeated bytes blocks = 1;
 }
 
-message GetChangeProofRequest {
+message ProofRequest {
+  oneof request {
+    ChangeProofRequest change_proof = 1;
+    RangeProofRequest range_proof = 2;
+  }
+}
+
+message ChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
   MaybeBytes start_key = 3;
@@ -56,20 +63,19 @@ message GetChangeProofRequest {
   uint32 bytes_limit = 6;
 }
 
-message GetChangeProofResponse {
-  oneof response {
-    bytes change_proof = 1;
-    bytes range_proof = 2;
-  }
-}
-
-// Range proof responses don't require any extra data, so no message is needed.
-message GetRangeProofRequest {
+message RangeProofRequest {
   bytes root_hash = 1;
   MaybeBytes start_key = 2;
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
   uint32 bytes_limit = 5;
+}
+
+message ProofResponse {
+  oneof response {
+    bytes change_proof = 1;
+    bytes range_proof = 2;
+  }
 }
 
 message ChangeProof {

@@ -142,15 +142,14 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 
 func createSyncers(t *testing.T, clientState, serverState state.Database, root common.Hash) (*FirewoodSyncer, *code.Syncer, *code.Queue) {
 	t.Helper()
-	// Create the mock P2P client that serves range proofs and change proofs from the server DB.
+	// Create the mock P2P proofClient that serves range proofs and change proofs from the server DB.
 	// Use CorethCodec as the default - the firewood syncer uses p2p directly, not the message codec,
 	// so the codec choice only affects the code request handler which is auxiliary to these tests.
 	var (
 		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
 		serverDB           = dbFromState(t, serverState)
 		mockClient         = client.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
-		rpClient           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB))
-		cpClient           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB))
+		proofClient        = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetProofHandler(serverDB))
 	)
 
 	// Create the producer code queue.
@@ -167,8 +166,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 		dbFromState(t, clientState),
 		root,
 		codeQueue,
-		rpClient,
-		cpClient,
+		proofClient,
 	)
 	require.NoError(t, err, "NewFirewoodSyncer()")
 	return firewoodSyncer, codeSyncer, codeQueue
