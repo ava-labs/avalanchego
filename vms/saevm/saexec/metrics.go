@@ -17,10 +17,11 @@ const (
 	LastSettledHeightName  = "last_settled_height"
 )
 
-// metrics holds the SAE block-lifecycle gauges. Both live here — the lowest
-// package that updates a member of the bucket — so one site owns
-// registration. Execution events update last_executed_height in-package;
-// settlement updates last_settled_height through [Executor.MarkSettled].
+// metrics holds the SAE block-lifecycle gauges. Both live with [Executor]
+// because it owns the execution lifecycle: [Executor.afterExecution]
+// writes last_executed_height directly, and [Executor.MarkSettled]
+// exposes the settled gauge for the sae VM to drive. Co-locating them
+// keeps registration in one place.
 type metrics struct {
 	lastExecutedHeight prometheus.Gauge
 	lastSettledHeight  prometheus.Gauge
