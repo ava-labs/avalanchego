@@ -22,18 +22,9 @@ func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
 
 	sk := txtest.NewKey(t) // sk is NOT funded.
 	w := newWallet(sk, sut.snowCtx, sut.Client)
-	const (
-		txFee          = 50
-		exportedAmount = 50
-	)
-	tx, _ := w.newExportTx(
-		t,
-		sut.snowCtx.XChainID,
-		txFee,
-		txtest.NewTransferOutput(exportedAmount, sk.Address()),
-	)
+	stx := w.newMinimalTx(t)
 
-	err := sut.IssueTx(t.Context(), tx)
+	err := sut.IssueTx(t.Context(), stx)
 	require.ErrorContainsf(t, err, errIssuingTx.Error(), "%T.IssueTx()", sut.Client)
 }
 

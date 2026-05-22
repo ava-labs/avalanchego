@@ -44,31 +44,16 @@ func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *
 }
 
 func TestAncestorInputIDs(t *testing.T) {
-	w := newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
-	export := func() *tx.Tx {
-		const (
-			txFee          = 0
-			exportedAmount = 50
-		)
-		signedExport, _ := w.newExportTx(
-			t,
-			snowtest.XChainID,
-			txFee,
-			txtest.NewTransferOutput(exportedAmount, w.sk.Address()),
-		)
-		return signedExport
-	}
-
 	var (
+		w       = newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
 		settled = common.Hash(ids.GenerateTestID())
-
-		tx1    = export()
-		block1 = newBlock(t, 1, settled, tx1)
-		tx2    = export()
-		block2 = newBlock(t, 2, block1.Hash(), tx2)
-		tx3    = export()
-		block3 = newBlock(t, 3, block2.Hash(), tx3)
-		block4 = newBlock(t, 4, block3.Hash())
+		tx1     = w.newMinimalTx(t)
+		block1  = newBlock(t, 1, settled, tx1)
+		tx2     = w.newMinimalTx(t)
+		block2  = newBlock(t, 2, block1.Hash(), tx2)
+		tx3     = w.newMinimalTx(t)
+		block3  = newBlock(t, 3, block2.Hash(), tx3)
+		block4  = newBlock(t, 4, block3.Hash())
 	)
 
 	tests := []struct {
