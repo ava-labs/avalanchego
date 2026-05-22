@@ -10,9 +10,7 @@ set -euo pipefail
 : "${PACKAGE_ARCH:?PACKAGE_ARCH must be set (x86_64 or aarch64)}"
 : "${OUTPUT_DIR:?OUTPUT_DIR must be set (bind-mounted output dir)}"
 
-# Package format identifier; defaults to RPM and is retained for
-# future (DEB and possibly other) packaging formats reuse.
-PKG_FORMAT="${PKG_FORMAT:-RPM}"
+: "${PKG_FORMAT:?PKG_FORMAT must be set (RPM or DEB)}"
 pkg_format_lower="${PKG_FORMAT,,}"
 
 REPO_ROOT="/build"
