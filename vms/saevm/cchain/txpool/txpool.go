@@ -330,17 +330,6 @@ func (p *Pending) Iter() iter.Seq[*tx.Tx] {
 	}
 }
 
-// Iterate calls f for each transaction in the pool until f returns false.
-//
-// Iteration order matches [Pending.Iter].
-func (p *Pending) Iterate(f func(*tx.Tx) bool) {
-	for tx := range p.Iter() {
-		if !f(tx) {
-			return
-		}
-	}
-}
-
 // Len returns the number of transactions currently in the pool.
 func (p *Pending) Len() int {
 	p.lock.RLock()

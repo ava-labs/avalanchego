@@ -22,9 +22,9 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
@@ -39,12 +39,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
@@ -66,7 +66,7 @@ type VM struct {
 	ctx          *snow.Context
 	state        *state.State
 	txpool       *txpool.Txpool
-	pushGossiper *gossip.PushGossiper[*tx.Tx]
+	pushGossiper *gossip.PushGossiper[*gossipTx]
 
 	// TODO: Remove this.
 	hooks *hooks
@@ -208,39 +208,45 @@ func (v *VM) Initialize(
 		return nil
 	})
 
-	snowCtx.Log.Info("registering coreth metrics")
-	metrics := prometheus.NewRegistry()
-	if err := snowCtx.Metrics.Register("coreth", metrics); err != nil {
-		return fmt.Errorf("registering metrics: %w", err)
+	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "cchain")
+	if err != nil {
+		return fmt.Errorf("making metrics: %w", err)
 	}
-
-	snowCtx.Log.Info("p2p gossip")
-	gossipSet, err := gossip.NewBloomSet(v.txpool, gossip.BloomSetConfig{})
+	bloomMetrics, err := bloom.NewMetrics("gossip_bloom", reg)
+	if err != nil {
+		return fmt.Errorf("creating gossip bloom metrics: %w", err)
+	}
+	gossipSet, err := gossip.NewBloomSet[*gossipTx](
+		newGossipTxPool(v.txpool),
+		gossip.BloomSetConfig{
+			Metrics: bloomMetrics,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("creating gossip bloom set: %w", err)
 	}
 	const pullGossipPeriod = time.Second
-	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
+	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem[*gossipTx](
 		snowCtx.NodeID,
 		v.Network,
 		v.ValidatorPeers,
 		gossipSet,
-		tx.Marshaller{},
+		gossipMarshaller{},
 		gossip.SystemConfig{
 			Log:           snowCtx.Log,
-			Registry:      metrics,
+			Registry:      reg,
 			Namespace:     "gossip",
 			HandlerID:     p2p.AtomicTxGossipHandlerID,
 			RequestPeriod: pullGossipPeriod,
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("creating atomic tx gossip system: %w", err)
+		return fmt.Errorf("creating cross-chain tx gossip system: %w", err)
 	}
 	v.pushGossiper = pushGossiper
 
 	if err := v.VM.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
-		return fmt.Errorf("registering atomic tx gossip handler: %w", err)
+		return fmt.Errorf("registering cross-chain tx gossip handler: %w", err)
 	}
 
 	gossipCtx, cancelGossip := context.WithCancel(context.Background())
@@ -411,19 +417,6 @@ func minNextBlockTime(h *types.Header) time.Time {
 	mde := *e.MinDelayExcess
 	delay := time.Duration(mde.Delay()) * time.Millisecond //#nosec G115 -- delay excess is verified by consensus
 	return customtypes.BlockTime(h).Add(delay)
-}
-
-// RejectBlock re-admits a rejected block's cross-chain transactions to the
-// local pool so peers that still consider them valid can include them.
-func (v *VM) RejectBlock(ctx context.Context, b *blocks.Block) error {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b.EthBlock()))
-	if err != nil {
-		return fmt.Errorf("parsing txs of rejected block %s (%d): %w", b.Hash(), b.NumberU64(), err)
-	}
-	for _, t := range txs {
-		_ = v.txpool.Add(t)
-	}
-	return v.VM.RejectBlock(ctx, b)
 }
 
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse

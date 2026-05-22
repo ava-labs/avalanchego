@@ -36,7 +36,7 @@ import (
 type service struct {
 	ctx          *snow.Context
 	txpool       *txpool.Txpool
-	pushGossiper *gossip.PushGossiper[*tx.Tx]
+	pushGossiper *gossip.PushGossiper[*gossipTx]
 	state        *state.State
 
 	chainAlias  string
@@ -47,7 +47,7 @@ type service struct {
 func newService(
 	ctx *snow.Context,
 	txpool *txpool.Txpool,
-	pushGossiper *gossip.PushGossiper[*tx.Tx],
+	pushGossiper *gossip.PushGossiper[*gossipTx],
 	state *state.State,
 ) (*service, error) {
 	chainAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
@@ -224,14 +224,13 @@ func (s *service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) 
 	if err != nil {
 		return fmt.Errorf("parsing transaction: %w", err)
 	}
+
 	if err := s.txpool.Add(t); err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
 		return fmt.Errorf("%w: %w", errIssuingTx, err)
 	}
 
-	// Whether the tx was newly admitted or already in the pool, push it to
-	// peers — ensures this node propagates it even if it was first seen via
-	// pull gossip.
-	s.pushGossiper.Add(t)
+	// Even if already in the pool from a peer's gossip, push it to peers.
+	s.pushGossiper.Add(toGossipTx(t))
 
 	r.TxID = t.ID()
 	return nil

@@ -29,11 +29,14 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -59,14 +62,35 @@ type SUT struct {
 
 	snowCtx *snow.Context
 	memory  *atomic.Memory
+	sender  *saetest.Sender
 }
+
+// Implements [saetest.Peer]
+func (s *SUT) NodeID() ids.NodeID      { return s.snowCtx.NodeID }
+func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis core.Genesis
+		genesis    core.Genesis
+		nodeID     ids.NodeID
+		validators set.Set[ids.NodeID]
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withNodeID overrides the SUT's randomly generated NodeID.
+func withNodeID(id ids.NodeID) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.nodeID = id
+	})
+}
+
+// withValidators adds each NodeID to the validator set with weight 1.
+func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.validators = vdrs
+	})
+}
 
 // newSUT initializes a cchain [VM], transitions it to [snow.NormalOp], and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
@@ -85,6 +109,7 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 				Difficulty: big.NewInt(0), // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
 			},
+			nodeID: ids.GenerateTestNodeID(),
 		}, opts...)
 	)
 
@@ -92,20 +117,29 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
 	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
-	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
+	snowCtx.NodeID = cfg.nodeID
 	snowCtx.Log = saetest.NewTBLogger(tb, logging.Debug)
+	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
+
+	vdrState, ok := snowCtx.ValidatorState.(*validatorstest.State)
+	require.Truef(tb, ok, "unexpected type %T for snowCtx.ValidatorState", snowCtx.ValidatorState)
+	vdrState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, cfg.validators.Len())
+		for id := range cfg.validators {
+			validatorSet[id] = &validators.GetValidatorOutput{
+				NodeID: id,
+				Weight: 1,
+			}
+		}
+		return validatorSet, nil
+	}
 
 	chainDB := prefixdb.New([]byte("chain"), db)
 
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
-	// The SAE mempool may push gossip transactions when they are issued.
-	appSender := &enginetest.Sender{
-		SendAppGossipF: func(context.Context, snowcommon.SendConfig, []byte) error {
-			return nil
-		},
-	}
+	appSender := saetest.NewSender(tb, cfg.validators)
 
 	require.NoErrorf(tb, vm.Initialize(
 		ctx,
@@ -125,6 +159,10 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 	})
 	require.NoErrorf(tb, vm.SetState(ctx, snow.NormalOp), "%T.SetState(%s)", vm, snow.NormalOp)
 
+	// Avalanchego marks the local node as connected so that p2p protocols don't
+	// need to treat our node as a special case.
+	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
+
 	handlers, err := vm.CreateHandlers(ctx)
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
 
@@ -135,12 +173,15 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 	server := httptest.NewServer(mux)
 	tb.Cleanup(server.Close)
 
-	return &SUT{
+	sut := &SUT{
 		VM:      vm,
 		Client:  NewClient(server.URL),
 		snowCtx: snowCtx,
 		memory:  memory,
+		sender:  appSender,
 	}
+	appSender.SetSelf(sut)
+	return sut
 }
 
 // assertUTXOsExist asserts that the shared memory between peerChainID and the
