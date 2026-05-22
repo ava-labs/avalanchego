@@ -128,6 +128,9 @@ setup_gpg() {
         gpg --batch --import "${gpg_key_file}"
         cp "${gpg_key_file}" "${NFPM_SIGNING_KEY}"
     elif [[ -f "${NFPM_SIGNING_KEY}" ]]; then
+        # avalanchego and subnet-evm builds run in separate docker invocations
+        # but share the on-disk key via the bind-mounted build/gpg directory so
+        # the validator's single exported public key verifies both RPMs.
         echo "Reusing existing ephemeral GPG key"
         gpg --batch --import "${NFPM_SIGNING_KEY}"
     else
@@ -175,4 +178,19 @@ run_nfpm_package() {
         --config "${resolved_path}" \
         --packager "${packager}" \
         --target "${target_path}"
+}
+
+# Verify that all expected package files exist in a directory.
+#
+# Args: pkg_dir file1 [file2 ...]
+assert_files_exist() {
+    local pkg_dir="${1:?package directory required}"; shift
+    local missing=()
+    for f in "$@"; do
+        [[ -f "${pkg_dir}/${f}" ]] || missing+=("${pkg_dir}/${f}")
+    done
+    if (( ${#missing[@]} > 0 )); then
+        printf 'ERROR: expected file not found: %s\n' "${missing[@]}" >&2
+        exit 1
+    fi
 }

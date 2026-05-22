@@ -24,8 +24,6 @@ SCRIPTS_DIR="${REPO_ROOT}/.github/packaging/scripts"
 
 # shellcheck disable=SC1091
 source "${SCRIPTS_DIR}/lib-build-common.sh"
-# shellcheck disable=SC1091
-source "${SCRIPTS_DIR}/lib-validate-common.sh"
 
 resolve_subnet_evm_vm_id
 
