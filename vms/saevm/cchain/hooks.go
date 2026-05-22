@@ -240,6 +240,8 @@ type builder struct {
 	potentialTxs iter.Seq[*hookTx]
 }
 
+// See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
+// the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
@@ -285,9 +287,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		},
 		&customtypes.HeaderExtra{
 			// Prior to SAE, ExtDataGasUsed included the gas cost of the
-			// cross-chain transactions to advance the ACP-176 fee state. After
-			// SAE, the gas cost is accounted for in the executor via
-			// [hook.Op.Gas].
+			// cross-chain transactions. However, with SAE, the gas cost is
+			// included in [types.Header.GasUsed] through with [hook.Op.Gas].
 			ExtDataGasUsed: big.NewInt(0),
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),

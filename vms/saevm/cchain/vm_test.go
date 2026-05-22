@@ -95,12 +95,11 @@ func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 // newSUT initializes a cchain [VM], transitions it to [snow.NormalOp], and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
 // [NewClient] expects.
-func newSUT(tb testing.TB, opts ...sutOption) *SUT {
+func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
 	var (
 		vm  = &VM{}
-		ctx = tb.Context()
 		db  = memdb.New()
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
@@ -118,8 +117,9 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	snowCtx.NodeID = cfg.nodeID
-	snowCtx.Log = saetest.NewTBLogger(tb, logging.Debug)
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
+	log := saetest.NewTBLogger(tb, logging.Debug)
+	snowCtx.Log = log
 
 	vdrState, ok := snowCtx.ValidatorState.(*validatorstest.State)
 	require.Truef(tb, ok, "unexpected type %T for snowCtx.ValidatorState", snowCtx.ValidatorState)
@@ -141,6 +141,7 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 
 	appSender := saetest.NewSender(tb, cfg.validators)
 
+	ctx := log.CancelOnError(tb.Context())
 	require.NoErrorf(tb, vm.Initialize(
 		ctx,
 		snowCtx,
@@ -181,7 +182,7 @@ func newSUT(tb testing.TB, opts ...sutOption) *SUT {
 		sender:  appSender,
 	}
 	appSender.SetSelf(sut)
-	return sut
+	return ctx, sut
 }
 
 // assertUTXOsExist asserts that the shared memory between peerChainID and the
@@ -200,7 +201,7 @@ func (s *SUT) assertUTXOsExist(tb testing.TB, peerChainID ids.ID, want ...*avax.
 
 	got := make([]*avax.UTXO, len(utxoBytes))
 	for i, b := range utxoBytes {
-		got[i] = txtest.MustParseUTXO(tb, b)
+		got[i] = txtest.ParseUTXO(tb, b)
 	}
 	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
 		tb.Errorf("UTXOs in shared memory with %s (-want +got):\n%s", peerChainID, diff)
@@ -233,7 +234,7 @@ func (s *SUT) addUTXOs(tb testing.TB, peerChainID ids.ID, utxos ...*avax.UTXO) {
 		inputID := utxo.InputID()
 		e := &atomic.Element{
 			Key:   inputID[:],
-			Value: txtest.MustMarshalUTXO(tb, utxo),
+			Value: txtest.MarshalUTXO(tb, utxo),
 		}
 		if o, ok := utxo.Out.(avax.Addressable); ok {
 			e.Traits = o.Addresses()
@@ -272,19 +273,19 @@ func (s *SUT) assertAccount(tb testing.TB, addr common.Address, wantNonce uint64
 
 // issueAndExecute submits t through [Client.IssueTx] and drives the consensus
 // loop to produce, accept, and execute the next block, which is returned.
-func (s *SUT) issueAndExecute(tb testing.TB, t *tx.Tx) *blocks.Block {
+func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blocks.Block {
 	tb.Helper()
 
-	require.NoErrorf(tb, s.IssueTx(tb.Context(), t), "%T.IssueTx()", s.Client)
-	return s.runConsensusLoop(tb)
+	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
+	return s.runConsensusLoop(ctx, tb)
 }
 
 // assertTxAccepted asserts that [Client.GetTx] returns the given tx at the
 // given block height.
-func (s *SUT) assertTxAccepted(tb testing.TB, want *tx.Tx, wantHeight uint64) {
+func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, wantHeight uint64) {
 	tb.Helper()
 
-	got, gotHeight, err := s.GetTx(tb.Context(), want.ID())
+	got, gotHeight, err := s.GetTx(ctx, want.ID())
 	require.NoErrorf(tb, err, "%T.GetTx()", s.Client)
 	if diff := cmp.Diff(want, got, txtest.CmpOpt()); diff != "" {
 		tb.Errorf("%T.GetTx() (-want +got):\n%s", s.Client, diff)
@@ -294,38 +295,38 @@ func (s *SUT) assertTxAccepted(tb testing.TB, want *tx.Tx, wantHeight uint64) {
 
 // runConsensusLoop builds a block on top of the last-accepted block, drives it
 // through verify+accept, and waits until it has been executed.
-func (s *SUT) runConsensusLoop(tb testing.TB) *blocks.Block {
+func (s *SUT) runConsensusLoop(ctx context.Context, tb testing.TB) *blocks.Block {
 	tb.Helper()
 
-	blk := s.buildVerifyAccept(tb)
-	require.NoErrorf(tb, blk.WaitUntilExecuted(tb.Context()), "%T.WaitUntilExecuted()", blk)
+	blk := s.buildVerifyAccept(ctx, tb)
+	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
 	return blk
 }
 
 // buildVerifyAccept builds, verifies, and accepts a block on top of the
 // last-accepted block.
-func (s *SUT) buildVerifyAccept(tb testing.TB) *blocks.Block {
+func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB) *blocks.Block {
 	tb.Helper()
 
-	blk := s.buildVerify(tb, s.lastAccepted(tb))
-	require.NoErrorf(tb, s.AcceptBlock(tb.Context(), blk), "%T.AcceptBlock()", s.VM)
+	lastAccepted := s.lastAccepted(ctx, tb)
+	blk := s.buildVerify(ctx, tb, lastAccepted)
+	require.NoErrorf(tb, s.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.VM)
 	return blk
 }
 
 // lastAccepted returns the ID of the last-accepted block.
-func (s *SUT) lastAccepted(tb testing.TB) ids.ID {
+func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	tb.Helper()
 
-	id, err := s.LastAccepted(tb.Context())
+	id, err := s.LastAccepted(ctx)
 	require.NoErrorf(tb, err, "%T.LastAccepted()", s.VM)
 	return id
 }
 
 // buildVerify builds and verifies a block on top of preferenceID.
-func (s *SUT) buildVerify(tb testing.TB, preferenceID ids.ID) *blocks.Block {
+func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID) *blocks.Block {
 	tb.Helper()
 
-	ctx := tb.Context()
 	// TODO(StephenButtolph): When implementing Warp, we will need to provide
 	// meaningful block contexts.
 	var blockCtx *block.Context
@@ -358,6 +359,24 @@ func newWallet(sk *secp256k1.PrivateKey, snowCtx *snow.Context, client *Client) 
 		snowCtx: snowCtx,
 		client:  client,
 	}
+}
+
+// newMinimalExportTx builds and signs an [tx.Export] sending a single output to
+// [snowtest.XChainID].
+func (w *wallet) newMinimalTx(tb testing.TB) *tx.Tx {
+	tb.Helper()
+
+	const (
+		txFee          = 1
+		exportedAmount = 1
+	)
+	t, _ := w.newExportTx(
+		tb,
+		snowtest.XChainID,
+		txFee,
+		txtest.NewTransferOutput(exportedAmount, w.sk.Address()),
+	)
+	return t
 }
 
 // newExportTx builds and signs an [tx.Export] sending outputs to
@@ -404,6 +423,7 @@ func (w *wallet) newExportTx(
 // by the wallet, crediting the total imported (minus fee) to `to` on the
 // C-Chain.
 func (w *wallet) newImportTx(
+	ctx context.Context,
 	tb testing.TB,
 	sourceChain ids.ID,
 	to common.Address,
@@ -411,11 +431,10 @@ func (w *wallet) newImportTx(
 ) (*tx.Tx, *tx.Import) {
 	tb.Helper()
 
-	utxos := w.getUTXOs(tb, sourceChain)
-
 	var (
 		avaxAssetID  = w.snowCtx.AVAXAssetID
 		importedAVAX uint64
+		utxos        = w.client.getAllUTXOs(ctx, tb, sourceChain, maxGetUTXOsLimit, w.sk.Address())
 		inputs       = make([]*avax.TransferableInput, 0, len(utxos))
 	)
 	for _, utxo := range utxos {
@@ -454,47 +473,6 @@ func (w *wallet) newImportTx(
 	return w.sign(tb, imp, len(inputs)), imp
 }
 
-// getUTXOs returns every UTXO controlled by the wallet that has been exported
-// to this chain from sourceChain.
-func (w *wallet) getUTXOs(tb testing.TB, sourceChain ids.ID) []*avax.UTXO {
-	tb.Helper()
-	return getUTXOs(tb, w.client, sourceChain, maxGetUTXOsLimit, w.sk.Address())
-}
-
-// getUTXOs drains [Client.GetUTXOs] for addrs by walking pages of size limit
-// until a short page signals the end of the result set.
-func getUTXOs(
-	tb testing.TB,
-	client *Client,
-	sourceChain ids.ID,
-	limit uint32,
-	addrs ...ids.ShortID,
-) []*avax.UTXO {
-	tb.Helper()
-
-	var (
-		startAddr   ids.ShortID
-		startUTXOID ids.ID
-		utxos       []*avax.UTXO
-	)
-	for {
-		page, endAddr, endUTXOID, err := client.GetUTXOs(
-			tb.Context(),
-			addrs,
-			sourceChain,
-			limit,
-			startAddr,
-			startUTXOID,
-		)
-		require.NoErrorf(tb, err, "%T.GetUTXOs()", client)
-		utxos = append(utxos, page...)
-		if uint64(len(page)) < uint64(limit) {
-			return utxos
-		}
-		startAddr, startUTXOID = endAddr, endUTXOID
-	}
-}
-
 // sign wraps u in a [tx.Tx] with numCreds copies of a single-sig credential
 // over u.
 func (w *wallet) sign(tb testing.TB, u tx.Unsigned, numCreds int) *tx.Tx {
@@ -531,7 +509,7 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 func TestExport(t *testing.T) {
 	sk := txtest.NewKey(t)
 	sender := sk.EthAddress()
-	sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Alloc = saetest.MaxAllocFor(sender)
 	}))
 
@@ -548,16 +526,19 @@ func TestExport(t *testing.T) {
 	)
 
 	initialBalance := sut.balance(t, sender)
-	blk := sut.issueAndExecute(t, signedExport)
-	sut.assertTxAccepted(t, signedExport, blk.NumberU64())
-	const amountBurned = exportedAmount + txFee
-	sut.assertAccount(t, sender, 1, addNAVAX(t, initialBalance, -amountBurned))
+	blk := sut.issueAndExecute(ctx, t, signedExport)
+	sut.assertTxAccepted(ctx, t, signedExport, blk.NumberU64())
+	const (
+		nonce        = 1
+		amountBurned = exportedAmount + txFee
+	)
+	sut.assertAccount(t, sender, nonce, addNAVAX(t, initialBalance, -amountBurned))
 	sut.assertUTXOsExist(t, sut.snowCtx.XChainID, txtest.ExportedUTXOs(signedExport.ID(), export)...)
 }
 
 // TestImport exercises the cchain VM end-to-end with an Import tx.
 func TestImport(t *testing.T) {
-	sut := newSUT(t)
+	ctx, sut := newSUT(t)
 
 	const utxoAmount = 100
 	sk := txtest.NewKey(t)
@@ -570,67 +551,54 @@ func TestImport(t *testing.T) {
 	w := newWallet(sk, sut.snowCtx, sut.Client)
 	receiver := txtest.NewKey(t).EthAddress()
 	const txFee = 50
-	signedImport, _ := w.newImportTx(t, sut.snowCtx.XChainID, receiver, txFee)
+	signedImport, _ := w.newImportTx(ctx, t, sut.snowCtx.XChainID, receiver, txFee)
 
-	blk := sut.issueAndExecute(t, signedImport)
-	sut.assertTxAccepted(t, signedImport, blk.NumberU64())
-	const amountMinted = utxoAmount - txFee
-	sut.assertAccount(t, receiver, 0, tx.ScaleAVAX(amountMinted))
+	blk := sut.issueAndExecute(ctx, t, signedImport)
+	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())
+	const (
+		nonce        = 0
+		amountMinted = utxoAmount - txFee
+	)
+	sut.assertAccount(t, receiver, nonce, tx.ScaleAVAX(amountMinted))
 }
 
 // TestBuildBlockOnProcessing verifies that the block builder excludes a mempool
 // candidate whose inputs were already consumed by an unsettled ancestor block.
 func TestBuildBlockOnProcessing(t *testing.T) {
-	var (
-		skA = txtest.NewKey(t)
-		skB = txtest.NewKey(t)
-	)
-	sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(
-			skA.EthAddress(),
-			skB.EthAddress(),
-		)
+	keys := make([]*secp256k1.PrivateKey, 2)
+	for i := range keys {
+		keys[i] = txtest.NewKey(t)
+	}
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		addrs := make([]common.Address, len(keys))
+		for i, sk := range keys {
+			addrs[i] = sk.EthAddress()
+		}
+		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
 	}))
 
-	newExport := func(w *wallet) *tx.Tx {
-		const (
-			txFee          = 50
-			exportedAmount = 50
-		)
-		signedExport, _ := w.newExportTx(
-			t,
-			sut.snowCtx.XChainID,
-			txFee,
-			txtest.NewTransferOutput(exportedAmount, w.sk.Address()),
-		)
-		return signedExport
+	var (
+		preference = sut.lastAccepted(ctx, t)
+		blocks     = make([]*blocks.Block, len(keys))
+	)
+	for i, sk := range keys {
+		stx := newWallet(sk, sut.snowCtx, sut.Client).newMinimalTx(t)
+		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(tx)", sut.Client)
+
+		block := sut.buildVerify(ctx, t, preference)
+		if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, block), txtest.CmpOpt()); diff != "" {
+			t.Errorf("%T txs (-want +got):\n%s", block, diff)
+		}
+		blocks[i] = block
+		preference = block.ID()
 	}
-
-	ctx := t.Context()
-	wA := newWallet(skA, sut.snowCtx, sut.Client)
-	txA := newExport(wA)
-	require.NoErrorf(t, sut.IssueTx(ctx, txA), "%T.IssueTx(txA)", sut.Client)
-	blockA := sut.buildVerify(t, sut.lastAccepted(t))
-	if diff := cmp.Diff([]*tx.Tx{txA}, blockTxs(t, blockA), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T txs (-want +got):\n%s", blockA, diff)
+	for i, block := range blocks {
+		require.NoErrorf(t, sut.AcceptBlock(ctx, block), "%T.AcceptBlock(%d)", sut.VM, i)
+		require.NoErrorf(t, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(%d)", block, i)
+		for _, tx := range blockTxs(t, block) {
+			sut.assertTxAccepted(ctx, t, tx, block.NumberU64())
+		}
 	}
-
-	// blockA is verified but not accepted, so txA stays in the mempool and
-	// is presented to blockB's builder as a candidate.
-	wB := newWallet(skB, sut.snowCtx, sut.Client)
-	txB := newExport(wB)
-	require.NoErrorf(t, sut.IssueTx(ctx, txB), "%T.IssueTx(txB)", sut.Client)
-	blockB := sut.buildVerify(t, blockA.ID())
-	if diff := cmp.Diff([]*tx.Tx{txB}, blockTxs(t, blockB), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T txs (-want +got):\n%s", blockB, diff)
-	}
-
-	require.NoErrorf(t, sut.AcceptBlock(ctx, blockA), "%T.AcceptBlock(blockA)", sut.VM)
-	require.NoErrorf(t, sut.AcceptBlock(ctx, blockB), "%T.AcceptBlock(blockB)", sut.VM)
-	require.NoErrorf(t, blockB.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(blockB)", blockB)
-
-	sut.assertTxAccepted(t, txA, blockA.NumberU64())
-	sut.assertTxAccepted(t, txB, blockB.NumberU64())
 }
 
 // blockTxs returns every cross-chain tx encoded in the block.
@@ -648,7 +616,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 	ethSender := ethWallet.Addresses()[0]
 	exportKey := txtest.NewKey(t)
-	sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Alloc = saetest.MaxAllocFor(
 			ethSender,
 			exportKey.EthAddress(),
@@ -663,7 +631,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		GasPrice: big.NewInt(1),
 	})
 	rpc := sut.GethRPCBackends()
-	require.NoErrorf(t, rpc.SendTx(t.Context(), tracedTx), "%T.SendTx(%#x)", rpc, tracedTx.Hash())
+	require.NoErrorf(t, rpc.SendTx(ctx, tracedTx), "%T.SendTx(%#x)", rpc, tracedTx.Hash())
 
 	// Export gives us observable external state.
 	w := newWallet(exportKey, sut.snowCtx, sut.Client)
@@ -677,15 +645,15 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		txFee,
 		txtest.NewTransferOutput(exportedAmount, exportKey.Address()),
 	)
-	require.NoErrorf(t, sut.IssueTx(t.Context(), signedExport), "%T.IssueTx()", sut.Client)
+	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
 
-	blk := sut.buildVerify(t, sut.lastAccepted(t))
+	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 	require.Equalf(t, types.Transactions{tracedTx}, blk.Transactions(), "%T.Transactions()", blk)
 	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T txs (-want +got):\n%s", blk, diff)
 	}
 
-	_, _, _, release, err := rpc.StateAtTransaction(t.Context(), blk.EthBlock(), 0, 0)
+	_, _, _, release, err := rpc.StateAtTransaction(ctx, blk.EthBlock(), 0, 0)
 	require.NoErrorf(t, err, "%T.StateAtTransaction(...)", rpc)
 	defer release()
 

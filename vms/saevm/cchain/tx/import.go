@@ -74,13 +74,13 @@ func (i *Import) inputIDs() set.Set[ids.ID] {
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
 // practice and allows for easier fuzzing.
-func (i *Import) burned(assetID ids.ID) (uint64, error) {
+func (i *Import) burned(avaxAssetID ids.ID) (nAVAX, error) {
 	var (
-		burned uint64
+		burned nAVAX
 		err    error
 	)
 	for _, in := range i.ImportedInputs {
-		if in.Asset.ID == assetID {
+		if in.Asset.ID == avaxAssetID {
 			burned, err = math.Add(burned, in.In.Amount())
 			if err != nil {
 				return 0, err
@@ -88,7 +88,7 @@ func (i *Import) burned(assetID ids.ID) (uint64, error) {
 		}
 	}
 	for _, out := range i.Outs {
-		if out.AssetID == assetID {
+		if out.AssetID == avaxAssetID {
 			burned, err = math.Sub(burned, out.Amount)
 			if err != nil {
 				return 0, err

@@ -13,17 +13,15 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 )
 
-// GetTxStatus exposes the deprecated [service.GetAtomicTxStatus]
-// endpoint to tests in this package only. It is intentionally not part of
-// [Client]'s production surface: new code should call [Client.GetTx], which
-// returns the tx and its block height in a single call. Defined here so the
-// deprecated endpoint stays exercisable without inviting external use.
-func (c *Client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (TxStatus, error) {
+// getTxStatus exposes the deprecated [service.GetAtomicTxStatus] endpoint.
+func (c *Client) getTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (TxStatus, error) {
 	res := TxStatus{}
 	err := c.r.SendRequest(ctx, "avax.getAtomicTxStatus", &api.JSONTxID{
 		TxID: txID,
@@ -31,49 +29,67 @@ func (c *Client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Op
 	return res, err
 }
 
+// getAllUTXOs drains [Client.GetUTXOs] for addrs by walking pages of size limit
+// until a short page signals the end of the result set.
+func (c *Client) getAllUTXOs(
+	ctx context.Context,
+	tb testing.TB,
+	sourceChain ids.ID,
+	limit uint32,
+	addrs ...ids.ShortID,
+) []*avax.UTXO {
+	tb.Helper()
+
+	var (
+		startAddr   ids.ShortID
+		startUTXOID ids.ID
+		utxos       []*avax.UTXO
+	)
+	for {
+		page, endAddr, endUTXOID, err := c.GetUTXOs(
+			ctx,
+			addrs,
+			sourceChain,
+			limit,
+			startAddr,
+			startUTXOID,
+		)
+		require.NoErrorf(tb, err, "%T.GetUTXOs()", c)
+		utxos = append(utxos, page...)
+		if uint64(len(page)) < uint64(limit) {
+			return utxos
+		}
+		startAddr, startUTXOID = endAddr, endUTXOID
+	}
+}
+
 // TestIssueTxRejectsInvalidTransaction asserts that [Client.IssueTx] surfaces
 // an error from the transaction pool's verification pipeline.
 func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
-	sut := newSUT(t)
+	ctx, sut := newSUT(t)
 
 	sk := txtest.NewKey(t) // sk is NOT funded.
 	w := newWallet(sk, sut.snowCtx, sut.Client)
-	const (
-		txFee          = 50
-		exportedAmount = 50
-	)
-	tx, _ := w.newExportTx(
-		t,
-		sut.snowCtx.XChainID,
-		txFee,
-		txtest.NewTransferOutput(exportedAmount, sk.Address()),
-	)
+	stx := w.newMinimalTx(t)
 
-	err := sut.IssueTx(t.Context(), tx)
+	err := sut.IssueTx(ctx, stx)
 	require.ErrorContainsf(t, err, errIssuingTx.Error(), "%T.IssueTx()", sut.Client)
 }
 
 // TestGetTxNotFound asserts that [Client.GetTx] surfaces an error when the
 // requested tx has never been accepted.
 func TestGetTxNotFound(t *testing.T) {
-	sut := newSUT(t)
+	ctx, sut := newSUT(t)
 
-	_, _, err := sut.GetTx(t.Context(), ids.GenerateTestID())
+	_, _, err := sut.GetTx(ctx, ids.GenerateTestID())
 	require.ErrorContainsf(t, err, errFetchingTx.Error(), "%T.GetTx()", sut.Client)
 }
 
 // TestGetAtomicTxStatus exercises the deprecated avax.getAtomicTxStatus
 // endpoint on both the unknown and accepted branches.
 func TestGetAtomicTxStatus(t *testing.T) {
-	sut := newSUT(t)
+	ctx, sut := newSUT(t)
 
-	// Unknown: a freshly-generated txID has never been seen.
-	status, err := sut.GetTxStatus(t.Context(), ids.GenerateTestID())
-	require.NoError(t, err)
-	require.Equal(t, Unknown, status.Status)
-	require.Nil(t, status.Height)
-
-	// Accepted: import a UTXO and have the resulting tx accepted in a block.
 	const utxoAmount = 100
 	sk := txtest.NewKey(t)
 	sut.addUTXOs(
@@ -84,20 +100,33 @@ func TestGetAtomicTxStatus(t *testing.T) {
 	w := newWallet(sk, sut.snowCtx, sut.Client)
 	receiver := txtest.NewKey(t).EthAddress()
 	const txFee = 50
-	signedImport, _ := w.newImportTx(t, sut.snowCtx.XChainID, receiver, txFee)
-	blk := sut.issueAndExecute(t, signedImport)
+	signedImport, _ := w.newImportTx(ctx, t, sut.snowCtx.XChainID, receiver, txFee)
 
-	status, err = sut.GetTxStatus(t.Context(), signedImport.ID())
-	require.NoError(t, err)
-	require.Equal(t, Accepted, status.Status)
-	require.NotNil(t, status.Height)
-	require.Equal(t, blk.NumberU64(), uint64(*status.Height))
+	t.Run("before_execution", func(t *testing.T) {
+		got, err := sut.getTxStatus(ctx, signedImport.ID())
+		require.NoError(t, err)
+		want := TxStatus{
+			Status: Unknown,
+		}
+		require.Equal(t, want, got)
+	})
+
+	blk := sut.issueAndExecute(ctx, t, signedImport)
+	t.Run("after_execution", func(t *testing.T) {
+		got, err := sut.getTxStatus(ctx, signedImport.ID())
+		require.NoError(t, err)
+		want := TxStatus{
+			Status: Accepted,
+			Height: utils.PointerTo(json.Uint64(blk.NumberU64())),
+		}
+		require.Equal(t, want, got)
+	})
 }
 
 // TestGetUTXOsPagination asserts that walking [Client.GetUTXOs] yields each
 // seeded UTXO exactly once.
 func TestGetUTXOsPagination(t *testing.T) {
-	sut := newSUT(t)
+	ctx, sut := newSUT(t)
 
 	const numUTXOs uint64 = 5
 	want := make([]*avax.UTXO, numUTXOs)
@@ -110,7 +139,7 @@ func TestGetUTXOsPagination(t *testing.T) {
 	// pageSize=1 stresses the boundary behavior so any off-by-one in the cursor
 	// logic will surface here.
 	const pageSize = 1
-	got := getUTXOs(t, sut.Client, snowtest.XChainID, pageSize, addr)
+	got := sut.Client.getAllUTXOs(ctx, t, snowtest.XChainID, pageSize, addr)
 	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
 		t.Errorf("paginated UTXOs (-want +got):\n%s", diff)
 	}
