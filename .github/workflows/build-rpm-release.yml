@@ -37,11 +37,13 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      # When building an older tag via workflow_dispatch, the tag's tree
-      # may not contain the packaging scripts. Overlay them from the
-      # workflow branch so that packaging:test-build-rpms is available.
-      # Split into two steps because actions/checkout and the copy
-      # cannot be combined.
+      # When building an older tag via workflow_dispatch, the tag's
+      # .github/packaging tree may be stale or absent. Replace it
+      # wholesale with the workflow branch's version so that the build
+      # uses the current packaging:test-build-rpms task and scripts.
+      # Split into two steps because actions/checkout (which provides
+      # the master-side tree) and the cp (which applies it) cannot be
+      # combined.
       - name: Overlay packaging scripts from workflow branch
         if: github.event.inputs.tag
         uses: actions/checkout@v5
@@ -53,7 +55,6 @@ jobs:
         if: github.event.inputs.tag
         run: |
           rm -rf .github/packaging
-          mkdir -p .github
           cp -r .packaging-overlay/.github/packaging .github/packaging
           rm -rf .packaging-overlay
         shell: bash
