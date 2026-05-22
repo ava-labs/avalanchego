@@ -142,7 +142,7 @@ func (v *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating gossip bloom metrics: %w", err)
 	}
-	gossipSet, err := gossip.NewBloomSet[*gossipTx](
+	gossipSet, err := gossip.NewBloomSet(
 		newGossipTxPool(v.txpool),
 		gossip.BloomSetConfig{
 			Metrics: bloomMetrics,
@@ -152,7 +152,7 @@ func (v *VM) Initialize(
 		return fmt.Errorf("creating gossip bloom set: %w", err)
 	}
 	const pullGossipPeriod = time.Second
-	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem[*gossipTx](
+	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		snowCtx.NodeID,
 		v.Network,
 		v.ValidatorPeers,
