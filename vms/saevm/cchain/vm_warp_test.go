@@ -7,6 +7,7 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -22,8 +23,10 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -31,9 +34,99 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
+
+// peer captures AppResponse, AppRequestFailed, and AppGossip messages and
+// exposes them for inspection.
+type peer struct {
+	id       ids.NodeID
+	sender   *saetest.Sender
+	response *buffer.UnboundedBlockingDeque[peerResponse]
+	gossip   *buffer.UnboundedBlockingDeque[peerGossip]
+}
+
+type peerResponse struct {
+	nodeID    ids.NodeID
+	requestID uint32
+	bytes     []byte
+	err       *snowcommon.AppError
+}
+
+type peerGossip struct {
+	nodeID ids.NodeID
+	bytes  []byte
+}
+
+// newPeer returns a [peer] with a fresh NodeID. vdrs is passed through to its
+// underlying [saetest.Sender].
+func newPeer(tb testing.TB, vdrs set.Set[ids.NodeID]) *peer {
+	p := &peer{
+		id:       ids.GenerateTestNodeID(),
+		sender:   saetest.NewSender(tb, vdrs),
+		response: buffer.NewUnboundedBlockingDeque[peerResponse](1),
+		gossip:   buffer.NewUnboundedBlockingDeque[peerGossip](1),
+	}
+	p.sender.SetSelf(p)
+	return p
+}
+
+// Response blocks until the peer captures an AppResponse or AppRequestFailed to
+// return.
+func (p *peer) Response() (ids.NodeID, uint32, []byte, *snowcommon.AppError) {
+	r, _ := p.response.PopLeft()
+	return r.nodeID, r.requestID, r.bytes, r.err
+}
+
+// Gossip blocks until the peer captures AppGossip to return.
+func (p *peer) Gossip(ctx context.Context) (ids.NodeID, []byte) {
+	r, _ := p.gossip.PopLeft()
+	return r.nodeID, r.bytes
+}
+
+func (p *peer) NodeID() ids.NodeID      { return p.id }
+func (p *peer) Sender() *saetest.Sender { return p.sender }
+
+func (p *peer) AppResponse(_ context.Context, from ids.NodeID, requestID uint32, b []byte) error {
+	p.response.PushRight(peerResponse{
+		nodeID:    from,
+		requestID: requestID,
+		bytes:     b,
+	})
+	return nil
+}
+
+func (p *peer) AppRequestFailed(_ context.Context, from ids.NodeID, requestID uint32, appErr *snowcommon.AppError) error {
+	p.response.PushRight(peerResponse{
+		nodeID:    from,
+		requestID: requestID,
+		err:       appErr,
+	})
+	return nil
+}
+
+func (p *peer) AppGossip(_ context.Context, nodeID ids.NodeID, b []byte) error {
+	p.gossip.PushRight(peerGossip{
+		nodeID: nodeID,
+		bytes:  b,
+	})
+	return nil
+}
+
+func (p *peer) AppRequest(ctx context.Context, from ids.NodeID, requestID uint32, _ time.Time, _ []byte) error {
+	return p.sender.SendAppError(
+		ctx,
+		from,
+		requestID,
+		p2p.ErrUnexpected.Code,
+		p2p.ErrUnexpected.Message,
+	)
+}
+
+func (*peer) Connected(context.Context, ids.NodeID, *version.Application) error { return nil }
+func (*peer) Disconnected(context.Context, ids.NodeID) error                    { return nil }
 
 // TestSendWarpMessage verifies that a warp message emitted by a tx is only
 // available for signing AFTER the block containing the tx has executed.
@@ -44,7 +137,7 @@ func TestSendWarpMessage(t *testing.T) {
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Alloc = saetest.MaxAllocFor(sender)
 	}))
-	capturer := saetest.NewCapturingPeer(t, set.Set[ids.NodeID]{})
+	capturer := newPeer(t, set.Set[ids.NodeID]{})
 	saetest.ConnectTo[saetest.Peer](t, sut, capturer)
 
 	payloadData := utils.RandomBytes(100)
@@ -253,7 +346,7 @@ func verifyWarpMessage(
 	ctx context.Context,
 	t *testing.T,
 	sut *SUT,
-	capturer *saetest.CapturingPeer,
+	capturer *peer,
 	payloadBytes []byte,
 	expected int32,
 ) {
@@ -267,9 +360,8 @@ func verifyWarpMessage(
 	deadline, _ := ctx.Deadline()
 	require.NoError(t, sut.AppRequest(ctx, capturer.NodeID(), 1, deadline, msg))
 
-	got, appErr := capturer.Receive(ctx)
+	_, _, got, appErr := capturer.Response()
 	if expected == 0 {
-		require.Nil(t, appErr)
 		require.NotNil(t, got)
 		return
 	}
