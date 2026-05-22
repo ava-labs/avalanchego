@@ -171,7 +171,9 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 
 	initialRoot := fw.Root()
 	if initialRoot == ffi.EmptyRoot {
-		log.Debug("firewood opened with no committed revisions", "path", path)
+		log.Debug("empty firewood database opened", "path", path)
+	} else {
+		log.Debug("firewood database opened", "root", initialRoot, "path", path)
 	}
 
 	blockHashes := make(map[common.Hash]struct{})
