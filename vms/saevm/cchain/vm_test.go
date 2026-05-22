@@ -360,6 +360,24 @@ func newWallet(sk *secp256k1.PrivateKey, snowCtx *snow.Context, client *Client) 
 	}
 }
 
+// newMinimalExportTx builds and signs an [tx.Export] sending a single output to
+// [snowtest.XChainID].
+func (w *wallet) newMinimalTx(tb testing.TB) *tx.Tx {
+	tb.Helper()
+
+	const (
+		txFee          = 1
+		exportedAmount = 1
+	)
+	t, _ := w.newExportTx(
+		tb,
+		snowtest.XChainID,
+		txFee,
+		txtest.NewTransferOutput(exportedAmount, w.sk.Address()),
+	)
+	return t
+}
+
 // newExportTx builds and signs an [tx.Export] sending outputs to
 // destinationChain. The wallet contributes a single AVAX input from its eth
 // address with Amount = sum(outputs.Amt) + fee, using its next nonce.
@@ -592,23 +610,9 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		)
 	}))
 
-	newExport := func(w *wallet) *tx.Tx {
-		const (
-			txFee          = 50
-			exportedAmount = 50
-		)
-		signedExport, _ := w.newExportTx(
-			t,
-			sut.snowCtx.XChainID,
-			txFee,
-			txtest.NewTransferOutput(exportedAmount, w.sk.Address()),
-		)
-		return signedExport
-	}
-
 	ctx := t.Context()
 	wA := newWallet(skA, sut.snowCtx, sut.Client)
-	txA := newExport(wA)
+	txA := wA.newMinimalTx(t)
 	require.NoErrorf(t, sut.IssueTx(ctx, txA), "%T.IssueTx(txA)", sut.Client)
 	blockA := sut.buildVerify(t, sut.lastAccepted(t))
 	if diff := cmp.Diff([]*tx.Tx{txA}, blockTxs(t, blockA), txtest.CmpOpt()); diff != "" {
@@ -618,7 +622,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	// blockA is verified but not accepted, so txA stays in the mempool and
 	// is presented to blockB's builder as a candidate.
 	wB := newWallet(skB, sut.snowCtx, sut.Client)
-	txB := newExport(wB)
+	txB := wB.newMinimalTx(t)
 	require.NoErrorf(t, sut.IssueTx(ctx, txB), "%T.IssueTx(txB)", sut.Client)
 	blockB := sut.buildVerify(t, blockA.ID())
 	if diff := cmp.Diff([]*tx.Tx{txB}, blockTxs(t, blockB), txtest.CmpOpt()); diff != "" {
