@@ -536,16 +536,20 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
 	}))
 
-	blocks := make([]*blocks.Block, len(keys))
+	var (
+		preference = sut.lastAccepted(ctx, t)
+		blocks     = make([]*blocks.Block, len(keys))
+	)
 	for i, sk := range keys {
 		stx := newWallet(sk, sut.snowCtx, sut.Client).newMinimalTx(t)
 		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(tx)", sut.Client)
 
-		block := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+		block := sut.buildVerify(ctx, t, preference)
 		if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, block), txtest.CmpOpt()); diff != "" {
 			t.Errorf("%T txs (-want +got):\n%s", block, diff)
 		}
 		blocks[i] = block
+		preference = block.ID()
 	}
 	for i, block := range blocks {
 		require.NoErrorf(t, sut.AcceptBlock(ctx, block), "%T.AcceptBlock(%d)", sut.VM, i)
