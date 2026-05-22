@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
@@ -122,7 +123,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
 	var (
-		vm  = &VM{}
+		vm = &VM{
+			pullGossipPeriod: 100 * time.Millisecond,
+			pushGossipPeriod: 100 * time.Millisecond,
+		}
 		db  = memdb.New()
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
