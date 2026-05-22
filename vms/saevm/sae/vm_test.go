@@ -41,12 +41,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
@@ -84,9 +85,12 @@ type SUT struct {
 	hooks   *hookstest.Stub
 	logger  *saetest.TBLogger
 
-	validators *validatorstest.State
-	sender     *enginetest.Sender
+	sender *saetest.Sender
 }
+
+// Implements [saetest.Peer].
+func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
+func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
@@ -96,9 +100,25 @@ type (
 		genesis     core.Genesis
 		db          database.Database
 		precompiles map[common.Address]libevm.PrecompiledContract
+		nodeID      ids.NodeID
+		validators  set.Set[ids.NodeID]
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withNodeID overrides the SUT's randomly generated NodeID.
+func withNodeID(id ids.NodeID) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.nodeID = id
+	})
+}
+
+// withValidators adds each NodeID to the validator set with weight 1.
+func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.validators = vdrs
+	})
+}
 
 // chainID is made a global to keep it constant across multiple SUTs.
 var chainID = ids.GenerateTestID()
@@ -126,7 +146,8 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			Timestamp:  saeparams.TauSeconds,
 			Difficulty: big.NewInt(0), // irrelevant but required
 		},
-		db: memdb.New(),
+		db:     memdb.New(),
+		nodeID: ids.GenerateTestNodeID(),
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
@@ -140,12 +161,21 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	ctx := logger.CancelOnError(tb.Context())
 	snowCtx := snowtest.Context(tb, chainID)
 	snowCtx.Log = logger
-
-	sender := &enginetest.Sender{
-		SendAppGossipF: func(context.Context, snowcommon.SendConfig, []byte) error {
-			return nil
-		},
+	snowCtx.NodeID = conf.nodeID
+	vdrState, ok := snowCtx.ValidatorState.(*validatorstest.State)
+	require.Truef(tb, ok, "unexpected type %T for snowCtx.ValidatorState", snowCtx.ValidatorState)
+	vdrState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, conf.validators.Len())
+		for id := range conf.validators {
+			validatorSet[id] = &validators.GetValidatorOutput{
+				NodeID: id,
+				Weight: 1,
+			}
+		}
+		return validatorSet, nil
 	}
+
+	sender := saetest.NewSender(tb, conf.validators)
 
 	require.NoError(tb, snow.Initialize(
 		ctx,
@@ -171,11 +201,12 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
 	})
 
-	rpcClient, ethClient := dialRPC(ctx, tb, snow)
+	// Avalanchego marks the local node as connected so that p2p protocols
+	// don't need to treat our node as a special case.
+	require.NoErrorf(tb, snow.Connected(ctx, snowCtx.NodeID, version.Current), "Connected(%s)", snowCtx.NodeID)
 
-	validators, ok := snowCtx.ValidatorState.(*validatorstest.State)
-	require.Truef(tb, ok, "unexpected type %T for snowCtx.ValidatorState", snowCtx.ValidatorState)
-	return ctx, &SUT{
+	rpcClient, ethClient := dialRPC(ctx, tb, snow)
+	sut := &SUT{
 		ChainVM:   snow,
 		Client:    ethClient,
 		rpcClient: rpcClient,
@@ -189,9 +220,10 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		hooks:  conf.hooks,
 		logger: logger,
 
-		validators: validators,
-		sender:     sender,
+		sender: sender,
 	}
+	sender.SetSelf(sut)
+	return ctx, sut
 }
 
 func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Client, *ethclient.Client) {
@@ -323,10 +355,6 @@ func registerPrecompiles(tb testing.TB, precompiles map[common.Address]libevm.Pr
 		PrecompileOverrides: precompiles,
 	}
 	h.Register(tb)
-}
-
-func (s *SUT) nodeID() ids.NodeID {
-	return s.rawVM.snowCtx.NodeID
 }
 
 // context returns a [context.Context], derived from the [testing.TB], that is
@@ -968,7 +996,7 @@ func requireReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 	for _, sut := range nodes {
 		assert.Eventuallyf(tb, func() bool {
 			return sut.rawVM.mempool.Has(ids.ID(txHash))
-		}, 5*time.Second, 100*time.Millisecond, "tx %x not gossiped to node %s", txHash, sut.nodeID())
+		}, 5*time.Second, 100*time.Millisecond, "tx %x not gossiped to node %s", txHash, sut.NodeID())
 	}
 	if tb.Failed() {
 		tb.FailNow()
@@ -978,7 +1006,7 @@ func requireReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 func requireNotReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 	tb.Helper()
 	for _, sut := range nodes {
-		assert.False(tb, sut.rawVM.mempool.Has(ids.ID(txHash)), "tx %x was gossiped to node %s", txHash, sut.nodeID())
+		assert.False(tb, sut.rawVM.mempool.Has(ids.ID(txHash)), "tx %x was gossiped to node %s", txHash, sut.NodeID())
 	}
 	if tb.Failed() {
 		tb.FailNow()
@@ -988,8 +1016,7 @@ func requireNotReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 func TestGossip(t *testing.T) {
 	n := newNetworkedSUTs(t, 2, 2)
 
-	nonValidators := n.allNonValidators()
-	api := nonValidators[0]
+	api := n.nonValidators[0]
 	tx := api.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &common.Address{},
 		Gas:       params.TxGas,
@@ -997,8 +1024,8 @@ func TestGossip(t *testing.T) {
 		Value:     big.NewInt(1),
 	})
 	api.mustSendTx(t, tx)
-	requireReceiveTx(t, n.allValidators(), tx.Hash())
-	requireNotReceiveTx(t, nonValidators[1:], tx.Hash())
+	requireReceiveTx(t, n.validators, tx.Hash())
+	requireNotReceiveTx(t, n.nonValidators[1:], tx.Hash())
 }
 
 func TestBlockSources(t *testing.T) {
