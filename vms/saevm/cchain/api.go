@@ -45,9 +45,9 @@ type service struct {
 
 func newService(
 	ctx *snow.Context,
-	txpool *txpool.Txpool,
+	pool *txpool.Txpool,
 	pushGossiper *gossip.PushGossiper[*gossipTx],
-	state *state.State,
+	db *state.State,
 ) (*service, error) {
 	chainAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
 	if err != nil {
@@ -62,9 +62,9 @@ func newService(
 
 	return &service{
 		ctx:          ctx,
-		txpool:       txpool,
+		txpool:       pool,
 		pushGossiper: pushGossiper,
-		state:        state,
+		state:        db,
 
 		chainAlias:  chainAlias,
 		hrp:         hrp,
