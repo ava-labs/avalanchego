@@ -1024,23 +1024,26 @@ func (s signatureRequestVerifier) verifyValidatorSetMerkleCommitment(
 	return nil
 }
 
-// merkleValidatorLeafHash computes the Merkle leaf hash for a validator using
-// the 128-byte BLST-padded public key format:
-// sha256([16 zeros][48 bytes X][16 zeros][48 bytes Y][8 bytes weight]).
-// This matches Solidity's sha256(abi.encodePacked(paddedKey, weight)) in
-// ValidatorSets.verifyMerkleAttestation.
+// merkleValidatorLeafHash computes the Merkle leaf hash for a validator,
+// matching Solidity's sha256Validator: sha256(abi.encodePacked(uint256(1), blsPublicKey, weight)).
+// The padded key format is [16 zeros][48 bytes X][16 zeros][48 bytes Y] (128 bytes),
+// so the full input is 32 + 128 + 8 = 168 bytes.
 func merkleValidatorLeafHash(pk [96]byte, weight uint64) [32]byte {
-	var buf [136]byte
-	copy(buf[16:64], pk[:48])  // X coordinate → bytes 16-63
-	copy(buf[80:128], pk[48:]) // Y coordinate → bytes 80-127
-	binary.BigEndian.PutUint64(buf[128:], weight)
+	var buf [168]byte // 32 bytes uint256(1) + 128 bytes padded key + 8 bytes weight
+	buf[31] = 1       // uint256(1) leaf domain separator
+	copy(buf[48:96], pk[:48])   // X coordinate → bytes 48-95
+	copy(buf[112:160], pk[48:]) // Y coordinate → bytes 112-159
+	binary.BigEndian.PutUint64(buf[160:], weight)
 	return sha256.Sum256(buf[:])
 }
 
-// nullLeafHash is sha256 of 136 zero bytes (null padded key + zero weight).
-// It is used to pad the validator set to the next power of two so the resulting
-// tree is always balanced and compatible with OpenZeppelin's multiProofVerify.
-var nullLeafHash = sha256.Sum256(make([]byte, 136))
+// nullLeafHash matches sha256Validator(Validator{blsPublicKey: zeroes, weight: 0})
+// in ValidatorSets.sol: sha256(uint256(1) ++ 128-zero padded key ++ 8-zero weight).
+var nullLeafHash = func() [32]byte {
+	var buf [168]byte
+	buf[31] = 1 // uint256(1) leaf domain separator
+	return sha256.Sum256(buf[:])
+}()
 
 // buildMerkleRoot builds a Merkle root from a slice of leaf hashes using
 // sorted-pair hashing at each level. The leaf set is padded to the next power
@@ -1071,13 +1074,17 @@ func buildMerkleRoot(layer [][32]byte) [32]byte {
 	return layer[0]
 }
 
-// merklePairHash hashes two 32-byte values together after sorting them
-// lexicographically so that merklePairHash(a,b) == merklePairHash(b,a).
+// merklePairHash hashes two 32-byte values together, matching Solidity's
+// sha256InternalPair: sha256(abi.encodePacked(uint256(0), smaller, larger)).
+// The uint256(0) prefix is the internal-node domain separator.
 func merklePairHash(a, b [32]byte) [32]byte {
 	if bytes.Compare(a[:], b[:]) > 0 {
 		a, b = b, a
 	}
-	return sha256.Sum256(append(a[:], b[:]...))
+	var buf [96]byte // 32 bytes uint256(0) + 32 bytes smaller + 32 bytes larger
+	copy(buf[32:64], a[:])
+	copy(buf[64:96], b[:])
+	return sha256.Sum256(buf[:])
 }
 
 // verifyBlockTimestamp verifies that the block at the given height is a Banff
