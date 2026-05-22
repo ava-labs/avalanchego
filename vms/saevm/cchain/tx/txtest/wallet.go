@@ -41,8 +41,8 @@ func Sign(tb testing.TB, u tx.Unsigned, s keychain.Signer) Signature {
 	return Signature(sig)
 }
 
-// MustMarshalUTXO returns the canonical binary format of utxo.
-func MustMarshalUTXO(tb testing.TB, utxo *avax.UTXO) []byte {
+// MarshalUTXO returns the canonical binary format of utxo.
+func MarshalUTXO(tb testing.TB, utxo *avax.UTXO) []byte {
 	tb.Helper()
 
 	b, err := tx.MarshalUTXO(utxo)
@@ -50,8 +50,8 @@ func MustMarshalUTXO(tb testing.TB, utxo *avax.UTXO) []byte {
 	return b
 }
 
-// MustParseUTXO deserializes an [avax.UTXO] from its canonical binary format.
-func MustParseUTXO(tb testing.TB, b []byte) *avax.UTXO {
+// ParseUTXO deserializes an [avax.UTXO] from its canonical binary format.
+func ParseUTXO(tb testing.TB, b []byte) *avax.UTXO {
 	tb.Helper()
 
 	utxo, err := tx.ParseUTXO(b)

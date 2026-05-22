@@ -159,7 +159,7 @@ func (s *SUT) assertUTXOsExist(tb testing.TB, peerChainID ids.ID, want ...*avax.
 
 	got := make([]*avax.UTXO, len(utxoBytes))
 	for i, b := range utxoBytes {
-		got[i] = txtest.MustParseUTXO(tb, b)
+		got[i] = txtest.ParseUTXO(tb, b)
 	}
 	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
 		tb.Errorf("UTXOs in shared memory with %s (-want +got):\n%s", peerChainID, diff)
@@ -192,7 +192,7 @@ func (s *SUT) addUTXOs(tb testing.TB, peerChainID ids.ID, utxos ...*avax.UTXO) {
 		inputID := utxo.InputID()
 		e := &atomic.Element{
 			Key:   inputID[:],
-			Value: txtest.MustMarshalUTXO(tb, utxo),
+			Value: txtest.MarshalUTXO(tb, utxo),
 		}
 		if o, ok := utxo.Out.(avax.Addressable); ok {
 			e.Traits = o.Addresses()
