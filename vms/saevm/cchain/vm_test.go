@@ -60,9 +60,8 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
-// SUT is the system under test for the cchain [VM]. It bundles the [VM], an
-// HTTP [Client] for cross-chain RPC, and an [ethclient.Client] for eth-RPC, all
-// connected to an in-process [httptest.Server].
+// SUT is the system under test for the cchain [VM]. It bundles the [VM]
+// itself and an HTTP [Client] connected to an in-process [httptest.Server].
 type SUT struct {
 	*VM
 	*Client
@@ -418,16 +417,15 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	return id
 }
 
-// buildVerify builds and verifies a block on top of preferenceID. blockCtx
-// MAY be nil; warp tests need an explicit value (e.g. PChainHeight).
+// buildVerify builds and verifies a block on top of preferenceID.
 func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID) *blocks.Block {
 	tb.Helper()
 
 	return s.buildVerifyWithContext(ctx, tb, preferenceID, nil)
 }
 
-// buildVerify builds and verifies a block on top of preferenceID. blockCtx
-// MAY be nil; warp tests need an explicit value (e.g. PChainHeight).
+// buildVerifyWithContext builds and verifies a block on top of preferenceID.
+// blockCtx MAY be nil; warp tests need an explicit value (e.g. PChainHeight).
 func (s *SUT) buildVerifyWithContext(ctx context.Context, tb testing.TB, preferenceID ids.ID, blockCtx *block.Context) *blocks.Block {
 	tb.Helper()
 
@@ -701,9 +699,8 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		blocks[i] = block
 		preference = block.ID()
 	}
-	for i, block := range blocks {
-		require.NoErrorf(t, sut.AcceptBlock(ctx, block), "%T.AcceptBlock(%d)", sut.VM, i)
-		require.NoErrorf(t, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(%d)", block, i)
+	for _, block := range blocks {
+		sut.acceptAndExecute(ctx, t, block)
 		for _, tx := range blockTxs(t, block) {
 			sut.assertTxAccepted(ctx, t, tx, block.NumberU64())
 		}
