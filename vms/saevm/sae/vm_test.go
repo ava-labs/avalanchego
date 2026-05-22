@@ -763,40 +763,139 @@ func TestSyntacticBlockChecks(t *testing.T) {
 		return time.Unix(now, 0)
 	}
 
+	bodyWithTx := types.Body{
+		Transactions: []*types.Transaction{
+			types.NewTx(&types.DynamicFeeTx{
+				To:        &zeroAddr,
+				Gas:       params.TxGas,
+				GasFeeCap: big.NewInt(1),
+				Value:     big.NewInt(1),
+			}),
+		},
+	}
+
 	tests := []struct {
-		name    string
-		header  *types.Header
-		wantErr error
+		name string
+		// mutate will receive a valid header for an empty body and should return a mutated version of it.
+		mutate      func(*types.Header) *types.Header
+		body        types.Body
+		withdrawals []*types.Withdrawal
+		wantErr     error
 	}{
 		{
+			name:   "valid_header", // base case for test setup
+			mutate: func(h *types.Header) *types.Header { return h },
+		},
+		{
 			name: "block_height_overflow_protection",
-			header: &types.Header{
-				Number: new(big.Int).Lsh(big.NewInt(1), 64),
+			mutate: func(h *types.Header) *types.Header {
+				h.Number = new(big.Int).Lsh(big.NewInt(1), 64)
+				return h
 			},
 			wantErr: errBlockHeightNotUint64,
 		},
 		{
 			name: "block_time_at_maximum",
-			header: &types.Header{
-				Number: big.NewInt(1),
-				Time:   now + maxFutureBlockSeconds,
+			mutate: func(h *types.Header) *types.Header {
+				h.Time = now + maxFutureBlockSeconds
+				return h
 			},
 		},
 		{
 			name: "block_time_after_maximum",
-			header: &types.Header{
-				Number: big.NewInt(1),
-				Time:   now + maxFutureBlockSeconds + 1,
+			mutate: func(h *types.Header) *types.Header {
+				h.Time = now + maxFutureBlockSeconds + 1
+				return h
 			},
 			wantErr: errBlockTooFarInFuture,
+		},
+		{
+			name: "invalid_tx_hash_empty",
+			mutate: func(h *types.Header) *types.Header {
+				h.TxHash = common.Hash{}
+				return h
+			},
+			wantErr: errTxHashMismatch,
+		},
+		{
+			name:    "invalid_tx_hash_nonempty",
+			mutate:  func(h *types.Header) *types.Header { return h }, // uses [types.EmptyTxsHash]
+			body:    bodyWithTx,                                       // contains a tx
+			wantErr: errTxHashMismatch,
+		},
+		{
+			name: "valid_tx_hash_nonempty",
+			mutate: func(h *types.Header) *types.Header {
+				h.TxHash = types.DeriveSha(types.Transactions(bodyWithTx.Transactions), saetest.TrieHasher())
+				return h
+			},
+			body: bodyWithTx,
+		},
+		{
+			name: "invalid_uncle_hash_empty",
+			mutate: func(h *types.Header) *types.Header {
+				h.UncleHash = common.Hash{}
+				return h
+			},
+			wantErr: errUncleHashMismatch,
+		},
+		{
+			name:   "invalid_uncle_hash_nonempty",
+			mutate: func(h *types.Header) *types.Header { return h }, // uses [types.EmptyUncleHash]
+			body: types.Body{
+				Uncles: []*types.Header{{}},
+			},
+			wantErr: errUncleHashMismatch,
+		},
+		{
+			name: "valid_uncle_hash_nonempty",
+			mutate: func(h *types.Header) *types.Header {
+				h.UncleHash = types.CalcUncleHash([]*types.Header{{}})
+				return h
+			},
+			body: types.Body{
+				Uncles: []*types.Header{{}},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "nil_withdrawals_nonnil_hash",
+			mutate: func(h *types.Header) *types.Header {
+				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
+				return h
+			},
+			wantErr: errWithdrawalHashMismatch,
+		},
+		{
+			name: "nonnil_withdrawals_nil_hash",
+			mutate: func(h *types.Header) *types.Header {
+				h.WithdrawalsHash = nil
+				return h
+			},
+			withdrawals: []*types.Withdrawal{},
+			wantErr:     errWithdrawalHashMismatch,
+		},
+		{
+			name: "nonnil_withdrawals_nonempty_hash",
+			mutate: func(h *types.Header) *types.Header {
+				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
+				return h
+			},
+			withdrawals: []*types.Withdrawal{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := blockstest.NewBlock(t, types.NewBlockWithHeader(tt.header), nil, nil)
+			hdr := tt.mutate(&types.Header{
+				Number:    big.NewInt(1),
+				UncleHash: types.EmptyUncleHash,
+				TxHash:    types.EmptyTxsHash,
+			})
+			ethB := types.NewBlockWithHeader(hdr).WithBody(tt.body).WithWithdrawals(tt.withdrawals)
+			b := blockstest.NewBlock(t, ethB, nil, nil)
 			_, err := sut.ParseBlock(ctx, b.Bytes())
-			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", tt.header.Number, tt.header.Time, uint64(now))
+			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", hdr.Number, hdr.Time, uint64(now))
 		})
 	}
 }
