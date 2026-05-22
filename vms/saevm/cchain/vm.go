@@ -42,6 +42,9 @@ import (
 type VM struct {
 	*sae.VM // created by [VM.Initialize]
 
+	pullGossipPeriod time.Duration
+	pushGossipPeriod time.Duration
+
 	ctx          *snow.Context
 	state        *state.State
 	txpool       *txpool.Txpool
@@ -151,7 +154,6 @@ func (v *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating gossip bloom set: %w", err)
 	}
-	const pullGossipPeriod = time.Second
 	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		snowCtx.NodeID,
 		v.Network,
@@ -163,7 +165,7 @@ func (v *VM) Initialize(
 			Registry:      reg,
 			Namespace:     "gossip",
 			HandlerID:     p2p.AtomicTxGossipHandlerID,
-			RequestPeriod: pullGossipPeriod,
+			RequestPeriod: v.pullGossipPeriod,
 		},
 	)
 	if err != nil {
@@ -178,11 +180,10 @@ func (v *VM) Initialize(
 	gossipCtx, cancelGossip := context.WithCancel(context.Background())
 	var gossipWG sync.WaitGroup
 	gossipWG.Go(func() {
-		gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, pullGossipPeriod)
+		gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, v.pullGossipPeriod)
 	})
 	gossipWG.Go(func() {
-		const pushGossipPeriod = 100 * time.Millisecond
-		gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, pushGossipPeriod)
+		gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, v.pushGossipPeriod)
 	})
 	v.onClose = append(v.onClose, func(context.Context) error {
 		cancelGossip()
