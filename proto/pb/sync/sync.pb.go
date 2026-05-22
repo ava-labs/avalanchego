@@ -21,70 +21,14 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// EVMNodeType selects which EVM-sync trie a leaf-range request walks.
-// Distinct from Firewood/merkledb sync types in this file.
-//   - STATE_TRIE is the EVM account and storage trie: account balances,
-//     nonces, storage slots, and code hashes.
-//   - ATOMIC_TRIE is the C-Chain atomic operations trie used for cross-chain
-//     transfers between the C-Chain and the X-/P-Chains via shared memory.
-type EVMNodeType int32
-
-const (
-	EVMNodeType_EVM_NODE_TYPE_UNSPECIFIED EVMNodeType = 0
-	EVMNodeType_EVM_NODE_TYPE_STATE_TRIE  EVMNodeType = 1
-	EVMNodeType_EVM_NODE_TYPE_ATOMIC_TRIE EVMNodeType = 2
-)
-
-// Enum value maps for EVMNodeType.
-var (
-	EVMNodeType_name = map[int32]string{
-		0: "EVM_NODE_TYPE_UNSPECIFIED",
-		1: "EVM_NODE_TYPE_STATE_TRIE",
-		2: "EVM_NODE_TYPE_ATOMIC_TRIE",
-	}
-	EVMNodeType_value = map[string]int32{
-		"EVM_NODE_TYPE_UNSPECIFIED": 0,
-		"EVM_NODE_TYPE_STATE_TRIE":  1,
-		"EVM_NODE_TYPE_ATOMIC_TRIE": 2,
-	}
-)
-
-func (x EVMNodeType) Enum() *EVMNodeType {
-	p := new(EVMNodeType)
-	*p = x
-	return p
-}
-
-func (x EVMNodeType) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (EVMNodeType) Descriptor() protoreflect.EnumDescriptor {
-	return file_sync_sync_proto_enumTypes[0].Descriptor()
-}
-
-func (EVMNodeType) Type() protoreflect.EnumType {
-	return &file_sync_sync_proto_enumTypes[0]
-}
-
-func (x EVMNodeType) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use EVMNodeType.Descriptor instead.
-func (EVMNodeType) EnumDescriptor() ([]byte, []int) {
-	return file_sync_sync_proto_rawDescGZIP(), []int{0}
-}
-
 type GetLeafRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	RootHash []byte                 `protobuf:"bytes,1,opt,name=root_hash,json=rootHash,proto3" json:"root_hash,omitempty"`
 	// Empty for account trie, non-empty for storage trie.
-	AccountHash   []byte      `protobuf:"bytes,2,opt,name=account_hash,json=accountHash,proto3" json:"account_hash,omitempty"`
-	StartKey      []byte      `protobuf:"bytes,3,opt,name=start_key,json=startKey,proto3" json:"start_key,omitempty"`
-	EndKey        []byte      `protobuf:"bytes,4,opt,name=end_key,json=endKey,proto3" json:"end_key,omitempty"`
-	KeyLimit      uint32      `protobuf:"varint,5,opt,name=key_limit,json=keyLimit,proto3" json:"key_limit,omitempty"`
-	NodeType      EVMNodeType `protobuf:"varint,6,opt,name=node_type,json=nodeType,proto3,enum=sync.EVMNodeType" json:"node_type,omitempty"`
+	AccountHash   []byte `protobuf:"bytes,2,opt,name=account_hash,json=accountHash,proto3" json:"account_hash,omitempty"`
+	StartKey      []byte `protobuf:"bytes,3,opt,name=start_key,json=startKey,proto3" json:"start_key,omitempty"`
+	EndKey        []byte `protobuf:"bytes,4,opt,name=end_key,json=endKey,proto3" json:"end_key,omitempty"`
+	KeyLimit      uint32 `protobuf:"varint,5,opt,name=key_limit,json=keyLimit,proto3" json:"key_limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -154,15 +98,6 @@ func (x *GetLeafRequest) GetKeyLimit() uint32 {
 	return 0
 }
 
-func (x *GetLeafRequest) GetNodeType() EVMNodeType {
-	if x != nil {
-		return x.NodeType
-	}
-	return EVMNodeType_EVM_NODE_TYPE_UNSPECIFIED
-}
-
-// GetLeafResponse intentionally omits the legacy `More` field which is
-// set client-side after range-proof verification, never on the wire.
 type GetLeafResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Keys          [][]byte               `protobuf:"bytes,1,rep,name=keys,proto3" json:"keys,omitempty"`
@@ -311,12 +246,12 @@ func (x *GetCodeResponse) GetData() [][]byte {
 	return nil
 }
 
-// GetBlockRequest identifies a canonical block by height. The response
-// walks up to `parents` ancestors back from that height.
+// GetBlockRequest returns the block at height plus num_parents
+// ancestors: [height, height-1, ..., height-num_parents].
 type GetBlockRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Height        uint64                 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
-	Parents       uint32                 `protobuf:"varint,2,opt,name=parents,proto3" json:"parents,omitempty"`
+	NumParents    uint32                 `protobuf:"varint,2,opt,name=num_parents,json=numParents,proto3" json:"num_parents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -358,9 +293,9 @@ func (x *GetBlockRequest) GetHeight() uint64 {
 	return 0
 }
 
-func (x *GetBlockRequest) GetParents() uint32 {
+func (x *GetBlockRequest) GetNumParents() uint32 {
 	if x != nil {
-		return x.Parents
+		return x.NumParents
 	}
 	return 0
 }
@@ -1038,14 +973,13 @@ var File_sync_sync_proto protoreflect.FileDescriptor
 
 const file_sync_sync_proto_rawDesc = "" +
 	"\n" +
-	"\x0fsync/sync.proto\x12\x04sync\"\xd3\x01\n" +
+	"\x0fsync/sync.proto\x12\x04sync\"\xa3\x01\n" +
 	"\x0eGetLeafRequest\x12\x1b\n" +
 	"\troot_hash\x18\x01 \x01(\fR\brootHash\x12!\n" +
 	"\faccount_hash\x18\x02 \x01(\fR\vaccountHash\x12\x1b\n" +
 	"\tstart_key\x18\x03 \x01(\fR\bstartKey\x12\x17\n" +
 	"\aend_key\x18\x04 \x01(\fR\x06endKey\x12\x1b\n" +
-	"\tkey_limit\x18\x05 \x01(\rR\bkeyLimit\x12.\n" +
-	"\tnode_type\x18\x06 \x01(\x0e2\x11.sync.EVMNodeTypeR\bnodeType\"\\\n" +
+	"\tkey_limit\x18\x05 \x01(\rR\bkeyLimit\"\\\n" +
 	"\x0fGetLeafResponse\x12\x12\n" +
 	"\x04keys\x18\x01 \x03(\fR\x04keys\x12\x16\n" +
 	"\x06values\x18\x02 \x03(\fR\x06values\x12\x1d\n" +
@@ -1054,10 +988,11 @@ const file_sync_sync_proto_rawDesc = "" +
 	"\x0eGetCodeRequest\x12\x16\n" +
 	"\x06hashes\x18\x01 \x03(\fR\x06hashes\"%\n" +
 	"\x0fGetCodeResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x03(\fR\x04data\"C\n" +
+	"\x04data\x18\x01 \x03(\fR\x04data\"J\n" +
 	"\x0fGetBlockRequest\x12\x16\n" +
-	"\x06height\x18\x01 \x01(\x04R\x06height\x12\x18\n" +
-	"\aparents\x18\x02 \x01(\rR\aparents\"*\n" +
+	"\x06height\x18\x01 \x01(\x04R\x06height\x12\x1f\n" +
+	"\vnum_parents\x18\x02 \x01(\rR\n" +
+	"numParents\"*\n" +
 	"\x10GetBlockResponse\x12\x16\n" +
 	"\x06blocks\x18\x01 \x03(\fR\x06blocks\"\xfb\x01\n" +
 	"\x15GetChangeProofRequest\x12&\n" +
@@ -1112,11 +1047,7 @@ const file_sync_sync_proto_rawDesc = "" +
 	"\x05value\x18\x01 \x01(\fR\x05value\"2\n" +
 	"\bKeyValue\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\fR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value*i\n" +
-	"\vEVMNodeType\x12\x1d\n" +
-	"\x19EVM_NODE_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
-	"\x18EVM_NODE_TYPE_STATE_TRIE\x10\x01\x12\x1d\n" +
-	"\x19EVM_NODE_TYPE_ATOMIC_TRIE\x10\x02B/Z-github.com/ava-labs/avalanchego/proto/pb/syncb\x06proto3"
+	"\x05value\x18\x02 \x01(\fR\x05valueB/Z-github.com/ava-labs/avalanchego/proto/pb/syncb\x06proto3"
 
 var (
 	file_sync_sync_proto_rawDescOnce sync.Once
@@ -1130,49 +1061,46 @@ func file_sync_sync_proto_rawDescGZIP() []byte {
 	return file_sync_sync_proto_rawDescData
 }
 
-var file_sync_sync_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_sync_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_sync_sync_proto_goTypes = []any{
-	(EVMNodeType)(0),               // 0: sync.EVMNodeType
-	(*GetLeafRequest)(nil),         // 1: sync.GetLeafRequest
-	(*GetLeafResponse)(nil),        // 2: sync.GetLeafResponse
-	(*GetCodeRequest)(nil),         // 3: sync.GetCodeRequest
-	(*GetCodeResponse)(nil),        // 4: sync.GetCodeResponse
-	(*GetBlockRequest)(nil),        // 5: sync.GetBlockRequest
-	(*GetBlockResponse)(nil),       // 6: sync.GetBlockResponse
-	(*GetChangeProofRequest)(nil),  // 7: sync.GetChangeProofRequest
-	(*GetChangeProofResponse)(nil), // 8: sync.GetChangeProofResponse
-	(*GetRangeProofRequest)(nil),   // 9: sync.GetRangeProofRequest
-	(*ChangeProof)(nil),            // 10: sync.ChangeProof
-	(*RangeProof)(nil),             // 11: sync.RangeProof
-	(*ProofNode)(nil),              // 12: sync.ProofNode
-	(*KeyChange)(nil),              // 13: sync.KeyChange
-	(*Key)(nil),                    // 14: sync.Key
-	(*MaybeBytes)(nil),             // 15: sync.MaybeBytes
-	(*KeyValue)(nil),               // 16: sync.KeyValue
-	nil,                            // 17: sync.ProofNode.ChildrenEntry
+	(*GetLeafRequest)(nil),         // 0: sync.GetLeafRequest
+	(*GetLeafResponse)(nil),        // 1: sync.GetLeafResponse
+	(*GetCodeRequest)(nil),         // 2: sync.GetCodeRequest
+	(*GetCodeResponse)(nil),        // 3: sync.GetCodeResponse
+	(*GetBlockRequest)(nil),        // 4: sync.GetBlockRequest
+	(*GetBlockResponse)(nil),       // 5: sync.GetBlockResponse
+	(*GetChangeProofRequest)(nil),  // 6: sync.GetChangeProofRequest
+	(*GetChangeProofResponse)(nil), // 7: sync.GetChangeProofResponse
+	(*GetRangeProofRequest)(nil),   // 8: sync.GetRangeProofRequest
+	(*ChangeProof)(nil),            // 9: sync.ChangeProof
+	(*RangeProof)(nil),             // 10: sync.RangeProof
+	(*ProofNode)(nil),              // 11: sync.ProofNode
+	(*KeyChange)(nil),              // 12: sync.KeyChange
+	(*Key)(nil),                    // 13: sync.Key
+	(*MaybeBytes)(nil),             // 14: sync.MaybeBytes
+	(*KeyValue)(nil),               // 15: sync.KeyValue
+	nil,                            // 16: sync.ProofNode.ChildrenEntry
 }
 var file_sync_sync_proto_depIdxs = []int32{
-	0,  // 0: sync.GetLeafRequest.node_type:type_name -> sync.EVMNodeType
-	15, // 1: sync.GetChangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	15, // 2: sync.GetChangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	15, // 3: sync.GetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	15, // 4: sync.GetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	12, // 5: sync.ChangeProof.start_proof:type_name -> sync.ProofNode
-	12, // 6: sync.ChangeProof.end_proof:type_name -> sync.ProofNode
-	13, // 7: sync.ChangeProof.key_changes:type_name -> sync.KeyChange
-	12, // 8: sync.RangeProof.start_proof:type_name -> sync.ProofNode
-	12, // 9: sync.RangeProof.end_proof:type_name -> sync.ProofNode
-	16, // 10: sync.RangeProof.key_values:type_name -> sync.KeyValue
-	14, // 11: sync.ProofNode.key:type_name -> sync.Key
-	15, // 12: sync.ProofNode.value_or_hash:type_name -> sync.MaybeBytes
-	17, // 13: sync.ProofNode.children:type_name -> sync.ProofNode.ChildrenEntry
-	15, // 14: sync.KeyChange.value:type_name -> sync.MaybeBytes
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	14, // 0: sync.GetChangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	14, // 1: sync.GetChangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	14, // 2: sync.GetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	14, // 3: sync.GetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	11, // 4: sync.ChangeProof.start_proof:type_name -> sync.ProofNode
+	11, // 5: sync.ChangeProof.end_proof:type_name -> sync.ProofNode
+	12, // 6: sync.ChangeProof.key_changes:type_name -> sync.KeyChange
+	11, // 7: sync.RangeProof.start_proof:type_name -> sync.ProofNode
+	11, // 8: sync.RangeProof.end_proof:type_name -> sync.ProofNode
+	15, // 9: sync.RangeProof.key_values:type_name -> sync.KeyValue
+	13, // 10: sync.ProofNode.key:type_name -> sync.Key
+	14, // 11: sync.ProofNode.value_or_hash:type_name -> sync.MaybeBytes
+	16, // 12: sync.ProofNode.children:type_name -> sync.ProofNode.ChildrenEntry
+	14, // 13: sync.KeyChange.value:type_name -> sync.MaybeBytes
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_sync_sync_proto_init() }
@@ -1189,14 +1117,13 @@ func file_sync_sync_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sync_sync_proto_rawDesc), len(file_sync_sync_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      0,
 			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_sync_sync_proto_goTypes,
 		DependencyIndexes: file_sync_sync_proto_depIdxs,
-		EnumInfos:         file_sync_sync_proto_enumTypes,
 		MessageInfos:      file_sync_sync_proto_msgTypes,
 	}.Build()
 	File_sync_sync_proto = out.File

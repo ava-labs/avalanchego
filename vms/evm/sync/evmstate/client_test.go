@@ -31,7 +31,6 @@ func TestClient_Send(t *testing.T) {
 	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{
 		RootHash: []byte{0xab},
 		KeyLimit: 1024,
-		NodeType: syncpb.EVMNodeType_EVM_NODE_TYPE_STATE_TRIE,
 	}, resp)
 	require.NoError(t, err)
 	outcome.Success()

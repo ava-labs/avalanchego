@@ -31,6 +31,7 @@ const (
 	EVMLeafsRequestHandlerID
 	EVMCodeRequestHandlerID
 	EVMBlockRequestHandlerID
+	EVMAtomicLeafsRequestHandlerID
 )
 
 var (

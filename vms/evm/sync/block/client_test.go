@@ -24,7 +24,7 @@ func TestClient_Send(t *testing.T) {
 	c := synctest.NewClient[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse](t, ctx, nodeID, wantResp)
 
 	resp := &syncpb.GetBlockResponse{}
-	outcome, err := c.Send(ctx, &syncpb.GetBlockRequest{Height: 100, Parents: 5}, resp)
+	outcome, err := c.Send(ctx, &syncpb.GetBlockRequest{Height: 100, NumParents: 5}, resp)
 	require.NoError(t, err)
 	outcome.Success()
 
