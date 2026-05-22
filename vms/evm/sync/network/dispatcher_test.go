@@ -5,7 +5,6 @@ package network
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -109,9 +108,9 @@ func TestDispatcher_ContextCancelled(t *testing.T) {
 	require.Nil(t, outcome)
 }
 
-// Exercises the canonical caller pattern: `defer outcome.Failure()` as
-// a pessimistic default, then `outcome.Success()` on the happy path.
-// Idempotency makes `Success` win. The deferred `Failure` that fires
+// Exercises the canonical caller pattern: defer outcome.Failure() as
+// a pessimistic default, then outcome.Success() on the happy path.
+// Idempotency makes Success win. The deferred Failure that fires
 // afterward is a no-op, and the peer stays in responsivePeers.
 //
 // NOTE: Builds its own [p2p.PeerTracker] (instead of using
@@ -159,12 +158,7 @@ func TestOutcome_DeferFailureOnly(t *testing.T) {
 
 	// Validation fails, no Success call. The deferred Failure fires
 	// and the peer drops out of responsivePeers.
-	func() {
-		defer outcome.Failure()
-		if err := errors.New("bad proof"); err != nil {
-			return
-		}
-	}()
+	defer outcome.Failure()
 
 	require.Equal(t, 0.0, gaugeValue(t, reg, "test_peer_tracker_num_responsive_peers"))
 }
@@ -219,7 +213,7 @@ func newRegisteredTracker(t *testing.T, nodeID ids.NodeID) (*prometheus.Registry
 	return reg, tracker
 }
 
-// gaugeValue reads a single named gauge from `reg`.
+// gaugeValue reads a single named gauge from reg.
 func gaugeValue(t *testing.T, reg *prometheus.Registry, name string) float64 {
 	t.Helper()
 	mfs, err := reg.Gather()

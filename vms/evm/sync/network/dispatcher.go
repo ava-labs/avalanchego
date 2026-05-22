@@ -62,6 +62,9 @@ func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*
 // SendTo sends req to nodeID. On error, Outcome is nil and the peer
 // has already been scored.
 func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errMarshalRequest, err)
@@ -96,11 +99,11 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 			return nil, fmt.Errorf("%w: %w", errHandlerFailed, r.err)
 		}
 
-		const epsilon = 1e-6
-		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
 		if err := proto.Unmarshal(r.bytes, resp); err != nil {
 			return nil, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
 		}
+		const epsilon = 1e-6
+		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
 		return &Outcome{
 			peers:     d.peers,
 			nodeID:    nodeID,
@@ -111,10 +114,8 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 
 // Outcome lets the caller score a peer after validating its response.
 // At least one of Success or Failure must be called. Both are
-// idempotent, so `defer outcome.Failure()` plus `outcome.Success()` is
-// the canonical happy-path pattern.
-//
-// Forgetting both leaves an unpaired RegisterRequest on the
+// idempotent, so defer outcome.Failure() plus outcome.Success() is
+// safe. Forgetting both leaves an unpaired RegisterRequest on the
 // [p2p.PeerTracker].
 type Outcome struct {
 	peers     *p2p.PeerTracker
@@ -137,7 +138,7 @@ var _ p2p.NodeSampler = noopSampler{}
 
 // noopSampler is a no-op [p2p.NodeSampler]. Required because
 // [p2p.Network.NewClient] needs a non-nil sampler, but [Dispatcher]
-// always picks an explicit peer so [Sample] never runs.
+// always picks an explicit peer so Sample never runs.
 type noopSampler struct{}
 
 func (noopSampler) Sample(context.Context, int) []ids.NodeID { return nil }
