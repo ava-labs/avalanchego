@@ -128,6 +128,10 @@ go_test(
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",
         "//utils/crypto/secp256k1",
+<<<<<<< HEAD
+=======
+        "//utils/formatting",
+>>>>>>> 7e2e9ba9798cc1811503733ed5bb20a0811040bb
         "//utils/json",
         "//utils/logging",
         "//utils/rpc",
@@ -141,6 +145,7 @@ go_test(
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/cchain/warp",
+        "//vms/saevm/cmputils",
         "//vms/saevm/params",
         "//vms/saevm/saetest",
         "//vms/secp256k1fx",

@@ -53,7 +53,7 @@ func TestSendWarpMessage(t *testing.T) {
 
 	sendWarpTx(ctx, t, sut, ethWallet, warpSendInput, nil /*no predicate*/)
 
-	built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t), nil)
+	built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 	require.Len(t, built.EthBlock().Transactions(), 1)
 
 	// Before the block has executed the warp verifier has nothing to sign.
@@ -151,7 +151,7 @@ func TestPredicateVerification(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			validateTx := sendWarpTx(ctx, t, sut, ethWallet, tt.txPayload, tt.signedMsg)
 
-			built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t), &block.Context{PChainHeight: 0})
+			built := sut.buildVerifyWithContext(ctx, t, sut.lastAccepted(ctx, t), &block.Context{PChainHeight: 0})
 			require.Len(t, built.EthBlock().Transactions(), 1)
 
 			sut.acceptAndExecute(ctx, t, built)
@@ -193,7 +193,7 @@ func sendWarpTx(
 		Data:       txPayload,
 		AccessList: accessList,
 	})
-	require.NoError(t, sut.EthClient.SendTransaction(ctx, signedTx))
+	require.NoError(t, sut.ethclient.SendTransaction(ctx, signedTx))
 	return signedTx
 }
 

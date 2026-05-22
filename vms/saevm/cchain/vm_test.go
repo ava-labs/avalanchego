@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -17,7 +16,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
-	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
@@ -47,12 +45,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
+	ethrpc "github.com/ava-labs/libevm/rpc"
 )
 
 func TestMain(m *testing.M) {
@@ -67,18 +67,15 @@ type SUT struct {
 	*VM
 	*Client
 
-	// EthClient is dialled against the VM's `/ws` endpoint and is the
-	// recommended way to submit eth transactions to the SUT.
-	EthClient *ethclient.Client
-
-	snowCtx *snow.Context
-	memory  *atomic.Memory
-	sender  *saetest.Sender
-
 	// validatorKeys are populated when [withWarpValidators] is used and
 	// correspond, by index, to the BLS validator set returned by
 	// snowCtx.ValidatorState.GetWarpValidatorSets.
 	validatorKeys []*localsigner.LocalSigner
+
+	snowCtx   *snow.Context
+	memory    *atomic.Memory
+	sender    *saetest.Sender
+	ethclient *ethclient.Client
 }
 
 // Implements [saetest.Peer]
@@ -206,21 +203,22 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	server := httptest.NewServer(mux)
 	tb.Cleanup(server.Close)
 
-	wsURL := strings.Replace(server.URL, "http://", "ws://", 1) + cchainHTTPPrefix + "/ws"
-	rpcClient, err := rpc.DialContext(ctx, wsURL)
-	require.NoErrorf(tb, err, "rpc.DialContext(%q)", wsURL)
-	tb.Cleanup(rpcClient.Close)
-	ethClient := ethclient.NewClient(rpcClient)
-	tb.Cleanup(ethClient.Close)
+	const wsHTTPPath = cchainHTTPPrefix + "/ws"
+	wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
+	ethRPCClient, err := ethrpc.Dial(wsURI)
+	require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
+	tb.Cleanup(ethRPCClient.Close)
 
 	sut := &SUT{
-		VM:            vm,
-		Client:        NewClient(server.URL),
-		EthClient:     ethClient,
-		snowCtx:       snowCtx,
-		memory:        memory,
-		sender:        appSender,
+		VM:     vm,
+		Client: NewClient(server.URL),
+
 		validatorKeys: validatorKeys,
+
+		snowCtx:   snowCtx,
+		memory:    memory,
+		sender:    appSender,
+		ethclient: ethclient.NewClient(ethRPCClient),
 	}
 	appSender.SetSelf(sut)
 	return ctx, sut
@@ -406,7 +404,7 @@ func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB) *blocks.Bloc
 	tb.Helper()
 
 	lastAccepted := s.lastAccepted(ctx, tb)
-	blk := s.buildVerify(ctx, tb, lastAccepted, nil)
+	blk := s.buildVerify(ctx, tb, lastAccepted)
 	require.NoErrorf(tb, s.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.VM)
 	return blk
 }
@@ -422,7 +420,15 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 
 // buildVerify builds and verifies a block on top of preferenceID. blockCtx
 // MAY be nil; warp tests need an explicit value (e.g. PChainHeight).
-func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID, blockCtx *block.Context) *blocks.Block {
+func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID) *blocks.Block {
+	tb.Helper()
+
+	return s.buildVerifyWithContext(ctx, tb, preferenceID, nil)
+}
+
+// buildVerify builds and verifies a block on top of preferenceID. blockCtx
+// MAY be nil; warp tests need an explicit value (e.g. PChainHeight).
+func (s *SUT) buildVerifyWithContext(ctx context.Context, tb testing.TB, preferenceID ids.ID, blockCtx *block.Context) *blocks.Block {
 	tb.Helper()
 
 	require.NoErrorf(tb, s.SetPreference(ctx, preferenceID, blockCtx), "%T.SetPreference()", s.VM)
@@ -688,7 +694,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		stx := newWallet(sk, sut.snowCtx, sut.Client).newMinimalTx(t)
 		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(tx)", sut.Client)
 
-		block := sut.buildVerify(ctx, t, preference, nil)
+		block := sut.buildVerify(ctx, t, preference)
 		if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, block), txtest.CmpOpt()); diff != "" {
 			t.Errorf("%T txs (-want +got):\n%s", block, diff)
 		}
@@ -733,7 +739,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		Gas:      ethparams.TxGas,
 		GasPrice: big.NewInt(1),
 	})
-	require.NoErrorf(t, sut.EthClient.SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.EthClient, tracedTx.Hash())
+	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.ethclient, tracedTx.Hash())
 
 	// Export gives us observable external state.
 	w := newWallet(exportKey, sut.snowCtx, sut.Client)
@@ -749,13 +755,12 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	)
 	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
 
-	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t), nil)
-	// Compare by hash because the tx round-trips through RLP via the JSON-RPC
-	// transport, which canonicalises an empty Data field.
-	require.Len(t, blk.Transactions(), 1)
-	require.Equalf(t, tracedTx.Hash(), blk.Transactions()[0].Hash(), "%T.Transactions()[0]", blk)
+	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	if diff := cmp.Diff(types.Transactions{tracedTx}, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
+		t.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
+	}
 	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T txs (-want +got):\n%s", blk, diff)
+		t.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
 	}
 
 	rpc := sut.GethRPCBackends()
