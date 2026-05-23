@@ -418,31 +418,96 @@ func TestDiffStakersDelegator(t *testing.T) {
 	)
 }
 
-func TestDiffStakersDelegatorCancelOut(t *testing.T) {
-	delegator := newTestStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID())
+func TestDiffDelegatorCancelOut(t *testing.T) {
+	setupState := func(t *testing.T) (*State, *Staker) {
+		t.Helper()
+		state := newTestState(t, memdb.New())
+		subnetID := ids.GenerateTestID()
+		nodeID := ids.GenerateTestNodeID()
+		require.NoError(t, state.PutCurrentValidator(newTestStaker(subnetID, nodeID)))
+		return state, newTestStaker(subnetID, nodeID)
+	}
 
-	t.Run("delete then put same persisted delegator", func(t *testing.T) {
-		diff := &diffStakers{}
-		diff.DeleteDelegator(delegator)
-		diff.PutDelegator(delegator)
+	currentDelegators := func(t *testing.T, state *State, d *Staker) []*Staker {
+		t.Helper()
+		iter, err := state.GetCurrentDelegatorIterator(d.SubnetID, d.NodeID)
+		require.NoError(t, err)
+		defer iter.Release()
+		return iterator.ToSlice(iter)
+	}
 
-		delegatorIter := diff.GetDelegatorIterator(iterator.FromSlice(delegator), delegator.SubnetID, delegator.NodeID)
-		require.Equal(t, []*Staker{delegator}, iterator.ToSlice(delegatorIter))
+	t.Run("delete then put identical delegator leaves state unchanged", func(t *testing.T) {
+		state, delegator := setupState(t)
+		require.NoError(t, state.PutCurrentDelegator(delegator))
 
-		iter := diff.GetStakerIterator(iterator.FromSlice(delegator))
-		require.Equal(t, []*Staker{delegator}, iterator.ToSlice(iter))
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		require.NoError(t, diff.DeleteCurrentDelegator(delegator))
+		require.NoError(t, diff.PutCurrentDelegator(delegator))
+		require.NoError(t, diff.Apply(state))
+
+		require.Equal(t, []*Staker{delegator}, currentDelegators(t, state, delegator))
 	})
 
-	t.Run("put then delete same delegator", func(t *testing.T) {
-		diff := &diffStakers{}
-		diff.PutDelegator(delegator)
-		diff.DeleteDelegator(delegator)
+	t.Run("delete then put with updated weight applies the replacement", func(t *testing.T) {
+		state, delegator := setupState(t)
+		delegator.Weight = 2
+		require.NoError(t, state.PutCurrentDelegator(delegator))
 
-		delegatorIter := diff.GetDelegatorIterator(iterator.Empty[*Staker]{}, delegator.SubnetID, delegator.NodeID)
-		require.Empty(t, iterator.ToSlice(delegatorIter))
+		updated := *delegator
+		updated.Weight = delegator.Weight - 1
 
-		iter := diff.GetStakerIterator(iterator.Empty[*Staker]{})
-		require.Empty(t, iterator.ToSlice(iter))
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		require.NoError(t, diff.DeleteCurrentDelegator(delegator))
+		require.NoError(t, diff.PutCurrentDelegator(&updated))
+		require.NoError(t, diff.Apply(state))
+
+		require.Equal(t, []*Staker{&updated}, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("put then delete identical delegator leaves state empty", func(t *testing.T) {
+		state, delegator := setupState(t)
+
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		require.NoError(t, diff.PutCurrentDelegator(delegator))
+		require.NoError(t, diff.DeleteCurrentDelegator(delegator))
+		require.NoError(t, diff.Apply(state))
+
+		require.Empty(t, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("put then delete with mismatched weight leaves state empty", func(t *testing.T) {
+		state, delegator := setupState(t)
+		delegator.Weight = 2
+
+		mismatched := *delegator
+		mismatched.Weight = delegator.Weight - 1
+
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		require.NoError(t, diff.PutCurrentDelegator(delegator))
+		require.NoError(t, diff.DeleteCurrentDelegator(&mismatched))
+		require.NoError(t, diff.Apply(state))
+
+		require.Empty(t, currentDelegators(t, state, delegator))
+	})
+
+	t.Run("pending: delete then put identical delegator leaves state unchanged", func(t *testing.T) {
+		state, delegator := setupState(t)
+		state.PutPendingDelegator(delegator)
+
+		diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+		require.NoError(t, err)
+		diff.DeletePendingDelegator(delegator)
+		diff.PutPendingDelegator(delegator)
+		require.NoError(t, diff.Apply(state))
+
+		iter, err := state.GetPendingDelegatorIterator(delegator.SubnetID, delegator.NodeID)
+		require.NoError(t, err)
+		defer iter.Release()
+		require.Equal(t, []*Staker{delegator}, iterator.ToSlice(iter))
 	})
 }
 
@@ -454,13 +519,13 @@ func TestBaseStakersDelegatorCancelOutPersistence(t *testing.T) {
 		diff := v.validatorDiffs[delegator.SubnetID][delegator.NodeID]
 		require.NotNil(t, diff)
 		require.NoError(t, writeCurrentDelegatorDiff(list, diff, CodecVersion1))
+		delete(v.validatorDiffs[delegator.SubnetID], delegator.NodeID)
 	}
 
-	t.Run("delete then put same persisted delegator", func(t *testing.T) {
+	t.Run("delete then put identical persisted delegator", func(t *testing.T) {
 		list := linkeddb.NewDefault(memdb.New())
 		v := newBaseStakers()
 
-		// Persist the delegator.
 		v.PutDelegator(delegator)
 		writeDiff(t, v, list)
 
@@ -478,7 +543,7 @@ func TestBaseStakersDelegatorCancelOutPersistence(t *testing.T) {
 		require.True(t, has)
 	})
 
-	t.Run("put then delete same delegator", func(t *testing.T) {
+	t.Run("put then delete identical delegator never persists", func(t *testing.T) {
 		list := linkeddb.NewDefault(memdb.New())
 		v := newBaseStakers()
 
