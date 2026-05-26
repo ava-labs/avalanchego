@@ -30,7 +30,7 @@ pub enum NodeHashAlgorithm {
 
 impl Default for NodeHashAlgorithm {
     fn default() -> Self {
-        if cfg!(feature = "ethhash") {
+        if firewood_storage::NodeHashAlgorithm::compile_option().is_ethereum() {
             NodeHashAlgorithm::Ethereum
         } else {
             NodeHashAlgorithm::MerkleDB

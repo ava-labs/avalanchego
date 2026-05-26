@@ -71,7 +71,8 @@ pub fn proof_node_to_mpt_rlp(node: &ProofNode) -> SmallVec<[Box<[u8]>; 2]> {
     // The account-node concept only exists in ethhash mode. Without that
     // feature, depth-64 nodes are plain MPT nodes and no special handling
     // fires.
-    let is_account = cfg!(feature = "ethhash") && key.len() == ACCOUNT_DEPTH_NIBBLES;
+    let is_account = firewood_storage::NodeHashAlgorithm::compile_option().is_ethereum()
+        && key.len() == ACCOUNT_DEPTH_NIBBLES;
     let value_bytes = node.value_digest.as_ref().and_then(ValueDigest::value);
 
     if node.child_hashes.count() == 0 {
