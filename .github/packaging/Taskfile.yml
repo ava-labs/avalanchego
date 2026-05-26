@@ -204,5 +204,6 @@ tasks:
     env:
       TAG: '{{.PACKAGING_TAG}}'
       GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_DEB_HOST_ARCH}}'
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-deb.sh'
