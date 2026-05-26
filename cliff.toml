@@ -25,7 +25,18 @@ body = """
             {% continue -%}
         {% endif -%}
         - {% if commit.scope %}*({{ commit.scope }})* {% endif -%}
-            {% if commit.breaking %}[**breaking**] {% endif -%}
+            {%- set_global breaking = commit.breaking -%}
+            {%- set_global breaking_scopes = [] -%}
+            {%- if commit.remote.pr_labels is defined -%}
+              {%- for label in commit.remote.pr_labels -%}
+                {%- if label is starting_with("breaking-change/") -%}
+                  {%- set_global breaking = true -%}
+                  {%- set scope = label | trim_start_matches(pat="breaking-change/") -%}
+                  {%- set_global breaking_scopes = breaking_scopes | concat(with=scope) -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endif -%}
+            {% if breaking %}[**breaking**{% if breaking_scopes | length > 0 %} {{ breaking_scopes | sort | join(sep=", ") }}{% endif %}] {% endif -%}
             {{ commit.message | upper_first }}
     {% endfor -%}
 {% endfor %}\n
@@ -80,7 +91,7 @@ commit_preprocessors = [
     { pattern = '\(#([0-9]+)\)', replace = '([#${1}](<REPO>/pull/${1}))' },
 ]
 # Prevent commits that are breaking from being excluded by commit parsers.
-protect_breaking_commits = false
+protect_breaking_commits = true
 # An array of regex based parsers for extracting data from the commit message.
 # Assigns commits to groups.
 # Optionally sets the commit's scope and can decide to exclude commits from further processing.

@@ -18,8 +18,8 @@ All notable changes to this project will be documented in this file.
 - *(manager)* Resolve empty-trie revision under ethhash without RootStore (TOB-FIREWOOD-7) ([#1982](https://github.com/ava-labs/firewood/pull/1982))
 - *(range-proof)* Use last_kv_key as right-edge anchor for inclusion-style end_proofs ([#1970](https://github.com/ava-labs/firewood/pull/1970))
 - *(manager)* Hold proposals lock across cleanup and reparent (TOB-FIREWOOD-6) ([#1981](https://github.com/ava-labs/firewood/pull/1981))
-- *(manager)* Use CommittedId for parent identity, skip trivial commits ([#1987](https://github.com/ava-labs/firewood/pull/1987))
-- *(storage)* Pin committed parent in Reconstructed to prevent reaping ([#2000](https://github.com/ava-labs/firewood/pull/2000))
+- *(manager)* [**breaking** firewood-storage] Use CommittedId for parent identity, skip trivial commits ([#1987](https://github.com/ava-labs/firewood/pull/1987))
+- *(storage)* [**breaking** firewood, firewood-ffi, firewood-storage] Pin committed parent in Reconstructed to prevent reaping ([#2000](https://github.com/ava-labs/firewood/pull/2000))
 
 ### 🚜 Refactor
 
@@ -88,10 +88,10 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
-- *(metrics)* [**breaking**] Remove histograms ([#1847](https://github.com/ava-labs/firewood/pull/1847))
+- *(metrics)* [**breaking** firewood-go] Remove histograms ([#1847](https://github.com/ava-labs/firewood/pull/1847))
 - *(proofs)* Replace ChildMask [bool; 16] with u16 newtype ([#1849](https://github.com/ava-labs/firewood/pull/1849))
 - *(range-proofs)* Consolidate ChildrenMap into ChildMask ([#1852](https://github.com/ava-labs/firewood/pull/1852))
-- *(merkle)* [**breaking**] Reduce visibility of firewood::merkle module ([#1858](https://github.com/ava-labs/firewood/pull/1858))
+- *(merkle)* [**breaking** firewood] Reduce visibility of firewood::merkle module ([#1858](https://github.com/ava-labs/firewood/pull/1858))
 - Rename verify_root_hash to verify_range_proof_root_hash ([#1887](https://github.com/ava-labs/firewood/pull/1887))
 - *(ffi)* Remove ArcCache from DatabaseHandle ([#1891](https://github.com/ava-labs/firewood/pull/1891))
 - *(metrics)* Consolidate metric registry definitions with macro ([#1867](https://github.com/ava-labs/firewood/pull/1867))
