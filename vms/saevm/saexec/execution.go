@@ -297,13 +297,12 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	//
 	// 1. [blocks.Block.MarkExecuted] guarantees disk then in-memory changes.
 	// 2. Internal indicator of last executed MUST follow in-memory change.
-	// 3. Metrics indicator of last executed MUST follow internal indicator.
-	// 4. External indicator of last executed MUST follow internal indicator.
+	// 3. External indicators (events + metrics) of last executed MUST follow
+	//    the internal indicator.
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
-	e.metrics.markExecuted(b.Height())                  // (3)
-	e.sendPostExecutionEvents(b.EthBlock(), r.Receipts) // (4)
+	e.sendPostExecutionEvents(b.EthBlock(), r.Receipts) // (3)
 	return nil
 }
 

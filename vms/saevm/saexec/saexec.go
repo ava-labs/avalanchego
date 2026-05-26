@@ -109,12 +109,6 @@ func New(
 	return e, nil
 }
 
-// MarkSettled records height as the latest settled height. See [metrics]
-// for why the lifecycle gauge is colocated in this package.
-func (e *Executor) MarkSettled(height uint64) {
-	e.metrics.markSettled(height)
-}
-
 var _ io.Closer = (*Executor)(nil)
 
 // Close shuts down the [Executor], waits for the currently executing block

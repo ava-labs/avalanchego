@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -41,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -57,6 +57,7 @@ type VM struct {
 	config         Config
 	snowCtx        *snow.Context
 	metricRegistry *prometheus.Registry
+	metrics        *metrics
 
 	db  ethdb.Database
 	xdb saetypes.ExecutionResults
@@ -124,15 +125,20 @@ func NewVM[T hook.Transaction](
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "sae")
+	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
 	if err != nil {
 		return nil, err
+	}
+	m, err := newMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
 	vm := &VM{
 		hooks:          hooks,
 		config:         cfg,
 		snowCtx:        snowCtx,
 		metricRegistry: reg,
+		metrics:        m,
 		db:             db,
 	}
 	defer func() {
@@ -204,7 +210,7 @@ func NewVM[T hook.Transaction](
 		vm.last.accepted.Store(head)
 		vm.preference.Store(head)
 		// [saexec.New] already records the initial executed height.
-		vm.exec.MarkSettled(lastSettled.Height())
+		vm.metrics.markSettled(lastSettled.Height())
 	}
 
 	{ // ==========  Mempool  ==========

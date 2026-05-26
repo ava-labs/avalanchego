@@ -4,27 +4,15 @@
 package saexec
 
 import (
-	"errors"
-
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Exported metric names for the SAE lifecycle bucket. Cross-package callers
-// (tests, alert/dashboard wiring) should reference these constants rather
-// than the raw strings.
-const (
-	LastExecutedHeightName = "last_executed_height"
-	LastSettledHeightName  = "last_settled_height"
-)
+// LastExecutedHeightName names the gauge for the height of the last block
+// that completed async execution.
+const LastExecutedHeightName = "last_executed_height"
 
-// metrics holds the SAE block-lifecycle gauges. Both live with [Executor]
-// because it owns the execution lifecycle: [Executor.afterExecution]
-// writes last_executed_height directly, and [Executor.MarkSettled]
-// exposes the settled gauge for the sae VM to drive. Co-locating them
-// keeps registration in one place.
 type metrics struct {
 	lastExecutedHeight prometheus.Gauge
-	lastSettledHeight  prometheus.Gauge
 }
 
 func newMetrics(reg prometheus.Registerer) (*metrics, error) {
@@ -33,21 +21,10 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Name: LastExecutedHeightName,
 			Help: "Height of the latest block that completed async execution.",
 		}),
-		lastSettledHeight: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: LastSettledHeightName,
-			Help: "Height of the latest block that has settled.",
-		}),
 	}
-	return m, errors.Join(
-		reg.Register(m.lastExecutedHeight),
-		reg.Register(m.lastSettledHeight),
-	)
+	return m, reg.Register(m.lastExecutedHeight)
 }
 
 func (m *metrics) markExecuted(height uint64) {
 	m.lastExecutedHeight.Set(float64(height))
-}
-
-func (m *metrics) markSettled(height uint64) {
-	m.lastSettledHeight.Set(float64(height))
 }
