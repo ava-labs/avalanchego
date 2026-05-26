@@ -229,7 +229,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 // valid with respect to the worst-case state.
 func (b *builder) PotentialEndOfBlockOps(
 	ctx context.Context,
-	header *types.Header,
+	building *types.Header,
 	settledHash common.Hash,
 	source saetypes.BlockSource,
 ) iter.Seq[*hookTx] {
@@ -239,7 +239,7 @@ func (b *builder) PotentialEndOfBlockOps(
 		// between the block we are building and the last executed block. Since
 		// we know the settled block has been executed, we use that as our
 		// reference point.
-		inputs, err := ancestorInputIDs(header, settledHash, source)
+		inputs, err := ancestorInputIDs(building, settledHash, source)
 		if err != nil {
 			b.ctx.Log.Error("failed to get ancestor input IDs",
 				zap.Error(err),

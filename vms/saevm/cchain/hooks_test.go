@@ -46,9 +46,9 @@ func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *
 func TestAncestorInputIDs(t *testing.T) {
 	var (
 		w       = newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
-		settled = common.Hash(ids.GenerateTestID())
+		genesis = common.Hash(ids.GenerateTestID())
 		tx1     = w.newMinimalTx(t)
-		block1  = newBlock(t, 1, settled, tx1)
+		block1  = newBlock(t, 1, genesis, tx1)
 		tx2     = w.newMinimalTx(t)
 		block2  = newBlock(t, 2, block1.Hash(), tx2)
 		tx3     = w.newMinimalTx(t)
@@ -64,25 +64,31 @@ func TestAncestorInputIDs(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:    "empty range",
+			name:    "empty_range",
 			header:  block1.Header(),
-			settled: settled,
+			settled: genesis,
 			want:    nil,
 		},
 		{
-			name:    "single ancestor",
+			name:    "single_ancestor",
 			header:  block2.Header(),
-			settled: settled,
+			settled: genesis,
 			want:    tx1.InputIDs(),
 		},
 		{
-			name:    "multiple ancestors",
+			name:    "multiple_ancestors",
 			header:  block4.Header(),
-			settled: settled,
+			settled: genesis,
 			want:    set.UnionOf(tx1.InputIDs(), tx2.InputIDs(), tx3.InputIDs()),
 		},
 		{
-			name:    "missing block",
+			name:    "stops_at_settled",
+			header:  block4.Header(),
+			settled: block1.Hash(),
+			want:    set.UnionOf(tx2.InputIDs(), tx3.InputIDs()),
+		},
+		{
+			name:    "missing_block",
 			header:  block2.Header(),
 			settled: common.Hash(ids.GenerateTestID()), // never matches
 			wantErr: errMissingBlock,
