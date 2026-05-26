@@ -561,31 +561,30 @@ func TestGetValidatorRules(t *testing.T) {
 	}
 
 	var (
-		avaxAssetID   = ids.GenerateTestID()
-		customAssetID = ids.GenerateTestID()
-		subnetID      = ids.GenerateTestID()
-
 		minValidatorStake       uint64 = 1
 		maxValidatorStake       uint64 = 2
-		minStakeDuration               = time.Second
-		maxStakeDuration               = 4 * time.Second
+		minStakeDuration               = 2 * time.Second
+		heliconMinStakeDuration        = time.Second
+		maxStakeDuration               = 3 * time.Second
 		minDelegationFee        uint32 = 1337
-		heliconMinStakeDuration        = 3 * time.Second
+		avaxAssetID                    = ids.GenerateTestID()
+		customAssetID                  = ids.GenerateTestID()
+		subnetID                       = ids.GenerateTestID()
 	)
 
 	tests := []test{
 		{
-			name:     "primary network",
+			name:     "primary network, pre-Helicon",
 			subnetID: constants.PrimaryNetworkID,
 			backend: &Backend{
 				Config: &config.Internal{
 					MinValidatorStake:       minValidatorStake,
 					MaxValidatorStake:       maxValidatorStake,
 					MinStakeDuration:        minStakeDuration,
+					HeliconMinStakeDuration: heliconMinStakeDuration,
 					MaxStakeDuration:        maxStakeDuration,
 					MinDelegationFee:        minDelegationFee,
-					HeliconMinStakeDuration: heliconMinStakeDuration,
-					UpgradeConfig:           upgradetest.GetConfig(upgradetest.Granite),
+					UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(upgradetest.Granite, time.Time{}),
 				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,
@@ -601,16 +600,16 @@ func TestGetValidatorRules(t *testing.T) {
 			},
 		},
 		{
-			name:     "primary network post-Helicon",
+			name:     "primary network, post-Helicon",
 			subnetID: constants.PrimaryNetworkID,
 			backend: &Backend{
 				Config: &config.Internal{
 					MinValidatorStake:       minValidatorStake,
 					MaxValidatorStake:       maxValidatorStake,
 					MinStakeDuration:        minStakeDuration,
+					HeliconMinStakeDuration: heliconMinStakeDuration,
 					MaxStakeDuration:        maxStakeDuration,
 					MinDelegationFee:        minDelegationFee,
-					HeliconMinStakeDuration: heliconMinStakeDuration,
 					UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, time.Time{}),
 				},
 				Ctx: &snow.Context{
@@ -627,10 +626,11 @@ func TestGetValidatorRules(t *testing.T) {
 			},
 		},
 		{
-			name:        "can't get subnet transformation",
-			subnetID:    subnetID,
-			backend:     nil,
-			expectedErr: database.ErrNotFound,
+			name:          "can't get subnet transformation",
+			subnetID:      subnetID,
+			backend:       nil,
+			expectedRules: &addValidatorRules{},
+			expectedErr:   database.ErrNotFound,
 		},
 		{
 			name:     "subnet",
@@ -640,10 +640,12 @@ func TestGetValidatorRules(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &txs.TransformSubnetTx{
 						AssetID:           customAssetID,
+						InitialSupply:     10,
+						MaximumSupply:     100,
 						MinValidatorStake: minValidatorStake,
 						MaxValidatorStake: maxValidatorStake,
-						MinStakeDuration:  1337,
-						MaxStakeDuration:  42,
+						MinStakeDuration:  42,
+						MaxStakeDuration:  1337,
 						MinDelegationFee:  minDelegationFee,
 						Subnet:            subnetID,
 					},
@@ -654,8 +656,8 @@ func TestGetValidatorRules(t *testing.T) {
 				assetID:           customAssetID,
 				minValidatorStake: minValidatorStake,
 				maxValidatorStake: maxValidatorStake,
-				minStakeDuration:  1337 * time.Second,
-				maxStakeDuration:  42 * time.Second,
+				minStakeDuration:  42 * time.Second,
+				maxStakeDuration:  1337 * time.Second,
 				minDelegationFee:  minDelegationFee,
 			},
 		},
@@ -664,10 +666,12 @@ func TestGetValidatorRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
+
 			s := statetest.New(t, statetest.Config{})
 			if tt.setup != nil {
 				tt.setup(s)
 			}
+
 			rules, err := getValidatorRules(tt.backend, s, tt.subnetID)
 			if tt.expectedErr != nil {
 				require.ErrorIs(err, tt.expectedErr)
@@ -689,28 +693,29 @@ func TestGetDelegatorRules(t *testing.T) {
 		expectedErr   error
 	}
 	var (
-		avaxAssetID   = ids.GenerateTestID()
-		customAssetID = ids.GenerateTestID()
-		subnetID      = ids.GenerateTestID()
-
 		minDelegatorStake       uint64 = 1
+		minValidatorStake       uint64 = 1
 		maxValidatorStake       uint64 = 2
-		minStakeDuration               = time.Second
-		maxStakeDuration               = 4 * time.Second
-		heliconMinStakeDuration        = 3 * time.Second
+		minStakeDuration               = 2 * time.Second
+		heliconMinStakeDuration        = time.Second
+		maxStakeDuration               = 3 * time.Second
+		minDelegationFee        uint32 = 0
+		avaxAssetID                    = ids.GenerateTestID()
+		customAssetID                  = ids.GenerateTestID()
+		subnetID                       = ids.GenerateTestID()
 	)
 	tests := []test{
 		{
-			name:     "primary network",
+			name:     "primary network, pre-Helicon",
 			subnetID: constants.PrimaryNetworkID,
 			backend: &Backend{
 				Config: &config.Internal{
 					MinDelegatorStake:       minDelegatorStake,
 					MaxValidatorStake:       maxValidatorStake,
 					MinStakeDuration:        minStakeDuration,
-					MaxStakeDuration:        maxStakeDuration,
 					HeliconMinStakeDuration: heliconMinStakeDuration,
-					UpgradeConfig:           upgradetest.GetConfig(upgradetest.Granite),
+					MaxStakeDuration:        maxStakeDuration,
+					UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(upgradetest.Granite, time.Time{}),
 				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,
@@ -726,15 +731,15 @@ func TestGetDelegatorRules(t *testing.T) {
 			},
 		},
 		{
-			name:     "primary network post-Helicon",
+			name:     "primary network, post-Helicon",
 			subnetID: constants.PrimaryNetworkID,
 			backend: &Backend{
 				Config: &config.Internal{
 					MinDelegatorStake:       minDelegatorStake,
 					MaxValidatorStake:       maxValidatorStake,
 					MinStakeDuration:        minStakeDuration,
-					MaxStakeDuration:        maxStakeDuration,
 					HeliconMinStakeDuration: heliconMinStakeDuration,
+					MaxStakeDuration:        maxStakeDuration,
 					UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, time.Time{}),
 				},
 				Ctx: &snow.Context{
@@ -751,10 +756,11 @@ func TestGetDelegatorRules(t *testing.T) {
 			},
 		},
 		{
-			name:        "can't get subnet transformation",
-			subnetID:    subnetID,
-			backend:     nil,
-			expectedErr: database.ErrNotFound,
+			name:          "can't get subnet transformation",
+			subnetID:      subnetID,
+			backend:       nil,
+			expectedRules: &addDelegatorRules{},
+			expectedErr:   database.ErrNotFound,
 		},
 		{
 			name:     "subnet",
@@ -764,10 +770,14 @@ func TestGetDelegatorRules(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &txs.TransformSubnetTx{
 						AssetID:                  customAssetID,
-						MinDelegatorStake:        minDelegatorStake,
+						InitialSupply:            10,
+						MaximumSupply:            100,
+						MinValidatorStake:        minValidatorStake,
 						MaxValidatorStake:        maxValidatorStake,
-						MinStakeDuration:         1337,
-						MaxStakeDuration:         42,
+						MinDelegatorStake:        minDelegatorStake,
+						MinStakeDuration:         42,
+						MaxStakeDuration:         1337,
+						MinDelegationFee:         minDelegationFee,
 						MaxValidatorWeightFactor: 21,
 						Subnet:                   subnetID,
 					},
@@ -778,8 +788,8 @@ func TestGetDelegatorRules(t *testing.T) {
 				assetID:                  customAssetID,
 				minDelegatorStake:        minDelegatorStake,
 				maxValidatorStake:        maxValidatorStake,
-				minStakeDuration:         1337 * time.Second,
-				maxStakeDuration:         42 * time.Second,
+				minStakeDuration:         42 * time.Second,
+				maxStakeDuration:         1337 * time.Second,
 				maxValidatorWeightFactor: 21,
 			},
 		},
@@ -787,10 +797,12 @@ func TestGetDelegatorRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
+
 			s := statetest.New(t, statetest.Config{})
 			if tt.setup != nil {
 				tt.setup(s)
 			}
+
 			rules, err := getDelegatorRules(tt.backend, s, tt.subnetID)
 			if tt.expectedErr != nil {
 				require.ErrorIs(err, tt.expectedErr)
