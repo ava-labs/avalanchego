@@ -33,6 +33,17 @@ documented before it is modified for the same reasons it should be adequately
 tested before it is modified. Documentation of the maintenance layer is no
 longer optional infrastructure. It is a precondition for safe change.
 
+That expectation should be applied proportionally. It does not mean every
+mechanical edit, obvious rename, formatting-only change, or tightly local fix
+requires a documentation pass first. It does mean that when a safe change
+depends on non-obvious assumptions, preserved invariants, design rationale,
+constraints, or validation expectations that are not recoverable from code and
+tests alone, that context should be documented before or as part of the change.
+For net-new areas, add repository documentation once the surface area,
+complexity, or maintenance risk is high enough that future readers would
+otherwise need to reconstruct important reasoning from PRs, issue threads, or
+oral history.
+
 ## Definition
 
 Repository documentation is the subset of information a future reader needs to
@@ -255,8 +266,9 @@ code. Common shapes include:
 
 - `README.md` for the package-level index
 - `<feature>.md` for a single combined feature document
-- `<feature>-design.md` or `<feature>-maintainers.md` when user-facing and
-  maintainer-facing material are split
+- `<feature>-architecture.md`, `<feature>-concepts.md`, or
+  `<feature>-maintainers.md` when user-facing and maintainer-facing material
+  are split
 - `validation.md` or similar for cross-cutting topics within an area
 
 The exact filename matters less than making the document easy to find and easy
@@ -273,9 +285,17 @@ reachability. The convention is:
 - if a document is not linked from any README, it is effectively orphaned
 
 In practice, when adding a new document, also add a link to it from the
-appropriate README. When moving or renaming a document, update inbound links.
-Treat broken or missing inbound links the same way you would treat an
-unreferenced symbol in code.
+appropriate README. For cross-cutting documentation under `docs/`,
+`docs/README.md` is the index for that subtree. Every top-level document in
+`docs/` should be linked from `docs/README.md`, and subdirectories under
+`docs/` that contain multiple documents should usually have their own
+`README.md` linking the documents in that area. Particularly important
+cross-cutting documents may also be linked from the repository root
+`README.md`, but `docs/README.md` is the minimum required index.
+
+When moving or renaming a document, update inbound links. Treat broken or
+missing inbound links the same way you would treat an unreferenced symbol in
+code.
 
 When exploring or modifying an unfamiliar area of the repository, readers and
 agents should start with the nearest README, then follow its links to the more
@@ -369,6 +389,13 @@ kept current with the code it describes, and a precondition for safe
 modification. Modifying code whose maintenance rationale is missing or
 stale carries the same kind of risk as modifying untested code, and
 should prompt the same response: document first, then change.
+
+Apply that rule proportionally here as well. If a change is purely mechanical
+and does not alter behavior, constraints, rationale, or validation
+expectations, a documentation update may not be needed. If the change relies
+on or changes durable context that a future maintainer would need in order to
+review or evolve the area safely, updating the repository documentation is part
+of doing the change correctly.
 
 When moving, consolidating, or shortening existing documentation, do not treat
 that refactor as permission to discard durable maintenance rationale. The live
