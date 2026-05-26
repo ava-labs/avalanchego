@@ -179,7 +179,7 @@ func (s *SUT) assertUTXOsExist(tb testing.TB, peerChainID ids.ID, want ...*avax.
 }
 
 // assertUTXOsMissing asserts that the shared memory between peerChainID and the
-// C-Chain does not contain any of the expected UTXOs.
+// C-Chain does not contain any of the unwanted UTXOs.
 func (s *SUT) assertUTXOsMissing(tb testing.TB, peerChainID ids.ID, unwanted ...*avax.UTXO) {
 	tb.Helper()
 
