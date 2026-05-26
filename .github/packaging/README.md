@@ -1,39 +1,50 @@
-# RPM packaging
+# Linux Packaging for AvalancheGo
 
 ## Overview
 
-This directory contains the RPM packaging implementation for AvalancheGo and
-Subnet-EVM.
+This directory contains the Linux packaging implementation for `avalanchego` and
+`subnet-evm`:
 
-It exists to ship signed RPMs for RHEL 9.x-compatible systems without making
-future maintainers reconstruct the packaging model from CI YAML and shell
-scripts alone.
+- RPM packages for RHEL 9.x-compatible systems
+- DEB packages for Ubuntu 22.04 (jammy) and 24.04 (noble)
 
-This document is for two audiences:
+Packages are built with `nfpm` inside per-format builder containers, signed with
+GPG, and validated by installing the built packages in fresh target-distro
+containers. Non-PR workflow runs upload packages and exported public keys as
+GitHub Actions artifacts; DEB release runs also publish Ubuntu S3 assets.
 
-- **users/release engineers** who need to build or publish RPMs
-- **maintainers** who need to change the packaging implementation safely
+This document is the canonical packaging design note for the repository. It is
+for release engineers who build or publish packages and maintainers who need to
+change the packaging implementation safely.
 
 ## Usage
 
 ### What gets produced
 
-The packaging pipeline builds two RPMs per architecture:
+The packaging pipeline builds two packages per format and architecture:
 
-| Package | Installed path |
-| --- | --- |
-| `avalanchego` | `/var/opt/avalanchego/bin/avalanchego` |
-| `subnet-evm` | `/var/opt/avalanchego/plugins/<VM_ID>` |
+| Format | Package | Installed path | Dependency floor |
+| --- | --- | --- | --- |
+| RPM | `avalanchego` | `/var/opt/avalanchego/bin/avalanchego` | `glibc >= 2.34` |
+| RPM | `subnet-evm` | `/var/opt/avalanchego/plugins/<VM_ID>` | `glibc >= 2.34` |
+| DEB | `avalanchego` | `/usr/local/bin/avalanchego` | `libc6 (>= 2.35)` |
+| DEB | `subnet-evm` | `/usr/local/lib/avalanchego/plugins/<VM_ID>` | `libc6 (>= 2.35)` |
 
-Both packages declare `glibc >= 2.34`.
+`<VM_ID>` is sourced from `graft/subnet-evm/scripts/constants.sh`.
 
 ### Main entrypoints
 
-- CI workflow: `.github/workflows/build-rpm-release.yml`
+- RPM workflow: `.github/workflows/build-rpm-release.yml`
+- DEB workflow: `.github/workflows/build-deb-release.yml`
 - Packaging taskfile: `.github/packaging/Taskfile.yml`
-- Build script: `.github/packaging/scripts/build-rpm.sh`
-- Validation script: `.github/packaging/scripts/validate-rpm.sh`
-- nfpm package definitions: `.github/packaging/nfpm/*.yml`
+- Build script: `.github/packaging/scripts/build-package.sh`
+- Validation scripts:
+  - `.github/packaging/scripts/validate-rpm.sh`
+  - `.github/packaging/scripts/validate-deb.sh`
+- `nfpm` package definitions: `.github/packaging/nfpm/*.yml`
+- Builder images:
+  - `.github/packaging/Dockerfile.rpm`
+  - `.github/packaging/Dockerfile.deb`
 
 ### Local build and validation
 
@@ -43,106 +54,131 @@ Build and validate the full RPM pipeline locally with:
 ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-rpms
 ```
 
+Build and validate the full DEB pipeline locally with:
+
+```bash
+./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-debs
+```
+
 Or, via the root Taskfile include:
 
 ```bash
 task packaging:test-build-rpms
+task packaging:test-build-debs
 ```
 
 Useful environment variables:
 
-- `PACKAGING_TAG` - tag/version label to embed, defaults to `v0.0.0`
-- `RPM_GPG_KEY_FILE` - real signing key for non-ephemeral signing
-- `NFPM_RPM_PASSPHRASE` - passphrase for the signing key
+- `PACKAGING_TAG` - tag/version label to embed; defaults to `v0.0.0` for local
+  testing
+- `PACKAGE_ARCH` - package architecture override (`x86_64`/`aarch64` for RPM,
+  `amd64`/`arm64` for DEB); defaults to the host architecture mapped to the
+  package format
+- `GPG_KEY_FILE` - private signing key file; empty means generate/reuse an
+  ephemeral local key
+- `GPG_KEY_PASSPHRASE` - passphrase for `GPG_KEY_FILE`; mirrored internally to
+  the `NFPM_<FORMAT>_PASSPHRASE` variable expected by `nfpm`
 
-Without `RPM_GPG_KEY_FILE`, the build generates a short-lived ephemeral GPG key
-so that local and PR builds still exercise the signing path.
+Without `GPG_KEY_FILE`, the build generates a short-lived ephemeral RSA key with
+a known throwaway passphrase. This keeps local and PR builds exercising the same
+signing path used by release builds without requiring release credentials.
 
-### CI behavior
+## CI behavior
 
-`.github/workflows/build-rpm-release.yml` runs in three modes:
+`.github/workflows/build-rpm-release.yml` and
+`.github/workflows/build-deb-release.yml` run in three modes:
 
-- **tag push** - builds release RPMs for the pushed tag
-- **workflow_dispatch** - builds RPMs for an explicitly provided tag
+- **tag push** - builds release packages for the pushed tag
+- **workflow_dispatch** - builds packages for an explicitly provided tag
 - **pull_request** - smoke-tests the packaging pipeline for changes under
   `.github/packaging/` or the workflow itself
 
 PR builds use a synthetic tag (`v0.0.0-pr.<sha>`) and ephemeral signing.
-Non-PR builds import the real RPM signing key from Actions secrets and upload
-RPMs plus the exported public key as artifacts.
+Non-PR builds import the real signing key from Actions secrets and upload
+packages plus the exported public key as artifacts.
+
+The exported public key names are format-specific:
+
+- `RPM-GPG-KEY-avalanchego`
+- `DEB-GPG-KEY-avalanchego`
+
+DEB release runs additionally upload packages to S3 under
+`linux/debs/ubuntu/{jammy,noble}/{arch}/`; the DEB public key is uploaded to
+`linux/debs/ubuntu/{jammy,noble}/` because one signing key serves all
+architectures of a release.
 
 ## Conceptual model
 
-The RPM pipeline intentionally treats packaging as a layer *around* the source
-release tree rather than as part of the historical release tree itself.
+The packaging pipeline treats packaging as a layer around the source release
+tree rather than as part of the historical release tree itself.
 
 The model is:
 
 1. Check out the source revision being packaged
-2. Build inside a Rocky Linux 9 container so the binary links against glibc 2.34
-3. Package with `nfpm`
-4. Sign the RPMs
-5. Validate by installing the built RPMs into a fresh Rocky Linux 9 container
+2. Overlay the current `.github/packaging` implementation for manual tag builds
+   when the requested tag may predate packaging support
+3. Build inside a target-distro container so the binary links against the right
+   glibc floor
+4. Package with `nfpm`
+5. Sign the package inline with `nfpm`
+6. Validate by installing the package in a fresh target-distro container and
+   running smoke tests
 
-This directory is code-adjacent because the implementation lives here:
-Dockerfile, task entrypoints, package manifests, and shell scripts all evolve
-together.
+This directory is code-adjacent because the Dockerfiles, task entrypoints,
+package manifests, workflow glue, and shell scripts all evolve together.
 
 Two architecture naming schemes are in play and must stay aligned:
 
-| Context | x86_64 | arm64 |
-| --- | --- | --- |
-| `uname -m` / RPM | `x86_64` | `aarch64` |
-| Docker / Go downloads | `amd64` | `arm64` |
+| `uname -m` | Docker `TARGETARCH` / Go downloads | RPM arch | DEB arch |
+| --- | --- | --- | --- |
+| `x86_64` | `amd64` | `x86_64` | `amd64` |
+| `arm64` / `aarch64` | `arm64` | `aarch64` | `arm64` |
 
-The Taskfile normalizes host architecture to RPM names; the Dockerfile maps
-Docker `TARGETARCH` values to the names expected by upstream downloads.
+The Taskfile normalizes host architecture to package-format names; the
+Dockerfiles use Docker's `TARGETARCH` values for Go and `nfpm` downloads.
 
 ## Maintenance notes
 
-### Why the build uses Rocky Linux 9
+### Why the builds use target-distro containers
 
-The packaging target is RHEL 9.x-compatible systems, so builds run in a
+RPMs target RHEL 9.x-compatible systems, so RPM builds run in a
 `rockylinux:9` container and produce binaries linked against glibc 2.34.
-Building on the default GitHub runner image would instead link against the host
-Ubuntu glibc, which is too new for the intended target.
 
-Current supported architectures are:
+DEBs target Ubuntu jammy as the oldest supported Ubuntu release, so DEB builds
+run in an `ubuntu:22.04` container and produce binaries linked against glibc
+2.35.
 
-- `x86_64`
-- `aarch64`
+Building on the default GitHub runner image would link against the runner's
+Ubuntu glibc, which may be newer than the intended target runtime.
 
-### Why the workflow overlays `.github/packaging` for manual tag builds
+### Why workflows overlay `.github/packaging` for manual tag builds
 
-`workflow_dispatch` accepts an arbitrary tag, including tags created before RPM
-packaging existed in this repository.
+`workflow_dispatch` accepts an arbitrary tag, including tags created before this
+packaging implementation existed in the repository.
 
 Those older tags may not contain:
 
 - `.github/packaging/`
-- the current packaging scripts and nfpm manifests
-- the current packaging Dockerfile and helper logic
+- the current packaging scripts and `nfpm` manifests
+- the current packaging Dockerfiles and helper logic
 
-To keep manual rebuilds of older releases possible, the workflow first checks
-out the requested tag as the source tree and then overlays `.github/packaging`
-from the workflow branch:
+To keep manual rebuilds of older releases possible, workflows first check out
+the requested tag as the source tree and then overlay `.github/packaging` from
+the workflow branch:
 
 1. `actions/checkout` of the requested tag into the workspace root
 2. second sparse checkout of `.github/packaging` into `.packaging-overlay`
-3. copy overlay contents into `.github/packaging` in the tagged tree
+3. replace the tagged tree's `.github/packaging` with the overlay contents
 4. run the current packaging pipeline against the historical source
 
-This is intentionally narrow: it overlays **only the packaging implementation**,
+This is intentionally narrow: it overlays only the packaging implementation,
 not the rest of the branch. That lets maintainers improve packaging logic over
 time while still packaging historical source revisions.
 
-#### Implications for maintainers
-
 When changing `.github/packaging`, keep in mind that `workflow_dispatch` may run
-those scripts against trees that predate the packaging feature.
-
-Changes are safer when they depend only on repository interfaces that already
-exist across the intended release range, such as:
+those scripts against trees that predate the packaging feature. Changes are
+safer when they depend only on repository interfaces that already exist across
+the intended release range, such as:
 
 - `scripts/build.sh`
 - `scripts/constants.sh`
@@ -155,34 +191,41 @@ document the cutoff explicitly in this README and in the workflow change.
 
 ### Signing behavior
 
-RPMs are always built through the signing path.
+RPMs and DEBs are always built through the signing path.
 
 - **CI release/manual builds** import the real private key from
   `secrets.RPM_GPG_PRIVATE_KEY`
-- **local and PR builds** generate an ephemeral RSA key with no passphrase
+- **local and PR builds** generate an ephemeral RSA key with a known throwaway
+  passphrase
 
-This is deliberate: unsigned fast paths tend to rot, while always exercising the
-signing path keeps packaging validation closer to what is shipped.
+Release events (tag push and `workflow_dispatch`) fail fast in
+`workflow-setup-packaging.sh` when no signing key is configured, so a
+misconfigured release cannot silently fall back to the ephemeral key.
 
-The build exports `RPM-GPG-KEY-avalanchego` next to the RPMs so validation and
-consumers can import the matching public key.
+The build exports the matching public key next to the packages so validation and
+consumers can import it.
 
 ### Validation strategy
 
-The main validation entrypoint is `test-build-rpms`, which:
+The main validation entrypoints are `test-build-rpms` and `test-build-debs`.
+They:
 
-1. builds both RPMs
-2. starts a fresh `rockylinux:9` container
-3. imports the public key
-4. verifies RPM signatures
-5. installs both RPMs
-6. runs smoke tests on the installed binaries
+1. build both `avalanchego` and `subnet-evm` packages
+2. start a fresh target-distro container
+3. import the exported public key
+4. verify package signatures
+5. install both packages
+6. run smoke tests on the installed binaries
+
+RPM validation runs in `rockylinux:9`. DEB validation runs in both
+`ubuntu:22.04` and `ubuntu:24.04`.
 
 The smoke tests intentionally check a small set of high-value invariants:
 
-- the RPM can be installed on the target distro base
+- the package can be installed on the target distro base
 - signature verification works
-- `avalanchego --version` runs and contains the built commit hash
+- `avalanchego --version` runs and starts with `avalanchego/`
+- `avalanchego --version` contains the git commit hash captured during the build
 - the Subnet-EVM plugin is installed at the expected VM-ID-derived path
 - the plugin binary also reports the expected commit hash
 
@@ -192,27 +235,27 @@ artifacts for the target runtime.
 
 ### Binary linking rationale
 
-The current approach prefers **dynamic glibc linking** over static musl linking.
-This part of the design is worth documenting in more detail because future
-maintainers are likely to revisit alternative linking strategies, and the
+The current approach prefers dynamic glibc linking over static musl linking.
+Future maintainers are likely to revisit alternative linking strategies, and the
 trade-offs are not recoverable from the packaging scripts alone.
 
 #### Problem the packaging layer is solving
 
-We need to ship RPMs for RHEL-family systems, but CI runners normally build on
-Ubuntu. Different distros ship different glibc versions, so a dynamically linked
-binary built against a newer Ubuntu glibc may not run on an older RHEL-family
-system. The packaging pipeline therefore builds inside `rockylinux:9` so the
-result targets glibc 2.34, which matches the current deployment baseline.
+We need to ship Linux packages for RHEL-family systems and Ubuntu, while general
+CI runs mostly on Ubuntu. Different distros ship different glibc versions, so a
+dynamically linked binary built against a newer Ubuntu glibc may not run on an
+older target distro. The packaging pipeline therefore builds inside target-distro
+containers so each package targets the oldest supported glibc for that format.
 
 #### Why dynamic glibc is the current choice
 
-- glibc compatibility is the practical constraint for RHEL-family deployment
+- glibc compatibility is the practical constraint for the supported Linux
+  package targets
 - glibc avoids taking on musl-specific performance and compatibility risk for a
   performance-sensitive node binary
 - Go race-detector workflows remain compatible with glibc-based builds
 - binaries linked against older glibc generally run on newer glibc releases,
-  which is the compatibility direction we want for a RHEL 9 baseline
+  which is the compatibility direction we want for each package baseline
 
 #### Why not static musl right now
 
@@ -225,8 +268,8 @@ still live unless new evidence says otherwise:
 - musl's smaller default thread stacks have caused surprises in other CGO-heavy
   projects
 - Go's race detector does not work with musl, which would complicate validation
-- the Firewood/FFI side of the build has historically been more naturally aligned
-  with `*-linux-gnu` targets than with a musl packaging path
+- the Firewood/FFI side of the build has historically been more naturally
+  aligned with `*-linux-gnu` targets than with a musl packaging path
 - we do not have a dedicated performance validation loop that would confidently
   catch musl-induced regressions before release
 
@@ -244,17 +287,16 @@ than the current dynamic-glibc approach.
 
 #### Container builds are the current stopgap
 
-Building in `rockylinux:9` is the current way to target the correct glibc.
-That does leave a residual maintenance concern: broad CI on Ubuntu is not the
-same thing as testing the final release binary on the exact same runtime used
-for packaging. The RPM smoke tests reduce that gap by verifying installation,
-signatures, and basic execution on Rocky Linux 9, but they are not a substitute
-for full release-path parity.
+Building in `rockylinux:9` and `ubuntu:22.04` is the current way to target the
+correct glibc floors. That leaves a residual maintenance concern: broad CI on
+Ubuntu is not the same thing as testing the final release binary on the exact
+same runtime used for packaging. Package smoke tests reduce that gap by
+verifying installation, signatures, and basic execution on target distro
+containers, but they are not a substitute for full release-path parity.
 
-The maintenance implication is that future changes should not assume the
-current packaging smoke tests fully eliminate host-vs-release-runtime
-divergence. They are a pragmatic guardrail, not proof that the entire release
-artifact path has become runtime-agnostic.
+Future changes should not assume the current packaging smoke tests fully
+eliminate host-vs-release-runtime divergence. They are a pragmatic guardrail,
+not proof that the entire release artifact path has become runtime-agnostic.
 
 #### Longer-term direction: hermetic Bazel toolchain
 
@@ -263,12 +305,12 @@ The longer-term direction is still a hermetic Bazel toolchain that can make
 plumbing. The key design idea is that build and test should use the same glibc
 baseline regardless of the host runner image.
 
-Earlier design work also identified some likely rough edges for anyone revisiting
+Earlier design work also identified likely rough edges for anyone revisiting
 that path, including Rust/CGO coordination, toolchain-selection bugs around
 non-default targets, and third-party native dependencies that may need extra
 Bazel integration work. The important point for repository documentation is not
-that each of those historical details must remain exhaustive forever, but that
-"move release builds into Bazel" is not a trivial mechanical swap.
+that each historical detail must remain exhaustive forever, but that "move
+release builds into Bazel" is not a trivial mechanical swap.
 
 Future maintainers revisiting this area should treat the current container build
 as a practical bridge, not necessarily the final architecture.
@@ -279,7 +321,7 @@ This section records alternative approaches that help explain the current design
 and may be relevant when future maintainers revisit packaging decisions:
 
 - **Build on the default GitHub runner** - this risks linking against a newer
-  host glibc than the target RHEL-family systems provide.
+  host glibc than the target distributions provide.
 - **Switch to static musl for portability** - this trades away known and
   still-relevant performance, CGO, and validation properties without current
   evidence that the trade is safe.
@@ -295,10 +337,13 @@ If you change this area, preserve these unless you are intentionally revisiting
 the design:
 
 - RPMs install under `/var/opt/avalanchego/...`
+- DEBs install under `/usr/local/...`
 - Subnet-EVM installs under the VM ID from
   `graft/subnet-evm/scripts/constants.sh`
-- release builds target glibc 2.34 / Rocky Linux 9 compatibility
+- RPM release builds target glibc 2.34 / Rocky Linux 9 compatibility
+- DEB release builds target glibc 2.35 / Ubuntu 22.04 compatibility
 - the same pipeline path is used for both local smoke testing and CI builds
+- package signatures are always produced and validated
 - manual tag builds continue to package historical source trees via the overlay
   mechanism, unless a documented compatibility cutoff is introduced
 
@@ -306,7 +351,8 @@ the design:
 
 The current design should be reconsidered if any of these change:
 
-- the supported Linux distribution baseline moves away from RHEL 9.x / glibc 2.34
+- the supported Linux distribution baselines move away from RHEL 9.x / glibc
+  2.34 or Ubuntu 22.04 / glibc 2.35
 - Bazel becomes the canonical release build path and can unify build and test
   against the same glibc baseline
 - packaging needs to cover more historical tags than the current repository
@@ -314,17 +360,21 @@ The current design should be reconsidered if any of these change:
 - performance or compatibility data makes static linking newly attractive
 - historical rebuild compatibility is no longer a requirement, or a documented
   cutoff replaces the current overlay behavior
-- release distribution needs move beyond GitHub Actions artifacts
+- release distribution needs move beyond GitHub Actions artifacts and the
+  current DEB S3 layout
 
 ## References
 
 ### Repository entrypoints
 
-- Workflow: `/.github/workflows/build-rpm-release.yml`
+- RPM workflow: `/.github/workflows/build-rpm-release.yml`
+- DEB workflow: `/.github/workflows/build-deb-release.yml`
 - Taskfile: `/.github/packaging/Taskfile.yml`
-- Builder image: `/.github/packaging/Dockerfile`
-- Build script: `/.github/packaging/scripts/build-rpm.sh`
-- Validation script: `/.github/packaging/scripts/validate-rpm.sh`
+- RPM builder image: `/.github/packaging/Dockerfile.rpm`
+- DEB builder image: `/.github/packaging/Dockerfile.deb`
+- Build script: `/.github/packaging/scripts/build-package.sh`
+- RPM validation script: `/.github/packaging/scripts/validate-rpm.sh`
+- DEB validation script: `/.github/packaging/scripts/validate-deb.sh`
 - Root task include: `/Taskfile.yml`
 
 ### Maintainer background for revisiting linking choices
@@ -338,8 +388,8 @@ The important background to preserve is:
 - **musl is not just a portability shortcut** - it changes allocator/runtime
   behavior in ways that may matter for a performance-sensitive, multithreaded,
   CGO-using node process
-- **musl changes the validation surface** - in particular, Go's race detector
-  is not available in the same way it is for the current glibc-based build/test
+- **musl changes the validation surface** - in particular, Go's race detector is
+  not available in the same way it is for the current glibc-based build/test
   path
 - **static glibc is not a free escape hatch** - it still requires deliberate
   compatibility validation and introduces its own libc caveats
