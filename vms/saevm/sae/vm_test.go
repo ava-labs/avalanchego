@@ -610,6 +610,55 @@ func TestCanCreateContractSoftError(t *testing.T) {
 	assert.Equalf(t, uint64(1), sdb.GetNonce(sut.wallet.Addresses()[0]), "%T.GetNonce([sender]) after blocked contract creation", sdb)
 }
 
+func TestMinGasConsumptionFloor(t *testing.T) {
+	const (
+		highLimit     uint64 = 1_000_000
+		lowLimit      uint64 = params.TxGas
+		gasFeeCap     int64  = 1 // makes effectiveGasPrice == 1, so debit == gasUsed
+		transferValue uint64 = 42
+	)
+	expectedFloor := hook.MinimumGasConsumption(highLimit)
+
+	ctx, sut := newSUT(t, 1)
+
+	// Register after newSUT so genesis runs with default hooks. The floor only
+	// needs to apply to user txs.
+	stub := &libevmhookstest.Stub{MinimumGasConsumptionFn: hook.MinimumGasConsumption}
+	stub.Register(t)
+
+	sender := sut.wallet.Addresses()[0]
+	recipient := common.Address{0xaa}
+
+	preBalance := sut.stateAt(t, sut.genesis.PostExecutionStateRoot()).GetBalance(sender)
+
+	highLimitTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &recipient,
+		Gas:       highLimit,
+		GasFeeCap: big.NewInt(gasFeeCap),
+		Value:     new(big.Int).SetUint64(transferValue),
+	})
+	lowLimitTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &recipient,
+		Gas:       lowLimit,
+		GasFeeCap: big.NewInt(gasFeeCap),
+	})
+
+	b := sut.runConsensusLoop(t, highLimitTx, lowLimitTx)
+	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+	require.Lenf(t, b.Receipts(), 2, "%T.Receipts()", b)
+
+	highReceipt, lowReceipt := b.Receipts()[0], b.Receipts()[1]
+	require.Equal(t, types.ReceiptStatusSuccessful, highReceipt.Status)
+	require.Equal(t, types.ReceiptStatusSuccessful, lowReceipt.Status)
+
+	assert.Equal(t, expectedFloor, highReceipt.GasUsed, "high-limit tx must be charged the floor")
+	assert.Equal(t, lowLimit, lowReceipt.GasUsed, "low-limit tx must be unaffected")
+
+	postBalance := sut.stateAt(t, b.PostExecutionStateRoot()).GetBalance(sender)
+	want := new(uint256.Int).Sub(preBalance, uint256.NewInt(transferValue+expectedFloor+lowLimit))
+	assert.Equal(t, want, postBalance, "sender balance reflects the gas floor")
+}
+
 // TestCustomTransactionInclusion verifies that block building includes custom
 // transactions.
 func TestCustomTransactionInclusion(t *testing.T) {
