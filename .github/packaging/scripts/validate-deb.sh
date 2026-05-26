@@ -5,18 +5,12 @@
 # Validates locally-built DEBs by running fresh Ubuntu containers for both
 # jammy (22.04) and noble (24.04): verify the nFPM-native _gpgorigin
 # signature, install the package, and run the smoke test.
-#
-# Required env vars:
-#   TAG            - Git tag (e.g., "v1.14.1")
-#   GIT_COMMIT     - Full git commit hash used to build the binaries
-#
-# Optional env vars:
-#   PACKAGE_ARCH   - DEB architecture ("amd64" or "arm64"), defaults to host
 
 set -euo pipefail
 
-: "${TAG:?TAG must be set}"
-: "${GIT_COMMIT:?GIT_COMMIT must be set}"
+: "${TAG:?TAG must be set (Git tag, e.g. v1.14.1)}"
+: "${GIT_COMMIT:?GIT_COMMIT must be set (full git commit hash used to build the binaries)}"
+: "${PACKAGE_ARCH:?PACKAGE_ARCH must be set (amd64 or arm64)}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEB_DIR="${REPO_ROOT}/build/deb"
@@ -24,10 +18,7 @@ SCRIPTS_DIR="${REPO_ROOT}/.github/packaging/scripts"
 
 # shellcheck disable=SC1091
 source "${SCRIPTS_DIR}/lib-build-common.sh"
-# shellcheck disable=SC1091
-source "${SCRIPTS_DIR}/lib-validate-common.sh"
 
-detect_host_arch DEB
 resolve_subnet_evm_vm_id
 
 assert_files_exist "${DEB_DIR}" \
@@ -67,13 +58,14 @@ for UBUNTU_IMAGE in ubuntu:22.04 ubuntu:24.04; do
                 rm -rf "${workdir}"
             }
 
-            if [[ -f /debs/DEB-GPG-KEY-avalanchego ]]; then
-                gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
-                verify_deb_signature "/debs/avalanchego-${TAG}-${PACKAGE_ARCH}.deb"
-                verify_deb_signature "/debs/subnet-evm-${TAG}-${PACKAGE_ARCH}.deb"
-            else
-                echo "Skipping GPG verification (unsigned build)"
+            # Import GPG key and verify signatures (always produced by the build).
+            if [[ ! -f /debs/DEB-GPG-KEY-avalanchego ]]; then
+                echo "ERROR: DEB-GPG-KEY-avalanchego not found; build did not export a key" >&2
+                exit 1
             fi
+            gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
+            verify_deb_signature "/debs/avalanchego-${TAG}-${PACKAGE_ARCH}.deb"
+            verify_deb_signature "/debs/subnet-evm-${TAG}-${PACKAGE_ARCH}.deb"
 
             dpkg -i "/debs/avalanchego-${TAG}-${PACKAGE_ARCH}.deb"
             dpkg -i "/debs/subnet-evm-${TAG}-${PACKAGE_ARCH}.deb"

@@ -1,20 +1,6 @@
 #!/usr/bin/env bash
 
 # Build and sign a Linux package with nfpm inside the container.
-#
-# Required env vars:
-#   NFPM_PACKAGER  - nfpm packager: "rpm" or "deb"
-#   PACKAGE        - "avalanchego" or "subnet-evm"
-#   VERSION        - Semantic version without "v" prefix (e.g., "1.14.1")
-#   TAG            - Git tag (e.g., "v1.14.1")
-#   PACKAGE_ARCH   - Architecture (x86_64/aarch64 for RPM, amd64/arm64 for DEB)
-#   OUTPUT_DIR     - Directory for the output package (bind-mounted from host)
-#
-# Optional env vars:
-#   GPG_KEY_FILE        - Path to GPG private key
-#   GPG_KEY_PASSPHRASE  - Passphrase for the GPG key (re-exported internally
-#                         to nfpm's NFPM_<FORMAT>_PASSPHRASE)
-#   AVALANCHEGO_COMMIT  - Git commit hash (auto-detected if not set)
 
 set -euo pipefail
 
