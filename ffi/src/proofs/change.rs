@@ -241,7 +241,7 @@ pub extern "C" fn fwd_db_verify_change_proof<'db>(
     proof: Option<&ChangeProofContext>,
     args: CreateChangeProofArgs<'_>,
 ) -> crate::ProposalResult<'db> {
-    let handle = db.and_then(|db| proof.map(|p| (db, p)));
+    let handle = db.zip(proof);
     crate::invoke_with_handle(handle, |(db, ctx)| {
         let proof = ctx
             .proof()
@@ -277,7 +277,7 @@ pub extern "C" fn fwd_db_verify_and_commit_change_proof(
     proof: Option<&ChangeProofContext>,
     args: CreateChangeProofArgs<'_>,
 ) -> HashResult {
-    let handle = db.and_then(|db| proof.map(|p| (db, p)));
+    let handle = db.zip(proof);
     crate::invoke_with_handle(handle, |(db, ctx)| {
         let proof = ctx
             .proof()

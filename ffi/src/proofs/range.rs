@@ -381,7 +381,7 @@ pub extern "C" fn fwd_db_verify_range_proof<'db>(
         max_length,
     } = args;
 
-    let handle = db.and_then(|db| proof.map(|p| (db, p)));
+    let handle = db.zip(proof);
 
     crate::invoke_with_handle(handle, |(db, ctx)| {
         let start_key = start_key.into_option();
@@ -439,7 +439,7 @@ pub extern "C" fn fwd_db_verify_and_commit_range_proof<'db>(
         max_length,
     } = args;
 
-    let handle = db.and_then(|db| proof.map(|p| (db, p)));
+    let handle = db.zip(proof);
 
     crate::invoke_with_handle(handle, |(db, ctx)| {
         let start_key = start_key.into_option();

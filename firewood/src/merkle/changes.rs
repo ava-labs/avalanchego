@@ -852,7 +852,7 @@ mod tests {
                 index += 1;
             }
         }
-        assert!(index == batch_sorted.len());
+        assert_eq!(index, batch_sorted.len());
 
         // Third test that just skips the children after calling `next` once. This should skip all of
         // the children of the root node, causing the next call to `next` to return None.

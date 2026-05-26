@@ -217,7 +217,7 @@ fn test_missing_key_proof() {
     for key in ["a", "j", "l", "z"] {
         let proof = merkle.prove(key.as_ref()).unwrap();
         assert!(!proof.is_empty());
-        assert!(proof.len() == 1);
+        assert_eq!(proof.len(), 1);
 
         proof.verify(key, None::<&[u8]>, &root_hash).unwrap();
     }

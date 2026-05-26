@@ -1531,7 +1531,7 @@ mod tests {
 
         let err = node_store.persist(&mut header).unwrap_err();
         let err_ctx = err.context();
-        assert!(err_ctx == Some("allocate_node"));
+        assert_eq!(err_ctx, Some("allocate_node"));
 
         let io_err = err
             .source()
