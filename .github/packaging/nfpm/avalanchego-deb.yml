@@ -6,7 +6,7 @@ description: "AvalancheGo node — the official Avalanche protocol implementatio
 homepage: "https://github.com/ava-labs/avalanchego"
 license: "BSD-3-Clause"
 depends:
-  - "libc6 (>= 2.34)"
+  - "libc6 (>= 2.35)"
 contents:
   - src: "${BINARY_PATH}"
     dst: /usr/local/bin/avalanchego
