@@ -1074,6 +1074,7 @@ func TestBlockSources(t *testing.T) {
 	settled := sut.runConsensusLoop(t)
 	vmTime.advanceToSettle(ctx, t, settled)
 	unsettled := sut.runConsensusLoop(t)
+	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
 
 	verified := sut.createAndVerifyBlock(t, unsettled)
 	unverified := sut.buildAndParseBlock(t, unwrap(t, verified))
