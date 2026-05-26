@@ -92,34 +92,40 @@ even in compressed form.
 
 ### What this looks like in practice
 
-A concrete example of a document written against this guide is
-[`tests/fixture/tmpnet/topology.md`](../tests/fixture/tmpnet/topology.md).
-The excerpts below are drawn from it and mapped to each layer.
+A concrete example of a document written in the style this guide recommends is
+[`.github/packaging/README.md`](../.github/packaging/README.md). It is a useful
+example because it documents not just how to use the RPM packaging flow, but also
+the design constraints and maintenance rationale a future maintainer would need
+to change it intentionally.
 
-- **Why it exists** - open with the problem, not the solution:
+The document maps cleanly to the four layers:
 
-  > The default behavior assumes a largely colocated network. Topology
-  > support exists for tests that need a declared, persistent connectivity
-  > layout between groups of nodes rather than uniform local behavior.
+- **Why it exists** - the overview explains that the directory exists to ship
+  signed RPMs for RHEL 9.x-compatible systems *without making future maintainers
+  reconstruct the packaging model from CI YAML and shell scripts alone.* That is
+  exactly the sort of durable motivation repository documentation should
+  preserve.
 
-- **How to use it** - a "For users" section covering what the feature does,
-  when to use it, and the current support and limits, including explicit
-  non-goals (e.g., "dynamic topology mutation after network start").
+- **How to use it** - the usage sections identify the produced artifacts, the
+  main entrypoints, local build/validation commands, and CI behavior.  A reader
+  who just needs to build or validate RPMs can stop there and still succeed.
 
-- **How to think about it** - a single sentence is often enough to anchor
-  the mental model:
+- **How to think about it** - the conceptual model section explains that the RPM
+  packaging code is kept separate from the source tree being packaged rather
+  than treated as something that must already exist in each historical release
+  tag. It also calls out the architecture-name mapping between RPM conventions
+  and Docker/Go conventions. Those are important details that are not obvious
+  from individual scripts alone.
 
-  > Topology is modeled as a property of the **network**, not of an
-  > individual node, because it describes relationships between sets of
-  > nodes.
+- **How to change it safely** - the maintenance notes preserve why builds run in
+  Rocky Linux 9, why manual tag builds overlay only `.github/packaging`, why the
+  signing path is always exercised, why dynamic glibc is the current linking
+  choice, what alternatives were considered, which invariants should be
+  preserved, and what assumptions would justify revisiting the design.
 
-- **How to change it safely** - a "For maintainers" section recording why
-  realization is restricted to one runtime today, why latency is the chosen
-  impairment, and what assumptions would justify revisiting either decision.
-
-The document is not exhaustive in any layer. It records what a future reader
-would not be able to recover from the code alone, and leaves the rest to the
-code and tests.
+The document is not exhaustive in any layer. It records the parts that would be
+expensive to rediscover from code and CI configuration alone, and leaves the rest
+to the implementation.
 
 ## Scope
 
@@ -232,7 +238,7 @@ When deciding whether to keep rationale about an explored path, ask: if a future
 maintainer proposed an obvious alternative here, would the repository docs
 explain why that might be wrong? If not, the rationale may still be missing.
 
-Preserve durable reasoning, not process exhaust.
+Preserve durable reasoning, not step-by-step history.
 
 ## Location and naming
 
@@ -355,8 +361,8 @@ Update it when work changes:
 - the best entrypoint for future readers
 
 This is especially important when work is split across multiple agent sessions
-or issue boundaries. The document becomes a stable memory surface for the code
-or workflow itself, rather than a per-task handoff note.
+or issue boundaries. The document becomes a shared record for the code or
+workflow itself, rather than a per-task handoff note.
 
 Documentation should be maintained like tests, and treated like tests:
 kept current with the code it describes, and a precondition for safe
