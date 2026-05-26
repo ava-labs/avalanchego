@@ -5,6 +5,7 @@
 package gastime
 
 import (
+	"errors"
 	"math"
 	"time"
 
@@ -53,6 +54,8 @@ func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time,
 	return FromProxyTime(tm, startingExcess, c)
 }
 
+var errZeroTarget = errors.New("zero target not allowed")
+
 // FromProxyTime returns a new [Time] derived from the provided [proxytime.Time].
 // The provided time MUST have a rate corresponding to the target.
 func FromProxyTime(tm *proxytime.Time[gas.Gas], excess gas.Gas, c GasPriceConfig) (*Time, error) {
@@ -64,7 +67,10 @@ func FromProxyTime(tm *proxytime.Time[gas.Gas], excess gas.Gas, c GasPriceConfig
 		excess = 0
 	}
 
-	target := clampTarget(tm.Rate() / TargetToRate)
+	target := tm.Rate() / TargetToRate
+	if target == 0 {
+		return nil, errZeroTarget
+	}
 	t := &Time{
 		Time:   tm,
 		target: target,

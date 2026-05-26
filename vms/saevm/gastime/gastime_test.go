@@ -125,6 +125,13 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestNewZeroTarget(t *testing.T) {
+	tm := proxytime.Of[gas.Gas](time.Unix(0, 0))
+	tm.SetRate(0)
+	_, err := FromProxyTime(tm, 0, DefaultGasPriceConfig())
+	require.ErrorIs(t, err, errZeroTarget)
+}
+
 func TestExcess(t *testing.T) {
 	const rate = gas.Gas(3.2e6)
 	tm := mustNew(t, time.Unix(42, 0), rate/2, 0, DefaultGasPriceConfig())
