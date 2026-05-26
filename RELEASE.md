@@ -64,13 +64,73 @@ Updating the Rust MSRV requires edits in two places:
 just release-step-update-rust-dependencies
 ```
 
-See the note in [justfile] about how the `cargo upgrade --incompatible` may fail
-if dependency upgrades require code changes. If significant changes are needed
-to resolve the dependency issues, do that in a separate step from release.
+The recipe runs `cargo upgrade`, `cargo upgrade --incompatible`, `cargo update
+--verbose`, and the test suite to verify nothing broke.
+
+Crates listed under `[patch.crates-io]` in `Cargo.toml` reference specific git
+revisions and cannot be upgraded through the registry. Exclude them explicitly
+when running `cargo upgrade`:
+
+```shell
+cargo upgrade --exclude <patched-crate-name>
+```
+
+Check `[patch.crates-io]` in `Cargo.toml` to see the current set of patched
+crates. Update them separately by adjusting the revision in `Cargo.toml` and
+opening a dedicated PR.
+
+If an incompatible upgrade requires code changes that are out of scope for the
+release, exclude it and track the work in a new GitHub issue:
+
+```shell
+cargo upgrade --incompatible --exclude <dependency-name>
+```
+
+Open an issue titled `chore(deps): upgrade <dependency-name> to <version>`.
 
 ### Go Dependencies
 
 Go dependencies are updated on an as-needed basis, usually for security.
+
+## Versioning Policy
+
+Firewood follows [Semantic Versioning](https://semver.org/). While the major
+version is 0, a minor-version bump signals breaking changes and a patch-version
+bump signals non-breaking changes.
+
+### Crates with public API guarantees
+
+| Crate | Public interface |
+| ----- | ---------------- |
+| `firewood` | Rust API |
+| `firewood-storage` | Rust API |
+| `firewood-ffi` | C ABI, metrics schema, database file format |
+| `firewood-go` (via `firewood-go-ethhash`) | Go module API |
+| `fwdctl` | CLI flags and config file format |
+
+Tag pull requests with the appropriate `breaking-change/<crate>` label when the
+change breaks the public interface. `git cliff` reads these labels via the GitHub
+API and marks affected entries in the CHANGELOG automatically.
+
+### Crates without public API guarantees
+
+`firewood-macros`, `firewood-benchmark`, `firewood-replay`, and `firewood-triehash`
+have no stability guarantees. `firewood-triehash` is a test helper pinned at its
+current version; do not bump it during workspace releases.
+
+### Determining whether a change is breaking
+
+Use [`cargo-semver-checks`](https://github.com/obi1kenobi/cargo-semver-checks)
+to detect Rust API-level breaking changes in `firewood` and `firewood-storage`.
+This check is **informational and inconclusive in the negative direction**: a
+passing result does not guarantee compatibility, because it does not cover
+metrics names, file format, behavioral guarantees, or C ABI stability.
+
+### firewood-go-ethhash versioning
+
+The Go module at `ava-labs/firewood-go-ethhash` tracks `firewood-ffi`. When
+`firewood-ffi` is bumped to `v0.6.0`, CI tags `firewood-go-ethhash` at
+`ffi/v0.6.0`.
 
 ## Package Version
 
@@ -117,14 +177,22 @@ is correct and reflects the new package versions.
 
 ## Changelog
 
-To build the changelog, see git-cliff.org. Short version:
-
-```sh
+```shell
 just release-step-refresh-changelog v0.1.1
 ```
 
-where `v0.1.1` is the newest tag. This is a required paramter to ensure the
-changelog has the correct headers.
+`git cliff` generates the full `CHANGELOG.md` by reading commits since the
+previous tag. It also fetches PR metadata from the GitHub API, so export a
+`GITHUB_TOKEN` with read access to the repository before running:
+
+```shell
+export GITHUB_TOKEN=<your-token>
+just release-step-refresh-changelog v0.1.1
+```
+
+Breaking changes are detected automatically from both conventional commit
+syntax (`feat!:`, `BREAKING CHANGE:` footer) and PR labels (`breaking-change/*`).
+No manual edits to `CHANGELOG.md` are needed or expected.
 
 ## Commit
 
@@ -147,19 +215,50 @@ have irrelevant changes on future releases.
 
 ## Publish
 
-To trigger a release, push a tag to the main branch matching the new version,
+### Tag the release
 
-```sh
-# be sure to switch back to the main branch before tagging
+Switch to the updated `main` branch and push a signed, annotated tag:
+
+```shell
 git checkout main
 git pull --prune
 git tag -s -a v0.1.1 -m 'Release v0.1.1'
 git push origin v0.1.1
 ```
 
-for `v0.1.1` for the merged version change. The CI will automatically publish a
-draft release which consists of release notes and changes (see
-[.github/workflows/release.yaml](.github/workflows/release.yaml)).
+### What CI does automatically
+
+Pushing the tag triggers three automated jobs:
+
+1. **Draft GitHub release** ([`.github/workflows/release.yaml`](.github/workflows/release.yaml)):
+   Creates a draft release with auto-generated notes. Do not act yet — publish
+   the draft manually (see below) to trigger the crates.io workflow.
+
+2. **firewood-go-ethhash publish** ([`.github/workflows/attach-static-libs.yaml`](.github/workflows/attach-static-libs.yaml)):
+   Builds the `firewood-ffi` static library for each supported target, pushes
+   the result to `ava-labs/firewood-go-ethhash`, and tags it `ffi/v0.1.1`.
+   This typically takes 10–15 minutes.
+
+### Publish the draft release (manual step)
+
+The crates.io workflow does **not** run until the GitHub release is published.
+
+1. Go to <https://github.com/ava-labs/firewood/releases>.
+2. Find the draft (labelled **Draft**).
+3. Click the pencil icon (**Edit**).
+4. Review the auto-generated notes and add any missing context.
+5. Scroll to the bottom and click **Publish release**.
+
+### After publishing the release
+
+Publishing triggers the crates.io workflow ([`.github/workflows/publish.yaml`](.github/workflows/publish.yaml)),
+which obtains a short-lived OIDC token from crates.io (trusted publishing is
+pre-configured for this workflow) and publishes each crate in topological
+dependency order, automatically skipping:
+
+- Crates whose current version is already published.
+- Crates that transitively depend on a `[patch.crates-io]` git reference
+  (crates.io rejects non-registry dependencies).
 
 ## Milestone
 
