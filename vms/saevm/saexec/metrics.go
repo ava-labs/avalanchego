@@ -3,9 +3,7 @@
 
 package saexec
 
-import (
-	"github.com/prometheus/client_golang/prometheus"
-)
+import "github.com/prometheus/client_golang/prometheus"
 
 // LastExecutedHeightName names the gauge for the height of the last block
 // that completed async execution.
