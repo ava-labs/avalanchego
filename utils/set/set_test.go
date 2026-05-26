@@ -124,7 +124,7 @@ func TestUnionOf(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := UnionOf(tt.elements...)
-			require.Equal(t, tt.expected, s)
+			require.Equalf(t, tt.expected, s, "UnionOf(%v)", tt.elements)
 		})
 	}
 }
