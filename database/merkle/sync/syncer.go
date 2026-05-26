@@ -42,8 +42,7 @@ var (
 	ErrAlreadyClosed                  = errors.New("Syncer is closed")
 	ErrNoRangeProofMarshalerProvided  = errors.New("range proof marshaler is a required field of the sync config")
 	ErrNoChangeProofMarshalerProvided = errors.New("change proof marshaler is a required field of the sync config")
-	ErrNoRangeProofClientProvided     = errors.New("range proof client is a required field of the sync config")
-	ErrNoChangeProofClientProvided    = errors.New("change proof client is a required field of the sync config")
+	ErrNoProofClientProvided          = errors.New("proof client is a required field of the sync config")
 	ErrNoDatabaseProvided             = errors.New("sync database is a required field of the sync config")
 	ErrNoLogProvided                  = errors.New("log is a required field of the sync config")
 	ErrZeroWorkLimit                  = errors.New("simultaneous work limit must be greater than 0")
@@ -51,7 +50,7 @@ var (
 	errInvalidRangeProof              = errors.New("failed to verify range proof")
 	errInvalidChangeProof             = errors.New("failed to verify change proof")
 	errTooManyBytes                   = errors.New("response contains more than requested bytes")
-	errUnexpectedChangeProofResponse  = errors.New("unexpected response type")
+	errUnexpectedResponseType         = errors.New("unexpected response type")
 )
 
 type priority byte
@@ -147,8 +146,7 @@ type Syncer[R any, C any] struct {
 type Config[R any, C any] struct {
 	RangeProofMarshaler   Marshaler[R]
 	ChangeProofMarshaler  Marshaler[C]
-	RangeProofClient      *p2p.Client
-	ChangeProofClient     *p2p.Client
+	ProofClient           *p2p.Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
@@ -168,10 +166,8 @@ func NewSyncer[R any, C any](
 		return nil, ErrNoRangeProofMarshalerProvided
 	case config.ChangeProofMarshaler == nil:
 		return nil, ErrNoChangeProofMarshalerProvided
-	case config.RangeProofClient == nil:
-		return nil, ErrNoRangeProofClientProvided
-	case config.ChangeProofClient == nil:
-		return nil, ErrNoChangeProofClientProvided
+	case config.ProofClient == nil:
+		return nil, ErrNoProofClientProvided
 	case config.Log == nil:
 		return nil, ErrNoLogProvided
 	case config.SimultaneousWorkLimit == 0:
@@ -403,13 +399,16 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	request := &pb.GetChangeProofRequest{
+	changeReq := &pb.ChangeProofRequest{
 		StartRootHash: work.localRootID[:],
 		EndRootHash:   targetRootID[:],
 		StartKey:      protoutils.MaybeToProto(work.start),
 		EndKey:        protoutils.MaybeToProto(work.end),
 		KeyLimit:      DefaultRequestKeyLimit,
 		BytesLimit:    DefaultRequestByteSizeLimit,
+	}
+	request := &pb.ProofRequest{
+		Request: &pb.ProofRequest_ChangeProof{ChangeProof: changeReq},
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -422,7 +421,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		defer s.finishWorkItem()
 
-		if err := s.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
+		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, err); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
@@ -430,7 +429,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		}
 	}
 
-	if err := s.sendRequest(ctx, s.config.ChangeProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
@@ -456,12 +455,15 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	request := &pb.GetRangeProofRequest{
+	rangeReq := &pb.RangeProofRequest{
 		RootHash:   targetRootID[:],
 		StartKey:   protoutils.MaybeToProto(work.start),
 		EndKey:     protoutils.MaybeToProto(work.end),
 		KeyLimit:   DefaultRequestKeyLimit,
 		BytesLimit: DefaultRequestByteSizeLimit,
+	}
+	request := &pb.ProofRequest{
+		Request: &pb.ProofRequest_RangeProof{RangeProof: rangeReq},
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -474,7 +476,7 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
 		defer s.finishWorkItem()
 
-		if err := s.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
+		if err := s.handleRangeProofResponse(ctx, targetRootID, work, rangeReq, responseBytes, appErr); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
@@ -482,7 +484,7 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		}
 	}
 
-	if err := s.sendRequest(ctx, s.config.RangeProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
@@ -552,7 +554,7 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
-	request *pb.GetRangeProofRequest,
+	request *pb.RangeProofRequest,
 	responseBytes []byte,
 	err error,
 ) error {
@@ -560,7 +562,13 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(responseBytes)
+	var response pb.ProofResponse
+	if err := proto.Unmarshal(responseBytes, &response); err != nil {
+		return err
+	}
+
+	// A change proof returned is unexpected.
+	rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(response.GetRangeProof())
 	if err != nil {
 		return err
 	}
@@ -596,7 +604,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
-	request *pb.GetChangeProofRequest,
+	request *pb.ChangeProofRequest,
 	responseBytes []byte,
 	err error,
 ) error {
@@ -604,8 +612,8 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		return err
 	}
 
-	var changeProofResp pb.GetChangeProofResponse
-	if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
+	var response pb.ProofResponse
+	if err := proto.Unmarshal(responseBytes, &response); err != nil {
 		return err
 	}
 
@@ -616,10 +624,10 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		return err
 	}
 
-	switch changeProofResp := changeProofResp.Response.(type) {
-	case *pb.GetChangeProofResponse_ChangeProof:
+	switch response := response.Response.(type) {
+	case *pb.ProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
-		changeProof, err := s.config.ChangeProofMarshaler.Unmarshal(changeProofResp.ChangeProof)
+		changeProof, err := s.config.ChangeProofMarshaler.Unmarshal(response.ChangeProof)
 		if err != nil {
 			return err
 		}
@@ -642,8 +650,8 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		}
 
 		s.completeWorkItem(work, nextKey, targetRootID)
-	case *pb.GetChangeProofResponse_RangeProof:
-		rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(changeProofResp.RangeProof)
+	case *pb.ProofResponse_RangeProof:
+		rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(response.RangeProof)
 		if err != nil {
 			return err
 		}
@@ -672,7 +680,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 	default:
 		return fmt.Errorf(
 			"%w: %T",
-			errUnexpectedChangeProofResponse, changeProofResp,
+			errUnexpectedResponseType, response,
 		)
 	}
 
