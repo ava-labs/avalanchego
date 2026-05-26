@@ -24,12 +24,6 @@ vars:
         arm64)  echo "aarch64" ;;
         *)      echo "${arch}" ;;
       esac
-  # Git commit hash, resolved on host (container may not have .git for worktrees).
-  PACKAGING_GIT_COMMIT:
-    sh: git rev-parse HEAD
-  # Default tag for local testing; overridden by CI for release builds.
-  PACKAGING_TAG:
-    sh: echo "${PACKAGING_TAG:-v0.0.0}"
   # Map uname -m to DEB arch names (x86_64 -> amd64).
   PACKAGING_DEB_HOST_ARCH:
     sh: |
@@ -39,6 +33,11 @@ vars:
         aarch64|arm64) echo "arm64" ;;
         *)             echo "${arch}" ;;
       esac
+  # Git commit hash, resolved on host (container may not have .git for worktrees).
+  PACKAGING_GIT_COMMIT:
+    sh: git rev-parse HEAD
+  # Default tag for local testing; overridden by CI for release builds.
+  PACKAGING_TAG: '{{env "PACKAGING_TAG" | default "v0.0.0"}}'
   PACKAGING_RPM_DOCKER_IMAGE: avalanchego-rpm-builder
   PACKAGING_DEB_DOCKER_IMAGE: avalanchego-deb-builder
   PACKAGING_RPM_OUTPUT_DIR: '{{.REPO_ROOT}}/build/rpm'
@@ -50,28 +49,58 @@ tasks:
     silent: true
     cmd: task --list | grep packaging
 
-  build-rpms:
-    desc: Builds RPMs for both avalanchego and subnet-evm
+  build-avalanchego-deb:
+    desc: Builds DEB for avalanchego
+    vars:
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_DEB_HOST_ARCH}}'
+    deps: [build-deb-builder-docker-image]
     cmds:
-      - task: build-avalanchego-rpm
-      - task: build-subnet-evm-rpm
+      - task: build-package
+        vars:
+          PACKAGE: avalanchego
+          NFPM_PACKAGER: deb
+          TAG: '{{.PACKAGING_TAG}}'
+          PACKAGE_ARCH: '{{.PACKAGE_ARCH}}'
+          OUTPUT_DIR: '{{.PACKAGING_DEB_OUTPUT_DIR}}'
+          DOCKER_IMAGE: '{{.PACKAGING_DEB_DOCKER_IMAGE}}'
+          GPG_KEY_FILE: '{{.GPG_KEY_FILE | default ""}}'
 
-  build-rpm-builder-docker-image:
-    desc: Builds the RPM builder Docker image
+  build-avalanchego-rpm:
+    desc: Builds RPM for avalanchego
+    vars:
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
+    deps: [build-rpm-builder-docker-image]
+    cmds:
+      - task: build-package
+        vars:
+          PACKAGE: avalanchego
+          NFPM_PACKAGER: rpm
+          TAG: '{{.PACKAGING_TAG}}'
+          PACKAGE_ARCH: '{{.PACKAGE_ARCH}}'
+          OUTPUT_DIR: '{{.PACKAGING_RPM_OUTPUT_DIR}}'
+          DOCKER_IMAGE: '{{.PACKAGING_RPM_DOCKER_IMAGE}}'
+          GPG_KEY_FILE: '{{.GPG_KEY_FILE | default ""}}'
+
+  build-deb-builder-docker-image:
+    desc: Builds the DEB builder Docker image
     internal: true
     env:
       GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
-      DOCKER_IMAGE: '{{.PACKAGING_RPM_DOCKER_IMAGE}}'
+      DOCKER_IMAGE: '{{.PACKAGING_DEB_DOCKER_IMAGE}}'
       CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
-      DOCKERFILE: Dockerfile.rpm
+      DOCKERFILE: Dockerfile.deb
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/build-builder-image.sh'
+
+  build-debs:
+    desc: Builds DEBs for both avalanchego and subnet-evm
+    cmds:
+      - task: build-avalanchego-deb
+      - task: build-subnet-evm-deb
 
   build-package:
     desc: Builds a package in the supplied builder Docker image
     internal: true
-    vars:
-      PASSPHRASE_ENV: 'NFPM_{{.NFPM_PACKAGER | upper}}_PASSPHRASE'
     env:
       GPG_KEY_PASSPHRASE: '{{.GPG_KEY_PASSPHRASE}}'
       VERSION: '{{trimPrefix "v" .TAG}}'
@@ -95,26 +124,43 @@ tasks:
           {{.DOCKER_IMAGE}}
           .github/packaging/scripts/build-package.sh
 
-  build-avalanchego-rpm:
-    desc: Builds RPM for avalanchego
+  build-rpm-builder-docker-image:
+    desc: Builds the RPM builder Docker image
+    internal: true
+    env:
+      GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
+      DOCKER_IMAGE: '{{.PACKAGING_RPM_DOCKER_IMAGE}}'
+      CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
+      DOCKERFILE: Dockerfile.rpm
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/build-builder-image.sh'
+
+  build-rpms:
+    desc: Builds RPMs for both avalanchego and subnet-evm
+    cmds:
+      - task: build-avalanchego-rpm
+      - task: build-subnet-evm-rpm
+
+  build-subnet-evm-deb:
+    desc: Builds DEB for subnet-evm
     vars:
-      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .RPM_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
-    deps: [build-rpm-builder-docker-image]
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_DEB_HOST_ARCH}}'
+    deps: [build-deb-builder-docker-image]
     cmds:
       - task: build-package
         vars:
-          PACKAGE: avalanchego
-          NFPM_PACKAGER: rpm
+          PACKAGE: subnet-evm
+          NFPM_PACKAGER: deb
           TAG: '{{.PACKAGING_TAG}}'
           PACKAGE_ARCH: '{{.PACKAGE_ARCH}}'
-          OUTPUT_DIR: '{{.PACKAGING_RPM_OUTPUT_DIR}}'
-          DOCKER_IMAGE: '{{.PACKAGING_RPM_DOCKER_IMAGE}}'
+          OUTPUT_DIR: '{{.PACKAGING_DEB_OUTPUT_DIR}}'
+          DOCKER_IMAGE: '{{.PACKAGING_DEB_DOCKER_IMAGE}}'
           GPG_KEY_FILE: '{{.GPG_KEY_FILE | default ""}}'
 
   build-subnet-evm-rpm:
     desc: Builds RPM for subnet-evm
     vars:
-      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .RPM_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
     deps: [build-rpm-builder-docker-image]
     cmds:
       - task: build-package
@@ -125,72 +171,6 @@ tasks:
           PACKAGE_ARCH: '{{.PACKAGE_ARCH}}'
           OUTPUT_DIR: '{{.PACKAGING_RPM_OUTPUT_DIR}}'
           DOCKER_IMAGE: '{{.PACKAGING_RPM_DOCKER_IMAGE}}'
-          GPG_KEY_FILE: '{{.GPG_KEY_FILE | default ""}}'
-
-  test-build-rpms:
-    desc: Builds and validates RPMs end-to-end
-    cmds:
-      - task: build-rpms
-      - task: validate-rpms
-
-  validate-rpms:
-    desc: Validates built RPMs by installing and smoke testing in a fresh container
-    env:
-      TAG: '{{.PACKAGING_TAG}}'
-      GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
-      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
-    cmds:
-      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-rpm.sh'
-
-  # ── DEB packaging tasks ──────────────────────────────────────────
-
-  build-debs:
-    desc: Builds DEBs for both avalanchego and subnet-evm
-    cmds:
-      - task: build-avalanchego-deb
-      - task: build-subnet-evm-deb
-
-  build-deb-builder-docker-image:
-    desc: Builds the DEB builder Docker image
-    internal: true
-    env:
-      GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
-      DOCKER_IMAGE: '{{.PACKAGING_DEB_DOCKER_IMAGE}}'
-      CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
-      DOCKERFILE: Dockerfile.deb
-    cmds:
-      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/build-builder-image.sh'
-
-  build-avalanchego-deb:
-    desc: Builds DEB for avalanchego
-    vars:
-      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .DEB_ARCH | default .PACKAGING_DEB_HOST_ARCH}}'
-    deps: [build-deb-builder-docker-image]
-    cmds:
-      - task: build-package
-        vars:
-          PACKAGE: avalanchego
-          NFPM_PACKAGER: deb
-          TAG: '{{.PACKAGING_TAG}}'
-          PACKAGE_ARCH: '{{.PACKAGE_ARCH}}'
-          OUTPUT_DIR: '{{.PACKAGING_DEB_OUTPUT_DIR}}'
-          DOCKER_IMAGE: '{{.PACKAGING_DEB_DOCKER_IMAGE}}'
-          GPG_KEY_FILE: '{{.GPG_KEY_FILE | default ""}}'
-
-  build-subnet-evm-deb:
-    desc: Builds DEB for subnet-evm
-    vars:
-      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .DEB_ARCH | default .PACKAGING_DEB_HOST_ARCH}}'
-    deps: [build-deb-builder-docker-image]
-    cmds:
-      - task: build-package
-        vars:
-          PACKAGE: subnet-evm
-          NFPM_PACKAGER: deb
-          TAG: '{{.PACKAGING_TAG}}'
-          PACKAGE_ARCH: '{{.PACKAGE_ARCH}}'
-          OUTPUT_DIR: '{{.PACKAGING_DEB_OUTPUT_DIR}}'
-          DOCKER_IMAGE: '{{.PACKAGING_DEB_DOCKER_IMAGE}}'
           GPG_KEY_FILE: '{{.GPG_KEY_FILE | default ""}}'
 
   test-build-debs:
@@ -198,6 +178,12 @@ tasks:
     cmds:
       - task: build-debs
       - task: validate-debs
+
+  test-build-rpms:
+    desc: Builds and validates RPMs end-to-end
+    cmds:
+      - task: build-rpms
+      - task: validate-rpms
 
   validate-debs:
     desc: Validates built DEBs by installing and smoke testing in fresh containers
@@ -207,3 +193,12 @@ tasks:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_DEB_HOST_ARCH}}'
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-deb.sh'
+
+  validate-rpms:
+    desc: Validates built RPMs by installing and smoke testing in a fresh container
+    env:
+      TAG: '{{.PACKAGING_TAG}}'
+      GIT_COMMIT: '{{.PACKAGING_GIT_COMMIT}}'
+      PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_RPM_HOST_ARCH}}'
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-rpm.sh'
