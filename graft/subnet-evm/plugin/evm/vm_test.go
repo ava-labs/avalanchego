@@ -3711,9 +3711,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 				require.NoError(t, err)
 				t.Cleanup(client.Close)
 
-				for i := range numBlocks {
-					blockNum := uint64(i + 1)
-
+				for blockNum := uint64(0); blockNum <= numBlocks; blockNum++ {
 					// Checking the sender's nonce (which should equal the block number)
 					// verifies that the reconstructed state is both openable and correct.
 					nonce, err := client.NonceAt(ctx, testEthAddrs[0], new(big.Int).SetUint64(blockNum))
