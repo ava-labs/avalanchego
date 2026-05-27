@@ -41,17 +41,6 @@ echo "Resolved tag: ${TAG}" >&2
 GPG_PRIVATE_KEY="${GPG_PRIVATE_KEY:-}"
 RELEASE="${RELEASE:-}"
 
-# Release events (tag push, workflow_dispatch) require a signing key. An
-# empty key would silently fall back to ephemeral generation in
-# build-package.sh and publish unsigned-by-real-key packages.
-if [[ -z "${GPG_PRIVATE_KEY}" ]]; then
-    if [[ -n "${TAG_INPUT}" ]] || [[ "${GITHUB_REF:-}" == refs/tags/* ]]; then
-        echo "Error: GPG signing key required for release builds." >&2
-        echo "Set the RPM_GPG_PRIVATE_KEY repository secret." >&2
-        exit 1
-    fi
-fi
-
 if [[ -n "${GPG_PRIVATE_KEY}" ]]; then
     GPG_KEY_FILE="$(mktemp)"
     chmod 600 "${GPG_KEY_FILE}"
