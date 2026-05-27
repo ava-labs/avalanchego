@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
@@ -36,7 +37,6 @@ import (
 
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
-	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var _ hook.PointsG[*hookTx] = (*hooks)(nil)
@@ -153,7 +153,7 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (*hooks) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
+func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
 	return nil
 }
 
@@ -207,7 +207,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		&customtypes.HeaderExtra{
 			// Prior to SAE, ExtDataGasUsed included the gas cost of the
 			// cross-chain transactions. However, with SAE, the gas cost is
-			// included in [types.Header.GasUsed] through with [hook.Op.Gas].
+			// included in [types.Header.GasUsed] with [hook.Op.Gas].
 			ExtDataGasUsed: big.NewInt(0),
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost: big.NewInt(0),
