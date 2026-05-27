@@ -155,11 +155,21 @@ func targetExcess(h *types.Header) acp176.TargetExcess {
 	return 0
 }
 
-func (*hooks) SettledHeight(h *types.Header) uint64 {
-	if s := customtypes.GetHeaderExtra(h).SettledHeight; s != nil {
-		return *s
+func (*hooks) SettledBy(h *types.Header) hook.Settled {
+	e := customtypes.GetHeaderExtra(h)
+	return hook.Settled{
+		Height:       maybe(e.SettledHeight),
+		GasUnix:      maybe(e.SettledGasUnix),
+		GasNumerator: maybe(e.SettledGasNumerator),
+		Excess:       maybe(e.SettledExcess),
 	}
-	return 0
+}
+
+func maybe[T any](p *T) T {
+	if p != nil {
+		return *p
+	}
+	return utils.Zero[T]()
 }
 
 func (*hooks) BlockTime(h *types.Header) time.Time {
@@ -403,7 +413,7 @@ func (b *builder) BuildBlock(
 	ethTxs []*types.Transaction,
 	receipts []*types.Receipt,
 	avaxTxs []*hookTx,
-	settledHeight uint64,
+	settled hook.Settled,
 ) (*types.Block, error) {
 	if len(ethTxs) == 0 && len(avaxTxs) == 0 {
 		return nil, errEmptyBlock
@@ -430,7 +440,10 @@ func (b *builder) BuildBlock(
 	header.Extra = customheader.SetPredicateBytesInExtra(rulesExtra.AvalancheRules, header.Extra, predicateBytes)
 
 	headerExtra := customtypes.GetHeaderExtra(header)
-	headerExtra.SettledHeight = &settledHeight
+	headerExtra.SettledHeight = &settled.Height
+	headerExtra.SettledGasUnix = &settled.GasUnix
+	headerExtra.SettledGasNumerator = &settled.GasNumerator
+	headerExtra.SettledExcess = &settled.Excess
 	return customtypes.NewBlockWithExtData(
 		header,
 		ethTxs,
