@@ -207,7 +207,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		&customtypes.HeaderExtra{
 			// Prior to SAE, ExtDataGasUsed included the gas cost of the
 			// cross-chain transactions. However, with SAE, the gas cost is
-			// included in [types.Header.GasUsed] through with [hook.Op.Gas].
+			// included in [types.Header.GasUsed] with [hook.Op.Gas].
 			ExtDataGasUsed: big.NewInt(0),
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost: big.NewInt(0),
