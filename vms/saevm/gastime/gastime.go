@@ -5,6 +5,7 @@
 package gastime
 
 import (
+	"errors"
 	"math"
 	"time"
 
@@ -42,25 +43,38 @@ type Time struct {
 // New returns a new [Time], derived from a [time.Time]. The consumption of
 // `target` * [TargetToRate] units of [gas.Gas] is equivalent to a tick of 1
 // second.
+//
+// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
+// meaningfully provide. We should instead take in startingPrice.
 func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time, error) {
-	if err := c.Validate(); err != nil {
-		return nil, err
-	}
-
 	tm := proxytime.Of[gas.Gas](at)
 	target = clampTarget(target)
 	tm.SetRate(rateOf(target))
 
-	// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
-	// meaningfully provide. We should instead take in startingPrice.
-	if c.StaticPricing {
-		startingExcess = 0
+	return FromProxyTime(tm, startingExcess, c)
+}
+
+var errZeroTarget = errors.New("zero target not allowed")
+
+// FromProxyTime returns a new [Time] derived from the provided [proxytime.Time].
+// The provided time MUST have a rate corresponding to the target.
+func FromProxyTime(tm *proxytime.Time[gas.Gas], excess gas.Gas, c GasPriceConfig) (*Time, error) {
+	if err := c.Validate(); err != nil {
+		return nil, err
 	}
 
+	if c.StaticPricing {
+		excess = 0
+	}
+
+	target := tm.Rate() / TargetToRate
+	if target == 0 {
+		return nil, errZeroTarget
+	}
 	t := &Time{
 		Time:   tm,
 		target: target,
-		excess: startingExcess,
+		excess: excess,
 		config: c,
 	}
 	t.enforceMinExcess()

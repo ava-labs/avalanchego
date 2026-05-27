@@ -15,10 +15,12 @@ ARG TARGETARCH
 
 # Install build dependencies
 # - gcc: required for cgo (CGO_ENABLED=1 in scripts/constants.sh)
+# - gettext: envsubst for nfpm config template expansion
 # - gnupg2: GPG signing of RPM packages
 # - git: version detection in build scripts
 RUN dnf install -y \
         gcc \
+        gettext \
         gnupg2 \
         git \
     && dnf clean all

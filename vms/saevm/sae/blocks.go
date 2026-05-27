@@ -175,7 +175,7 @@ func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	if got, want := lastSettled.PostExecutionStateRoot(), b.SettledStateRoot(); got != want {
 		return fmt.Errorf("%w: got %#x ; want %#x", errSettledRootMismatch, got, want)
 	}
-	if got, want := lastSettled.NumberU64(), vm.hooks.SettledHeight(header); got != want {
+	if got, want := lastSettled.NumberU64(), vm.hooks.SettledBy(header).Height; got != want {
 		return fmt.Errorf("%w: got %d ; want %d", errSettledHeightMismatch, got, want)
 	}
 	if err := b.SetAncestors(parent, lastSettled); err != nil {
