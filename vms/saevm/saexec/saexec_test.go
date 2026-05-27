@@ -465,9 +465,7 @@ func TestGasAccounting(t *testing.T) {
 	ctx, sut := newSUT(t, withHooks(hooks))
 
 	at := func(blockTime, txs uint64, rate gas.Gas) *proxytime.Time[gas.Gas] {
-		tm := proxytime.New[gas.Gas](blockTime, rate)
-		tm.Tick(gas.Gas(txs) * gasPerTx)
-		return tm
+		return proxytime.New[gas.Gas](blockTime, gas.Gas(txs)*gasPerTx, rate)
 	}
 
 	// If this fails then all of the tests need to be adjusted. This is cleaner
