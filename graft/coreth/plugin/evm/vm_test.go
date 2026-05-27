@@ -2283,6 +2283,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 
 				client, err := ethclient.Dial(server.URL)
 				require.NoError(t, err)
+				t.Cleanup(client.Close)
 
 				for i := range numBlocks {
 					blockNum := uint64(i + 1)
