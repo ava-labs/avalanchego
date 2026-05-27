@@ -122,9 +122,9 @@ func (*hooks) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	}
 }
 
-func (*hooks) SettledHeight(*types.Header) uint64 {
+func (*hooks) SettledBy(*types.Header) hook.Settled {
 	// TODO(StephenButtolph): Extract from the header.
-	return 0
+	return hook.Settled{}
 }
 
 func (*hooks) BlockTime(h *types.Header) time.Time {
@@ -316,7 +316,7 @@ func (*builder) BuildBlock(
 	ethTxs []*types.Transaction,
 	receipts []*types.Receipt,
 	avaxTxs []*hookTx,
-	settledHeight uint64,
+	settled hook.Settled,
 ) (*types.Block, error) {
 	txs := make([]*tx.Tx, len(avaxTxs))
 	for i, avaxTx := range avaxTxs {
@@ -329,8 +329,8 @@ func (*builder) BuildBlock(
 
 	// TODO(StephenButtolph): Encode warp predicate results in the header.
 	_ = blockCtx
-	// TODO(StephenButtolph): Encode settledHeight in the block.
-	_ = settledHeight
+	// TODO(StephenButtolph): Encode settled in the block.
+	_ = settled
 	// TODO(StephenButtolph): Verify the extDataHash matches the hash of extData
 	// during parsing.
 	return customtypes.NewBlockWithExtData(
