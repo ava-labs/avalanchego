@@ -109,6 +109,76 @@ func TestReconstructedRevisions(t *testing.T) {
 	}
 }
 
+// TestReconstructedCopyTrie verifies that CopyTrie on a reconstructed account
+// trie returns a usable, independent trie.
+func TestReconstructedCopyTrie(t *testing.T) {
+	db := newTestDatabase(t)
+
+	trie, err := db.OpenTrie(types.EmptyRootHash)
+	require.NoError(t, err)
+
+	var (
+		addr    = common.HexToAddress("1234")
+		balance = uint256.NewInt(100)
+	)
+
+	// Commit an initial revision so we can open a reconstructed view on top.
+	require.NoError(t, trie.UpdateAccount(addr, &types.StateAccount{Balance: balance}))
+	initialRoot, _, err := trie.Commit(true)
+	require.NoError(t, err)
+
+	require.NoError(t, db.TrieDB().Update(
+		initialRoot,
+		types.EmptyRootHash,
+		0,
+		nil,
+		nil,
+		stateconf.WithTrieDBUpdatePayload(common.Hash{}, common.Hash{1})),
+	)
+	require.NoError(t, db.TrieDB().Commit(initialRoot, true))
+
+	tdb := db.TrieDB().Backend().(*TrieDB)
+	rev, err := tdb.Firewood.LatestRevision()
+	require.NoError(t, err)
+
+	recon, err := rev.Reconstruct(nil)
+	require.NoError(t, err)
+	require.NoError(t, rev.Drop())
+	t.Cleanup(func() {
+		require.NoError(t, recon.Drop())
+	})
+
+	reconDB, err := NewReconstructedStateAccessor(db, recon, true /* computeRootOnHash */)
+	require.NoError(t, err)
+
+	// Create the reconstructed trie to compare against.
+	reconTrie, err := reconDB.OpenTrie(initialRoot)
+	require.NoError(t, err)
+
+	// CopyTrie returns a non-nil trie if successful.
+	copiedReconTrie := reconDB.CopyTrie(reconTrie)
+	require.NotNil(t, copiedReconTrie)
+
+	copiedRecon, ok := copiedReconTrie.(*reconstructedAccountTrie)
+	require.True(t, ok)
+	t.Cleanup(func() {
+		require.NoError(t, copiedRecon.recon.Drop())
+	})
+
+	// Verify that the copied trie's state matches that of the original.
+	gotAccount, err := copiedReconTrie.GetAccount(addr)
+	require.NoError(t, err)
+	require.Equal(t, balance, gotAccount.Balance)
+
+	// Mutate only the copy.
+	require.NoError(t, copiedReconTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(200)}))
+	copiedReconTrieRoot := copiedReconTrie.Hash()
+	reconTrieRoot := reconTrie.Hash()
+
+	// Verify that mutating the copy did not mutate the original reconstructed trie.
+	require.NotEqual(t, reconTrieRoot, copiedReconTrieRoot)
+}
+
 // TestReconstructedRevisionHashing verifies computeRootOnHash=false only
 // flushes writes without computing the reconstructed root.
 func TestReconstructedRevisionHashing(t *testing.T) {
