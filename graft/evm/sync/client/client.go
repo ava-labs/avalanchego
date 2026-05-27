@@ -361,6 +361,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 			response, err = c.network.SendSyncedAppRequest(ctx, nodeID, requestBytes)
 		}
 		metric.UpdateRequestLatency(time.Since(start))
+		c.pt.RegisterRequest(nodeID)
 
 		if err != nil {
 			logCtx := make([]any, 0, 8)

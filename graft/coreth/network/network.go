@@ -484,14 +484,6 @@ func (n *network) Size() uint32 {
 	return uint32(n.peers.Size())
 }
 
-func (n *network) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {
-	n.peers.RegisterResponse(nodeID, bandwidth)
-}
-
-func (n *network) RegisterFailure(nodeID ids.NodeID) {
-	n.peers.RegisterFailure(nodeID)
-}
-
 // SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 // Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 // the request should be retried.

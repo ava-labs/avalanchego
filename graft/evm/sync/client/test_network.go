@@ -26,15 +26,20 @@ type testNetwork struct {
 	callback       func() // callback is called prior to processing each test call
 	requestErr     []error
 	nodesRequested []ids.NodeID
+
+	peerTracker *p2p.PeerTracker
 }
 
 // PeerTracker returns a new empty peer tracker.
-func (*testNetwork) PeerTracker() *p2p.PeerTracker {
-	pt, err := p2p.NewPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry(), set.Set[ids.NodeID]{}, nil)
-	if err != nil {
-		panic(err)
+func (t *testNetwork) PeerTracker() *p2p.PeerTracker {
+	if t.peerTracker == nil {
+		pt, err := p2p.NewPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry(), set.Set[ids.NodeID]{}, nil)
+		if err != nil {
+			panic(err)
+		}
+		t.peerTracker = pt
 	}
-	return pt
+	return t.peerTracker
 }
 
 func (*testNetwork) P2PNetwork() *p2p.Network {

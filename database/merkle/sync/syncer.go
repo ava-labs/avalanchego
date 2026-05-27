@@ -51,6 +51,7 @@ var (
 	errInvalidChangeProof             = errors.New("failed to verify change proof")
 	errTooManyBytes                   = errors.New("response contains more than requested bytes")
 	errUnexpectedResponseType         = errors.New("unexpected response type")
+	errNoPeersAvailable               = errors.New("no peers available")
 )
 
 type priority byte
@@ -499,10 +500,10 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	s.metrics.RequestMade()
 }
 
-type appResponseCallbackWithCheck func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, err error) bool
+type appResponseCallbackWithResult func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, err error) bool
 
 // toAppResponseCallback wraps the callback, discarding the bool return value.
-func (c appResponseCallbackWithCheck) toAppResponseCallback() p2p.AppResponseCallback {
+func (c appResponseCallbackWithResult) toAppResponseCallback() p2p.AppResponseCallback {
 	return func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
 		_ = c(ctx, nodeID, responseBytes, err)
 	}
@@ -512,7 +513,7 @@ func (s *Syncer[_, _]) sendRequest(
 	ctx context.Context,
 	client *p2p.Client,
 	requestBytes []byte,
-	onResponse appResponseCallbackWithCheck,
+	onResponse appResponseCallbackWithResult,
 ) error {
 	switch {
 	case len(s.config.StateSyncNodes) > 0:
@@ -528,16 +529,16 @@ func (s *Syncer[_, _]) sendRequest(
 	}
 }
 
-func sendRequestWithPeerTracker(ctx context.Context, c *p2p.Client, pt *p2p.PeerTracker, requestBytes []byte, onResponse appResponseCallbackWithCheck) error {
+func sendRequestWithPeerTracker(ctx context.Context, c *p2p.Client, pt *p2p.PeerTracker, requestBytes []byte, onResponse appResponseCallbackWithResult) error {
 	nodeID, ok := pt.SelectPeer()
 	if !ok {
-		return errors.New("no peers available")
+		return errNoPeersAvailable
 	}
 	pt.RegisterRequest(nodeID)
-	t := time.Now()
+	start := time.Now()
 	return c.AppRequest(ctx, set.Of(nodeID), requestBytes, func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) {
-		timeToRespond := time.Since(t)
-		if handled := onResponse(ctx, nodeID, responseBytes, appErr); !handled {
+		timeToRespond := time.Since(start)
+		if success := onResponse(ctx, nodeID, responseBytes, appErr); !success {
 			pt.RegisterFailure(nodeID)
 			return
 		}
@@ -782,8 +783,13 @@ func (s *Syncer[_, _]) setError(err error) {
 	s.errLock.Lock()
 	defer s.errLock.Unlock()
 
+	if s.fatalError != nil {
+		return
+	}
+
 	s.config.Log.Error("sync errored", zap.Error(err))
 	s.fatalError = err
+
 	// Call in goroutine because we might be holding [s.workLock]
 	go func() {
 		s.workLock.Lock()

@@ -61,7 +61,7 @@ func (*TestClient) StateSyncNodes() []ids.NodeID {
 }
 
 func (*TestClient) Network() Network {
-	return nil
+	panic("Network is not supported in TestClient")
 }
 
 func (ml *TestClient) GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error) {

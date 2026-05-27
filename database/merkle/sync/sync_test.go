@@ -356,6 +356,84 @@ func Test_Sync_WithPeerTracker(t *testing.T) {
 	require.Equal(t, knownNodeID, observedNodeID, "peer tracker must drive node selection")
 }
 
+func Test_Sync_NoPeersAvailable(t *testing.T) {
+	targetRoot := ids.GenerateTestID()
+	clientDB := &db{id: ids.Empty}
+
+	pt, err := p2p.NewPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry(), set.Set[ids.NodeID]{}, nil)
+	require.NoError(t, err)
+
+	syncer, err := NewSyncer(
+		clientDB,
+		Config[*proofDouble, *proofDouble]{
+			TargetRoot:            targetRoot,
+			RangeProofMarshaler:   marshaler{},
+			ChangeProofMarshaler:  marshaler{},
+			ProofClient:           p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, p2p.TestHandler{}),
+			PeerTracker:           pt,
+			Log:                   logging.NoLog{},
+			SimultaneousWorkLimit: 1,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+	err = syncer.Sync(t.Context())
+	require.ErrorIs(t, err, errNoPeersAvailable)
+}
+
+// Test_Sync_NodeIDs ensures that specific nodeIDs are used for state syncing.
+func Test_Sync_NodeIDs(t *testing.T) {
+	targetRoot := ids.GenerateTestID()
+	clientDB := &db{id: ids.Empty}
+
+	const numRequests = 10
+	response := marshalRangeProofResponse(t, &proofDouble{newRoot: ids.Empty})
+	finalResponse := marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot})
+	count := 0
+	expectedHandler := p2p.TestHandler{
+		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+			count++
+			if count >= numRequests {
+				return finalResponse, nil
+			}
+			return response, nil
+		},
+	}
+	unexpectedHandler := p2p.TestHandler{
+		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+			assert.Fail(t, "unexpected AppRequest to node")
+			return nil, nil
+		},
+	}
+
+	expectedNodeID := ids.GenerateTestNodeID()
+	unexpectedNodeID := ids.GenerateTestNodeID()
+	syncer, err := NewSyncer(
+		clientDB,
+		Config[*proofDouble, *proofDouble]{
+			TargetRoot:           targetRoot,
+			RangeProofMarshaler:  marshaler{},
+			ChangeProofMarshaler: marshaler{},
+			ProofClient: p2ptest.NewClientWithPeers(
+				t,
+				t.Context(),
+				ids.EmptyNodeID,
+				p2p.TestHandler{},
+				map[ids.NodeID]p2p.Handler{
+					expectedNodeID:   expectedHandler,
+					unexpectedNodeID: unexpectedHandler,
+				},
+			),
+			StateSyncNodes:        []ids.NodeID{expectedNodeID},
+			Log:                   logging.NoLog{},
+			SimultaneousWorkLimit: 1,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+	require.NoErrorf(t, syncer.Sync(t.Context()), "%T.Sync()", syncer)
+}
+
 func Test_Midpoint(t *testing.T) {
 	require := require.New(t)
 
