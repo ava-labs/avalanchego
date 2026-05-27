@@ -30,7 +30,7 @@ func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
 			r := RulesExtra(extras.Rules{
 				AvalancheRules: extras.AvalancheRules{IsHelicon: tt.isHelicon},
 			})
-			assert.Equal(t, tt.want, r.MinimumGasConsumption(tt.limit))
+			assert.Equalf(t, tt.want, r.MinimumGasConsumption(tt.limit), "%T.MinimumGasConsumption(%d)", r, tt.limit)
 		})
 	}
 }
