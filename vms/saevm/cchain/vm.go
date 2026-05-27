@@ -60,7 +60,7 @@ type VM struct {
 var ethDBPrefix = []byte("ethdb")
 
 // Initialize initializes the VM.
-func (v *VM) Initialize(
+func (vm *VM) Initialize(
 	ctx context.Context,
 	snowCtx *snow.Context,
 	avaDB avadb.Database,
@@ -72,11 +72,11 @@ func (v *VM) Initialize(
 ) (retErr error) {
 	defer func() {
 		if retErr != nil {
-			retErr = errors.Join(retErr, v.Shutdown(ctx))
+			retErr = errors.Join(retErr, vm.Shutdown(ctx))
 		}
 	}()
 
-	v.ctx = snowCtx
+	vm.ctx = snowCtx
 
 	// TODO(StephenButtolph): Allow minimal user configuration via configBytes.
 	_ = configBytes
@@ -98,18 +98,18 @@ func (v *VM) Initialize(
 		return fmt.Errorf("setting up genesis block: %w", err)
 	}
 
-	v.state, err = state.New(snowCtx, avaDB)
+	vm.state, err = state.New(snowCtx, avaDB)
 	if err != nil {
 		return fmt.Errorf("creating cchain state: %w", err)
 	}
-	v.onClose = append(v.onClose, func(context.Context) error {
-		return v.state.Close()
+	vm.onClose = append(vm.onClose, func(context.Context) error {
+		return vm.state.Close()
 	})
 
 	pendingTxs := txpool.NewPending()
 	hooks := newHooks(
 		snowCtx,
-		v.state,
+		vm.state,
 		pendingTxs,
 	)
 	mempoolConfig := legacypool.DefaultConfig
@@ -122,19 +122,19 @@ func (v *VM) Initialize(
 			TrieDBConfig: trieDBConfig,
 		},
 	}
-	v.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
-	v.onClose = append(v.onClose, v.VM.Shutdown)
+	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 	const maxTxPoolSize = 1024
-	v.txpool, err = txpool.New(snowCtx, chainConfig, pendingTxs, v.VM, maxTxPoolSize)
+	vm.txpool, err = txpool.New(snowCtx, chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
 	if err != nil {
 		return fmt.Errorf("creating txpool: %w", err)
 	}
-	v.onClose = append(v.onClose, func(context.Context) error {
-		v.txpool.Close()
+	vm.onClose = append(vm.onClose, func(context.Context) error {
+		vm.txpool.Close()
 		return nil
 	})
 
@@ -147,7 +147,7 @@ func (v *VM) Initialize(
 		return fmt.Errorf("creating gossip bloom metrics: %w", err)
 	}
 	gossipSet, err := gossip.NewBloomSet(
-		newGossipTxPool(v.txpool),
+		newGossipTxPool(vm.txpool),
 		gossip.BloomSetConfig{
 			Metrics: bloomMetrics,
 		},
@@ -157,8 +157,8 @@ func (v *VM) Initialize(
 	}
 	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		snowCtx.NodeID,
-		v.Network,
-		v.ValidatorPeers,
+		vm.Network,
+		vm.ValidatorPeers,
 		gossipSet,
 		gossipMarshaller{},
 		gossip.SystemConfig{
@@ -166,27 +166,27 @@ func (v *VM) Initialize(
 			Registry:      reg,
 			Namespace:     "gossip",
 			HandlerID:     p2p.AtomicTxGossipHandlerID,
-			RequestPeriod: v.pullGossipPeriod,
+			RequestPeriod: vm.pullGossipPeriod,
 		},
 	)
 	if err != nil {
 		return fmt.Errorf("creating cross-chain tx gossip system: %w", err)
 	}
-	v.pushGossiper = pushGossiper
+	vm.pushGossiper = pushGossiper
 
-	if err := v.VM.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
+	if err := vm.VM.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
 		return fmt.Errorf("registering cross-chain tx gossip handler: %w", err)
 	}
 
 	gossipCtx, cancelGossip := context.WithCancel(context.Background())
 	var gossipWG sync.WaitGroup
 	gossipWG.Go(func() {
-		gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, v.pullGossipPeriod)
+		gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, vm.pullGossipPeriod)
 	})
 	gossipWG.Go(func() {
-		gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, v.pushGossipPeriod)
+		gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, vm.pushGossipPeriod)
 	})
-	v.onClose = append(v.onClose, func(context.Context) error {
+	vm.onClose = append(vm.onClose, func(context.Context) error {
 		cancelGossip()
 		gossipWG.Wait()
 		return nil
@@ -202,13 +202,13 @@ const (
 
 // CreateHandlers returns the HTTP handlers exposed by the underlying SAE VM
 // augmented with the avax service at [avaxHTTPExtensionPath].
-func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	m, err := v.VM.CreateHandlers(ctx)
+func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	m, err := vm.VM.CreateHandlers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating SAE handlers: %w", err)
 	}
 
-	service, err := newService(v.ctx, v.txpool, v.pushGossiper, v.state)
+	service, err := newService(vm.ctx, vm.txpool, vm.pushGossiper, vm.state)
 	if err != nil {
 		return nil, fmt.Errorf("creating avax service: %w", err)
 	}
@@ -223,7 +223,7 @@ func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error
 
 // WaitForEvent waits for a transaction to be in the txpool or for the SAE VM to
 // produce an event.
-func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	// TODO(StephenButtolph): Do not busy loop with [common.PendingTxs]. The
 	// txpools are cleared after block execution, so we may still have
 	// transactions in the txpool while blocks containing those transactions are
@@ -239,12 +239,12 @@ func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	results := make(chan result, 2)
 	go func() {
 		defer cancel()
-		msg, err := v.VM.WaitForEvent(ctx)
+		msg, err := vm.VM.WaitForEvent(ctx)
 		results <- result{msg, err}
 	}()
 	go func() {
 		defer cancel()
-		err := v.txpool.AwaitTxs(ctx)
+		err := vm.txpool.AwaitTxs(ctx)
 		results <- result{common.PendingTxs, err}
 	}()
 
@@ -256,11 +256,11 @@ func (v *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 // order.
 //
 // It is idempotent and safe to call after a partially-failed [VM.Initialize].
-func (v *VM) Shutdown(ctx context.Context) error {
-	errs := make([]error, len(v.onClose))
-	for i, f := range slices.Backward(v.onClose) {
+func (vm *VM) Shutdown(ctx context.Context) error {
+	errs := make([]error, len(vm.onClose))
+	for i, f := range slices.Backward(vm.onClose) {
 		errs[i] = f(ctx)
 	}
-	v.onClose = nil
+	vm.onClose = nil
 	return errors.Join(errs...)
 }
