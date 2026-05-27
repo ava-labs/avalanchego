@@ -33,8 +33,8 @@ The packaging pipeline builds two packages per format and architecture:
 
 ### Main entrypoints
 
-- RPM workflow: `.github/workflows/build-rpm-release.yml`
-- DEB workflow: `.github/workflows/build-deb-release.yml`
+- Workflow: `.github/workflows/build-linux-packages.yml` (unified RPM + DEB)
+- Build/validate composite action: `.github/packaging/actions/build-package/action.yml`
 - Packaging taskfile: `.github/packaging/Taskfile.yml`
 - Build script: `.github/packaging/scripts/build-package.sh`
 - Validation scripts:
@@ -84,8 +84,9 @@ signing path used by release builds without requiring release credentials.
 
 ## CI behavior
 
-`.github/workflows/build-rpm-release.yml` and
-`.github/workflows/build-deb-release.yml` run in three modes:
+`.github/workflows/build-linux-packages.yml` builds both RPM and DEB
+packages from a single workflow (format × arch matrix delegating bulk work
+to `.github/packaging/actions/build-package`) and runs in three modes:
 
 - **tag push** - builds release packages for the pushed tag
 - **workflow_dispatch** - builds packages for an explicitly provided tag
@@ -399,8 +400,8 @@ The current design should be reconsidered if any of these change:
 
 ### Repository entrypoints
 
-- RPM workflow: `/.github/workflows/build-rpm-release.yml`
-- DEB workflow: `/.github/workflows/build-deb-release.yml`
+- Workflow: `/.github/workflows/build-linux-packages.yml`
+- Build/validate composite action: `/.github/packaging/actions/build-package/action.yml`
 - Taskfile: `/.github/packaging/Taskfile.yml`
 - RPM builder image: `/.github/packaging/Dockerfile.rpm`
 - DEB builder image: `/.github/packaging/Dockerfile.deb`
