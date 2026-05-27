@@ -111,7 +111,9 @@ type SUT struct {
 func newSUT(t *testing.T) *SUT {
 	t.Helper()
 	backend := utilstest.NewBackendWithPrecompile(t, testPrecompileConfig, []common.Address{adminAddress})
-	t.Cleanup(func() { backend.Close() })
+	t.Cleanup(func() {
+		require.NoError(t, backend.Close(), "backend.Close()")
+	})
 
 	gasPriceManager, err := bindings.NewIGasPriceManager(gaspricemanager.ContractAddress, backend.Client())
 	require.NoError(t, err, "NewIGasPriceManager()")
