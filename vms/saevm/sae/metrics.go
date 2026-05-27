@@ -9,9 +9,9 @@ import (
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 )
 
-// LastSettledHeightName names the gauge for the height of the last settled
+// lastSettledHeightName names the gauge for the height of the last settled
 // block.
-const LastSettledHeightName = "last_settled_height"
+const lastSettledHeightName = "last_settled_height"
 
 type metrics struct {
 	registry          *prometheus.Registry
@@ -27,7 +27,7 @@ func newMetrics(snowMetrics apimetrics.MultiGatherer) (*metrics, error) {
 	m := &metrics{
 		registry: reg,
 		lastSettledHeight: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: LastSettledHeightName,
+			Name: lastSettledHeightName,
 			Help: "Height of the latest block that has settled.",
 		}),
 	}

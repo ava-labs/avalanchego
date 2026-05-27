@@ -20,7 +20,10 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Help: "Height of the latest block that completed async execution.",
 		}),
 	}
-	return m, reg.Register(m.lastExecutedHeight)
+	if err := reg.Register(m.lastExecutedHeight); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (m *metrics) markExecuted(height uint64) {

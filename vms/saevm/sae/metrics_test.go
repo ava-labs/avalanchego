@@ -25,7 +25,7 @@ func TestSettlementMetric(t *testing.T) {
 	vmTime.advanceToSettle(ctx, t, executed)
 	settledBy := sut.runConsensusLoop(t)
 	require.NoErrorf(t, settledBy.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", settledBy)
-	require.Equal(t, float64(executed.Height()), gaugeValue(t, sut.rawVM.metrics.registry, LastSettledHeightName), "last settled height")
+	require.Equal(t, float64(executed.Height()), gaugeValue(t, sut.rawVM.metrics.registry, lastSettledHeightName), "last settled height")
 }
 
 // gaugeValue returns the current value of a single-series gauge from `g` by
