@@ -45,9 +45,7 @@ import (
 var (
 	adminKey, _  = crypto.GenerateKey()
 	adminAddress = crypto.PubkeyToAddress(adminKey.PublicKey)
-)
 
-var (
 	genesisGasPriceConfig = commontype.GasPriceConfig{
 		TargetGas:    2_000_000,
 		MinGasPrice:  25,
@@ -102,6 +100,29 @@ func toCommonGasPriceConfig(c bindings.IGasPriceManagerGasPriceConfig) commontyp
 	}
 }
 
+// SUT is the system under test, primarily the [bindings.IGasPriceManager]
+// binding to the gas price manager precompile.
+type SUT struct {
+	backend         *sim.Backend
+	gasPriceManager *bindings.IGasPriceManager
+	admin           *bind.TransactOpts
+}
+
+func newSUT(t *testing.T) *SUT {
+	t.Helper()
+	backend := utilstest.NewBackendWithPrecompile(t, testPrecompileConfig, []common.Address{adminAddress})
+	t.Cleanup(func() { backend.Close() })
+
+	gasPriceManager, err := bindings.NewIGasPriceManager(gaspricemanager.ContractAddress, backend.Client())
+	require.NoError(t, err, "NewIGasPriceManager()")
+
+	return &SUT{
+		backend:         backend,
+		gasPriceManager: gasPriceManager,
+		admin:           utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID),
+	}
+}
+
 func deployTestContract(t *testing.T, b *sim.Backend, auth *bind.TransactOpts) (common.Address, *bindings.GasPriceManagerTest) {
 	t.Helper()
 	addr, tx, contract, err := bindings.DeployGasPriceManagerTest(auth, b.Client(), gaspricemanager.ContractAddress)
@@ -118,105 +139,74 @@ func setGasPriceConfig(t *testing.T, b *sim.Backend, contract *bindings.GasPrice
 	return receipt.BlockNumber.Uint64()
 }
 
-func TestGasPriceManager(t *testing.T) {
-	chainID := params.TestChainConfig.ChainID
-	admin := utilstest.NewAuth(t, adminKey, chainID)
+func TestGasPriceManager_AdminHasAdminRole(t *testing.T) {
+	s := newSUT(t)
+	allowlisttest.VerifyRole(t, s.gasPriceManager, adminAddress, allowlist.AdminRole)
+}
 
-	type testCase struct {
-		name string
-		test func(t *testing.T, backend *sim.Backend, gasPriceManager *bindings.IGasPriceManager)
-	}
+func TestGasPriceManager_NewContractHasNoRole(t *testing.T) {
+	s := newSUT(t)
+	testContractAddr, _ := deployTestContract(t, s.backend, s.admin)
+	allowlisttest.VerifyRole(t, s.gasPriceManager, testContractAddr, allowlist.NoRole)
+}
 
-	testCases := []testCase{
-		{
-			name: "should verify admin has admin role",
-			test: func(t *testing.T, _ *sim.Backend, gasPriceManager *bindings.IGasPriceManager) {
-				allowlisttest.VerifyRole(t, gasPriceManager, adminAddress, allowlist.AdminRole)
-			},
-		},
-		{
-			name: "should verify new contract has no role",
-			test: func(t *testing.T, backend *sim.Backend, gasPriceManager *bindings.IGasPriceManager) {
-				testContractAddr, _ := deployTestContract(t, backend, admin)
-				allowlisttest.VerifyRole(t, gasPriceManager, testContractAddr, allowlist.NoRole)
-			},
-		},
-		{
-			name: "contract should not be able to change gas price config without enabled",
-			test: func(t *testing.T, backend *sim.Backend, _ *bindings.IGasPriceManager) {
-				_, testContract := deployTestContract(t, backend, admin)
+func TestGasPriceManager_UnenabledContractCannotSetConfig(t *testing.T) {
+	s := newSUT(t)
+	_, testContract := deployTestContract(t, s.backend, s.admin)
 
-				_, err := testContract.SetGasPriceConfig(admin, toBindingsGasPriceConfig(updatedGasPriceConfig))
-				require.ErrorContains(t, err, vm.ErrExecutionReverted.Error(), "SetGasPriceConfig() without enabled role") //nolint:forbidigo // upstream error wrapped as string
-			},
-		},
-		{
-			name: "enabled contract should set and modify gas price config",
-			test: func(t *testing.T, backend *sim.Backend, gasPriceManager *bindings.IGasPriceManager) {
-				testContractAddr, testContract := deployTestContract(t, backend, admin)
-				allowlisttest.SetAsEnabled(t, backend, gasPriceManager, admin, testContractAddr)
-				allowlisttest.VerifyRole(t, gasPriceManager, testContractAddr, allowlist.EnabledRole)
+	_, err := testContract.SetGasPriceConfig(s.admin, toBindingsGasPriceConfig(updatedGasPriceConfig))
+	require.ErrorContains(t, err, vm.ErrExecutionReverted.Error(), "SetGasPriceConfig() without enabled role") //nolint:forbidigo // upstream error wrapped as string
+}
 
-				got, err := testContract.GetGasPriceConfig(nil)
-				require.NoError(t, err, "GetGasPriceConfig() before set")
-				require.Equal(t, genesisGasPriceConfig, toCommonGasPriceConfig(got), "genesis gas price config")
+func TestGasPriceManager_EnabledContractSetsAndModifiesConfig(t *testing.T) {
+	s := newSUT(t)
+	testContractAddr, testContract := deployTestContract(t, s.backend, s.admin)
+	allowlisttest.SetAsEnabled(t, s.backend, s.gasPriceManager, s.admin, testContractAddr)
+	allowlisttest.VerifyRole(t, s.gasPriceManager, testContractAddr, allowlist.EnabledRole)
 
-				blockNum := setGasPriceConfig(t, backend, testContract, admin, updatedGasPriceConfig)
+	got, err := testContract.GetGasPriceConfig(nil)
+	require.NoError(t, err, "GetGasPriceConfig() before set")
+	require.Equal(t, genesisGasPriceConfig, toCommonGasPriceConfig(got), "genesis gas price config")
 
-				got, err = testContract.GetGasPriceConfig(nil)
-				require.NoError(t, err, "GetGasPriceConfig() after set")
-				require.Equal(t, updatedGasPriceConfig, toCommonGasPriceConfig(got), "updated gas price config")
+	blockNum := setGasPriceConfig(t, s.backend, testContract, s.admin, updatedGasPriceConfig)
 
-				lastChangedAt, err := testContract.GetGasPriceConfigLastChangedAt(nil)
-				require.NoError(t, err, "GetGasPriceConfigLastChangedAt()")
-				require.Equal(t, blockNum, lastChangedAt.Uint64(), "last changed at block number")
-			},
-		},
-		{
-			name: "bool fields round-trip through contract",
-			test: func(t *testing.T, backend *sim.Backend, gasPriceManager *bindings.IGasPriceManager) {
-				testContractAddr, testContract := deployTestContract(t, backend, admin)
-				allowlisttest.SetAsEnabled(t, backend, gasPriceManager, admin, testContractAddr)
+	got, err = testContract.GetGasPriceConfig(nil)
+	require.NoError(t, err, "GetGasPriceConfig() after set")
+	require.Equal(t, updatedGasPriceConfig, toCommonGasPriceConfig(got), "updated gas price config")
 
-				setGasPriceConfig(t, backend, testContract, admin, boolGasPriceConfig)
+	lastChangedAt, err := testContract.GetGasPriceConfigLastChangedAt(nil)
+	require.NoError(t, err, "GetGasPriceConfigLastChangedAt()")
+	require.Equal(t, blockNum, lastChangedAt.Uint64(), "last changed at block number")
+}
 
-				got, err := testContract.GetGasPriceConfig(nil)
-				require.NoError(t, err, "GetGasPriceConfig()")
-				require.Equal(t, boolGasPriceConfig, toCommonGasPriceConfig(got), "boolean gas price config round-trip")
-			},
-		},
-		{
-			name: "contract role can be revoked",
-			test: func(t *testing.T, backend *sim.Backend, gasPriceManager *bindings.IGasPriceManager) {
-				testContractAddr, testContract := deployTestContract(t, backend, admin)
-				allowlisttest.SetAsEnabled(t, backend, gasPriceManager, admin, testContractAddr)
+func TestGasPriceManager_BoolFieldsRoundTrip(t *testing.T) {
+	s := newSUT(t)
+	testContractAddr, testContract := deployTestContract(t, s.backend, s.admin)
+	allowlisttest.SetAsEnabled(t, s.backend, s.gasPriceManager, s.admin, testContractAddr)
 
-				setGasPriceConfig(t, backend, testContract, admin, updatedGasPriceConfig)
+	setGasPriceConfig(t, s.backend, testContract, s.admin, boolGasPriceConfig)
 
-				got, err := testContract.GetGasPriceConfig(nil)
-				require.NoError(t, err, "GetGasPriceConfig() after set")
-				require.Equal(t, updatedGasPriceConfig, toCommonGasPriceConfig(got), "config set by enabled contract")
+	got, err := testContract.GetGasPriceConfig(nil)
+	require.NoError(t, err, "GetGasPriceConfig()")
+	require.Equal(t, boolGasPriceConfig, toCommonGasPriceConfig(got), "boolean gas price config round-trip")
+}
 
-				allowlisttest.SetAsNone(t, backend, gasPriceManager, admin, testContractAddr)
-				allowlisttest.VerifyRole(t, gasPriceManager, testContractAddr, allowlist.NoRole)
+func TestGasPriceManager_RoleCanBeRevoked(t *testing.T) {
+	s := newSUT(t)
+	testContractAddr, testContract := deployTestContract(t, s.backend, s.admin)
+	allowlisttest.SetAsEnabled(t, s.backend, s.gasPriceManager, s.admin, testContractAddr)
 
-				_, err = testContract.SetGasPriceConfig(admin, toBindingsGasPriceConfig(boolGasPriceConfig))
-				require.ErrorContains(t, err, vm.ErrExecutionReverted.Error(), "SetGasPriceConfig() after role revoked") //nolint:forbidigo // upstream error wrapped as string
-			},
-		},
-	}
+	setGasPriceConfig(t, s.backend, testContract, s.admin, updatedGasPriceConfig)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			backend := utilstest.NewBackendWithPrecompile(t, testPrecompileConfig, []common.Address{adminAddress})
-			defer backend.Close()
+	got, err := testContract.GetGasPriceConfig(nil)
+	require.NoError(t, err, "GetGasPriceConfig() after set")
+	require.Equal(t, updatedGasPriceConfig, toCommonGasPriceConfig(got), "config set by enabled contract")
 
-			gasPriceManager, err := bindings.NewIGasPriceManager(gaspricemanager.ContractAddress, backend.Client())
-			require.NoError(t, err, "NewIGasPriceManager()")
+	allowlisttest.SetAsNone(t, s.backend, s.gasPriceManager, s.admin, testContractAddr)
+	allowlisttest.VerifyRole(t, s.gasPriceManager, testContractAddr, allowlist.NoRole)
 
-			tc.test(t, backend, gasPriceManager)
-		})
-	}
+	_, err = testContract.SetGasPriceConfig(s.admin, toBindingsGasPriceConfig(boolGasPriceConfig))
+	require.ErrorContains(t, err, vm.ErrExecutionReverted.Error(), "SetGasPriceConfig() after role revoked") //nolint:forbidigo // upstream error wrapped as string
 }
 
 func TestGasPriceManager_InvalidGasPriceConfig(t *testing.T) {
@@ -253,41 +243,27 @@ func TestGasPriceManager_InvalidGasPriceConfig(t *testing.T) {
 		},
 	}
 
-	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
-
-	backend := utilstest.NewBackendWithPrecompile(t, testPrecompileConfig, []common.Address{adminAddress})
-	defer backend.Close()
-
-	gasPriceManager, err := bindings.NewIGasPriceManager(gaspricemanager.ContractAddress, backend.Client())
-	require.NoError(t, err, "NewIGasPriceManager()")
-
-	testContractAddr, testContract := deployTestContract(t, backend, admin)
-	allowlisttest.SetAsEnabled(t, backend, gasPriceManager, admin, testContractAddr)
+	s := newSUT(t)
+	testContractAddr, testContract := deployTestContract(t, s.backend, s.admin)
+	allowlisttest.SetAsEnabled(t, s.backend, s.gasPriceManager, s.admin, testContractAddr)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := testContract.SetGasPriceConfig(admin, tt.config)
+			_, err := testContract.SetGasPriceConfig(s.admin, tt.config)
 			require.ErrorContains(t, err, vm.ErrExecutionReverted.Error(), "SetGasPriceConfig(%+v)", tt.config) //nolint:forbidigo // upstream error wrapped as string
 		})
 	}
 }
 
 func TestGasPriceManager_Events(t *testing.T) {
-	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
+	s := newSUT(t)
+	testContractAddr, testContract := deployTestContract(t, s.backend, s.admin)
+	allowlisttest.SetAsEnabled(t, s.backend, s.gasPriceManager, s.admin, testContractAddr)
 
-	backend := utilstest.NewBackendWithPrecompile(t, testPrecompileConfig, []common.Address{adminAddress})
-	defer backend.Close()
-
-	gasPriceManager, err := bindings.NewIGasPriceManager(gaspricemanager.ContractAddress, backend.Client())
-	require.NoError(t, err, "NewIGasPriceManager()")
-
-	testContractAddr, testContract := deployTestContract(t, backend, admin)
-	allowlisttest.SetAsEnabled(t, backend, gasPriceManager, admin, testContractAddr)
-
-	setGasPriceConfig(t, backend, testContract, admin, updatedGasPriceConfig)
+	setGasPriceConfig(t, s.backend, testContract, s.admin, updatedGasPriceConfig)
 
 	// The event sender is the wrapper contract address, not adminAddress.
-	iter, err := gasPriceManager.FilterGasPriceConfigUpdated(nil, []common.Address{testContractAddr})
+	iter, err := s.gasPriceManager.FilterGasPriceConfigUpdated(nil, []common.Address{testContractAddr})
 	require.NoError(t, err, "FilterGasPriceConfigUpdated()")
 	defer iter.Close()
 
