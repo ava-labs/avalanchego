@@ -254,7 +254,7 @@ jobs:
           shared-key: "debug-no-features"
       - name: Build Firewood FFI
         working-directory: ffi
-        run: cargo build --locked --release
+        run: cargo build --locked
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
