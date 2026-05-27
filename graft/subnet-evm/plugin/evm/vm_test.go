@@ -3718,7 +3718,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 					// verifies that the reconstructed state is both openable and correct.
 					nonce, err := client.NonceAt(ctx, testEthAddrs[0], new(big.Int).SetUint64(blockNum))
 					require.NoError(t, err)
-					require.Equal(t, blockNum, nonce)
+					require.Equalf(t, blockNum, nonce, "expected nonce %d at height %d, got: %d", blockNum, blockNum, nonce)
 				}
 			})
 		})
