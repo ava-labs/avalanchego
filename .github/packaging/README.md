@@ -8,14 +8,13 @@ This directory contains the Linux packaging implementation for `avalanchego` and
 - RPM packages for RHEL 9.x-compatible systems
 - DEB packages for Ubuntu 22.04 (jammy) and 24.04 (noble)
 
-Packages are built with `nfpm` inside per-format builder containers, signed with
-GPG, and validated by installing the built packages in fresh target-distro
-containers. Non-PR workflow runs upload packages and exported public keys as
-GitHub Actions artifacts; DEB release runs also publish Ubuntu S3 assets.
+It exists to ship signed Linux packages without making future maintainers
+reconstruct the packaging model from CI YAML and shell scripts alone.
 
-This document is the canonical packaging design note for the repository. It is
-for release engineers who build or publish packages and maintainers who need to
-change the packaging implementation safely.
+This document is for two audiences:
+
+- **users/release engineers** who need to build or publish packages
+- **maintainers** who need to change the packaging implementation safely
 
 ## Usage
 
@@ -115,39 +114,64 @@ The model is:
 1. Check out the source revision being packaged
 2. Overlay the current `.github/packaging` implementation for manual tag builds
    when the requested tag may predate packaging support
-3. Build inside a target-distro container so the binary links against the right
+3. Build inside a target Linux distribution container so the binary links against the right
    glibc floor
-4. Package with `nfpm`
-5. Sign the package inline with `nfpm`
-6. Validate by installing the package in a fresh target-distro container and
+4. Package and sign with `nfpm` (single `nfpm package` invocation)
+5. Validate by installing the package in a fresh target Linux distribution container and
    running smoke tests
 
 This directory is code-adjacent because the Dockerfiles, task entrypoints,
 package manifests, workflow glue, and shell scripts all evolve together.
 
-Two architecture naming schemes are in play and must stay aligned:
+Four architecture naming schemes are in play and must stay aligned:
 
 | `uname -m` | Docker `TARGETARCH` / Go downloads | RPM arch | DEB arch |
 | --- | --- | --- | --- |
 | `x86_64` | `amd64` | `x86_64` | `amd64` |
 | `arm64` / `aarch64` | `arm64` | `aarch64` | `arm64` |
 
-The Taskfile normalizes host architecture to package-format names; the
-Dockerfiles use Docker's `TARGETARCH` values for Go and `nfpm` downloads.
+The Taskfile normalizes host architecture to the names used by a given package
+format; the Dockerfiles use Docker's `TARGETARCH` values for Go and `nfpm`
+downloads.
+
+The packaging path assumes Docker's target platform matches the host's
+`uname -m`. `TARGETARCH` is set by Docker BuildKit from the resolved target
+platform (`--platform`, `DOCKER_DEFAULT_PLATFORM`, or host default in that
+priority), but `build-builder-image.sh` and the Taskfile's `PACKAGE_ARCH`
+default both derive from host `uname -m` independently. If those diverge
+— e.g. `DOCKER_DEFAULT_PLATFORM=linux/amd64` on an arm64 host — the build
+either fails (Go checksum mismatch when the script's host-derived
+`GO_CHECKSUM` doesn't match the tarball Docker downloaded for the resolved
+target) or mislabels packages (the produced `.rpm`/`.deb` carries the
+host's arch in its filename despite being built in a target-arch
+container). Cross-arch local builds are out of scope; use the CI matrix
+or a remote builder.
 
 ## Maintenance notes
 
-### Why the builds use target-distro containers
+### Why builds run in target Linux distribution containers
 
-RPMs target RHEL 9.x-compatible systems, so RPM builds run in a
-`rockylinux:9` container and produce binaries linked against glibc 2.34.
+AvalancheGo and Subnet-EVM are dynamically linked against glibc. To produce
+binaries that run on every supported Linux distribution, each build runs inside
+a container based on the *oldest* supported release for that target Linux
+distribution/family — the resulting binary's glibc floor matches that release,
+and newer releases run it via glibc's forward compatibility.
 
-DEBs target Ubuntu jammy as the oldest supported Ubuntu release, so DEB builds
-run in an `ubuntu:22.04` container and produce binaries linked against glibc
-2.35.
+#### RPM — built in `rockylinux:9`
+
+RPMs target RHEL 9.x-compatible systems, so RPM builds run in a `rockylinux:9`
+container and produce binaries linked against glibc 2.34.
+
+#### DEB — built in `ubuntu:22.04`
+
+DEBs target Ubuntu 22.04 (jammy), the oldest LTS we support, so DEB builds run
+in an `ubuntu:22.04` container and produce binaries linked against glibc 2.35.
+Compatibility of the produced packages is then verified by installing and
+smoke-testing in both `ubuntu:22.04` and `ubuntu:24.04` (the newest LTS we
+support).
 
 Building on the default GitHub runner image would link against the runner's
-Ubuntu glibc, which may be newer than the intended target runtime.
+Ubuntu glibc, which is typically newer than the intended jammy floor.
 
 ### Why workflows overlay `.github/packaging` for manual tag builds
 
@@ -169,14 +193,17 @@ the workflow branch:
 3. replace the tagged tree's `.github/packaging` with the overlay contents
 4. run the current packaging pipeline against the historical source
 
-This is intentionally narrow: it overlays only the packaging implementation,
+This is intentionally narrow: it overlays **only the packaging implementation**,
 not the rest of the branch. That lets maintainers improve packaging logic over
 time while still packaging historical source revisions.
 
+#### Implications for maintainers
+
 When changing `.github/packaging`, keep in mind that `workflow_dispatch` may run
-those scripts against trees that predate the packaging feature. Changes are
-safer when they depend only on repository interfaces that already exist across
-the intended release range, such as:
+those scripts against trees that predate the packaging feature.
+
+Changes are safer when they depend only on repository interfaces that already
+exist across the intended release range, such as:
 
 - `scripts/build.sh`
 - `scripts/constants.sh`
@@ -196,12 +223,18 @@ RPMs and DEBs are always built through the signing path.
 - **local and PR builds** generate an ephemeral RSA key with a known throwaway
   passphrase
 
+This is deliberate: unsigned fast paths tend to rot, while always exercising the
+signing path keeps packaging validation closer to what is shipped.
+
 Release events (tag push and `workflow_dispatch`) fail fast in
 `workflow-setup-packaging.sh` when no signing key is configured, so a
 misconfigured release cannot silently fall back to the ephemeral key.
 
-The build exports the matching public key next to the packages so validation and
-consumers can import it.
+The build exports the matching public key next to the packages. On DEB release
+events (tag push / `workflow_dispatch`), `upload-debs-s3` publishes it alongside
+the `.deb`s under `s3://${BUCKET}/linux/debs/ubuntu/<release>/` so DEB consumers
+can fetch and import it before installing. On PR/local builds the key is
+ephemeral and is not published.
 
 ### Validation strategy
 
@@ -209,14 +242,15 @@ The main validation entrypoints are `test-build-rpms` and `test-build-debs`.
 They:
 
 1. build both `avalanchego` and `subnet-evm` packages
-2. start a fresh target-distro container
+2. start a fresh target Linux distribution container
 3. import the exported public key
 4. verify package signatures
 5. install both packages
 6. run smoke tests on the installed binaries
 
 RPM validation runs in `rockylinux:9`. DEB validation runs in both
-`ubuntu:22.04` and `ubuntu:24.04`.
+`ubuntu:22.04` (the build/target floor) and `ubuntu:24.04` (the newest LTS) to
+catch any compatibility regressions across the supported Ubuntu range.
 
 The smoke tests intentionally check a small set of high-value invariants:
 
@@ -242,18 +276,19 @@ trade-offs are not recoverable from the packaging scripts alone.
 We need to ship Linux packages for RHEL-family systems and Ubuntu, while general
 CI runs mostly on Ubuntu. Different distros ship different glibc versions, so a
 dynamically linked binary built against a newer Ubuntu glibc may not run on an
-older target distro. The packaging pipeline therefore builds inside target-distro
-containers so each package targets the oldest supported glibc for that format.
+older target distribution. The packaging pipeline therefore builds inside
+target Linux distribution containers so each package targets the oldest
+supported glibc for its target Linux distribution family.
 
 #### Why dynamic glibc is the current choice
 
 - glibc compatibility is the practical constraint for the supported Linux
-  package targets
+  distributions
 - glibc avoids taking on musl-specific performance and compatibility risk for a
   performance-sensitive node binary
 - Go race-detector workflows remain compatible with glibc-based builds
 - binaries linked against older glibc generally run on newer glibc releases,
-  which is the compatibility direction we want for each package baseline
+  which is the compatibility we want to guarantee for each supported distro
 
 #### Why not static musl right now
 
@@ -289,7 +324,7 @@ Building in `rockylinux:9` and `ubuntu:22.04` is the current way to target the
 correct glibc floors. That leaves a residual maintenance concern: broad CI on
 Ubuntu is not the same thing as testing the final release binary on the exact
 same runtime used for packaging. Package smoke tests reduce that gap by
-verifying installation, signatures, and basic execution on target distro
+verifying installation, signatures, and basic execution on target Linux distribution
 containers, but they are not a substitute for full release-path parity.
 
 Future changes should not assume the current packaging smoke tests fully
@@ -341,7 +376,6 @@ the design:
 - RPM release builds target glibc 2.34 / Rocky Linux 9 compatibility
 - DEB release builds target glibc 2.35 / Ubuntu 22.04 compatibility
 - the same pipeline path is used for both local smoke testing and CI builds
-- package signatures are always produced and validated
 - manual tag builds continue to package historical source trees via the overlay
   mechanism, unless a documented compatibility cutoff is introduced
 
@@ -359,7 +393,7 @@ The current design should be reconsidered if any of these change:
 - historical rebuild compatibility is no longer a requirement, or a documented
   cutoff replaces the current overlay behavior
 - release distribution needs move beyond GitHub Actions artifacts and the
-  current DEB S3 layout
+  current S3 publishing path structure for DEB releases
 
 ## References
 
