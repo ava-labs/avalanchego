@@ -1,6 +1,10 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package loggingtest provides [logging.Logger] implementations for use in
+// tests. [New] forwards logs to a [testing.TB], treating warnings and errors as
+// test failures. [NewRecorder] captures logs in memory so tests can assert on
+// what was logged without any output.
 package loggingtest
 
 import (
