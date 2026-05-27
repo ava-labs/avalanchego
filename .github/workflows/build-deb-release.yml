@@ -36,23 +36,26 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      # When building an older tag via workflow_dispatch, the tag's tree
-      # may not contain the packaging scripts. Overlay them from the
-      # workflow branch so that packaging:test-build-debs is available.
+      # Probe whether a local composite action can be invoked from the
+      # overlaid packaging tree. For pull_request runs we still perform the
+      # overlay via a second checkout of the current ref so the action is
+      # supplied through the same mechanism as historical-tag rebuilds.
       - name: Overlay packaging scripts from workflow branch
-        if: github.event.inputs.tag
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.ref }}
           path: .packaging-overlay
           sparse-checkout: .github/packaging
 
       - name: Apply packaging overlay
-        if: github.event.inputs.tag
         run: |
           rm -rf .github/packaging
           mv .packaging-overlay/.github/packaging .github/packaging
           rm -rf .packaging-overlay
         shell: bash
+
+      - name: Probe post-overlay local action
+        uses: ./.github/packaging/actions/probe
 
       - uses: ./.github/actions/setup-go-for-project
 
