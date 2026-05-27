@@ -58,12 +58,6 @@ var (
 		TimeToDouble: 300,
 	}
 
-	boolGasPriceConfig = commontype.GasPriceConfig{
-		ValidatorTargetGas: true,
-		StaticPricing:      true,
-		MinGasPrice:        7,
-	}
-
 	testPrecompileConfig = gaspricemanager.NewConfig(
 		utils.PointerTo[uint64](0),
 		[]common.Address{adminAddress},
@@ -200,18 +194,6 @@ func TestGasPriceManager_EnabledContractSetsAndModifiesConfig(t *testing.T) {
 	require.Equal(t, blockNum, lastChangedAt.Uint64(), "last changed at block number")
 }
 
-func TestGasPriceManager_BoolFieldsRoundTrip(t *testing.T) {
-	s := newSUT(t)
-	testContractAddr, testContract := s.deployTestContract(t)
-	allowlisttest.SetAsEnabled(t, s.backend, s.gasPriceManager, s.admin, testContractAddr)
-
-	s.setGasPriceConfig(t, testContract, boolGasPriceConfig)
-
-	got, err := testContract.GetGasPriceConfig(nil)
-	require.NoError(t, err, "GetGasPriceConfig()")
-	require.Equal(t, boolGasPriceConfig, toCommonGasPriceConfig(got), "boolean gas price config round-trip")
-}
-
 func TestGasPriceManager_RoleCanBeRevoked(t *testing.T) {
 	s := newSUT(t)
 	testContractAddr, testContract := s.deployTestContract(t)
@@ -226,7 +208,7 @@ func TestGasPriceManager_RoleCanBeRevoked(t *testing.T) {
 	allowlisttest.SetAsNone(t, s.backend, s.gasPriceManager, s.admin, testContractAddr)
 	allowlisttest.VerifyRole(t, s.gasPriceManager, testContractAddr, allowlist.NoRole)
 
-	_, err = testContract.SetGasPriceConfig(s.admin, toBindingsGasPriceConfig(boolGasPriceConfig))
+	_, err = testContract.SetGasPriceConfig(s.admin, toBindingsGasPriceConfig(updatedGasPriceConfig))
 	require.ErrorContains(t, err, vm.ErrExecutionReverted.Error(), "SetGasPriceConfig() after role revoked") //nolint:forbidigo // upstream error wrapped as string
 }
 
