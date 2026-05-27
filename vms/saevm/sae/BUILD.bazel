@@ -72,6 +72,7 @@ go_test(
     name = "sae_test",
     srcs = [
         "always_test.go",
+        "metrics_test.go",
         "networked_test.go",
         "recovery_test.go",
         "rpc_custom_test.go",
