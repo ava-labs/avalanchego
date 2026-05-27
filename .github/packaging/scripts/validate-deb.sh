@@ -28,8 +28,8 @@ assert_files_exist "${DEB_DIR}" \
 # ── Verify + install + smoke test (both jammy and noble) ─────────
 # nfpm stores a detached GPG signature in the `_gpgorigin` ar member,
 # covering debian-binary + control.tar.* + data.tar.* concatenated in
-# ar-member order. Verifying with `gpg --verify` keeps the same flow
-# on every supported Ubuntu release.
+# ar-member order. We verify with `gpg --verify` against that
+# detached signature.
 
 for UBUNTU_IMAGE in ubuntu:22.04 ubuntu:24.04; do
     echo "=== Verify, install and smoke test in fresh ${UBUNTU_IMAGE} container ==="
@@ -59,11 +59,11 @@ for UBUNTU_IMAGE in ubuntu:22.04 ubuntu:24.04; do
             }
 
             # Import GPG key and verify signatures (always produced by the build).
-            if [[ ! -f /debs/DEB-GPG-KEY-avalanchego ]]; then
-                echo "ERROR: DEB-GPG-KEY-avalanchego not found; build did not export a key" >&2
+            if [[ ! -f /debs/GPG-KEY-avalanchego ]]; then
+                echo "ERROR: GPG-KEY-avalanchego not found; build did not export a key" >&2
                 exit 1
             fi
-            gpg --batch --import /debs/DEB-GPG-KEY-avalanchego
+            gpg --batch --import /debs/GPG-KEY-avalanchego
             verify_deb_signature "/debs/avalanchego-${TAG}-${PACKAGE_ARCH}.deb"
             verify_deb_signature "/debs/subnet-evm-${TAG}-${PACKAGE_ARCH}.deb"
 

@@ -97,10 +97,8 @@ PR builds use a synthetic tag (`v0.0.0-pr.<sha>`) and ephemeral signing.
 Non-PR builds import the real signing key from Actions secrets and upload
 packages plus the exported public key as artifacts.
 
-The exported public key names are format-specific:
-
-- `RPM-GPG-KEY-avalanchego`
-- `DEB-GPG-KEY-avalanchego`
+The exported public key is named `GPG-KEY-avalanchego` and lives next to
+each format's packages (`build/rpm/` for RPM, `build/deb/` for DEB).
 
 DEB release runs additionally upload packages to S3 under
 `linux/debs/ubuntu/{jammy,noble}/{arch}/`; the DEB public key is uploaded to
