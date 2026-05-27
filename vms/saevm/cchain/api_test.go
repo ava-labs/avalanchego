@@ -100,7 +100,7 @@ func TestGetAtomicTxStatus(t *testing.T) {
 	w := newWallet(sk, sut.snowCtx, sut.Client)
 	receiver := txtest.NewKey(t).EthAddress()
 	const txFee = 50
-	signedImport, _ := w.newImportTx(ctx, t, sut.snowCtx.XChainID, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sut.snowCtx.XChainID, receiver, txFee)
 
 	t.Run("before_execution", func(t *testing.T) {
 		got, err := sut.getTxStatus(ctx, signedImport.ID())
