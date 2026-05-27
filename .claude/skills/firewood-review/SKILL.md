@@ -1,7 +1,7 @@
 ---
 name: firewood-review
 description: Use when reviewing ava-labs/firewood code changes — pull request or local workspace. Invoke with phrases like "review PR", "review my changes", "review this branch", "firewood review". Handles PR checkout, staged/unstaged changes, Rust toolchain, Go FFI, CI workflow, and multi-agent parallel review.
-compatibility: Requires Claude Code with git, cargo/rustup, golangci-lint, and the gh CLI. Designed for use in the ava-labs/firewood workspace.
+compatibility: Requires Claude Code with git, cargo/rustup, go, and the gh CLI. Designed for use in the ava-labs/firewood workspace.
 allowed-tools: Read Write Bash Agent AskUserQuestion EnterWorktree ExitWorktree mcp__github__pull_request_read mcp__github__list_pull_requests mcp__github__get_commit mcp__github__list_commits
 ---
 
@@ -122,7 +122,7 @@ Go bindings require the FFI build to use the workspace `target/` dir (the `LDFLA
 ```bash
 cargo build -p firewood-ffi -F ethhash,logger --frozen
 cd ffi
-golangci-lint run
+./scripts/lint.sh
 go test ./... -race
 ```
 

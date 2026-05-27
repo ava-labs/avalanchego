@@ -259,12 +259,11 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: "ffi/go.mod"
-          cache-dependency-path: "ffi/go.sum"
+          cache-dependency-path: |
+            ffi/go.sum
+            ffi/tools/external/go.sum
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # @v7 -> v9.2.0
-        with:
-          version: latest
-          working-directory: ffi
+        run: ./ffi/scripts/lint.sh
       - name: Test Go FFI bindings
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks

@@ -28,4 +28,4 @@ updates:
       github-actions:
         patterns:
           - "*"
-    open-pull-requests-limit: 10 # Enable GitHub Actions updates for security
+    open-pull-requests-limit: 0 # Disable non-security version updates
