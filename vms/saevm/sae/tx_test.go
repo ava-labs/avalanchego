@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sae
+package sae_test
 
 import (
 	"fmt"
@@ -12,10 +12,12 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/saevm/saevmtest"
 )
 
 func TestTxTypeSupport(t *testing.T) {
-	ctx, sut := newSUT(t, 1)
+	ctx, sut := saevmtest.NewSUT(t, 1)
 
 	var to common.Address
 	txs := []types.TxData{
@@ -38,16 +40,16 @@ func TestTxTypeSupport(t *testing.T) {
 
 	for _, tx := range txs {
 		t.Run(fmt.Sprintf("%T", tx), func(t *testing.T) {
-			sut.sendTxsAndWaitUntilPending(t, sut.wallet.SetNonceAndSign(t, 0, tx))
+			sut.SendTxsAndWaitUntilPending(t, sut.Wallet.SetNonceAndSign(t, 0, tx))
 		})
 		if t.Failed() {
 			t.FailNow()
 		}
 	}
-	b := sut.runConsensusLoop(t)
+	b := sut.RunConsensusLoop(t)
 	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 
-	sdb := sut.stateAt(t, b.PostExecutionStateRoot())
-	got := sdb.GetNonce(sut.wallet.Addresses()[0])
+	sdb := sut.StateAt(t, b.PostExecutionStateRoot())
+	got := sdb.GetNonce(sut.Wallet.Addresses()[0])
 	require.Equal(t, uint64(len(txs)), got, "Nonce of account sending all transaction types")
 }

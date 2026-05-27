@@ -17,7 +17,6 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
@@ -198,7 +197,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		db:     newEthDB(conf.db),
+		db:     NewEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
 
@@ -212,7 +211,7 @@ func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Clien
 
 	handlers, err := snow.CreateHandlers(ctx)
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", snow)
-	server := httptest.NewServer(handlers[wsHTTPExtensionPath])
+	server := httptest.NewServer(handlers[WSHTTPExtensionPath])
 	tb.Cleanup(server.Close)
 	rpcClient, err := rpc.Dial("ws://" + server.Listener.Addr().String())
 	require.NoErrorf(tb, err, "rpc.Dial(http.NewServer(%T.CreateHandlers()))", snow)
@@ -474,36 +473,6 @@ func unwrap(tb testing.TB, b snowman.Block) *blocks.Block {
 		tb.Fatalf("snowman.Block of concrete type %T", b)
 		return nil
 	}
-}
-
-// assertBlockHashInvariants MUST NOT be called concurrently with
-// [VM.AcceptBlock] as it depends on the last-accepted block. It also blocks
-// until said block has finished execution.
-func (s *SUT) assertBlockHashInvariants(ctx context.Context, t *testing.T) {
-	t.Helper()
-	t.Run("block_hash_invariants", func(t *testing.T) {
-		b := s.lastAcceptedBlock(t)
-		require.NoError(t, b.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
-		t.Logf("Last accepted (and executed) block: %d", b.Height())
-
-		for num, want := range map[rpc.BlockNumber]common.Hash{
-			rpc.BlockNumber(b.Number().Int64()): b.Hash(),
-			rpc.LatestBlockNumber:               b.Hash(),               // Because we've waited until it's executed
-			rpc.SafeBlockNumber:                 b.LastSettled().Hash(), // Safe from disk corruption, not re-org, as acceptance guarantees finality
-			rpc.FinalizedBlockNumber:            b.LastSettled().Hash(), // Because we maintain label monotonicity
-		} {
-			t.Run(num.String(), func(t *testing.T) {
-				got, err := s.Client.HeaderByNumber(ctx, big.NewInt(num.Int64()))
-				require.NoErrorf(t, err, "%T.HeaderByNumber(%v)", s.Client, num)
-				assert.Equalf(t, want, got.Hash(), "%T.HeaderByNumber(%v).Hash()", s.Client, num)
-			})
-		}
-
-		// The RPC implementation doesn't use the database to resolve the block
-		// labels above, so we still need to check them.
-		assert.Equal(t, b.Hash(), rawdb.ReadHeadBlockHash(s.db), "rawdb.ReadHeadBlockHash() MUST reflect last-executed block")
-		assert.Equal(t, b.LastSettled().Hash(), rawdb.ReadFinalizedBlockHash(s.db), "rawdb.ReadFinalizedBlockHash() MUST reflect last-settled block")
-	})
 }
 
 func TestIntegration(t *testing.T) {

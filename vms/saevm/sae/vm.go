@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
@@ -25,11 +26,13 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -413,6 +416,30 @@ func (vm *VM) close() error {
 // Version reports the VM's version.
 func (*VM) Version(context.Context) (string, error) {
 	return version.Current.String(), nil
+}
+
+func (vm *VM) LastAcceptedBlock() *blocks.Block {
+	return vm.last.accepted.Load()
+}
+
+func (vm *VM) LastSettledBlock() *blocks.Block {
+	return vm.last.settled.Load()
+}
+
+func (vm *VM) StateDB(root common.Hash) (*state.StateDB, error) {
+	return vm.exec.StateDB(root)
+}
+
+func (vm *VM) TxPool() *txpool.TxPool {
+	return vm.mempool.Pool
+}
+
+func (vm *VM) NodeID() ids.NodeID {
+	return vm.snowCtx.NodeID
+}
+
+func (vm *VM) PublicKey() *bls.PublicKey {
+	return vm.snowCtx.PublicKey
 }
 
 func (vm *VM) log() logging.Logger {
