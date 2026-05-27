@@ -2,6 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "saevmtest",
+    testonly = True,
     srcs = ["sut.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/saevmtest",
     visibility = ["//visibility:public"],
