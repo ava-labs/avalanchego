@@ -3,29 +3,18 @@
 
 package sae
 
-import (
-	"github.com/prometheus/client_golang/prometheus"
-
-	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
-)
+import "github.com/prometheus/client_golang/prometheus"
 
 // lastSettledHeightName names the gauge for the height of the last settled
 // block.
 const lastSettledHeightName = "last_settled_height"
 
 type metrics struct {
-	registry          *prometheus.Registry
 	lastSettledHeight prometheus.Gauge
 }
 
-func newMetrics(snowMetrics apimetrics.MultiGatherer) (*metrics, error) {
-	reg, err := apimetrics.MakeAndRegister(snowMetrics, "sae")
-	if err != nil {
-		return nil, err
-	}
-
+func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 	m := &metrics{
-		registry: reg,
 		lastSettledHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: lastSettledHeightName,
 			Help: "Height of the latest block that has settled.",

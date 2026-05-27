@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -123,7 +124,11 @@ func NewVM[T hook.Transaction](
 		cfg.Now = time.Now
 	}
 
-	m, err := newMetrics(snowCtx.Metrics)
+	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
+	if err != nil {
+		return nil, fmt.Errorf("registering sae metrics: %w", err)
+	}
+	m, err := newMetrics(reg)
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
@@ -180,7 +185,7 @@ func NewVM[T hook.Transaction](
 			cfg.DBConfig,
 			hooks,
 			snowCtx.Log,
-			vm.metrics.registry,
+			reg,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("saexec.New(...): %v", err)
@@ -217,7 +222,7 @@ func NewVM[T hook.Transaction](
 		}
 		vm.toClose = append(vm.toClose, txPool)
 
-		bloomMetrics, err := bloom.NewMetrics("mempool", vm.metrics.registry)
+		bloomMetrics, err := bloom.NewMetrics("mempool", reg)
 		if err != nil {
 			return nil, err
 		}
@@ -242,7 +247,7 @@ func NewVM[T hook.Transaction](
 	}
 
 	{ // ==========  P2P Gossip  ==========
-		network, peers, validatorPeers, err := newNetwork(snowCtx, sender, vm.metrics.registry)
+		network, peers, validatorPeers, err := newNetwork(snowCtx, sender, reg)
 		if err != nil {
 			return nil, fmt.Errorf("newNetwork(...): %v", err)
 		}
@@ -256,7 +261,7 @@ func NewVM[T hook.Transaction](
 			txgossip.Marshaller{},
 			gossip.SystemConfig{
 				Log:           snowCtx.Log,
-				Registry:      vm.metrics.registry,
+				Registry:      reg,
 				Namespace:     "gossip",
 				RequestPeriod: pullGossipPeriod,
 			},
