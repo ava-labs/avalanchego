@@ -14,6 +14,9 @@ on:
       - ".github/packaging/**"
       - ".github/workflows/build-deb-release.yml"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-deb:
     strategy:
@@ -79,7 +82,7 @@ jobs:
           path: |
             build/deb/avalanchego-${{ steps.setup.outputs.tag }}-${{ matrix.deb_arch }}.deb
             build/deb/subnet-evm-${{ steps.setup.outputs.tag }}-${{ matrix.deb_arch }}.deb
-            build/deb/DEB-GPG-KEY-avalanchego
+            build/deb/GPG-KEY-avalanchego
 
       - name: Cleanup
         if: always()
@@ -135,6 +138,6 @@ jobs:
               "s3://${BUCKET}/linux/debs/ubuntu/${release}/${DEB_ARCH}/"
             aws s3 cp "build/deb/subnet-evm-${TAG}-${DEB_ARCH}.deb" \
               "s3://${BUCKET}/linux/debs/ubuntu/${release}/${DEB_ARCH}/"
-            aws s3 cp "build/deb/DEB-GPG-KEY-avalanchego" \
+            aws s3 cp "build/deb/GPG-KEY-avalanchego" \
               "s3://${BUCKET}/linux/debs/ubuntu/${release}/"
           done

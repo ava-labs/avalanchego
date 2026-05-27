@@ -4,10 +4,11 @@
 
 set -euo pipefail
 
-: "${VERSION:?VERSION must be set}"
-: "${TAG:?TAG must be set}"
-: "${PACKAGE_ARCH:?PACKAGE_ARCH must be set}"
-: "${OUTPUT_DIR:?OUTPUT_DIR must be set}"
+: "${PACKAGE:?PACKAGE must be set (avalanchego or subnet-evm)}"
+: "${VERSION:?VERSION must be set (semantic version without v prefix, e.g. 1.14.1)}"
+: "${TAG:?TAG must be set (git tag, e.g. v1.14.1)}"
+: "${PACKAGE_ARCH:?PACKAGE_ARCH must be set (x86_64/aarch64 for RPM, amd64/arm64 for DEB)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR must be set (bind-mounted directory for the produced package)}"
 : "${NFPM_PACKAGER:?NFPM_PACKAGER must be set (rpm or deb)}"
 
 NFPM_PACKAGER="${NFPM_PACKAGER,,}"
@@ -38,7 +39,7 @@ generate_changelog "${VERSION}"
 
 # ── GPG signing ───────────────────────────────────────────────────
 
-GPG_PUBLIC_KEY="${OUTPUT_DIR}/${pkg_format_upper}-GPG-KEY-avalanchego"
+GPG_PUBLIC_KEY="${OUTPUT_DIR}/GPG-KEY-avalanchego"
 
 # nfpm reads the signing passphrase from a packager-specific env var
 # (NFPM_RPM_PASSPHRASE, NFPM_DEB_PASSPHRASE, ...); mirror our format-
