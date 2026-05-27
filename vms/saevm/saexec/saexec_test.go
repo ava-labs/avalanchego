@@ -36,6 +36,7 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
@@ -68,7 +69,7 @@ type SUT struct {
 	saedbConfig saedb.Config
 	chain       *blockstest.ChainBuilder
 	wallet      *saetest.Wallet
-	logger      *saetest.TBLogger
+	logger      *loggingtest.TBLogger
 	db          ethdb.Database
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
@@ -91,7 +92,7 @@ type (
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
-	logger := saetest.NewTBLogger(tb, logging.Warn)
+	logger := loggingtest.NewTBLogger(tb, logging.Warn)
 	ctx := logger.CancelOnError(tb.Context())
 
 	sutCfg := options.ApplyTo(&sutConfig{
@@ -693,7 +694,7 @@ func FuzzOpCodes(f *testing.F) {
 		// Ensure that the SUT [logging.Logger] remains of this type so >=WARN
 		// logs become failures.
 		//nolint:staticcheck
-		var logger *saetest.TBLogger = sut.logger
+		var logger *loggingtest.TBLogger = sut.logger
 		// Errors in execution (i.e. reverts) are fine, but we don't want them
 		// bubbling up any further.
 		require.NoErrorf(t, sut.execute(b, logger), "%T.execute()", sut.Executor)

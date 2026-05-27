@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -33,7 +33,7 @@ func newEthBlock(num, time uint64, parent *types.Block) *types.Block {
 
 func newBlock(tb testing.TB, eth *types.Block, parent, lastSettled *Block) *Block {
 	tb.Helper()
-	b, err := New(eth, parent, lastSettled, saetest.NewTBLogger(tb, logging.Warn))
+	b, err := New(eth, parent, lastSettled, loggingtest.NewTBLogger(tb, logging.Warn))
 	require.NoError(tb, err, "New()")
 	return b
 }
@@ -90,7 +90,7 @@ func TestSetAncestors(t *testing.T) {
 
 	t.Run("incorrect_parent", func(t *testing.T) {
 		// Note that the arguments to [New] are inverted.
-		_, err := New(child, lastSettled, parent, saetest.NewTBLogger(t, logging.Warn))
+		_, err := New(child, lastSettled, parent, loggingtest.NewTBLogger(t, logging.Warn))
 		require.ErrorIs(t, err, errParentHashMismatch, "New() with inverted parent and last-settled blocks")
 	})
 

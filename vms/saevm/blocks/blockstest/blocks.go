@@ -24,11 +24,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -96,7 +96,7 @@ func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block
 
 	props := options.ApplyTo(&blockProperties{}, opts...)
 	if props.logger == nil {
-		props.logger = saetest.NewTBLogger(tb, logging.Warn)
+		props.logger = loggingtest.NewTBLogger(tb, logging.Warn)
 	}
 
 	b, err := blocks.New(eth, parent, lastSettled, props.logger)
