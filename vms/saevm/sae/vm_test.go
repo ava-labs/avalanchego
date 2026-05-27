@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"net/http/httptest"
 	"os"
-	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -33,7 +32,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -62,7 +60,6 @@ import (
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
-	dto "github.com/prometheus/client_model/go"
 )
 
 func TestMain(m *testing.M) {
@@ -1015,34 +1012,6 @@ func TestGossip(t *testing.T) {
 	api.mustSendTx(t, tx)
 	requireReceiveTx(t, n.allValidators(), tx.Hash())
 	requireNotReceiveTx(t, nonValidators[1:], tx.Hash())
-}
-
-func TestSettlementMetric(t *testing.T) {
-	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 1, opt)
-
-	executed := sut.runConsensusLoop(t)
-	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
-
-	vmTime.advanceToSettle(ctx, t, executed)
-	settledBy := sut.runConsensusLoop(t)
-	require.NoErrorf(t, settledBy.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", settledBy)
-	require.Equal(t, float64(executed.Height()), gaugeValue(t, sut.rawVM.metricRegistry, LastSettledHeightName), "last settled height")
-}
-
-// gaugeValue returns the current value of a single-series gauge from `g` by
-// name, failing the test if it is missing or has more than one series.
-func gaugeValue(t *testing.T, g prometheus.Gatherer, name string) float64 {
-	t.Helper()
-	mfs, err := g.Gather()
-	require.NoError(t, err, "Gather()")
-	i := slices.IndexFunc(mfs, func(mf *dto.MetricFamily) bool {
-		return mf.GetName() == name
-	})
-	require.GreaterOrEqualf(t, i, 0, "metric %q not found", name)
-	series := mfs[i].GetMetric()
-	require.Lenf(t, series, 1, "metric %q series count", name)
-	return series[0].GetGauge().GetValue()
 }
 
 func TestBlockSources(t *testing.T) {

@@ -13,7 +13,6 @@ import (
 	"slices"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
@@ -176,16 +175,18 @@ func TestExecutionSynchronisation(t *testing.T) {
 
 func TestExecutionMetrics(t *testing.T) {
 	ctx, sut := newSUT(t)
-	b := sut.chain.NewBlock(t, nil)
 
+	// [Executor.sendPostExecutionEvents] sets the gauge immediately before
+	// emitting the chain-head event, so receiving the event guarantees the
+	// gauge has been updated.
+	headEvents := saetest.NewEventCollector(sut.SubscribeChainHeadEvent)
+
+	b := sut.chain.NewBlock(t, nil)
 	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
-	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	// [Executor.afterExecution] updates LastExecutedHeight after
-	// [blocks.Block.MarkExecuted] returns, so the gauge can lag behind
-	// [blocks.Block.WaitUntilExecuted] unblocking for a brief period.
-	require.Eventually(t, func() bool {
-		return testutil.ToFloat64(sut.metrics.lastExecutedHeight) == float64(b.Height())
-	}, time.Second, 10*time.Millisecond, "last executed height")
+	require.NoError(t, headEvents.WaitForAtLeast(ctx, 1), "EventCollector.WaitForAtLeast()")
+
+	require.Equal(t, float64(b.Height()), testutil.ToFloat64(sut.metrics.lastExecutedHeight), "last executed height")
+	require.NoError(t, headEvents.Unsubscribe(), "EventCollector.Unsubscribe()")
 }
 
 func TestReceiptPropagation(t *testing.T) {
