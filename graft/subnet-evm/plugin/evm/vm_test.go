@@ -3608,7 +3608,6 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 	tests := []struct {
 		name     string
 		vmConfig string
-		testF    func(t *testing.T, c ethclient.Client, blockNum uint64)
 	}{
 		{
 			name: "every revision persisted on disk",
@@ -3622,18 +3621,11 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 				"commit-interval": 1,
 				"state-history": 2
 			}`,
-			// Querying the nonce of the zero address is sufficient: it succeeds
-			// only if the EVM can open the matching trie at each height.
-			testF: func(t *testing.T, c ethclient.Client, blockNum uint64) {
-				nonce, err := c.NonceAt(t.Context(), common.Address{}, new(big.Int).SetUint64(blockNum))
-				require.NoError(t, err)
-				require.Zero(t, nonce)
-			},
 		},
 		{
 			name: "revisions reconstructed via reexecution",
 			// Setting commit-interval = 10 means that the Firewood background
-			// deferred persistence worked persists every ceil(10/2) = 5 commits
+			// deferred persistence worker persists every ceil(10/2) = 5 commits
 			// to disk. After restart, queries against non-persisted blocks must
 			// walk back to the nearest persisted revision (or genesis) and
 			// re-execute forward.
@@ -3645,13 +3637,6 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 				"commit-interval": 10,
 				"state-history": 11
 			}`,
-			// Checking the sender's nonce (which should equal the block number)
-			// verifies that the reconstructed state is correct, not just openable.
-			testF: func(t *testing.T, c ethclient.Client, blockNum uint64) {
-				nonce, err := c.NonceAt(t.Context(), testEthAddrs[0], new(big.Int).SetUint64(blockNum))
-				require.NoError(t, err)
-				require.Equal(t, blockNum, nonce)
-			},
 		},
 	}
 
@@ -3726,8 +3711,13 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 				require.NoError(t, err)
 
 				for i := range numBlocks {
-					blockNum := i + 1
-					tt.testF(t, client, uint64(blockNum))
+					blockNum := uint64(i + 1)
+
+					// Checking the sender's nonce (which should equal the block number)
+					// verifies that the reconstructed state is both openable and correct.
+					nonce, err := client.NonceAt(ctx, testEthAddrs[0], new(big.Int).SetUint64(blockNum))
+					require.NoError(t, err)
+					require.Equal(t, blockNum, nonce)
 				}
 			})
 		})
