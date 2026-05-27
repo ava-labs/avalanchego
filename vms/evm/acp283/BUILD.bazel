@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "acp283",
+    srcs = ["acp283.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/acp283",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/math",
+        "//vms/components/gas",
+    ],
+)
+
+go_test(
+    name = "acp283_test",
+    srcs = ["acp283_test.go"],
+    embed = [":acp283"],
+    deps = [
+        "//vms/components/gas",
+        "@com_github_stretchr_testify//require",
+    ],
+)
