@@ -106,7 +106,7 @@ func withLegacyBackend() sutOption {
 
 func newState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
 	ctx := snowtest.Context(tb, snowtest.CChainID)
-	ctx.Log = loggingtest.NewTBLogger(tb, logging.Debug)
+	ctx.Log = loggingtest.New(tb, logging.Debug)
 	ctx.SharedMemory = sm
 
 	s, err := New(ctx, db)

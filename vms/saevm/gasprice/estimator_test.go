@@ -102,7 +102,7 @@ func newSUT(tb testing.TB, c Config) *SUT {
 	genesis := blockstest.NewGenesis(tb, db, xdb, config, types.GenesisAlloc{})
 	chain := blockstest.NewChainBuilder(genesis)
 
-	log := loggingtest.NewTBLogger(tb, logging.Debug)
+	log := loggingtest.New(tb, logging.Debug)
 	e, err := NewEstimator(chain, log, c)
 	require.NoError(tb, err, "NewEstimator()")
 	tb.Cleanup(func() {

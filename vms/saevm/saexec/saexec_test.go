@@ -69,7 +69,7 @@ type SUT struct {
 	saedbConfig saedb.Config
 	chain       *blockstest.ChainBuilder
 	wallet      *saetest.Wallet
-	logger      *loggingtest.TBLogger
+	logger      *loggingtest.Logger
 	db          ethdb.Database
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
@@ -92,7 +92,7 @@ type (
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
-	logger := loggingtest.NewTBLogger(tb, logging.Warn)
+	logger := loggingtest.New(tb, logging.Warn)
 	ctx := logger.CancelOnError(tb.Context())
 
 	sutCfg := options.ApplyTo(&sutConfig{
@@ -694,7 +694,7 @@ func FuzzOpCodes(f *testing.F) {
 		// Ensure that the SUT [logging.Logger] remains of this type so >=WARN
 		// logs become failures.
 		//nolint:staticcheck
-		var logger *loggingtest.TBLogger = sut.logger
+		var logger *loggingtest.Logger = sut.logger
 		// Errors in execution (i.e. reverts) are fine, but we don't want them
 		// bubbling up any further.
 		require.NoErrorf(t, sut.execute(b, logger), "%T.execute()", sut.Executor)

@@ -91,7 +91,7 @@ func TestSettlementInvariants(t *testing.T) {
 		assert.NoError(t, b.WaitUntilSettled(t.Context()), "WaitUntilSettled()")
 		assert.NoError(t, b.CheckInvariants(Settled), "CheckInvariants(Settled)")
 
-		rec := loggingtest.NewLogRecorder(logging.Warn)
+		rec := loggingtest.NewRecorder(logging.Warn)
 		b.log = rec
 		assertNumErrorLogs := func(t *testing.T, want int) {
 			t.Helper()
@@ -108,7 +108,7 @@ func TestSettlementInvariants(t *testing.T) {
 			t.FailNow()
 		}
 
-		want := []*loggingtest.LogRecord{
+		want := []*loggingtest.Record{
 			{
 				Level: logging.Error,
 				Msg:   getParentOfSettledErrMsg,

@@ -96,7 +96,7 @@ func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block
 
 	props := options.ApplyTo(&blockProperties{}, opts...)
 	if props.logger == nil {
-		props.logger = loggingtest.NewTBLogger(tb, logging.Warn)
+		props.logger = loggingtest.New(tb, logging.Warn)
 	}
 
 	b, err := blocks.New(eth, parent, lastSettled, props.logger)

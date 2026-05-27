@@ -142,7 +142,7 @@ func TestMarkExecuted(t *testing.T) {
 			}
 
 			t.Run("MarkExecuted_again", func(t *testing.T) {
-				rec := loggingtest.NewLogRecorder(logging.Warn)
+				rec := loggingtest.NewRecorder(logging.Warn)
 				b.log = rec
 				require.ErrorIs(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), errMarkBlockExecutedAgain)
 				// The database's head block might have been corrupted so this MUST

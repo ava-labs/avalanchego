@@ -136,7 +136,7 @@ func newSUT(tb testing.TB, state libevm.StateReader) *SUT {
 
 	backend := newBackend(state)
 	ctx := snowtest.Context(tb, snowtest.CChainID)
-	ctx.Log = loggingtest.NewTBLogger(tb, logging.Debug)
+	ctx.Log = loggingtest.New(tb, logging.Debug)
 	pool, err := New(
 		ctx,
 		saetest.ChainConfig(),
