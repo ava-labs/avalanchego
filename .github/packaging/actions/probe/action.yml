@@ -1,0 +1,10 @@
+name: packaging-probe
+description: Probe that a local action can be invoked after packaging overlay
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        test -f .github/packaging/Taskfile.yml
+        echo "packaging probe action ran"
