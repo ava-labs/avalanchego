@@ -129,7 +129,7 @@ func TestNewZeroTarget(t *testing.T) {
 	tm := proxytime.Of[gas.Gas](time.Unix(0, 0))
 	tm.SetRate(0)
 	_, err := FromProxyTime(tm, 0, DefaultGasPriceConfig())
-	require.ErrorIs(t, err, errZeroTarget)
+	require.ErrorIs(t, err, errZeroTarget, "FromProxyTime()")
 }
 
 func TestExcess(t *testing.T) {
