@@ -351,8 +351,7 @@ func TestLastToSettleAt(t *testing.T) {
 		require.Equal(t, proxytime.FractionalSecond[gas.Gas]{Numerator: 1, Denominator: 10}, tm.Fraction())
 		blocks[24].markExecutedForTests(t, db, xdb, tm)
 
-		partiallyExecutedAt := proxytime.New[gas.Gas](27, 100)
-		partiallyExecutedAt.Tick(1)
+		partiallyExecutedAt := proxytime.New[gas.Gas](27, 1, 100)
 		blocks[25].SetInterimExecutionTime(partiallyExecutedAt)
 
 		tests = append(tests, testCase{
