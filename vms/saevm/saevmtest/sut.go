@@ -38,14 +38,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
 
@@ -53,7 +52,6 @@ import (
 var ChainID = ids.GenerateTestID()
 
 type Config struct {
-	Hooks       *hookstest.Stub
 	VMConfig    sae.Config
 	LogLevel    logging.Level
 	Genesis     core.Genesis
@@ -69,22 +67,9 @@ func WithVMTime(tb testing.TB, startTime time.Time) (Option, *VMTime) {
 	tb.Helper()
 	t := &VMTime{Time: startTime}
 	opt := options.Func[Config](func(c *Config) {
-		// TODO(StephenButtolph) unify the time functions provided in the config
-		// and the hooks.
-		c.Hooks.Now = t.Now
 		c.VMConfig.Now = t.Now
 	})
 	return opt, t
-}
-
-// WithExecResultsDB returns an option that replaces the default
-// execution-results database with the provided one.
-func WithExecResultsDB(hdb database.HeightIndex) Option {
-	return options.Func[Config](func(c *Config) {
-		c.Hooks.ExecutionResultsDBFn = func(string) (saetypes.ExecutionResults, error) {
-			return saetypes.ExecutionResults{HeightIndex: hdb}, nil
-		}
-	})
 }
 
 func WithCommitInterval(interval uint64) Option {
@@ -135,14 +120,14 @@ type SUT struct {
 	Genesis *blocks.Block
 	Wallet  *saetest.Wallet
 	DB      ethdb.Database
-	Hooks   *hookstest.Stub
 	Logger  *saetest.TBLogger
 
 	Validators *validatorstest.State
 	Sender     *enginetest.Sender
 }
 
-func NewSUT(tb testing.TB, numAccounts uint, opts ...Option) (context.Context, *SUT) {
+// NewSUT constructs a [SUT] using the provided hooks.
+func NewSUT[T hook.Transaction](tb testing.TB, numAccounts uint, hooks hook.PointsG[T], opts ...Option) (context.Context, *SUT) {
 	tb.Helper()
 
 	mempoolConf := legacypool.DefaultConfig // copies
@@ -150,11 +135,7 @@ func NewSUT(tb testing.TB, numAccounts uint, opts ...Option) (context.Context, *
 
 	keys := saetest.NewUNSAFEKeyChain(tb, numAccounts)
 
-	xdb := saetest.NewExecutionResultsDB()
 	conf := options.ApplyTo(&Config{
-		Hooks: hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
-			return xdb, nil
-		})),
 		VMConfig: sae.Config{
 			MempoolConfig: mempoolConf,
 		},
@@ -168,7 +149,7 @@ func NewSUT(tb testing.TB, numAccounts uint, opts ...Option) (context.Context, *
 		DB: memdb.New(),
 	}, opts...)
 
-	vm := sae.NewSinceGenesis(conf.Hooks, conf.VMConfig)
+	vm := sae.NewSinceGenesis(hooks, conf.VMConfig)
 	snow := adaptor.Convert(vm)
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
@@ -225,7 +206,6 @@ func NewSUT(tb testing.TB, numAccounts uint, opts ...Option) (context.Context, *
 			types.LatestSigner(conf.Genesis.Config),
 		),
 		DB:     sae.NewEthDB(conf.DB),
-		Hooks:  conf.Hooks,
 		Logger: logger,
 
 		Validators: validators,

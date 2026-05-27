@@ -16,9 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saevmtest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 func TestAcceptBlock(t *testing.T) {
@@ -38,7 +41,12 @@ func TestAcceptBlock(t *testing.T) {
 
 	opt, vmTime := saevmtest.WithVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
-	ctx, sut := saevmtest.NewSUT(t, 1, opt)
+	xdb := saetest.NewExecutionResultsDB()
+	hooks := hookstest.NewStub(100e6,
+		hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) { return xdb, nil }),
+		hookstest.WithNow(vmTime.Now),
+	)
+	ctx, sut := saevmtest.NewSUT(t, 1, hooks, opt)
 	// Causes [VM.AcceptBlock] to wait until the block has executed.
 	require.NoError(t, sut.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
 

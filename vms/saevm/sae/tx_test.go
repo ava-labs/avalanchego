@@ -13,11 +13,19 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saevmtest"
+
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 func TestTxTypeSupport(t *testing.T) {
-	ctx, sut := saevmtest.NewSUT(t, 1)
+	xdb := saetest.NewExecutionResultsDB()
+	hooks := hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(
+		func(string) (saetypes.ExecutionResults, error) { return xdb, nil },
+	))
+	ctx, sut := saevmtest.NewSUT(t, 1, hooks)
 
 	var to common.Address
 	txs := []types.TxData{

@@ -26,11 +26,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saevmtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 type worstCaseFlags struct {
@@ -152,7 +155,11 @@ func TestWorstCase(t *testing.T) {
 		// Although the precompile is part of the test harness, its behaviour is
 		// key to the correctness of the rest of the tests, so we run a few
 		// tests on it.
-		ctx, sut := saevmtest.NewSUT(t, 1, sutOpt)
+		xdb := saetest.NewExecutionResultsDB()
+		hooks := hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(
+			func(string) (saetypes.ExecutionResults, error) { return xdb, nil },
+		))
+		ctx, sut := saevmtest.NewSUT(t, 1, hooks, sutOpt)
 
 		newU64 := func(u uint64) *uint64 {
 			return &u
@@ -208,7 +215,12 @@ func TestWorstCase(t *testing.T) {
 
 			timeOpt, vmTime := saevmtest.WithVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
-			ctx, sut := saevmtest.NewSUT(t, flags.numAccounts, sutOpt, timeOpt)
+			xdb := saetest.NewExecutionResultsDB()
+			hooks := hookstest.NewStub(100e6,
+				hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) { return xdb, nil }),
+				hookstest.WithNow(vmTime.Now),
+			)
+			ctx, sut := saevmtest.NewSUT(t, flags.numAccounts, hooks, sutOpt, timeOpt)
 
 			addrs := sut.Wallet.Addresses()
 			numEOAs := len(addrs)
