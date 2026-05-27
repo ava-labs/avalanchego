@@ -71,15 +71,11 @@ build_binary() {
 
 # Resolve the subnet-evm VM ID from the canonical constants file.
 # Sets SUBNET_EVM_VM_ID (global) as a side effect.
-#
-# Older subnet-evm constants.sh revisions (e.g., v1.14.1) print
-# "Using branch: ..." to stdout when sourced; discard that while
-# capturing so SUBNET_EVM_VM_ID is exactly DEFAULT_VM_ID.
 resolve_subnet_evm_vm_id() {
     SUBNET_EVM_VM_ID="$(
         {
             # shellcheck disable=SC1091
-            source "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh" >/dev/null
+            source "${REPO_ROOT}/graft/subnet-evm/scripts/constants.sh"
             # shellcheck disable=SC2154
             : "${DEFAULT_VM_ID:?DEFAULT_VM_ID must be set by constants.sh}"
         } >&2
