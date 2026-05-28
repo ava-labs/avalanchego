@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 )
@@ -56,7 +55,7 @@ func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
 	ctx, sut := newSUT(t)
 
 	sk := txtest.NewKey(t) // sk is NOT funded.
-	w := newWallet(sk, sut.snowCtx, sut.Client)
+	w := newWallet(sk, sut.ctx, sut.Client)
 	stx := w.newMinimalTx(t)
 
 	err := sut.IssueTx(ctx, stx)
@@ -77,18 +76,19 @@ func TestGetTxNotFound(t *testing.T) {
 func TestGetUTXOsPagination(t *testing.T) {
 	ctx, sut := newSUT(t)
 
+	sourceChain := sut.ctx.XChainID
 	const numUTXOs uint64 = 5
 	want := make([]*avax.UTXO, numUTXOs)
 	addr := txtest.NewKey(t).Address()
 	for i := range numUTXOs {
-		want[i] = txtest.NewUTXO(i+1, sut.snowCtx.AVAXAssetID, addr)
+		want[i] = txtest.NewUTXO(i+1, sut.ctx.AVAXAssetID, addr)
 	}
-	sut.addUTXOs(t, snowtest.XChainID, want...)
+	sut.addUTXOs(t, sut.ctx.ChainID, sourceChain, want...)
 
 	// pageSize=1 stresses the boundary behavior so any off-by-one in the cursor
 	// logic will surface here.
 	const pageSize = 1
-	got := sut.Client.getAllUTXOs(ctx, t, snowtest.XChainID, pageSize, addr)
+	got := sut.Client.getAllUTXOs(ctx, t, sourceChain, pageSize, addr)
 	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
 		t.Errorf("paginated UTXOs (-want +got):\n%s", diff)
 	}

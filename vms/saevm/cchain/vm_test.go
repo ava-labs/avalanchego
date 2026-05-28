@@ -64,7 +64,6 @@ type SUT struct {
 	*VM
 	*Client
 
-	snowCtx   *snow.Context
 	memory    *atomic.Memory
 	ethclient *ethclient.Client
 }
@@ -153,7 +152,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	return ctx, &SUT{
 		VM:        vm,
 		Client:    NewClient(server.URL),
-		snowCtx:   snowCtx,
 		memory:    memory,
 		ethclient: ethclient.NewClient(ethRPCClient),
 	}
@@ -198,9 +196,9 @@ func (s *SUT) assertUTXOsMissing(tb testing.TB, readerChainID, writerChainID ids
 	}
 }
 
-// addUTXOs puts the given UTXOs into shared memory between peerChainID and the
-// C-Chain.
-func (s *SUT) addUTXOs(tb testing.TB, peerChainID ids.ID, utxos ...*avax.UTXO) {
+// addUTXOs acts as the writer chain and inserts the given UTXOs so that the
+// reader chain can read them in the future.
+func (s *SUT) addUTXOs(tb testing.TB, readerChainID, writerChainID ids.ID, utxos ...*avax.UTXO) {
 	tb.Helper()
 
 	elems := make([]*atomic.Element, len(utxos))
@@ -215,11 +213,11 @@ func (s *SUT) addUTXOs(tb testing.TB, peerChainID ids.ID, utxos ...*avax.UTXO) {
 		}
 		elems[i] = e
 	}
-	peerMemory := s.memory.NewSharedMemory(peerChainID)
-	err := peerMemory.Apply(map[ids.ID]*atomic.Requests{
-		snowtest.CChainID: {PutRequests: elems},
+	writerMemory := s.memory.NewSharedMemory(writerChainID)
+	err := writerMemory.Apply(map[ids.ID]*atomic.Requests{
+		readerChainID: {PutRequests: elems},
 	})
-	require.NoErrorf(tb, err, "%T.Apply()", peerMemory)
+	require.NoErrorf(tb, err, "%T.Apply()", writerMemory)
 }
 
 // balance returns the balance of addr at the last-executed state.
@@ -491,8 +489,8 @@ func TestExport(t *testing.T) {
 	}))
 
 	var (
-		w                = newWallet(sk, sut.snowCtx, sut.Client)
-		destinationChain = sut.snowCtx.XChainID
+		w                = newWallet(sk, sut.ctx, sut.Client)
+		destinationChain = sut.ctx.XChainID
 	)
 	const (
 		txFee          = 50
@@ -523,17 +521,13 @@ func TestImport(t *testing.T) {
 	const utxoAmount = 100
 	var (
 		sk          = txtest.NewKey(t)
-		utxo        = txtest.NewUTXO(utxoAmount, sut.snowCtx.AVAXAssetID, sk.Address())
-		sourceChain = sut.snowCtx.XChainID
+		utxo        = txtest.NewUTXO(utxoAmount, sut.ctx.AVAXAssetID, sk.Address())
+		sourceChain = sut.ctx.XChainID
 	)
-	sut.addUTXOs(
-		t,
-		sourceChain,
-		utxo,
-	)
+	sut.addUTXOs(t, sut.ctx.ChainID, sourceChain, utxo)
 
 	var (
-		w        = newWallet(sk, sut.snowCtx, sut.Client)
+		w        = newWallet(sk, sut.ctx, sut.Client)
 		receiver = txtest.NewKey(t).EthAddress()
 	)
 	const txFee = 50
@@ -569,7 +563,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		blocks     = make([]*blocks.Block, len(keys))
 	)
 	for i, sk := range keys {
-		stx := newWallet(sk, sut.snowCtx, sut.Client).newMinimalTx(t)
+		stx := newWallet(sk, sut.ctx, sut.Client).newMinimalTx(t)
 		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(tx)", sut.Client)
 
 		// Delaying acceptance ensures that already-issued txs are still in the
@@ -623,8 +617,8 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 
 	// Export gives us observable external state.
 	var (
-		w                = newWallet(exportKey, sut.snowCtx, sut.Client)
-		destinationChain = sut.snowCtx.XChainID
+		w                = newWallet(exportKey, sut.ctx, sut.Client)
+		destinationChain = sut.ctx.XChainID
 	)
 	const (
 		txFee          = 50
