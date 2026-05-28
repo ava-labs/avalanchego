@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -43,6 +44,7 @@ type HeaderExtra struct {
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
+	MinPriceExcess   *acp283.PriceExcess
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.
@@ -124,6 +126,10 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		e := *h.MinDelayExcess
 		cp.MinDelayExcess = &e
 	}
+	if h.MinPriceExcess != nil {
+		e := *h.MinPriceExcess
+		cp.MinPriceExcess = &e
+	}
 	SetHeaderExtra(dst, cp)
 }
 
@@ -177,6 +183,7 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.BlockGasCost = extras.BlockGasCost
 	h.TimeMilliseconds = extras.TimeMilliseconds
 	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
+	h.MinPriceExcess = (*uint64)(extras.MinPriceExcess)
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -185,6 +192,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
+	extras.MinPriceExcess = (*acp283.PriceExcess)(h.MinPriceExcess)
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -245,6 +253,10 @@ type HeaderSerializable struct {
 	// MinDelayExcess was added by Granite and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
+
+	// MinPriceExcess was added by Helicon (ACP-283) and is ignored in legacy headers.
+	// We use *uint64 type here to avoid rlpgen generating incorrect code
+	MinPriceExcess *uint64 `json:"minPriceExcess" rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -263,6 +275,7 @@ type headerMarshaling struct {
 	ExcessBlobGas    *hexutil.Uint64
 	TimeMilliseconds *hexutil.Uint64
 	MinDelayExcess   *hexutil.Uint64
+	MinPriceExcess   *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
