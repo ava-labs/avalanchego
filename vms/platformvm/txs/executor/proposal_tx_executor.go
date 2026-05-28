@@ -56,8 +56,8 @@ func ProposalTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	tx *txs.Tx,
-	onCommitState state.Diff,
-	onAbortState state.Diff,
+	onCommitState *state.Diff,
+	onAbortState *state.Diff,
 ) error {
 	proposalExecutor := proposalTxExecutor{
 		backend:       backend,
@@ -81,10 +81,10 @@ type proposalTxExecutor struct {
 	// [onCommitState] is the state used for validation.
 	// [onCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
-	onCommitState state.Diff
+	onCommitState *state.Diff
 	// [onAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
-	onAbortState state.Diff
+	onAbortState *state.Diff
 }
 
 func (*proposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
@@ -383,16 +383,26 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 
 		// Handle staker lifecycle.
-		e.onCommitState.DeleteCurrentValidator(stakerToReward)
-		e.onAbortState.DeleteCurrentValidator(stakerToReward)
+		if err := e.onCommitState.DeleteCurrentValidator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current validator from commit state: %w", err)
+		}
+
+		if err := e.onAbortState.DeleteCurrentValidator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current validator from abort state: %w", err)
+		}
 	case txs.DelegatorTx:
 		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
 
 		// Handle staker lifecycle.
-		e.onCommitState.DeleteCurrentDelegator(stakerToReward)
-		e.onAbortState.DeleteCurrentDelegator(stakerToReward)
+		if err := e.onCommitState.DeleteCurrentDelegator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current delegator from commit state: %w", err)
+		}
+
+		if err := e.onAbortState.DeleteCurrentDelegator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current delegator from abort state: %w", err)
+		}
 	default:
 		// Invariant: Permissioned stakers are removed by the advancement of
 		//            time and the current chain timestamp is == this staker's

@@ -23,27 +23,30 @@ const defaultQueueCapacity = 5000
 var (
 	_ types.Finalizer = (*Queue)(nil)
 
-	ErrFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
-	errFailedToFinalizeCodeQueue    = errors.New("failed to finalize code queue")
+	ErrQueueClosed = errors.New("code queue is closed")
 )
 
-// Queue implements the producer side of code fetching.
-// It accepts code hashes, persists durable "to-fetch" markers (idempotent per hash),
-// and enqueues the hashes as-is onto an internal channel consumed by the code syncer.
-// The queue does not perform in-memory deduplication or local-code checks - that is
-// the responsibility of the consumer.
+// Queue is a fan-in/fan-out bridge between code hash producers (leaf sync workers)
+// and the code syncer consumer. Producers call [Queue.AddCode] which persists durable
+// disk markers and appends hashes to an internal queue. A single background goroutine
+// forwards them to the output channel. [Queue.AddCode] never blocks the caller.
+//
+// Deduplication and local-code checks are the consumer's responsibility.
 type Queue struct {
-	db   ethdb.Database
-	quit <-chan struct{}
+	db  ethdb.Database
+	out chan common.Hash // output to consumer
 
-	// `in` and `out` MUST be the same channel. We need to be able to set `in`
-	// to nil after closing, to avoid a send-after-close, but
-	// [CodeQueue.CodeHashes] MUST NOT return a nil channel otherwise consumers
-	// will block permanently.
-	in            chan<- common.Hash // Invariant: open or nil, but never closed
-	out           <-chan common.Hash // Invariant: never nil
-	chanLock      sync.RWMutex
-	closeChanOnce sync.Once // See usage in [CodeQueue.closeOutChannelOnce]
+	cancel      context.CancelFunc
+	done        <-chan struct{} // cancelled on Shutdown
+	forwardDone chan struct{}   // closed when forward() exits
+
+	closeMu     sync.RWMutex
+	closeInOnce sync.Once
+	closed      bool
+
+	pendingMu sync.Mutex
+	pending   []common.Hash
+	in        chan struct{} // producer signal, buffered to 1
 
 	capacity int
 }
@@ -59,85 +62,60 @@ func WithCapacity(n int) QueueOption {
 	})
 }
 
-// NewQueue creates a new code queue applying optional functional options.
-// The `quit` channel, if non-nil, MUST eventually be closed to avoid leaking a
-// goroutine.
-func NewQueue(db ethdb.Database, quit <-chan struct{}, opts ...QueueOption) (*Queue, error) {
-	// Create with defaults, then apply options.
+// NewQueue creates a code queue. Call [Queue.Finalize] for normal completion
+// or [Queue.Shutdown] for cancellation. Both are safe to call in any order.
+func NewQueue(db ethdb.Database, opts ...QueueOption) (*Queue, error) {
 	q := &Queue{
 		db:       db,
-		quit:     quit,
 		capacity: defaultQueueCapacity,
 	}
 	options.ApplyTo(q, opts...)
 
-	// Initialize the channel with the (potentially overridden) capacity.
-	ch := make(chan common.Hash, q.capacity)
-	q.in = ch
-	q.out = ch
+	q.out = make(chan common.Hash, q.capacity)
+	q.in = make(chan struct{}, 1)
+	q.forwardDone = make(chan struct{})
 
-	if quit != nil {
-		// Close the output channel on early shutdown to unblock consumers.
-		go func() {
-			<-q.quit
-			q.closeChannelOnce()
-		}()
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	q.cancel = cancel
+	q.done = ctx.Done()
 
-	// Always initialize eagerly.
+	go q.forward()
+
 	if err := q.init(); err != nil {
+		cancel()
+		<-q.forwardDone
 		return nil, err
 	}
 	return q, nil
 }
 
-// CodeHashes returns the receive-only channel of code hashes to consume.
+// CodeHashes returns the receive-only channel consumed by the code syncer.
 func (q *Queue) CodeHashes() <-chan common.Hash {
 	return q.out
 }
 
-func (q *Queue) closeChannelOnce() bool {
-	var done bool
-	q.closeChanOnce.Do(func() {
-		q.chanLock.Lock()
-		defer q.chanLock.Unlock()
-
-		close(q.in)
-		// [CodeQueue.AddCode] takes a read lock before accessing `in` and we
-		// want it to block instead of allowing a send-after-close. Calling
-		// AddCode() after Finalize() isn't valid, and calling it after `quit`
-		// is closed will be picked up by the `select` so a nil alternative case
-		// is desirable.
-		q.in = nil
-		done = true
-	})
-	return done
-}
-
-// AddCode persists and enqueues new code hashes.
-// Persists idempotent "to-fetch" markers for all inputs and enqueues them as-is.
-// Returns errAddCodeAfterFinalize after a clean finalize and errFailedToAddCodeHashesToQueue on early quit.
+// AddCode persists code hashes as durable disk markers and enqueues them
+// for the forwarder goroutine. Never blocks the caller.
+// Returns [ErrQueueClosed] after [Queue.Shutdown] or [Queue.Finalize].
 func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
 	}
 
-	// Mark this enqueue as in-flight immediately so shutdown paths wait for us
-	// before closing the output channel.
-	q.chanLock.RLock()
-	defer q.chanLock.RUnlock()
-	if q.in == nil {
-		// Although this will happen anyway once the `select` is reached,
-		// bailing early avoids unnecessary database writes.
-		return ErrFailedToAddCodeHashesToQueue
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
+	q.closeMu.RLock()
+	defer q.closeMu.RUnlock()
+
+	if q.closed {
+		return ErrQueueClosed
+	}
+
+	// Persist to-fetch markers keyed by code hash (idempotent overwrites).
+	// The consumer deletes markers after fetching or if code is already present.
 	batch := q.db.NewBatch()
-	// Persist all input hashes as to-fetch markers. Consumer will dedupe and skip
-	// already-present code. Persisting all enables consumer-side retry.
-	// Note: markers are keyed by code hash, so repeated persists overwrite the same
-	// key rather than growing DB usage. The consumer deletes the marker after
-	// fulfilling the request (or when it detects code is already present).
 	for _, codeHash := range codeHashes {
 		if err := customrawdb.WriteCodeToFetch(batch, codeHash); err != nil {
 			return fmt.Errorf("failed to write code to fetch marker: %w", err)
@@ -148,40 +126,109 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 		return fmt.Errorf("failed to write batch of code to fetch markers due to: %w", err)
 	}
 
-	for _, h := range codeHashes {
+	q.pendingMu.Lock()
+	q.pending = append(q.pending, codeHashes...)
+	q.pendingMu.Unlock()
+
+	// Signal coalescing: skip if the forwarder is already notified.
+	select {
+	case q.in <- struct{}{}:
+	default:
+	}
+
+	return nil
+}
+
+// Finalize waits for all pending hashes to be sent, then closes out.
+// Blocks if no consumer is draining [Queue.CodeHashes]. Idempotent with [Queue.Shutdown].
+func (q *Queue) Finalize() error {
+	q.stop(false)
+	return nil
+}
+
+// Shutdown cancels the forwarder, waits for exit, then closes out.
+// Unsent hashes are safe as disk markers and will be recovered on restart.
+// Idempotent with [Queue.Finalize].
+func (q *Queue) Shutdown() {
+	q.stop(true)
+}
+
+func (q *Queue) markClosed() {
+	q.closeMu.Lock()
+	defer q.closeMu.Unlock()
+	q.closed = true
+}
+
+// stop waits for in-flight AddCode calls (via write lock), optionally cancels
+// the forwarder, signals no more work, and waits for the forwarder to exit.
+func (q *Queue) stop(shouldCancel bool) {
+	q.markClosed()
+	if shouldCancel {
+		q.cancel()
+	}
+	q.closeInOnce.Do(func() {
+		close(q.in)
+	})
+	<-q.forwardDone
+}
+
+// forward moves hashes from pending to `q.out`. It owns `q.out` and closes it on exit.
+func (q *Queue) forward() {
+	defer func() {
+		close(q.out)
+		close(q.forwardDone)
+	}()
+	for {
 		select {
-		case q.in <- h: // guaranteed to be open or nil, but never closed
-		case <-q.quit:
-			return ErrFailedToAddCodeHashesToQueue
-		case <-ctx.Done():
-			return ctx.Err()
+		case _, ok := <-q.in:
+			stop := q.drainPending()
+			if !ok || stop {
+				return
+			}
+		case <-q.done:
+			return
 		}
 	}
-	return nil
 }
 
-// Finalize signals that no further code hashes will be added.
-// Waits for in-flight enqueues to complete, then closes the output channel.
-// If the queue was already closed due to early quit, returns errFailedToFinalizeCodeQueue.
-func (q *Queue) Finalize() error {
-	if !q.closeChannelOnce() {
-		return errFailedToFinalizeCodeQueue
+// drainPending sends all accumulated pending hashes to out.
+// Returns true if cancelled via done.
+func (q *Queue) drainPending() bool {
+	takePending := func() []common.Hash {
+		q.pendingMu.Lock()
+		defer q.pendingMu.Unlock()
+		batch := q.pending
+		q.pending = nil
+		return batch
 	}
-	return nil
+
+	for {
+		batch := takePending()
+		if len(batch) == 0 {
+			return false
+		}
+
+		for _, h := range batch {
+			select {
+			case q.out <- h:
+			case <-q.done:
+				return true
+			}
+		}
+	}
 }
 
-// init enqueues any persisted code markers found on disk.
+// init recovers persisted code markers from disk and re-enqueues them.
+// AddCode will re-persist the same markers, which is a harmless redundancy
+// that only happens on resume after restart.
 func (q *Queue) init() error {
-	// Recover any persisted code markers and enqueue them.
-	// Note: dbCodeHashes are already present as "to-fetch" markers. addCode will
-	// re-persist them, which is a trivial redundancy that happens only on resume
-	// (e.g., after restart). We accept this to keep the code simple.
 	dbCodeHashes, err := recoverUnfetchedCodeHashes(q.db)
 	if err != nil {
 		return fmt.Errorf("unable to recover previous sync state: %w", err)
 	}
-	// Use context.Background() since init() runs during construction before sync starts.
-	// The channel is empty, so sends won't block. Shutdown is handled via q.quit in AddCode.
+
+	// context.Background: init runs during construction before sync starts,
+	// the queue is not closed yet so AddCode will always succeed.
 	if err := q.AddCode(context.Background(), dbCodeHashes); err != nil {
 		return fmt.Errorf("unable to resume previous sync: %w", err)
 	}
@@ -189,8 +236,8 @@ func (q *Queue) init() error {
 	return nil
 }
 
-// recoverUnfetchedCodeHashes cleans out any codeToFetch markers from the database that are no longer
-// needed and returns any outstanding markers to the queue.
+// recoverUnfetchedCodeHashes returns persisted code markers that still need fetching
+// and deletes markers for code already present locally.
 func recoverUnfetchedCodeHashes(db ethdb.Database) ([]common.Hash, error) {
 	it := customrawdb.NewCodeToFetchIterator(db)
 	defer it.Release()
@@ -201,7 +248,6 @@ func recoverUnfetchedCodeHashes(db ethdb.Database) ([]common.Hash, error) {
 	for it.Next() {
 		codeHash := common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):])
 
-		// If we already have the codeHash, delete the marker from the database and continue.
 		if !rawdb.HasCode(db, codeHash) {
 			codeHashes = append(codeHashes, codeHash)
 			continue
@@ -214,7 +260,6 @@ func recoverUnfetchedCodeHashes(db ethdb.Database) ([]common.Hash, error) {
 			continue
 		}
 
-		// Write the batch to disk if it has reached the ideal batch size.
 		if err := batch.Write(); err != nil {
 			return nil, fmt.Errorf("failed to write batch removing old code markers: %w", err)
 		}

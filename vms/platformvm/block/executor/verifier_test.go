@@ -469,9 +469,14 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnDecisionState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
+	timestamp := time.Now()
+	s.SetTimestamp(timestamp)
+	parentOnDecisionState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -507,18 +512,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Set expectations for dependencies.
-	timestamp := time.Now()
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
-		// Allow metrics to be calculated.
-		parentOnCommitState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
-		parentOnCommitState.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1),
-		parentOnCommitState.EXPECT().NumActiveL1Validators().Return(0).Times(1),
-		parentOnCommitState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
-	)
-
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
 	require.NoError(blk.Verify(t.Context()))
@@ -526,7 +520,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	// Assert expected state.
 	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
 	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
-	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
+	require.Equal(parentOnCommitState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
@@ -549,9 +543,14 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnDecisionState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
+	timestamp := time.Now()
+	s.SetTimestamp(timestamp)
+	parentOnDecisionState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -586,18 +585,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		2,
 	)
 	require.NoError(err)
-
-	// Set expectations for dependencies.
-	timestamp := time.Now()
-	gomock.InOrder(
-		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
-		// Allow metrics to be calculated.
-		parentOnAbortState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
-		parentOnAbortState.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1),
-		parentOnAbortState.EXPECT().NumActiveL1Validators().Return(0).Times(1),
-		parentOnAbortState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
-	)
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
@@ -876,8 +864,10 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	require.NoError(err)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -940,8 +930,10 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentTime := time.Now()
-	parentOnCommitState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
+	parentOnCommitState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	parentOnAbortState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{

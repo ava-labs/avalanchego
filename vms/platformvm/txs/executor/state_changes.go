@@ -108,7 +108,7 @@ func advanceTimeTo(
 	backend *Backend,
 	parentState state.Chain,
 	newChainTime time.Time,
-) (state.Diff, bool, error) {
+) (*state.Diff, bool, error) {
 	// We promote pending stakers to current stakers first and remove
 	// completed stakers from the current staker set. We assume that any
 	// promoted staker will not immediately be removed from the current staker
@@ -127,16 +127,34 @@ func advanceTimeTo(
 
 	// Promote any pending stakers to current if [StartTime] <= [newChainTime].
 	//
+	// Pending validators are promoted before pending delegators so that when we attempt to promote a current delegator,
+	// the current validator exists to satisfy a defensive check that a current delegator being added must have an
+	// existing current validator.
+	//
+	// Pending stakers are ordered such that ties in Staker.NextTime are broken by Staker.Priority. It is possible for a
+	// tie to result in an Apricot pending delegator being ordered before a pending validator, so we must do two passes
+	// to promote pending validators before pending delegators to respect the expected ordering. Rewards however must be
+	// performed in the original staker iterator ordering to respect the historical ordering.
+	//
 	// Invariant: It is not safe to modify the state while iterating over it,
 	// so we use the parentState's iterator rather than the changes iterator.
 	// ParentState must not be modified before this iterator is released.
+	type promotion struct {
+		pending *state.Staker
+		current *state.Staker
+	}
+
+	var (
+		validatorPromotions []promotion
+		delegatorPromotions []promotion
+	)
+
 	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
 		return nil, false, err
 	}
 	defer pendingStakerIterator.Release()
 
-	var changed bool
 	for pendingStakerIterator.Next() {
 		stakerToRemove := pendingStakerIterator.Value()
 		if stakerToRemove.StartTime.After(newChainTime) {
@@ -147,53 +165,59 @@ func advanceTimeTo(
 		stakerToAdd.NextTime = stakerToRemove.EndTime
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
-		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
-			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+		// Only permissionless networks (including the primary network) are eligible for rewards
+		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorPendingPriority {
+			supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
+			if err != nil {
 				return nil, false, err
 			}
-			changes.DeletePendingValidator(stakerToRemove)
-			changed = true
-			continue
-		}
 
-		supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
-		if err != nil {
-			return nil, false, err
-		}
-
-		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
-		if err != nil {
-			return nil, false, err
-		}
-
-		potentialReward := rewards.Calculate(
-			stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
-			stakerToRemove.Weight,
-			supply,
-		)
-		stakerToAdd.PotentialReward = potentialReward
-
-		// Invariant: [rewards.Calculate] can never return a [potentialReward]
-		//            such that [supply + potentialReward > maximumSupply].
-		changes.SetCurrentSupply(stakerToRemove.SubnetID, supply+potentialReward)
-
-		switch stakerToRemove.Priority {
-		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
-			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+			rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
+			if err != nil {
 				return nil, false, err
 			}
-			changes.DeletePendingValidator(stakerToRemove)
 
-		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
-			changes.PutCurrentDelegator(&stakerToAdd)
-			changes.DeletePendingDelegator(stakerToRemove)
+			potentialReward := rewards.Calculate(
+				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
+				stakerToRemove.Weight,
+				supply,
+			)
+			stakerToAdd.PotentialReward = potentialReward
 
+			// Invariant: reward.Calculator.Calculate can never return a potentialReward
+			//            such that supply + potentialReward > maximumSupply.
+			changes.SetCurrentSupply(stakerToRemove.SubnetID, supply+potentialReward)
+		}
+
+		// Buffer state changes so that we can perform validator updates before delegator updates to respect state's
+		// expected order of operations.
+		promotion := promotion{pending: stakerToRemove, current: &stakerToAdd}
+
+		switch {
+		case stakerToRemove.Priority.IsPendingValidator():
+			validatorPromotions = append(validatorPromotions, promotion)
+		case stakerToRemove.Priority.IsPendingDelegator():
+			delegatorPromotions = append(delegatorPromotions, promotion)
 		default:
 			return nil, false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
-
-		changed = true
 	}
+
+	for _, p := range validatorPromotions {
+		if err := changes.PutCurrentValidator(p.current); err != nil {
+			return nil, false, fmt.Errorf("putting current validator: %w", err)
+		}
+		changes.DeletePendingValidator(p.pending)
+	}
+
+	for _, p := range delegatorPromotions {
+		if err := changes.PutCurrentDelegator(p.current); err != nil {
+			return nil, false, fmt.Errorf("putting current delegator: %w", err)
+		}
+		changes.DeletePendingDelegator(p.pending)
+	}
+
+	changed := len(validatorPromotions) > 0 || len(delegatorPromotions) > 0
 
 	// Remove any current stakers whose [EndTime] <= [newChainTime].
 	//
@@ -220,7 +244,9 @@ func advanceTimeTo(
 			break
 		}
 
-		changes.DeleteCurrentValidator(stakerToRemove)
+		if err := changes.DeleteCurrentValidator(stakerToRemove); err != nil {
+			return nil, false, fmt.Errorf("deleting current validator: %w", err)
+		}
 		changed = true
 	}
 
@@ -263,7 +289,7 @@ func advanceTimeTo(
 // Ref: https://github.com/avalanche-foundation/ACPs/tree/e333b335c34c8692d84259d21bd07b2bb849dc2c/ACPs/77-reinventing-subnets#registerl1validatortx
 func removeStaleExpiries(
 	parentState state.Chain,
-	changes state.Diff,
+	changes *state.Diff,
 	newChainTimeUnix uint64,
 ) error {
 	// Invariant: It is not safe to modify the state while iterating over it, so
@@ -290,7 +316,7 @@ func removeStaleExpiries(
 
 func advanceDynamicFeeState(
 	config gas.Config,
-	changes state.Diff,
+	changes *state.Diff,
 	seconds uint64,
 ) {
 	dynamicFeeState := changes.GetFeeState()
@@ -309,7 +335,7 @@ func advanceDynamicFeeState(
 func advanceValidatorFeeState(
 	config fee.Config,
 	parentState state.Chain,
-	changes state.Diff,
+	changes *state.Diff,
 	seconds uint64,
 ) (bool, error) {
 	validatorFeeState := fee.State{

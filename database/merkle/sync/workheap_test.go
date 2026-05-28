@@ -308,3 +308,38 @@ func TestWorkHeapMergeInsertRandom(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkHeapStatus(t *testing.T) {
+	h := newWorkHeap()
+	id := ids.GenerateTestID()
+
+	h.MergeInsert(&workItem{
+		start:       maybe.Nothing[[]byte](),
+		end:         maybe.Some([]byte{128}),
+		priority:    lowPriority,
+		localRootID: id,
+	})
+	pct := h.KeyspacePercent(id)
+	require.InDelta(t, 50.0, pct, 0.0001)
+
+	h.MergeInsert(&workItem{
+		start:       maybe.Some([]byte{192}),
+		end:         maybe.Nothing[[]byte](),
+		priority:    lowPriority,
+		localRootID: id,
+	})
+	pct = h.KeyspacePercent(id)
+	require.InDelta(t, 75.0, pct, 0.0001)
+
+	otherID := ids.GenerateTestID()
+	h.MergeInsert(&workItem{
+		start:       maybe.Some([]byte{128}),
+		end:         maybe.Some([]byte{192}),
+		priority:    lowPriority,
+		localRootID: otherID,
+	})
+	pct = h.KeyspacePercent(id)
+	require.InDelta(t, 75.0, pct, 0.0001)
+	pct = h.KeyspacePercent(otherID)
+	require.InDelta(t, 25.0, pct, 0.0001)
+}
