@@ -49,6 +49,7 @@ type VM struct {
 	ctx          *snow.Context
 	state        *state.State
 	txpool       *txpool.Txpool
+	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
 
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
@@ -146,7 +147,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating gossip bloom metrics: %w", err)
 	}
-	gossipSet, err := gossip.NewBloomSet(
+	vm.gossipSet, err = gossip.NewBloomSet(
 		newGossipTxPool(vm.txpool),
 		gossip.BloomSetConfig{
 			Metrics: bloomMetrics,
@@ -159,7 +160,7 @@ func (vm *VM) Initialize(
 		snowCtx.NodeID,
 		vm.Network,
 		vm.ValidatorPeers,
-		gossipSet,
+		vm.gossipSet,
 		gossipMarshaller{},
 		gossip.SystemConfig{
 			Log:           snowCtx.Log,
@@ -208,7 +209,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		return nil, fmt.Errorf("creating SAE handlers: %w", err)
 	}
 
-	service, err := newService(vm.ctx, vm.txpool, vm.pushGossiper, vm.state)
+	service, err := newService(vm.ctx, vm.gossipSet, vm.pushGossiper, vm.state)
 	if err != nil {
 		return nil, fmt.Errorf("creating avax service: %w", err)
 	}
