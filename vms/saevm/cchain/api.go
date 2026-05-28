@@ -35,7 +35,7 @@ import (
 // reflects on them to dispatch requests.
 type service struct {
 	ctx          *snow.Context
-	txpool       *txpool.Txpool
+	txpool       *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
 	state        *state.State
 
@@ -46,7 +46,7 @@ type service struct {
 
 func newService(
 	ctx *snow.Context,
-	pool *txpool.Txpool,
+	pool *gossip.BloomSet[*gossipTx],
 	pushGossiper *gossip.PushGossiper[*gossipTx],
 	db *state.State,
 ) (*service, error) {
@@ -225,7 +225,7 @@ func (s *service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) 
 		return fmt.Errorf("parsing transaction: %w", err)
 	}
 
-	if err := s.txpool.Add(t); err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
+	if err := s.txpool.Add(toGossipTx(t)); err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
 		return fmt.Errorf("%w: %w", errIssuingTx, err)
 	}
 

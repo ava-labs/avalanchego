@@ -125,6 +125,7 @@ go_test(
         "//snow/validators",
         "//snow/validators/validatorstest",
         "//utils",
+        "//utils/bloom",
         "//utils/buffer",
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",

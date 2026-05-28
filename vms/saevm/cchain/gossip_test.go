@@ -8,14 +8,27 @@ import (
 
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
+
+// assertTxBloomContains asserts that the transaction bloom contains the given
+// transaction IDs.
+func (s *SUT) assertTxBloomContains(tb testing.TB, txIDs ...ids.ID) {
+	tb.Helper()
+
+	filter, salt := s.gossipSet.BloomFilter()
+	for i, txID := range txIDs {
+		assert.Truef(tb, bloom.Contains(filter, txID[:], salt[:]), "bloom filter should contain %s (%d)", txID, i)
+	}
+}
 
 // TestPushGossip verifies that a cross-chain transaction issued to an API node
 // is push-gossiped to a validator for block building.
@@ -35,6 +48,7 @@ func TestPushGossip(t *testing.T) {
 	w := newWallet(sk, api.ctx, api.Client)
 	stx := w.newMinimalTx(t)
 	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
+	api.assertTxBloomContains(t, stx.ID())
 
 	blk := vdr.runConsensusLoop(vdrCtx, t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
@@ -66,9 +80,11 @@ func TestPullGossip(t *testing.T) {
 	w := newWallet(sk, api.ctx, api.Client)
 	stx := w.newMinimalTx(t)
 	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
+	api.assertTxBloomContains(t, stx.ID())
 
 	blk := vdrB.runConsensusLoop(vdrBCtx, t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
 	}
+	vdrA.assertTxBloomContains(t, stx.ID())
 }
