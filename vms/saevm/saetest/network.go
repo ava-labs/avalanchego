@@ -29,6 +29,8 @@ type Peer interface {
 	Sender() *Sender
 }
 
+var _ common.AppSender = (*Sender)(nil)
+
 // Sender is a test [common.AppSender] that routes messages between in-process
 // peers registered via [Sender.AddPeer]. Like the production avalanchego
 // instance, each call is delivered in its own goroutine.
