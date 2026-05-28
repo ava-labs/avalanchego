@@ -69,7 +69,7 @@ func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
 	ctx, sut := newSUT(t)
 
 	sk := txtest.NewKey(t) // sk is NOT funded.
-	w := newWallet(sk, sut.snowCtx, sut.Client)
+	w := newWallet(sk, sut.ctx, sut.Client)
 	stx := w.newMinimalTx(t)
 
 	err := sut.IssueTx(ctx, stx)
@@ -91,16 +91,20 @@ func TestGetAtomicTxStatus(t *testing.T) {
 	ctx, sut := newSUT(t)
 
 	const utxoAmount = 100
-	sk := txtest.NewKey(t)
+	var (
+		sourceChain = snowtest.XChainID
+		sk          = txtest.NewKey(t)
+	)
 	sut.addUTXOs(
 		t,
-		snowtest.XChainID,
-		txtest.NewUTXO(utxoAmount, sut.snowCtx.AVAXAssetID, sk.Address()),
+		sut.ctx.ChainID,
+		sourceChain,
+		txtest.NewUTXO(utxoAmount, sut.ctx.AVAXAssetID, sk.Address()),
 	)
-	w := newWallet(sk, sut.snowCtx, sut.Client)
+	w := newWallet(sk, sut.ctx, sut.Client)
 	receiver := txtest.NewKey(t).EthAddress()
 	const txFee = 50
-	signedImport := w.newImportTx(ctx, t, sut.snowCtx.XChainID, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	t.Run("before_execution", func(t *testing.T) {
 		got, err := sut.getTxStatus(ctx, signedImport.ID())
@@ -128,18 +132,19 @@ func TestGetAtomicTxStatus(t *testing.T) {
 func TestGetUTXOsPagination(t *testing.T) {
 	ctx, sut := newSUT(t)
 
+	sourceChain := sut.ctx.XChainID
 	const numUTXOs uint64 = 5
 	want := make([]*avax.UTXO, numUTXOs)
 	addr := txtest.NewKey(t).Address()
 	for i := range numUTXOs {
-		want[i] = txtest.NewUTXO(i+1, sut.snowCtx.AVAXAssetID, addr)
+		want[i] = txtest.NewUTXO(i+1, sut.ctx.AVAXAssetID, addr)
 	}
-	sut.addUTXOs(t, snowtest.XChainID, want...)
+	sut.addUTXOs(t, sut.ctx.ChainID, sourceChain, want...)
 
 	// pageSize=1 stresses the boundary behavior so any off-by-one in the cursor
 	// logic will surface here.
 	const pageSize = 1
-	got := sut.Client.getAllUTXOs(ctx, t, snowtest.XChainID, pageSize, addr)
+	got := sut.Client.getAllUTXOs(ctx, t, sourceChain, pageSize, addr)
 	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
 		t.Errorf("paginated UTXOs (-want +got):\n%s", diff)
 	}

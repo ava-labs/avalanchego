@@ -32,7 +32,7 @@ func TestPushGossip(t *testing.T) {
 	vdrCtx, vdr := newSUT(t, withAlloc, withNodeID(vdrID), withValidators(vdrs))
 	saetest.Connect(t, api, vdr)
 
-	w := newWallet(sk, api.snowCtx, api.Client)
+	w := newWallet(sk, api.ctx, api.Client)
 	stx := w.newMinimalTx(t)
 	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
 
@@ -63,7 +63,7 @@ func TestPullGossip(t *testing.T) {
 	saetest.Connect(t, api, vdrA)
 	saetest.Connect(t, vdrA, vdrB)
 
-	w := newWallet(sk, api.snowCtx, api.Client)
+	w := newWallet(sk, api.ctx, api.Client)
 	stx := w.newMinimalTx(t)
 	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
 

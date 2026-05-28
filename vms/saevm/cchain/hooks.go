@@ -302,7 +302,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		&customtypes.HeaderExtra{
 			// Prior to SAE, ExtDataGasUsed included the gas cost of the
 			// cross-chain transactions. However, with SAE, the gas cost is
-			// included in [types.Header.GasUsed] through with [hook.Op.Gas].
+			// included in [types.Header.GasUsed] with [hook.Op.Gas].
 			ExtDataGasUsed: big.NewInt(0),
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
@@ -360,9 +360,10 @@ func (b *builder) PotentialEndOfBlockOps(
 				continue
 			}
 
-			// Even for transactions from the txpool, we need to ensure that
-			// Import txs are consuming UTXOs that still exist so that our
-			// in-memory UTXO conflict checks are sufficient.
+			// Even for transactions from the txpool, which may have been
+			// verified against out-dated state, we need to ensure that import
+			// txs are consuming UTXOs that still exist so that our in-memory
+			// UTXO conflict checks are sufficient.
 			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory); err != nil {
 				b.ctx.Log.Debug("tx failed credential verification",
 					zap.Stringer("txID", t.id),

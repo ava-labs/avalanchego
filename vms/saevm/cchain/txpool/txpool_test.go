@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
@@ -135,7 +136,7 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 
 	backend := newBackend(state)
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
-	log := saetest.NewTBLogger(tb, logging.Debug)
+	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 	pool, err := New(
 		snowCtx,

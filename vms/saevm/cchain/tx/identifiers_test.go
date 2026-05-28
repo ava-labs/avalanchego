@@ -6,6 +6,8 @@ package tx
 // These identifiers are all exported for usage by tx_test.go, which is compiled
 // in a separate package to allow for the usage of the txtest package.
 
+const X2CRate = _x2cRate
+
 var (
 	// tx errors:
 	ErrWrongNetworkID          = errWrongNetworkID

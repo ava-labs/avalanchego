@@ -128,13 +128,11 @@ go_test(
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",
         "//utils/crypto/secp256k1",
-<<<<<<< HEAD
-=======
         "//utils/formatting",
->>>>>>> 7e2e9ba9798cc1811503733ed5bb20a0811040bb
         "//utils/json",
         "//utils/logging",
         "//utils/rpc",
+        "//utils/logging/loggingtest",
         "//utils/set",
         "//version",
         "//vms/components/avax",
@@ -148,6 +146,7 @@ go_test(
         "//vms/saevm/cmputils",
         "//vms/saevm/params",
         "//vms/saevm/saetest",
+        "//vms/saevm/saexec",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",

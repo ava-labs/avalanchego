@@ -294,7 +294,7 @@ func sendWarpTx(
 // SUT's chain.
 func newUnsignedWarpMessage(t *testing.T, sut *SUT, payload []byte) *avalancheWarp.UnsignedMessage {
 	t.Helper()
-	msg, err := avalancheWarp.NewUnsignedMessage(sut.snowCtx.NetworkID, sut.snowCtx.ChainID, payload)
+	msg, err := avalancheWarp.NewUnsignedMessage(sut.ctx.NetworkID, sut.ctx.ChainID, payload)
 	require.NoError(t, err)
 	return msg
 }

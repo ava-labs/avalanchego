@@ -23,6 +23,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	// Imported for [saexec.Execute] comment resolution.
+	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -40,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -72,14 +76,13 @@ type SUT struct {
 	// snowCtx.ValidatorState.GetWarpValidatorSets.
 	validatorKeys []*localsigner.LocalSigner
 
-	snowCtx   *snow.Context
 	memory    *atomic.Memory
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
 }
 
 // Implements [saetest.Peer]
-func (s *SUT) NodeID() ids.NodeID      { return s.snowCtx.NodeID }
+func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
 func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
@@ -145,7 +148,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	snowCtx.NodeID = cfg.nodeID
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
-	log := saetest.NewTBLogger(tb, logging.Debug)
+	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 
 	vdrState, ok := snowCtx.ValidatorState.(*validatorstest.State)
@@ -218,7 +221,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 		validatorKeys: validatorKeys,
 
-		snowCtx:   snowCtx,
 		memory:    memory,
 		sender:    appSender,
 		ethclient: ethclient.NewClient(ethRPCClient),
@@ -283,9 +285,9 @@ func newWarpValidatorSet(
 	return sortedSigners
 }
 
-// assertUTXOsExist asserts that the shared memory between peerChainID and the
-// C-Chain contains each of the expected UTXOs.
-func (s *SUT) assertUTXOsExist(tb testing.TB, peerChainID ids.ID, want ...*avax.UTXO) {
+// assertUTXOsExist asserts that reader chain can read the expected UTXOs from
+// writer chain.
+func (s *SUT) assertUTXOsExist(tb testing.TB, readerChainID, writerChainID ids.ID, want ...*avax.UTXO) {
 	tb.Helper()
 
 	keys := make([][]byte, len(want))
@@ -293,38 +295,38 @@ func (s *SUT) assertUTXOsExist(tb testing.TB, peerChainID ids.ID, want ...*avax.
 		inputID := utxo.InputID()
 		keys[i] = inputID[:]
 	}
-	peerMemory := s.memory.NewSharedMemory(peerChainID)
-	utxoBytes, err := peerMemory.Get(snowtest.CChainID, keys)
-	require.NoErrorf(tb, err, "%T.Get()", peerMemory)
+	readerMemory := s.memory.NewSharedMemory(readerChainID)
+	utxoBytes, err := readerMemory.Get(writerChainID, keys)
+	require.NoErrorf(tb, err, "%T.Get()", readerMemory)
 
 	got := make([]*avax.UTXO, len(utxoBytes))
 	for i, b := range utxoBytes {
 		got[i] = txtest.ParseUTXO(tb, b)
 	}
 	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
-		tb.Errorf("UTXOs in shared memory with %s (-want +got):\n%s", peerChainID, diff)
+		tb.Errorf("UTXOs in shared memory with %s (-want +got):\n%s", writerChainID, diff)
 	}
 }
 
-// assertUTXOsMissing asserts that the shared memory between peerChainID and the
-// C-Chain does not contain any of the unwanted UTXOs.
-func (s *SUT) assertUTXOsMissing(tb testing.TB, peerChainID ids.ID, unwanted ...*avax.UTXO) {
+// assertUTXOsExist asserts that reader chain can not read the unwanted UTXOs
+// from writer chain.
+func (s *SUT) assertUTXOsMissing(tb testing.TB, readerChainID, writerChainID ids.ID, unwanted ...*avax.UTXO) {
 	tb.Helper()
 
-	peerMemory := s.memory.NewSharedMemory(peerChainID)
+	readerMemory := s.memory.NewSharedMemory(readerChainID)
 	for i, utxo := range unwanted {
 		inputID := utxo.InputID()
 		key := inputID[:]
 
 		keys := [][]byte{key}
-		_, err := peerMemory.Get(snowtest.CChainID, keys)
-		assert.ErrorIsf(tb, err, database.ErrNotFound, "%T.Get(utxo %d)", peerMemory, i)
+		_, err := readerMemory.Get(writerChainID, keys)
+		assert.ErrorIsf(tb, err, database.ErrNotFound, "%T.Get(utxo %d)", readerMemory, i)
 	}
 }
 
-// addUTXOs puts the given UTXOs into shared memory between peerChainID and the
-// C-Chain.
-func (s *SUT) addUTXOs(tb testing.TB, peerChainID ids.ID, utxos ...*avax.UTXO) {
+// addUTXOs acts as the writer chain and inserts the given UTXOs so that the
+// reader chain can read them in the future.
+func (s *SUT) addUTXOs(tb testing.TB, readerChainID, writerChainID ids.ID, utxos ...*avax.UTXO) {
 	tb.Helper()
 
 	elems := make([]*atomic.Element, len(utxos))
@@ -339,11 +341,11 @@ func (s *SUT) addUTXOs(tb testing.TB, peerChainID ids.ID, utxos ...*avax.UTXO) {
 		}
 		elems[i] = e
 	}
-	peerMemory := s.memory.NewSharedMemory(peerChainID)
-	err := peerMemory.Apply(map[ids.ID]*atomic.Requests{
-		snowtest.CChainID: {PutRequests: elems},
+	writerMemory := s.memory.NewSharedMemory(writerChainID)
+	err := writerMemory.Apply(map[ids.ID]*atomic.Requests{
+		readerChainID: {PutRequests: elems},
 	})
-	require.NoErrorf(tb, err, "%T.Apply()", peerMemory)
+	require.NoErrorf(tb, err, "%T.Apply()", writerMemory)
 }
 
 // balance returns the balance of addr at the last-executed state.
@@ -600,20 +602,23 @@ func (w *wallet) sign(tb testing.TB, u tx.Unsigned, numCreds int) *tx.Tx {
 	}
 }
 
-var x2cRate = big.NewInt(tx.X2CRate)
-
-// addNAVAX returns balance + nAVAXDelta. nAVAXDelta may be negative.
+// addNAVAX returns balance + nAVAXDelta. nAVAXDelta MAY be negative.
 func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int {
 	tb.Helper()
 
-	delta := big.NewInt(nAVAXDelta)
-	delta.Mul(delta, x2cRate)
-	bigBalance := balance.ToBig()
-	bigBalance.Add(bigBalance, delta)
+	var (
+		op       = (*uint256.Int).AddOverflow
+		absDelta = uint64(nAVAXDelta)
+	)
+	if nAVAXDelta < 0 {
+		op = (*uint256.Int).SubOverflow
+		absDelta = -absDelta
+	}
 
-	result, overflow := uint256.FromBig(bigBalance)
+	delta := tx.ScaleAVAX(absDelta)
+	_, overflow := op(&balance, &balance, &delta)
 	require.Falsef(tb, overflow, "addNAVAX(%s, %d) overflows uint256", balance, nAVAXDelta)
-	return *result
+	return balance
 }
 
 // TestExport exercises the cchain VM end-to-end with an Export tx.
@@ -624,14 +629,17 @@ func TestExport(t *testing.T) {
 		c.genesis.Alloc = saetest.MaxAllocFor(sender)
 	}))
 
-	w := newWallet(sk, sut.snowCtx, sut.Client)
+	var (
+		w                = newWallet(sk, sut.ctx, sut.Client)
+		destinationChain = sut.ctx.XChainID
+	)
 	const (
 		txFee          = 50
 		exportedAmount = 50
 	)
 	signedExport, export := w.newExportTx(
 		t,
-		sut.snowCtx.XChainID,
+		destinationChain,
 		txFee,
 		txtest.NewTransferOutput(exportedAmount, sk.Address()),
 	)
@@ -644,7 +652,7 @@ func TestExport(t *testing.T) {
 		amountBurned = exportedAmount + txFee
 	)
 	sut.assertAccount(t, sender, nonce, addNAVAX(t, initialBalance, -amountBurned))
-	sut.assertUTXOsExist(t, sut.snowCtx.XChainID, txtest.ExportedUTXOs(signedExport.ID(), export)...)
+	sut.assertUTXOsExist(t, destinationChain, sut.ctx.ChainID, txtest.ExportedUTXOs(signedExport.ID(), export)...)
 }
 
 // TestImport exercises the cchain VM end-to-end with an Import tx.
@@ -652,17 +660,19 @@ func TestImport(t *testing.T) {
 	ctx, sut := newSUT(t)
 
 	const utxoAmount = 100
-	sk := txtest.NewKey(t)
-	sut.addUTXOs(
-		t,
-		snowtest.XChainID,
-		txtest.NewUTXO(utxoAmount, sut.snowCtx.AVAXAssetID, sk.Address()),
+	var (
+		sk          = txtest.NewKey(t)
+		utxo        = txtest.NewUTXO(utxoAmount, sut.ctx.AVAXAssetID, sk.Address())
+		sourceChain = sut.ctx.XChainID
 	)
+	sut.addUTXOs(t, sut.ctx.ChainID, sourceChain, utxo)
 
-	w := newWallet(sk, sut.snowCtx, sut.Client)
-	receiver := txtest.NewKey(t).EthAddress()
+	var (
+		w        = newWallet(sk, sut.ctx, sut.Client)
+		receiver = txtest.NewKey(t).EthAddress()
+	)
 	const txFee = 50
-	signedImport := w.newImportTx(ctx, t, sut.snowCtx.XChainID, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	blk := sut.issueAndExecute(ctx, t, signedImport)
 	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())
@@ -671,6 +681,7 @@ func TestImport(t *testing.T) {
 		amountMinted = utxoAmount - txFee
 	)
 	sut.assertAccount(t, receiver, nonce, tx.ScaleAVAX(amountMinted))
+	sut.assertUTXOsMissing(t, sut.ctx.ChainID, sourceChain, utxo)
 }
 
 // TestBuildBlockOnProcessing verifies that the block builder excludes a mempool
@@ -693,9 +704,11 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		blocks     = make([]*blocks.Block, len(keys))
 	)
 	for i, sk := range keys {
-		stx := newWallet(sk, sut.snowCtx, sut.Client).newMinimalTx(t)
+		stx := newWallet(sk, sut.ctx, sut.Client).newMinimalTx(t)
 		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(tx)", sut.Client)
 
+		// Delaying acceptance ensures that already-issued txs are still in the
+		// mempool and are therefore (ineligible) candidates for inclusion here.
 		block := sut.buildVerify(ctx, t, preference)
 		if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, block), txtest.CmpOpt()); diff != "" {
 			t.Errorf("%T txs (-want +got):\n%s", block, diff)
@@ -743,14 +756,17 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.ethclient, tracedTx.Hash())
 
 	// Export gives us observable external state.
-	w := newWallet(exportKey, sut.snowCtx, sut.Client)
+	var (
+		w                = newWallet(exportKey, sut.ctx, sut.Client)
+		destinationChain = sut.ctx.XChainID
+	)
 	const (
 		txFee          = 50
 		exportedAmount = 50
 	)
 	signedExport, export := w.newExportTx(
 		t,
-		sut.snowCtx.XChainID,
+		destinationChain,
 		txFee,
 		txtest.NewTransferOutput(exportedAmount, exportKey.Address()),
 	)
@@ -765,6 +781,10 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	}
 
 	rpc := sut.GethRPCBackends()
+	// To rebuild the state at a particular tx, the [saexec.Execute] method is
+	// called with all preceding transactions. In turn, this calls post-block
+	// hooks of which atomic-state application would be one, but must be
+	// excluded when tracing.
 	_, _, _, release, err := rpc.StateAtTransaction(ctx, blk.EthBlock(), 0, 0)
 	require.NoErrorf(t, err, "%T.StateAtTransaction(...)", rpc)
 	defer release()
@@ -772,5 +792,5 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	// We haven't accepted the block yet, so it should be impossible for the
 	// execution results to have been applied.
 	exportedUTXOs := txtest.ExportedUTXOs(signedExport.ID(), export)
-	sut.assertUTXOsMissing(t, sut.snowCtx.XChainID, exportedUTXOs...)
+	sut.assertUTXOsMissing(t, destinationChain, sut.ctx.ChainID, exportedUTXOs...)
 }

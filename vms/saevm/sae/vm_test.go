@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
@@ -71,6 +72,8 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
+var _ saetest.Peer = (*SUT)(nil)
+
 // SUT is the system under test. Testing SHOULD be performed via the embedded
 // types as these most accurately reflect the public API. Any access to the
 // other fields SHOULD instead be exposed as methods, such as [SUT.stateAt], to
@@ -85,12 +88,11 @@ type SUT struct {
 	wallet  *saetest.Wallet
 	db      ethdb.Database
 	hooks   *hookstest.Stub
-	logger  *saetest.TBLogger
+	logger  *loggingtest.Logger
 
 	sender *saetest.Sender
 }
 
-// Implements [saetest.Peer].
 func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
 func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
@@ -159,7 +161,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
 	})
 
-	logger := saetest.NewTBLogger(tb, conf.logLevel)
+	logger := loggingtest.New(tb, conf.logLevel)
 	ctx := logger.CancelOnError(tb.Context())
 	snowCtx := snowtest.Context(tb, chainID)
 	snowCtx.Log = logger
