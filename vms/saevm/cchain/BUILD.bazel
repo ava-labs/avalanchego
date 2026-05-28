@@ -90,6 +90,7 @@ go_test(
         "//snow/snowtest",
         "//utils/crypto/secp256k1",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/set",
         "//vms/components/avax",
         "//vms/saevm/blocks",
