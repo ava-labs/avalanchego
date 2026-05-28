@@ -96,7 +96,7 @@ func (s *Staker) Less(than *Staker) bool {
 
 func NewCurrentStaker(
 	txID ids.ID,
-	staker txs.Staker,
+	staker txs.BoundedStaker,
 	startTime time.Time,
 	potentialReward uint64,
 ) (*Staker, error) {
