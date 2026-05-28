@@ -19,6 +19,7 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -101,7 +102,7 @@ func newSUT(tb testing.TB, c Config) *SUT {
 	genesis := blockstest.NewGenesis(tb, db, xdb, config, types.GenesisAlloc{})
 	chain := blockstest.NewChainBuilder(genesis)
 
-	log := saetest.NewTBLogger(tb, logging.Debug)
+	log := loggingtest.New(tb, logging.Debug)
 	e, err := NewEstimator(chain, log, c)
 	require.NoError(tb, err, "NewEstimator()")
 	tb.Cleanup(func() {

@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -72,7 +73,7 @@ func newWallet(tb testing.TB, numAccounts uint) *saetest.Wallet {
 
 func newSUT(t *testing.T, numAccounts uint) SUT {
 	t.Helper()
-	logger := saetest.NewTBLogger(t, logging.Warn)
+	logger := loggingtest.New(t, logging.Warn)
 
 	wallet := newWallet(t, numAccounts)
 	config := saetest.ChainConfig()
@@ -267,7 +268,7 @@ func TestP2PIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := saetest.NewTBLogger(t, logging.Debug)
+			logger := loggingtest.New(t, logging.Debug)
 			ctx := logger.CancelOnError(t.Context())
 
 			sendID := ids.GenerateTestNodeID()
