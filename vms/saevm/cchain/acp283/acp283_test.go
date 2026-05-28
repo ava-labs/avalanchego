@@ -25,38 +25,28 @@ func TestPrice(t *testing.T) {
 		},
 		{
 			name:   "min_excess_change",
-			excess: 726_820, // smallest excess that increases the price above MinPriceWei
+			excess: 288_230_376_151_711_749, // smallest excess that raises the price above MinPriceWei
 			price:  MinPriceWei + 1,
 		},
 		{
-			name:   "max_initial_excess_change",
-			excess: MaxPriceExcessDiff,
-			price:  MinPriceWei,
+			name:   "1_navax",
+			excess: 8_617_325_259_044_912_670,
+			price:  1_000_000_000,
 		},
 		{
-			name:   "1M_wei",
-			excess: 14_486_613, // ConversionRate (2^20) * ln(10^6)
-			price:  1_000_000,
+			name:   "100_navax",
+			excess: 10_532_286_427_721_559_929,
+			price:  100_000_000_000,
 		},
 		{
-			name:   "initial",
-			excess: InitialPriceExcess,
-			price:  10_000_006,
-		},
-		{
-			name:   "qmax_binding",
-			excess: 26_558_791, // smallest excess at which the QMaxWei cap binds
-			price:  QMaxWei,
+			name:   "max_price",
+			excess: 18_446_744_073_709_551_578, // smallest excess at which the price saturates
+			price:  math.MaxUint64,
 		},
 		{
 			name:   "max_excess",
-			excess: maxPriceExcess,
-			price:  QMaxWei,
-		},
-		{
-			name:   "largest_excess",
 			excess: math.MaxUint64,
-			price:  QMaxWei,
+			price:  math.MaxUint64,
 		},
 	}
 	for _, test := range tests {
@@ -80,34 +70,35 @@ func TestUpdatePriceExcess(t *testing.T) {
 			expected: 42,
 		},
 		{
-			name:     "within_range_up",
+			name:     "increase_within_cap",
 			initial:  50,
-			desired:  150,
-			expected: 150,
+			desired:  100,
+			expected: 100,
 		},
 		{
-			name:     "within_range_down",
-			initial:  150,
+			name:     "decrease_within_cap",
+			initial:  100,
 			desired:  50,
 			expected: 50,
 		},
 		{
-			name:     "clamped_up",
+			name:     "increase_clamped",
 			initial:  0,
-			desired:  1000,
+			desired:  10 * MaxPriceExcessDiff,
 			expected: MaxPriceExcessDiff,
 		},
 		{
-			name:     "clamped_down",
-			initial:  1000,
+			name:     "decrease_clamped",
+			initial:  10 * MaxPriceExcessDiff,
 			desired:  0,
-			expected: 1000 - MaxPriceExcessDiff,
+			expected: 9 * MaxPriceExcessDiff,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			test.initial.UpdatePriceExcess(test.desired)
-			require.Equal(t, test.expected, test.initial)
+			excess := test.initial
+			excess.UpdatePriceExcess(test.desired)
+			require.Equal(t, test.expected, excess)
 		})
 	}
 }
@@ -126,22 +117,22 @@ func TestDesiredPriceExcess(t *testing.T) {
 		{
 			name:   "min_excess_change",
 			price:  MinPriceWei + 1,
-			excess: 726_820,
+			excess: 288_230_376_151_711_749,
 		},
 		{
-			name:   "1M_wei",
-			price:  1_000_000,
-			excess: 14_486_613,
+			name:   "1_nAvax",
+			price:  1_000_000_000,
+			excess: 8_617_325_259_044_912_670,
 		},
 		{
-			name:   "initial",
-			price:  10_000_006,
-			excess: InitialPriceExcess,
+			name:   "100_nAvax",
+			price:  100_000_000_000,
+			excess: 10_532_286_427_721_559_929,
 		},
 		{
-			name:   "qmax_binding",
-			price:  QMaxWei,
-			excess: 26_558_791,
+			name:   "max_price",
+			price:  math.MaxUint64,
+			excess: 18_446_744_073_709_551_578,
 		},
 	}
 	for _, test := range tests {
