@@ -199,11 +199,11 @@ func gasUsed(t Unsigned) (gas.Gas, error) {
 	return math.Add(intrinsicGas, dynamicGas)
 }
 
-// X2CRate is the conversion rate between the smallest denomination on the
-// X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain, 1 aAVAX.
-const X2CRate = 1_000_000_000
+const _x2cRate = 1_000_000_000
 
-var x2cRate = uint256.NewInt(X2CRate)
+// x2cRate is the conversion rate between the smallest denomination on the
+// X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain, 1 aAVAX.
+var x2cRate = uint256.NewInt(_x2cRate)
 
 type (
 	nAVAX = uint64

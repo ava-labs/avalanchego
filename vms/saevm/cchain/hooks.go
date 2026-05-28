@@ -266,9 +266,10 @@ func (b *builder) PotentialEndOfBlockOps(
 				continue
 			}
 
-			// Even for transactions from the txpool, we need to ensure that
-			// Import txs are consuming UTXOs that still exist so that our
-			// in-memory UTXO conflict checks are sufficient.
+			// Even for transactions from the txpool, which may have been
+			// verified against out-dated state, we need to ensure that import
+			// txs are consuming UTXOs that still exist so that our in-memory
+			// UTXO conflict checks are sufficient.
 			if err := t.tx.VerifyCredentials(b.ctx.SharedMemory); err != nil {
 				b.ctx.Log.Debug("tx failed credential verification",
 					zap.Stringer("txID", t.id),
