@@ -26,10 +26,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -106,7 +106,7 @@ func withLegacyBackend() sutOption {
 
 func newState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
 	ctx := snowtest.Context(tb, snowtest.CChainID)
-	ctx.Log = saetest.NewTBLogger(tb, logging.Debug)
+	ctx.Log = loggingtest.New(tb, logging.Debug)
 	ctx.SharedMemory = sm
 
 	s, err := New(ctx, db)

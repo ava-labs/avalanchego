@@ -64,6 +64,7 @@ go_test(
         "//tests",
         "//utils/constants",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/math/meter",
         "//utils/resource",
         "//utils/set",

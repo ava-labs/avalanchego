@@ -29,6 +29,7 @@ go_test(
     embed = [":gasprice"],
     deps = [
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//vms/saevm/blocks",
         "//vms/saevm/blocks/blockstest",
         "//vms/saevm/gastime",

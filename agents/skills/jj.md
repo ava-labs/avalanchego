@@ -19,20 +19,40 @@ Run `jj status` (or check for a `.jj/` directory at the repo root). If it succee
 | --- | --- | --- |
 | Show working copy state | `jj status` | Not `git status`. |
 | Set/edit current commit message | `jj describe -m "..."` | The working copy **is** a commit; there is no separate "commit" step. |
-| Create a new empty commit on top | `jj new -m "..."` | Use this when you want to start fresh work. |
+| Finalize working copy and start a new one | `jj commit -m "..."` | Shorthand for `jj describe -m "..."` followed by `jj new`. Prefer this when you're done with the current change and want a fresh empty working copy on top — one command, one permission prompt. |
+| Create a new empty commit on top | `jj new -m "..."` | Use this when starting fresh work without describing `@` first. |
 | Create a branch | `jj bookmark create <name>` | jj calls branches "bookmarks". When the user says "branch," they mean bookmark. |
 | Move a bookmark to current commit | `jj bookmark move <name>` | Defaults to `--to @` (the working copy). |
 | List history | `jj log` | Default view is concise; use `-r ::` for full graph. |
 | Show commits on a branch ahead of the default branch | `jj log -r '<default-branch>..<branch>'` | Quote the revset — `..` confuses some shells. |
 | Show a commit's contents | `jj show --git <rev>` | Pass `--git` for git-style diffs (familiar format). |
 | Diff working copy or revisions | `jj diff --git` | Always pass `--git` — produces standard git-style diffs instead of jj's native format. |
+| Diff a whole branch vs. the default branch | `jj diff --git --from 'fork_point(<default-branch> \| <branch>)' --to <branch>` | See note below — `-r '<default-branch>..<branch>'` does **not** work, and `--from <default-branch>` is usually wrong. |
 | Read a file at a revision | `jj file show -r <rev> <path>` | **Not** `git show <rev>:<path>`. |
 | Fold working-copy edits into a parent commit | `jj squash --into <change-id-or-@->` | Useful when iterating on a not-yet-pushed change. `@-` = parent of working copy. |
 | Target a specific commit for describe/squash | `<change-id>` or positional ref like `@-` | Prefer `@-` over the change-id when targeting "the commit you just squashed into" — it survives rewrites and stays unambiguous. |
 | Push a bookmark | `jj git push --bookmark <name>` | If GPG signing times out, just retry the same command — the retry surfaces the unlock dialog. |
 | Fetch | `jj git fetch` | Prefer this over raw `git fetch`. |
+| Create a PR | `gh pr create --head <bookmark> --base <base>` | jj leaves git's `HEAD` detached, so `gh pr create` can't infer the branch — always pass `--head` and `--base` explicitly. |
 
 Only fall back to raw `git` when jj genuinely lacks the feature — this is rare.
+
+### Diffing a branch against the default branch
+
+Three traps to avoid:
+
+- **`jj diff -r '<default-branch>..<branch>'` errors out** with `Cannot diff revsets with gaps in`. `jj diff -r` resolves to a *single* revision, not a range. (`jj log -r '<default-branch>..<branch>'` works because `jj log` accepts revsets; `jj diff` does not.)
+- **`jj diff --from <default-branch> --to <branch>`** includes every commit that has landed on the default branch since the branch forked — so the diff shows your branch's changes **inverted** alongside the unrelated new default-branch work. Almost never what you want.
+- **The right invocation** anchors `--from` at the actual fork point:
+
+  ```bash
+  jj diff --git --from 'fork_point(<default-branch> | <branch>)' --to <branch>
+  jj diff --git --from 'fork_point(<default-branch> | <branch>)' --to <branch> --stat   # file-level summary
+  ```
+
+  `fork_point()` takes a **single revset** (a set of commits, expressed with `|`) and returns their common ancestor — equivalent to `git merge-base <default-branch> <branch>`. Note the `|` (set union), not a comma: `fork_point(<default-branch>, <branch>)` errors with "Expected 1 arguments". This gives you exactly the changes the branch introduces, regardless of how far the default branch has moved.
+
+When the branch is the working copy, `<branch>` can be `@`.
 
 ## Commit message format
 
@@ -165,6 +185,18 @@ Merge-commit steps:
 9. **Create a new revision.** Run `jj new` after pushing to prevent additional changes on already-pushed GitHub revisions. All pushes should be considered immutable.
 
 10. **Addressing comments.** Offer to respond to each comment. Start the response with `Fixed in <sha>.` if applicable. If it isn't obvious from the change, explain how it was fixed, keeping the response terse. The reviewer can always read the commit comment for more details. An example of an obvious change is if the reviewer says "remove this pub(crate)" and that's what we did — no need to add more details.
+
+### Turning an existing commit into a merge commit
+
+If `@` already has the changes you want and you just need to add a second parent (e.g., bringing in `<default-branch>` after you've already started editing), don't create a new merge commit on top — rebase `@` to gain the extra parent:
+
+```bash
+jj rebase -r @ -d @- -d <default-branch>
+```
+
+**Use repeated `-d` flags**, one per parent. `-d 'all:(p1 | p2)'` is **not** valid (`all:` is a revset prefix, not a `-d` modifier) and `-d 'p1|p2'` resolves to a single ambiguous revision.
+
+After the rebase, describe the commit, move the bookmark, and push as in the merge-commit steps above.
 
 ## Rebasing a branch with stale `merge: merge <default-branch>` commits
 

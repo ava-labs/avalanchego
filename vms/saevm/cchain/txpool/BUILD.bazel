@@ -43,6 +43,7 @@ go_test(
         "//utils/constants",
         "//utils/crypto/secp256k1",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//vms/components/avax",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
