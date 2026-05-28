@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
@@ -341,6 +342,11 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 
 			headerExtra.MinDelayExcess = new(acp226.DelayExcess)
 			*headerExtra.MinDelayExcess = acp226.InitialDelayExcess
+		}
+		// Helicon: seed the ACP-283 dynamic min gas price excess.
+		if confExtra.IsHelicon(g.Timestamp) {
+			headerExtra.MinPriceExcess = new(acp283.PriceExcess)
+			*headerExtra.MinPriceExcess = acp283.InitialPriceExcess
 		}
 	}
 

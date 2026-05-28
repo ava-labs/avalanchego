@@ -10,7 +10,10 @@ package(default_visibility = [
 
 package_group(
     name = "external_consumers",
-    packages = [],
+    packages = [
+        "//graft/coreth/core",
+        "//graft/coreth/plugin/evm/customtypes",
+    ],
 )
 
 go_library(
