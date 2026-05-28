@@ -560,6 +560,55 @@ func TestBaseStakersDelegatorCancelOutPersistence(t *testing.T) {
 		iter := v.GetDelegatorIterator(delegator.SubnetID, delegator.NodeID)
 		require.Empty(t, iterator.ToSlice(iter))
 	})
+
+	t.Run("delete then put with updated metadata persists the replacement", func(t *testing.T) {
+		list := linkeddb.NewDefault(memdb.New())
+		v := newBaseStakers()
+
+		v.PutDelegator(delegator)
+		writeDiff(t, v, list)
+
+		updated := *delegator
+		updated.PotentialReward = delegator.PotentialReward + 1
+
+		v.DeleteDelegator(delegator)
+		v.PutDelegator(&updated)
+		writeDiff(t, v, list)
+
+		metadataBytes, err := list.Get(delegator.TxID[:])
+		require.NoError(t, err)
+		var metadata delegatorMetadata
+		require.NoError(t, parseDelegatorMetadata(metadataBytes, &metadata))
+		require.Equal(t, updated.PotentialReward, metadata.PotentialReward)
+	})
+
+	t.Run("pending: delete then put with updated metadata persists the entry", func(t *testing.T) {
+		validatorList := linkeddb.NewDefault(memdb.New())
+		delegatorList := linkeddb.NewDefault(memdb.New())
+		v := newBaseStakers()
+
+		writePending := func(t *testing.T) {
+			t.Helper()
+			diff := v.validatorDiffs[delegator.SubnetID][delegator.NodeID]
+			require.NotNil(t, diff)
+			require.NoError(t, writePendingDiff(validatorList, delegatorList, diff))
+			delete(v.validatorDiffs[delegator.SubnetID], delegator.NodeID)
+		}
+
+		v.PutDelegator(delegator)
+		writePending(t)
+
+		updated := *delegator
+		updated.PotentialReward = delegator.PotentialReward + 1
+
+		v.DeleteDelegator(delegator)
+		v.PutDelegator(&updated)
+		writePending(t)
+
+		has, err := delegatorList.Has(delegator.TxID[:])
+		require.NoError(t, err)
+		require.True(t, has)
+	})
 }
 
 func newTestStaker(subnetID ids.ID, nodeID ids.NodeID) *Staker {

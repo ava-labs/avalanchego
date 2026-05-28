@@ -203,9 +203,10 @@ func (v *baseStakers) PutDelegator(staker *Staker) {
 	validator.delegators.ReplaceOrInsert(staker)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	// A delete followed by a re-add of the same staker is a no-op.
-	// Undo the deletion instead of recording an add.
-	if _, ok := validatorDiff.deletedDelegators[staker.TxID]; ok {
+	// Cancel a prior delete only when the re-added staker is identical.
+	// A mismatch (e.g. different weight) must be recorded as a replacement
+	// so the diff captures the field change for the next DB write.
+	if existing, ok := validatorDiff.deletedDelegators[staker.TxID]; ok && existing.Equals(staker) {
 		delete(validatorDiff.deletedDelegators, staker.TxID)
 	} else {
 		if validatorDiff.addedDelegators == nil {
