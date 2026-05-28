@@ -30,8 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -57,9 +56,8 @@ func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
 	chainConfig *ethparams.ChainConfig,
-	initialMinDelayExcess acp226.DelayExcess,
-	desiredDelayExcess *acp226.DelayExcess,
-	desiredTargetExcess *acp176.TargetExcess,
+	initialDelayExponent dynamic.DelayExponent,
+	desired desiredParams,
 	pool *txpool.Pending,
 	warpStorage *warp.Storage,
 ) *hooks {
@@ -80,15 +78,12 @@ func newHooks(
 	}
 	return &hooks{
 		builder: builder{
-			ctx:                   ctx,
-			chainConfig:           chainConfig,
-			initialMinDelayExcess: initialMinDelayExcess,
-			now:                   time.Now,
-			desired: desiredParams{
-				delayExcess:  desiredDelayExcess,
-				targetExcess: desiredTargetExcess,
-			},
-			potentialTxs: poolTxs,
+			ctx:                  ctx,
+			chainConfig:          chainConfig,
+			initialDelayExponent: initialDelayExponent,
+			now:                  time.Now,
+			desired:              desired,
+			potentialTxs:         poolTxs,
 		},
 		state:       state,
 		warpStorage: warpStorage,
@@ -114,15 +109,16 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 	headerExtra := customtypes.GetHeaderExtra(header)
 	now := h.BlockTime(header)
 	return &builder{
-		ctx:                   h.ctx,
-		chainConfig:           h.chainConfig,
-		initialMinDelayExcess: h.initialMinDelayExcess,
+		ctx:                  h.ctx,
+		chainConfig:          h.chainConfig,
+		initialDelayExponent: h.initialDelayExponent,
 		now: func() time.Time {
 			return now
 		},
 		desired: desiredParams{
-			delayExcess:  headerExtra.MinDelayExcess,
-			targetExcess: headerExtra.TargetExcess,
+			delayExponent:  headerExtra.DelayExponent,
+			targetExponent: headerExtra.TargetExponent,
+			priceExponent:  headerExtra.PriceExponent,
 		},
 		potentialTxs: slices.Values(txs),
 	}, nil
@@ -141,16 +137,25 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 	}, nil
 }
 
+const targetToExcessScaling = 87 // 87 ~= 60 / ln(2)
+
 func (*hooks) GasConfigAfter(h *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	return targetExcess(h).Target(), gastime.GasPriceConfig{
-		TargetToExcessScaling: acp176.TargetToExcessScaling,
-		MinPrice:              acp176.MinPrice,
+	return targetExponent(h).Target(), gastime.GasPriceConfig{
+		TargetToExcessScaling: targetToExcessScaling,
+		MinPrice:              priceExponent(h).Price(),
 	}
 }
 
-func targetExcess(h *types.Header) acp176.TargetExcess {
-	if te := customtypes.GetHeaderExtra(h).TargetExcess; te != nil {
+func targetExponent(h *types.Header) dynamic.TargetExponent {
+	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
 		return *te
+	}
+	return 0
+}
+
+func priceExponent(h *types.Header) dynamic.PriceExponent {
+	if pe := customtypes.GetHeaderExtra(h).PriceExponent; pe != nil {
+		return *pe
 	}
 	return 0
 }
@@ -238,14 +243,15 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
 type desiredParams struct {
-	delayExcess  *acp226.DelayExcess
-	targetExcess *acp176.TargetExcess
+	delayExponent  *dynamic.DelayExponent
+	targetExponent *dynamic.TargetExponent
+	priceExponent  *dynamic.PriceExponent
 }
 
 type builder struct {
-	ctx                   *snow.Context
-	chainConfig           *ethparams.ChainConfig
-	initialMinDelayExcess acp226.DelayExcess
+	ctx                  *snow.Context
+	chainConfig          *ethparams.ChainConfig
+	initialDelayExponent dynamic.DelayExponent
 
 	now func() time.Time
 	// When fields in [desiredParams] are set, the builder produces headers
@@ -260,9 +266,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 
-	mde := b.initialMinDelayExcess
-	if pmde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pmde != nil {
-		mde = *pmde
+	de := b.initialDelayExponent
+	if pde := customtypes.GetHeaderExtra(parent).DelayExponent; pde != nil {
+		de = *pde
 	}
 
 	// Enforce block-building separation against the parent's MinDelayExcess.
@@ -273,21 +279,15 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		}
 
 		delay := nowMS - parentTimeMS
-		minDelay := mde.Delay()
+		minDelay := de.Delay()
 		if delay < minDelay {
 			return nil, fmt.Errorf("block building separation not satisfied: delay=%d minDelay=%d", delay, minDelay)
 		}
 	}
 
-	if b.desired.delayExcess != nil {
-		mde.UpdateDelayExcess(*b.desired.delayExcess)
-	}
-
-	te := targetExcess(parent)
-	if b.desired.targetExcess != nil {
-		te.UpdateTargetExcess(*b.desired.targetExcess)
-	}
-
+	de = de.Toward(b.desired.delayExponent)
+	te := targetExponent(parent).Toward(b.desired.targetExponent)
+	pe := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -307,8 +307,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			MinDelayExcess:   &mde,
-			TargetExcess:     &te,
+			DelayExponent:    &de,
+			TargetExponent:   &te,
+			PriceExponent:    &pe,
 		},
 	), nil
 }

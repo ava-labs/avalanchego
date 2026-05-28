@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestCalculateBlockBuildingDelay(t *testing.T) {
@@ -148,7 +149,7 @@ func createGraniteTestHeader(parentHash common.Hash, timeMilliseconds uint64, mi
 
 	extra := &customtypes.HeaderExtra{
 		TimeMilliseconds: &timeMilliseconds,
-		MinDelayExcess:   &minDelayExcess,
+		DelayExponent:    (*dynamic.DelayExponent)(&minDelayExcess),
 	}
 	customtypes.SetHeaderExtra(header, extra)
 

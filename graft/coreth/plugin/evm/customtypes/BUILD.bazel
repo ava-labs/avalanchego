@@ -21,7 +21,7 @@ go_library(
     deps = [
         "//vms/components/gas",
         "//vms/evm/acp226",
-        "//vms/saevm/cchain/acp176",
+        "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core/state",
@@ -47,7 +47,7 @@ graft_go_test(
         "//utils",
         "//vms/components/gas",
         "//vms/evm/acp226",
-        "//vms/saevm/cchain/acp176",
+        "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",

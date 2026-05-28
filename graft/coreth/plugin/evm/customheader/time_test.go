@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestVerifyTime(t *testing.T) {
@@ -345,7 +346,7 @@ func generateHeaderWithMinDelayExcessAndTime(timeSeconds uint64, timeMillisecond
 		},
 		&customtypes.HeaderExtra{
 			TimeMilliseconds: timeMilliseconds,
-			MinDelayExcess:   minDelayExcess,
+			DelayExponent:    (*dynamic.DelayExponent)(minDelayExcess),
 		},
 	)
 }

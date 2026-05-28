@@ -349,8 +349,11 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 
 	headerExtra := customtypes.GetHeaderExtra(header)
-	if headerExtra.TargetExcess != nil {
-		return fmt.Errorf("unexpected TargetExcess in header extra: %d", *headerExtra.TargetExcess)
+	if headerExtra.TargetExponent != nil {
+		return fmt.Errorf("unexpected TargetExponent in header extra: %d", *headerExtra.TargetExponent)
+	}
+	if headerExtra.PriceExponent != nil {
+		return fmt.Errorf("unexpected PriceExponent in header extra: %d", *headerExtra.PriceExponent)
 	}
 	if headerExtra.SettledHeight != nil {
 		return fmt.Errorf("unexpected SettledHeight in header extra: %d", *headerExtra.SettledHeight)

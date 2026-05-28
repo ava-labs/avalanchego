@@ -51,7 +51,7 @@ func VerifyMinDelayExcess(
 		return nil
 	}
 
-	remoteDelayExcess := customtypes.GetHeaderExtra(header).MinDelayExcess
+	remoteDelayExcess := (*acp226.DelayExcess)(customtypes.GetHeaderExtra(header).DelayExponent)
 	if remoteDelayExcess == nil {
 		return fmt.Errorf("%w: %s", errRemoteMinDelayExcessNil, header.Hash())
 	}
@@ -94,7 +94,7 @@ func minDelayExcess(
 	if config.IsGranite(parent.Time) {
 		// If the parent block was running with ACP-226, we start with the
 		// resulting min delay excess from the parent block.
-		parentMinDelayExcess := customtypes.GetHeaderExtra(parent).MinDelayExcess
+		parentMinDelayExcess := (*acp226.DelayExcess)(customtypes.GetHeaderExtra(parent).DelayExponent)
 		if parentMinDelayExcess == nil {
 			return 0, fmt.Errorf("%w: %s", errParentMinDelayExcessNil, parent.Hash())
 		}

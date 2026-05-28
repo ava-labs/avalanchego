@@ -12,8 +12,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -44,8 +43,9 @@ type HeaderExtra struct {
 	ExtDataGasUsed      *big.Int
 	BlockGasCost        *big.Int
 	TimeMilliseconds    *uint64
-	MinDelayExcess      *acp226.DelayExcess
-	TargetExcess        *acp176.TargetExcess
+	DelayExponent       *dynamic.DelayExponent
+	TargetExponent      *dynamic.TargetExponent
+	PriceExponent       *dynamic.PriceExponent
 	SettledHeight       *uint64
 	SettledGasUnix      *uint64
 	SettledGasNumerator *gas.Gas
@@ -127,13 +127,17 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		m := *h.TimeMilliseconds
 		cp.TimeMilliseconds = &m
 	}
-	if h.MinDelayExcess != nil {
-		e := *h.MinDelayExcess
-		cp.MinDelayExcess = &e
+	if h.DelayExponent != nil {
+		e := *h.DelayExponent
+		cp.DelayExponent = &e
 	}
-	if h.TargetExcess != nil {
-		e := *h.TargetExcess
-		cp.TargetExcess = &e
+	if h.TargetExponent != nil {
+		e := *h.TargetExponent
+		cp.TargetExponent = &e
+	}
+	if h.PriceExponent != nil {
+		e := *h.PriceExponent
+		cp.PriceExponent = &e
 	}
 	if h.SettledHeight != nil {
 		h := *h.SettledHeight
@@ -203,8 +207,9 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.ExtDataGasUsed = extras.ExtDataGasUsed
 	h.BlockGasCost = extras.BlockGasCost
 	h.TimeMilliseconds = extras.TimeMilliseconds
-	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
-	h.TargetExcess = (*uint64)(extras.TargetExcess)
+	h.DelayExponent = (*uint64)(extras.DelayExponent)
+	h.TargetExponent = (*uint64)(extras.TargetExponent)
+	h.PriceExponent = (*uint64)(extras.PriceExponent)
 	h.SettledHeight = extras.SettledHeight
 	h.SettledGasUnix = extras.SettledGasUnix
 	h.SettledGasNumerator = (*uint64)(extras.SettledGasNumerator)
@@ -216,8 +221,9 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.ExtDataGasUsed = h.ExtDataGasUsed
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
-	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
-	extras.TargetExcess = (*acp176.TargetExcess)(h.TargetExcess)
+	extras.DelayExponent = (*dynamic.DelayExponent)(h.DelayExponent)
+	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
+	extras.PriceExponent = (*dynamic.PriceExponent)(h.PriceExponent)
 	extras.SettledHeight = h.SettledHeight
 	extras.SettledGasUnix = h.SettledGasUnix
 	extras.SettledGasNumerator = (*gas.Gas)(h.SettledGasNumerator)
@@ -279,13 +285,17 @@ type HeaderSerializable struct {
 	// TimeMilliseconds was added by Granite and is ignored in legacy headers.
 	TimeMilliseconds *uint64 `json:"timestampMilliseconds" rlp:"optional"`
 
-	// MinDelayExcess was added by Granite and is ignored in legacy headers.
+	// DelayExponent was added by Granite and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
+	DelayExponent *uint64 `json:"minDelayExcess" rlp:"optional"`
 
-	// TargetExcess was added by Helicon and is ignored in legacy headers.
+	// TargetExponent was added by Helicon and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	TargetExcess *uint64 `json:"targetExcess" rlp:"optional"`
+	TargetExponent *uint64 `json:"targetExponent" rlp:"optional"`
+
+	// PriceExponent was added by Helicon and is ignored in legacy headers.
+	// We use *uint64 type here to avoid rlpgen generating incorrect code
+	PriceExponent *uint64 `json:"priceExponent" rlp:"optional"`
 
 	// SettledHeight was added by Helicon and is ignored in legacy headers.
 	SettledHeight *uint64 `json:"settledHeight" rlp:"optional"`
@@ -315,8 +325,9 @@ type headerMarshaling struct {
 	BlobGasUsed         *hexutil.Uint64
 	ExcessBlobGas       *hexutil.Uint64
 	TimeMilliseconds    *hexutil.Uint64
-	MinDelayExcess      *hexutil.Uint64
-	TargetExcess        *hexutil.Uint64
+	DelayExponent       *hexutil.Uint64
+	TargetExponent      *hexutil.Uint64
+	PriceExponent       *hexutil.Uint64
 	SettledHeight       *hexutil.Uint64
 	SettledGasUnix      *hexutil.Uint64
 	SettledGasNumerator *hexutil.Uint64

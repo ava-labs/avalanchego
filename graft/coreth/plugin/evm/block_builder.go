@@ -201,11 +201,11 @@ func minNextBlockTime(parent *types.Header) time.Time {
 	parentExtra := customtypes.GetHeaderExtra(parent)
 	// If the parent header has no min delay excess, there is nothing to wait for, because the rule does not apply
 	// to the block to be built.
-	if parentExtra.MinDelayExcess == nil {
+	if parentExtra.DelayExponent == nil {
 		return time.Time{}
 	}
 	parentTime := customtypes.BlockTime(parent)
-	acp226DelayExcess := *parentExtra.MinDelayExcess
+	acp226DelayExcess := *parentExtra.DelayExponent
 	// parent's delay excess is already verified by consensus
 	// so this should not overflow
 	requiredDelay := time.Duration(acp226DelayExcess.Delay()) * time.Millisecond

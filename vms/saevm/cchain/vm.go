@@ -40,10 +40,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -64,9 +63,9 @@ type VM struct {
 	*sae.VM // created by [VM.Initialize]
 
 	// These are configurable to speed up testing.
-	pullGossipPeriod      time.Duration
-	pushGossipPeriod      time.Duration
-	initialMinDelayExcess acp226.DelayExcess
+	pullGossipPeriod     time.Duration
+	pushGossipPeriod     time.Duration
+	initialDelayExponent dynamic.DelayExponent
 
 	ctx          *snow.Context
 	state        *state.State
@@ -163,15 +162,18 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("parsing warp messages: %w", err)
 	}
 
-	var desiredDelayExcess *acp226.DelayExcess
-	if userConfig.MinDelayTarget != nil {
-		desiredDelayExcess = new(acp226.DelayExcess)
-		*desiredDelayExcess = acp226.DesiredDelayExcess(*userConfig.MinDelayTarget)
+	var desired desiredParams
+	if userConfig.DelayTarget != nil {
+		desired.delayExponent = new(dynamic.DelayExponent)
+		*desired.delayExponent = dynamic.DesiredDelayExponent(*userConfig.DelayTarget)
 	}
-	var desiredTargetExcess *acp176.TargetExcess
 	if userConfig.GasTarget != nil {
-		desiredTargetExcess = new(acp176.TargetExcess)
-		*desiredTargetExcess = acp176.DesiredTargetExcess(*userConfig.GasTarget)
+		desired.targetExponent = new(dynamic.TargetExponent)
+		*desired.targetExponent = dynamic.DesiredTargetExponent(*userConfig.GasTarget)
+	}
+	if userConfig.PriceTarget != nil {
+		desired.priceExponent = new(dynamic.PriceExponent)
+		*desired.priceExponent = dynamic.DesiredPriceExponent(*userConfig.PriceTarget)
 	}
 
 	pendingTxs := txpool.NewPending()
@@ -180,9 +182,8 @@ func (vm *VM) Initialize(
 		snowCtx,
 		vm.state,
 		chainConfig,
-		vm.initialMinDelayExcess,
-		desiredDelayExcess,
-		desiredTargetExcess,
+		vm.initialDelayExponent,
+		desired,
 		pendingTxs,
 		warpStorage,
 	)
@@ -415,11 +416,11 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 // is allowed by h's [acp226.DelayExcess].
 func minNextBlockTime(h *types.Header) time.Time {
 	e := customtypes.GetHeaderExtra(h)
-	if e.MinDelayExcess == nil {
+	if e.DelayExponent == nil {
 		return time.Time{}
 	}
 
-	mde := *e.MinDelayExcess
+	mde := *e.DelayExponent
 	delay := time.Duration(mde.Delay()) * time.Millisecond //#nosec G115 -- delay excess is verified by consensus
 	return customtypes.BlockTime(h).Add(delay)
 }

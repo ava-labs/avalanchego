@@ -66,6 +66,7 @@ graft_go_test(
         "//vms/components/gas",
         "//vms/evm/acp176",
         "//vms/evm/acp226",
+        "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",

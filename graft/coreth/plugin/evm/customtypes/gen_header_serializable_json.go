@@ -40,8 +40,9 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 		ExcessBlobGas       *hexutil.Uint64  `json:"excessBlobGas" rlp:"optional"`
 		ParentBeaconRoot    *common.Hash     `json:"parentBeaconBlockRoot" rlp:"optional"`
 		TimeMilliseconds    *hexutil.Uint64  `json:"timestampMilliseconds" rlp:"optional"`
-		MinDelayExcess      *hexutil.Uint64  `json:"minDelayExcess" rlp:"optional"`
-		TargetExcess        *hexutil.Uint64  `json:"targetExcess" rlp:"optional"`
+		DelayExponent       *hexutil.Uint64  `json:"minDelayExcess" rlp:"optional"`
+		TargetExponent      *hexutil.Uint64  `json:"targetExponent" rlp:"optional"`
+		PriceExponent       *hexutil.Uint64  `json:"priceExponent" rlp:"optional"`
 		SettledHeight       *hexutil.Uint64  `json:"settledHeight" rlp:"optional"`
 		SettledGasUnix      *hexutil.Uint64  `json:"settledGasUnix" rlp:"optional"`
 		SettledGasNumerator *hexutil.Uint64  `json:"settledGasNumerator" rlp:"optional"`
@@ -72,8 +73,9 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 	enc.ExcessBlobGas = (*hexutil.Uint64)(h.ExcessBlobGas)
 	enc.ParentBeaconRoot = h.ParentBeaconRoot
 	enc.TimeMilliseconds = (*hexutil.Uint64)(h.TimeMilliseconds)
-	enc.MinDelayExcess = (*hexutil.Uint64)(h.MinDelayExcess)
-	enc.TargetExcess = (*hexutil.Uint64)(h.TargetExcess)
+	enc.DelayExponent = (*hexutil.Uint64)(h.DelayExponent)
+	enc.TargetExponent = (*hexutil.Uint64)(h.TargetExponent)
+	enc.PriceExponent = (*hexutil.Uint64)(h.PriceExponent)
 	enc.SettledHeight = (*hexutil.Uint64)(h.SettledHeight)
 	enc.SettledGasUnix = (*hexutil.Uint64)(h.SettledGasUnix)
 	enc.SettledGasNumerator = (*hexutil.Uint64)(h.SettledGasNumerator)
@@ -108,8 +110,9 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 		ExcessBlobGas       *hexutil.Uint64   `json:"excessBlobGas" rlp:"optional"`
 		ParentBeaconRoot    *common.Hash      `json:"parentBeaconBlockRoot" rlp:"optional"`
 		TimeMilliseconds    *hexutil.Uint64   `json:"timestampMilliseconds" rlp:"optional"`
-		MinDelayExcess      *hexutil.Uint64   `json:"minDelayExcess" rlp:"optional"`
-		TargetExcess        *hexutil.Uint64   `json:"targetExcess" rlp:"optional"`
+		DelayExponent       *hexutil.Uint64   `json:"minDelayExcess" rlp:"optional"`
+		TargetExponent      *hexutil.Uint64   `json:"targetExponent" rlp:"optional"`
+		PriceExponent       *hexutil.Uint64   `json:"priceExponent" rlp:"optional"`
 		SettledHeight       *hexutil.Uint64   `json:"settledHeight" rlp:"optional"`
 		SettledGasUnix      *hexutil.Uint64   `json:"settledGasUnix" rlp:"optional"`
 		SettledGasNumerator *hexutil.Uint64   `json:"settledGasNumerator" rlp:"optional"`
@@ -202,11 +205,14 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 	if dec.TimeMilliseconds != nil {
 		h.TimeMilliseconds = (*uint64)(dec.TimeMilliseconds)
 	}
-	if dec.MinDelayExcess != nil {
-		h.MinDelayExcess = (*uint64)(dec.MinDelayExcess)
+	if dec.DelayExponent != nil {
+		h.DelayExponent = (*uint64)(dec.DelayExponent)
 	}
-	if dec.TargetExcess != nil {
-		h.TargetExcess = (*uint64)(dec.TargetExcess)
+	if dec.TargetExponent != nil {
+		h.TargetExponent = (*uint64)(dec.TargetExponent)
+	}
+	if dec.PriceExponent != nil {
+		h.PriceExponent = (*uint64)(dec.PriceExponent)
 	}
 	if dec.SettledHeight != nil {
 		h.SettledHeight = (*uint64)(dec.SettledHeight)
