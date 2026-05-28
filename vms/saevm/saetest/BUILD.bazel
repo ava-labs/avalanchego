@@ -5,7 +5,6 @@ go_library(
     name = "saetest",
     testonly = True,
     srcs = [
-        "capturing_peer.go",
         "goleak.go",
         "heightdb.go",
         "network.go",

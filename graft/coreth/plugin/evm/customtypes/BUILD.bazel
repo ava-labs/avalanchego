@@ -19,6 +19,7 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes",
     deps = [
+        "//vms/components/gas",
         "//vms/evm/acp226",
         "//vms/saevm/cchain/acp176",
         "@com_github_ava_labs_libevm//common",
@@ -44,6 +45,7 @@ graft_go_test(
         "//graft/coreth/internal/blocktest",
         "//graft/coreth/params",
         "//utils",
+        "//vms/components/gas",
         "//vms/evm/acp226",
         "//vms/saevm/cchain/acp176",
         "@com_github_ava_labs_libevm//common",
