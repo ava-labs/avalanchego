@@ -24,10 +24,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -48,19 +49,17 @@ func NewEthBlock(tb testing.TB, parent *types.Block, txs types.Transactions, opt
 			BlobGasUsed:     new(uint64),
 			ExcessBlobGas:   new(uint64),
 		},
-		settledHeight: parent.NumberU64() + 1, // synchronoous
 	}
 	props = options.ApplyTo(props, opts...)
-	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, props.settledHeight)
+	block, err := hookstest.BuildBlock(props.header, nil, txs, props.receipts, props.ops, hook.Settled{})
 	require.NoError(tb, err, "hookstest.BuildBlock()")
 	return block
 }
 
 type ethBlockProperties struct {
-	header        *types.Header
-	receipts      types.Receipts
-	ops           []hookstest.Op
-	settledHeight uint64
+	header   *types.Header
+	receipts types.Receipts
+	ops      []hookstest.Op
 }
 
 // ModifyHeader returns an option to modify the [types.Header] constructed by
@@ -97,7 +96,7 @@ func NewBlock(tb testing.TB, eth *types.Block, parent, lastSettled *blocks.Block
 
 	props := options.ApplyTo(&blockProperties{}, opts...)
 	if props.logger == nil {
-		props.logger = saetest.NewTBLogger(tb, logging.Warn)
+		props.logger = loggingtest.New(tb, logging.Warn)
 	}
 
 	b, err := blocks.New(eth, parent, lastSettled, props.logger)
