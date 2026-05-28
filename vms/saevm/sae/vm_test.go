@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
@@ -87,7 +88,7 @@ type SUT struct {
 	wallet  *saetest.Wallet
 	db      ethdb.Database
 	hooks   *hookstest.Stub
-	logger  *saetest.TBLogger
+	logger  *loggingtest.Logger
 
 	sender *saetest.Sender
 }
@@ -160,7 +161,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
 	})
 
-	logger := saetest.NewTBLogger(tb, conf.logLevel)
+	logger := loggingtest.New(tb, conf.logLevel)
 	ctx := logger.CancelOnError(tb.Context())
 	snowCtx := snowtest.Context(tb, chainID)
 	snowCtx.Log = logger

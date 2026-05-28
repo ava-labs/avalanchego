@@ -7,7 +7,6 @@ go_library(
     srcs = [
         "goleak.go",
         "heightdb.go",
-        "logging.go",
         "network.go",
         "saetest.go",
         "wallet.go",
@@ -20,7 +19,6 @@ go_library(
         "//snow/engine/common",
         "//snow/validators",
         "//utils/lock",
-        "//utils/logging",
         "//utils/set",
         "//utils/timer/mockable",
         "//version",
@@ -40,8 +38,6 @@ go_library(
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
-        "@org_uber_go_zap//:zap",
-        "@org_uber_go_zap//zapcore",
     ],
 )
 

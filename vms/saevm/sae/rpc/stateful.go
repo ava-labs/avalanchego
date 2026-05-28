@@ -29,6 +29,10 @@ var noopRelease tracers.StateReleaseFunc = func() {}
 // noEndOfBlockOps wraps [hook.Points] to suppress
 // [hook.Points.EndOfBlockOps] and [hook.Points.AfterExecutingBlock], used by
 // the tracer to skip end-of-block operations during partial replay.
+//
+// TODO(StephenButtolph): Properly abstract execution to not rely on method
+// suppression. It is fragile and could result in accidentially modifying the
+// block state or even disk state during tracing.
 type noEndOfBlockOps struct {
 	hook.Points
 }
