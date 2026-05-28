@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -99,7 +100,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
-	log := saetest.NewTBLogger(tb, logging.Debug)
+	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 
 	chainDB := prefixdb.New([]byte("chain"), db)

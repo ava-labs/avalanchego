@@ -7,7 +7,6 @@ go_library(
     srcs = [
         "goleak.go",
         "heightdb.go",
-        "logging.go",
         "saetest.go",
         "wallet.go",
     ],
@@ -16,7 +15,6 @@ go_library(
     deps = [
         "//database",
         "//utils/lock",
-        "//utils/logging",
         "//vms/saevm/saedb",
         "//vms/saevm/types",
         "@com_github_ava_labs_libevm//common",
@@ -31,8 +29,6 @@ go_library(
         "@com_github_holiman_uint256//:uint256",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
-        "@org_uber_go_zap//:zap",
-        "@org_uber_go_zap//zapcore",
     ],
 )
 
