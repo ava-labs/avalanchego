@@ -39,17 +39,17 @@
       },
       "locked": {
         "dir": "nix/go",
-        "lastModified": 1773256574,
-        "narHash": "sha256-bZiyC/Y4LIBdp9RR93rJYqh3Ls+VZap5L0KNyjGo308=",
+        "lastModified": 1780000179,
+        "narHash": "sha256-bwDUHWy4bHO0xmmHPJgYVXIDeP90PQNRYovglGuLybU=",
         "owner": "ava-labs",
         "repo": "avalanchego",
-        "rev": "50585cbbdfe1af02a2c11bdc9fa77fca26e6b838",
+        "rev": "89ac856f87556f8dd38ed93530d10eb92210da35",
         "type": "github"
       },
       "original": {
         "dir": "nix/go",
         "owner": "ava-labs",
-        "ref": "50585cbbdfe1af02a2c11bdc9fa77fca26e6b838",
+        "ref": "89ac856f87556f8dd38ed93530d10eb92210da35",
         "repo": "avalanchego",
         "type": "github"
       }

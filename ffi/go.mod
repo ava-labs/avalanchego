@@ -4,7 +4,7 @@ module github.com/ava-labs/firewood/ffi
 //   - ffi/go.mod (here)
 //   - ffi/tests/eth/go.mod
 //   - ffi/tests/firewood/go.mod
-go 1.25.8
+go 1.25.10
 
 require (
 	github.com/prometheus/client_golang v1.22.0

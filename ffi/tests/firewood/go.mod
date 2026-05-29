@@ -1,6 +1,6 @@
 module github.com/ava-labs/firewood/ffi/tests/firewood
 
-go 1.25.8
+go 1.25.10
 
 require (
 	github.com/ava-labs/firewood-go/ffi v0.0.0 // this is replaced to use the parent folder
