@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ava-labs/libevm/common"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -76,30 +76,30 @@ const maxGetUTXOsLimit = 1024
 
 // terminal IDs are used as a sentinel to indicate the end of pagination.
 var (
-	termAddr   = ids.ShortID(common.HexToAddress("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"))
-	termUTXOID = ids.ID(common.HexToHash("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"))
+	termAddr   ids.ShortID = new(uint256.Int).SetAllOne().Bytes20()
+	termUTXOID ids.ID      = new(uint256.Int).SetAllOne().Bytes32()
 )
 
-func (s *service) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOsReply) error {
+func (s *service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, resp *api.GetUTXOsReply) error {
 	s.ctx.Log.Debug("API called",
 		zap.String("service", "avax"),
 		zap.String("method", "getUTXOs"),
-		logging.UserStrings("addresses", a.Addresses),
-		zap.Stringer("encoding", a.Encoding),
+		logging.UserStrings("addresses", args.Addresses),
+		zap.Stringer("encoding", args.Encoding),
 	)
 
-	sourceChainID, err := s.ctx.BCLookup.Lookup(a.SourceChain)
+	sourceChainID, err := s.ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {
-		return fmt.Errorf("parsing source chainID %q: %w", a.SourceChain, err)
+		return fmt.Errorf("parsing source chainID %q: %w", args.SourceChain, err)
 	}
 
 	const maxAddrs = 1024
-	if len(a.Addresses) > maxAddrs {
-		return fmt.Errorf("too many addresses: %d exceeds %d", len(a.Addresses), maxAddrs)
+	if len(args.Addresses) > maxAddrs {
+		return fmt.Errorf("too many addresses: %d exceeds %d", len(args.Addresses), maxAddrs)
 	}
 
-	addrs := make([][]byte, len(a.Addresses))
-	for i, str := range a.Addresses {
+	addrs := make([][]byte, len(args.Addresses))
+	for i, str := range args.Addresses {
 		addr, err := s.parseAddress(str)
 		if err != nil {
 			return fmt.Errorf("parsing address %q: %w", str, err)
@@ -108,38 +108,38 @@ func (s *service) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOs
 	}
 
 	// Set the response encoding here in case the client provided the terminal
-	// cursor.
-	r.Encoding = a.Encoding
+	// cursor, which would return early below.
+	resp.Encoding = args.Encoding
 
 	var (
 		startAddr ids.ShortID
 		startUTXO ids.ID
 	)
-	if a.StartIndex != (api.Index{}) {
-		startAddr, err = s.parseAddress(a.StartIndex.Address)
+	if args.StartIndex != (api.Index{}) {
+		startAddr, err = s.parseAddress(args.StartIndex.Address)
 		if err != nil {
-			return fmt.Errorf("parsing start address %q: %w", a.StartIndex.Address, err)
+			return fmt.Errorf("parsing start address %q: %w", args.StartIndex.Address, err)
 		}
-		startUTXO, err = ids.FromString(a.StartIndex.UTXO)
+		startUTXO, err = ids.FromString(args.StartIndex.UTXO)
 		if err != nil {
-			return fmt.Errorf("parsing start utxoID %q: %w", a.StartIndex.UTXO, err)
+			return fmt.Errorf("parsing start utxoID %q: %w", args.StartIndex.UTXO, err)
 		}
 		if startAddr == termAddr && startUTXO == termUTXOID {
 			// Client provided the terminal index, so there are no more results.
-			r.UTXOs = []string{}
-			r.EndIndex.Address = s.zeroAddress
-			r.EndIndex.UTXO = ids.Empty.String()
+			resp.UTXOs = []string{}
+			resp.EndIndex.Address = s.zeroAddress
+			resp.EndIndex.UTXO = ids.Empty.String()
 			return nil
 		}
 	}
 
-	limit := a.Limit
+	limit := args.Limit
 	if limit == 0 || limit > maxGetUTXOsLimit {
 		limit = maxGetUTXOsLimit
 	}
 
-	// [atomic.SharedMemory.Indexed] iterates inclusively from startAddr and
-	// startUTXO, so we fetch one extra UTXO to return the next index.
+	// [atomic.SharedMemory.Indexed] returns the last address and last UTXO, so
+	// we fetch one extra UTXO to determine the next index.
 	utxos, nextAddr, nextUTXO, err := s.ctx.SharedMemory.Indexed(
 		sourceChainID,
 		addrs,
@@ -151,6 +151,8 @@ func (s *service) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOs
 		return fmt.Errorf("retrieving UTXOs: %w", err)
 	}
 
+	// Now we convert the closed interval [start, end] from shared memory to the
+	// half-open interval [start, end) expected for the API.
 	var (
 		endAddr ids.ShortID
 		endUTXO ids.ID
@@ -164,27 +166,27 @@ func (s *service) GetUTXOs(_ *http.Request, a *api.GetUTXOsArgs, r *api.GetUTXOs
 		endUTXO = termUTXOID
 	}
 
-	r.UTXOs = make([]string, len(utxos))
+	resp.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		r.UTXOs[i], err = formatting.Encode(a.Encoding, utxo)
+		resp.UTXOs[i], err = formatting.Encode(args.Encoding, utxo)
 		if err != nil {
 			return fmt.Errorf("encoding utxo: %w", err)
 		}
 	}
 
-	r.EndIndex.Address, err = address.Format(s.chainAlias, s.hrp, endAddr[:])
+	resp.EndIndex.Address, err = address.Format(s.chainAlias, s.hrp, endAddr[:])
 	if err != nil {
 		return fmt.Errorf("formatting address: %w", err)
 	}
-	r.EndIndex.UTXO = endUTXO.String()
-	r.NumFetched = json.Uint64(len(utxos))
+	resp.EndIndex.UTXO = endUTXO.String()
+	resp.NumFetched = json.Uint64(len(utxos))
 	return nil
 }
 
 // parseAddress parses str as either a human-readable address or cb58-encoded
 // address.
 func (s *service) parseAddress(str string) (ids.ShortID, error) {
-	if a, err := ids.ShortFromString(str); err == nil {
+	if a, err := ids.ShortFromString(str); err == nil { // if NO error
 		return a, nil
 	}
 
@@ -207,23 +209,18 @@ func (s *service) parseAddress(str string) (ids.ShortID, error) {
 
 var errIssuingTx = errors.New("issuing tx")
 
-func (s *service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) error {
+func (s *service) IssueTx(_ *http.Request, args *api.FormattedTx, resp *api.JSONTxID) error {
 	s.ctx.Log.Debug("API called",
 		zap.String("service", "avax"),
 		zap.String("method", "issueTx"),
-		logging.UserString("tx", a.Tx),
-		zap.Stringer("encoding", a.Encoding),
+		logging.UserString("tx", args.Tx),
+		zap.Stringer("encoding", args.Encoding),
 	)
 
-	txBytes, err := formatting.Decode(a.Encoding, a.Tx)
+	t, err := decodeTx(args.Tx, args.Encoding)
 	if err != nil {
-		return fmt.Errorf("decoding transaction: %w", err)
+		return err
 	}
-	t, err := tx.Parse(txBytes)
-	if err != nil {
-		return fmt.Errorf("parsing transaction: %w", err)
-	}
-
 	if err := s.txpool.Add(toGossipTx(t)); err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
 		return fmt.Errorf("%w: %w", errIssuingTx, err)
 	}
@@ -231,7 +228,7 @@ func (s *service) IssueTx(_ *http.Request, a *api.FormattedTx, r *api.JSONTxID) 
 	// Even if already in the pool from a peer's gossip, push it to peers.
 	s.pushGossiper.Add(toGossipTx(t))
 
-	r.TxID = t.ID()
+	resp.TxID = t.ID()
 	return nil
 }
 
@@ -245,28 +242,24 @@ type GetTxReply struct {
 
 var errFetchingTx = errors.New("fetching tx")
 
-func (s *service) GetAtomicTx(_ *http.Request, a *api.GetTxArgs, r *GetTxReply) error {
+func (s *service) GetAtomicTx(_ *http.Request, args *api.GetTxArgs, resp *GetTxReply) error {
 	s.ctx.Log.Debug("API called",
 		zap.String("service", "avax"),
 		zap.String("method", "getAtomicTx"),
-		zap.Stringer("txID", a.TxID),
-		zap.Stringer("encoding", a.Encoding),
+		zap.Stringer("txID", args.TxID),
+		zap.Stringer("encoding", args.Encoding),
 	)
 
-	t, height, err := s.state.GetTx(a.TxID)
+	t, height, err := s.state.GetTx(args.TxID)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errFetchingTx, err)
 	}
-	txBytes, err := t.Bytes()
-	if err != nil {
-		return fmt.Errorf("marshalling tx: %w", err)
-	}
-	r.Tx, err = formatting.Encode(a.Encoding, txBytes)
+	resp.Tx, err = encodeTx(t, args.Encoding)
 	if err != nil {
 		return fmt.Errorf("encoding tx: %w", err)
 	}
-	r.Encoding = a.Encoding
-	r.Height = json.Uint64(height)
+	resp.Encoding = args.Encoding
+	resp.Height = json.Uint64(height)
 	return nil
 }
 
@@ -305,25 +298,31 @@ func (c *Client) GetUTXOs(
 	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	options ...rpc.Option,
-) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	res := &api.GetUTXOsReply{}
-	err := c.r.SendRequest(ctx, "avax.getUTXOs", &api.GetUTXOsArgs{
-		Addresses:   ids.ShortIDsToStrings(addrs),
-		SourceChain: sourceChain.String(),
-		Limit:       json.Uint32(limit),
-		StartIndex: api.Index{
-			Address: startAddr.String(),
-			UTXO:    startUTXOID.String(),
+) (_ []*avax.UTXO, endAddr ids.ShortID, endUTXOID ids.ID, _ error) {
+	var resp api.GetUTXOsReply
+	err := c.r.SendRequest(
+		ctx,
+		"avax.getUTXOs",
+		&api.GetUTXOsArgs{
+			Addresses:   ids.ShortIDsToStrings(addrs),
+			SourceChain: sourceChain.String(),
+			Limit:       json.Uint32(limit),
+			StartIndex: api.Index{
+				Address: startAddr.String(),
+				UTXO:    startUTXOID.String(),
+			},
+			Encoding: clientEncoding,
 		},
-		Encoding: clientEncoding,
-	}, res, options...)
+		&resp,
+		options...,
+	)
 	if err != nil {
 		return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("sending request: %w", err)
 	}
 
-	utxos := make([]*avax.UTXO, len(res.UTXOs))
-	for i, raw := range res.UTXOs {
-		utxoBytes, err := formatting.Decode(res.Encoding, raw)
+	utxos := make([]*avax.UTXO, len(resp.UTXOs))
+	for i, raw := range resp.UTXOs {
+		utxoBytes, err := formatting.Decode(resp.Encoding, raw)
 		if err != nil {
 			return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("decoding utxo %d: %w", i, err)
 		}
@@ -332,11 +331,11 @@ func (c *Client) GetUTXOs(
 			return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("parsing utxo %d: %w", i, err)
 		}
 	}
-	endAddr, err := address.ParseToID(res.EndIndex.Address)
+	endAddr, err = address.ParseToID(resp.EndIndex.Address)
 	if err != nil {
 		return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("parsing end address: %w", err)
 	}
-	endUTXOID, err := ids.FromString(res.EndIndex.UTXO)
+	endUTXOID, err = ids.FromString(resp.EndIndex.UTXO)
 	if err != nil {
 		return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("parsing end utxoID: %w", err)
 	}
@@ -345,19 +344,21 @@ func (c *Client) GetUTXOs(
 
 // IssueTx submits t to the txpool.
 func (c *Client) IssueTx(ctx context.Context, t *tx.Tx, options ...rpc.Option) error {
-	txBytes, err := t.Bytes()
+	txStr, err := encodeTx(t, clientEncoding)
 	if err != nil {
-		return fmt.Errorf("marshalling tx: %w", err)
-	}
-	txStr, err := formatting.Encode(clientEncoding, txBytes)
-	if err != nil {
-		return fmt.Errorf("encoding tx: %w", err)
+		return err
 	}
 
-	err = c.r.SendRequest(ctx, "avax.issueTx", &api.FormattedTx{
-		Tx:       txStr,
-		Encoding: clientEncoding,
-	}, &api.JSONTxID{}, options...)
+	err = c.r.SendRequest(
+		ctx,
+		"avax.issueTx",
+		&api.FormattedTx{
+			Tx:       txStr,
+			Encoding: clientEncoding,
+		},
+		&api.JSONTxID{},
+		options...,
+	)
 	if err != nil {
 		return fmt.Errorf("sending request: %w", err)
 	}
@@ -367,22 +368,48 @@ func (c *Client) IssueTx(ctx context.Context, t *tx.Tx, options ...rpc.Option) e
 // GetTx returns an accepted cross-chain transaction along with the block height
 // at which it was accepted.
 func (c *Client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) (*tx.Tx, uint64, error) {
-	res := &GetTxReply{}
-	err := c.r.SendRequest(ctx, "avax.getAtomicTx", &api.GetTxArgs{
-		TxID:     txID,
-		Encoding: clientEncoding,
-	}, res, options...)
+	var resp GetTxReply
+	err := c.r.SendRequest(
+		ctx,
+		"avax.getAtomicTx",
+		&api.GetTxArgs{
+			TxID:     txID,
+			Encoding: clientEncoding,
+		},
+		&resp,
+		options...,
+	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("sending request: %w", err)
 	}
 
-	txBytes, err := formatting.Decode(res.Encoding, res.Tx)
+	t, err := decodeTx(resp.Tx, resp.Encoding)
 	if err != nil {
-		return nil, 0, fmt.Errorf("decoding tx: %w", err)
+		return nil, 0, err
 	}
-	t, err := tx.Parse(txBytes)
+	return t, uint64(resp.Height), nil
+}
+
+func encodeTx(t *tx.Tx, encoding formatting.Encoding) (string, error) {
+	b, err := t.Bytes()
 	if err != nil {
-		return nil, 0, fmt.Errorf("parsing tx: %w", err)
+		return "", fmt.Errorf("marshalling tx: %w", err)
 	}
-	return t, uint64(res.Height), nil
+	s, err := formatting.Encode(encoding, b)
+	if err != nil {
+		return "", fmt.Errorf("encoding tx: %w", err)
+	}
+	return s, nil
+}
+
+func decodeTx(s string, encoding formatting.Encoding) (*tx.Tx, error) {
+	b, err := formatting.Decode(encoding, s)
+	if err != nil {
+		return nil, fmt.Errorf("decoding tx: %w", err)
+	}
+	t, err := tx.Parse(b)
+	if err != nil {
+		return nil, fmt.Errorf("parsing tx: %w", err)
+	}
+	return t, nil
 }
