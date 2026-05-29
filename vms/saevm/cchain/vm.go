@@ -197,8 +197,6 @@ func (vm *VM) Initialize(
 		DBConfig: saedb.Config{
 			TrieDBConfig: trieDBConfig,
 		},
-		// TODO(StephenButtolph): Configure this correctly.
-		ExcessAfterLastSynchronous: 0,
 	}
 
 	snowCtx.Log.Info("constructing the sae VM")

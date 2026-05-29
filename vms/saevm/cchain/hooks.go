@@ -260,7 +260,7 @@ type builder struct {
 	potentialTxs iter.Seq[*hookTx]
 }
 
-var errHeliconUnactivated = errors.New("Helicon is not activated")
+var errHeliconUnactivated = errors.New("helicon is not activated")
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.

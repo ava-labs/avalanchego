@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/params"
@@ -22,7 +23,7 @@ import (
 )
 
 // maxFeePerGas is the fee that transactions issued by this test will pay.
-const maxFeePerGas = 100 * params.Wei
+const maxFeePerGas = 10_000 * params.Wei
 
 var gasPrice = big.NewInt(maxFeePerGas)
 
@@ -56,8 +57,8 @@ func main() {
 			Nonce:     nonce,
 			GasTipCap: big.NewInt(params.Wei),
 			GasFeeCap: gasPrice,
-			Gas:       params.TxGas,
-			To:        &eoa,
+			Gas:       8_000_000,
+			Data:      []byte{byte(vm.INVALID)},
 		})
 
 		tx, err = types.SignTx(tx, signer, ecdsaKey)
