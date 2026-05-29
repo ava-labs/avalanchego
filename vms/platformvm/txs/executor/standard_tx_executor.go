@@ -1371,7 +1371,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
-func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
+func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 	var (
 		chainTime = e.state.GetTimestamp()
 		txID      = e.tx.ID()
