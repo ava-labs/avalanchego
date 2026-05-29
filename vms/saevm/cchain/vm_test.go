@@ -466,16 +466,16 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 	tb.Helper()
 
 	var (
-		op       = (*uint256.Int).AddOverflow
+		op       = balance.AddOverflow
 		absDelta = uint64(nAVAXDelta)
 	)
 	if nAVAXDelta < 0 {
-		op = (*uint256.Int).SubOverflow
+		op = balance.SubOverflow
 		absDelta = -absDelta
 	}
 
 	delta := tx.ScaleAVAX(absDelta)
-	_, overflow := op(&balance, &balance, &delta)
+	_, overflow := op(&balance, &delta)
 	require.Falsef(tb, overflow, "addNAVAX(%s, %d) overflows uint256", balance, nAVAXDelta)
 	return balance
 }
