@@ -56,6 +56,9 @@ func (c *Client) getAllUTXOs(
 		)
 		require.NoErrorf(tb, err, "%T.GetUTXOs()", c)
 		utxos = append(utxos, page...)
+		// This termination condition matches the initial API behavior from
+		// coreth. Changing the expected termination condition could
+		// accidentally break legacy users.
 		if uint64(len(page)) < uint64(limit) {
 			return utxos
 		}

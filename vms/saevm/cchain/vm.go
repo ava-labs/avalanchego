@@ -252,7 +252,7 @@ func (vm *VM) Initialize(
 	}
 	vm.pushGossiper = pushGossiper
 
-	if err := vm.VM.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
+	if err := vm.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
 		return fmt.Errorf("registering cross-chain tx gossip handler: %w", err)
 	}
 
