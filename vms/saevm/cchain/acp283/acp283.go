@@ -16,50 +16,49 @@ const (
 	minPriceWei = 1
 
 	// conversionRate (D) is the conversion factor for the exponential price
-	// curve. It is fixed at MaxUint64 / ln(MaxUint64) so the full uint64 excess
-	// range maps onto the full uint64 price range, removing the need for a
-	// price cap.
+	// curve. It is fixed at MaxUint64 / ln(MaxUint64) so the full uint64
+	// exponent range maps onto the full uint64 price range, removing the need
+	// for a price cap.
 	conversionRate = 415_828_534_307_635_077
 
-	// maxPriceExcessDiff (Q) is the maximum change in excess per block. It is
-	// conversionRate * ln(2) / MinBlocksToDouble, where MinBlocksToDouble = 3634
-	// is the fewest blocks over which the price can double or halve (the single
-	// tunable parameter, ~1h to double at 1s blocks).
-	maxPriceExcessDiff PriceExcess = 79_314_908_132_007
+	// maxPriceExponentDiff (Q) is the maximum change in the exponent per block.
+	// It is conversionRate * ln(2) / MinBlocksToDouble, where MinBlocksToDouble
+	// = 3634 is the fewest blocks over which the price can double or halve (the
+	// single tunable parameter, ~1h to double at 1s blocks).
+	maxPriceExponentDiff PriceExponent = 79_314_908_132_007
 
-	// InitialPriceExcess is the C-chain's initial price excess. The minimum
-	// price is 1 wei, so the excess starts at 0.
-	InitialPriceExcess PriceExcess = 0
+	// InitialPriceExponent is the C-chain's initial price exponent. The minimum
+	// price is 1 wei, so the exponent starts at 0.
+	InitialPriceExponent PriceExponent = 0
 
-	// maxExponent is the largest excess DesiredPriceExcess can return: the price
-	// saturates at MaxUint64 once the excess reaches MaxUint64 - 37.
+	// maxExponent is the largest exponent DesiredPriceExponent can return: the
+	// price saturates at MaxUint64 once the exponent reaches MaxUint64 - 37.
 	maxExponent = math.MaxUint64 - 37
 )
 
-// PriceExcess represents the excess for price calculation in the dynamic
-// minimum gas price mechanism.
-type PriceExcess uint64
+// PriceExponent represents the exponent in the dynamic minimum gas price curve.
+type PriceExponent uint64
 
 // Price returns the minimum gas price in wei, `q`.
 //
 // Price = minPriceWei * e^(p / conversionRate)
-func (p PriceExcess) Price() gas.Price {
+func (p PriceExponent) Price() gas.Price {
 	return gas.CalculatePrice(minPriceWei, gas.Gas(p), conversionRate)
 }
 
-// Toward moves the PriceExcess as close as possible to desired without
-// exceeding the maximum PriceExcess change.
-func (p *PriceExcess) Toward(desired PriceExcess) {
-	*p = calculatePriceExcess(*p, desired)
+// Toward moves the PriceExponent as close as possible to desired without
+// exceeding the maximum PriceExponent change.
+func (p *PriceExponent) Toward(desired PriceExponent) {
+	*p = calculatePriceExponent(*p, desired)
 }
 
-// DesiredPriceExcess returns the smallest excess whose Price is at least
+// DesiredPriceExponent returns the smallest exponent whose Price is at least
 // desiredPrice.
-func DesiredPriceExcess(desiredPrice gas.Price) PriceExcess {
-	// Binary search the excess range. sort.Search is unusable because both its
+func DesiredPriceExponent(desiredPrice gas.Price) PriceExponent {
+	// Binary search the exponent range. sort.Search is unusable because both its
 	// bound and result are int: the answer can exceed MaxInt64 (e.g. a 100 nAVAX
-	// floor needs excess > 1e19).
-	lo, hi := PriceExcess(0), PriceExcess(maxExponent)
+	// floor needs an exponent > 1e19).
+	lo, hi := PriceExponent(0), PriceExponent(maxExponent)
 	for lo < hi {
 		mid := lo + (hi-lo)/2
 		if mid.Price() >= desiredPrice {
@@ -71,15 +70,15 @@ func DesiredPriceExcess(desiredPrice gas.Price) PriceExcess {
 	return lo
 }
 
-// calculatePriceExcess calculates the optimal new PriceExcess for a block
-// proposer to include given the current and desired excess values.
+// calculatePriceExponent calculates the optimal new PriceExponent for a block
+// proposer to include given the current and desired exponent values.
 //
 // TODO(https://github.com/ava-labs/avalanchego/issues/5438): consolidate this
 // with the ACP-176 and ACP-226 integrators into a shared package.
-func calculatePriceExcess(excess, desired PriceExcess) PriceExcess {
-	change := min(safemath.AbsDiff(excess, desired), maxPriceExcessDiff)
-	if excess < desired {
-		return excess + change
+func calculatePriceExponent(exponent, desired PriceExponent) PriceExponent {
+	change := min(safemath.AbsDiff(exponent, desired), maxPriceExponentDiff)
+	if exponent < desired {
+		return exponent + change
 	}
-	return excess - change
+	return exponent - change
 }

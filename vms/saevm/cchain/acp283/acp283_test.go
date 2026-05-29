@@ -14,44 +14,44 @@ import (
 
 func TestPrice(t *testing.T) {
 	tests := []struct {
-		name   string
-		excess PriceExcess
-		price  gas.Price
+		name     string
+		exponent PriceExponent
+		price    gas.Price
 	}{
 		{
-			name:   "zero",
-			excess: 0,
-			price:  minPriceWei,
+			name:     "zero",
+			exponent: 0,
+			price:    minPriceWei,
 		},
 		{
-			name:   "min_excess_change",
-			excess: 288_230_376_151_711_749, // smallest excess that raises the price above minPriceWei
-			price:  minPriceWei + 1,
+			name:     "min_exponent_change",
+			exponent: 288_230_376_151_711_749, // smallest exponent that raises the price above minPriceWei
+			price:    minPriceWei + 1,
 		},
 		{
-			name:   "1_navax",
-			excess: 8_617_325_259_044_912_670,
-			price:  1_000_000_000,
+			name:     "1_navax",
+			exponent: 8_617_325_259_044_912_670,
+			price:    1_000_000_000,
 		},
 		{
-			name:   "100_navax",
-			excess: 10_532_286_427_721_559_929,
-			price:  100_000_000_000,
+			name:     "100_navax",
+			exponent: 10_532_286_427_721_559_929,
+			price:    100_000_000_000,
 		},
 		{
-			name:   "max_price",
-			excess: maxExponent, // smallest excess at which the price saturates
-			price:  math.MaxUint64,
+			name:     "max_price",
+			exponent: maxExponent, // smallest exponent at which the price saturates
+			price:    math.MaxUint64,
 		},
 		{
-			name:   "max_excess",
-			excess: math.MaxUint64,
-			price:  math.MaxUint64,
+			name:     "max_exponent",
+			exponent: math.MaxUint64,
+			price:    math.MaxUint64,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.price, test.excess.Price())
+			require.Equal(t, test.price, test.exponent.Price())
 		})
 	}
 }
@@ -59,9 +59,9 @@ func TestPrice(t *testing.T) {
 func TestToward(t *testing.T) {
 	tests := []struct {
 		name     string
-		initial  PriceExcess
-		desired  PriceExcess
-		expected PriceExcess
+		initial  PriceExponent
+		desired  PriceExponent
+		expected PriceExponent
 	}{
 		{
 			name:     "no_change",
@@ -84,60 +84,60 @@ func TestToward(t *testing.T) {
 		{
 			name:     "increase_clamped",
 			initial:  0,
-			desired:  10 * maxPriceExcessDiff,
-			expected: maxPriceExcessDiff,
+			desired:  10 * maxPriceExponentDiff,
+			expected: maxPriceExponentDiff,
 		},
 		{
 			name:     "decrease_clamped",
-			initial:  10 * maxPriceExcessDiff,
+			initial:  10 * maxPriceExponentDiff,
 			desired:  0,
-			expected: 9 * maxPriceExcessDiff,
+			expected: 9 * maxPriceExponentDiff,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			excess := test.initial
-			excess.Toward(test.desired)
-			require.Equal(t, test.expected, excess)
+			exponent := test.initial
+			exponent.Toward(test.desired)
+			require.Equal(t, test.expected, exponent)
 		})
 	}
 }
 
-func TestDesiredPriceExcess(t *testing.T) {
+func TestDesiredPriceExponent(t *testing.T) {
 	tests := []struct {
-		name   string
-		price  gas.Price
-		excess PriceExcess
+		name     string
+		price    gas.Price
+		exponent PriceExponent
 	}{
 		{
-			name:   "zero",
-			price:  minPriceWei,
-			excess: 0,
+			name:     "zero",
+			price:    minPriceWei,
+			exponent: 0,
 		},
 		{
-			name:   "min_excess_change",
-			price:  minPriceWei + 1,
-			excess: 288_230_376_151_711_749,
+			name:     "min_exponent_change",
+			price:    minPriceWei + 1,
+			exponent: 288_230_376_151_711_749,
 		},
 		{
-			name:   "1_nAvax",
-			price:  1_000_000_000,
-			excess: 8_617_325_259_044_912_670,
+			name:     "1_nAvax",
+			price:    1_000_000_000,
+			exponent: 8_617_325_259_044_912_670,
 		},
 		{
-			name:   "100_nAvax",
-			price:  100_000_000_000,
-			excess: 10_532_286_427_721_559_929,
+			name:     "100_nAvax",
+			price:    100_000_000_000,
+			exponent: 10_532_286_427_721_559_929,
 		},
 		{
-			name:   "max_price",
-			price:  math.MaxUint64,
-			excess: maxExponent,
+			name:     "max_price",
+			price:    math.MaxUint64,
+			exponent: maxExponent,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.excess, DesiredPriceExcess(test.price))
+			require.Equal(t, test.exponent, DesiredPriceExponent(test.price))
 		})
 	}
 }
