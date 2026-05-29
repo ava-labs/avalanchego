@@ -147,6 +147,8 @@ func (s *service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, resp *api.Ge
 		return fmt.Errorf("retrieving UTXOs: %w", err)
 	}
 
+	// Now we convert the closed interval [start, end] from shared memory to the
+	// half-open interval [start, end) expected for the API.
 	var (
 		endAddr ids.ShortID
 		endUTXO ids.ID
@@ -306,7 +308,7 @@ func (c *Client) GetUTXOs(
 			},
 			Encoding: clientEncoding,
 		},
-		resp,
+		&resp,
 		options...,
 	)
 	if err != nil {
