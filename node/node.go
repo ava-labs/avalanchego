@@ -59,7 +59,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -1230,8 +1229,7 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Factory{
 			PreFactory:     &coreth.Factory{},
 			PostFactory:    &saevm.Factory{},
-			TransitionTime: upgrade.InitiallyActiveTime,
-			// TransitionTime: n.Config.UpgradeConfig.HeliconTime,
+			TransitionTime: n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
 		}),
 	)
 	if err != nil {

@@ -348,6 +348,10 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 		return err
 	}
 
+	if extraConfig.IsHelicon(header.Time) {
+		return errors.New("expected to have transitioned to SAE prior to Helicon")
+	}
+
 	headerExtra := customtypes.GetHeaderExtra(header)
 	if headerExtra.TargetExponent != nil {
 		return fmt.Errorf("unexpected TargetExponent in header extra: %d", *headerExtra.TargetExponent)

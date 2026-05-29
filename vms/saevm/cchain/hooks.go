@@ -260,10 +260,16 @@ type builder struct {
 	potentialTxs iter.Seq[*hookTx]
 }
 
+var errHeliconUnactivated = errors.New("Helicon is not activated")
+
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
+	if !b.ctx.NetworkUpgrades.IsHeliconActivated(now) {
+		return nil, errHeliconUnactivated
+	}
+
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 
 	de := b.initialDelayExponent
