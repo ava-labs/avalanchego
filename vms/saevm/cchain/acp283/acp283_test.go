@@ -21,12 +21,12 @@ func TestPrice(t *testing.T) {
 		{
 			name:   "zero",
 			excess: 0,
-			price:  MinPriceWei,
+			price:  minPriceWei,
 		},
 		{
 			name:   "min_excess_change",
-			excess: 288_230_376_151_711_749, // smallest excess that raises the price above MinPriceWei
-			price:  MinPriceWei + 1,
+			excess: 288_230_376_151_711_749, // smallest excess that raises the price above minPriceWei
+			price:  minPriceWei + 1,
 		},
 		{
 			name:   "1_navax",
@@ -40,7 +40,7 @@ func TestPrice(t *testing.T) {
 		},
 		{
 			name:   "max_price",
-			excess: 18_446_744_073_709_551_578, // smallest excess at which the price saturates
+			excess: maxExponent, // smallest excess at which the price saturates
 			price:  math.MaxUint64,
 		},
 		{
@@ -56,7 +56,7 @@ func TestPrice(t *testing.T) {
 	}
 }
 
-func TestUpdatePriceExcess(t *testing.T) {
+func TestToward(t *testing.T) {
 	tests := []struct {
 		name     string
 		initial  PriceExcess
@@ -84,20 +84,20 @@ func TestUpdatePriceExcess(t *testing.T) {
 		{
 			name:     "increase_clamped",
 			initial:  0,
-			desired:  10 * MaxPriceExcessDiff,
-			expected: MaxPriceExcessDiff,
+			desired:  10 * maxPriceExcessDiff,
+			expected: maxPriceExcessDiff,
 		},
 		{
 			name:     "decrease_clamped",
-			initial:  10 * MaxPriceExcessDiff,
+			initial:  10 * maxPriceExcessDiff,
 			desired:  0,
-			expected: 9 * MaxPriceExcessDiff,
+			expected: 9 * maxPriceExcessDiff,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			excess := test.initial
-			excess.UpdatePriceExcess(test.desired)
+			excess.Toward(test.desired)
 			require.Equal(t, test.expected, excess)
 		})
 	}
@@ -111,12 +111,12 @@ func TestDesiredPriceExcess(t *testing.T) {
 	}{
 		{
 			name:   "zero",
-			price:  MinPriceWei,
+			price:  minPriceWei,
 			excess: 0,
 		},
 		{
 			name:   "min_excess_change",
-			price:  MinPriceWei + 1,
+			price:  minPriceWei + 1,
 			excess: 288_230_376_151_711_749,
 		},
 		{
@@ -132,7 +132,7 @@ func TestDesiredPriceExcess(t *testing.T) {
 		{
 			name:   "max_price",
 			price:  math.MaxUint64,
-			excess: 18_446_744_073_709_551_578,
+			excess: maxExponent,
 		},
 	}
 	for _, test := range tests {
