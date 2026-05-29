@@ -295,7 +295,7 @@ type HeaderSerializable struct {
 
 	// PriceExponent was added by Helicon and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	PriceExponent *uint64 `json:"priceExponent" rlp:"optional"`
+	PriceExponent *uint64 `json:"minPriceExponent" rlp:"optional"`
 
 	// SettledHeight was added by Helicon and is ignored in legacy headers.
 	SettledHeight *uint64 `json:"settledHeight" rlp:"optional"`
