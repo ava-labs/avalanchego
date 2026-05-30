@@ -6,9 +6,18 @@ package firewood
 import (
 	"fmt"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/log"
 )
+
+func init() {
+	state.RegisterDatabaseInterceptor(wrapIfFirewood)
+	if err := ffi.StartMetrics(); err != nil {
+		log.Crit("starting firewood metrics", "error", err)
+	}
+}
 
 var _ state.Database = (*stateAccessor)(nil)
 
@@ -17,7 +26,11 @@ type stateAccessor struct {
 	triedb *TrieDB
 }
 
-func NewStateAccessor(db state.Database, fw *TrieDB) state.Database {
+func wrapIfFirewood(db state.Database) state.Database {
+	fw, ok := db.TrieDB().Backend().(*TrieDB)
+	if !ok {
+		return db
+	}
 	return &stateAccessor{
 		Database: db,
 		triedb:   fw,

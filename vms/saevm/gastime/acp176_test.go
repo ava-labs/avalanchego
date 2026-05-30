@@ -4,21 +4,16 @@
 package gastime
 
 import (
+	"fmt"
 	"math"
-	"math/big"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/params"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 )
 
 // TestInvalidConfigRejected verifies that zero values for TargetToExcessScaling
@@ -29,18 +24,18 @@ func TestInvalidConfigRejected(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		config   hook.GasPriceConfig
+		config   GasPriceConfig
 		expected error
 	}{
 		{
 			"zero_scaling",
-			hook.GasPriceConfig{TargetToExcessScaling: 0, MinPrice: DefaultGasPriceConfig().MinPrice},
-			errInvalidGasPriceConfig,
+			GasPriceConfig{TargetToExcessScaling: 0, MinPrice: DefaultGasPriceConfig().MinPrice},
+			errTargetToExcessScalingZero,
 		},
 		{
 			"zero_min_price",
-			hook.GasPriceConfig{TargetToExcessScaling: DefaultGasPriceConfig().TargetToExcessScaling, MinPrice: 0},
-			errInvalidGasPriceConfig,
+			GasPriceConfig{TargetToExcessScaling: DefaultGasPriceConfig().TargetToExcessScaling, MinPrice: 0},
+			errMinPriceZero,
 		},
 	}
 
@@ -48,15 +43,14 @@ func TestInvalidConfigRejected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tm := mustNew(t, time.Unix(42, 0), target, 0, DefaultGasPriceConfig())
 
-			initialScaling := tm.config.targetToExcessScaling
-			initialMinPrice := tm.config.minPrice
-			hooks := hookstest.NewStub(target, hookstest.WithGasPriceConfig(tt.config))
-			err := tm.AfterBlock(0, hooks, &types.Header{Time: 42})
+			initialScaling := tm.config.TargetToExcessScaling
+			initialMinPrice := tm.config.MinPrice
+			err := tm.AfterBlock(0, target, tt.config)
 			require.ErrorIs(t, err, tt.expected, "AfterBlock()")
 
 			// Config unchanged after rejected update
-			assert.Equal(t, initialScaling, tm.config.targetToExcessScaling, "targetToExcessScaling changed")
-			assert.Equal(t, initialMinPrice, tm.config.minPrice, "minPrice changed")
+			assert.Equal(t, initialScaling, tm.config.TargetToExcessScaling, "targetToExcessScaling changed")
+			assert.Equal(t, initialMinPrice, tm.config.MinPrice, "minPrice changed")
 		})
 	}
 }
@@ -73,17 +67,13 @@ func TestTargetUpdateTiming(t *testing.T) {
 	initialRate := tm.Rate()
 
 	const (
-		newTime   uint64 = initialTime + 1
-		newTarget        = initialTarget + 100_000
+		newTime   = initialTime + 1
+		newTarget = initialTarget + 100_000
 	)
-	hook := hookstest.NewStub(newTarget)
-	header := &types.Header{
-		Time: newTime,
-	}
 
 	initialPrice := tm.Price()
-	tm.BeforeBlock(hook, header)
-	assert.Equal(t, newTime, tm.Unix(), "Unix time advanced by BeforeBlock()")
+	tm.BeforeBlock(time.Unix(newTime, 0))
+	assert.Equal(t, uint64(newTime), tm.Unix(), "Unix time advanced by BeforeBlock()")
 	assert.Equal(t, initialTarget, tm.Target(), "Target not changed by BeforeBlock()")
 	// While the price technically could remain the same, being more strict
 	// ensures the test is meaningful.
@@ -98,8 +88,8 @@ func TestTargetUpdateTiming(t *testing.T) {
 		expectedEndTime  = newTime + secondsOfGasUsed
 	)
 	used := initialRate * secondsOfGasUsed
-	require.NoError(t, tm.AfterBlock(used, hook, header), "AfterBlock()")
-	assert.Equal(t, expectedEndTime, tm.Unix(), "Unix time advanced by AfterBlock() due to gas consumption")
+	require.NoError(t, tm.AfterBlock(used, newTarget, DefaultGasPriceConfig()), "AfterBlock()")
+	assert.Equal(t, uint64(expectedEndTime), tm.Unix(), "Unix time advanced by AfterBlock() due to gas consumption")
 	assert.Equal(t, newTarget, tm.Target(), "Target updated by AfterBlock()")
 	// While the price technically could remain the same, being more strict
 	// ensures the test is meaningful.
@@ -116,6 +106,7 @@ func FuzzWorstCasePrice(f *testing.F) {
 		time3, nanos3, used3, limit3, target3 uint64,
 	) {
 		initTarget = max(initTarget, 1)
+		gasCfg := DefaultGasPriceConfig()
 
 		initUnix := int64(min(initTimestamp, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
 		worstcase := mustNew(t, time.Unix(initUnix, 0), gas.Gas(initTarget), gas.Gas(initExcess), DefaultGasPriceConfig())
@@ -160,302 +151,749 @@ func FuzzWorstCasePrice(f *testing.F) {
 		for _, block := range blocks {
 			block.limit = max(block.used, block.limit)
 			block.target = clampTarget(max(block.target, 1))
+			blockSeconds := int64(min(block.time, math.MaxInt64)) //#nosec G115 -- Clamped to MaxInt64
 
-			header := &types.Header{
-				Time: block.time,
-			}
-			hook := hookstest.NewStub(block.target, hookstest.WithNow(func() time.Time {
-				return time.Unix(
-					int64(block.time), //#nosec G115 -- Won't overflow for a few millennia
-					int64(block.nanos),
-				)
-			}))
-
-			worstcase.BeforeBlock(hook, header)
-			actual.BeforeBlock(hook, header)
+			tm := time.Unix(blockSeconds, int64(block.nanos))
+			worstcase.BeforeBlock(tm)
+			actual.BeforeBlock(tm)
 
 			// The crux of this test lies in the maintaining of this inequality
 			// through the use of `limit` instead of `used` in `AfterBlock()`
 			require.LessOrEqualf(t, actual.Price(), worstcase.Price(), "actual <= worst-case %T.Price()", actual)
-			require.NoError(t, worstcase.AfterBlock(block.limit, hook, header), "worstcase.AfterBlock()")
-			require.NoError(t, actual.AfterBlock(block.used, hook, header), "actual.AfterBlock()")
+			require.NoError(t, worstcase.AfterBlock(block.limit, block.target, gasCfg), "worstcase.AfterBlock()")
+			require.NoError(t, actual.AfterBlock(block.used, block.target, gasCfg), "actual.AfterBlock()")
 		}
 	})
 }
 
-func FuzzPriceInvarianceAfterBlock(f *testing.F) {
-	for _, s := range []struct {
-		T, x, M, KonT         uint64
-		newT, newM, newKonT   uint64
-		initStatic, newStatic bool
+func TestAfterBlock(t *testing.T) {
+	tests := []struct {
+		name    string
+		init    state
+		gasUsed gas.Gas
+		new     state
+		wantErr error
 	}{
-		// Basic scaling change: K doubles, price should be maintained
+		// Normal changes:
 		{
-			T: 1e6, M: 1, KonT: 1, // i.e. K == 1e6
-			x:    2e6,          // Initial price is M⋅exp(x/K) = exp(2/1) ~= 7
-			newT: 1e6, newM: 1, // both unchanged
-			newKonT: 2, // i.e. K == 2e6; without proper scaling, price becomes exp(2/2) ~= 2
-		},
-		// K at MaxUint64 boundary
-		{
-			T: 1e6, M: 1, KonT: math.MaxUint64,
-			x:    2e6,
-			newT: 1e6, newM: 1,
-			newKonT: math.MaxUint64,
-		},
-		// MinPrice increase above current price: price should bump to new M
-		{
-			T: 1e6, M: 1, KonT: 87,
-			x:       2e6, // price = 1 * e^(2/87) ~= 1.023
-			newT:    1e6,
-			newM:    100, // new M > current price, should bump
-			newKonT: 87,
-		},
-		// MinPrice decrease: price should be maintained
-		{
-			T: 1e6, M: 100, KonT: 87,
-			x:       1e6, // price > 100
-			newT:    1e6,
-			newM:    50, // M decreases
-			newKonT: 87,
-		},
-		// MinPrice increase below current price: price should be maintained
-		{
-			T: 1e6, M: 1, KonT: 87,
-			x:       100e6, // high excess = high price >> 10
-			newT:    1e6,
-			newM:    10, // new M < current price
-			newKonT: 87,
-		},
-		// Large excess value
-		{
-			T: 1e6, M: 1, KonT: 87,
-			x:       1e9, // very high excess
-			newT:    1e6,
-			newM:    1,
-			newKonT: 100,
-		},
-		// High MinPrice with scaling change
-		{
-			T: 1e6, M: 1e9, KonT: 87,
-			x:       5e6,
-			newT:    1e6,
-			newM:    1e9,
-			newKonT: 50,
-		},
-		// Zero excess with config changes
-		{
-			T: 1e6, M: 1, KonT: 87,
-			x:       0,
-			newT:    1e6,
-			newM:    1,
-			newKonT: 50,
-		},
-		// Around MaxUint64 scaling with MinPrice decrease
-		{
-			T: 1e6, M: 26, KonT: math.MaxInt64 - 100,
-			x:       1e6,
-			newT:    1e6,
-			newM:    1,
-			newKonT: math.MaxInt64 - 10,
-		},
-		// MaxUint64 scaling with high excess min price at 11 gwei
-		{
-			T: 1e6, M: 1e12, KonT: 87,
-			x:       1e9,
-			newT:    1e6,
-			newM:    1e12,
-			newKonT: math.MaxUint64,
-		},
-		// Dynamic to static pricing: price should snap to newMinPrice
-		{
-			T: 1e6, M: 1, KonT: 87,
-			x:         1e9, // high excess = high price
-			newT:      1e6,
-			newM:      1,
-			newKonT:   87,
-			newStatic: true,
-		},
-		// Static to dynamic pricing: price continuity from initMinPrice
-		{
-			T: 1e6, M: 100, KonT: 87,
-			x:          5e6,
-			initStatic: true,
-			newT:       1e6,
-			newM:       50, // M decreases, should maintain initMinPrice via excess
-			newKonT:    87,
-		},
-		// Static to static with MinPrice change: price should be newMinPrice
-		{
-			T: 1e6, M: 100, KonT: 87,
-			x:          5e6,
-			initStatic: true,
-			newT:       1e6,
-			newM:       200,
-			newKonT:    87,
-			newStatic:  true,
+			name: "target_doubles",
+			init: state{
+				Target: 1_000_000,
+				Excess: 2_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 7,
+			},
+			new: state{
+				Target: 2_000_000,
+				Excess: 4_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 7,
+			},
 		},
 		{
-			KonT: 0, // invalid
-			T:    1, M: 1,
+			name: "scaling_doubles",
+			init: state{
+				Target: 1_000_000,
+				Excess: 2_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 7,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 4_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 2,
+					MinPrice:              1,
+				},
+				Price: 7,
+			},
 		},
 		{
-			M: 0, // invalid
-			T: 1, KonT: 1,
+			name: "target_and_scaling_doubles",
+			init: state{
+				Target: 1_000_000,
+				Excess: 2_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 7,
+			},
+			new: state{
+				Target: 2_000_000,
+				Excess: 8_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 2,
+					MinPrice:              1,
+				},
+				Price: 7,
+			},
 		},
 		{
-			newM: 0, // invalid
-			T:    1, M: 1, KonT: 1,
-			newKonT: 1,
+			name: "target_and_scaling_doubles_zero",
+			init: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			new: state{
+				Target: 2_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 2,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
 		},
 		{
-			newKonT: 0, // invalid
-			T:       1, M: 1, KonT: 1,
-			newM: 1,
+			name: "gas_used_no_config_change",
+			init: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			gasUsed: 1_000_000,
+			new: state{
+				Target: 1_000_000,
+				Excess: 500_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
 		},
-	} {
-		f.Add(s.T, s.x, s.M, s.KonT, s.initStatic, s.newT, s.newM, s.newKonT, s.newStatic)
+		{
+			name: "gas_used_before_scaling",
+			init: state{
+				Target: 1_000_000,
+				Excess: 2_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 7,
+			},
+			gasUsed: 3_000_000,
+			new: state{
+				Target: 2 * 1_000_000,
+				Excess: 2 * (2_000_000 + 3_000_000/2),
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: gas.Price(math.Floor(math.Exp(7. / 2.))),
+			},
+		},
+		{
+			name: "min_price_increase_above_current",
+			init: state{
+				Target: 1_000_000,
+				Excess: 2_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              100,
+				},
+				Price: 100,
+			},
+		},
+		{
+			name: "min_price_unrepresentable",
+			init: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 1_802_924_127,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1_000_000_000,
+				},
+				Price: 1_000_000_000,
+			},
+		},
+		{
+			name: "min_price_previously_unrepresentable",
+			init: state{
+				Target: 1_000_000,
+				Excess: 1_802_924_127,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1_000_000_000,
+				},
+				Price: 1_000_000_000,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 1_802_924_127,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 999_999_990,
+			},
+		},
+		{
+			name: "min_price_increase_below_current",
+			init: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 100,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              50,
+				},
+				Price: 100,
+			},
+		},
+		{
+			name: "min_price_decrease",
+			init: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              100,
+				},
+				Price: 100,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 100,
+			},
+		},
+
+		// Static pricing:
+		{
+			name: "static_pricing_with_gas_used",
+			init: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+					StaticPricing:         true,
+				},
+				Price: 1,
+			},
+			gasUsed: 1_000_000,
+			new: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+					StaticPricing:         true,
+				},
+				Price: 1,
+			},
+		},
+		{
+			name: "introducing_static_pricing_overrides_excess",
+			init: state{
+				Target: 1_000_000,
+				Excess: 1_000_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 98_150,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+					StaticPricing:         true,
+				},
+				Price: 1,
+			},
+		},
+		{
+			name: "static_pricing_price_decrease",
+			init: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              100,
+					StaticPricing:         true,
+				},
+				Price: 100,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 340_346_002,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              50,
+					StaticPricing:         true,
+				},
+				Price: 50,
+			},
+		},
+		{
+			name: "static_pricing_price_increase",
+			init: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              100,
+					StaticPricing:         true,
+				},
+				Price: 100,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 460_953_612,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              200,
+					StaticPricing:         true,
+				},
+				Price: 200,
+			},
+		},
+		{
+			name: "static_pricing_removal_decrease_min_price",
+			init: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              100,
+					StaticPricing:         true,
+				},
+				Price: 100,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              50,
+				},
+				Price: 100,
+			},
+		},
+		{
+			name: "static_pricing_removal_increase_min_price",
+			init: state{
+				Target: 1_000_000,
+				Excess: 400_649_807,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              100,
+					StaticPricing:         true,
+				},
+				Price: 100,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 460_953_612,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              200,
+				},
+				Price: 200,
+			},
+		},
+
+		// Extreme changes:
+		{
+			name: "scaling_to_max",
+			init: state{
+				Target: 1_000_000,
+				Excess: 2_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 7,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: math.MaxUint64,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: math.MaxUint64, // Maximizing scaling causes excess to cap
+					MinPrice:              1,
+				},
+				Price: 2,
+			},
+		},
+		{
+			name: "large_excess_with_scaling_change",
+			init: state{
+				Target: 1_000_000,
+				Excess: 10_000_000_000_000_000_000,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: math.MaxUint64,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 11_494_252_873_563_218_391,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 100,
+					MinPrice:              1,
+				},
+				Price: math.MaxUint64,
+			},
+		},
+		{
+			name: "high_price_scaling_rounding_causes_price_increase",
+			init: state{
+				Target: 1_000_000,
+				Excess: 1_802_924_127,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 999_999_990,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 1_036_163_292,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 50,
+					MinPrice:              1,
+				},
+				Price: 1_000_000_002,
+			},
+		},
+		{
+			name: "scaling_old_k_overflow",
+			init: state{
+				Target: 1_000_000,
+				Excess: math.MaxUint64,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: math.MaxUint64,
+					MinPrice:              1,
+				},
+				Price: 2,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 1,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+		},
+		{
+			name: "scaling_old_k_overflow_rounds_up",
+			init: state{
+				Target: 1_000_000,
+				Excess: 1,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: math.MaxUint64,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 1,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+		},
+		{
+			name: "scaling_new_k_overflow",
+			init: state{
+				Target: 1_000_000,
+				Excess: 1,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: math.MaxUint64,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: math.MaxUint64,
+					MinPrice:              1,
+				},
+				Price: 2,
+			},
+		},
+		{
+			name: "max_min_price",
+			init: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: gas.Gas(math.Ceil(1_000_000 * math.Log(math.MaxUint64))),
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 1,
+					MinPrice:              math.MaxUint64,
+				},
+				Price: math.MaxUint64,
+			},
+		},
+
+		// Invalid inputs:
+		{
+			name: "invalid_target_override",
+			init: state{
+				Target: 0,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			new: state{
+				Target: 1,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+		},
+		{
+			name: "invalid_zero_scaling",
+			init: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 0,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			wantErr: errTargetToExcessScalingZero,
+		},
+		{
+			name: "invalid_zero_min_price",
+			init: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              1,
+				},
+				Price: 1,
+			},
+			new: state{
+				Target: 1_000_000,
+				Excess: 0,
+				Config: GasPriceConfig{
+					TargetToExcessScaling: 87,
+					MinPrice:              0,
+				},
+				Price: 1,
+			},
+			wantErr: errMinPriceZero,
+		},
+	}
+	ignore := cmpopts.IgnoreFields(state{}, "UnixTime", "ConsumedThisSecond", "Target", "Config")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tm := mustNew(t, time.Unix(0, 0), tt.init.Target, tt.init.Excess, tt.init.Config)
+
+			tt.init.Rate = tm.Target() * TargetToRate
+			tm.requireState(
+				t,
+				fmt.Sprintf("New(%v, %d, %d, %+v)", tm, tt.init.Target, tt.init.Excess, tt.init.Config),
+				tt.init,
+				ignore,
+			)
+
+			err := tm.AfterBlock(tt.gasUsed, tt.new.Target, tt.new.Config)
+			require.ErrorIsf(t, err, tt.wantErr, "%T.AfterBlock", tm)
+
+			tt.new.Rate = tm.Target() * TargetToRate
+			tm.requireState(
+				t,
+				fmt.Sprintf("%v.AfterBlock(%d, %d, %+v)", tm, tt.gasUsed, tt.new.Target, tt.new.Config),
+				tt.new,
+				ignore,
+			)
+		})
+	}
+}
+
+// TestOscillatingMinPrice verifies that oscillating MinPrice between two values
+// does not impact gas price growth. When blocks consistently consume
+// above-target gas, the price should increase over time regardless of MinPrice
+// changes.
+func TestOscillatingMinPrice(t *testing.T) {
+	const (
+		target       gas.Gas   = 1_000_000
+		gasPerBlock  gas.Gas   = 10_000_000 // must be sufficiently large
+		numBlocks              = 1000
+		highMinPrice gas.Price = 2
+		lowMinPrice  gas.Price = 1
+	)
+
+	highPriceConfig := DefaultGasPriceConfig()
+	highPriceConfig.MinPrice = highMinPrice
+
+	lowPriceConfig := highPriceConfig
+	lowPriceConfig.MinPrice = lowMinPrice
+
+	control := mustNew(t, time.Unix(0, 0), target, 0, highPriceConfig)
+	modified := mustNew(t, time.Unix(0, 0), target, 0, highPriceConfig)
+
+	require.Equalf(t, highMinPrice, control.Price(), "%T.Price()", control)
+	require.Equalf(t, highMinPrice, modified.Price(), "%T.Price()", modified)
+
+	for i := range numBlocks {
+		require.NoErrorf(t, control.AfterBlock(
+			gasPerBlock,
+			target,
+			highPriceConfig,
+		), "%T.AfterBlock(static)", control)
+
+		oscillatingConfig := highPriceConfig
+		if i%2 == 0 {
+			oscillatingConfig = lowPriceConfig
+		}
+		require.NoErrorf(t, modified.AfterBlock(
+			gasPerBlock,
+			target,
+			oscillatingConfig,
+		), "%T.AfterBlock(oscillating)", modified)
 	}
 
-	f.Fuzz(func(
-		t *testing.T,
-		initTarget, initExcess, initMinPrice, initScaling uint64, initStaticPricing bool,
-		// There is no `newExcess` because it's computed (and tested).
-		newTarget, newMinPrice, newScaling uint64, newStaticPricing bool,
-	) {
-		if initScaling > 1e6 || newScaling > 1e6 {
-			// The scaling factor controls the rate of gas-price doubling, where
-			// 87 is approximately half an hour, and price is inversely
-			// proportional to the value.
-			t.Skip("Excessive scaling")
+	// Sanity check that price normally increases.
+	assert.Greater(t, control.Price(), highMinPrice, "control price must increase with sustained above-target usage")
+	assert.Equal(t, control.Price(), modified.Price(), "oscillating MinPrice must not impact price growth")
+}
+
+func BenchmarkPriceExcess(b *testing.B) {
+	benchmarks := []struct {
+		name string
+		p    gas.Price
+		k    gas.Gas
+	}{
+		{"p=1", 1, 87_000_000},
+		{"small", 100, 87_000_000},
+		{"medium", 1_000_000_000, 87_000_000},
+		{"large", math.MaxUint64, 87_000_000},
+		{"large_k", 1_000_000_000, math.MaxUint64},
+		{"slowest", math.MaxUint64, 1 << 58},
+	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			for b.Loop() {
+				excessForPrice(bm.p, bm.k)
+			}
+		})
+	}
+}
+
+func FuzzPriceExcess(f *testing.F) {
+	seeds := []struct {
+		p gas.Price
+		k gas.Gas
+	}{
+		{1, 1},
+		{2, 1},
+		{2, 1_000_000_000},
+		{1_000_000_000, 1},
+		{2, math.MaxUint64},
+		{math.MaxUint64, 1},
+		{math.MaxUint64, math.MaxUint64},
+	}
+	for _, s := range seeds {
+		f.Add(uint64(s.p), uint64(s.k))
+	}
+	f.Fuzz(func(t *testing.T, pInt, kInt uint64) {
+		p, k := gas.Price(pInt), gas.Gas(kInt)
+		if p == 0 {
+			t.Skip("ln(0) is undefined")
+		}
+		if k == 0 {
+			t.Skip("div by zero is undefined")
 		}
 
-		// Avoid having to deal with weird edge cases for extremely low targets
-		// due to insufficient resolution in the rational exponent.
-		switch minRate := gas.Gas(params.TxGas); {
-		case SafeRateOfTarget(gas.Gas(initTarget)) < minRate:
-			t.Skip("Initial target too low")
-		case SafeRateOfTarget(gas.Gas(newTarget)) < minRate:
-			t.Skip("New target too low")
+		x := excessForPrice(p, k)
+		gotP := calculatePrice(x, k)
+		assert.LessOrEqual(t, gotP, p, "gotPrice <= wantPrice")
+
+		if gotP < p && x != math.MaxUint64 {
+			require.Greater(t, calculatePrice(x+1, k), p, "calculatePrice(x+1) > wantPrice")
 		}
-
-		initConfig := hook.GasPriceConfig{
-			TargetToExcessScaling: gas.Gas(initScaling),
-			MinPrice:              gas.Price(initMinPrice),
-			StaticPricing:         initStaticPricing,
-		}
-		tm, err := New(
-			time.Unix(0, 0),
-			gas.Gas(initTarget),
-			gas.Gas(initExcess),
-			initConfig,
-		)
-
-		{
-			var wantErrIs error
-			if initScaling == 0 || initMinPrice == 0 {
-				wantErrIs = errInvalidGasPriceConfig
-			}
-			require.ErrorIsf(t, err, wantErrIs, "New(... %+v)", initConfig)
-			if wantErrIs != nil {
-				return
-			}
-		}
-
-		initExp := tm.exponent()
-		initPrice := tm.Price()
-
-		{
-			hooks := hookstest.NewStub(
-				gas.Gas(newTarget),
-				hookstest.WithGasPriceConfig(hook.GasPriceConfig{
-					MinPrice:              gas.Price(newMinPrice),
-					TargetToExcessScaling: gas.Gas(newScaling),
-					StaticPricing:         newStaticPricing,
-				}))
-
-			var wantErrIs error
-			if newScaling == 0 || newMinPrice == 0 {
-				wantErrIs = errInvalidGasPriceConfig
-			}
-
-			// Consuming gas increases the excess, which changes the price.
-			// We're only interested in invariance under changes in config.
-			const gasUsed = 0
-			err := tm.AfterBlock(gasUsed, hooks, nil)
-			require.ErrorIsf(t, err, wantErrIs, "AfterBlock([%+v])", hooks)
-			if wantErrIs != nil {
-				return
-			}
-		}
-
-		pr := message.NewPrinter(language.English)
-		log := func(desc string, from, to uint64) {
-			if from == to {
-				t.Log(pr.Sprintf("%s (unchanged): %d", desc, from))
-			} else {
-				t.Log(pr.Sprintf("%s: %d -> %d", desc, from, to))
-			}
-		}
-		log("Target", initTarget, newTarget)
-		log("MinPrice", initMinPrice, newMinPrice)
-		log("TargetToExcessScaling", initScaling, newScaling)
-		t.Logf("StaticPricing: %t -> %t", initStaticPricing, newStaticPricing)
-		log("Excess", initExcess, uint64(tm.excess))
-		log("Price (value under test)", uint64(initPrice), uint64(tm.Price()))
-
-		switch minP := gas.Price(newMinPrice); {
-		case minP > initPrice:
-			require.Equal(t, minP, tm.Price(), "minimum price > initial price -> price == min")
-
-		case newStaticPricing:
-			require.Equal(t, minP, tm.Price(), "static pricing -> price == min")
-
-		case tm.config.equalHookConfig(t, initConfig):
-			// Target-only changes keep the x/K exponent as close to equal as
-			// possible given the resolution of the denominator.
-			newExp := tm.exponent()
-
-			diff := new(big.Rat).Sub(newExp, initExp)
-			diff.Abs(diff)
-
-			tolerance := new(big.Rat).SetFrac(
-				big.NewInt(1),
-				newExp.Denom(),
-			)
-			if diff.Cmp(tolerance) >= 0 {
-				t.Errorf("Exponent of price equation changed from %v to %v; diff = %v >= %v", initExp, newExp, diff, tolerance)
-			}
-
-		default:
-			// Due to integer arithmetic in binary search, exact price
-			// continuity isn't always achievable. [Time.findExcessForPrice]
-			// finds the lowest excess that results in >= the targeted price.
-			assert.GreaterOrEqual(t, tm.Price(), initPrice, "binary search on excess results in price >= initial")
-			if tm.excess > 0 {
-				tm.excess--
-				assert.Less(t, tm.Price(), initPrice, "binary search on excess results in lowest price >= initial")
-			}
+		if gotP == p && x != 0 {
+			require.Less(t, calculatePrice(x-1, k), p, "calculatePrice(x-1) < wantPrice")
 		}
 	})
-}
-
-// equalHookConfig is equivalent to [config.equal] but accepts a
-// [hook.GasPriceConfig] that is first converted and validated.
-func (c *config) equalHookConfig(tb testing.TB, hookCfg hook.GasPriceConfig) bool {
-	tb.Helper()
-	other, err := newConfig(hookCfg)
-	require.NoError(tb, err)
-	return c.equals(other)
-}
-
-// exponent returns x/K, the exponent of the gas price. For fixed M, equal
-// exponents result in equal prices. However if scaling results in a new
-// exponent with insufficient resolution (too low a denominator) to be identical
-// then the price could be different.
-func (tm *Time) exponent() *big.Rat {
-	return new(big.Rat).SetFrac(
-		new(big.Int).SetUint64(uint64(tm.excess)),
-		new(big.Int).SetUint64(uint64(tm.excessScalingFactor())),
-	)
 }

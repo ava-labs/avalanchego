@@ -117,7 +117,7 @@ func (s *State) StartBlock(h *types.Header) error {
 		)
 	}
 
-	s.clock.BeforeBlock(s.hooks, h)
+	s.clock.BeforeBlock(s.hooks.BlockTime(h))
 	s.blockSize = 0
 
 	s.maxBlockSize = safeMaxBlockSize(s.clock)
@@ -332,7 +332,8 @@ func (s *State) GasUsed() uint64 {
 // resulted in said transaction being included, which is reflected in the
 // indexing of tx-sender balances.
 func (s *State) FinishBlock() (*blocks.WorstCaseBounds, error) {
-	if err := s.clock.AfterBlock(s.blockSize, s.hooks, s.curr); err != nil {
+	target, gasCfg := s.hooks.GasConfigAfter(s.curr)
+	if err := s.clock.AfterBlock(s.blockSize, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("finishing block gas time update: %w", err)
 	}
 	s.qSize += s.blockSize

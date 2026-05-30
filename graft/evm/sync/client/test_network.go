@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 var _ Network = (*testNetwork)(nil)
@@ -33,7 +32,7 @@ func (*testNetwork) Sample(context.Context, int) []ids.NodeID {
 	panic("Sample unimplemented")
 }
 
-func (t *testNetwork) SendSyncedAppRequestAny(_ context.Context, _ *version.Application, _ []byte) ([]byte, ids.NodeID, error) {
+func (t *testNetwork) SendSyncedAppRequestAny(_ context.Context, _ []byte) ([]byte, ids.NodeID, error) {
 	if len(t.response) == 0 {
 		return nil, ids.EmptyNodeID, errors.New("no tested response to return in testNetwork")
 	}
@@ -90,4 +89,6 @@ func (t *testNetwork) testResponses(callback func(), responses ...[]byte) {
 	t.numCalls = 0
 }
 
-func (*testNetwork) TrackBandwidth(ids.NodeID, float64) {}
+func (*testNetwork) RegisterResponse(ids.NodeID, float64) {}
+
+func (*testNetwork) RegisterFailure(ids.NodeID) {}

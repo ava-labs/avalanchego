@@ -517,7 +517,9 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 	}
 
 	if isCurrentValidator {
-		e.state.DeleteCurrentValidator(staker)
+		if err := e.state.DeleteCurrentValidator(staker); err != nil {
+			return fmt.Errorf("deleting current validator: %w", err)
+		}
 	} else {
 		e.state.DeletePendingValidator(staker)
 	}
@@ -1369,7 +1371,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
-func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
+func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 	var (
 		chainTime = e.state.GetTimestamp()
 		txID      = e.tx.ID()
@@ -1427,7 +1429,9 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 			return err
 		}
 	case priority.IsCurrentDelegator():
-		e.state.PutCurrentDelegator(staker)
+		if err := e.state.PutCurrentDelegator(staker); err != nil {
+			return fmt.Errorf("putting current delegator: %w", err)
+		}
 	case priority.IsPendingValidator():
 		if err := e.state.PutPendingValidator(staker); err != nil {
 			return err

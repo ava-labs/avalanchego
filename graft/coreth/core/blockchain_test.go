@@ -424,6 +424,95 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 	}
 }
 
+// TestArchiveUngracefulShutdown ensures that if the blockchain
+// crashes without emptying the acceptor queue, all states will be persisted
+// after startup.
+func TestArchiveUngracefulShutdown(t *testing.T) {
+	for _, s := range schemes {
+		t.Run(s, func(t *testing.T) {
+			testArchiveUngracefulShutdown(t, s)
+		})
+	}
+}
+
+func testArchiveUngracefulShutdown(t *testing.T, scheme string) {
+	var (
+		key1, _   = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		key2, _   = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+		addr1     = crypto.PubkeyToAddress(key1.PublicKey)
+		addr2     = crypto.PubkeyToAddress(key2.PublicKey)
+		chainDB   = rawdb.NewMemoryDatabase()
+		numStates = uint64(5)
+	)
+
+	gspec := &Genesis{
+		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+		Alloc:  types.GenesisAlloc{addr1: {Balance: big.NewInt(1000000)}},
+	}
+
+	chainDataDir := t.TempDir()
+	config := &CacheConfig{
+		TrieCleanLimit:            256,
+		TrieDirtyLimit:            256,
+		TrieDirtyCommitTarget:     20,
+		TriePrefetcherParallelism: 4,
+		Pruning:                   false, // archival
+		CommitInterval:            1,
+		StateHistory:              2, // Minimum allowable by Firewood
+		AcceptorQueueLimit:        64,
+		StateScheme:               scheme,
+		ChainDataDir:              chainDataDir,
+	}
+
+	blockchain, err := createBlockChain(chainDB, config, gspec, common.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate (2 * numStates) blocks.
+	signer := types.HomesteadSigner{}
+	_, blocks, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, 2*int(numStates), 10, func(i int, gen *BlockGen) {
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), ethparams.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := blockchain.InsertChain(blocks); err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range blocks[:numStates] {
+		if err := blockchain.Accept(b); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Close the acceptor queue prior to committing the rest of the blocks.
+	// This simulates a crash when the acceptor queue is non-empty, since those
+	// operations will not be completed.
+	blockchain.stopAcceptor()
+	for _, b := range blocks[numStates:] {
+		if err := blockchain.Accept(b); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Completely close chain, startup again, ensure all states are available.
+	blockchain.Stop()
+
+	blockchain, err = createBlockChain(chainDB, blockchain.cacheConfig, gspec, blocks[len(blocks)-1].Hash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range blocks {
+		if !blockchain.HasState(b.Root()) {
+			t.Fatalf("missing state for block %d", b.NumberU64())
+		}
+	}
+	blockchain.Stop()
+}
+
 // TestPruningToNonPruning tests that opening a previously pruned database as a
 // non-pruned database is successful.
 //

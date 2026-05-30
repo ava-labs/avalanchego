@@ -418,8 +418,7 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 			tdb.Firewood,
 			summary.GetBlockRoot(),
 			codeQueue,
-			c.config.Client.AddClient(p2p.FirewoodRangeProofHandlerID),
-			c.config.Client.AddClient(p2p.FirewoodChangeProofHandlerID),
+			c.config.Client.AddClient(p2p.FirewoodProofHandlerID),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create firewood syncer: %w", err)

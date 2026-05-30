@@ -676,11 +676,8 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			return fmt.Errorf("expected a %T with %s scheme, got %T", tdb, customrawdb.FirewoodScheme, vm.eth.BlockChain().TrieDB().Backend())
 		}
 		n := vm.Network.P2PNetwork()
-		if err := n.AddHandler(p2p.FirewoodRangeProofHandlerID, syncer.NewGetRangeProofHandler(tdb.Firewood)); err != nil {
-			return fmt.Errorf("adding firewood range proof handler: %w", err)
-		}
-		if err := n.AddHandler(p2p.FirewoodChangeProofHandlerID, syncer.NewGetChangeProofHandler(tdb.Firewood)); err != nil {
-			return fmt.Errorf("adding firewood change proof handler: %w", err)
+		if err := n.AddHandler(p2p.FirewoodProofHandlerID, syncer.NewGetProofHandler(tdb.Firewood)); err != nil {
+			return fmt.Errorf("adding firewood proof handler: %w", err)
 		}
 	default:
 		log.Warn("state sync is not supported for this scheme, no leaf handlers will be registered", "scheme", scheme)

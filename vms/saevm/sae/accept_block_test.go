@@ -24,8 +24,8 @@ func TestAcceptBlock(t *testing.T) {
 	// TODO(JonathanOppenheimer): determine whether this test is actually flaky
 	// or whether there's a bug in the test. This test is enabled in Bazel and
 	// disabled in go test.
-	if os.Getenv("SAEVM_TEST_ACCEPT_BLOCK") == "" {
-		t.Skip("FLAKY: set SAEVM_TEST_ACCEPT_BLOCK to run")
+	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
+		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
 	}
 
 	// We use a generous timeout because GC finalizers from previous tests take

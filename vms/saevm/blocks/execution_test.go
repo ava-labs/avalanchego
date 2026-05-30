@@ -21,10 +21,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -142,7 +142,7 @@ func TestMarkExecuted(t *testing.T) {
 			}
 
 			t.Run("MarkExecuted_again", func(t *testing.T) {
-				rec := saetest.NewLogRecorder(logging.Warn)
+				rec := loggingtest.NewRecorder(logging.Warn)
 				b.log = rec
 				require.ErrorIs(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), errMarkBlockExecutedAgain)
 				// The database's head block might have been corrupted so this MUST
@@ -174,7 +174,7 @@ type selfAsHasher common.Hash
 
 func (h selfAsHasher) Hash() common.Hash { return common.Hash(h) }
 
-func mustNewGasTime(tb testing.TB, at time.Time, target, excess gas.Gas, gasPriceConfig hook.GasPriceConfig) *gastime.Time {
+func mustNewGasTime(tb testing.TB, at time.Time, target, excess gas.Gas, gasPriceConfig gastime.GasPriceConfig) *gastime.Time {
 	tb.Helper()
 	tm, err := gastime.New(at, target, excess, gasPriceConfig)
 	require.NoError(tb, err, "gastime.New()")

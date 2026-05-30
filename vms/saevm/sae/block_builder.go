@@ -310,13 +310,21 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		receipts = append(receipts, b.Receipts()...)
 	}
 
+	// All fields of [hook.Settled] MUST be populated, otherwise state sync
+	// and recovery will not function correctly.
+	settledGasTime := lastSettled.ExecutedByGasTime()
 	ethB, err := builder.BuildBlock(
 		hdr,
 		bCtx,
 		included,
 		receipts,
 		includedOps,
-		lastSettled.NumberU64(),
+		hook.Settled{
+			Height:       lastSettled.NumberU64(),
+			GasUnix:      settledGasTime.Unix(),
+			GasNumerator: settledGasTime.Fraction().Numerator,
+			Excess:       settledGasTime.Excess(),
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -337,8 +345,8 @@ func lastToSettle(
 	now time.Time,
 	log logging.Logger,
 ) (*blocks.Block, error) {
-	bTime := blocks.PreciseTime(hooks, hdr)
-	pTime := blocks.PreciseTime(hooks, parent.Header())
+	bTime := hooks.BlockTime(hdr)
+	pTime := hooks.BlockTime(parent.Header())
 
 	// It is allowed for [hook.BlockBuilder] to further constrain the allowed
 	// block times. However, every block MUST at least satisfy these basic
