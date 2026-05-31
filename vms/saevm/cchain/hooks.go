@@ -21,7 +21,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
@@ -470,10 +469,9 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("generating predicates: %w", err)
 	}
-	// TODO(StephenButtolph): [customheader.SetPredicateBytesInExtra] assumes
-	// fee information is also encoded in [types.Header.Extra]. Replace this
-	// once predicate bytes have a dedicated extra field.
-	header.Extra = customheader.SetPredicateBytesInExtra(rulesExtra.AvalancheRules, header.Extra, predicateBytes)
+	// TODO(StephenButtolph): Should we only encode the predicate bytes when
+	// there is at least one predicate?
+	header.Extra = predicateBytes
 
 	headerExtra := customtypes.GetHeaderExtra(header)
 	headerExtra.SettledHeight = &settled.Height
