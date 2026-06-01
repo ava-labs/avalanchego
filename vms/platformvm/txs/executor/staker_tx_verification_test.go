@@ -750,7 +750,7 @@ func TestGetDelegatorRules(t *testing.T) {
 				assetID:                  avaxAssetID,
 				minDelegatorStake:        minDelegatorStake,
 				maxValidatorStake:        maxValidatorStake,
-				minStakeDuration:         heliconMinStakeDuration,
+				minStakeDuration:         minStakeDuration,
 				maxStakeDuration:         maxStakeDuration,
 				maxValidatorWeightFactor: MaxValidatorWeightFactor,
 			},
