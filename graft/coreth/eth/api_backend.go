@@ -267,7 +267,7 @@ func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.B
 		// because the interface does not return one. The underlying reconstructed
 		// revision will be freed by the GC when stateDb becomes unreachable,
 		// since stateDb holds the only references to it.
-		stateDb, _, err = b.eth.firewoodState(ctx, header, b.eth.BlockChain().CacheConfig().CommitInterval)
+		stateDb, _, err = b.eth.firewoodState(ctx, header, b.eth.BlockChain().CacheConfig().CommitInterval, false)
 	}
 	if err != nil {
 		return nil, nil, err
@@ -301,7 +301,7 @@ func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockN
 			// because the interface does not return one. The underlying reconstructed
 			// revision will be freed by the GC when stateDb becomes unreachable,
 			// since stateDb holds the only references to it.
-			stateDb, _, err = b.eth.firewoodState(ctx, header, b.eth.BlockChain().CacheConfig().CommitInterval)
+			stateDb, _, err = b.eth.firewoodState(ctx, header, b.eth.BlockChain().CacheConfig().CommitInterval, false)
 		}
 		if err != nil {
 			return nil, nil, err
@@ -546,6 +546,24 @@ func (b *EthAPIBackend) StateAtBlock(ctx context.Context, block *types.Block, re
 
 func (b *EthAPIBackend) StateAtNextBlock(ctx context.Context, parent, nextBlock *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
 	return b.eth.StateAtNextBlock(ctx, parent, nextBlock, reexec, base, readOnly, preferDisk)
+}
+
+func (b *EthAPIBackend) ReconstructedFirewoodStateAtNextBlock(ctx context.Context, parent, nextBlock *types.Block, reexec uint64) (*state.StateDB, tracers.StateReleaseFunc, bool, error) {
+	if b.eth.BlockChain().CacheConfig().StateScheme != customrawdb.FirewoodScheme {
+		return nil, nil, false, nil
+	}
+
+	statedb, release, err := b.eth.firewoodState(ctx, parent.Header(), reexec, true)
+	if err != nil {
+		return nil, nil, true, err
+	}
+
+	blockContext := core.NewBlockContext(nextBlock.Number(), nextBlock.Time())
+	if err := core.ApplyUpgrades(b.eth.blockchain.Config(), &parent.Header().Time, blockContext, statedb); err != nil {
+		release()
+		return nil, nil, true, err
+	}
+	return statedb, release, true, nil
 }
 
 func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {

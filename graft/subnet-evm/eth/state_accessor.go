@@ -210,12 +210,17 @@ func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), erro
 // walking back to a persisted revision or genesis, then re-executing blocks
 // forward.
 //
+// If forceReconstructed is true, an available Firewood state is still reopened
+// as a non-persistent reconstructed view instead of using the live trie.
+//
 // The walk-back is bounded by `reexec`. If no persisted revision or genesis is
 // found within `reexec` blocks of the requested block, this returns an error.
-func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, reexec uint64) (_ *state.StateDB, _ tracers.StateReleaseFunc, finalErr error) {
+func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, reexec uint64, forceReconstructed bool) (_ *state.StateDB, _ tracers.StateReleaseFunc, finalErr error) {
 	// Fast path: state is available directly.
-	if statedb, err := eth.blockchain.StateAt(header.Root); err == nil {
-		return statedb, noopReleaser, nil
+	if !forceReconstructed {
+		if statedb, err := eth.blockchain.StateAt(header.Root); err == nil {
+			return statedb, noopReleaser, nil
+		}
 	}
 
 	// Get the Firewood TrieDB.
@@ -233,11 +238,11 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		if err := ctx.Err(); err != nil {
 			return nil, nil, err
 		}
-		if eth.blockchain.HasState(current.Root) {
-			break
-		}
 		if current.Number.Uint64() == 0 {
 			reachedGenesis = true
+			break
+		}
+		if eth.blockchain.HasState(current.Root) {
 			break
 		}
 		parent := eth.blockchain.GetHeader(current.ParentHash, current.Number.Uint64()-1)
@@ -408,7 +413,7 @@ func (eth *Ethereum) reconstructGenesis() (*ffi.Reconstructed, error) {
 func (eth *Ethereum) stateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (statedb *state.StateDB, release tracers.StateReleaseFunc, err error) {
 	switch eth.blockchain.CacheConfig().StateScheme {
 	case customrawdb.FirewoodScheme:
-		return eth.firewoodState(ctx, block.Header(), reexec)
+		return eth.firewoodState(ctx, block.Header(), reexec, false)
 	case rawdb.PathScheme:
 		return eth.pathState(block)
 	default:
