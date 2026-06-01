@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -51,6 +52,7 @@ func newHooks(
 	state *cchainstate.State,
 	pool *txpool.Pending,
 	now func() time.Time,
+	desiredMinPriceExponent *dynamic.PriceExponent,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -72,6 +74,7 @@ func newHooks(
 			ctx,
 			now,
 			poolTxs,
+			desiredMinPriceExponent,
 		},
 		state,
 	}
@@ -99,6 +102,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return now
 		},
 		slices.Values(txs),
+		customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
 	}, nil
 }
 
@@ -115,11 +119,19 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 	}, nil
 }
 
-func (*hooks) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	// TODO(StephenButtolph): Extract parameters from the header.
+// InitialPriceExponent is the C-chain's initial price exponent. The minimum
+// price is 1 wei, so the exponent starts at 0.
+const InitialPriceExponent dynamic.PriceExponent = 0
+
+func (*hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+	// TODO(StephenButtolph): Extract the gas target from the header (ACP-176).
+	minPrice := InitialPriceExponent.Price()
+	if exp := customtypes.GetHeaderExtra(header).MinPriceExponent; exp != nil {
+		minPrice = exp.Price()
+	}
 	return 1_000_000, gastime.GasPriceConfig{
 		TargetToExcessScaling: 87,
-		MinPrice:              1,
+		MinPrice:              minPrice,
 	}
 }
 
@@ -189,9 +201,10 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
 type builder struct {
-	ctx          *snow.Context
-	now          func() time.Time
-	potentialTxs iter.Seq[*hookTx]
+	ctx                     *snow.Context
+	now                     func() time.Time
+	potentialTxs            iter.Seq[*hookTx]
+	desiredMinPriceExponent *dynamic.PriceExponent
 }
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
@@ -201,6 +214,12 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	// TODO(StephenButtolph): Encode the ACP-183 min price excess in the header.
 	// TODO(StephenButtolph): Enforce the minimum block time here.
 	now := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
+	parentExtra := customtypes.GetHeaderExtra(parent)
+	minPriceExponent := InitialPriceExponent
+	if parentExtra.MinPriceExponent != nil {
+		minPriceExponent = *parentExtra.MinPriceExponent
+	}
+	minPriceExponent = minPriceExponent.Toward(b.desiredMinPriceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -221,7 +240,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &now,
 			// TODO(StephenButtolph): Encode the min-delay excess.
-			MinDelayExcess: new(acp226.DelayExcess),
+			MinDelayExcess:   new(acp226.DelayExcess),
+			MinPriceExponent: &minPriceExponent,
 		},
 	), nil
 }
