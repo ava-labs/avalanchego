@@ -277,15 +277,13 @@ func (b *backend) stateAtTransactionSAE(ethB *types.Block, txIndex int) (*core.M
 // under coreth's historical execution rules. Each transaction is charged at the
 // block's header base fee, not a value derived from the SAE gas clock.
 //
-// The recompute loop here is a near-verbatim copy of coreth's
-// (*Ethereum).stateAtTransaction in graft/coreth/eth/state_accessor.go, with one
-// addition: coreth credits the burned base fee to the (blackhole) coinbase from
-// inside its registered libevm hooks, whereas libevm's [core.ApplyMessage]
-// simply discards it. We therefore apply [hook.Points.AfterExecutingTransaction]
-// after each replayed transaction.
+// The replay mirrors coreth's (*Ethereum).stateAtTransaction in
+// graft/coreth/eth/state_accessor.go, with one addition: coreth credits the
+// burned base fee to the (blackhole) coinbase from inside its registered libevm
+// hooks, whereas libevm's [core.ApplyMessage] simply discards it. We therefore
+// apply [hook.Points.AfterExecutingTransaction] after each replayed transaction.
 //
-// TODO(JonathanOppenheimer): once coreth's stateAtTransaction is deleted, include
-// a permalink to its final resting place.
+// txIndex MUST be in range as [backend.StateAtTransaction] validates it.
 func stateAtTransactionPreSAE(
 	opener saedb.StateDBOpener,
 	hooks hook.Points,
@@ -299,30 +297,29 @@ func stateAtTransactionPreSAE(
 	if err != nil {
 		return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("opening pre-Helicon parent state at %#x (tracing pre-Helicon blocks requires an archival node): %w", parentRoot, err)
 	}
-	release := noopRelease
+
 	// SAE's ChainContext has no consensus engine, so the coinbase is supplied as
 	// the block author explicitly (coreth passes nil and derives it via Author).
 	coinbase := ethB.Coinbase()
+	blockCtx := core.NewEVMBlockContext(ethB.Header(), chainCtx, &coinbase)
 
-	// Blocks carry a base fee once EIP-1559 (Apricot Phase 3) is active; earlier
-	// blocks have none, leaving the burn at zero.
+	// ethB.BaseFee() is nil before EIP-1559.
 	var baseFee uint256.Int
 	if bf := ethB.BaseFee(); bf != nil {
-		baseFee = *uint256.MustFromBig(bf)
+		baseFee.SetFromBig(bf)
 	}
 
-	// Recompute transactions up to the target index.
 	signer := types.MakeSigner(cfg, ethB.Number(), ethB.Time())
-	for idx, tx := range ethB.Transactions() {
-		// Assemble the transaction call message and return if the requested offset
-		msg, _ := core.TransactionToMessage(tx, signer, ethB.BaseFee())
-		txContext := core.NewEVMTxContext(msg)
-		context := core.NewEVMBlockContext(ethB.Header(), chainCtx, &coinbase)
-		if idx == txIndex {
-			return msg, context, statedb, release, nil
+	txs := ethB.Transactions()
+
+	// Replay transactions 0..txIndex-1 to produce the state just before the
+	// target transaction.
+	for idx, tx := range txs[:txIndex] {
+		msg, err := core.TransactionToMessage(tx, signer, ethB.BaseFee())
+		if err != nil {
+			return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("converting transaction %#x to message: %v", tx.Hash(), err)
 		}
-		// Not yet the searched for transaction, execute on top of the current state
-		vmenv := vm.NewEVM(context, txContext, statedb, cfg, vm.Config{})
+		vmenv := vm.NewEVM(blockCtx, core.NewEVMTxContext(msg), statedb, cfg, vm.Config{})
 		statedb.SetTxContext(tx.Hash(), idx)
 		result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()))
 		if err != nil {
@@ -333,11 +330,15 @@ func stateAtTransactionPreSAE(
 		if err := hooks.AfterExecutingTransaction(statedb, baseFee, tx, receipt); err != nil {
 			return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("after-transaction hook for %#x: %v", tx.Hash(), err)
 		}
-		// Ensure any modifications are committed to the state
-		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
-		statedb.Finalise(vmenv.ChainConfig().IsEIP158(ethB.Number()))
+		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect.
+		statedb.Finalise(cfg.IsEIP158(ethB.Number()))
 	}
-	return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("transaction index %d out of range for block %#x", txIndex, ethB.Hash())
+
+	msg, err := core.TransactionToMessage(txs[txIndex], signer, ethB.BaseFee())
+	if err != nil {
+		return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("converting transaction %#x to message: %v", txs[txIndex].Hash(), err)
+	}
+	return msg, blockCtx, statedb, noopRelease, nil
 }
 
 // postExecutionStateRoot returns the post-execution state root for the block
