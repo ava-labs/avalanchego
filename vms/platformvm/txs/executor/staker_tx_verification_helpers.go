@@ -81,7 +81,7 @@ func getDelegatorRules(
 			assetID:                  backend.Ctx.AVAXAssetID,
 			minDelegatorStake:        backend.Config.MinDelegatorStake,
 			maxValidatorStake:        backend.Config.MaxValidatorStake,
-			minStakeDuration:         primaryNetworkMinStakeDuration(backend.Config, chainState.GetTimestamp()),
+			minStakeDuration:         backend.Config.MinStakeDuration,
 			maxStakeDuration:         backend.Config.MaxStakeDuration,
 			maxValidatorWeightFactor: MaxValidatorWeightFactor,
 		}, nil
