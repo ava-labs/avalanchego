@@ -32,6 +32,9 @@ type Config struct {
 	// the node will default to use the parent block's minimum gas price.
 	PriceTarget *gas.Price `json:"min-price-target,omitempty"`
 
+	// Pruning encodes whether the node should prune intermediate trie nodes.
+	Pruning bool `json:"pruning-enabled"`
+
 	// WarpOffChainMessages encodes off-chain messages (unrelated to any
 	// on-chain event ie. block or AddressedCall) that the node should be
 	// willing to sign.
@@ -39,7 +42,9 @@ type Config struct {
 }
 
 func ParseConfig(b []byte) (Config, error) {
-	var c Config
+	c := Config{
+		Pruning: true,
+	}
 	if len(b) == 0 {
 		return c, nil
 	}

@@ -196,6 +196,7 @@ func (vm *VM) Initialize(
 		MempoolConfig: mempoolConfig,
 		DBConfig: saedb.Config{
 			TrieDBConfig: trieDBConfig,
+			Archival:     !userConfig.Pruning,
 		},
 	}
 

@@ -64,7 +64,7 @@ type VM struct {
 	preference atomic.Pointer[blocks.Block]
 	last       struct {
 		accepted, settled atomic.Pointer[blocks.Block]
-		synchronous       uint64
+		synchronous       *blocks.Block
 	}
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
@@ -150,7 +150,7 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("blocks.New([last synchronous], ...): %v", err)
 	}
-	vm.last.synchronous = lastSync.Height()
+	vm.last.synchronous = lastSync
 
 	{ // ==========  Sync -> Async  ==========
 		if err := lastSync.MarkSynchronous(hooks, db, xdb); err != nil {

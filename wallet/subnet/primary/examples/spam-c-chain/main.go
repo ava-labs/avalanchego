@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 
 	ethereum "github.com/ava-labs/libevm"
 )
@@ -31,7 +30,7 @@ func main() {
 	ctx := context.Background()
 	const (
 		chainUUID = "C"
-		uri       = primary.LocalAPIURI + "/ext/bc/" + chainUUID + "/rpc"
+		uri       = "http://localhost:9690" + "/ext/bc/" + chainUUID + "/rpc"
 	)
 	c, err := ethclient.DialContext(ctx, uri)
 	if err != nil {

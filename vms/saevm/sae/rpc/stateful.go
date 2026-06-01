@@ -108,19 +108,22 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	} else {
 		hdr = rawdb.ReadHeader(b.DB(), hash, num)
 
-		// TODO(arr4n) export [blocks.executionResults] to avoid multiple
-		// database reads and canoto unmarshallings here.
-		var err error
-		hdr.Root, err = blocks.PostExecutionStateRoot(b.XDB(), num)
-		if err != nil {
-			return nil, nil, err
-		}
+		// TODO(StephenButtolph): hdr may be nil after we support state sync.
+		if hdr.Number.Uint64() > b.LastSynchronous().NumberU64() {
+			// TODO(arr4n) export [blocks.executionResults] to avoid multiple
+			// database reads and canoto unmarshallings here.
+			var err error
+			hdr.Root, err = blocks.PostExecutionStateRoot(b.XDB(), num)
+			if err != nil {
+				return nil, nil, err
+			}
 
-		bf, err := blocks.ExecutionBaseFee(b.XDB(), num)
-		if err != nil {
-			return nil, nil, err
+			bf, err := blocks.ExecutionBaseFee(b.XDB(), num)
+			if err != nil {
+				return nil, nil, err
+			}
+			hdr.BaseFee = bf.ToBig()
 		}
-		hdr.BaseFee = bf.ToBig()
 	}
 
 	sdb, err := b.StateDB(hdr.Root)
@@ -143,9 +146,18 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	root, err := b.postExecutionStateRoot(block.Hash(), block.NumberU64())
-	if err != nil {
-		return nil, nil, err
+	var root common.Hash
+	if sb := b.LastSynchronous(); sb.NumberU64() >= block.NumberU64() {
+		// If the block is synchronous, we can trust its post-execution state root.
+		root = block.Root()
+	} else {
+		// Otherwise, we need to look up the post-execution state root for the
+		// block, which may be on disk if the block is non-canonical.
+		var err error
+		root, err = b.postExecutionStateRoot(block.Hash(), block.NumberU64())
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	sdb, err := b.StateDB(root)

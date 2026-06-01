@@ -117,6 +117,8 @@ func VerifyExtraPrefix(
 func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 	extraLen := len(extra)
 	switch {
+	case rules.IsHelicon:
+		return nil
 	case rules.IsFortuna:
 		if extraLen < acp176.StateSize {
 			return fmt.Errorf(
