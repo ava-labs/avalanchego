@@ -82,7 +82,7 @@ var (
 		FortunaTime:                  InitiallyActiveTime,
 		GraniteTime:                  InitiallyActiveTime,
 		GraniteEpochDuration:         30 * time.Second,
-		HeliconTime:                  time.Date(2026, time.June, 1, 9, 43, 0, 0, time.Local),
+		HeliconTime:                  time.Date(2026, time.June, 1, 11, 6, 0, 0, time.Local),
 		// HeliconTime: UnscheduledActivationTime,
 	}
 
