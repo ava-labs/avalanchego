@@ -343,10 +343,10 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 			headerExtra.MinDelayExcess = new(acp226.DelayExcess)
 			*headerExtra.MinDelayExcess = acp226.InitialDelayExcess
 		}
-		// Helicon: seed the ACP-283 dynamic min gas price excess.
+		// Helicon: seed the ACP-283 dynamic min gas price exponent.
 		if confExtra.IsHelicon(g.Timestamp) {
-			headerExtra.MinPriceExcess = new(acp283.PriceExcess)
-			*headerExtra.MinPriceExcess = acp283.InitialPriceExcess
+			headerExtra.MinPriceExponent = new(acp283.PriceExponent)
+			*headerExtra.MinPriceExponent = acp283.InitialPriceExponent
 		}
 	}
 

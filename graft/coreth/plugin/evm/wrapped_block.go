@@ -343,6 +343,10 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
 		return err
 	}
+	// Ensure MinPriceExponent is consistent with rules (ACP-283).
+	if err := customheader.VerifyMinPriceExponent(extraConfig, parent, header); err != nil {
+		return err
+	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.
 	if err := customheader.VerifyTime(extraConfig, parent, header, b.vm.clock.Time()); err != nil {
 		return err

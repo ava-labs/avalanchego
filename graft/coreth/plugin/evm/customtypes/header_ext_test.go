@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
@@ -50,31 +51,29 @@ func TestHeaderJSON(t *testing.T) {
 	_ = testHeaderEncodeDecode(t, json.Marshal, json.Unmarshal)
 }
 
-// TestHeaderRLPNilMinPriceExcess confirms that clearing MinPriceExcess, the last
-// optional field, reproduces the pre-ACP-283 encoding byte-for-byte and decodes
-// back to nil, so headers written before the field existed keep the same hash.
-func TestHeaderRLPNilMinPriceExcess(t *testing.T) {
+// TestHeaderRLPNilMinPriceExponent confirms that clearing MinPriceExponent
+// reproduces the pre-ACP-283 encoding exactly and decodes back to nil, so
+// headers written before the field existed keep the same hash.
+func TestHeaderRLPNilMinPriceExponent(t *testing.T) {
 	t.Parallel()
 
 	header, _ := headerWithNonZeroFields()
-	GetHeaderExtra(header).MinPriceExcess = nil
+	GetHeaderExtra(header).MinPriceExponent = nil
 
 	got, err := rlp.EncodeToBytes(header)
-	require.NoError(t, err, "encode")
+	require.NoError(t, err)
 
-	// Golden data from before MinPriceExcess was added; clearing the field must
-	// reproduce it exactly. WARNING: changing these values can break backwards
-	// compatibility with extreme consequences as block-hash calculation may break.
-	const (
-		wantHex     = "f90236a00100000000000000000000000000000000000000000000000000000000000000a00200000000000000000000000000000000000000000000000000000000000000940300000000000000000000000000000000000000a00400000000000000000000000000000000000000000000000000000000000000a00500000000000000000000000000000000000000000000000000000000000000a00600000000000000000000000000000000000000000000000000000000000000b901000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008090a0b0c0da00e00000000000000000000000000000000000000000000000000000000000000880f00000000000000a015000000000000000000000000000000000000000000000000000000000000001016171213a014000000000000000000000000000000000000000000000000000000000000001819"
-		wantHashHex = "be13d7b6f1242dd87477eee76a46f9fa58311bf459e0d49cac6862b187b3fe9c"
-	)
-	require.Equal(t, wantHex, hex.EncodeToString(got), "Header RLP")
-	require.Equal(t, "0x"+wantHashHex, header.Hash().Hex(), "Header.Hash()")
+	// Golden RLP from before MinPriceExponent was added. Changing it changes
+	// the block hash.
+	const wantHex = "f90236a00100000000000000000000000000000000000000000000000000000000000000a00200000000000000000000000000000000000000000000000000000000000000940300000000000000000000000000000000000000a00400000000000000000000000000000000000000000000000000000000000000a00500000000000000000000000000000000000000000000000000000000000000a00600000000000000000000000000000000000000000000000000000000000000b901000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008090a0b0c0da00e00000000000000000000000000000000000000000000000000000000000000880f00000000000000a015000000000000000000000000000000000000000000000000000000000000001016171213a014000000000000000000000000000000000000000000000000000000000000001819"
+
+	wantBytes := common.FromHex(wantHex)
+	require.Equal(t, wantBytes, got)
+	require.Equal(t, crypto.Keccak256Hash(wantBytes), header.Hash())
 
 	gotHeader := new(types.Header)
-	require.NoError(t, rlp.DecodeBytes(got, gotHeader), "decode")
-	require.Nil(t, GetHeaderExtra(gotHeader).MinPriceExcess)
+	require.NoError(t, rlp.DecodeBytes(got, gotHeader))
+	require.Nil(t, GetHeaderExtra(gotHeader).MinPriceExponent)
 }
 
 func testHeaderEncodeDecode(
@@ -145,7 +144,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		BlockGasCost:     big.NewInt(23),
 		TimeMilliseconds: utils.PointerTo[uint64](24),
 		MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(25)),
-		MinPriceExcess:   utils.PointerTo(acp283.PriceExcess(26)),
+		MinPriceExponent: utils.PointerTo(acp283.PriceExponent(26)),
 	}
 	return WithHeaderExtra(header, extra), extra
 }
@@ -199,7 +198,7 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *acp226.DelayExcess:
 				assertNonZero(t, f)
-			case *acp283.PriceExcess:
+			case *acp283.PriceExponent:
 				assertNonZero(t, f)
 			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:
 				require.NotEmpty(t, f)
@@ -212,7 +211,7 @@ func allFieldsSet[T interface {
 
 func assertNonZero[T interface {
 	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
-		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *acp283.PriceExcess
+		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *acp283.PriceExponent
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)
