@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -205,7 +206,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		if parent == nil {
 			return nil, bCtx, nil, nil, fmt.Errorf("parent block %d (%#x) of synchronous block %d not found", ethB.NumberU64()-1, ethB.ParentHash(), ethB.NumberU64())
 		}
-		return stateAtTransactionPreSAE(b, b.ChainContext(), b.ChainConfig(), ethB, parent.Root(), txIndex)
+		return stateAtTransactionPreSAE(b, b.Hooks(), b.ChainContext(), b.ChainConfig(), ethB, parent.Root(), txIndex)
 	}
 	return b.stateAtTransactionSAE(ethB, txIndex)
 }
@@ -277,12 +278,17 @@ func (b *backend) stateAtTransactionSAE(ethB *types.Block, txIndex int) (*core.M
 // block's header base fee, not a value derived from the SAE gas clock.
 //
 // The recompute loop here is a near-verbatim copy of coreth's
-// (*Ethereum).stateAtTransaction in graft/coreth/eth/state_accessor.go.
+// (*Ethereum).stateAtTransaction in graft/coreth/eth/state_accessor.go, with one
+// addition: coreth credits the burned base fee to the (blackhole) coinbase from
+// inside its registered libevm hooks, whereas libevm's [core.ApplyMessage]
+// simply discards it. We therefore apply [hook.Points.AfterExecutingTransaction]
+// after each replayed transaction.
 //
 // TODO(JonathanOppenheimer): once coreth's stateAtTransaction is deleted, include
 // a permalink to its final resting place.
 func stateAtTransactionPreSAE(
 	opener saedb.StateDBOpener,
+	hooks hook.Points,
 	chainCtx core.ChainContext,
 	cfg *params.ChainConfig,
 	ethB *types.Block,
@@ -298,6 +304,13 @@ func stateAtTransactionPreSAE(
 	// the block author explicitly (coreth passes nil and derives it via Author).
 	coinbase := ethB.Coinbase()
 
+	// Blocks carry a base fee once EIP-1559 (Apricot Phase 3) is active; earlier
+	// blocks have none, leaving the burn at zero.
+	var baseFee uint256.Int
+	if bf := ethB.BaseFee(); bf != nil {
+		baseFee = *uint256.MustFromBig(bf)
+	}
+
 	// Recompute transactions up to the target index.
 	signer := types.MakeSigner(cfg, ethB.Number(), ethB.Time())
 	for idx, tx := range ethB.Transactions() {
@@ -311,8 +324,14 @@ func stateAtTransactionPreSAE(
 		// Not yet the searched for transaction, execute on top of the current state
 		vmenv := vm.NewEVM(context, txContext, statedb, cfg, vm.Config{})
 		statedb.SetTxContext(tx.Hash(), idx)
-		if _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas())); err != nil {
+		result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()))
+		if err != nil {
 			return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
+		}
+		// Credit the base-fee burn to the blackhole.
+		receipt := &types.Receipt{GasUsed: result.UsedGas}
+		if err := hooks.AfterExecutingTransaction(statedb, baseFee, tx, receipt); err != nil {
+			return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("after-transaction hook for %#x: %v", tx.Hash(), err)
 		}
 		// Ensure any modifications are committed to the state
 		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
