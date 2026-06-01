@@ -226,10 +226,15 @@ func Execute(
 		tip := tx.EffectiveGasTipValue(header.BaseFee)
 		receipt.EffectiveGasPrice = tip.Add(header.BaseFee, tip)
 
+		// Store the receipt as soon as possible to minimize user latency.
 		if r, ok := receiptStore.Load(tx.Hash()); ok {
 			r.Put(&Receipt{receipt, signer, tx})
 		}
 		receipts[ti] = receipt
+
+		if err := hooks.AfterExecutingTransaction(stateDB, *baseFee, tx, receipt); err != nil {
+			return nil, fmt.Errorf("after-transaction hook: %v", err)
+		}
 	}
 
 	numTxs := len(b.Transactions())

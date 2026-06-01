@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
@@ -226,6 +227,14 @@ func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 }
 
 func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
+	return nil
+}
+
+func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, tx *types.Transaction, r *types.Receipt) error {
+	var burned uint256.Int
+	burned.SetUint64(r.GasUsed)
+	burned.Mul(&burned, &baseFee)
+	db.AddBalance(constants.BlackholeAddr, &burned)
 	return nil
 }
 
