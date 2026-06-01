@@ -25,6 +25,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -87,6 +88,33 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 			parallel: true,
 		},
 	}...)
+}
+
+// TestStateAtTransactionWithSynchronousParent covers tracing block 1 when the
+// synchronous parent's XDB entry is absent.
+func TestStateAtTransactionWithSynchronousParent(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	recipient := sut.wallet.Addresses()[0]
+	tracedTx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &recipient,
+		Gas:      params.TxGas,
+		GasPrice: big.NewInt(1),
+	})
+	b := sut.runConsensusLoop(t, tracedTx)
+	require.Equal(t, uint64(1), b.NumberU64(), "runConsensusLoop(...) block number")
+
+	// Simulate an archival or state-synced node with the synchronous header but
+	// no persisted SAE execution results for it.
+	emptyXDB := saetest.NewExecutionResultsDB()
+	sut.rawVM.xdb = emptyXDB
+	sut.rawVM.toClose = append(sut.rawVM.toClose, &emptyXDB)
+
+	gethBackend := sut.rawVM.GethRPCBackends()
+	_, _, sdb, release, err := gethBackend.StateAtTransaction(ctx, b.EthBlock(), 0, 0)
+	require.NoErrorf(t, err, "%T.StateAtTransaction(block 1, txIndex 0)", gethBackend)
+	defer release()
+	require.NotNilf(t, sdb, "%T.StateAtTransaction(block 1, txIndex 0) state DB", gethBackend)
 }
 
 func TestDebugTrace(t *testing.T) {

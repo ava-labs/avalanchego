@@ -201,7 +201,13 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing parent block: %v", err)
 	}
-	if err := parent.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
+	if b.LastSynchronous().NumberU64() >= parent.NumberU64() {
+		// Synchronous block artefacts are header-derived, as in
+		// [backend.StateAtBlock].
+		if err := parent.RestoreSynchronousExecutionArtefacts(b.Hooks()); err != nil {
+			return nil, bCtx, nil, nil, fmt.Errorf("parent %T.RestoreSynchronousExecutionArtefacts(...): %v", parent, err)
+		}
+	} else if err := parent.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("parent %T.RestoreExecutionArtefacts(...): %v", parent, err)
 	}
 

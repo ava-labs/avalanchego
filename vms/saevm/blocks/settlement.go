@@ -86,6 +86,23 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 //
 // TODO(arr4n) refactor to avoid requiring DB writes.
 func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.ExecutionResults) error {
+	e, err := b.synchronousExecutionResults(hooks)
+	if err != nil {
+		return err
+	}
+	if err := b.markExecuted(db.NewBatch(), xdb, e, false, nil); err != nil {
+		return err
+	}
+	b.synchronous = true
+	return b.markSettled(nil)
+}
+
+// synchronousExecutionResults derives the execution artefacts that a
+// synchronous block would have persisted.
+//
+// The header is authoritative for the post-execution state root and base fee
+// while gas time is recomputed from the header.
+func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
 	ethB := b.EthBlock()
 
 	// Receipts of a synchronous block have already been "settled" by the block
@@ -108,7 +125,7 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 		cfg,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	e := &executionResults{
 		byGas:         *execTime.Clone(),
@@ -116,13 +133,20 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 		stateRootPost: ethB.Root(),
 	}
 	if err := e.setBaseFee(ethB.BaseFee()); err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+// RestoreSynchronousExecutionArtefacts restores only the in-memory execution
+// artefacts of a synchronous block. It performs no DB reads or writes and does
+// not mark the block synchronous or settled.
+func (b *Block) RestoreSynchronousExecutionArtefacts(hooks hook.Points) error {
+	e, err := b.synchronousExecutionResults(hooks)
+	if err != nil {
 		return err
 	}
-	if err := b.markExecuted(db.NewBatch(), xdb, e, false, nil); err != nil {
-		return err
-	}
-	b.synchronous = true
-	return b.markSettled(nil)
+	return b.markExecutedAfterDiskArtefacts(e, nil)
 }
 
 // WaitUntilSettled blocks until either [Block.MarkSettled] is called or the
