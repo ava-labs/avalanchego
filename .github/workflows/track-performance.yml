@@ -7,6 +7,8 @@ on:
     # These cron expressions are matched exactly in configure-benchmark to set parameters
     # Weekdays at 05:00 UTC (00:00 ET) - 1M blocks: 40M → 41M
     - cron: '0 5 * * 1-5'
+    # Weekdays at 05:05 UTC - 500k blocks: 33M -> 33.5M
+    - cron: '5 5 * * 1-5'
   workflow_dispatch:
     inputs:
       firewood:
@@ -83,6 +85,12 @@ jobs:
                 echo "::notice::Schedule: daily-40m-41m"
                 echo "name=daily-40m-41m" >> "$GITHUB_OUTPUT"
                 echo "test=firewood-40m-41m" >> "$GITHUB_OUTPUT"
+                echo "timeout-minutes=720" >> "$GITHUB_OUTPUT"
+                ;;
+              "5 5 * * 1-5")  # Weekdays at 05:05 UTC: firewood-33m-33m500k
+                echo "::notice::Schedule: daily-33m-33m500k"
+                echo "name=daily-33m-33m500k" >> "$GITHUB_OUTPUT"
+                echo "test=firewood-33m-33m500k" >> "$GITHUB_OUTPUT"
                 echo "timeout-minutes=720" >> "$GITHUB_OUTPUT"
                 ;;
               *)

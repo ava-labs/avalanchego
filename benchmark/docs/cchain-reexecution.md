@@ -137,6 +137,7 @@ For long tests, trigger directly:
 | Schedule | Test | ~Duration |
 | --- | --- | --- |
 | Weekdays 05:00 UTC | `firewood-40m-41m` (blocks 40M–41M) | <2h |
+| Weekdays 05:05 UTC | `firewood-33m-33m500k` (blocks 33M–33.5M) | <2h |
 
 ## Finding S3 Data
 
