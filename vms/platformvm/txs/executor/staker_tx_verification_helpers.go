@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -23,6 +24,13 @@ type addValidatorRules struct {
 	minDelegationFee  uint32
 }
 
+func primaryNetworkMinStakeDuration(cfg *config.Internal, timestamp time.Time) time.Duration {
+	if cfg.UpgradeConfig.IsHeliconActivated(timestamp) {
+		return cfg.HeliconMinStakeDuration
+	}
+	return cfg.MinStakeDuration
+}
+
 func getValidatorRules(
 	backend *Backend,
 	chainState state.Chain,
@@ -33,7 +41,7 @@ func getValidatorRules(
 			assetID:           backend.Ctx.AVAXAssetID,
 			minValidatorStake: backend.Config.MinValidatorStake,
 			maxValidatorStake: backend.Config.MaxValidatorStake,
-			minStakeDuration:  backend.Config.MinStakeDuration,
+			minStakeDuration:  primaryNetworkMinStakeDuration(backend.Config, chainState.GetTimestamp()),
 			maxStakeDuration:  backend.Config.MaxStakeDuration,
 			minDelegationFee:  backend.Config.MinDelegationFee,
 		}, nil
