@@ -2,9 +2,11 @@
 // See the file LICENSE.md for licensing terms.
 
 mod change;
+mod code_hash;
 mod range;
 
 pub use self::change::*;
+pub use self::code_hash::*;
 pub use self::range::*;
 
 // Re-export firewood-side types that used to be defined in this crate, so

@@ -4,25 +4,15 @@
 use std::convert::Into;
 use std::num::NonZeroUsize;
 
-#[cfg(feature = "ethhash")]
-use firewood_storage::{RlpList, TrieHash};
-
 use firewood::{
     ProofError,
     api::{self, FrozenChangeProof},
 };
 
 use crate::{
-    BorrowedBytes, ChangeProofResult, DatabaseHandle, HashKey, HashResult, KeyRange, Maybe,
-    NextKeyRangeResult, OwnedBytes, ValueResult, VoidResult,
+    BorrowedBytes, ChangeProofResult, CodeIteratorHandle, CodeIteratorResult, DatabaseHandle,
+    HashKey, HashResult, KeyRange, Maybe, NextKeyRangeResult, OwnedBytes, ValueResult, VoidResult,
 };
-
-#[cfg(feature = "ethhash")]
-const EMPTY_CODE_HASH: [u8; 32] = [
-    // "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
-    0xc5, 0xd2, 0x46, 0x01, 0x86, 0xf7, 0x23, 0x3c, 0x92, 0x7e, 0x7d, 0xb2, 0xdc, 0xc7, 0x03, 0xc0,
-    0xe5, 0x00, 0xb6, 0x53, 0xca, 0x82, 0x27, 0x3b, 0x7b, 0xfa, 0xd8, 0x04, 0x5d, 0x85, 0xa4, 0x70,
-];
 
 /// Arguments for creating a change proof.
 #[derive(Debug)]
@@ -83,6 +73,14 @@ impl ChangeProofContext {
             .ok_or(api::Error::ProofError(ProofError::ProofIsNone))?;
         firewood::find_next_key_after_change_proof(proof, end_key)
     }
+
+    fn code_hash_iter(&self) -> Result<CodeIteratorHandle<'_>, api::Error> {
+        let proof = self
+            .proof
+            .as_ref()
+            .ok_or(api::Error::ProofError(ProofError::ProofIsNone))?;
+        CodeIteratorHandle::from_batch_ops(proof.batch_ops())
+    }
 }
 
 /// A key range that should be fetched to continue iterating through a range
@@ -98,83 +96,6 @@ pub struct NextKeyRange {
     /// If set, a non-inclusive upper bound for the next range to fetch. If not
     /// set, the range is unbounded (this is the final range).
     pub end_key: Maybe<OwnedBytes>,
-}
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct CodeIteratorHandle<'a> {
-    #[cfg(feature = "ethhash")]
-    inner: std::slice::Iter<'a, KeyValuePair>,
-    // uninhabitable fields make the struct impossible to construct when the feature is disabled
-    #[cfg(not(feature = "ethhash"))]
-    void: std::convert::Infallible,
-    #[cfg(not(feature = "ethhash"))]
-    marker: std::marker::PhantomData<&'a ()>,
-}
-
-type KeyValuePair = (Box<[u8]>, Box<[u8]>);
-
-impl Iterator for CodeIteratorHandle<'_> {
-    type Item = Result<HashKey, api::Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        #[cfg(not(feature = "ethhash"))]
-        match self.void {}
-
-        #[cfg(feature = "ethhash")]
-        self.inner.find_map(|(key, value)| {
-            if key.len() != 32 {
-                return None;
-            }
-
-            let Ok(code_hash_slice) = RlpList::parse(value).and_then(|l| l.nth_bytes(3)) else {
-                return Some(Err(api::Error::ProofError(ProofError::InvalidValueFormat)));
-            };
-            let code_hash: HashKey = TrieHash::try_from(code_hash_slice).ok()?.into();
-            if code_hash == TrieHash::from(EMPTY_CODE_HASH).into() {
-                return None;
-            }
-
-            Some(Ok(code_hash))
-        })
-    }
-}
-
-impl<'a> CodeIteratorHandle<'a> {
-    /// Create a new code hash iterator from the given key/value pairs.
-    /// The key/value pairs should be the raw entries from the
-    /// underlying proof.
-    ///
-    /// The iterator must be freed after use.
-    ///
-    /// Arguments:
-    /// - `key_values` - The key/value pairs from the proof.
-    ///
-    /// Returns:
-    /// - `Ok(CodeIteratorHandle)` if the iterator was successfully created.
-    /// - `Err(api::Error)` if the iterator could not be created.
-    ///
-    /// # Errors
-    ///
-    /// - Returns `api::Error::FeatureNotSupported` if the `ethhash` feature
-    ///   is not enabled.
-    #[cfg_attr(feature = "ethhash", allow(clippy::missing_const_for_fn))]
-    #[cfg_attr(not(feature = "ethhash"), allow(unused_variables))]
-    pub fn new(key_values: &'a [KeyValuePair]) -> Result<Self, api::Error> {
-        #[cfg(not(feature = "ethhash"))]
-        {
-            Err(api::Error::FeatureNotSupported(
-                "ethhash code hash iterator".to_owned(),
-            ))
-        }
-
-        #[cfg(feature = "ethhash")]
-        {
-            Ok(CodeIteratorHandle {
-                inner: key_values.iter(),
-            })
-        }
-    }
 }
 
 /// Create a change proof for the given range of keys between two roots.
@@ -312,6 +233,37 @@ pub extern "C" fn fwd_change_proof_find_next_key(
     })
 }
 
+/// Returns an iterator over the code hashes contained in the change proof.
+/// The iterator must be freed after use.
+///
+/// Only `BatchOp::Put` entries contribute code hashes; `Delete` and
+/// `DeleteRange` entries are skipped. Can be called at any time after
+/// the proof has been created.
+///
+/// # Arguments
+///
+/// - `proof` - A [`ChangeProofContext`] previously returned from the create
+///   method or deserialized from bytes.
+///
+/// # Returns
+///
+/// - [`CodeIteratorResult::NullHandlePointer`] if the caller provided a null pointer.
+/// - [`CodeIteratorResult::Ok`] containing a pointer to the `CodeIteratorHandle` if successful.
+/// - [`CodeIteratorResult::Err`] containing an error message if the iterator could not be created.
+///
+/// # Thread Safety
+///
+/// It is not safe to call this function concurrently with the same proof context
+/// nor is it safe to call any other function that accesses the same proof context
+/// concurrently. The caller must ensure exclusive access to the proof context
+/// for the duration of the call.
+#[unsafe(no_mangle)]
+pub extern "C" fn fwd_change_proof_code_hash_iter(
+    proof: Option<&ChangeProofContext>,
+) -> CodeIteratorResult<'_> {
+    crate::invoke_with_handle(proof, ChangeProofContext::code_hash_iter)
+}
+
 fn serialize_change_proof(
     proof: Option<&FrozenChangeProof>,
 ) -> Result<Option<Box<[u8]>>, api::Error> {
@@ -384,11 +336,5 @@ impl crate::MetricsContextExt for ChangeProofContext {
 impl crate::MetricsContextExt for (&DatabaseHandle, &ChangeProofContext) {
     fn metrics_context(&self) -> Option<firewood_metrics::MetricsContext> {
         self.0.metrics_context()
-    }
-}
-
-impl crate::MetricsContextExt for CodeIteratorHandle<'_> {
-    fn metrics_context(&self) -> Option<firewood_metrics::MetricsContext> {
-        None
     }
 }

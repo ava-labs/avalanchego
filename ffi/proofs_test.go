@@ -352,6 +352,46 @@ func TestRangeProofCodeHashes(t *testing.T) {
 	require.Equalf(t, 1, i, "expected one yield from %T.CodeHashes()", proof)
 }
 
+func TestChangeProofCodeHashes(t *testing.T) {
+	r := require.New(t)
+	db := newTestDatabase(t)
+
+	// Baseline insert so the change proof's start root is non-empty. The key
+	// is shorter than 32 bytes so it is naturally skipped by the code-hash
+	// extractor's account-key filter even if it were ever present in
+	// batch_ops (it should not be, since it is unchanged in endRoot).
+	startRoot, err := db.Update([]BatchOp{Put([]byte("baseline"), []byte("v"))})
+	r.NoError(err)
+
+	// RLP encoded account with code hash — same blob as TestRangeProofCodeHashes.
+	key := [32]byte{0x12, 0x34, 0x56} // key must be length 32
+	val, err := hex.DecodeString("f8440164a056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421a0044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d")
+	r.NoError(err)
+	codeHash := stringToHash(t, "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d")
+
+	endRoot, err := db.Update([]BatchOp{Put(key[:], val)})
+	r.NoError(err)
+
+	proof, err := db.ChangeProof(startRoot, endRoot, nothing(), nothing(), changeProofLenUnbounded)
+	r.NoError(err)
+	t.Cleanup(func() { r.NoError(proof.Free()) })
+
+	i := 0
+	mode, err := inferHashingMode(t.Context())
+	r.NoError(err)
+	for h, err := range proof.CodeHashes() {
+		i++
+		if mode == ethhashKey {
+			r.NoError(err, "%T.CodeHashes()", proof)
+			r.Equal(codeHash, h)
+		} else {
+			require.ErrorContains(t, err, "feature not supported in this build: ethhash code hash iterator")
+		}
+	}
+
+	require.Equalf(t, 1, i, "expected one yield from %T.CodeHashes()", proof)
+}
+
 func TestRangeProofFreeReleasesKeepAlive(t *testing.T) {
 	r := require.New(t)
 	db := newTestDatabase(t)

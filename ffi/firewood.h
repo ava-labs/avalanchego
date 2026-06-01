@@ -307,6 +307,50 @@ typedef struct VoidResult {
 } VoidResult;
 
 /**
+ * A result type returned from FFI functions that create an code hash iterator
+ */
+enum CodeIteratorResult_Tag {
+  /**
+   * The caller provided a null pointer to a proof handle.
+   */
+  CodeIteratorResult_NullHandlePointer,
+  /**
+   * Building the iterator was successful and the iterator handle is returned
+   */
+  CodeIteratorResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`].
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  CodeIteratorResult_Err,
+};
+typedef size_t CodeIteratorResult_Tag;
+
+typedef struct CodeIteratorResult_Ok_Body {
+  /**
+   * An opaque pointer to the [`CodeIteratorHandle`].
+   * The value should be freed with [`fwd_code_hash_iter_free`]
+   *
+   * [`fwd_code_hash_iter_free`]: crate::fwd_code_hash_iter_free
+   */
+  struct CodeIteratorHandle *handle;
+} CodeIteratorResult_Ok_Body;
+
+typedef struct CodeIteratorResult {
+  CodeIteratorResult_Tag tag;
+  union {
+    CodeIteratorResult_Ok_Body ok;
+    struct {
+      OwnedBytes err;
+    };
+  };
+} CodeIteratorResult;
+
+/**
  * Maybe is a C-compatible optional type using a tagged union pattern.
  *
  * FFI methods and types can use this to represent optional values where `Optional<T>`
@@ -1361,50 +1405,6 @@ typedef struct DatabaseHandleArgs {
 } DatabaseHandleArgs;
 
 /**
- * A result type returned from FFI functions that create an code hash iterator
- */
-enum CodeIteratorResult_Tag {
-  /**
-   * The caller provided a null pointer to a proof handle.
-   */
-  CodeIteratorResult_NullHandlePointer,
-  /**
-   * Building the iterator was successful and the iterator handle is returned
-   */
-  CodeIteratorResult_Ok,
-  /**
-   * An error occurred and the message is returned as an [`OwnedBytes`].
-   *
-   * The caller must call [`fwd_free_owned_bytes`] to free the memory
-   * associated with this error.
-   *
-   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
-   */
-  CodeIteratorResult_Err,
-};
-typedef size_t CodeIteratorResult_Tag;
-
-typedef struct CodeIteratorResult_Ok_Body {
-  /**
-   * An opaque pointer to the [`CodeIteratorHandle`].
-   * The value should be freed with [`fwd_code_hash_iter_free`]
-   *
-   * [`fwd_code_hash_iter_free`]: crate::fwd_code_hash_iter_free
-   */
-  struct CodeIteratorHandle *handle;
-} CodeIteratorResult_Ok_Body;
-
-typedef struct CodeIteratorResult {
-  CodeIteratorResult_Tag tag;
-  union {
-    CodeIteratorResult_Ok_Body ok;
-    struct {
-      OwnedBytes err;
-    };
-  };
-} CodeIteratorResult;
-
-/**
  * Arguments for initializing logging for the Firewood FFI.
  */
 typedef struct LogArgs {
@@ -1465,6 +1465,34 @@ struct HashResult fwd_batch(const struct DatabaseHandle *db, BorrowedBatchOps va
  * - [`VoidResult::Err`] if an I/O error occurred during the flush.
  */
 struct VoidResult fwd_block_replay_flush(void);
+
+/**
+ * Returns an iterator over the code hashes contained in the change proof.
+ * The iterator must be freed after use.
+ *
+ * Only `BatchOp::Put` entries contribute code hashes; `Delete` and
+ * `DeleteRange` entries are skipped. Can be called at any time after
+ * the proof has been created.
+ *
+ * # Arguments
+ *
+ * - `proof` - A [`ChangeProofContext`] previously returned from the create
+ *   method or deserialized from bytes.
+ *
+ * # Returns
+ *
+ * - [`CodeIteratorResult::NullHandlePointer`] if the caller provided a null pointer.
+ * - [`CodeIteratorResult::Ok`] containing a pointer to the `CodeIteratorHandle` if successful.
+ * - [`CodeIteratorResult::Err`] containing an error message if the iterator could not be created.
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct CodeIteratorResult fwd_change_proof_code_hash_iter(const struct ChangeProofContext *proof);
 
 /**
  * Determine the next key range to fetch for a change proof.
@@ -1592,8 +1620,8 @@ struct VoidResult fwd_code_hash_iter_free(struct CodeIteratorHandle *iter);
  *
  * # Arguments
  *
- * - `iter` - A [`CodeIteratorHandle`] previously returned from the
- *   `fwd_range_proof_code_hash_iter` method.
+ * - `iter` - A [`CodeIteratorHandle`] previously returned from a proof's
+ *   code-hash-iterator function.
  *
  * # Returns
  *

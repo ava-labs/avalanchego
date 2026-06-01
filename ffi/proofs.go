@@ -35,6 +35,8 @@ package ffi
 // #cgo nocallback fwd_db_verify_and_commit_change_proof
 // #cgo noescape fwd_change_proof_find_next_key
 // #cgo nocallback fwd_change_proof_find_next_key
+// #cgo noescape fwd_change_proof_code_hash_iter
+// #cgo nocallback fwd_change_proof_code_hash_iter
 // #cgo noescape fwd_change_proof_to_bytes
 // #cgo nocallback fwd_change_proof_to_bytes
 // #cgo noescape fwd_change_proof_from_bytes
@@ -469,12 +471,36 @@ func (proof *ChangeProof) FindNextKey(endKey Maybe[[]byte]) (*NextKeyRange, erro
 // of this proof. This list may contain duplicates and is not guaranteed to be in any particular order.
 //
 // Note: this method is only relevant for Ethereum tries.
-// This method can only be called after a successful verification of the proof,
-// otherwise an error is returned on the first iteration.
-//
-// TODO(#1598): implement this method to extract code hashes from account nodes.
-func (*ChangeProof) CodeHashes() iter.Seq2[Hash, error] {
-	return func(func(Hash, error) bool) {}
+// This method can be called any time after the proof is created — verification
+// is not required, since extraction is purely RLP parsing of the values
+// already present in the proof. Only code hashes referenced by Put entries
+// (the post-state of accounts touched by the proof) are yielded; Delete and
+// DeleteRange entries are skipped.
+func (p *ChangeProof) CodeHashes() iter.Seq2[Hash, error] {
+	return func(yield func(Hash, error) bool) {
+		iter, err := getCodeHashIteratorFromCodeHashIteratorResult(C.fwd_change_proof_code_hash_iter(p.handle))
+		if err != nil {
+			yield(EmptyRoot, err)
+			return
+		}
+		defer func() {
+			if err := iter.Free(); err != nil {
+				panic(err)
+			}
+		}()
+		for hash, err := iter.Next(); ; hash, err = iter.Next() {
+			if err != nil {
+				yield(EmptyRoot, err)
+				return
+			}
+			if hash == EmptyRoot {
+				return
+			}
+			if !yield(hash, err) {
+				return
+			}
+		}
+	}
 }
 
 // MarshalBinary returns a serialized representation of this ChangeProof.
