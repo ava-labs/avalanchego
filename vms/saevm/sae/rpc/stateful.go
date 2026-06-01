@@ -299,23 +299,26 @@ func stateAtTransactionPreSAE(
 	}
 
 	// SAE's ChainContext has no consensus engine, so the coinbase is supplied as
-	// the block author explicitly (coreth passes nil and derives it via Author).
+	// the block author explicitly.
 	coinbase := ethB.Coinbase()
 	blockCtx := core.NewEVMBlockContext(ethB.Header(), chainCtx, &coinbase)
 
 	// ethB.BaseFee() is nil before EIP-1559.
+	baseFeeBig := ethB.BaseFee()
 	var baseFee uint256.Int
-	if bf := ethB.BaseFee(); bf != nil {
-		baseFee.SetFromBig(bf)
+	if baseFeeBig != nil {
+		baseFee.SetFromBig(baseFeeBig)
 	}
 
-	signer := types.MakeSigner(cfg, ethB.Number(), ethB.Time())
+	blockNumber := ethB.Number()
+	signer := types.MakeSigner(cfg, blockNumber, ethB.Time())
+	eip158 := cfg.IsEIP158(blockNumber)
 	txs := ethB.Transactions()
 
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
 	for idx, tx := range txs[:txIndex] {
-		msg, err := core.TransactionToMessage(tx, signer, ethB.BaseFee())
+		msg, err := core.TransactionToMessage(tx, signer, baseFeeBig)
 		if err != nil {
 			return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("converting transaction %#x to message: %v", tx.Hash(), err)
 		}
@@ -331,10 +334,10 @@ func stateAtTransactionPreSAE(
 			return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("after-transaction hook for %#x: %v", tx.Hash(), err)
 		}
 		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect.
-		statedb.Finalise(cfg.IsEIP158(ethB.Number()))
+		statedb.Finalise(eip158)
 	}
 
-	msg, err := core.TransactionToMessage(txs[txIndex], signer, ethB.BaseFee())
+	msg, err := core.TransactionToMessage(txs[txIndex], signer, baseFeeBig)
 	if err != nil {
 		return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("converting transaction %#x to message: %v", txs[txIndex].Hash(), err)
 	}
