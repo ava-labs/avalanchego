@@ -15,3 +15,8 @@ go_library(
         "//vms/components/gas",
     ],
 )
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
