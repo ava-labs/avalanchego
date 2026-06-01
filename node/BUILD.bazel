@@ -45,7 +45,6 @@ go_library(
         "//snow/validators",
         "//staking",
         "//trace",
-        "//upgrade",
         "//utils",
         "//utils/constants",
         "//utils/crypto/bls",

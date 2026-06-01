@@ -419,7 +419,7 @@ func GetRewardsCalculator(
 			}
 			rc.MinConsumptionRate = minConsumptionRate
 		} else {
-			rc.MinConsumptionRate = rc.MinConsumptionRate - _heliconMinConsumptionRateReduction
+			rc.MinConsumptionRate -= _heliconMinConsumptionRateReduction
 		}
 		return reward.NewCalculator(rc), nil
 	}
