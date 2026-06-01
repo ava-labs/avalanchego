@@ -23,7 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -48,6 +50,13 @@ type VM struct {
 
 var ethDBPrefix = []byte("ethdb")
 
+// Config is the JSON configuration for the cchain VM.
+type Config struct {
+	// DesiredMinGasPriceWei is this node's vote for the ACP-283 minimum gas
+	// price floor. nil for no vote.
+	DesiredMinGasPriceWei *uint64 `json:"desiredMinGasPriceWei,omitempty"`
+}
+
 // Initialize initializes the VM.
 func (vm *VM) Initialize(
 	ctx context.Context,
@@ -67,8 +76,17 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	// TODO(StephenButtolph): Allow minimal user configuration via configBytes.
-	_ = configBytes
+	var cfg Config
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &cfg); err != nil {
+			return fmt.Errorf("unmarshalling config: %w", err)
+		}
+	}
+	var desiredMinPriceExponent *acp283.PriceExponent
+	if cfg.DesiredMinGasPriceWei != nil {
+		e := acp283.DesiredPriceExponent(gas.Price(*cfg.DesiredMinGasPriceWei))
+		desiredMinPriceExponent = &e
+	}
 
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
@@ -100,6 +118,7 @@ func (vm *VM) Initialize(
 		snowCtx,
 		vm.state,
 		pendingTxs,
+		desiredMinPriceExponent,
 	)
 	mempoolConfig := legacypool.DefaultConfig
 	// Treat all transactions equally regardless of submission source — no
