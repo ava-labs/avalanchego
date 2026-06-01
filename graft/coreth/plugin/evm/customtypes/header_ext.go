@@ -158,6 +158,40 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 	SetHeaderExtra(dst, cp)
 }
 
+func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
+	m["extDataHash"] = h.ExtDataHash
+	if h.ExtDataGasUsed != nil {
+		m["extDataGasUsed"] = (*hexutil.Big)(h.ExtDataGasUsed)
+	}
+	if h.BlockGasCost != nil {
+		m["blockGasCost"] = (*hexutil.Big)(h.BlockGasCost)
+	}
+	if h.TimeMilliseconds != nil {
+		m["timestampMilliseconds"] = hexutil.Uint64(*h.TimeMilliseconds)
+	}
+	if h.DelayExponent != nil {
+		m["minDelayExcess"] = hexutil.Uint64(*h.DelayExponent)
+	}
+	if h.TargetExponent != nil {
+		m["targetExponent"] = hexutil.Uint64(*h.TargetExponent)
+	}
+	if h.PriceExponent != nil {
+		m["minPriceExponent"] = hexutil.Uint64(*h.PriceExponent)
+	}
+	if h.SettledHeight != nil {
+		m["settledHeight"] = hexutil.Uint64(*h.SettledHeight)
+	}
+	if h.SettledGasUnix != nil {
+		m["settledGasUnix"] = hexutil.Uint64(*h.SettledGasUnix)
+	}
+	if h.SettledGasNumerator != nil {
+		m["settledGasNumerator"] = hexutil.Uint64(*h.SettledGasNumerator)
+	}
+	if h.SettledExcess != nil {
+		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
+	}
+}
+
 func (h *HeaderSerializable) updateFromEth(eth *ethtypes.Header) {
 	h.ParentHash = eth.ParentHash
 	h.UncleHash = eth.UncleHash
