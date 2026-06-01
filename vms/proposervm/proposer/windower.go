@@ -23,7 +23,7 @@ import (
 
 // Proposer list constants
 const (
-	WindowDuration = 5 * time.Second
+	WindowDuration = 700 * time.Millisecond
 
 	MaxVerifyWindows = 6
 	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration // 30 seconds
