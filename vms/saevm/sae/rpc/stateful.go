@@ -217,7 +217,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 // [saexec.NullReceiptStore] to skip end-of-block operations and receipt
 // broadcasting.
 //
-// txIndex MUST be in range; [backend.StateAtTransaction] validates it.
+// txIndex MUST be in range as [backend.StateAtTransaction] validates it.
 func (b *backend) stateAtTransactionSAE(ethB *types.Block, txIndex int) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
 	var bCtx vm.BlockContext
 	if b.LastExecuted().NumberU64() < ethB.NumberU64()-1 {
