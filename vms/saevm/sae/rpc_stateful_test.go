@@ -90,8 +90,9 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 	}...)
 }
 
-// TestStateAtTransactionWithSynchronousParent covers tracing block 1 when the
-// synchronous parent's XDB entry is absent.
+// TestStateAtTransactionWithSynchronousParent asserts that a transaction can be
+// traced when its block's synchronous parent is absent from the
+// execution-results DB, as on an archival or state-synced node.
 func TestStateAtTransactionWithSynchronousParent(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
@@ -102,13 +103,11 @@ func TestStateAtTransactionWithSynchronousParent(t *testing.T) {
 		GasPrice: big.NewInt(1),
 	})
 	b := sut.runConsensusLoop(t, tracedTx)
-	require.Equal(t, uint64(1), b.NumberU64(), "runConsensusLoop(...) block number")
+	require.Equalf(t, uint64(1), b.NumberU64(), "%T.NumberU64()", b)
 
 	// Simulate an archival or state-synced node with the synchronous header but
 	// no persisted SAE execution results for it.
-	emptyXDB := saetest.NewExecutionResultsDB()
-	sut.rawVM.xdb = emptyXDB
-	sut.rawVM.toClose = append(sut.rawVM.toClose, &emptyXDB)
+	sut.rawVM.xdb = saetest.NewExecutionResultsDB()
 
 	gethBackend := sut.rawVM.GethRPCBackends()
 	_, _, sdb, release, err := gethBackend.StateAtTransaction(ctx, b.EthBlock(), 0, 0)
