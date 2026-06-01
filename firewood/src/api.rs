@@ -307,6 +307,19 @@ pub trait Db {
     ///   operations to apply
     #[expect(clippy::missing_errors_doc)]
     fn propose(&self, data: impl IntoBatchIter) -> Result<Self::Proposal<'_>, Error>;
+
+    /// Apply a batch to the latest revision, commit it, and return the committed root hash.
+    ///
+    /// This is a convenience method for the common one-shot write path. It returns the
+    /// proposal's root hash instead of reading [`Db::root_hash`] after commit, so callers
+    /// receive the root for the revision this method committed.
+    #[expect(clippy::missing_errors_doc)]
+    fn update(&self, data: impl IntoBatchIter) -> Result<Option<HashKey>, Error> {
+        let proposal = self.propose(data)?;
+        let root_hash = DbView::root_hash(&proposal);
+        proposal.commit()?;
+        Ok(root_hash)
+    }
 }
 
 /// A view of the database at a specific time.

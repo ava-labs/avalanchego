@@ -763,6 +763,59 @@ mod test {
     }
 
     #[test]
+    fn test_update_commits_batch_and_returns_root() {
+        let db = TestDb::new();
+
+        let root = db
+            .update(vec![BatchOp::Put {
+                key: b"k",
+                value: b"v",
+            }])
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(db.root_hash().as_ref(), Some(&root));
+
+        let historical = db.revision(root.clone()).unwrap();
+        assert_eq!(&*historical.val(b"k").unwrap().unwrap(), b"v");
+
+        let next_root = db
+            .update(vec![BatchOp::Put {
+                key: b"k",
+                value: b"v2",
+            }])
+            .unwrap()
+            .unwrap();
+
+        assert_ne!(root, next_root);
+        assert_eq!(&*historical.val(b"k").unwrap().unwrap(), b"v");
+        assert_eq!(
+            &*db.revision(next_root).unwrap().val(b"k").unwrap().unwrap(),
+            b"v2"
+        );
+    }
+
+    #[test]
+    fn test_update_returns_empty_root_after_delete_all() {
+        let db = TestDb::new();
+
+        db.update(vec![BatchOp::Put {
+            key: b"k",
+            value: b"v",
+        }])
+        .unwrap();
+
+        let root = db
+            .update(vec![BatchOp::<&[u8], &[u8]>::Delete {
+                key: b"k".as_slice(),
+            }])
+            .unwrap();
+
+        assert_eq!(root, TrieHash::default_root_hash());
+        assert_eq!(db.root_hash(), TrieHash::default_root_hash());
+    }
+
+    #[test]
     fn test_proposal_reads() {
         let db = TestDb::new();
         let batch = vec![BatchOp::Put {
