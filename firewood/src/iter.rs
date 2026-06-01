@@ -810,7 +810,7 @@ mod tests {
     #[test]
     fn key_value_iterate_empty() {
         let merkle = create_test_merkle();
-        let iter = merkle.key_value_iter_from_key(b"x".to_vec().into_boxed_slice());
+        let iter = merkle.key_value_iter_from_key(b"x");
         assert_iterator_is_exhausted(iter);
     }
 
@@ -1058,7 +1058,7 @@ mod tests {
 
         // Test with start key
         for i in 0..=max {
-            let mut iter = merkle.key_value_iter_from_key(vec![i].into_boxed_slice());
+            let mut iter = merkle.key_value_iter_from_key(&[i]);
             for j in 0..=max {
                 let expected_key = vec![i, j];
                 let expected_value = vec![i, j];
@@ -1187,7 +1187,7 @@ mod tests {
             merkle.insert(key, key.clone().into_boxed_slice()).unwrap();
         }
 
-        let mut iter = merkle.key_value_iter_from_key(vec![intermediate].into_boxed_slice());
+        let mut iter = merkle.key_value_iter_from_key(&[intermediate]);
 
         let first_expected = key_values[1].as_slice();
         let first = iter.next().unwrap().unwrap();
@@ -1233,7 +1233,7 @@ mod tests {
         let start = keys.iter().position(|key| key[0] == branch_path).unwrap();
         let keys = &keys[start..];
 
-        let mut iter = merkle.key_value_iter_from_key(vec![branch_path].into_boxed_slice());
+        let mut iter = merkle.key_value_iter_from_key(&[branch_path]);
 
         for key in keys {
             let next = iter.next().unwrap().unwrap();
@@ -1281,7 +1281,7 @@ mod tests {
         let start = keys.iter().position(|key| key == &branch_key).unwrap();
         let keys = &keys[start..];
 
-        let mut iter = merkle.key_value_iter_from_key(branch_key.into_boxed_slice());
+        let mut iter = merkle.key_value_iter_from_key(&branch_key);
 
         for key in keys {
             let next = iter.next().unwrap().unwrap();
@@ -1311,7 +1311,7 @@ mod tests {
 
         let keys = &keys[(missing as usize)..];
 
-        let mut iter = merkle.key_value_iter_from_key(vec![missing].into_boxed_slice());
+        let mut iter = merkle.key_value_iter_from_key(&[missing]);
 
         for key in keys {
             let next = iter.next().unwrap().unwrap();
@@ -1337,7 +1337,7 @@ mod tests {
             merkle.insert(&key, key.clone().into()).unwrap();
         });
 
-        let iter = merkle.key_value_iter_from_key(vec![start_key].into_boxed_slice());
+        let iter = merkle.key_value_iter_from_key(&[start_key]);
 
         assert_iterator_is_exhausted(iter);
     }
@@ -1358,7 +1358,7 @@ mod tests {
             })
             .collect();
 
-        let mut iter = merkle.key_value_iter_from_key(vec![start_key].into_boxed_slice());
+        let mut iter = merkle.key_value_iter_from_key(&[start_key]);
 
         for key in keys {
             let next = iter.next().unwrap().unwrap();
@@ -1390,7 +1390,7 @@ mod tests {
 
         let keys = &keys[((missing >> 4) as usize)..];
 
-        let mut iter = merkle.key_value_iter_from_key(vec![missing].into_boxed_slice());
+        let mut iter = merkle.key_value_iter_from_key(&[missing]);
 
         for key in keys {
             let next = iter.next().unwrap().unwrap();
@@ -1409,7 +1409,7 @@ mod tests {
         let mut merkle = create_test_merkle();
         merkle.insert(&key, key.into()).unwrap();
 
-        let iter = merkle.key_value_iter_from_key(greater_key);
+        let iter = merkle.key_value_iter_from_key(&greater_key);
 
         assert_iterator_is_exhausted(iter);
     }
@@ -1434,7 +1434,7 @@ mod tests {
 
         let keys = &keys[((greatest >> 4) as usize)..];
 
-        let mut iter = merkle.key_value_iter_from_key(vec![greatest].into_boxed_slice());
+        let mut iter = merkle.key_value_iter_from_key(&[greatest]);
 
         for key in keys {
             let next = iter.next().unwrap().unwrap();

@@ -1158,12 +1158,8 @@ impl<T: TrieReader> Merkle<T> {
         PathIterator::new(&self.nodestore, key)
     }
 
-    pub(super) fn key_value_iter_from_key<K: AsRef<[u8]>>(
-        &self,
-        key: K,
-    ) -> MerkleKeyValueIter<'_, T> {
-        // TODO danlaine: change key to &[u8]
-        MerkleKeyValueIter::from_key(&self.nodestore, key.as_ref())
+    pub(super) fn key_value_iter_from_key(&self, key: &[u8]) -> MerkleKeyValueIter<'_, T> {
+        MerkleKeyValueIter::from_key(&self.nodestore, key)
     }
 
     /// Generate a cryptographic proof for a range of key-value pairs in the Merkle trie.
