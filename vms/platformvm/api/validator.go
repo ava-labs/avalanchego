@@ -88,7 +88,7 @@ type PermissionlessValidator struct {
 
 	// Auto-renewed validators.
 	// The owner who can modify auto-renewed validator config, if applicable.
-	ConfigOwner *Owner `json:"configOwner,omitempty"`
+	ValidatorAuthority *Owner `json:"validatorAuthority,omitempty"`
 	// The validation cycle duration in seconds, if applicable.
 	Period *json.Uint64 `json:"period,omitempty"`
 	// Percentage of rewards to auto-compound, if applicable.
