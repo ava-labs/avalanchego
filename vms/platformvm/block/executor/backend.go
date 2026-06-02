@@ -51,7 +51,7 @@ func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
 	return b.state, blkID == b.state.GetLastAccepted()
 }
 
-func (b *backend) getOnAbortState(blkID ids.ID) (state.Diff, bool) {
+func (b *backend) getOnAbortState(blkID ids.ID) (*state.Diff, bool) {
 	state, ok := b.blkIDToState[blkID]
 	if !ok || state.onAbortState == nil {
 		return nil, false
@@ -59,7 +59,7 @@ func (b *backend) getOnAbortState(blkID ids.ID) (state.Diff, bool) {
 	return state.onAbortState, true
 }
 
-func (b *backend) getOnCommitState(blkID ids.ID) (state.Diff, bool) {
+func (b *backend) getOnCommitState(blkID ids.ID) (*state.Diff, bool) {
 	state, ok := b.blkIDToState[blkID]
 	if !ok || state.onCommitState == nil {
 		return nil, false

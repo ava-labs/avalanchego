@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
+var _ UnsignedTx = (*SetAutoRenewedValidatorConfigTx)(nil)
+
 type SetAutoRenewedValidatorConfigTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`

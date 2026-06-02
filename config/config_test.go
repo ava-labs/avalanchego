@@ -896,6 +896,11 @@ func TestGetStakingSigner(t *testing.T) {
 			// Avoid using the mainnet network name by default because not all
 			// builds support mainnet configurations.
 			v.Set(NetworkNameKey, constants.UnitTestName)
+
+			// Set the data dir to a temporary directory to keep this test hermetic.
+			// Otherwise GetNodeConfig may create default paths under $HOME.
+			v.Set(DataDirKey, dataDir)
+
 			for key, value := range tt.config {
 				v.Set(key, value)
 			}
@@ -949,6 +954,10 @@ func TestGetDiskSpaceConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			v := setupViperFlags()
+
+			// Set the data dir to a temporary directory to keep this test hermetic.
+			// Otherwise GetNodeConfig may create default paths under $HOME.
+			v.Set(DataDirKey, t.TempDir())
 
 			for key, value := range tt.config {
 				v.Set(key, value)

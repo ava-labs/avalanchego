@@ -1,0 +1,67 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
+go_library(
+    name = "state",
+    srcs = [
+        "codec.go",
+        "state.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/state",
+    deps = [
+        "//chains/atomic",
+        "//codec",
+        "//codec/linearcodec",
+        "//database",
+        "//database/prefixdb",
+        "//graft/coreth/plugin/evm/atomic/state",
+        "//ids",
+        "//snow",
+        "//utils/units",
+        "//utils/wrappers",
+        "//vms/evm/database",
+        "//vms/saevm/cchain/tx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//trie/trienode",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_ava_labs_libevm//triedb/hashdb",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "state_test",
+    srcs = ["state_test.go"],
+    embed = [":state"],
+    deps = [
+        "//chains/atomic",
+        "//database",
+        "//database/memdb",
+        "//database/prefixdb",
+        "//database/versiondb",
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/atomic/state",
+        "//ids",
+        "//snow/snowtest",
+        "//utils/logging",
+        "//utils/logging/loggingtest",
+        "//vms/components/avax",
+        "//vms/saevm/cchain/tx",
+        "//vms/saevm/cchain/tx/txtest",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

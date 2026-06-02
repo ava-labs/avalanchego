@@ -4,20 +4,28 @@
 package node
 
 import (
+	"context"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/networking/router/routermock"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 const numValidators = 5_000
+
+type testExternalHandler struct{}
+
+func (*testExternalHandler) Connected(ids.NodeID, *version.Application, ids.ID) {}
+
+func (*testExternalHandler) Disconnected(ids.NodeID) {}
+
+func (*testExternalHandler) HandleInbound(context.Context, *message.InboundMessage) {}
 
 // Tests that reconnects that mutate the beacon manager's current total stake
 // weight is consistent. Test is not deterministic.
@@ -35,27 +43,18 @@ func TestBeaconManager_DataRace(t *testing.T) {
 
 	wg := &sync.WaitGroup{}
 
-	ctrl := gomock.NewController(t)
-	mockRouter := routermock.NewRouter(ctrl)
-
 	b := beaconManager{
-		Router:                  mockRouter,
+		ExternalHandler:         &testExternalHandler{},
 		beacons:                 validatorSet,
 		requiredConns:           numValidators,
 		onSufficientlyConnected: make(chan struct{}),
 	}
 
 	// connect numValidators validators, each with a weight of 1
-	wg.Add(2 * numValidators)
-	mockRouter.EXPECT().
-		Connected(gomock.Any(), gomock.Any(), gomock.Any()).
-		Times(2 * numValidators).
-		Do(func(ids.NodeID, *version.Application, ids.ID) {
-			wg.Done()
-		})
-
+	wg.Add(numValidators)
 	for _, nodeID := range validatorIDs {
 		go func() {
+			defer wg.Done()
 			b.Connected(nodeID, version.Current, constants.PrimaryNetworkID)
 			b.Connected(nodeID, version.Current, ids.GenerateTestID())
 		}()
@@ -67,15 +66,11 @@ func TestBeaconManager_DataRace(t *testing.T) {
 
 	// disconnect numValidators validators
 	wg.Add(numValidators)
-	mockRouter.EXPECT().
-		Disconnected(gomock.Any()).
-		Times(numValidators).
-		Do(func(ids.NodeID) {
-			wg.Done()
-		})
-
 	for _, nodeID := range validatorIDs {
-		go b.Disconnected(nodeID)
+		go func() {
+			defer wg.Done()
+			b.Disconnected(nodeID)
+		}()
 	}
 	wg.Wait()
 

@@ -19,13 +19,13 @@ import (
 
 func TestGetState(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 	s := statetest.New(t, statetest.Config{})
+	onAcceptState, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
 	var (
-		onAcceptState = state.NewMockDiff(ctrl)
-		blkID1        = ids.GenerateTestID()
-		blkID2        = ids.GenerateTestID()
-		b             = &backend{
+		blkID1 = ids.GenerateTestID()
+		blkID2 = ids.GenerateTestID()
+		b      = &backend{
 			state: s,
 			blkIDToState: map[ids.ID]*blockState{
 				blkID1: {

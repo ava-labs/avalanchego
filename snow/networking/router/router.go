@@ -29,7 +29,7 @@ type Router interface {
 	Initialize(
 		nodeID ids.NodeID,
 		log logging.Logger,
-		timeouts timeout.Manager,
+		timeouts *timeout.Manager,
 		shutdownTimeout time.Duration,
 		criticalChains set.Set[ids.ID],
 		sybilProtectionEnabled bool,
