@@ -268,6 +268,60 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	require.Equal(indexedExportTx.ID(), exportTx.ID(), "expected ID of indexed import tx to match original txID")
 }
 
+// TestCommitAtomicTrieOnShutdown verifies that shutting down the VM persists the
+// atomic trie at the last accepted height, so a restart needs no re-indexing.
+func TestCommitAtomicTrieOnShutdown(t *testing.T) {
+	require := require.New(t)
+	ctx := t.Context()
+	fork := upgradetest.ApricotPhase2
+
+	vm := newAtomicTestVM()
+	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{Fork: &fork})
+	require.NoError(addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
+		vmtest.TestShortIDAddrs[0]: 50_000_000,
+	}))
+
+	// Accept one atomic import block below the default commit interval (4096),
+	// so the trie is not yet committed at its last accepted height.
+	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
+	require.NoError(err)
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
+	_, err = vm.WaitForEvent(ctx)
+	require.NoError(err)
+	blk, err := vm.BuildBlock(ctx)
+	require.NoError(err)
+	require.NoError(blk.Verify(ctx))
+	require.NoError(vm.SetPreference(ctx, blk.ID()))
+	require.NoError(blk.Accept(ctx))
+
+	wantRoot := vm.AtomicBackend.AtomicTrie().LastAcceptedRoot()
+	_, commitHeight := vm.AtomicBackend.AtomicTrie().LastCommitted()
+	require.Less(commitHeight, blk.Height(), "atomic trie should not yet be committed at the last accepted height")
+
+	// Shut down (committing the trie), then restart from the same database.
+	require.NoError(vm.Shutdown(ctx))
+
+	vmtest.ResetMetrics(tvm.Ctx)
+	restartedVM := newAtomicTestVM()
+	require.NoError(restartedVM.Initialize(
+		ctx,
+		tvm.Ctx,
+		tvm.DB,
+		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork])),
+		nil,
+		nil,
+		nil,
+		tvm.AppSender,
+	))
+	defer func() {
+		require.NoError(restartedVM.Shutdown(ctx))
+	}()
+
+	gotRoot, gotHeight := restartedVM.AtomicBackend.AtomicTrie().LastCommitted()
+	require.Equal(blk.Height(), gotHeight)
+	require.Equal(wantRoot, gotRoot)
+}
+
 func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string) {
 	require := require.New(t)
 	importAmount := uint64(10000000)
