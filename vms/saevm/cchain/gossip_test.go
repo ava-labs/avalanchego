@@ -31,6 +31,17 @@ func (s *SUT) assertTxBloomContains(tb testing.TB, txIDs ...ids.ID) {
 	}
 }
 
+// assertTxBloomEmpty asserts that the transaction bloom is empty.
+//
+// Asserting the bloom doesn't contain a specific transaction would be flaky
+// because of false positives.
+func (s *SUT) assertTxBloomEmpty(tb testing.TB) {
+	tb.Helper()
+
+	filter, _ := s.gossipSet.BloomFilter()
+	assert.Zero(tb, filter.Count(), "bloom filter should be empty")
+}
+
 // TestPushGossip verifies that a cross-chain transaction issued to an API node
 // is push-gossiped to a validator for block building.
 func TestPushGossip(t *testing.T) {
@@ -87,7 +98,6 @@ func TestPullGossip(t *testing.T) {
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
 	}
-	vdrA.assertTxBloomContains(t, stx.ID())
 }
 
 // TestPushGossipAfterPullGossip verifies that a validator which previously
@@ -122,7 +132,8 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 	e, err := vdrA.WaitForEvent(vdrACtx)
 	require.NoErrorf(t, err, "%T.WaitForEvent()", vdrA.VM)
 	assert.Equalf(t, common.PendingTxs, e, "%T.WaitForEvent() event", vdrA.VM)
-	vdrA.assertTxBloomContains(t, stx.ID())
+
+	vdrB.assertTxBloomEmpty(t)
 
 	// Even though the validator learned about stx via pull gossip, they should
 	// still push gossip stx to vdrB if they see it over the API.
