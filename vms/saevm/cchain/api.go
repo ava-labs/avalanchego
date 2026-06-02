@@ -35,7 +35,7 @@ import (
 // reflects on them to dispatch requests.
 type service struct {
 	ctx          *snow.Context
-	txpool       *gossip.BloomSet[*gossipTx]
+	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
 	state        *state.State
 
@@ -46,7 +46,7 @@ type service struct {
 
 func newService(
 	ctx *snow.Context,
-	pool *gossip.BloomSet[*gossipTx],
+	gossipSet *gossip.BloomSet[*gossipTx],
 	pushGossiper *gossip.PushGossiper[*gossipTx],
 	db *state.State,
 ) (*service, error) {
@@ -63,7 +63,7 @@ func newService(
 
 	return &service{
 		ctx:          ctx,
-		txpool:       pool,
+		gossipSet:    gossipSet,
 		pushGossiper: pushGossiper,
 		state:        db,
 
@@ -222,12 +222,13 @@ func (s *service) IssueTx(_ *http.Request, args *api.FormattedTx, resp *api.JSON
 	if err != nil {
 		return err
 	}
-	if err := s.txpool.Add(toGossipTx(t)); err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
+	gossipTx := toGossipTx(t)
+	if err := s.gossipSet.Add(gossipTx); err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
 		return fmt.Errorf("%w: %w", errIssuingTx, err)
 	}
 
 	// Even if already in the pool from a peer's gossip, push it to peers.
-	s.pushGossiper.Add(toGossipTx(t))
+	s.pushGossiper.Add(gossipTx)
 
 	resp.TxID = t.ID()
 	return nil
