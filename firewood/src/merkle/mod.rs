@@ -18,6 +18,7 @@ use crate::api::{
 };
 use crate::iter::{MerkleKeyValueIter, PathIterator};
 use crate::merkle::changes::DiffMerkleNodeStream;
+use crate::proofs::ProofEdge;
 use crate::proofs::change::ChangeProof;
 use crate::{
     ChangeProofVerificationContext, Proof, ProofCollection, ProofError, ProofNode, RangeProof,
@@ -133,11 +134,13 @@ fn verify_edge<H: ProofCollection + ?Sized>(
     edge_kv: Option<(&[u8], &[u8])>,
     edge_proof: &Proof<H>,
     root_hash: &TrieHash,
-    bound_is_lower: bool,
+    edge: ProofEdge,
 ) -> Result<(), api::Error> {
     if edge_proof.is_empty() {
         return Ok(());
     }
+
+    let bound_is_lower = matches!(edge, ProofEdge::Left);
 
     // Validate bound vs edge key ordering
     if let (Some(bound), Some((edge_key, _))) = (requested_bound, edge_kv) {
@@ -156,13 +159,28 @@ fn verify_edge<H: ProofCollection + ?Sized>(
         }
     }
 
+    // Any `UnexpectedHash` bubbling up from this edge's `verify()` walk is
+    // by construction an edge-proof failure — re-stamp it with which edge.
+    let annotate = |e: ProofError| match e {
+        ProofError::UnexpectedHash { expected, actual } => ProofError::EdgeProofHashMismatch {
+            edge,
+            expected,
+            actual,
+        },
+        other => other,
+    };
+
     // Verify the proof for this edge
     if let Some(bound) = requested_bound {
         let expected_value: Option<&[u8]> =
             edge_kv.and_then(|(key, value)| (bound == key).then_some(value));
-        edge_proof.verify(bound, expected_value, root_hash)?;
+        edge_proof
+            .verify(bound, expected_value, root_hash)
+            .map_err(|e| api::Error::ProofError(annotate(e)))?;
     } else if let Some((edge_key, edge_value)) = edge_kv {
-        edge_proof.verify(edge_key, Some(edge_value), root_hash)?;
+        edge_proof
+            .verify(edge_key, Some(edge_value), root_hash)
+            .map_err(|e| api::Error::ProofError(annotate(e)))?;
     }
 
     Ok(())
@@ -694,7 +712,7 @@ pub fn verify_range_proof<H: ProofCollection<Node = ProofNode>>(
             left_edge_kv,
             proof.start_proof(),
             root_hash,
-            true,
+            ProofEdge::Left,
         )?;
     }
 
@@ -716,7 +734,13 @@ pub fn verify_range_proof<H: ProofCollection<Node = ProofNode>>(
     let right_boundary = right_edge(proof.end_proof().as_ref(), last_kv_bytes, last_key_bytes);
     match &right_boundary {
         RightBoundary::InRange(bound) => {
-            verify_edge(*bound, right_edge_kv, proof.end_proof(), root_hash, false)?;
+            verify_edge(
+                *bound,
+                right_edge_kv,
+                proof.end_proof(),
+                root_hash,
+                ProofEdge::Right,
+            )?;
         }
         RightBoundary::OutOfRange(bound) => {
             // `right_edge` only returns `OutOfRange(K)` when `K > last_kv`
@@ -895,8 +919,12 @@ fn verify_range_proof_root_hash<H: ProofCollection<Node = ProofNode>>(
     let computed =
         compute_root_hash_with_proofs(&root_node, &[], &proof_node_map, &outside_children);
 
-    if computed != root_hash.clone().into_hash_type() {
-        return Err(api::Error::ProofError(ProofError::UnexpectedHash));
+    let expected = root_hash.clone().into_hash_type();
+    if computed != expected {
+        return Err(api::Error::ProofError(ProofError::UnexpectedHash {
+            expected,
+            actual: computed,
+        }));
     }
 
     Ok(())

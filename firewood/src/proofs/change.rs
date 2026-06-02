@@ -7,6 +7,7 @@ use crate::{
     Proof, ProofCollection, ProofError,
     api::{self, FrozenChangeProof, HashKey},
     db::BatchOp,
+    proofs::ProofEdge,
 };
 
 /// A change proof can demonstrate that by applying the provided array of `BatchOp`s to a Merkle
@@ -226,10 +227,20 @@ fn verify_boundary_proof<C: ProofCollection>(
     end_root: &HashKey,
     boundary_op: Option<&FrozenBatchOp>,
     mismatch_error: ProofError,
+    edge: ProofEdge,
 ) -> Result<(), api::Error> {
     let result = match proof.value_digest(key, end_root) {
         Ok(result) => result,
         Err(ProofError::Empty) => None,
+        // Any `UnexpectedHash` from this boundary `value_digest` walk is by
+        // construction an edge-proof failure — re-stamp it with which edge.
+        Err(ProofError::UnexpectedHash { expected, actual }) => {
+            return Err(api::Error::ProofError(ProofError::EdgeProofHashMismatch {
+                edge,
+                expected,
+                actual,
+            }));
+        }
         Err(e) => return Err(api::Error::ProofError(e)),
     };
 
@@ -399,6 +410,7 @@ pub fn verify_change_proof_structure(
             &end_root,
             boundary_op,
             ProofError::StartProofOperationMismatch,
+            ProofEdge::Left,
         )?;
     }
 
@@ -440,6 +452,7 @@ pub fn verify_change_proof_structure(
             &end_root,
             end_boundary_op,
             ProofError::EndProofOperationMismatch,
+            ProofEdge::Right,
         )?;
     }
 

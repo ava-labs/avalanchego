@@ -55,6 +55,25 @@ use thiserror::Error;
 
 use crate::merkle::Value;
 
+/// Which edge of a range proof was being verified when an error occurred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ProofEdge {
+    /// The start (lower-bound) proof.
+    Left,
+    /// The end (upper-bound) proof.
+    Right,
+}
+
+impl std::fmt::Display for ProofEdge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProofEdge::Left => f.write_str("left"),
+            ProofEdge::Right => f.write_str("right"),
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 #[non_exhaustive]
 /// Reasons why a proof is invalid
@@ -63,9 +82,28 @@ pub enum ProofError {
     #[error("non-monotonic range increase")]
     NonMonotonicIncreaseRange,
 
-    /// Unexpected hash
-    #[error("unexpected hash")]
-    UnexpectedHash,
+    /// A node's hash did not match the hash expected by its parent (or the
+    /// root hash for the first proof node).
+    #[error("hash mismatch (expected {expected}, was {actual})")]
+    UnexpectedHash {
+        /// Hash the verifier expected (from the parent node or `root_hash`).
+        expected: HashType,
+        /// Hash actually computed from the proof node.
+        actual: HashType,
+    },
+
+    /// Hash mismatch while verifying one of a range or change proof's edge
+    /// proofs. Carries which edge tripped, so callers can tell a tampered
+    /// start boundary apart from a tampered end boundary.
+    #[error("hash mismatch on {edge} edge proof (expected {expected}, was {actual})")]
+    EdgeProofHashMismatch {
+        /// Which edge of the proof failed.
+        edge: ProofEdge,
+        /// Hash the verifier expected.
+        expected: HashType,
+        /// Hash actually computed from the edge proof node.
+        actual: HashType,
+    },
 
     /// Unexpected value
     #[error("unexpected value")]
@@ -444,6 +482,14 @@ impl<T: ProofCollection + ?Sized> Proof<T> {
     ///   of the next node's key in the proof.
     /// - [`ProofError::NodeNotInTrie`] — the child pointer from one node to the
     ///   next is absent, meaning the proof path does not exist in the trie.
+    ///
+    /// # Note
+    ///
+    /// Callers verifying a range or change proof's edge proof (e.g.
+    /// `verify_edge`, `verify_boundary_proof`) intercept
+    /// [`ProofError::UnexpectedHash`] from this walk and surface
+    /// [`ProofError::EdgeProofHashMismatch`] instead, annotated with which edge
+    /// tripped.
     pub fn value_digest<K: AsRef<[u8]>>(
         &self,
         key: K,
@@ -459,8 +505,12 @@ impl<T: ProofCollection + ?Sized> Proof<T> {
 
         let mut iter = self.0.as_ref().iter().peekable();
         while let Some(node) = iter.next() {
-            if node.to_hash() != expected_hash {
-                return Err(ProofError::UnexpectedHash);
+            let actual_hash = node.to_hash();
+            if actual_hash != expected_hash {
+                return Err(ProofError::UnexpectedHash {
+                    expected: expected_hash,
+                    actual: actual_hash,
+                });
             }
 
             // Assert that only nodes whose keys are an even number of nibbles

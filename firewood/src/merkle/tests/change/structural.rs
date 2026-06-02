@@ -228,7 +228,34 @@ fn test_boundary_proof_rejects_wrong_root() {
     .unwrap_err();
     assert!(matches!(
         err,
-        api::Error::ProofError(crate::ProofError::UnexpectedHash)
+        api::Error::ProofError(crate::ProofError::EdgeProofHashMismatch {
+            edge: crate::ProofEdge::Left,
+            ..
+        })
+    ));
+}
+
+/// Right-edge companion to `test_boundary_proof_rejects_wrong_root`: with no
+/// `start_key` the start proof is empty and skipped, so the wrong-root failure
+/// surfaces on the *end* boundary and must be annotated `ProofEdge::Right`.
+#[test]
+fn test_boundary_proof_rejects_wrong_root_right_edge() {
+    let (db, _dir) = setup_db![(b"\x10", b"v0"), (b"\xa0", b"v1")];
+    let (root1, root2) = setup_2nd_commit!(db, [(b"\x50", b"mid")]);
+
+    let proof = db
+        .change_proof(root1, root2, None, Some(b"\xa0"), None)
+        .unwrap();
+    assert!(proof.start_proof().is_empty());
+    let err =
+        verify_change_proof_structure(&proof, api::HashKey::empty(), None, Some(b"\xa0"), None)
+            .unwrap_err();
+    assert!(matches!(
+        err,
+        api::Error::ProofError(crate::ProofError::EdgeProofHashMismatch {
+            edge: crate::ProofEdge::Right,
+            ..
+        })
     ));
 }
 

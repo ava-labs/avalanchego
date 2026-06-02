@@ -157,7 +157,7 @@ pub mod proofs;
 pub use merkle::{Key, Value, verify_change_proof_root_hash, verify_range_proof};
 pub use proofs::{
     ChangeProof, ChangeProofVerificationContext, EmptyProofCollection, InvalidHeader, KeyRange,
-    Proof, ProofCollection, ProofError, ProofNode, ProofType, RangeProof,
+    Proof, ProofCollection, ProofEdge, ProofError, ProofNode, ProofType, RangeProof,
     RangeProofVerificationContext, ReadError, find_next_key_after_change_proof,
     find_next_key_after_range_proof, verify_change_proof_structure, verify_range_proof_structure,
 };

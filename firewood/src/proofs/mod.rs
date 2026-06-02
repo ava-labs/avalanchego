@@ -308,7 +308,7 @@ pub use self::range::{
 };
 pub use self::reader::ReadError;
 pub use self::types::{
-    EmptyProofCollection, Proof, ProofCollection, ProofError, ProofNode, ProofType,
+    EmptyProofCollection, Proof, ProofCollection, ProofEdge, ProofError, ProofNode, ProofType,
 };
 
 pub(super) mod magic {
