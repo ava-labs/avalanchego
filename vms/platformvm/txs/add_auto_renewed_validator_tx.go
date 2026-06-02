@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	_ UnsignedTx  = (*SetAutoRenewedValidatorConfigTx)(nil)
+	_ UnsignedTx  = (*AddAutoRenewedValidatorTx)(nil)
 	_ ValidatorTx = (*AddAutoRenewedValidatorTx)(nil)
 )
 
@@ -164,7 +164,7 @@ func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	}
 
 	if err := verify.All(tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner, tx.ValidatorAuthority); err != nil {
-		return fmt.Errorf("failed to verify signer, or rewards owners: %w", err)
+		return fmt.Errorf("failed to verify signer, rewards owners or validator authority: %w", err)
 	}
 
 	if tx.Signer.Key() == nil {
