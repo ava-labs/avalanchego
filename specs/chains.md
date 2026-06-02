@@ -1,584 +1,397 @@
-# Chains, Genesis, Node Initialization, Configuration, and Upgrades
+# Chains, Subnets, and Cross-Chain Atomic Memory
 
-## 1. Chain Manager (`chains/`)
+## 1. Purpose
 
-### 1.1 Role
+This document specifies the **orchestration layer** that sits between the node and the
+running blockchains: the **chain `Manager`** (`chains/`), the **`Subnet` abstraction**
+(`subnets/`), and the **cross-chain atomic shared memory** (`chains/atomic/`).
 
-The chain manager owns the full lifecycle of every blockchain running on the node:
-- Creates chains (from P-Chain `CreateChainTx` or direct genesis).
-- Associates VMs with chains.
-- Registers chains with the consensus router.
-- Provides lookup by chain ID or alias.
+The chain manager is the component that turns an abstract chain description
+(`ChainID` + `SubnetID` + `VMID` + genesis) into a fully wired, running blockchain:
+a database partition, a VM wrapped in a stack of decorators, a consensus engine, a
+network message handler, a sender, and a router registration. Subnets group chains,
+hold their consensus parameters, and track bootstrapping status. Atomic memory is the
+shared database that lets one chain (e.g. the X-Chain) hand UTXOs to another chain
+(e.g. the P- or C-Chain) atomically.
 
-### 1.2 Manager Interface
+This document covers **wiring and orchestration**. The internals of each VM
+(see [platformvm.md](platformvm.md), [avm.md](avm.md), [evm.md](evm.md)) and the
+consensus algorithms themselves (see [consensus.md](consensus.md),
+[simplex.md](simplex.md)) are cross-referenced, not duplicated.
 
-```go
-// chains/manager.go
-type Manager interface {
-    ids.Aliaser                   // alias ↔ chain ID resolution
-    ids.AliasReader
+## 2. Responsibilities & Scope
 
-    QueueChainCreation(ChainParameters)
-    SubnetID(chainID ids.ID) (ids.ID, error)
-    IsBootstrapped(chainID ids.ID) bool
-    Subnets() *Subnets
-}
-```
+**In scope (`chains` package):**
+- Building a chain end-to-end: DB prefixing, VM construction & wrapper stack, engine,
+  bootstrapper, state-syncer, handler, sender, router registration, health checks,
+  metrics.
+- Selecting the engine family (Snowman linear chain vs. Avalanche DAG) from the VM type.
+- Queuing and ordering chain creation (P-Chain first, others after P-Chain bootstraps).
+- Chain aliasing, registrants, and the `LinearizableVM` wrapper.
 
-```go
-type ChainParameters struct {
-    ID           ids.ID         // unique chain ID
-    SubnetID     ids.ID         // subnet that validates this chain
-    GenesisData  []byte         // genesis bytes
-    VMID         ids.ID         // VM to use
-    FxIDs        []ids.ID       // feature extensions
-    CustomBeacons validators.Manager  // only for P-chain
-}
-```
+**In scope (`subnets` package):**
+- The `Subnet` abstraction: tracked bootstrapping chains, consensus config, and the
+  validator-only/allow-list access policy.
 
-### 1.3 Chain Creation Flow
+**In scope (`chains/atomic` package):**
+- The shared-memory model used for X↔P↔C atomic transfers: `Memory`, `SharedMemory`,
+  `Apply`/`Get`/`Indexed`, prefixed value/index databases, atomic batch commits, and
+  the gRPC plugin transport (`gsharedmemory`).
 
-```
-P-Chain accepts CreateChainTx
-  → P-Chain calls chainManager.QueueChainCreation(params)
-     → Appended to chainsQueue (unbounded deque)
-     
-Once P-Chain bootstraps:
-  → unblockChainCreatorCh signal sent
-  → dispatchChainCreator() goroutine wakes
-  → Processes queue one by one
-  → createChain(params)
-     1. Get VM factory from VMManager
-     2. Create DB prefixes (vm, vertex, bootstrapping)
-     3. Raw VM = vmFactory.New()
-     4. Optionally wrap: TracedVM → ProposerVM → MeterVM (see [VM Wrapping Order](vms.md#53-vm-wrapping-order))
-     5. vm.Initialize(genesis, config, fxs, appSender)
-     6. Create consensus engine (Snowman or Avalanche) — see [Consensus Engine](consensus.md#15-engine-state-machine)
-     7. Create handler (message dispatcher)
-     8. Register with router
-     9. Start handler goroutines
-```
+**Out of scope:** VM transaction logic, consensus voting (Snowball/Snowman/Simplex),
+networking transport, P-Chain validator-set management. These are cross-referenced.
 
-Failure handling: For **critical chains** (P, X, C), any error triggers node shutdown.
+## 3. Package / File Layout
 
-### 1.4 VM Wrapping Stack
+| Path | Role |
+| --- | --- |
+| `chains/manager.go` | The `Manager` interface and `manager` impl; the heart of chain wiring. |
+| `chains/subnets.go` | `Subnets` registry: per-node map of running `subnets.Subnet` instances. |
+| `chains/registrant.go` | `Registrant` interface — notified on each chain creation. |
+| `chains/linearizable_vm.go` | `initializeOnLinearizeVM` / `linearizeOnInitializeVM` wrappers for DAG→linear transition. |
+| `chains/test_manager.go` | No-op `Manager` for tests. |
+| `subnets/subnet.go` | `Subnet` interface + `subnet` impl (bootstrap tracking, `Allower`). |
+| `subnets/config.go` | `Config`: validator-only, allowed nodes, Snow/Simplex params, proposervm history. |
+| `subnets/no_op_allower.go` | `Allower` that permits everything. |
+| `chains/atomic/memory.go` | `Memory`: per-pair shared DB, ref-counted locks, `sharedID` hashing. |
+| `chains/atomic/shared_memory.go` | `SharedMemory` interface + `sharedMemory` impl (`Get`/`Indexed`/`Apply`). |
+| `chains/atomic/state.go` | `state`: value DB + trait index DB, tombstone semantics. |
+| `chains/atomic/prefixes.go` | inbound/outbound × smaller/larger value/index prefix scheme. |
+| `chains/atomic/writer.go` | `WriteAll`: replay & commit multiple batches atomically. |
+| `chains/atomic/codec.go` | Linear codec for `dbElement` and ID pairs. |
+| `chains/atomic/gsharedmemory/` | gRPC client/server exposing `SharedMemory` to out-of-process VMs. |
+| `chains/atomic/README.md` | Canonical narrative for the shared-memory design. |
 
-For Snowman (linear) chains:
-```
-User VM
-  ↓ TracedVM (if tracing enabled)
-  ↓ ProposerVM
-  ↓ MeterVM (if metering enabled)
-  ↓ TracedVM (second layer)
-```
+## 4. Core Types
 
-For Avalanche (DAG) chains (X-Chain before linearization):
-```
-User VM (LinearizableVM)
-  ↓ Dual-engine: Avalanche DAG engine + Snowman linearizer
-```
+### Manager (`chains/manager.go`)
 
-### 1.5 Registrant Pattern
+- `Manager` interface — `chains/manager.go:126`. Embeds `ids.Aliaser`. Key methods:
+  `QueueChainCreation` (`:133`), `AddRegistrant` (`:137`), `IsBootstrapped` (`:146`),
+  `StartChainCreator` (`:150`), `Shutdown` (`:152`).
+- `ChainParameters` — `chains/manager.go:156`: `{ID, SubnetID, GenesisData, VMID,
+  FxIDs, CustomBeacons}`. `CustomBeacons` is only set for the P-Chain.
+- `ManagerConfig` — `chains/manager.go:186`: the full set of node-supplied
+  dependencies (DB, `VMManager`, `Router`, `Net`, `Validators`, `AtomicMemory`,
+  `TimeoutManager`, `CriticalChains`, `Subnets`, upgrade schedule, etc.).
+- `manager` struct — `chains/manager.go:250`: holds the chain map
+  (`chains map[ids.ID]handler.Handler`), the blocking creation queue
+  (`chainsQueue`), the `unblockChainCreatorCh` gate, and per-subsystem metric
+  gatherers.
+- `chain` struct — `chains/manager.go:171`: `{Name, Context, VM, Handler}` — the
+  product of `buildChain`.
+- Construction: `New(*ManagerConfig)` — `chains/manager.go:290`.
 
-After each chain is created, `notifyRegistrants()` fires. Registrants implement:
-```go
-type Registrant interface {
-    RegisterChain(name string, ctx *snow.ConsensusContext, vm common.VM)
-}
-```
+### Subnet (`subnets/subnet.go`, `chains/subnets.go`)
 
-This is how API endpoints get registered: the [API Server](api.md#1-api-server-apiserver) is the primary registrant that calls `vm.CreateHandlers()` and mounts them. The indexer is another registrant added before the API server.
+- `Subnet` interface — `subnets/subnet.go:24`. Embeds `common.BootstrapTracker` and
+  `Allower`. Methods: `AddChain` (`:28`), `Config` (`:31`), `IsBootstrapped`,
+  `Bootstrapped`, `AllBootstrapped`, `IsAllowed`.
+- `subnet` impl — `subnets/subnet.go:36`: tracks `bootstrapping`/`bootstrapped` chain
+  sets and a `PreemptionSignal` fired when the last chain finishes bootstrapping
+  (`Bootstrapped`, `:63`).
+- `Allower.IsAllowed` — `subnets/subnet.go:92`: permits a peer if it is this node, the
+  subnet is not validator-only, the peer is a validator, or it is in `AllowedNodes`.
+- `subnets.Config` — `subnets/config.go:21`: `ValidatorOnly`, `AllowedNodes`,
+  `SnowParameters`/`SimplexParameters` (mutually exclusive — `ValidConsensusConfiguration`,
+  `:66`), and `ProposerNumHistoricalBlocks`.
+- `Subnets` registry — `chains/subnets.go:18`: node-level map from `SubnetID` to a
+  live `subnets.Subnet`. `GetOrCreate` (`:28`) lazily creates a subnet, defaulting its
+  config to the Primary Network config when none is supplied. `NewSubnets` (`:66`)
+  requires a Primary Network config and pre-creates the Primary Network subnet.
 
-### 1.6 Subnet Management (`chains/subnets.go`)
+### SharedMemory (`chains/atomic/`)
 
-```go
-type Subnets struct {
-    subnetLock    sync.RWMutex
-    subnetConfigs map[ids.ID]subnets.Config
-    subnets       map[ids.ID]subnets.Subnet  // subnet state tracking
-}
-```
+- `Memory` — `chains/atomic/memory.go:28`: owns the base `database.Database` and a map
+  of ref-counted locks keyed by `sharedID`. `NewSharedMemory(chainID)` (`:41`) returns
+  a per-chain view. `GetSharedDatabase`/`ReleaseSharedDatabase` (`:53`, `:64`) provide
+  a locked nested prefix DB for a chain pair.
+- `SharedMemory` interface — `chains/atomic/shared_memory.go:28`: `Get`, `Indexed`,
+  `Apply`. The per-chain impl `sharedMemory` (`:60`) embeds `{m, thisChainID}`.
+- `Requests` / `Element` — `chains/atomic/shared_memory.go:15`, `:22`: a batch of
+  `RemoveRequests` and `PutRequests`; an `Element` is `{Key, Value, Traits}`.
+- `state` — `chains/atomic/state.go:43`: a `valueDB` (key→`dbElement`) plus an
+  `indexDB` (trait→keys via `linkeddb`). `dbElement.Present` (`:25`) implements the
+  tombstone scheme.
+- `sharedID(id1, id2)` — `chains/atomic/memory.go:104`: orders the two IDs, marshals
+  the pair, and hashes it, so both chains derive the same shared partition.
 
-`GetOrCreate(subnetID)` creates a subnet on first access with default Snowball config. Each subnet tracks bootstrap state: a chain is considered bootstrapped when its consensus engine transitions to `NormalOp`.
+## 5. Diagrams
 
----
-
-## 2. Atomic Memory (`chains/atomic/`)
-
-Cross-chain transfers use atomic shared memory — a bidirectional, lock-protected key-value store pair for each pair of chains. Used by [AVM ImportTx/ExportTx](vms.md#15-transaction-execution-visitor-pattern), [PlatformVM ImportTx/ExportTx](platformvm.md#21-apricot-era), and [SAEVM C-Chain](vms.md#46-c-chain-wrapper-cchain).
-
-### 2.1 Architecture
-
-```go
-type Memory struct {
-    lock  sync.Mutex
-    locks map[ids.ID]*rcLock  // reference-counted lock per shared pair
-    db    database.Database
-}
-```
-
-For chains A and B:
-- **Shared pair ID** = `Hash(Sort([A, B]))` — symmetric regardless of order.
-- Under the shared pair, there are two namespaces: `inbound` and `outbound`, relative to each chain's perspective.
-
-```
-db layout:
-  [sharedID] /
-    [chainA_perspective] /
-      inbound/   ← data sent from B to A
-      outbound/  ← data sent from A to B
-```
-
-### 2.2 SharedMemory Interface
-
-```go
-type SharedMemory interface {
-    Get(peerChainID ids.ID, keys [][]byte) (values [][]byte, err error)
-
-    Indexed(
-        peerChainID ids.ID,
-        traits [][]byte,
-        startTrait, startKey []byte,
-        limit int,
-    ) (values [][]byte, lastTrait, lastKey []byte, err error)
-
-    Apply(requests map[ids.ID]*Requests, batches ...database.Batch) error
-}
-```
-
-`Apply` is atomic: applies all requests from multiple chains in a single database batch. Lock ordering (sorted shared IDs) prevents deadlocks. Internally, `Apply` uses a `versiondb` to stage all shared-memory changes, then calls `CommitBatch()` and `WriteAll()` which invokes [Batch.Write()](database.md#11-batch-interface) — ensuring both block acceptance and atomic memory update happen in the same underlying database write.
-
-### 2.3 Element Structure
-
-```go
-type Element struct {
-    Key    []byte
-    Value  []byte
-    Traits [][]byte  // indexed traits for `Indexed` lookup
-}
-
-type Requests struct {
-    RemoveRequests [][]byte
-    PutRequests    []*Element
-}
-```
-
-### 2.4 Cross-Chain Transfer Flow
+### 5.1 Chain-creation wiring (`buildChain` → `createSnowmanChain`)
 
 ```
-Chain A (e.g., X-Chain) runs ExportTx:
-  → avax.Apply({ChainB: Requests{PutRequests: [utxo]}})
-  → Writes to A's outbound / B's inbound under sharedID(A,B)
+ChainParameters{ID, SubnetID, VMID, FxIDs, GenesisData}
+        │
+        ▼
+  manager.buildChain (manager.go:479)
+        │  ┌─ create chain data dir + chain logger
+        │  ├─ build snow.ConsensusContext  (SharedMemory = AtomicMemory.NewSharedMemory(ID))
+        │  ├─ VMManager.GetFactory(VMID).New(log)  → raw VM
+        │  └─ resolve Fx factories
+        │
+        ├── vm is block.ChainVM ───────────────► createSnowmanChain (manager.go:1066)
+        └── vm is vertex.Linearizable… ────────► createAvalancheChain (manager.go:610)
 
-Chain B (e.g., P-Chain) runs ImportTx:
-  → SharedMemory.Get(ChainA, keys)          ← reads from inbound
-  → After import accepted: Apply({ChainA: Requests{RemoveRequests: [keys]}})
-  → Removes the consumed UTXOs
+  createSnowmanChain wiring:
+
+   base DB (ManagerConfig.DB)
+     └─ meterdb  (per-chain metrics)
+         └─ prefixdb[ chainID ]                       ← per-chain partition
+             ├─ prefixdb["vm"]            → vmDB      (passed to VM.Initialize)
+             └─ prefixdb["interval_bs"]   → bootstrap state
+
+   VM wrapper stack (inner → outer), what the engine actually calls:
+     rawVM (block.ChainVM)
+        └─ tracedvm     (if TracingEnabled)
+            └─ proposervm.New(...)        ← snowman++ block timing/signing
+                └─ metervm  (if MeterVMEnabled)
+                    └─ tracedvm "proposervm"
+                        └─ block.ChangeNotifier (cn)  ← drives WaitForEvent
+     vm.Initialize(ctx, vmDB, genesis, upgrade, config, fxs, messageSender)
+
+   sender.New(ctx, MsgCreator, Net, Router, TimeoutManager, ENGINE_TYPE_CHAIN, sb)
+        │
+   engine gear (created in order: engine, bootstrapper, state-syncer):
+     snowgetter.New(vm, sender)                      ← AllGetsServer
+     smcon.Topological{Snowflake}                    ← consensus
+     smeng.New(Config{Ctx, VM, Sender, Validators,
+                      Params=sb.Config().SnowParameters, ...})
+     smbootstrap.New(...)  → engine.Start
+     syncer.New(...)       → bootstrapper.Start
+        │
+   handler.New(ctx, cn, vm.WaitForEvent, vdrs, ... sb, ...)
+     h.SetEngineManager(EngineManager{Chain:{StateSyncer, Bootstrapper, Consensus}})
+        │
+        ▼
+   chain{Name, Context, VM, Handler}
+        │
+  manager.createChain (manager.go:378) finishes the wiring:
+     ├─ m.chains[ID] = handler
+     ├─ Alias(ID, ID.String())
+     ├─ notifyRegistrants(name, ctx, vm)
+     ├─ Router.AddChain(handler)          ← messages now routable to this chain
+     └─ handler.Start(...)                ← begins processing
 ```
 
-Both operations are committed atomically with the accepting block's database writes (both are in the same `database.Batch`).
+`createAvalancheChain` (`manager.go:610`) builds **two** engines under one handler — a
+`DAG` engine (Avalanche) and a `Chain` engine (Snowman) — plus the linearization
+wrappers (§ 6.3) so the chain can transition from DAG to linear consensus.
 
----
-
-## 3. Genesis (`genesis/`)
-
-### 3.1 Config Structure
-
-```go
-type Config struct {
-    NetworkID                  uint32
-    Allocations                []Allocation    // address → AVAX distributions
-    StartTime                  uint64          // network start (Unix)
-    InitialStakeDuration       uint64          // validator duration (seconds)
-    InitialStakeDurationOffset uint64          // stagger between validators
-    InitialStakedFunds         []ids.ShortID   // addresses with locked stakes
-    InitialStakers             []Staker        // genesis validators
-    CChainGenesis              string          // serialized C-Chain genesis
-    Message                    string          // network message
-}
-
-type Allocation struct {
-    ETHAddr        ids.ShortID    // Ethereum address for X-chain claiming
-    AVAXAddr       ids.ShortID    // Avalanche address
-    InitialAmount  uint64         // unlocked on X-chain
-    UnlockSchedule []LockedAmount // locked tranches on P-chain
-}
-
-type Staker struct {
-    NodeID        ids.NodeID
-    RewardAddress ids.ShortID
-    DelegationFee uint32
-    Signer        *signer.ProofOfPossession
-}
-```
-
-### 3.2 Genesis Generation (`FromConfig`)
-
-**Step 1: X-Chain Genesis**
-- Creates AVAX asset (`CreateAssetTx`) as fixed-cap with `InitialAmount` distributed to all `Allocations`.
-- `ETHAddr` stored as memo bytes for later cross-chain claiming.
-- Result: X-chain genesis bytes, AVAX asset ID.
-
-**Step 2: P-Chain Genesis**
-- Creates `PermissionlessValidator` for each `Staker`.
-- Distributes staked funds from `InitialStakedFunds` proportionally across validators.
-- Stagger start times: validator `i` starts at `StartTime + i × InitialStakeDurationOffset`.
-- Creates locked-unlock P-chain UTXOs per `Allocation.UnlockSchedule`.
-- Creates two chains: X-Chain (VMID = AVM) and C-Chain (VMID = EVM).
-- Embeds C-Chain genesis from `CChainGenesis` string.
-
-**Step 3: Validation**
-- All times monotonically ordered; start time not in future.
-- Staked funds cover validator stakes.
-- Supply > 0.
-
-### 3.3 Network-Specific Configs
-
-| Network | Config file | Special |
-|---------|-------------|---------|
-| Mainnet | `genesis_mainnet.json` | CortinaXChainStopVertexID set |
-| Fuji | `genesis_fuji.json` | Earlier upgrade times |
-| Local | `genesis_local.json` | All upgrades activated at genesis |
-
-### 3.4 Bootstrap Nodes
-
-Each network has a list of embedded bootstrap nodes (`bootstrappers_mainnet.json` etc.):
-```go
-type Bootstrapper struct {
-    ID  ids.NodeID
-    IP  netip.AddrPort
-}
-```
-
-`SampleBootstrappers(networkID, count)` returns a random sample. Used during node startup to find initial peers before the validator set is known. These nodes are connected to via the [peer lifecycle](networking.md#2-peer-lifecycle).
-
-### 3.5 Known Validators
-
-Embedded per-network JSON `validators.json`. Used to verify P-Chain transactions during bootstrap before the full validator set is available.
-
----
-
-## 4. Node Initialization (`node/`, `app/`, `main/`)
-
-### 4.1 Entry Point (`main/main.go`)
+### 5.2 Atomic-memory flow (export from ChainA, import to ChainB)
 
 ```
-main()
-  1. Register EVM extras: evm.RegisterAllLibEVMExtras()
-  2. Parse flags via Cobra
-  3. If --version: print and exit
-  4. config.GetNodeConfig() → NodeConfig
-  5. app.New(nodeConfig) → App
-  6. os.Exit(app.Run(nodeApp))
+                base DB ("shared memory" prefix, node.go:1268 → atomic.NewMemory)
+                         │
+   sharedID = hash(order(ChainA, ChainB))   (memory.go:104)
+                         │
+        prefixdb[ sharedID ]  ← bidirectional channel for the pair
+           ├─ prefix 0/1 : smaller-chain value/index DB
+           └─ prefix 2/3 : larger-chain  value/index DB   (prefixes.go)
+
+  EXPORT  (ChainA accepts an export block):
+    smA = AtomicMemory.NewSharedMemory(ChainA)
+    smA.Apply(                                  (shared_memory.go:115)
+        { ChainB: Requests{ PutRequests:[Element{utxoKey, utxoBytes, [ownerAddrs]}] } },
+        chainA_db_batch... )
+      │  versiondb wraps base DB
+      │  Put → written to ChainB's INBOUND state (outbound view from A)
+      │  vdb.CommitBatch() + WriteAll(batch, chainA_db_batch...)
+      ▼
+    ONE atomic write commits {shared-memory put} ∪ {ChainA's own DB ops}.
+
+  DISCOVER (wallet/API):
+    smB.Indexed(ChainA, [ownerAddrs], ...) → UTXO bytes (shared_memory.go:85)
+
+  IMPORT  (ChainB accepts an import block):
+    smB.Apply(
+        { ChainA: Requests{ RemoveRequests:[utxoKey] } },
+        chainB_db_batch... )                    (shared_memory.go:115)
+      │  Remove → ChainB's inbound state; if not yet present, writes a tombstone
+      │           (dbElement.Present=false, state.go:148) so bootstrapping can
+      │           consume a UTXO before the producing chain replays its add.
+      ▼
+    ONE atomic write commits {shared-memory remove} ∪ {ChainB's own DB ops}.
 ```
 
-### 4.2 Application Lifecycle (`app/app.go`)
+## 6. Component Boundaries & Relationships
 
+### 6.1 Manager ↔ node
+
+The node owns the singletons and injects them via `ManagerConfig`
+(`node/node.go:1125`): the base `DB`, `VMManager`, `chainRouter`, `Net`, validator
+`Manager`, `TimeoutManager`, `APIServer`, and `AtomicMemory` (`node/node.go:1269`).
+The node also builds the `Subnets` registry (`node/node.go:1120`) and passes it in.
+
+Control flow at startup:
+1. Node calls `StartChainCreator(platformParams)` (`node/node.go:918`,
+   `manager.go:1517`). This **synchronously** creates the P-Chain (its `VM.Initialize`
+   must finish first because it seeds node-wide state), then launches
+   `dispatchChainCreator` in a goroutine.
+2. The P-Chain VM, once bootstrapped, queues every other chain via
+   `QueueChainCreation` (`manager.go:353`), called from
+   `platformvm/config.Internal.CreateChain` (`vms/platformvm/config/internal.go:108`).
+3. `dispatchChainCreator` (`manager.go:1534`) blocks on `unblockChainCreatorCh` until
+   the P-Chain bootstrap callback closes it (`manager.go:1165`), then drains the queue.
+
+The manager can shut the whole node down via `ShutdownNodeFunc` if a **critical chain**
+(X, P, or C — `CriticalChains`) fails to build (`manager.go:402`).
+
+### 6.2 Manager ↔ VM / engine / handler
+
+The manager never touches consensus voting or VM transaction logic; it only assembles
+the gears and hands message routing to the `handler`:
+
+- **VM type drives engine family** (`manager.go:554`): a `block.ChainVM` →
+  `createSnowmanChain`; a `vertex.LinearizableVMWithEngine` → `createAvalancheChain`.
+  Any other type → `errUnknownVMType`. A non-P-Chain using `PlatformVMID` is rejected
+  (`errCreatePlatformVM`, `manager.go:480`).
+- **VM wrapper stack** (inner→outer): raw VM → `tracedvm` → `proposervm` → `metervm`
+  → `tracedvm` → `block.ChangeNotifier`. The `proposervm` adds snowman++ block timing
+  and BLS/staking signatures; `metervm` records metrics; `ChangeNotifier` (`cn`)
+  exposes `WaitForEvent` to the handler.
+- **DB partitioning**: each chain gets `prefixdb[chainID]` over a per-chain `meterdb`,
+  further split into `vm` and bootstrapping prefixes (`manager.go:95`–`104`). The VM
+  receives only its `prefixdb["vm"]` sub-database.
+- **Consensus params** come from the **subnet**, not the VM:
+  `sb.Config().SnowParameters` (`manager.go:849`, `:1274`). If nil, build fails with a
+  hint that Simplex may be configured. `sampleK` is clamped to the bootstrap weight.
+- **Engine selection note:** in this revision the engine is always
+  `smcon.Topological{SnowflakeFactory}` for the Chain engine; the handler dispatches
+  Simplex messages (`snow/networking/handler/handler.go:742`) and `subnets.Config`
+  carries `SimplexParameters`, but the Manager's engine construction here is
+  Snowman/Avalanche. See [simplex.md](simplex.md) for the Simplex engine.
+- **Handler** is built once per chain (`handler.New`) and receives the `EngineManager`
+  bundling `{StateSyncer, Bootstrapper, Consensus}` for each engine family
+  (`manager.go:1039`, `:1441`). The handler is the boundary between the network and
+  consensus; the manager registers it with the `Router` only after the chain map and
+  alias are set (`createChain`, `manager.go:459`).
+- **Registrants** (`registrant.go:12`) are notified before message processing starts
+  (`notifyRegistrants`, `manager.go:1573`) — this is how API handlers and indexers
+  attach to a new VM.
+
+### 6.3 Linearizable VM wrapper (`chains/linearizable_vm.go`)
+
+The Avalanche→Snowman transition is mediated by two adapters:
+
+- `initializeOnLinearizeVM` (`linearizable_vm.go:27`) wraps the DAG VM. When the
+  Avalanche engine calls `Linearize(stopVertexID)`, this adapter instead calls
+  `Initialize` on the proposervm-wrapped inner VM (`:52`) and closes
+  `waitForLinearize`, switching `WaitForEvent` over to the linear VM (`:43`).
+- `linearizeOnInitializeVM` (`linearizable_vm.go:71`) wraps the linear VM. Its
+  `Initialize` is redirected to `Linearize(stopVertexID)` (`:82`), so the proposervm's
+  normal `Initialize` call drives linearization.
+
+`createAvalancheChain` (`manager.go:766`–`834`) builds both adapters so the same
+underlying VM database and genesis serve both the DAG bootstrap phase and the
+post-linearization Snowman phase. For the X-Chain, `StopVertexID` comes from
+`Upgrades.CortinaXChainStopVertexID` (`manager.go:1021`).
+
+### 6.4 Atomic memory ↔ VMs
+
+`AtomicMemory` (`*atomic.Memory`) is a single node-wide object over the
+`"shared memory"` DB prefix (`node.go:1268`). Each chain receives its own
+`SharedMemory` view through `ConsensusContext.SharedMemory`
+(`manager.go:511`). A VM:
+
+- writes UTXOs to a peer chain via `Apply` with `PutRequests` (export);
+- removes UTXOs it consumes via `Apply` with `RemoveRequests` (import);
+- discovers spendable UTXOs via `Indexed`/`Get`.
+
+Because the shared-memory DB and the VM's own `vmDB` descend from the same base
+database, `Apply` can fold the VM's own batch into the shared-memory commit
+(`WriteAll`, `writer.go:10`) so the two are **one atomic write**. Out-of-process
+(plugin) VMs reach shared memory over gRPC: `gsharedmemory.Client` (`shared_memory_client.go:19`)
+marshals `Apply`/`Get`/`Indexed`, and `gsharedmemory.Server` (`shared_memory_server.go:19`)
+reconstructs the requests and batches against the node's local DB. `filteredBatch`
+(`filtered_batch.go:12`) collapses a batch's puts/deletes before transmission.
+
+## 7. Key Behaviors, Invariants, Ordering, Concurrency
+
+**Chain-creation ordering.**
+- The **P-Chain is always first** and is created synchronously (`StartChainCreator`,
+  `manager.go:1526`); it initializes the node-wide `validatorState` (`manager.go:1126`).
+- All other chains are queued and only drained after `unblockChainCreatorCh` closes,
+  which happens when the P-Chain finishes bootstrapping (`bootstrapFunc`,
+  `manager.go:1165`). Invariant: only chains on **tracked subnets** are queued
+  (enforced by the P-Chain before calling `QueueChainCreation`).
+- `QueueChainCreation` de-dups via `Subnet.AddChain` (`subnets/subnet.go:76`) — a chain
+  already staged/bootstrapping is skipped (`manager.go:354`).
+
+**Critical chains.** X, P, C are in `CriticalChains`; a build failure for one calls
+`ShutdownNodeFunc(1)` (`manager.go:402`), and these chains are started without panic
+recovery (`manager.go:475`).
+
+**Subnet bootstrap tracking.** A subnet is "bootstrapped" when its `bootstrapping` set
+is empty (`subnets/subnet.go:56`). The bootstrap engine is wired as the subnet's
+`BootstrapTracker` (`BootstrapTracker: sb`, `manager.go:970`, `:1397`); when a chain
+finishes, `Bootstrapped` (`:63`) fires the preemption signal. The node-level
+`bootstrapped` health check reports any subnet still bootstrapping
+(`manager.go:1474`).
+
+**Primary Network as a special subnet.** `constants.PrimaryNetworkID` is created
+eagerly in `NewSubnets` (`chains/subnets.go:80`) and its `Config` is the default for
+any subnet lacking explicit config (`chains/subnets.go:39`). The P-Chain, X-Chain, and
+C-Chain all run on it. Validator beacons for the P-Chain come from
+`ChainParameters.CustomBeacons` rather than the shared validator manager
+(`manager.go:568`).
+
+**Atomic-memory invariants & concurrency.**
+- `Apply` is **atomic**: all shared-memory mutations plus the caller's DB batches are
+  committed in a single `versiondb` write (`shared_memory.go:130`–`164`).
+- The underlying DB of the supplied batches **must** be the same base DB as
+  SharedMemory's (interface invariant, `shared_memory.go:53`).
+- **Deadlock avoidance:** `Apply` sorts `sharedID`s before locking
+  (`shared_memory.go:127`) so concurrent applies acquire pair-locks in a global order.
+- **Ref-counted locks:** `makeLock`/`releaseLock` (`memory.go:71`, `:88`) track callers
+  per `sharedID`; the map entry is dropped at count 0. `GetSharedDatabase` returns the
+  lock already held; `ReleaseSharedDatabase` must be paired one-to-one or it panics.
+- **Directionality:** a chain can only **put** to a peer's inbound state and only
+  **remove/read** from its own inbound state. Implemented by swapping
+  `inbound`/`outbound` prefixes (`prefixes.go:33`) and ordering by chain ID.
+- **Tombstones:** `RemoveValue` on a not-yet-present key writes `Present=false`
+  (`state.go:148`); a later `SetValue` of that key cancels and deletes the marker
+  (`state.go:86`). This lets the P-Chain consume a C-Chain UTXO during bootstrapping
+  before the C-Chain replays the producing block. Double-put / double-remove are
+  errors (`errDuplicatePut`, `errDuplicateRemove`).
+- **Conflict checking is the VM's job:** shared memory only confirms presence; the VM
+  must verify no processing ancestor block double-spends the same atomic UTXO (see
+  `chains/atomic/README.md` § "Issue an import transaction").
+- **Indexed pagination:** `getKeys` (`state.go:197`) iterates traits in sorted order,
+  de-duplicates keys via a hashed set, and returns `lastTrait`/`lastKey` cursors.
+
+## 8. Configuration (Subnet Configs)
+
+Per-subnet config is loaded from `{subnetID}.json` under `--subnet-config-dir` and
+maps to `subnets.Config` (`subnets/config.go:21`). See `subnets/config.md` for the
+full CLI↔JSON key table.
+
+| Field | Meaning |
+| --- | --- |
+| `validatorOnly` | If true, the node only exchanges this subnet's chain messages with validators (private subnet). Enforced by `IsAllowed` (`subnet.go:92`). |
+| `allowedNodes` | Extra NodeIDs allowed when `validatorOnly` is true. Setting it without `validatorOnly` is an error (`config.go:77`). |
+| `snowParameters` | Snowball/Snowman consensus parameters (k, alpha, beta, …). Used as `consensusParams` in engine build (`manager.go:849`). |
+| `simplexParameters` | Simplex consensus parameters. Mutually exclusive with `snowParameters` (`ValidConsensusConfiguration`, `config.go:66`). |
+| `consensusParameters` | Deprecated alias for `snowParameters`. |
+| `proposerNumHistoricalBlocks` | Number of historical snowman++ blocks the proposervm retains per chain (`config.go:54`); 0 = keep all. Passed to `proposervm.Config` (`manager.go:787`, `:1209`). |
+
+A subnet with neither Snow nor Simplex params set fails `ValidParameters`
+(`config.go:76`) and the Manager refuses to build a chain whose `SnowParameters` are
+nil (`manager.go:842`).
+
+## 9. Cross-References
+
+- [overview.md](overview.md) — where the chain manager fits in node startup.
+- [node.md](node.md) — node wiring of `ManagerConfig`, `Subnets`, and `AtomicMemory`.
+- [consensus.md](consensus.md) — Snowman/Avalanche engines selected by the Manager.
+- [simplex.md](simplex.md) — the Simplex engine referenced by `subnets.Config`.
+- [networking.md](networking.md) — `Router`, `Sender`, `handler`, peer/timeout managers.
+- [vm-framework.md](vm-framework.md) — `block.ChainVM`, `vertex.LinearizableVM`,
+  proposervm/metervm/tracedvm wrappers, `WaitForEvent`.
+- [platformvm.md](platformvm.md) — the P-Chain, which queues all other chains and
+  seeds validator state.
+- [avm.md](avm.md), [evm.md](evm.md) — X-Chain (DAG→linearized) and C-Chain VMs.
+- [database.md](database.md) — `prefixdb`, `meterdb`, `versiondb`, `linkeddb`, batches.
+- [primitives.md](primitives.md) — `ids.ID`, aliasing, codecs, hashing.
+- [api.md](api.md) — registrant-driven API handler attachment.
 ```
-app.New(config):
-  1. Set directory permissions
-  2. Create logging factory
-  3. Raise file descriptor limit
-  4. node.New(config) → Node
-  5. Return App struct
-
-app.Run(app):
-  1. Start app (non-blocking)
-  2. Register SIGINT, SIGTERM handlers → call app.Stop()
-  3. Register SIGABRT handler → dump goroutine stacks
-  4. Block on app.ExitCode()
-  5. Return exit code
-```
-
-### 4.3 Node Initialization Sequence (`node/node.go`)
-
-The `New(config)` function initializes in this order:
-
-**Phase 1 — Identity:**
-1. Extract `NodeID` from staking TLS certificate.
-2. Load or generate BLS signer (ephemeral / key-file / RPC).
-3. Generate `ProofOfPossession` (BLS signature proving key ownership).
-
-**Phase 2 — Infrastructure:**
-4. Create metrics gatherer (Prometheus multi-gatherer).
-5. Detect NAT (UPnP/NAT-PMP).
-6. Start API server (HTTP listener).
-7. Initialize database (LevelDB or PebbleDB).
-8. Create `atomic.Memory` (shared memory for cross-chain transfers).
-9. Create `message.OutboundMsgBuilder`.
-
-**Phase 3 — Networking:**
-10. Create `validators.Manager`.
-11. Initialize resource manager (CPU/disk tracking per peer).
-12. Create P2P [network.Network](networking.md#1-network-interface) (TCP listener, TLS, peer management).
-13. Create `snow.AcceptorGroup` (block/tx/vertex event bus).
-
-**Phase 4 — Chain Ecosystem:**
-14. Start health API.
-15. Create `chains.Manager`. This then creates PlatformVM via [PlatformVM initialization](platformvm.md#11-initialize-sequence).
-16. Register built-in VMs: PlatformVM, AVM, EVM.
-17. Scan plugin directory for external VMs.
-18. Load chain/VM aliases.
-19. Start admin and info APIs.
-20. Create indexer (if enabled).
-21. Start profiler (if enabled).
-
-**Phase 5 — Chain Startup:**
-22. Call `chainManager.StartChainCreator(platformChainParams)`.
-   - P-Chain created synchronously.
-   - Async goroutine waits for P-Chain bootstrap, then creates X and C chains.
-
-### 4.4 Critical Chains
-
-```go
-CriticalChains = set.Set[ids.ID]{PChainID, XChainID, CChainID}
-```
-
-Failure to create any critical chain triggers `ShutdownNodeFunc(1)`. P-Chain must bootstrap before X/C chain creation can proceed, enforced by the `unblockChainCreatorCh` signal mechanism — see [Bootstrap Sequencing](chains.md#45-bootstrap-sequencing).
-
-### 4.5 Bootstrap Sequencing
-
-Bootstrap peers are discovered via [P2P networking](networking.md#4-peer-gossip-and-peerlist-exchange) (PeerList gossip exchange):
-
-```
-Node connects to bootstrap peers
-  → Validator list received from peers
-  → Verified against embedded validators.json
-  → Once ≥ 3/4 of bootstrap weight connected: unblock chain creator
-  
-P-Chain bootstraps:
-  → Replays all P-Chain history
-  → Rebuilds validator sets
-  → Signals X/C chains to start
-  
-X-Chain bootstraps:
-  → Replays all X-Chain history
-  
-C-Chain bootstraps:
-  → Replays or state-syncs EVM history
-```
-
----
-
-## 5. Configuration (`config/`)
-
-### 5.1 Flag Categories
-
-**Identity:**
-- `--data-dir` (default `~/.avalanchego`): All persistent data.
-- `--genesis-file` / `--genesis-content`: Custom genesis (not Mainnet).
-- `--upgrade-file`: Custom upgrade schedule.
-
-**Network:**
-- `--public-ip` / `--public-ip-resolution-service`: Public IP advertisement.
-- `--listen-host:--listen-port` (default `0.0.0.0:9651`): P2P listener.
-- `--bootstrap-ids`, `--bootstrap-ips`: Manual bootstrap peers.
-
-**API:**
-- `--http-host:--http-port` (default `127.0.0.1:9650`): HTTP API server.
-- `--api-admin-enabled`: Enable admin API.
-- `--api-health-enabled`: Enable health API (default true).
-- `--api-metrics-enabled`: Enable metrics API (default true).
-
-**Consensus (Snow):**
-- `--snow-sample-size`: K (default 20).
-- `--snow-preference-quorum-size`: AlphaPreference (default 15).
-- `--snow-confidence-quorum-size`: AlphaConfidence (default 15).
-- `--snow-commit-threshold`: Beta (default 20).
-- `--snow-concurrent-repolls`: ConcurrentRepolls (default 4).
-
-These values are the node-wide Snow parameter defaults; see [Default Parameters](consensus.md#12-snowball-voting-primitives-snowconsensussnowball) for how they feed into per-subnet consensus configuration.
-
-**Staking:**
-- `--staking-tls-key-file`, `--staking-tls-cert-file`: Node TLS identity.
-- `--staking-signer-key-file`: BLS private key file.
-- `--staking-ephemeral-signer-enabled`: Generate ephemeral BLS key (dev only).
-
-**Database:**
-- `--db-type` (leveldb / pebbledb, default leveldb).
-- `--db-dir` (default `~/.avalanchego/db`).
-
-**Subnets:**
-- `--track-subnets`: Comma-separated subnet IDs to validate.
-- `--subnet-config-dir`: Per-subnet config files.
-
-**Proposer VM:**
-- `--proposer-min-block-delay` (default 100ms): Minimum time between blocks.
-
-**Logging:**
-- `--log-level` (verbo/debug/info/warn/error/fatal, default info).
-- `--log-format` (auto/plain/json, default auto).
-
-### 5.2 Config Loading Priority
-
-```
-hardcoded defaults
-  ← config file (--config-file or --config-content)
-  ← environment variables (AVALANCHE_ prefix)
-  ← command-line flags
-```
-
-Later sources override earlier ones (Viper integration).
-
-### 5.3 Chain Config
-
-Per-chain config in `~/.avalanchego/configs/chains/<chainID>/config.json`:
-```go
-type ChainConfig struct {
-    Config  []byte  // VM-specific configuration
-    Upgrade []byte  // VM-specific upgrade bytes
-}
-```
-
-Looked up by chain ID or alias (e.g., `C`, `X`, `P`). The C-Chain config passes through directly to the [SAEVM C-Chain](vms.md#46-c-chain-wrapper-cchain) (or legacy EVM), where it controls EVM-specific settings such as state sync configuration, fee parameters, and API toggles.
-
-### 5.4 Subnet Config
-
-Per-subnet config in `~/.avalanchego/configs/subnets/<subnetID>.json`:
-```go
-type Config struct {
-    // Snowball parameters (override defaults for this subnet)
-    SnowParameters        snowball.Parameters
-    // Simplex parameters (if using Simplex consensus — see [Simplex consensus](consensus.md#part-2-simplex-consensus))
-    SimplexParameters     simplex.Parameters
-    // ProposerVM
-    ProposerNumHistoricalBlocks uint64
-}
-```
-
----
-
-## 6. Upgrade Management (`upgrade/`)
-
-### 6.1 Upgrade Config
-
-```go
-type Config struct {
-    // Apricot phases (2021)
-    ApricotPhase1Time            time.Time
-    ApricotPhase2Time            time.Time
-    ApricotPhase3Time            time.Time
-    ApricotPhase4Time            time.Time
-    ApricotPhase4MinPChainHeight uint64
-    ApricotPhase5Time            time.Time
-    ApricotPhasePre6Time         time.Time
-    ApricotPhase6Time            time.Time
-    ApricotPhasePost6Time        time.Time
-
-    // Banff (2022) — elastic subnets
-    BanffTime time.Time
-
-    // Cortina (2023) — X-Chain linearization
-    CortinaTime              time.Time
-    CortinaXChainStopVertexID ids.ID
-
-    // Durango (2024)
-    DurangoTime time.Time
-
-    // Etna (2024) — L1 validators
-    EtnaTime time.Time
-
-    // Fortuna (2025)
-    FortunaTime time.Time
-
-    // Granite (2025) — Simplex, epochs
-    GraniteTime          time.Time
-    GraniteEpochDuration time.Duration  // 5 min mainnet, 30 sec local
-
-    // Helicon (unscheduled)
-    HeliconTime time.Time
-}
-```
-
-### 6.2 Activation Predicates
-
-Each upgrade exposes an `IsXxx(t time.Time) bool` method:
-```go
-func (c *Config) IsBanffActivated(t time.Time) bool {
-    return !t.Before(c.BanffTime)
-}
-```
-
-VMs and the engine check these predicates when processing blocks to apply the correct rules. Both the [Snowman Engine](consensus.md#15-engine-state-machine) and [PlatformVM](platformvm.md) gate block validation logic on these activation checks.
-
-### 6.3 Special Cases
-
-**ApricotPhase4:** Requires both time AND `pChainHeight ≥ ApricotPhase4MinPChainHeight`. Ensures validator set stability.
-
-**CortinaXChainStopVertexID:** A well-known vertex ID that marks where the X-Chain DAG was linearized into a Snowman chain. All DAG vertices before this are treated as historical. This is the endpoint of [Avalanche DAG consensus](consensus.md#14-avalanche-dag-consensus-snowconsensusavalanche) on the X-Chain.
-
-**GraniteEpochDuration:** Configurable per network. Controls [Simplex epoch](consensus.md#21-protocol-overview) length (validator set snapshot interval).
-
-### 6.4 Validation
-
-```go
-func (c *Config) Validate() error {
-    // All upgrade times must be monotonically increasing
-    // Returns error if any later upgrade precedes an earlier one
-}
-```
-
-### 6.5 Network Activation Times
-
-| Upgrade | Mainnet activation | Purpose |
-|---------|-------------------|---------|
-| ApricotPhase1 | March 2021 | Initial launch fixes |
-| ApricotPhase2 | May 2021 | Fee burns |
-| ApricotPhase3 | Sep 2021 | Fee structure |
-| ApricotPhase4 | Oct 2021 | Validator set changes |
-| ApricotPhase5 | Dec 2021 | Subnet functionality |
-| Banff | Oct 2022 | Elastic subnets |
-| Cortina | Apr 2023 | X-Chain linearization |
-| Durango | Mar 2024 | Transfer subnet ownership, BaseTx |
-| Etna | Nov 2024 | L1 validators, dynamic fees |
-| Fortuna | 2025 | (details TBD) |
-| Granite | 2025 | Simplex consensus, epochs |
-
----
-
-## 7. VM Registry and Plugin System (`vms/`)
-
-### 7.1 VM Manager
-
-```go
-type Manager struct {
-    factories map[ids.ID]factory.Factory  // VMID → Factory
-    aliases   map[ids.ID][]string         // VMID → aliases
-}
-
-type Factory interface {
-    New(*snow.Context) (interface{}, error)
-}
-```
-
-Built-in VMs registered at node startup:
-- `platformvm.VMID` → `platformvm.Factory`
-- `avm.VMID` → `avm.Factory`
-- `evm.VMID` → `evm.Factory` (RPCChainVM wrapping EVM binary)
-
-External plugin VMs scanned from `--plugin-dir`. The VMID is referenced in [CreateChainTx](platformvm.md#21-apricot-era) when a new chain is created on a subnet — the transaction records which VMID the chain should use.
-
-### 7.2 VM Registry (`vms/registry/`)
-
-Dynamically discovers and loads VM plugins from the filesystem:
-```go
-type VMRegistry interface {
-    Reload(ctx context.Context) (added, failed []ids.ID, err error)
-}
-```
-
-Plugin detection: `sha256(binaryBytes)` as VMID; file name as default alias. On node startup and after [Admin API LoadVMs()](api.md#2-admin-api-apiadmin) call.
-
-### 7.3 Runtime Manager (`vms/rpcchainvm/runtime/`)
-
-Manages the lifecycle of external VM subprocesses; see [RPCChainVM](vms.md#part-3-rpcchainvm) for the full subprocess protocol:
-```go
-type Manager interface {
-    Register(vmID ids.ID, config *subprocess.Config) error
-    GetRuntime(vmID ids.ID) (Status, error)
-    Stop(vmID ids.ID) error
-    StopAll()
-}
-```
-
-Each registered VM gets a `subprocess.Runtime` that tracks its PID, gRPC address, and health.

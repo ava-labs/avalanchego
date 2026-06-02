@@ -1,581 +1,331 @@
-# API, Wallet SDK, Staking, IDs, and Cryptography
+# AvalancheGo — HTTP/JSON-RPC API, Indexer & Wallet
 
-## 1. API Server (`api/server/`)
+## 1. Purpose
 
-### 1.1 Architecture
+This document specifies the **node-level API surface** of AvalancheGo: the single multiplexing HTTP server, the framework chains/VMs use to register handlers, the node-wide endpoints (`/ext/info`, `/ext/admin`, `/ext/health`, `/ext/metrics`), the health-check subsystem, the optional accepted-container indexer, and the Go wallet SDK. It explains *how the framework works and where the boundaries are* — it does **not** enumerate the JSON-RPC methods of each VM. Those belong to the VM specs ([platformvm.md](platformvm.md), [avm.md](avm.md), [evm.md](evm.md)).
 
-The API server is a standard Go `net/http` server with HTTP/2 support (via h2c):
+A reader should come away understanding: that AvalancheGo runs exactly one HTTP server multiplexing every endpoint, how a chain's VM handlers get mounted under `/ext/bc/<chainID>`, how the request router dispatches (header-route vs legacy path-route), how readiness/health/liveness differ and how their worker model behaves, what the indexer stores and exposes, and how the wallet's backend/builder/signer triad builds and issues transactions.
+
+---
+
+## 2. Responsibilities & Scope
+
+**In scope:**
+- The HTTP server (`api/server/`): construction, lifecycle, routing, CORS, allowed-hosts (DNS-rebinding protection), per-call metrics, tracing, the bootstrap-rejection middleware.
+- Handler registration framework: `PathAdder`, `RegisterChain`, header routes, aliases, the `chains.Registrant` boundary.
+- Node-wide services: `api/info/`, `api/admin/`, `api/health/`, `api/metrics/`, plus shared types in `api/common_args_responses.go` and `api/traced_handler.go`.
+- The health subsystem in detail (`api/health/`): the three workers, tags, monotonic readiness checks, metrics.
+- The optional indexer (`indexer/`): what is indexed, ordering invariants, the index API.
+- The wallet SDK (`wallet/`): backend/builder/signer pattern, the primary-network wallet.
+
+**Out of scope (cross-referenced):**
+- VM-specific endpoint semantics — see [platformvm.md](platformvm.md), [avm.md](avm.md), [evm.md](evm.md).
+- The chain-creation lifecycle that *calls* `RegisterChain` — see [chains.md](chains.md).
+- Networking/peer concepts surfaced by `info.peers` — see [networking.md](networking.md).
+- Databases backing the indexer — see [database.md](database.md).
+
+---
+
+## 3. Package / File Layout
+
+```
+api/
+  common_args_responses.go   Shared request/response structs (GetBlock, GetTx, GetUTXOs, JSONAddress…)
+  traced_handler.go          OpenTelemetry wrapper around any http.Handler
+  server/
+    server.go                Server interface, server impl, RegisterChain, middleware, CORS wrapper
+    router.go                router: mux + header-route table + alias table
+    allowed_hosts.go         Host-header allow-list (DNS rebinding defense)
+    metrics.go               Per-base calls / calls_processing / calls_duration
+  info/
+    service.go               Info JSON-RPC service (unprivileged node info)
+    client.go                Go client
+  admin/
+    service.go               Admin JSON-RPC service (privileged: profiling, aliases, logger, DB)
+    key_value_reader.go, client.go
+  health/
+    health.go                Health interface; wraps 3 workers (readiness/health/liveness)
+    worker.go                worker: periodic check runner, tags, metrics
+    checker.go               Checker / CheckerFunc interface
+    handler.go               GET + JSON-RPC POST HTTP handlers
+    service.go               JSON-RPC Service (Readiness/Health/Liveness methods)
+    result.go                Result struct
+    README.md                Authoritative description of the health model
+  metrics/
+    multi_gatherer.go        MultiGatherer (register/deregister sub-gatherers)
+    prefix_gatherer.go       Namespaces metrics by prefix
+    label_gatherer.go        Namespaces metrics by an added label
+  connectclient/
+    client.go                connect-rpc (gRPC-over-HTTP) client + route-header interceptor
+
+indexer/
+  indexer.go                 Indexer: chains.Registrant; creates per-chain indices + endpoints
+  index.go                   index: append-only accepted-container store (acceptance order)
+  service.go                 index JSON-RPC service (GetContainerByIndex, GetContainerByID…)
+  container.go, codec.go     Container record + codec
+  client.go                  Go client for an index
+  examples/                  Runnable polling examples (p-chain, x-chain-blocks)
+
+wallet/
+  subnet/primary/            MakeWallet / MakePWallet, FetchState, primary-network Wallet
+    common/                  Options, UTXO cache, spend helpers
+  chain/{p,x,c}/             Per-chain wallet = builder + signer + backend + client
+    p/builder, p/signer, p/wallet   (split packages for P-chain)
+    x/builder, x/signer             (split packages for X-chain)
+```
+
+---
+
+## 4. Core Types
+
+### 4.1 `Server` interface & implementation
+
+`api/server/server.go:60` defines the contract:
 
 ```go
 type Server interface {
-    Dispatch() error
-    DispatchTLS(certFile, keyFile string) error
-    RegisterChain(chainName string, vm common.VM)
-    AddRoute(handler http.Handler, base, endpoint string) error
-    AddAliases(base string, aliases ...string) error
-    // ... authentication helpers
+    PathAdder                // AddRoute, AddAliases
+    PathAdderWithReadLock    // …WithReadLock variants
+    Dispatch() error         // start serving
+    RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM)
+    Shutdown() error
 }
 ```
 
-**Middleware stack (inside-out):**
-1. CORS (`rs/cors`)
-2. Node ID header attachment (`X-Avalanche-NodeID`)
-3. Host filter (allowed hosts validation)
-4. Tracing (OpenTelemetry, optional)
-5. Bootstrap state guard (reject calls until chain bootstrapped)
-6. Prometheus metrics
+- `PathAdder` (`server.go:41`): `AddRoute(handler, base, endpoint)` and `AddAliases`. This is the **only** way arbitrary subsystems mount handlers. The indexer holds just a `server.PathAdder`, not the full server.
+- The concrete `server` (`server.go:80`) wraps a single `*http.Server` whose handler is built in `New` (`server.go:101`): `wrapHandler(router, …)` → host filter → CORS → adds the `node-id` response header. The server uses `h2c` (HTTP/2 cleartext) so connect-rpc clients work without TLS, capped at `maxConcurrentStreams = 64` (`server.go:33`).
+- `Dispatch()` (`server.go:149`) is just `srv.Serve(listener)`. `Shutdown()` (`server.go:289`) closes the listener, calls graceful `Shutdown` with `shutdownTimeout`, then forces `Close`.
+- All URLs are rooted at `baseURL = "/ext"` (`server.go:32`).
 
-**HTTP/2 (h2c):** Supports up to 64 concurrent streams per connection (`maxConcurrentStreams = 64` in `api/server/server.go`).
+### 4.2 The `router`
 
-**Chain registration:** Chains register their API handlers through the [Registrant pattern](chains.md#15-registrant-pattern). When a new chain is created, the chain manager calls `RegisterChain()` on each registered `Registrant`, including the API server. The API server then calls `vm.CreateHandlers()` and mounts the returned handlers under `/ext/bc/<chainID>/`.
+`api/server/router.go:25` is the dispatch core. It holds three independent maps under a `sync.RWMutex`:
 
-### 1.2 URL Structure
+- `routes map[string]map[string]http.Handler` — legacy **path-based** routing (`base` → `endpoint` → handler), also mirrored into a `gorilla/mux` router.
+- `headerRoutes map[string]http.Handler` — **header-based** routing keyed by the value of the `Avalanche-Api-Route` header (`HTTPHeaderRoute`, `router.go:17`).
+- `aliases` + `reservedRoutes` — alias bookkeeping.
 
+`ServeHTTP` (`router.go:49`) is the fork point:
+
+```go
+route, ok := request.Header[HTTPHeaderRoute]
+if !ok {                          // no header → legacy mux path routing
+    r.router.ServeHTTP(...)
+} else if len(route) < 1 {
+    400
+} else if handler := r.headerRoutes[route[0]]; handler == nil {
+    404
+} else {
+    handler.ServeHTTP(...)        // header route (used by connect-rpc VMs)
+}
 ```
-/ext/bc/<chainID or alias>/<endpoint>   — chain-specific APIs
-/ext/P/                                 — P-Chain API
-/ext/X/                                 — X-Chain API
-/ext/C/                                 — C-Chain API
-/ext/health                             — health API
-/ext/metrics                            — Prometheus metrics
-/ext/admin                              — admin API
-/ext/info                               — node info API
+
+### 4.3 Handler registration: chain VMs
+
+`RegisterChain` (`server.go:153`) is the boundary where a chain's VM contributes its endpoints. It does two things:
+
+1. **Path-route handlers** — calls `vm.CreateHandlers(ctx)` under the chain's `ctx.Lock`, returning `map[extension]http.Handler`. Each is mounted under `defaultEndpoint = path.Join("bc", ctx.ChainID.String())` (`server.go:169`), i.e. `/ext/bc/<chainID><extension>`. Each route URL extension is validated with `url.ParseRequestURI`; malformed ones are skipped, not fatal.
+2. **Header-route handler** — calls `vm.NewHTTPHandler(ctx)`; if non-nil it is registered in the header-route table under the chain ID string via `router.AddHeaderRoute` (`server.go:206`). This is the connect-rpc / gRPC-style path; clients select it by sending `Avalanche-Api-Route: <chainID>`.
+
+Both handlers pass through `wrapMiddleware` (`server.go:224`): optional tracing → `rejectMiddleware` → metrics wrapper.
+
+`rejectMiddleware` (`server.go:260`) is an important invariant: **API calls to a chain are rejected with HTTP 503 until that chain reaches `snow.NormalOp`** (i.e. finished state-sync/bootstrap). It re-reads `ctx.State.Get().State` on every request, so handlers go live automatically once bootstrapping completes.
+
+### 4.4 Handler registration: node-wide services
+
+Node-wide services are mounted directly via `AddRoute(handler, base, "")` in `node/node.go`. They are **plain `gorilla/rpc/v2` JSON-RPC servers** (except metrics and the health GET handlers):
+
+| URL | base / endpoint | Source |
+|-----|-----------------|--------|
+| `/ext/info` | `info`, `""` | `info.NewService` → `node.go:1380` |
+| `/ext/admin` | `admin`, `""` | `admin.NewService` → `node.go:1320` |
+| `/ext/metrics` | `metrics`, `""` | `promhttp.HandlerFor` → `node.go:1302` |
+| `/ext/health` | `health`, `""` | `health.NewGetAndPostHandler` → `node.go:1631` |
+| `/ext/health/readiness` | `health`, `/readiness` | `health.NewGetHandler(Readiness)` → `node.go:1640` |
+| `/ext/health/health` | `health`, `/health` | `node.go:1649` |
+| `/ext/health/liveness` | `health`, `/liveness` | `node.go:1658` |
+| `/ext/index/<chain>/<type>` | `index/<name>`, `/<endpoint>` | indexer → `indexer.go:340` |
+
+### 4.5 JSON-RPC 2.0 codec
+
+Every JSON-RPC service uses `gorilla/rpc/v2` with the custom codec from `utils/json.NewCodec()` (`utils/json/codec.go:28`). This codec lowercases the first letter of the method name, so the exported Go method `Info.GetNodeID` is invoked over the wire as `info.getNodeID`. Methods follow the gorilla signature `func(*http.Request, *Args, *Reply) error`. A request looks like:
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"info.getNodeID","params":{}}
 ```
 
-### 1.3 Router (`api/server/router.go`)
+### 4.6 Health `Checker`
 
-Gorilla mux with two routing modes:
+`api/health/checker.go:11`:
 
-1. **URL-based**: Standard path matching.
-2. **Header-based**: Route via `Avalanche-Api-Route` HTTP header.
+```go
+type Checker interface {
+    HealthCheck(context.Context) (interface{}, error)   // details + nil error = healthy
+}
+type CheckerFunc func(context.Context) (interface{}, error)
+```
 
-Alias management: multiple names can map to one canonical route. Reserved routes prevent conflicts.
+A subsystem reports healthy by returning `nil` error; the `interface{}` is JSON-marshalled into `Result.Details` (`api/health/result.go:19`). Results also carry `Timestamp`, `Duration`, `ContiguousFailures`, and `TimeOfFirstFailure`.
 
 ---
 
-## 2. Admin API (`api/admin/`)
+## 5. Request Routing & Registration Flow
 
-JSON-RPC 2.0 over HTTP at `/ext/admin`.
+### 5.1 Request routing
 
-| Method | Description |
-|--------|-------------|
-| `StartCPUProfiler()` | Begin CPU profiling to file |
-| `StopCPUProfiler()` | Stop and flush CPU profile |
-| `MemoryProfile()` | Snapshot heap profile |
-| `LockProfile()` | Mutex contention profile |
-| `Alias(endpoint, alias)` | Add alias for API endpoint |
-| `AliasChain(chainID, alias)` | Add alias for chain |
-| `GetChainAliases(chainID)` | List all aliases for chain |
-| `SetLoggerLevel(loggerName, level)` | Adjust log level at runtime |
-| `GetLoggerLevel(loggerName)` | Query current log levels |
-| `LoadVMs()` | Scan plugin dir and load new VMs |
-| `GetConfig()` | Return node startup config |
-| `DbGet(key hex-string)` | Read raw database value |
-| `Stacktrace()` | Dump goroutine stacks to file |
+```
+HTTP request
+   │
+   ▼  http.Server (h2c, HTTP/1.1 or HTTP/2 cleartext)
+wrapHandler:  set "node-id" header
+   │  cors.Handler (AllowedOrigins, AllowCredentials)
+   │  allowedHostsHandler (Host header allow-list)
+   ▼
+router.ServeHTTP
+   │
+   ├── has "Avalanche-Api-Route" header? ── yes ──► headerRoutes[value]  (VM connect-rpc handler)
+   │                                                  └─ wrapMiddleware (trace→reject→metrics)
+   └── no ──► gorilla/mux match on "/ext/<base><endpoint>"
+                 ├─ /ext/bc/<chainID>...   chain VM handler (reject-until-NormalOp + metrics)
+                 ├─ /ext/info|admin        gorilla JSON-RPC service
+                 ├─ /ext/health[/...]      GET→200/503 ; POST→JSON-RPC
+                 ├─ /ext/metrics           Prometheus text exposition
+                 └─ /ext/index/<chain>/... index JSON-RPC service
+```
 
-**`LoadVMs()`** calls `VMRegistry.Reload()` (see [VM Registry](chains.md#72-vm-registry-vmsregistry)) to scan the plugin directory for new VM binaries, then registers them with the VM Manager so subsequent `CreateChain` calls can use them.
+### 5.2 Chain handler-registration flow
+
+```
+chains.Manager creates chain  (see chains.md)
+   │  ctx reaches the registrant list
+   ▼
+manager.RegisterChain → fan-out to every Registrant  (manager.go:605 AddRegistrant)
+   ├──► server.RegisterChain(name, ctx, vm)            (registered at node.go:1179)
+   │       ├─ vm.CreateHandlers()  → mount under /ext/bc/<chainID><ext>
+   │       └─ vm.NewHTTPHandler()  → header route keyed by chainID
+   └──► indexer.RegisterChain(name, ctx, vm)           (registered at node.go:899)
+           └─ if primary network & indexing enabled: create block/tx/vtx indices + /ext/index endpoints
+```
+
+Both `server` and `indexer` implement `chains.Registrant` (`chains/registrant.go:12`). The node adds them with `n.chainManager.AddRegistrant(...)`, so chain creation pushes into the API layer rather than the API layer polling.
 
 ---
 
-## 3. Health API (`api/health/`)
+## 6. Component Boundaries & Relationships
 
-HTTP GET and POST at `/ext/health`, `/ext/health/readiness`, `/ext/health/liveness`.
+### server ↔ chains.Manager
+The boundary is the `chains.Registrant` interface (`chains/registrant.go:12`). `chains.Manager` knows nothing about HTTP; it calls `RegisterChain(name, ctx, vm)` on each registrant after a chain is created but **before it processes messages**. The server is one such registrant (`node.go:1179`). The server's only inputs are the chain name, the `*snow.ConsensusContext` (for the chain ID, lock, and bootstrap state), and the VM (for `CreateHandlers`/`NewHTTPHandler`). The server never reaches into chain internals.
 
-```go
-type APIReply struct {
-    Checks  map[string]Result
-    Healthy bool
-}
+### server ↔ each VM service
+A VM exposes its API two ways (`server.go:155`, `server.go:191`):
+- **`CreateHandlers()`** returns path-mounted handlers (the classic `gorilla/rpc` JSON-RPC service at `/ext/bc/<chainID>`, e.g. `vms/platformvm/service.go`). See the VM specs for method semantics.
+- **`NewHTTPHandler()`** returns a single handler reached by header routing — the connect-rpc transport. Clients use `connectclient.SetRouteHeaderInterceptor` (`connectclient/client.go:22`) to set `Avalanche-Api-Route: <chainID>`.
 
-type Result struct {
-    Message interface{}
-    Error   *string
-    Duration Duration
-    Timestamp time.Time
-    ContiguousFailures uint32
-    TimeOfFirstFailure *time.Time
-}
-```
+The server wraps every VM handler with `rejectMiddleware` so the chain's bootstrap state gates access, plus per-chain metrics and optional tracing. This is the only behavior the server imposes on VM endpoints.
 
-- HTTP 200 if healthy; 503 if not.
-- Optional tag filtering: `?tags=foo,bar` to query only specific check groups.
-- Subsystems register checks via `health.Registerer`.
+### health ↔ subsystems
+`health.Health` (`health.go:34`) is a pure registry: subsystems call `RegisterHealthCheck("network", n.Net, ApplicationTag)` etc. (`node.go:1432`). The health subsystem invokes each `Checker.HealthCheck` periodically and never holds its own locks during the call (`worker.go:226`), so a checker may safely grab the subsystem's locks without deadlock. Subsystems registered as health checks include `network`, `router`, `database`, `diskspace`, `bls`, `futureupgrade`, and `shuttingDown` (`node.go:1432`–`1840`), all tagged `application`.
 
-**Registered checks include:**
-- **[Networking](networking.md#1-network-interface):** `network.Network` implements `health.Checker`; reports connected peer count, send failure rate, and inbound connection metrics.
-- **[Database](database.md#1-core-interface):** LevelDB and PebbleDB implement `HealthCheck()`, returning disk usage statistics. The `database.Database` interface embeds `health.Checker`.
-- **Chain bootstrapping state:** Each chain's handler registers a health check that returns unhealthy until the chain has completed bootstrapping (the bootstrap state guard in the API middleware also uses this).
-- Disk space, memory, and CPU resource checks registered during node initialization.
+### indexer ↔ engine
+The indexer never talks to the HTTP server beyond `PathAdder`. It learns about accepted containers by registering as an `snow.Acceptor` with the per-chain `AcceptorGroup`s (`indexer.go:326`). The consensus engine pushes `Accept(ctx, containerID, bytes)` to the index synchronously, in acceptance order, **before** the VM commits the container (`index.go:41`). The indexer mounts a read-only JSON-RPC service per index via `PathAdder.AddRoute` (`indexer.go:340`).
+
+### wallet ↔ node
+The wallet is a **client-side SDK**, fully decoupled from the node process. It talks to a node over the standard P/X/C JSON-RPC endpoints (and EVM RPC) using `MakeWallet(ctx, uri, …)` (`wallet/subnet/primary/wallet.go:80`). It builds and signs transactions locally and only issues finished bytes.
 
 ---
 
-## 4. Info API (`api/info/`)
+## 7. Key Behaviors, Invariants & Security
 
-JSON-RPC 2.0 at `/ext/info`.
+### Health model (authoritative: `api/health/README.md`)
+Three independent workers (`health.go:61`) sharing one `checks_failing` gauge:
 
-| Method | Returns |
-|--------|---------|
-| `GetNodeVersion()` | Version string, database version, git commit |
-| `GetNodeID()` | NodeID, proof of possession |
-| `GetNodeIP()` | Public IP |
-| `Uptime()` | `{rewardingStakePercentage, weightedAveragePercentage}` |
-| `GetNetworkID()` | Network ID number |
-| `GetNetworkName()` | "mainnet", "fuji", "local" |
-| `Peers(nodeIDs)` | Peer list with IP, version, last contact, bench status |
-| `GetBlockchainID(alias)` | Chain ID from alias |
-| `IsBootstrapped(chainID)` | bool |
-| `GetVMs()` | All registered VMs and aliases |
-| `GetTxFee()` | Current fee schedule |
-| `Acps()` | Avalanche Consensus Proposals — support/objection percentages |
-| `Upgrades()` | Full upgrade schedule |
+- **Readiness** — registered via `RegisterMonotonicCheck` (`health.go:85` → `worker.go:127`). A monotonic check runs only until it first passes; thereafter it caches and returns the success result forever. Used for one-time startup gates.
+- **Health** — flips freely based on the subsystem's heuristic (`health.go:88`).
+- **Liveness** — indicates an unrecoverable state requiring a restart (`health.go:92`).
 
-**`Uptime()`** queries [networking.NodeUptime()](networking.md#7-uptime-tracking-from-peers-perspective) (`network.Network.NodeUptime()`) which calculates the node's perceived uptime as reported by its validator peers. The result is weighted by stake weight across connected validators.
+Worker behavior (`worker.go`):
+- `Start(ctx, freq)` launches one goroutine that runs all checks immediately, then every `freq` (default **30s**, set in `node`). `Start` is idempotent via `sync.Once` (`worker.go:172`).
+- Each iteration clones the check map and runs **every check in its own goroutine** (`worker.go:214`); a check added mid-iteration runs next time.
+- A newly registered check is immediately recorded as failing with `Result{Error:"not yet run"}` (`result.go:13`, `worker.go:112`). So a node is unhealthy until checks actually run and pass.
+- `ContiguousFailures` and `TimeOfFirstFailure` accumulate across iterations (`worker.go:244`).
+- On `Stop` (`worker.go:196`) in-flight checks finish, the goroutine exits, and checks never run again.
 
-**`GetTxFee()` response:**
-```go
-GetTxFeeResponse {
-    TxFee                         uint64
-    CreateAssetTxFee              uint64
-    CreateSubnetTxFee             uint64
-    TransformSubnetTxFee          uint64
-    CreateBlockchainTxFee         uint64
-    AddPrimaryNetworkValidatorFee uint64
-    AddPrimaryNetworkDelegatorFee uint64
-    AddSubnetValidatorFee         uint64
-    AddSubnetDelegatorFee         uint64
-}
-```
+**Tags** (`health.go:21`): every check implicitly gets `AllTag = "all"`. Registering with `AllTag` explicitly is an error (`worker.go:80`, prevents metric double-count). The special `ApplicationTag = "application"` makes a check appear in **every** tag-filtered query — application checks cannot be filtered out (`worker.go:153`). `Results(tags...)` always unions in the application tag; with no tags it returns the `all` set. A result set is healthy iff every included check's `Error == nil` (`worker.go:166`).
 
----
+**HTTP semantics** (`handler.go`): `GET /ext/health[/...]` returns the JSON `APIReply{checks, healthy}` with status **200 if healthy, 503 if not** (`handler.go:57`); the `?tag=` query filters. The same path also accepts JSON-RPC `POST` (`health.readiness/health/liveness`) via `NewGetAndPostHandler` (`handler.go:19`), which forks on `r.Method`.
 
-## 5. Metrics API (`api/metrics/`)
+### Security
+- **CORS** (`server.go:327`): `AllowedOrigins` from `--http-allowed-origins` (default `*`), `AllowCredentials: true`.
+- **Allowed hosts / DNS-rebinding defense** (`allowed_hosts.go`): the `Host` header is checked against `--http-allowed-hosts` (default `localhost`). A wildcard `*` disables the check. Requests with an empty Host or an IP-literal Host are always allowed; an unlisted hostname gets **403** (`allowed_hosts.go:75`). This blocks DNS-rebinding attacks that bypass CORS.
+- **No built-in auth**: there is no token/API-key auth layer in the server. Privileged endpoints are protected by *not exposing them*: the **Admin API is disabled by default** and the HTTP server should be bound to localhost / behind a reverse proxy. Operators restrict access via `--http-host`, allowed hosts, and the per-API enable flags.
+- The `node-id` response header (`server.go:334`) is informational, identifying which node served the request.
 
-Prometheus scrape endpoint at `/ext/metrics`.
+### Metrics & tracing
+- Every wrapped handler increments `calls`, tracks `calls_processing`, and adds to `calls_duration`, labelled by `base` (chain name) (`server/metrics.go`). These live in the API registerer.
+- The Prometheus endpoint aggregates a `MultiGatherer` (`metrics/multi_gatherer.go:20`); subsystems register sub-registries namespaced by prefix (`prefix_gatherer.go`) or label (`label_gatherer.go`) via `metrics.MakeAndRegister`.
+- If tracing is enabled, `api.TraceHandler` (`traced_handler.go:24`) opens an OTel span per request tagged with method/url/host/etc.
 
-**MultiGatherer:** Dynamic registration/deregistration of metric sources:
-```go
-type MultiGatherer interface {
-    Register(name string, gatherer prometheus.Gatherer) error
-    Deregister(name string)
-    prometheus.Gatherer  // Gather() []*dto.MetricFamily
-}
-```
+### Indexer invariants
+- An index stores containers **by acceptance order**: a monotonic `nextAcceptedIndex` maps `index → Container` and `containerID → index` (`index.go:38`). `Accept` is idempotent — re-accepting an already-stored container is a no-op (`index.go:119`), covering the crash window where the index committed but the VM had not.
+- The whole write (both directions + the counter) is committed atomically through a `versiondb` (`index.go:160`).
+- Only **primary-network** chains are indexed, and only when `--index-enabled` is set (`indexer.go:142`, `indexer.go:188`).
+- DAG VMs (X-Chain pre-linearization) get three indices — `block`, `vtx`, `tx`; linear chains get only `block` (`indexer.go:262`). An unexpected VM type closes the indexer.
+- **Incomplete-index guard**: if a chain was indexed in a previous run but indexing is now off (or vice-versa) and `--index-allow-incomplete` is false, the node **fatally exits** to avoid gaps (`indexer.go:189`, `indexer.go:220`).
+- `GetContainerRange` is capped at `MaxFetchedByRange = 1024` (`index.go:24`).
 
-**PrefixGatherer:** Prefixes all metric names with a namespace string.
-**LabelGatherer:** Adds static Prometheus labels to all metrics.
-
-**Component consumers:** [MeterDB](database.md#29-meterdb-databasemeterdb) registers per-chain database metrics here. Each chain gets a dedicated MeterDB wrapping its prefixed DB, and the gathered metrics are published under the chain's namespace (e.g., `chain_<chainID>_db_*`).
+### Edge cases
+- Adding a route that conflicts with a reserved alias returns `errAlreadyReserved` (`router.go:116`); adding an alias before its base exists still works because routes are mirrored to aliases on creation (`router.go:143`).
+- `AddRouteWithReadLock` exists because some callers (e.g. admin's `AliasChain`) register routes while already holding the router read lock during request handling; it temporarily releases it (`server.go:237`).
+- A VM whose `CreateHandlers` errors is logged and skipped — the chain still runs without an HTTP surface (`server.go:157`).
 
 ---
 
-## 6. Wallet SDK (`wallet/`)
+## 8. Configuration
 
-### 6.1 Primary Network Wallet
+API enable flags and HTTP options (`config/flags.go`, defaults shown):
 
-```go
-// wallet/subnet/primary/
-type Wallet interface {
-    P() pwallet.Wallet
-    X() xwallet.Wallet
-    C() cwallet.Wallet
-}
-```
+| Flag | Default | Effect |
+|------|---------|--------|
+| `--api-admin-enabled` | `false` | Mount `/ext/admin` (privileged). |
+| `--api-info-enabled` | `true` | Mount `/ext/info`. |
+| `--api-health-enabled` | `true` | Mount `/ext/health[/...]`. |
+| `--api-metrics-enabled` | `true` | Mount `/ext/metrics`. |
+| `--index-enabled` | `false` | Run the indexer + mount `/ext/index/...`. |
+| `--index-allow-incomplete` | `false` | Permit indices with gaps (otherwise fatal). |
+| `--http-host` | `127.0.0.1` | Bind address (empty/unspecified = all interfaces). |
+| `--http-port` | `9650` | Port (`0` = auto-assign). |
+| `--http-allowed-origins` | `*` | CORS allowed origins. |
+| `--http-allowed-hosts` | `localhost` | Allowed `Host` headers; `*` disables the check. |
 
-**Construction:**
-```go
-wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-    URI:              uri,       // node URI
-    AVAXKeychain:     avaxKC,
-    EthKeychain:      ethKC,
-    SubnetIDs:        subnetIDs,
-    ValidationIDs:    validationIDs,
-})
-```
+Per-chain VM endpoints (`/ext/bc/<chainID>`) are always mounted for every running chain; there is no per-chain enable flag at this layer. `HTTPConfig` (read/write/idle timeouts, `server.go:73`) comes from the node's HTTP config block. Config wiring: `config/config.go:311`–`325`; the keys themselves: `config/keys.go`.
 
-Fetches UTXOs and chain context from the remote node.
-
-### 6.2 P-Chain Wallet
-
-```go
-// wallet/chain/p/wallet/wallet.go
-type Wallet interface {
-    Builder() builder.Builder
-    Signer()  signer.Signer
-
-    // Staking
-    IssueAddValidatorTx(vdr, rewardsOwner, shares, ...) (*txs.Tx, error)
-    IssueAddDelegatorTx(vdr, rewardsOwner, ...) (*txs.Tx, error)
-    IssueAddSubnetValidatorTx(vdr, ...) (*txs.Tx, error)
-    IssueRemoveSubnetValidatorTx(nodeID, subnetID, ...) (*txs.Tx, error)
-    IssueAddPermissionlessValidatorTx(vdr, signer, assetID, ...) (*txs.Tx, error)
-    IssueAddPermissionlessDelegatorTx(vdr, assetID, ...) (*txs.Tx, error)
-
-    // Subnet management
-    IssueCreateSubnetTx(owner, ...) (*txs.Tx, error)
-    IssueCreateChainTx(subnetID, genesis, vmID, fxIDs, name, ...) (*txs.Tx, error)
-    IssueTransformSubnetTx(subnetID, assetID, ...) (*txs.Tx, error)
-    IssueTransferSubnetOwnershipTx(subnetID, owner, ...) (*txs.Tx, error)
-    IssueConvertSubnetToL1Tx(subnetID, chainID, addr, validators, ...) (*txs.Tx, error)
-
-    // L1 validators
-    IssueRegisterL1ValidatorTx(balance, pop, warpMsg, ...) (*txs.Tx, error)
-    IssueSetL1ValidatorWeightTx(warpMsg, ...) (*txs.Tx, error)
-    IssueIncreaseL1ValidatorBalanceTx(validationID, balance, ...) (*txs.Tx, error)
-    IssueDisableL1ValidatorTx(validationID, ...) (*txs.Tx, error)
-
-    // Value transfer
-    IssueBaseTx(outputs, ...) (*txs.Tx, error)
-    IssueImportTx(chainID, to, ...) (*txs.Tx, error)
-    IssueExportTx(chainID, outputs, ...) (*txs.Tx, error)
-}
-```
-
-**Builder context:**
-```go
-type Context struct {
-    NetworkID        uint32
-    AVAXAssetID      ids.ID
-    ComplexityWeights map[string]uint16  // Etna dynamic fee weights
-    GasPrice         uint64             // base gas price
-}
-```
-
-The Etna dynamic fee uses four complexity dimensions (from `vms/components/gas/dimensions.go`): `Bandwidth`, `DBRead`, `DBWrite`, and `Compute`. Each transaction type has a pre-computed complexity in `vms/platformvm/txs/fee/complexity.go`. See [PlatformVM transactions](platformvm.md#2-transaction-types) for the full transaction type catalog.
-
-### 6.3 X-Chain Wallet
-
-```go
-type Wallet interface {
-    Builder() builder.Builder
-    Signer()  signer.Signer
-
-    IssueBaseTx(outputs, ...) (*txs.Tx, error)
-    IssueCreateAssetTx(name, symbol, denomination, initialState, ...) (*txs.Tx, error)
-    IssueOperationTx(ops, ...) (*txs.Tx, error)
-    IssueOperationTxMintFT(outputs, ...) (*txs.Tx, error)
-    IssueOperationTxMintNFT(assetID, payload, owners, ...) (*txs.Tx, error)
-    IssueOperationTxMintProperty(assetID, owner, ...) (*txs.Tx, error)
-    IssueOperationTxBurnProperty(assetID, ...) (*txs.Tx, error)
-    IssueImportTx(chainID, to, ...) (*txs.Tx, error)
-    IssueExportTx(chainID, outputs, ...) (*txs.Tx, error)
-}
-```
-
-See [AVM transactions](vms.md#11-transaction-types) for the full list of X-Chain transaction types and their UTXO model.
-
-### 6.4 C-Chain Wallet
-
-```go
-type Wallet interface {
-    IssueImportTx(chainID, to common.Address, ...) (*evm.Tx, error)
-    IssueExportTx(chainID, outputs, ...) (*evm.Tx, error)
-}
-```
-
-Handles both AVAX-side (UTXO) and EVM-side (account) representations. See [SAEVM C-Chain wrapper](vms.md#46-c-chain-wrapper) for how import/export transactions are processed on the C-Chain side.
-
-### 6.5 Options Pattern
-
-All `Issue*` methods accept variadic options:
-```go
-type Option interface{ Apply(*options) }
-
-// Common options:
-WithContext(ctx context.Context)
-WithChangeOwner(owner *secp256k1fx.OutputOwners)
-WithBaseFee(*big.Int)
-WithPollFrequency(time.Duration)
-WithAssumeDecided()  // skip confirmation polling
-```
-
-### 6.6 Transaction Flow
-
-```
-1. wallet.P().IssueAddValidatorTx(...)
-2. Builder.NewAddValidatorTx() → calculates fees, selects UTXOs, computes change
-3. Signer.Sign(ctx, tx)         → adds secp256k1 + BLS signatures
-4. client.IssueTx(tx)          → HTTP POST to platformvm RPC
-5. Confirmation polling         → polls until tx accepted (if not WithAssumeDecided)
-```
-
-Internally, `IssueAddValidatorTx` calls `builder.NewAddValidatorTx()` then `IssueUnsignedTx()`, which calls `signer.Sign()` followed by `IssueTx()`. The signer uses the [secp256k1 keychain](api.md#91-secp256k1-utilscryptosecp256k1) for UTXO authorization and optionally a [BLS key](api.md#72-bls-key) for validator proof-of-possession.
+There is exactly **one** `http.Server` for the node, constructed at `node.go:1024`. Every endpoint above shares it.
 
 ---
 
-## 7. Staking Certificate Management (`staking/`)
+## 9. Wallet SDK (high level)
 
-### 7.1 TLS Certificate
+The wallet (`wallet/`) builds and issues P/X/C transactions entirely client-side using a **backend / builder / signer** triad per chain:
 
-Node identity is a self-signed ECDSA P-256 certificate:
+- **Builder** (`wallet/chain/*/builder/`) — assembles unsigned transactions, selecting UTXOs and computing fees. It reads available funds from the backend's UTXO view.
+- **Signer** (`wallet/chain/*/signer/`) — walks an unsigned tx (visitor pattern, `signer/visitor.go`) and produces credentials from a `keychain.Keychain`, again consulting the backend to resolve which UTXOs/owners a credential must satisfy.
+- **Backend** (`wallet/chain/*/backend.go`) — the local, mutable state: a cache of UTXOs (`common.ChainUTXOs`) and (for P-chain) subnet/L1 owners. It is updated optimistically as txs are issued and accepted (`wallet/chain/p/wallet/backend_visitor.go`), so a sequence of dependent txs can be built before any is confirmed.
+- **Client** — issues the signed bytes to the node's JSON-RPC endpoint (`IssueTx`).
 
-```go
-func NewCertAndKeyBytes() (certBytes, keyBytes []byte, err error)
-// Generates:
-// - ECDSA key on P-256 curve
-// - Self-signed X.509 cert:
-//   - Validity: 2000-01-01 to ~2100
-//   - Serial number: 0
-//   - Key usage: Digital Signature
-//   - No CA constraints
+`pwallet.Wallet` (`wallet/chain/p/wallet/wallet.go:31`) exposes one `Issue<TxType>Tx` method per P-chain transaction (e.g. `IssueAddValidatorTx`, `IssueBaseTx`) that builds → signs → issues in one call, plus accessors `Builder()` / `Signer()` for manual control.
 
-func InitNodeStakingKeyPair(keyPath, certPath string) error
-// Idempotent: generates only if files don't exist
-// Key: PKCS8 PEM; Cert: X.509 PEM
-```
-
-**NodeID derivation:**
-```
-SHA256(cert.Raw) → RIPEMD160(result) → 20-byte NodeID
-```
-
-The NodeID is used in the [TLS upgrade flow](networking.md#62-upgrade-flow): after a TLS handshake completes, the peer's certificate is extracted and `ids.NodeIDFromCert()` derives the NodeID, which is then used for all subsequent peer identity checks.
-
-### 7.2 BLS Key
-
-Used for Warp signing and validator weight aggregation:
-
-```go
-type Signer interface {
-    PublicKey() *bls.PublicKey
-    Sign(msg []byte) (*bls.Signature, error)
-    SignProofOfPossession(msg []byte) (*bls.Signature, error)
-}
-```
-
-**Proof of Possession (PoP):** A BLS signature that proves the node controls the private key, preventing key substitution attacks. Uses a separate cipher suite from ordinary message signing.
-
-**Key sizes:**
-- Public key: 48 bytes (compressed G1 point)
-- Signature: 96 bytes (compressed G2 point)
-
-**Component consumers:**
-- [Simplex BLS signing](consensus.md#24-bls-signing-simplexblsgo): Simplex consensus uses `BLSSigner` and `BLSVerifier` (from `simplex/bls.go`) to sign and verify notarization/finalization quorum certificates.
-- [Warp messaging](platformvm.md#83-warp-messaging-vmsplatformvmwarp): all Warp messages are BLS-signed by validators; the P-Chain verifies aggregated BLS signatures against the validator set at a given height.
-- [Networking handshake](networking.md#23-handshake-message-handshake): the `Handshake` message includes a BLS-signed IP (`IpBlsSig`), which the recipient verifies using the sender's PoP-verified public key to authenticate the claimed IP address.
-
-### 7.3 Certificate Verification (`staking/verify.go`)
-
-```go
-func CheckSignature(cert *Certificate, msg []byte, sig []byte) error
-// Supports RSA-PSS (PKCS1v15 + SHA256) and ECDSA (ASN1 + SHA256)
-```
+`MakeWallet(ctx, uri, avaxKeychain, ethKeychain, config)` (`wallet/subnet/primary/wallet.go:80`) bootstraps a primary-network wallet: it `FetchState` (UTXOs for the given addresses) and P-chain `GetOwners`, then wires the three per-chain triads and returns a `Wallet` with `.P()`, `.X()`, `.C()` accessors. `WalletConfig.SubnetIDs`/`ValidationIDs` pre-load owners needed for subnet/L1 transactions. Because state is fetched once at construction, an external issuer mutating the same UTXOs can desync the wallet. The `wallet/subnet/primary/examples/` directory contains runnable end-to-end examples for each transaction type.
 
 ---
 
-## 8. ID Types (`ids/`)
+## 10. Cross-References
 
-### 8.1 ID (32 bytes)
-
-```go
-type ID [32]byte  // IDLen = 32
-
-// Creation
-IDs.FromString(str string) (ID, error)  // CB58 decode
-IDs.ToID(bytes []byte) (ID, error)       // Hash256 of arbitrary bytes
-
-// Encoding
-id.String() string   // CB58
-id.Hex() string      // hex
-
-// Operations
-id.Prefix(prefixes ...uint64) ID   // Hash with uint64 prefixes
-id.Append(suffixes ...uint32) ID   // Hash with uint32 suffixes
-id.XOR(other ID) ID                // bitwise XOR
-id.Bit(i uint) int                 // extract bit at position i
-id.Compare(other ID) int           // lexicographic compare
-```
-
-**CB58 encoding:** Base58 (using the `mr-tron/base58` alphabet) with a 4-byte SHA256 checksum appended before encoding. Note: the implementation uses standard Base58, not Crockford's alphabet. All 32-byte IDs are displayed as CB58 strings (e.g., `2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM`). The encoding/decoding logic lives in `utils/cb58/cb58.go`.
-
-### 8.2 NodeID (20 bytes)
-
-```go
-type NodeID ShortID  // 20-byte alias
-
-// Derivation
-ids.NodeIDFromCert(cert *staking.Certificate) NodeID
-// = RIPEMD160(SHA256(cert.Raw))
-
-// Display
-nodeID.String() → "NodeID-<CB58>"
-ids.NodeIDFromString("NodeID-<CB58>") (NodeID, error)
-```
-
-JSON marshal/unmarshal uses the `"NodeID-"` prefix.
-
-**Usage:** NodeID derivation is used in the [TLS handshake upgrade flow](networking.md#62-upgrade-flow) to establish peer identity from their TLS certificate.
-
-### 8.3 ShortID (20 bytes)
-
-```go
-type ShortID [20]byte  // ShortIDLen = 20
-
-ids.ToShortID(bytes []byte) (ShortID, error)  // Hash160
-ids.ShortFromPrefixedString(str, prefix) (ShortID, error)
-
-shortID.String() → CB58
-shortID.PrefixedString(prefix) → prefix + CB58
-// Common: "P-avax...", "X-avax...", "C-0x..."
-```
-
-Used for addresses (RIPEMD160 of public key), chain aliases (first 20 bytes of chain ID), and display addresses with chain prefix.
-
-### 8.4 Aliaser
-
-```go
-type Aliaser interface {
-    Alias(id ID) (string, error)           // ID → primary alias
-    AliasOrDefault(id ID) string
-    Aliases(id ID) ([]string, error)       // all aliases
-    PrimaryAliasOrDefault(id ID) string
-}
-
-type AliasWriter interface {
-    Aliaser
-    Link(id ID, alias string) error
-    RemoveAlias(alias string)
-}
-```
-
-Chains register their human-readable names (e.g., `"P"`, `"X"`, `"C"`) via the Aliaser.
-
----
-
-## 9. Cryptographic Utilities (`utils/crypto/`)
-
-### 9.1 SECP256K1 (`utils/crypto/secp256k1/`)
-
-ECDSA over secp256k1 (Bitcoin curve), using `decred/dcrd`.
-
-**Key sizes:**
-- Private key: 32 bytes
-- Compressed public key: 33 bytes
-- Signature: 65 bytes (`r[32] || s[32] || v[1]` recovery byte)
-
-```go
-// Generation
-secp256k1.NewPrivateKey() (*PrivateKey, error)
-
-// Public key
-priv.PublicKey() *PublicKey
-pub.Address() ids.ShortID          // RIPEMD160(SHA256(pubkey))
-pub.EthAddress() common.Address    // Ethereum keccak160
-
-// Signing
-priv.Sign(msg []byte) ([]byte, error)      // signs SHA256(msg)
-priv.SignHash(hash []byte) ([]byte, error) // signs raw 32-byte hash
-
-// Verification
-pub.Verify(msg, sig []byte) bool
-pub.VerifyHash(hash, sig []byte) bool
-secp256k1.RecoverPublicKey(msg, sig) (*PublicKey, error)
-```
-
-**Recovery cache:** `RecoverCache` (LRU) maps `(hash, sig) → NodeID`. Avoids expensive ECDSA recovery on repeated verification.
-
-**Canonical signature check:** `verifySECP256K1RSignatureFormat` rejects non-canonical signatures (high-S malleability prevention).
-
-**Component consumers:**
-- [AVM secp256k1fx](vms.md#13-fx-feature-extension-system): The `secp256k1fx` feature extension (`vms/secp256k1fx/`) uses secp256k1 signatures to authorize UTXO spending on the X-Chain and P-Chain. `secp256k1fx.Fx` verifies `TransferInput`, `MintOperation`, etc.
-- [P-Chain UTXO verification](platformvm.md#41-two-phase-verification): PlatformVM's execution engine calls `fx.VerifyTransfer()` and `fx.VerifyPermission()` from `secp256k1fx` during the two-phase verification of import/export and validator transactions.
-
-### 9.2 BLS (`utils/crypto/bls/`)
-
-Boneh-Lynn-Shacham using `supranational/blst` (constant-time, BLST reference implementation).
-
-```go
-// Public key: 48 bytes (compressed G1 point)
-bls.PublicKeyToCompressedBytes(pk) []byte
-bls.PublicKeyFromCompressedBytes(b) (*PublicKey, error)
-
-// Signature: 96 bytes (compressed G2 point)
-bls.SignatureToBytes(sig) []byte
-bls.SignatureFromBytes(b) (*Signature, error)
-
-// Aggregation
-bls.AggregatePublicKeys(pks []*PublicKey) (*PublicKey, error)
-bls.AggregateSignatures(sigs []*Signature) (*Signature, error)
-
-// Verification
-bls.Verify(pk, sig, msg) bool
-bls.VerifyProofOfPossession(pk, sig, msg) bool
-
-// Aggregated batch verification
-bls.VerifyAggregate(pks []*PublicKey, sig *Signature, msgs [][]byte) bool
-```
-
-**Cipher suites:**
-- `CiphersuiteSignature`: For regular BLS message signing.
-- `CiphersuiteProofOfPossession`: Distinct hash-to-curve; prevents PoP/signature confusion.
-
-**Warp message signing:** All Warp messages signed with `CiphersuiteSignature`. PoP uses `CiphersuiteProofOfPossession`. This prevents a validator's regular message signature from being reused as a PoP.
-
-### 9.3 Keychain Abstraction (`utils/crypto/keychain/`)
-
-```go
-type Signer interface {
-    Sign(msg []byte) ([]byte, error)
-    Address() ids.ShortID
-}
-
-type Keychain interface {
-    Get(addr ids.ShortID) (Signer, bool)
-    Addresses() set.Set[ids.ShortID]
-}
-```
-
-Unifies different signing backends (secp256k1, BLS, HSM) for wallet operations.
-
----
-
-## 10. Compression (`utils/compression/`)
-
-Two compression algorithms supported:
-
-| Algorithm | Usage |
-|-----------|-------|
-| Zstandard (zstd) | P2P messages, BlockDB, snapshot files |
-| Gzip | Legacy; some API responses |
-
-```go
-type Compressor interface {
-    Compress([]byte) ([]byte, error)
-    Decompress([]byte) ([]byte, error)
-}
-```
-
-P2P message compression: If compressed size is smaller than the original, messages are wrapped in a `p2p.Message{CompressedZstd: ...}` envelope. Both ends must detect and decompress. See [P2P message wire format](networking.md#31-wire-format) for details on when compression is applied.
-
-[BlockDB compression](database.md#63-block-entry-format) uses the same zstd compressor: each block entry in `x/blockdb/` is zstd-compressed before writing to disk, with the compressed bytes stored after the `blockEntryHeader`.
-
----
-
-## 11. Hashing (`utils/hashing/`)
-
-```go
-func ComputeHash256(data []byte) []byte        // SHA256
-func ComputeHash256Array(data []byte) [32]byte // SHA256 as array
-func ComputeHash160(data []byte) []byte        // RIPEMD160(SHA256(data))
-func ComputeHashOf(a, b []byte) []byte         // SHA256(a||b)
-func PrefixHashID(prefix uint64, id ID) ID     // used for DB prefix keys
-```
-
-All cryptographic hashes use SHA-256. Addresses use RIPEMD-160 of SHA-256 (matches Bitcoin / Ethereum address derivation).
-
----
-
-## 12. Formatting and Encoding (`utils/formatting/`)
-
-```go
-// Encoding enum
-const (
-    Hex    Encoding = "hex"
-    CB58   Encoding = "cb58"
-    JSON   Encoding = "json"
-)
-
-func Encode(encoding Encoding, bytes []byte) (string, error)
-func Decode(encoding Encoding, str string) ([]byte, error)
-```
-
-API responses use CB58 for IDs and hex for raw bytes by default. Callers may request either via the `encoding` parameter.
+- [overview.md](overview.md) — where the API server sits in the node.
+- [node.md](node.md) — node lifecycle that constructs the server, health, indexer, and registers node-wide APIs.
+- [chains.md](chains.md) — `chains.Manager` and the `RegisterChain` fan-out that mounts VM handlers.
+- [vm-framework.md](vm-framework.md) — the `common.VM` `CreateHandlers` / `NewHTTPHandler` contract.
+- [platformvm.md](platformvm.md), [avm.md](avm.md), [evm.md](evm.md) — per-VM `/ext/bc/<chainID>` endpoint semantics.
+- [networking.md](networking.md) — peer/uptime data behind `info.peers` / `info.uptime`.
+- [database.md](database.md) — the databases backing the indexer.
+- [primitives.md](primitives.md) — IDs, encodings (`formatting.Encoding`), `json.Uint64` used across requests.
+- [consensus.md](consensus.md) / [simplex.md](simplex.md) — the acceptance events the indexer subscribes to.

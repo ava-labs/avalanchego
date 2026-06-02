@@ -1,621 +1,494 @@
-# Database Layer
+# Database & Storage Layer
 
-## 1. Core Interface (`database/`)
+## 1. Purpose
 
-All storage in AvalancheGo goes through a composable interface hierarchy:
+AvalancheGo stores all persistent state (blocks, transactions, validator sets,
+chain state, metadata) through a single, composable key-value abstraction.
+Rather than coupling each consumer to a concrete engine, the codebase defines a
+small `Database` interface ([database/database.go](../database/database.go)) and
+builds everything else — backends, namespacing, buffering, metrics, corruption
+guards, RPC transport, and the Merkle-trie state store — as implementations or
+**decorators** of that interface.
+
+This document describes the storage abstractions only. The business logic of the
+VMs that consume them (state schemas, block formats) lives in
+[platformvm.md](platformvm.md), [avm.md](avm.md), and [evm.md](evm.md); how each
+chain is given its own database is in [chains.md](chains.md).
+
+## 2. Responsibilities & Scope
+
+In scope:
+
+- The core `Database`/`Batch`/`Iterator` interfaces and their behavioral contract.
+- Concrete backends: `leveldb`, `pebbledb`, `memdb`.
+- Decorators: `prefixdb` (keyspace isolation), `versiondb` (buffered atomic
+  commit), `meterdb` (metrics), `corruptabledb` (corruption fail-stop),
+  `rpcdb` (gRPC transport for out-of-process VMs).
+- Structured helpers built on `Database`: `linkeddb` (ordered list),
+  `heightindexdb`, `x/blockdb` (raw block files), `x/archivedb` (height-versioned).
+- `x/merkledb` — the verifiable Merkle-radix-trie store used for state sync.
+- `cache/` — the LRU + metered caching layer used throughout.
+
+Out of scope (cross-referenced): VM state machines, consensus, networking
+([networking.md](networking.md)), the state-sync protocol drivers above merkledb.
+
+## 3. Package / File Layout
+
+| Path | Role |
+|------|------|
+| [database/database.go](../database/database.go) | Core interfaces (`Database`, KV reader/writer/deleter, `Compacter`, `HeightIndex`) |
+| [database/batch.go](../database/batch.go) | `Batch`/`Batcher` interfaces + `BatchOps` helper |
+| [database/iterator.go](../database/iterator.go) | `Iterator`/`Iteratee` + `IteratorError` |
+| [database/errors.go](../database/errors.go) | `ErrClosed`, `ErrNotFound` |
+| [database/common.go](../database/common.go) | Batch capacity-shrink constants |
+| [database/helpers.go](../database/helpers.go) | Typed get/put helpers (uint64, IDs, etc.) |
+| [database/factory/factory.go](../database/factory/factory.go) | Backend selection + wrapping |
+| [database/leveldb/db.go](../database/leveldb/db.go) | LevelDB (goleveldb) backend |
+| [database/pebbledb/db.go](../database/pebbledb/db.go) | PebbleDB (CockroachDB pebble) backend |
+| [database/memdb/db.go](../database/memdb/db.go) | In-memory map backend |
+| [database/prefixdb/db.go](../database/prefixdb/db.go) | Keyspace namespacing decorator |
+| [database/versiondb/db.go](../database/versiondb/db.go) | In-memory write buffer with atomic commit |
+| [database/meterdb/db.go](../database/meterdb/db.go) | Prometheus metrics decorator |
+| [database/corruptabledb/db.go](../database/corruptabledb/db.go) | Fail-stop on unexpected errors |
+| [database/rpcdb/db_client.go](../database/rpcdb/db_client.go), [db_server.go](../database/rpcdb/db_server.go) | gRPC client/server bridge |
+| [database/linkeddb/linkeddb.go](../database/linkeddb/linkeddb.go) | Doubly-linked-list KV store |
+| [database/heightindexdb/](../database/heightindexdb/) | `HeightIndex` implementations (memdb, meterdb) |
+| [x/merkledb/](../x/merkledb/) | Merkle-radix-trie database |
+| [x/blockdb/](../x/blockdb/) | Append-only raw block file store |
+| [x/archivedb/](../x/archivedb/) | Height-versioned append-only KV |
+| [cache/cache.go](../cache/cache.go) | `Cacher` interface |
+| [cache/lru/](../cache/lru/) | LRU + sized LRU caches |
+| [cache/metercacher/](../cache/metercacher/) | Metrics wrapper for caches |
+
+## 4. Core Interfaces
+
+### 4.1 `Database`
+
+`Database` is an aggregation of small single-method interfaces
+([database/database.go:89](../database/database.go)):
 
 ```go
-// database/database.go
 type Database interface {
-    KeyValueReaderWriterDeleter
-    Batcher
-    Iteratee
-    Compacter
-    io.Closer
-    health.Checker
-}
-
-type KeyValueReader interface {
-    Has(key []byte) (bool, error)
-    Get(key []byte) ([]byte, error)  // ErrNotFound if missing
-}
-
-type KeyValueWriter interface {
-    Put(key, value []byte) error
-}
-
-type KeyValueDeleter interface {
-    Delete(key []byte) error
-}
-
-type Compacter interface {
-    Compact(start, limit []byte) error  // nil = infinity
+    KeyValueReaderWriterDeleter   // Has / Get / Put / Delete
+    Batcher                       // NewBatch
+    Iteratee                      // NewIterator*
+    Compacter                     // Compact
+    io.Closer                     // Close
+    health.Checker                // HealthCheck
 }
 ```
 
-**Component consumers:** The `Database` interface (and specifically its `health.Checker` embedding) is registered with the [Health API](api.md#3-health-api) so that database errors surface as health check failures. LevelDB and PebbleDB each implement `HealthCheck()` returning disk statistics.
+The constituent KV methods ([database.go:17-69](../database/database.go)):
 
-### 1.1 Batch Interface
+```go
+Has(key []byte) (bool, error)
+Get(key []byte) ([]byte, error)   // returns ErrNotFound if absent
+Put(key, value []byte) error      // nil key == empty key; nil value may read back nil-or-empty
+Delete(key []byte) error
+Compact(start, limit []byte) error // nil start = -inf, nil limit = +inf
+```
+
+Documented argument-aliasing contract: `key`/`value` are always **safe to modify
+after the call returns**; returned byte slices from `Get` are **safe to read but
+not to modify**. Implementations clone as needed.
+
+The interface deliberately mirrors go-ethereum's `ethdb` so that geth-derived EVM
+code can use it unchanged ([database.go:4-6](../database/database.go)).
+
+### 4.2 `Batch` / `Batcher`
+
+A `Batch` is a write-only buffer flushed atomically by `Write`
+([database/batch.go:14](../database/batch.go)):
 
 ```go
 type Batch interface {
     KeyValueWriterDeleter
-    Size() int              // total buffered bytes
-    Write() error           // atomic flush
-    Reset()                 // clear for reuse
-    Replay(w KeyValueWriterDeleter) error  // apply to another target
-    Inner() Batch           // innermost batch in chain
+    Size() int                              // buffered bytes (keys+values+deletes)
+    Write() error                           // atomic flush to host db
+    Reset()                                 // clear for reuse
+    Replay(w KeyValueWriterDeleter) error   // re-apply ops, in order, to another target
+    Inner() Batch                           // innermost batch (used when decorators nest)
 }
 ```
 
-`Write()` is all-or-nothing: either all ops succeed or none do.
+`BatchOps` ([batch.go:50](../database/batch.go)) is a reusable helper that records
+cloned ops and implements `Replay`; versiondb and others embed it.
+`common.go` defines `MaxExcessCapacityFactor`/`CapacityReductionFactor`
+([common.go:13](../database/common.go)) controlling when a batch's backing slice
+is shrunk on `Reset` to bound retained memory.
 
-### 1.2 Iterator Interface
+### 4.3 `Iterator` / `Iteratee`
 
-```go
-type Iterator interface {
-    Next() bool
-    Error() error
-    Key() []byte     // valid until Release()
-    Value() []byte   // valid until Release()
-    Release()        // must be called; safe to call multiple times
-}
+`Iterator` ([database/iterator.go:21](../database/iterator.go)) is a lazy cursor.
+Contract:
 
-type Iteratee interface {
-    NewIterator() Iterator
-    NewIteratorWithStart(start []byte) Iterator
-    NewIteratorWithPrefix(prefix []byte) Iterator
-    NewIteratorWithStartAndPrefix(start, prefix []byte) Iterator
-}
-```
+- `Next()` returns `false` on exhaustion **or** error; `Error()` is checked after.
+- A closed DB makes `Next()` return `false` and `Error()` return `ErrClosed`.
+- Not safe for concurrent use; multiple iterators may run concurrently.
+- `Release()` is mandatory, idempotent, and may be called before exhaustion.
 
-### 1.3 Error Semantics
+`Iteratee` provides four constructors ([iterator.go:51](../database/iterator.go)):
+full, `WithStart`, `WithPrefix`, `WithStartAndPrefix`. `IteratorError`
+([iterator.go:71](../database/iterator.go)) is a no-op iterator that only reports a
+fixed error — returned by decorators when the DB is already closed.
 
-| Error | Meaning |
-|-------|---------|
-| `ErrNotFound` | Key does not exist (Get, Has) |
-| `ErrClosed` | Database was closed |
-| All others | I/O or corruption errors |
+### 4.4 Errors
 
----
+Only two sentinel errors ([database/errors.go](../database/errors.go)):
+`ErrClosed` and `ErrNotFound`. These are treated as **expected** (non-corrupting)
+everywhere; any other error is treated as potential corruption (see §7.3).
 
-## 2. Storage Implementations
+### 4.5 `HeightIndex`
 
-### 2.1 MemDB (`database/memdb/`)
+A specialized height-keyed store ([database.go:99](../database/database.go)):
+`Put(height, value)`, `Get(height)`, `Has(height)`, `Sync(start,end)`, `Close()`.
+Implemented by [x/blockdb](../x/blockdb/database.go) and wrapped by
+[database/heightindexdb/meterdb](../database/heightindexdb/meterdb/db.go).
 
-In-memory, ephemeral key-value store.
+## 5. The Decorator Stack
 
-```go
-type Database struct {
-    lock sync.RWMutex
-    db   map[string][]byte
-}
-```
-
-- Keys stored as strings; values cloned on read/write.
-- Iterator snapshots keys at creation time (safe from concurrent writes).
-- `Compact()` is a no-op.
-- Use: testing, caching layers, ephemeral state.
-
-### 2.2 LevelDB (`database/leveldb/`)
-
-Wraps `syndtr/goleveldb`. Default database engine.
-
-**Config defaults:**
-```
-BlockCacheCapacity:   12 MiB      (64-bit blocks cached in memory)
-WriteBuffer:          6 MiB each  (two memtables before flush)
-OpenFilesCacheCapacity: 1024      (file descriptors)
-CompactionTotalSize:  10 MiB base, 10× multiplier per level
-BloomFilter:          10 bits/key
-```
-
-- Background goroutine polls LevelDB stats every 10s for Prometheus metrics.
-- Batch overhead: 8 bytes per operation (for size tracking).
-- `Compact(nil, nil)` triggers full compaction.
-
-**Batch:**
-- Wraps `leveldb.Batch`.
-- `Replay()` reconstructs ops by re-running Put/Delete on target.
-
-### 2.3 PebbleDB (`database/pebbledb/`)
-
-CockroachDB's embedded database; alternative to LevelDB.
-
-**Config defaults:**
-```
-CacheSize:          512 MiB
-BytesPerSync:       512 KiB
-MaxOpenFiles:       4096
-ReadSamplingMultiplier: -1 (disabled; prevents compaction write stalls)
-MaxConcurrentCompactions: 1
-```
-
-- Iterators registered in `openIterators` set; auto-closed on DB close.
-- Batch idempotence: second `Write()` call clones the batch first (pebble limitation).
-- Upper bound calculation for prefix iteration: increment last non-0xFF byte.
-
-### 2.4 VersionDB (`database/versiondb/`)
-
-In-memory copy-on-write layer over any Database. Enables state diffs and rollbacks.
-
-```go
-type Database struct {
-    lock  sync.RWMutex
-    mem   map[string]valueDelete   // pending changes
-    db    database.Database        // underlying DB
-    batch database.Batch
-}
-
-type valueDelete struct {
-    value  []byte
-    delete bool  // true = deletion in the map
-}
-```
-
-**Operations:**
-- `Commit()`: Flush `mem` → `db.batch` → `batch.Write()` → clear `mem`.
-- `Abort()`: Clear `mem` without writing.
-- `CommitBatch()`: Return batch without flushing (caller controls write timing).
-- `SetDatabase(newDB)`: Hot-swap underlying DB (used by state sync).
-
-**Iterator:** Merges in-memory map with underlying DB iterator. In-memory writes take precedence over disk reads for the same key.
-
-**Use:** P-Chain and X-Chain state diffs; any place where "apply if accepted, discard if rejected" semantics are needed.
-
-**Component consumers:**
-- [PlatformVM state diffs](platformvm.md#52-state-diff-copy-on-write): `vms/platformvm/state/state.go` wraps the root DB in a `versiondb.Database` as `baseDB`, and each block execution creates a `Diff` on top of it.
-- [AVM state](vms.md#16-state-storage-avmstate): `vms/avm/state/state.go` holds a `*versiondb.Database` as its backing store, committing on block acceptance.
-
-### 2.5 PrefixDB (`database/prefixdb/`)
-
-Namespace isolation by prepending a fixed-length prefix to all keys.
-
-```go
-type Database struct {
-    dbPrefix   []byte   // Hash256(userPrefix) — fixed 32 bytes
-    dbLimit    []byte   // dbPrefix + 1 (upper bound)
-    db         database.Database
-}
-```
-
-- Prefix is a SHA256 hash of the user-supplied prefix bytes; gives fixed 32-byte overhead regardless of prefix length.
-- `JoinPrefixes(p1, p2)` = `Hash256(p1 || p2)` for nested namespaces.
-- Iterator strips prefix from returned keys.
-- Batches pool-manage `[]byte` buffers for efficiency.
-
-**Use:** Isolating different state namespaces (UTXOs, validators, transactions) within a single physical DB file.
-
-**Component consumers:**
-- [P-Chain database prefixes](platformvm.md#53-database-prefixes): PlatformVM builds a deep tree of PrefixDB layers (validators, current/pending stakers, UTXOs, subnets, etc.) all rooted in a single `versiondb.Database`.
-- [MerkleDB namespaces](database.md#44-storage-layout): MerkleDB internally creates three PrefixDB namespaces (`0x00` metadata, `0x01` value nodes, `0x02` intermediate nodes) over its `baseDB`.
-- [Chain VM databases](chains.md#13-chain-creation-flow): The chain manager (`chains/manager.go`) creates a PrefixDB keyed by `ctx.ChainID[:]` for each chain, then further subdivides it into `vmDB`, `vertexDB`, `bootstrappingDB`, etc.
-
-### 2.6 LinkedDB (`database/linkeddb/`)
-
-Ordered doubly-linked list on top of a key-value store.
-
-```go
-type node struct {
-    Value       []byte
-    HasNext     bool
-    Next        []byte
-    HasPrevious bool
-    Previous    []byte
-}
-```
-
-- `Put(key, value)`: If key exists, update; else insert as new head.
-- `Delete(key)`: Remove and relink neighbors.
-- `HeadKey()`: Cached.
-- Iterator walks `Next` pointers from head.
-
-**Caching:** LRU node cache (default 1024 entries). Head key separately cached with dirty bit.
-
-**Use:** Transaction ordering, FIFO queues, ordered event logs.
-
-### 2.7 RPCDB (`database/rpcdb/`)
-
-Database over gRPC for inter-process communication.
-
-**Server** (`DatabaseServer`):
-```go
-type DatabaseServer struct {
-    db database.Database
-    iteratorLock sync.RWMutex
-    iterators map[uint64]database.Iterator
-}
-```
-
-Allocates iterators by ID. `IteratorNext` returns up to 128 KiB per RPC call (batched).
-
-**Client** (`DatabaseClient`):
-- Implements `database.Database` by calling gRPC stubs.
-- Batch deduplication: strips duplicate keys (keeps last write).
-- Streaming iterator: background goroutine fetches batches; client consumes locally.
-
-**Error mapping:** gRPC status codes ↔ `database.ErrNotFound` / `database.ErrClosed`.
-
-**Use:** VM subprocess (RPCChainVM) database access; node isolation.
-
-**Component consumers:** [RPCChainVM database proxy](vms.md#34-database-proxy-databaserpcdb): when the node spawns an external VM subprocess, `vm_client.go` creates an RPCDB server over the node-side database and passes the client-side connection to the subprocess via `vm_server.go`.
-
-### 2.8 CorruptableDB (`database/corruptabledb/`)
-
-Wrapper that detects unexpected errors and prevents further access.
-
-```go
-type Database struct {
-    database.Database
-    errorLock    sync.RWMutex
-    initialError error  // first non-recoverable error
-}
-```
-
-- `ErrNotFound`, `ErrClosed` are allowed (no action).
-- Any other error: sets `initialError` once; all subsequent ops return that error.
-- Prevents cascade corruption from partial writes.
-
-**Application:** Applied by `database/factory/factory.go` as the outermost wrapper on every root database (LevelDB or PebbleDB) created via `factory.New()`. This means every chain's physical storage has corruption detection. Additionally, `vms/rpcchainvm/vm_server.go` wraps the RPCDB-supplied database in CorruptableDB before passing it to the VM subprocess.
-
-### 2.9 MeterDB (`database/meterdb/`)
-
-Prometheus metrics decorator for any Database.
-
-Metrics collected (labeled by method):
-- `calls` counter
-- `duration` gauge (cumulative nanoseconds)
-- `size` counter (bytes read/written)
-
-Instruments: all `Database`, `Batch`, and `Iterator` methods.
-
-**Component consumers:** The chain manager (`chains/manager.go`) wraps each chain's prefixed DB in a MeterDB before handing it to the VM, with metrics reported through the [Prometheus metrics API](api.md#5-metrics-api) under the chain's metric namespace.
-
-### 2.10 HeightIndexDB (`database/heightindexdb/`)
-
-Maps `uint64` height → `[]byte` value.
-
-```go
-type HeightIndex interface {
-    Put(height uint64, value []byte) error
-    Get(height uint64) ([]byte, error)
-    Has(height uint64) (bool, error)
-    Sync(start, end uint64) error
-}
-```
-
-In-memory implementation uses `map[uint64][]byte`.
-
-**Component consumers:**
-- **ProposerVM state** (`vms/proposervm/state/`): uses `HeightIndex` to map block heights to proposer block IDs, enabling efficient height-to-block lookups during bootstrapping and state sync.
-- **BlockDB** (`x/blockdb/`): `x/blockdb/database.go` implements the `database.HeightIndex` interface, providing the same `Put`/`Get`/`Has`/`Sync` contract backed by a file-based store (see [Section 6](#6-blockdb-xblockdb)).
-- **SAEVM** (`vms/saevm/`): uses `HeightIndex` in `ExecutionResults` to track block execution results by height.
-
----
-
-## 3. Implementation Comparison
-
-| Feature | MemDB | LevelDB | PebbleDB | VersionDB | PrefixDB | LinkedDB | RPCDB |
-|---------|-------|---------|----------|-----------|----------|----------|-------|
-| Persistence | None | Disk | Disk | Via parent | Via parent | Via parent | Remote |
-| Thread safety | RWMutex | Internal | Pebble locks | RWMutex | RWMutex | RWMutex | Network |
-| Key ordering | Lexicographic | Lexicographic | Lexicographic | Lexicographic | Lexicographic | Insertion order | Parent |
-| ACID batches | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Compaction | No-op | Yes | Yes | Via parent | Via parent | N/A | Delegated |
-| Primary use | Testing | Default storage | High-throughput | State diffs | Namespacing | Ordered lists | IPC |
-
----
-
-## 4. MerkleDB — PATRICIA Trie (`x/merkledb/`)
-
-### 4.1 Architecture
-
-```go
-type merkleDB struct {
-    baseDB             database.Database
-    valueNodeDB        *valueNodeDB         // leaf nodes
-    intermediateNodeDB *intermediateNodeDB  // internal nodes
-    history            *trieHistory         // for change proofs
-    root               maybe.Maybe[*node]
-    rootID             ids.ID
-}
-```
-
-A radix/PATRICIA trie with configurable branch factor.
-
-**Component consumers:** MerkleDB is used wherever cryptographic state commitments and range/change proofs are required:
-- The EVM state sync path (`vms/evm/sync/`) uses MerkleDB's range and change proof protocol.
-- The generic state sync syncer (`database/merkle/sync/`) targets any `database.MerkleDB`-compatible store.
-- ProposerVM state sync ([Section 2.7](vms.md#27-state-sync-support)) integrates with the same proof mechanism.
-
-### 4.2 Branch Factors
-
-| BranchFactor | Bits per token | Max trie depth for 256-bit key |
-|-------------|---------------|-------------------------------|
-| 2 | 1 bit | 256 |
-| 4 | 2 bits | 128 |
-| 16 | 4 bits | 64 |
-| 256 | 8 bits | 32 |
-
-Keys are divided into tokens of N bits. Each token is an index into the node's `Children` array.
-
-### 4.3 Node Structure
-
-```go
-type node struct {
-    Key      Key             // full path from root to this node
-    Children [BranchFactor]*node
-    Value    []byte          // nil for internal nodes; non-nil for leaves
-    hash     ids.ID          // cached node hash
-}
-
-type Key struct {
-    length int     // bit length
-    value  string  // compact bit string
-}
-```
-
-### 4.4 Storage Layout
-
-Three namespaces in `baseDB` (via PrefixDB):
-
-| Prefix | Content |
-|--------|---------|
-| `0x00` | Metadata: `cleanShutdown`, `rootKey` |
-| `0x01` | Value nodes: `key → value bytes` |
-| `0x02` | Intermediate nodes: `key → serialized children` |
-
-### 4.5 View / Diff Model
-
-```go
-type View interface {
-    Get(key []byte) ([]byte, error)
-    Put(key, value []byte) error
-    Delete(key []byte) error
-    NewView(ctx, ViewChanges) (View, error)
-    CommitToDB(ctx) error
-    GetMerkleRoot(ctx) (ids.ID, error)
-    GetProof(ctx, key []byte) (*Proof, error)
-}
-```
-
-- Lazy clone-on-write: shares unchanged subtrees with parent view.
-- In-memory change buffer until `CommitToDB()`.
-- Child views track parent invalidation; concurrent views allowed.
-- `CommitToDB()` flushes all changes to `merkleDB` atomically.
-
-### 4.6 Caching
-
-**ValueNodeDB caching:**
-```go
-type valueNodeDB struct {
-    baseDB    database.Database
-    nodeCache cache.Cacher[Key, *node]
-}
-```
-Cache miss: deserialize from `baseDB` prefix `0x01`.
-
-**IntermediateNodeDB — three-tier:**
-1. `writeBuffer` (dirty nodes, LRU eviction): holds recently modified nodes.
-2. `nodeCache` (clean cache): recently read unmodified nodes.
-3. `baseDB` prefix `0x02`: persisted nodes.
-
-Eviction: batch-evict oldest `evictionBatchSize` bytes from `writeBuffer` to disk.
-
-### 4.7 Hashing
+Every decorator implements `database.Database` by wrapping another
+`database.Database`, so they compose freely. The runtime stack for a typical
+chain (assembled in [chains/manager.go:635-645](../chains/manager.go) and
+[database/factory/factory.go:59-62](../database/factory/factory.go)):
 
 ```
-Leaf node:     hash = Hash256([value])
-Internal node: hash = Hash256([version][token0][hash0]...[tokenN][hashN])
-Root ID = hash(root node)
+                 per-chain / per-component prefixdb (keyspace isolation)
+                          prefixdb(VMDBPrefix), prefixdb(VertexDBPrefix), ...
+                                        |
+                          prefixdb(ChainID)            <- chains/manager.go:640
+                                        |
+                          meterdb (per-chain metrics)  <- chains/manager.go:635
+                                        |
+        ----  shared base DB (built once at node startup)  ----
+                          versiondb (only if readOnly)  <- factory.go:61
+                                        |
+                          corruptabledb (fail-stop)     <- factory.go:59
+                                        |
+                  leveldb | pebbledb | memdb (the concrete engine)
 ```
 
-After `CommitToDB()`, hashes are recomputed bottom-up for modified subtrees. `RootGenConcurrency` goroutines parallelize hash computation.
+`versiondb` is layered on top per write transaction by VMs (e.g. for atomic block
+commit, §6.2) rather than only at the base; `factory.New` adds one only for
+read-only mode.
 
-**Clean shutdown:** `cleanShutdownKey` set to 1 before shutdown. On unclean shutdown (value = 0), intermediate nodes may need rebuild.
+### 5.1 `prefixdb` — keyspace isolation
 
-### 4.8 Proof Types
+`prefixdb.New(prefix, db)` ([prefixdb/db.go:62](../database/prefixdb/db.go))
+prepends every key with a fixed prefix and confines iteration/compaction to
+`[prefix, increment(prefix))` ([db.go:48](../database/prefixdb/db.go) computes the
+limit; [db.go:175](../database/prefixdb/db.go) scopes iterators).
 
-**Inclusion/Exclusion Proof:**
-```go
-type Proof struct {
-    Path  []ProofNode
-    Key   Key
-    Value maybe.Maybe[[]byte]
-}
+- The prefix stored is `hashing.ComputeHash256(prefix)`
+  ([db.go:84](../database/prefixdb/db.go)), giving every prefix a fixed 32-byte
+  length so prefixes can't ambiguously overlap.
+- Nesting is flattened: wrapping a `prefixdb` in another `prefixdb` joins+rehashes
+  the prefixes and points at the **original base** db, avoiding deep call chains
+  ([db.go:63-68](../database/prefixdb/db.go)). `NewNested`
+  ([db.go:77](../database/prefixdb/db.go)) opts out of this compression.
+- Iterators strip the prefix from returned keys
+  ([db.go:358](../database/prefixdb/db.go)).
+- Closing a prefixdb only marks it closed; it does **not** close the shared base.
+- A pooled `BytesPool` ([db.go:247](../database/prefixdb/db.go)) reuses prefixed-key
+  buffers to limit allocations on the hot path.
 
-type ProofNode struct {
-    Key         Key
-    ValueOrHash maybe.Maybe[[]byte]  // value if small, hash if large
-    Children    map[byte]ids.ID      // child node hashes
-}
+This is how each chain gets an isolated namespace: `prefixdb.New(ChainID, ...)`
+then further `prefixdb.New(VMDBPrefix, ...)` etc. (see [chains.md](chains.md)).
+
+### 5.2 `versiondb` — buffered atomic commit
+
+`versiondb.New(db)` ([versiondb/db.go:46](../database/versiondb/db.go)) holds all
+writes in an in-memory `map[string]valueDelete`
+([db.go:35-43](../database/versiondb/db.go)) and only touches the underlying DB on
+`Commit`:
+
+- `Put`/`Delete` mutate the map; `Get`/`Has` read the map first, then fall through
+  to the base DB ([db.go:54-103](../database/versiondb/db.go)).
+- `Commit` ([db.go:186](../database/versiondb/db.go)) replays the buffered map into
+  a single base-DB batch and calls `Write()` — one atomic flush — then clears the
+  buffer. `Abort` ([db.go:203](../database/versiondb/db.go)) just clears the map.
+- `CommitBatch` ([db.go:218](../database/versiondb/db.go)) returns the prepared
+  batch without writing, letting a caller fold these writes into a larger atomic
+  operation (used so a VM can commit DB state and shared-memory atomically).
+- It implements `Commitable` ([db.go:25](../database/versiondb/db.go)).
+- Its iterator merges the sorted in-memory keys with the base iterator
+  ([db.go:321](../database/versiondb/db.go)), honoring buffered deletes.
+- `SetDatabase`/`GetDatabase` ([db.go:164](../database/versiondb/db.go)) allow
+  swapping the base (used during bootstrap/state-sync swaps).
+
+### 5.3 `meterdb` — metrics
+
+`meterdb.New(reg, db)` ([meterdb/db.go](../database/meterdb/db.go)) times every
+method and counts bytes read/written, exporting per-method Prometheus metrics
+(one label per method — `has`, `get`, `put`, `batch_write`, `iterator_next`, …
+[db.go:21-85](../database/meterdb/db.go)). It is placed per-chain just under the
+chain's prefixdb so each chain reports independently.
+
+### 5.4 `corruptabledb` — fail-stop
+
+`corruptabledb.New(db, log)` ([corruptabledb/db.go:36](../database/corruptabledb/db.go))
+guards against silent data corruption. `handleError`
+([db.go:134](../database/corruptabledb/db.go)) inspects every returned error: if it
+is anything other than `nil`, `ErrNotFound`, or `ErrClosed`, the wrapper latches
+that error and **every subsequent operation fails** with it
+([db.go:127-155](../database/corruptabledb/db.go)). This prevents the node from
+continuing to operate on a possibly-corrupted disk. It sits directly above the
+backend in `factory.New`.
+
+### 5.5 `rpcdb` — serving the DB over gRPC
+
+`rpcdb` bridges the `Database` interface across a process boundary for
+out-of-process (plugin) VMs (see [vm-framework.md](vm-framework.md),
+`vms/rpcchainvm`):
+
+- **Server** `rpcdb.NewServer(db)` ([db_server.go:41](../database/rpcdb/db_server.go))
+  wraps a real `Database` and answers `rpcdbpb` RPCs (`Has`, `Get`, `Put`,
+  `WriteBatch`, iterator lifecycle). It runs in the avalanchego process; the VM
+  plugin connects as a client ([vms/rpcchainvm/vm_client.go:293](../vms/rpcchainvm/vm_client.go)).
+- **Client** `rpcdb.NewClient(...)` ([db_client.go:34](../database/rpcdb/db_client.go))
+  implements `Database` by issuing those RPCs. Used inside the plugin process
+  ([vms/rpcchainvm/vm_server.go:196](../vms/rpcchainvm/vm_server.go)).
+- Sentinel errors are encoded as enum values across the wire and decoded back
+  ([rpcdb/errors.go](../database/rpcdb/errors.go)): only `ErrClosed`/`ErrNotFound`
+  round-trip as "expected"; anything else is a real gRPC error.
+- Iterators are streamed in **batches**: a background `fetch` goroutine pulls pages
+  of key/values, and the invariant that exactly one outstanding request exists per
+  server-side iterator id is enforced client-side
+  ([db_client.go:215-219](../database/rpcdb/db_client.go)). Batching amortizes the
+  per-key RPC cost.
+
+### 5.6 `linkeddb` — ordered list on top of a KV store
+
+`linkeddb` ([linkeddb/linkeddb.go:27](../database/linkeddb/linkeddb.go)) implements
+a doubly-linked list over an arbitrary `Database`, giving insertion-ordered
+iteration that a plain KV store (sorted by key) can't. Each entry is a `node`
+with `Next`/`Previous` pointers ([linkeddb.go:56](../database/linkeddb/linkeddb.go));
+a head pointer at key `0x01` anchors the list. It caches nodes in an LRU
+([linkeddb.go:64](../database/linkeddb/linkeddb.go)) and batches writes. Used by
+mempools and similar ordered collections.
+
+## 6. Concrete Backends & the Factory
+
+### 6.1 Backends
+
+| Backend | Engine | Notes |
+|---------|--------|-------|
+| `leveldb` | goleveldb (pure Go) | Defaults: 12 MiB block cache, 12 MiB write buffer, 1024 file handles, bloom 10 bits/key ([leveldb/db.go:30-62](../database/leveldb/db.go)). Reports disk stats via `HealthCheck`. |
+| `pebbledb` | cockroachdb/pebble | Defaults: 512 MiB cache, memtable = cache/4, stop-writes threshold 8 ([pebbledb/db.go:23-44](../database/pebbledb/db.go)). |
+| `memdb` | in-process `map[string][]byte` | Ephemeral, RW-locked ([memdb/db.go:30](../database/memdb/db.go)); used for tests and read-only/no-persistence modes. |
+
+Both disk engines take a JSON config blob letting operators override the defaults.
+
+### 6.2 Factory & wrapping
+
+`factory.New(name, path, readOnly, config, reg, logger)`
+([factory/factory.go:28](../database/factory/factory.go)) selects the engine by
+name (`leveldb` | `memdb` | `pebbledb`), then **always** wraps it in
+`corruptabledb`, and additionally wraps in `versiondb` when `readOnly` and not
+memdb ([factory.go:59-62](../database/factory/factory.go)). The node builds this
+base DB once and hands it to the chain manager, which adds the per-chain
+`meterdb` + `prefixdb` layers (§5).
+
+**Atomic block commit pattern:** a VM accumulates a block's state changes in a
+`versiondb` over its chain DB; once the block is accepted, `Commit` flushes them
+in one base-DB batch, so the engine sees the whole block atomically (and a crash
+leaves either the whole block or none of it). When the block must also write
+cross-chain shared memory, `CommitBatch` is used to merge both into one write
+([chains/atomic/shared_memory.go:130](../chains/atomic/shared_memory.go)).
+
+## 7. Component Boundaries & Relationships
+
+### 7.1 DB ↔ VM / chain state
+
+The chain manager owns the only references to the base engine. Each chain receives
+a `prefixdb(ChainID)` sub-namespace and, within it, further prefixes for the VM,
+vertex, and bootstrap stores ([chains/manager.go:640-645](../chains/manager.go)).
+A VM never sees the engine, only its `database.Database` handle — so it cannot
+read or corrupt another chain's keyspace. See [chains.md](chains.md),
+[vm-framework.md](vm-framework.md).
+
+### 7.2 DB ↔ rpcchainvm plugin (rpcdb)
+
+For plugin VMs the boundary is a gRPC channel: avalanchego runs
+`rpcdb.NewServer` over the chain's real DB, and the plugin process holds an
+`rpcdb` client implementing `database.Database`. The plugin therefore programs
+against the identical interface whether in- or out-of-process. The corruption and
+metrics decorators stay on the server side. See [vm-framework.md](vm-framework.md).
+
+### 7.3 Corruption isolation
+
+`ErrNotFound`/`ErrClosed` are control-flow signals, not failures. Any other error
+bubbling out of an engine is assumed to indicate disk/data corruption:
+`corruptabledb` latches it and refuses further work, and `rpcdb` propagates it as a
+non-sentinel gRPC error. This keeps a damaged node from compounding corruption.
+
+### 7.4 merkledb ↔ state sync
+
+`x/merkledb`'s `MerkleDB` satisfies the generic
+`merklesync.DB[*RangeProof, *ChangeProof]` interface
+([x/merkledb/db.go:42](../x/merkledb/db.go), [database/merkle/sync/db.go:25](../database/merkle/sync/db.go)),
+which the state-sync engine uses to fetch/verify/commit ranges from peers. The
+sync driver itself ([database/merkle/sync/](../database/merkle/sync/)) is out of
+scope here; merkledb only provides the proofs.
+
+## 8. merkledb — the verifiable trie store
+
+`x/merkledb` is a key-value store backed by a **Merkle radix trie**: it behaves
+like a `database.Database` but additionally exposes a cryptographic root hash and
+proofs, enabling trustless state sync ([x/merkledb/README.md](../x/merkledb/README.md)).
+
+### 8.1 Trie structure & hashing
+
+- A trie is made of `node`s; each node's key is a prefix of its children's keys
+  and it has up to `BranchFactor` children. Supported branch factors are 2/16/256,
+  mapping to token sizes 1/4/8 bits ([x/merkledb/key.go:20](../x/merkledb/key.go));
+  the default is `BranchFactor16` ([db.go:199](../x/merkledb/db.go)).
+- Each node has an **ID** = hash of its contents. The `Hasher` interface hashes a
+  node from its children IDs, value (or value-hash if long), and key
+  ([x/merkledb/hashing.go:25](../x/merkledb/hashing.go), `HashLength = 32`,
+  default SHA-256). Changing any node changes its ID and cascades to the **root
+  ID**, which uniquely identifies a *revision* of the state.
+- Persistence splits nodes into **value nodes** (prefix `1`) and **intermediate
+  nodes** (prefix `2`), plus metadata (prefix `0`), each in its own backing store
+  ([db.go:44-46, 263-264](../x/merkledb/db.go)). A `cleanShutdownKey`
+  ([db.go:48-64](../x/merkledb/db.go)) records whether intermediate nodes were
+  flushed cleanly; on an unclean shutdown they are rebuilt from value nodes
+  ([db.go:397 `rebuild`](../x/merkledb/db.go)).
+
+### 8.2 Views
+
+A **view** ([x/merkledb/view.go](../x/merkledb/view.go)) is an immutable proposed
+set of changes layered on the DB or another view. Changes and node IDs are
+computed **lazily** (only when a root hash or commit is needed) to avoid hashing
+on every edit. Views chain into a tree; a view may be committed only if its parent
+is the DB and only once. Committing a view **invalidates** its siblings and their
+descendants (they then return `ErrInvalid`). Writes to the DB itself go through an
+internal view (`NewBatch`/`Put`/`Delete` build one).
+
+### 8.3 Proofs
+
+Defined in [x/merkledb/proof.go](../x/merkledb/proof.go):
+
+- **`Proof`** ([proof.go:112](../x/merkledb/proof.go)): a single-key
+  inclusion/exclusion proof — the node path from root to the (would-be) target.
+  A verifier reconstructs a trie from the path and checks its root equals the
+  trusted root ID.
+- **`RangeProof`** ([proof.go:184](../x/merkledb/proof.go)): proves a contiguous,
+  complete set of key/value pairs in `[start, end]` at a root (start proof + end
+  proof + the pairs). Lets a syncing client download many pairs at once and verify
+  there are no omitted keys in the range.
+- **`ChangeProof`** ([proof.go:349](../x/merkledb/proof.go)) + `KeyChange`
+  ([proof.go:341](../x/merkledb/proof.go)): proves the set of key changes between
+  two root IDs over a range — used to *catch up* a partially-synced DB without
+  re-downloading unchanged state.
+
+The DB serves these via `GetProof`, `GetRangeProofAtRoot`, `GetChangeProof` and
+verifies/commits peer proofs via `VerifyRangeProof`/`CommitRangeProof`,
+`VerifyChangeProof`/`CommitChangeProof` ([db.go:70-165, 713-875](../x/merkledb/db.go)).
+Change proofs require sufficient retained history (`HistoryLength`, default 300
+revisions, [db.go:202](../x/merkledb/db.go)); the `trieHistory`
+([x/merkledb/history.go:21](../x/merkledb/history.go)) records recent change
+summaries in memory.
+
+### 8.4 Proof flow (state sync)
+
+```
+syncing client                         serving peer (MerkleDB)
+   | known trusted endRootID r              |
+   |--- GetRangeProof(start,end,r) -------->|  GetRangeProofAtRoot
+   |<-- RangeProof{startPf,endPf,kvs} ------|
+   | VerifyRangeProof(r) -> ok              |
+   | CommitRangeProof  (writes kvs locally) |
+   | ... repeat for next range ...          |
+   | later, to catch up old->new root:      |
+   |--- GetChangeProof(oldR,newR,range) --->|
+   |<-- ChangeProof{keyChanges,...} --------|
+   | VerifyChangeProof / CommitChangeProof  |
 ```
 
-- **Inclusion proof:** `Path` reaches node where `Key == query key` with non-nil `Value`.
-- **Exclusion proof:** `Path` reaches a node where the query key doesn't exist.
-- Verification: recompute hashes from leaves to root; compare with expected root ID.
+## 9. x/blockdb and x/archivedb
 
-**Range Proof:**
-```go
-type RangeProof struct {
-    StartProof *Proof
-    EndProof   *Proof
-    KeyChanges []KeyChange  // all keys in [start, end], sorted
-    KeyValues  map[string][]byte
-}
-```
+- **`x/blockdb`** ([x/blockdb/database.go](../x/blockdb/database.go)) is a
+  purpose-built store for raw block bytes, implementing `database.HeightIndex`
+  ([database.go:53](../x/blockdb/database.go)). Blocks are appended to flat data
+  files (`blockdb_N.dat`) with a separate index file (`blockdb.idx`); each entry
+  carries a height, size, xxhash checksum, and version
+  ([database.go:30-44, blockEntryHeader](../x/blockdb/database.go)) and may be
+  zstd-compressed. It supports recovery of the index from the data files and an
+  LRU read cache ([x/blockdb/cache_db.go](../x/blockdb/cache_db.go)). This avoids
+  LSM write-amplification for large, write-once block payloads.
+- **`x/archivedb`** ([x/archivedb/db.go](../x/archivedb/db.go)) is an append-only,
+  height-versioned KV store: each `NewBatch(height)` records puts/deletes tagged
+  with that height, and reads ask for a key *as of* a height, returning the most
+  recent value at or below it ([db.go:23-44](../x/archivedb/db.go)). It keeps the
+  full history of every key (used for historical/archival state queries) rather
+  than overwriting in place.
 
-Proves completeness: no keys exist in `[start, end]` that are not in `KeyChanges`.
+## 10. Caching Layer (`cache/`)
 
-**Change Proof:**
-```go
-type ChangeProof struct {
-    StartProof *Proof     // lower bound in old state
-    EndProof   *Proof     // upper bound in new state
-    KeyChanges []KeyChange // [{key, oldValue, newValue}]
-}
-```
+`Cacher[K,V]` ([cache/cache.go:7](../cache/cache.go)) is a best-effort,
+evicting key-value cache: `Put`, `Get`, `Evict`, `Flush`, `Len`, `PortionFilled`.
 
-Proves differences between `startRootID` and `endRootID`. Enables incremental state sync.
+- **`lru.Cache`** ([cache/lru/cache.go:29](../cache/lru/cache.go)): count-bounded
+  LRU; optional `OnEvict` callback. **`lru.SizedCache`**
+  ([cache/lru/sized_cache.go:37](../cache/lru/sized_cache.go)): byte-size-bounded
+  via a per-entry size function (used where values vary in size). `Deduplicator`
+  ([cache/lru/deduplicator.go](../cache/lru/deduplicator.go)) collapses in-flight
+  duplicate work.
+- **`metercacher.Cache`** ([cache/metercacher/cache.go:16](../cache/metercacher/cache.go)):
+  decorates any `Cacher` with hit/miss/eviction Prometheus metrics.
+- **`cache.Empty`** ([cache/empty.go](../cache/empty.go)): a no-op cache for
+  disabling caching without branching.
 
-### 4.9 History
+Consumers include merkledb's value/intermediate node caches
+([db.go:203-204](../x/merkledb/db.go)), `linkeddb`'s node cache, blockdb's read
+cache, and many VM state caches.
 
-```go
-type trieHistory struct {
-    changes []*changelist  // circular buffer, size = HistoryLength
-}
-```
+## 11. Key Behaviors & Invariants
 
-Stores the `HistoryLength` (default 300) most recent change lists. Enables:
-- `GetChangeProof(startRoot, endRoot)` without re-scanning state.
-- `GetRangeProofAtRoot(rootID, start, end)` for historical queries.
+- **Atomicity.** `Batch.Write` and `versiondb.Commit` flush all buffered ops as one
+  unit; partial application is not observable across a crash for the disk engines.
+- **Isolation.** `prefixdb` (with hashed, fixed-length prefixes) guarantees a chain
+  cannot read or iterate outside its namespace; closing a sub-DB never closes the
+  shared base.
+- **Argument aliasing.** Callers may reuse their key/value buffers immediately after
+  any call; implementations clone. Returned slices from `Get` must not be mutated.
+- **Closed semantics.** Operations after `Close` return `ErrClosed`; iterators on a
+  closed DB stop and report `ErrClosed`.
+- **Fail-stop on corruption.** Unexpected (non-sentinel) errors latch
+  `corruptabledb` and halt further DB use.
+- **merkledb determinism.** Identical key/value sets always yield identical root IDs
+  regardless of insertion order; view changes are hashed lazily and concurrently
+  (`RootGenConcurrency`).
+- **Performance.** Hot paths pool byte buffers (prefixdb), shrink oversized batch
+  slices (`common.go`), batch rpcdb iterator pages, and cache trie nodes; choose
+  `pebbledb` for large state, `leveldb` as the legacy default, `memdb` for tests.
 
-### 4.10 State Synchronization
+## 12. Configuration
 
-`database/merkle/sync/` implements incremental state sync:
-1. Requesting node asks for key ranges + proofs.
-2. Serving node returns `RangeProof`.
-3. Requesting node validates proof and commits.
-4. Repeat with next range until complete.
+| Setting | Where | Default |
+|---------|-------|---------|
+| DB engine (`db-type`) | `factory.New` name arg | `leveldb` \| `pebbledb` \| `memdb` |
+| Read-only mode | `factory.New` `readOnly` | wraps in `versiondb` (non-memdb) |
+| Engine JSON config | `factory.New` `config` | per-engine overrides of cache/buffer/handles |
+| LevelDB block cache / write buffer | [leveldb/db.go:36,40](../database/leveldb/db.go) | 12 MiB / 12 MiB |
+| LevelDB file handle cap / bloom bits | [leveldb/db.go:44,48](../database/leveldb/db.go) | 1024 / 10 |
+| Pebble cache / memtable / stop-writes | [pebbledb/db.go:30,42,43](../database/pebbledb/db.go) | 512 MiB / cache÷4 / 8 |
+| merkledb branch factor | [db.go:199](../x/merkledb/db.go) | `BranchFactor16` |
+| merkledb history length | [db.go:202](../x/merkledb/db.go) | 300 revisions |
+| merkledb value/intermediate node cache | [db.go:203-204](../x/merkledb/db.go) | 1 MiB each |
+| linkeddb node cache | [linkeddb.go:16](../database/linkeddb/linkeddb.go) | 1024 entries |
 
-Uses `CommitRangeProof()` which returns the next key after the proof's end for pagination.
+Node-level wiring of these (CLI flags, where the base DB is created) is in
+[node.md](node.md).
 
-**Related components:**
-- [Chains bootstrap sequencing](chains.md#45-bootstrap-sequencing): state sync is one of the bootstrapping strategies; chain bootstrappers drive the sync protocol.
-- [ProposerVM state sync support](vms.md#27-state-sync-support): ProposerVM wraps inner VM state summaries and delegates sync to the inner VM, which may use MerkleDB's range proof mechanism.
+## 13. Cross-References
 
----
-
-## 5. ArchiveDB (`x/archivedb/`)
-
-Append-only historical state storage.
-
-> **Note:** ArchiveDB (`x/archivedb/`) is a standalone package introduced to support Firewood archival queries (see recent commits `74e4738be2`, `fe062719a9`). It currently has no importers outside its own package in the main `avalanchego` module — it is designed as infrastructure for future Firewood-backed archival state access on the C-Chain (EVM). The Firewood database integration in `vms/saevm/cchain/` uses BlockDB (see [Section 6](#6-blockdb-xblockdb)) for block storage, while archival EVM state reexecution is handled via separate Firewood commit-replay logic.
-
-### 5.1 Key Encoding
-
-```
-Key:   [1-byte prefix][8-byte height big-endian][user key bytes]
-Value: [1-bit operation][remaining bytes]
-         0 = Put (value follows)
-         1 = Delete (no value)
-```
-
-### 5.2 Operations
-
-```go
-func (db *Database) NewBatch(height uint64) *batch
-// → batch.Put(key, value)
-// → batch.Delete(key)
-// → batch.Write()  // atomic flush
-
-func (db *Database) Open(height uint64) *Reader
-// → reader.Get(key)       // value at this height
-// → reader.GetHeight(key) // (value, firstSetHeight)
-```
-
-**Read semantics:** `Get(key)` at height H searches backward from H to find the most recent entry with `height ≤ H`. Returns `ErrNotFound` if the key was deleted or never set.
-
-**Example:**
-```
-Put("foo", "v1") at height 10
-Put("foo", "v2") at height 100
-Delete("foo")    at height 1000
-
-Open(50).Get("foo")   → "v1"
-Open(100).Get("foo")  → "v2"
-Open(1000).Get("foo") → ErrNotFound
-Open(99).GetHeight("foo") → ("v1", 10)
-```
-
-### 5.3 Characteristics
-
-- No indexing overhead for heights without changes.
-- Only deltas stored, not full snapshots.
-- Use: blockchain state archival, forensic queries, historical API endpoints.
-
----
-
-## 6. BlockDB (`x/blockdb/`)
-
-Height-indexed block storage optimized for append-only writes and O(1) random access.
-
-**Component consumers:** BlockDB is used by the SAEVM C-Chain hooks (`vms/saevm/cchain/hooks.go`) to store serialized EVM blocks at each height. It also implements the `database.HeightIndex` interface, so ProposerVM and other components can use it as a height-indexed store. BlockDB is *not* used by PlatformVM, AVM, or the Snow consensus engines — those use LevelDB/PebbleDB directly via the chain manager's `vmDB`.
-
-### 6.1 File Layout
-
-```
-blockdb.idx            — index file (random access by height)
-blockdb_0.dat          — first data file
-blockdb_1.dat          — second data file (when first exceeds MaxDataFileSize)
-...
-```
-
-### 6.2 Index File Format
-
-```go
-type indexFileHeader struct {
-    Version         uint64
-    MaxDataFileSize uint64
-    MinHeight       BlockHeight
-    MaxHeight       BlockHeight
-    NextWriteOffset uint64
-    Reserved        [24]byte
-}
-
-type indexEntry struct {
-    Offset   uint64   // byte offset in data file
-    Size     uint32   // block data bytes
-    Reserved [4]byte
-}
-```
-
-Height → `(dataFileIndex, offset, size)` via `indexEntry` array. O(1) lookup.
-
-### 6.3 Block Entry Format
-
-```go
-type blockEntryHeader struct {
-    Height   BlockHeight
-    Size     uint32
-    Checksum uint64   // xxHash
-    Version  uint16
-}
-// Followed by: [zstd-compressed block bytes]
-```
-
-- xxHash checksum on every block; corruption detected on read.
-- Zstandard compression; configurable level. See also [P2P message compression](networking.md#31-wire-format) which uses the same zstd compressor from `utils/compression/`.
-
-### 6.4 Operations
-
-```go
-Put(height uint64, data []byte) error  // write block, update index
-Get(height uint64) ([]byte, error)     // index lookup → read → decompress → verify
-Sync(start, end uint64) error          // flush range to disk
-```
-
-### 6.5 Caching
-
-LRU cache of open file handles (configurable `MaxOpenFiles`). Prevents repeated open/close of frequently-accessed data files.
-
-### 6.6 Error Handling
-
-`ErrCorrupted` returned on:
-- Checksum mismatch.
-- Invalid height in entry.
-- Malformed header bytes.
-
-Supports index rebuild from valid blocks for partial recovery.
-
----
-
-## 7. Design Principles
-
-1. **Interface segregation**: Small, composable interfaces; callers only depend on what they use.
-2. **Atomic batching**: `Batch.Write()` is always all-or-nothing.
-3. **Resource safety**: `Iterator.Release()` and `Database.Close()` always safe to call.
-4. **Layered composition**: VersionDB → PrefixDB → LevelDB is a typical stack; each layer concerns one responsibility.
-5. **Error propagation**: Iterators accumulate errors; checked via `it.Error()` after loop.
-6. **Merkle consistency**: Root ID cryptographically commits to all state.
-7. **History tracking**: MerkleDB's `trieHistory` enables proof generation without full state re-scan.
+- [overview.md](overview.md) — system overview.
+- [chains.md](chains.md) — per-chain prefixdb namespacing and DB handoff.
+- [vm-framework.md](vm-framework.md) — VM↔DB boundary and rpcchainvm/rpcdb plugins.
+- [platformvm.md](platformvm.md), [avm.md](avm.md), [evm.md](evm.md) — DB consumers.
+- [node.md](node.md) — base DB construction and config flags.
+- [networking.md](networking.md) — transport for state-sync proofs.
+- [primitives.md](primitives.md) — `ids`, `maybe`, hashing utilities used here.
+- [consensus.md](consensus.md), [simplex.md](simplex.md), [api.md](api.md) — siblings.

@@ -1,590 +1,547 @@
-# Platform VM (P-Chain)
+# PlatformVM (P-Chain)
 
-The P-Chain (`vms/platformvm/`) is the Snowman-based VM that manages:
-- Primary network validators and delegators
-- Subnets and their validators
-- L1 (pay-as-you-go) validators post-Etna
-- Cross-chain imports/exports (via atomic memory)
-- Staking rewards and fee collection
+## 1. Purpose
 
-## Directory Layout
+The **PlatformVM** runs the **P-Chain**, the metadata and coordination chain of
+the Avalanche Primary Network. It is the network's *source of truth for who
+validates what*. Every other chain in the node — the X-Chain (AVM), the C-Chain
+(EVM), and every Subnet/L1 blockchain — derives its validator set, and therefore
+its consensus sampling and Warp/ICM signature aggregation, from state stored on
+the P-Chain.
+
+The P-Chain is itself a linear (Snowman) chain. It is special in two ways that
+no other VM is:
+
+1. It implements `validators.State` (`vms/platformvm/vm.go:59`,
+   `vms/platformvm/vm.go:66`), the boundary the rest of the node calls to learn
+   validator sets at historical heights. This is consumed by consensus, the
+   networking layer, Snowman++ proposer selection, and Warp verification.
+2. It is the only VM that still uses **oracle blocks** (proposal / commit /
+   abort) to make a non-deterministic decision: whether a finished validator
+   earned its staking reward, based on measured uptime.
+
+This document covers the P-Chain's business logic: the UTXO model, the full
+transaction taxonomy, the block types and the proposal/commit/abort flow, the
+staking lifecycle, subnets vs. ACP-77 L1s, reward math, the validator-set
+provider boundary, and Warp/ICM signing. The generic VM framework
+(`ChainVM`, mempool plumbing, RPC chain VM) is described in
+[vm-framework.md](./vm-framework.md) and is not repeated here.
+
+## 2. Responsibilities & scope
+
+- **Staking & validator management** for the Primary Network: add/remove
+  validators and delegators, track current vs. pending sets, compute potential
+  rewards, and issue rewards (or not) based on uptime.
+- **Subnet management**: create subnets (`CreateSubnetTx`), create blockchains
+  on subnets (`CreateChainTx`), manage subnet ownership and permissioned subnet
+  validators.
+- **L1 management (ACP-77)**: convert a permissioned subnet into a
+  pay-as-you-go L1 (`ConvertSubnetToL1Tx`), register/weight/balance/disable L1
+  validators driven by Warp messages.
+- **The UTXO ledger** for AVAX on the P-Chain, including cross-chain
+  import/export via shared atomic memory with the X-Chain and C-Chain.
+- **Serving validator sets** at arbitrary historical heights to the rest of the
+  node (`validators.State`).
+- **Warp/ICM signing & verification** of P-Chain-authored messages
+  (subnet conversion, L1 validator registration).
+
+Out of scope: snowman consensus mechanics ([consensus.md](./consensus.md)),
+P2P/gossip transport ([networking.md](./networking.md)), the AVAX asset model
+shared with the X-Chain ([avm.md](./avm.md), [primitives.md](./primitives.md)).
+
+## 3. Package / file layout
+
+| Path | Role |
+|------|------|
+| `vms/platformvm/vm.go` | `VM` type; wires together state, manager, builder, network, validators; implements `ChainVM` + `validators.State` |
+| `vms/platformvm/factory.go` | `Factory.New` — constructs a `VM` from `config.Internal` |
+| `vms/platformvm/service.go` | JSON-RPC API (`platform.*`): `GetCurrentValidators`, `GetStake`, `IssueTx`, `GetBlock`, ... |
+| `vms/platformvm/client.go` | Go client for the above API |
+| `vms/platformvm/config/` | `Internal` (node-supplied config: stake bounds, reward config, upgrade times, tracked subnets) and `Config` (execution/cache tuning) |
+| `vms/platformvm/txs/` | All unsigned transaction types + `Tx` wrapper, codec, visitor, priorities |
+| `vms/platformvm/txs/executor/` | Transaction execution & verification (standard / proposal / atomic), state-change helpers, Warp verification |
+| `vms/platformvm/txs/fee/` | Static + dynamic (Etna) fee calculators, tx complexity |
+| `vms/platformvm/txs/mempool/` | P-Chain mempool |
+| `vms/platformvm/block/` | Stateless block types (Apricot/Banff × proposal/commit/abort/standard/atomic), codec, visitor |
+| `vms/platformvm/block/builder/` | Block production: when to build, what to pack, proposal vs. standard |
+| `vms/platformvm/block/executor/` | Stateful block verify/accept/reject, oracle option generation, block-state cache |
+| `vms/platformvm/state/` | On-disk state, staker sets (current/pending), diffs, L1 validators, expiries, weight/pubkey diffs |
+| `vms/platformvm/reward/` | Staking reward calculator + reward split |
+| `vms/platformvm/validators/` | `Manager` implementing `validators.State` (historical validator-set reconstruction) |
+| `vms/platformvm/validators/fee/` | ACP-77 continuous validator-fee accounting |
+| `vms/platformvm/network/` | Tx gossip + ACP-118 Warp signature request handling |
+| `vms/platformvm/warp/`, `signer/` | Warp message codec/anycast constant, BLS proof-of-possession signer |
+| `vms/platformvm/stakeable/` | `LockIn`/`LockOut` time-locked transfer wrappers |
+| `vms/platformvm/utxo/` | UTXO flow-checker (`VerifySpend`) |
+| `vms/platformvm/genesis/` | Genesis parsing/codec |
+| `vms/platformvm/uptime` (via `snow/uptime`) | Uptime tracking used for reward decisions |
+
+## 4. Core types
+
+### 4.1 The VM
+
+`VM` (`vms/platformvm/vm.go:62`) embeds `config.Internal`, the block
+`Builder`, the `*network.Network`, and a `validators.State`. `Initialize`
+(`vms/platformvm/vm.go:97`) constructs the dependency graph:
+
+- `state.New(...)` — the on-disk state (`vms/platformvm/vm.go:138`)
+- `pvalidators.NewManager(...)` — the validator-set provider, assigned to
+  `vm.State` (`vms/platformvm/vm.go:153`)
+- `txexecutor.Backend` — shared inputs for all tx execution
+  (`vms/platformvm/vm.go:159`)
+- `blockexecutor.NewManager(...)` — verify/accept/reject + block-state cache
+  (`vms/platformvm/vm.go:181`)
+- `network.New(...)` — gossip + Warp signing (`vms/platformvm/vm.go:190`)
+- `blockbuilder.New(...)` — block production (`vms/platformvm/vm.go:218`)
+
+The VM asserts at compile time that it satisfies `validators.State`
+(`vms/platformvm/vm.go:59`). It also runs `initBlockchains`
+(`vms/platformvm/vm.go:300`) on startup to instantiate every chain this node
+should validate, plus background goroutines for gossip, mempool pruning, and
+block reindexing.
+
+### 4.2 Transactions
+
+Every concrete tx is an `UnsignedTx` wrapped in a `txs.Tx` (signed envelope with
+credentials). Dispatch is via the `txs.Visitor` interface
+(`vms/platformvm/txs/visitor.go:7`), grouped by the upgrade that introduced
+them:
+
+| Tx | Introduced | What it does |
+|----|-----------|--------------|
+| `AddValidatorTx` | Apricot | Add a Primary Network validator (legacy; pre-Banff proposal tx) |
+| `AddSubnetValidatorTx` | Apricot | Add a validator to a permissioned subnet |
+| `AddDelegatorTx` | Apricot | Delegate stake to a Primary Network validator (legacy) |
+| `CreateChainTx` | Apricot | Create a blockchain inside a subnet |
+| `CreateSubnetTx` | Apricot | Create a permissioned subnet with an owner |
+| `ImportTx` / `ExportTx` | Apricot | Move AVAX to/from the X- or C-Chain via shared memory |
+| `AdvanceTimeTx` | Apricot | (Pre-Banff only) advance chain time; proposal tx |
+| `RewardValidatorTx` | Apricot | Proposal tx that removes a finished staker and (if committed) pays its reward |
+| `RemoveSubnetValidatorTx` | Banff | Remove a permissioned subnet validator |
+| `TransformSubnetTx` | Banff | Turn a subnet into an elastic (permissionless) subnet; **forbidden post-Etna** |
+| `AddPermissionlessValidatorTx` | Banff | Add a validator (Primary Network or elastic subnet) with a BLS key & reward owners |
+| `AddPermissionlessDelegatorTx` | Banff | Delegate to a permissionless validator |
+| `TransferSubnetOwnershipTx` | Durango | Change a subnet's owner |
+| `BaseTx` | Durango | Pure UTXO transfer / fee burn, no side effects |
+| `ConvertSubnetToL1Tx` | Etna (ACP-77) | Convert a subnet to an L1 with an on-chain manager + initial validator set |
+| `RegisterL1ValidatorTx` | Etna | Add an L1 validator, authorized by a Warp message from the subnet manager |
+| `SetL1ValidatorWeightTx` | Etna | Change (or zero-out/remove) an L1 validator's weight via Warp |
+| `IncreaseL1ValidatorBalanceTx` | Etna | Top up an L1 validator's continuous-fee balance |
+| `DisableL1ValidatorTx` | Etna | Deactivate an L1 validator (authorized by its deactivation owner) and refund balance |
+
+Staking transactions implement layered interfaces in
+`vms/platformvm/txs/staker_tx.go`: `Staker` (subnet, nodeID, BLS key, weight,
+priority), `BoundedStaker` (+ `EndTime`), `ScheduledStaker` (+ `StartTime`,
+pending priority), `PermissionlessStaker` (+ stake outputs), `ValidatorTx`
+(+ reward owners and delegation `Shares`), and `DelegatorTx`. A key invariant
+(`vms/platformvm/txs/staker_tx.go`) is that a `DelegatorTx` never also satisfies
+`ValidatorTx`.
+
+`AddPermissionlessValidatorTx` (`vms/platformvm/txs/add_permissionless_validator_tx.go:35`)
+is the canonical modern staker. Its `SyntacticVerify`
+(`...:121`) enforces the rule **"has BLS key ⇔ is Primary Network"** — Primary
+Network validators must register a BLS key with a proof of possession; subnet
+validators must use the empty signer.
+
+`ConvertSubnetToL1Tx` (`vms/platformvm/txs/convert_subnet_to_l1_tx.go:34`)
+carries the manager `ChainID`/`Address` and an initial sorted list of
+`ConvertSubnetToL1Validator` (`...:86`), each with a NodeID, weight, initial
+balance, BLS proof of possession, and `RemainingBalanceOwner` /
+`DeactivationOwner` (`message.PChainOwner`s).
+
+### 4.3 Blocks
+
+Stateless block types live in `vms/platformvm/block/`. The common interface is
+`Block` (`vms/platformvm/block/block.go:16`); `BanffBlock` adds `Timestamp()`
+(`...:34`). Dispatch is via `block.Visitor`
+(`vms/platformvm/block/visitor.go:6`). Each block type has an Apricot and a
+Banff variant; Banff variants prepend a `Time uint64`:
+
+- **Standard** (`standard_block.go`) — holds decision transactions; the normal
+  block type since Banff. `BanffStandardBlock` also advances chain time.
+- **Proposal** (`proposal_block.go`) — an **oracle block** holding exactly one
+  proposal tx (post-Banff, always a `RewardValidatorTx`). `BanffProposalBlock`
+  may also carry decision txs and a timestamp
+  (`vms/platformvm/block/proposal_block.go:20`).
+- **Commit / Abort** (`commit_block.go`, `abort_block.go`) — the two children
+  of a proposal block; exactly one is accepted, encoding the
+  reward/no-reward decision.
+- **Atomic** (`atomic_block.go`) — Apricot-only; wrapped a single import/export
+  tx before ApricotPhase5. Post-Phase5 atomic txs go into standard blocks.
+
+`CommonBlock` (`common_block.go:12`) holds parent ID, height, and the computed
+`BlockID` (sha256 of the serialized block). The block codec registers types per
+upgrade (`vms/platformvm/block/codec.go`), reusing the tx codec version.
+
+### 4.4 State
+
+`state.Chain` (`vms/platformvm/state/state.go:113`) is the read/write interface
+that both the persistent `State` and in-memory `Diff`s satisfy. It exposes:
+timestamp, the Etna fee state (`gas.State`), the L1-validator excess and accrued
+fees, per-subnet current supply, UTXOs and reward UTXOs, subnets and subnet
+owners, subnet→L1 conversions, subnet transformations, chains, and txs. Staker
+operations are split across `Stakers`/`CurrentStakers`/`PendingStakers`
+(`vms/platformvm/state/stakers.go:33`) and `L1Validators`
+(`vms/platformvm/state/l1_validator.go:34`).
+
+A **`Staker`** (`vms/platformvm/state/staker.go:22`) is the in-memory record for
+a current or pending validator/delegator: `TxID`, `NodeID`, `PublicKey`,
+`SubnetID`, `Weight`, `StartTime`, `EndTime`, `PotentialReward`, and the
+sorting fields `NextTime` + `Priority`. Stakers are ordered by `Less`
+(`...:79`): by `NextTime`, then `Priority`, then `TxID`. `NextTime` is the
+`StartTime` for pending stakers and the `EndTime` for current ones, so a single
+sorted iterator yields the next state change.
+
+An **`L1Validator`** (`vms/platformvm/state/l1_validator.go:81`) is the ACP-77
+record keyed by a `ValidationID`. Its constant fields (subnet, node, BLS key,
+balance/deactivation owners, start time) never change; its mutable fields are
+`Weight`, `MinNonce` (Warp replay protection), and `EndAccumulatedFee`. A
+validator is **active** iff `EndAccumulatedFee != 0`; `EndAccumulatedFee` is the
+total accrued network fee at which the validator's prepaid balance runs out, at
+which point it is auto-deactivated.
+
+**Diffs.** `state.Diff` (`vms/platformvm/state/diff.go:30`) layers mutations on
+top of a parent `Chain` and flattens them into the parent via `Apply`
+(`...:612`). `NewDiff` builds a diff over a block's parent state; `NewDiffOn`
+chains a diff on an arbitrary parent. Diffs are how block verification computes
+"the state if this block is accepted" without mutating disk.
+
+**Priorities.** `txs.Priority` (`vms/platformvm/txs/priorities.go:46`) and the
+`PendingToCurrentPriorities` map (`...:37`) encode the strict ordering in which
+stakers move between sets. The documented invariant is that **permissioned
+subnet validators are removed by time advancement, while permissionless stakers
+are removed by a `RewardValidatorTx` after time has advanced** — this is why
+those two removal paths are distinct.
+
+## 5. Execution flow & staking lifecycle
+
+### 5.1 Transaction execution
+
+Three executors implement `txs.Visitor`:
+
+- **`StandardTx`** (`vms/platformvm/txs/executor/standard_tx_executor.go:77`) —
+  for decision txs in standard (and Banff proposal) blocks. Each visitor method
+  verifies the tx, runs the UTXO flow-check
+  (`backend.FlowChecker.VerifySpend`), then `avax.Consume`/`avax.Produce`s
+  UTXOs and applies side effects to the `Diff`. Returns consumed import inputs,
+  atomic shared-memory requests, and an optional `onAccept` callback (e.g.
+  `CreateChainTx` defers `Config.CreateChain` to acceptance,
+  `...:251`).
+- **`ProposalTx`** (`vms/platformvm/txs/executor/proposal_tx_executor.go:55`) —
+  for the single proposal tx. It is given **two** diffs, `onCommitState` and
+  `onAbortState`, assumed to start equal, and mutates each to represent the
+  committed vs. aborted outcome.
+- **`AtomicTx`** (`atomic_tx_executor.go`) — Apricot-only atomic block path.
+
+`putStaker` (`standard_tx_executor.go:1374`) is the shared add-staker routine.
+Pre-Durango it creates a *pending* staker with a future `StartTime`; post-Durango
+it computes `PotentialReward` immediately, bumps `CurrentSupply`, and creates a
+*current* staker starting at the current chain time. Permissioned subnet
+validators never get a potential reward.
+
+### 5.2 Block verification
+
+`verifier` (`vms/platformvm/block/executor/verifier.go:39`) handles each block
+type:
+
+- **`BanffStandardBlock`** (`...:114`): create a diff on the parent, advance
+  time to the block timestamp (`executor.AdvanceTimeTo`), then process all
+  decision txs. The block must make a state change or it is rejected with
+  `ErrStandardBlockWithoutChanges` (`...:495`).
+- **`BanffProposalBlock`** (`...:59`): advance time on `onDecisionState`,
+  process the embedded decision txs, then fork `onDecisionState` into
+  `onCommitState` and `onAbortState` and run `ProposalTx` against both
+  (`...:413`).
+
+`processStandardTxs` (`...:524`) enforces the Etna block gas limit (computing
+complexity, consuming gas from the fee state), executes each tx, rejects
+duplicate inputs (`ErrConflictingBlockTxs`), merges atomic requests, verifies
+inputs are unique against ancestors, and finally deactivates any L1 validators
+whose balance can't cover the next second
+(`deactivateLowBalanceL1Validators`, `...:676`). All verified state is cached
+in `blkIDToState[blkID]` for later acceptance — verification never touches disk.
+
+### 5.3 The proposal / commit / abort oracle flow
+
+This is the P-Chain's distinguishing mechanism. When a validator's staking
+period ends, the network must decide whether it earned its reward, and the
+deciding input — measured uptime — is **node-local and non-deterministic**, so
+it cannot live in a normal deterministic block. The flow:
 
 ```
-vms/platformvm/
-├── vm.go              # VM initialization and interface implementation
-├── block/
-│   ├── builder/       # Block building from mempool
-│   └── executor/      # Block execution (verify/accept/reject)
-├── txs/
-│   ├── executor/      # Transaction verification and state mutation
-│   ├── fee/           # Fee calculation
-│   ├── mempool/       # Pending transaction pool
-│   └── *.go           # All transaction type definitions
-├── state/             # State management, diff, persistence
-├── validators/        # Validator set management helpers
-├── network/           # P2P gossip for P-chain transactions
-├── reward/            # Reward calculator
-├── warp/              # Warp message signing/verification
-└── config/            # P-chain configuration parameters
+                 BanffProposalBlock { RewardValidatorTx(stakerTxID) }
+                 /                                                  \
+       prefers commit?                                       prefers commit?
+       (uptime >= req)                                       (uptime >= req)
+         /                                                          \
+  BanffCommitBlock  ── reward paid, staker removed,        BanffAbortBlock ── no reward,
+                       supply unchanged                                       staker removed,
+                                                                              supply decremented
 ```
 
----
+1. The builder issues a `BanffProposalBlock` whose proposal tx is a
+   `RewardValidatorTx` naming the staker at the front of the current-staker
+   iterator (`buildBlock`, `vms/platformvm/block/builder/builder.go:321`).
+2. `ProposalTx` runs `RewardValidatorTx`
+   (`proposal_tx_executor.go:331`): it verifies the chain time equals the
+   staker's `EndTime`, refunds the staked UTXOs to **both** diffs, and on the
+   **commit** diff adds the reward UTXO(s) (`rewardValidatorTx`/`rewardDelegatorTx`).
+   On the **abort** diff it decrements `CurrentSupply` by the potential reward
+   (`...:414`). The staker is deleted from both diffs.
+3. The engine asks the VM for the proposal block's options. `options`
+   (`vms/platformvm/block/executor/options.go:55`) builds a commit and an abort
+   block and orders them by `prefersCommit` (`...:143`): it fetches the staker's
+   Primary Network validator, computes uptime via the uptime calculator, and
+   compares it against the required uptime percentage (Primary Network's
+   `UptimePercentage`, or the subnet's `UptimeRequirement`). On any error it
+   defaults to *prefer commit* (over-reward rather than under-reward) — and must
+   not propagate the error, since errors here would be treated as fatal.
+4. Consensus votes between the two children. Whichever is accepted applies its
+   diff. `acceptor.optionBlock` (`acceptor.go:117`) first accepts the parent
+   proposal block (applying its `onDecisionState`), then the chosen option's
+   `onAcceptState`.
 
-## 1. VM Interface Implementation
+Acceptance ordering note: the proposal block itself is *not* written to disk
+when accepted (`acceptor.proposalBlock`, `acceptor.go:187`) — only its `blkID`
+is recorded as last-accepted in memory. It is persisted together with its
+accepted child, so a crash never leaves a proposal block on disk without a
+decision (Snowman requires the last committed block to be a decision block).
 
-The VM struct implements `snowman.ChainVM` and several optional extensions:
-- `snowman.BuildBlockWithContextChainVM` (uses P-chain height in block building)
-- `snowman.SetPreferenceWithContextChainVM`
-- `secp256k1fx.VM`
-- `validators.State` (P-chain validator lookups for other VMs)
+### 5.4 Time advancement & the staking lifecycle
 
-> **Component consumers:** The `validators.State` interface is consumed by [ProposerVM](vms.md#22-block-types) (via `proposer/windower.go`) for proposer selection using historical validator sets, and by the warp verification path (see [Section 8.3](#83-warp-messaging-vmsplatformvmwarp)) which calls `GetValidatorSet` to reconstruct the signing set at a given P-chain height. [Simplex](consensus.md#part-2-simplex-consensus) also accesses P-chain state indirectly via the `snow.Context` provided during initialization.
+`advanceTimeTo` (`vms/platformvm/txs/executor/state_changes.go:107`) is the
+engine of the lifecycle. Given a `newChainTime`, on a fresh diff it:
 
-### 1.1 Initialize Sequence
+1. **Promotes pending → current**: iterates pending stakers whose `StartTime <=
+   newChainTime`, computes their `PotentialReward` (permissionless only),
+   bumps subnet supply, and moves them to the current set. Validators are
+   promoted before delegators (a current delegator requires its validator to
+   already exist).
+2. **Removes finished permissioned validators**: current stakers with `EndTime
+   <= newChainTime` *and* `SubnetPermissionedValidatorCurrentPriority` are
+   deleted here. Permissionless stakers are **not** removed here — they stop at
+   the first non-permissioned staker, because they are removed by
+   `RewardValidatorTx` (see §5.3).
+3. **(Etna+)** removes stale Warp expiries, advances the dynamic-fee state and
+   the continuous validator-fee state, and auto-deactivates L1 validators whose
+   accrued fee exceeds their `EndAccumulatedFee` (`advanceValidatorFeeState`,
+   `...:335`).
 
-```go
-func (vm *VM) Initialize(ctx, chainCtx, db, genesisBytes, _, configBytes, _, appSender) error
-```
+`VerifyNewChainTime` (`...:35`) bounds time advancement: monotonic
+(`>= currentChainTime`), within `SyncBound` (10s) of local time, and never past
+the next staker-change time, so no set change is ever skipped.
 
-1. Load `ExecutionConfig` from `configBytes`.
-2. Create codec (linearcodec) and register all types.
-3. Initialize `secp256k1fx.Fx`.
-4. Create `RewardCalculator` with `RewardConfig`.
-5. Initialize `State` from genesis bytes.
-6. Create `ValidatorManager` (wraps snow's validators.Manager, syncs to state).
-7. Create `UTXOVerifier` for secp256k1fx verification.
-8. Create `UptimeManager` using state's uptime storage.
-9. Build `TxExecutorBackend` (carries all verification dependencies).
-10. Create `Mempool` with gas-based ordering.
-11. Create `BlockExecutorManager`.
-12. Initialize `Network` (push/pull gossip for txs).
-13. Create `BlockBuilder` for proposing blocks.
-14. Initialize all tracked subnets/chains from state.
-15. Set preference to last accepted block.
-16. Start periodic mempool pruning goroutine.
-17. Start async block height index goroutine.
-
-### 1.2 Key Lifecycle Methods
-
-| Method | Action |
-|--------|--------|
-| `ParseBlock(bytes)` | Deserialize → `block.Parse()` → wrap in stateful `manager.NewBlock()` |
-| `GetBlock(id)` | Retrieve from state by block ID |
-| `LastAccepted()` | Return state's last accepted block ID |
-| `SetPreference(id)` | Update the preferred tip; recalculate reorg depth |
-| `BuildBlock(ctx)` | Pull from builder; uses P-chain height for proposer context |
-| `SetState(state)` | Transition between Bootstrapping and NormalOp |
-| `Connected(nodeID, version)` | Notify uptime manager |
-| `Disconnected(nodeID)` | Notify uptime manager |
-
----
-
-## 2. Transaction Types
-
-All transactions implement the `Visitor` interface for double-dispatch execution:
-
-```go
-type Visitor interface {
-    AddValidatorTx(*AddValidatorTx) error
-    AddSubnetValidatorTx(*AddSubnetValidatorTx) error
-    AddDelegatorTx(*AddDelegatorTx) error
-    CreateChainTx(*CreateChainTx) error
-    CreateSubnetTx(*CreateSubnetTx) error
-    ImportTx(*ImportTx) error
-    ExportTx(*ExportTx) error
-    AdvanceTimeTx(*AdvanceTimeTx) error
-    RewardValidatorTx(*RewardValidatorTx) error
-    RemoveSubnetValidatorTx(*RemoveSubnetValidatorTx) error
-    TransformSubnetTx(*TransformSubnetTx) error
-    AddPermissionlessValidatorTx(*AddPermissionlessValidatorTx) error
-    AddPermissionlessDelegatorTx(*AddPermissionlessDelegatorTx) error
-    TransferSubnetOwnershipTx(*TransferSubnetOwnershipTx) error
-    BaseTx(*BaseTx) error
-    ConvertSubnetToL1Tx(*ConvertSubnetToL1Tx) error
-    RegisterL1ValidatorTx(*RegisterL1ValidatorTx) error
-    SetL1ValidatorWeightTx(*SetL1ValidatorWeightTx) error
-    IncreaseL1ValidatorBalanceTx(*IncreaseL1ValidatorBalanceTx) error
-    DisableL1ValidatorTx(*DisableL1ValidatorTx) error
-}
-```
-
-### 2.1 Apricot Era
-
-**AddValidatorTx** — Join primary network validator set.
-- Fields: `NodeID`, `Start/End time`, `Stake amount`, `DelegationShares` (basis points), `StakeOuts`, `RewardsOwner`.
-- Locked for entire duration; delegation allowed.
-
-**AddDelegatorTx** — Delegate to primary network validator.
-- Fields: `Validator NodeID`, `Start/End time`, `Stake amount`, `DelegatorRewardsOwner`.
-- Must end before the validator it delegates to.
-
-**AddSubnetValidatorTx** — Join a permissioned subnet.
-- Fields: `SubnetValidator{NodeID, SubnetID, Weight, Start/End}`, `SubnetAuth` (subnet owner signature).
-
-**CreateSubnetTx** — Create a new subnet.
-- Fields: `Owner fx.Owner` (controls who can add validators).
-- SubnetID = hash of this transaction.
-
-**CreateChainTx** — Create a blockchain within a subnet.
-- Fields: `SubnetID`, `ChainName` (ASCII ≤128 chars), `VMID`, `FxIDs`, `GenesisData` (≤1 MiB).
-- Requires subnet authorization.
-- When accepted, triggers [Chain Creation Flow](chains.md#13-chain-creation-flow) via `chainManager.QueueChainCreation()`.
-
-**ImportTx** — Import UTXOs from another chain via atomic memory.
-- Fields: `SourceChain ids.ID`, `ImportedInputs []*TransferableInput`.
-- Uses [Atomic Memory](chains.md#2-atomic-memory-chainsatomic) to consume UTXOs placed by the source chain.
-
-**ExportTx** — Export UTXOs to another chain via atomic memory.
-- Fields: `DestinationChain ids.ID`, `ExportedOutputs []*TransferableOutput`.
-- Cannot export locked/stakeable outputs.
-- Uses [Atomic Memory](chains.md#2-atomic-memory-chainsatomic) to place UTXOs for the destination chain to import.
-
-**AdvanceTimeTx** — Advance chain clock (staker activation).
-- Fields: `Time uint64`.
-- Constraint: `Time > current`, `Time ≤ next staker set change`.
-- When accepted + committed: pending stakers with `StartTime ≤ Time` move to current set.
-
-**RewardValidatorTx** — Remove staker and distribute rewards.
-- Fields: `TxID ids.ID` (the staker's creation tx).
-- `CommitBlock`: rewards distributed; `AbortBlock`: staker removed, no reward.
-
-### 2.2 Banff Era
-
-**RemoveSubnetValidatorTx** — Remove a permissioned subnet validator.
-
-**TransformSubnetTx** (disabled post-Etna — returns `errTransformSubnetTxPostEtna`) — Convert to custom-token staking.
-- Specifies: `AssetID`, supply limits, consumption rates, stake duration bounds, delegation fee floor.
-- The `complexityVisitor` in `txs/fee/` also returns `ErrUnsupportedTx` for this type, meaning it cannot be included in Etna-era blocks that use the dynamic fee calculator.
-
-**AddPermissionlessValidatorTx** — Join primary or permissionless subnet without owner permission.
-- Fields: `Signer` (BLS key for primary network), `ValidationRewardsOwner`, `DelegatorRewardsOwner`, `DelegationShares`.
-
-**AddPermissionlessDelegatorTx** — Delegate to permissionless validator.
-
-### 2.3 Durango Era
-
-**TransferSubnetOwnershipTx** — Change subnet owner.
-- Requires current owner authorization.
-
-**BaseTx** — Simple UTXO value transfer (no staking).
-
-### 2.4 Etna Era (L1 Validators)
-
-**ConvertSubnetToL1Tx** — Irreversible conversion to pay-as-you-go L1.
-- Fields: `ChainID`, `Address` (subnet manager contract), `Validators []L1ValidatorInit`, `SubnetAuth`.
-
-**RegisterL1ValidatorTx** — Register L1 validator.
-- Fields: `Balance` (initial fee balance), `ProofOfPossession` (BLS PoP), `Message` (warp message from subnet manager).
-- The warp message must originate from the subnet manager contract (the `ChainID` + `Address` recorded in `ConvertSubnetToL1Tx`). The subnet manager contract lives on the L1's execution chain (e.g., C-Chain or SAEVM); it emits the warp message to authorize registration.
-- Uses [BLS](api.md#92-bls-utilscryptobls) signature aggregation for warp verification.
-
-**SetL1ValidatorWeightTx** — Adjust L1 validator weight via warp message from subnet manager.
-- Warp message must come from the same subnet manager contract recorded in the L1 conversion.
-
-**IncreaseL1ValidatorBalanceTx** — Add to L1 validator's accrued fee balance.
-
-**DisableL1ValidatorTx** — Deactivate L1 validator; remaining balance returned to `RemainingBalanceOwner`.
-- Can be called by the `DeactivationOwner` or by anyone if `RemainingBalance == 0`.
-
----
-
-## 3. Block Types
-
-The P-Chain uses [Snowman Consensus](consensus.md#13-snowman-consensus-linear-chain-snowconsensussnowman) for finalization. Blocks are processed by the [Snowman Engine State Machine](consensus.md#15-engine-state-machine) which drives `VM.BuildBlock()`, `VM.ParseBlock()`, and acceptance/rejection callbacks.
-
-### 3.1 Hierarchy
+Full lifecycle of a Primary Network validator:
 
 ```
-Block (interface)
-├── ApricotStandardBlock      — list of txs, no timestamp
-│   └── BanffStandardBlock   — adds timestamp
-├── ApricotProposalBlock      — single proposal tx (staking)
-│   └── BanffProposalBlock   — adds timestamp + extra txs
-├── ApricotAtomicBlock        — single atomic (cross-chain) tx
-├── ApricotAbortBlock         — decision: abort proposal
-│   └── BanffAbortBlock
-└── ApricotCommitBlock        — decision: commit proposal
-    └── BanffCommitBlock
+AddPermissionlessValidatorTx
+   │  (pre-Durango)            (post-Durango)
+   ▼                              │
+PENDING set ── time reaches ──►   │ immediately
+StartTime, supply bumped ─────► CURRENT set (counted in validator set, sampled by consensus)
+                                   │  uptime tracked while connected
+                                   ▼  time reaches EndTime
+                          RewardValidatorTx proposal block
+                                  / commit            \ abort
+                       stake refunded +            stake refunded,
+                       reward minted               no reward, supply decremented
+                                  \                /
+                                   ▼
+                              removed from CURRENT set
 ```
 
-### 3.2 Block Semantics
-
-**StandardBlock**: Execute all txs as regular state mutations. Accepted or rejected atomically.
-
-**ProposalBlock**: Single staking proposal. Always followed by a CommitBlock or AbortBlock child.
-- `onCommitState` diff: applied if CommitBlock accepted.
-- `onAbortState` diff: applied if AbortBlock accepted.
-
-**AtomicBlock**: Single cross-chain tx (Apricot only).
-
-**CommitBlock / AbortBlock**: Decision blocks; no txs. Finalise their parent proposal.
-
-### 3.3 Block ID
-
-`BlockID = SHA256(serialized_block_bytes)`.
-
----
-
-## 4. Execution Engine
-
-### 4.1 Two-Phase Verification
-
-Every transaction goes through:
-
-1. **SyntacticVerify** — format, field constraints, codec version. No state access.
-2. **SemanticVerify** — signature validation, UTXO availability, fee sufficiency. Reads state.
-
-### 4.2 StandardTxExecutor
-
-Handles: `BaseTx`, `AddSubnetValidatorTx`, `CreateSubnetTx`, `CreateChainTx`, `ImportTx`, `ExportTx`, `RemoveSubnetValidatorTx`, `AddPermissionlessValidatorTx/Delegator`, `TransformSubnetTx`, `ConvertSubnetToL1Tx`, `RegisterL1ValidatorTx`, `SetL1ValidatorWeightTx`, `IncreaseL1ValidatorBalanceTx`, `DisableL1ValidatorTx`, `TransferSubnetOwnershipTx`.
-
-Returns: `(consumedUTXOIDs, atomicRequests, onAcceptCallback, error)`.
-
-Key actions per type:
-- **ImportTx**: Issue atomic remove-request on source chain; verify imported inputs.
-- **ExportTx**: Issue atomic put-request on destination chain; consume local inputs.
-- **CreateSubnetTx**: Write subnet owner to state.
-- **CreateChainTx**: Validate subnet exists + authorized; store chain tx; queue `chainManager.QueueChainCreation()`.
-
-### 4.3 ProposalTxExecutor
-
-Handles: `AddValidatorTx`, `AddDelegatorTx`, `AdvanceTimeTx`, `RewardValidatorTx`.
-
-Creates two state diffs:
-```go
-onCommitState state.Diff  // applied if CommitBlock wins
-onAbortState  state.Diff  // applied if AbortBlock wins
-```
-
-**AdvanceTimeTx.Execute**:
-- Set `onCommitState.timestamp = tx.Time`.
-- For all pending stakers with `StartTime ≤ tx.Time`: move to current set (onCommit only).
-- Emit reward UTXOs for stakers ending at `tx.Time`.
-
-**RewardValidatorTx.Execute**:
-- Identify staker by `tx.TxID`.
-- Calculate `potentialReward` via `RewardCalculator`.
-- `onCommit`: transfer rewards to `RewardsOwner` and `DelegatorRewardsOwner`.
-- `onAbort`: just remove staker, no reward.
-
-### 4.4 Fee Calculation (`txs/fee/`)
-
-**Pre-Etna (static):**
-- Fixed fee per transaction type: `config.TxFee`, `config.CreateSubnetTxFee`, etc.
-
-**Etna era (dynamic gas):**
-```go
-// vms/components/gas/dimensions.go
-type Dimensions [4]uint64  // [Bandwidth, DBRead, DBWrite, Compute]
-
-// TxComplexity(tx) → gas.Dimensions
-// Gas = Dimensions.ToGas(Weights)  // dot-product of complexity × per-dimension weight
-// Fee = Gas × GasPrice (nAVAX/gas)
-```
-
-`TxComplexity()` in `txs/fee/complexity.go` implements the `Visitor` pattern to sum per-field bandwidth, DB read/write counts, and compute costs (e.g., `intrinsicBLSPoPVerifyCompute = 1050us`, `intrinsicSECP256k1FxSignatureCompute = 200us`). Note: `AddValidatorTx`, `AddDelegatorTx`, `AdvanceTimeTx`, `RewardValidatorTx`, and `TransformSubnetTx` return `ErrUnsupportedTx` from the complexity calculator (they use the pre-Etna static fee path).
-
-Mempool orders by `gasPrice = totalFee / totalGas` (higher = earlier inclusion).
-
----
-
-## 5. State Management
-
-### 5.1 State Interface
-
-The `state.State` manages all persistent data for the P-Chain:
-
-- **UTXO set**: by UTXO ID, with indexed lookup by address
-- **Stakers**: current + pending validator and delegator sets
-- **Subnets**: owners, configurations, L1 conversions
-- **Chains**: creation txs, indexed by subnet
-- **Transactions**: by TxID with acceptance status
-- **Reward UTXOs**: by staker TxID
-- **Timestamps and fee state**
-
-### 5.2 State Diff (Copy-on-Write)
-
-`state.Diff` is a Go-level in-memory overlay that implements the `Chain` interface. It is **not** backed by [VersionDB](database.md#24-versiondb-databaseversiondb) at the diff layer itself; instead, the underlying persistent `state.State` uses a `versiondb.Database` as its `baseDB`, and all prefix namespaces are built on top of that via [PrefixDB](database.md#25-prefixdb-databaseprefixdb). The `Diff` holds pending mutations in Go maps and applies them on commit.
-
-```go
-type Diff struct {
-    parentID      ids.ID
-    stateVersions Versions
-
-    timestamp         time.Time
-    feeState          gas.State
-    l1ValidatorExcess gas.Gas
-    accruedFees       uint64
-
-    currentSupply         map[ids.ID]uint64
-    expiryDiff            *expiryDiff
-    l1ValidatorsDiff      *l1ValidatorsDiff
-    modifiedStakingInfo   map[ids.ID]map[ids.NodeID]StakingInfo
-    currentStakerDiffs    diffStakers
-    pendingStakerDiffs    diffStakers
-    subnetOwners          map[ids.ID]fx.Owner
-    subnetToL1Conversions map[ids.ID]SubnetToL1Conversion
-    transformedSubnets    map[ids.ID]*txs.Tx
-    addedChains           map[ids.ID][]*txs.Tx
-    modifiedUTXOs         map[ids.ID]*avax.UTXO
-    // ...
-}
-```
-
-On `diff.Apply(parentState)`:
-- Write all changes to parent.
-- Misses fall through to parent's state (reads not cached in diff go to parent).
-
-On rejection: diff discarded, parent unchanged.
-
-### 5.3 Database Prefixes
-
-The persistent state is organized using [PrefixDB](database.md#25-prefixdb-databaseprefixdb) namespaces layered on top of a [VersionDB](database.md#24-versiondb-databaseversiondb) base. Each prefix is a SHA256 hash of a byte key, giving a fixed 32-byte namespace regardless of logical key length.
-
-```
-block:{blockID}
-validator/current/{nodeID}
-validator/pending/{nodeID}
-delegator/current/{txID}
-delegator/pending/{txID}
-subnet:{subnetID}
-subnetOwner:{subnetID}
-chain:{subnetID}:{chainID}
-tx:{txID}
-rewardUTXOs:{txID}
-utxo:{utxoID}
-utxoIndex:{address}:{utxoID}
-expiryReplayProtection:{txID}
-l1/weights:{subnetID}
-l1/active:{validationID}
-l1/inactive:{validationID}
-timestamp
-feeState
-lastAccepted
-cleanShutdown
-```
-
-### 5.4 Staker Ordering
-
-Priority determines ordering when multiple stakers have the same `NextTime`:
-
-**Pending (activation order):**
-1. PrimaryNetworkDelegatorApricotPending
-2. PrimaryNetworkValidatorPending
-3. PrimaryNetworkDelegatorBanffPending
-4. SubnetPermissionlessValidatorPending
-5. SubnetPermissionlessDelegatorPending
-6. SubnetPermissionedValidatorPending
-
-**Current (removal order, lowest removed first):**
-1. SubnetPermissionedValidatorCurrent
-2. SubnetPermissionlessDelegatorCurrent
-3. SubnetPermissionlessValidatorCurrent
-4. PrimaryNetworkDelegatorCurrent
-5. PrimaryNetworkValidatorCurrent (last)
-
-> **Invariant:** All permissioned stakers must be removed first because they are removed by time advancement. Permissionless stakers are removed with a `RewardValidatorTx` after time has advanced.
-
----
-
-## 6. Staking Mechanics
-
-### 6.1 Staker Struct
-
-```go
-type Staker struct {
-    TxID        ids.ID
-    NodeID      ids.NodeID
-    PublicKey   *bls.PublicKey  // primary network only
-    SubnetID    ids.ID
-    Weight      uint64
-    StartTime   time.Time
-    EndTime     time.Time
-    PotentialReward uint64
-    NextTime    time.Time  // min(StartTime, EndTime)
-    Priority    txs.Priority
-}
-```
-
-### 6.2 Validator Lifecycle
-
-```
-AddValidatorTx accepted
-  → Staker added to pendingValidators
-
-AdvanceTimeTx(T) + CommitBlock
-  → All pending stakers with StartTime ≤ T move to currentValidators
-  → ValidatorManager weights updated
-  → uptime tracking starts (via Connected callback)
-
-RewardValidatorTx(txID) + CommitBlock
-  → Staker removed from currentValidators
-  → Reward UTXOs created for validator and delegators
-  → ValidatorManager weights updated
-
-RewardValidatorTx(txID) + AbortBlock
-  → Staker removed, no reward
-```
-
-Uptime accumulation is managed by the [Uptime Tracker](consensus.md#110-uptime-tracking-snowuptime). The P-Chain `VM.Connected()` / `VM.Disconnected()` callbacks notify the `UptimeManager`, which updates the stored uptime for each primary-network validator. The uptime ratio determines whether a `RewardValidatorTx` results in a reward (CommitBlock) or not (AbortBlock).
-
-### 6.3 Reward Formula
-
-```go
-func (c *calculator) Calculate(
-    stakedDuration time.Duration,
-    stakedAmount, currentSupply uint64,
-) uint64
-
-// remainingSupply = SupplyCap - currentSupply
-// portionOfExisting = stakedAmount / currentSupply
-// portionOfDuration = stakedDuration / MintingPeriod
-// mintingRate = MinConsumptionRate + (MaxConsumptionRate - MinConsumptionRate) * portionOfDuration
-// reward = remainingSupply * portionOfExisting * mintingRate * portionOfDuration
-// reward = min(reward, remainingSupply)  // capped to never exceed SupplyCap
-```
-
-Configured by `RewardConfig`: `MinConsumptionRate`, `MaxConsumptionRate`, `MintingPeriod`, `SupplyCap`. The `SupplyCap` constraint is enforced both by the formula (reward cannot exceed `remainingSupply = SupplyCap - currentSupply`) and by the `min()` clamp in the calculator. The current supply is tracked in `state.State` and updated on every `RewardValidatorTx` commit.
-
-### 6.4 Delegator Reward Split
-
-```
-delegatorReward = validatorReward × (1 - delegationFee%) × (delegatorWeight / totalDelegatedWeight)
-```
-
-`delegationFee` is set by the validator in `AddValidatorTx.DelegationShares` (basis points, max 10000 = 100%).
-
-### 6.5 L1 Validator Accrued Fee Model (Etna)
-
-```go
-type L1Validator struct {
-    ValidationID          ids.ID
-    SubnetID              ids.ID     `serialize:"true"`
-    NodeID                ids.NodeID `serialize:"true"`
-    PublicKey             []byte     `serialize:"true"`  // uncompressed BLS public key
-    RemainingBalanceOwner []byte     `serialize:"true"`  // returned when validator exits
-    DeactivationOwner     []byte     `serialize:"true"`  // can manually deactivate
-    StartTime             uint64     `serialize:"true"`  // unix seconds
-    Weight                uint64     `serialize:"true"`
-    MinNonce              uint64     `serialize:"true"`  // prevents replay of weight updates
-    EndAccumulatedFee     uint64     `serialize:"true"`  // global accrued-fee total at deactivation
-}
-```
-
-- `EndAccumulatedFee` encodes "how much total fee must have accrued globally before this validator is deactivated." When the chain's global accrued fee counter reaches `EndAccumulatedFee`, the validator is removed and any unused balance is returned to `RemainingBalanceOwner`.
-- `IsActive()` returns true when `Weight != 0 && EndAccumulatedFee != 0`.
-- Weight updates use `MinNonce` for ordering (prevents replay). Setting weight to 0 removes the validator.
-- There is no separate `RemainingBalance` or `AccumulatedFee` field; fee accounting is done via the global counter vs. `EndAccumulatedFee`.
-
----
-
-## 7. Mempool
-
-```go
-type Mempool struct {
-    tree          *btree.BTreeG[meteredTx]           // ordered by gasPrice desc
-    txs           map[ids.ID]meteredTx
-    consumedUTXOs *setmap.SetMap[ids.ID, ids.ID]      // input UTXO tracking
-    droppedTxIDs  *lru.Cache[ids.ID, error]
-    gasAvailable  gas.Gas
-    weights       gas.Dimensions
-}
-```
-
-**Add(tx):**
-1. Check no consumed UTXO overlap with existing txs.
-2. Calculate gas usage.
-3. Add to btree if `gas.Used ≤ gas.Available`.
-4. Track consumed UTXOs.
-
-**Periodic pruning:** Re-validate all txs against current preferred state; remove invalid ones.
-
-**Gas capacity:** `gasAvailable = totalCapacity - sumOfTxGases`. When a new tx has higher `gasPrice` than the lowest-priced existing txs, those lower-priced txs are evicted to make room.
-
-**Gossip:** New transactions are broadcast to peers using [P2P gossip](networking.md#9-p2p-higher-level-abstractions-networkp2p) (both push gossip for immediate propagation and pull gossip for reconciliation). The `network.Network` struct in `vms/platformvm/network/` wraps a `p2p.Network` and configures a `gossip.PushGossiper` and `gossip.PullGossiper` for P-Chain transactions.
-
----
-
-## 8. Subnet Management
-
-### 8.1 Permissioned Subnet Lifecycle
-
-1. `CreateSubnetTx` — creates subnet with owner.
-2. `AddSubnetValidatorTx` — owner authorizes each validator.
-3. `CreateChainTx` — creates blockchain on subnet (requires owner auth).
-4. `RemoveSubnetValidatorTx` — owner removes validator.
-5. `TransferSubnetOwnershipTx` — ownership transferred.
-
-### 8.2 Conversion to L1
-
-`ConvertSubnetToL1Tx`:
-- One-way conversion (irreversible).
-- Specifies subnet manager contract (`ChainID` + `Address`).
-- Provides initial validators with BLS keys and opening balances.
-- After conversion: `RegisterL1ValidatorTx` / `SetL1ValidatorWeightTx` drive validator set via warp messages from the manager contract.
-
-### 8.3 Warp Messaging (`vms/platformvm/warp/`)
-
-The P-Chain can:
-- **Sign** warp messages to other chains (proves P-Chain state to other VMs).
-- **Verify** warp messages from other chains (subnet manager contracts drive L1 validators).
-
-Verification requires ≥67% of validator weight to have signed (`WarpQuorumNumerator = 67`, `WarpQuorumDenominator = 100`, defined in `txs/executor/warp_verifier.go`).
-
-Verification uses [BLS](api.md#92-bls-utilscryptobls) public key aggregation: validator public keys for all signers (identified by a bitset) are aggregated into a single aggregate key, then a single BLS signature is verified against that key. The validator set is retrieved from `validators.State.GetValidatorSet()` at the P-chain height embedded in the warp message.
-
-> **Component consumers:** The warp verification path is used by `RegisterL1ValidatorTx` and `SetL1ValidatorWeightTx` to authenticate messages from subnet manager contracts.
-
----
-
-## 9. Block Building
-
-### 9.1 Builder (`block/builder/`)
-
-```go
-type Builder interface {
-    BuildBlock(context.Context) (snowman.Block, error)
-}
-```
-
-**Algorithm:**
-1. Check if there are stakers whose `EndTime ≤ now` — if so, must emit `RewardValidatorTx`.
-2. Check if `AdvanceTimeTx` is needed (pending staker activation or timestamp advancement).
-3. Otherwise, pack regular txs from mempool up to `TargetBlockSize` (128 KiB).
-4. Return block (StandardBlock or ProposalBlock with AdvanceTimeTx).
-
-**`WaitForEvent()`:** Waits for `PendingTxs` message from the mempool/network, or for a timer when stakers are about to expire.
-
-> **Engine integration:** The [Snowman Engine](consensus.md#15-engine-state-machine) invokes `VM.WaitForEvent()` to block until a block is available, then calls `VM.BuildBlock()`. The engine manages the overall flow of proposing, voting, and committing blocks. The P-Chain also implements `BuildBlockWithContextChainVM` so the engine can pass the current P-chain height as context for [ProposerVM](vms.md#21-purpose) slot validation.
-
-### 9.2 Tx Packing
-
-Transactions sorted by `gasPrice` (highest first). Each tx verified during packing; invalid txs skipped and dropped from mempool.
-
----
-
-## 10. API (`api/platformvm/`)
-
-All methods are JSON-RPC 2.0. Key endpoints:
-
-**Validator queries:**
-- `getCurrentValidators(subnetID)` — active validators
-- `getPendingValidators(subnetID)` — pending validators
-- `getStakingAssetID(subnetID)` — staking asset
-
-**UTXO queries:**
-- `getUTXOs(addresses, sourceChain)` — paginated UTXO listing
-
-**Transaction operations:**
-- `issueTx(tx)` — submit signed tx
-- `getTx(txID)` — retrieve by ID
-- `getTxStatus(txID)` — acceptance status
-
-**Chain/subnet queries:**
-- `getBlockchains()` — all chains
-- `getSubnets(subnetIDs)` — subnet details
-
-**Supply/economics:**
-- `getCurrentSupply(subnetID)` — minted supply
-- `getRewardUTXOs(txID)` — reward UTXOs for a staker
-- `getMinStake(subnetID)` — minimum stake amounts
+### 5.5 Block production
+
+`builder.WaitForEvent` (`builder/builder.go:97`) sleeps until either the next
+staker-change time is reached or the mempool signals pending txs.
+`buildBlock` (`...:272`) packs txs (Etna vs. Durango packers, honoring gas/size
+limits), then **prioritizes rewards**: if a staker's `EndTime` equals the new
+chain time it builds a `BanffProposalBlock` with a `RewardValidatorTx`
+(`...:325`); otherwise it builds a `BanffStandardBlock` with the packed txs, or
+declines (`ErrNoPendingBlocks`) if there's nothing to do.
+
+## 6. Component boundaries & relationships
+
+### 6.1 The validator-set provider boundary (most important)
+
+The P-Chain `VM` *is* the node's `validators.State`. The actual implementation
+is `validators.Manager` (`vms/platformvm/validators/manager.go:48`), assigned to
+`vm.State`. The rest of the node never reads P-Chain state directly; it calls
+this interface. Key methods:
+
+- **`GetValidatorSet(ctx, height, subnetID)`** (`manager.go:165`) — returns the
+  validator set (nodeID → weight + BLS key) for a subnet **at a specific
+  historical P-Chain height**. It starts from the *current* set
+  (`cfg.Validators.GetMap(subnetID)`) and replays weight diffs and public-key
+  diffs backward from the current height down to `targetHeight+1`
+  (`ApplyValidatorWeightDiffs` / `ApplyValidatorPublicKeyDiffs`). Results are
+  cached per tracked subnet.
+- **`GetCurrentHeight` / `GetMinimumHeight`** (`manager.go:129`, `:106`) — the
+  current accepted height and a "safely final" lagging height (parent of the
+  oldest block in a 30s sliding window). `GetMinimumHeight` is what Snowman++
+  uses as the recommended P-Chain height for proposer selection.
+- **`GetSubnetID(chainID)`** (`manager.go:316`) — maps a blockchain ID to its
+  subnet, used to know *which* validator set secures a given chain.
+- **`GetCurrentValidatorSet(ctx, subnetID)`** (`manager.go:342`) and
+  **`GetWarpValidatorSets`** (`manager.go:143`) — current sets including ACP-77
+  L1 validators, used by the API and Warp verification respectively.
+
+**Who consumes this boundary:**
+
+- **Consensus** ([consensus.md](./consensus.md)) samples each chain's validator
+  set by weight; the weights come from `GetValidatorSet`.
+- **Snowman++** ([consensus.md](./consensus.md)) selects block proposers from
+  the validator set at a recommended P-Chain height (`GetMinimumHeight`).
+- **Networking** ([networking.md](./networking.md)) gates peer connections and
+  message handling on validator membership; `p2p.NewValidators` wraps this
+  `validators.State` (`vms/platformvm/network/network.go:57`).
+- **Warp / ICM** verifies aggregated BLS signatures against the signing
+  subnet's validator set at the message's P-Chain height.
+
+The `validators.Manager` is fed by the **block acceptor**: `commonAccept`
+(`acceptor.go:266`) calls `validators.OnAcceptedBlockID(blkID)` on every accept,
+which advances the sliding window. The current in-memory set
+(`cfg.Validators`) is mutated as staker state changes are applied, and the
+historical diffs are written to disk so any past height can be reconstructed.
+
+Because most of these calls require the P-Chain context lock, the VM wraps the
+manager in `validators.NewLockedState` before handing it to the network
+(`vms/platformvm/vm.go:194`).
+
+### 6.2 Atomic-memory boundary with X-Chain / C-Chain
+
+`ImportTx` / `ExportTx` move AVAX across chains through **shared atomic memory**
+(see [chains.md](./chains.md), [primitives.md](./primitives.md)).
+`standardTxExecutor.ImportTx` (`standard_tx_executor.go:312`) reads the imported
+UTXOs from `Ctx.SharedMemory.Get(SourceChain, ...)`, flow-checks them, and emits
+a `RemoveRequests` atomic request; `ExportTx` (`...:410`) emits `PutRequests`
+with the exported UTXOs marshaled for the destination chain. These requests are
+returned up to the block verifier and applied **atomically with the database
+commit** at acceptance time via `SharedMemory.Apply(atomicRequests, batch)`
+(`acceptor.go:246`). The P-Chain's secp256k1fx codec registration order is
+deliberately matched to the AVM's (`vms/platformvm/txs/codec.go:67`) so UTXO
+type IDs line up across the shared memory boundary. Import verification is
+skipped while bootstrapping or partial-syncing.
+
+### 6.3 Warp / ICM boundary
+
+The P-Chain both **signs** and **consumes** Warp messages:
+
+- **Signing**: the node's `WarpSigner` (BLS) is exposed over gRPC by
+  `gwarp.Server` (`vms/platformvm/warp/gwarp/server.go`) and used by the network
+  layer's ACP-118 handler.
+- **Consuming**: ACP-77 L1 transactions are driven by Warp messages.
+  `RegisterL1ValidatorTx` (`standard_tx_executor.go:874`) parses the Warp
+  message → addressed call → `RegisterL1Validator` payload, verifies it was sent
+  from the converted subnet's manager chain/address (`verifyL1Conversion`,
+  `...:1449`), checks the expiry window (`RegisterL1ValidatorTxExpiryWindow` =
+  1 day), guards against replay via the `expiry` set, verifies the BLS proof of
+  possession, and creates the `L1Validator`. `SetL1ValidatorWeightTx`
+  (`...:1032`) similarly parses an `L1ValidatorWeight` payload, enforces a
+  monotonic `MinNonce`, refuses to remove the last validator
+  (`errRemovingLastValidator`), and refunds remaining balance when weight is set
+  to 0.
+- **Verification**: the network's `signatureRequestVerifier`
+  (`vms/platformvm/network/warp.go:50`) answers ACP-118 signature requests for
+  P-Chain-addressed-call messages, and `manager.VerifyTx`
+  (`block/executor/manager.go:151`) verifies inbound Warp messages on mempool
+  txs against the validator state at the recommended P-Chain height.
+
+### 6.4 Uptime boundary
+
+The `uptime.Manager` (`vms/platformvm/vm.go:156`) tracks per-node connectivity.
+`VM.Connected`/`Disconnected` (`vms/platformvm/vm.go:472`) feed it, and the
+proposal-block option logic (`options.prefersCommit`) reads
+`CalculateUptimePercentFrom` to decide reward eligibility. This is the only
+place node-local, non-consensus data influences the chain — and it does so only
+through the commit/abort vote, never directly in deterministic state.
+
+## 7. Key behaviors, invariants & edge cases
+
+- **Reward math.** `calculator.Calculate`
+  (`vms/platformvm/reward/calculator.go:42`) computes
+  `Reward = RemainingSupply × (StakedAmount/CurrentSupply) × MintingRate ×
+  (StakingDuration/MintingPeriod)`, where the minting rate interpolates between
+  `MinConsumptionRate` and `MaxConsumptionRate` by stake duration. It is
+  asymptotic to `SupplyCap` and clamped to `RemainingSupply`. All arithmetic is
+  big-int to avoid overflow; the invariant is that `supply + reward` never
+  exceeds the cap.
+- **Reward split (delegation).** `reward.Split`
+  (`vms/platformvm/reward/calculator.go:72`) divides a delegator's potential
+  reward between delegator and delegatee using the validator's `Shares`
+  (out of `PercentDenominator` = 1,000,000). For validators that started after
+  CortinaTime, the delegatee's cut is *accrued* on the validator's staking info
+  and paid out when the validator itself leaves
+  (`rewardDelegatorTx`, `proposal_tx_executor.go:611`); pre-Cortina it was paid
+  immediately.
+- **Potential reward is locked in at promotion.** A staker's reward is computed
+  from the supply at the moment it enters the current set (post-Durango: at
+  add; pre-Durango: at pending→current promotion). Aborting the reward later
+  *decrements* supply by exactly that amount, keeping supply consistent
+  (`proposal_tx_executor.go:414`).
+- **Commit-on-error.** If uptime can't be computed, the option logic defaults to
+  commit and must swallow the error (a returned error would be fatal)
+  (`options.go:76`).
+- **Standard blocks must change state** (`ErrStandardBlockWithoutChanges`).
+- **Conflicting/duplicate inputs** within a block or against pinned ancestors
+  are rejected (`ErrConflictingBlockTxs`, `verifyUniqueInputs`).
+- **`TransformSubnetTx` is forbidden post-Etna** (`errTransformSubnetTxPostEtna`);
+  ACP-77 `ConvertSubnetToL1Tx` is the modern path.
+- **Stakeable locks**: `stakeable.LockOut`/`LockIn`
+  (`vms/platformvm/stakeable/stakeable_lock.go`) wrap a transfer with a
+  `Locktime`; they may not be nested and require non-zero locktime.
+- **L1 active-validator capacity.** Activating an L1 validator fails with
+  `errMaxNumActiveValidators` if the active count reaches
+  `ValidatorFeeConfig.Capacity`. Low-balance active validators are
+  auto-deactivated each block and each time advancement.
+- **Partial sync.** With `PartialSyncPrimaryNetwork`, import txs are disallowed
+  (`ErrImportTxWhilePartialSyncing`) and a tx that would make this node a
+  primary validator logs a health warning.
+- **BLS keys.** Primary Network validators must supply a `signer.ProofOfPossession`
+  (`vms/platformvm/signer/proof_of_possession.go`) proving ownership of the BLS
+  public key; the empty signer is used for subnet validators. L1 validators
+  carry their BLS key (uncompressed) in state for Warp aggregation.
+
+## 8. Configuration & parameters
+
+`config.Internal` (`vms/platformvm/config/internal.go`) carries the
+node-supplied, consensus-relevant parameters:
+
+| Field | Meaning |
+|-------|---------|
+| `Validators` | The live `validators.Manager` (in-memory current sets) |
+| `MinValidatorStake` / `MaxValidatorStake` | Bounds on Primary Network validator stake |
+| `MinDelegatorStake` | Minimum delegation amount |
+| `MinDelegationFee` | Minimum delegation `Shares` a validator may charge |
+| `MinStakeDuration` / `MaxStakeDuration` | Staking period bounds |
+| `UptimePercentage` | Minimum uptime to earn a Primary Network reward |
+| `RewardConfig` | `MaxConsumptionRate`, `MinConsumptionRate`, `MintingPeriod`, `SupplyCap` (`reward/config.go`) |
+| `UpgradeConfig` | Activation times for Apricot/Banff/Cortina/Durango/Etna/Helicon |
+| `DynamicFeeConfig` | Etna dynamic gas-fee config (`gas.Config`) |
+| `ValidatorFeeConfig` | ACP-77 continuous validator-fee config (target, capacity, price) |
+| `SybilProtectionEnabled`, `PartialSyncPrimaryNetwork`, `TrackedSubnets` | Validation scope |
+
+`config.Config` (`vms/platformvm/config/config.go:34`) holds execution/cache
+tuning (cache sizes, `MempoolGasCapacity` = 1,000,000, `MempoolPruneFrequency` =
+30m, checksum toggle) parsed from the chain's config bytes.
+
+Reward constant: `reward.PercentDenominator` = 1,000,000
+(`vms/platformvm/reward/config.go:12`). Execution constants:
+`MaxFutureStartTime` = 2 weeks, `SyncBound` = 10s,
+`RegisterL1ValidatorTxExpiryWindow` = 1 day
+(`txs/executor/proposal_tx_executor.go:23`, `standard_tx_executor.go:42`).
+
+## 9. Cross-references
+
+- [overview.md](./overview.md) — where the P-Chain sits in the node
+- [consensus.md](./consensus.md) — Snowman + Snowman++ consuming validator sets
+- [simplex.md](./simplex.md) — alternative consensus engine
+- [networking.md](./networking.md) — gossip transport, validator-gated peering
+- [node.md](./node.md) — node bootstrap, chain manager
+- [vm-framework.md](./vm-framework.md) — generic `ChainVM`, mempool, RPC plumbing
+- [avm.md](./avm.md) — X-Chain, shared secp256k1fx asset model & shared memory
+- [evm.md](./evm.md) — C-Chain
+- [chains.md](./chains.md) — chain manager & atomic shared memory
+- [database.md](./database.md) — versioned database layer under P-Chain state
+- [api.md](./api.md) — JSON-RPC conventions for `platform.*`
+- [primitives.md](./primitives.md) — UTXOs, transferable in/out, codecs, BLS
