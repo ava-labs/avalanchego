@@ -12,9 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	// Imported for [snowtest.Context] comment resolution.
+	_ "github.com/ava-labs/avalanchego/snow/snowtest"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -41,6 +45,10 @@ type Sender struct {
 	self   eventual.Value[common.AppHandler]
 	selfID ids.NodeID
 
+	wgLock  sync.Mutex
+	closing bool
+	wg      sync.WaitGroup
+
 	peersLock sync.RWMutex
 	peers     map[ids.NodeID]common.AppHandler
 }
@@ -63,6 +71,18 @@ func (s *Sender) SetSelf(self Peer) {
 	s.self.Put(self)
 }
 
+// Close stops sending messages and blocks until all in-flight messages are
+// delivered.
+func (s *Sender) Close() {
+	s.wgLock.Lock()
+	s.closing = true
+	s.wgLock.Unlock()
+
+	// We MUST NOT hold wgLock while waiting, since the sender goroutines can be
+	// reentrent.
+	s.wg.Wait()
+}
+
 // AddPeer registers peer so that messages addressed to peer.NodeID() are
 // delivered to it.
 func (s *Sender) AddPeer(peer Peer) {
@@ -73,23 +93,33 @@ func (s *Sender) AddPeer(peer Peer) {
 }
 
 func (s *Sender) SendAppRequest(_ context.Context, to set.Set[ids.NodeID], requestID uint32, b []byte) error {
-	go s.sendAppRequest(to, requestID, b)
+	s.send(func() { s.sendAppRequest(to, requestID, b) })
 	return nil
 }
 
 func (s *Sender) SendAppResponse(_ context.Context, to ids.NodeID, requestID uint32, b []byte) error {
-	go s.sendAppResponse(to, requestID, b)
+	s.send(func() { s.sendAppResponse(to, requestID, b) })
 	return nil
 }
 
 func (s *Sender) SendAppError(_ context.Context, nodeID ids.NodeID, requestID uint32, code int32, message string) error {
-	go s.sendAppError(nodeID, requestID, code, message)
+	s.send(func() { s.sendAppError(nodeID, requestID, code, message) })
 	return nil
 }
 
 func (s *Sender) SendAppGossip(_ context.Context, c common.SendConfig, b []byte) error {
-	go s.sendAppGossip(c, b)
+	s.send(func() { s.sendAppGossip(c, b) })
 	return nil
+}
+
+// send executes f in a new goroutine if the sender is not closed.
+func (s *Sender) send(f func()) {
+	s.wgLock.Lock()
+	defer s.wgLock.Unlock()
+
+	if !s.closing {
+		s.wg.Go(f)
+	}
 }
 
 func (s *Sender) sendAppRequest(to set.Set[ids.NodeID], requestID uint32, b []byte) {
@@ -215,5 +245,30 @@ func ConnectTo[P Peer](tb testing.TB, self P, peers ...P) {
 		dstID := peer.NodeID()
 		require.NoErrorf(tb, self.Connected(ctx, dstID, version.Current), "%T.Connected(%s)", self, dstID)
 		require.NoErrorf(tb, peer.Connected(ctx, selfID, version.Current), "%T.Connected(%s)", peer, selfID)
+	}
+}
+
+// SetValidators makes state report each NodeID in vdrs as a validator with
+// weight 1 from GetValidatorSet.
+//
+// state MUST be a [validatorstest.State], which is the concrete type installed
+// by [snowtest.Context]. It is accepted as the [validators.State] interface
+// rather than the concrete type so that callers can pass snowCtx.ValidatorState
+// directly without each repeating the type assertion this helper exists to
+// share.
+func SetValidators(tb testing.TB, state validators.State, vdrs set.Set[ids.NodeID]) {
+	tb.Helper()
+
+	vdrState, ok := state.(*validatorstest.State)
+	require.Truef(tb, ok, "unexpected type %T for validator state", state)
+	vdrState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		out := make(map[ids.NodeID]*validators.GetValidatorOutput, vdrs.Len())
+		for id := range vdrs {
+			out[id] = &validators.GetValidatorOutput{
+				NodeID: id,
+				Weight: 1,
+			}
+		}
+		return out, nil
 	}
 }

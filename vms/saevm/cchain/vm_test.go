@@ -151,19 +151,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
-
-	vdrState, ok := snowCtx.ValidatorState.(*validatorstest.State)
-	require.Truef(tb, ok, "unexpected type %T for snowCtx.ValidatorState", snowCtx.ValidatorState)
-	vdrState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, cfg.validators.Len())
-		for id := range cfg.validators {
-			validatorSet[id] = &validators.GetValidatorOutput{
-				NodeID: id,
-				Weight: 1,
-			}
-		}
-		return validatorSet, nil
-	}
+	saetest.SetValidators(tb, snowCtx.ValidatorState, cfg.validators)
 
 	var validatorKeys []*localsigner.LocalSigner
 	if cfg.warpValidators > 0 {
@@ -227,6 +215,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		ethclient: ethclient.NewClient(ethRPCClient),
 	}
 	appSender.SetSelf(sut)
+	tb.Cleanup(appSender.Close)
 	return ctx, sut
 }
 
