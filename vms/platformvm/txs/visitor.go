@@ -32,4 +32,9 @@ type Visitor interface {
 	SetL1ValidatorWeightTx(*SetL1ValidatorWeightTx) error
 	IncreaseL1ValidatorBalanceTx(*IncreaseL1ValidatorBalanceTx) error
 	DisableL1ValidatorTx(*DisableL1ValidatorTx) error
+
+	// Helicon Transactions:
+	AddAutoRenewedValidatorTx(*AddAutoRenewedValidatorTx) error
+	SetAutoRenewedValidatorConfigTx(*SetAutoRenewedValidatorConfigTx) error
+	RewardAutoRenewedValidatorTx(*RewardAutoRenewedValidatorTx) error
 }
