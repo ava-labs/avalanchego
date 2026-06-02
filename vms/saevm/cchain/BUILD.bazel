@@ -94,8 +94,6 @@ go_test(
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//snow/snowtest",
-        "//snow/validators",
-        "//snow/validators/validatorstest",
         "//utils/bloom",
         "//utils/crypto/secp256k1",
         "//utils/logging",

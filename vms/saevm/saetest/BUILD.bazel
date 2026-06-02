@@ -18,6 +18,7 @@ go_library(
         "//ids",
         "//snow/engine/common",
         "//snow/validators",
+        "//snow/validators/validatorstest",
         "//utils/lock",
         "//utils/set",
         "//utils/timer/mockable",

@@ -44,8 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -166,18 +164,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	snowCtx := snowtest.Context(tb, chainID)
 	snowCtx.Log = logger
 	snowCtx.NodeID = conf.nodeID
-	vdrState, ok := snowCtx.ValidatorState.(*validatorstest.State)
-	require.Truef(tb, ok, "unexpected type %T for snowCtx.ValidatorState", snowCtx.ValidatorState)
-	vdrState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, conf.validators.Len())
-		for id := range conf.validators {
-			validatorSet[id] = &validators.GetValidatorOutput{
-				NodeID: id,
-				Weight: 1,
-			}
-		}
-		return validatorSet, nil
-	}
+	saetest.SetValidators(tb, snowCtx.ValidatorState, conf.validators)
 
 	sender := saetest.NewSender(tb, conf.validators)
 
