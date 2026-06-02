@@ -403,6 +403,19 @@ func (a *AtomicBackend) AtomicTrie() *AtomicTrie {
 	return a.atomicTrie
 }
 
+// CommitToHeight commits the atomic trie at the last accepted root for height
+// and flushes it to disk, even if height is not a commit-interval boundary.
+// It is a no-op if the trie is already committed at or beyond height.
+func (a *AtomicBackend) CommitToHeight(height uint64) error {
+	if _, committedHeight := a.atomicTrie.LastCommitted(); committedHeight >= height {
+		return nil
+	}
+	if err := a.atomicTrie.Commit(height, a.atomicTrie.LastAcceptedRoot()); err != nil {
+		return err
+	}
+	return a.repo.db.Commit()
+}
+
 // mergeAtomicOps merges atomic requests represented by [txs]
 // to the [output] map, depending on whether [chainID] is present in the map.
 func mergeAtomicOps(txs []*atomic.Tx) (map[ids.ID]*avalancheatomic.Requests, error) {

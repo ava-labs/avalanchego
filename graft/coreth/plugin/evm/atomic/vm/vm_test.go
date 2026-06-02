@@ -279,27 +279,27 @@ func TestCommitAtomicTrieOnShutdown(t *testing.T) {
 	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{Fork: &fork})
 	require.NoError(addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
 		vmtest.TestShortIDAddrs[0]: 50_000_000,
-	}))
+	}), "addUTXOs()")
 
 	// Accept one atomic import block below the default commit interval (4096),
 	// so the trie is not yet committed at its last accepted height.
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
-	require.NoError(err)
-	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
+	require.NoError(err, "vm.newImportTx()")
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx), "AtomicMempool.AddLocalTx()")
 	_, err = vm.WaitForEvent(ctx)
-	require.NoError(err)
+	require.NoError(err, "vm.WaitForEvent()")
 	blk, err := vm.BuildBlock(ctx)
-	require.NoError(err)
-	require.NoError(blk.Verify(ctx))
-	require.NoError(vm.SetPreference(ctx, blk.ID()))
-	require.NoError(blk.Accept(ctx))
+	require.NoError(err, "vm.BuildBlock()")
+	require.NoError(blk.Verify(ctx), "blk.Verify()")
+	require.NoError(vm.SetPreference(ctx, blk.ID()), "vm.SetPreference()")
+	require.NoError(blk.Accept(ctx), "blk.Accept()")
 
 	wantRoot := vm.AtomicBackend.AtomicTrie().LastAcceptedRoot()
 	_, commitHeight := vm.AtomicBackend.AtomicTrie().LastCommitted()
 	require.Less(commitHeight, blk.Height(), "atomic trie should not yet be committed at the last accepted height")
 
 	// Shut down (committing the trie), then restart from the same database.
-	require.NoError(vm.Shutdown(ctx))
+	require.NoError(vm.Shutdown(ctx), "vm.Shutdown()")
 
 	vmtest.ResetMetrics(tvm.Ctx)
 	restartedVM := newAtomicTestVM()
@@ -312,14 +312,14 @@ func TestCommitAtomicTrieOnShutdown(t *testing.T) {
 		nil,
 		nil,
 		tvm.AppSender,
-	))
+	), "restartedVM.Initialize()")
 	defer func() {
-		require.NoError(restartedVM.Shutdown(ctx))
+		require.NoError(restartedVM.Shutdown(ctx), "restartedVM.Shutdown()")
 	}()
 
 	gotRoot, gotHeight := restartedVM.AtomicBackend.AtomicTrie().LastCommitted()
-	require.Equal(blk.Height(), gotHeight)
-	require.Equal(wantRoot, gotRoot)
+	require.Equal(blk.Height(), gotHeight, "atomic trie should be committed at the last accepted height after restart")
+	require.Equal(wantRoot, gotRoot, "atomic trie's committed root should match the last accepted root after restart")
 }
 
 func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string) {

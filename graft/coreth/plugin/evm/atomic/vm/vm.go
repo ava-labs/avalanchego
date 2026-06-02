@@ -316,17 +316,11 @@ func (vm *VM) Shutdown(context.Context) error {
 		vm.cancel()
 	}
 	// Persist the atomic trie at the last accepted height before the inner VM
-	// closes the database, so it need not be re-indexed from the repository on
-	// the next startup (it is otherwise only committed at commit intervals).
+	// closes the database, so the next startup need not re-index it from the
+	// atomic tx repository.
 	if vm.bootstrapped.Get() {
 		if lastAccepted := vm.InnerVM.LastAcceptedExtendedBlock(); lastAccepted != nil {
-			atomicTrie := vm.AtomicBackend.AtomicTrie()
-			// Commit the trie, then flush the version db it writes through to disk.
-			err := atomicTrie.Commit(lastAccepted.Height(), atomicTrie.LastAcceptedRoot())
-			if err == nil {
-				err = vm.InnerVM.VersionDB().Commit()
-			}
-			if err != nil {
+			if err := vm.AtomicBackend.CommitToHeight(lastAccepted.Height()); err != nil {
 				log.Error("failed to commit atomic trie on shutdown", "err", err)
 			}
 		}
