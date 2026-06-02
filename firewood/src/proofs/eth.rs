@@ -28,8 +28,8 @@
 
 use firewood_storage::eth_encoding::nibbles_to_eth_compact;
 use firewood_storage::{
-    BranchNode, Children, HashType, PathComponent, RlpItem, ValueDigest, encode_list,
-    fix_account_storage_root_value,
+    BranchNode, Children, HashType, PathComponent, RlpError, RlpItem, RlpList, ValueDigest,
+    encode_list, fix_account_storage_root_value, parse_be_uint, parse_fixed,
 };
 use sha3::{Digest, Keccak256};
 use smallvec::{SmallVec, smallvec};
@@ -201,6 +201,77 @@ pub fn synth_storage_leaf_rlp(storage_child: &ProofNode) -> Option<Box<[u8]>> {
     ]))
 }
 
+/// Structured errors raised while decoding an account RLP value. Wrapped
+/// into [`crate::api::Error::InternalError`] at the public boundary so the
+/// firewood API surface keeps a single error type.
+#[derive(Debug, thiserror::Error)]
+enum AccountDecodeError {
+    #[error("malformed account RLP: {0}")]
+    Rlp(#[from] RlpError),
+    #[error("account RLP has {0} fields, expected at least 4")]
+    FieldCount(usize),
+    #[error("account field {0}: {1}")]
+    Field(&'static str, RlpError),
+}
+
+impl From<AccountDecodeError> for crate::api::Error {
+    fn from(e: AccountDecodeError) -> Self {
+        crate::api::Error::InternalError(Box::new(e))
+    }
+}
+
+/// Decoded fields of an ethereum account RLP value.
+///
+/// `balance` is zero-padded big-endian to fit the JSON-RPC `quantity` shape
+/// without an extra allocation. `storage_root` is the storage trie root as
+/// encoded in the account leaf; callers that need the ethereum-canonical
+/// storage hash for an account with exactly one storage slot must override
+/// this with `Keccak256(synth_storage_leaf_rlp(...))`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AccountFields {
+    /// Transaction count for this account.
+    pub nonce: u64,
+    /// Account balance, zero-padded big-endian.
+    pub balance: [u8; 32],
+    /// Storage trie root recorded in the account leaf.
+    pub storage_root: [u8; 32],
+    /// Keccak-256 of the account's contract code (or empty-code hash).
+    pub code_hash: [u8; 32],
+}
+
+impl AccountFields {
+    /// Parse an ethereum account RLP value (`[nonce, balance, storageRoot, codeHash]`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::api::Error::InternalError`] if the RLP is malformed,
+    /// the field count is wrong, `nonce` is more than 8 bytes, `balance` is
+    /// more than 32 bytes, or either hash field is not exactly 32 bytes.
+    pub fn from_rlp(rlp_bytes: &[u8]) -> Result<Self, crate::api::Error> {
+        Self::from_rlp_inner(rlp_bytes).map_err(Into::into)
+    }
+
+    fn from_rlp_inner(rlp_bytes: &[u8]) -> Result<Self, AccountDecodeError> {
+        let list = RlpList::parse(rlp_bytes)?;
+        let fields = list.fields()?;
+        // Coreth emits 5-item account RLP with a trailing empty byte
+        // (see firewood/src/merkle/tests/ethhash.rs:267-270); accept any
+        // list with at least the four standard fields and ignore extras.
+        let &[nonce_bytes, balance_bytes, storage_bytes, code_bytes] = fields
+            .first_chunk::<4>()
+            .ok_or(AccountDecodeError::FieldCount(fields.len()))?;
+
+        let field = |name: &'static str| move |e| AccountDecodeError::Field(name, e);
+
+        Ok(Self {
+            nonce: u64::from_be_bytes(parse_be_uint::<8>(nonce_bytes).map_err(field("nonce"))?),
+            balance: parse_be_uint::<32>(balance_bytes).map_err(field("balance"))?,
+            storage_root: parse_fixed::<32>(storage_bytes).map_err(field("storageRoot"))?,
+            code_hash: parse_fixed::<32>(code_bytes).map_err(field("codeHash"))?,
+        })
+    }
+}
+
 /// Encode one child slot of a branch as an [`RlpItem`] for proof emission.
 ///
 /// Distinct from `firewood_storage::nodestore::hash::child_to_rlp_item`,
@@ -370,6 +441,120 @@ mod tests {
         // The hash referenced in the outer must equal keccak(inner).
         let inner_hash = Keccak256::digest(&bytes[1]);
         assert_eq!(outer_fields[1], inner_hash.as_slice());
+    }
+
+    fn build_account_rlp(
+        nonce: &[u8],
+        balance: &[u8],
+        storage_root: &[u8; 32],
+        code_hash: &[u8; 32],
+    ) -> Box<[u8]> {
+        firewood_storage::encode_list(&[
+            RlpItem::Bytes(nonce),
+            RlpItem::Bytes(balance),
+            RlpItem::Bytes(storage_root),
+            RlpItem::Bytes(code_hash),
+        ])
+    }
+
+    #[test]
+    fn decode_account_round_trip() {
+        let storage = [0x11u8; 32];
+        let code = [0x22u8; 32];
+        let bytes = build_account_rlp(&[0x42], &[0x05, 0x00], &storage, &code);
+        let fields = AccountFields::from_rlp(&bytes).unwrap();
+        assert_eq!(fields.nonce, 0x42);
+        assert_eq!(fields.balance[30..], [0x05, 0x00]);
+        assert!(fields.balance[..30].iter().all(|&b| b == 0));
+        assert_eq!(fields.storage_root, storage);
+        assert_eq!(fields.code_hash, code);
+    }
+
+    #[test]
+    fn decode_account_zero_nonce_zero_balance() {
+        let storage = [0u8; 32];
+        let code = [0u8; 32];
+        // Per RLP minimal encoding, 0 is the empty byte string.
+        let bytes = build_account_rlp(&[], &[], &storage, &code);
+        let fields = AccountFields::from_rlp(&bytes).unwrap();
+        assert_eq!(fields.nonce, 0);
+        assert_eq!(fields.balance, [0u8; 32]);
+    }
+
+    #[test]
+    fn decode_account_rejects_too_few_fields() {
+        let bytes = firewood_storage::encode_list(&[
+            RlpItem::Bytes(&[0x01]),
+            RlpItem::Bytes(&[0x02]),
+            RlpItem::Bytes(&[0x03]),
+        ]);
+        match AccountFields::from_rlp_inner(&bytes) {
+            Err(AccountDecodeError::FieldCount(3)) => {}
+            other => panic!("expected FieldCount(3), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decode_account_accepts_coreth_five_item_shape() {
+        // Coreth emits a 5-item account RLP: [nonce, balance, storageRoot,
+        // codeHash, trailing-empty]. Extras past field 3 must be ignored.
+        let storage = [0x11u8; 32];
+        let code = [0x22u8; 32];
+        let bytes = firewood_storage::encode_list(&[
+            RlpItem::Bytes(&[0x42]),
+            RlpItem::Bytes(&[0x05]),
+            RlpItem::Bytes(&storage),
+            RlpItem::Bytes(&code),
+            RlpItem::Empty,
+        ]);
+        let fields = AccountFields::from_rlp(&bytes).unwrap();
+        assert_eq!(fields.nonce, 0x42);
+        assert_eq!(fields.storage_root, storage);
+        assert_eq!(fields.code_hash, code);
+    }
+
+    #[test]
+    fn decode_account_rejects_oversized_nonce() {
+        let storage = [0u8; 32];
+        let code = [0u8; 32];
+        let bytes = build_account_rlp(&[1u8; 9], &[], &storage, &code);
+        match AccountFields::from_rlp_inner(&bytes) {
+            Err(AccountDecodeError::Field("nonce", RlpError::TooLong { actual: 9, max: 8 })) => {}
+            other => panic!("expected nonce TooLong, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decode_account_rejects_short_storage_root() {
+        let code = [0u8; 32];
+        let bytes = firewood_storage::encode_list(&[
+            RlpItem::Bytes(&[]),
+            RlpItem::Bytes(&[]),
+            RlpItem::Bytes(&[0u8; 31]),
+            RlpItem::Bytes(&code),
+        ]);
+        match AccountFields::from_rlp_inner(&bytes) {
+            Err(AccountDecodeError::Field(
+                "storageRoot",
+                RlpError::WrongLength {
+                    actual: 31,
+                    expected: 32,
+                },
+            )) => {}
+            other => panic!("expected storageRoot WrongLength, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decode_account_public_wraps_internal_error() {
+        // The public API surface returns api::Error, wrapping AccountDecodeError.
+        let bytes = firewood_storage::encode_list(&[
+            RlpItem::Bytes(&[0x01]),
+            RlpItem::Bytes(&[0x02]),
+            RlpItem::Bytes(&[0x03]),
+        ]);
+        let err = AccountFields::from_rlp(&bytes).expect_err("3 fields should fail");
+        assert!(matches!(err, crate::api::Error::InternalError(_)));
     }
 
     #[test]

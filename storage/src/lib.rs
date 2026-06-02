@@ -84,7 +84,10 @@ pub use u4::{TryFromIntError, U4};
 pub use linear::filebacked::FileBacked;
 pub use linear::memory::MemStore;
 pub use node::persist::MaybePersistedNode;
-pub use rlp::{NULL_RLP, RlpError, RlpItem, RlpList, encode_list, replace_list_field};
+pub use rlp::{
+    NULL_RLP, RlpError, RlpItem, RlpList, encode_list, parse_be_uint, parse_fixed,
+    replace_list_field,
+};
 pub use root_store::RootStore;
 #[cfg(any(test, feature = "test_utils"))]
 pub use test_utils::SeededRng;

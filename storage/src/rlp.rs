@@ -38,6 +38,23 @@ pub enum RlpError {
     /// Length prefix or single-byte form was not used in its minimal encoding.
     #[error("non-minimal RLP length encoding")]
     NonMinimalLength,
+    /// Byte-string longer than the caller's bound when parsing a variable-
+    /// length unsigned integer.
+    #[error("RLP byte string is {actual} bytes, max {max}")]
+    TooLong {
+        /// Length of the input byte string.
+        actual: usize,
+        /// Maximum length the caller accepts.
+        max: usize,
+    },
+    /// Byte-string length did not match the caller's fixed-size expectation.
+    #[error("RLP byte string is {actual} bytes, expected {expected}")]
+    WrongLength {
+        /// Length of the input byte string.
+        actual: usize,
+        /// Expected exact length.
+        expected: usize,
+    },
 }
 
 /// One child of a list passed to [`encode_list`].
@@ -233,6 +250,45 @@ pub fn replace_list_field(
     out.extend_from_slice(suffix);
     debug_assert_eq!(out.len(), new_total);
     Ok(out.into_boxed_slice())
+}
+
+/// Right-align an RLP byte string into an `N`-byte big-endian buffer, padding
+/// the high bytes with zero.
+///
+/// Matches the shape of RLP-encoded unsigned integers: leading zeros are
+/// stripped on the wire, so a `u64` of value 1 arrives as the single byte
+/// `0x01` — this helper widens it back to the fixed-size form the caller
+/// wants.
+///
+/// # Errors
+///
+/// Returns [`RlpError::TooLong`] if `bytes.len() > N`.
+#[inline]
+pub fn parse_be_uint<const N: usize>(bytes: &[u8]) -> Result<[u8; N], RlpError> {
+    if bytes.len() > N {
+        return Err(RlpError::TooLong {
+            actual: bytes.len(),
+            max: N,
+        });
+    }
+    let mut out = [0u8; N];
+    for (slot, &b) in out.iter_mut().rev().zip(bytes.iter().rev()) {
+        *slot = b;
+    }
+    Ok(out)
+}
+
+/// Convert an RLP byte string of exactly `N` bytes into `[u8; N]`.
+///
+/// # Errors
+///
+/// Returns [`RlpError::WrongLength`] if `bytes.len() != N`.
+#[inline]
+pub fn parse_fixed<const N: usize>(bytes: &[u8]) -> Result<[u8; N], RlpError> {
+    bytes.try_into().map_err(|_| RlpError::WrongLength {
+        actual: bytes.len(),
+        expected: N,
+    })
 }
 
 // ---------- internals ----------
@@ -624,6 +680,47 @@ mod tests {
         expected: RlpError,
     ) {
         assert_eq!(replace_list_field(input, index, replacement), Err(expected));
+    }
+
+    // ---------- parse_be_uint / parse_fixed ----------
+
+    #[test_case(&[], [0u8; 8] ; "empty pads to all zeros")]
+    #[test_case(&[0xaa, 0xbb, 0xcc], [0, 0, 0, 0, 0, 0xaa, 0xbb, 0xcc] ; "short right-aligns")]
+    #[test_case(&[0, 1, 2, 3, 4, 5, 6, 7], [0, 1, 2, 3, 4, 5, 6, 7] ; "exact length is identity")]
+    fn parse_be_uint_pads(input: &[u8], expected: [u8; 8]) {
+        assert_eq!(parse_be_uint::<8>(input).unwrap(), expected);
+    }
+
+    #[test_case(9 ; "one over")]
+    #[test_case(16 ; "double")]
+    fn parse_be_uint_rejects_overlong(len: usize) {
+        let bytes = vec![0u8; len];
+        assert_eq!(
+            parse_be_uint::<8>(&bytes),
+            Err(RlpError::TooLong {
+                actual: len,
+                max: 8
+            })
+        );
+    }
+
+    #[test]
+    fn parse_fixed_exact() {
+        let bytes = [0xabu8; 32];
+        assert_eq!(parse_fixed::<32>(&bytes).unwrap(), bytes);
+    }
+
+    #[test_case(31; "too short")]
+    #[test_case(33; "too long")]
+    fn parse_fixed_rejects_wrong_length(len: usize) {
+        let bytes = vec![0u8; len];
+        assert_eq!(
+            parse_fixed::<32>(&bytes),
+            Err(RlpError::WrongLength {
+                actual: len,
+                expected: 32,
+            })
+        );
     }
 
     // ---------- parity with the upstream `rlp` crate ----------
