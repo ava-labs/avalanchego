@@ -403,14 +403,17 @@ func (a *AtomicBackend) AtomicTrie() *AtomicTrie {
 	return a.atomicTrie
 }
 
-// CommitToHeight commits the atomic trie at the last accepted root for height
-// and flushes it to disk, even if height is not a commit-interval boundary.
-// It is a no-op if the trie is already committed at or beyond height.
-func (a *AtomicBackend) CommitToHeight(height uint64) error {
-	if _, committedHeight := a.atomicTrie.LastCommitted(); committedHeight >= height {
+// CommitLastAcceptedRoot commits the atomic trie's current last accepted root
+// at lastAcceptedHeight and flushes it to disk, even if lastAcceptedHeight is
+// not a commit-interval boundary. It is a no-op if the trie is already committed
+// at or beyond lastAcceptedHeight.
+//
+// lastAcceptedHeight MUST correspond to the current last accepted root.
+func (a *AtomicBackend) CommitLastAcceptedRoot(lastAcceptedHeight uint64) error {
+	if _, committedHeight := a.atomicTrie.LastCommitted(); committedHeight >= lastAcceptedHeight {
 		return nil
 	}
-	if err := a.atomicTrie.Commit(height, a.atomicTrie.LastAcceptedRoot()); err != nil {
+	if err := a.atomicTrie.Commit(lastAcceptedHeight, a.atomicTrie.LastAcceptedRoot()); err != nil {
 		return err
 	}
 	return a.repo.db.Commit()
