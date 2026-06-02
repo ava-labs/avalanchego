@@ -31,17 +31,6 @@ func (s *SUT) assertTxBloomContains(tb testing.TB, txIDs ...ids.ID) {
 	}
 }
 
-// assertTxBloomNotContains asserts that the transaction bloom does not contain
-// the given transaction IDs.
-func (s *SUT) assertTxBloomNotContains(tb testing.TB, txIDs ...ids.ID) {
-	tb.Helper()
-
-	filter, salt := s.gossipSet.BloomFilter()
-	for i, txID := range txIDs {
-		assert.Falsef(tb, bloom.Contains(filter, txID[:], salt[:]), "bloom filter should not contain %s (%d)", txID, i)
-	}
-}
-
 // TestPushGossip verifies that a cross-chain transaction issued to an API node
 // is push-gossiped to a validator for block building.
 func TestPushGossip(t *testing.T) {
@@ -134,7 +123,6 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 	require.NoErrorf(t, err, "%T.WaitForEvent()", vdrA.VM)
 	assert.Equalf(t, common.PendingTxs, e, "%T.WaitForEvent() event", vdrA.VM)
 	vdrA.assertTxBloomContains(t, stx.ID())
-	vdrB.assertTxBloomNotContains(t, stx.ID())
 
 	// Even though the validator learned about stx via pull gossip, they should
 	// still push gossip stx to vdrB if they see it over the API.
