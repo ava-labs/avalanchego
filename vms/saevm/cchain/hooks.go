@@ -230,7 +230,7 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, tx *types.Transaction, r *types.Receipt) error {
+func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, _ *types.Transaction, r *types.Receipt) error {
 	var burned uint256.Int
 	burned.SetUint64(r.GasUsed)
 	burned.Mul(&burned, &baseFee)

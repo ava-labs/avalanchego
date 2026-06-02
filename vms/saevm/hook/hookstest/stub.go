@@ -242,7 +242,7 @@ func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr
 }
 
 // AfterExecutingTransaction is a no-op that always returns nil.
-func (*Stub) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, tx *types.Transaction, r *types.Receipt) error {
+func (*Stub) AfterExecutingTransaction(*state.StateDB, uint256.Int, *types.Transaction, *types.Receipt) error {
 	return nil
 }
 
