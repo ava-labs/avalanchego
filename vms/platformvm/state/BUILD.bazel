@@ -91,7 +91,6 @@ go_test(
         "//cache/lru",
         "//codec",
         "//database",
-        "//database/linkeddb",
         "//database/memdb",
         "//genesis",
         "//ids",
