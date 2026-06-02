@@ -1371,13 +1371,11 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 }
 
 func (*standardTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
-	// todo: implement
-	return nil
+	return ErrUnimplemented
 }
 
 func (*standardTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
-	// todo: implement
-	return nil
+	return ErrUnimplemented
 }
 
 func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {

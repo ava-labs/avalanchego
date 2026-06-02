@@ -223,15 +223,12 @@ var (
 		gas.DBWrite: 6, // write remaining balance utxo + weight diff + deactivated weight diff + public key diff + delete staker + write staker
 	}
 
-	IntrinsicAddAutoRenewedValidatorTxComplexities = gas.Dimensions{} // todo: implement
-
-	IntrinsicSetAutoRenewedValidatorConfigTxComplexities = gas.Dimensions{} // todo: implement
-
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
 	errUnsupportedOwner  = errors.New("unsupported owner type")
 	errUnsupportedAuth   = errors.New("unsupported auth type")
 	errUnsupportedSigner = errors.New("unsupported signer type")
+	errUnimplemented     = errors.New("unimplemented")
 )
 
 func TxComplexity(txs ...txs.UnsignedTx) (gas.Dimensions, error) {
@@ -799,56 +796,12 @@ func (c *complexityVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) e
 	return err
 }
 
-func (c *complexityVisitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	signerComplexity, err := SignerComplexity(tx.Signer)
-	if err != nil {
-		return err
-	}
-	outputsComplexity, err := OutputComplexity(tx.Stake()...)
-	if err != nil {
-		return err
-	}
-	validatorOwnerComplexity, err := OwnerComplexity(tx.ValidationRewardsOwner())
-	if err != nil {
-		return err
-	}
-	delegatorOwnerComplexity, err := OwnerComplexity(tx.DelegationRewardsOwner())
-	if err != nil {
-		return err
-	}
-	configOwnerComplexity, err := OwnerComplexity(tx.Owner)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicAddAutoRenewedValidatorTxComplexities.Add(
-		&baseTxComplexity,
-		&signerComplexity,
-		&outputsComplexity,
-		&validatorOwnerComplexity,
-		&delegatorOwnerComplexity,
-		&configOwnerComplexity,
-	)
-	return err
+func (*complexityVisitor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	return errUnimplemented
 }
 
-func (c *complexityVisitor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidatorConfigTx) error {
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	authComplexity, err := AuthComplexity(tx.Auth)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicSetAutoRenewedValidatorConfigTxComplexities.Add(
-		&baseTxComplexity,
-		&authComplexity,
-	)
-	return err
+func (*complexityVisitor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+	return errUnimplemented
 }
 
 func (*complexityVisitor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {

@@ -18,9 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-var _ ValidatorTx = (*AddAutoRenewedValidatorTx)(nil)
+var (
+	_ UnsignedTx  = (*SetAutoRenewedValidatorConfigTx)(nil)
+	_ ValidatorTx = (*AddAutoRenewedValidatorTx)(nil)
+)
 
 var (
 	errMissingSigner                   = errors.New("missing signer")
@@ -34,7 +38,7 @@ type AddAutoRenewedValidatorTx struct {
 	BaseTx `serialize:"true"`
 
 	// Node ID of the validator
-	ValidatorNodeID ids.NodeID `serialize:"true" json:"nodeID"`
+	ValidatorNodeID types.JSONByteSlice `serialize:"true" json:"nodeID"`
 
 	// Signer is the BLS key for this validator.
 	Signer signer.Signer `serialize:"true" json:"signer"`
@@ -48,16 +52,13 @@ type AddAutoRenewedValidatorTx struct {
 	// Where to send delegation rewards when done validating
 	DelegatorRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"`
 
-	// Who is authorized to modify the auto-restake config
-	Owner fx.Owner `serialize:"true" json:"owner"`
+	// Who is authorized to manage this validator
+	ValidatorAuthority fx.Owner `serialize:"true" json:"validatorAuthority"`
 
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has DelegationShares=300,000 then they
 	// take 30% of rewards from delegators
-	DelegationShares uint32 `serialize:"true" json:"shares"`
-
-	// Weight of this validator used when sampling
-	Wght uint64 `serialize:"true" json:"weight"`
+	DelegationShares uint32 `serialize:"true" json:"delegationShares"`
 
 	// Percentage of rewards to restake at the end of each cycle, expressed in millionths (percentage * 10,000).
 	// Range [0..1_000_000]:
@@ -74,8 +75,14 @@ func (*AddAutoRenewedValidatorTx) SubnetID() ids.ID {
 	return constants.PrimaryNetworkID
 }
 
+// NodeID returns the validator's node ID.
+//
+// The error from nodeID is intentionally dropped: this method must only be
+// called on a syntactically verified tx (SyntacticVerify validates the node ID
+// and is run before acceptance, so persisted txs satisfy this too).
 func (tx *AddAutoRenewedValidatorTx) NodeID() ids.NodeID {
-	return tx.ValidatorNodeID
+	nodeID, _ := tx.nodeID()
+	return nodeID
 }
 
 func (tx *AddAutoRenewedValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
@@ -86,8 +93,15 @@ func (tx *AddAutoRenewedValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	return key, key != nil, nil
 }
 
+// Weight returns the validator's stake weight.
+//
+// The error from stakeWeight is intentionally dropped: this method must only be
+// called on a syntactically verified tx (SyntacticVerify validates the stake
+// outputs and is run before acceptance, so persisted txs satisfy this too).
+// Under that invariant the error is always nil.
 func (tx *AddAutoRenewedValidatorTx) Weight() uint64 {
-	return tx.Wght
+	weight, _ := tx.stakeWeight()
+	return weight
 }
 
 func (*AddAutoRenewedValidatorTx) CurrentPriority() Priority {
@@ -121,7 +135,7 @@ func (tx *AddAutoRenewedValidatorTx) InitCtx(ctx *snow.Context) {
 	}
 	tx.ValidatorRewardsOwner.InitCtx(ctx)
 	tx.DelegatorRewardsOwner.InitCtx(ctx)
-	tx.Owner.InitCtx(ctx)
+	tx.ValidatorAuthority.InitCtx(ctx)
 }
 
 // SyntacticVerify returns nil iff tx is valid
@@ -131,8 +145,6 @@ func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.ValidatorNodeID == ids.EmptyNodeID:
-		return errEmptyNodeID
 	case len(tx.StakeOuts) == 0:
 		return errNoStake
 	case tx.DelegationShares > reward.PercentDenominator:
@@ -143,11 +155,15 @@ func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		return errMissingPeriod
 	}
 
+	if _, err := tx.nodeID(); err != nil {
+		return err
+	}
+
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 
-	if err := verify.All(tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner, tx.Owner); err != nil {
+	if err := verify.All(tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner, tx.ValidatorAuthority); err != nil {
 		return fmt.Errorf("failed to verify signer, or rewards owners: %w", err)
 	}
 
@@ -161,24 +177,18 @@ func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		}
 	}
 
-	totalStakeWeight := uint64(0)
 	for _, out := range tx.StakeOuts {
 		if out.AssetID() != ctx.AVAXAssetID {
 			return errInvalidStakedAsset
 		}
-
-		newWeight, err := math.Add(totalStakeWeight, out.Output().Amount())
-		if err != nil {
-			return err
-		}
-		totalStakeWeight = newWeight
 	}
 
-	switch {
-	case !avax.IsSortedTransferableOutputs(tx.StakeOuts, Codec):
+	if _, err := tx.stakeWeight(); err != nil {
+		return err
+	}
+
+	if !avax.IsSortedTransferableOutputs(tx.StakeOuts, Codec) {
 		return errOutputsNotSorted
-	case totalStakeWeight != tx.Wght:
-		return fmt.Errorf("%w: weight %d != stake %d", errValidatorWeightMismatch, tx.Wght, totalStakeWeight)
 	}
 
 	// cache that this is valid
@@ -188,4 +198,38 @@ func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 func (tx *AddAutoRenewedValidatorTx) Visit(visitor Visitor) error {
 	return visitor.AddAutoRenewedValidatorTx(tx)
+}
+
+func (tx *AddAutoRenewedValidatorTx) nodeID() (ids.NodeID, error) {
+	nodeID, err := ids.ToNodeID(tx.ValidatorNodeID)
+	if err != nil {
+		return ids.EmptyNodeID, err
+	}
+
+	if nodeID == ids.EmptyNodeID {
+		return ids.EmptyNodeID, errEmptyNodeID
+	}
+
+	return nodeID, nil
+}
+
+func (tx *AddAutoRenewedValidatorTx) stakeWeight() (uint64, error) {
+	weight := uint64(0)
+	for _, out := range tx.StakeOuts {
+		switch {
+		case out == nil:
+			return 0, avax.ErrNilTransferableOutput
+		case out.Output() == nil:
+			return 0, avax.ErrNilTransferableFxOutput
+		}
+
+		newWeight, err := math.Add(weight, out.Output().Amount())
+		if err != nil {
+			return 0, err
+		}
+
+		weight = newWeight
+	}
+
+	return weight, nil
 }

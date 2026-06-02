@@ -40,6 +40,7 @@ var (
 	ErrInvalidID                     = errors.New("invalid ID")
 	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
+	ErrUnimplemented                 = errors.New("unimplemented")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -433,8 +434,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 }
 
 func (*proposalTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
-	// todo: implement
-	return nil
+	return ErrUnimplemented
 }
 
 func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
