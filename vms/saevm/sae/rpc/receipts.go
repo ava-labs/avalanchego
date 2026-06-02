@@ -52,7 +52,7 @@ func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, 
 			}
 			rawBlk := rawdb.ReadBlock(db, h, num)
 			// TODO(StephenButtolph): Can panic after state-sync
-			if rawBlk.NumberU64() <= b.LastSynchronous().NumberU64() {
+			if b.isSynchronous(rawBlk.NumberU64()) {
 				receipts := rawdb.ReadRawReceipts(db, rawBlk.Hash(), rawBlk.NumberU64())
 				if err := receipts.DeriveFields(
 					b.ChainConfig(),
