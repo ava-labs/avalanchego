@@ -200,6 +200,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		ethclient: ethclient.NewClient(ethRPCClient),
 	}
 	appSender.SetSelf(sut)
+	tb.Cleanup(appSender.Close)
 	return ctx, sut
 }
 

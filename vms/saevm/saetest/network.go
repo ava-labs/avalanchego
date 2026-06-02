@@ -41,6 +41,10 @@ type Sender struct {
 	self   eventual.Value[common.AppHandler]
 	selfID ids.NodeID
 
+	wgLock  sync.Mutex
+	closing bool
+	wg      sync.WaitGroup
+
 	peersLock sync.RWMutex
 	peers     map[ids.NodeID]common.AppHandler
 }
@@ -63,6 +67,18 @@ func (s *Sender) SetSelf(self Peer) {
 	s.self.Put(self)
 }
 
+// Close stops sending messages and blocks until all in-flight messages are
+// delivered.
+func (s *Sender) Close() {
+	s.wgLock.Lock()
+	s.closing = true
+	s.wgLock.Unlock()
+
+	// We MUST NOT hold wgLock while waiting, since the sender goroutines can be
+	// reentrent.
+	s.wg.Wait()
+}
+
 // AddPeer registers peer so that messages addressed to peer.NodeID() are
 // delivered to it.
 func (s *Sender) AddPeer(peer Peer) {
@@ -73,23 +89,33 @@ func (s *Sender) AddPeer(peer Peer) {
 }
 
 func (s *Sender) SendAppRequest(_ context.Context, to set.Set[ids.NodeID], requestID uint32, b []byte) error {
-	go s.sendAppRequest(to, requestID, b)
+	s.send(func() { s.sendAppRequest(to, requestID, b) })
 	return nil
 }
 
 func (s *Sender) SendAppResponse(_ context.Context, to ids.NodeID, requestID uint32, b []byte) error {
-	go s.sendAppResponse(to, requestID, b)
+	s.send(func() { s.sendAppResponse(to, requestID, b) })
 	return nil
 }
 
 func (s *Sender) SendAppError(_ context.Context, nodeID ids.NodeID, requestID uint32, code int32, message string) error {
-	go s.sendAppError(nodeID, requestID, code, message)
+	s.send(func() { s.sendAppError(nodeID, requestID, code, message) })
 	return nil
 }
 
 func (s *Sender) SendAppGossip(_ context.Context, c common.SendConfig, b []byte) error {
-	go s.sendAppGossip(c, b)
+	s.send(func() { s.sendAppGossip(c, b) })
 	return nil
+}
+
+// send executes f in a new goroutine if the sender is not closed.
+func (s *Sender) send(f func()) {
+	s.wgLock.Lock()
+	defer s.wgLock.Unlock()
+
+	if !s.closing {
+		s.wg.Go(f)
+	}
 }
 
 func (s *Sender) sendAppRequest(to set.Set[ids.NodeID], requestID uint32, b []byte) {
