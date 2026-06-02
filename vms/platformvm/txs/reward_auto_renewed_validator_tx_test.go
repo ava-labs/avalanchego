@@ -12,56 +12,45 @@ import (
 )
 
 func TestRewardAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
-	type test struct {
-		name    string
-		txFunc  func() *RewardAutoRenewedValidatorTx
-		wantErr error
-	}
-
-	tests := []test{
+	tests := []struct {
+		name string
+		tx   *RewardAutoRenewedValidatorTx
+		want error
+	}{
 		{
-			name: "nil tx",
-			txFunc: func() *RewardAutoRenewedValidatorTx {
-				return nil
-			},
-			wantErr: ErrNilTx,
+			name: "nil",
+			tx:   nil,
+			want: ErrNilTx,
 		},
 		{
-			name: "missing timestamp",
-			txFunc: func() *RewardAutoRenewedValidatorTx {
-				return &RewardAutoRenewedValidatorTx{
-					TxID:      ids.GenerateTestID(),
-					Timestamp: 0,
-				}
+			name: "missing_timestamp",
+			tx: &RewardAutoRenewedValidatorTx{
+				TxID:      ids.GenerateTestID(),
+				Timestamp: 0,
 			},
-			wantErr: errMissingTimestamp,
+			want: errMissingTimestamp,
 		},
 		{
-			name: "missing tx id",
-			txFunc: func() *RewardAutoRenewedValidatorTx {
-				return &RewardAutoRenewedValidatorTx{
-					Timestamp: 1,
-				}
+			name: "missing_tx_id",
+			tx: &RewardAutoRenewedValidatorTx{
+				Timestamp: 1,
 			},
-			wantErr: errMissingTxID,
+			want: errMissingTxID,
 		},
 		{
-			name: "valid auto-renewed validator",
-			txFunc: func() *RewardAutoRenewedValidatorTx {
-				return &RewardAutoRenewedValidatorTx{
-					TxID:      ids.GenerateTestID(),
-					Timestamp: 1,
-				}
+			name: "valid",
+			tx: &RewardAutoRenewedValidatorTx{
+				TxID:      ids.GenerateTestID(),
+				Timestamp: 1,
 			},
-			wantErr: nil,
+			want: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tx := tt.txFunc()
-			gotErr := tx.SyntacticVerify(nil)
-			require.ErrorIs(t, gotErr, tt.wantErr)
+			got := tt.tx.SyntacticVerify(nil)
+			require.ErrorIs(t, got, tt.want)
 		})
 	}
 }

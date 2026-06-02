@@ -7,20 +7,50 @@ on:
   merge_group:
     types: [checks_requested]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
+  coreth-required:
+    if: ${{ always() }}
+    needs:
+      - lint_test
+      - unit_test
+      - e2e_warp
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi
+
   lint_test:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: ./graft/coreth
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
       - name: Run all lint checks
-        run: nix develop --command ./scripts/run_task.sh lint-all-ci
+        run: ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
-        run: nix develop --command ./scripts/run_task.sh check-go-mod-tidy
+        run: ./scripts/run_task.sh check-go-mod-tidy
 
   unit_test:
     name: Unit Tests (${{ matrix.os }})
@@ -31,19 +61,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-22.04, ubuntu-latest]
+        os: [macos-26, ubuntu-22.04, ubuntu-24.04]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - run: ./scripts/run_task.sh build-test
       - run: ./scripts/run_task.sh coverage
 
   e2e_warp:
     name: E2E Warp Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Run Warp E2E Tests

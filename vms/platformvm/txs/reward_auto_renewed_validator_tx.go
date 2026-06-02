@@ -14,19 +14,26 @@ import (
 
 var (
 	_ UnsignedTx = (*RewardAutoRenewedValidatorTx)(nil)
-	_ RewardTx   = (*RewardAutoRenewedValidatorTx)(nil)
 
 	errMissingTxID      = errors.New("missing tx id")
 	errMissingTimestamp = errors.New("missing timestamp")
 )
 
 // RewardAutoRenewedValidatorTx is a transaction that represents a proposal to
-// reward/remove an auto-renewed validator that is currently validating from the validator set.
+// reward an auto-renewed validator that is currently validating.
+//
+// If the validator has been configured to exit the validator set or the rewards
+// are not granted, this transaction will remove them from the validator set.
+//
+// Otherwise, this transaction will instantiate the next staking period for the
+// validator.
 type RewardAutoRenewedValidatorTx struct {
-	// ID of the tx that created the validator being removed/rewarded
+	// ID of the tx that created the validator being rewarded
 	TxID ids.ID `serialize:"true" json:"txID"`
 
-	// End time of the validation cycle
+	// End time of the validation cycle.
+	//
+	// This ensures reward txs for different cycles of the same auto-renewed validator have different IDs.
 	Timestamp uint64 `serialize:"true" json:"timestamp"`
 
 	unsignedBytes []byte // Unsigned byte representation of this data

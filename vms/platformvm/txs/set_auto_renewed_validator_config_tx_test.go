@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -20,129 +21,91 @@ import (
 )
 
 func TestSetAutoRenewedValidatorConfigTxSyntacticVerify(t *testing.T) {
-	type test struct {
-		name    string
-		txFunc  func() *SetAutoRenewedValidatorConfigTx
-		wantErr error
-	}
-
-	var (
-		networkID = uint32(1337)
-		chainID   = ids.GenerateTestID()
-	)
-
-	ctx := &snow.Context{
-		ChainID:   chainID,
-		NetworkID: networkID,
-	}
-
-	// A BaseTx that already passed syntactic verification.
-	verifiedBaseTx := BaseTx{
-		SyntacticallyVerified: true,
-	}
-
-	// A BaseTx that passes syntactic verification.
-	validBaseTx := BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
-			BlockchainID: chainID,
-		},
-	}
-
-	// A BaseTx that fails syntactic verification.
-	invalidBaseTx := BaseTx{}
-
-	tests := []test{
+	tests := []struct {
+		name   string
+		mutate func(*SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx
+		want   error
+	}{
 		{
-			name: "nil tx",
-			txFunc: func() *SetAutoRenewedValidatorConfigTx {
+			name: "nil",
+			mutate: func(*SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx {
 				return nil
 			},
-			wantErr: ErrNilTx,
+			want: ErrNilTx,
 		},
 		{
-			name: "already verified",
-			txFunc: func() *SetAutoRenewedValidatorConfigTx {
+			name: "already_verified",
+			mutate: func(*SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx {
 				return &SetAutoRenewedValidatorConfigTx{
-					BaseTx: verifiedBaseTx,
+					BaseTx: BaseTx{
+						SyntacticallyVerified: true,
+					},
 				}
 			},
-			wantErr: nil,
+			want: nil,
 		},
 		{
-			name: "empty txID",
-			txFunc: func() *SetAutoRenewedValidatorConfigTx {
-				return &SetAutoRenewedValidatorConfigTx{
-					BaseTx: validBaseTx,
-				}
+			name: "empty_txID",
+			mutate: func(tx *SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx {
+				tx.TxID = ids.Empty
+				return tx
 			},
-			wantErr: errMissingTxID,
+			want: errMissingTxID,
 		},
 		{
-			name: "too many restake shares",
-			txFunc: func() *SetAutoRenewedValidatorConfigTx {
-				autoCompoundRewardShares := uint32(2_000_000)
-
-				return &SetAutoRenewedValidatorConfigTx{
-					BaseTx:                   validBaseTx,
-					TxID:                     ids.GenerateTestID(),
-					AutoCompoundRewardShares: autoCompoundRewardShares,
-				}
+			name: "too_many_restake_shares",
+			mutate: func(tx *SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx {
+				tx.AutoCompoundRewardShares = reward.PercentDenominator + 1
+				return tx
 			},
-			wantErr: errTooManyAutoCompoundRewardShares,
+			want: errTooManyAutoCompoundRewardShares,
 		},
 		{
-			name: "invalid auth",
-			txFunc: func() *SetAutoRenewedValidatorConfigTx {
-				var invalidAuth *secp256k1fx.Input
-
-				return &SetAutoRenewedValidatorConfigTx{
-					BaseTx:                   validBaseTx,
-					TxID:                     ids.GenerateTestID(),
-					Auth:                     invalidAuth,
-					AutoCompoundRewardShares: reward.PercentDenominator,
-					Period:                   0,
-				}
+			name: "invalid_auth",
+			mutate: func(tx *SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx {
+				tx.Auth = (*secp256k1fx.Input)(nil)
+				return tx
 			},
-			wantErr: secp256k1fx.ErrNilInput,
+			want: secp256k1fx.ErrNilInput,
 		},
 		{
-			name: "invalid BaseTx",
-			txFunc: func() *SetAutoRenewedValidatorConfigTx {
-				autoCompoundRewardShares := uint32(500_000)
-
-				return &SetAutoRenewedValidatorConfigTx{
-					BaseTx:                   invalidBaseTx,
-					TxID:                     ids.GenerateTestID(),
-					AutoCompoundRewardShares: autoCompoundRewardShares,
-				}
+			name: "invalid_BaseTx",
+			mutate: func(tx *SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx {
+				tx.BaseTx = BaseTx{}
+				return tx
 			},
-			wantErr: avax.ErrWrongNetworkID,
+			want: avax.ErrWrongNetworkID,
 		},
 		{
-			name: "valid tx",
-			txFunc: func() *SetAutoRenewedValidatorConfigTx {
-				validAuth := &secp256k1fx.Input{SigIndices: []uint32{0}}
-
-				return &SetAutoRenewedValidatorConfigTx{
-					BaseTx:                   validBaseTx,
-					TxID:                     ids.GenerateTestID(),
-					Auth:                     validAuth,
-					AutoCompoundRewardShares: reward.PercentDenominator,
-					Period:                   0,
-				}
+			name: "valid",
+			mutate: func(tx *SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx {
+				return tx
 			},
+			want: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tx := tt.txFunc()
-			gotErr := tx.SyntacticVerify(ctx)
-			require.ErrorIs(t, gotErr, tt.wantErr)
+			ctx := snowtest.Context(t, snowtest.PChainID)
+
+			tx := tt.mutate(&SetAutoRenewedValidatorConfigTx{
+				BaseTx: BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+					},
+				},
+				TxID:                     ids.GenerateTestID(),
+				Auth:                     &secp256k1fx.Input{SigIndices: []uint32{0}},
+				AutoCompoundRewardShares: reward.PercentDenominator,
+			})
+
+			got := tx.SyntacticVerify(ctx)
+			require.ErrorIs(t, got, tt.want)
 
 			if tx != nil {
-				require.Equal(t, tt.wantErr == nil, tx.SyntacticallyVerified)
+				require.Equal(t, tt.want == nil, tx.SyntacticallyVerified)
 			}
 		})
 	}
@@ -161,7 +124,7 @@ func TestSetAutoRenewedValidatorConfigTxSerialization(t *testing.T) {
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 	}
 
-	simpleSetConfigTx := &SetAutoRenewedValidatorConfigTx{
+	tx := &SetAutoRenewedValidatorConfigTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    constants.MainnetID,
@@ -192,9 +155,9 @@ func TestSetAutoRenewedValidatorConfigTxSerialization(t *testing.T) {
 		AutoCompoundRewardShares: 500_000,
 		Period:                   200 * 24 * 60 * 60,
 	}
-	avax.SortTransferableOutputs(simpleSetConfigTx.Outs, Codec)
-	utils.Sort(simpleSetConfigTx.Ins)
-	require.NoError(simpleSetConfigTx.SyntacticVerify(&snow.Context{
+	avax.SortTransferableOutputs(tx.Outs, Codec)
+	utils.Sort(tx.Ins)
+	require.NoError(tx.SyntacticVerify(&snow.Context{
 		NetworkID: 1,
 		ChainID:   constants.PlatformChainID,
 	}))
@@ -255,7 +218,7 @@ func TestSetAutoRenewedValidatorConfigTxSerialization(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x01, 0x07, 0xac, 0x00,
 	}
 
-	var unsignedTx UnsignedTx = simpleSetConfigTx
+	var unsignedTx UnsignedTx = tx
 	gotBytes, err := Codec.Marshal(CodecVersion, &unsignedTx)
 	require.NoError(err)
 	require.Equal(wantBytes, gotBytes)

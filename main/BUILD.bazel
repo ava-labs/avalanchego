@@ -18,6 +18,12 @@ go_library(
 go_binary(
     name = "main",
     embed = [":main_lib"],
+    gotags = [
+        # Allow packages to expose `cmp.Options` for comparing their types in
+        # tests only by constraining the files with: //go:build !nocmpopts
+        # If any identifiers leak then the binary won't build.
+        "nocmpopts",
+    ],
     visibility = ["//visibility:public"],
     x_defs = {
         # keep

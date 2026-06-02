@@ -940,12 +940,11 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 	)
 
 	wantTx := txs.AddAutoRenewedValidatorTx{
-		ValidatorNodeID:          nodeID,
+		ValidatorNodeID:          nodeID[:],
 		Signer:                   pop,
-		Wght:                     weight,
 		ValidatorRewardsOwner:    validationRewardsOwner,
 		DelegatorRewardsOwner:    delegationRewardsOwner,
-		Owner:                    configOwner,
+		ValidatorAuthority:       configOwner,
 		DelegationShares:         delegationShares,
 		AutoCompoundRewardShares: autoCompoundShares,
 		Period:                   periodSeconds,

@@ -66,7 +66,7 @@ func testSync(t *testing.T, test syncTest, c codec.Manager, leafReqType message.
 	mockClient.GetCodeIntercept = test.GetCodeIntercept
 
 	// Create the code fetcher.
-	fetcher, err := code.NewQueue(clientEthDB, make(chan struct{}))
+	fetcher, err := code.NewQueue(clientEthDB)
 	require.NoError(t, err, "failed to create code fetcher")
 
 	// Create the consumer code syncer.

@@ -676,11 +676,8 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			return fmt.Errorf("expected a %T with %s scheme, got %T", tdb, customrawdb.FirewoodScheme, vm.eth.BlockChain().TrieDB().Backend())
 		}
 		n := vm.Network.P2PNetwork()
-		if err := n.AddHandler(p2p.FirewoodRangeProofHandlerID, syncer.NewGetRangeProofHandler(tdb.Firewood)); err != nil {
-			return fmt.Errorf("adding firewood range proof handler: %w", err)
-		}
-		if err := n.AddHandler(p2p.FirewoodChangeProofHandlerID, syncer.NewGetChangeProofHandler(tdb.Firewood)); err != nil {
-			return fmt.Errorf("adding firewood change proof handler: %w", err)
+		if err := n.AddHandler(p2p.FirewoodProofHandlerID, syncer.NewGetProofHandler(tdb.Firewood)); err != nil {
+			return fmt.Errorf("adding firewood proof handler: %w", err)
 		}
 	default:
 		log.Warn("state sync is not supported for this scheme, no leaf handlers will be registered", "scheme", scheme)
@@ -1204,25 +1201,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return apis, nil
 }
 
-// NewHTTPHandler implements the block.ChainVM interface
-func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
-	handlers, err := vm.CreateHandlers(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return the main RPC handler as the primary HTTP handler
-	if handler, exists := handlers[ethRPCEndpoint]; exists {
-		return handler, nil
-	}
-
-	// Fallback to a default handler if no RPC handler exists
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "No HTTP handler available", http.StatusNotFound)
-	}), nil
-}
-
-func (*VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
+func (*VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	return nil, nil
 }
 

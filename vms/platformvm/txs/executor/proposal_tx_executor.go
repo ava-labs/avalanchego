@@ -59,8 +59,8 @@ func ProposalTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	tx *txs.Tx,
-	onCommitState state.Diff,
-	onAbortState state.Diff,
+	onCommitState *state.Diff,
+	onAbortState *state.Diff,
 ) error {
 	proposalExecutor := proposalTxExecutor{
 		backend:       backend,
@@ -84,10 +84,10 @@ type proposalTxExecutor struct {
 	// [onCommitState] is the state used for validation.
 	// [onCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
-	onCommitState state.Diff
+	onCommitState *state.Diff
 	// [onAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
-	onAbortState state.Diff
+	onAbortState *state.Diff
 }
 
 func (*proposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
@@ -704,7 +704,7 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	validationRewards uint64,
 	delegateeRewards uint64,
-	chainState state.Diff,
+	chainState *state.Diff,
 	outputIndexOffset uint32,
 ) (uint32, error) {
 	avaxAsset := avax.Asset{ID: e.backend.Ctx.AVAXAssetID}
@@ -995,7 +995,7 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 
 // createUTXOsStakeOut creates UTXOs to return a staker's staked tokens.
 // The UTXOs are added to all provided state diffs.
-func createUTXOsStakeOut(stakerTx txs.PermissionlessStaker, txID ids.ID, states ...state.Diff) {
+func createUTXOsStakeOut(stakerTx txs.PermissionlessStaker, txID ids.ID, states ...*state.Diff) {
 	outputIndexOffset := len(stakerTx.Outputs())
 
 	for i, out := range stakerTx.Stake() {

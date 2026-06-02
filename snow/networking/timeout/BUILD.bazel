@@ -24,7 +24,6 @@ go_test(
     srcs = [
         "main_test.go",
         "manager_test.go",
-        "mocks_generate_test.go",
     ],
     embed = [":timeout"],
     deps = [
