@@ -151,7 +151,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
-	saetest.SetValidators(tb, snowCtx.ValidatorState, cfg.validators)
+	vdrState := saetest.SetValidators(tb, snowCtx.ValidatorState, cfg.validators)
 
 	var validatorKeys []*localsigner.LocalSigner
 	if cfg.warpValidators > 0 {

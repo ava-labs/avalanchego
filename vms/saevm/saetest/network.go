@@ -249,14 +249,15 @@ func ConnectTo[P Peer](tb testing.TB, self P, peers ...P) {
 }
 
 // SetValidators makes state report each NodeID in vdrs as a validator with
-// weight 1 from GetValidatorSet.
+// weight 1 from GetValidatorSet. It returns the underlying [validatorstest.State]
+// so callers can configure it further (e.g. a warp validator set).
 //
 // state MUST be a [validatorstest.State], which is the concrete type installed
 // by [snowtest.Context]. It is accepted as the [validators.State] interface
 // rather than the concrete type so that callers can pass snowCtx.ValidatorState
 // directly without each repeating the type assertion this helper exists to
 // share.
-func SetValidators(tb testing.TB, state validators.State, vdrs set.Set[ids.NodeID]) {
+func SetValidators(tb testing.TB, state validators.State, vdrs set.Set[ids.NodeID]) *validatorstest.State {
 	tb.Helper()
 
 	vdrState, ok := state.(*validatorstest.State)
@@ -271,4 +272,5 @@ func SetValidators(tb testing.TB, state validators.State, vdrs set.Set[ids.NodeI
 		}
 		return out, nil
 	}
+	return vdrState
 }
