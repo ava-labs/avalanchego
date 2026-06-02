@@ -79,7 +79,7 @@ func (s *Sender) Close() {
 	s.wgLock.Unlock()
 
 	// We MUST NOT hold wgLock while waiting, since the sender goroutines can be
-	// reentrent.
+	// reentrant.
 	s.wg.Wait()
 }
 
