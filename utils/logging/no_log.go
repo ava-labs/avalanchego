@@ -63,20 +63,6 @@ func (NoLog) RecoverAndExit(f, exit func()) {
 
 func (NoLog) Stop() {}
 
-type NoWarn struct{ NoLog }
-
-func (NoWarn) Fatal(string, ...zap.Field) {
-	panic("unexpected Fatal")
-}
-
-func (NoWarn) Error(string, ...zap.Field) {
-	panic("unexpected Error")
-}
-
-func (NoWarn) Warn(string, ...zap.Field) {
-	panic("unexpected Warn")
-}
-
 type discard struct{}
 
 func (discard) Write(p []byte) (int, error) {

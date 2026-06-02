@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"math/rand/v2"
 	"net/http/httptest"
 	"os"
 	"sync"
@@ -46,11 +47,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -95,7 +98,7 @@ type SUT struct {
 	wallet  *saetest.Wallet
 	db      ethdb.Database
 	hooks   *hookstest.Stub
-	logger  *saetest.TBLogger
+	logger  *loggingtest.Logger
 
 	validators *validatorstest.State
 	sender     *enginetest.Sender
@@ -149,7 +152,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
 	})
 
-	logger := saetest.NewTBLogger(tb, conf.logLevel)
+	logger := loggingtest.New(tb, conf.logLevel)
 	ctx := logger.CancelOnError(tb.Context())
 	snowCtx := snowtest.Context(tb, chainID)
 	snowCtx.Log = logger
@@ -1085,5 +1088,44 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+func TestSettledGasTime(t *testing.T) {
+	const target = 1e7
+	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, opt, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.Target = target
+	}))
+
+	const numBlocks = 100
+	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
+	bs := make([]*blocks.Block, 0, numBlocks+1)
+	bs = append(bs, sut.genesis)
+	for range numBlocks {
+		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        nil, // contract creation
+			Gas:       params.TxGasContractCreation,
+			GasFeeCap: big.NewInt(1),
+		}))
+		if rng.Int32N(2) == 0 {
+			vmTime.advanceToSettle(ctx, t, b)
+		}
+		bs = append(bs, b)
+	}
+
+	for i, b := range bs {
+		if i == 0 {
+			continue // genesis block has no [hook.SettledBy] struct.
+		}
+		settledHeight := sut.hooks.SettledBy(b.Header()).Height
+		settledBlock := bs[settledHeight]
+
+		want := settledBlock.ExecutedByGasTime()
+		got, err := hook.SettledGasTime(sut.hooks, settledBlock.Header(), b.Header())
+		require.NoErrorf(t, err, "SettledGasTime() for block %d (settled height %d)", b.Height(), settledHeight)
+		if diff := cmp.Diff(want, got, gastime.CmpOpt()); diff != "" {
+			t.Errorf("SettledGasTime() for block %d (settled at height %d) diff (-want +got):\n%s", b.Height(), settledHeight, diff)
+		}
 	}
 }
