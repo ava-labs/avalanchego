@@ -271,18 +271,33 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 // TestCommitAtomicTrieOnShutdown verifies that shutting down the VM persists the
 // atomic trie at the last accepted height, so a restart needs no re-indexing.
 func TestCommitAtomicTrieOnShutdown(t *testing.T) {
+	for _, scheme := range vmtest.Schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testCommitAtomicTrieOnShutdown(t, scheme)
+		})
+	}
+}
+
+func testCommitAtomicTrieOnShutdown(t *testing.T, scheme string) {
 	require := require.New(t)
 	ctx := t.Context()
 	fork := upgradetest.ApricotPhase2
 
+	const commitInterval = 4096
+	configJSON := fmt.Sprintf(`{"commit-interval": %d}`, commitInterval)
+
 	vm := newAtomicTestVM()
-	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{Fork: &fork})
+	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+		Fork:       &fork,
+		Scheme:     scheme,
+		ConfigJSON: configJSON,
+	})
 	require.NoError(addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
 		vmtest.TestShortIDAddrs[0]: 50_000_000,
 	}), "addUTXOs()")
 
-	// Accept one atomic import block below the default commit interval (4096),
-	// so the trie is not yet committed at its last accepted height.
+	// Accept one atomic import block below the commit interval, so the trie is
+	// not yet committed at its last accepted height.
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
 	require.NoError(err, "vm.newImportTx()")
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx), "AtomicMempool.AddLocalTx()")
@@ -298,8 +313,13 @@ func TestCommitAtomicTrieOnShutdown(t *testing.T) {
 	_, commitHeight := vm.AtomicBackend.AtomicTrie().LastCommitted()
 	require.Less(commitHeight, blk.Height(), "atomic trie should not yet be committed at the last accepted height")
 
-	// Shut down (committing the trie), then restart from the same database.
+	// Shut down (which commits the trie), then restart from the same database
+	// with the same configuration. Reusing the scheme is required so Firewood
+	// reopens the same database.
 	require.NoError(vm.Shutdown(ctx), "vm.Shutdown()")
+
+	restartConfigJSON, err := vmtest.OverrideSchemeConfig(scheme, configJSON)
+	require.NoError(err, "vmtest.OverrideSchemeConfig()")
 
 	vmtest.ResetMetrics(tvm.Ctx)
 	restartedVM := newAtomicTestVM()
@@ -309,7 +329,7 @@ func TestCommitAtomicTrieOnShutdown(t *testing.T) {
 		tvm.DB,
 		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork])),
 		nil,
-		nil,
+		[]byte(restartConfigJSON),
 		nil,
 		tvm.AppSender,
 	), "restartedVM.Initialize()")
