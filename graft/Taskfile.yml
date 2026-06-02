@@ -1,14 +1,20 @@
 # https://taskfile.dev
-# To run on a system without task installed, `../scripts/run_task.sh` will execute it with `go run`.
-# If in the nix dev shell, `task` is available.
+# To run on a system without task installed, `../scripts/run_task.sh` will
+# prefer host task, otherwise use the repo's nix-pinned task when nix is
+# installed, otherwise bootstrap task via `go tool`.
+# If in the nix dev shell, repo tasks use the pinned toolchain.
 
 version: '3'
 
-# vars:
+vars:
+  # Task entrypoints run through the repo's nix wrapper so they use the pinned
+  # dev-shell toolchain when nix is available, without nesting nix shells.
+  NIX_RUN: '{{printf "%s/../scripts/nix_run.sh" .TASKFILE_DIR}}'
   # REPO_MODULE: github.com/ava-labs/REPO_NAME
+  STREVM_MODULE: github.com/ava-labs/strevm
 
 tasks:
-  default: ../scripts/run_task.sh --list
+  default: '{{.NIX_RUN}} ../scripts/run_task.sh --list'
 
   # REPO_NAME-rewrite-imports:
   #   desc: Rewrite imports of out-of-tree REPO_NAME to in-tree REPO_NAME
@@ -16,4 +22,12 @@ tasks:
 
   # REPO_NAME-subtree-merge:
   #   desc: Perform git subtree merge of REPO_NAME into graft/REPO_NAME (commits)
-  #   cmd: bash ./scripts/subtree-merge.sh {{.REPO_MODULE}} master
+  #   cmd: bash ./scripts/subtree-merge.sh {{.REPO_MODULE}} BRANCH
+
+  strevm-rewrite-imports:
+    desc: Rewrite imports of out-of-tree strevm ({{.STREVM_MODULE}}) to in-tree saevm
+    cmd: bash ./scripts/rewrite-imports.sh {{.STREVM_MODULE}} github.com/ava-labs/avalanchego/vms/saevm
+
+  strevm-subtree-merge:
+    desc: Perform git subtree merge of strevm into vms/saevm (commits)
+    cmd: bash ./scripts/subtree-merge.sh {{.STREVM_MODULE}} main vms/saevm

@@ -9,12 +9,14 @@
 #   GO_VERSION    - Go version to install (e.g., "1.24.12")
 #   DOCKER_IMAGE  - Name for the built Docker image
 #   CONTEXT_DIR   - Path to the Dockerfile directory
+#   DOCKERFILE    - Dockerfile name (e.g., "Dockerfile.rpm")
 
 set -euo pipefail
 
 : "${GO_VERSION:?GO_VERSION must be set}"
 : "${DOCKER_IMAGE:?DOCKER_IMAGE must be set}"
 : "${CONTEXT_DIR:?CONTEXT_DIR must be set}"
+: "${DOCKERFILE:?DOCKERFILE must be set (e.g. Dockerfile.rpm)}"
 
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required but not found on PATH" >&2; exit 1; }
 
@@ -39,8 +41,20 @@ if [[ -z "${checksum}" || "${checksum}" == "null" ]]; then
 fi
 echo "Go checksum: ${checksum}"
 
-docker build \
+# The docker-container driver leaves the result in BuildKit cache unless we
+# explicitly load it into the local image store for the subsequent docker run.
+build_flags=()
+build_driver=$(
+    docker buildx inspect 2>/dev/null \
+        | awk '/^Driver:/ { print $2; exit }'
+) || true
+if [[ "${build_driver}" == "docker-container" ]]; then
+    build_flags+=(--load)
+fi
+
+docker build "${build_flags[@]}" \
     --build-arg GO_VERSION="${GO_VERSION}" \
     --build-arg GO_CHECKSUM="${checksum}" \
+    -f "${CONTEXT_DIR}/${DOCKERFILE}" \
     -t "${DOCKER_IMAGE}" \
     "${CONTEXT_DIR}"

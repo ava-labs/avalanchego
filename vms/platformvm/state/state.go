@@ -283,10 +283,15 @@ type State struct {
 	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block; if the entry is nil, it is not in the database
 	blockDB     database.Database
 
-	validatorsDB                 database.Database
-	currentValidatorsDB          database.Database
-	currentValidatorBaseDB       database.Database
-	currentValidatorList         linkeddb.LinkedDB
+	validatorsDB           database.Database
+	currentValidatorsDB    database.Database
+	currentValidatorBaseDB database.Database
+	// modifiedStakingInfo are pending updates that have not been flushed yet to metadata.
+	// An update in this map requires an update in validatorState.updatedMetadata to flush the change
+	// to disk.
+	modifiedStakingInfo  map[ids.ID]map[ids.NodeID]StakingInfo
+	currentValidatorList linkeddb.LinkedDB
+
 	currentDelegatorBaseDB       database.Database
 	currentDelegatorList         linkeddb.LinkedDB
 	currentSubnetValidatorBaseDB database.Database
@@ -357,11 +362,6 @@ type State struct {
 	// TODO: Remove indexedHeights once v1.11.3 has been released.
 	indexedHeights *heightRange
 	singletonDB    database.Database
-
-	// modifiedStakingInfo are pending updates that have not been flushed yet to metadata.
-	// An update in this map requires an update in validatorState.updatedMetadata to flush the change
-	// to disk.
-	modifiedStakingInfo map[ids.ID]map[ids.NodeID]StakingInfo
 }
 
 // heightRange is used to track which heights are safe to use the native DB
@@ -672,6 +672,7 @@ func New(
 		validatorsDB:                        validatorsDB,
 		currentValidatorsDB:                 currentValidatorsDB,
 		currentValidatorBaseDB:              currentValidatorBaseDB,
+		modifiedStakingInfo:                 make(map[ids.ID]map[ids.NodeID]StakingInfo),
 		currentValidatorList:                linkeddb.NewDefault(currentValidatorBaseDB),
 		currentDelegatorBaseDB:              currentDelegatorBaseDB,
 		currentDelegatorList:                linkeddb.NewDefault(currentDelegatorBaseDB),
@@ -729,8 +730,7 @@ func New(
 		chainCache:   chainCache,
 		chainDBCache: chainDBCache,
 
-		singletonDB:         prefixdb.New(SingletonPrefix, baseDB),
-		modifiedStakingInfo: make(map[ids.ID]map[ids.NodeID]StakingInfo),
+		singletonDB: prefixdb.New(SingletonPrefix, baseDB),
 	}
 
 	if err := s.sync(genesisBytes); err != nil {
@@ -762,6 +762,11 @@ func (s *State) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo St
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
+	s.setStakingInfo(subnetID, vdrID, stakingInfo)
+	return nil
+}
+
+func (s *State) setStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo StakingInfo) {
 	nodeIDToStakingInfo, ok := s.modifiedStakingInfo[subnetID]
 	if !ok {
 		nodeIDToStakingInfo = make(map[ids.NodeID]StakingInfo)
@@ -769,8 +774,6 @@ func (s *State) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo St
 	}
 
 	nodeIDToStakingInfo[vdrID] = stakingInfo
-
-	return nil
 }
 
 func (s *State) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
@@ -927,6 +930,10 @@ func (s *State) PutCurrentValidator(staker *Staker) error {
 
 	s.currentStakers.PutValidator(staker)
 
+	// The validator's metadata isn't written to [validatorState] until
+	// [State.Commit] runs, so seed [modifiedStakingInfo] with the zero value so
+	// that reads through [State.GetStakingInfo] before [State.Commit] observe a default.
+	s.setStakingInfo(staker.SubnetID, staker.NodeID, StakingInfo{})
 	return nil
 }
 
@@ -940,9 +947,13 @@ func (s *State) DeleteCurrentValidator(staker *Staker) error {
 	}
 
 	s.currentStakers.DeleteValidator(staker)
+	delete(s.modifiedStakingInfo[staker.SubnetID], staker.NodeID)
+
 	return nil
 }
 
+// verifyNoDelegators checks that the validator for the subnetID and nodeID pair does not have
+// delegators associated with it.
 func verifyNoDelegators(cs CurrentStakers, subnetID ids.ID, nodeID ids.NodeID) error {
 	itr, err := cs.GetCurrentDelegatorIterator(subnetID, nodeID)
 	if err != nil {
@@ -2879,20 +2890,10 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 			// if-else) because during a validator replacement both are set.
 			if validatorDiff.removed != nil {
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
-
-				// If we are not performing a replacement, we should not try to update staking info because
-				// this no longer exists.
-				if validatorDiff.added == nil {
-					delete(s.modifiedStakingInfo[subnetID], nodeID)
-				}
 			}
 			if validatorDiff.added != nil {
 				staker := validatorDiff.added
 
-				// The validator is being added.
-				//
-				// Invariant: It's impossible for a delegator to have been rewarded
-				// in the same block that the validator was added.
 				startTime := uint64(staker.StartTime.Unix())
 				metadata := &validatorMetadata{
 					txID:        staker.TxID,
@@ -2920,6 +2921,8 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 		}
 	}
 
+	// Applying staking info must run after applying validator diffs. SetStakingInfo requires AddValidatorMetadata
+	// to have already populated the metadata entry for any newly added validator in this batch.
 	for subnetID, nodes := range s.modifiedStakingInfo {
 		for nodeID, stakingInfo := range nodes {
 			if err := s.validatorState.SetStakingInfo(subnetID, nodeID, stakingInfo); err != nil {
@@ -2928,7 +2931,6 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 		}
 	}
 
-	// Clear the diff now that we have flushed its changes
 	maps.Clear(s.modifiedStakingInfo)
 
 	if err := s.validatorState.WriteValidatorMetadata(

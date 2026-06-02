@@ -41,7 +41,6 @@ go_test(
     srcs = [
         "chain_router_test.go",
         "main_test.go",
-        "mocks_generate_test.go",
     ],
     embed = [":router"],
     deps = [
@@ -65,6 +64,7 @@ go_test(
         "//tests",
         "//utils/constants",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/math/meter",
         "//utils/resource",
         "//utils/set",

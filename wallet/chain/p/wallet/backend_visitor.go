@@ -175,7 +175,7 @@ func (b *backendVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) erro
 func (b *backendVisitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
 	b.b.setOwner(
 		b.txID,
-		tx.Owner,
+		tx.ValidatorAuthority,
 	)
 	return b.baseTx(&tx.BaseTx)
 }

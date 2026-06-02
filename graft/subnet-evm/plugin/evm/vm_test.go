@@ -3598,56 +3598,63 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 	}
 }
 
-// Tests that querying states no longer in memory is still possible when in
-// archival mode.
-//
-// Querying for the nonce of the zero address at various heights is sufficient
-// as this succeeds only if the EVM has the matching trie at each height.
-func TestArchivalQueries(t *testing.T) {
-	// Setting the state history to 5 means that we keep around only the 5 latest
-	// tries in memory. By creating numBlocks (10), we'll have:
-	//	- Tries 0-5: on-disk
-	// 	- Tries 6-10: in-memory
+// TestFirewoodArchivalQueries verifies that historical RPC queries succeed
+// against a Firewood archive node after the VM has been restarted, exercising
+// both the on-disk read path (every revision persisted) and the
+// reconstruct-by-reexecution path.
+func TestFirewoodArchivalQueries(t *testing.T) {
+	const numBlocks = 10
+
 	tests := []struct {
-		name   string
-		config string
+		name     string
+		vmConfig string
 	}{
 		{
-			name: "firewood",
-			config: `{
+			name: "every revision persisted on disk",
+			// Setting commit-interval = 1 forces Firewood to persist every committed
+			// revision; every historical query is served directly from disk.
+			vmConfig: `{
 				"state-scheme": "firewood",
 				"snapshot-cache": 0,
 				"pruning-enabled": false,
 				"state-sync-enabled": false,
-				"state-history": 5
+				"commit-interval": 1,
+				"state-history": 2
 			}`,
 		},
 		{
-			name: "hashdb",
-			config: `{
-				"state-scheme": "hash",
+			name: "revisions reconstructed via reexecution",
+			// Setting commit-interval = 10 means that the Firewood background
+			// deferred persistence worker persists every ceil(10/2) = 5 commits
+			// to disk. After restart, queries against non-persisted blocks must
+			// walk back to the nearest persisted revision (or genesis) and
+			// re-execute forward.
+			vmConfig: `{
+				"state-scheme": "firewood",
+				"snapshot-cache": 0,
 				"pruning-enabled": false,
-				"state-history": 5
+				"state-sync-enabled": false,
+				"commit-interval": 10,
+				"state-history": 11
 			}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctx := t.Context()
+			fork := upgradetest.Latest
 
-			vm := newVM(t, testVMConfig{configJSON: tt.config})
-			t.Cleanup(func() {
-				require.NoError(vm.vm.Shutdown(ctx))
+			tvm := newVM(t, testVMConfig{
+				fork:       &fork,
+				configJSON: tt.vmConfig,
 			})
 
-			numBlocks := 10
 			for range numBlocks {
-				nonce := vm.vm.txPool.Nonce(testEthAddrs[0])
+				nonce := tvm.vm.txPool.Nonce(testEthAddrs[0])
 				signedTx := newSignedLegacyTx(
 					t,
-					vm.vm.chainConfig,
+					tvm.vm.chainConfig,
 					testKeys[0].ToECDSA(),
 					nonce,
 					&common.Address{},
@@ -3656,28 +3663,62 @@ func TestArchivalQueries(t *testing.T) {
 					big.NewInt(testMinGasPrice),
 					nil,
 				)
-
-				blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm.vm)
-				require.NoError(err)
-
-				require.NoError(blk.Accept(ctx))
+				blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, tvm.vm)
+				require.NoError(t, err)
+				require.NoError(t, blk.Accept(ctx))
 			}
-			vm.vm.blockChain.DrainAcceptorQueue()
+			tvm.vm.blockChain.DrainAcceptorQueue()
 
-			handlers, err := vm.vm.CreateHandlers(ctx)
-			require.NoError(err)
+			require.NoError(t, tvm.vm.Shutdown(ctx))
 
-			server := httptest.NewServer(handlers[ethRPCEndpoint])
-			t.Cleanup(server.Close)
+			t.Run("VM Restart", func(t *testing.T) {
+				ctx := t.Context()
 
-			client, err := ethclient.Dial(server.URL)
-			require.NoError(err)
+				vm := &VM{}
+				t.Cleanup(func() {
+					require.NoError(t, vm.Shutdown(ctx))
+				})
 
-			for i := 0; i <= numBlocks; i++ {
-				nonce, err := client.NonceAt(ctx, common.Address{}, big.NewInt(int64(i)))
-				require.NoErrorf(err, "failed to get nonce at block %d", i)
-				require.Zero(nonce)
-			}
+				// Build a fresh snow.Context so metric registration starts clean
+				// (re-initializing the VM against the previous context would
+				// double-register Prometheus collectors). Carry over ChainDataDir
+				// so the restarted VM finds the persisted Firewood state, and
+				// NetworkUpgrades so blocks decode under the same fork rules.
+				restartCtx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
+				restartCtx.NetworkUpgrades = upgradetest.GetConfig(fork)
+				restartCtx.ChainDataDir = tvm.vm.ctx.ChainDataDir
+
+				require.NoError(t, vm.Initialize(
+					ctx,
+					restartCtx,
+					tvm.db,
+					[]byte(toGenesisJSON(paramstest.ForkToChainConfig[fork])),
+					[]byte{},
+					[]byte(tt.vmConfig),
+					[]*commonEng.Fx{},
+					tvm.appSender,
+				))
+				require.NoError(t, vm.SetState(ctx, snow.NormalOp))
+				require.Equal(t, uint64(numBlocks), vm.blockChain.LastAcceptedBlock().NumberU64())
+
+				handlers, err := vm.CreateHandlers(ctx)
+				require.NoError(t, err)
+
+				server := httptest.NewServer(handlers[ethRPCEndpoint])
+				t.Cleanup(server.Close)
+
+				client, err := ethclient.Dial(server.URL)
+				require.NoError(t, err)
+				t.Cleanup(client.Close)
+
+				for blockNum := uint64(0); blockNum <= numBlocks; blockNum++ {
+					// Checking the sender's nonce (which should equal the block number)
+					// verifies that the reconstructed state is both openable and correct.
+					nonce, err := client.NonceAt(ctx, testEthAddrs[0], new(big.Int).SetUint64(blockNum))
+					require.NoError(t, err)
+					require.Equal(t, blockNum, nonce, "nonce at height %d", blockNum)
+				}
+			})
 		})
 	}
 }

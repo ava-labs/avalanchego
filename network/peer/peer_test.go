@@ -35,7 +35,7 @@ import (
 )
 
 type testPeer struct {
-	Peer
+	*Peer
 	inboundMsgChan <-chan *message.InboundMessage
 }
 
@@ -154,7 +154,7 @@ func startTestPeers(rawPeer0 *rawTestPeer, rawPeer1 *rawTestPeer) (*testPeer, *t
 	return peer0, peer1
 }
 
-func awaitReady(t *testing.T, peers ...Peer) {
+func awaitReady(t *testing.T, peers ...*testPeer) {
 	t.Helper()
 	require := require.New(t)
 
@@ -393,13 +393,13 @@ func TestShouldDisconnect(t *testing.T) {
 
 	tests := []struct {
 		name                     string
-		initialPeer              *peer
-		expectedPeer             *peer
+		initialPeer              *Peer
+		expectedPeer             *Peer
 		expectedShouldDisconnect bool
 	}{
 		{
 			name: "peer is reporting old version",
-			initialPeer: &peer{
+			initialPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -411,7 +411,7 @@ func TestShouldDisconnect(t *testing.T) {
 					Patch: 0,
 				},
 			},
-			expectedPeer: &peer{
+			expectedPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -427,7 +427,7 @@ func TestShouldDisconnect(t *testing.T) {
 		},
 		{
 			name: "peer is not a validator",
-			initialPeer: &peer{
+			initialPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -435,7 +435,7 @@ func TestShouldDisconnect(t *testing.T) {
 				},
 				version: version.Current,
 			},
-			expectedPeer: &peer{
+			expectedPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -447,7 +447,7 @@ func TestShouldDisconnect(t *testing.T) {
 		},
 		{
 			name: "peer is a validator without a BLS key",
-			initialPeer: &peer{
+			initialPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -466,7 +466,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.Current,
 			},
-			expectedPeer: &peer{
+			expectedPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -489,7 +489,7 @@ func TestShouldDisconnect(t *testing.T) {
 		},
 		{
 			name: "already verified peer",
-			initialPeer: &peer{
+			initialPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -509,7 +509,7 @@ func TestShouldDisconnect(t *testing.T) {
 				version:              version.Current,
 				txIDOfVerifiedBLSKey: txID,
 			},
-			expectedPeer: &peer{
+			expectedPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -533,7 +533,7 @@ func TestShouldDisconnect(t *testing.T) {
 		},
 		{
 			name: "peer without signature",
-			initialPeer: &peer{
+			initialPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -553,7 +553,7 @@ func TestShouldDisconnect(t *testing.T) {
 				version: version.Current,
 				ip:      &SignedIP{},
 			},
-			expectedPeer: &peer{
+			expectedPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -577,7 +577,7 @@ func TestShouldDisconnect(t *testing.T) {
 		},
 		{
 			name: "peer with invalid signature",
-			initialPeer: &peer{
+			initialPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -599,7 +599,7 @@ func TestShouldDisconnect(t *testing.T) {
 					BLSSignature: must(blsKey.SignProofOfPossession([]byte("wrong message"))),
 				},
 			},
-			expectedPeer: &peer{
+			expectedPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -625,7 +625,7 @@ func TestShouldDisconnect(t *testing.T) {
 		},
 		{
 			name: "peer with valid signature",
-			initialPeer: &peer{
+			initialPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -647,7 +647,7 @@ func TestShouldDisconnect(t *testing.T) {
 					BLSSignature: must(blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())),
 				},
 			},
-			expectedPeer: &peer{
+			expectedPeer: &Peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),

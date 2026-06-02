@@ -54,6 +54,7 @@ go_library(
         "//utils/buffer",
         "//utils/constants",
         "//utils/crypto/bls",
+        "//utils/lock",
         "//utils/logging",
         "//utils/metric",
         "//utils/perms",

@@ -30,7 +30,7 @@ on:
         default: ''
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
-        default: 30
+        default: '30'
       with-dependencies:
         description: 'Dependencies to use (e.g., "firewood=abc123" or "firewood=abc,libevm=xyz")'
         default: ''
@@ -40,13 +40,16 @@ on:
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   define-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Define Matrix
         id: define-matrix
         shell: bash -x {0}
@@ -91,7 +94,7 @@ jobs:
       contents: write
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install ARC Dependencies
         shell: bash
         run: |
@@ -104,7 +107,7 @@ jobs:
       # c-chain-reexecution-benchmark's Nix install will be skipped; installation is idempotent.
       - name: Install Nix
         if: matrix.libevm-ref != '' || matrix.firewood-ref != ''
-        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Configure dependency versions

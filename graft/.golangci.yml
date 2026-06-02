@@ -3,7 +3,7 @@
 # This is a relaxed config that runs on all files, including legacy geth code.
 # A second pass using avalanchego's stricter config (../../.golangci.yml) runs
 # only on Avalanche-authored files (excluding upstream files in upstream_files.txt).
-version: "2" 
+version: "2"
 run:
   tests: true
 
@@ -20,7 +20,7 @@ linters:
     - misspell
     - reassign
     # - revive # only certain checks enabled
-    - staticcheck 
+    - staticcheck
     - unconvert
     - unused
     - whitespace
@@ -40,8 +40,8 @@ linters:
         - -QF1006  # Lift if + break into loop condition
         - -QF1008  # Omit embedded fields from selector expression
         - -QF1010  # Convert slice of bytes to string when printing it
-        - -SA1019  # Use of deprecated identifiers: triggers when you import or use something marked deprecated. 
-        - -SA4009  # A function argument is overwritten before its first use. 
+        - -SA1019  # Use of deprecated identifiers: triggers when you import or use something marked deprecated.
+        - -SA4009  # A function argument is overwritten before its first use.
         - -SA9003  # Empty body in an if or else branch.
         - -ST1003  # Poorly chosen identifier.
         - -ST1008  # A function's error value should be its last return value.

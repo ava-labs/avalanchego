@@ -897,13 +897,12 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	require.NoError(err)
 
 	addAutoRenewedValidatorTx := &txs.AddAutoRenewedValidatorTx{
-		ValidatorNodeID:          nodeID,
+		ValidatorNodeID:          nodeID[:],
 		Signer:                   pop,
 		ValidatorRewardsOwner:    rewardOwner,
 		DelegatorRewardsOwner:    rewardOwner,
-		Owner:                    configOwner,
+		ValidatorAuthority:       configOwner,
 		DelegationShares:         reward.PercentDenominator,
-		Wght:                     weight,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		Period:                   periodSeconds,
 	}
@@ -1658,7 +1657,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					require.Equal(avajson.Uint32(expectedDeactivationOwner.Threshold), v.DeactivationOwner.Threshold)
 					return v.NodeID
 				default:
-					require.Failf("unexpected validator type", "got: %T", vdr)
+					t.Fatalf("unexpected validator type: %T", vdr)
 					return ids.NodeID{}
 				}
 			}

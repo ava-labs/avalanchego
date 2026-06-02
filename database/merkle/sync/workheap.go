@@ -5,11 +5,14 @@ package sync
 
 import (
 	"bytes"
+	"math"
 
 	"github.com/google/btree"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 // A priority queue of syncWorkItems.
@@ -156,4 +159,30 @@ func (wh *workHeap) remove(item *workItem) {
 
 func (wh *workHeap) Len() int {
 	return wh.innerHeap.Len()
+}
+
+// KeyspacePercent returns the approximate percentage of work in the heap
+// for a given [ids.ID] root, relative to the entire keyspace.
+// Keys are truncated to 8 bytes when calculating the progress.
+func (wh *workHeap) KeyspacePercent(root ids.ID) float64 {
+	var progress uint64
+	wh.sortedItems.Ascend(func(item *workItem) bool {
+		if item.localRootID != root {
+			return true
+		}
+
+		// Determine the start value (0x0 if no value)
+		start := timer.ProgressFromHash(item.start.Value())
+
+		// Determine the end value (max if no value)
+		end := timer.ProgressFromHash(item.end.Value())
+		if end == 0 {
+			end = math.MaxUint64
+		}
+
+		progress += end - start
+		return true
+	})
+
+	return (float64(progress) / float64(math.MaxUint64)) * 100
 }

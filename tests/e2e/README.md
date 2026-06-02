@@ -15,11 +15,10 @@ See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
 
 ### Simplifying usage with direnv
 
-The repo includes a [.envrc](../../.envrc) that can be applied by
-[direnv](https://direnv.net/) when in a shell. This will enable
-`ginkgo` to be invoked directly (without a `./bin/` prefix ) and
-without having to specify the `--avalanchego-path` or `--plugin-dir`
-flags.
+For repo-level `direnv` setup and behavior, see [CONTRIBUTING.md](../../CONTRIBUTING.md#direnv).
+In this test workflow, the repo's [`.envrc`](../../.envrc) makes
+`ginkgo` available without a `./bin/` prefix and avoids having to
+specify the `--avalanchego-path` or `--plugin-dir` flags.
 
 ### Filtering test execution with labels
 
