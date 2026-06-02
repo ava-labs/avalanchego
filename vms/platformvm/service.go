@@ -916,7 +916,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				if !ok {
 					return nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", attr.autoRenewedValidatorConfigOwner)
 				}
-				vdr.ConfigOwner, err = s.getAPIOwner(configOwner)
+				vdr.ValidatorAuthority, err = s.getAPIOwner(configOwner)
 				if err != nil {
 					return nil, err
 				}
