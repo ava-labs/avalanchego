@@ -65,6 +65,8 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
+var _ saetest.Peer = (*SUT)(nil)
+
 // SUT is the system under test for the cchain [VM]. It bundles the [VM]
 // itself and an HTTP [Client] connected to an in-process [httptest.Server].
 type SUT struct {
@@ -81,7 +83,6 @@ type SUT struct {
 	ethclient *ethclient.Client
 }
 
-// Implements [saetest.Peer]
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
 func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
