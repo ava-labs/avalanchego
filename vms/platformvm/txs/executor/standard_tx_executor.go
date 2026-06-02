@@ -1476,3 +1476,8 @@ func verifyL1Conversion(
 	}
 	return nil
 }
+
+// Creating L1 transaction
+func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateChainTx) error {
+
+}

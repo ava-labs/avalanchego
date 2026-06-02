@@ -138,5 +138,6 @@ func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&AddAutoRenewedValidatorTx{}),
 		targetCodec.RegisterType(&SetAutoRenewedValidatorConfigTx{}),
 		targetCodec.RegisterType(&RewardAutoRenewedValidatorTx{}),
+		targetCodec.RegisterType(&CreateL1Tx{}),
 	)
 }
