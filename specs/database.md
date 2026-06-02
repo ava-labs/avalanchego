@@ -33,6 +33,8 @@ type Compacter interface {
 }
 ```
 
+**Component consumers:** The `Database` interface (and specifically its `health.Checker` embedding) is registered with the [Health API](api.md#3-health-api) so that database errors surface as health check failures. LevelDB and PebbleDB each implement `HealthCheck()` returning disk statistics.
+
 ### 1.1 Batch Interface
 
 ```go
@@ -161,6 +163,10 @@ type valueDelete struct {
 
 **Use:** P-Chain and X-Chain state diffs; any place where "apply if accepted, discard if rejected" semantics are needed.
 
+**Component consumers:**
+- [PlatformVM state diffs](platformvm.md#52-state-diff-copy-on-write): `vms/platformvm/state/state.go` wraps the root DB in a `versiondb.Database` as `baseDB`, and each block execution creates a `Diff` on top of it.
+- [AVM state](vms.md#16-state-storage-avmstate): `vms/avm/state/state.go` holds a `*versiondb.Database` as its backing store, committing on block acceptance.
+
 ### 2.5 PrefixDB (`database/prefixdb/`)
 
 Namespace isolation by prepending a fixed-length prefix to all keys.
@@ -179,6 +185,11 @@ type Database struct {
 - Batches pool-manage `[]byte` buffers for efficiency.
 
 **Use:** Isolating different state namespaces (UTXOs, validators, transactions) within a single physical DB file.
+
+**Component consumers:**
+- [P-Chain database prefixes](platformvm.md#53-database-prefixes): PlatformVM builds a deep tree of PrefixDB layers (validators, current/pending stakers, UTXOs, subnets, etc.) all rooted in a single `versiondb.Database`.
+- [MerkleDB namespaces](database.md#44-storage-layout): MerkleDB internally creates three PrefixDB namespaces (`0x00` metadata, `0x01` value nodes, `0x02` intermediate nodes) over its `baseDB`.
+- [Chain VM databases](chains.md#13-chain-creation-flow): The chain manager (`chains/manager.go`) creates a PrefixDB keyed by `ctx.ChainID[:]` for each chain, then further subdivides it into `vmDB`, `vertexDB`, `bootstrappingDB`, etc.
 
 ### 2.6 LinkedDB (`database/linkeddb/`)
 
@@ -227,6 +238,8 @@ Allocates iterators by ID. `IteratorNext` returns up to 128 KiB per RPC call (ba
 
 **Use:** VM subprocess (RPCChainVM) database access; node isolation.
 
+**Component consumers:** [RPCChainVM database proxy](vms.md#34-database-proxy-databaserpcdb): when the node spawns an external VM subprocess, `vm_client.go` creates an RPCDB server over the node-side database and passes the client-side connection to the subprocess via `vm_server.go`.
+
 ### 2.8 CorruptableDB (`database/corruptabledb/`)
 
 Wrapper that detects unexpected errors and prevents further access.
@@ -243,6 +256,8 @@ type Database struct {
 - Any other error: sets `initialError` once; all subsequent ops return that error.
 - Prevents cascade corruption from partial writes.
 
+**Application:** Applied by `database/factory/factory.go` as the outermost wrapper on every root database (LevelDB or PebbleDB) created via `factory.New()`. This means every chain's physical storage has corruption detection. Additionally, `vms/rpcchainvm/vm_server.go` wraps the RPCDB-supplied database in CorruptableDB before passing it to the VM subprocess.
+
 ### 2.9 MeterDB (`database/meterdb/`)
 
 Prometheus metrics decorator for any Database.
@@ -253,6 +268,8 @@ Metrics collected (labeled by method):
 - `size` counter (bytes read/written)
 
 Instruments: all `Database`, `Batch`, and `Iterator` methods.
+
+**Component consumers:** The chain manager (`chains/manager.go`) wraps each chain's prefixed DB in a MeterDB before handing it to the VM, with metrics reported through the [Prometheus metrics API](api.md#5-metrics-api) under the chain's metric namespace.
 
 ### 2.10 HeightIndexDB (`database/heightindexdb/`)
 
@@ -268,7 +285,11 @@ type HeightIndex interface {
 ```
 
 In-memory implementation uses `map[uint64][]byte`.
-Use: block height → block ID index.
+
+**Component consumers:**
+- **ProposerVM state** (`vms/proposervm/state/`): uses `HeightIndex` to map block heights to proposer block IDs, enabling efficient height-to-block lookups during bootstrapping and state sync.
+- **BlockDB** (`x/blockdb/`): `x/blockdb/database.go` implements the `database.HeightIndex` interface, providing the same `Put`/`Get`/`Has`/`Sync` contract backed by a file-based store (see [Section 6](#6-blockdb-xblockdb)).
+- **SAEVM** (`vms/saevm/`): uses `HeightIndex` in `ExecutionResults` to track block execution results by height.
 
 ---
 
@@ -301,6 +322,11 @@ type merkleDB struct {
 ```
 
 A radix/PATRICIA trie with configurable branch factor.
+
+**Component consumers:** MerkleDB is used wherever cryptographic state commitments and range/change proofs are required:
+- The EVM state sync path (`vms/evm/sync/`) uses MerkleDB's range and change proof protocol.
+- The generic state sync syncer (`database/merkle/sync/`) targets any `database.MerkleDB`-compatible store.
+- ProposerVM state sync ([Section 2.7](vms.md#27-state-sync-support)) integrates with the same proof mechanism.
 
 ### 4.2 Branch Factors
 
@@ -454,11 +480,17 @@ Stores the `HistoryLength` (default 300) most recent change lists. Enables:
 
 Uses `CommitRangeProof()` which returns the next key after the proof's end for pagination.
 
+**Related components:**
+- [Chains bootstrap sequencing](chains.md#45-bootstrap-sequencing): state sync is one of the bootstrapping strategies; chain bootstrappers drive the sync protocol.
+- [ProposerVM state sync support](vms.md#27-state-sync-support): ProposerVM wraps inner VM state summaries and delegates sync to the inner VM, which may use MerkleDB's range proof mechanism.
+
 ---
 
 ## 5. ArchiveDB (`x/archivedb/`)
 
 Append-only historical state storage.
+
+> **Note:** ArchiveDB (`x/archivedb/`) is a standalone package introduced to support Firewood archival queries (see recent commits `74e4738be2`, `fe062719a9`). It currently has no importers outside its own package in the main `avalanchego` module — it is designed as infrastructure for future Firewood-backed archival state access on the C-Chain (EVM). The Firewood database integration in `vms/saevm/cchain/` uses BlockDB (see [Section 6](#6-blockdb-xblockdb)) for block storage, while archival EVM state reexecution is handled via separate Firewood commit-replay logic.
 
 ### 5.1 Key Encoding
 
@@ -508,6 +540,8 @@ Open(99).GetHeight("foo") → ("v1", 10)
 
 Height-indexed block storage optimized for append-only writes and O(1) random access.
 
+**Component consumers:** BlockDB is used by the SAEVM C-Chain hooks (`vms/saevm/cchain/hooks.go`) to store serialized EVM blocks at each height. It also implements the `database.HeightIndex` interface, so ProposerVM and other components can use it as a height-indexed store. BlockDB is *not* used by PlatformVM, AVM, or the Snow consensus engines — those use LevelDB/PebbleDB directly via the chain manager's `vmDB`.
+
 ### 6.1 File Layout
 
 ```
@@ -551,7 +585,7 @@ type blockEntryHeader struct {
 ```
 
 - xxHash checksum on every block; corruption detected on read.
-- Zstandard compression; configurable level.
+- Zstandard compression; configurable level. See also [P2P message compression](networking.md#31-wire-format) which uses the same zstd compressor from `utils/compression/`.
 
 ### 6.4 Operations
 

@@ -311,7 +311,9 @@ type Sender interface {
 }
 ```
 
-The sender implementation (`snow/networking/sender/sender.go`) wraps the `ExternalSender` (network layer), registers requests with the router for timeout tracking, and routes loopback messages directly.
+The sender implementation (`snow/networking/sender/sender.go`) wraps the `ExternalSender` (network layer), registers requests with the router for timeout tracking, and routes loopback messages directly. Before sending to any peer, the sender checks `timeouts.IsBenched(chainID, nodeID)`; if benched, the request is immediately counted as failed (see [Benchlist](#part-4-benchlist)).
+
+> **Used by networking layer:** All outbound consensus messages are routed through [`network.Network`](networking.md#1-network-interface) which implements `ExternalSender`. See [networking.md — Section 1](networking.md#1-network-interface).
 
 ---
 
@@ -336,6 +338,8 @@ Internals:
 - Worker pool processes messages from both queues.
 - `EngineManager` selects correct engine (Avalanche vs. Snowman) by engine type in message.
 - Messages dropped if sender not in validator set (for some message types).
+
+> **Message source:** Inbound messages arrive from the networking layer via `Router.HandleInbound()` → `ChainRouter` → `Handler.Push()`. See [networking.md — Section 3.4 Message Dispatch](networking.md#34-message-dispatch-in-peerhandle).
 
 ---
 
@@ -377,6 +381,10 @@ type ConsensusContext struct {
 ```
 
 Acceptors are notified on every block/tx/vertex acceptance, enabling the indexer and other subsystems to react.
+
+> **Chain Manager creates and injects this context:** `chains.Manager.createChain()` constructs the `ConsensusContext` (including `BlockAcceptor`, `TxAcceptor`, `VertexAcceptor`) and passes it to the engine and VM. See [chains.md — Section 1.3](chains.md#13-chain-creation-flow).
+>
+> **Acceptor registrations:** The node-level `BlockAcceptorGroup` / `TxAcceptorGroup` / `VertexAcceptorGroup` are passed into the chain manager config. The indexer (`indexer.NewIndexer`) registers itself via `acceptorGroup.RegisterAcceptor()` to index every accepted block. Additional registrations may be made for cross-chain bridges or audit subsystems. See [chains.md — Section 1](chains.md#1-chain-manager-chains).
 
 ---
 
@@ -422,6 +430,12 @@ type State interface {
 
 Used by ProposerVM and Warp for cross-height validator lookups.
 
+> **Consumers of `validators.State`:**
+> - [ProposerVM (vms.md)](vms.md#part-2-proposervm) calls `ValidatorState.GetValidatorSet(ctx, pChainHeight, subnetID)` to determine the proposer window for a given P-Chain height.
+> - [ProposerVM (vms.md)](vms.md#part-2-proposervm) calls `ValidatorState.GetCurrentHeight()` and `GetMinimumHeight()` when building/verifying blocks.
+> - Simplex `BLSVerifier` is initialized from `config.Params.InitialValidators` which is derived from the current validator set at epoch start.
+> - The `ValidatorState` is stored on `snow.Context.ValidatorState` and injected by the Chain Manager for every chain.
+
 ---
 
 ### 1.10 Uptime Tracking (`snow/uptime/`)
@@ -438,7 +452,11 @@ type Manager interface {
 }
 ```
 
-State is persisted per nodeID: `(cumulativeDuration, lastUpdated)`. On `Connect`, starts a timer. On `Disconnect`, adds elapsed time to cumulative duration. P-Chain reads this to decide whether a validator earns rewards.
+State is persisted per nodeID: `(cumulativeDuration, lastUpdated)`. On `Connect`, records the connection time. On `Disconnect`, accumulates elapsed time to the cumulative duration. The actual `Manager` interface in `snow/uptime/manager.go` is split into `Tracker` (Start/Stop tracking, Connect/Disconnect) and `Calculator` (CalculateUptime*, CalculateUptimePercent*) sub-interfaces, and also includes a `StartedTracking() bool` predicate.
+
+> **P-Chain reads uptime to decide rewards:** `vms/platformvm` creates an `uptime.Manager` (backed by the P-Chain state DB) and uses `CalculateUptimePercentFrom(nodeID, startTime)` when determining if a validator earns staking rewards at the end of their staking period. See [platformvm.md](platformvm.md).
+>
+> **Networking layer feeds uptime:** The network layer tracks peer connectivity and calls `uptimeManager.Connect(nodeID)` / `Disconnect(nodeID)` as peers connect and disconnect. See [networking.md — Section 7](networking.md#7-uptime-tracking-from-peers-perspective).
 
 ---
 
@@ -559,6 +577,10 @@ type BLSVerifier struct {
 
 QC validation: all signers unique, in validator set, and aggregated signature verifies.
 
+> **BLS cipher suites:** Simplex uses `bls.Verify()` which operates on the standard `CiphersuiteSignature` domain — the same suite used for Warp message signing. The `CiphersuiteProofOfPossession` (used for staking PoP proofs) is distinct and not used here. See [api.md — Section 9.2 BLS](api.md#92-bls-utilscryptobls).
+>
+> **BLS key source:** The `signBLS` function and validator public keys originate from `snow.Context.PublicKey` and `ValidatorState`. Node BLS keys are managed as part of staking identity. See [api.md — Section 7.2 BLS Key](api.md#72-bls-key).
+
 ### 2.5 Storage (`simplex/storage.go`)
 
 ```go
@@ -576,6 +598,10 @@ type Storage struct {
 ```
 
 `Index(block, finalization)` persists a finalized block; `Retrieve(seq)` returns it.
+
+Note: The actual `Storage` struct in `simplex/storage.go` also holds a `QCDeserializer` (for deserializing quorum certificates from bytes), a `vm block.ChainVM` reference (for retrieving VM blocks by height), and a `logging.Logger`. Serialization uses Canoto encoding, not protobuf, for the storage layer.
+
+> **Database dependency:** Simplex storage uses `database.KeyValueReaderWriter` — the same database abstraction used throughout avalanchego. See [database.md](database.md) for the full interface hierarchy.
 
 ### 2.6 Engine (`simplex/engine.go`)
 
@@ -647,6 +673,10 @@ Supports threshold queries: `bag.Threshold()` returns elements with count ≥ th
 - A validator is benched if it fails to respond to requests within a threshold.
 - Benched validators are excluded from polls until the bench period expires.
 - Prevents a few slow/faulty validators from blocking consensus.
+
+The Sender checks `timeouts.IsBenched(chainID, nodeID)` before sending each request; benched validators receive an immediate synthetic failure response rather than an actual network message. This means benched validators do not participate in Snow polls until the bench period expires.
+
+> **Sybil resistance note:** Benchlist decisions are per-chain, not global. A validator benched on one chain can still be polled on another chain. The bench period is independent of stake weight.
 
 ---
 

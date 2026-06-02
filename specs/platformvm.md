@@ -38,6 +38,8 @@ The VM struct implements `snowman.ChainVM` and several optional extensions:
 - `secp256k1fx.VM`
 - `validators.State` (P-chain validator lookups for other VMs)
 
+> **Component consumers:** The `validators.State` interface is consumed by [ProposerVM](vms.md#22-block-types) (via `proposer/windower.go`) for proposer selection using historical validator sets, and by the warp verification path (see [Section 8.3](#83-warp-messaging-vmsplatformvmwarp)) which calls `GetValidatorSet` to reconstruct the signing set at a given P-chain height. [Simplex](consensus.md#part-2-simplex-consensus) also accesses P-chain state indirectly via the `snow.Context` provided during initialization.
+
 ### 1.1 Initialize Sequence
 
 ```go
@@ -126,13 +128,16 @@ type Visitor interface {
 **CreateChainTx** — Create a blockchain within a subnet.
 - Fields: `SubnetID`, `ChainName` (ASCII ≤128 chars), `VMID`, `FxIDs`, `GenesisData` (≤1 MiB).
 - Requires subnet authorization.
+- When accepted, triggers [Chain Creation Flow](chains.md#13-chain-creation-flow) via `chainManager.QueueChainCreation()`.
 
 **ImportTx** — Import UTXOs from another chain via atomic memory.
 - Fields: `SourceChain ids.ID`, `ImportedInputs []*TransferableInput`.
+- Uses [Atomic Memory](chains.md#2-atomic-memory-chainsatomic) to consume UTXOs placed by the source chain.
 
 **ExportTx** — Export UTXOs to another chain via atomic memory.
 - Fields: `DestinationChain ids.ID`, `ExportedOutputs []*TransferableOutput`.
 - Cannot export locked/stakeable outputs.
+- Uses [Atomic Memory](chains.md#2-atomic-memory-chainsatomic) to place UTXOs for the destination chain to import.
 
 **AdvanceTimeTx** — Advance chain clock (staker activation).
 - Fields: `Time uint64`.
@@ -147,8 +152,9 @@ type Visitor interface {
 
 **RemoveSubnetValidatorTx** — Remove a permissioned subnet validator.
 
-**TransformSubnetTx** (deprecated post-Etna) — Convert to custom-token staking.
+**TransformSubnetTx** (disabled post-Etna — returns `errTransformSubnetTxPostEtna`) — Convert to custom-token staking.
 - Specifies: `AssetID`, supply limits, consumption rates, stake duration bounds, delegation fee floor.
+- The `complexityVisitor` in `txs/fee/` also returns `ErrUnsupportedTx` for this type, meaning it cannot be included in Etna-era blocks that use the dynamic fee calculator.
 
 **AddPermissionlessValidatorTx** — Join primary or permissionless subnet without owner permission.
 - Fields: `Signer` (BLS key for primary network), `ValidationRewardsOwner`, `DelegatorRewardsOwner`, `DelegationShares`.
@@ -169,16 +175,22 @@ type Visitor interface {
 
 **RegisterL1ValidatorTx** — Register L1 validator.
 - Fields: `Balance` (initial fee balance), `ProofOfPossession` (BLS PoP), `Message` (warp message from subnet manager).
+- The warp message must originate from the subnet manager contract (the `ChainID` + `Address` recorded in `ConvertSubnetToL1Tx`). The subnet manager contract lives on the L1's execution chain (e.g., C-Chain or SAEVM); it emits the warp message to authorize registration.
+- Uses [BLS](api.md#92-bls-utilscryptobls) signature aggregation for warp verification.
 
 **SetL1ValidatorWeightTx** — Adjust L1 validator weight via warp message from subnet manager.
+- Warp message must come from the same subnet manager contract recorded in the L1 conversion.
 
 **IncreaseL1ValidatorBalanceTx** — Add to L1 validator's accrued fee balance.
 
 **DisableL1ValidatorTx** — Deactivate L1 validator; remaining balance returned to `RemainingBalanceOwner`.
+- Can be called by the `DeactivationOwner` or by anyone if `RemainingBalance == 0`.
 
 ---
 
 ## 3. Block Types
+
+The P-Chain uses [Snowman Consensus](consensus.md#13-snowman-consensus-linear-chain-snowconsensussnowman) for finalization. Blocks are processed by the [Snowman Engine State Machine](consensus.md#15-engine-state-machine) which drives `VM.BuildBlock()`, `VM.ParseBlock()`, and acceptance/rejection callbacks.
 
 ### 3.1 Hierarchy
 
@@ -262,16 +274,15 @@ onAbortState  state.Diff  // applied if AbortBlock wins
 
 **Etna era (dynamic gas):**
 ```go
-type Complexity struct {
-    NumOperations uint64
-    NumSignatures uint64
-    DataLength    uint64
-    MintOutput    bool
-    ExportOutput  bool
-}
-// Gas = Complexity.ToGas(Weights)
+// vms/components/gas/dimensions.go
+type Dimensions [4]uint64  // [Bandwidth, DBRead, DBWrite, Compute]
+
+// TxComplexity(tx) → gas.Dimensions
+// Gas = Dimensions.ToGas(Weights)  // dot-product of complexity × per-dimension weight
 // Fee = Gas × GasPrice (nAVAX/gas)
 ```
+
+`TxComplexity()` in `txs/fee/complexity.go` implements the `Visitor` pattern to sum per-field bandwidth, DB read/write counts, and compute costs (e.g., `intrinsicBLSPoPVerifyCompute = 1050us`, `intrinsicSECP256k1FxSignatureCompute = 200us`). Note: `AddValidatorTx`, `AddDelegatorTx`, `AdvanceTimeTx`, `RewardValidatorTx`, and `TransformSubnetTx` return `ErrUnsupportedTx` from the complexity calculator (they use the pre-Etna static fee path).
 
 Mempool orders by `gasPrice = totalFee / totalGas` (higher = earlier inclusion).
 
@@ -293,16 +304,30 @@ The `state.State` manages all persistent data for the P-Chain:
 
 ### 5.2 State Diff (Copy-on-Write)
 
+`state.Diff` is a Go-level in-memory overlay that implements the `Chain` interface. It is **not** backed by [VersionDB](database.md#24-versiondb-databaseversiondb) at the diff layer itself; instead, the underlying persistent `state.State` uses a `versiondb.Database` as its `baseDB`, and all prefix namespaces are built on top of that via [PrefixDB](database.md#25-prefixdb-databaseprefixdb). The `Diff` holds pending mutations in Go maps and applies them on commit.
+
 ```go
 type Diff struct {
-    parentID           ids.ID
-    timestamp          time.Time
-    currentSupply      map[ids.ID]uint64
-    modifiedUTXOs      map[ids.ID]*avax.UTXO
-    currentStakerDiffs diffStakers  // additions/removals from current set
-    pendingStakerDiffs diffStakers  // additions/removals from pending set
-    subnetOwners       map[ids.ID]fx.Owner
-    addedChains        map[ids.ID][]*txs.Tx
+    parentID      ids.ID
+    stateVersions Versions
+
+    timestamp         time.Time
+    feeState          gas.State
+    l1ValidatorExcess gas.Gas
+    accruedFees       uint64
+
+    currentSupply         map[ids.ID]uint64
+    expiryDiff            *expiryDiff
+    l1ValidatorsDiff      *l1ValidatorsDiff
+    modifiedStakingInfo   map[ids.ID]map[ids.NodeID]StakingInfo
+    currentStakerDiffs    diffStakers
+    pendingStakerDiffs    diffStakers
+    subnetOwners          map[ids.ID]fx.Owner
+    subnetToL1Conversions map[ids.ID]SubnetToL1Conversion
+    transformedSubnets    map[ids.ID]*txs.Tx
+    addedChains           map[ids.ID][]*txs.Tx
+    modifiedUTXOs         map[ids.ID]*avax.UTXO
+    // ...
 }
 ```
 
@@ -313,6 +338,8 @@ On `diff.Apply(parentState)`:
 On rejection: diff discarded, parent unchanged.
 
 ### 5.3 Database Prefixes
+
+The persistent state is organized using [PrefixDB](database.md#25-prefixdb-databaseprefixdb) namespaces layered on top of a [VersionDB](database.md#24-versiondb-databaseversiondb) base. Each prefix is a SHA256 hash of a byte key, giving a fixed 32-byte namespace regardless of logical key length.
 
 ```
 block:{blockID}
@@ -356,6 +383,8 @@ Priority determines ordering when multiple stakers have the same `NextTime`:
 4. PrimaryNetworkDelegatorCurrent
 5. PrimaryNetworkValidatorCurrent (last)
 
+> **Invariant:** All permissioned stakers must be removed first because they are removed by time advancement. Permissionless stakers are removed with a `RewardValidatorTx` after time has advanced.
+
 ---
 
 ## 6. Staking Mechanics
@@ -397,6 +426,8 @@ RewardValidatorTx(txID) + AbortBlock
   → Staker removed, no reward
 ```
 
+Uptime accumulation is managed by the [Uptime Tracker](consensus.md#110-uptime-tracking-snowuptime). The P-Chain `VM.Connected()` / `VM.Disconnected()` callbacks notify the `UptimeManager`, which updates the stored uptime for each primary-network validator. The uptime ratio determines whether a `RewardValidatorTx` results in a reward (CommitBlock) or not (AbortBlock).
+
 ### 6.3 Reward Formula
 
 ```go
@@ -407,12 +438,13 @@ func (c *calculator) Calculate(
 
 // remainingSupply = SupplyCap - currentSupply
 // portionOfExisting = stakedAmount / currentSupply
-// portionOfDuration = stakedDuration / MaxStakingDuration
-// mintingRate = MinRate + (MaxRate - MinRate) * portionOfDuration
+// portionOfDuration = stakedDuration / MintingPeriod
+// mintingRate = MinConsumptionRate + (MaxConsumptionRate - MinConsumptionRate) * portionOfDuration
 // reward = remainingSupply * portionOfExisting * mintingRate * portionOfDuration
+// reward = min(reward, remainingSupply)  // capped to never exceed SupplyCap
 ```
 
-Configured by `RewardConfig`: `MinConsumptionRate`, `MaxConsumptionRate`, `MintingPeriod`, `SupplyCap`.
+Configured by `RewardConfig`: `MinConsumptionRate`, `MaxConsumptionRate`, `MintingPeriod`, `SupplyCap`. The `SupplyCap` constraint is enforced both by the formula (reward cannot exceed `remainingSupply = SupplyCap - currentSupply`) and by the `min()` clamp in the calculator. The current supply is tracked in `state.State` and updated on every `RewardValidatorTx` commit.
 
 ### 6.4 Delegator Reward Split
 
@@ -426,23 +458,23 @@ delegatorReward = validatorReward × (1 - delegationFee%) × (delegatorWeight / 
 
 ```go
 type L1Validator struct {
-    ValidationID    ids.ID
-    SubnetID        ids.ID
-    NodeID          ids.NodeID
-    PublicKey        []byte
-    Weight           uint64
-    RemainingBalance uint64
-    AccumulatedFee   uint64
-    EndAccumulatedFee uint64   // fee total when validator will be deactivated
-    StartTime        time.Time
-    RemainingBalanceOwner []byte
-    DeactivationOwner     []byte
+    ValidationID          ids.ID
+    SubnetID              ids.ID     `serialize:"true"`
+    NodeID                ids.NodeID `serialize:"true"`
+    PublicKey             []byte     `serialize:"true"`  // uncompressed BLS public key
+    RemainingBalanceOwner []byte     `serialize:"true"`  // returned when validator exits
+    DeactivationOwner     []byte     `serialize:"true"`  // can manually deactivate
+    StartTime             uint64     `serialize:"true"`  // unix seconds
+    Weight                uint64     `serialize:"true"`
+    MinNonce              uint64     `serialize:"true"`  // prevents replay of weight updates
+    EndAccumulatedFee     uint64     `serialize:"true"`  // global accrued-fee total at deactivation
 }
 ```
 
-- `RemainingBalance` decreases each block.
-- When `RemainingBalance == 0`, validator is removed.
-- Leftover balance returned to `RemainingBalanceOwner`.
+- `EndAccumulatedFee` encodes "how much total fee must have accrued globally before this validator is deactivated." When the chain's global accrued fee counter reaches `EndAccumulatedFee`, the validator is removed and any unused balance is returned to `RemainingBalanceOwner`.
+- `IsActive()` returns true when `Weight != 0 && EndAccumulatedFee != 0`.
+- Weight updates use `MinNonce` for ordering (prevents replay). Setting weight to 0 removes the validator.
+- There is no separate `RemainingBalance` or `AccumulatedFee` field; fee accounting is done via the global counter vs. `EndAccumulatedFee`.
 
 ---
 
@@ -467,7 +499,9 @@ type Mempool struct {
 
 **Periodic pruning:** Re-validate all txs against current preferred state; remove invalid ones.
 
-**Gas capacity:** `gasAvailable = totalCapacity - sumOfTxGases`.
+**Gas capacity:** `gasAvailable = totalCapacity - sumOfTxGases`. When a new tx has higher `gasPrice` than the lowest-priced existing txs, those lower-priced txs are evicted to make room.
+
+**Gossip:** New transactions are broadcast to peers using [P2P gossip](networking.md#9-p2p-higher-level-abstractions-networkp2p) (both push gossip for immediate propagation and pull gossip for reconciliation). The `network.Network` struct in `vms/platformvm/network/` wraps a `p2p.Network` and configures a `gossip.PushGossiper` and `gossip.PullGossiper` for P-Chain transactions.
 
 ---
 
@@ -495,7 +529,11 @@ The P-Chain can:
 - **Sign** warp messages to other chains (proves P-Chain state to other VMs).
 - **Verify** warp messages from other chains (subnet manager contracts drive L1 validators).
 
-Verification requires ≥80% of validator weight to have signed.
+Verification requires ≥67% of validator weight to have signed (`WarpQuorumNumerator = 67`, `WarpQuorumDenominator = 100`, defined in `txs/executor/warp_verifier.go`).
+
+Verification uses [BLS](api.md#92-bls-utilscryptobls) public key aggregation: validator public keys for all signers (identified by a bitset) are aggregated into a single aggregate key, then a single BLS signature is verified against that key. The validator set is retrieved from `validators.State.GetValidatorSet()` at the P-chain height embedded in the warp message.
+
+> **Component consumers:** The warp verification path is used by `RegisterL1ValidatorTx` and `SetL1ValidatorWeightTx` to authenticate messages from subnet manager contracts.
 
 ---
 
@@ -516,6 +554,8 @@ type Builder interface {
 4. Return block (StandardBlock or ProposalBlock with AdvanceTimeTx).
 
 **`WaitForEvent()`:** Waits for `PendingTxs` message from the mempool/network, or for a timer when stakers are about to expire.
+
+> **Engine integration:** The [Snowman Engine](consensus.md#15-engine-state-machine) invokes `VM.WaitForEvent()` to block until a block is available, then calls `VM.BuildBlock()`. The engine manages the overall flow of proposing, voting, and committing blocks. The P-Chain also implements `BuildBlockWithContextChainVM` so the engine can pass the current P-chain height as context for [ProposerVM](vms.md#21-purpose) slot validation.
 
 ### 9.2 Tx Packing
 

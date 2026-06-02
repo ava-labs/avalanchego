@@ -76,7 +76,7 @@ type Operation struct {
 ```
 Operations sorted canonically before signing.
 
-**ImportTx** — Pull UTXOs from atomic memory (another chain).
+**ImportTx** — Pull UTXOs from atomic memory (another chain). See [Atomic Memory](chains.md#2-atomic-memory).
 ```go
 type ImportTx struct {
     BaseTx
@@ -85,7 +85,7 @@ type ImportTx struct {
 }
 ```
 
-**ExportTx** — Push UTXOs to atomic memory (another chain).
+**ExportTx** — Push UTXOs to atomic memory (another chain). See [Atomic Memory](chains.md#2-atomic-memory).
 ```go
 type ExportTx struct {
     BaseTx
@@ -129,7 +129,7 @@ type Fx interface {
 
 Three built-in FX implementations:
 
-**secp256k1fx** — SECP256K1 threshold signatures.
+**secp256k1fx** — SECP256K1 threshold signatures. Uses [SECP256K1 cryptographic primitives](api.md#91-secp256k1-utilscryptosecp256k1).
 - `TransferInput/Output`: standard UTXO with M-of-N threshold.
 - `MintOutput/MintOperation`: minting authority (threshold on mint key set).
 - `Credential`: array of secp256k1 signatures.
@@ -201,18 +201,20 @@ func (e *Executor) CreateAssetTx(tx *txs.CreateAssetTx) error {
 }
 
 func (e *Executor) ImportTx(tx *txs.ImportTx) error {
-    // Record atomic request to remove from source chain
+    // Record atomic request to remove from source chain's outbound namespace
     e.AtomicRequests[tx.SourceChain] = removeRequest(tx.ImportedIns)
     avax.Consume(e.State, tx.Ins)
     avax.Produce(e.State, tx.TxID, tx.Outs)
 }
 
 func (e *Executor) ExportTx(tx *txs.ExportTx) error {
-    // Record atomic request to put on destination chain
+    // Record atomic request to put on destination chain's inbound namespace
     e.AtomicRequests[tx.DestinationChain] = putRequest(tx.ExportedOuts)
     avax.Consume(e.State, tx.Ins)
 }
 ```
+
+The `AtomicRequests` map is committed to [Atomic Memory](chains.md#2-atomic-memory) via `SharedMemory.Apply()` atomically with the block acceptance batch.
 
 ### 1.6 State Storage (`avm/state/`)
 
@@ -239,7 +241,7 @@ type State interface {
 }
 ```
 
-All state changes buffered in `VersionDB`; committed atomically on block acceptance.
+All state changes buffered in [VersionDB](database.md#24-versiondb); committed atomically on block acceptance. This ensures UTXO mutations and atomic memory writes land in the same database batch.
 
 ---
 
@@ -247,7 +249,7 @@ All state changes buffered in `VersionDB`; committed atomically on block accepta
 
 ### 2.1 Purpose
 
-ProposerVM implements **Snowman++**: a soft leader election layer on top of any Snowman VM, reducing consensus latency by limiting who can propose in early time windows.
+ProposerVM implements **Snowman++**: a soft leader election layer on top of any Snowman VM, reducing consensus latency by limiting who can propose in early time windows. It is driven by the [Consensus Engine](consensus.md#15-engine-state-machine) and wraps the inner VM (AVM, PlatformVM, RPCChainVM, etc.). See [ChainVM Interface](#54-chainvm-interface-summary) for the interface it implements and [VM Wrapping Order](#53-vm-wrapping-order) for its position in the stack.
 
 ### 2.2 Block Types
 
@@ -289,20 +291,28 @@ type Windower interface {
     Proposers(ctx, blockHeight, pChainHeight, maxWindows) ([]ids.NodeID, error)
     Delay(ctx, blockHeight, pChainHeight, validatorID, maxWindows) (time.Duration, error)
     ExpectedProposer(ctx, blockHeight, pChainHeight, slot) (ids.NodeID, error)
+    MinDelayForProposer(ctx, blockHeight, pChainHeight, nodeID, startSlot) (time.Duration, error)
 }
 ```
 
+The Windower calls [validators.State](consensus.md#19-validator-management) (`ctx.ValidatorState.GetValidatorSet()`) to retrieve the historical validator set at `pChainHeight`.
+
 **Algorithm:**
-1. Seed = `blockHeight XOR ChainID`.
-2. Retrieve validators active at `pChainHeight`.
+1. Seed = `chainSource XOR blockHeight` (where `chainSource` = first 8 bytes of ChainID).
+2. Retrieve validators active at `pChainHeight` via `validators.State.GetValidatorSet()`.
 3. Sort validators canonically by NodeID.
-4. Weighted random sampling without replacement using seed.
-5. Return first `maxWindows` validators (default 6).
+4. Weighted random sampling without replacement using Mersenne Twister (MT19937) seeded by the XOR value.
+5. Return first `maxWindows` validators (default 6 for verification, up to 60 for building).
+
+**Post-Durango slot-based scheme:**
+- Each slot is 5 seconds wide.
+- `ExpectedProposer(blockHeight, pChainHeight, slot)` returns the node assigned to that slot.
+- Seed = `chainSource XOR blockHeight XOR bits.Reverse64(slot)` (slot reversed to avoid seed-space collisions).
 
 **Time windows:**
 - Window duration: 5 seconds.
 - Validator `i` in the list may propose starting at `parent.Timestamp + (i × 5s)`.
-- After `maxWindows × 5s` = 30 seconds: any validator may propose.
+- After `MaxVerifyWindows × 5s` = 30 seconds: any validator may propose.
 
 ### 2.4 Verification Flow
 
@@ -320,7 +330,7 @@ type Windower interface {
 
 ### 2.5 State (`proposervm/state/`)
 
-Stores mapping of proposer block ID → inner block ID and proposer block metadata. Required to:
+Stores mapping of proposer block ID → inner block ID and proposer block metadata. Uses [database](database.md) for persistence. Required to:
 - Look up inner blocks from proposer block IDs.
 - Reconstruct proposer blocks from inner blocks after restart.
 
@@ -338,6 +348,8 @@ ProposerVM (implements block.ChainVM)
 Inner VM (AVM, PlatformVM, RPCChainVM, etc.)
 ```
 
+ProposerVM wraps the [ChainVM Interface](#54-chainvm-interface-summary). After ProposerVM, a MeterVM and second TracedVM layer are applied by the [Chain Manager](chains.md#14-vm-wrapping-stack).
+
 ### 2.7 State Sync Support
 
 ProposerVM supports state sync by tracking proposer block info alongside state summaries. After a state sync, inner blocks are re-verified to restore the proposer/inner block mapping.
@@ -348,7 +360,7 @@ ProposerVM supports state sync by tracking proposer block info alongside state s
 
 ### 3.1 gRPC Plugin Architecture
 
-External VMs run as separate OS processes and communicate over gRPC:
+External VMs run as separate OS processes and communicate over gRPC. The RPCChainVM implements the [ChainVM Interface](#54-chainvm-interface-summary) remotely, allowing any language to implement a VM. ProposerVM wraps the RPCChainVM client just like any other ChainVM.
 
 ```
 AvalancheGo Process                    VM Subprocess
@@ -370,7 +382,7 @@ VMClient (block.ChainVM impl)  ←──►  VMServer (gRPC server)
 
 **Step 4:** Parent receives subprocess's address, creates gRPC client, checks protocol version.
 
-**Timeout:** If no handshake within 5 seconds: `ErrHandshakeFailed`.
+**Timeout:** If no handshake within the configured `HandshakeTimeout`: `ErrHandshakeFailed`.
 
 **Version mismatch:** Returns `ErrProtocolVersionMismatch`.
 
@@ -400,7 +412,7 @@ Key RPC methods:
 
 ### 3.4 Database Proxy (`database/rpcdb/`)
 
-All database operations proxied via gRPC. The VM subprocess receives a database client at initialization:
+All database operations proxied via gRPC using [RPCDB](database.md#27-rpcdb). The VM subprocess receives a database client at initialization:
 
 **Server** holds an actual `database.Database` and exposes it via gRPC.
 **Client** implements `database.Database` by calling gRPC methods.
@@ -428,7 +440,7 @@ type Config struct {
 
 ### 4.1 What SAE Means
 
-**Streaming Asynchronous Execution (ACP-194):** The EVM block execution is decoupled from block proposal. Blocks can be proposed while the previous block is still executing. Reduces proposal latency from O(execution_time) to O(proposal_time).
+**Streaming Asynchronous Execution ([ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution)):** The EVM block execution is decoupled from block proposal. Blocks can be proposed while the previous block is still executing. Reduces proposal latency from O(execution_time) to O(proposal_time).
 
 ### 4.2 Architecture
 
@@ -500,9 +512,9 @@ type VM struct {
 }
 ```
 
-**Cross-chain integration:**
-- **Imports**: P2P RPC accepts import txs; `state` tracks pending imports; executed atomically with EVM txs via hooks.
-- **Exports**: EVM logs monitored for export events; export requests batched per destination chain.
+**Cross-chain integration** via [Atomic Memory](chains.md#2-atomic-memory):
+- **Imports**: P2P RPC accepts import txs; `state` tracks pending imports; executed atomically with EVM txs via hooks using `SharedMemory.Apply()`.
+- **Exports**: EVM logs monitored for export events; export requests batched per destination chain and written to atomic memory.
 
 **Hook points:**
 ```go
@@ -524,7 +536,7 @@ Dynamic EIP-1559-style gas pricing. Base fee adjusts per block based on utilizat
 
 ### 4.8 Transaction Gossip (`txgossip/`)
 
-EVM transactions gossiped to peers using push/pull protocol via `network/p2p/gossip`. Prevents redundant retransmission via bloom filters.
+EVM transactions gossiped to peers using push/pull protocol via [P2P gossip](networking.md#9-p2p-higher-level-abstractions) (`network/p2p/gossip`). Prevents redundant retransmission via bloom filters.
 
 ---
 
@@ -532,7 +544,7 @@ EVM transactions gossiped to peers using push/pull protocol via `network/p2p/gos
 
 ### 5.1 MeterVM (`vms/metervm/`)
 
-Wraps any VM to collect Prometheus metrics:
+Wraps any VM to collect [Prometheus metrics](api.md#5-metrics-api) via the metrics API:
 - Counts and durations for every VM method call.
 - Labels: `Initialize`, `BuildBlock`, `ParseBlock`, `GetBlock`, `Verify`, `Accept`, `Reject`, etc.
 
@@ -542,21 +554,24 @@ Wraps any VM to add OpenTelemetry distributed tracing. Each VM method creates a 
 
 ### 5.3 VM Wrapping Order
 
-For a typical chain:
+For a typical Snowman (linear) chain, the actual wrapping order in `chains/manager.go` is:
 
 ```
 InnerVM
-  ↓ TracedVM (optional)
+  ↓ TracedVM (if tracing enabled, inner layer)
   ↓ ProposerVM
-  ↓ MeterVM (optional)
-  ↓ TracedVM (second layer, optional)
+  ↓ MeterVM (if metering enabled)
+  ↓ TracedVM (outer layer, if tracing enabled)
+  ↓ ChangeNotifier
   ↓ Handler (message dispatcher)
   ↓ Consensus Engine
 ```
 
-The ProposerVM wraps the inner VM because it needs to intercept block operations. MeterVM can be placed inside or outside ProposerVM.
+See [Chain Manager VM Wrapping Stack](chains.md#14-vm-wrapping-stack) for the chains-side view of this stack. The ProposerVM wraps the inner VM because it needs to intercept block operations. MeterVM is placed outside ProposerVM so it measures the full proposer overhead. The ChangeNotifier sits outermost to detect when the preferred block changes.
 
 ### 5.4 ChainVM Interface Summary
+
+The `ChainVM` interface is the primary contract between the consensus engine and any VM. **ProposerVM wraps this interface**, adding proposer headers before passing operations to the inner VM. **RPCChainVM implements it remotely** via gRPC so external processes can serve as VMs.
 
 ```go
 type ChainVM interface {

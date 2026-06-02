@@ -51,9 +51,9 @@ Once P-Chain bootstraps:
      1. Get VM factory from VMManager
      2. Create DB prefixes (vm, vertex, bootstrapping)
      3. Raw VM = vmFactory.New()
-     4. Optionally wrap: TracedVM → ProposerVM → MeterVM
+     4. Optionally wrap: TracedVM → ProposerVM → MeterVM (see [VM Wrapping Order](vms.md#53-vm-wrapping-order))
      5. vm.Initialize(genesis, config, fxs, appSender)
-     6. Create consensus engine (Snowman or Avalanche)
+     6. Create consensus engine (Snowman or Avalanche) — see [Consensus Engine](consensus.md#15-engine-state-machine)
      7. Create handler (message dispatcher)
      8. Register with router
      9. Start handler goroutines
@@ -87,7 +87,7 @@ type Registrant interface {
 }
 ```
 
-This is how API endpoints get registered: the API server is a registrant that calls `vm.CreateHandlers()` and mounts them.
+This is how API endpoints get registered: the [API Server](api.md#1-api-server-apiserver) is the primary registrant that calls `vm.CreateHandlers()` and mounts them. The indexer is another registrant added before the API server.
 
 ### 1.6 Subnet Management (`chains/subnets.go`)
 
@@ -105,7 +105,7 @@ type Subnets struct {
 
 ## 2. Atomic Memory (`chains/atomic/`)
 
-Cross-chain transfers use atomic shared memory — a bidirectional, lock-protected key-value store pair for each pair of chains.
+Cross-chain transfers use atomic shared memory — a bidirectional, lock-protected key-value store pair for each pair of chains. Used by [AVM ImportTx/ExportTx](vms.md#15-transaction-execution-visitor-pattern), [PlatformVM ImportTx/ExportTx](platformvm.md#21-apricot-era), and [SAEVM C-Chain](vms.md#46-c-chain-wrapper-cchain).
 
 ### 2.1 Architecture
 
@@ -146,7 +146,7 @@ type SharedMemory interface {
 }
 ```
 
-`Apply` is atomic: applies all requests from multiple chains in a single database batch. Lock ordering (sorted shared IDs) prevents deadlocks.
+`Apply` is atomic: applies all requests from multiple chains in a single database batch. Lock ordering (sorted shared IDs) prevents deadlocks. Internally, `Apply` uses a `versiondb` to stage all shared-memory changes, then calls `CommitBatch()` and `WriteAll()` which invokes [Batch.Write()](database.md#11-batch-interface) — ensuring both block acceptance and atomic memory update happen in the same underlying database write.
 
 ### 2.3 Element Structure
 
@@ -250,7 +250,7 @@ type Bootstrapper struct {
 }
 ```
 
-`SampleBootstrappers(networkID, count)` returns a random sample. Used during node startup to find initial peers before the validator set is known.
+`SampleBootstrappers(networkID, count)` returns a random sample. Used during node startup to find initial peers before the validator set is known. These nodes are connected to via the [peer lifecycle](networking.md#2-peer-lifecycle).
 
 ### 3.5 Known Validators
 
@@ -310,12 +310,12 @@ The `New(config)` function initializes in this order:
 **Phase 3 — Networking:**
 10. Create `validators.Manager`.
 11. Initialize resource manager (CPU/disk tracking per peer).
-12. Create P2P `network.Network` (TCP listener, TLS, peer management).
+12. Create P2P [network.Network](networking.md#1-network-interface) (TCP listener, TLS, peer management).
 13. Create `snow.AcceptorGroup` (block/tx/vertex event bus).
 
 **Phase 4 — Chain Ecosystem:**
 14. Start health API.
-15. Create `chains.Manager`.
+15. Create `chains.Manager`. This then creates PlatformVM via [PlatformVM initialization](platformvm.md#11-initialize-sequence).
 16. Register built-in VMs: PlatformVM, AVM, EVM.
 17. Scan plugin directory for external VMs.
 18. Load chain/VM aliases.
@@ -334,9 +334,11 @@ The `New(config)` function initializes in this order:
 CriticalChains = set.Set[ids.ID]{PChainID, XChainID, CChainID}
 ```
 
-Failure to create any critical chain triggers `ShutdownNodeFunc(1)`.
+Failure to create any critical chain triggers `ShutdownNodeFunc(1)`. P-Chain must bootstrap before X/C chain creation can proceed, enforced by the `unblockChainCreatorCh` signal mechanism — see [Bootstrap Sequencing](chains.md#45-bootstrap-sequencing).
 
 ### 4.5 Bootstrap Sequencing
+
+Bootstrap peers are discovered via [P2P networking](networking.md#4-peer-gossip-and-peerlist-exchange) (PeerList gossip exchange):
 
 ```
 Node connects to bootstrap peers
@@ -385,6 +387,8 @@ C-Chain bootstraps:
 - `--snow-commit-threshold`: Beta (default 20).
 - `--snow-concurrent-repolls`: ConcurrentRepolls (default 4).
 
+These values are the node-wide Snow parameter defaults; see [Default Parameters](consensus.md#12-snowball-voting-primitives-snowconsensussnowball) for how they feed into per-subnet consensus configuration.
+
 **Staking:**
 - `--staking-tls-key-file`, `--staking-tls-cert-file`: Node TLS identity.
 - `--staking-signer-key-file`: BLS private key file.
@@ -426,7 +430,7 @@ type ChainConfig struct {
 }
 ```
 
-Looked up by chain ID or alias (e.g., `C`, `X`, `P`).
+Looked up by chain ID or alias (e.g., `C`, `X`, `P`). The C-Chain config passes through directly to the [SAEVM C-Chain](vms.md#46-c-chain-wrapper-cchain) (or legacy EVM), where it controls EVM-specific settings such as state sync configuration, fee parameters, and API toggles.
 
 ### 5.4 Subnet Config
 
@@ -435,7 +439,7 @@ Per-subnet config in `~/.avalanchego/configs/subnets/<subnetID>.json`:
 type Config struct {
     // Snowball parameters (override defaults for this subnet)
     SnowParameters        snowball.Parameters
-    // Simplex parameters (if using Simplex)
+    // Simplex parameters (if using Simplex consensus — see [Simplex consensus](consensus.md#part-2-simplex-consensus))
     SimplexParameters     simplex.Parameters
     // ProposerVM
     ProposerNumHistoricalBlocks uint64
@@ -495,15 +499,15 @@ func (c *Config) IsBanffActivated(t time.Time) bool {
 }
 ```
 
-VMs and the engine check these predicates when processing blocks to apply the correct rules.
+VMs and the engine check these predicates when processing blocks to apply the correct rules. Both the [Snowman Engine](consensus.md#15-engine-state-machine) and [PlatformVM](platformvm.md) gate block validation logic on these activation checks.
 
 ### 6.3 Special Cases
 
 **ApricotPhase4:** Requires both time AND `pChainHeight ≥ ApricotPhase4MinPChainHeight`. Ensures validator set stability.
 
-**CortinaXChainStopVertexID:** A well-known vertex ID that marks where the X-Chain DAG was linearized into a Snowman chain. All DAG vertices before this are treated as historical.
+**CortinaXChainStopVertexID:** A well-known vertex ID that marks where the X-Chain DAG was linearized into a Snowman chain. All DAG vertices before this are treated as historical. This is the endpoint of [Avalanche DAG consensus](consensus.md#14-avalanche-dag-consensus-snowconsensusavalanche) on the X-Chain.
 
-**GraniteEpochDuration:** Configurable per network. Controls Simplex epoch length (validator set snapshot interval).
+**GraniteEpochDuration:** Configurable per network. Controls [Simplex epoch](consensus.md#21-protocol-overview) length (validator set snapshot interval).
 
 ### 6.4 Validation
 
@@ -552,7 +556,7 @@ Built-in VMs registered at node startup:
 - `avm.VMID` → `avm.Factory`
 - `evm.VMID` → `evm.Factory` (RPCChainVM wrapping EVM binary)
 
-External plugin VMs scanned from `--plugin-dir`.
+External plugin VMs scanned from `--plugin-dir`. The VMID is referenced in [CreateChainTx](platformvm.md#21-apricot-era) when a new chain is created on a subnet — the transaction records which VMID the chain should use.
 
 ### 7.2 VM Registry (`vms/registry/`)
 
@@ -563,11 +567,11 @@ type VMRegistry interface {
 }
 ```
 
-Plugin detection: `sha256(binaryBytes)` as VMID; file name as default alias. On node startup and after `admin.LoadVMs()` call.
+Plugin detection: `sha256(binaryBytes)` as VMID; file name as default alias. On node startup and after [Admin API LoadVMs()](api.md#2-admin-api-apiadmin) call.
 
 ### 7.3 Runtime Manager (`vms/rpcchainvm/runtime/`)
 
-Manages the lifecycle of external VM subprocesses:
+Manages the lifecycle of external VM subprocesses; see [RPCChainVM](vms.md#part-3-rpcchainvm) for the full subprocess protocol:
 ```go
 type Manager interface {
     Register(vmID ids.ID, config *subprocess.Config) error

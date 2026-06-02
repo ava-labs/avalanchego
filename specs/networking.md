@@ -222,6 +222,8 @@ handlePeerList()      ← p2p.PeerList     (after handshake only)
 Router.HandleInbound()← everything else  (dropped if !finishedHandshake)
 ```
 
+`Router.HandleInbound()` calls `ChainRouter.HandleInbound()` which dispatches the message to the per-chain `Handler.Push()`. The per-chain Handler then routes the message to the correct consensus engine (Snowman or Avalanche) or Simplex engine. See [consensus.md — Section 1.7 Handler](consensus.md#17-handler-snownetworkinghandlerhandlergo).
+
 ---
 
 ## 4. Peer Gossip and PeerList Exchange
@@ -282,6 +284,7 @@ All five checks must pass before a message is processed:
   - Validator pool: `VdrAllocSize × (stake / totalStake)`
   - At-large pool: `AtLargeAllocSize`, capped per non-validator at `NodeMaxAtLargeBytes`
 - Queues messages waiting for bytes (FIFO).
+- Stake weights are read from `validators.Manager.TotalWeight(primaryNetworkID)` and `GetWeight(primaryNetworkID, nodeID)` — the same `validators.Manager` interface managed by Snow consensus. See [consensus.md — Section 1.9 Validator Management](consensus.md#19-validator-management-snowvalidators).
 
 **3. Bandwidth throttle** (`bandwidth_throttler.go`):
 - Token bucket per peer: `RefillRate` bytes/sec, `MaxBurstSize` burst.
@@ -324,6 +327,8 @@ Config: `UpgradeCooldown`, `MaxRecentConnsUpgraded`.
 ---
 
 ## 6. TLS and Certificate Identity
+
+> **Staking certificate management:** The TLS certificate used here is the node's staking identity certificate. Generation, storage, and NodeID derivation are managed by the `staking/` package. See [api.md — Section 7 Staking Certificate Management](api.md#7-staking-certificate-management-staking).
 
 ### 6.1 TLS Configuration
 
@@ -372,6 +377,8 @@ UptimeResult {
 
 `RewardingStakePercentage` is the fraction of total stake held by peers that report our uptime ≥ `UptimeRequirement`.
 
+> **Feeds into Snow uptime tracking:** In addition to the peer-reported view above, the PlatformVM maintains its own authoritative uptime via `snow/uptime.Manager`. The PlatformVM calls `uptimeManager.Connect(nodeID)` / `Disconnect(nodeID)` as peers join and leave, tracking cumulative online time. This accumulated time determines whether a validator earns staking rewards at the end of their staking period. See [consensus.md — Section 1.10 Uptime Tracking](consensus.md#110-uptime-tracking-snowuptime) and [platformvm.md](platformvm.md).
+
 ---
 
 ## 8. Dialer (`network/dialer/`)
@@ -410,3 +417,9 @@ Gossip sub-package (`network/p2p/gossip/`) implements push and pull gossip:
 - **Pull gossip**: Periodically request items with a bloom filter; sender returns items not in filter.
 
 ACP-118 handler (`network/p2p/acp118/`) implements the cross-subnet warp signing protocol.
+
+> **Gossip consumers:**
+> - [PlatformVM](platformvm.md) uses `network/p2p/gossip` via `vms/platformvm/network/` to gossip pending transactions (push + pull gossip). The PlatformVM registers a gossip handler under `p2p.TxGossipHandlerID`.
+> - [SAEVM (vms.md)](vms.md) uses `network/p2p/gossip` via `vms/saevm/txgossip/` for Ethereum transaction propagation. A `txgossip.Set` acts as the gossipable mempool.
+>
+> **ACP-118 / Warp signing:** The PlatformVM registers an `acp118.Handler` (backed by a `signatureRequestVerifier`) so that peers can request BLS signatures over Warp messages. This is how cross-subnet Warp messages collect the required validator signatures. See [platformvm.md](platformvm.md).

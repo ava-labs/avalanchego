@@ -25,7 +25,9 @@ type Server interface {
 5. Bootstrap state guard (reject calls until chain bootstrapped)
 6. Prometheus metrics
 
-**HTTP/2 (h2c):** Supports up to 64 concurrent streams per connection.
+**HTTP/2 (h2c):** Supports up to 64 concurrent streams per connection (`maxConcurrentStreams = 64` in `api/server/server.go`).
+
+**Chain registration:** Chains register their API handlers through the [Registrant pattern](chains.md#15-registrant-pattern). When a new chain is created, the chain manager calls `RegisterChain()` on each registered `Registrant`, including the API server. The API server then calls `vm.CreateHandlers()` and mounts the returned handlers under `/ext/bc/<chainID>/`.
 
 ### 1.2 URL Structure
 
@@ -71,6 +73,8 @@ JSON-RPC 2.0 over HTTP at `/ext/admin`.
 | `DbGet(key hex-string)` | Read raw database value |
 | `Stacktrace()` | Dump goroutine stacks to file |
 
+**`LoadVMs()`** calls `VMRegistry.Reload()` (see [VM Registry](chains.md#72-vm-registry-vmsregistry)) to scan the plugin directory for new VM binaries, then registers them with the VM Manager so subsequent `CreateChain` calls can use them.
+
 ---
 
 ## 3. Health API (`api/health/`)
@@ -97,7 +101,11 @@ type Result struct {
 - Optional tag filtering: `?tags=foo,bar` to query only specific check groups.
 - Subsystems register checks via `health.Registerer`.
 
-**Registered checks include:** network connectivity, chain bootstrapping, disk space, memory, CPU.
+**Registered checks include:**
+- **[Networking](networking.md#1-network-interface):** `network.Network` implements `health.Checker`; reports connected peer count, send failure rate, and inbound connection metrics.
+- **[Database](database.md#1-core-interface):** LevelDB and PebbleDB implement `HealthCheck()`, returning disk usage statistics. The `database.Database` interface embeds `health.Checker`.
+- **Chain bootstrapping state:** Each chain's handler registers a health check that returns unhealthy until the chain has completed bootstrapping (the bootstrap state guard in the API middleware also uses this).
+- Disk space, memory, and CPU resource checks registered during node initialization.
 
 ---
 
@@ -120,6 +128,8 @@ JSON-RPC 2.0 at `/ext/info`.
 | `GetTxFee()` | Current fee schedule |
 | `Acps()` | Avalanche Consensus Proposals — support/objection percentages |
 | `Upgrades()` | Full upgrade schedule |
+
+**`Uptime()`** queries [networking.NodeUptime()](networking.md#7-uptime-tracking-from-peers-perspective) (`network.Network.NodeUptime()`) which calculates the node's perceived uptime as reported by its validator peers. The result is weighted by stake weight across connected validators.
 
 **`GetTxFee()` response:**
 ```go
@@ -153,6 +163,8 @@ type MultiGatherer interface {
 
 **PrefixGatherer:** Prefixes all metric names with a namespace string.
 **LabelGatherer:** Adds static Prometheus labels to all metrics.
+
+**Component consumers:** [MeterDB](database.md#29-meterdb-databasemeterdb) registers per-chain database metrics here. Each chain gets a dedicated MeterDB wrapping its prefixed DB, and the gathered metrics are published under the chain's namespace (e.g., `chain_<chainID>_db_*`).
 
 ---
 
@@ -228,6 +240,8 @@ type Context struct {
 }
 ```
 
+The Etna dynamic fee uses four complexity dimensions (from `vms/components/gas/dimensions.go`): `Bandwidth`, `DBRead`, `DBWrite`, and `Compute`. Each transaction type has a pre-computed complexity in `vms/platformvm/txs/fee/complexity.go`. See [PlatformVM transactions](platformvm.md#2-transaction-types) for the full transaction type catalog.
+
 ### 6.3 X-Chain Wallet
 
 ```go
@@ -247,6 +261,8 @@ type Wallet interface {
 }
 ```
 
+See [AVM transactions](vms.md#11-transaction-types) for the full list of X-Chain transaction types and their UTXO model.
+
 ### 6.4 C-Chain Wallet
 
 ```go
@@ -256,7 +272,7 @@ type Wallet interface {
 }
 ```
 
-Handles both AVAX-side (UTXO) and EVM-side (account) representations.
+Handles both AVAX-side (UTXO) and EVM-side (account) representations. See [SAEVM C-Chain wrapper](vms.md#46-c-chain-wrapper) for how import/export transactions are processed on the C-Chain side.
 
 ### 6.5 Options Pattern
 
@@ -281,6 +297,8 @@ WithAssumeDecided()  // skip confirmation polling
 4. client.IssueTx(tx)          → HTTP POST to platformvm RPC
 5. Confirmation polling         → polls until tx accepted (if not WithAssumeDecided)
 ```
+
+Internally, `IssueAddValidatorTx` calls `builder.NewAddValidatorTx()` then `IssueUnsignedTx()`, which calls `signer.Sign()` followed by `IssueTx()`. The signer uses the [secp256k1 keychain](api.md#91-secp256k1-utilscryptosecp256k1) for UTXO authorization and optionally a [BLS key](api.md#72-bls-key) for validator proof-of-possession.
 
 ---
 
@@ -310,6 +328,8 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error
 SHA256(cert.Raw) → RIPEMD160(result) → 20-byte NodeID
 ```
 
+The NodeID is used in the [TLS upgrade flow](networking.md#62-upgrade-flow): after a TLS handshake completes, the peer's certificate is extracted and `ids.NodeIDFromCert()` derives the NodeID, which is then used for all subsequent peer identity checks.
+
 ### 7.2 BLS Key
 
 Used for Warp signing and validator weight aggregation:
@@ -327,6 +347,11 @@ type Signer interface {
 **Key sizes:**
 - Public key: 48 bytes (compressed G1 point)
 - Signature: 96 bytes (compressed G2 point)
+
+**Component consumers:**
+- [Simplex BLS signing](consensus.md#24-bls-signing-simplexblsgo): Simplex consensus uses `BLSSigner` and `BLSVerifier` (from `simplex/bls.go`) to sign and verify notarization/finalization quorum certificates.
+- [Warp messaging](platformvm.md#83-warp-messaging-vmsplatformvmwarp): all Warp messages are BLS-signed by validators; the P-Chain verifies aggregated BLS signatures against the validator set at a given height.
+- [Networking handshake](networking.md#23-handshake-message-handshake): the `Handshake` message includes a BLS-signed IP (`IpBlsSig`), which the recipient verifies using the sender's PoP-verified public key to authenticate the claimed IP address.
 
 ### 7.3 Certificate Verification (`staking/verify.go`)
 
@@ -360,7 +385,7 @@ id.Bit(i uint) int                 // extract bit at position i
 id.Compare(other ID) int           // lexicographic compare
 ```
 
-**CB58 encoding:** Crockford's Base58 with 4-byte SHA256 checksum. All 32-byte IDs displayed as CB58 strings (e.g., `2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM`).
+**CB58 encoding:** Base58 (using the `mr-tron/base58` alphabet) with a 4-byte SHA256 checksum appended before encoding. Note: the implementation uses standard Base58, not Crockford's alphabet. All 32-byte IDs are displayed as CB58 strings (e.g., `2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM`). The encoding/decoding logic lives in `utils/cb58/cb58.go`.
 
 ### 8.2 NodeID (20 bytes)
 
@@ -369,7 +394,7 @@ type NodeID ShortID  // 20-byte alias
 
 // Derivation
 ids.NodeIDFromCert(cert *staking.Certificate) NodeID
-// = RIPEMD160(SHA256(cert.DER))
+// = RIPEMD160(SHA256(cert.Raw))
 
 // Display
 nodeID.String() → "NodeID-<CB58>"
@@ -377,6 +402,8 @@ ids.NodeIDFromString("NodeID-<CB58>") (NodeID, error)
 ```
 
 JSON marshal/unmarshal uses the `"NodeID-"` prefix.
+
+**Usage:** NodeID derivation is used in the [TLS handshake upgrade flow](networking.md#62-upgrade-flow) to establish peer identity from their TLS certificate.
 
 ### 8.3 ShortID (20 bytes)
 
@@ -448,6 +475,10 @@ secp256k1.RecoverPublicKey(msg, sig) (*PublicKey, error)
 
 **Canonical signature check:** `verifySECP256K1RSignatureFormat` rejects non-canonical signatures (high-S malleability prevention).
 
+**Component consumers:**
+- [AVM secp256k1fx](vms.md#13-fx-feature-extension-system): The `secp256k1fx` feature extension (`vms/secp256k1fx/`) uses secp256k1 signatures to authorize UTXO spending on the X-Chain and P-Chain. `secp256k1fx.Fx` verifies `TransferInput`, `MintOperation`, etc.
+- [P-Chain UTXO verification](platformvm.md#41-two-phase-verification): PlatformVM's execution engine calls `fx.VerifyTransfer()` and `fx.VerifyPermission()` from `secp256k1fx` during the two-phase verification of import/export and validator transactions.
+
 ### 9.2 BLS (`utils/crypto/bls/`)
 
 Boneh-Lynn-Shacham using `supranational/blst` (constant-time, BLST reference implementation).
@@ -513,7 +544,9 @@ type Compressor interface {
 }
 ```
 
-P2P message compression: If compressed size is smaller than the original, messages are wrapped in a `p2p.Message{CompressedZstd: ...}` envelope. Both ends must detect and decompress.
+P2P message compression: If compressed size is smaller than the original, messages are wrapped in a `p2p.Message{CompressedZstd: ...}` envelope. Both ends must detect and decompress. See [P2P message wire format](networking.md#31-wire-format) for details on when compression is applied.
+
+[BlockDB compression](database.md#63-block-entry-format) uses the same zstd compressor: each block entry in `x/blockdb/` is zstd-compressed before writing to disk, with the compressed bytes stored after the `blockEntryHeader`.
 
 ---
 
