@@ -31,9 +31,11 @@ import (
 )
 
 const (
-	testCommitInterval = 1024
-	testTargetHeight   = 100
-	testNumWorkers     = 4
+	// testRequestSize is the maximum number of leaves fetched per network
+	// request (the syncer's default).
+	testRequestSize  = defaultRequestSize
+	testTargetHeight = 100
+	testNumWorkers   = 4
 )
 
 type atomicSyncTestCheckpoint struct {
@@ -70,7 +72,7 @@ func TestSyncerScenarios(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := rand.New(rand.NewSource(1))
-			targetHeight := 10 * uint64(testCommitInterval)
+			targetHeight := 10 * uint64(testRequestSize)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 			root, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
 
@@ -106,19 +108,21 @@ func TestSyncerResumeScenarios(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := rand.New(rand.NewSource(1))
-			targetHeight := 10 * uint64(testCommitInterval)
+			targetHeight := 10 * uint64(testRequestSize)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 			numTrieKeys := int(targetHeight) - 1 // no atomic ops for genesis
 			root, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, numTrieKeys, state.TrieKeyLength)
 
+			// The atomic trie commits at every height, so an interrupted sync
+			// loses no committed progress.
 			testSyncer(t, serverTrieDB, targetHeight, root, []atomicSyncTestCheckpoint{
 				{
 					targetRoot:              root,
 					targetHeight:            targetHeight,
-					leafCutoff:              testCommitInterval*5 - 1,
-					expectedNumLeavesSynced: testCommitInterval * 4,
+					leafCutoff:              testRequestSize*5 - 1,
+					expectedNumLeavesSynced: testRequestSize * 4,
 				},
-			}, int64(targetHeight)+testCommitInterval-1, tt.numWorkers) // we will resync the last commitInterval - 1 leafs
+			}, int64(targetHeight), tt.numWorkers)
 		})
 	}
 }
@@ -150,25 +154,27 @@ func TestSyncerResumeNewRootCheckpointScenarios(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := rand.New(rand.NewSource(1))
-			targetHeight1 := 10 * uint64(testCommitInterval)
+			targetHeight1 := 10 * uint64(testRequestSize)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 			numTrieKeys1 := int(targetHeight1) - 1 // no atomic ops for genesis
 			root1, _, _ := synctest.GenerateIndependentTrie(t, r, serverTrieDB, numTrieKeys1, state.TrieKeyLength)
 
-			targetHeight2 := 20 * uint64(testCommitInterval)
+			targetHeight2 := 20 * uint64(testRequestSize)
 			numTrieKeys2 := int(targetHeight2) - 1 // no atomic ops for genesis
 			root2, _, _ := synctest.FillIndependentTrie(
 				t, r, numTrieKeys1, numTrieKeys2, state.TrieKeyLength, serverTrieDB, root1,
 			)
 
+			// The atomic trie commits at every height, so an interrupted sync
+			// loses no committed progress.
 			testSyncer(t, serverTrieDB, targetHeight1, root1, []atomicSyncTestCheckpoint{
 				{
 					targetRoot:              root2,
 					targetHeight:            targetHeight2,
-					leafCutoff:              testCommitInterval*5 - 1,
-					expectedNumLeavesSynced: testCommitInterval * 4,
+					leafCutoff:              testRequestSize*5 - 1,
+					expectedNumLeavesSynced: testRequestSize * 4,
 				},
-			}, int64(targetHeight2)+testCommitInterval-1, tt.numWorkers) // we will resync the last commitInterval - 1 leafs
+			}, int64(targetHeight2), tt.numWorkers)
 		})
 	}
 }
@@ -184,13 +190,13 @@ func TestSyncerParallelizationScenarios(t *testing.T) {
 	}{
 		{
 			name:         "parallelization with 4 workers",
-			targetHeight: 2 * uint64(testCommitInterval), // 2,048 leaves for meaningful parallelization
+			targetHeight: 2 * uint64(testRequestSize), // 2,048 leaves for meaningful parallelization
 			numWorkers:   4,
 			description:  "should work correctly with 4 worker goroutines",
 		},
 		{
 			name:         "default parallelization",
-			targetHeight: uint64(testCommitInterval), // 1,024 leaves to test commit boundary
+			targetHeight: uint64(testRequestSize), // 1,024 leaves (one request batch)
 			numWorkers:   0,
 			description:  "should default to parallelization with default workers",
 		},
@@ -307,7 +313,7 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 	clientTrieDB := atomicTrie.TrieDB()
 	synctest.AssertTrieConsistency(t, targetRoot, serverTrieDB, clientTrieDB, nil)
 
-	// check all commit heights are created correctly
+	// Verify the committed root matches the root derived from the server trie's keys
 	hasher := trie.NewEmpty(triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil))
 
 	serverTrie, err := trie.New(trie.TrieID(targetRoot), serverTrieDB)
@@ -333,7 +339,7 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 	for height := uint64(0); height <= targetHeight; height++ {
 		require.NoErrorf(t, addAllKeysWithPrefix(database.PackUInt64(height)), "failed to add keys for height %d", height)
 
-		if height%testCommitInterval == 0 {
+		if height%testRequestSize == 0 {
 			expected := hasher.Hash()
 			root, err := atomicTrie.Root(height)
 			require.NoError(t, err)
@@ -359,7 +365,7 @@ func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (conte
 	repo, err := state.NewAtomicTxRepository(clientDB, message.CorethCodec, 0)
 	require.NoError(t, err, "NewAtomicTxRepository()")
 
-	atomicBackend, err := state.NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, 0, common.Hash{}, testCommitInterval)
+	atomicBackend, err := state.NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, 0, common.Hash{})
 	require.NoError(t, err, "NewAtomicBackend()")
 
 	return ctx, mockClient, atomicBackend, clientDB

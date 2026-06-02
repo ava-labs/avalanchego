@@ -234,7 +234,6 @@ func (vm *VM) Initialize(
 	vm.AtomicBackend, err = atomicstate.NewAtomicBackend(
 		vm.Ctx.SharedMemory, bonusBlockHeights,
 		vm.AtomicTxRepository, lastAcceptedHeight, lastAcceptedHash,
-		vm.InnerVM.Config().CommitInterval,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create atomic backend: %w", err)

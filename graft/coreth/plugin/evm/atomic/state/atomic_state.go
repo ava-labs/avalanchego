@@ -48,8 +48,8 @@ func (a *atomicState) Accept(commitBatch database.Batch) error {
 		}
 	}
 
-	// Accept the root of this atomic trie (will be persisted if at a commit interval)
-	if _, err := a.backend.atomicTrie.AcceptTrie(a.blockHeight, a.atomicRoot); err != nil {
+	// Accept the root of this atomic trie (persisted at every block).
+	if err := a.backend.atomicTrie.AcceptTrie(a.blockHeight, a.atomicRoot); err != nil {
 		return err
 	}
 	// Update the last accepted block to this block and remove it from

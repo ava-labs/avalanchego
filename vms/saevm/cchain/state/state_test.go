@@ -128,10 +128,9 @@ func newOldState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMem
 	repo, err := oldstate.NewAtomicTxRepository(versiondb.New(db), atomic.Codec, 0)
 	require.NoErrorf(tb, err, "state.NewAtomicTxRepository(%T, %T, ...)", db, atomic.Codec)
 
-	// Making the legacy backend commit at every height matches the new State's
-	// every-height-is-committed semantics.
-	const commitInterval = 1
-	backend, err := oldstate.NewAtomicBackend(sm, nil, repo, 0, common.Hash{}, commitInterval)
+	// The legacy backend commits the atomic trie at every height, matching the
+	// new State's every-height-is-committed semantics.
+	backend, err := oldstate.NewAtomicBackend(sm, nil, repo, 0, common.Hash{})
 	require.NoErrorf(tb, err, "state.NewAtomicBackend(%T, %T)", sm, repo)
 	return &oldState{
 		tb:      tb,

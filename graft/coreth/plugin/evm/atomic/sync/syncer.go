@@ -185,18 +185,14 @@ func (s *Syncer) onLeafs(ctx context.Context, keys [][]byte, values [][]byte) er
 			if err := s.atomicTrie.InsertTrie(nodes, root); err != nil {
 				return err
 			}
-			// AcceptTrie commits the trieDB and returns [isCommit] as true
-			// if we have reached or crossed a commit interval.
-			isCommit, err := s.atomicTrie.AcceptTrie(s.lastHeight, root)
-			if err != nil {
+			// AcceptTrie commits the trieDB at every height.
+			if err := s.atomicTrie.AcceptTrie(s.lastHeight, root); err != nil {
 				return err
 			}
-			if isCommit {
-				// Flush pending changes to disk to preserve progress and
-				// free up memory if the trieDB was committed.
-				if err := s.db.Commit(); err != nil {
-					return err
-				}
+			// Flush pending changes to disk to preserve progress and free up
+			// memory.
+			if err := s.db.Commit(); err != nil {
+				return err
 			}
 			// Trie must be re-opened after committing (not safe for re-use after commit)
 			trie, err := s.atomicTrie.OpenTrie(root)
@@ -225,7 +221,7 @@ func (s *Syncer) onFinish() error {
 	if err := s.atomicTrie.InsertTrie(nodes, root); err != nil {
 		return err
 	}
-	if _, err := s.atomicTrie.AcceptTrie(s.targetHeight, root); err != nil {
+	if err := s.atomicTrie.AcceptTrie(s.targetHeight, root); err != nil {
 		return err
 	}
 	if err := s.db.Commit(); err != nil {

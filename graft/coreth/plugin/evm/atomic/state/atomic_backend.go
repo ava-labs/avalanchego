@@ -44,11 +44,11 @@ type AtomicBackend struct {
 func NewAtomicBackend(
 	sharedMemory avalancheatomic.SharedMemory,
 	bonusBlocks map[uint64]ids.ID, repo *AtomicRepository,
-	lastAcceptedHeight uint64, lastAcceptedHash common.Hash, commitInterval uint64,
+	lastAcceptedHeight uint64, lastAcceptedHash common.Hash,
 ) (*AtomicBackend, error) {
 	codec := repo.codec
 
-	atomicTrie, err := newAtomicTrie(repo.atomicTrieStorage, repo.metadataDB, codec, lastAcceptedHeight, commitInterval)
+	atomicTrie, err := newAtomicTrie(repo.atomicTrieStorage, repo.metadataDB, codec, lastAcceptedHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -127,14 +127,11 @@ func (a *AtomicBackend) initialize(lastAcceptedHeight uint64) error {
 		if err := a.atomicTrie.InsertTrie(nodes, root); err != nil {
 			return err
 		}
-		isCommit, err := a.atomicTrie.AcceptTrie(height, root)
-		if err != nil {
+		if err := a.atomicTrie.AcceptTrie(height, root); err != nil {
 			return err
 		}
-		if isCommit {
-			if err := a.repo.db.Commit(); err != nil {
-				return err
-			}
+		if err := a.repo.db.Commit(); err != nil {
+			return err
 		}
 		// Trie must be re-opened after committing (not safe for re-use after commit)
 		tr, err = a.atomicTrie.OpenTrie(root)
@@ -158,7 +155,7 @@ func (a *AtomicBackend) initialize(lastAcceptedHeight uint64) error {
 		if err := a.atomicTrie.InsertTrie(nil, lastAcceptedRoot); err != nil {
 			return err
 		}
-		if _, err := a.atomicTrie.AcceptTrie(lastAcceptedHeight, lastAcceptedRoot); err != nil {
+		if err := a.atomicTrie.AcceptTrie(lastAcceptedHeight, lastAcceptedRoot); err != nil {
 			return err
 		}
 	}

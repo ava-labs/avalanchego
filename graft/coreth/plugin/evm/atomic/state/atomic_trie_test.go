@@ -31,7 +31,9 @@ import (
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
 
-const testCommitInterval = 100
+// numTestHeights is the number of heights indexed by tests that simply need to
+// process a range of blocks.
+const numTestHeights = 100
 
 // indexAtomicTxs updates [tr] with entries in [atomicOps] at height by creating
 // a new snapshot, calculating a new root, and calling InsertTrie followed
@@ -51,85 +53,29 @@ func indexAtomicTxs(tr *AtomicTrie, height uint64, atomicOps map[ids.ID]*avalanc
 	if err := tr.InsertTrie(nodes, root); err != nil {
 		return err
 	}
-	_, err = tr.AcceptTrie(height, root)
-	return err
-}
-
-func TestNearestCommitHeight(t *testing.T) {
-	type test struct {
-		height, commitInterval, expectedCommitHeight uint64
-	}
-
-	for _, test := range []test{
-		{
-			height:               4500,
-			commitInterval:       4096,
-			expectedCommitHeight: 4096,
-		},
-		{
-			height:               8500,
-			commitInterval:       4096,
-			expectedCommitHeight: 8192,
-		},
-		{
-			height:               950,
-			commitInterval:       100,
-			expectedCommitHeight: 900,
-		},
-	} {
-		commitHeight := nearestCommitHeight(test.height, test.commitInterval)
-		require.Equal(t, test.expectedCommitHeight, commitHeight)
-	}
+	return tr.AcceptTrie(height, root)
 }
 
 func TestAtomicTrieInitialize(t *testing.T) {
 	type test struct {
-		commitInterval, lastAcceptedHeight, expectedCommitHeight uint64
-		numTxsPerBlock                                           func(uint64) int
+		lastAcceptedHeight uint64
+		numTxsPerBlock     func(uint64) int
 	}
 	for name, test := range map[string]test{
 		"genesis": {
-			commitInterval:       10,
-			lastAcceptedHeight:   0,
-			expectedCommitHeight: 0,
-			numTxsPerBlock:       constTxsPerHeight(0),
+			lastAcceptedHeight: 0,
+			numTxsPerBlock:     constTxsPerHeight(0),
 		},
-		"before first commit": {
-			commitInterval:       10,
-			lastAcceptedHeight:   5,
-			expectedCommitHeight: 0,
-			numTxsPerBlock:       constTxsPerHeight(3),
+		"atomic txs at every height": {
+			lastAcceptedHeight: 100,
+			numTxsPerBlock:     constTxsPerHeight(3),
 		},
-		"first commit": {
-			commitInterval:       10,
-			lastAcceptedHeight:   10,
-			expectedCommitHeight: 10,
-			numTxsPerBlock:       constTxsPerHeight(3),
-		},
-		"past first commit": {
-			commitInterval:       10,
-			lastAcceptedHeight:   15,
-			expectedCommitHeight: 10,
-			numTxsPerBlock:       constTxsPerHeight(3),
-		},
-		"many existing commits": {
-			commitInterval:       10,
-			lastAcceptedHeight:   1000,
-			expectedCommitHeight: 1000,
-			numTxsPerBlock:       constTxsPerHeight(3),
-		},
-		"many existing commits plus 1": {
-			commitInterval:       10,
-			lastAcceptedHeight:   1001,
-			expectedCommitHeight: 1000,
-			numTxsPerBlock:       constTxsPerHeight(3),
-		},
-		"some blocks without atomic tx": {
-			commitInterval:       10,
-			lastAcceptedHeight:   101,
-			expectedCommitHeight: 100,
+		"gaps between atomic txs with trailing empty blocks": {
+			lastAcceptedHeight: 101,
+			// Atomic txs only appear at sparse heights <= 50, so heights 51..101
+			// have none and must be back-filled with a committed root.
 			numTxsPerBlock: func(height uint64) int {
-				if height <= 50 || height == 101 {
+				if height <= 50 {
 					return 1
 				}
 				return 0
@@ -144,27 +90,35 @@ func TestAtomicTrieInitialize(t *testing.T) {
 			writeTxs(t, repo, 1, test.lastAcceptedHeight+1, test.numTxsPerBlock, nil, operationsMap)
 
 			// Construct the atomic trie for the first time
-			atomicBackend1, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
+			atomicBackend1, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, test.lastAcceptedHeight, common.Hash{})
 			require.NoError(t, err)
 			atomicTrie1 := atomicBackend1.AtomicTrie()
 
 			rootHash1, commitHeight1 := atomicTrie1.LastCommitted()
-			require.Equal(t, test.expectedCommitHeight, commitHeight1)
-			if test.expectedCommitHeight != 0 {
+			require.Equal(t, test.lastAcceptedHeight, commitHeight1)
+			if test.lastAcceptedHeight != 0 {
 				require.NotZero(t, rootHash1)
 			}
 
-			// Verify the operations up to the expected commit height
-			verifyOperations(t, atomicTrie1, atomictest.TestTxCodec, rootHash1, 1, test.expectedCommitHeight, operationsMap)
+			// A committed root must exist at every height up to the last committed
+			// height, including heights with no atomic txs (back-filled during
+			// initialization). SAE relies on this property.
+			for h := uint64(1); h <= commitHeight1; h++ {
+				root, err := atomicTrie1.Root(h)
+				require.NoError(t, err)
+				require.NotZerof(t, root, "expected committed root at height %d", h)
+			}
+
+			verifyOperations(t, atomicTrie1, atomictest.TestTxCodec, rootHash1, 1, test.lastAcceptedHeight, operationsMap)
 
 			// Construct the atomic trie again (on the same database) and ensure the last accepted root is correct.
-			atomicBackend2, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
+			atomicBackend2, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, test.lastAcceptedHeight, common.Hash{})
 			require.NoError(t, err)
 			atomicTrie2 := atomicBackend2.AtomicTrie()
 			require.Equal(t, atomicTrie1.LastAcceptedRoot(), atomicTrie2.LastAcceptedRoot())
 
 			// Construct the atomic trie again (on an empty database) and ensure that it produces the same hash.
-			atomicBackend3, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
+			atomicBackend3, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, test.lastAcceptedHeight, common.Hash{})
 			require.NoError(t, err)
 			atomicTrie3 := atomicBackend3.AtomicTrie()
 
@@ -172,10 +126,11 @@ func TestAtomicTrieInitialize(t *testing.T) {
 			require.Equal(t, commitHeight1, commitHeight3)
 			require.Equal(t, rootHash1, rootHash3)
 
-			// We now index additional operations up the next commit interval in order to confirm that nothing
-			// during the initialization phase will cause an invalid root when indexing continues.
-			nextCommitHeight := nearestCommitHeight(test.lastAcceptedHeight+test.commitInterval, test.commitInterval)
-			for i := test.lastAcceptedHeight + 1; i <= nextCommitHeight; i++ {
+			// Index some additional blocks to confirm that nothing during the
+			// initialization phase causes an invalid root when indexing continues.
+			const additionalBlocks = 10
+			nextHeight := test.lastAcceptedHeight + additionalBlocks
+			for i := test.lastAcceptedHeight + 1; i <= nextHeight; i++ {
 				txs := atomictest.NewTestTxs(test.numTxsPerBlock(i))
 				require.NoError(t, repo.Write(i, txs))
 
@@ -184,21 +139,21 @@ func TestAtomicTrieInitialize(t *testing.T) {
 				require.NoError(t, indexAtomicTxs(atomicTrie1, i, atomicOps))
 				operationsMap[i] = atomicOps
 			}
-			updatedRoot, updatedLastCommitHeight := atomicTrie1.LastCommitted()
-			require.Equal(t, nextCommitHeight, updatedLastCommitHeight)
+			updatedRoot, updatedHeight := atomicTrie1.LastCommitted()
+			require.Equal(t, nextHeight, updatedHeight)
 			require.NotZero(t, updatedRoot)
 
-			// Verify the operations up to the new expected commit height
-			verifyOperations(t, atomicTrie1, atomictest.TestTxCodec, updatedRoot, 1, updatedLastCommitHeight, operationsMap)
+			// Verify the operations up to the new last committed height.
+			verifyOperations(t, atomicTrie1, atomictest.TestTxCodec, updatedRoot, 1, updatedHeight, operationsMap)
 
 			// Generate a new atomic trie to compare the root against.
-			atomicBackend4, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, nextCommitHeight, common.Hash{}, test.commitInterval)
+			atomicBackend4, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, nextHeight, common.Hash{})
 			require.NoError(t, err)
 			atomicTrie4 := atomicBackend4.AtomicTrie()
 
 			rootHash4, commitHeight4 := atomicTrie4.LastCommitted()
 			require.Equal(t, updatedRoot, rootHash4)
-			require.Equal(t, updatedLastCommitHeight, commitHeight4)
+			require.Equal(t, updatedHeight, commitHeight4)
 		})
 	}
 }
@@ -212,13 +167,13 @@ func TestIndexerInitializesOnlyOnce(t *testing.T) {
 	writeTxs(t, repo, 1, lastAcceptedHeight+1, constTxsPerHeight(2), nil, operationsMap)
 
 	// Initialize atomic repository
-	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 10 /* commitInterval*/)
+	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{})
 	require.NoError(t, err)
 	atomicTrie := atomicBackend.AtomicTrie()
 
 	hash, height := atomicTrie.LastCommitted()
 	require.NotZero(t, hash)
-	require.Equal(t, uint64(20), height)
+	require.Equal(t, lastAcceptedHeight, height)
 
 	// We write another tx at a height below the last committed height in the repo and then
 	// re-initialize the atomic trie since initialize is not supposed to run again the height
@@ -227,7 +182,7 @@ func TestIndexerInitializesOnlyOnce(t *testing.T) {
 	require.NoError(t, repo.Write(15, []*atomic.Tx{atomictest.GenerateTestExportTx()}))
 
 	// Re-initialize the atomic trie
-	atomicBackend, err = NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 10 /* commitInterval */)
+	atomicBackend, err = NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{})
 	require.NoError(t, err)
 	atomicTrie = atomicBackend.AtomicTrie()
 
@@ -240,50 +195,16 @@ func newTestAtomicTrie(t *testing.T) *AtomicTrie {
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, 0)
 	require.NoError(t, err)
-	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, 0, common.Hash{}, testCommitInterval)
+	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, 0, common.Hash{})
 	require.NoError(t, err)
 	return atomicBackend.AtomicTrie()
-}
-
-func TestIndexerWriteAndRead(t *testing.T) {
-	atomicTrie := newTestAtomicTrie(t)
-
-	blockRootMap := make(map[uint64]common.Hash)
-	lastCommittedBlockHeight := uint64(0)
-	var lastCommittedBlockHash common.Hash
-
-	// process 305 blocks so that we get three commits (100, 200, 300)
-	for height := uint64(1); height <= testCommitInterval*3+5; /*=305*/ height++ {
-		atomicRequests, err := atomictest.ConvertToAtomicOps(atomictest.GenerateTestImportTx())
-		require.NoError(t, err)
-		require.NoError(t, indexAtomicTxs(atomicTrie, height, atomicRequests))
-		if height%testCommitInterval == 0 {
-			lastCommittedBlockHash, lastCommittedBlockHeight = atomicTrie.LastCommitted()
-			require.NotZero(t, lastCommittedBlockHash)
-			blockRootMap[lastCommittedBlockHeight] = lastCommittedBlockHash
-		}
-	}
-
-	// ensure we have 3 roots
-	require.Len(t, blockRootMap, 3)
-
-	hash, height := atomicTrie.LastCommitted()
-	require.Equal(t, lastCommittedBlockHeight, height)
-	require.Equal(t, lastCommittedBlockHash, hash)
-
-	// Verify that [atomicTrie] can access each of the expected roots
-	for height, hash := range blockRootMap {
-		root, err := atomicTrie.Root(height)
-		require.NoError(t, err)
-		require.Equal(t, hash, root)
-	}
 }
 
 func TestAtomicOpsAreNotTxOrderDependent(t *testing.T) {
 	atomicTrie1 := newTestAtomicTrie(t)
 	atomicTrie2 := newTestAtomicTrie(t)
 
-	for height := uint64(0); height <= testCommitInterval; /*=205*/ height++ {
+	for height := uint64(0); height <= numTestHeights; height++ {
 		tx1 := atomictest.GenerateTestImportTx()
 		tx2 := atomictest.GenerateTestImportTx()
 		atomicRequests1, err := mergeAtomicOps([]*atomic.Tx{tx1, tx2})
@@ -297,16 +218,14 @@ func TestAtomicOpsAreNotTxOrderDependent(t *testing.T) {
 	root1, height1 := atomicTrie1.LastCommitted()
 	root2, height2 := atomicTrie2.LastCommitted()
 	require.NotZero(t, root1)
-	require.Equal(t, uint64(testCommitInterval), height1)
-	require.Equal(t, uint64(testCommitInterval), height2)
+	require.Equal(t, uint64(numTestHeights), height1)
+	require.Equal(t, uint64(numTestHeights), height2)
 	require.Equal(t, root1, root2)
 }
 
 func TestAtomicTrieDoesNotSkipBonusBlocks(t *testing.T) {
 	lastAcceptedHeight := uint64(100)
 	numTxsPerBlock := 3
-	commitInterval := uint64(10)
-	expectedCommitHeight := uint64(100)
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, lastAcceptedHeight)
 	require.NoError(t, err)
@@ -319,22 +238,22 @@ func TestAtomicTrieDoesNotSkipBonusBlocks(t *testing.T) {
 		14: {},
 	}
 	// Construct the atomic trie for the first time
-	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), bonusBlocks, repo, lastAcceptedHeight, common.Hash{}, commitInterval)
+	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), bonusBlocks, repo, lastAcceptedHeight, common.Hash{})
 	require.NoError(t, err)
 	atomicTrie := atomicBackend.AtomicTrie()
 
 	rootHash, commitHeight := atomicTrie.LastCommitted()
-	require.Equal(t, expectedCommitHeight, commitHeight)
+	require.Equal(t, lastAcceptedHeight, commitHeight)
 	require.NotZero(t, rootHash)
 
 	// Verify the operations are as expected
-	verifyOperations(t, atomicTrie, atomictest.TestTxCodec, rootHash, 1, expectedCommitHeight, operationsMap)
+	verifyOperations(t, atomicTrie, atomictest.TestTxCodec, rootHash, 1, lastAcceptedHeight, operationsMap)
 }
 
 func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
 	// operations to index
 	ops := make([]map[ids.ID]*avalancheatomic.Requests, 0)
-	for i := 0; i <= testCommitInterval; i++ {
+	for i := 0; i <= numTestHeights; i++ {
 		atomicOps, err := atomictest.ConvertToAtomicOps(atomictest.GenerateTestImportTx())
 		require.NoError(t, err)
 		ops = append(ops, atomicOps)
@@ -342,7 +261,7 @@ func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
 
 	// without nils
 	a1 := newTestAtomicTrie(t)
-	for i := uint64(0); i <= testCommitInterval; i++ {
+	for i := uint64(0); i <= numTestHeights; i++ {
 		if i%2 == 0 {
 			require.NoError(t, indexAtomicTxs(a1, i, ops[i]))
 		}
@@ -350,11 +269,11 @@ func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
 
 	root1, height1 := a1.LastCommitted()
 	require.NotZero(t, root1)
-	require.Equal(t, uint64(testCommitInterval), height1)
+	require.Equal(t, uint64(numTestHeights), height1)
 
 	// with nils
 	a2 := newTestAtomicTrie(t)
-	for i := uint64(0); i <= testCommitInterval; i++ {
+	for i := uint64(0); i <= numTestHeights; i++ {
 		if i%2 == 0 {
 			require.NoError(t, indexAtomicTxs(a2, i, ops[i]))
 		} else {
@@ -363,7 +282,7 @@ func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
 	}
 	root2, height2 := a2.LastCommitted()
 	require.NotZero(t, root2)
-	require.Equal(t, uint64(testCommitInterval), height2)
+	require.Equal(t, uint64(numTestHeights), height2)
 
 	// key requirement of the test
 	require.Equal(t, root1, root2)
@@ -371,21 +290,19 @@ func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
 
 func TestApplyToSharedMemory(t *testing.T) {
 	type test struct {
-		commitInterval, lastAcceptedHeight uint64
-		setMarker                          func(*AtomicBackend) error
-		expectOpsApplied                   func(height uint64) bool
-		bonusBlockHeights                  map[uint64]ids.ID
+		lastAcceptedHeight uint64
+		setMarker          func(*AtomicBackend) error
+		expectOpsApplied   func(height uint64) bool
+		bonusBlockHeights  map[uint64]ids.ID
 	}
 
 	for name, test := range map[string]test{
 		"marker is set to height": {
-			commitInterval:     10,
 			lastAcceptedHeight: 25,
 			setMarker:          func(a *AtomicBackend) error { return a.MarkApplyToSharedMemoryCursor(10) },
-			expectOpsApplied:   func(height uint64) bool { return height > 10 && height <= 20 },
+			expectOpsApplied:   func(height uint64) bool { return height > 10 && height <= 25 },
 		},
 		"marker is set to height, should skip bonus blocks": {
-			commitInterval:     10,
 			lastAcceptedHeight: 25,
 			setMarker:          func(a *AtomicBackend) error { return a.MarkApplyToSharedMemoryCursor(10) },
 			bonusBlockHeights:  map[uint64]ids.ID{15: {}},
@@ -393,11 +310,10 @@ func TestApplyToSharedMemory(t *testing.T) {
 				if height == 15 {
 					return false
 				}
-				return height > 10 && height <= 20
+				return height > 10 && height <= 25
 			},
 		},
 		"marker is set to height + blockchain ID": {
-			commitInterval:     10,
 			lastAcceptedHeight: 25,
 			setMarker: func(a *AtomicBackend) error {
 				cursor := make([]byte, wrappers.LongLen+len(atomictest.TestBlockchainID[:]))
@@ -405,10 +321,9 @@ func TestApplyToSharedMemory(t *testing.T) {
 				copy(cursor[wrappers.LongLen:], atomictest.TestBlockchainID[:])
 				return a.repo.metadataDB.Put(appliedSharedMemoryCursorKey, cursor)
 			},
-			expectOpsApplied: func(height uint64) bool { return height > 10 && height <= 20 },
+			expectOpsApplied: func(height uint64) bool { return height > 10 && height <= 25 },
 		},
 		"marker not set": {
-			commitInterval:     10,
 			lastAcceptedHeight: 25,
 			setMarker:          func(*AtomicBackend) error { return nil },
 			expectOpsApplied:   func(uint64) bool { return false },
@@ -424,13 +339,13 @@ func TestApplyToSharedMemory(t *testing.T) {
 			// Initialize atomic repository
 			m := avalancheatomic.NewMemory(db)
 			sharedMemories := atomictest.NewSharedMemories(m, snowtest.CChainID, atomictest.TestBlockchainID)
-			backend, err := NewAtomicBackend(sharedMemories.ThisChain, test.bonusBlockHeights, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
+			backend, err := NewAtomicBackend(sharedMemories.ThisChain, test.bonusBlockHeights, repo, test.lastAcceptedHeight, common.Hash{})
 			require.NoError(t, err)
 			atomicTrie := backend.AtomicTrie()
 
 			hash, height := atomicTrie.LastCommitted()
 			require.NotZero(t, hash)
-			require.Equal(t, uint64(20), height)
+			require.Equal(t, test.lastAcceptedHeight, height)
 
 			// prepare peer chain's shared memory by applying items we expect to remove as puts
 			for _, ops := range operationsMap {
@@ -459,7 +374,7 @@ func TestApplyToSharedMemory(t *testing.T) {
 			// marker should be removed after ApplyToSharedMemory is complete
 			testOps()
 			// reinitialize the atomic trie
-			_, err = NewAtomicBackend(sharedMemories.ThisChain, nil, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
+			_, err = NewAtomicBackend(sharedMemories.ThisChain, nil, repo, test.lastAcceptedHeight, common.Hash{})
 			require.NoError(t, err)
 			// require that ops were applied as expected
 			testOps()
@@ -470,107 +385,71 @@ func TestApplyToSharedMemory(t *testing.T) {
 func TestAtomicTrie_AcceptTrie(t *testing.T) {
 	t.Parallel()
 
+	// When AcceptTrie is called with a height beyond lastCommittedHeight+1,
+	// the gap lastCommittedHeight+1, height-1 is back-filled with the
+	// current lastAcceptedRoot, and the supplied root is committed at height.
 	testCases := map[string]struct {
 		lastAcceptedRoot        common.Hash
 		lastCommittedRoot       common.Hash
 		lastCommittedHeight     uint64
-		commitInterval          uint64
 		height                  uint64
 		root                    common.Hash
-		wantHasCommitted        bool
 		wantLastCommittedHeight uint64
 		wantLastCommittedRoot   common.Hash
 		wantLastAcceptedRoot    common.Hash
-		wantTipBufferRoot       common.Hash
 		wantMetadataDBKVs       map[string]string // hex to hex
 	}{
-		"no_committing": {
+		"backfill_gap": {
 			lastAcceptedRoot:        types.EmptyRootHash,
 			lastCommittedRoot:       common.Hash{2},
 			lastCommittedHeight:     100,
-			commitInterval:          10,
 			height:                  105,
 			root:                    common.Hash{3},
-			wantLastCommittedHeight: 100,
-			wantLastCommittedRoot:   common.Hash{2},
+			wantLastCommittedHeight: 105,
+			wantLastCommittedRoot:   common.Hash{3},
 			wantLastAcceptedRoot:    common.Hash{3},
-			wantTipBufferRoot:       common.Hash{3},
 			wantMetadataDBKVs: map[string]string{
-				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100
-				hex.EncodeToString(lastCommittedKey): "0000000000000064",                         // height 100
+				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100 (pre-existing)
+				"0000000000000065":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 101 (back-filled)
+				"0000000000000066":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 102 (back-filled)
+				"0000000000000067":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 103 (back-filled)
+				"0000000000000068":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 104 (back-filled)
+				"0000000000000069":                   hex.EncodeToString(common.Hash{3}.Bytes()), // height 105 (committed)
+				hex.EncodeToString(lastCommittedKey): "0000000000000069",                         // height 105
 			},
 		},
-		"no_committing_with_previous_root": {
+		"backfill_gap_with_previous_root": {
 			lastAcceptedRoot:        common.Hash{1},
 			lastCommittedRoot:       common.Hash{2},
 			lastCommittedHeight:     100,
-			commitInterval:          10,
 			height:                  105,
 			root:                    common.Hash{3},
-			wantLastCommittedHeight: 100,
-			wantLastCommittedRoot:   common.Hash{2},
-			wantLastAcceptedRoot:    common.Hash{3},
-			wantTipBufferRoot:       common.Hash{3},
-			wantMetadataDBKVs: map[string]string{
-				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100
-				hex.EncodeToString(lastCommittedKey): "0000000000000064",                         // height 100
-			},
-		},
-		"commit_all_up_to_height_without_height": {
-			lastAcceptedRoot:        types.EmptyRootHash,
-			lastCommittedRoot:       common.Hash{2},
-			lastCommittedHeight:     60,
-			commitInterval:          10,
-			height:                  105,
-			root:                    common.Hash{3},
-			wantHasCommitted:        true,
-			wantLastCommittedHeight: 100,
-			wantLastCommittedRoot:   types.EmptyRootHash,
-			wantLastAcceptedRoot:    common.Hash{3},
-			wantTipBufferRoot:       common.Hash{3},
-			wantMetadataDBKVs: map[string]string{
-				"000000000000003c":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 60
-				"0000000000000046":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 70
-				"0000000000000050":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 80
-				"000000000000005a":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 90
-				"0000000000000064":                   hex.EncodeToString(types.EmptyRootHash[:]), // height 100
-				hex.EncodeToString(lastCommittedKey): "0000000000000064",                         // height 100
-			},
-		},
-		"commit_root": {
-			lastAcceptedRoot:        types.EmptyRootHash,
-			lastCommittedRoot:       common.Hash{2},
-			lastCommittedHeight:     100,
-			commitInterval:          10,
-			height:                  110,
-			root:                    common.Hash{3},
-			wantHasCommitted:        true,
-			wantLastCommittedHeight: 110,
+			wantLastCommittedHeight: 105,
 			wantLastCommittedRoot:   common.Hash{3},
 			wantLastAcceptedRoot:    common.Hash{3},
-			wantTipBufferRoot:       common.Hash{3},
 			wantMetadataDBKVs: map[string]string{
-				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100
-				"000000000000006e":                   hex.EncodeToString(common.Hash{3}.Bytes()), // height 110
-				hex.EncodeToString(lastCommittedKey): "000000000000006e",                         // height 110
+				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100 (pre-existing)
+				"0000000000000065":                   hex.EncodeToString(common.Hash{1}.Bytes()), // height 101 (back-filled w/ lastAcceptedRoot)
+				"0000000000000066":                   hex.EncodeToString(common.Hash{1}.Bytes()), // height 102 (back-filled w/ lastAcceptedRoot)
+				"0000000000000067":                   hex.EncodeToString(common.Hash{1}.Bytes()), // height 103 (back-filled w/ lastAcceptedRoot)
+				"0000000000000068":                   hex.EncodeToString(common.Hash{1}.Bytes()), // height 104 (back-filled w/ lastAcceptedRoot)
+				"0000000000000069":                   hex.EncodeToString(common.Hash{3}.Bytes()), // height 105 (committed)
+				hex.EncodeToString(lastCommittedKey): "0000000000000069",                         // height 105
 			},
 		},
-		"commit_root_with_previous_root": {
+		"no_gap": {
 			lastAcceptedRoot:        common.Hash{1},
 			lastCommittedRoot:       common.Hash{2},
-			lastCommittedHeight:     100,
-			commitInterval:          10,
-			height:                  110,
+			lastCommittedHeight:     104,
+			height:                  105,
 			root:                    common.Hash{3},
-			wantHasCommitted:        true,
-			wantLastCommittedHeight: 110,
+			wantLastCommittedHeight: 105,
 			wantLastCommittedRoot:   common.Hash{3},
 			wantLastAcceptedRoot:    common.Hash{3},
-			wantTipBufferRoot:       common.Hash{3},
 			wantMetadataDBKVs: map[string]string{
-				"0000000000000064":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 100
-				"000000000000006e":                   hex.EncodeToString(common.Hash{3}.Bytes()), // height 110
-				hex.EncodeToString(lastCommittedKey): "000000000000006e",                         // height 110
+				"0000000000000068":                   hex.EncodeToString(common.Hash{2}.Bytes()), // height 104 (pre-existing)
+				"0000000000000069":                   hex.EncodeToString(common.Hash{3}.Bytes()), // height 105 (committed)
+				hex.EncodeToString(lastCommittedKey): "0000000000000069",                         // height 105
 			},
 		},
 	}
@@ -584,7 +463,7 @@ func TestAtomicTrie_AcceptTrie(t *testing.T) {
 			metadataDB := prefixdb.New(atomicTrieMetaDBPrefix, versionDB)
 			const lastAcceptedHeight = 0 // no effect
 			atomicTrie, err := newAtomicTrie(atomicTrieStorage, metadataDB, atomictest.TestTxCodec,
-				lastAcceptedHeight, testCase.commitInterval)
+				lastAcceptedHeight)
 			require.NoError(t, err)
 			atomicTrie.lastAcceptedRoot = testCase.lastAcceptedRoot
 			if testCase.lastAcceptedRoot != types.EmptyRootHash {
@@ -606,17 +485,16 @@ func TestAtomicTrie_AcceptTrie(t *testing.T) {
 			}
 			require.NoError(t, atomicTrie.updateLastCommitted(testCase.lastCommittedRoot, testCase.lastCommittedHeight))
 
-			hasCommitted, err := atomicTrie.AcceptTrie(testCase.height, testCase.root)
-			require.NoError(t, err)
+			require.NoError(t, atomicTrie.AcceptTrie(testCase.height, testCase.root))
 
-			require.Equal(t, testCase.wantHasCommitted, hasCommitted)
 			require.Equal(t, testCase.wantLastCommittedHeight, atomicTrie.lastCommittedHeight)
 			require.Equal(t, testCase.wantLastCommittedRoot, atomicTrie.lastCommittedRoot)
 			require.Equal(t, testCase.wantLastAcceptedRoot, atomicTrie.lastAcceptedRoot)
 
-			// Check dereferencing previous dirty root inserted occurred
+			// Acceptance leaves no dirty storage: the inserted root was either
+			// committed during back-fill or dereferenced.
 			_, storageSize, _ := atomicTrie.trieDB.Size()
-			require.Zerof(t, storageSize, "storage size should be zero after accepting the trie due to the dirty nodes derefencing but is %s", storageSize)
+			require.Zerof(t, storageSize, "dirty storage size should be zero after accepting the trie but is %s", storageSize)
 
 			for wantKeyHex, wantValueHex := range testCase.wantMetadataDBKVs {
 				wantKey, err := hex.DecodeString(wantKeyHex)
@@ -649,7 +527,7 @@ func BenchmarkAtomicTrieInit(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sharedMemory := atomictest.TestSharedMemory()
-		atomicBackend, err := NewAtomicBackend(sharedMemory, nil, repo, lastAcceptedHeight, common.Hash{}, 5000)
+		atomicBackend, err := NewAtomicBackend(sharedMemory, nil, repo, lastAcceptedHeight, common.Hash{})
 		require.NoError(b, err)
 		atomicTrie = atomicBackend.AtomicTrie()
 
@@ -674,7 +552,7 @@ func BenchmarkAtomicTrieIterate(b *testing.B) {
 	require.NoError(b, err)
 	writeTxs(b, repo, 1, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
 
-	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 5000)
+	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{})
 	require.NoError(b, err)
 	atomicTrie := atomicBackend.AtomicTrie()
 
@@ -745,7 +623,7 @@ func benchmarkApplyToSharedMemory(b *testing.B, disk database.Database, blocks u
 	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, lastAcceptedHeight)
 	require.NoError(b, err)
 
-	backend, err := NewAtomicBackend(sharedMemory, nil, repo, 0, common.Hash{}, 5000)
+	backend, err := NewAtomicBackend(sharedMemory, nil, repo, 0, common.Hash{})
 	require.NoError(b, err)
 	trie := backend.AtomicTrie()
 	for height := uint64(1); height <= lastAcceptedHeight; height++ {

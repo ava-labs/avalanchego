@@ -32,7 +32,7 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
+	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{})
 	require.NoError(t, err)
 	atomicTrie1 := atomicBackend.AtomicTrie()
 
@@ -45,7 +45,7 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
-	atomicBackend2, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
+	atomicBackend2, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{})
 	require.NoError(t, err)
 	atomicTrie2 := atomicBackend2.AtomicTrie()
 	lastCommittedHash2, lastCommittedHeight2 := atomicTrie2.LastCommitted()
@@ -71,8 +71,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	commitInterval := uint64(100)
-	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, commitInterval)
+	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{})
 	require.NoError(err)
 	atomicTrie := atomicBackend.AtomicTrie()
 
@@ -91,9 +90,9 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	nextRoot, nodes, err := atomicTrieSnapshot.Commit(false)
 	require.NoError(err)
 	require.NoError(atomicTrie.InsertTrie(nodes, nextRoot))
-	isCommit, err := atomicTrie.AcceptTrie(lastCommittedHeight+commitInterval, nextRoot)
-	require.NoError(err)
-	require.True(isCommit)
+	// The atomic trie commits at every height, so accepting the next height
+	// commits the (corrupted) root.
+	require.NoError(atomicTrie.AcceptTrie(lastCommittedHeight+1, nextRoot))
 
 	corruptedHash, _ := atomicTrie.LastCommitted()
 	iter, err := atomicTrie.Iterator(corruptedHash, nil)

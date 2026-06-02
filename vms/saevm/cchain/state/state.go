@@ -68,10 +68,6 @@ type State struct {
 }
 
 // New initializes the state with db.
-//
-// TODO(#5375): Coreth's commitInterval must be reduced to 1 prior to
-// transitioning to SAE. Otherwise, the atomic trie may not contain operations
-// for recent blocks.
 func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 	root, height, err := readLast(db)
 	if err != nil {
