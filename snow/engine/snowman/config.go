@@ -17,12 +17,13 @@ import (
 type Config struct {
 	common.AllGetsServer
 
-	Ctx                 *snow.ConsensusContext
-	VM                  block.ChainVM
-	Sender              common.Sender
-	Validators          validators.Manager
-	ConnectedValidators tracker.Peers
-	Params              snowball.Parameters
-	Consensus           snowman.Consensus
-	PartialSync         bool
+	Ctx                   *snow.ConsensusContext
+	VM                    block.ChainVM
+	Sender                common.Sender
+	Validators            validators.Manager
+	ConnectedValidators   tracker.Peers
+	Params                snowball.Parameters
+	Consensus             snowman.Consensus
+	PartialSync           bool
+	PChainProgressUpdater PChainProgressUpdater
 }

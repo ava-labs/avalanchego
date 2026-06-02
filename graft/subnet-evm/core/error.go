@@ -30,6 +30,7 @@ package core
 import (
 	"errors"
 
+	ethcore "github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 )
 
@@ -78,7 +79,7 @@ var (
 	ErrInsufficientFunds = errors.New("insufficient funds for gas * price + value")
 
 	// ErrGasUintOverflow is returned when calculating gas usage.
-	ErrGasUintOverflow = errors.New("gas uint64 overflow")
+	ErrGasUintOverflow = ethcore.ErrGasUintOverflow
 
 	// ErrIntrinsicGas is returned if the transaction is specified to use less gas
 	// than required to start the invocation.

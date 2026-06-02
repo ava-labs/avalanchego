@@ -820,7 +820,7 @@ func (c *complexityVisitor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVali
 	if err != nil {
 		return err
 	}
-	configOwnerComplexity, err := OwnerComplexity(tx.Owner)
+	configOwnerComplexity, err := OwnerComplexity(tx.ValidatorAuthority)
 	if err != nil {
 		return err
 	}

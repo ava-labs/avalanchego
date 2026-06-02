@@ -693,7 +693,7 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 		}
 
 		if addAutoRenewedValidatorTx, ok := stakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
-			attr.autoRenewedValidatorConfigOwner = addAutoRenewedValidatorTx.Owner
+			attr.autoRenewedValidatorConfigOwner = addAutoRenewedValidatorTx.ValidatorAuthority
 		}
 
 	case txs.DelegatorTx:

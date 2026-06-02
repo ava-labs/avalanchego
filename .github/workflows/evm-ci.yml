@@ -7,15 +7,44 @@ on:
   merge_group:
     types: [checks_requested]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
+  evm-shared-required:
+    if: ${{ always() }}
+    needs:
+      - lint_test
+      - unit_test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi
+
   lint_test:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: ./graft/evm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Run all lint checks
         run: ../../scripts/run_task.sh lint-all-ci
@@ -31,9 +60,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-22.04, ubuntu-latest]
+        os: [macos-26, ubuntu-22.04, ubuntu-24.04]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - run: ../../scripts/run_task.sh build-test
       - run: ../../scripts/run_task.sh coverage

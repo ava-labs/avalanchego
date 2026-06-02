@@ -81,7 +81,7 @@ func TestFirewoodSync(t *testing.T) {
 
 			// Code queue should be closed.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
-			require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+			require.ErrorIs(t, err, code.ErrQueueClosed)
 		})
 	}
 }
@@ -135,26 +135,25 @@ func TestFirewoodSyncerFinalizeScenarios(t *testing.T) {
 
 			// After finalize, the queue should reject new code additions.
 			err := codeQueue.AddCode(t.Context(), []common.Hash{{1}})
-			require.ErrorIs(t, err, code.ErrFailedToAddCodeHashesToQueue)
+			require.ErrorIs(t, err, code.ErrQueueClosed)
 		})
 	}
 }
 
 func createSyncers(t *testing.T, clientState, serverState state.Database, root common.Hash) (*FirewoodSyncer, *code.Syncer, *code.Queue) {
 	t.Helper()
-	// Create the mock P2P client that serves range proofs and change proofs from the server DB.
+	// Create the mock P2P proofClient that serves range proofs and change proofs from the server DB.
 	// Use CorethCodec as the default - the firewood syncer uses p2p directly, not the message codec,
 	// so the codec choice only affects the code request handler which is auxiliary to these tests.
 	var (
 		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
 		serverDB           = dbFromState(t, serverState)
 		mockClient         = client.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
-		rpClient           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetRangeProofHandler(serverDB))
-		cpClient           = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetChangeProofHandler(serverDB))
+		proofClient        = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetProofHandler(serverDB))
 	)
 
 	// Create the producer code queue.
-	codeQueue, err := code.NewQueue(clientState.DiskDB().(ethdb.Database), make(chan struct{}))
+	codeQueue, err := code.NewQueue(clientState.DiskDB().(ethdb.Database))
 	require.NoError(t, err, "NewCodeQueue()")
 
 	// Create the consumer code syncer.
@@ -167,8 +166,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 		dbFromState(t, clientState),
 		root,
 		codeQueue,
-		rpClient,
-		cpClient,
+		proofClient,
 	)
 	require.NoError(t, err, "NewFirewoodSyncer()")
 	return firewoodSyncer, codeSyncer, codeQueue
@@ -188,14 +186,12 @@ func createDB(t *testing.T) state.Database {
 	triedbConfig := &triedb.Config{
 		DBOverride: config.BackendConstructor,
 	}
-	// Create the state database using libevm's state package, then wrap it with
-	// firewood.NewStateAccessor to avoid an import cycle between firewood and state packages.
-	internalState := state.NewDatabaseWithConfig(diskdb, triedbConfig)
-	tdb := internalState.TrieDB().Backend().(*firewood.TrieDB)
+
+	cache := state.NewDatabaseWithConfig(diskdb, triedbConfig)
 	t.Cleanup(func() {
-		require.NoError(t, tdb.Close())
+		require.NoError(t, cache.TrieDB().Close())
 	})
-	return firewood.NewStateAccessor(internalState, tdb)
+	return cache
 }
 
 func assertFirewoodConsistency(t *testing.T, root common.Hash, clientState state.Database, accounts map[*utilstest.Key]*types.StateAccount) {
