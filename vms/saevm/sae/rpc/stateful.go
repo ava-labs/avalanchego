@@ -309,6 +309,15 @@ func stateAtTransactionPreSAE(
 	eip158 := cfg.IsEIP158(blockNumber)
 	txs := ethB.Transactions()
 
+	// EIP-4788: the parent beacon block root is stored via a system call at the
+	// start of the block, before any transactions. It MUST be replayed here to
+	// reproduce the pre-transaction state, mirroring the equivalent call in
+	// [saexec.Execute] used for post-Helicon blocks.
+	if beaconRoot := ethB.BeaconRoot(); beaconRoot != nil {
+		vmenv := vm.NewEVM(blockCtx, vm.TxContext{}, statedb, cfg, vm.Config{})
+		core.ProcessBeaconBlockRoot(*beaconRoot, vmenv, statedb)
+	}
+
 	// Replay transactions 0..txIndex-1 to produce the state just before the
 	// target transaction.
 	for idx, tx := range txs[:txIndex] {
