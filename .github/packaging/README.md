@@ -1,5 +1,8 @@
 # RPM packaging
 
+> Linux binary tarballs (`.tar.gz` + detached `.tar.gz.sig`) are documented
+> separately in [`linux-tar.md`](./linux-tar.md).
+
 ## Overview
 
 This directory contains the RPM packaging implementation for AvalancheGo and
@@ -326,6 +329,10 @@ The current design should be reconsidered if any of these change:
 - Build script: `/.github/packaging/scripts/build-rpm.sh`
 - Validation script: `/.github/packaging/scripts/validate-rpm.sh`
 - Root task include: `/Taskfile.yml`
+
+### Sibling packaging documentation
+
+- Linux tarballs: [`./linux-tar.md`](./linux-tar.md)
 
 ### Maintainer background for revisiting linking choices
 
