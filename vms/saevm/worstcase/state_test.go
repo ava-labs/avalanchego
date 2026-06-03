@@ -286,7 +286,7 @@ func TestMultipleBlocks(t *testing.T) {
 				{eoaViaTx: startingBalance},
 				{eoaViaTx: startingBalance - raisedBaseFee*100_000},
 				{eoaViaTx: startingBalance - raisedBaseFee*100_000 - (raisedBaseFee*200_000 + 123_456)},
-				{eoaViaTx: startingBalance - raisedBaseFee*100_000 - (raisedBaseFee*200_000 + 123_456) - (raisedBaseFee+3)*100_000},                       // non-dynamic fee, charged in full
+				{eoaViaTx: startingBalance - raisedBaseFee*100_000 - (raisedBaseFee*200_000 + 123_456) - (raisedBaseFee+3)*100_000},                             // non-dynamic fee, charged in full
 				{eoaViaTx: startingBalance - raisedBaseFee*100_000 - (raisedBaseFee*200_000 + 123_456) - (raisedBaseFee+3)*100_000 - (raisedBaseFee+1)*100_000}, // dynamic fee: effective gas price = baseFee + gasTipCap
 			},
 		},
