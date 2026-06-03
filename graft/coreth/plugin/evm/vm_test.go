@@ -1260,7 +1260,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// use the block's timestamp instead of 0 since rewind to genesis
 	// is hardcoded to be allowed in core/genesis.go.
 	newCTX := snowtest.Context(t, vm.ctx.ChainID)
-	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, paramstest.LatestSupportedFork, upgrade.UnscheduledActivationTime)
+	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork+1, blk.Timestamp())
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork, upgrade.InitiallyActiveTime)
 	genesis := []byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork]))
@@ -2153,7 +2153,8 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 			ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
 			headerExtra := customtypes.GetHeaderExtra(ethBlock.Header())
 
-			require.Equal(test.expectedMinDelayExcess, headerExtra.DelayExponent, "expected %s, got %s", test.expectedMinDelayExcess, headerExtra.DelayExponent)
+			gotMinDelayExcess := (*acp226.DelayExcess)(headerExtra.DelayExponent)
+			require.Equal(test.expectedMinDelayExcess, gotMinDelayExcess, "expected %s, got %s", test.expectedMinDelayExcess, gotMinDelayExcess)
 		})
 	}
 }
