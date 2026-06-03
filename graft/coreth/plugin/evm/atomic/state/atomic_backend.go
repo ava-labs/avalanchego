@@ -403,12 +403,11 @@ func (a *AtomicBackend) AtomicTrie() *AtomicTrie {
 	return a.atomicTrie
 }
 
-// CommitLastAcceptedRoot commits the atomic trie's current last accepted root
-// at lastAcceptedHeight and flushes it to disk, even if lastAcceptedHeight is
-// not a commit-interval boundary. It is a no-op if the trie is already committed
-// at or beyond lastAcceptedHeight.
+// CommitLastAccepted commits the atomic trie's current last accepted root at
+// height and flushes it to disk, even if height is not a commit-interval
+// boundary. It is a no-op if the trie is already committed at or beyond height.
 //
-// lastAcceptedHeight MUST correspond to the current last accepted root.
+// height MUST correspond to the current last accepted root.
 func (a *AtomicBackend) CommitLastAccepted(height uint64) error {
 	if _, committedHeight := a.atomicTrie.LastCommitted(); committedHeight >= height {
 		return nil
