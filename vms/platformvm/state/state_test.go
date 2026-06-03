@@ -3435,11 +3435,10 @@ func testGetStakingInfo(t *testing.T, newCSF func(t *testing.T) CurrentStakers) 
 			wantErr:  database.ErrNotFound,
 		},
 		{
-			name:     "default_to_not_found",
+			name:     "default_to_zero",
 			puts:     []*Staker{validator},
-			subnetID: ids.ID{1},
-			nodeID:   ids.NodeID{2},
-			wantErr:  database.ErrNotFound,
+			subnetID: validator.SubnetID,
+			nodeID:   validator.NodeID,
 		},
 		{
 			name: "staking_info_set_for_committed_validator",
@@ -3468,7 +3467,20 @@ func testGetStakingInfo(t *testing.T, newCSF func(t *testing.T) CurrentStakers) 
 			nodeID:   defaultValidator.NodeID,
 			wantErr:  database.ErrNotFound,
 		},
-		// TODO base does not allow updating staking info associated with a validator before it has been written
+		{
+			name: "validator_added_in_current_diff_and_staking_info_set",
+			puts: []*Staker{validator},
+			setStakingInfos: []setStakingInfoArgs{
+				{
+					SubnetID:    validator.SubnetID,
+					NodeID:      validator.NodeID,
+					StakingInfo: StakingInfo{DelegateeReward: 123},
+				},
+			},
+			subnetID: validator.SubnetID,
+			nodeID:   validator.NodeID,
+			want:     StakingInfo{DelegateeReward: 123},
+		},
 	}
 
 	for _, tt := range tests {
@@ -3779,7 +3791,7 @@ func testGetCurrentStakerIterator(t *testing.T, csF func(t *testing.T) CurrentSt
 }
 
 // Tests deleting a delegator and its corresponding validator.
-func TestStateDiffIntegration_DeleteValdiatorAndItsDelegator(t *testing.T) {
+func TestStateAndDiffIntegration_DeleteValidatorAndItsDelegator(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
 	diff, err := NewDiffOn(state, true)
@@ -3791,8 +3803,7 @@ func TestStateDiffIntegration_DeleteValdiatorAndItsDelegator(t *testing.T) {
 	delegator := newTestStaker(validator.SubnetID, validator.NodeID)
 	require.NoError(t, diff.PutCurrentDelegator(delegator))
 	require.NoError(t, diff.Apply(state))
-	_, err = state.CommitBatch()
-	require.NoError(t, err)
+	require.NoError(t, state.Commit())
 
 	diff, err = NewDiffOn(state, true)
 	require.NoError(t, err)
@@ -3801,13 +3812,307 @@ func TestStateDiffIntegration_DeleteValdiatorAndItsDelegator(t *testing.T) {
 	require.NoError(t, diff.DeleteCurrentDelegator(delegator))
 	require.NoError(t, diff.DeleteCurrentValidator(validator))
 	require.NoError(t, diff.Apply(state))
-	_, err = state.CommitBatch()
-	require.NoError(t, err)
+	require.NoError(t, state.Commit())
 
 	// The validator should be deleted, and it should have no delegators in its iterator.
 	_, err = state.GetCurrentValidator(validator.SubnetID, validator.NodeID)
-	require.ErrorIs(t, err, database.ErrNotFound)
+	require.Equal(t, database.ErrNotFound, err) // Do not use ErrorsIs to check legacy GetCurrentValidator behavior
 	itr, err := state.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
 	require.NoError(t, err)
 	require.Empty(t, iterator.ToSlice(itr))
+}
+
+func TestStateAndDiffIntegration_StakingInfo(t *testing.T) {
+	type op func(t *testing.T, d *Diff)
+
+	put := func(s *Staker) op {
+		return func(t *testing.T, d *Diff) {
+			require.NoError(t, d.PutCurrentValidator(s))
+		}
+	}
+
+	setStakingInfo := func(s *Staker, info StakingInfo) op {
+		return func(t *testing.T, d *Diff) {
+			require.NoError(t, d.SetStakingInfo(s.SubnetID, s.NodeID, info))
+		}
+	}
+
+	del := func(s *Staker) op {
+		return func(t *testing.T, d *Diff) {
+			require.NoError(t, d.DeleteCurrentValidator(s))
+		}
+	}
+
+	type want struct {
+		staker *Staker
+		info   StakingInfo
+		err    error
+	}
+
+	type diff struct {
+		ops   []op
+		wants []want // checked against this diff before Apply
+	}
+
+	validator1 := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
+	validator1Replacement := *validator1
+	validator1Replacement.TxID = ids.GenerateTestID()
+	validator2 := newTestStaker(ids.GenerateTestID(), ids.GenerateTestNodeID())
+	stakingInfo := StakingInfo{DelegateeReward: 123}
+
+	tests := []struct {
+		name  string
+		diffs []diff
+	}{
+		{
+			name: "add_defaults_to_zero",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+			},
+		},
+		{
+			name: "add_then_set",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops:   []op{setStakingInfo(validator1, stakingInfo)},
+					wants: []want{{staker: validator1, info: stakingInfo}},
+				},
+			},
+		},
+		{
+			name: "add_with_set",
+			diffs: []diff{
+				{
+					ops: []op{
+						put(validator1),
+						setStakingInfo(validator1, stakingInfo),
+					},
+					wants: []want{{staker: validator1, info: stakingInfo}},
+				},
+			},
+		},
+		{
+			name: "set_then_delete",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops:   []op{setStakingInfo(validator1, stakingInfo)},
+					wants: []want{{staker: validator1, info: stakingInfo}},
+				},
+				{
+					ops:   []op{del(validator1)},
+					wants: []want{{staker: validator1, err: database.ErrNotFound}},
+				},
+			},
+		},
+		{
+			name: "set_and_delete",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops: []op{
+						setStakingInfo(validator1, stakingInfo),
+						del(validator1),
+					},
+					wants: []want{{staker: validator1, err: database.ErrNotFound}},
+				},
+			},
+		},
+		{
+			name: "delete_and_add_different",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops: []op{
+						del(validator1),
+						put(validator2),
+						setStakingInfo(validator2, stakingInfo),
+					},
+					wants: []want{
+						{staker: validator1, err: database.ErrNotFound},
+						{staker: validator2, info: stakingInfo},
+					},
+				},
+			},
+		},
+		{
+			// A replacement (delete + put with a different TxID) drops any
+			// prior SetStakingInfo from the same diff and defaults back to zero.
+			name: "replace_resets_staking_info_to_zero",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops: []op{
+						setStakingInfo(validator1, stakingInfo),
+						del(validator1),
+						put(&validator1Replacement),
+					},
+					wants: []want{{staker: &validator1Replacement}},
+				},
+			},
+		},
+		{
+			// A no-op replacement (delete + put with the exact same staker)
+			// cancels out in the diff and leaves the prior validator untouched.
+			name: "replace_with_same_validator",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops:   []op{del(validator1), put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+			},
+		},
+		{
+			name: "replace_with_same_validator_and_set",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops: []op{
+						del(validator1),
+						put(validator1),
+						setStakingInfo(validator1, stakingInfo),
+					},
+					wants: []want{{staker: validator1, info: stakingInfo}},
+				},
+			},
+		},
+		{
+			name: "replace_with_same_validator_after_set_in_same_diff",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops: []op{
+						setStakingInfo(validator1, stakingInfo),
+						del(validator1),
+						put(validator1),
+					},
+					wants: []want{{staker: validator1}},
+				},
+			},
+		},
+		{
+			name: "replace_with_same_validator_after_set_in_prior_diff",
+			diffs: []diff{
+				{
+					ops: []op{
+						put(validator1),
+						setStakingInfo(validator1, stakingInfo),
+					},
+					wants: []want{{staker: validator1, info: stakingInfo}},
+				},
+				{
+					ops: []op{
+						del(validator1),
+						put(validator1),
+					},
+					wants: []want{{staker: validator1}},
+				},
+			},
+		},
+		{
+			name: "replace_with_updated_validator",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops:   []op{del(validator1), put(&validator1Replacement)},
+					wants: []want{{staker: &validator1Replacement}},
+				},
+			},
+		},
+		{
+			name: "replace_with_updated_validator_and_set",
+			diffs: []diff{
+				{
+					ops:   []op{put(validator1)},
+					wants: []want{{staker: validator1}},
+				},
+				{
+					ops: []op{
+						del(validator1),
+						put(&validator1Replacement),
+						setStakingInfo(&validator1Replacement, stakingInfo),
+					},
+					wants: []want{{staker: &validator1Replacement, info: stakingInfo}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := newTestState(t, memdb.New())
+
+			for i, d := range tt.diffs {
+				diff, err := NewDiffOn(state, true)
+				require.NoError(t, err)
+
+				for _, o := range d.ops {
+					o(t, diff)
+				}
+
+				for _, w := range d.wants {
+					gotValidator, err := diff.GetCurrentValidator(w.staker.SubnetID, w.staker.NodeID)
+					require.ErrorIsf(t, err, w.err, "diff %d", i)
+					if w.err != nil {
+						require.Nilf(t, gotValidator, "diff %d", i)
+					} else {
+						require.Equalf(t, w.staker, gotValidator, "diff %d", i)
+					}
+
+					gotStakingInfo, err := diff.GetStakingInfo(w.staker.SubnetID, w.staker.NodeID)
+					require.ErrorIsf(t, err, w.err, "diff %d", i)
+					require.Equalf(t, w.info, gotStakingInfo, "diff %d", i)
+				}
+
+				require.NoErrorf(t, diff.Apply(state), "diff %d", i)
+				require.NoErrorf(t, state.Commit(), "diff %d", i)
+			}
+
+			for _, w := range tt.diffs[len(tt.diffs)-1].wants {
+				gotValidator, err := state.GetCurrentValidator(w.staker.SubnetID, w.staker.NodeID)
+				require.ErrorIs(t, err, w.err)
+				if w.err != nil {
+					require.Nil(t, gotValidator)
+				} else {
+					require.Equal(t, w.staker, gotValidator)
+				}
+
+				gotStakingInfo, err := state.GetStakingInfo(w.staker.SubnetID, w.staker.NodeID)
+				require.ErrorIs(t, err, w.err)
+				require.Equal(t, w.info, gotStakingInfo)
+			}
+		})
+	}
 }

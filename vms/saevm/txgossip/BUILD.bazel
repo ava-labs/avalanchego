@@ -40,6 +40,7 @@ go_test(
         "//network/p2p/gossip",
         "//network/p2p/p2ptest",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//vms/saevm/blocks",
         "//vms/saevm/blocks/blockstest",
         "//vms/saevm/cmputils",

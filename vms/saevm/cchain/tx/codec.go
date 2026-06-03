@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -72,4 +73,18 @@ func ParseSlice(b []byte) ([]*Tx, error) {
 		return nil, errInefficientSlicePacking
 	}
 	return txs, nil
+}
+
+// MarshalUTXO serializes an [avax.UTXO] to its canonical binary format.
+func MarshalUTXO(utxo *avax.UTXO) ([]byte, error) {
+	return c.Marshal(codecVersion, utxo)
+}
+
+// ParseUTXO deserializes an [avax.UTXO] from its canonical binary format.
+func ParseUTXO(b []byte) (*avax.UTXO, error) {
+	utxo := new(avax.UTXO)
+	if _, err := c.Unmarshal(b, utxo); err != nil {
+		return nil, err
+	}
+	return utxo, nil
 }
