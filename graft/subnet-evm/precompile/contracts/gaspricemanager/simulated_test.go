@@ -127,9 +127,14 @@ func (s *SUT) deployTestContract(t *testing.T) (common.Address, *bindings.GasPri
 	return addr, contract
 }
 
-// setGasPriceConfig routes the call through the deployed wrapper contract
-// rather than the IGasPriceManager binding directly exercising the ABI
-// round-trip these tests exist to verify.
+// setGasPriceConfig calls [bindings.GasPriceManagerTest.SetGasPriceConfig]
+// with the updated config provided. This call is blocking until the transaction's
+// receipts are available. The block number in which this transaction was included
+// is returned.
+//
+// Callers MUST use this function instead of the [bindings.IGasPriceManager]
+// binding directly: routing the call through the deployed wrapper contract is
+// what verifies the Go -> wrapper -> ABI re-encoding -> precompile round-trip.
 func (s *SUT) setGasPriceConfig(t *testing.T, contract *bindings.GasPriceManagerTest, config commontype.GasPriceConfig) uint64 {
 	t.Helper()
 	tx, err := contract.SetGasPriceConfig(s.admin, toBindingsGasPriceConfig(config))
