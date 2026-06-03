@@ -46,9 +46,13 @@ vars:
   PACKAGING_RPM_OUTPUT_DIR: '{{.REPO_ROOT}}/build/rpm'
   PACKAGING_DEB_OUTPUT_DIR: '{{.REPO_ROOT}}/build/deb'
   # rcodesign version, sourced from the macOS release workflow so the local
-  # validator and the CI runner pin the same Apple-signing tool.
+  # validator and the CI runner pin the same Apple-signing tool. Resolved via
+  # `git rev-parse --show-toplevel` because go-task evaluates included-Taskfile
+  # vars at startup with `{{.TASKFILE_DIR}}` pointing at the root Taskfile dir,
+  # making `{{.REPO_ROOT}}` (computed from TASKFILE_DIR/../..) two levels off
+  # in CI.
   PACKAGING_APPLE_CODESIGN_VERSION:
-    sh: awk -F'"' '/APPLE_CODESIGN_PKG_VERSION:/ {print $2; exit}' "{{.REPO_ROOT}}/.github/workflows/build-macos-release.yml"
+    sh: awk -F'"' '/APPLE_CODESIGN_PKG_VERSION:/ {print $2; exit}' "$(git rev-parse --show-toplevel)/.github/workflows/build-macos-release.yml"
   PACKAGING_MACOS_DOCKER_IMAGE: avalanchego-macos-zip-builder
   PACKAGING_MACOS_OUTPUT_DIR: '{{.REPO_ROOT}}/build/macos'
 
