@@ -228,6 +228,7 @@ var (
 	errUnsupportedOwner  = errors.New("unsupported owner type")
 	errUnsupportedAuth   = errors.New("unsupported auth type")
 	errUnsupportedSigner = errors.New("unsupported signer type")
+	errUnimplemented     = errors.New("unimplemented")
 )
 
 func TxComplexity(txs ...txs.UnsignedTx) (gas.Dimensions, error) {
@@ -793,6 +794,18 @@ func (c *complexityVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) e
 		&authComplexity,
 	)
 	return err
+}
+
+func (*complexityVisitor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	return errUnimplemented
+}
+
+func (*complexityVisitor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+	return errUnimplemented
+}
+
+func (*complexityVisitor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	return ErrUnsupportedTx
 }
 
 func baseTxComplexity(tx *txs.BaseTx) (gas.Dimensions, error) {

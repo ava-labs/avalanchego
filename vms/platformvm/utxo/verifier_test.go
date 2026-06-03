@@ -33,6 +33,74 @@ func (*dummyUnsignedTx) Visit(txs.Visitor) error {
 	return nil
 }
 
+func TestGetInputOutputs(t *testing.T) {
+	// TODO: add other TX types
+
+	baseIn := &avax.TransferableInput{
+		Asset: avax.Asset{ID: ids.GenerateTestID()},
+	}
+	baseOut := &avax.TransferableOutput{
+		Asset: avax.Asset{ID: ids.GenerateTestID()},
+	}
+	stakeOut := &avax.TransferableOutput{
+		Asset: avax.Asset{ID: ids.GenerateTestID()},
+	}
+
+	tests := []struct {
+		name             string
+		tx               txs.UnsignedTx
+		wantInputs       []*avax.TransferableInput
+		wantOutputs      []*avax.TransferableOutput
+		wantProducedAVAX uint64
+		wantErr          error
+	}{
+		{
+			name: "add auto-renewed validator",
+			tx: &txs.AddAutoRenewedValidatorTx{
+				BaseTx: txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						Ins:  []*avax.TransferableInput{baseIn},
+						Outs: []*avax.TransferableOutput{baseOut},
+					},
+				},
+				StakeOuts: []*avax.TransferableOutput{stakeOut},
+			},
+			wantInputs:  []*avax.TransferableInput{baseIn},
+			wantOutputs: []*avax.TransferableOutput{baseOut, stakeOut},
+		},
+		{
+			name: "set auto-renewed validator config",
+			tx: &txs.SetAutoRenewedValidatorConfigTx{
+				BaseTx: txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						Ins:  []*avax.TransferableInput{baseIn},
+						Outs: []*avax.TransferableOutput{baseOut},
+					},
+				},
+			},
+			wantInputs:  []*avax.TransferableInput{baseIn},
+			wantOutputs: []*avax.TransferableOutput{baseOut},
+		},
+		{
+			name:    "reward auto-renewed validator",
+			tx:      &txs.RewardAutoRenewedValidatorTx{},
+			wantErr: ErrUnsupportedTxType,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			gotInputs, gotOutputs, gotProducedAVAX, gotErr := GetInputOutputs(test.tx)
+			require.ErrorIs(gotErr, test.wantErr)
+			require.Equal(test.wantInputs, gotInputs)
+			require.Equal(test.wantOutputs, gotOutputs)
+			require.Equal(test.wantProducedAVAX, gotProducedAVAX)
+		})
+	}
+}
+
 func TestVerifySpendUTXOs(t *testing.T) {
 	fx := &secp256k1fx.Fx{}
 
