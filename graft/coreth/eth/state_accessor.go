@@ -53,6 +53,13 @@ import (
 // for releasing state.
 var noopReleaser = tracers.StateReleaseFunc(func() {})
 
+const (
+	firewoodStateInvariantErr      = "firewood_state_reconstruction_invariant_failed"
+	firewoodStateReconstructionErr = "firewood_state_reconstruction_failed"
+	firewoodStateReexecutionErr    = "firewood_state_reexecution_failed"
+	firewoodStateRootMismatchErr   = "firewood_state_reexecution_root_mismatch"
+)
+
 func (eth *Ethereum) hashState(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (statedb *state.StateDB, release tracers.StateReleaseFunc, err error) {
 	reexec = 0 // Do not support re-executing historical blocks to grab state
 	var (
@@ -212,15 +219,18 @@ func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), erro
 // The walk-back is bounded by `reexec`. If no persisted revision or genesis is
 // found within `reexec` blocks of the requested block, this returns an error.
 func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, reexec uint64) (_ *state.StateDB, _ tracers.StateReleaseFunc, finalErr error) {
+	targetNumber := header.Number.Uint64()
+	targetRoot := header.Root
+
 	// Fast path: state is available directly.
-	if statedb, err := eth.blockchain.StateAt(header.Root); err == nil {
+	if statedb, err := eth.blockchain.StateAt(targetRoot); err == nil {
 		return statedb, noopReleaser, nil
 	}
 
 	// Get the Firewood TrieDB.
 	fwDB, ok := eth.blockchain.TrieDB().Backend().(*firewood.TrieDB)
 	if !ok {
-		return nil, nil, errors.New("expected Firewood backend for historical state reconstruction")
+		return nil, nil, fmt.Errorf("%s: expected Firewood backend, got %T", firewoodStateReconstructionErr, eth.blockchain.TrieDB().Backend())
 	}
 
 	var (
@@ -239,9 +249,16 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 			reachedGenesis = true
 			break
 		}
-		parent := eth.blockchain.GetHeader(current.ParentHash, current.Number.Uint64()-1)
+		currentNumber := current.Number.Uint64()
+		parent := eth.blockchain.GetHeader(current.ParentHash, currentNumber-1)
 		if parent == nil {
-			return nil, nil, fmt.Errorf("missing block %v %d", current.ParentHash, current.Number.Uint64()-1)
+			return nil, nil, fmt.Errorf(
+				"%s: missing parent header while walking back to persisted state (target_block=%d current_block=%d parent_hash=%s)",
+				firewoodStateInvariantErr,
+				targetNumber,
+				currentNumber,
+				current.ParentHash,
+			)
 		}
 		current = parent
 	}
@@ -257,14 +274,24 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	if reachedGenesis {
 		genesisDB, err := eth.inMemoryGenesisDB()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf(
+				"%s: failed to create in-memory genesis database (target_block=%d): %w",
+				firewoodStateReconstructionErr,
+				targetNumber,
+				err,
+			)
 		}
 
 		// If the target block is genesis, return the state directly.
-		if header.Number.Uint64() == 0 {
-			cache, err = state.New(header.Root, genesisDB, nil)
+		if targetNumber == 0 {
+			cache, err = state.New(targetRoot, genesisDB, nil)
 			if err != nil {
-				return nil, nil, fmt.Errorf("creating genesis state: %w", err)
+				return nil, nil, fmt.Errorf(
+					"%s: failed to open genesis state (target_block=%d): %w",
+					firewoodStateReconstructionErr,
+					targetNumber,
+					err,
+				)
 			}
 			return cache, noopReleaser, nil
 		}
@@ -273,25 +300,49 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		// and header as the starting point for re-execution.
 		genesisBlock := eth.blockchain.GetBlockByNumber(0)
 		if genesisBlock == nil {
-			return nil, nil, errors.New("genesis block not found")
+			return nil, nil, fmt.Errorf(
+				"%s: genesis block not found while preparing replay (target_block=%d)",
+				firewoodStateInvariantErr,
+				targetNumber,
+			)
 		}
 
 		cache, err = state.New(genesisBlock.Root(), genesisDB, nil)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf(
+				"%s: failed to open in-memory genesis state (genesis_root=%s target_block=%d): %w",
+				firewoodStateReconstructionErr,
+				genesisBlock.Root(),
+				targetNumber,
+				err,
+			)
 		}
 		current = genesisBlock.Header()
 		release = noopReleaser
 	} else {
 		if !eth.blockchain.HasState(current.Root) {
-			return nil, nil, fmt.Errorf("no persisted state found within %d blocks", reexec)
+			return nil, nil, fmt.Errorf(
+				"%s: no persisted state found within reexec limit (target_block=%d reexec=%d last_checked_block=%d last_checked_root=%s)",
+				firewoodStateInvariantErr,
+				targetNumber,
+				reexec,
+				current.Number.Uint64(),
+				current.Root,
+			)
 		}
 
 		// Get the base revision.
 		baseRoot := current.Root
 		rev, err := fwDB.Firewood.Revision(ffi.Hash(baseRoot))
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to open base revision at %s: %w", baseRoot.Hex(), err)
+			return nil, nil, fmt.Errorf(
+				"%s: failed to open persisted base revision (base_block=%d base_root=%s target_block=%d): %w",
+				firewoodStateReconstructionErr,
+				current.Number.Uint64(),
+				baseRoot,
+				targetNumber,
+				err,
+			)
 		}
 
 		// Create initial Reconstructed from the base revision.
@@ -300,7 +351,14 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 			log.Warn("Failed to drop revision", "root", baseRoot.Hex(), "err", err)
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("initial reconstruction: %w", err)
+			return nil, nil, fmt.Errorf(
+				"%s: failed to create reconstructed Firewood view from base revision (base_block=%d base_root=%s target_block=%d): %w",
+				firewoodStateReconstructionErr,
+				current.Number.Uint64(),
+				baseRoot,
+				targetNumber,
+				err,
+			)
 		}
 
 		// Create a single accessor for the entire re-execution; the underlying
@@ -313,12 +371,26 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 			false, /* computeRootOnHash */
 		)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf(
+				"%s: failed to create replay accessor from reconstructed Firewood view (base_block=%d base_root=%s target_block=%d): %w",
+				firewoodStateReconstructionErr,
+				current.Number.Uint64(),
+				baseRoot,
+				targetNumber,
+				err,
+			)
 		}
 
 		cache, err = state.New(current.Root, accessor, nil)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf(
+				"%s: failed to open replay state at base revision (base_block=%d base_root=%s target_block=%d): %w",
+				firewoodStateReconstructionErr,
+				current.Number.Uint64(),
+				baseRoot,
+				targetNumber,
+				err,
+			)
 		}
 		release = func() { recon.Drop() }
 	}
@@ -330,9 +402,10 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	}()
 
 	replayRoot := current.Root
+	baseNumber := current.Number.Uint64()
 
 	// Re-execute blocks forward from current+1 to the target block.
-	for current.Number.Uint64() < header.Number.Uint64() {
+	for current.Number.Uint64() < targetNumber {
 		if err := ctx.Err(); err != nil {
 			return nil, nil, err
 		}
@@ -340,12 +413,27 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		next := current.Number.Uint64() + 1
 		nextBlock := eth.blockchain.GetBlockByNumber(next)
 		if nextBlock == nil {
-			return nil, nil, fmt.Errorf("block %d not found", next)
+			return nil, nil, fmt.Errorf(
+				"%s: missing block during replay (base_block=%d target_block=%d target_root=%s missing_block=%d)",
+				firewoodStateInvariantErr,
+				baseNumber,
+				targetNumber,
+				targetRoot,
+				next,
+			)
 		}
 
 		_, _, _, err := eth.blockchain.Processor().Process(nextBlock, current, cache, vm.Config{})
 		if err != nil {
-			return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
+			return nil, nil, fmt.Errorf(
+				"%s: block processing failed (base_block=%d target_block=%d target_root=%s replay_block=%d): %w",
+				firewoodStateReexecutionErr,
+				baseNumber,
+				targetNumber,
+				targetRoot,
+				next,
+				err,
+			)
 		}
 
 		replayRoot = cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
@@ -358,12 +446,15 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		replayRoot = common.Hash(recon.Root())
 	}
 
-	if replayRoot != header.Root {
+	if replayRoot != targetRoot {
 		return nil, nil, fmt.Errorf(
-			"state root mismatch at block %d: got %s, want %s",
-			header.Number.Uint64(),
-			replayRoot.Hex(),
-			header.Root.Hex(),
+			"%s: base_block=%d target_block=%d expected_root=%s actual_root=%s replayed_blocks=%d",
+			firewoodStateRootMismatchErr,
+			baseNumber,
+			targetNumber,
+			targetRoot,
+			replayRoot,
+			targetNumber-baseNumber,
 		)
 	}
 
@@ -376,12 +467,24 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 			true, /* computeRootOnHash */
 		)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf(
+				"%s: failed to create return accessor from reconstructed Firewood view (base_block=%d target_block=%d): %w",
+				firewoodStateReconstructionErr,
+				baseNumber,
+				targetNumber,
+				err,
+			)
 		}
 
-		cache, err = state.New(header.Root, returnAccessor, nil)
+		cache, err = state.New(targetRoot, returnAccessor, nil)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf(
+				"%s: failed to reopen target state from reconstructed Firewood view (base_block=%d target_block=%d): %w",
+				firewoodStateReconstructionErr,
+				baseNumber,
+				targetNumber,
+				err,
+			)
 		}
 	}
 
