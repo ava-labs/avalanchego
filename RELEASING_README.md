@@ -383,7 +383,7 @@ the scripts under `.github/packaging/scripts/`. The workflow imports
 `secrets.RPM_GPG_PASSPHRASE` to the tarball build. Validation and upload
 require the exact tarballs, their `.sig` files, and `GPG-KEY-avalanchego`;
 upload verifies signatures before copying artifacts to S3. See
-[`docs/design/linux-binary-signing.md`](docs/design/linux-binary-signing.md).
+[`.github/packaging/linux-tar.md`](.github/packaging/linux-tar.md).
 
 **Docker Images:**
 
