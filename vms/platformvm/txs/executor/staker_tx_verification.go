@@ -1014,7 +1014,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return nil, ErrStakeTooLong
 	}
 
-	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.Owner, tx.Auth)
+	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth)
 	if err != nil {
 		return nil, err
 	}
