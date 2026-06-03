@@ -22,6 +22,11 @@ they relate:
   recently added (commit "sae: Implement minimal C-Chain VM") and reuses Coreth/libevm
   primitives plus shared helpers in `vms/evm/`. Its internal name is `strevm`
   (`vms/saevm/README.md:1`).
+  > **Deep dive:** the SAE-EVM has its own dedicated, exhaustive spec —
+  > **[saevm.md](saevm.md)** — covering the Accept→Execute→Settle model, the async
+  > executor, the gas-time fee engine, the hook extension interface, the C-Chain
+  > specialization, and the JSON-RPC surface. The sections below summarize SAE only
+  > enough to contrast it with Coreth; consult [saevm.md](saevm.md) for the details.
 
 Both run as a `block.ChainVM` under the **Snowman** linear consensus engine
 ([consensus.md](consensus.md)), and both bridge UTXOs to/from the X/P chains via
@@ -415,6 +420,8 @@ threads a `MinDelayExcess` field through the block header
 
 ## 9. Cross-References
 
+- **[saevm.md](saevm.md) — the exhaustive SAE-EVM (`strevm`) deep dive** (async
+  execution model, executor, gas-time fees, hooks, C-Chain layer, JSON-RPC).
 - [overview.md](overview.md) — system-wide map of the Primary Network and its chains.
 - [consensus.md](consensus.md) — Snowman linear consensus driving the C-Chain VM.
 - [simplex.md](simplex.md) — alternative consensus protocol.
