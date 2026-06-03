@@ -22,9 +22,12 @@ func NewDatabaseWithNodeDB(db ethdb.Database, triedb *triedb.Database) state.Dat
 }
 
 func wrapIfFirewood(db state.Database) state.Database {
-	fw, ok := db.TrieDB().Backend().(*firewood.TrieDB)
-	if !ok {
+	switch fw := db.TrieDB().Backend().(type) {
+	case *firewood.TrieDB:
+		return firewood.NewStateAccessor(db, fw)
+	case *firewood.ReconstructedTrieDB:
+		return firewood.NewReconstructedStateAccessor(db, fw)
+	default:
 		return db
 	}
-	return firewood.NewStateAccessor(db, fw)
 }
