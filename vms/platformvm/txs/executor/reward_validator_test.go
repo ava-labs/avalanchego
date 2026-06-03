@@ -1022,8 +1022,8 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 				&env.backend,
 				feeCalculator,
 				tt.updateStateAndGetTx(t, env.state),
-				must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
-				must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
+				must[*state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
+				must[*state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
 			)
 
 			require.ErrorIs(t, err, tt.wantErr)
@@ -1111,7 +1111,7 @@ func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 	require.Equal(t, abortSupply, currentSupply-staker.PotentialReward)
 
 	for _, stateTest := range []struct {
-		diff                  state.Diff
+		diff                  *state.Diff
 		wantValidationRewards uint64
 	}{
 		{diff: onAbortState, wantValidationRewards: 1_000_000},
