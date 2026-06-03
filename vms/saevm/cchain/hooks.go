@@ -77,7 +77,7 @@ func newHooks(
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], error) {
-	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	rawTxs, err := parseBlockTxs(b)
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -133,7 +133,7 @@ func (*hooks) BlockTime(h *types.Header) time.Time {
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, err := parseBlockTxs(b)
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -158,7 +158,7 @@ func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) e
 }
 
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, err := parseBlockTxs(b)
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}
@@ -286,7 +286,23 @@ func (b *builder) PotentialEndOfBlockOps(
 	}
 }
 
-var errMissingBlock = errors.New("missing block")
+var (
+	errMissingBlock        = errors.New("missing block")
+	errExtDataHashMismatch = errors.New("extData hash does not match header")
+)
+
+// parseBlockTxs parses the cross-chain transactions stored in the block's
+// extData, after verifying that the extData matches the [ExtDataHash] committed
+// to in the block header. The build path sets this hash in [builder.BuildBlock]
+// via [customtypes.NewBlockWithExtData], so every parse path must enforce it to
+// guarantee the extData has not been tampered with.
+func parseBlockTxs(b *types.Block) ([]*tx.Tx, error) {
+	extData := customtypes.BlockExtData(b)
+	if want, got := customtypes.GetHeaderExtra(b.Header()).ExtDataHash, customtypes.CalcExtDataHash(extData); want != got {
+		return nil, fmt.Errorf("%w: header %s, extData %s", errExtDataHashMismatch, want, got)
+	}
+	return tx.ParseSlice(extData)
+}
 
 // ancestorInputIDs returns the set of input IDs of all cross-chain transactions
 // in the block range (h, settled), both exclusive.
@@ -299,7 +315,7 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
 		}
 
-		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
+		txs, err := parseBlockTxs(p)
 		if err != nil {
 			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}
@@ -332,8 +348,8 @@ func (*builder) BuildBlock(
 	_ = blockCtx
 	// TODO(StephenButtolph): Encode settled in the block.
 	_ = settled
-	// TODO(StephenButtolph): Verify the extDataHash matches the hash of extData
-	// during parsing.
+	// The extDataHash committed to the header here is verified against the
+	// extData on every parse path via [parseBlockTxs].
 	return customtypes.NewBlockWithExtData(
 		header,
 		ethTxs,
