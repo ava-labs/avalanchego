@@ -38,6 +38,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/holiman/uint256"
+
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -245,90 +247,67 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		current = parent
 	}
 
-	var (
-		cache   *state.StateDB
-		release tracers.StateReleaseFunc
-		recon   *ffi.Reconstructed
-	)
-
-	// Genesis state is not in Firewood; reconstruct it from the genesis
-	// spec using an in-memory hash-based trie.
-	if reachedGenesis {
-		genesisDB, err := eth.inMemoryGenesisDB()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// If the target block is genesis, return the state directly.
-		if header.Number.Uint64() == 0 {
-			cache, err = state.New(header.Root, genesisDB, nil)
-			if err != nil {
-				return nil, nil, fmt.Errorf("creating genesis state: %w", err)
-			}
-			return cache, noopReleaser, nil
-		}
-
-		// The target block is past genesis, so we need the genesis root
-		// and header as the starting point for re-execution.
-		genesisBlock := eth.blockchain.GetBlockByNumber(0)
-		if genesisBlock == nil {
-			return nil, nil, errors.New("genesis block not found")
-		}
-
-		cache, err = state.New(genesisBlock.Root(), genesisDB, nil)
-		if err != nil {
-			return nil, nil, err
-		}
-		current = genesisBlock.Header()
-		release = noopReleaser
-	} else {
-		if !eth.blockchain.HasState(current.Root) {
-			return nil, nil, fmt.Errorf("no persisted state found within %d blocks", reexec)
-		}
-
-		// Get the base revision.
-		baseRoot := current.Root
-		rev, err := fwDB.Firewood.Revision(ffi.Hash(baseRoot))
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to open base revision at %s: %w", baseRoot.Hex(), err)
-		}
-
-		// Create initial Reconstructed from the base revision.
-		recon, err = rev.Reconstruct(nil)
-		if err := rev.Drop(); err != nil {
-			log.Warn("Failed to drop revision", "root", baseRoot.Hex(), "err", err)
-		}
-		if err != nil {
-			return nil, nil, fmt.Errorf("initial reconstruction: %w", err)
-		}
-
-		// Create a single accessor for the entire re-execution; the underlying
-		// Reconstructed is mutated in place so the accessor remains valid.
-		// Root hashing is deferred until after replay, when the target root is
-		// validated once against the requested header.
-		accessor, err := firewood.NewReconstructedStateAccessor(
-			eth.blockchain.StateCache(),
-			recon,
-			false, /* computeRootOnHash */
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		cache, err = state.New(current.Root, accessor, nil)
-		if err != nil {
-			return nil, nil, err
-		}
-		release = func() { recon.Drop() }
+	if !reachedGenesis && !eth.blockchain.HasState(current.Root) {
+		return nil, nil, fmt.Errorf("no persisted state found within %d blocks", reexec)
 	}
 
+	// Open the base reconstructed view. For a persisted block this is the
+	// revision at current.Root. For genesis it is the empty revision (genesis
+	// state is never persisted in Firewood); the genesis allocation is applied
+	// on top of it below to materialize genesis state in the reconstructed view.
+	baseRoot := current.Root
+	if reachedGenesis {
+		baseRoot = types.EmptyRootHash
+	}
+
+	rev, err := fwDB.Firewood.Revision(ffi.Hash(baseRoot))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open base revision at %s: %w", baseRoot.Hex(), err)
+	}
+
+	// Create the initial Reconstructed from the base revision.
+	recon, err := rev.Reconstruct(nil)
+	if dropErr := rev.Drop(); dropErr != nil {
+		log.Warn("Failed to drop revision", "root", baseRoot.Hex(), "err", dropErr)
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("initial reconstruction: %w", err)
+	}
+
+	release := tracers.StateReleaseFunc(func() { recon.Drop() })
 	defer func() {
 		if finalErr != nil {
 			release()
 		}
 	}()
 
-	replayRoot := current.Root
+	// Create a single accessor for the entire re-execution; the underlying
+	// Reconstructed is mutated in place so the accessor remains valid.
+	// Root hashing is deferred until after replay, when the target root is
+	// validated once against the requested header.
+	accessor, err := firewood.NewReconstructedStateAccessor(
+		eth.blockchain.StateCache(),
+		recon,
+		false, /* computeRootOnHash */
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cache, err := state.New(baseRoot, accessor, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Genesis state is not persisted in Firewood, so reconstruct it on top of
+	// the empty revision by replaying the genesis allocation. This mutates the
+	// reconstructed view in place (no persistence), leaving it at the genesis
+	// root so the forward replay below can start from genesis.
+	if reachedGenesis {
+		if err := eth.applyGenesisAlloc(cache, current); err != nil {
+			return nil, nil, err
+		}
+	}
 
 	// Re-execute blocks forward from current+1 to the target block.
 	for current.Number.Uint64() < header.Number.Uint64() {
@@ -347,17 +326,13 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 			return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
 		}
 
-		replayRoot = cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
+		cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
 		current = nextBlock.Header()
 	}
 
-	// If using a reconstructed revision, compute the root hash here as root computation
-	// was deferred during block reexecution.
-	if recon != nil {
-		replayRoot = common.Hash(recon.Root())
-	}
-
-	if replayRoot != header.Root {
+	// Root computation was deferred during replay; compute and validate the
+	// reconstructed root once against the requested header.
+	if replayRoot := common.Hash(recon.Root()); replayRoot != header.Root {
 		return nil, nil, fmt.Errorf(
 			"state root mismatch at block %d: got %s, want %s",
 			header.Number.Uint64(),
@@ -368,34 +343,55 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 
 	// Before returning, reopen a clean StateDB against the same reconstructed view,
 	// now with normal root computation enabled.
-	if recon != nil {
-		returnAccessor, err := firewood.NewReconstructedStateAccessor(
-			eth.blockchain.StateCache(),
-			recon,
-			true, /* computeRootOnHash */
-		)
-		if err != nil {
-			return nil, nil, err
-		}
+	returnAccessor, err := firewood.NewReconstructedStateAccessor(
+		eth.blockchain.StateCache(),
+		recon,
+		true, /* computeRootOnHash */
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 
-		cache, err = state.New(header.Root, returnAccessor, nil)
-		if err != nil {
-			return nil, nil, err
-		}
+	cache, err = state.New(header.Root, returnAccessor, nil)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return cache, release, nil
 }
 
-// inMemoryGenesisDB creates an in-memory hash-based trie database populated
-// with the committed genesis state.
-func (eth *Ethereum) inMemoryGenesisDB() (state.Database, error) {
-	db := rawdb.NewMemoryDatabase()
-	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
-	if _, err := eth.config.Genesis.Commit(db, tdb); err != nil {
-		return nil, err
+// applyGenesisAlloc reconstructs the genesis state on top of the (empty)
+// reconstructed view backing statedb by replaying the genesis allocation, then
+// flushes it into the reconstructed view via IntermediateRoot.
+//
+// It mirrors the state construction in (*core.Genesis).toBlock but writes
+// through the reconstructed view instead of persisting to the database, since
+// genesis state is never stored in Firewood. This intentionally duplicates
+// toBlock's state setup (genesis code cannot be modified); the final root check
+// in firewoodState guards against the two drifting apart.
+func (eth *Ethereum) applyGenesisAlloc(statedb *state.StateDB, genesis *types.Header) error {
+	g := eth.config.Genesis
+
+	// Configure any stateful precompiles that should be enabled in the genesis.
+	blockContext := core.NewBlockContext(genesis.Number, genesis.Time)
+	if err := core.ApplyPrecompileActivations(g.Config, nil, blockContext, statedb); err != nil {
+		return fmt.Errorf("unable to configure precompiles in genesis block: %w", err)
 	}
-	return state.NewDatabaseWithNodeDB(db, tdb), nil
+
+	for addr, account := range g.Alloc {
+		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
+		statedb.SetCode(addr, account.Code)
+		statedb.SetNonce(addr, account.Nonce)
+		for key, value := range account.Storage {
+			statedb.SetState(addr, key, value)
+		}
+	}
+
+	// Flush the allocation into the reconstructed view so the forward replay
+	// observes genesis state. IntermediateRoot mirrors toBlock and routes the
+	// accumulated writes through Reconstruct (no persistence).
+	statedb.IntermediateRoot(false)
+	return nil
 }
 
 // stateAtBlock retrieves the state database associated with a certain block.
