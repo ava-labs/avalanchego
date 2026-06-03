@@ -750,7 +750,7 @@ func createAutoRenewedValidatorTx(
 				Memo: types.JSONByteSlice{},
 			},
 		},
-		ValidatorNodeID: nodeID,
+		ValidatorNodeID: nodeID.Bytes(),
 		Signer:          sig,
 		StakeOuts: []*avax.TransferableOutput{
 			{
@@ -758,7 +758,7 @@ func createAutoRenewedValidatorTx(
 					ID: ids.GenerateTestID(),
 				},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: 2 * units.KiloAvax,
+					Amt: weight,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
@@ -775,13 +775,12 @@ func createAutoRenewedValidatorTx(
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
-		Owner: &secp256k1fx.OutputOwners{
+		ValidatorAuthority: &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		DelegationShares:         reward.PercentDenominator,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
-		Wght:                     weight,
 		Period:                   period,
 	}
 }
