@@ -10,7 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var _ UnsignedTx = (*RewardValidatorTx)(nil)
+var (
+	_ UnsignedTx = (*RewardValidatorTx)(nil)
+	_ RewardTx   = (*RewardValidatorTx)(nil)
+)
 
 // RewardValidatorTx is a transaction that represents a proposal to
 // remove a validator that is currently validating from the validator set.

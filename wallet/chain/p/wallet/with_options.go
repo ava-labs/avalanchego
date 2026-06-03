@@ -300,6 +300,48 @@ func (w *withOptions) IssueAddPermissionlessDelegatorTx(
 	)
 }
 
+func (w *withOptions) IssueAddAutoRenewedValidatorTx(
+	validatorNodeID ids.NodeID,
+	weight uint64,
+	signer vmsigner.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	configOwner *secp256k1fx.OutputOwners,
+	delegationShares uint32,
+	autoCompoundRewardShares uint32,
+	periodSeconds uint64,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueAddAutoRenewedValidatorTx(
+		validatorNodeID,
+		weight,
+		signer,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		configOwner,
+		delegationShares,
+		autoCompoundRewardShares,
+		periodSeconds,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) IssueSetAutoRenewedValidatorConfigTx(
+	txID ids.ID,
+	autoCompoundRewardShares uint32,
+	periodSeconds uint64,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueSetAutoRenewedValidatorConfigTx(
+		txID,
+		autoCompoundRewardShares,
+		periodSeconds,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *withOptions) IssueUnsignedTx(
 	utx txs.UnsignedTx,
 	options ...common.Option,
