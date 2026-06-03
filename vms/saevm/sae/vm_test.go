@@ -122,6 +122,14 @@ func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 	})
 }
 
+// withGenesisBaseFee overrides the genesis block's base fee, which SAE uses as
+// the starting gas price.
+func withGenesisBaseFee(fee *big.Int) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.BaseFee = fee
+	})
+}
+
 // chainID is made a global to keep it constant across multiple SUTs.
 var chainID = ids.GenerateTestID()
 
@@ -147,6 +155,12 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			Alloc:      saetest.MaxAllocFor(keys.Addresses()...),
 			Timestamp:  saeparams.TauSeconds,
 			Difficulty: big.NewInt(0), // irrelevant but required
+			// SAE derives its starting gas price from the genesis base fee. Tests
+			// predominantly use a gas price of 1, so default to the minimum base
+			// fee; gen.ToBlock() would otherwise fall back to geth's EIP-1559
+			// InitialBaseFee (1 gwei). Tests that exercise a non-minimum genesis
+			// base fee override this.
+			BaseFee: big.NewInt(1),
 		},
 		db:     memdb.New(),
 		nodeID: ids.GenerateTestNodeID(),
