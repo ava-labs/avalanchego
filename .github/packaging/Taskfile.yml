@@ -1,6 +1,11 @@
-# RPM packaging tasks for avalanchego and subnet-evm.
+# Packaging tasks for avalanchego and subnet-evm.
 #
-# Builds RPMs inside a Rocky Linux 9 container (glibc 2.34) with GPG signing.
+# RPM:       Builds RPMs in a Rocky Linux 9 container with GPG signing.
+# macOS zip: Builds + signs macOS zips in a debian:stable-slim container,
+#            mirroring the workflow's ubuntu-24.04 sign-publish job. Local
+#            test uses self-signed Apple cert + ephemeral GPG key when real
+#            credentials aren't provided.
+#
 # PACKAGING_TAG defaults to v0.0.0 for local testing; set for release builds.
 
 version: '3'
@@ -30,6 +35,12 @@ vars:
     sh: echo "${PACKAGING_TAG:-v0.0.0}"
   PACKAGING_DOCKER_IMAGE: avalanchego-rpm-builder
   PACKAGING_OUTPUT_DIR: '{{.REPO_ROOT}}/build/rpm'
+  # rcodesign version, sourced from the macOS release workflow so the local
+  # validator and the CI runner pin the same Apple-signing tool.
+  PACKAGING_APPLE_CODESIGN_VERSION:
+    sh: awk -F'"' '/APPLE_CODESIGN_PKG_VERSION:/ {print $2; exit}' "{{.REPO_ROOT}}/.github/workflows/build-macos-release.yml"
+  PACKAGING_MACOS_DOCKER_IMAGE: avalanchego-macos-zip-builder
+  PACKAGING_MACOS_OUTPUT_DIR: '{{.REPO_ROOT}}/build/macos'
 
 tasks:
   default:
@@ -122,3 +133,61 @@ tasks:
       PACKAGE_ARCH: '{{.PACKAGE_ARCH | default .PACKAGING_HOST_ARCH}}'
     cmds:
       - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-rpm.sh'
+
+  build-macos-zip-builder-docker-image:
+    desc: Builds the macOS zip validator Docker image
+    internal: true
+    env:
+      GO_VERSION: '{{.PACKAGING_GO_VERSION}}'
+      APPLE_CODESIGN_VERSION: '{{.PACKAGING_APPLE_CODESIGN_VERSION}}'
+      DOCKER_IMAGE: '{{.PACKAGING_MACOS_DOCKER_IMAGE}}'
+      CONTEXT_DIR: '{{.REPO_ROOT}}/.github/packaging'
+      DOCKERFILE: Dockerfile.macos-zip
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/build-macos-zip-builder-image.sh'
+
+  build-macos-zip:
+    desc: Builds and signs macOS zip archives (Apple + GPG); ephemeral creds if not provided
+    vars:
+      MACOS_TAG: '{{.PACKAGING_TAG}}'
+    env:
+      GPG_KEY_PASSPHRASE: '{{.GPG_KEY_PASSPHRASE}}'
+      MACOS_SIGNING_PKCS12_BASE64: '{{.MACOS_SIGNING_PKCS12_BASE64}}'
+      MACOS_SIGNING_PASSWORD: '{{.MACOS_SIGNING_PASSWORD}}'
+      MACOS_NOTARIZATION_AUTH_KEY: '{{.MACOS_NOTARIZATION_AUTH_KEY}}'
+      MACOS_NOTARIZATION_KEY_ID: '{{.MACOS_NOTARIZATION_KEY_ID}}'
+      MACOS_NOTARIZATION_ISSUER_ID: '{{.MACOS_NOTARIZATION_ISSUER_ID}}'
+    deps: [build-macos-zip-builder-docker-image]
+    cmds:
+      - cmd: mkdir -p {{.PACKAGING_MACOS_OUTPUT_DIR}}
+      - cmd: >-
+          docker run --rm
+          -v {{.REPO_ROOT}}:/build
+          -v {{.PACKAGING_MACOS_OUTPUT_DIR}}:/output
+          {{if .GPG_KEY_FILE}}-v {{.GPG_KEY_FILE}}:{{.GPG_KEY_FILE}}:ro{{end}}
+          -e TAG={{.MACOS_TAG}}
+          -e OUTPUT_DIR=/output
+          {{if .GPG_KEY_FILE}}-e GPG_KEY_FILE={{.GPG_KEY_FILE}}{{end}}
+          {{if .GPG_KEY_PASSPHRASE}}-e GPG_KEY_PASSPHRASE{{end}}
+          {{if .MACOS_SIGNING_PKCS12_BASE64}}-e MACOS_SIGNING_PKCS12_BASE64{{end}}
+          {{if .MACOS_SIGNING_PASSWORD}}-e MACOS_SIGNING_PASSWORD{{end}}
+          {{if .MACOS_NOTARIZATION_AUTH_KEY}}-e MACOS_NOTARIZATION_AUTH_KEY{{end}}
+          {{if .MACOS_NOTARIZATION_KEY_ID}}-e MACOS_NOTARIZATION_KEY_ID{{end}}
+          {{if .MACOS_NOTARIZATION_ISSUER_ID}}-e MACOS_NOTARIZATION_ISSUER_ID{{end}}
+          {{.PACKAGING_MACOS_DOCKER_IMAGE}}
+          .github/packaging/scripts/build-macos-zip.sh
+
+  validate-macos-zip:
+    desc: Validates built macOS zips by verifying signatures and contents in a fresh container
+    env:
+      TAG: '{{.PACKAGING_TAG}}'
+      PACKAGING_DOCKER_IMAGE: '{{.PACKAGING_MACOS_DOCKER_IMAGE}}'
+    deps: [build-macos-zip-builder-docker-image]
+    cmds:
+      - cmd: '{{.REPO_ROOT}}/.github/packaging/scripts/validate-macos-zip.sh'
+
+  test-build-macos-zip:
+    desc: Builds and validates macOS zips end-to-end
+    cmds:
+      - task: build-macos-zip
+      - task: validate-macos-zip
