@@ -912,7 +912,7 @@ func verifyAddAutoRenewedValidatorTx(
 		// Ensure the validator fee is at least the minimum amount
 		return ErrInsufficientDelegationFee
 
-	case tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
+	case tx.Period < uint64(backend.Config.HeliconMinStakeDuration/time.Second):
 		// Ensure staking length is not too short
 		return ErrStakeTooShort
 
@@ -1008,7 +1008,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 	}
 
 	switch {
-	case tx.Period > 0 && tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
+	case tx.Period > 0 && tx.Period < uint64(backend.Config.HeliconMinStakeDuration/time.Second):
 		return nil, ErrStakeTooShort
 	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
 		return nil, ErrStakeTooLong
