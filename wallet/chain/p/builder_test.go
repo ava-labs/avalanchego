@@ -899,7 +899,7 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		require                       = require.New(t)
 		validationRewardsOwner        = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
 		delegationRewardsOwner        = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
-		configOwner                   = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
+		validatorAuthority            = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
 		delegationShares       uint32 = reward.PercentDenominator
 		autoCompoundShares     uint32 = 500_000
 		weight                        = 2 * units.Avax
@@ -925,7 +925,7 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		avaxAssetID,
 		validationRewardsOwner,
 		delegationRewardsOwner,
-		configOwner,
+		validatorAuthority,
 		delegationShares,
 		autoCompoundShares,
 		periodSeconds,
@@ -944,7 +944,7 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		Signer:                   pop,
 		ValidatorRewardsOwner:    validationRewardsOwner,
 		DelegatorRewardsOwner:    delegationRewardsOwner,
-		ValidatorAuthority:       configOwner,
+		ValidatorAuthority:       validatorAuthority,
 		DelegationShares:         delegationShares,
 		AutoCompoundRewardShares: autoCompoundShares,
 		Period:                   periodSeconds,

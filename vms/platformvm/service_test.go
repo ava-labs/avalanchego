@@ -887,7 +887,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		Threshold: 1,
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
-	configOwner := &secp256k1fx.OutputOwners{
+	validatorAuthority := &secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
@@ -901,7 +901,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		Signer:                   pop,
 		ValidatorRewardsOwner:    rewardOwner,
 		DelegatorRewardsOwner:    rewardOwner,
-		ValidatorAuthority:       configOwner,
+		ValidatorAuthority:       validatorAuthority,
 		DelegationShares:         reward.PercentDenominator,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		Period:                   periodSeconds,
@@ -947,12 +947,12 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	require.NotNil(gotValidator.Signer)
 	require.Equal(pop.PublicKey, gotValidator.Signer.PublicKey)
 	require.Equal(pop.ProofOfPossession, gotValidator.Signer.ProofOfPossession)
-	require.NotNil(gotValidator.ConfigOwner)
-	require.Equal(avajson.Uint32(configOwner.Threshold), gotValidator.ConfigOwner.Threshold)
-	require.Len(gotValidator.ConfigOwner.Addresses, 1)
-	wantConfigOwnerAddr, err := service.addrManager.FormatLocalAddress(configOwner.Addrs[0])
+	require.NotNil(gotValidator.ValidatorAuthority)
+	require.Equal(avajson.Uint32(validatorAuthority.Threshold), gotValidator.ValidatorAuthority.Threshold)
+	require.Len(gotValidator.ValidatorAuthority.Addresses, 1)
+	wantValidatorAuthorityAddr, err := service.addrManager.FormatLocalAddress(validatorAuthority.Addrs[0])
 	require.NoError(err)
-	require.Equal(wantConfigOwnerAddr, gotValidator.ConfigOwner.Addresses[0])
+	require.Equal(wantValidatorAuthorityAddr, gotValidator.ValidatorAuthority.Addresses[0])
 	require.Equal(avajson.Uint64(periodSeconds), *gotValidator.Period)
 	require.Equal(avajson.Uint32(autoCompoundRewardShares), *gotValidator.AutoCompoundRewardShares)
 }

@@ -333,7 +333,7 @@ type Builder interface {
 	//   rewards this validator earns.
 	// - delegationRewardsOwner specifies the owner of all the rewards this
 	//   validator earns from delegations.
-	// - configOwner specifies the owner authorized to modify the validator's
+	// - validatorAuthority specifies the owner authorized to modify the validator's
 	//   auto-renewal configuration.
 	// - delegationShares specifies the fraction (out of 1,000,000) that this
 	//   validator will take from delegation rewards.
@@ -347,7 +347,7 @@ type Builder interface {
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
-		configOwner *secp256k1fx.OutputOwners,
+		validatorAuthority *secp256k1fx.OutputOwners,
 		delegationShares uint32,
 		autoCompoundRewardShares uint32,
 		periodSeconds uint64,
@@ -1549,7 +1549,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
-	configOwner *secp256k1fx.OutputOwners,
+	validatorAuthority *secp256k1fx.OutputOwners,
 	delegationShares uint32,
 	autoCompoundRewardShares uint32,
 	periodSeconds uint64,
@@ -1577,7 +1577,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 	if err != nil {
 		return nil, err
 	}
-	configOwnerComplexity, err := fee.OwnerComplexity(configOwner)
+	validatorAuthorityComplexity, err := fee.OwnerComplexity(validatorAuthority)
 	if err != nil {
 		return nil, err
 	}
@@ -1587,7 +1587,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 		&signerComplexity,
 		&validatorOwnerComplexity,
 		&delegatorOwnerComplexity,
-		&configOwnerComplexity,
+		&validatorAuthorityComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -1607,7 +1607,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 
 	utils.Sort(validationRewardsOwner.Addrs)
 	utils.Sort(delegationRewardsOwner.Addrs)
-	utils.Sort(configOwner.Addrs)
+	utils.Sort(validatorAuthority.Addrs)
 	tx := &txs.AddAutoRenewedValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
@@ -1621,7 +1621,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 		StakeOuts:                stakeOutputs,
 		ValidatorRewardsOwner:    validationRewardsOwner,
 		DelegatorRewardsOwner:    delegationRewardsOwner,
-		ValidatorAuthority:       configOwner,
+		ValidatorAuthority:       validatorAuthority,
 		DelegationShares:         delegationShares,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		Period:                   periodSeconds,

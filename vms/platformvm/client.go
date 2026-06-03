@@ -641,9 +641,9 @@ func (c *Client) GetDeactivationOwners(ctx context.Context, validationIDs ...ids
 	return deactivationOwners, nil
 }
 
-// getAutoRenewedValidatorConfigOwners returns a map of auto-renewed validator
-// tx ID to config owner.
-func (c *Client) getAutoRenewedValidatorConfigOwners(
+// getAutoRenewedValidatorAuthorities returns a map of auto-renewed validator
+// tx ID to validator authority.
+func (c *Client) getAutoRenewedValidatorAuthorities(
 	ctx context.Context,
 	txIDs ...ids.ID,
 ) (map[ids.ID]fx.Owner, error) {
@@ -669,7 +669,7 @@ func (c *Client) getAutoRenewedValidatorConfigOwners(
 }
 
 // GetOwners returns the union of GetSubnetOwners, GetDeactivationOwners, and
-// getAutoRenewedValidatorConfigOwners.
+// getAutoRenewedValidatorAuthorities.
 func (c *Client) GetOwners(
 	ctx context.Context,
 	subnetIDs []ids.ID,
@@ -684,14 +684,14 @@ func (c *Client) GetOwners(
 	if err != nil {
 		return nil, err
 	}
-	configOwners, err := c.getAutoRenewedValidatorConfigOwners(ctx, autoRenewedValidatorTxIDs...)
+	validatorAuthorities, err := c.getAutoRenewedValidatorAuthorities(ctx, autoRenewedValidatorTxIDs...)
 	if err != nil {
 		return nil, err
 	}
 
-	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
+	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners)+len(validatorAuthorities))
 	maps.Copy(owners, subnetOwners)
 	maps.Copy(owners, deactivationOwners)
-	maps.Copy(owners, configOwners)
+	maps.Copy(owners, validatorAuthorities)
 	return owners, nil
 }

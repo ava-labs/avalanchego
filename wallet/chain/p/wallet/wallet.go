@@ -321,7 +321,7 @@ type Wallet interface {
 	//   rewards this validator earns.
 	// - delegationRewardsOwner specifies the owner of all the rewards this
 	//   validator earns from delegations.
-	// - configOwner specifies the owner authorized to modify the validator's
+	// - validatorAuthority specifies the owner authorized to modify the validator's
 	//   auto-renewal configuration.
 	// - delegationShares specifies the fraction (out of 1,000,000) that this
 	//   validator will take from delegation rewards.
@@ -335,7 +335,7 @@ type Wallet interface {
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
-		configOwner *secp256k1fx.OutputOwners,
+		validatorAuthority *secp256k1fx.OutputOwners,
 		delegationShares uint32,
 		autoCompoundRewardShares uint32,
 		periodSeconds uint64,
@@ -663,7 +663,7 @@ func (w *wallet) IssueAddAutoRenewedValidatorTx(
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
-	configOwner *secp256k1fx.OutputOwners,
+	validatorAuthority *secp256k1fx.OutputOwners,
 	delegationShares uint32,
 	autoCompoundRewardShares uint32,
 	periodSeconds uint64,
@@ -676,7 +676,7 @@ func (w *wallet) IssueAddAutoRenewedValidatorTx(
 		assetID,
 		validationRewardsOwner,
 		delegationRewardsOwner,
-		configOwner,
+		validatorAuthority,
 		delegationShares,
 		autoCompoundRewardShares,
 		periodSeconds,

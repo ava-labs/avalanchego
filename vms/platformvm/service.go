@@ -83,7 +83,7 @@ type stakerAttributes struct {
 	delegationRewardsOwner fx.Owner
 	proofOfPossession      *signer.ProofOfPossession
 
-	autoRenewedValidatorConfigOwner fx.Owner
+	autoRenewedValidatorAuthority fx.Owner
 }
 
 // GetHeight returns the height of the last accepted block
@@ -693,7 +693,7 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 		}
 
 		if addAutoRenewedValidatorTx, ok := stakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
-			attr.autoRenewedValidatorConfigOwner = addAutoRenewedValidatorTx.ValidatorAuthority
+			attr.autoRenewedValidatorAuthority = addAutoRenewedValidatorTx.ValidatorAuthority
 		}
 
 	case txs.DelegatorTx:
@@ -911,12 +911,12 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				Signer:                 attr.proofOfPossession,
 			}
 
-			if attr.autoRenewedValidatorConfigOwner != nil {
-				configOwner, ok := attr.autoRenewedValidatorConfigOwner.(*secp256k1fx.OutputOwners)
+			if attr.autoRenewedValidatorAuthority != nil {
+				validatorAuthority, ok := attr.autoRenewedValidatorAuthority.(*secp256k1fx.OutputOwners)
 				if !ok {
-					return nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", attr.autoRenewedValidatorConfigOwner)
+					return nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", attr.autoRenewedValidatorAuthority)
 				}
-				vdr.ConfigOwner, err = s.getAPIOwner(configOwner)
+				vdr.ValidatorAuthority, err = s.getAPIOwner(validatorAuthority)
 				if err != nil {
 					return nil, err
 				}
