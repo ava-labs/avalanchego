@@ -939,8 +939,8 @@ func TestRewardValidatorStakerType(t *testing.T) {
 		&env.backend,
 		feeCalculator,
 		must[*txs.Tx](t)(newRewardValidatorTx(t, addAutoRenewedValidatorTx.ID())),
-		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
-		must[state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
+		must[*state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
+		must[*state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
 	)
 	require.ErrorIs(t, err, errShouldUseRewardAutoRenewedValidator)
 }

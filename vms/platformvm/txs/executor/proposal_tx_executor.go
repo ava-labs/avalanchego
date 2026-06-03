@@ -704,7 +704,7 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	validationRewards uint64,
 	delegateeRewards uint64,
-	chainState state.Diff,
+	chainState *state.Diff,
 	outputIndexOffset uint32,
 ) (uint32, error) {
 	avaxAsset := avax.Asset{ID: e.backend.Ctx.AVAXAssetID}
@@ -995,7 +995,7 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 
 // createUTXOsStakeOut creates UTXOs to return a staker's staked tokens.
 // The UTXOs are added to all provided state diffs.
-func createUTXOsStakeOut(stakerTx txs.PermissionlessStaker, txID ids.ID, states ...state.Diff) {
+func createUTXOsStakeOut(stakerTx txs.PermissionlessStaker, txID ids.ID, states ...*state.Diff) {
 	outputIndexOffset := len(stakerTx.Outputs())
 
 	for i, out := range stakerTx.Stake() {
