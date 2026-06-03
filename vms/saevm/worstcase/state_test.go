@@ -46,11 +46,43 @@ type SUT struct {
 
 const (
 	initialGasTarget = 1_000_000
-	initialExcess    = 60_303_807 // Maximum excess that results in gas price of 1
+	// initialBaseFee is the genesis base fee used by TestMultipleBlocks. SAE
+	// derives the starting gas price from it. At a base fee of 1 the price band is
+	// far too wide (~60M excess) for a single block to move the integer base fee,
+	// so a higher value is used to keep the dynamic fee responses observable.
+	initialBaseFee = 16
+	// raisedBaseFee is the base fee after a full block (block 0) raises the price,
+	// and fallenBaseFee is the base fee after a subsequent block advances time far
+	// enough to lower it. Both are consequences of initialBaseFee and the gas
+	// usage below.
+	raisedBaseFee = 17
+	fallenBaseFee = 15
 )
 
-func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
+// sutOption configures the SUT built by newSUT.
+type sutOption func(*sutConfig)
+
+type sutConfig struct {
+	baseFee int64
+}
+
+// withGenesisBaseFee overrides the genesis base fee, which SAE uses as the
+// starting gas price.
+func withGenesisBaseFee(fee int64) sutOption {
+	return func(c *sutConfig) {
+		c.baseFee = fee
+	}
+}
+
+func newSUT(tb testing.TB, alloc types.GenesisAlloc, opts ...sutOption) SUT {
 	tb.Helper()
+
+	// Default to the minimum base fee; tests that exercise dynamic fee responses
+	// override it via withGenesisBaseFee.
+	cfg := sutConfig{baseFee: 1}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
 
 	db, cache, _ := ethtest.NewEmptyStateDB(tb)
 	config := saetest.ChainConfig()
@@ -62,7 +94,7 @@ func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
 		config,
 		alloc,
 		blockstest.WithGasTarget(initialGasTarget),
-		blockstest.WithGasExcess(initialExcess),
+		blockstest.WithBaseFee(big.NewInt(cfg.baseFee)),
 	)
 	hooks := hookstest.NewStub(initialGasTarget)
 	s, err := NewState(hooks, config, genesis, saetest.NewStateDBOpener(cache, nil))
@@ -103,7 +135,7 @@ func TestMultipleBlocks(t *testing.T) {
 		eoaViaTx: {
 			Balance: new(big.Int).SetUint64(startingBalance),
 		},
-	})
+	}, withGenesisBaseFee(initialBaseFee))
 
 	state := sut.State
 	lastHash := sut.genesis.Hash()
@@ -127,13 +159,13 @@ func TestMultipleBlocks(t *testing.T) {
 		{
 			hooks:        hookstest.NewStub(2 * initialGasTarget), // Will double the target _after_ this block.
 			wantGasLimit: initialMaxBlockSize,
-			wantBaseFee:  uint256.NewInt(1),
+			wantBaseFee:  uint256.NewInt(initialBaseFee),
 			ops: []op{
 				{
 					name: "include_small_operation",
 					op: Op{
 						Gas:       gas.Gas(params.TxGas),
-						GasFeeCap: *uint256.NewInt(1),
+						GasFeeCap: *uint256.NewInt(initialBaseFee),
 						Burn: map[common.Address]hook.AccountDebit{
 							eoa: {},
 						},
@@ -144,7 +176,7 @@ func TestMultipleBlocks(t *testing.T) {
 					name: "would_exceed_limit",
 					op: Op{
 						Gas:       gas.Gas(initialMaxBlockSize - params.TxGas + 1),
-						GasFeeCap: *uint256.NewInt(1),
+						GasFeeCap: *uint256.NewInt(initialBaseFee),
 					},
 					wantErr: core.ErrGasLimitReached,
 				},
@@ -152,7 +184,7 @@ func TestMultipleBlocks(t *testing.T) {
 					name: "fill_block",
 					op: Op{
 						Gas:       gas.Gas(initialMaxBlockSize - params.TxGas),
-						GasFeeCap: *uint256.NewInt(1),
+						GasFeeCap: *uint256.NewInt(initialBaseFee),
 					},
 					wantErr: nil,
 				},
@@ -166,13 +198,13 @@ func TestMultipleBlocks(t *testing.T) {
 		{
 			hooks:        hookstest.NewStub(initialGasTarget), // Restore the target _after_ this block.
 			wantGasLimit: 2 * initialMaxBlockSize,
-			wantBaseFee:  uint256.NewInt(2),
+			wantBaseFee:  uint256.NewInt(raisedBaseFee),
 			ops: []op{
 				{
 					name: "import",
 					op: Op{
 						Gas:       1,
-						GasFeeCap: *uint256.NewInt(2),
+						GasFeeCap: *uint256.NewInt(raisedBaseFee),
 						Mint: map[common.Address]uint256.Int{
 							eoaNoBalance: *uint256.NewInt(importedAmount),
 						},
@@ -183,7 +215,7 @@ func TestMultipleBlocks(t *testing.T) {
 					name: "imported_funds_insufficient",
 					op: Op{
 						Gas:       1,
-						GasFeeCap: *uint256.NewInt(2),
+						GasFeeCap: *uint256.NewInt(raisedBaseFee),
 						Burn: map[common.Address]AccountDebit{
 							eoaNoBalance: {
 								Amount:     *uint256.NewInt(importedAmount + 1),
@@ -197,7 +229,7 @@ func TestMultipleBlocks(t *testing.T) {
 					name: "spend_imported_funds",
 					op: Op{
 						Gas:       1,
-						GasFeeCap: *uint256.NewInt(2),
+						GasFeeCap: *uint256.NewInt(raisedBaseFee),
 						Burn: map[common.Address]AccountDebit{
 							eoaNoBalance: {
 								Amount:     *uint256.NewInt(importedAmount),
@@ -216,23 +248,23 @@ func TestMultipleBlocks(t *testing.T) {
 		},
 		{
 			wantGasLimit: initialMaxBlockSize,
-			wantBaseFee:  uint256.NewInt(2),
+			wantBaseFee:  uint256.NewInt(raisedBaseFee),
 			txsAfterOps: []*types.Transaction{
 				wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 					To:       &common.Address{},
 					Gas:      100_000,
-					GasPrice: big.NewInt(2),
+					GasPrice: big.NewInt(raisedBaseFee),
 				}),
 				wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 					To:       &common.Address{},
 					Gas:      200_000,
-					GasPrice: big.NewInt(2),
+					GasPrice: big.NewInt(raisedBaseFee),
 					Value:    big.NewInt(123_456),
 				}),
 				wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 					To:       nil,
 					Gas:      100_000,
-					GasPrice: big.NewInt(10), // charged in full
+					GasPrice: big.NewInt(raisedBaseFee + 3), // above the base fee; charged in full
 				}),
 				wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 					To:        &common.Address{},
@@ -246,25 +278,25 @@ func TestMultipleBlocks(t *testing.T) {
 					// the penultimate tx.
 					To:       &common.Address{},
 					Gas:      params.TxGas,
-					GasPrice: big.NewInt(2),
+					GasPrice: big.NewInt(raisedBaseFee),
 				}),
 			},
 			wantMinSenderBalances: []map[common.Address]uint64{
 				// Before each tx:
 				{eoaViaTx: startingBalance},
-				{eoaViaTx: startingBalance - 2*100_000},
-				{eoaViaTx: startingBalance - 2*100_000 - (2*200_000 + 123_456)},
-				{eoaViaTx: startingBalance - 2*100_000 - (2*200_000 + 123_456) - 10*100_000},             // non-dynamic fee
-				{eoaViaTx: startingBalance - 2*100_000 - (2*200_000 + 123_456) - 10*100_000 - 3*100_000}, // dynamic fee: effective gas price = baseFee + gasTipCap
+				{eoaViaTx: startingBalance - raisedBaseFee*100_000},
+				{eoaViaTx: startingBalance - raisedBaseFee*100_000 - (raisedBaseFee*200_000 + 123_456)},
+				{eoaViaTx: startingBalance - raisedBaseFee*100_000 - (raisedBaseFee*200_000 + 123_456) - (raisedBaseFee+3)*100_000},                             // non-dynamic fee, charged in full
+				{eoaViaTx: startingBalance - raisedBaseFee*100_000 - (raisedBaseFee*200_000 + 123_456) - (raisedBaseFee+3)*100_000 - (raisedBaseFee+1)*100_000}, // dynamic fee: effective gas price = baseFee + gasTipCap
 			},
 		},
 		{
-			// We have currently included slightly over 10s worth of gas. We
-			// should increase the time by that same amount to restore the base
-			// fee.
+			// We have currently included slightly over 10s worth of gas.
+			// Advancing the time by a comparable amount drains the accumulated
+			// excess and brings the base fee back down below where it started.
 			time:         21,
 			wantGasLimit: initialMaxBlockSize,
-			wantBaseFee:  uint256.NewInt(1),
+			wantBaseFee:  uint256.NewInt(fallenBaseFee),
 		},
 	}
 	for i, block := range tests {

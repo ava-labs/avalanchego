@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor/executormock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
@@ -864,6 +865,95 @@ func TestGetValidatorsAt(t *testing.T) {
 	// include the new validator
 	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators)+1)
+}
+
+func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t)
+
+	nodeID := ids.GenerateTestNodeID()
+	startTime := service.vm.clock.Time()
+
+	const (
+		autoCompoundRewardShares = uint32(reward.PercentDenominator / 3)
+		potentialReward          = uint64(12_345)
+		period                   = defaultMinStakingDuration
+	)
+	periodSeconds := uint64(period / time.Second)
+	weight := service.vm.MinValidatorStake
+	endTime := startTime.Add(period)
+
+	rewardOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+	configOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	addAutoRenewedValidatorTx := &txs.AddAutoRenewedValidatorTx{
+		ValidatorNodeID:          nodeID[:],
+		Signer:                   pop,
+		ValidatorRewardsOwner:    rewardOwner,
+		DelegatorRewardsOwner:    rewardOwner,
+		ValidatorAuthority:       configOwner,
+		DelegationShares:         reward.PercentDenominator,
+		AutoCompoundRewardShares: autoCompoundRewardShares,
+		Period:                   periodSeconds,
+	}
+	tx := &txs.Tx{Unsigned: addAutoRenewedValidatorTx}
+	require.NoError(tx.Initialize(txs.Codec))
+
+	service.vm.ctx.Lock.Lock()
+	staker := &state.Staker{
+		TxID:            tx.ID(),
+		NodeID:          addAutoRenewedValidatorTx.NodeID(),
+		PublicKey:       pop.Key(),
+		SubnetID:        addAutoRenewedValidatorTx.SubnetID(),
+		Weight:          weight,
+		StartTime:       startTime,
+		EndTime:         endTime,
+		PotentialReward: potentialReward,
+		NextTime:        endTime,
+		Priority:        addAutoRenewedValidatorTx.CurrentPriority(),
+	}
+
+	require.NoError(service.vm.state.PutCurrentValidator(staker))
+	service.vm.state.AddTx(tx, status.Committed)
+	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
+		AutoCompoundRewardShares: autoCompoundRewardShares,
+		NextPeriod:               periodSeconds,
+	}))
+	require.NoError(service.vm.state.Commit())
+	service.vm.ctx.Lock.Unlock()
+
+	reply := GetCurrentValidatorsReply{}
+	require.NoError(service.GetCurrentValidators(&http.Request{}, &GetCurrentValidatorsArgs{
+		SubnetID: constants.PrimaryNetworkID,
+		NodeIDs:  []ids.NodeID{nodeID},
+	}, &reply))
+	require.Len(reply.Validators, 1)
+
+	gotValidator := reply.Validators[0].(pchainapi.PermissionlessValidator)
+	require.Equal(nodeID, gotValidator.NodeID)
+	require.Equal(avajson.Uint64(weight), gotValidator.Weight)
+	require.Equal(avajson.Uint64(potentialReward), *gotValidator.PotentialReward)
+	require.NotNil(gotValidator.Signer)
+	require.Equal(pop.PublicKey, gotValidator.Signer.PublicKey)
+	require.Equal(pop.ProofOfPossession, gotValidator.Signer.ProofOfPossession)
+	require.NotNil(gotValidator.ValidatorAuthority)
+	require.Equal(avajson.Uint32(configOwner.Threshold), gotValidator.ValidatorAuthority.Threshold)
+	require.Len(gotValidator.ValidatorAuthority.Addresses, 1)
+	wantConfigOwnerAddr, err := service.addrManager.FormatLocalAddress(configOwner.Addrs[0])
+	require.NoError(err)
+	require.Equal(wantConfigOwnerAddr, gotValidator.ValidatorAuthority.Addresses[0])
+	require.Equal(avajson.Uint64(periodSeconds), *gotValidator.Period)
+	require.Equal(avajson.Uint32(autoCompoundRewardShares), *gotValidator.AutoCompoundRewardShares)
 }
 
 func TestGetValidatorsAtArgsMarshalling(t *testing.T) {

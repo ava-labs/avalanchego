@@ -94,6 +94,8 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *dynamic.TargetExponent:
 				assertDifferentPointers(t, f, fieldCp)
+			case *dynamic.PriceExponent:
+				assertDifferentPointers(t, f, fieldCp)
 			case *gas.Gas:
 				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:

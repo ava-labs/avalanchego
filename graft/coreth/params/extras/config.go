@@ -79,7 +79,9 @@ var (
 		c.NetworkUpgrades.HeliconTimestamp = utils.PointerTo[uint64](0)
 	})
 
-	TestChainConfig = copyConfig(TestHeliconChainConfig)
+	// Helicon is not supported by coreth, so the default test config activates
+	// every upgrade through Granite but leaves Helicon disabled.
+	TestChainConfig = copyConfig(TestGraniteChainConfig)
 )
 
 func copyConfig(c *ChainConfig) *ChainConfig {

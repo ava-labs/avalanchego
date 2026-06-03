@@ -38,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -195,7 +194,7 @@ func stateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 
 		stateSyncDisabledConfigJSON, err := OverrideSchemeConfig(scheme, `{"state-sync-enabled":false}`)
 		require.NoError(t, err, "OverrideSchemeConfig()")
-		genesisJSON := []byte(GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))
+		genesisJSON := []byte(GenesisJSON(paramstest.ForkToChainConfig[paramstest.LatestSupportedFork]))
 		require.NoError(t, syncDisabledVM.Initialize(
 			t.Context(),
 			testSyncVMSetup.syncerVM.SnowCtx,
@@ -288,7 +287,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	// This is necessary to support fetching a state summary.
 	config := fmt.Sprintf(`{"commit-interval": %d, "state-history": %d, "state-sync-commit-interval": %d}`, test.SyncableInterval, test.SyncableInterval, test.SyncableInterval)
 	serverVM, cb := testSetup.NewVM()
-	fork := upgradetest.Latest
+	fork := paramstest.LatestSupportedFork
 	serverTest := SetupTestVM(t, serverVM, TestVMConfig{
 		Fork:       &fork,
 		ConfigJSON: config,

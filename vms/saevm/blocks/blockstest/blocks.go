@@ -130,6 +130,8 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 		Config:    config,
 		Timestamp: conf.timestamp,
 		Alloc:     alloc,
+		// If nil, gen.ToBlock() falls back to geth's EIP-1559 InitialBaseFee.
+		BaseFee: conf.baseFee,
 	}
 
 	tdb := state.NewDatabaseWithConfig(db, conf.tdbConfig).TrieDB()
@@ -147,7 +149,7 @@ type genesisConfig struct {
 	tdbConfig *triedb.Config
 	timestamp uint64
 	gasTarget gas.Gas
-	// gasExcess gas.Gas
+	baseFee   *big.Int
 }
 
 // A GenesisOption configures [NewGenesis].
@@ -174,7 +176,12 @@ func WithGasTarget(target gas.Gas) GenesisOption {
 	})
 }
 
-// WithGasExcess overrides the gas excess used by [NewGenesis].
-func WithGasExcess(gas.Gas) GenesisOption {
-	return options.Func[genesisConfig](func(*genesisConfig) {})
+// WithBaseFee overrides the base fee of the genesis block created by
+// [NewGenesis]. SAE derives the starting gas price from this base fee, so it
+// controls the initial price of the dynamic fee mechanism. If unset,
+// gen.ToBlock() falls back to geth's EIP-1559 InitialBaseFee.
+func WithBaseFee(fee *big.Int) GenesisOption {
+	return options.Func[genesisConfig](func(gc *genesisConfig) {
+		gc.baseFee = fee
+	})
 }

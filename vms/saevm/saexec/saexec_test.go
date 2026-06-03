@@ -109,7 +109,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	for addr, acc := range sutCfg.extraAlloc {
 		alloc[addr] = acc
 	}
-	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, blockstest.WithTrieDBConfig(tdbConfig), blockstest.WithGasTarget(sutCfg.hooks.Target))
+	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, blockstest.WithTrieDBConfig(tdbConfig), blockstest.WithGasTarget(sutCfg.hooks.Target), blockstest.WithBaseFee(big.NewInt(1)))
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),

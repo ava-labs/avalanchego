@@ -84,7 +84,7 @@ func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, 
 			}, nil
 		},
 	)
-	if err != nil {
+	if err != nil || r == nil {
 		return nil, nil, err
 	}
 	return r.receipts, r.block, nil

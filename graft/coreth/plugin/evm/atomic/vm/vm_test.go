@@ -268,6 +268,80 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	require.Equal(indexedExportTx.ID(), exportTx.ID(), "expected ID of indexed import tx to match original txID")
 }
 
+// TestCommitAtomicTrieOnShutdown verifies that shutting down the VM persists the
+// atomic trie at the last accepted height, so a restart needs no re-indexing.
+func TestCommitAtomicTrieOnShutdown(t *testing.T) {
+	for _, scheme := range vmtest.Schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testCommitAtomicTrieOnShutdown(t, scheme)
+		})
+	}
+}
+
+func testCommitAtomicTrieOnShutdown(t *testing.T, scheme string) {
+	require := require.New(t)
+	ctx := t.Context()
+	fork := upgradetest.ApricotPhase2
+
+	const commitInterval = 4096
+	configJSON := fmt.Sprintf(`{"commit-interval": %d}`, commitInterval)
+
+	vm := newAtomicTestVM()
+	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+		Fork:       &fork,
+		Scheme:     scheme,
+		ConfigJSON: configJSON,
+	})
+	require.NoError(addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
+		vmtest.TestShortIDAddrs[0]: 50_000_000,
+	}), "addUTXOs()")
+
+	// Accept one atomic import block below the commit interval, so the trie is
+	// not yet committed at its last accepted height.
+	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
+	require.NoError(err, "vm.newImportTx()")
+	require.NoError(vm.AtomicMempool.AddLocalTx(importTx), "AtomicMempool.AddLocalTx()")
+	_, err = vm.WaitForEvent(ctx)
+	require.NoError(err, "vm.WaitForEvent()")
+	blk, err := vm.BuildBlock(ctx)
+	require.NoError(err, "vm.BuildBlock()")
+	require.NoError(blk.Verify(ctx), "blk.Verify()")
+	require.NoError(vm.SetPreference(ctx, blk.ID()), "vm.SetPreference()")
+	require.NoError(blk.Accept(ctx), "blk.Accept()")
+
+	wantRoot := vm.AtomicBackend.AtomicTrie().LastAcceptedRoot()
+	_, commitHeight := vm.AtomicBackend.AtomicTrie().LastCommitted()
+	require.Less(commitHeight, blk.Height(), "atomic trie should not yet be committed at the last accepted height")
+
+	// Shut down (which commits the trie), then restart from the same database
+	// with the same configuration. Reusing the scheme is required so Firewood
+	// reopens the same database.
+	require.NoError(vm.Shutdown(ctx), "vm.Shutdown()")
+
+	restartConfigJSON, err := vmtest.OverrideSchemeConfig(scheme, configJSON)
+	require.NoError(err, "vmtest.OverrideSchemeConfig()")
+
+	vmtest.ResetMetrics(tvm.Ctx)
+	restartedVM := newAtomicTestVM()
+	require.NoError(restartedVM.Initialize(
+		ctx,
+		tvm.Ctx,
+		tvm.DB,
+		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork])),
+		nil,
+		[]byte(restartConfigJSON),
+		nil,
+		tvm.AppSender,
+	), "restartedVM.Initialize()")
+	defer func() {
+		require.NoError(restartedVM.Shutdown(ctx), "restartedVM.Shutdown()")
+	}()
+
+	gotRoot, gotHeight := restartedVM.AtomicBackend.AtomicTrie().LastCommitted()
+	require.Equal(blk.Height(), gotHeight, "atomic trie should be committed at the last accepted height after restart")
+	require.Equal(wantRoot, gotRoot, "atomic trie's committed root should match the last accepted root after restart")
+}
+
 func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string) {
 	require := require.New(t)
 	importAmount := uint64(10000000)
@@ -1586,7 +1660,7 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
+			fork := paramstest.LatestSupportedFork
 			vm := newAtomicTestVM()
 			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 				Fork: &fork,
