@@ -13,9 +13,15 @@ they relate:
 
 - **Coreth** (`graft/coreth/`, `graft/evm/`) — the **production** C-Chain VM. A
   full go-ethereum-derived (via [libevm](https://github.com/ava-labs/libevm)) client
-  that has historically run as an out-of-process **rpcchainvm plugin**
-  ([vm-framework.md](vm-framework.md)). It implements synchronous execution (a block
-  is executed before it is accepted), atomic import/export, warp, dynamic fees, etc.
+  that runs in-process by default (registered at `constants.EVMID`) and can also run
+  as an out-of-process **rpcchainvm plugin** ([vm-framework.md](vm-framework.md)). It
+  implements synchronous execution (a block is executed before it is accepted),
+  atomic import/export, warp, dynamic fees, etc.
+  > **Deep dive:** Coreth has its own dedicated, exhaustive spec —
+  > **[coreth.md](coreth.md)** — covering the two-layer VM + extension seam,
+  > synchronous Verify/Accept, libevm extras, the network-upgrade phases, dynamic
+  > fees (AP3 window → ACP-176 → ACP-226), atomic txs & the atomic trie, Warp/ICM,
+  > state sync, the trie backends (hashdb/pathdb/Firewood), and the JSON-RPC surface.
 - **SAE-EVM** (`vms/saevm/`) — the in-tree, minimal C-Chain VM implementing
   **Streaming Asynchronous Execution** ([ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-streaming-asynchronous-execution)),
   where blocks are *accepted first and executed asynchronously afterward*. It was
@@ -420,6 +426,9 @@ threads a `MinDelayExcess` field through the block header
 
 ## 9. Cross-References
 
+- **[coreth.md](coreth.md) — the exhaustive Coreth (production C-Chain VM) deep dive**
+  (two-layer VM, synchronous execution, libevm extras, upgrades, dynamic fees,
+  atomic txs, Warp/ICM, state sync, trie backends).
 - **[saevm.md](saevm.md) — the exhaustive SAE-EVM (`strevm`) deep dive** (async
   execution model, executor, gas-time fees, hooks, C-Chain layer, JSON-RPC).
 - [overview.md](overview.md) — system-wide map of the Primary Network and its chains.

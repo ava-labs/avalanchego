@@ -280,6 +280,7 @@ validator sets.
 | [platformvm.md](platformvm.md) | `vms/platformvm/` | P-Chain: staking, subnets/L1s, validator sets, oracle blocks |
 | [avm.md](avm.md) | `vms/avm/`, `vms/components/avax/` | X-Chain: the UTXO model, asset creation, import/export |
 | [evm.md](evm.md) | `vms/saevm/`, `graft/coreth/`, `graft/evm/`, `vms/evm/` | C-Chain: Coreth vs SAE-EVM, EVM↔atomic-memory bridge, gas/fees |
+| [coreth.md](coreth.md) | `graft/coreth/`, `graft/evm/` (deep dive) | Coreth (production C-Chain VM): two-layer VM, synchronous execution, libevm extras, upgrades, dynamic fees, atomic txs, Warp/ICM, state sync, trie backends |
 | [saevm.md](saevm.md) | `vms/saevm/` (deep dive) | SAE-EVM (`strevm`): ACP-194 Accept→Execute→Settle, async executor, gas-time fees, hooks, atomic txs, JSON-RPC |
 | [database.md](database.md) | `database/`, `x/merkledb/`, `x/blockdb/`, `x/archivedb/`, `cache/` | the Database interface, decorator stack, merkledb proofs, state-sync storage |
 | [api.md](api.md) | `api/`, `indexer/`, `wallet/` | the HTTP server, handler registration, health model, indexer, wallet SDK |
