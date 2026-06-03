@@ -897,13 +897,12 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	require.NoError(err)
 
 	addAutoRenewedValidatorTx := &txs.AddAutoRenewedValidatorTx{
-		ValidatorNodeID:          nodeID,
+		ValidatorNodeID:          types.JSONByteSlice(nodeID.Bytes()),
 		Signer:                   pop,
 		ValidatorRewardsOwner:    rewardOwner,
 		DelegatorRewardsOwner:    rewardOwner,
-		Owner:                    configOwner,
+		ValidatorAuthority:       configOwner,
 		DelegationShares:         reward.PercentDenominator,
-		Wght:                     weight,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		Period:                   periodSeconds,
 	}

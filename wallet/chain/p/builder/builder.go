@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -1615,14 +1616,13 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 			Outs:         baseOutputs,
 			Memo:         memo,
 		}},
-		ValidatorNodeID:          validatorNodeID,
+		ValidatorNodeID:          types.JSONByteSlice(validatorNodeID.Bytes()),
 		Signer:                   signer,
 		StakeOuts:                stakeOutputs,
 		ValidatorRewardsOwner:    validationRewardsOwner,
 		DelegatorRewardsOwner:    delegationRewardsOwner,
-		Owner:                    configOwner,
+		ValidatorAuthority:       configOwner,
 		DelegationShares:         delegationShares,
-		Wght:                     weight,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		Period:                   periodSeconds,
 	}

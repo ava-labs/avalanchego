@@ -643,8 +643,7 @@ func (c *Client) GetDeactivationOwners(ctx context.Context, validationIDs ...ids
 
 // getAutoRenewedValidatorConfigOwners returns a map of auto-renewed validator
 // tx ID to config owner.
-func getAutoRenewedValidatorConfigOwners(
-	c *Client,
+func (c *Client) getAutoRenewedValidatorConfigOwners(
 	ctx context.Context,
 	txIDs ...ids.ID,
 ) (map[ids.ID]fx.Owner, error) {
@@ -685,7 +684,7 @@ func (c *Client) GetOwners(
 	if err != nil {
 		return nil, err
 	}
-	configOwners, err := getAutoRenewedValidatorConfigOwners(c, ctx, autoRenewedValidatorTxIDs...)
+	configOwners, err := c.getAutoRenewedValidatorConfigOwners(ctx, autoRenewedValidatorTxIDs...)
 	if err != nil {
 		return nil, err
 	}
