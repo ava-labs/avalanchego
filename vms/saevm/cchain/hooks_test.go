@@ -43,6 +43,46 @@ func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *
 	)
 }
 
+func TestParseBlockTxs(t *testing.T) {
+	w := newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
+	tx1 := w.newMinimalTx(t)
+
+	t.Run("valid", func(t *testing.T) {
+		require := require.New(t)
+
+		got, err := parseBlockTxs(newBlock(t, 1, common.Hash{}, tx1))
+		require.NoError(err)
+		require.Len(got, 1)
+		require.Equal(tx1.ID(), got[0].ID())
+	})
+
+	t.Run("hash_mismatch", func(t *testing.T) {
+		require := require.New(t)
+
+		extData, err := tx.MarshalSlice([]*tx.Tx{tx1})
+		require.NoError(err)
+
+		// Build a block whose committed ExtDataHash does not match its
+		// extData by keeping the wrong hash (setExtDataHash=false).
+		header := customtypes.WithHeaderExtra(
+			&types.Header{Number: big.NewInt(1)},
+			&customtypes.HeaderExtra{ExtDataHash: common.Hash(ids.GenerateTestID())},
+		)
+		b := customtypes.NewBlockWithExtData(
+			header,
+			nil, // txs
+			nil, // uncles
+			nil, // receipts
+			saetest.TrieHasher(),
+			extData,
+			false, // setExtDataHash
+		)
+
+		_, err = parseBlockTxs(b)
+		require.ErrorIs(err, errExtDataHashMismatch)
+	})
+}
+
 func TestAncestorInputIDs(t *testing.T) {
 	var (
 		w       = newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
