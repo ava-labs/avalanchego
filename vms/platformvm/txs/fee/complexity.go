@@ -225,6 +225,7 @@ var (
 
 	IntrinsicAddAutoRenewedValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			wrappers.IntLen + // nodeID length
 			ids.NodeIDLen + // nodeID
 			wrappers.IntLen + // signer typeID
 			wrappers.IntLen + // num stake outs
@@ -232,7 +233,6 @@ var (
 			wrappers.IntLen + // delegator rewards typeID
 			wrappers.IntLen + // owner typeID
 			wrappers.IntLen + // delegation shares
-			wrappers.LongLen + // weight
 			wrappers.IntLen + // auto compound reward shares
 			wrappers.LongLen, // period
 		gas.DBWrite: 3, // put staker + write weight diff + write pk diff
