@@ -8,6 +8,11 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
+// LatestSupportedFork is the most recent fork that coreth supports. Coreth does
+// not implement Helicon, so tests cap the activated upgrades at Granite rather
+// than using [upgradetest.Latest].
+const LatestSupportedFork = upgradetest.Granite
+
 var ForkToChainConfig = map[upgradetest.Fork]*params.ChainConfig{
 	upgradetest.NoUpgrades:        params.TestLaunchConfig,
 	upgradetest.ApricotPhase1:     params.TestApricotPhase1Config,

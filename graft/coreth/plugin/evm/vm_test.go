@@ -109,7 +109,7 @@ func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf(`{"continuous-profiler-dir": %q,"continuous-profiler-frequency": "500ms"}`, profilerDir)
-	fork := upgradetest.Latest
+	fork := paramstest.LatestSupportedFork
 	vm := newDefaultTestVM()
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 		Fork:       &fork,
@@ -1260,7 +1260,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// use the block's timestamp instead of 0 since rewind to genesis
 	// is hardcoded to be allowed in core/genesis.go.
 	newCTX := snowtest.Context(t, vm.ctx.ChainID)
-	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)
+	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, paramstest.LatestSupportedFork, upgrade.UnscheduledActivationTime)
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork+1, blk.Timestamp())
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork, upgrade.InitiallyActiveTime)
 	genesis := []byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork]))
@@ -1712,7 +1712,7 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
+			fork := paramstest.LatestSupportedFork
 			if testCase.Fork != nil {
 				fork = *testCase.Fork
 			}
@@ -1746,7 +1746,7 @@ func (*testService) Echo(str string, i int, args *echoArgs) echoResult {
 func TestCreateHandlers(t *testing.T) {
 	var (
 		ctx  = t.Context()
-		fork = upgradetest.Latest
+		fork = paramstest.LatestSupportedFork
 		vm   = newDefaultTestVM()
 	)
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
@@ -2207,7 +2207,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			fork := upgradetest.Latest
+			fork := paramstest.LatestSupportedFork
 
 			vm := newDefaultTestVM()
 			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{

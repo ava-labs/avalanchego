@@ -1586,7 +1586,7 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
+			fork := paramstest.LatestSupportedFork
 			vm := newAtomicTestVM()
 			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 				Fork: &fork,

@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/tracers"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
@@ -931,7 +932,7 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 }
 
 func TestClearWarpDB(t *testing.T) {
-	ctx, db, genesisBytes, _ := vmtest.SetupGenesis(t, upgradetest.Latest)
+	ctx, db, genesisBytes, _ := vmtest.SetupGenesis(t, paramstest.LatestSupportedFork)
 	vm := newDefaultTestVM()
 	require.NoError(t, vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{}))
 

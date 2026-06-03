@@ -44,6 +44,7 @@ graft_go_test(
     deps = [
         "//graft/coreth/params/extras",
         "//graft/coreth/params/extras/extrastest",
+        "//graft/coreth/params/paramstest",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/precompileconfig",
         "//graft/coreth/precompile/precompiletest",

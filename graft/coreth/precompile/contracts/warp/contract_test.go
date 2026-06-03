@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,7 +30,7 @@ import (
 
 var forks = []upgradetest.Fork{
 	upgradetest.Fortuna,
-	upgradetest.Latest,
+	paramstest.LatestSupportedFork,
 }
 
 func runTests(
