@@ -4,6 +4,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
@@ -20,11 +22,11 @@ type CreateL1Tx struct {
 	FxIDs       []ids.ID `serialize:"true" json:"fxIDs"`
 	GenesisData []byte   `serialize:"true" json:"genesisData"`
 
-	// Validator manager
+	// Validator Manager Variables
 	ManagerChainID ids.ID              `serialize:"true" json:"chainID"`
 	ManagerAddress types.JSONByteSlice `serialize:"true" json:"address"`
 
-	// Initial validators
+	// Initial Validators
 	Validators []*ConvertSubnetToL1Validator `serialize:"true" json:"validators"`
 }
 
@@ -62,6 +64,17 @@ func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
 
 	tx.SyntacticallyVerified = true
 	return nil
+}
+
+// BlockchainID returns the blockchainID for the chain created by this tx.
+// Defined as SHA256(subnetID || 0x00 || chainIndex), where chainIndex is 0
+// since CreateL1Tx creates exactly one chain.
+func (tx *CreateL1Tx) BlockchainID(subnetID ids.ID) ids.ID {
+	packer := wrappers.Packer{Bytes: make([]byte, ids.IDLen+1+wrappers.IntLen)}
+	packer.PackFixedBytes(subnetID[:])
+	packer.PackByte(0x00)
+	packer.PackInt(0)
+	return hashing.ComputeHash256Array(packer.Bytes)
 }
 
 func (tx *CreateL1Tx) Visit(visitor Visitor) error {

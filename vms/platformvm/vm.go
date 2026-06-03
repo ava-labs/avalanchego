@@ -326,16 +326,19 @@ func (vm *VM) initBlockchains() error {
 
 // Create the subnet with ID [subnetID]
 func (vm *VM) createSubnet(subnetID ids.ID) error {
-	chains, err := vm.state.GetChains(subnetID)
+	chainTxs, err := vm.state.GetChains(subnetID)
 	if err != nil {
 		return err
 	}
-	for _, chain := range chains {
-		tx, ok := chain.Unsigned.(*txs.CreateChainTx)
-		if !ok {
-			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
+	for _, chain := range chainTxs {
+		switch tx := chain.Unsigned.(type) {
+		case *txs.CreateChainTx:
+			vm.Internal.CreateChain(chain.ID(), tx)
+		case *txs.CreateL1Tx:
+			vm.Internal.CreateL1Chain(subnetID, tx)
+		default:
+			return fmt.Errorf("expected tx type *txs.CreateChainTx or *txs.CreateL1Tx but got %T", chain.Unsigned)
 		}
-		vm.Internal.CreateChain(chain.ID(), tx)
 	}
 	return nil
 }

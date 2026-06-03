@@ -4363,6 +4363,300 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	}
 }
 
+func TestStandardExecutorCreateL1Tx(t *testing.T) {
+	var (
+		fx = &secp256k1fx.Fx{}
+		vm = &secp256k1fx.TestVM{
+			Log: logging.NoLog{},
+		}
+	)
+	require.NoError(t, fx.InitializeVM(vm))
+
+	var (
+		ctx           = snowtest.Context(t, constants.PlatformChainID)
+		defaultConfig = &config.Internal{
+			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+		}
+		baseState = statetest.New(t, statetest.Config{
+			Upgrades: defaultConfig.UpgradeConfig,
+		})
+		flowChecker = utxo.NewVerifier(
+			ctx,
+			&vm.Clk,
+			fx,
+		)
+	)
+
+	testAddresses := make([]ids.ShortID, len(genesistest.DefaultFundedKeys))
+	for i, key := range genesistest.DefaultFundedKeys {
+		testAddresses[i] = key.Address()
+	}
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	nodeID := ids.GenerateTestNodeID()
+	managerChainID := ids.GenerateTestID()
+	managerAddress := utils.RandomBytes(32)
+
+	const weight = 1
+
+	// Use a single address to avoid needing sorted owner addresses.
+	ownerAddrs := []ids.ShortID{testAddresses[0]}
+	validator := &txs.ConvertSubnetToL1Validator{
+		NodeID:  nodeID.Bytes(),
+		Weight:  weight,
+		Balance: 1,
+		Signer:  *pop,
+		RemainingBalanceOwner: message.PChainOwner{
+			Threshold: 1,
+			Addresses: ownerAddrs,
+		},
+		DeactivationOwner: message.PChainOwner{
+			Threshold: 1,
+			Addresses: ownerAddrs,
+		},
+	}
+
+	// Build the CreateL1Tx manually. The input references the genesis UTXO for
+	// DefaultFundedKeys[0]. We spend the full genesis balance as the fee; any
+	// excess over the actual fee is burned, which is valid.
+	unsignedCreateL1Tx := &txs.CreateL1Tx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    ctx.NetworkID,
+				BlockchainID: ctx.ChainID,
+				Ins: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID:        snowtest.AVAXAssetID,
+							OutputIndex: 0,
+						},
+						Asset: avax.Asset{ID: ctx.AVAXAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   genesistest.DefaultInitialBalance,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+				},
+			},
+		},
+		ChainName:      "Test L1",
+		VMID:           ids.GenerateTestID(),
+		GenesisData:    []byte("genesis"),
+		ManagerChainID: managerChainID,
+		ManagerAddress: managerAddress,
+		Validators:     []*txs.ConvertSubnetToL1Validator{validator},
+	}
+
+	createL1Tx, err := txs.NewSigned(
+		unsignedCreateL1Tx,
+		txs.Codec,
+		[][]*secp256k1.PrivateKey{{genesistest.DefaultFundedKeys[0]}},
+	)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		tx             *txs.Tx
+		updateExecutor func(executor *standardTxExecutor) error
+		expectedErr    error
+	}{
+		{
+			name: "invalid prior to Etna",
+			tx:   createL1Tx,
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Config = &config.Internal{
+					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+				}
+				return nil
+			},
+			expectedErr: errEtnaUpgradeNotActive,
+		},
+		{
+			name: "tx fails syntactic verification",
+			tx:   createL1Tx,
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
+				return nil
+			},
+			expectedErr: avax.ErrWrongChainID,
+		},
+		{
+			name: "too many active validators",
+			tx:   createL1Tx,
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Config = &config.Internal{
+					DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
+					ValidatorFeeConfig: validatorfee.Config{
+						Capacity:                 0,
+						Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
+						MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
+						ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+					},
+					UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+				}
+				return nil
+			},
+			expectedErr: errMaxNumActiveValidators,
+		},
+		{
+			name: "duplicate L1 validator",
+			tx:   createL1Tx,
+			updateExecutor: func(e *standardTxExecutor) error {
+				subnetID := createL1Tx.ID()
+				return e.state.PutL1Validator(state.L1Validator{
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID,
+					NodeID:       nodeID,
+					Weight:       1,
+				})
+			},
+			expectedErr: state.ErrDuplicateL1Validator,
+		},
+		{
+			name: "insufficient fee",
+			tx:   createL1Tx,
+			updateExecutor: func(e *standardTxExecutor) error {
+				// Use a price large enough that the fee exceeds the 1 Avax input.
+				e.feeCalculator = txfee.NewDynamicCalculator(
+					e.backend.Config.DynamicFeeConfig.Weights,
+					1_000_000_000*genesis.LocalParams.DynamicFeeConfig.MinPrice,
+				)
+				return nil
+			},
+			expectedErr: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
+			name: "valid tx",
+			tx:   createL1Tx,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+			require.NoError(err)
+
+			executor := &standardTxExecutor{
+				backend: &Backend{
+					Config:       defaultConfig,
+					Bootstrapped: utils.NewAtomic(true),
+					Fx:           fx,
+					FlowChecker:  flowChecker,
+					Ctx:          ctx,
+				},
+				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
+				tx:            test.tx,
+				state:         diff,
+			}
+			require.NoError(executor.backend.Fx.Bootstrapped())
+			if test.updateExecutor != nil {
+				require.NoError(test.updateExecutor(executor))
+			}
+
+			err = test.tx.Unsigned.Visit(executor)
+			require.ErrorIs(err, test.expectedErr)
+			if err != nil {
+				return
+			}
+
+			// Verify UTXOs were consumed
+			for utxoID := range test.tx.InputIDs() {
+				_, err := diff.GetUTXO(utxoID)
+				require.ErrorIs(err, database.ErrNotFound)
+			}
+
+			txID := test.tx.ID()
+			subnetID := txID // subnetID == txID for CreateL1Tx
+
+			// The block executor normally calls AddTx after StandardTx succeeds.
+			// Simulate that here so GetChains can resolve the tx after commit.
+			diff.AddTx(test.tx, status.Committed)
+
+			// Apply diff so GetChains can read from the committed state
+			require.NoError(diff.Apply(baseState))
+			require.NoError(baseState.Commit())
+
+			// Verify subnet was registered
+			subnetIDs, err := baseState.GetSubnetIDs()
+			require.NoError(err)
+			require.Contains(subnetIDs, subnetID)
+
+			// Verify chain was registered and can be retrieved
+			chains, err := baseState.GetChains(subnetID)
+			require.NoError(err)
+			require.Len(chains, 1)
+			// Compare by txID — deep equality fails due to private fields
+			// (e.g. publicKey, SyntacticallyVerified) not surviving round-trip.
+			require.Equal(test.tx.ID(), chains[0].ID())
+			chainTx, ok := chains[0].Unsigned.(*txs.CreateL1Tx)
+			require.True(ok)
+			require.Equal(unsignedCreateL1Tx.VMID, chainTx.VMID)
+			require.Equal(unsignedCreateL1Tx.GenesisData, chainTx.GenesisData)
+
+			// Verify L1 conversion was recorded
+			expectedConversionID, err := message.SubnetToL1ConversionID(message.SubnetToL1ConversionData{
+				SubnetID:       subnetID,
+				ManagerChainID: managerChainID,
+				ManagerAddress: managerAddress,
+				Validators: []message.SubnetToL1ConversionValidatorData{
+					{
+						NodeID:       nodeID.Bytes(),
+						BLSPublicKey: pop.PublicKey,
+						Weight:       weight,
+					},
+				},
+			})
+			require.NoError(err)
+
+			stateConversion, err := baseState.GetSubnetToL1Conversion(subnetID)
+			require.NoError(err)
+			require.Equal(
+				state.SubnetToL1Conversion{
+					ConversionID: expectedConversionID,
+					ChainID:      managerChainID,
+					Addr:         managerAddress,
+				},
+				stateConversion,
+			)
+
+			// Verify L1 validator was registered
+			validationID := subnetID.Append(0)
+			pkBytes := bls.PublicKeyToUncompressedBytes(sk.PublicKey())
+
+			remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.RemainingBalanceOwner)
+			require.NoError(err)
+			deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.DeactivationOwner)
+			require.NoError(err)
+
+			l1Validator, err := baseState.GetL1Validator(validationID)
+			require.NoError(err)
+			require.Equal(
+				state.L1Validator{
+					ValidationID:          validationID,
+					SubnetID:              subnetID,
+					NodeID:                nodeID,
+					PublicKey:             pkBytes,
+					RemainingBalanceOwner: remainingBalanceOwner,
+					DeactivationOwner:     deactivationOwner,
+					StartTime:             uint64(baseState.GetTimestamp().Unix()),
+					Weight:                validator.Weight,
+					MinNonce:              0,
+					EndAccumulatedFee:     validator.Balance + baseState.GetAccruedFees(),
+				},
+				l1Validator,
+			)
+		})
+	}
+}
+
 func must[T any](t require.TestingT) func(T, error) T {
 	return func(val T, err error) T {
 		require.NoError(t, err)

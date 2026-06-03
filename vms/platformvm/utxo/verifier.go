@@ -469,6 +469,23 @@ func (i *inputOutputGetter) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 	return nil
 }
 
+// Had to create a new function: 1. in case we remove ConvertSubnetToL1Tx. 2. because ConvertSubnetToL1Tx takes in an instance of *txs.ConvertSubnetToL1Tx
+
+func (i *inputOutputGetter) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	for _, v := range tx.Validators {
+		producedAVAX, err := math.Add(i.ProducedAVAX, v.Balance)
+		if err != nil {
+			return fmt.Errorf("failed to add validator balance: %w", err)
+		}
+
+		i.ProducedAVAX = producedAVAX
+	}
+
+	return nil
+}
+
 // RegisterL1ValidatorTx treats the validator balance like produced AVAX because
 // the fee payer must have enough input AVAX to cover the initial state of the
 // validator

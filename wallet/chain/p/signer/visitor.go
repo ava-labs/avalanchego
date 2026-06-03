@@ -197,6 +197,15 @@ func (s *visitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
 	return sign(s.tx, txSigners)
 }
 
+// CreateL1Tx creates a whole new subnet, so there is no existing subnet auth to sign, so we remove that part completely.
+func (s *visitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, txSigners)
+}
+
 func (s *visitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {

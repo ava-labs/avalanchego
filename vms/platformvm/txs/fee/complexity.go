@@ -192,6 +192,18 @@ var (
 		gas.DBRead:  3, // subnet auth + transformation lookup + conversion lookup
 		gas.DBWrite: 2, // write conversion manager + total weight
 	}
+	IntrinsicCreateL1TxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			wrappers.ShortLen + // chainName length
+			ids.IDLen +         // vmID
+			wrappers.IntLen +   // num fxIDs
+			wrappers.IntLen +   // genesis length
+			ids.IDLen +         // managerChainID
+			wrappers.IntLen +   // address length
+			wrappers.IntLen,    // validators length
+		gas.DBRead:  0, // no subnet auth, no transformation/conversion lookup
+		gas.DBWrite: 3, // put subnet + put chain + put conversion
+	}
 	IntrinsicRegisterL1ValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.LongLen + // balance
@@ -733,6 +745,42 @@ func (c *complexityVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 		&gas.Dimensions{
 			gas.Bandwidth: uint64(len(tx.Address)),
 		},
+	)
+	return err
+}
+
+func (c *complexityVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	bandwidth, err := math.Mul(uint64(len(tx.FxIDs)), ids.IDLen)
+	if err != nil {
+		return err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(tx.ChainName)))
+	if err != nil {
+		return err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(tx.GenesisData)))
+	if err != nil {
+		return err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(tx.ManagerAddress)))
+	if err != nil {
+		return err
+	}
+	dynamicComplexity := gas.Dimensions{
+		gas.Bandwidth: bandwidth,
+	}
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	validatorComplexity, err := ConvertSubnetToL1ValidatorComplexity(tx.Validators...)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicCreateL1TxComplexities.Add(
+		&dynamicComplexity,
+		&baseTxComplexity,
+		&validatorComplexity,
 	)
 	return err
 }

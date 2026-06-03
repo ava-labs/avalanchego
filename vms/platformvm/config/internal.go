@@ -107,3 +107,22 @@ func (c *Internal) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 
 	c.Chains.QueueChainCreation(chainParams)
 }
+
+// CreateL1Chain creates the blockchain described in [tx], but only if this node
+// is a member of the subnet that validates the chain. Unlike CreateChain, the
+// subnetID is passed explicitly because CreateL1Tx derives it as the txID
+// rather than storing it as a field on the transaction.
+func (c *Internal) CreateL1Chain(subnetID ids.ID, tx *txs.CreateL1Tx) {
+	if c.SybilProtectionEnabled &&
+		!c.TrackedSubnets.Contains(subnetID) {
+		return
+	}
+
+	c.Chains.QueueChainCreation(chains.ChainParameters{
+		ID:          tx.BlockchainID(subnetID),
+		SubnetID:    subnetID,
+		GenesisData: tx.GenesisData,
+		VMID:        tx.VMID,
+		FxIDs:       tx.FxIDs,
+	})
+}

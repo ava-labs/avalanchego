@@ -9,14 +9,14 @@ type Visitor interface {
 	AddValidatorTx(*AddValidatorTx) error
 	AddSubnetValidatorTx(*AddSubnetValidatorTx) error
 	AddDelegatorTx(*AddDelegatorTx) error
-	CreateChainTx(*CreateChainTx) error   // THIS WILL BE REMOVED
-	CreateSubnetTx(*CreateSubnetTx) error // THIS WILL BE REMOVED
+	CreateChainTx(*CreateChainTx) error
+	CreateSubnetTx(*CreateSubnetTx) error
 	ImportTx(*ImportTx) error
 	ExportTx(*ExportTx) error
 	AdvanceTimeTx(*AdvanceTimeTx) error
 	RewardValidatorTx(*RewardValidatorTx) error
 
-	// ADDED (one transaction creating subnet then chain then coverting to L1)
+	// ADDED (one transaction for creating subnet, creating chain, then coverting to L1)
 	CreateL1Tx(*CreateL1Tx) error
 
 	// Banff Transactions:
@@ -30,7 +30,7 @@ type Visitor interface {
 	BaseTx(*BaseTx) error
 
 	// Etna Transactions:
-	ConvertSubnetToL1Tx(*ConvertSubnetToL1Tx) error // THIS WILL BE REMOVED
+	ConvertSubnetToL1Tx(*ConvertSubnetToL1Tx) error
 	RegisterL1ValidatorTx(*RegisterL1ValidatorTx) error
 	SetL1ValidatorWeightTx(*SetL1ValidatorWeightTx) error
 	IncreaseL1ValidatorBalanceTx(*IncreaseL1ValidatorBalanceTx) error
