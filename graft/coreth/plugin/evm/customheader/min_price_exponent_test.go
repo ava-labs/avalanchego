@@ -117,6 +117,13 @@ func TestVerifyMinPriceExponent(t *testing.T) {
 			header: &types.Header{Time: 1001},
 		},
 		{
+			name:    "pre_helicon_rejects_set_value",
+			config:  extras.TestGraniteChainConfig,
+			parent:  &types.Header{Time: 1000},
+			header:  headerWithMinPriceExponent(1001, parentExponent),
+			wantErr: errRemoteMinPriceExponentSet,
+		},
+		{
 			name:    "missing_value",
 			config:  extras.TestHeliconChainConfig,
 			parent:  &types.Header{Time: 1000},
