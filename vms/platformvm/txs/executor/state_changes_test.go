@@ -407,19 +407,21 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
 
+	rewardConfig := reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .1 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
 	updated, err := AdvanceTimeTo(
 		&Backend{
 			Config: &config.Internal{
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
 				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+				RewardConfig:       rewardConfig,
 			},
-			Rewards: reward.NewCalculator(reward.Config{
-				MaxConsumptionRate: .12 * reward.PercentDenominator,
-				MinConsumptionRate: .1 * reward.PercentDenominator,
-				MintingPeriod:      365 * 24 * time.Hour,
-				SupplyCap:          720 * units.MegaAvax,
-			}),
+			Rewards: reward.NewCalculator(rewardConfig),
 		},
 		s,
 		startTime,
@@ -485,12 +487,27 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
 
-	rewards := reward.NewCalculator(reward.Config{
+	rewardConfig := reward.Config{
 		MaxConsumptionRate: .12 * reward.PercentDenominator,
 		MinConsumptionRate: .1 * reward.PercentDenominator,
 		MintingPeriod:      365 * 24 * time.Hour,
 		SupplyCap:          720 * units.MegaAvax,
-	})
+	}
+	backend := &Backend{
+		Config: &config.Internal{
+			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			RewardConfig:       rewardConfig,
+		},
+		Rewards: reward.NewCalculator(rewardConfig),
+	}
+
+	// Derive the expectations from the same calculator the promotion logic
+	// uses, so the assertions stay correct regardless of the active reward
+	// schedule (e.g. Helicon's reduced consumption rate).
+	rewards, err := GetRewardsCalculator(backend, s, constants.PrimaryNetworkID)
+	require.NoError(t, err)
 
 	initialSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
@@ -499,18 +516,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 	wantDelegatorReward := rewards.Calculate(duration, delegatorWeight, initialSupply)
 	wantValidatorReward := rewards.Calculate(duration, validatorWeight, initialSupply+wantDelegatorReward)
 
-	_, err = AdvanceTimeTo(
-		&Backend{
-			Config: &config.Internal{
-				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
-				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
-			},
-			Rewards: rewards,
-		},
-		s,
-		startTime,
-	)
+	_, err = AdvanceTimeTo(backend, s, startTime)
 	require.NoError(t, err)
 
 	gotValidator, err := s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
