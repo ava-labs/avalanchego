@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -2291,6 +2292,45 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 					nonce, err := client.NonceAt(ctx, vmtest.TestEthAddrs[0], new(big.Int).SetUint64(blockNum))
 					require.NoError(t, err)
 					require.Equal(t, blockNum, nonce, "nonce at height %d", blockNum)
+
+					blockNumOrHash := rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(blockNum))
+					to := vmtest.TestEthAddrs[1]
+					callArg := map[string]any{
+						"from":     vmtest.TestEthAddrs[0],
+						"to":       &to,
+						"value":    (*hexutil.Big)(big.NewInt(1)),
+						"gas":      hexutil.Uint64(ethparams.TxGas),
+						"gasPrice": (*hexutil.Big)(vmtest.InitialBaseFee),
+					}
+
+					// eth_estimateGas params.
+					var (
+						gasResult            hexutil.Uint64
+						estimateGasRPCMethod = "eth_estimateGas"
+					)
+
+					rpcClient := client.Client()
+					// Verify that eth_estimateGas works.
+					require.NoErrorf(t, rpcClient.CallContext(ctx, &gasResult, estimateGasRPCMethod, callArg, blockNumOrHash), "failed to estimate gas at block %d", blockNum)
+					require.Equalf(t, ethparams.TxGas, uint64(gasResult), "unexpected gas estimate at block %d", blockNum)
+
+					// eth_createAccessList params.
+					var (
+						createAccessListRPCMethod = "eth_createAccessList"
+						accessListResult          struct {
+							Accesslist *types.AccessList `json:"accessList"`
+							Error      string            `json:"error,omitempty"`
+							GasUsed    hexutil.Uint64    `json:"gasUsed"`
+						}
+					)
+
+					// Verify that eth_createAccessList works.
+					require.NoErrorf(t, rpcClient.CallContext(ctx, &accessListResult, createAccessListRPCMethod, callArg, blockNumOrHash), "failed to create access list at block %d", blockNum)
+					require.Emptyf(t, accessListResult.Error, "unexpected VM error at block %d", blockNum)
+					require.NotNilf(t, accessListResult.Accesslist, "missing access list at block %d", blockNum)
+					// An EOA-to-EOA transfer does not touch any storage slots, and should not produce an access list.
+					require.Emptyf(t, *accessListResult.Accesslist, "unexpected access list at block %d", blockNum)
+					require.Equalf(t, ethparams.TxGas, uint64(accessListResult.GasUsed), "unexpected gas used at block %d", blockNum)
 				}
 			})
 		})

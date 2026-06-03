@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/log"
 )
 
 var _ state.Database = (*reconstructedStateAccessor)(nil)
@@ -73,10 +74,14 @@ func (*reconstructedStateAccessor) OpenStorageTrie(stateRoot common.Hash, addr c
 func (*reconstructedStateAccessor) CopyTrie(t state.Trie) state.Trie {
 	switch t := t.(type) {
 	case *reconstructedAccountTrie:
-		// reconstructedAccountTrie is not concurrent-safe
-		return nil
+		cp, err := t.Copy()
+		if err != nil {
+			log.Error("Failed to copy reconstructed trie", "error", err)
+			return nil
+		}
+		return cp
 	case *storageTrie:
-		return nil
+		return nil // The storage trie just wraps the account trie, so we must re-open it separately.
 	default:
 		panic(fmt.Errorf("unknown trie type %T", t))
 	}
