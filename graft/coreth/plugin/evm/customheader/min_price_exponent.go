@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	errRemoteMinPriceExponentSet = errors.New("remote min price exponent should be nil")
 	errRemoteMinPriceExponentNil = errors.New("remote min price exponent should not be nil")
 	errIncorrectMinPriceExponent = errors.New("incorrect min price exponent")
 	errParentMinPriceExponentNil = errors.New("parent min price exponent should not be nil")
@@ -44,11 +45,15 @@ func VerifyMinPriceExponent(
 	parent *types.Header,
 	header *types.Header,
 ) error {
+	remote := customtypes.GetHeaderExtra(header).MinPriceExponent
 	if !config.IsHelicon(header.Time) {
+		// TODO(powerslider): remove after Helicon is activated.
+		if remote != nil {
+			return fmt.Errorf("%w: %s", errRemoteMinPriceExponentSet, header.Hash())
+		}
 		return nil
 	}
 
-	remote := customtypes.GetHeaderExtra(header).MinPriceExponent
 	if remote == nil {
 		return fmt.Errorf("%w: %s", errRemoteMinPriceExponentNil, header.Hash())
 	}
