@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -243,14 +244,20 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 			NetworkID:    env.ctx.NetworkID,
 			BlockchainID: env.ctx.ChainID,
 		}},
-		ValidatorNodeID:          nodeID,
-		Signer:                   pop,
-		StakeOuts:                []*avax.TransferableOutput{},
+		ValidatorNodeID: types.JSONByteSlice(nodeID.Bytes()),
+		Signer:          pop,
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: env.config.MinValidatorStake,
+				},
+			},
+		},
 		ValidatorRewardsOwner:    &secp256k1fx.OutputOwners{},
 		DelegatorRewardsOwner:    &secp256k1fx.OutputOwners{},
-		Owner:                    &secp256k1fx.OutputOwners{},
+		ValidatorAuthority:       &secp256k1fx.OutputOwners{},
 		DelegationShares:         reward.PercentDenominator,
-		Wght:                     env.config.MinValidatorStake,
 		AutoCompoundRewardShares: reward.PercentDenominator,
 		Period:                   uint64(stakePeriod / time.Second),
 	}, txs.Codec, nil)
@@ -733,16 +740,22 @@ func TestNewRewardTxForStaker(t *testing.T) {
 			name: "AddAutoRenewedValidatorTx returns RewardAutoRenewedValidatorTx",
 			stakerTxFunc: func(t testing.TB) *txs.Tx {
 				utx := &txs.AddAutoRenewedValidatorTx{
-					BaseTx:                validBaseTx,
-					ValidatorNodeID:       ids.GenerateTestNodeID(),
-					Period:                1,
-					Wght:                  2,
-					Signer:                blsPOP,
-					StakeOuts:             []*avax.TransferableOutput{},
+					BaseTx:          validBaseTx,
+					ValidatorNodeID: types.JSONByteSlice(ids.GenerateTestNodeID().Bytes()),
+					Period:          1,
+					Signer:          blsPOP,
+					StakeOuts: []*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{ID: ids.GenerateTestID()},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 2,
+							},
+						},
+					},
 					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
 					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
 					DelegationShares:      reward.PercentDenominator,
-					Owner:                 &secp256k1fx.OutputOwners{},
+					ValidatorAuthority:    &secp256k1fx.OutputOwners{},
 				}
 
 				tx, err := txs.NewSigned(utx, txs.Codec, nil)
