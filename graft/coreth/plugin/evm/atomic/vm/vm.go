@@ -321,13 +321,13 @@ func (vm *VM) Shutdown(context.Context) error {
 	if vm.AtomicBackend != nil {
 		_, lastAcceptedHeight, err := vm.InnerVM.ReadLastAccepted()
 		if err != nil {
-			log.Error("failed to read last accepted block on shutdown", "err", err)
-		} else if err := vm.AtomicBackend.CommitLastAcceptedRoot(lastAcceptedHeight); err != nil {
-			log.Error("failed to commit atomic trie on shutdown", "err", err)
+			log.Error("reading last accepted block on shutdown", "err", err)
+		} else if err := vm.AtomicBackend.CommitLastAccepted(lastAcceptedHeight); err != nil {
+			log.Error("committing atomic trie on shutdown", "err", err)
 		}
 	}
 	if err := vm.InnerVM.Shutdown(context.Background()); err != nil {
-		log.Error("failed to shutdown inner VM", "err", err)
+		log.Error("shutting down inner VM", "err", err)
 	}
 	vm.shutdownWg.Wait()
 	return nil

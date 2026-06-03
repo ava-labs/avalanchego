@@ -409,11 +409,11 @@ func (a *AtomicBackend) AtomicTrie() *AtomicTrie {
 // at or beyond lastAcceptedHeight.
 //
 // lastAcceptedHeight MUST correspond to the current last accepted root.
-func (a *AtomicBackend) CommitLastAcceptedRoot(lastAcceptedHeight uint64) error {
-	if _, committedHeight := a.atomicTrie.LastCommitted(); committedHeight >= lastAcceptedHeight {
+func (a *AtomicBackend) CommitLastAccepted(height uint64) error {
+	if _, committedHeight := a.atomicTrie.LastCommitted(); committedHeight >= height {
 		return nil
 	}
-	if err := a.atomicTrie.Commit(lastAcceptedHeight, a.atomicTrie.LastAcceptedRoot()); err != nil {
+	if err := a.atomicTrie.Commit(height, a.atomicTrie.LastAcceptedRoot()); err != nil {
 		return err
 	}
 	return a.repo.db.Commit()
