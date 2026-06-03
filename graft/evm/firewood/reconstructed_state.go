@@ -81,7 +81,7 @@ func (*reconstructedStateAccessor) CopyTrie(t state.Trie) state.Trie {
 		}
 		return cp
 	case *storageTrie:
-		return nil
+		return nil // The storage trie just wraps the account trie, so we must re-open it separately.
 	default:
 		panic(fmt.Errorf("unknown trie type %T", t))
 	}
