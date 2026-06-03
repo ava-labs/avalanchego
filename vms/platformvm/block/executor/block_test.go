@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 func TestBlockOptions(t *testing.T) {
@@ -513,7 +514,7 @@ func TestBlockOptions(t *testing.T) {
 					nodeID     = ids.GenerateTestNodeID()
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddAutoRenewedValidatorTx{
-							ValidatorNodeID: nodeID,
+							ValidatorNodeID: types.JSONByteSlice(nodeID.Bytes()),
 						},
 						TxID: stakerTxID,
 					}
@@ -567,7 +568,7 @@ func TestBlockOptions(t *testing.T) {
 					nodeID     = ids.GenerateTestNodeID()
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddAutoRenewedValidatorTx{
-							ValidatorNodeID: nodeID,
+							ValidatorNodeID: types.JSONByteSlice(nodeID.Bytes()),
 						},
 						TxID: stakerTxID,
 					}
