@@ -142,7 +142,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		if bytes.Equal(txBytes, b) {
 			return testTx, nil
 		}
-		require.FailNow("asked to parse unexpected transaction")
+		t.Fatal("asked to parse unexpected transaction")
 		return nil, nil
 	}
 

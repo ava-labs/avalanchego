@@ -88,8 +88,8 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 	return txs.RegisterEtnaTypes(targetCodec)
 }
 
-// RegisterHeliconTypes registers the type information for transactions that
-// were valid during the Helicon series of upgrades.
+// RegisterHeliconTypes registers the type information for blocks that were
+// valid during the Helicon series of upgrades.
 func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 	return txs.RegisterHeliconTypes(targetCodec)
 }

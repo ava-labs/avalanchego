@@ -513,7 +513,7 @@ func TestBlockOptions(t *testing.T) {
 					nodeID     = ids.GenerateTestNodeID()
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddAutoRenewedValidatorTx{
-							ValidatorNodeID: nodeID,
+							ValidatorNodeID: nodeID[:],
 						},
 						TxID: stakerTxID,
 					}
@@ -567,7 +567,7 @@ func TestBlockOptions(t *testing.T) {
 					nodeID     = ids.GenerateTestNodeID()
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddAutoRenewedValidatorTx{
-							ValidatorNodeID: nodeID,
+							ValidatorNodeID: nodeID[:],
 						},
 						TxID: stakerTxID,
 					}

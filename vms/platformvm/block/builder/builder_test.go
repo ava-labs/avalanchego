@@ -243,14 +243,13 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 			NetworkID:    env.ctx.NetworkID,
 			BlockchainID: env.ctx.ChainID,
 		}},
-		ValidatorNodeID:          nodeID,
+		ValidatorNodeID:          nodeID[:],
 		Signer:                   pop,
 		StakeOuts:                []*avax.TransferableOutput{},
 		ValidatorRewardsOwner:    &secp256k1fx.OutputOwners{},
 		DelegatorRewardsOwner:    &secp256k1fx.OutputOwners{},
-		Owner:                    &secp256k1fx.OutputOwners{},
+		ValidatorAuthority:       &secp256k1fx.OutputOwners{},
 		DelegationShares:         reward.PercentDenominator,
-		Wght:                     env.config.MinValidatorStake,
 		AutoCompoundRewardShares: reward.PercentDenominator,
 		Period:                   uint64(stakePeriod / time.Second),
 	}, txs.Codec, nil)
@@ -734,15 +733,14 @@ func TestNewRewardTxForStaker(t *testing.T) {
 			stakerTxFunc: func(t testing.TB) *txs.Tx {
 				utx := &txs.AddAutoRenewedValidatorTx{
 					BaseTx:                validBaseTx,
-					ValidatorNodeID:       ids.GenerateTestNodeID(),
+					ValidatorNodeID:       ids.GenerateTestNodeID().Bytes(),
 					Period:                1,
-					Wght:                  2,
 					Signer:                blsPOP,
 					StakeOuts:             []*avax.TransferableOutput{},
 					ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
 					DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
 					DelegationShares:      reward.PercentDenominator,
-					Owner:                 &secp256k1fx.OutputOwners{},
+					ValidatorAuthority:    &secp256k1fx.OutputOwners{},
 				}
 
 				tx, err := txs.NewSigned(utx, txs.Codec, nil)

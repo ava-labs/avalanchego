@@ -897,13 +897,12 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	require.NoError(err)
 
 	addAutoRenewedValidatorTx := &txs.AddAutoRenewedValidatorTx{
-		ValidatorNodeID:          nodeID,
+		ValidatorNodeID:          nodeID[:],
 		Signer:                   pop,
 		ValidatorRewardsOwner:    rewardOwner,
 		DelegatorRewardsOwner:    rewardOwner,
-		Owner:                    configOwner,
+		ValidatorAuthority:       configOwner,
 		DelegationShares:         reward.PercentDenominator,
-		Wght:                     weight,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		Period:                   periodSeconds,
 	}
@@ -947,12 +946,12 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	require.NotNil(gotValidator.Signer)
 	require.Equal(pop.PublicKey, gotValidator.Signer.PublicKey)
 	require.Equal(pop.ProofOfPossession, gotValidator.Signer.ProofOfPossession)
-	require.NotNil(gotValidator.ConfigOwner)
-	require.Equal(avajson.Uint32(configOwner.Threshold), gotValidator.ConfigOwner.Threshold)
-	require.Len(gotValidator.ConfigOwner.Addresses, 1)
+	require.NotNil(gotValidator.ValidatorAuthority)
+	require.Equal(avajson.Uint32(configOwner.Threshold), gotValidator.ValidatorAuthority.Threshold)
+	require.Len(gotValidator.ValidatorAuthority.Addresses, 1)
 	wantConfigOwnerAddr, err := service.addrManager.FormatLocalAddress(configOwner.Addrs[0])
 	require.NoError(err)
-	require.Equal(wantConfigOwnerAddr, gotValidator.ConfigOwner.Addresses[0])
+	require.Equal(wantConfigOwnerAddr, gotValidator.ValidatorAuthority.Addresses[0])
 	require.Equal(avajson.Uint64(periodSeconds), *gotValidator.Period)
 	require.Equal(avajson.Uint32(autoCompoundRewardShares), *gotValidator.AutoCompoundRewardShares)
 }
@@ -1658,7 +1657,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					require.Equal(avajson.Uint32(expectedDeactivationOwner.Threshold), v.DeactivationOwner.Threshold)
 					return v.NodeID
 				default:
-					require.Failf("unexpected validator type", "got: %T", vdr)
+					t.Fatalf("unexpected validator type: %T", vdr)
 					return ids.NodeID{}
 				}
 			}

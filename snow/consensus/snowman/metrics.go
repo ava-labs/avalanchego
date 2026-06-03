@@ -117,7 +117,7 @@ func newMetrics(
 		consensusLatencies: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Name:    "consensus_latencies",
 			Help:    "times (in ns) from issuance of a block to acceptance, bucketed",
-			Buckets: prometheus.LinearBuckets(float64(time.Second), float64(time.Second), 4),
+			Buckets: prometheus.LinearBuckets(float64(time.Second), float64(time.Second), 8),
 		}),
 		buildLatencyAccepted: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "blks_build_accept_latency",

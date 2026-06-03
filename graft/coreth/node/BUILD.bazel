@@ -1,5 +1,10 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
 go_library(
     name = "node",
     srcs = [
@@ -10,7 +15,6 @@ go_library(
         "node.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/node",
-    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/internal/debug",
         "//graft/evm/rpc",

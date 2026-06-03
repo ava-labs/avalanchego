@@ -1,6 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
 go_library(
     name = "evm",
     srcs = [
@@ -21,7 +26,6 @@ go_library(
         "wrapped_block.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm",
-    visibility = ["//visibility:public"],
     deps = [
         "//api",
         "//api/metrics",
@@ -95,6 +99,7 @@ go_library(
         "//vms/evm/uptimetracker",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//eth/tracers/js",
@@ -141,7 +146,6 @@ graft_go_test(
         "//graft/evm/constants",
         "//graft/evm/firewood",
         "//graft/evm/rpc",
-        "//graft/evm/sync/client",
         "//graft/evm/sync/engine",
         "//graft/evm/sync/synctest",
         "//graft/evm/utils",
@@ -221,6 +225,7 @@ graft_go_test(
         "@com_github_ava_labs_libevm//trie",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
         "@org_uber_go_mock//gomock",

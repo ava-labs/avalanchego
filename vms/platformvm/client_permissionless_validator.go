@@ -64,7 +64,7 @@ type ClientPermissionlessValidator struct {
 	Delegators      []ClientDelegator
 
 	// Auto-renewed validators.
-	ConfigOwner              *ClientOwner
+	ValidatorAuthority       *ClientOwner
 	Period                   *uint64
 	AutoCompoundRewardShares *uint32
 }
@@ -163,7 +163,7 @@ func getClientPrimaryOrSubnetValidator(apiValidator api.PermissionlessValidator)
 		return ClientPermissionlessValidator{}, err
 	}
 
-	configOwner, err := apiOwnerToClientOwner(apiValidator.ConfigOwner)
+	validatorAuthority, err := apiOwnerToClientOwner(apiValidator.ValidatorAuthority)
 	if err != nil {
 		return ClientPermissionlessValidator{}, err
 	}
@@ -199,7 +199,7 @@ func getClientPrimaryOrSubnetValidator(apiValidator api.PermissionlessValidator)
 		DelegatorWeight:        (*uint64)(apiValidator.DelegatorWeight),
 		Delegators:             clientDelegators,
 
-		ConfigOwner:              configOwner,
+		ValidatorAuthority:       validatorAuthority,
 		Period:                   (*uint64)(apiValidator.Period),
 		AutoCompoundRewardShares: (*uint32)(apiValidator.AutoCompoundRewardShares),
 	}, nil
