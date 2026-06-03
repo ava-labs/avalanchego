@@ -282,6 +282,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint64(MinDelegatorFeeKey, uint64(genesis.LocalParams.MinDelegationFee), "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
 	// Minimum Stake Duration
 	fs.Duration(MinStakeDurationKey, genesis.LocalParams.MinStakeDuration, "Minimum staking duration")
+	fs.Duration(HeliconMinStakeDurationKey, genesis.LocalParams.HeliconMinStakeDuration, "Minimum staking duration for Helicon")
 	// Maximum Stake Duration
 	fs.Duration(MaxStakeDurationKey, genesis.LocalParams.MaxStakeDuration, "Maximum staking duration")
 	// Stake Reward Configs

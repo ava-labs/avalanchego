@@ -82,8 +82,8 @@ var (
 		FortunaTime:                  InitiallyActiveTime,
 		GraniteTime:                  InitiallyActiveTime,
 		GraniteEpochDuration:         30 * time.Second,
-		HeliconTime:                  time.Date(2026, time.June, 1, 12+4, 45, 0, 0, time.UTC),
-		// HeliconTime: UnscheduledActivationTime,
+		HeliconTime:                  InitiallyActiveTime,
+		// HeliconTime:                  time.Date(2026, time.June, 4, 16, 0, 0, 0, time.UTC), // Noon ET on the 4th
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
