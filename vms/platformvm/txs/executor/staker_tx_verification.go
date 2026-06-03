@@ -142,12 +142,12 @@ func verifyAddValidatorTx(
 		return nil, ErrStakeTooLong
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return nil, fmt.Errorf("getting utxos %w", err)
-	}
-
 	if !backend.Bootstrapped.Get() {
+		_, outs, _, err := utxo.GetInputOutputs(tx)
+		if err != nil {
+			return nil, err
+		}
+
 		return outs, nil
 	}
 
@@ -155,47 +155,11 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	_, err = GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-	if err == nil {
-		return nil, fmt.Errorf(
-			"%s is %w of the primary network",
-			tx.Validator.NodeID,
-			ErrAlreadyValidator,
-		)
-	}
-	if err != database.ErrNotFound {
-		return nil, fmt.Errorf(
-			"failed to find whether %s is a primary network validator: %w",
-			tx.Validator.NodeID,
-			err,
-		)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
+	if err := verifyNoValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID); err != nil {
 		return nil, err
 	}
 
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return nil, fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
-	return outs, nil
+	return verifySpend(backend, feeCalculator, chainState, tx, sTx.Creds)
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
@@ -220,10 +184,7 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	startTime := currentTimestamp
-	if !isDurangoActive {
-		startTime = tx.StartTime()
-	}
+	startTime := getStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime())
 	duration := tx.EndTime().Sub(startTime)
 
 	switch {
@@ -244,21 +205,8 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
-	if err == nil {
-		return fmt.Errorf(
-			"attempted to issue %w for %s on subnet %s",
-			ErrDuplicateValidator,
-			tx.Validator.NodeID,
-			tx.SubnetValidator.Subnet,
-		)
-	}
-	if err != database.ErrNotFound {
-		return fmt.Errorf(
-			"failed to find whether %s is a subnet validator: %w",
-			tx.Validator.NodeID,
-			err,
-		)
+	if err := verifyNoValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID); err != nil {
+		return err
 	}
 
 	if err := verifySubnetValidatorPrimaryNetworkRequirements(isDurangoActive, chainState, tx.Validator); err != nil {
@@ -270,36 +218,8 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
-	return nil
+	_, err = verifySpend(backend, feeCalculator, chainState, tx, baseTxCreds)
+	return err
 }
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -361,32 +281,8 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, err
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return nil, false, fmt.Errorf("getting utxos: %w", err)
-	}
-
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
+	if _, err := verifySpend(backend, feeCalculator, chainState, tx, baseTxCreds); err != nil {
 		return nil, false, err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return nil, false, fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
 	return vdr, isCurrentValidator, nil
@@ -438,12 +334,11 @@ func verifyAddDelegatorTx(
 		return nil, ErrWeightTooSmall
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return nil, fmt.Errorf("getting utxos: %w", err)
-	}
-
 	if !backend.Bootstrapped.Get() {
+		_, outs, _, err := utxo.GetInputOutputs(tx)
+		if err != nil {
+			return nil, fmt.Errorf("getting utxos: %w", err)
+		}
 		return outs, nil
 	}
 
@@ -469,54 +364,18 @@ func verifyAddDelegatorTx(
 		maximumWeight = min(maximumWeight, backend.Config.MaxValidatorStake)
 	}
 
-	if !txs.BoundedBy(
-		startTime,
-		endTime,
-		primaryNetworkValidator.StartTime,
-		primaryNetworkValidator.EndTime,
-	) {
-		return nil, ErrPeriodMismatch
-	}
-	overDelegated, err := overDelegated(
+	if err := verifyDelegatorLimits(
 		chainState,
 		primaryNetworkValidator,
 		maximumWeight,
 		tx.Validator.Wght,
 		startTime,
 		endTime,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if overDelegated {
-		return nil, ErrOverDelegated
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return nil, fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
 	); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return nil, err
 	}
 
-	return outs, nil
+	return verifySpend(backend, feeCalculator, chainState, tx, sTx.Creds)
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -545,10 +404,7 @@ func verifyAddPermissionlessValidatorTx(
 		return nil
 	}
 
-	startTime := currentTimestamp
-	if !isDurangoActive {
-		startTime = tx.StartTime()
-	}
+	startTime := getStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime())
 	duration := tx.EndTime().Sub(startTime)
 
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
@@ -560,54 +416,18 @@ func verifyAddPermissionlessValidatorTx(
 		return err
 	}
 
-	stakedAssetID := tx.StakeOuts[0].AssetID()
-	switch {
-	case tx.Validator.Wght < validatorRules.minValidatorStake:
-		// Ensure validator is staking at least the minimum amount
-		return ErrWeightTooSmall
-
-	case tx.Validator.Wght > validatorRules.maxValidatorStake:
-		// Ensure validator isn't staking too much
-		return ErrWeightTooLarge
-
-	case tx.DelegationShares < validatorRules.minDelegationFee:
-		// Ensure the validator fee is at least the minimum amount
-		return ErrInsufficientDelegationFee
-
-	case duration < validatorRules.minStakeDuration:
-		// Ensure staking length is not too short
-		return ErrStakeTooShort
-
-	case duration > validatorRules.maxStakeDuration:
-		// Ensure staking length is not too long
-		return ErrStakeTooLong
-
-	case stakedAssetID != validatorRules.assetID:
-		// Wrong assetID used
-		return fmt.Errorf(
-			"%w: %s != %s",
-			ErrWrongStakedAssetID,
-			validatorRules.assetID,
-			stakedAssetID,
-		)
+	if err := verifyValidatorParameters(
+		validatorRules,
+		tx.Validator.Wght,
+		tx.DelegationShares,
+		duration,
+		tx.StakeOuts[0].AssetID(),
+	); err != nil {
+		return err
 	}
 
-	_, err = GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
-	if err == nil {
-		return fmt.Errorf(
-			"%w: %s on %s",
-			ErrDuplicateValidator,
-			tx.Validator.NodeID,
-			tx.Subnet,
-		)
-	}
-	if err != database.ErrNotFound {
-		return fmt.Errorf(
-			"failed to find whether %s is a validator on %s: %w",
-			tx.Validator.NodeID,
-			tx.Subnet,
-			err,
-		)
+	if err := verifyNoValidator(chainState, tx.Subnet, tx.Validator.NodeID); err != nil {
+		return err
 	}
 
 	if tx.Subnet != constants.PrimaryNetworkID {
@@ -616,36 +436,8 @@ func verifyAddPermissionlessValidatorTx(
 		}
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
-	return nil
+	_, err = verifySpend(backend, feeCalculator, chainState, tx, sTx.Creds)
+	return err
 }
 
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
@@ -676,12 +468,9 @@ func verifyAddPermissionlessDelegatorTx(
 
 	var (
 		endTime   = tx.EndTime()
-		startTime = currentTimestamp
+		startTime = getStakerStartTime(isDurangoActive, currentTimestamp, tx.StartTime())
+		duration  = endTime.Sub(startTime)
 	)
-	if !isDurangoActive {
-		startTime = tx.StartTime()
-	}
-	duration := endTime.Sub(startTime)
 
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
 		return err
@@ -692,28 +481,13 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	stakedAssetID := tx.StakeOuts[0].AssetID()
-	switch {
-	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
-		// Ensure delegator is staking at least the minimum amount
-		return ErrWeightTooSmall
-
-	case duration < delegatorRules.minStakeDuration:
-		// Ensure staking length is not too short
-		return ErrStakeTooShort
-
-	case duration > delegatorRules.maxStakeDuration:
-		// Ensure staking length is not too long
-		return ErrStakeTooLong
-
-	case stakedAssetID != delegatorRules.assetID:
-		// Wrong assetID used
-		return fmt.Errorf(
-			"%w: %s != %s",
-			ErrWrongStakedAssetID,
-			delegatorRules.assetID,
-			stakedAssetID,
-		)
+	if err := verifyDelegatorParameters(
+		delegatorRules,
+		tx.Validator.Wght,
+		duration,
+		tx.StakeOuts[0].AssetID(),
+	); err != nil {
+		return err
 	}
 
 	validator, err := GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
@@ -735,27 +509,15 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 	maximumWeight = min(maximumWeight, delegatorRules.maxValidatorStake)
 
-	if !txs.BoundedBy(
-		startTime,
-		endTime,
-		validator.StartTime,
-		validator.EndTime,
-	) {
-		return ErrPeriodMismatch
-	}
-	overDelegated, err := overDelegated(
+	if err := verifyDelegatorLimits(
 		chainState,
 		validator,
 		maximumWeight,
 		tx.Validator.Wght,
 		startTime,
 		endTime,
-	)
-	if err != nil {
+	); err != nil {
 		return err
-	}
-	if overDelegated {
-		return ErrOverDelegated
 	}
 
 	if tx.Subnet != constants.PrimaryNetworkID {
@@ -770,36 +532,8 @@ func verifyAddPermissionlessDelegatorTx(
 		}
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		sTx.Creds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
-	return nil
+	_, err = verifySpend(backend, feeCalculator, chainState, tx, sTx.Creds)
+	return err
 }
 
 // Returns an error if the given tx is invalid.
@@ -841,36 +575,8 @@ func verifyTransferSubnetOwnershipTx(
 		return err
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = safemath.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
-	if err := backend.FlowChecker.VerifySpend(
-		tx,
-		chainState,
-		ins,
-		outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: producedAVAX,
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
-	}
-
-	return nil
+	_, err = verifySpend(backend, feeCalculator, chainState, tx, baseTxCreds)
+	return err
 }
 
 // verifyAddAutoRenewedValidatorTx carries out the validation for an AddAutoRenewedValidatorTx.
@@ -921,36 +627,12 @@ func verifyAddAutoRenewedValidatorTx(
 		return ErrStakeTooLong
 	}
 
-	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.NodeID())
-	switch {
-	case err == nil:
-		return fmt.Errorf(
-			"%w: %s",
-			ErrDuplicateValidator,
-			tx.NodeID(),
-		)
-	case errors.Is(err, database.ErrNotFound):
-		// OK: validator not found
-
-	default:
-		return fmt.Errorf(
-			"failed to get primary network validator %s: %w",
-			tx.NodeID(),
-			err,
-		)
-	}
-
-	if err := verifySpend(
-		backend,
-		feeCalculator,
-		chainState,
-		tx,
-		sTx.Creds,
-	); err != nil {
+	if err := verifyNoValidator(chainState, constants.PrimaryNetworkID, tx.NodeID()); err != nil {
 		return err
 	}
 
-	return nil
+	_, err := verifySpend(backend, feeCalculator, chainState, tx, sTx.Creds)
+	return err
 }
 
 // verifySetAutoRenewedValidatorConfigTx carries out the validation for an SetAutoRenewedValidatorConfigTx.
@@ -1019,7 +701,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return nil, err
 	}
 
-	if err := verifySpend(
+	if _, err := verifySpend(
 		backend,
 		feeCalculator,
 		chainState,
@@ -1030,6 +712,135 @@ func verifySetAutoRenewedValidatorConfigTx(
 	}
 
 	return validator, nil
+}
+
+// getStakerStartTime returns the start time used to validate a staker. Post-Durango
+// the chain time is used; pre-Durango the start time encoded in the tx is used.
+func getStakerStartTime(isDurangoActive bool, chainTime, preDurangoStart time.Time) time.Time {
+	if isDurangoActive {
+		return chainTime
+	}
+	return preDurangoStart
+}
+
+// verifyValidatorParameters verifies the staking bounds for a validator.
+func verifyValidatorParameters(
+	rules *addValidatorRules,
+	weight uint64,
+	delegationShares uint32,
+	duration time.Duration,
+	stakedAssetID ids.ID,
+) error {
+	switch {
+	case weight < rules.minValidatorStake:
+		// Ensure validator is staking at least the minimum amount
+		return ErrWeightTooSmall
+
+	case weight > rules.maxValidatorStake:
+		// Ensure validator isn't staking too much
+		return ErrWeightTooLarge
+
+	case delegationShares < rules.minDelegationFee:
+		// Ensure the validator fee is at least the minimum amount
+		return ErrInsufficientDelegationFee
+
+	case duration < rules.minStakeDuration:
+		// Ensure staking length is not too short
+		return ErrStakeTooShort
+
+	case duration > rules.maxStakeDuration:
+		// Ensure staking length is not too long
+		return ErrStakeTooLong
+
+	case stakedAssetID != rules.assetID:
+		// Wrong assetID used
+		return fmt.Errorf(
+			"%w: %s != %s",
+			ErrWrongStakedAssetID,
+			rules.assetID,
+			stakedAssetID,
+		)
+	}
+	return nil
+}
+
+// verifyDelegatorParameters verifies the staking bounds for a delegator.
+func verifyDelegatorParameters(
+	rules *addDelegatorRules,
+	weight uint64,
+	duration time.Duration,
+	stakedAssetID ids.ID,
+) error {
+	switch {
+	case weight < rules.minDelegatorStake:
+		// Ensure delegator is staking at least the minimum amount
+		return ErrWeightTooSmall
+
+	case duration < rules.minStakeDuration:
+		// Ensure staking length is not too short
+		return ErrStakeTooShort
+
+	case duration > rules.maxStakeDuration:
+		// Ensure staking length is not too long
+		return ErrStakeTooLong
+
+	case stakedAssetID != rules.assetID:
+		// Wrong assetID used
+		return fmt.Errorf(
+			"%w: %s != %s",
+			ErrWrongStakedAssetID,
+			rules.assetID,
+			stakedAssetID,
+		)
+	}
+	return nil
+}
+
+// verifyNoValidator returns ErrDuplicateValidator if [nodeID] is already a
+// current or pending validator of [subnetID].
+func verifyNoValidator(chainState state.Chain, subnetID ids.ID, nodeID ids.NodeID) error {
+	_, err := GetValidator(chainState, subnetID, nodeID)
+	if err == nil {
+		return fmt.Errorf(
+			"%w: %s on %s",
+			ErrDuplicateValidator,
+			nodeID,
+			subnetID,
+		)
+	}
+	if err != database.ErrNotFound {
+		return fmt.Errorf(
+			"failed to find whether %s is a validator on %s: %w",
+			nodeID,
+			subnetID,
+			err,
+		)
+	}
+	return nil
+}
+
+// verifyDelegatorLimits verifies that [validator]'s staking period bounds the
+// delegator's [start, end] period and that adding [addedWeight] would not
+// over-delegate [validator] beyond [maxWeight].
+func verifyDelegatorLimits(
+	chainState state.Chain,
+	validator *state.Staker,
+	maxWeight uint64,
+	addedWeight uint64,
+	start time.Time,
+	end time.Time,
+) error {
+	if !txs.BoundedBy(start, end, validator.StartTime, validator.EndTime) {
+		return ErrPeriodMismatch
+	}
+	overDelegated, err := overDelegated(chainState, validator, maxWeight, addedWeight, start, end)
+	if err != nil {
+		return err
+	}
+	if overDelegated {
+		return ErrOverDelegated
+	}
+	return nil
 }
 
 // Ensure the proposed validator starts after the current time
@@ -1051,26 +862,28 @@ func verifyStakerStartTime(isDurangoActive bool, chainTime, stakerTime time.Time
 	return nil
 }
 
+// verifySpend runs the flow check for tx and returns the produced outputs, which callers use as the refund outputs
+// when a staker is not added.
 func verifySpend(
 	backend *Backend,
 	feeCalculator fee.Calculator,
 	chainState state.Chain,
 	tx txs.UnsignedTx,
 	creds []verify.Verifiable,
-) error {
+) ([]*avax.TransferableOutput, error) {
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("getting utxos: %w", err)
+		return nil, fmt.Errorf("getting utxos: %w", err)
 	}
 
 	txFee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
-		return fmt.Errorf("calculating fee: %w", err)
+		return nil, fmt.Errorf("calculating fee: %w", err)
 	}
 
 	producedAVAX, err = safemath.Add(producedAVAX, txFee)
 	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
+		return nil, fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := backend.FlowChecker.VerifySpend(
@@ -1083,8 +896,8 @@ func verifySpend(
 			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
-		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
 	}
 
-	return nil
+	return outs, nil
 }
