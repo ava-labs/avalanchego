@@ -13,12 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
-func clampedToward(parent, target acp283.PriceExponent) acp283.PriceExponent {
-	parent.Toward(target)
-	return parent
+func clampedToward(parent, target dynamic.PriceExponent) dynamic.PriceExponent {
+	return parent.Toward(&target)
 }
 
 func TestMinPriceExponent(t *testing.T) {
@@ -26,15 +25,15 @@ func TestMinPriceExponent(t *testing.T) {
 	const activationTime = uint64(1000)
 	activatingHeliconConfig.NetworkUpgrades.HeliconTimestamp = utils.PointerTo(activationTime)
 
-	parentExponent := acp283.PriceExponent(1000)
+	parentExponent := dynamic.PriceExponent(1000)
 
 	tests := []struct {
 		name      string
 		config    *extras.ChainConfig
 		parent    *types.Header
 		timestamp uint64
-		desired   *acp283.PriceExponent
-		want      *acp283.PriceExponent
+		desired   *dynamic.PriceExponent
+		want      *dynamic.PriceExponent
 		wantErr   error
 	}{
 		{
@@ -42,14 +41,14 @@ func TestMinPriceExponent(t *testing.T) {
 			config:    extras.TestGraniteChainConfig,
 			parent:    &types.Header{Time: 100},
 			timestamp: 101,
-			desired:   utils.PointerTo(acp283.PriceExponent(1000)),
+			desired:   utils.PointerTo(dynamic.PriceExponent(1000)),
 		},
 		{
 			name:      "activation_seeds_initial",
 			config:    &activatingHeliconConfig,
 			parent:    &types.Header{Time: activationTime - 1},
 			timestamp: activationTime + 1,
-			want:      utils.PointerTo(acp283.InitialPriceExponent),
+			want:      utils.PointerTo(dynamic.InitialPriceExponent),
 		},
 		{
 			name:      "missing_parent_value",
@@ -78,7 +77,7 @@ func TestMinPriceExponent(t *testing.T) {
 			config:    extras.TestHeliconChainConfig,
 			parent:    headerWithMinPriceExponent(1000, parentExponent),
 			timestamp: 1001,
-			desired:   utils.PointerTo(acp283.PriceExponent(math.MaxUint64)),
+			desired:   utils.PointerTo(dynamic.PriceExponent(math.MaxUint64)),
 			want:      utils.PointerTo(clampedToward(parentExponent, math.MaxUint64)),
 		},
 		{
@@ -86,7 +85,7 @@ func TestMinPriceExponent(t *testing.T) {
 			config:    extras.TestHeliconChainConfig,
 			parent:    headerWithMinPriceExponent(1000, parentExponent),
 			timestamp: 1001,
-			desired:   utils.PointerTo(acp283.PriceExponent(0)),
+			desired:   utils.PointerTo(dynamic.PriceExponent(0)),
 			want:      utils.PointerTo(clampedToward(parentExponent, 0)),
 		},
 	}
@@ -101,7 +100,7 @@ func TestMinPriceExponent(t *testing.T) {
 }
 
 func TestVerifyMinPriceExponent(t *testing.T) {
-	parentExponent := acp283.PriceExponent(1000)
+	parentExponent := dynamic.PriceExponent(1000)
 
 	tests := []struct {
 		name    string
@@ -166,7 +165,7 @@ func TestVerifyMinPriceExponent(t *testing.T) {
 	}
 }
 
-func headerWithMinPriceExponent(time uint64, exponent acp283.PriceExponent) *types.Header {
+func headerWithMinPriceExponent(time uint64, exponent dynamic.PriceExponent) *types.Header {
 	return customtypes.WithHeaderExtra(
 		&types.Header{Time: time},
 		&customtypes.HeaderExtra{MinPriceExponent: &exponent},

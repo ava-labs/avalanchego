@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestHeaderRLP(t *testing.T) {
@@ -144,7 +144,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		BlockGasCost:     big.NewInt(23),
 		TimeMilliseconds: utils.PointerTo[uint64](24),
 		MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(25)),
-		MinPriceExponent: utils.PointerTo(acp283.PriceExponent(26)),
+		MinPriceExponent: utils.PointerTo(dynamic.PriceExponent(26)),
 	}
 	return WithHeaderExtra(header, extra), extra
 }
@@ -198,7 +198,7 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *acp226.DelayExcess:
 				assertNonZero(t, f)
-			case *acp283.PriceExponent:
+			case *dynamic.PriceExponent:
 				assertNonZero(t, f)
 			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:
 				require.NotEmpty(t, f)
@@ -211,7 +211,7 @@ func allFieldsSet[T interface {
 
 func assertNonZero[T interface {
 	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
-		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *acp283.PriceExponent
+		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *dynamic.PriceExponent
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)
