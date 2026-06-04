@@ -136,6 +136,27 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
+	// IssueCreateL1Tx creates, signs, and issues a transaction that atomically
+	// creates a subnet, a chain, and converts the subnet to a Permissionless L1.
+	//
+	// - [chainName] is the human-readable name of the chain
+	// - [vmID] is the ID of the VM the chain runs
+	// - [fxIDs] are the feature extensions the chain runs
+	// - [genesisData] is the genesis data for the chain
+	// - [chainID] specifies which chain the validator manager is deployed on
+	// - [address] specifies the address of the validator manager
+	// - [validators] specifies the initial L1 validators
+	IssueCreateL1Tx(
+		chainName string,
+		vmID ids.ID,
+		fxIDs []ids.ID,
+		genesisData []byte,
+		chainID ids.ID,
+		address []byte,
+		validators []*txs.ConvertSubnetToL1Validator,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
 	// IssueConvertSubnetToL1Tx creates, signs, and issues a transaction that
 	// converts the subnet to a Permissionless L1.
 	//
@@ -432,6 +453,23 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewTransferSubnetOwnershipTx(subnetID, owner, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueCreateL1Tx(
+	chainName string,
+	vmID ids.ID,
+	fxIDs []ids.ID,
+	genesisData []byte,
+	chainID ids.ID,
+	address []byte,
+	validators []*txs.ConvertSubnetToL1Validator,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewCreateL1Tx(chainName, vmID, fxIDs, genesisData, chainID, address, validators, options...)
 	if err != nil {
 		return nil, err
 	}

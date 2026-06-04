@@ -4382,6 +4382,16 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 		baseState = statetest.New(t, statetest.Config{
 			Upgrades: defaultConfig.UpgradeConfig,
 		})
+		wallet = txstest.NewWallet(
+			t,
+			ctx,
+			defaultConfig,
+			baseState,
+			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+			nil, // subnetIDs
+			nil, // validationIDs
+			nil, // chainIDs
+		)
 		flowChecker = utxo.NewVerifier(
 			ctx,
 			&vm.Clk,
@@ -4402,6 +4412,8 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	managerChainID := ids.GenerateTestID()
 	managerAddress := utils.RandomBytes(32)
+	vmID := ids.GenerateTestID()
+	genesisData := []byte("genesis")
 
 	const weight = 1
 
@@ -4422,41 +4434,14 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 		},
 	}
 
-	// Build the CreateL1Tx manually. The input references the genesis UTXO for
-	// DefaultFundedKeys[0]. We spend the full genesis balance as the fee; any
-	// excess over the actual fee is burned, which is valid.
-	unsignedCreateL1Tx := &txs.CreateL1Tx{
-		BaseTx: txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    ctx.NetworkID,
-				BlockchainID: ctx.ChainID,
-				Ins: []*avax.TransferableInput{
-					{
-						UTXOID: avax.UTXOID{
-							TxID:        snowtest.AVAXAssetID,
-							OutputIndex: 0,
-						},
-						Asset: avax.Asset{ID: ctx.AVAXAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt:   genesistest.DefaultInitialBalance,
-							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-						},
-					},
-				},
-			},
-		},
-		ChainName:      "Test L1",
-		VMID:           ids.GenerateTestID(),
-		GenesisData:    []byte("genesis"),
-		ManagerChainID: managerChainID,
-		ManagerAddress: managerAddress,
-		Validators:     []*txs.ConvertSubnetToL1Validator{validator},
-	}
-
-	createL1Tx, err := txs.NewSigned(
-		unsignedCreateL1Tx,
-		txs.Codec,
-		[][]*secp256k1.PrivateKey{{genesistest.DefaultFundedKeys[0]}},
+	createL1Tx, err := wallet.IssueCreateL1Tx(
+		"Test L1",
+		vmID,
+		nil,
+		genesisData,
+		managerChainID,
+		managerAddress,
+		[]*txs.ConvertSubnetToL1Validator{validator},
 	)
 	require.NoError(t, err)
 
@@ -4485,6 +4470,24 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 				return nil
 			},
 			expectedErr: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid memo length",
+			tx: func() *txs.Tx {
+				tx, err := wallet.IssueCreateL1Tx(
+					"Test L1",
+					vmID,
+					nil,
+					genesisData,
+					managerChainID,
+					managerAddress,
+					[]*txs.ConvertSubnetToL1Validator{validator},
+					common.WithMemo([]byte("memo!")),
+				)
+				require.NoError(t, err)
+				return tx
+			}(),
+			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "too many active validators",
@@ -4522,14 +4525,56 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 			name: "insufficient fee",
 			tx:   createL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
-				// Use a price large enough that the fee exceeds the 1 Avax input.
 				e.feeCalculator = txfee.NewDynamicCalculator(
 					e.backend.Config.DynamicFeeConfig.Weights,
-					1_000_000_000*genesis.LocalParams.DynamicFeeConfig.MinPrice,
+					100*genesis.LocalParams.DynamicFeeConfig.MinPrice,
 				)
 				return nil
 			},
 			expectedErr: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
+			name: "validators balance overflow",
+			tx: func() *txs.Tx {
+				overflowValidator := &txs.ConvertSubnetToL1Validator{
+					NodeID:  types.JSONByteSlice(ids.ShortID{1}.Bytes()),
+					Weight:  1,
+					Balance: math.MaxUint64,
+					Signer:  *pop,
+				}
+				unsigned := &txs.CreateL1Tx{
+					BaseTx: txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							NetworkID:    ctx.NetworkID,
+							BlockchainID: ctx.ChainID,
+							Ins: []*avax.TransferableInput{
+								{
+									UTXOID: avax.UTXOID{
+										TxID:        snowtest.AVAXAssetID,
+										OutputIndex: 0,
+									},
+									Asset: avax.Asset{ID: ctx.AVAXAssetID},
+									In: &secp256k1fx.TransferInput{
+										Amt:   genesistest.DefaultInitialBalance,
+										Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+									},
+								},
+							},
+						},
+					},
+					ChainName:      "Test L1",
+					VMID:           vmID,
+					GenesisData:    genesisData,
+					ManagerChainID: managerChainID,
+					ManagerAddress: managerAddress,
+					Validators:     []*txs.ConvertSubnetToL1Validator{overflowValidator, validator},
+				}
+				utils.Sort(unsigned.Validators)
+				tx, err := txs.NewSigned(unsigned, txs.Codec, [][]*secp256k1.PrivateKey{{genesistest.DefaultFundedKeys[0]}})
+				require.NoError(t, err)
+				return tx
+			}(),
+			expectedErr: safemath.ErrOverflow,
 		},
 		{
 			name: "valid tx",
@@ -4567,41 +4612,26 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 				return
 			}
 
-			// Verify UTXOs were consumed
+			txID := test.tx.ID()
+			subnetID := txID // subnetID == txID for CreateL1Tx
+
+			// --- Assertions in the diff (before apply/commit) ---
+
+			// Input UTXOs consumed
 			for utxoID := range test.tx.InputIDs() {
 				_, err := diff.GetUTXO(utxoID)
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			txID := test.tx.ID()
-			subnetID := txID // subnetID == txID for CreateL1Tx
+			// Output UTXOs produced (change outputs)
+			for _, expectedUTXO := range test.tx.UTXOs() {
+				utxoID := expectedUTXO.InputID()
+				utxo, err := diff.GetUTXO(utxoID)
+				require.NoError(err)
+				require.Equal(expectedUTXO, utxo)
+			}
 
-			// The block executor normally calls AddTx after StandardTx succeeds.
-			// Simulate that here so GetChains can resolve the tx after commit.
-			diff.AddTx(test.tx, status.Committed)
-
-			// Apply diff so GetChains can read from the committed state
-			require.NoError(diff.Apply(baseState))
-			require.NoError(baseState.Commit())
-
-			// Verify subnet was registered
-			subnetIDs, err := baseState.GetSubnetIDs()
-			require.NoError(err)
-			require.Contains(subnetIDs, subnetID)
-
-			// Verify chain was registered and can be retrieved
-			chains, err := baseState.GetChains(subnetID)
-			require.NoError(err)
-			require.Len(chains, 1)
-			// Compare by txID — deep equality fails due to private fields
-			// (e.g. publicKey, SyntacticallyVerified) not surviving round-trip.
-			require.Equal(test.tx.ID(), chains[0].ID())
-			chainTx, ok := chains[0].Unsigned.(*txs.CreateL1Tx)
-			require.True(ok)
-			require.Equal(unsignedCreateL1Tx.VMID, chainTx.VMID)
-			require.Equal(unsignedCreateL1Tx.GenesisData, chainTx.GenesisData)
-
-			// Verify L1 conversion was recorded
+			// L1 conversion recorded
 			expectedConversionID, err := message.SubnetToL1ConversionID(message.SubnetToL1ConversionData{
 				SubnetID:       subnetID,
 				ManagerChainID: managerChainID,
@@ -4616,7 +4646,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 			})
 			require.NoError(err)
 
-			stateConversion, err := baseState.GetSubnetToL1Conversion(subnetID)
+			stateConversion, err := diff.GetSubnetToL1Conversion(subnetID)
 			require.NoError(err)
 			require.Equal(
 				state.SubnetToL1Conversion{
@@ -4627,7 +4657,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 				stateConversion,
 			)
 
-			// Verify L1 validator was registered
+			// L1 validator registered
 			validationID := subnetID.Append(0)
 			pkBytes := bls.PublicKeyToUncompressedBytes(sk.PublicKey())
 
@@ -4636,7 +4666,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 			deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.DeactivationOwner)
 			require.NoError(err)
 
-			l1Validator, err := baseState.GetL1Validator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 			require.Equal(
 				state.L1Validator{
@@ -4646,13 +4676,33 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 					PublicKey:             pkBytes,
 					RemainingBalanceOwner: remainingBalanceOwner,
 					DeactivationOwner:     deactivationOwner,
-					StartTime:             uint64(baseState.GetTimestamp().Unix()),
+					StartTime:             uint64(diff.GetTimestamp().Unix()),
 					Weight:                validator.Weight,
 					MinNonce:              0,
-					EndAccumulatedFee:     validator.Balance + baseState.GetAccruedFees(),
+					EndAccumulatedFee:     validator.Balance + diff.GetAccruedFees(),
 				},
 				l1Validator,
 			)
+
+			// --- Chain assertion requires apply + commit ---
+			// GetChains is only on State (not Diff), and calls GetTx internally,
+			// so the tx must be in the txDB first.
+			diff.AddTx(test.tx, status.Committed)
+			require.NoError(diff.Apply(baseState))
+			require.NoError(baseState.Commit())
+
+			subnetIDs, err := baseState.GetSubnetIDs()
+			require.NoError(err)
+			require.Contains(subnetIDs, subnetID)
+
+			chains, err := baseState.GetChains(subnetID)
+			require.NoError(err)
+			require.Len(chains, 1)
+			require.Equal(test.tx.ID(), chains[0].ID())
+			chainTx, ok := chains[0].Unsigned.(*txs.CreateL1Tx)
+			require.True(ok)
+			require.Equal(vmID, chainTx.VMID)
+			require.Equal(genesisData, chainTx.GenesisData)
 		})
 	}
 }
