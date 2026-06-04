@@ -1495,10 +1495,10 @@ func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	}
 
 	var (
-		txID        = e.tx.ID()
-		subnetID    = txID
-		startTime   = uint64(currentTimestamp.Unix())
-		currentFees = e.state.GetAccruedFees()
+		txID                     = e.tx.ID()
+		subnetID                 = txID
+		startTime                = uint64(currentTimestamp.Unix())
+		currentFees              = e.state.GetAccruedFees()
 		subnetToL1ConversionData = message.SubnetToL1ConversionData{
 			SubnetID:       subnetID,
 			ManagerChainID: tx.ManagerChainID,
@@ -1596,7 +1596,7 @@ func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	// Register the new subnet
 	e.state.AddSubnet(subnetID)
 	// L1 subnets have no traditional PoA owner. Set an empty owner so the
-	// GetSubnet API can find the subnet in state.
+	// GetSubnet API can find the subnet in state (will be removed when the service.go is removed. set an owner for now for testing purposes)
 	e.state.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{})
 	// Register the chain under the new subnet
 	e.state.AddL1Chain(subnetID, e.tx)
