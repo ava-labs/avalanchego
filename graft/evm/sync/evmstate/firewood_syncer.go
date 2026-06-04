@@ -26,7 +26,7 @@ var (
 )
 
 type FirewoodSyncer struct {
-	s         *merklesync.Syncer[*syncer.RangeProof, struct{}]
+	s         *merklesync.Syncer[*syncer.RangeProof, *syncer.ChangeProof]
 	cancel    context.CancelFunc
 	codeQueue *code.Queue
 	// finalizeOnce is initialized in the constructor to make Finalize idempotent.
