@@ -30,36 +30,28 @@ func PredicateBytes(
 		return nil, nil
 	}
 
-	predicateResults, err := blockPredicates(snowContext, blockContext, rules, txs)
-	if err != nil {
-		return nil, fmt.Errorf("block predicates: %w", err)
-	}
-	return predicateResults.Bytes()
-}
-
-func blockPredicates(
-	snowContext *snow.Context,
-	blockContext *block.Context, // MAY be nil
-	rules *extras.Rules,
-	txs []*types.Transaction,
-) (predicate.BlockResults, error) {
-	var results predicate.BlockResults
-	// TODO: Calculate tx predicates concurrently.
-	for _, tx := range txs {
-		txResults, err := txPredicates(snowContext, blockContext, rules, tx)
-		if err != nil {
-			return nil, err
+	var (
+		results predicate.BlockResults
+		context = &precompileconfig.PredicateContext{
+			SnowCtx:            snowContext,
+			ProposerVMBlockCtx: blockContext,
 		}
-		results.Set(tx.Hash(), txResults)
+	)
+	for i, tx := range txs {
+		txHash := tx.Hash()
+		txResults, err := txPredicates(context, rules, tx)
+		if err != nil {
+			return nil, fmt.Errorf("tx predicates %s (%d): %w", txHash, i, err)
+		}
+		results.Set(txHash, txResults)
 	}
-	return results, nil
+	return results.Bytes()
 }
 
 var errNoBlockContext = errors.New("no block context")
 
 func txPredicates(
-	snowContext *snow.Context,
-	blockContext *block.Context, // MAY be nil
+	context *precompileconfig.PredicateContext,
 	rules *extras.Rules,
 	tx *types.Transaction,
 ) (predicate.PrecompileResults, error) {
@@ -70,15 +62,11 @@ func txPredicates(
 		return nil, nil
 	}
 
-	if blockContext == nil {
+	if context.ProposerVMBlockCtx == nil {
 		return nil, errNoBlockContext
 	}
 
 	var (
-		context = precompileconfig.PredicateContext{
-			SnowCtx:            snowContext,
-			ProposerVMBlockCtx: blockContext,
-		}
 		txHash  = tx.Hash()
 		results = make(predicate.PrecompileResults, len(predicates))
 	)
@@ -89,11 +77,11 @@ func txPredicates(
 		predicaterContract := rules.Predicaters[address]
 		bitset := set.NewBits()
 		for i, predicate := range contractPredicates {
-			if err := predicaterContract.VerifyPredicate(&context, predicate); err != nil {
+			if err := predicaterContract.VerifyPredicate(context, predicate); err != nil {
 				bitset.Add(i)
 			}
 		}
-		snowContext.Log.Debug("verified predicates",
+		context.SnowCtx.Log.Debug("verified predicates",
 			zap.Stringer("txHash", txHash),
 			zap.Stringer("address", address),
 			zap.Stringer("results", bitset),
