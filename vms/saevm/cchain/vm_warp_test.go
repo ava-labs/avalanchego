@@ -158,7 +158,7 @@ func TestSendWarpMessage(t *testing.T) {
 	blockHashPayload, err := payload.NewHash(built.ID())
 	require.NoError(t, err)
 	blockMessage := newUnsignedWarpMessage(t, sut, blockHashPayload.Bytes())
-	verifyWarpMessage(ctx, t, sut, capturer, blockMessage.Bytes(), int32(warp.VerifyErrCode))
+	verifyWarpMessage(ctx, t, sut, capturer, blockMessage.Bytes(), int32(warp.NotAcceptedErrCode))
 
 	sut.acceptAndExecute(ctx, t, built)
 

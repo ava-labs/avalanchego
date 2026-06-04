@@ -439,12 +439,12 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// blockClient adapts [sae.VM] to the [saewarp.BlockClient] interface.
+// blockClient adapts [sae.VM] to the [saewarp.Backend] interface.
 type blockClient struct {
 	vm *sae.VM
 }
 
-var _ saewarp.BlockClient = (*blockClient)(nil)
+var _ saewarp.Backend = (*blockClient)(nil)
 
 func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
 	b, err := c.vm.GetBlock(ctx, blockID)

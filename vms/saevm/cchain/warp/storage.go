@@ -14,12 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-const (
-	dbPrefix  = "warp"
-	cacheSize = 500
-)
+var (
+	dbPrefix = []byte("warp")
 
-var _ precompileconfig.WarpMessageWriter = (*Storage)(nil)
+	_ precompileconfig.WarpMessageWriter = (*Storage)(nil)
+)
 
 // Storage persists and fetches warp messages.
 type Storage struct {
@@ -29,18 +28,23 @@ type Storage struct {
 }
 
 // NewStorage creates a new Storage backed by the provided database.
+//
+// It allows providing additional messages that will be returned by GetMessage
+// but are not persisted in the database.
 func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 	overrides := make(map[ids.ID]*warp.UnsignedMessage, len(msgs))
 	for _, m := range msgs {
 		overrides[m.ID()] = m
 	}
+	const cacheSize = 500
 	return &Storage{
-		db:        prefixdb.New([]byte(dbPrefix), db),
+		db:        prefixdb.New(dbPrefix, db),
 		cache:     lru.NewCache[ids.ID, *warp.UnsignedMessage](cacheSize),
 		overrides: overrides,
 	}
 }
 
+// AddMessage adds the provided message to storage.
 func (b *Storage) AddMessage(m *warp.UnsignedMessage) error {
 	id := m.ID()
 	if err := b.db.Put(id[:], m.Bytes()); err != nil {
@@ -50,6 +54,7 @@ func (b *Storage) AddMessage(m *warp.UnsignedMessage) error {
 	return nil
 }
 
+// GetMessage returns the message with the given ID.
 func (b *Storage) GetMessage(id ids.ID) (*warp.UnsignedMessage, error) {
 	if m, ok := b.cache.Get(id); ok {
 		return m, nil
@@ -60,12 +65,12 @@ func (b *Storage) GetMessage(id ids.ID) (*warp.UnsignedMessage, error) {
 
 	bytes, err := b.db.Get(id[:])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loading message: %w", err)
 	}
 
 	m, err := warp.ParseUnsignedMessage(bytes)
 	if err != nil {
-		return nil, fmt.Errorf("parsing message %s: %w", id, err)
+		return nil, fmt.Errorf("parsing message: %w", err)
 	}
 	b.cache.Put(id, m)
 	return m, nil

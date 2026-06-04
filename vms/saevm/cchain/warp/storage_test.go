@@ -12,11 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
-
-const networkID uint32 = 54321
 
 var sourceChainID = ids.GenerateTestID()
 
@@ -26,7 +25,7 @@ func newHash(tb testing.TB) (*warp.UnsignedMessage, *payload.Hash) {
 	)
 	require.NoError(tb, err)
 
-	m, err := warp.NewUnsignedMessage(networkID, sourceChainID, p.Bytes())
+	m, err := warp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, p.Bytes())
 	require.NoError(tb, err)
 	return m, p
 }
@@ -38,7 +37,7 @@ func newAddressedCall(tb testing.TB) (*warp.UnsignedMessage, *payload.AddressedC
 	)
 	require.NoError(tb, err)
 
-	m, err := warp.NewUnsignedMessage(networkID, sourceChainID, p.Bytes())
+	m, err := warp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, p.Bytes())
 	require.NoError(tb, err)
 	return m, p
 }
