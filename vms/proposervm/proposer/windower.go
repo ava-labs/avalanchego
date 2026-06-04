@@ -23,16 +23,16 @@ import (
 
 // Proposer list constants
 const (
-	WindowDuration = 700 * time.Millisecond
+	WindowDuration = 1 * time.Second
 
 	MaxVerifyWindows = 6
-	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration // 30 seconds
+	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration // 6 seconds
 
 	MaxBuildWindows = 60
-	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
+	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 1 minute
 
 	MaxLookAheadSlots  = 720
-	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration // 1 hour
+	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration // 12 minutes
 )
 
 var (
