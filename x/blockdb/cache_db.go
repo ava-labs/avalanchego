@@ -22,18 +22,18 @@ var _ database.HeightIndex = (*cacheDB)(nil)
 // because concurrent writes to the same height are not an intended use case.
 type cacheDB struct {
 	db     *Database
-	cache  *lru.Cache[BlockHeight, BlockData]
+	cache  *lru.Cache[uint64, []byte]
 	closed atomic.Bool
 }
 
 func newCacheDB(db *Database, size uint16) *cacheDB {
 	return &cacheDB{
 		db:    db,
-		cache: lru.NewCache[BlockHeight, BlockData](int(size)),
+		cache: lru.NewCache[uint64, []byte](int(size)),
 	}
 }
 
-func (c *cacheDB) Get(height BlockHeight) (BlockData, error) {
+func (c *cacheDB) Get(height uint64) ([]byte, error) {
 	if c.closed.Load() {
 		c.db.log.Error("Failed Get: database closed", zap.Uint64("height", height))
 		return nil, database.ErrClosed
@@ -50,7 +50,7 @@ func (c *cacheDB) Get(height BlockHeight) (BlockData, error) {
 	return data, nil
 }
 
-func (c *cacheDB) Put(height BlockHeight, data BlockData) error {
+func (c *cacheDB) Put(height uint64, data []byte) error {
 	if c.closed.Load() {
 		c.db.log.Error("Failed Put: database closed", zap.Uint64("height", height))
 		return database.ErrClosed
@@ -64,7 +64,7 @@ func (c *cacheDB) Put(height BlockHeight, data BlockData) error {
 	return nil
 }
 
-func (c *cacheDB) Has(height BlockHeight) (bool, error) {
+func (c *cacheDB) Has(height uint64) (bool, error) {
 	if c.closed.Load() {
 		c.db.log.Error("Failed Has: database closed", zap.Uint64("height", height))
 		return false, database.ErrClosed
