@@ -27,6 +27,7 @@ go_test(
     ],
     embed = [":dynamic"],
     deps = [
+        "//utils",
         "//vms/components/gas",
         "@com_github_stretchr_testify//require",
     ],

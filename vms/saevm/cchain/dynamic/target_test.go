@@ -7,6 +7,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
@@ -40,14 +41,14 @@ var targetReaderCases = []readerCase[TargetExponent, gas.Gas]{
 }
 
 var targetTowardCases = []towardCase[TargetExponent]{
-	{name: "nil_unchanged", current: 13_605_152, noDesired: true, want: 13_605_152},
-	{name: "no_change", current: 0, desired: 0, want: 0},
-	{name: "increase_within_cap", current: 1000, desired: 2000, want: 2000},
-	{name: "decrease_within_cap", current: 2000, desired: 1000, want: 1000},
-	{name: "increase_at_cap", current: 0, desired: maxTargetDiff, want: maxTargetDiff},
-	{name: "decrease_at_cap", current: maxTargetDiff, desired: 0, want: 0},
-	{name: "increase_capped", current: 0, desired: maxTargetDiff + 1, want: maxTargetDiff},
-	{name: "decrease_capped", current: 1_000_000, desired: 0, want: 1_000_000 - maxTargetDiff},
+	{name: "nil_unchanged", current: 13_605_152, want: 13_605_152},
+	{name: "no_change", current: 0, desired: utils.PointerTo[TargetExponent](0), want: 0},
+	{name: "increase_within_cap", current: 1000, desired: utils.PointerTo[TargetExponent](2000), want: 2000},
+	{name: "decrease_within_cap", current: 2000, desired: utils.PointerTo[TargetExponent](1000), want: 1000},
+	{name: "increase_at_cap", current: 0, desired: utils.PointerTo[TargetExponent](maxTargetDiff), want: maxTargetDiff},
+	{name: "decrease_at_cap", current: maxTargetDiff, desired: utils.PointerTo[TargetExponent](0), want: 0},
+	{name: "increase_capped", current: 0, desired: utils.PointerTo[TargetExponent](maxTargetDiff + 1), want: maxTargetDiff},
+	{name: "decrease_capped", current: 1_000_000, desired: utils.PointerTo[TargetExponent](0), want: 1_000_000 - maxTargetDiff},
 }
 
 func TestTarget(t *testing.T) {
@@ -64,8 +65,8 @@ func TestTargetExponentToward(t *testing.T) {
 
 func FuzzTargetExponentToward(f *testing.F) {
 	for _, c := range targetTowardCases {
-		if !c.noDesired {
-			f.Add(uint64(c.current), uint64(c.desired))
+		if c.desired != nil {
+			f.Add(uint64(c.current), uint64(*c.desired))
 		}
 	}
 	f.Fuzz(func(t *testing.T, current, desired uint64) {

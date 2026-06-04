@@ -7,6 +7,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
@@ -33,14 +34,14 @@ var priceReaderCases = []readerCase[PriceExponent, gas.Price]{
 }
 
 var priceTowardCases = []towardCase[PriceExponent]{
-	{name: "nil_unchanged", current: 1 << 40, noDesired: true, want: 1 << 40},
-	{name: "no_change", current: 0, desired: 0, want: 0},
-	{name: "increase_within_cap", current: 1000, desired: 2000, want: 2000},
-	{name: "decrease_within_cap", current: 2000, desired: 1000, want: 1000},
-	{name: "increase_at_cap", current: 0, desired: maxPriceDiff, want: maxPriceDiff},
-	{name: "decrease_at_cap", current: maxPriceDiff, desired: 0, want: 0},
-	{name: "increase_capped", current: 0, desired: maxPriceDiff + 1, want: maxPriceDiff},
-	{name: "decrease_capped", current: 2 * maxPriceDiff, desired: 0, want: maxPriceDiff},
+	{name: "nil_unchanged", current: 1 << 40, want: 1 << 40},
+	{name: "no_change", current: 0, desired: utils.PointerTo[PriceExponent](0), want: 0},
+	{name: "increase_within_cap", current: 1000, desired: utils.PointerTo[PriceExponent](2000), want: 2000},
+	{name: "decrease_within_cap", current: 2000, desired: utils.PointerTo[PriceExponent](1000), want: 1000},
+	{name: "increase_at_cap", current: 0, desired: utils.PointerTo[PriceExponent](maxPriceDiff), want: maxPriceDiff},
+	{name: "decrease_at_cap", current: maxPriceDiff, desired: utils.PointerTo[PriceExponent](0), want: 0},
+	{name: "increase_capped", current: 0, desired: utils.PointerTo[PriceExponent](maxPriceDiff + 1), want: maxPriceDiff},
+	{name: "decrease_capped", current: 2 * maxPriceDiff, desired: utils.PointerTo[PriceExponent](0), want: maxPriceDiff},
 }
 
 func TestPrice(t *testing.T) {
@@ -57,8 +58,8 @@ func TestPriceExponentToward(t *testing.T) {
 
 func FuzzPriceExponentToward(f *testing.F) {
 	for _, c := range priceTowardCases {
-		if !c.noDesired {
-			f.Add(uint64(c.current), uint64(c.desired))
+		if c.desired != nil {
+			f.Add(uint64(c.current), uint64(*c.desired))
 		}
 	}
 	f.Fuzz(func(t *testing.T, current, desired uint64) {

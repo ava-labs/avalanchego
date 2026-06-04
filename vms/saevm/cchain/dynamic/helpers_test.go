@@ -19,14 +19,13 @@ type readerCase[E, V ~uint64] struct {
 	skipDesired bool
 }
 
-// towardCase pins a single Toward step. A nil desired (noDesired) must leave the
-// current value unchanged.
+// towardCase pins a single Toward step. A nil desired must leave the current
+// value unchanged.
 type towardCase[E ~uint64] struct {
-	name      string
-	current   E
-	desired   E
-	noDesired bool
-	want      E
+	name    string
+	current E
+	desired *E
+	want    E
 }
 
 func testReader[E, V ~uint64](t *testing.T, cases []readerCase[E, V], value func(E) V) {
@@ -53,11 +52,7 @@ func testDesired[E, V ~uint64](t *testing.T, cases []readerCase[E, V], desired f
 func testToward[E ~uint64](t *testing.T, cases []towardCase[E], toward func(E, *E) E) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			var desired *E
-			if !c.noDesired {
-				desired = &c.desired
-			}
-			got := toward(c.current, desired)
+			got := toward(c.current, c.desired)
 			require.Equal(t, c.want, got)
 		})
 	}

@@ -6,6 +6,8 @@ package dynamic
 import (
 	"math"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // Independent copies of the implementation's constants. Sharing them would make
@@ -36,14 +38,14 @@ var delayReaderCases = []readerCase[DelayExponent, uint64]{
 }
 
 var delayTowardCases = []towardCase[DelayExponent]{
-	{name: "nil_unchanged", current: 1234, noDesired: true, want: 1234},
-	{name: "no_change", current: 0, desired: 0, want: 0},
-	{name: "increase_within_cap", current: 50, desired: 100, want: 100},
-	{name: "decrease_within_cap", current: 100, desired: 50, want: 50},
-	{name: "increase_at_cap", current: 0, desired: maxDelayDiff, want: maxDelayDiff},
-	{name: "decrease_at_cap", current: maxDelayDiff, desired: 0, want: 0},
-	{name: "increase_capped", current: 0, desired: 1000, want: maxDelayDiff},
-	{name: "decrease_capped", current: 1000, desired: 0, want: 1000 - maxDelayDiff},
+	{name: "nil_unchanged", current: 1234, want: 1234},
+	{name: "no_change", current: 0, desired: utils.PointerTo[DelayExponent](0), want: 0},
+	{name: "increase_within_cap", current: 50, desired: utils.PointerTo[DelayExponent](100), want: 100},
+	{name: "decrease_within_cap", current: 100, desired: utils.PointerTo[DelayExponent](50), want: 50},
+	{name: "increase_at_cap", current: 0, desired: utils.PointerTo[DelayExponent](maxDelayDiff), want: maxDelayDiff},
+	{name: "decrease_at_cap", current: maxDelayDiff, desired: utils.PointerTo[DelayExponent](0), want: 0},
+	{name: "increase_capped", current: 0, desired: utils.PointerTo[DelayExponent](1000), want: maxDelayDiff},
+	{name: "decrease_capped", current: 1000, desired: utils.PointerTo[DelayExponent](0), want: 1000 - maxDelayDiff},
 }
 
 func TestDelay(t *testing.T) {
@@ -60,8 +62,8 @@ func TestDelayExponentToward(t *testing.T) {
 
 func FuzzDelayExponentToward(f *testing.F) {
 	for _, c := range delayTowardCases {
-		if !c.noDesired {
-			f.Add(uint64(c.current), uint64(c.desired))
+		if c.desired != nil {
+			f.Add(uint64(c.current), uint64(*c.desired))
 		}
 	}
 	f.Fuzz(func(t *testing.T, current, desired uint64) {
