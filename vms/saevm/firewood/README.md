@@ -19,14 +19,14 @@ db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
 
 Firewood's CGo FFI exposes two types of Rust-owned heap objects: `ffi.Revision` and `ffi.Proposal`. Both must be explicitly freed to avoid leaking Rust memory — Go's garbage collector does not manage Rust allocations.
 
-Proposals must be either freed (via `Drop`) or committed. This happens in the following places:
+All proposals are either explicitly freed (via `Drop`) or committed. Proposals are dropped in the following functions:
 
-- `trieHash`: immediately dropped when a proposal produces no state change (root is unchanged).
-- `accountTrie.hash`: the previous reader is dropped when a new proposal replaces it.
 - `TrieDB.Close`: all pending and committable proposals are dropped before the database is closed.
 - `TrieDB.Commit`: proposals are committed in ancestor-first order; if any commit fails, the remaining proposals are dropped rather than leaked.
+- `TrieDB.trieHash`: immediately dropped when a proposal produces no state change (root is unchanged).
+- `accountTrie.hash`: the previous reader is dropped when a new proposal replaces it.
 
-However, the `state.Trie` implementation does not have a `Close` method or anything similar, so any proposal or revision remaining within a trie can only be garbage collected. Because this is only ever used by the `state.StateDB`, one must only allow these objects to be garbage collected prior to calling `TrieDB.Close()`, which will wait a short time until all objects have been freed.
+However, the `state.Trie` implementation does not have a `Close` method or anything similar, so any proposal or revision remaining within a trie can only be garbage collected. Because the account trie is only ever created by the `state.StateDB`, one must only allow these objects to be garbage collected prior to calling `TrieDB.Close()`.
 
 ## Operation Model
 
@@ -56,17 +56,15 @@ Reads never reflect pending writes (see [Why reads aren't safe](#why-reads-arent
 
 This is required because Firewood enforces strict ancestor ordering: a child proposal cannot be committed before its parent. The `DeferredCommitInterval` configuration deliberately delays disk commits to batch I/O, allowing multiple blocks' worth of proposals to accumulate as an in-memory linked list. When `Commit` is eventually called for a later root, all uncommitted ancestors are flushed in a single pass.
 
-The `TrieDB` will never create an empty proposal, so there will never be ambiguity about which proposal represents `root`, unlike in the historical Firewood TrieDB. There will never be two proposals with the same root, since at minimum, a nonce is incremented.
+The `TrieDB` will never return an empty proposal, so there will never be ambiguity about which proposal represents `root`, unlike in the historical Firewood TrieDB. There will never be two proposals with the same root, since at minimum, a nonce is incremented.
 
-As a consequence, `Commit` for a single root may write many proposals to disk. Any error from `Commit` should be treated as fatal.
+As a consequence, `Commit` for a single root may queue many proposals to be committed, and thus could be written to disk at any time. Any error from `Commit` should be treated as fatal. `Commit` is not expected to be an expensive operation, since all disk commits are handled asynchronously.
 
 ### Why `Reader` is unimplemented (custom trie reader)
 
 `TrieDB.Reader(root)` always returns an error. The `triedb.Backend` interface expects `Reader` to supply node bytes to a generic `trie.Trie`, which then reassembles the Merkle Trie from encoded node data. Firewood does not store state in that format, and the resulting `trie.Trie` created would be nonsensical.
 
 Instead, this package provides custom `accountTrie` and `storageTrie` implementations that read directly from `ffi.Revision` and `ffi.Proposal` objects via flat key-value `Get` calls. This avoids another implementation of a reader-like object, and allows re-using the Firewood API.
-
-Returning an error from `Reader` ensures no code path accidentally falls back to the standard MPT reader, which would fail or silently read stale data.
 
 ### Why reads aren't safe
 
@@ -81,7 +79,7 @@ accountTrie.DeleteAccount(addr)
 val := storageTrie.GetStorage(addr, key)
 ```
 
-What is the expected value of `val`? Should it be `nil`, since the account was deleted? Should it be `putVal`, since the storage trie in go-ethereum is a separate struct? Or should it return an error, since this is nonsensical?
-The important detail here is that the `state.StateDB` will never do this. Maintaining a map of pending writes would cover most cases, but storage reads would also need to check whether the parent account has been prefix-deleted — which is difficult to track without the full trie context. Additionally, if an account is recreated after deletion, a naive pending-writes map could not determine whether storage should be considered deleted when read later. Even worse, if an account is deleted by the `state.StateDB`, the corresponding storages will never be explicitly deleted from the storage trie, so we have to rely on prefix deletions.
+What is the expected value of `val`? Should it be `nil`, since the account was deleted? Should it be `putVal`, since the storage trie in go-ethereum is a separate struct? Or should it return an error, because an invariant was violated?
+The important detail here is that the `state.StateDB` will never do read after writing. Maintaining a map of pending writes would cover most cases, but storage reads would also need to check whether the parent account has been prefix-deleted — which is difficult to track without the full trie context. Additionally, if an account is recreated after deletion, a naive pending-writes map could not determine whether storage should be considered deleted when read later. Even worse, if an account is deleted by the `state.StateDB`, the corresponding storages will never be explicitly deleted from the storage trie, so we have to rely on prefix deletions.
 
 For all these caveats, the only logical conclusion for compatibility is that the implementation of `state.Trie` must only guarantee that the `state.StateDB` functions correctly. Since it will not read after writing until `state.StateDB.IntermediateRoot` is called, we can rely on reading from an actual proposal/revision.
