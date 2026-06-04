@@ -841,6 +841,147 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
+
+	ginkgo.It("atomically creates an L1 using CreateL1Tx", func() {
+		env := e2e.GetEnv(tc)
+		nodeURI := env.GetRandomNodeURI()
+
+		tc.By("loading the wallet")
+		var (
+			keychain   = env.NewKeychain()
+			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
+			pWallet    = baseWallet.P()
+			pClient    = platformvm.NewClient(nodeURI.URI)
+		)
+
+		tc.By("creating the chain genesis")
+		genesisKey, err := secp256k1.NewPrivateKey()
+		require.NoError(err)
+
+		genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
+			Timestamp: time.Now().Unix(),
+			Allocations: []genesis.Allocation{
+				{
+					Address: genesisKey.Address(),
+					Balance: math.MaxUint64,
+				},
+			},
+		})
+		require.NoError(err)
+
+		// Start the genesis validator node without subnet tracking since
+		// the subnetID (= CreateL1Tx txID) is not known until after issuance.
+		tc.By("creating the genesis validator node")
+		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
+
+		genesisNodePoP, err := subnetGenesisNode.GetProofOfPossession()
+		require.NoError(err)
+
+		genesisNodePK, err := bls.PublicKeyFromCompressedBytes(genesisNodePoP.PublicKey[:])
+		require.NoError(err)
+
+		var (
+			address        = []byte{}
+			managerChainID = ids.Empty
+		)
+
+		var createL1Tx *txs.Tx
+		tc.By("issuing a CreateL1Tx", func() {
+			tx, err := pWallet.IssueCreateL1Tx(
+				"No Permissions",
+				constants.XSVMID,
+				nil,
+				genesisBytes,
+				managerChainID,
+				address,
+				[]*txs.ConvertSubnetToL1Validator{
+					{
+						NodeID:  subnetGenesisNode.NodeID.Bytes(),
+						Weight:  genesisWeight,
+						Balance: genesisBalance,
+						Signer:  *genesisNodePoP,
+					},
+				},
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+			createL1Tx = tx
+		})
+
+		// subnetID == txID for CreateL1Tx per ACP spec
+		subnetID := createL1Tx.ID()
+		genesisValidationID := subnetID.Append(0)
+
+		expectedConversionID, err := warpmessage.SubnetToL1ConversionID(warpmessage.SubnetToL1ConversionData{
+			SubnetID:       subnetID,
+			ManagerChainID: managerChainID,
+			ManagerAddress: address,
+			Validators: []warpmessage.SubnetToL1ConversionValidatorData{
+				{
+					NodeID:       subnetGenesisNode.NodeID.Bytes(),
+					BLSPublicKey: genesisNodePoP.PublicKey,
+					Weight:       genesisWeight,
+				},
+			},
+		})
+		require.NoError(err)
+
+		tc.By("verifying the L1 was created", func() {
+			tc.By("verifying the subnet reports as an L1", func() {
+				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+				require.NoError(err)
+				require.False(subnet.IsPermissioned)
+				require.Equal(expectedConversionID, subnet.ConversionID)
+				require.Equal(managerChainID, subnet.ManagerChainID)
+				require.Equal(address, subnet.ManagerAddress)
+			})
+
+			tc.By("verifying the validator set was initialized", func() {
+				height, err := pClient.GetHeight(tc.DefaultContext())
+				require.NoError(err)
+
+				subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, platformapi.Height(height))
+				require.NoError(err)
+				require.Equal(
+					map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+						subnetGenesisNode.NodeID: {
+							NodeID:    subnetGenesisNode.NodeID,
+							PublicKey: genesisNodePK,
+							Weight:    genesisWeight,
+						},
+					},
+					subnetValidators,
+				)
+			})
+
+			tc.By("verifying the L1 validator can be fetched", func() {
+				l1Validator, _, err := pClient.GetL1Validator(tc.DefaultContext(), genesisValidationID)
+				require.NoError(err)
+				require.LessOrEqual(l1Validator.Balance, genesisBalance)
+
+				l1Validator.StartTime = 0
+				l1Validator.Balance = 0
+				require.Equal(
+					platformvm.L1Validator{
+						SubnetID:  subnetID,
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   genesisWeight,
+						MinNonce: 0,
+					},
+					l1Validator,
+				)
+			})
+		})
+
+		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
+	})
 })
 
 func wrapWarpSignatureRequest(

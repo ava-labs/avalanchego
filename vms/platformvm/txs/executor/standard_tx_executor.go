@@ -1595,6 +1595,9 @@ func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	avax.Produce(e.state, txID, tx.Outs)
 	// Register the new subnet
 	e.state.AddSubnet(subnetID)
+	// L1 subnets have no traditional PoA owner. Set an empty owner so the
+	// GetSubnet API can find the subnet in state.
+	e.state.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{})
 	// Register the chain under the new subnet
 	e.state.AddL1Chain(subnetID, e.tx)
 	// Track the L1 conversion
