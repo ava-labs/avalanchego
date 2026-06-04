@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -82,9 +82,9 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("unmarshalling config: %w", err)
 		}
 	}
-	var desiredMinPriceExponent *acp283.PriceExponent
+	var desiredMinPriceExponent *dynamic.PriceExponent
 	if cfg.DesiredMinGasPriceWei != nil {
-		e := acp283.DesiredPriceExponent(gas.Price(*cfg.DesiredMinGasPriceWei))
+		e := dynamic.DesiredPriceExponent(gas.Price(*cfg.DesiredMinGasPriceWei))
 		desiredMinPriceExponent = &e
 	}
 

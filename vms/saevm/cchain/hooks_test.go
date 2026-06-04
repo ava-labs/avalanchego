@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -48,22 +48,17 @@ func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *
 	)
 }
 
-func headerWithMinPriceExponent(exp acp283.PriceExponent) *types.Header {
+func headerWithMinPriceExponent(exp dynamic.PriceExponent) *types.Header {
 	return customtypes.WithHeaderExtra(
 		&types.Header{Number: big.NewInt(0)},
 		&customtypes.HeaderExtra{MinPriceExponent: &exp},
 	)
 }
 
-func clampedToward(parent, target acp283.PriceExponent) acp283.PriceExponent {
-	parent.Toward(target)
-	return parent
-}
-
 func TestGasConfigAfter(t *testing.T) {
 	tests := []struct {
 		name     string
-		exponent *acp283.PriceExponent
+		exponent *dynamic.PriceExponent
 		want     gas.Price
 	}{
 		{
@@ -72,12 +67,12 @@ func TestGasConfigAfter(t *testing.T) {
 		},
 		{
 			name:     "smallest_exponent_above_one_wei",
-			exponent: utils.PointerTo(acp283.DesiredPriceExponent(2)),
+			exponent: utils.PointerTo(dynamic.DesiredPriceExponent(2)),
 			want:     2,
 		},
 		{
 			name:     "saturated_exponent",
-			exponent: utils.PointerTo(acp283.DesiredPriceExponent(math.MaxUint64)),
+			exponent: utils.PointerTo(dynamic.DesiredPriceExponent(math.MaxUint64)),
 			want:     math.MaxUint64,
 		},
 	}
@@ -94,20 +89,20 @@ func TestGasConfigAfter(t *testing.T) {
 }
 
 func TestBuildHeaderMinPriceExponent(t *testing.T) {
-	const parentExponent acp283.PriceExponent = 1000
+	const parentExponent dynamic.PriceExponent = 1000
 	parentNoExponent := &types.Header{Number: big.NewInt(0)}
 	parentWith := headerWithMinPriceExponent(parentExponent)
 
 	tests := []struct {
 		name    string
 		parent  *types.Header
-		desired *acp283.PriceExponent
-		want    acp283.PriceExponent
+		desired *dynamic.PriceExponent
+		want    dynamic.PriceExponent
 	}{
 		{
 			name:   "no_parent_no_desired_seeds_initial",
 			parent: parentNoExponent,
-			want:   acp283.InitialPriceExponent,
+			want:   dynamic.InitialPriceExponent,
 		},
 		{
 			name:   "parent_set_no_desired_carries",
@@ -123,8 +118,8 @@ func TestBuildHeaderMinPriceExponent(t *testing.T) {
 		{
 			name:    "desired_above_clamped",
 			parent:  parentWith,
-			desired: utils.PointerTo(acp283.PriceExponent(math.MaxUint64)),
-			want:    clampedToward(parentExponent, math.MaxUint64),
+			desired: utils.PointerTo(dynamic.PriceExponent(math.MaxUint64)),
+			want:    parentExponent.Toward(utils.PointerTo(dynamic.PriceExponent(math.MaxUint64))),
 		},
 	}
 	for _, tt := range tests {
@@ -140,13 +135,13 @@ func TestBuildHeaderMinPriceExponent(t *testing.T) {
 }
 
 func TestBlockRebuilderFromMinPriceExponent(t *testing.T) {
-	const parentExponent acp283.PriceExponent = 1000
+	const parentExponent dynamic.PriceExponent = 1000
 	parent := headerWithMinPriceExponent(parentExponent)
 
 	tests := []struct {
 		name    string
-		claimed acp283.PriceExponent
-		want    acp283.PriceExponent
+		claimed dynamic.PriceExponent
+		want    dynamic.PriceExponent
 	}{
 		{
 			name:    "honest_claim_within_cap_reproduces",
@@ -156,7 +151,7 @@ func TestBlockRebuilderFromMinPriceExponent(t *testing.T) {
 		{
 			name:    "cheated_claim_above_step_clamps",
 			claimed: math.MaxUint64,
-			want:    clampedToward(parentExponent, math.MaxUint64),
+			want:    parentExponent.Toward(utils.PointerTo(dynamic.PriceExponent(math.MaxUint64))),
 		},
 	}
 	for _, tt := range tests {
@@ -176,7 +171,7 @@ func TestBlockRebuilderFromMinPriceExponent(t *testing.T) {
 
 // newBlockWithMinPriceExponent returns a parseable block whose header carries
 // the given MinPriceExponent.
-func newBlockWithMinPriceExponent(tb testing.TB, number uint64, parent common.Hash, exp acp283.PriceExponent) *types.Block {
+func newBlockWithMinPriceExponent(tb testing.TB, number uint64, parent common.Hash, exp dynamic.PriceExponent) *types.Block {
 	tb.Helper()
 
 	extData, err := tx.MarshalSlice(nil)

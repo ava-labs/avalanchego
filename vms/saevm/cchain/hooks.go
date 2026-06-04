@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -51,7 +51,7 @@ func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
 	pool *txpool.Pending,
-	desiredMinPriceExponent *acp283.PriceExponent,
+	desiredMinPriceExponent *dynamic.PriceExponent,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -120,7 +120,7 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 
 func (*hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	// TODO(StephenButtolph): Extract the gas target from the header (ACP-176).
-	minPrice := acp283.PriceExponent(0).Price()
+	minPrice := dynamic.InitialPriceExponent.Price()
 	if exp := customtypes.GetHeaderExtra(header).MinPriceExponent; exp != nil {
 		minPrice = exp.Price()
 	}
@@ -193,7 +193,7 @@ type builder struct {
 	ctx                     *snow.Context
 	now                     func() time.Time
 	potentialTxs            iter.Seq[*hookTx]
-	desiredMinPriceExponent *acp283.PriceExponent
+	desiredMinPriceExponent *dynamic.PriceExponent
 }
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
@@ -202,13 +202,11 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	// TODO(StephenButtolph): Encode the ACP-176 target excess in the header.
 	// TODO(StephenButtolph): Enforce the minimum block time here.
 	parentExtra := customtypes.GetHeaderExtra(parent)
-	minPriceExponent := acp283.InitialPriceExponent
+	minPriceExponent := dynamic.InitialPriceExponent
 	if parentExtra.MinPriceExponent != nil {
 		minPriceExponent = *parentExtra.MinPriceExponent
 	}
-	if b.desiredMinPriceExponent != nil {
-		minPriceExponent.Toward(*b.desiredMinPriceExponent)
-	}
+	minPriceExponent = minPriceExponent.Toward(b.desiredMinPriceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),

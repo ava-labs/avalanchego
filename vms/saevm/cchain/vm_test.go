@@ -41,7 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -676,7 +676,7 @@ func TestRampMinPriceExponent(t *testing.T) {
 	w := newWallet(sk, sut.ctx, sut.Client)
 
 	const numBlocks = 3
-	prev := acp283.InitialPriceExponent
+	prev := dynamic.InitialPriceExponent
 	for i := 1; i <= numBlocks; i++ {
 		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 		got := customtypes.GetHeaderExtra(blk.EthBlock().Header()).MinPriceExponent
