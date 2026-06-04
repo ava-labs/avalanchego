@@ -24,7 +24,7 @@ type addValidatorRules struct {
 	minDelegationFee  uint32
 }
 
-func primaryNetworkMinStakeDuration(cfg *config.Internal, timestamp time.Time) time.Duration {
+func primaryNetworkValidatorMinStakeDuration(cfg *config.Internal, timestamp time.Time) time.Duration {
 	if cfg.UpgradeConfig.IsHeliconActivated(timestamp) {
 		return cfg.HeliconMinStakeDuration
 	}
@@ -41,7 +41,7 @@ func getValidatorRules(
 			assetID:           backend.Ctx.AVAXAssetID,
 			minValidatorStake: backend.Config.MinValidatorStake,
 			maxValidatorStake: backend.Config.MaxValidatorStake,
-			minStakeDuration:  primaryNetworkMinStakeDuration(backend.Config, chainState.GetTimestamp()),
+			minStakeDuration:  primaryNetworkValidatorMinStakeDuration(backend.Config, chainState.GetTimestamp()),
 			maxStakeDuration:  backend.Config.MaxStakeDuration,
 			minDelegationFee:  backend.Config.MinDelegationFee,
 		}, nil
