@@ -20,7 +20,6 @@ go_library(
         "//utils/math",
         "@com_github_cespare_xxhash_v2//:xxhash",
         "@com_github_datadog_zstd//:zstd",
-        "@com_github_gofrs_flock//:flock",
         "@org_uber_go_zap//:zap",
     ],
 )

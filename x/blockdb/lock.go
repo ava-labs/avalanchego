@@ -8,14 +8,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/gofrs/flock"
+	"syscall"
 )
 
 const lockFileName = "LOCK"
 
+type heldLock struct {
+	path string
+	file *os.File
+}
+
 type dbLocks struct {
-	locks []*flock.Flock
+	locks []heldLock
 }
 
 // acquireDBLocks creates indexDir and dataDir if needed and acquires exclusive
@@ -31,25 +35,36 @@ func acquireDBLocks(indexDir, dataDir string) (*dbLocks, error) {
 		paths = append(paths, data)
 	}
 
-	l := &dbLocks{locks: make([]*flock.Flock, 0, len(paths))}
+	l := &dbLocks{locks: make([]heldLock, 0, len(paths))}
 	for _, dir := range paths {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			_ = l.Release()
 			return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
-		fl := flock.New(filepath.Join(dir, lockFileName))
-		acquired, err := fl.TryLock()
+		held, err := tryLockDir(dir)
 		if err != nil {
 			_ = l.Release()
-			return nil, fmt.Errorf("failed to acquire lock on %s: %w", dir, err)
+			return nil, err
 		}
-		if !acquired {
-			_ = l.Release()
-			return nil, fmt.Errorf("%w: %s", errDatabaseInUse, dir)
-		}
-		l.locks = append(l.locks, fl)
+		l.locks = append(l.locks, held)
 	}
 	return l, nil
+}
+
+func tryLockDir(dir string) (heldLock, error) {
+	path := filepath.Join(dir, lockFileName)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDONLY, defaultFilePermissions)
+	if err != nil {
+		return heldLock{}, fmt.Errorf("failed to open lock file %s: %w", path, err)
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = f.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return heldLock{}, fmt.Errorf("%w: %s", errDatabaseInUse, dir)
+		}
+		return heldLock{}, fmt.Errorf("failed to acquire lock on %s: %w", dir, err)
+	}
+	return heldLock{path: path, file: f}, nil
 }
 
 // Release unlocks every lock held by l.
@@ -63,9 +78,12 @@ func (l *dbLocks) Release() error {
 		return nil
 	}
 	var errs []error
-	for _, fl := range l.locks {
-		if err := fl.Unlock(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to release lock on %s: %w", fl.Path(), err))
+	for _, h := range l.locks {
+		if err := syscall.Flock(int(h.file.Fd()), syscall.LOCK_UN); err != nil {
+			errs = append(errs, fmt.Errorf("failed to release lock on %s: %w", h.path, err))
+		}
+		if err := h.file.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("failed to close lock file %s: %w", h.path, err))
 		}
 	}
 	l.locks = nil
