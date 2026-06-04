@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -44,7 +44,7 @@ type HeaderExtra struct {
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
-	MinPriceExponent *acp283.PriceExponent
+	MinPriceExponent *dynamic.PriceExponent
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.
@@ -192,7 +192,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
-	extras.MinPriceExponent = (*acp283.PriceExponent)(h.MinPriceExponent)
+	extras.MinPriceExponent = (*dynamic.PriceExponent)(h.MinPriceExponent)
 }
 
 // NOTE: both generators currently do not support type aliases.

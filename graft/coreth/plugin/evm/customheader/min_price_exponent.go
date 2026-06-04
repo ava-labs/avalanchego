@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/acp283"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 var (
@@ -26,8 +26,8 @@ func MinPriceExponent(
 	config *extras.ChainConfig,
 	parent *types.Header,
 	timestamp uint64,
-	desired *acp283.PriceExponent,
-) (*acp283.PriceExponent, error) {
+	desired *dynamic.PriceExponent,
+) (*dynamic.PriceExponent, error) {
 	if !config.IsHelicon(timestamp) {
 		return nil, nil
 	}
@@ -75,14 +75,14 @@ func VerifyMinPriceExponent(
 	return nil
 }
 
-// minPriceExponent moves the parent value toward desired, clamped by acp283's
+// minPriceExponent moves the parent value toward desired, clamped by ACP-283's
 // per-block step. Assumes Helicon is active for the child.
 func minPriceExponent(
 	config *extras.ChainConfig,
 	parent *types.Header,
-	desired *acp283.PriceExponent,
-) (acp283.PriceExponent, error) {
-	exponent := acp283.InitialPriceExponent
+	desired *dynamic.PriceExponent,
+) (dynamic.PriceExponent, error) {
+	exponent := dynamic.InitialPriceExponent
 	if config.IsHelicon(parent.Time) {
 		parentExponent := customtypes.GetHeaderExtra(parent).MinPriceExponent
 		if parentExponent == nil {
@@ -90,8 +90,5 @@ func minPriceExponent(
 		}
 		exponent = *parentExponent
 	}
-	if desired != nil {
-		exponent.Toward(*desired)
-	}
-	return exponent, nil
+	return exponent.Toward(desired), nil
 }
