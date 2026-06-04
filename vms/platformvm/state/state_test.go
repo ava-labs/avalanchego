@@ -1216,6 +1216,44 @@ func TestReindexBlocks(t *testing.T) {
 	require.True(reindexed)
 }
 
+func TestStateAddL1Chain(t *testing.T) {
+	require := require.New(t)
+
+	s := newTestState(t, memdb.New())
+	subnetID := ids.GenerateTestID()
+
+	// Initially no chains for this subnet.
+	chains, err := s.GetChains(subnetID)
+	require.NoError(err)
+	require.Empty(chains)
+
+	// Add a CreateChainTx.
+	createChainTx := &txs.Tx{
+		Unsigned: &txs.CreateChainTx{
+			SubnetID: subnetID,
+		},
+	}
+	s.AddChain(createChainTx)
+
+	// Verify it appears.
+	chains, err = s.GetChains(subnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{createChainTx}, chains)
+
+	// Add a CreateL1Tx for the same subnet.
+	createL1Tx := &txs.Tx{
+		Unsigned: &txs.CreateL1Tx{
+			VMID: ids.GenerateTestID(),
+		},
+	}
+	s.AddL1Chain(subnetID, createL1Tx)
+
+	// Verify both appear in insertion order.
+	chains, err = s.GetChains(subnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{createChainTx, createL1Tx}, chains)
+}
+
 func TestStateSubnetOwner(t *testing.T) {
 	require := require.New(t)
 
