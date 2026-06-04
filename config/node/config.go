@@ -230,4 +230,7 @@ type Config struct {
 	// Path to write process context to (including PID, API URI, and
 	// staking address).
 	ProcessContextFilePath string `json:"processContextFilePath"`
+
+	FallbackNonValidatorCanPropose bool          `json:"fallbackNonValidatorCanPropose"`
+	FallbackProposerMaxWaitTime    time.Duration `json:"fallbackProposerMaxWaitTime"`
 }
