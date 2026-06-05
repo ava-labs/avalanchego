@@ -4389,7 +4389,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		nodeID,
 		weight,
 		pop,
-		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
 		configOwner,
@@ -4407,6 +4406,22 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		weight,
 		currentSupply,
 	)
+
+	// Input UTXOs are present before execution
+	inputIDs := addContVdrTx.InputIDs()
+	require.NotEmpty(t, inputIDs)
+	for utxoID := range inputIDs {
+		_, err := env.state.GetUTXO(utxoID)
+		require.NoError(t, err)
+	}
+
+	// Output UTXOs are not present before execution
+	baseTxOutputUTXOs := addContVdrTx.UTXOs()
+	require.NotEmpty(t, baseTxOutputUTXOs)
+	for _, utxo := range baseTxOutputUTXOs {
+		_, err := env.state.GetUTXO(utxo.InputID())
+		require.ErrorIs(t, err, database.ErrNotFound)
+	}
 
 	_, _, _, err = StandardTx(
 		&env.backend,
@@ -4455,14 +4470,12 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	}
 	require.Equal(t, wantStakingInfo, stakingInfo)
 
-	inputIDs := addContVdrTx.InputIDs()
 	require.NotEmpty(t, inputIDs)
 	for utxoID := range inputIDs {
 		_, err := env.state.GetUTXO(utxoID)
 		require.ErrorIs(t, err, database.ErrNotFound)
 	}
 
-	baseTxOutputUTXOs := addContVdrTx.UTXOs()
 	require.NotEmpty(t, baseTxOutputUTXOs)
 	for _, wantUTXO := range baseTxOutputUTXOs {
 		utxoID := wantUTXO.InputID()
@@ -4548,7 +4561,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 				ids.GenerateTestNodeID(),
 				env.config.MinValidatorStake,
 				pop,
-				env.ctx.AVAXAssetID,
 				&secp256k1fx.OutputOwners{},
 				&secp256k1fx.OutputOwners{},
 				&secp256k1fx.OutputOwners{},
@@ -4582,60 +4594,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 }
 
 func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
-	var (
-		env           = newEnvironment(t, upgradetest.Latest)
-		wallet        = newWallet(t, env, walletConfig{})
-		feeCalculator = state.PickFeeCalculator(env.config, env.state)
-	)
-
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
-
-	nodeID := ids.GenerateTestNodeID()
-
-	addAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
-		nodeID,
-		env.config.MinValidatorStake,
-		pop,
-		env.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{},
-		&secp256k1fx.OutputOwners{},
-		&secp256k1fx.OutputOwners{},
-		500_000,
-		300_000,
-		uint64((2*env.config.MinStakeDuration)/time.Second),
-	)
-	require.NoError(t, err)
-	env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
-
-	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
-
-	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
-	duration := time.Duration(validatorTx.Period) * time.Second
-	vdrStaker, err := state.NewStaker(
-		addAutoRenewedValidatorTx.ID(),
-		validatorTx,
-		startTime,
-		startTime.Add(duration),
-		validatorTx.Weight(),
-		uint64(1000000),
-	)
-	require.NoError(t, err)
-
-	require.NoError(t, env.state.PutCurrentValidator(vdrStaker))
-
-	initialStakingInfo := state.StakingInfo{
-		DelegateeReward:          1,
-		AccruedValidationRewards: 2,
-		AccruedDelegateeRewards:  3,
-		AutoCompoundRewardShares: 100_000,
-		NextPeriod:               validatorTx.Period,
-	}
-	require.NoError(t, env.state.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
-
 	tests := []struct {
 		name                        string
 		newPeriod                   uint64
@@ -4653,20 +4611,73 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 		},
 	}
 
-	fundingKey := genesistest.DefaultFundedKeys[0]
-	fundingAddr := fundingKey.Address()
-	existingUTXOIDs, err := env.state.UTXOIDs(fundingAddr[:], ids.Empty, 1)
-	require.NoError(t, err)
-	require.NotEmpty(t, existingUTXOIDs)
-
-	existingUTXO, err := env.state.GetUTXO(existingUTXOIDs[0])
-	require.NoError(t, err)
-
-	utxoOut := existingUTXO.Out.(*secp256k1fx.TransferOutput)
-	utxoAmount := utxoOut.Amt
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var (
+				env           = newEnvironment(t, upgradetest.Latest)
+				wallet        = newWallet(t, env, walletConfig{})
+				feeCalculator = state.PickFeeCalculator(env.config, env.state)
+			)
+
+			sk, err := localsigner.New()
+			require.NoError(t, err)
+
+			pop, err := signer.NewProofOfPossession(sk)
+			require.NoError(t, err)
+
+			nodeID := ids.GenerateTestNodeID()
+
+			addAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+				nodeID,
+				env.config.MinValidatorStake,
+				pop,
+				&secp256k1fx.OutputOwners{},
+				&secp256k1fx.OutputOwners{},
+				&secp256k1fx.OutputOwners{},
+				500_000,
+				300_000,
+				uint64((2*env.config.MinStakeDuration)/time.Second),
+			)
+			require.NoError(t, err)
+			env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
+
+			validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+
+			startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
+			duration := time.Duration(validatorTx.Period) * time.Second
+			vdrStaker, err := state.NewStaker(
+				addAutoRenewedValidatorTx.ID(),
+				validatorTx,
+				startTime,
+				startTime.Add(duration),
+				validatorTx.Weight(),
+				uint64(1000000),
+			)
+			require.NoError(t, err)
+
+			require.NoError(t, env.state.PutCurrentValidator(vdrStaker))
+
+			initialStakingInfo := state.StakingInfo{
+				DelegateeReward:          1,
+				AccruedValidationRewards: 2,
+				AccruedDelegateeRewards:  3,
+				AutoCompoundRewardShares: 100_000,
+				NextPeriod:               validatorTx.Period,
+			}
+			require.NoError(t, env.state.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
+
+			fundingKey := genesistest.DefaultFundedKeys[0]
+			fundingAddr := fundingKey.Address()
+			existingUTXOIDs, err := env.state.UTXOIDs(fundingAddr[:], ids.Empty, 1)
+			require.NoError(t, err)
+			require.NotEmpty(t, existingUTXOIDs)
+
+			existingUTXO, err := env.state.GetUTXO(existingUTXOIDs[0])
+			require.NoError(t, err)
+
+			utxoOut := existingUTXO.Out.(*secp256k1fx.TransferOutput)
+			utxoAmount := utxoOut.Amt
+
 			unsignedTx, err := wallet.Builder().NewSetAutoRenewedValidatorConfigTx(
 				addAutoRenewedValidatorTx.TxID,
 				tt.newAutoCompoundRewardShares,
@@ -4710,8 +4721,9 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 			require.NoError(t, err)
 			require.True(t, setAutoRenewedValidatorConfigTx.Unsigned.(*txs.SetAutoRenewedValidatorConfigTx).BaseTx.SyntacticallyVerified)
+			require.NoError(t, diff.Apply(env.state))
 
-			stakingInfo, err := diff.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
+			stakingInfo, err := env.state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
 			require.NoError(t, err)
 
 			wantStakingInfo := initialStakingInfo
@@ -4722,14 +4734,14 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			inputIDs := setAutoRenewedValidatorConfigTx.InputIDs()
 			require.NotEmpty(t, inputIDs)
 			for inputID := range inputIDs {
-				_, err := diff.GetUTXO(inputID)
+				_, err := env.state.GetUTXO(inputID)
 				require.ErrorIs(t, err, database.ErrNotFound)
 			}
 
 			outputUTXOs := setAutoRenewedValidatorConfigTx.UTXOs()
 			require.NotEmpty(t, outputUTXOs)
 			for _, wantUTXO := range outputUTXOs {
-				gotUTXO, err := diff.GetUTXO(wantUTXO.InputID())
+				gotUTXO, err := env.state.GetUTXO(wantUTXO.InputID())
 				require.NoError(t, err)
 				require.Equal(t, wantUTXO, gotUTXO)
 			}
@@ -4763,7 +4775,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		nodeID,
 		env.config.MinValidatorStake,
 		pop,
-		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{},
 		&secp256k1fx.OutputOwners{},
 		&secp256k1fx.OutputOwners{},
@@ -4778,7 +4789,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		nodeID,
 		env.config.MinValidatorStake,
 		pop,
-		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{},
 		&secp256k1fx.OutputOwners{},
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()}},
