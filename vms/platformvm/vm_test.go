@@ -893,7 +893,7 @@ func TestCreateSubnetChainTypes(t *testing.T) {
 	tests := []struct {
 		name        string
 		setupChains func(vm *VM, subnetID ids.ID)
-		expectedErr string
+		expectedErr error
 	}{
 		{
 			name: "CreateChainTx only",
@@ -919,7 +919,7 @@ func TestCreateSubnetChainTypes(t *testing.T) {
 			setupChains: func(vm *VM, subnetID ids.ID) {
 				vm.state.AddL1Chain(subnetID, &txs.Tx{Unsigned: &txs.CreateSubnetTx{}})
 			},
-			expectedErr: "expected tx type *txs.CreateChainTx or *txs.CreateL1Tx",
+			expectedErr: errUnknownChainType,
 		},
 	}
 
@@ -934,11 +934,7 @@ func TestCreateSubnetChainTypes(t *testing.T) {
 			test.setupChains(vm, subnetID)
 
 			err := vm.createSubnet(subnetID)
-			if test.expectedErr != "" {
-				require.ErrorContains(err, test.expectedErr)
-			} else {
-				require.NoError(err)
-			}
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }

@@ -9,9 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-var (
-	_ UnsignedTx = (*CreateL1Tx)(nil)
-)
+var _ UnsignedTx = (*CreateL1Tx)(nil)
 
 type CreateL1Tx struct {
 	BaseTx `serialize:"true"`
@@ -69,7 +67,7 @@ func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
 // BlockchainID returns the blockchainID for the chain created by this tx.
 // Defined as SHA256(subnetID || 0x00 || chainIndex), where chainIndex is 0
 // since CreateL1Tx creates exactly one chain.
-func (tx *CreateL1Tx) BlockchainID(subnetID ids.ID) ids.ID {
+func (*CreateL1Tx) BlockchainID(subnetID ids.ID) ids.ID {
 	packer := wrappers.Packer{Bytes: make([]byte, ids.IDLen+1+wrappers.IntLen)}
 	packer.PackFixedBytes(subnetID[:])
 	packer.PackByte(0x00)

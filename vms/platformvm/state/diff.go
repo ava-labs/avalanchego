@@ -540,7 +540,7 @@ func (d *Diff) AddChain(createChainTx *txs.Tx) {
 	}
 }
 
-// Added to accomodate for createL1Tx.
+// Added to accommodate for createL1Tx.
 func (d *Diff) AddL1Chain(subnetID ids.ID, tx *txs.Tx) {
 	if d.addedChains == nil {
 		d.addedChains = map[ids.ID][]*txs.Tx{

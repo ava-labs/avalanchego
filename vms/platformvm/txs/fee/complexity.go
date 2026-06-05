@@ -195,12 +195,12 @@ var (
 	IntrinsicCreateL1TxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.ShortLen + // chainName length
-			ids.IDLen +         // vmID
-			wrappers.IntLen +   // num fxIDs
-			wrappers.IntLen +   // genesis length
-			ids.IDLen +         // managerChainID
-			wrappers.IntLen +   // address length
-			wrappers.IntLen,    // validators length
+			ids.IDLen + // vmID
+			wrappers.IntLen + // num fxIDs
+			wrappers.IntLen + // genesis length
+			ids.IDLen + // managerChainID
+			wrappers.IntLen + // address length
+			wrappers.IntLen, // validators length
 		gas.DBRead:  0, // no subnet auth, no transformation/conversion lookup
 		gas.DBWrite: 3, // put subnet + put chain + put conversion
 	}

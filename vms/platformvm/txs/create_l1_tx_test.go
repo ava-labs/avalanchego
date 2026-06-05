@@ -188,11 +188,11 @@ func TestCreateL1TxSerialization(t *testing.T) {
 		{
 			name: "complex",
 			tx: &CreateL1Tx{
-				BaseTx:      baseWithInput,
-				ChainName:   "Test L1",
-				VMID:        vmID,
-				FxIDs:       []ids.ID{avaxAssetID},
-				GenesisData: []byte("genesis"),
+				BaseTx:         baseWithInput,
+				ChainName:      "Test L1",
+				VMID:           vmID,
+				FxIDs:          []ids.ID{avaxAssetID},
+				GenesisData:    []byte("genesis"),
 				ManagerChainID: managerChainID,
 				ManagerAddress: managerAddress,
 				Validators: []*ConvertSubnetToL1Validator{
@@ -362,16 +362,16 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		ctx        = snowtest.Context(t, ids.GenerateTestID())
+		ctx         = snowtest.Context(t, ids.GenerateTestID())
 		validBaseTx = BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 			},
 		}
-		validVMID          = ids.GenerateTestID()
-		invalidAddress     = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
-		validValidators    = []*ConvertSubnetToL1Validator{
+		validVMID       = ids.GenerateTestID()
+		invalidAddress  = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
+		validValidators = []*ConvertSubnetToL1Validator{
 			{
 				NodeID:                utils.RandomBytes(ids.NodeIDLen),
 				Weight:                1,
@@ -656,14 +656,14 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 		{
 			name: "passes verification with all fields",
 			tx: &CreateL1Tx{
-				BaseTx:      validBaseTx,
-				ChainName:   "Test L1",
-				VMID:        validVMID,
-				FxIDs:       []ids.ID{{0x01}, {0x02}},
-				GenesisData: make([]byte, units.KiB),
+				BaseTx:         validBaseTx,
+				ChainName:      "Test L1",
+				VMID:           validVMID,
+				FxIDs:          []ids.ID{{0x01}, {0x02}},
+				GenesisData:    make([]byte, units.KiB),
 				ManagerChainID: ids.GenerateTestID(),
 				ManagerAddress: make([]byte, 20),
-				Validators:  validValidators,
+				Validators:     validValidators,
 			},
 			expectedErr: nil,
 		},
@@ -709,6 +709,6 @@ func TestCreateL1TxBlockchainID(t *testing.T) {
 	// validationID = subnetID.Append(0) = SHA256(subnetID[32] || chainIndex[4])
 	// which is 36 bytes, the missing 0x00 byte makes them different.
 	validationID := subnetID.Append(0)
-	require.NotEqual(ids.ID(validationID), blockchainID)
+	require.NotEqual(validationID, blockchainID)
 	require.NotEqual(subnetID, blockchainID)
 }

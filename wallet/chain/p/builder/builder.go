@@ -830,6 +830,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 	return tx, b.initCtx(tx)
 }
+
 func (b *builder) NewCreateL1Tx(
 	chainName string,
 	vmID ids.ID,

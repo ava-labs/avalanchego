@@ -1206,7 +1206,7 @@ func (s *State) AddChain(createChainTxIntf *txs.Tx) {
 	}
 }
 
-// Added to accomodate for CreateL1Tx
+// Added to accommodate for CreateL1Tx
 func (s *State) AddL1Chain(subnetID ids.ID, tx *txs.Tx) {
 	s.addedChains[subnetID] = append(s.addedChains[subnetID], tx)
 	if chains, cached := s.chainCache.Get(subnetID); cached {

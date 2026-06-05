@@ -57,6 +57,8 @@ var (
 	_ snowmanblock.SetPreferenceWithContextChainVM = (*VM)(nil)
 	_ secp256k1fx.VM                               = (*VM)(nil)
 	_ validators.State                             = (*VM)(nil)
+
+	errUnknownChainType = errors.New("unknown chain type in createSubnet")
 )
 
 type VM struct {
@@ -337,7 +339,7 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		case *txs.CreateL1Tx:
 			vm.Internal.CreateL1Chain(subnetID, tx)
 		default:
-			return fmt.Errorf("expected tx type *txs.CreateChainTx or *txs.CreateL1Tx but got %T", chain.Unsigned)
+			return fmt.Errorf("%w: got %T", errUnknownChainType, chain.Unsigned)
 		}
 	}
 	return nil
