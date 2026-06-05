@@ -22,7 +22,7 @@ use std::num::NonZeroU64;
 include!(concat!(env!("OUT_DIR"), "/area_sizes.rs"));
 
 /// Returns an iterator over all valid area sizes.
-// TODO: return a named iterator
+// TODO(rkuris): return a named iterator
 pub(crate) fn area_size_iter() -> impl DoubleEndedIterator<Item = (AreaIndex, u64)> {
     AREA_SIZES
         .iter()

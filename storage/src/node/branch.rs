@@ -214,7 +214,7 @@ impl Debug for BranchNode {
         for (i, c) in &self.children {
             match c {
                 None => {}
-                Some(Child::Node(_)) => {} //TODO
+                Some(Child::Node(_)) => {} //TODO(rkuris)
                 Some(Child::AddressWithHash(addr, hash)) => {
                     write!(f, "({i:?}: address={addr:?} hash={hash})")?;
                 }

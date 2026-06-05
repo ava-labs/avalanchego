@@ -14,7 +14,7 @@
     reason = "Found 1 occurrences after enabling the lint."
 )]
 
-// TODO: remove bitflags, we only use one bit
+// TODO(rkuris): remove bitflags, we only use one bit
 use bitflags::bitflags;
 use smallvec::SmallVec;
 use std::fmt::{self, Debug, LowerHex};
@@ -55,7 +55,7 @@ impl Debug for Path {
 }
 
 impl LowerHex for Path {
-    // TODO: handle fill / alignment / etc
+    // TODO(#2049): handle fill / alignment / etc
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         if self.0.is_empty() {
             write!(f, "[]")

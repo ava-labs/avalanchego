@@ -618,7 +618,7 @@ impl<S: WritableStorage> NodeStore<Mutable<Propose>, S> {
                     if let CheckerError::AreaLeaks(ranges) = &error {
                         {
                             let _leaked_areas = self.split_all_leaked_ranges(ranges, None);
-                            // TODO: add _leaked_areas to the free list
+                            // TODO(#2048): add _leaked_areas to the free list
                         }
                         unfixable.push((error, None));
                     } else {

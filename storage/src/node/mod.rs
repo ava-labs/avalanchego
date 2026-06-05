@@ -34,7 +34,7 @@ pub mod path;
 pub mod persist;
 /// A node, either a Branch or Leaf
 
-// TODO: explain why Branch is boxed but Leaf is not
+// TODO(rkuris): explain why Branch is boxed but Leaf is not
 #[derive(PartialEq, Eq, Clone, Debug, EnumAsInner)]
 #[repr(C)]
 pub enum Node {
@@ -104,7 +104,7 @@ impl Default for LeafFirstByte {
     }
 }
 
-// TODO: Unstable extend_reserve re-implemented here
+// TODO(rkuris): Unstable extend_reserve re-implemented here
 // Extend<A>::extend_reserve is unstable so we implement it here
 // see https://github.com/rust-lang/rust/issues/72631
 pub trait ExtendableBytes: Write {
@@ -229,7 +229,7 @@ impl Node {
     /// The first byte of the encoding is the area size index, which is calculated from the total
     /// size of the encoded node. This method returns the `AreaIndex` for the encoded node.
     ///
-    /// TODO: We could pack two bytes of the partial path into one and handle the odd byte length
+    /// TODO(rkuris): We could pack two bytes of the partial path into one and handle the odd byte length
     ///
     /// # Errors
     ///
@@ -379,7 +379,7 @@ impl Node {
                 if childcount == 0 {
                     // branch is full of all children
                     for (_, child) in &mut children {
-                        // TODO: we can read them all at once
+                        // TODO(rkuris): we can read them all at once
                         let mut address_buf = [0u8; 8];
                         serialized.read_exact(&mut address_buf)?;
                         let address = u64::from_ne_bytes(address_buf);

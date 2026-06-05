@@ -12,7 +12,7 @@ impl<'a, P: SplitPath> HashableShunt<'a, P, &'a [PathComponent]> {
         match node {
             Node::Branch(node) => {
                 // All child hashes should be filled in.
-                // TODO danlaine: Enforce this with the type system.
+                // TODO(#2052): Enforce this with the type system.
                 debug_assert!(
                     node.children
                         .iter()

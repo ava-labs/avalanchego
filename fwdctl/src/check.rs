@@ -17,7 +17,7 @@ use num_format::{Locale, ToFormattedString};
 
 use crate::DatabasePath;
 
-// TODO: (optionally) add a fix option
+// TODO(#2046): (optionally) add a fix option
 #[derive(Args, Debug)]
 pub struct Options {
     #[command(flatten)]

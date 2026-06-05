@@ -733,7 +733,7 @@ enum Panic {
     SendSyncErr(Box<dyn std::error::Error + Send + Sync>),
     SendErr(Box<dyn std::error::Error + Send>),
     Unknown(#[expect(unused)] Box<dyn std::any::Any + Send>),
-    // TODO: add variant to capture backtrace with panic hook
+    // TODO(demosdemon): add variant to capture backtrace with panic hook
     // https://doc.rust-lang.org/stable/std/panic/fn.set_hook.html
 }
 

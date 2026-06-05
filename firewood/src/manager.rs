@@ -354,7 +354,7 @@ impl RevisionManager {
         // Revision reaping: when we exceed max_revisions, remove the oldest revision from memory
         // and send it to the `PersistWorker`.
         // If you crash after freeing some of these, then the free list will point to nodes that are not actually free.
-        // TODO: Handle the case where we get something off the free list that is not free
+        // TODO(rkuris): Handle the case where we get something off the free list that is not free
         while revisions.len() >= self.max_revisions {
             let oldest = revisions.pop_front().expect("must be present");
             let oldest_hash = oldest.root_hash().or_default_root_hash();

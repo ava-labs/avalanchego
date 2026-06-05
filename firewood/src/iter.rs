@@ -262,7 +262,7 @@ fn get_iterator_intial_state<T: TrieReader>(
                     node = match child {
                         None => return Ok(NodeIterState::Iterating { iter_stack }),
                         Some(Child::AddressWithHash(addr, _)) => merkle.read_node(*addr)?,
-                        Some(Child::Node(node)) => (*node).clone().into(), // TODO can we avoid cloning this?
+                        Some(Child::Node(node)) => (*node).clone().into(), // TODO(rkuris) can we avoid cloning this?
                         Some(Child::MaybePersisted(maybe_persisted, _)) => {
                             // For MaybePersisted, we need to get the node
                             maybe_persisted.as_shared_node(merkle)?

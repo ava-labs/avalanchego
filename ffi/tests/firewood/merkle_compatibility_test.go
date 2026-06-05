@@ -378,7 +378,7 @@ func fuzzTree(t *testing.T, randSource int64, byteSteps []byte) {
 
 	tr := newTestTree(t, rand)
 
-	// TODO: replace randomly generated values with bytes from the fuzzer
+	// TODO(#2045): replace randomly generated values with bytes from the fuzzer
 	for _, step := range byteSteps {
 		step = step % maxStep
 		// Make this two lines so debugger displays the stepStr value

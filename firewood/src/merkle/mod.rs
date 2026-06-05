@@ -1986,7 +1986,7 @@ impl<K: MutableKind, S: ReadableStorage> Merkle<NodeStore<Mutable<K>, S>> {
     ) -> Result<Option<Node>, FileIoError> {
         // 4 possibilities for the position of the `key` relative to `node`:
         // 1. The node is at `key`, in which case we need to delete this node and all its children.
-        // 2. The key is above the node (i.e. its ancestor), so the parent needs to be restructured (TODO).
+        // 2. The key is above the node (i.e. its ancestor), so the parent needs to be restructured (TODO(rkuris)).
         // 3. The key is below the node (i.e. its descendant), so continue traversing the trie.
         // 4. Neither is an ancestor of the other, in which case there's no work to do.
         let path_overlap = PrefixOverlap::from(key, node.partial_path().as_ref());

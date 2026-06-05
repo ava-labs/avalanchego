@@ -7,7 +7,7 @@ mod change;
 mod collapse;
 #[cfg(feature = "ethhash")]
 mod ethhash;
-// TODO: get the hashes from merkledb and verify compatibility with branch factor 256
+// TODO(rkuris): get the hashes from merkledb and verify compatibility with branch factor 256
 mod proof;
 mod range;
 mod reconcile;
@@ -634,7 +634,7 @@ fn test_insert_leaf_prefix() {
 #[test]
 fn test_insert_sibling_leaf() {
     // The node at key is a branch node with children key_2 and key_3.
-    // TODO assert in this test that key is the parent of key_2 and key_3.
+    // TODO(rkuris) assert in this test that key is the parent of key_2 and key_3.
     // i.e. the node types are branch, leaf, leaf respectively.
     let key = vec![0xff];
     let val = [1];

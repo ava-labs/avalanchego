@@ -70,7 +70,7 @@ impl<T: Version0> Version0 for Box<[T]> {
             .read_item::<usize>()
             .map_err(|err| err.set_item("array length"))?;
 
-        // FIXME: we must somehow validate `num_items` matches what is expected
+        // FIXME(demosdemon): we must somehow validate `num_items` matches what is expected
         // An incorrect, or unexpectedly large value could lead to DoS via OOM
         // or panicing
         (0..num_items).map(|_| reader.read_v0_item()).collect()

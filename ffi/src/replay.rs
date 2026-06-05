@@ -298,7 +298,7 @@ pub(crate) fn flush_to_disk() -> io::Result<()> {
     // we don't use recorder() here because flushing should not init
     // the recorder. TestMain opens and closes a db, that causes
     // some tests to fail.
-    // TODO[AMIN]: this should change when we make record db-specific.
+    // TODO(AminR443): this should change when we make record db-specific.
     if let Some(Some(rec)) = RECORDER.get() {
         rec.lock().flush_to_disk()
     } else {

@@ -239,7 +239,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 /// This means that the nodestore can have children.
 /// Only [`ImmutableProposal`] and [Committed] implement this trait.
 /// [`Mutable<Propose>`] and [`Mutable<Recon>`] do not implement this trait because they are not valid parents.
-/// TODO: Maybe this can be renamed to `ImmutableNodestore`
+/// TODO(rkuris): Maybe this can be renamed to `ImmutableNodestore`
 pub trait Parentable {
     /// Returns the parent of this nodestore.
     fn as_nodestore_parent(&self) -> NodeStoreParent;
@@ -1135,7 +1135,7 @@ impl<T, S: ReadableStorage> RootReader for NodeStore<Mutable<T>, S> {
 
 impl<S: ReadableStorage> RootReader for NodeStore<Committed, S> {
     fn root_node(&self) -> Option<SharedNode> {
-        // TODO: If the read_node fails, we just say there is no root; this is incorrect
+        // TODO(rkuris): If the read_node fails, we just say there is no root; this is incorrect
         self.kind
             .root
             .as_ref()
@@ -1242,7 +1242,7 @@ impl<T: HashedNodeReader> HashedNodeReader for &T {
     }
 }
 
-// TODO: return only the index since we can easily get the size from the index
+// TODO(rkuris): return only the index since we can easily get the size from the index
 fn area_index_and_size<S: ReadableStorage>(
     storage: &S,
     addr: LinearAddress,
@@ -1403,7 +1403,7 @@ where
     NodeStore<T, S>: NodeReader,
 {
     // Find the area index and size of the stored area at the given address if the area is valid.
-    // TODO: there should be a way to read stored area directly instead of try reading as a free area then as a node
+    // TODO(#2050): there should be a way to read stored area directly instead of try reading as a free area then as a node
     pub(crate) fn read_leaked_area(
         &self,
         address: LinearAddress,
@@ -1444,7 +1444,7 @@ mod tests {
 
     #[test]
     fn test_area_size_to_index() {
-        // TODO: rustify using: for size in AREA_SIZES
+        // TODO(rkuris): rustify using: for size in AREA_SIZES
         for (i, area_size) in area_size_iter() {
             // area size is at top of range
             assert_eq!(AreaIndex::from_size(area_size).unwrap(), i);

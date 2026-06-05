@@ -193,7 +193,7 @@ fn test_bad_proof() {
         let mut new_proof = proof.into_mutable();
         new_proof.pop();
 
-        // TODO: verify error result matches expected error
+        // TODO(demosdemon): verify error result matches expected error
         assert!(new_proof.verify(key, Some(value), &root_hash).is_err());
     }
 }

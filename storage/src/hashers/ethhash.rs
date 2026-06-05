@@ -203,7 +203,7 @@ impl<T: Hashable> Preimage for T {
                 // need to get the value again
                 if let Some(ValueDigest::Value(rlp_encoded_bytes)) = self.value_digest() {
                     // rlp_encoded_bytes needs to be decoded
-                    // TODO: Handle corruption
+                    // TODO(rkuris): Handle corruption
                     // needs to be the hash of the RLP encoding of the root node that
                     // would have existed here (instead of this account node)
                     // the "root node" is actually this branch node iff there is

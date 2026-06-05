@@ -1739,7 +1739,7 @@ func TestProposeOnProposalRehash(t *testing.T) {
 }
 
 func parseKVFromDumpFormat(dumpstr string) ([][]byte, [][]byte, error) {
-	// TODO: make this same as dump format outputted by firewood (slightly different, this is a debug one from my replay stuff)
+	// TODO(AminR443): make this same as dump format outputted by firewood (slightly different, this is a debug one from my replay stuff)
 	keys := make([][]byte, 0)
 	values := make([][]byte, 0)
 	lines := strings.SplitSeq(dumpstr, "\n")

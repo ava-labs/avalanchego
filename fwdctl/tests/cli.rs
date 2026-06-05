@@ -382,7 +382,7 @@ fn test_slow_fwdctl_check_db_with_data() {
 
         create_db(db_path);
 
-        // TODO: bulk loading data instead of inserting one by one
+        // TODO(#2047): bulk loading data instead of inserting one by one
         for _ in 0..4 {
             let key = sample_iter.by_ref().take(64).collect::<String>();
             let value = sample_iter.by_ref().take(10).collect::<String>();

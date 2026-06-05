@@ -79,7 +79,7 @@ impl<'a, N: NodeReader + RootReader> UnPersistedNodeIterator<'a, N> {
 
         // we must have an unpersisted root node to use this iterator
         // It's hard to tell at compile time if this is the case, so we assert it here
-        // TODO: can we use another trait or generic to enforce this?
+        // TODO(rkuris): can we use another trait or generic to enforce this?
         debug_assert!(root.as_ref().is_none_or(|r| r.unpersisted().is_some()));
         let (child_iter_stack, stack) = if let Some(root) = root {
             if let Some(branch) = root

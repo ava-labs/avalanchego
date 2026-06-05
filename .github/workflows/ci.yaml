@@ -73,6 +73,9 @@ jobs:
           strict: true
       - name: Format
         run: cargo fmt -- --check
+      # Fails on TODO/FIXME markers lacking an owner or issue (see issue #1603).
+      - name: Check TODO/FIXME annotations
+        run: ./scripts/check-todos.sh
 
   rust-lint-pr-comments:
     # caveat emptor: actions-rs/clippy-check can only write comments on pull requests

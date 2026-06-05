@@ -118,7 +118,7 @@ pub struct DbConfig {
     pub manager: RevisionManagerConfig,
     // Whether to perform parallel proposal creation. If set to BatchSize, then firewood
     // performs parallel proposal creation if the batch is >= to the BatchSize value.
-    // TODO: Experimentally determine the right value for BatchSize.
+    // TODO(bernard-avalabs): Experimentally determine the right value for BatchSize.
     #[builder(default = UseParallel::BatchSize(8))]
     pub use_parallel: UseParallel,
     /// Whether to enable `RootStore`.
