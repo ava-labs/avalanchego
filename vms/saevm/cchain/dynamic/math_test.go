@@ -9,14 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// readerCase pins an exponent to the value it produces. Set skipDesired when
-// the value is shared by multiple exponents, so Desired(value) need not return
-// this exact exponent.
+// readerCase pins an exponent to the value it produces.
 type readerCase[E, V ~uint64] struct {
-	name        string
-	exponent    E
-	value       V
-	skipDesired bool
+	name     string
+	exponent E
+	value    V
+	skipDesired bool // set when value is produced by multiple exponents
 }
 
 // towardCase pins a single Toward step. A nil desired must leave the current
