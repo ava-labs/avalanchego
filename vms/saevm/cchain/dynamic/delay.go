@@ -28,6 +28,7 @@ func (d DelayExponent) Delay() uint64 {
 //
 // If desired is nil, d is returned unmodified.
 func (d DelayExponent) Toward(desired *DelayExponent) DelayExponent {
+	// Per ACP-226, the per-block exponent change is capped at 200.
 	const maxDiff = 200
 	return toward(d, desired, maxDiff)
 }

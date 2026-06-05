@@ -21,7 +21,7 @@ go_test(
     name = "dynamic_test",
     srcs = [
         "delay_test.go",
-        "helpers_test.go",
+        "math_test.go",
         "price_test.go",
         "target_test.go",
     ],

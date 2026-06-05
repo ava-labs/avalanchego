@@ -10,19 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-// Independent copies of the implementation's constants. Sharing them would make
-// the assertions tautological.
-const (
-	minDelay         = 1                         // milliseconds
-	maxDelayDiff     = 200                       // DelayExponent.Toward step cap
-	maxDelayExponent = DelayExponent(46_516_320) // saturates Delay to MaxUint64
-)
-
 // delayReaderCases are reader vectors ported from the ACP-226 reference tests.
 var delayReaderCases = []readerCase[DelayExponent, uint64]{
-	{name: "zero", exponent: 0, value: minDelay},
-	{name: "smallest_change", exponent: 726_820, value: minDelay + 1},
-	{name: "max_step", exponent: maxDelayDiff, value: 1, skipDesired: true},
+	{name: "zero", exponent: 0, value: 1},
+	{name: "smallest_change", exponent: 726_820, value: 2},
+	{name: "max_step", exponent: 200, value: 1, skipDesired: true},
 	{name: "100ms", exponent: 4_828_872, value: 100},                                // 2^20 * ln(100) + 2
 	{name: "500ms", exponent: 6_516_490, value: 500},                                // 2^20 * ln(500) + 2
 	{name: "1000ms", exponent: 7_243_307, value: 1000},                              // 2^20 * ln(1000) + 1
@@ -32,8 +24,8 @@ var delayReaderCases = []readerCase[DelayExponent, uint64]{
 	{name: "60000ms", exponent: 11_536_538, value: 60000},                           // 2^20 * ln(60000) + 1
 	{name: "300000ms", exponent: 13_224_156, value: 300000},                         // 2^20 * ln(300000) + 1
 	{name: "largest_int64", exponent: 45_789_502, value: 9_223_368_741_047_657_702}, // 2^20 * ln(MaxInt64)
-	{name: "second_largest_uint64", exponent: maxDelayExponent - 1, value: 18_446_728_723_565_431_225},
-	{name: "largest_uint64", exponent: maxDelayExponent, value: math.MaxUint64},
+	{name: "second_largest_uint64", exponent: 46_516_319, value: 18_446_728_723_565_431_225},
+	{name: "largest_uint64", exponent: 46_516_320, value: math.MaxUint64},
 	{name: "saturated", exponent: math.MaxUint64, value: math.MaxUint64, skipDesired: true},
 }
 
@@ -42,10 +34,10 @@ var delayTowardCases = []towardCase[DelayExponent]{
 	{name: "no_change", current: 0, desired: utils.PointerTo[DelayExponent](0), want: 0},
 	{name: "increase_within_cap", current: 50, desired: utils.PointerTo[DelayExponent](100), want: 100},
 	{name: "decrease_within_cap", current: 100, desired: utils.PointerTo[DelayExponent](50), want: 50},
-	{name: "increase_at_cap", current: 0, desired: utils.PointerTo[DelayExponent](maxDelayDiff), want: maxDelayDiff},
-	{name: "decrease_at_cap", current: maxDelayDiff, desired: utils.PointerTo[DelayExponent](0), want: 0},
-	{name: "increase_capped", current: 0, desired: utils.PointerTo[DelayExponent](1000), want: maxDelayDiff},
-	{name: "decrease_capped", current: 1000, desired: utils.PointerTo[DelayExponent](0), want: 1000 - maxDelayDiff},
+	{name: "increase_at_cap", current: 0, desired: utils.PointerTo[DelayExponent](200), want: 200},
+	{name: "decrease_at_cap", current: 200, desired: utils.PointerTo[DelayExponent](0), want: 0},
+	{name: "increase_capped", current: 0, desired: utils.PointerTo[DelayExponent](1000), want: 200},
+	{name: "decrease_capped", current: 1000, desired: utils.PointerTo[DelayExponent](0), want: 800},
 }
 
 func TestDelay(t *testing.T) {
@@ -53,7 +45,7 @@ func TestDelay(t *testing.T) {
 }
 
 func TestDesiredDelayExponent(t *testing.T) {
-	testDesired(t, delayReaderCases, DesiredDelayExponent)
+	testSearch(t, delayReaderCases, DesiredDelayExponent)
 }
 
 func TestDelayExponentToward(t *testing.T) {
@@ -61,21 +53,9 @@ func TestDelayExponentToward(t *testing.T) {
 }
 
 func FuzzDelayExponentToward(f *testing.F) {
-	for _, c := range delayTowardCases {
-		if c.desired != nil {
-			f.Add(uint64(c.current), uint64(*c.desired))
-		}
-	}
-	f.Fuzz(func(t *testing.T, current, desired uint64) {
-		fuzzToward(t, DelayExponent(current), DelayExponent(desired), DelayExponent.Toward)
-	})
+	fuzzToward(f, delayTowardCases, DelayExponent.Toward)
 }
 
 func FuzzDesiredDelayExponent(f *testing.F) {
-	for _, c := range delayReaderCases {
-		f.Add(c.value)
-	}
-	f.Fuzz(func(t *testing.T, delay uint64) {
-		fuzzDesired(t, delay, DesiredDelayExponent, DelayExponent.Delay)
-	})
+	fuzzSearch(f, delayReaderCases, DesiredDelayExponent, DelayExponent.Delay)
 }
