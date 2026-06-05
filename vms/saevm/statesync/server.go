@@ -5,17 +5,12 @@ package statesync
 
 import "context"
 
-// GetLastStateSummary implements [adaptor.SyncableVM].
+// GetLastStateSummary implements [adaptor.StateSync].
 func (*VM[T]) GetLastStateSummary(context.Context) (*summary, error) {
 	panic("unimplemented")
 }
 
-// GetOngoingSyncStateSummary implements [adaptor.SyncableVM].
-func (*VM[T]) GetOngoingSyncStateSummary(context.Context) (*summary, error) {
-	panic("unimplemented")
-}
-
-// GetStateSummary implements [adaptor.SyncableVM].
+// GetStateSummary implements [adaptor.StateSync].
 func (*VM[T]) GetStateSummary(context.Context, uint64) (*summary, error) {
 	panic("unimplemented")
 }

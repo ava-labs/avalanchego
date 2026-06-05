@@ -4,8 +4,6 @@
 package statesync
 
 import (
-	"context"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 )
@@ -26,10 +24,5 @@ func (*summary) ID() ids.ID {
 
 // Bytes implements [adaptor.SummaryProperties].
 func (*summary) Bytes() []byte {
-	panic("unimplemented")
-}
-
-// ParseStateSummary implements [adaptor.SyncableVM].
-func (*VM[T]) ParseStateSummary(context.Context, []byte) (*summary, error) {
 	panic("unimplemented")
 }

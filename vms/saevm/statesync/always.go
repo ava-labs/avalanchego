@@ -43,7 +43,7 @@ func (*SinceGenesis[T]) Shutdown(ctx context.Context) error {
 	panic("unimplemented")
 }
 
-// StateSyncEnabled implements [adaptor.SyncableVM].
+// StateSyncEnabled implements [adaptor.StateSync].
 func (*SinceGenesis[T]) StateSyncEnabled(context.Context) (bool, error) {
 	panic("unimplemented")
 }

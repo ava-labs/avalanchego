@@ -12,9 +12,17 @@ import (
 
 // SyncableVM is a [ChainVM] that also supports state sync. See
 // [block.StateSyncableVM] and [block.StateSummary] for more documentation.
+//
+// Every method below is required: state sync is mandatory under this
+// conversion. The summary getters MUST return database.ErrNotFound when no
+// summary is available, never a nil SP.
 type SyncableVM[BP BlockProperties, SP SummaryProperties] interface {
 	ChainVM[BP]
+	StateSync[SP]
+}
 
+// StateSync is the state-sync surface of a VM, independent of the block type.
+type StateSync[SP SummaryProperties] interface {
 	StateSyncEnabled(context.Context) (bool, error)
 	GetLastStateSummary(context.Context) (SP, error)
 	GetOngoingSyncStateSummary(context.Context) (SP, error)
@@ -56,13 +64,17 @@ type syncAdaptor[BP BlockProperties, SP SummaryProperties] struct {
 // Summary is an implementation of [block.StateSummary], used by chains returned
 // by [ConvertStateSync]. The [SummaryProperties] can be accessed with
 // [Summary.Unwrap].
-type Summary[BP BlockProperties, SP SummaryProperties] struct {
+//
+// Summary holds the [StateSync] surface rather than the full [SyncableVM], so it
+// depends only on SP and never on the block type. It mirrors how [Block] holds a
+// [ChainVM].
+type Summary[SP SummaryProperties] struct {
 	s  SP
-	vm SyncableVM[BP, SP]
+	vm StateSync[SP]
 }
 
 // Unwrap returns the underlying [SummaryProperties] of the [Summary].
-func (s Summary[_, SP]) Unwrap() SP {
+func (s Summary[SP]) Unwrap() SP {
 	return s.s
 }
 
@@ -70,7 +82,7 @@ func (vm syncAdaptor[BP, SP]) newSummary(s SP, err error) (block.StateSummary, e
 	if err != nil {
 		return nil, err
 	}
-	return Summary[BP, SP]{s, vm.vm}, nil
+	return Summary[SP]{s, vm.vm}, nil
 }
 
 func (vm syncAdaptor[BP, SP]) StateSyncEnabled(ctx context.Context) (bool, error) {
@@ -82,7 +94,7 @@ func (vm syncAdaptor[BP, SP]) GetLastStateSummary(ctx context.Context) (block.St
 }
 
 func (vm syncAdaptor[BP, SP]) GetOngoingSyncStateSummary(ctx context.Context) (block.StateSummary, error) {
-	return vm.newSummary((vm.vm.GetOngoingSyncStateSummary(ctx)))
+	return vm.newSummary(vm.vm.GetOngoingSyncStateSummary(ctx))
 }
 
 func (vm syncAdaptor[BP, SP]) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
@@ -94,15 +106,15 @@ func (vm syncAdaptor[BP, SP]) ParseStateSummary(ctx context.Context, summaryByte
 }
 
 // ID propagates the respective method from the [SummaryProperties] carried by s.
-func (s Summary[_, _]) ID() ids.ID { return s.s.ID() }
+func (s Summary[_]) ID() ids.ID { return s.s.ID() }
 
 // Bytes propagates the respective method from the [SummaryProperties] carried by s.
-func (s Summary[_, _]) Bytes() []byte { return s.s.Bytes() }
+func (s Summary[_]) Bytes() []byte { return s.s.Bytes() }
 
 // Height propagates the respective method from the [SummaryProperties] carried by s.
-func (s Summary[_, _]) Height() uint64 { return s.s.Height() }
+func (s Summary[_]) Height() uint64 { return s.s.Height() }
 
 // Accept calls AcceptSummary(s) on the [SyncableVM] that created s.
-func (s Summary[_, _]) Accept(ctx context.Context) (block.StateSyncMode, error) {
+func (s Summary[_]) Accept(ctx context.Context) (block.StateSyncMode, error) {
 	return s.vm.AcceptSummary(ctx, s.s)
 }
