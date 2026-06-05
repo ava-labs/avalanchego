@@ -411,21 +411,3 @@ func BenchmarkBlockPredicates(b *testing.B) {
 		}
 	}
 }
-
-/*
-goos: darwin
-goarch: arm64
-pkg: github.com/ava-labs/avalanchego/vms/saevm/cchain/warp
-cpu: Apple M2 Max
-BenchmarkBlockPredicates/txs=1/predicates_per_tx=1-12         	    1617	    731423 ns/op	   12753 B/op	      91 allocs/op
-BenchmarkBlockPredicates/txs=1/predicates_per_tx=10-12        	     792	   1467925 ns/op	  113688 B/op	     779 allocs/op
-BenchmarkBlockPredicates/txs=1/predicates_per_tx=100-12       	     100	  10770929 ns/op	 1120770 B/op	    7624 allocs/op
-BenchmarkBlockPredicates/txs=10/predicates_per_tx=1-12        	     853	   1460580 ns/op	  122322 B/op	     869 allocs/op
-BenchmarkBlockPredicates/txs=10/predicates_per_tx=10-12       	     100	  13126095 ns/op	 1129938 B/op	    7751 allocs/op
-BenchmarkBlockPredicates/txs=10/predicates_per_tx=100-12      	      12	 102789278 ns/op	11199437 B/op	   76187 allocs/op
-BenchmarkBlockPredicates/txs=100/predicates_per_tx=1-12       	     100	  10835812 ns/op	 1220875 B/op	    8616 allocs/op
-BenchmarkBlockPredicates/txs=100/predicates_per_tx=10-12      	      10	 103477208 ns/op	11295153 B/op	   77426 allocs/op
-BenchmarkBlockPredicates/txs=100/predicates_per_tx=100-12     	       1	1016023458 ns/op	111997496 B/op	  761857 allocs/op
-PASS
-ok  	github.com/ava-labs/avalanchego/vms/saevm/cchain/warp	12.884s
-*/
