@@ -11,9 +11,9 @@ import (
 
 // readerCase pins an exponent to the value it produces.
 type readerCase[E, V ~uint64] struct {
-	name     string
-	exponent E
-	value    V
+	name        string
+	exponent    E
+	value       V
 	skipDesired bool // set when value is produced by multiple exponents
 }
 
