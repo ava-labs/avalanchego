@@ -43,11 +43,16 @@ request-oriented and transport-agnostic:
 
 | Metric                           | Type      | Meaning                                                 |
 | -------------------------------- | --------- | ------------------------------------------------------- |
-| `rpc/requests`                   | Gauge     | in-flight RPC requests                                  |
-| `rpc/success`                    | Gauge     | successful requests                                     |
-| `rpc/failure`                    | Gauge     | failed requests                                         |
+| `rpc/requests`                   | Gauge\*   | cumulative requests served                              |
+| `rpc/success`                    | Gauge\*   | cumulative successful requests                          |
+| `rpc/failure`                    | Gauge\*   | cumulative failed requests                              |
 | `rpc/duration/all`               | Timer     | aggregate request serving time                          |
 | `rpc/duration/{method}/{status}` | Histogram | per-method latency (`status` is `success` or `failure`) |
+
+\* Registered as go-metrics gauges but only ever `Inc`'d
+(`handler.go:619-623`), so they behave as monotonic counters, not
+point-in-time gauges. Notably, there is **no** in-flight-concurrency
+metric today.
 
 None of these distinguish WebSocket traffic from HTTP, and none
 describe the connection itself. As a result, operators cannot answer
@@ -346,12 +351,12 @@ metrics (`metrics.go:46-69`) move onto it with their dimensions promoted
 to labels. They still cover all transports, but now distinguish them via
 a `transport` label instead of being undifferentiated:
 
-| Old (go-metrics)                 | New (Prometheus)                                        | Change                                                                       |
-| -------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `rpc/success` + `rpc/failure`    | `rpc_requests_total{status,transport}`                  | two metrics → one counter; status `success`/`failure`; new `transport` label |
-| `rpc/duration/{method}/{status}` | `rpc_request_duration_seconds{method,status,transport}` | path segments → labels; ns → base-unit seconds, real histogram (not summary) |
-| `rpc/duration/all`               | `sum(rpc_request_duration_seconds)`                     | dropped; recover by aggregating without grouping                             |
-| `rpc/requests` (in-flight gauge) | `rpc_requests_in_flight{transport}`                     | renamed; gains `transport`                                                   |
+| Old (go-metrics)                 | New (Prometheus)                                        | Change                                                                        |
+| -------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `rpc/success` + `rpc/failure`    | `rpc_requests_total{status,transport}`                  | two metrics → one counter; status `success`/`failure`; new `transport` label  |
+| `rpc/duration/{method}/{status}` | `rpc_request_duration_seconds{method,status,transport}` | path segments → labels; ns → base-unit seconds, real histogram (not summary)  |
+| `rpc/duration/all`               | `sum(rpc_request_duration_seconds_sum)`                 | dropped; recover from the histogram's `_sum` (with `_count` for a mean)       |
+| `rpc/requests` (monotonic total) | `sum(rpc_requests_total)`                               | dropped; it equals success + failure, so the status counter already covers it |
 
 The `transport` label (`ws`/`http`/`ipc`) comes from `PeerInfo.Transport`
 (`server.go:223-226`), which the handler already has via its codec. It is
@@ -373,16 +378,16 @@ hits in the PR.
 
 ### Instrumentation points
 
-| Concern            | Location                                      | Mechanism                                                                                                                                           |
-| ------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| active / opened    | `trackCodec` (`server.go:138`)                | inc `connections_active` + `connections_opened_total` on successful track                                                                           |
-| closed / duration  | `untrackCodec` (`server.go:149`)              | dec `connections_active`, inc `connections_closed_total{reason}`, observe duration                                                                  |
-| bytes / messages   | codec read & write paths (`websocket.go:346`) | inc `rpc_ws_{bytes,messages}_total{direction}` after `ReadJSON` / write                                                                             |
-| subscription open  | `handleSubscribe` (`handler.go:660`)          | inc `subscriptions_active`+`subscriptions_opened_total{subscription}`                                                                               |
-| subscription close | `unsubscribe` (`handler.go:677`)              | dec `subscriptions_active`, inc `subscriptions_closed_total{subscription}`                                                                          |
-| notifications      | `Notifier.Notify` (`subscription.go:143`)     | inc `subscriptions_notifications_total{subscription,status}`                                                                                        |
-| requests           | request dispatch (`handler.go:553-583`)       | inc `rpc_requests_total{status,transport}`, observe `rpc_request_duration_seconds{...}`; for WS codecs also bump the per-connection request counter |
-| throttled          | `awaitLimit` (`handler.go:421`)               | inc `rpc_ws_throttled_total` when the reservation `delay` is non-zero                                                                               |
+| Concern            | Location                                                                                | Mechanism                                                                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| active / opened    | `trackCodec` (`server.go:138`)                                                          | inc `connections_active` + `connections_opened_total` on successful track                                                                           |
+| closed / duration  | `untrackCodec` (`server.go:149`)                                                        | dec `connections_active`, inc `connections_closed_total{reason}`, observe duration                                                                  |
+| bytes / messages   | codec read & write paths (`websocket.go:346`)                                           | inc `rpc_ws_{bytes,messages}_total{direction}` after `ReadJSON` / write                                                                             |
+| subscription open  | `addSubscriptions` (`handler.go:390`)                                                   | on non-nil `takeSubscription()` (actually registered), inc `subscriptions_active`+`subscriptions_opened_total{subscription}`                        |
+| subscription close | `unsubscribe` (`handler.go:677`) **and** `cancelServerSubscriptions` (`handler.go:402`) | dec `subscriptions_active`, inc `subscriptions_closed_total{subscription}` on both explicit-unsubscribe and connection-teardown paths               |
+| notifications      | `Notifier.Notify` (`subscription.go:143`)                                               | inc `subscriptions_notifications_total{subscription,status}`                                                                                        |
+| requests           | request dispatch (`handler.go:619-623`)                                                 | inc `rpc_requests_total{status,transport}`, observe `rpc_request_duration_seconds{...}`; for WS codecs also bump the per-connection request counter |
+| throttled          | `awaitLimit` (`handler.go:421`)                                                         | inc `rpc_ws_throttled_total` when the reservation `delay` is non-zero                                                                               |
 
 Per-connection counts (requests handled, subscriptions opened) are
 accumulated on a small per-connection counter held alongside the codec
@@ -411,12 +416,14 @@ internals.
 
 ### Gating connection metrics to WebSocket
 
-`trackCodec`/`untrackCodec` operate on any `ServerCodec`. To keep these
-metrics WebSocket-specific (and avoid double-counting HTTP, which uses
-`serveSingleRequest` and does not go through `ServeCodec`), the
-connection counters live in `ServeCodec`, which is the WebSocket and
-IPC long-lived path. HTTP requests bypass this path entirely
-(`server.go:159`), so they are naturally excluded.
+`trackCodec`/`untrackCodec` operate on any `ServerCodec`. HTTP is
+naturally excluded because it uses `serveSingleRequest` and never goes
+through `ServeCodec` (`server.go:159`). **IPC is not** (it shares the
+`ServeCodec` path), so the WS-scoped counters must guard on
+`codec.peerInfo().Transport == "ws"` rather than firing for every tracked
+codec; otherwise IPC connections would be counted under `rpc_ws_*`. (The
+transport-agnostic *request* metrics need no such guard: they carry a
+`transport` label and intentionally cover IPC too.)
 
 ### Logging
 
@@ -436,19 +443,26 @@ Changes:
 - **Connection open:** add `log.Info("WebSocket connection opened", ...)`
   after a successful upgrade (`websocket.go:73-78`), carrying the
   `PeerInfo` already assembled in `newWebsocketCodec`
-  (`websocket.go:315-323`): `RemoteAddr`, `Origin`, `UserAgent`.
+  (`websocket.go:315-323`): `RemoteAddr` (top-level) and `HTTP.Origin` /
+  `HTTP.UserAgent` (the origin/user-agent fields live under the nested
+  `PeerInfo.HTTP` struct, `server.go:231-239`).
 - **Connection close:** add `log.Info("WebSocket connection closed", ...)`
   in `untrackCodec` (`server.go:149`), with remote address, the
   lifetime computed for `rpc_ws_connection_duration_seconds`, and the
   close `reason` (see Close-reason categorization).
 - **Subscription created:** add a dedicated `log.Info("Subscription
-  opened", "subscription", kind, "id", id, ...)` in `handleSubscribe`
-  (`handler.go:660`). This is preferred over promoting the generic
+  opened", "subscription", kind, "id", id, ...)` in `addSubscriptions`
+  (`handler.go:390`), where `takeSubscription()` returns non-nil (i.e.
+  the subscription was actually registered). Instrumenting at the
+  `handleSubscribe` `Notifier` creation (`handler.go:660`) instead would
+  overcount, since the callback can still error without creating a
+  subscription. This is also preferred over promoting the generic
   "Served" line (`handler.go:582`) to Info, which would make *every*
   successful RPC call log at Info and flood the logs.
-- **Subscription cancelled:** `log.Debug` in `unsubscribe`
-  (`handler.go:677`). Unsubscribes are routine teardown, not worth an
-  INFO line.
+- **Subscription cancelled:** `log.Debug` on both teardown paths:
+  explicit `unsubscribe` (`handler.go:677`) and connection-close
+  `cancelServerSubscriptions` (`handler.go:402`). Unsubscribes are
+  routine teardown, not worth an INFO line.
 
 Connection open/close and subscription *creation* log at **INFO**;
 subscription cancellation and the high-frequency per-notification path
@@ -633,14 +647,14 @@ top and are independently shippable.
 
 ### Phase 1: Migrate the request metrics
 
-1. Define `rpc_requests_total{status,transport}`,
-   `rpc_request_duration_seconds{method,status,transport}`, and
-   `rpc_requests_in_flight{transport}` on `rpcMetrics`; delete the
-   go-metrics `rpc/success`, `rpc/failure`, `rpc/duration/*`,
-   `rpc/requests` registrations in `metrics.go`.
-2. Emit them in the request dispatch path (`handler.go:565-583`,
-   `updateServeTimeHistogram`), reading `transport` from the codec's
-   `PeerInfo.Transport`.
+1. Define `rpc_requests_total{status,transport}` and
+   `rpc_request_duration_seconds{method,status,transport}` on
+   `rpcMetrics`; delete the go-metrics `rpc/success`, `rpc/failure`,
+   `rpc/duration/*`, and `rpc/requests` registrations in `metrics.go`
+   (`rpc/requests` was just success + failure, now `sum(rpc_requests_total)`).
+2. Emit them where the gauges are incremented today
+   (`handler.go:619-623`, `updateServeTimeHistogram`), reading
+   `transport` from the codec's `PeerInfo.Transport`.
 3. Grep dashboards/alerts for the old names; record hits in the PR.
 4. Test status/method labelling for success and error responses.
 
@@ -673,11 +687,15 @@ top and are independently shippable.
 1. Add `rpc_ws_subscriptions_active{subscription}`,
    `_opened_total{subscription}`, `_closed_total{subscription}`, and
    `rpc_ws_subscriptions_notifications_total{subscription,status}`.
-2. Emit in `handleSubscribe` (`handler.go:660`), `unsubscribe`
-   (`handler.go:677`), and `Notifier.Notify` (`subscription.go:143`),
-   keyed by the `(namespace, name)` kind.
-3. Test subscribe/notify/unsubscribe accounting against a registered
-   subscription.
+2. Emit opened at `addSubscriptions` (`handler.go:390`) on non-nil
+   `takeSubscription()`; closed at **both** `unsubscribe`
+   (`handler.go:677`) and `cancelServerSubscriptions` (`handler.go:402`,
+   connection teardown) so the active gauge does not leak; notifications
+   at `Notifier.Notify` (`subscription.go:143`). All keyed by the
+   `(namespace, name)` kind.
+3. Test accounting for explicit unsubscribe **and** connection-close
+   teardown, and that a failed subscribe attempt does not increment
+   opened.
 
 ### Phase 5: Close-reason label
 
