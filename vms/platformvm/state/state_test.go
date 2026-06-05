@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -2674,6 +2675,58 @@ func TestValidatorMetadataPersistsPreHelicon(t *testing.T) {
 	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, nodeID)
 	require.NoError(err)
 	require.Equal(wantStakingInfo, gotStakingInfo)
+}
+
+func TestResolveValidatorMetadataCodec(t *testing.T) {
+	var (
+		durangoTime = time.Unix(1000, 0)
+		heliconTime = time.Unix(2000, 0)
+	)
+
+	s := newTestState(t, memdb.New())
+	s.upgrades = upgrade.Config{
+		DurangoTime: durangoTime,
+		HeliconTime: heliconTime,
+	}
+
+	tests := []struct {
+		name      string
+		timestamp time.Time
+		want      uint16
+	}{
+		{
+			name:      "pre-Durango",
+			timestamp: durangoTime.Add(-time.Second),
+			want:      CodecVersion0,
+		},
+		{
+			name:      "Durango activated",
+			timestamp: durangoTime,
+			want:      CodecVersion1,
+		},
+		{
+			name:      "between Durango and Helicon",
+			timestamp: heliconTime.Add(-time.Second),
+			want:      CodecVersion1,
+		},
+		{
+			name:      "Helicon activated",
+			timestamp: heliconTime,
+			want:      codecVersion2,
+		},
+		{
+			name:      "post-Helicon",
+			timestamp: heliconTime.Add(time.Second),
+			want:      codecVersion2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s.SetTimestamp(tt.timestamp)
+			require.Equal(t, tt.want, s.resolveValidatorMetadataCodec())
+		})
+	}
 }
 
 func TestDiffValidatorReplacement(t *testing.T) {
