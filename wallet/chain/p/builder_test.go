@@ -918,7 +918,7 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
-	utx, err := txBuilder.NewAddAutoRenewedValidatorTx(
+	gotTx, err := txBuilder.NewAddAutoRenewedValidatorTx(
 		nodeID,
 		weight,
 		pop,
@@ -930,15 +930,34 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		periodSeconds,
 	)
 	require.NoError(err)
-	require.Len(utx.StakeOuts, 1)
+	require.Len(gotTx.StakeOuts, 1)
 	require.Equal(
 		map[ids.ID]uint64{
 			avaxAssetID: weight,
 		},
-		addOutputAmounts(utx.StakeOuts),
+		addOutputAmounts(gotTx.StakeOuts),
 	)
 
-	wantTx := txs.AddAutoRenewedValidatorTx{
+	requireFeeIsCorrect(
+		require,
+		dynamicFeeCalculator,
+		gotTx,
+		&gotTx.BaseTx.BaseTx,
+		nil,
+		gotTx.StakeOuts,
+		nil,
+	)
+
+	require.Equal(testContextPostEtna.NetworkID, gotTx.NetworkID)
+	require.Equal(constants.PlatformChainID, gotTx.BlockchainID)
+	require.Nil(gotTx.Memo)
+
+	// BaseTx and StakeOuts are asserted separately because UTXO selection is
+	// fee-dependent and checked by requireFeeIsCorrect above.
+	gotTx.BaseTx = txs.BaseTx{}
+	gotTx.StakeOuts = nil
+
+	wantTx := &txs.AddAutoRenewedValidatorTx{
 		ValidatorNodeID:          types.JSONByteSlice(nodeID.Bytes()),
 		Signer:                   pop,
 		ValidatorRewardsOwner:    validationRewardsOwner,
@@ -948,20 +967,7 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		AutoCompoundRewardShares: autoCompoundShares,
 		Period:                   periodSeconds,
 	}
-	gotTx := *utx
-	gotTx.BaseTx = txs.BaseTx{}
-	gotTx.StakeOuts = nil
 	require.Equal(wantTx, gotTx)
-
-	requireFeeIsCorrect(
-		require,
-		dynamicFeeCalculator,
-		utx,
-		&utx.BaseTx.BaseTx,
-		nil,
-		utx.StakeOuts,
-		nil,
-	)
 }
 
 func TestSetAutoRenewedValidatorConfigTx(t *testing.T) {
@@ -977,24 +983,39 @@ func TestSetAutoRenewedValidatorConfigTx(t *testing.T) {
 		builder = builder.New(set.Of(utxoAddr, validationAuthAddr), testContextPostEtna, backend)
 	)
 
-	utx, err := builder.NewSetAutoRenewedValidatorConfigTx(
+	gotTx, err := builder.NewSetAutoRenewedValidatorConfigTx(
 		validationID,
 		autoCompoundShares,
 		periodSeconds,
 	)
 	require.NoError(err)
-	require.Equal(validationID, utx.TxID)
-	require.Equal(autoCompoundShares, utx.AutoCompoundRewardShares)
-	require.Equal(periodSeconds, utx.Period)
 	requireFeeIsCorrect(
 		require,
 		dynamicFeeCalculator,
-		utx,
-		&utx.BaseTx.BaseTx,
+		gotTx,
+		&gotTx.BaseTx.BaseTx,
 		nil,
 		nil,
 		nil,
 	)
+
+	require.Equal(testContextPostEtna.NetworkID, gotTx.NetworkID)
+	require.Equal(constants.PlatformChainID, gotTx.BlockchainID)
+	require.Nil(gotTx.Memo)
+
+	// BaseTx is asserted separately because UTXO selection is fee-dependent
+	// and checked by requireFeeIsCorrect above.
+	gotTx.BaseTx = txs.BaseTx{}
+
+	wantTx := &txs.SetAutoRenewedValidatorConfigTx{
+		TxID: validationID,
+		Auth: &secp256k1fx.Input{
+			SigIndices: []uint32{0},
+		},
+		AutoCompoundRewardShares: autoCompoundShares,
+		Period:                   periodSeconds,
+	}
+	require.Equal(wantTx, gotTx)
 }
 
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
