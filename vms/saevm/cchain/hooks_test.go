@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -19,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // newBlock returns a minimal [*types.Block] whose ExtData encodes txs and
@@ -43,9 +44,36 @@ func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *
 	)
 }
 
+// newTamperedBlock returns a block that encodes txs but whose header commits an
+// ExtDataHash that does not match its extData, simulating tampering.
+func newTamperedBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *types.Block {
+	tb.Helper()
+
+	extData, err := tx.MarshalSlice(txs)
+	require.NoErrorf(tb, err, "tx.MarshalSlice(%d txs)", len(txs))
+
+	header := customtypes.WithHeaderExtra(
+		&types.Header{
+			ParentHash: parent,
+			Number:     new(big.Int).SetUint64(number),
+		},
+		&customtypes.HeaderExtra{ExtDataHash: common.Hash(ids.GenerateTestID())},
+	)
+	return customtypes.NewBlockWithExtData(
+		header,
+		nil, // txs
+		nil, // uncles
+		nil, // receipts
+		saetest.TrieHasher(),
+		extData,
+		false, // keep the mismatching ExtDataHash; do not recompute
+	)
+}
+
 func TestParseBlockTxs(t *testing.T) {
 	w := newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
 	tx1 := w.newMinimalTx(t)
+	tx2 := w.newMinimalTx(t)
 
 	t.Run("valid", func(t *testing.T) {
 		require := require.New(t)
@@ -56,17 +84,30 @@ func TestParseBlockTxs(t *testing.T) {
 		require.Equal(tx1.ID(), got[0].ID())
 	})
 
+	t.Run("valid_empty", func(t *testing.T) {
+		require := require.New(t)
+
+		// A block with no txs has empty extData, which hashes to
+		// EmptyExtDataHash; verification and parsing must both accept it.
+		got, err := parseBlockTxs(newBlock(t, 1, common.Hash{}))
+		require.NoError(err)
+		require.Empty(got)
+	})
+
 	t.Run("hash_mismatch", func(t *testing.T) {
 		require := require.New(t)
 
+		// The block carries tx1's extData, but its header commits the hash of
+		// different (tx2's) extData. Verification must reject it, proving the
+		// committed hash is bound to this block's actual extData content.
 		extData, err := tx.MarshalSlice([]*tx.Tx{tx1})
 		require.NoError(err)
+		otherExtData, err := tx.MarshalSlice([]*tx.Tx{tx2})
+		require.NoError(err)
 
-		// Build a block whose committed ExtDataHash does not match its
-		// extData by keeping the wrong hash (setExtDataHash=false).
 		header := customtypes.WithHeaderExtra(
 			&types.Header{Number: big.NewInt(1)},
-			&customtypes.HeaderExtra{ExtDataHash: common.Hash(ids.GenerateTestID())},
+			&customtypes.HeaderExtra{ExtDataHash: customtypes.CalcExtDataHash(otherExtData)},
 		)
 		b := customtypes.NewBlockWithExtData(
 			header,
@@ -75,7 +116,7 @@ func TestParseBlockTxs(t *testing.T) {
 			nil, // receipts
 			saetest.TrieHasher(),
 			extData,
-			false, // setExtDataHash
+			false, // keep the committed hash; do not recompute
 		)
 
 		_, err = parseBlockTxs(b)
@@ -94,12 +135,18 @@ func TestAncestorInputIDs(t *testing.T) {
 		tx3     = w.newMinimalTx(t)
 		block3  = newBlock(t, 3, block2.Hash(), tx3)
 		block4  = newBlock(t, 4, block3.Hash())
+
+		// tampered is an ancestor whose committed ExtDataHash does not match
+		// its extData; tamperedChild points at it so the traversal parses it.
+		tampered      = newTamperedBlock(t, 1, genesis, tx1)
+		tamperedChild = newBlock(t, 2, tampered.Hash())
 	)
 
 	tests := []struct {
 		name    string
 		header  *types.Header
 		settled common.Hash
+		source  saetypes.BlockSource
 		want    set.Set[ids.ID]
 		wantErr error
 	}{
@@ -133,21 +180,38 @@ func TestAncestorInputIDs(t *testing.T) {
 			settled: common.Hash(ids.GenerateTestID()), // never matches
 			wantErr: errMissingBlock,
 		},
+		{
+			name:    "hash_mismatch",
+			header:  tamperedChild.Header(),
+			settled: genesis,
+			source: func(hash common.Hash, number uint64) (*types.Block, bool) {
+				if hash == tampered.Hash() && number == 1 {
+					return tampered, true
+				}
+				return nil, false
+			},
+			wantErr: errExtDataHashMismatch,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := func(hash common.Hash, number uint64) (*types.Block, bool) {
-				for _, b := range []*types.Block{block1, block2, block3} {
-					if b.Hash() == hash && b.NumberU64() == number {
-						return b, true
+			require := require.New(t)
+
+			source := tt.source
+			if source == nil {
+				source = func(hash common.Hash, number uint64) (*types.Block, bool) {
+					for _, b := range []*types.Block{block1, block2, block3} {
+						if b.Hash() == hash && b.NumberU64() == number {
+							return b, true
+						}
 					}
+					return nil, false
 				}
-				return nil, false
 			}
 
 			got, err := ancestorInputIDs(tt.header, tt.settled, source)
-			require.ErrorIs(t, err, tt.wantErr, "ancestorInputIDs()")
-			assert.Equal(t, tt.want, got, "ancestorInputIDs()")
+			require.ErrorIs(err, tt.wantErr, "ancestorInputIDs()")
+			require.Equal(tt.want, got, "ancestorInputIDs()")
 		})
 	}
 }
