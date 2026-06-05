@@ -70,7 +70,7 @@ func newTamperedBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*
 	)
 }
 
-func TestParseBlockTxs(t *testing.T) {
+func TestParseAndVerifyBlockTxs(t *testing.T) {
 	w := newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
 	tx1 := w.newMinimalTx(t)
 	tx2 := w.newMinimalTx(t)
@@ -78,7 +78,7 @@ func TestParseBlockTxs(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		require := require.New(t)
 
-		got, err := parseBlockTxs(newBlock(t, 1, common.Hash{}, tx1))
+		got, err := parseAndVerifyBlockTxs(newBlock(t, 1, common.Hash{}, tx1))
 		require.NoError(err)
 		require.Len(got, 1)
 		require.Equal(tx1.ID(), got[0].ID())
@@ -89,7 +89,7 @@ func TestParseBlockTxs(t *testing.T) {
 
 		// A block with no txs has empty extData, which hashes to
 		// EmptyExtDataHash; verification and parsing must both accept it.
-		got, err := parseBlockTxs(newBlock(t, 1, common.Hash{}))
+		got, err := parseAndVerifyBlockTxs(newBlock(t, 1, common.Hash{}))
 		require.NoError(err)
 		require.Empty(got)
 	})
@@ -119,7 +119,7 @@ func TestParseBlockTxs(t *testing.T) {
 			false, // keep the committed hash; do not recompute
 		)
 
-		_, err = parseBlockTxs(b)
+		_, err = parseAndVerifyBlockTxs(b)
 		require.ErrorIs(err, errExtDataHashMismatch)
 	})
 }
