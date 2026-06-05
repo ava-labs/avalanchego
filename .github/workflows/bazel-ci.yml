@@ -60,17 +60,22 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/setup-bazel-repository-cache
+        with:
+          cache-save: true
       - name: Check Bazel metadata
         shell: bash
         run: ./scripts/run_task.sh bazel-check-metadata
+      - name: Prefetch Bazel external dependencies
+        shell: bash
+        run: bazel fetch //...
 
   unit-main:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/setup-bazel-repository-cache
       - name: Run unit tests with Bazel
         shell: bash
         run: ./scripts/run_task.sh bazel-test-main
@@ -80,7 +85,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/setup-bazel-repository-cache
       - name: Run coreth unit tests with Bazel
         shell: bash
         run: ./scripts/run_task.sh bazel-test-coreth
@@ -90,7 +95,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/setup-bazel-repository-cache
       - name: Run subnet-evm unit tests with Bazel
         shell: bash
         run: ./scripts/run_task.sh bazel-test-subnet-evm
@@ -100,6 +105,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel-repository-cache
       - name: Run e2e tests with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
