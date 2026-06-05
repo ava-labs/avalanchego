@@ -60,11 +60,10 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
       - name: Check Bazel metadata
-        uses: ./.github/actions/run-bazel-task
-        with:
-          prune_runner_disk: 'false'
-          task: bazel-check-metadata
+        shell: bash
+        run: ./scripts/run_task.sh bazel-check-metadata
 
   unit-main:
     needs: check-metadata
