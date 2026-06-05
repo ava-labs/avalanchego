@@ -101,6 +101,7 @@ go_test(
         "//vms/saevm/params",
         "//vms/saevm/saetest",
         "//vms/saevm/saexec",
+        "//vms/saevm/types",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
