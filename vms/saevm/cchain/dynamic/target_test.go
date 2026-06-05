@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
-// targetReaderCases are reader vectors ported from the ACP-176 reference tests.
-// The ln argument is the target divided by the minimum (1_000_000).
+// targetReaderCases pin TargetExponent to its Target() value. The ln argument
+// is the target divided by the minimum.
 var targetReaderCases = []readerCase[TargetExponent, gas.Gas]{
 	{name: "zero", exponent: 0, value: 1_000_000},
 	{name: "largest_unchanged", exponent: 33, value: 1_000_000, skipDesired: true},

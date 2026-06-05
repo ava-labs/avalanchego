@@ -9,14 +9,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
-// PriceExponent encodes the gas price.
+// PriceExponent encodes the minimum gas price.
 type PriceExponent uint64
 
 // InitialPriceExponent is the C-chain's initial price exponent. The minimum
 // price is 1 wei, so the exponent starts at 0.
 const InitialPriceExponent PriceExponent = 0
 
-// Price returns the gas price in aAVAX.
+// Price returns the minimum gas price in wei (aAVAX).
 //
 // Price = minimum * e^(p / conversionRate)
 func (p PriceExponent) Price() gas.Price {

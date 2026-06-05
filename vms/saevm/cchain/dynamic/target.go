@@ -28,6 +28,7 @@ func (t TargetExponent) Target() gas.Gas {
 //
 // If desired is nil, t is returned unmodified.
 func (t TargetExponent) Toward(desired *TargetExponent) TargetExponent {
+	// Per ACP-176, the per-block exponent change is capped at 2^15.
 	const maxDiff = 1 << 15
 	return toward(t, desired, maxDiff)
 }

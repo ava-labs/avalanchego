@@ -10,7 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-// delayReaderCases are reader vectors ported from the ACP-226 reference tests.
+// delayReaderCases pin DelayExponent to its Delay() value, including the
+// ACP-226 initial seed and the saturating boundaries.
 var delayReaderCases = []readerCase[DelayExponent, uint64]{
 	{name: "zero", exponent: 0, value: 1},
 	{name: "smallest_change", exponent: 726_820, value: 2},
