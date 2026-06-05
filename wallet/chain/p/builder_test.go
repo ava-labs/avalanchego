@@ -922,7 +922,6 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		nodeID,
 		weight,
 		pop,
-		avaxAssetID,
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		validatorAuthority,

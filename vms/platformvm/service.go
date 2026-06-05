@@ -77,12 +77,11 @@ type Service struct {
 
 // All attributes are optional and may not be filled for each stakerTx.
 type stakerAttributes struct {
-	shares                 uint32
-	rewardsOwner           fx.Owner
-	validationRewardsOwner fx.Owner
-	delegationRewardsOwner fx.Owner
-	proofOfPossession      *signer.ProofOfPossession
-
+	shares                        uint32
+	rewardsOwner                  fx.Owner
+	validationRewardsOwner        fx.Owner
+	delegationRewardsOwner        fx.Owner
+	proofOfPossession             *signer.ProofOfPossession
 	autoRenewedValidatorAuthority fx.Owner
 }
 
@@ -677,23 +676,21 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 
 	switch stakerTx := tx.Unsigned.(type) {
 	case txs.ValidatorTx:
-		var pop *signer.ProofOfPossession
-		switch stakerTx := stakerTx.(type) {
-		case *txs.AddPermissionlessValidatorTx:
-			pop, _ = stakerTx.Signer.(*signer.ProofOfPossession)
-		case *txs.AddAutoRenewedValidatorTx:
-			pop, _ = stakerTx.Signer.(*signer.ProofOfPossession)
-		}
-
 		attr = &stakerAttributes{
 			shares:                 stakerTx.Shares(),
 			validationRewardsOwner: stakerTx.ValidationRewardsOwner(),
 			delegationRewardsOwner: stakerTx.DelegationRewardsOwner(),
-			proofOfPossession:      pop,
 		}
 
-		if addAutoRenewedValidatorTx, ok := stakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
-			attr.autoRenewedValidatorAuthority = addAutoRenewedValidatorTx.ValidatorAuthority
+		switch stakerTx := stakerTx.(type) {
+		case *txs.AddPermissionlessValidatorTx:
+			attr.proofOfPossession, _ = stakerTx.Signer.(*signer.ProofOfPossession)
+		case *txs.AddAutoRenewedValidatorTx:
+			attr.proofOfPossession, _ = stakerTx.Signer.(*signer.ProofOfPossession)
+			attr.autoRenewedValidatorAuthority = stakerTx.ValidatorAuthority
+		case *txs.AddValidatorTx:
+		default:
+			return nil, fmt.Errorf("unknown tx type %T", stakerTx)
 		}
 
 	case txs.DelegatorTx:
@@ -916,12 +913,15 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				if !ok {
 					return nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", attr.autoRenewedValidatorAuthority)
 				}
-				vdr.ValidatorAuthority, err = s.getAPIOwner(validatorAuthority)
+				apiAuthority, err := s.getAPIOwner(validatorAuthority)
 				if err != nil {
 					return nil, err
 				}
-				vdr.Period = utils.PointerTo(avajson.Uint64(stakingInfo.NextPeriod))
-				vdr.AutoCompoundRewardShares = utils.PointerTo(avajson.Uint32(stakingInfo.AutoCompoundRewardShares))
+				vdr.AutoRenewedConfig = &platformapi.AutoRenewedConfig{
+					ValidatorAuthority:       apiAuthority,
+					NextPeriod:               avajson.Uint64(stakingInfo.NextPeriod),
+					AutoCompoundRewardShares: avajson.Uint32(stakingInfo.AutoCompoundRewardShares),
+				}
 			}
 
 			validators = append(validators, vdr)

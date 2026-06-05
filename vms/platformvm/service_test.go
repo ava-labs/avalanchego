@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -923,7 +924,6 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		Priority:        addAutoRenewedValidatorTx.CurrentPriority(),
 	}
 
-	require.NoError(err)
 	require.NoError(service.vm.state.PutCurrentValidator(staker))
 	service.vm.state.AddTx(tx, status.Committed)
 	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
@@ -941,20 +941,48 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	require.Len(reply.Validators, 1)
 
 	gotValidator := reply.Validators[0].(pchainapi.PermissionlessValidator)
-	require.Equal(nodeID, gotValidator.NodeID)
-	require.Equal(avajson.Uint64(weight), gotValidator.Weight)
-	require.Equal(avajson.Uint64(potentialReward), *gotValidator.PotentialReward)
-	require.NotNil(gotValidator.Signer)
-	require.Equal(pop.PublicKey, gotValidator.Signer.PublicKey)
-	require.Equal(pop.ProofOfPossession, gotValidator.Signer.ProofOfPossession)
-	require.NotNil(gotValidator.ValidatorAuthority)
-	require.Equal(avajson.Uint32(validatorAuthority.Threshold), gotValidator.ValidatorAuthority.Threshold)
-	require.Len(gotValidator.ValidatorAuthority.Addresses, 1)
-	wantValidatorAuthorityAddr, err := service.addrManager.FormatLocalAddress(validatorAuthority.Addrs[0])
+
+	rewardOwnerAddr, err := service.addrManager.FormatLocalAddress(rewardOwner.Addrs[0])
 	require.NoError(err)
-	require.Equal(wantValidatorAuthorityAddr, gotValidator.ValidatorAuthority.Addresses[0])
-	require.Equal(avajson.Uint64(periodSeconds), *gotValidator.Period)
-	require.Equal(avajson.Uint32(autoCompoundRewardShares), *gotValidator.AutoCompoundRewardShares)
+	validatorAuthorityAddr, err := service.addrManager.FormatLocalAddress(validatorAuthority.Addrs[0])
+	require.NoError(err)
+
+	wantRewardOwner := &pchainapi.Owner{
+		Threshold: avajson.Uint32(rewardOwner.Threshold),
+		Addresses: []string{rewardOwnerAddr},
+	}
+	wantValidator := pchainapi.PermissionlessValidator{
+		Staker: pchainapi.Staker{
+			TxID:      tx.ID(),
+			StartTime: avajson.Uint64(startTime.Unix()),
+			EndTime:   avajson.Uint64(endTime.Unix()),
+			Weight:    avajson.Uint64(weight),
+			NodeID:    nodeID,
+		},
+		ValidationRewardOwner:  wantRewardOwner,
+		DelegationRewardOwner:  wantRewardOwner,
+		PotentialReward:        utils.PointerTo(avajson.Uint64(potentialReward)),
+		AccruedDelegateeReward: utils.PointerTo(avajson.Uint64(0)),
+		DelegationFee:          avajson.Float32(100),
+		Uptime:                 utils.PointerTo(avajson.Float32(100)),
+		Connected:              utils.PointerTo(false),
+		Signer: &signer.ProofOfPossession{
+			PublicKey:         pop.PublicKey,
+			ProofOfPossession: pop.ProofOfPossession,
+		},
+		AutoRenewedConfig: &pchainapi.AutoRenewedConfig{
+			ValidatorAuthority: &pchainapi.Owner{
+				Threshold: avajson.Uint32(validatorAuthority.Threshold),
+				Addresses: []string{validatorAuthorityAddr},
+			},
+			NextPeriod:               avajson.Uint64(periodSeconds),
+			AutoCompoundRewardShares: avajson.Uint32(autoCompoundRewardShares),
+		},
+		DelegatorCount:  utils.PointerTo(avajson.Uint64(0)),
+		DelegatorWeight: utils.PointerTo(avajson.Uint64(0)),
+		Delegators:      &[]pchainapi.PrimaryDelegator{},
+	}
+	require.Equal(wantValidator, gotValidator)
 }
 
 func TestGetValidatorsAtArgsMarshalling(t *testing.T) {

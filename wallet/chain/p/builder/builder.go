@@ -344,7 +344,6 @@ type Builder interface {
 		validatorNodeID ids.NodeID,
 		weight uint64,
 		signer signer.Signer,
-		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
 		validatorAuthority *secp256k1fx.OutputOwners,
@@ -361,7 +360,7 @@ type Builder interface {
 	// - autoCompoundRewardShares specifies the new fraction (out of 1,000,000) of
 	//   rewards to automatically restake.
 	// - periodSeconds is the new duration of each validation cycle, in seconds. Set to
-	//   trigger a graceful exit at the end of the current period.
+	//   0 to trigger a graceful exit at the end of the current period.
 	NewSetAutoRenewedValidatorConfigTx(
 		txID ids.ID,
 		autoCompoundRewardShares uint32,
@@ -1546,7 +1545,6 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 	validatorNodeID ids.NodeID,
 	weight uint64,
 	signer signer.Signer,
-	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	validatorAuthority *secp256k1fx.OutputOwners,
@@ -1557,7 +1555,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 ) (*txs.AddAutoRenewedValidatorTx, error) {
 	toBurn := map[ids.ID]uint64{}
 	toStake := map[ids.ID]uint64{
-		assetID: weight,
+		b.context.AVAXAssetID: weight,
 	}
 
 	ops := common.NewOptions(options)
@@ -1567,19 +1565,19 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 	}
 	signerComplexity, err := fee.SignerComplexity(signer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't get signer complexity: %w", err)
 	}
 	validatorOwnerComplexity, err := fee.OwnerComplexity(validationRewardsOwner)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("computing validation rewards owner complexity: %w", err)
 	}
 	delegatorOwnerComplexity, err := fee.OwnerComplexity(delegationRewardsOwner)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("computing delegation rewards owner complexity: %w", err)
 	}
 	validatorAuthorityComplexity, err := fee.OwnerComplexity(validatorAuthority)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("computing validator authority complexity: %w", err)
 	}
 
 	complexity, err := fee.IntrinsicAddAutoRenewedValidatorTxComplexities.Add(
@@ -1590,7 +1588,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 		&validatorAuthorityComplexity,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("computing AddAutoRenewedValidatorTx complexity: %w", err)
 	}
 
 	inputs, baseOutputs, stakeOutputs, err := b.spend(
@@ -1602,20 +1600,22 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 		ops,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("spending for AddAutoRenewedValidatorTx: %w", err)
 	}
 
 	utils.Sort(validationRewardsOwner.Addrs)
 	utils.Sort(delegationRewardsOwner.Addrs)
 	utils.Sort(validatorAuthority.Addrs)
 	tx := &txs.AddAutoRenewedValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.context.NetworkID,
-			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         baseOutputs,
-			Memo:         memo,
-		}},
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    b.context.NetworkID,
+				BlockchainID: constants.PlatformChainID,
+				Ins:          inputs,
+				Outs:         baseOutputs,
+				Memo:         memo,
+			},
+		},
 		ValidatorNodeID:          types.JSONByteSlice(validatorNodeID.Bytes()),
 		Signer:                   signer,
 		StakeOuts:                stakeOutputs,
@@ -1642,12 +1642,12 @@ func (b *builder) NewSetAutoRenewedValidatorConfigTx(
 
 	auth, err := b.authorize(txID, ops)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("authorizing SetAutoRenewedValidatorConfigTx: %w", err)
 	}
 
 	authComplexity, err := fee.AuthComplexity(auth)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("computing auth complexity: %w", err)
 	}
 
 	memo := ops.Memo()
@@ -1660,7 +1660,7 @@ func (b *builder) NewSetAutoRenewedValidatorConfigTx(
 		&authComplexity,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("computing SetAutoRenewedValidatorConfigTx complexity: %w", err)
 	}
 
 	inputs, outputs, _, err := b.spend(
@@ -1672,17 +1672,19 @@ func (b *builder) NewSetAutoRenewedValidatorConfigTx(
 		ops,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("spending for SetAutoRenewedValidatorConfigTx: %w", err)
 	}
 
 	tx := &txs.SetAutoRenewedValidatorConfigTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.context.NetworkID,
-			BlockchainID: constants.PlatformChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-			Memo:         memo,
-		}},
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    b.context.NetworkID,
+				BlockchainID: constants.PlatformChainID,
+				Ins:          inputs,
+				Outs:         outputs,
+				Memo:         memo,
+			},
+		},
 		TxID:                     txID,
 		Auth:                     auth,
 		AutoCompoundRewardShares: autoCompoundRewardShares,

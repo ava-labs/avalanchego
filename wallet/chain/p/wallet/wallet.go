@@ -332,7 +332,6 @@ type Wallet interface {
 		validatorNodeID ids.NodeID,
 		weight uint64,
 		signer vmsigner.Signer,
-		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
 		validatorAuthority *secp256k1fx.OutputOwners,
@@ -351,7 +350,7 @@ type Wallet interface {
 	// - autoCompoundRewardShares specifies the new fraction (out of
 	//   1,000,000) of rewards to automatically restake.
 	// - periodSeconds is the new duration of each validation cycle, in seconds. Set to
-	//   stop the validator at the end of the current cycle and unlock funds.
+	//   0 to trigger a graceful exit at the end of the current period.
 	IssueSetAutoRenewedValidatorConfigTx(
 		txID ids.ID,
 		autoCompoundRewardShares uint32,
@@ -660,7 +659,6 @@ func (w *wallet) IssueAddAutoRenewedValidatorTx(
 	validatorNodeID ids.NodeID,
 	weight uint64,
 	signer vmsigner.Signer,
-	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	validatorAuthority *secp256k1fx.OutputOwners,
@@ -673,7 +671,6 @@ func (w *wallet) IssueAddAutoRenewedValidatorTx(
 		validatorNodeID,
 		weight,
 		signer,
-		assetID,
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		validatorAuthority,
