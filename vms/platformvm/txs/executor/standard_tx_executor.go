@@ -6,6 +6,7 @@ package executor
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -1478,6 +1479,11 @@ func verifyL1Conversion(
 }
 
 func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	e.backend.Ctx.Log.Info("executing CreateL1Tx",
+		zap.Stringer("txID", e.tx.ID()),
+		zap.Stringer("managerChainID", tx.ManagerChainID),
+		zap.String("managerAddress", hex.EncodeToString(tx.ManagerAddress)),
+	)
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
