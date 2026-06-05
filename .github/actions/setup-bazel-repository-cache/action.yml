@@ -1,0 +1,44 @@
+name: 'Setup Bazel repository cache'
+description: 'Restore Bazel repository cache and configure Bazel to use it'
+
+inputs:
+  cache-save:
+    description: 'Whether to save the cache at job completion'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - id: cache-path
+      shell: bash
+      run: |
+        cache_dir="$HOME/.cache/bazel-repository-cache"
+        mkdir -p "$cache_dir"
+        echo "path=$cache_dir" >> "$GITHUB_OUTPUT"
+
+    - name: Restore and save Bazel repository cache
+      if: ${{ inputs.cache-save == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.cache-path.outputs.path }}
+        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock') }}
+        restore-keys: |
+          bazel-repo-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Restore Bazel repository cache
+      if: ${{ inputs.cache-save != 'true' }}
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.cache-path.outputs.path }}
+        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock') }}
+        restore-keys: |
+          bazel-repo-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Configure Bazel to use repository cache
+      shell: bash
+      run: |
+        cat >> "$HOME/.bazelrc" <<EOF
+        # Added by .github/actions/setup-bazel-repository-cache
+        common --repository_cache=${{ steps.cache-path.outputs.path }}
+        EOF
