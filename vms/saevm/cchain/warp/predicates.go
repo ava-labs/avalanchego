@@ -20,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
-var errNoBlockContext = errors.New("no block context")
-
 // PredicateBytes returns the marshalled predicate results of a block of
 // transactions.
 func PredicateBytes(
@@ -30,19 +28,44 @@ func PredicateBytes(
 	rules *extras.Rules,
 	txs []*types.Transaction,
 ) ([]byte, error) {
-	results, err := blockPredicates(snowContext, blockContext, rules, txs)
+	results, err := verifyBlock(snowContext, blockContext, rules, txs)
 	if err != nil {
 		return nil, err
 	}
 	return results.Bytes()
 }
 
-// blockPredicates verifies the predicates of every transaction in the block.
+type (
+	// lazy is a value computed on demand, when the returned function is called.
+	lazy[T any] = func() T
+	// lazyEntry is a key paired with a lazily-computed value.
+	lazyEntry[K comparable, V any] struct {
+		key   K
+		value lazy[V]
+	}
+)
+
+// collect resolves each entry's lazy value into a map. It returns nil if there
+// are no entries.
+func collect[K comparable, V any](entries []lazyEntry[K, V]) map[K]V {
+	if len(entries) == 0 {
+		return nil
+	}
+	m := make(map[K]V, len(entries))
+	for _, e := range entries {
+		m[e.key] = e.value()
+	}
+	return m
+}
+
+var errNoBlockContext = errors.New("no block context")
+
+// verifyBlock verifies the predicates of every transaction in the block.
 //
 // Every predicate is verified in its own goroutine on a single pool shared by
 // all transactions in the block, bounding the number of concurrent
 // verifications to the number of available CPUs.
-func blockPredicates(
+func verifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
 	rules *extras.Rules,
@@ -52,102 +75,89 @@ func blockPredicates(
 		return nil, nil
 	}
 
+	type result = lazyEntry[common.Hash, predicate.PrecompileResults]
 	var (
-		txResults = make([]func() (common.Hash, predicate.PrecompileResults), 0, len(txs))
-		eg        = &errgroup.Group{}
-		pc        = &precompileconfig.PredicateContext{
+		results = make([]result, 0, len(txs))
+		eg      = &errgroup.Group{}
+		pc      = &precompileconfig.PredicateContext{
 			SnowCtx:            snowContext,
 			ProposerVMBlockCtx: blockContext,
 		}
 	)
 	eg.SetLimit(runtime.GOMAXPROCS(0))
-	for i, tx := range txs {
-		result, err := txPredicates(pc, rules, tx, eg)
-		if err != nil {
-			return nil, fmt.Errorf("tx predicates %s (%d): %w", tx.Hash(), i, err)
+	for _, tx := range txs {
+		predicates := predicate.FromAccessList(rules, tx.AccessList())
+		if len(predicates) == 0 {
+			continue
 		}
-		if result != nil {
-			txResults = append(txResults, result)
+		if blockContext == nil {
+			return nil, errNoBlockContext
 		}
+		results = append(results, result{
+			key:   tx.Hash(),
+			value: verifyTx(pc, rules, predicates, eg),
+		})
 	}
 	if err := eg.Wait(); err != nil {
-		return nil, fmt.Errorf("waiting for predicate verification: %w", err)
+		return nil, fmt.Errorf("waiting for results: %w", err)
 	}
-
-	var results predicate.BlockResults
-	for _, result := range txResults {
-		txHash, txResults := result()
-		results.Set(txHash, txResults)
-	}
-	return results, nil
+	return collect(results), nil
 }
 
-// txPredicates enqueues the verification of each of tx's predicates onto eg.
+// verifyTx enqueues the verification of a transaction's predicates onto eg.
 // Each predicate is verified in its own goroutine.
 //
-// It returns a function that assembles the predicate results; the function
-// must only be called after eg.Wait has returned. The returned function is nil
-// when tx has no predicates.
-func txPredicates(
+// It returns a function that assembles the predicate results; the function must
+// only be called after eg.Wait has returned.
+func verifyTx(
 	pc *precompileconfig.PredicateContext,
 	rules *extras.Rules,
-	tx *types.Transaction,
+	predicatesByAddress map[common.Address][]predicate.Predicate,
 	eg *errgroup.Group,
-) (func() (common.Hash, predicate.PrecompileResults), error) {
-	predicates := predicate.FromAccessList(rules, tx.AccessList())
-	// Only require the block context to be populated when the tx has
-	// predicates.
-	if len(predicates) == 0 {
-		return nil, nil
+) lazy[predicate.PrecompileResults] {
+	type result = lazyEntry[common.Address, set.Bits]
+	results := make([]result, 0, len(predicatesByAddress))
+	for address, predicates := range predicatesByAddress {
+		results = append(results, result{
+			key: address,
+			value: verifyContract(
+				rules.Predicaters[address],
+				pc,
+				predicates,
+				eg,
+			),
+		})
 	}
-	if pc.ProposerVMBlockCtx == nil {
-		return nil, errNoBlockContext
+	return func() predicate.PrecompileResults {
+		return collect(results)
 	}
-
-	contractResults := make([]func() (common.Address, set.Bits), 0, len(predicates))
-	for address, contractPreds := range predicates {
-		contract := rules.Predicaters[address]
-		result := contractPredicates(pc, contract, contractPreds, address, eg)
-		contractResults = append(contractResults, result)
-	}
-
-	return func() (common.Hash, predicate.PrecompileResults) {
-		results := make(predicate.PrecompileResults, len(contractResults))
-		for _, result := range contractResults {
-			address, bitset := result()
-			results[address] = bitset
-		}
-		return tx.Hash(), results
-	}, nil
 }
 
-// contractPredicates enqueues the verification of each of a contract's
-// predicates onto eg. Each predicate is verified in its own goroutine.
+// verifyContract enqueues the verification of each of a contract's predicates
+// onto eg. Each predicate is verified in its own goroutine.
 //
 // It returns a function that assembles the contract's results; the function
 // must only be called after eg.Wait has returned.
-func contractPredicates(
-	context *precompileconfig.PredicateContext,
-	predicaterContract precompileconfig.Predicater,
+func verifyContract(
+	contract precompileconfig.Predicater,
+	pc *precompileconfig.PredicateContext,
 	predicates []predicate.Predicate,
-	address common.Address,
 	eg *errgroup.Group,
-) func() (common.Address, set.Bits) {
+) lazy[set.Bits] {
 	failures := make([]bool, len(predicates))
 	for i, pred := range predicates {
 		eg.Go(func() error {
-			failures[i] = predicaterContract.VerifyPredicate(context, pred) != nil
+			failures[i] = contract.VerifyPredicate(pc, pred) != nil
 			return nil
 		})
 	}
-
-	return func() (common.Address, set.Bits) {
-		bitset := set.NewBits()
+	return func() set.Bits {
+		r := set.NewBits()
 		for i, failed := range failures {
 			if failed {
-				bitset.Add(i)
+				r.Add(i)
 			}
 		}
-		return address, bitset
+		return r
 	}
 }

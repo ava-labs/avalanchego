@@ -236,7 +236,7 @@ func TestBlockPredicates(t *testing.T) {
 				snowContext = snowtest.Context(t, snowtest.CChainID)
 				rules       = newRules(test.contracts...)
 			)
-			actual, err := blockPredicates(snowContext, test.blockContext, rules, test.txs)
+			actual, err := verifyBlock(snowContext, test.blockContext, rules, test.txs)
 			require.ErrorIs(t, err, test.expectedErr)
 			require.Equal(t, test.expected, actual)
 		})
@@ -357,7 +357,7 @@ func newWarpRules() *extras.Rules {
 // signature verification. The matrix varies the block size (txs) and the number
 // of predicates per transaction.
 //
-// It only depends on blockPredicates' stable signature, so the same benchmark
+// It only depends on verifyBlock's stable signature, so the same benchmark
 // can be run on the sae-devnet-5 branch and compared with benchstat.
 func BenchmarkBlockPredicates(b *testing.B) {
 	// The aggregate signature size barely affects verification time, so the
@@ -399,13 +399,13 @@ func BenchmarkBlockPredicates(b *testing.B) {
 
 				// Confirm the predicates verify before timing, so the benchmark
 				// measures the success path rather than an early failure.
-				results, err := blockPredicates(snowContext, blockContext, rules, txs)
+				results, err := verifyBlock(snowContext, blockContext, rules, txs)
 				require.NoError(b, err)
 				require.Len(b, results, numTxs)
 				require.Equal(b, set.NewBits(), results[txs[0].Hash()][addr])
 
 				for b.Loop() {
-					_, _ = blockPredicates(snowContext, blockContext, rules, txs)
+					_, _ = verifyBlock(snowContext, blockContext, rules, txs)
 				}
 			})
 		}
