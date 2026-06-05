@@ -17,6 +17,10 @@ go_sdk.from_file(go_mod = "//:go.mod")
 go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_work = "//:go.work")
 
+# Go-based repo tools used via Bazel fallback in CI.
+tool_go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps", isolate = True)
+tool_go_deps.from_file(go_mod = "//tools/external:go.mod")
+
 # Patches for external dependencies that need custom BUILD files or fixes.
 # See docs/bazel.md "Patched Dependencies" for details on each override.
 GO_OVERRIDES = {
@@ -142,4 +146,13 @@ use_repo(
     "org_uber_go_goleak",
     "org_uber_go_mock",
     "org_uber_go_zap",
+)
+
+use_repo(
+    tool_go_deps,
+    "com_github_go_task_task_v3",
+    tool_com_github_fjl_gencodec = "com_github_fjl_gencodec",
+    tool_com_github_golangci_golangci_lint_v2 = "com_github_golangci_golangci_lint_v2",
+    tool_com_github_palantir_go_license = "com_github_palantir_go_license",
+    tool_com_github_rhysd_actionlint = "com_github_rhysd_actionlint",
 )

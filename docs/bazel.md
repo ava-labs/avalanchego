@@ -514,12 +514,17 @@ the current merge target.
 
 In GitHub Actions, the `check-metadata`, `unit-main`, `unit-coreth`, and
 `unit-subnet-evm` jobs run their repo-defined tasks directly via
-`./scripts/run_task.sh ...` after installing Go with
-`./.github/actions/setup-go-for-project`. They do not install Nix. This
-keeps the metadata gate and unit-test shards as cheap as possible while
-still exercising the same repo-defined tasks used locally. The E2E Bazel
-job still uses the Nix-based Bazel action because it needs the heavier
-repo toolchain.
+`./scripts/run_task.sh ...` without installing Go or Nix first. Those
+jobs use the local `./.github/actions/setup-bazel-repository-cache`
+composite action to restore a GitHub-backed Bazel repository cache, then
+rely on `run_task.sh` falling back to the Bazel-owned `//tools/external:task`
+target when `task` is not already on `PATH`. The per-platform
+`check-metadata` job is the designated cache writer and follows the metadata
+check with `bazel fetch //...` so downstream shards can restore a cache that
+already contains the full external dependency set for that platform. This
+keeps repo-tool bootstrapping and dependency caching inside Bazel for the
+lightweight Bazel CI shards. The E2E Bazel job uses the same repository-cache
+setup before its heavier test wrapper.
 
 That check includes the Bazel module metadata files, so lockfile drift is
 caught in the metadata phase rather than showing up later as a surprising
