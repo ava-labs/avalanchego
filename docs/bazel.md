@@ -6,11 +6,18 @@ avalanchego monorepo.
 ## Prerequisites
 
 The `bazel` command is provided by [bazelisk](https://github.com/bazelbuild/bazelisk),
-which automatically downloads the correct Bazel version from `.bazelversion`. All
+which automatically downloads the correct Bazel version from `.bazelversion`. Most
 Taskfile targets use `./scripts/nix_run.sh bazelisk ...`, which runs in the repo's
 nix dev shell when needed and avoids nesting `nix develop` when already inside it.
 In the nix dev shell (`nix develop`), `bazel` and `bazelisk` are both on PATH directly.
 For Nix installation and repo dev shell setup, see [CONTRIBUTING.md](../CONTRIBUTING.md#nix).
+
+Some CI paths are intentionally lighter-weight: `task bazel-check-metadata`,
+`task bazel-test-main`, `task bazel-test-coreth`, and `task bazel-test-subnet-evm`
+can run without Nix when the host already provides `bash`, `git`, `go`, standard
+Unix command-line tools, and `bazelisk`. The metadata path's BUILD file formatting
+step uses Bazel-hosted `buildifier_prebuilt` rather than a Nix-provided
+`buildifier` binary.
 
 ## Quick Start
 
@@ -505,6 +512,15 @@ This is especially useful for pull requests tested against a moving base
 branch, where the metadata included in the PR may be stale relative to
 the current merge target.
 
+In GitHub Actions, the `check-metadata`, `unit-main`, `unit-coreth`, and
+`unit-subnet-evm` jobs run their repo-defined tasks directly via
+`./scripts/run_task.sh ...` after installing Go with
+`./.github/actions/setup-go-for-project`. They do not install Nix. This
+keeps the metadata gate and unit-test shards as cheap as possible while
+still exercising the same repo-defined tasks used locally. The E2E Bazel
+job still uses the Nix-based Bazel action because it needs the heavier
+repo toolchain.
+
 That check includes the Bazel module metadata files, so lockfile drift is
 caught in the metadata phase rather than showing up later as a surprising
 working-tree mutation.
@@ -696,6 +712,8 @@ internal patch parser is strict about (unlike `git apply`).
 1. Edit the BUILD file in `.bazel/patches/build_files/<module>/`
 2. Run `task bazel-generate-patches` to regenerate `.patch` files
 3. Verify: `./scripts/nix_run.sh bazelisk build @<module>//<target>`
+   (or plain `bazelisk build @<module>//<target>` when the host already has the
+   required tools available)
 4. Commit both the BUILD file and the generated `.patch` file
 
 Patches that modify existing files (e.g., gnark-crypto's `no-sandbox`
