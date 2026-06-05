@@ -211,3 +211,7 @@ replace github.com/ava-labs/avalanchego => ../../
 replace github.com/ava-labs/avalanchego/graft/evm => ../evm
 
 replace github.com/ava-labs/avalanchego/graft/coreth => ../coreth
+
+// LOCAL ONLY — do not commit. Firewood eth_getProof (EthGetProof) is not in
+// the published v0.5.0; point ffi at the local checkout to build/lint/test.
+replace github.com/ava-labs/firewood-go-ethhash/ffi => /Users/rodrigo.villar/go/src/github.com/ava-labs/firewood/ffi

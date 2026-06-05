@@ -341,8 +341,10 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		)
 	}
 
-	// Before returning, reopen a clean StateDB against the same reconstructed view,
-	// now with normal root computation enabled.
+	// Before returning, reopen a clean StateDB against the same reconstructed
+	// view, now with normal root computation enabled. The reconstructed
+	// accessor implements firewood.Prover, so the returned state can serve
+	// trie-node proofs via eth_getProof (including for reconstructed genesis).
 	returnAccessor, err := firewood.NewReconstructedStateAccessor(
 		eth.blockchain.StateCache(),
 		recon,

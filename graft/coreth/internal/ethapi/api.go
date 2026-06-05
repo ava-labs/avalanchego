@@ -704,8 +704,12 @@ func (s *BlockChainAPI) GetProof(ctx context.Context, address common.Address, st
 	if statedb == nil || err != nil {
 		return nil, err
 	}
-	if _, ok := statedb.Database().TrieDB().Backend().(*firewood.TrieDB); ok {
-		return nil, errors.New("firewood database does not yet support getProof")
+	// Firewood cannot serve proofs through the standard trie.Prove path, so it
+	// generates them natively. The committed and reconstructed Firewood
+	// accessors both implement firewood.Prover; reconstructed genesis state is
+	// served through the reconstructed accessor as well (see firewoodState).
+	if prover, ok := statedb.Database().(firewood.Prover); ok {
+		return firewoodGetProof(prover, statedb, header.Root, address, keys, keyLengths)
 	}
 	codeHash := statedb.GetCodeHash(address)
 	storageRoot := statedb.GetStorageRoot(address)
@@ -761,6 +765,61 @@ func (s *BlockChainAPI) GetProof(ctx context.Context, address common.Address, st
 		CodeHash:     codeHash,
 		Nonce:        hexutil.Uint64(statedb.GetNonce(address)),
 		StorageHash:  storageRoot,
+		StorageProof: storageProof,
+	}, statedb.Error()
+}
+
+// firewoodGetProof builds an eth_getProof AccountResult using Firewood's native
+// proof generation for the account-trie and storage-trie nodes, while taking
+// all scalar values from statedb (which is authoritative for both committed and
+// reconstructed Firewood states). This keeps the output identical in shape to
+// the standard go-ethereum path.
+func firewoodGetProof(prover firewood.Prover, statedb *state.StateDB, root common.Hash, address common.Address, keys []common.Hash, keyLengths []int) (*AccountResult, error) {
+	accountKey := crypto.Keccak256(address.Bytes())
+	slotKeys := make([][]byte, len(keys))
+	for i, key := range keys {
+		slotKeys[i] = crypto.Keccak256(key.Bytes())
+	}
+
+	proof, err := prover.EthGetProof(root, accountKey, slotKeys)
+	if err != nil {
+		return nil, err
+	}
+	if len(proof.StorageProof) != len(keys) {
+		return nil, fmt.Errorf("firewood returned %d storage proofs for %d requested keys", len(proof.StorageProof), len(keys))
+	}
+
+	accountProof := make([]string, len(proof.AccountProof))
+	for i, node := range proof.AccountProof {
+		accountProof[i] = hexutil.Encode(node)
+	}
+
+	storageProof := make([]StorageResult, len(keys))
+	for i, key := range keys {
+		// Output key encoding mirrors the standard path: 32-byte input hashes
+		// are echoed as-is, shorter inputs use QUANTITY encoding.
+		var outputKey string
+		if keyLengths[i] != 32 {
+			outputKey = hexutil.EncodeBig(key.Big())
+		} else {
+			outputKey = hexutil.Encode(key[:])
+		}
+		nodes := proof.StorageProof[i].Proof
+		proofStrings := make([]string, len(nodes))
+		for j, node := range nodes {
+			proofStrings[j] = hexutil.Encode(node)
+		}
+		value := (*hexutil.Big)(statedb.GetState(address, key).Big())
+		storageProof[i] = StorageResult{outputKey, value, proofStrings}
+	}
+
+	return &AccountResult{
+		Address:      address,
+		AccountProof: accountProof,
+		Balance:      (*hexutil.Big)(statedb.GetBalance(address).ToBig()),
+		CodeHash:     statedb.GetCodeHash(address),
+		Nonce:        hexutil.Uint64(statedb.GetNonce(address)),
+		StorageHash:  statedb.GetStorageRoot(address),
 		StorageProof: storageProof,
 	}, statedb.Error()
 }

@@ -14,3 +14,8 @@ use (
 // an older genproto version that conflicts with the new split modules (googleapis/rpc,
 // googleapis/api). The replace forces a version that knows to defer to the submodules.
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20230526161137-0005af68ea54
+
+// LOCAL ONLY — do not commit. Points the Firewood FFI at the local checkout
+// that contains EthGetProof (not yet in the published v0.5.0). Required to
+// build/test eth_getProof Firewood support.
+replace github.com/ava-labs/firewood-go-ethhash/ffi => /Users/rodrigo.villar/go/src/github.com/ava-labs/firewood/ffi

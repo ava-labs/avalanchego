@@ -217,6 +217,10 @@ replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
 
 replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
 
+// LOCAL ONLY — do not commit. Firewood eth_getProof (EthGetProof) is not in
+// the published v0.5.0; point ffi at the local checkout to build/lint/test.
+replace github.com/ava-labs/firewood-go-ethhash/ffi => /Users/rodrigo.villar/go/src/github.com/ava-labs/firewood/ffi
+
 // Workaround for genproto ambiguous import conflict.
 // cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
 // Modern packages use split modules (genproto/googleapis/rpc, etc.).
