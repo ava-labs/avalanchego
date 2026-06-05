@@ -31,7 +31,9 @@ go_library(
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
+        "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
+        "@org_golang_x_sync//errgroup",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -57,6 +59,7 @@ go_test(
         "//snow/engine/snowman/block",
         "//snow/snowtest",
         "//utils",
+        "//utils/constants",
         "//utils/set",
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
@@ -64,5 +67,6 @@ go_test(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",
+        "@org_golang_x_sync//errgroup",
     ],
 )
