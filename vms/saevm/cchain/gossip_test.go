@@ -6,13 +6,11 @@ package cchain
 import (
 	"testing"
 
-	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -33,8 +31,7 @@ func (s *SUT) assertTxBloomContains(tb testing.TB, txIDs ...ids.ID) {
 
 // assertTxBloomEmpty asserts that the transaction bloom is empty.
 //
-// Asserting the bloom doesn't contain a specific transaction would be flaky
-// because of false positives.
+// Asserting the bloom doesn't contain a specific transaction could flake.
 func (s *SUT) assertTxBloomEmpty(tb testing.TB) {
 	tb.Helper()
 
@@ -47,11 +44,9 @@ func (s *SUT) assertTxBloomEmpty(tb testing.TB) {
 func TestPushGossip(t *testing.T) {
 	var (
 		sk        = txtest.NewKey(t)
-		withAlloc = options.Func[sutConfig](func(c *sutConfig) {
-			c.genesis.Alloc = saetest.MaxAllocFor(sk.EthAddress())
-		})
-		vdrID = ids.GenerateTestNodeID()
-		vdrs  = set.Of(vdrID)
+		withAlloc = withMaxAllocFor(sk.EthAddress())
+		vdrID     = ids.GenerateTestNodeID()
+		vdrs      = set.Of(vdrID)
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	vdrCtx, vdr := newSUT(t, withAlloc, withNodeID(vdrID), withValidators(vdrs))
@@ -70,78 +65,68 @@ func TestPushGossip(t *testing.T) {
 
 // TestPullGossip verifies that a validator will share a cross-chain transaction
 // via pull gossip to another connected validator.
-//
-// The API node is only transitively connected to vdrB, so vdrB can only learn
-// about the transaction by pulling it from vdrA.
 func TestPullGossip(t *testing.T) {
 	var (
 		sk        = txtest.NewKey(t)
-		withAlloc = options.Func[sutConfig](func(c *sutConfig) {
-			c.genesis.Alloc = saetest.MaxAllocFor(sk.EthAddress())
-		})
-		vdrIDA = ids.GenerateTestNodeID()
-		vdrIDB = ids.GenerateTestNodeID()
-		vdrs   = set.Of(vdrIDA, vdrIDB)
+		withAlloc = withMaxAllocFor(sk.EthAddress())
+		vdrIDA    = ids.GenerateTestNodeID()
+		vdrIDB    = ids.GenerateTestNodeID()
+		vdrs      = set.Of(vdrIDA, vdrIDB)
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	_, vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
 	vdrBCtx, vdrB := newSUT(t, withAlloc, withNodeID(vdrIDB), withValidators(vdrs))
-	saetest.Connect(t, api, vdrA)
-	saetest.Connect(t, vdrA, vdrB)
+	saetest.ConnectTo(t, api, vdrA) // api is not connected to vdrB
+	saetest.ConnectTo(t, vdrA, vdrB)
 
 	w := newWallet(sk, api.ctx, api.Client)
 	stx := w.newMinimalTx(t)
 	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
 	api.assertTxBloomContains(t, stx.ID())
 
+	// Because vdrB isn't connected to api, vdrB can only learn about the
+	// transaction by pulling it from vdrA.
 	blk := vdrB.runConsensusLoop(vdrBCtx, t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
 	}
 }
 
-// TestPushGossipAfterPullGossip verifies that a validator which previously
-// received a cross-chain transaction via pull gossip will share it via push
-// gossip to another connected validator.
-//
-// The API node is only transitively connected to vdrB, and vdrB doesn't
-// consider vdrA a validator, so vdrB can only learn about the transaction if
-// vdrA decides to push it.
+// TestPushGossipAfterPullGossip verifies that a node which previously received
+// a cross-chain transaction via gossip will share it via push gossip to a
+// connected validator.
 func TestPushGossipAfterPullGossip(t *testing.T) {
 	var (
 		sk        = txtest.NewKey(t)
-		withAlloc = options.Func[sutConfig](func(c *sutConfig) {
-			c.genesis.Alloc = saetest.MaxAllocFor(sk.EthAddress())
-		})
-		vdrIDA = ids.GenerateTestNodeID()
-		vdrIDB = ids.GenerateTestNodeID()
-		vdrs   = set.Of(vdrIDA, vdrIDB)
+		withAlloc = withMaxAllocFor(sk.EthAddress())
+		vdrIDA    = ids.GenerateTestNodeID()
+		vdrIDB    = ids.GenerateTestNodeID()
+		vdrs      = set.Of(vdrIDA, vdrIDB)
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	vdrACtx, vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
 	vdrBCtx, vdrB := newSUT(t, withAlloc, withNodeID(vdrIDB)) // vdrB doesn't consider vdrA a validator
-	saetest.Connect(t, api, vdrA)
-	saetest.Connect(t, vdrA, vdrB)
+	saetest.ConnectTo(t, api, vdrA)                           // api is not connected to vdrB
+	saetest.ConnectTo(t, vdrA, vdrB)
 
 	w := newWallet(sk, api.ctx, api.Client)
 	stx := w.newMinimalTx(t)
 	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
 	api.assertTxBloomContains(t, stx.ID())
 
-	// Wait for vdrA to learn about stx via pull gossip.
-	e, err := vdrA.WaitForEvent(vdrACtx)
-	require.NoErrorf(t, err, "%T.WaitForEvent()", vdrA.VM)
-	assert.Equalf(t, common.PendingTxs, e, "%T.WaitForEvent() event", vdrA.VM)
+	// Ensure vdrA learned about stx before we reissue the tx so we don't race
+	// with the normal issuance path.
+	vdrA.waitForPendingTxs(vdrACtx, t)
 
+	// Because vdrB doesn't consider vdrA a validator and isn't connected to
+	// api, vdrB can only learn about the transaction if vdrA pushes it.
 	vdrB.assertTxBloomEmpty(t)
 
-	// Even though the validator learned about stx via pull gossip, they should
-	// still push gossip stx to vdrB if they see it over the API.
 	require.NoErrorf(t, vdrA.IssueTx(vdrACtx, stx), "%T.IssueTx()", vdrA.VM)
+	vdrA.assertTxBloomContains(t, stx.ID())
 
 	blk := vdrB.runConsensusLoop(vdrBCtx, t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
 	}
-	vdrA.assertTxBloomContains(t, stx.ID())
 }

@@ -135,22 +135,24 @@ func (s *Sender) sendAppRequest(to set.Set[ids.NodeID], requestID uint32, b []by
 }
 
 func (s *Sender) sendAppResponse(to ids.NodeID, requestID uint32, b []byte) {
+	_, selfID := s.getSelf()
 	peer, ok := s.getPeer(to)
 	if !ok {
+		s.tb.Errorf("sending AppResponse to unknown peer %s from %s", to, selfID)
 		return
 	}
 	ctx := s.tb.Context()
-	_, selfID := s.getSelf()
 	assert.NoErrorf(s.tb, peer.AppResponse(ctx, selfID, requestID, b), "%T.AppResponse(%s)", peer, selfID)
 }
 
 func (s *Sender) sendAppError(to ids.NodeID, requestID uint32, code int32, message string) {
+	_, selfID := s.getSelf()
 	peer, ok := s.getPeer(to)
 	if !ok {
+		s.tb.Errorf("sending AppError to unknown peer %s from %s", to, selfID)
 		return
 	}
 	ctx := s.tb.Context()
-	_, selfID := s.getSelf()
 	appErr := &common.AppError{
 		Code:    code,
 		Message: message,
@@ -229,7 +231,8 @@ func Connect[P Peer](tb testing.TB, peers ...P) {
 	}
 }
 
-// ConnectTo wires self to each peer, marking both sides as connected.
+// ConnectTo symmetrically wires self to each peer, marking both sides as
+// connected.
 func ConnectTo[P Peer](tb testing.TB, self P, peers ...P) {
 	tb.Helper()
 
@@ -248,8 +251,8 @@ func ConnectTo[P Peer](tb testing.TB, self P, peers ...P) {
 	}
 }
 
-// SetValidators makes state report each NodeID in vdrs as a validator with
-// weight 1 from GetValidatorSet.
+// SetValidators makes `state` report each NodeID in vdrs as a validator with
+// weight 1 when [validators.State.GetValidatorSet] is called.
 //
 // state MUST be a [validatorstest.State], which is the concrete type installed
 // by [snowtest.Context]. It is accepted as the [validators.State] interface
