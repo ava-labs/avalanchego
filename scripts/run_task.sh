@@ -3,6 +3,7 @@
 set -euo pipefail
 
 AVALANCHE_PATH="$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )"
+CALLER_PATH="$(pwd)"
 
 # Launcher policy:
 # 1. Use a real `task` from PATH when available.
@@ -18,6 +19,10 @@ if command -v bazel >/dev/null 2>&1; then
   cd "${AVALANCHE_PATH}"
   bazel build //tools/external:task >/dev/null
   task_bin="$(bazel cquery --output=files //tools/external:task 2>/dev/null)"
+  if [[ "${task_bin}" != /* ]]; then
+    task_bin="${AVALANCHE_PATH}/${task_bin}"
+  fi
+  cd "${CALLER_PATH}"
   exec "${task_bin}" "${@}"
 fi
 
