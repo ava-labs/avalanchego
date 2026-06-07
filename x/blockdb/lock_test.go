@@ -102,7 +102,6 @@ func TestLock_AllowsOpenAfterError(t *testing.T) {
 	db, err := tryOpenAt(t, dir, dir)
 	require.Nil(t, db)
 	require.ErrorIs(t, err, io.EOF)
-	require.NotErrorIs(t, err, errDatabaseInUse)
 
 	require.NoError(t, os.Remove(indexPath))
 

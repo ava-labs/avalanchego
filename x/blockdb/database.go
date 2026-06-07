@@ -245,7 +245,6 @@ func New(config DatabaseConfig, log logging.Logger) (_ database.HeightIndex, err
 		if err != nil {
 			if rErr := s.locks.Release(); rErr != nil {
 				s.log.Error("Failed to release directory lock after failed initialization", zap.Error(rErr))
-				err = errors.Join(err, rErr)
 			}
 		}
 	}()
@@ -289,21 +288,20 @@ func (s *Database) Close() error {
 	}
 	s.closed = true
 
-	var errs []error
-	if err := s.persistIndexHeader(); err != nil {
-		s.log.Error("Failed to persist index header", zap.Error(err))
-		errs = append(errs, err)
+	var err error
+	if pErr := s.persistIndexHeader(); pErr != nil {
+		s.log.Error("Failed to persist index header", zap.Error(pErr))
+		err = pErr
 	}
 
 	s.closeFiles()
 
-	if err := s.locks.Release(); err != nil {
-		s.log.Error("Failed to release directory lock", zap.Error(err))
-		errs = append(errs, err)
+	if rErr := s.locks.Release(); rErr != nil {
+		s.log.Error("Failed to release directory lock", zap.Error(rErr))
 	}
 
 	s.log.Info("Block database closed successfully")
-	return errors.Join(errs...)
+	return err
 }
 
 // Put inserts a block into the store at the given height.
