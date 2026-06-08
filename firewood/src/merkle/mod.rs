@@ -20,6 +20,7 @@ use crate::iter::{MerkleKeyValueIter, PathIterator};
 use crate::merkle::changes::DiffMerkleNodeStream;
 use crate::proofs::ProofEdge;
 use crate::proofs::change::ChangeProof;
+use crate::proofs::eth::ACCOUNT_DEPTH_NIBBLES;
 use crate::{
     ChangeProofVerificationContext, Proof, ProofCollection, ProofError, ProofNode, RangeProof,
 };
@@ -30,6 +31,9 @@ use firewood_storage::{
     ImmutableProposal, IntoHashType, LeafNode, MaybePersistedNode, Mutable, MutableKind,
     NibblesIterator, Node, NodeStore, Path, PathBuf, PathComponent, Propose, ReadableStorage,
     SharedNode, TrieHash, TrieReader, U4, ValueDigest,
+};
+use firewood_storage::{
+    hash_node_as_storage_trie_root_for_node, hash_node_as_storage_trie_root_parts,
 };
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -375,24 +379,93 @@ fn compute_outside_children(
     Ok(result)
 }
 
-/// Recursively computes the hash of a node in the proving trie, merging
-/// child hashes from proof nodes for subtrees outside the proven range.
+/// Compute the hash of a node in the proving trie, merging child hashes
+/// from proof nodes for subtrees outside the proven range.
 ///
 /// For branch nodes, in-range children that are in-memory (`Child::Node`)
 /// are hashed recursively. Persisted children (`AddressWithHash`,
 /// `MaybePersisted`) already carry their hash and are used directly.
 /// Out-of-range children get their hash from the corresponding proof node.
+///
+/// Hashes the node as a normal trie node. Under `ethhash`, when this node
+/// is the single storage child of an account at depth 64, the parent
+/// instead invokes `compute_root_hash_as_storage_trie_root` to apply the
+/// storage-trie-root fold.
 fn compute_root_hash_with_proofs(
     node: &Node,
     path_prefix: &[PathComponent],
     proof_nodes: &HashMap<PathBuf, &ProofNode>,
     outside_children: &HashMap<PathBuf, ChildMask>,
 ) -> HashType {
-    let branch = match node {
-        Node::Leaf(_) => return HashableShunt::from_node(path_prefix, node).to_hash(),
-        Node::Branch(branch) => branch,
-    };
+    match node {
+        Node::Leaf(_) => HashableShunt::from_node(path_prefix, node).to_hash(),
+        Node::Branch(branch) => {
+            let parts = build_branch_parts(branch, path_prefix, proof_nodes, outside_children);
+            HashableShunt::new(
+                path_prefix,
+                parts.partial_path,
+                parts.value_digest,
+                parts.child_hashes,
+            )
+            .to_hash()
+        }
+    }
+}
 
+/// Compute the hash of a node as a standalone storage-trie root, applying
+/// the account-branch-nibble fold. Invoked by the parent at depth-64
+/// account boundaries when this node is the account's lone storage child;
+/// the fold matches what live hashing produced when the storage trie was
+/// first written.
+fn compute_root_hash_as_storage_trie_root(
+    node: &Node,
+    account_prefix: &[PathComponent],
+    branch_nibble: PathComponent,
+    proof_nodes: &HashMap<PathBuf, &ProofNode>,
+    outside_children: &HashMap<PathBuf, ChildMask>,
+) -> HashType {
+    match node {
+        Node::Leaf(_) => {
+            hash_node_as_storage_trie_root_for_node(account_prefix, branch_nibble, node)
+        }
+        Node::Branch(branch) => {
+            let path_prefix: PathBuf = account_prefix
+                .iter()
+                .copied()
+                .chain(once(branch_nibble))
+                .collect();
+            let parts = build_branch_parts(branch, &path_prefix, proof_nodes, outside_children);
+            hash_node_as_storage_trie_root_parts(
+                account_prefix,
+                branch_nibble,
+                parts.partial_path,
+                parts.value_digest,
+                parts.child_hashes,
+            )
+        }
+    }
+}
+
+/// Hashable parts of a branch node assembled by `build_branch_parts`. The
+/// caller applies the final hash via either `HashableShunt::new` (normal)
+/// or `hash_node_as_storage_trie_root_parts` (the single-storage-child
+/// fold used at depth-64 account boundaries under `ethhash`).
+struct BranchParts<'b> {
+    partial_path: &'b [PathComponent],
+    value_digest: Option<ValueDigest<&'b [u8]>>,
+    child_hashes: Children<Option<HashType>>,
+}
+
+/// Recursive worker for the two `compute_root_hash_with_proofs` entry
+/// points. Walks `branch`'s children (recursing into in-range subtrees,
+/// copying proof-node hashes for out-of-range slots) and returns the parts
+/// the caller needs to hash this node by either terminal helper.
+fn build_branch_parts<'b>(
+    branch: &'b BranchNode,
+    path_prefix: &[PathComponent],
+    proof_nodes: &HashMap<PathBuf, &'b ProofNode>,
+    outside_children: &HashMap<PathBuf, ChildMask>,
+) -> BranchParts<'b> {
     // Build full key for this node: path_prefix ++ partial_path
     let full_key: PathBuf = path_prefix
         .iter()
@@ -400,9 +473,13 @@ fn compute_root_hash_with_proofs(
         .copied()
         .collect();
 
-    let mut child_hashes: Children<Option<HashType>> = Children::new();
-
     let outside_mask = outside_children.get(&full_key);
+    let proof_node = proof_nodes.get(&full_key);
+
+    let single_storage_child =
+        single_effective_account_child(&full_key, branch, proof_node.copied(), outside_mask);
+
+    let mut child_hashes: Children<Option<HashType>> = Children::new();
 
     // For children inside the proven range, compute hashes recursively.
     // For children outside the range, use proof node hashes (set below).
@@ -422,15 +499,27 @@ fn compute_root_hash_with_proofs(
             unreachable!()
         };
         child_prefix.push(nibble);
-        let child_hash =
-            compute_root_hash_with_proofs(child_node, &child_prefix, proof_nodes, outside_children);
+        // Apply the storage-trie-root fold for the account's lone storage
+        // child; the dispatch lives here at the parent so the child's recursive
+        // call doesn't need to carry a flag.
+        let child_hash = if cfg!(feature = "ethhash") && single_storage_child == Some(nibble) {
+            compute_root_hash_as_storage_trie_root(
+                child_node,
+                &full_key,
+                nibble,
+                proof_nodes,
+                outside_children,
+            )
+        } else {
+            compute_root_hash_with_proofs(child_node, &child_prefix, proof_nodes, outside_children)
+        };
         child_hashes[nibble] = Some(child_hash);
         child_prefix.pop();
     }
 
     // For children outside the proven range, use proof node hashes.
-    if let (Some(proof_node), Some(outside)) = (proof_nodes.get(&full_key), outside_mask) {
-        for (nibble, hash) in proof_node.child_hashes.iter_present() {
+    if let (Some(pn), Some(outside)) = (proof_node, outside_mask) {
+        for (nibble, hash) in pn.child_hashes.iter_present() {
             if outside.is_set(nibble.0) {
                 child_hashes[nibble] = Some(hash.clone());
             }
@@ -443,18 +532,59 @@ fn compute_root_hash_with_proofs(
     // hash chain was verified by `value_digest()` during boundary proof
     // validation, and `reconcile_branch_proof_node` verified the hash
     // against the branch value when present. The digest is trusted.
-    let value_digest = branch.value.as_deref().map(ValueDigest::Value).or_else(|| {
-        proof_nodes
-            .get(&full_key)
-            .and_then(|pn| pn.value_digest.as_ref().map(ValueDigest::as_ref))
-    });
-    HashableShunt::new(
-        path_prefix,
-        branch.partial_path.as_components(),
+    let value_digest =
+        branch.value.as_deref().map(ValueDigest::Value).or_else(|| {
+            proof_node.and_then(|pn| pn.value_digest.as_ref().map(ValueDigest::as_ref))
+        });
+
+    BranchParts {
+        partial_path: branch.partial_path.as_components(),
         value_digest,
         child_hashes,
-    )
-    .to_hash()
+    }
+}
+
+/// At a depth-64 account branch, return the slot of the single effective
+/// storage child (the fake-root case live hashing applies), or `None`.
+///
+/// An "effective" child is either an in-range branch child or an
+/// out-of-range child carried by the proof node — together they reflect
+/// the true on-disk shape. Proof verification only; live hashing has its
+/// own detection in `hash_helper_inner`. Without `ethhash` there is no
+/// account-branch fold, so this always returns `None`.
+fn single_effective_account_child(
+    full_key: &[PathComponent],
+    branch: &BranchNode,
+    proof_node: Option<&ProofNode>,
+    outside_mask: Option<&ChildMask>,
+) -> Option<PathComponent> {
+    if !cfg!(feature = "ethhash") || full_key.len() != ACCOUNT_DEPTH_NIBBLES {
+        return None;
+    }
+
+    let mut only_child: Option<PathComponent> = None;
+    // In-range branch children (those NOT marked as outside).
+    for (nibble, _) in branch.children.iter_present() {
+        if !outside_mask.is_some_and(|m| m.is_set(nibble.0)) {
+            if only_child.is_some() {
+                return None;
+            }
+            only_child = Some(nibble);
+        }
+    }
+    // Out-of-range children, taken from the proof node.
+    if let (Some(pn), Some(mask)) = (proof_node, outside_mask) {
+        for (nibble, _) in pn.child_hashes.iter_present() {
+            if mask.is_set(nibble.0) {
+                if only_child.is_some() {
+                    return None;
+                }
+                only_child = Some(nibble);
+            }
+        }
+    }
+
+    only_child
 }
 
 /// Reject any proof node that carries a value digest (either

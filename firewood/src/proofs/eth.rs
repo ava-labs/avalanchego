@@ -38,7 +38,7 @@ use crate::proofs::types::ProofNode;
 
 /// Path length in nibbles at which a node is treated as an Ethereum account
 /// (Keccak-256 of a 20-byte address).
-const ACCOUNT_DEPTH_NIBBLES: usize = 64;
+pub(crate) const ACCOUNT_DEPTH_NIBBLES: usize = 64;
 
 /// Emit one or two canonical MPT-RLP nodes for `node`.
 ///

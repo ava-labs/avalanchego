@@ -63,10 +63,13 @@ use std::time::Instant;
 
 // Re-export types from alloc module
 pub use alloc::NodeAllocator;
+pub use hash::{
+    fix_account_storage_root_value, hash_node_as_storage_trie_root_for_node,
+    hash_node_as_storage_trie_root_parts,
+};
 pub use hash_algo::{NodeHashAlgorithm, NodeHashAlgorithmTryFromIntError};
 pub use primitives::{AreaIndex, LinearAddress};
 // Re-export types from header module
-pub use hash::fix_account_storage_root_value;
 pub use header::NodeStoreHeader;
 
 /// The [`NodeStore`] handles the serialization of nodes and
