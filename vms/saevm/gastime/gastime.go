@@ -125,21 +125,21 @@ func (tm *Time) Excess() gas.Gas {
 }
 
 // Price returns the price of a unit of gas, i.e. the "base fee", determined by
-// [gas.CalculatePrice].
+// [calculatePrice].
 func (tm *Time) Price() gas.Price {
-	p := calculatePrice(tm.excess, tm.excessScalingFactor())
+	k := tm.excessScalingFactor()
+	p := calculatePrice(tm.excess, &k)
 	// When minPrice can't be represented by e^(x/k), p may be too low.
 	return max(tm.config.MinPrice, p)
 }
 
 // excessScalingFactor returns the K variable of ACP-103/176, i.e.
-// [GasPriceConfig.TargetToExcessScaling] * T, capped at [math.MaxUint64].
+// [GasPriceConfig.TargetToExcessScaling] * T.
 //
-// TODO(StephenButtolph): Rather than capping this at MaxUint64, we should move
-// the evaluation of T * K into the exponential calculation. This would allow us
-// to never round any values during calculation of extreme inputs.
-func (tm *Time) excessScalingFactor() gas.Gas {
-	return intmath.BoundedMultiply(tm.config.TargetToExcessScaling, tm.target, math.MaxUint64)
+// The product can exceed [math.MaxUint64], but fits in 128 bits. It is returned
+// as a [uint256.Int] so the exponential calculation can use full precision.
+func (tm *Time) excessScalingFactor() uint256.Int {
+	return mulAsUint256(tm.config.TargetToExcessScaling, tm.target)
 }
 
 // BaseFee is equivalent to [Time.Price], returning the result as a uint256 for

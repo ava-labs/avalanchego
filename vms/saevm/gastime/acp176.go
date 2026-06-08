@@ -99,20 +99,21 @@ func (tm *Time) enforceMinExcess() {
 	k := tm.excessScalingFactor()
 	// Avoid the binary search in [excessForPrice] when the current excess
 	// already yields a price that satisfies the minimum.
-	if calculatePrice(tm.excess, k) >= tm.config.MinPrice {
+	if calculatePrice(tm.excess, &k) >= tm.config.MinPrice {
 		return
 	}
 
-	minExcess := excessForPrice(tm.config.MinPrice, k)
+	minExcess := excessForPrice(tm.config.MinPrice, &k)
 	tm.excess = max(tm.excess, minExcess)
 }
 
-// excessForPrice returns an integer approximation of ln(p) * k.
+// excessForPrice searches the [gas.Gas] range for a price closest to p.
 //
-// If [calculatePrice] can produce p, excessForPrice returns the minimum excess to
-// produce p. Otherwise, it returns the maximum excess to produce a number < p,
-// which may happen due to overflow or integer approximation.
-func excessForPrice(p gas.Price, k gas.Gas) gas.Gas {
+// If [calculatePrice] can produce p, [excessForPrice] returns the minimum excess
+// that does so. Otherwise, it returns the greatest excess that still produces a
+// lower price, which can happen because of integer approximation or because the
+// required excess is above [math.MaxUint64].
+func excessForPrice(p gas.Price, k *uint256.Int) gas.Gas {
 	if p <= 1 {
 		return 0
 	}
@@ -128,15 +129,16 @@ func excessForPrice(p gas.Price, k gas.Gas) gas.Gas {
 			lo = mid + 1
 		}
 	}
-	// If [calculatePrice] can't generate p due to integer approximation, honor
-	// the lower price expectation.
+	// If [calculatePrice] can't generate p exactly, honor the lower price
+	// expectation.
 	if calculatePrice(lo, k) > p {
 		return lo - 1
 	}
 	return lo
 }
 
-// calculatePrice returns an integer approximation of e^(x/k).
-func calculatePrice(x, k gas.Gas) gas.Price {
-	return gas.CalculatePrice(1, x, k)
+// calculatePrice returns an integer approximation of e^(x/k), capped at
+// [math.MaxUint64].
+func calculatePrice(x gas.Gas, k *uint256.Int) gas.Price {
+	return gas.CalculatePriceWithExcessConversion(1, x, k)
 }

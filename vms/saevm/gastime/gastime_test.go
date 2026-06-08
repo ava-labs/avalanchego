@@ -336,6 +336,69 @@ func TestMinAndStaticPrice(t *testing.T) {
 	}
 }
 
+// TestPriceWithExcessScalingOverflow verifies that the price is calculated with
+// the full-precision K = TargetToExcessScaling * T, even when that product
+// exceeds MaxUint64.
+func TestPriceWithExcessScalingOverflow(t *testing.T) {
+	const target = gas.Gas(1e6)
+
+	tests := []struct {
+		name     string
+		target   gas.Gas
+		scaling  gas.Gas
+		minPrice gas.Price
+		excess   gas.Gas
+		want     gas.Price
+	}{
+		{
+			// Would be 2 if K were capped at MaxUint64.
+			name:     "k_2x_max_exponent_one_half",
+			target:   2,
+			scaling:  math.MaxUint64,
+			minPrice: 1,
+			excess:   math.MaxUint64,
+			want:     1, // floor(e^0.5)
+		},
+		{
+			name:     "k_4x_max_exponent_one_quarter",
+			target:   4,
+			scaling:  math.MaxUint64,
+			minPrice: 1,
+			excess:   math.MaxUint64,
+			want:     1, // floor(e^0.25)
+		},
+		{
+			// The MinPrice floor still applies when K overflows uint64.
+			name:     "k_overflow_min_price_dominates",
+			target:   2,
+			scaling:  math.MaxUint64,
+			minPrice: 5,
+			excess:   math.MaxUint64,
+			want:     5,
+		},
+		{
+			// Control: K fits in uint64, so capped and full-precision agree.
+			name:     "no_overflow_exponent_one",
+			target:   target,
+			scaling:  DefaultTargetToExcessScaling,
+			minPrice: 1,
+			excess:   target * DefaultTargetToExcessScaling,
+			want:     2, // floor(e^1)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := GasPriceConfig{
+				TargetToExcessScaling: tt.scaling,
+				MinPrice:              tt.minPrice,
+			}
+			tm := mustNew(t, time.Unix(0, 0), tt.target, tt.excess, cfg)
+			require.Equalf(t, tt.want, tm.Price(), "%T.Price() with K = %d * %d", tm, tt.scaling, tt.target)
+		})
+	}
+}
+
 func TestTickExcessOverflow(t *testing.T) {
 	const (
 		shortFall   = 2

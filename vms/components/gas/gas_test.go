@@ -8,6 +8,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
 
@@ -177,6 +178,59 @@ func Test_CalculatePrice(t *testing.T) {
 		t.Run(fmt.Sprintf("%d*e^(%d/%d)=%d", test.minPrice, test.excess, test.excessConversionConstant, test.expected), func(t *testing.T) {
 			actual := CalculatePrice(test.minPrice, test.excess, test.excessConversionConstant)
 			require.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func Test_CalculatePriceWithExcessConversion(t *testing.T) {
+	maxUint64Times2 := new(uint256.Int).Mul(uint256.NewInt(2), uint256.NewInt(math.MaxUint64))
+	maxUint64Times4 := new(uint256.Int).Mul(uint256.NewInt(4), uint256.NewInt(math.MaxUint64))
+
+	tests := []struct {
+		name                     string
+		minPrice                 Price
+		excess                   Gas
+		excessConversionConstant *uint256.Int
+		want                     Price
+	}{
+		{
+			name:                     "uint64_denominator_matches_calculate_price",
+			minPrice:                 10,
+			excess:                   10_000_000,
+			excessConversionConstant: uint256.NewInt(1_000_000),
+			want:                     CalculatePrice(10, 10_000_000, 1_000_000),
+		},
+		{
+			name:                     "two_max_uint64_denominator",
+			minPrice:                 10,
+			excess:                   math.MaxUint64,
+			excessConversionConstant: maxUint64Times2,
+			want:                     16,
+		},
+		{
+			name:                     "four_max_uint64_denominator",
+			minPrice:                 10,
+			excess:                   math.MaxUint64,
+			excessConversionConstant: maxUint64Times4,
+			want:                     12,
+		},
+		{
+			name:                     "caps_at_max_uint64",
+			minPrice:                 math.MaxUint64,
+			excess:                   math.MaxUint64,
+			excessConversionConstant: maxUint64Times2,
+			want:                     math.MaxUint64,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CalculatePriceWithExcessConversion(
+				tt.minPrice,
+				tt.excess,
+				tt.excessConversionConstant,
+			)
+			require.Equal(t, tt.want, got, "CalculatePriceWithExcessConversion(%d, %d, %s)", tt.minPrice, tt.excess, tt.excessConversionConstant.Dec())
 		})
 	}
 }
