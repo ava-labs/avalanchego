@@ -901,13 +901,12 @@ func TestRewardValidatorStakerType(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		env.config.MinValidatorStake,
 		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
-		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{},
 		&secp256k1fx.OutputOwners{},
 		&secp256k1fx.OutputOwners{},
 		reward.PercentDenominator,
 		reward.PercentDenominator,
-		uint64(env.config.MinStakeDuration/time.Second),
+		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
 	env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
