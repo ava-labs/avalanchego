@@ -326,9 +326,8 @@ type Builder interface {
 	// of each validation period without requiring a new transaction.
 	//
 	// - validatorNodeID is the node ID of the validator.
-	// - weight is the amount of AVAX to stake.
+	// - weight is the amount of nAVAX (1e-9 AVAX) to stake.
 	// - signer is the BLS key for this validator.
-	// - assetID specifies the asset to stake.
 	// - validationRewardsOwner specifies the owner of all the validation
 	//   rewards this validator earns.
 	// - delegationRewardsOwner specifies the owner of all the rewards this

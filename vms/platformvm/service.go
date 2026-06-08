@@ -686,7 +686,12 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 		case *txs.AddPermissionlessValidatorTx:
 			attr.proofOfPossession, _ = stakerTx.Signer.(*signer.ProofOfPossession)
 		case *txs.AddAutoRenewedValidatorTx:
-			attr.proofOfPossession, _ = stakerTx.Signer.(*signer.ProofOfPossession)
+			pop, ok := stakerTx.Signer.(*signer.ProofOfPossession)
+			if !ok {
+				return nil, fmt.Errorf("expected *signer.ProofOfPossession but got %T", stakerTx.Signer)
+			}
+
+			attr.proofOfPossession = pop
 			attr.autoRenewedValidatorAuthority = stakerTx.ValidatorAuthority
 		case *txs.AddValidatorTx:
 		default:
