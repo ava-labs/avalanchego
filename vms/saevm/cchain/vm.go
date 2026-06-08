@@ -67,8 +67,10 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	// TODO(StephenButtolph): Allow minimal user configuration via configBytes.
-	_ = configBytes
+	cfg, err := ParseConfig(configBytes)
+	if err != nil {
+		return fmt.Errorf("parsing config: %w", err)
+	}
 
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
@@ -100,10 +102,11 @@ func (vm *VM) Initialize(
 		snowCtx,
 		vm.state,
 		pendingTxs,
+		cfg.desired(),
 	)
 	mempoolConfig := legacypool.DefaultConfig
-	// Treat all transactions equally regardless of submission source — no
-	// preferential admission or pricing for locally-submitted txs.
+	// Treat all transactions equally regardless of submission source. Locally
+	// submitted txs receive no preferential admission or pricing.
 	mempoolConfig.NoLocals = true
 	saeConfig := sae.Config{
 		MempoolConfig: mempoolConfig,

@@ -40,7 +40,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -71,9 +73,24 @@ type SUT struct {
 type (
 	sutConfig struct {
 		genesis core.Genesis
+		config  Config
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withGenesisAllocFor seeds the SUT's genesis with a max balance for each addr.
+func withGenesisAllocFor(addrs ...common.Address) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
+	})
+}
+
+// withPriceTarget sets [Config.PriceTarget] on the SUT.
+func withPriceTarget(p gas.Price) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.config.PriceTarget = &p
+	})
+}
 
 // newSUT initializes a cchain [VM], transitions it to [snow.NormalOp], and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
@@ -107,6 +124,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
+	configBytes, err := json.Marshal(cfg.config)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.config)
+
 	// The SAE mempool may push gossip transactions when they are issued.
 	appSender := &enginetest.Sender{
 		SendAppGossipF: func(context.Context, snowcommon.SendConfig, []byte) error {
@@ -121,7 +141,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		chainDB,
 		genesisBytes,
 		nil, // upgradeBytes
-		nil, // configBytes
+		configBytes,
 		nil, // fxs
 		appSender,
 	), "%T.Initialize()", vm)
@@ -484,9 +504,7 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 func TestExport(t *testing.T) {
 	sk := txtest.NewKey(t)
 	sender := sk.EthAddress()
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(sender)
-	}))
+	ctx, sut := newSUT(t, withGenesisAllocFor(sender))
 
 	var (
 		w                = newWallet(sk, sut.ctx, sut.Client)
@@ -550,13 +568,11 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	for i := range keys {
 		keys[i] = txtest.NewKey(t)
 	}
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		addrs := make([]common.Address, len(keys))
-		for i, sk := range keys {
-			addrs[i] = sk.EthAddress()
-		}
-		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
-	}))
+	addrs := make([]common.Address, len(keys))
+	for i, sk := range keys {
+		addrs[i] = sk.EthAddress()
+	}
+	ctx, sut := newSUT(t, withGenesisAllocFor(addrs...))
 
 	var (
 		preference = sut.lastAccepted(ctx, t)
@@ -599,12 +615,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 	ethSender := ethWallet.Addresses()[0]
 	exportKey := txtest.NewKey(t)
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(
-			ethSender,
-			exportKey.EthAddress(),
-		)
-	}))
+	ctx, sut := newSUT(t, withGenesisAllocFor(ethSender, exportKey.EthAddress()))
 
 	// Tracing will error if there isn't at least one ethereum transaction in
 	// the block.
@@ -653,4 +664,25 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	// execution results to have been applied.
 	exportedUTXOs := txtest.ExportedUTXOs(signedExport.ID(), export)
 	sut.assertUTXOsMissing(t, destinationChain, sut.ctx.ChainID, exportedUTXOs...)
+}
+
+// TestRampMinPriceExponent verifies that each built block raises
+// MinPriceExponent toward the node's ACP-283 vote.
+func TestRampMinPriceExponent(t *testing.T) {
+	sk := txtest.NewKey(t)
+	ctx, sut := newSUT(t,
+		withGenesisAllocFor(sk.EthAddress()),
+		withPriceTarget(1_000_000_000), // 1 nAVAX target.
+	)
+	w := newWallet(sk, sut.ctx, sut.Client)
+
+	const numBlocks = 3
+	prev := dynamic.InitialPriceExponent
+	for i := 1; i <= numBlocks; i++ {
+		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+		got := customtypes.GetHeaderExtra(blk.EthBlock().Header()).MinPriceExponent
+		require.NotNilf(t, got, "block %d MinPriceExponent", i)
+		require.Greaterf(t, *got, prev, "block %d MinPriceExponent should exceed parent's", i)
+		prev = *got
+	}
 }

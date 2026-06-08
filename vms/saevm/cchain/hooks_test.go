@@ -4,6 +4,7 @@
 package cchain
 
 import (
+	"math"
 	"math/big"
 	"testing"
 
@@ -15,9 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
@@ -40,6 +45,142 @@ func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *
 		saetest.TrieHasher(),
 		extData,
 		true, // setExtDataHash
+	)
+}
+
+func headerWithMinPriceExponent(exp dynamic.PriceExponent) *types.Header {
+	return customtypes.WithHeaderExtra(
+		&types.Header{Number: big.NewInt(0)},
+		&customtypes.HeaderExtra{MinPriceExponent: &exp},
+	)
+}
+
+func TestGasConfigAfter(t *testing.T) {
+	tests := []struct {
+		name     string
+		exponent *dynamic.PriceExponent
+		want     gas.Price
+	}{
+		{
+			name: "nil_defaults_to_one_wei",
+			want: 1,
+		},
+		{
+			name:     "exponent_returns_its_price",
+			exponent: utils.PointerTo(dynamic.DesiredPriceExponent(2)),
+			want:     2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			header := customtypes.WithHeaderExtra(
+				&types.Header{},
+				&customtypes.HeaderExtra{MinPriceExponent: tt.exponent},
+			)
+			_, cfg := (*hooks)(nil).GasConfigAfter(header)
+			assert.Equalf(t, tt.want, cfg.MinPrice, "GasConfigAfter()")
+		})
+	}
+}
+
+func TestBuildHeaderMinPriceExponent(t *testing.T) {
+	const parentExponent dynamic.PriceExponent = 1000
+	parentNoExponent := &types.Header{Number: big.NewInt(0)}
+	parentWith := headerWithMinPriceExponent(parentExponent)
+
+	tests := []struct {
+		name    string
+		parent  *types.Header
+		desired *dynamic.PriceExponent
+		want    dynamic.PriceExponent
+	}{
+		{
+			name:   "no_parent_no_desired_seeds_initial",
+			parent: parentNoExponent,
+			want:   dynamic.InitialPriceExponent,
+		},
+		{
+			name:   "parent_set_no_desired_carries",
+			parent: parentWith,
+			want:   parentExponent,
+		},
+		{
+			name:    "desired_within_cap_applied",
+			parent:  parentWith,
+			desired: utils.PointerTo(parentExponent + 500),
+			want:    parentExponent + 500,
+		},
+		{
+			name:    "desired_above_clamped",
+			parent:  parentWith,
+			desired: utils.PointerTo(dynamic.PriceExponent(math.MaxUint64)),
+			want:    parentExponent.Toward(utils.PointerTo(dynamic.PriceExponent(math.MaxUint64))),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHooks(snowtest.Context(t, snowtest.CChainID), nil, txpool.NewPending(), desiredParams{priceExponent: tt.desired})
+			header, err := h.BuildHeader(tt.parent)
+			require.NoError(t, err)
+			got := customtypes.GetHeaderExtra(header).MinPriceExponent
+			require.NotNil(t, got)
+			assert.Equalf(t, tt.want, *got, "BuildHeader()")
+		})
+	}
+}
+
+func TestBlockRebuilderFromMinPriceExponent(t *testing.T) {
+	const parentExponent dynamic.PriceExponent = 1000
+	parent := headerWithMinPriceExponent(parentExponent)
+
+	tests := []struct {
+		name    string
+		claimed dynamic.PriceExponent
+		want    dynamic.PriceExponent
+	}{
+		{
+			name:    "honest_claim_within_cap_reproduces",
+			claimed: parentExponent + 500,
+			want:    parentExponent + 500,
+		},
+		{
+			name:    "cheated_claim_above_step_clamps",
+			claimed: math.MaxUint64,
+			want:    parentExponent.Toward(utils.PointerTo(dynamic.PriceExponent(math.MaxUint64))),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			block := newBlockWithMinPriceExponent(t, 1, parent.Hash(), tt.claimed)
+			h := newHooks(snowtest.Context(t, snowtest.CChainID), nil, txpool.NewPending(), desiredParams{})
+			rb, err := h.BlockRebuilderFrom(block)
+			require.NoError(t, err)
+			rebuilt, err := rb.BuildHeader(parent)
+			require.NoError(t, err)
+			got := customtypes.GetHeaderExtra(rebuilt).MinPriceExponent
+			require.NotNil(t, got)
+			assert.Equalf(t, tt.want, *got, "rebuilder BuildHeader()")
+		})
+	}
+}
+
+// newBlockWithMinPriceExponent returns a parseable block whose header carries
+// the given MinPriceExponent.
+func newBlockWithMinPriceExponent(tb testing.TB, number uint64, parent common.Hash, exp dynamic.PriceExponent) *types.Block {
+	tb.Helper()
+
+	extData, err := tx.MarshalSlice(nil)
+	require.NoErrorf(tb, err, "tx.MarshalSlice()")
+
+	header := customtypes.WithHeaderExtra(
+		&types.Header{
+			ParentHash: parent,
+			Number:     new(big.Int).SetUint64(number),
+		},
+		&customtypes.HeaderExtra{MinPriceExponent: &exp},
+	)
+	return customtypes.NewBlockWithExtData(
+		header, nil, nil, nil, saetest.TrieHasher(), extData, true,
 	)
 }
 
