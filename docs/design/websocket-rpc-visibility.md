@@ -279,11 +279,14 @@ accumulated on a small per-connection counter and observed in
 `rpc_ws_connections_closed_total` carries a `reason` label whose values
 come from the bounded set below.
 
-The close cause is already available, it is just discarded today. The
-server's read loop (`Client.read`, `client.go:728`) gets the terminating
-error from `readBatch()` and forwards it to `readErr` without recording
-why (`client.go:730-737`). Threading that error to the close site lets
-us bucket every disconnect into a bounded `reason` set:
+The close cause is available at the read boundary. The `websocketCodec`'s
+decode wrapper records the terminating error from `conn.ReadMessage()` on
+the codec; `untrackCodec` reads it back at close (via the `wsConnInfo`
+interface) and classifies it. The one exception is `server_stop`, which is
+not derived from the error: when `untrackCodec` runs after `Server.Stop`
+has cleared the run flag, the close is attributed to `server_stop`
+directly (see the row below). This buckets every disconnect into a bounded
+`reason` set:
 
 | `reason`      | How detected                                                                                                              | Graceful?                                           |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
@@ -291,7 +294,7 @@ us bucket every disconnect into a bounded `reason` set:
 | `dropped`     | `websocket.IsUnexpectedCloseError`, e.g. code 1006 (`CloseAbnormalClosure`) — TCP reset, killed client, network partition | no — connection went away without a close handshake |
 | `timeout`     | read deadline exceeded after an unanswered keepalive ping (net timeout error)                                             | no — client stopped responding                      |
 | `read_limit`  | message exceeded `wsDefaultReadLimit` (32 MiB, `websocket.go:52`); gorilla close code 1009                                | no — protocol/abuse                                 |
-| `server_stop` | `Server.Stop` closed the codec (`server.go:188-198`)                                                                      | n/a — server-initiated                              |
+| `server_stop` | `Server.Stop` closed the codec; detected in `untrackCodec` via `!s.run.Load()`, not from the read error                    | n/a — server-initiated                              |
 | `error`       | any other read/decode error                                                                                               | no                                                  |
 
 **Can we tell whether the client closed gracefully?** Yes. A graceful
@@ -378,14 +381,18 @@ hits in the PR.
 
 ### Instrumentation points
 
+The `file.go:NNN` anchors throughout this document are indicative
+references from when it was written; they may have shifted in the
+implementation.
+
 | Concern            | Location                                                                                | Mechanism                                                                                                                                           |
 | ------------------ | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | active / opened    | `trackCodec` (`server.go:138`)                                                          | inc `connections_active` + `connections_opened_total` on successful track                                                                           |
 | closed / duration  | `untrackCodec` (`server.go:149`)                                                        | dec `connections_active`, inc `connections_closed_total{reason}`, observe duration; read the per-connection byte totals for the close log           |
-| bytes / messages   | codec read & write paths (`websocket.go:346`)                                           | inc `rpc_ws_{bytes,messages}_total{direction}` after `ReadJSON` / write                                                                             |
+| bytes / messages   | wrapped codec decode/encode (`websocket.go`)                                            | inc `rpc_ws_{bytes,messages}_total{direction}` in the wrapped decode/encode funcs                                                                   |
 | subscription open  | `addSubscriptions` (`handler.go:390`)                                                   | on non-nil `takeSubscription()` (actually registered), inc `subscriptions_active`+`subscriptions_opened_total{subscription}`                        |
 | subscription close | `unsubscribe` (`handler.go:677`) **and** `cancelServerSubscriptions` (`handler.go:402`) | dec `subscriptions_active`, inc `subscriptions_closed_total{subscription}` on both explicit-unsubscribe and connection-teardown paths               |
-| notifications      | `Notifier.Notify` (`subscription.go:143`)                                               | inc `subscriptions_notifications_total{subscription,status}`                                                                                        |
+| notifications      | `Notifier.send`                                                                         | inc `subscriptions_notifications_total{subscription,status}` at the actual send, so buffered-then-flushed notifications are counted once            |
 | requests           | request dispatch (`handler.go:619-623`)                                                 | inc `rpc_requests_total{status,transport}`, observe `rpc_request_duration_seconds{...}`; for WS codecs also bump the per-connection request counter |
 | throttled          | `awaitLimit` (`handler.go:421`)                                                         | inc `rpc_ws_throttled_total` when the reservation `delay` is non-zero                                                                               |
 
@@ -413,12 +420,15 @@ where `track`/`untrack` already live, and works uniformly for any
 `ServerCodec`, not just WebSocket.
 
 Byte counting requires visibility into the actual reader/writer. The
-`websocketCodec` wraps a `*websocket.Conn` (`websocket.go:297`) and
-uses `conn.WriteJSON` / `conn.ReadJSON` (`websocket.go:307-311`). The
-cleanest approach is to wrap the encode/decode functions passed to
-`NewFuncCodec` so the byte count is observed as JSON is marshalled to /
-unmarshalled from the connection, rather than reaching into gorilla
-internals.
+`websocketCodec` wraps a `*websocket.Conn` and originally used
+`conn.WriteJSON` / `conn.ReadJSON`, which do not expose a byte count. We
+wrap the encode/decode functions passed to `NewFuncCodec` and, inside
+them, replace those calls with their byte-visible equivalents:
+`json.Encoder` into a buffer + `conn.WriteMessage` on write, and
+`conn.ReadMessage` + `json.Unmarshal` on read. This reproduces
+`WriteJSON`'s framing (the encoder's trailing newline) and stays on
+gorilla's public API rather than reaching into its internals, while
+making the byte count observable as JSON crosses the connection.
 
 ### Gating connection metrics to WebSocket
 
@@ -713,7 +723,8 @@ top and are independently shippable.
    `takeSubscription()`; closed at **both** `unsubscribe`
    (`handler.go:677`) and `cancelServerSubscriptions` (`handler.go:402`,
    connection teardown) so the active gauge does not leak; notifications
-   at `Notifier.Notify` (`subscription.go:143`). All keyed by the
+   at `Notifier.send` (the actual write, so buffered-then-flushed
+   notifications are counted once). All keyed by the
    `(namespace, name)` kind.
 3. Test accounting for explicit unsubscribe **and** connection-close
    teardown, and that a failed subscribe attempt does not increment
@@ -721,14 +732,17 @@ top and are independently shippable.
 
 ### Phase 5: Close-reason label
 
-1. Thread the terminating error from `Client.read` (`client.go:730-737`)
-   to the close site instead of discarding it.
+1. Capture the terminating read error on the `websocketCodec` (in the
+   decode wrapper, from `conn.ReadMessage()`) so the close site can read
+   it back, instead of discarding it.
 2. Classify it into the bounded `reason` set (`normal`, `dropped`,
-   `timeout`, `read_limit`, `server_stop`, `error`) using
-   `websocket.IsCloseError` / `IsUnexpectedCloseError` and net-timeout
-   checks.
-3. Set the `reason` label on `rpc_ws_connections_closed_total`, and
-   include `reason` in the connection-closed INFO log.
+   `timeout`, `read_limit`, `error`) using `websocket.IsCloseError` /
+   `IsUnexpectedCloseError` and net-timeout checks; `server_stop` is set
+   directly when `Server.Stop` initiated the close (`!s.run.Load()` in
+   `untrackCodec`), without inspecting the error.
+3. Set the `reason` label on `rpc_ws_connections_closed_total`. (The
+   connection-closed INFO log that also carries `reason` lands in
+   Phase 7.)
 
 ### Phase 6: Throttle counter
 
