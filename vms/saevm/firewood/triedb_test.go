@@ -6,6 +6,7 @@ package firewood
 import (
 	"encoding/binary"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -278,5 +279,69 @@ func TestGenesis(t *testing.T) {
 		})
 		require.True(t, tdb.Initialized(genesisRoot), "Genesis root should still be initialized in the database")
 		require.NoError(t, tdb.Close())
+	})
+}
+
+func TestInvalidConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     func(TrieDBConfig) TrieDBConfig
+		wantErr error
+	}{
+		{
+			name:    "valid config",
+			cfg:     func(cfg TrieDBConfig) TrieDBConfig { return cfg },
+			wantErr: nil,
+		},
+		{
+			name: "empty directory",
+			cfg: func(cfg TrieDBConfig) TrieDBConfig {
+				cfg.DatabaseDir = ""
+				return cfg
+			},
+			wantErr: errDatabaseDirNotProvided,
+		},
+		{
+			name: "file instead of directory",
+			cfg: func(cfg TrieDBConfig) TrieDBConfig {
+				file := t.TempDir() + "/file"
+				require.NoError(t, os.WriteFile(file, []byte("not a directory"), 0o600))
+				cfg.DatabaseDir = file
+				return cfg
+			},
+			wantErr: errNotDirectory,
+		},
+		{
+			name: "too few revisions",
+			cfg: func(cfg TrieDBConfig) TrieDBConfig {
+				cfg.RevisionsInMemory = 1
+				return cfg
+			},
+			wantErr: errTooFewRevisions,
+		},
+		{
+			name: "commit interval too big",
+			cfg: func(cfg TrieDBConfig) TrieDBConfig {
+				cfg.DeferredCommitInterval = 5
+				cfg.RevisionsInMemory = 5
+				return cfg
+			},
+			wantErr: errCommitIntervalTooBig,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.cfg(DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug)))
+			_, err := New(cfg)
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestNoLogger(t *testing.T) {
+	cfg := DefaultConfig(t.TempDir(), nil)
+	require.Panics(t, func() {
+		_, _ = New(cfg)
 	})
 }

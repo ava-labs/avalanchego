@@ -73,12 +73,48 @@ func DefaultConfig(dir string, log logging.Logger) TrieDBConfig {
 func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
 	db, err := New(c)
 	if err != nil {
-		if c.Log == nil {
-			panic(fmt.Sprintf("creating firewood database: %v", err))
-		}
 		c.Log.Fatal("creating firewood database", zap.Error(err))
 	}
 	return db
+}
+
+var (
+	errDatabaseDirNotProvided = errors.New("DatabaseDir must be provided")
+	errTooFewRevisions        = errors.New("RevisionsInMemory must be >= 2")
+	errCommitIntervalTooBig   = errors.New("DeferredCommitInterval must be < RevisionsInMemory")
+	errNotDirectory           = errors.New("database directory path is not a directory")
+)
+
+func (c TrieDBConfig) Validate() error {
+	if c.Log == nil {
+		panic("TrieDBConfig.Log must be set")
+	}
+	if err := validateDir(c.DatabaseDir); err != nil {
+		return err
+	}
+	if c.RevisionsInMemory < 2 {
+		return fmt.Errorf("%w: got %d", errTooFewRevisions, c.RevisionsInMemory)
+	}
+	if c.DeferredCommitInterval >= uint64(c.RevisionsInMemory) {
+		return fmt.Errorf("%w: %d >= %d", errCommitIntervalTooBig, c.DeferredCommitInterval, c.RevisionsInMemory)
+	}
+	return nil
+}
+
+// validateDir ensures that the given directory exists and is a directory.
+func validateDir(dir string) error {
+	if dir == "" {
+		return errDatabaseDirNotProvided
+	}
+
+	switch info, err := os.Stat(dir); {
+	case err != nil:
+		return fmt.Errorf("os.Stat() on database directory: %w", err)
+	case !info.IsDir():
+		return fmt.Errorf("%w: %q", errNotDirectory, dir)
+	}
+
+	return nil
 }
 
 // TrieDB is a triedb.DBOverride implementation backed by Firewood.
@@ -116,20 +152,15 @@ type proposalRef struct {
 }
 
 func New(config TrieDBConfig) (*TrieDB, error) {
-	if err := validateDir(config.DatabaseDir); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(config.DatabaseDir, firewoodDir)
-
-	// The Firewood constructor will check that commitCount is nonzero.
-	minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
-	commitCount := min(config.DeferredCommitInterval, minDeferredPersistenceCommitCount)
 
 	options := []ffi.Option{
 		ffi.WithReadCacheStrategy(ffi.CacheAllReads), // Based on benchmarking, highest cache hit rate
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
-		ffi.WithDeferredPersistenceCommitCount(commitCount),
+		ffi.WithDeferredPersistenceCommitCount(config.DeferredCommitInterval),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
@@ -139,6 +170,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		options = append(options, ffi.WithExpensiveMetrics())
 	}
 
+	path := filepath.Join(config.DatabaseDir, firewoodDir)
 	fw, err := ffi.New(path, ffi.EthereumNodeHashing, options...)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
@@ -149,22 +181,6 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		committable: make(map[common.Hash]*proposalRef),
 		log:         config.Log,
 	}, nil
-}
-
-// validateDir ensures that the given directory exists and is a directory.
-func validateDir(dir string) error {
-	if dir == "" {
-		return errors.New("chain data directory must be set")
-	}
-
-	switch info, err := os.Stat(dir); {
-	case err != nil:
-		return fmt.Errorf("os.Stat() on database directory: %w", err)
-	case !info.IsDir():
-		return fmt.Errorf("database directory path is not a directory: %q", dir)
-	}
-
-	return nil
 }
 
 // Close drops all proposals that have not yet been committed and closes the
