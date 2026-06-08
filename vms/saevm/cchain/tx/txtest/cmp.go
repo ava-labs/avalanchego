@@ -23,3 +23,18 @@ func CmpOpt() cmp.Option {
 		cmpopts.EquateEmpty(),
 	})
 }
+
+// UTXOCmpOpt returns a configuration for [cmp.Diff] to compare [avax.UTXO]
+// instances or slices thereof. Slice order is not considered.
+func UTXOCmpOpt() cmp.Option {
+	return cmp.Options{
+		cmpopts.IgnoreUnexported(
+			avax.UTXOID{},
+			secp256k1fx.OutputOwners{},
+		),
+		cmpopts.EquateEmpty(),
+		cmpopts.SortSlices(func(a, b *avax.UTXO) bool {
+			return a.InputID().Compare(b.InputID()) < 0
+		}),
+	}
+}

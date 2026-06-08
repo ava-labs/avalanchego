@@ -40,6 +40,7 @@ var (
 	ErrInvalidID                     = errors.New("invalid ID")
 	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
+	ErrUnimplemented                 = errors.New("unimplemented")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -144,6 +145,14 @@ func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1Validator
 }
 
 func (*proposalTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
 	return ErrWrongTxType
 }
 
@@ -422,6 +431,10 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 	return nil
+}
+
+func (*proposalTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	return ErrUnimplemented
 }
 
 func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {

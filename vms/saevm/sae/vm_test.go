@@ -68,20 +68,7 @@ import (
 func TestMain(m *testing.M) {
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelError, true)))
 
-	goleak.VerifyTestMain(
-		m,
-		goleak.IgnoreCurrent(),
-		// ChainIndexer.Close() may check if the event loop is active before it is marked as active.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core.(*ChainIndexer).eventLoop"),
-		// diskLayer.Release() doesn't properly stop generation.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/state/snapshot.(*diskLayer).generate"),
-		// TxPool.Close() doesn't wait for its loop() method to signal termination.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/txpool.(*TxPool).loop.func2"),
-		// Not all filters subscriptions can be closed after the TxPool is closed.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).Logs.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewHeads.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewPendingTransactions.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
-	)
+	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
 // SUT is the system under test. Testing SHOULD be performed via the embedded
