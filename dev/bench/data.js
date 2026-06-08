@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780939433670,
+  "lastUpdate": 1780947810470,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -29562,6 +29562,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_accept_ms/ggas",
             "value": 713.3451390898603,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Razvan",
+            "username": "rrazvan1",
+            "email": "36448915+rrazvan1@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "c84b906db610e0fd18f139ce733d37ad420d9eaf",
+          "message": "ACP-236 (3): Add wallet support for auto-renewed validator transactions (#5202)",
+          "timestamp": "2026-06-08T18:01:30Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/c84b906db610e0fd18f139ce733d37ad420d9eaf"
+        },
+        "date": 1780947808159,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - mgas/s",
+            "value": 28.255937128110943,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - ms/ggas",
+            "value": 35390.792224163444,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_parse_ms/ggas",
+            "value": 69.48880782663537,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_verify_ms/ggas",
+            "value": 35267.86739608193,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
+            "value": 51.05095962255511,
             "unit": "block_accept_ms/ggas"
           }
         ]
