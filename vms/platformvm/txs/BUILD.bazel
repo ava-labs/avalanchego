@@ -4,6 +4,7 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "txs",
     srcs = [
+        "add_auto_renewed_validator_tx.go",
         "add_delegator_tx.go",
         "add_permissionless_delegator_tx.go",
         "add_permissionless_validator_tx.go",
@@ -22,7 +23,9 @@ go_library(
         "priorities.go",
         "register_l1_validator_tx.go",
         "remove_subnet_validator_tx.go",
+        "reward_auto_renewed_validator_tx.go",
         "reward_validator_tx.go",
+        "set_auto_renewed_validator_config_tx.go",
         "set_l1_validator_weight_tx.go",
         "staker_tx.go",
         "subnet_validator.go",
@@ -65,6 +68,7 @@ go_library(
 go_test(
     name = "txs_test",
     srcs = [
+        "add_auto_renewed_validator_tx_test.go",
         "add_delegator_test.go",
         "add_permissionless_delegator_tx_test.go",
         "add_permissionless_validator_tx_test.go",
@@ -78,6 +82,8 @@ go_test(
         "priorities_test.go",
         "register_l1_validator_tx_test.go",
         "remove_subnet_validator_tx_test.go",
+        "reward_auto_renewed_validator_tx_test.go",
+        "set_auto_renewed_validator_config_tx_test.go",
         "set_l1_validator_weight_tx_test.go",
         "subnet_validator_test.go",
         "transfer_subnet_ownership_tx_test.go",

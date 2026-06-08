@@ -45,6 +45,7 @@ go_test(
     embed = [":saexec"],
     deps = [
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//vms/components/gas",
         "//vms/saevm/blocks",
         "//vms/saevm/blocks/blockstest",

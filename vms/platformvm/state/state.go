@@ -283,10 +283,15 @@ type State struct {
 	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block; if the entry is nil, it is not in the database
 	blockDB     database.Database
 
-	validatorsDB                 database.Database
-	currentValidatorsDB          database.Database
-	currentValidatorBaseDB       database.Database
-	currentValidatorList         linkeddb.LinkedDB
+	validatorsDB           database.Database
+	currentValidatorsDB    database.Database
+	currentValidatorBaseDB database.Database
+	// modifiedStakingInfo are pending updates that have not been flushed yet to metadata.
+	// An update in this map requires an update in validatorState.updatedMetadata to flush the change
+	// to disk.
+	modifiedStakingInfo  map[ids.ID]map[ids.NodeID]StakingInfo
+	currentValidatorList linkeddb.LinkedDB
+
 	currentDelegatorBaseDB       database.Database
 	currentDelegatorList         linkeddb.LinkedDB
 	currentSubnetValidatorBaseDB database.Database
@@ -667,6 +672,7 @@ func New(
 		validatorsDB:                        validatorsDB,
 		currentValidatorsDB:                 currentValidatorsDB,
 		currentValidatorBaseDB:              currentValidatorBaseDB,
+		modifiedStakingInfo:                 make(map[ids.ID]map[ids.NodeID]StakingInfo),
 		currentValidatorList:                linkeddb.NewDefault(currentValidatorBaseDB),
 		currentDelegatorBaseDB:              currentDelegatorBaseDB,
 		currentDelegatorList:                linkeddb.NewDefault(currentDelegatorBaseDB),
@@ -742,6 +748,12 @@ func (s *State) GetStakingInfo(subnetID ids.ID, vdrID ids.NodeID) (StakingInfo, 
 		return StakingInfo{}, fmt.Errorf("getting current validator: %w", err)
 	}
 
+	// Check if this was modified in the current diff.
+	if si, ok := s.modifiedStakingInfo[subnetID][vdrID]; ok {
+		return si, nil
+	}
+
+	// Otherwise return whatever was previously committed.
 	return s.validatorState.GetStakingInfo(subnetID, vdrID)
 }
 
@@ -750,7 +762,18 @@ func (s *State) SetStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo St
 		return fmt.Errorf("getting current validator: %w", err)
 	}
 
-	return s.validatorState.SetStakingInfo(subnetID, vdrID, stakingInfo)
+	s.setStakingInfo(subnetID, vdrID, stakingInfo)
+	return nil
+}
+
+func (s *State) setStakingInfo(subnetID ids.ID, vdrID ids.NodeID, stakingInfo StakingInfo) {
+	nodeIDToStakingInfo, ok := s.modifiedStakingInfo[subnetID]
+	if !ok {
+		nodeIDToStakingInfo = make(map[ids.NodeID]StakingInfo)
+		s.modifiedStakingInfo[subnetID] = nodeIDToStakingInfo
+	}
+
+	nodeIDToStakingInfo[vdrID] = stakingInfo
 }
 
 func (s *State) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
@@ -907,6 +930,10 @@ func (s *State) PutCurrentValidator(staker *Staker) error {
 
 	s.currentStakers.PutValidator(staker)
 
+	// The validator's metadata isn't written to [validatorState] until
+	// [State.Commit] runs, so seed [modifiedStakingInfo] with the zero value so
+	// that reads through [State.GetStakingInfo] before [State.Commit] observe a default.
+	s.setStakingInfo(staker.SubnetID, staker.NodeID, StakingInfo{})
 	return nil
 }
 
@@ -920,6 +947,8 @@ func (s *State) DeleteCurrentValidator(staker *Staker) error {
 	}
 
 	s.currentStakers.DeleteValidator(staker)
+	delete(s.modifiedStakingInfo[staker.SubnetID], staker.NodeID)
+
 	return nil
 }
 
@@ -1890,9 +1919,9 @@ func (s *State) loadCurrentValidators() error {
 			return fmt.Errorf("failed loading validator transaction txID %s, %w", txID, err)
 		}
 
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		stakerTx, ok := tx.Unsigned.(txs.BoundedStaker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type txs.BoundedStaker but got %T", tx.Unsigned)
 		}
 
 		metadataBytes := validatorIt.Value()
@@ -1941,9 +1970,9 @@ func (s *State) loadCurrentValidators() error {
 			return err
 		}
 
-		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		stakerTx, ok := tx.Unsigned.(txs.BoundedStaker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type txs.BoundedStaker but got %T", tx.Unsigned)
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
@@ -1996,9 +2025,9 @@ func (s *State) loadCurrentValidators() error {
 				return err
 			}
 
-			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			stakerTx, ok := tx.Unsigned.(txs.BoundedStaker)
 			if !ok {
-				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+				return fmt.Errorf("expected tx type txs.BoundedStaker but got %T", tx.Unsigned)
 			}
 
 			metadataBytes := delegatorIt.Value()
@@ -2067,7 +2096,7 @@ func (s *State) loadPendingValidators() error {
 
 			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 			if !ok {
-				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+				return fmt.Errorf("expected tx type txs.ScheduledStaker but got %T", tx.Unsigned)
 			}
 
 			staker, err := NewPendingStaker(txID, stakerTx)
@@ -2102,7 +2131,7 @@ func (s *State) loadPendingValidators() error {
 
 			stakerTx, ok := tx.Unsigned.(txs.ScheduledStaker)
 			if !ok {
-				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+				return fmt.Errorf("expected tx type txs.ScheduledStaker but got %T", tx.Unsigned)
 			}
 
 			staker, err := NewPendingStaker(txID, stakerTx)
@@ -2221,6 +2250,7 @@ func (s *State) initValidatorSets() error {
 }
 
 func (s *State) write(updateValidators bool, height uint64) error {
+	// TODO: use codecVersion2 when state is persisting auto-renewed validator metadata
 	codecVersion := CodecVersion1
 	if !s.upgrades.IsDurangoActivated(s.GetTimestamp()) {
 		codecVersion = CodecVersion0
@@ -2831,10 +2861,6 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 			if validatorDiff.added != nil {
 				staker := validatorDiff.added
 
-				// The validator is being added.
-				//
-				// Invariant: It's impossible for a delegator to have been rewarded
-				// in the same block that the validator was added.
 				startTime := uint64(staker.StartTime.Unix())
 				metadata := &validatorMetadata{
 					txID:        staker.TxID,
@@ -2860,6 +2886,18 @@ func (s *State) writeCurrentStakers(codecVersion uint16) error {
 			}
 		}
 	}
+
+	// Applying staking info must run after applying validator diffs. SetStakingInfo requires AddValidatorMetadata
+	// to have already populated the metadata entry for any newly added validator in this batch.
+	for subnetID, nodes := range s.modifiedStakingInfo {
+		for nodeID, stakingInfo := range nodes {
+			if err := s.validatorState.SetStakingInfo(subnetID, nodeID, stakingInfo); err != nil {
+				return fmt.Errorf("setting staking info: %w", err)
+			}
+		}
+	}
+
+	maps.Clear(s.modifiedStakingInfo)
 
 	if err := s.validatorState.WriteValidatorMetadata(
 		s.currentValidatorList,
