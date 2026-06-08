@@ -31,7 +31,8 @@ Run `jj status` (or check for a `.jj/` directory at the repo root). If it succee
 | Read a file at a revision | `jj file show -r <rev> <path>` | **Not** `git show <rev>:<path>`. |
 | Fold working-copy edits into a parent commit | `jj squash --into <change-id-or-@->` | Useful when iterating on a not-yet-pushed change. `@-` = parent of working copy. |
 | Target a specific commit for describe/squash | `<change-id>` or positional ref like `@-` | Prefer `@-` over the change-id when targeting "the commit you just squashed into" — it survives rewrites and stays unambiguous. |
-| Push a bookmark | `jj git push --bookmark <name>` | If GPG signing times out, just retry the same command — the retry surfaces the unlock dialog. |
+| Sign commits before pushing | `jj sign -r @-` (or a revset range) | Run as a **separate step before pushing** so the user knows it's time to press their YubiKey. See *Signing before push* below. |
+| Push a bookmark | `jj git push --bookmark <name>` | Sign first (see above). If signing still times out during push, just retry the same command — the retry surfaces the unlock dialog. |
 | Fetch | `jj git fetch` | Prefer this over raw `git fetch`. |
 | Create a PR | `gh pr create --head <bookmark> --base <base>` | jj leaves git's `HEAD` detached, so `gh pr create` can't infer the branch — always pass `--head` and `--base` explicitly. |
 
@@ -53,6 +54,27 @@ Three traps to avoid:
   `fork_point()` takes a **single revset** (a set of commits, expressed with `|`) and returns their common ancestor — equivalent to `git merge-base <default-branch> <branch>`. Note the `|` (set union), not a comma: `fork_point(<default-branch>, <branch>)` errors with "Expected 1 arguments". This gives you exactly the changes the branch introduces, regardless of how far the default branch has moved.
 
 When the branch is the working copy, `<branch>` can be `@`.
+
+## Signing before push
+
+This contributor signs commits with a hardware key (YubiKey). Signing during `jj git push` is error-prone: the push blocks waiting for a touch the user may not be expecting, and the GPG/touch prompt times out. **Always sign as an explicit, separate step before pushing**, and tell the user a YubiKey touch is coming so they're ready.
+
+```bash
+jj sign                             # sign the whole unpushed stack (uses the configured revsets.sign default)
+jj sign -r @-                       # sign a single commit (typically the just-finalized parent)
+jj sign -r '<default-branch>..@'    # sign every commit on the branch ahead of the default branch
+jj sign -r '<branch1>::<branch2>'   # sign an explicit range
+```
+
+This contributor's config sets `revsets.sign = "reachable(@, mutable())"`, so a **bare `jj sign`** signs every mutable (unpushed) commit reachable from `@` — usually the simplest choice, and it covers everything a subsequent push would otherwise sign. Their `git.sign-on-push = true` is exactly why pushes block on a YubiKey touch; pre-signing makes the push a no-op for signing.
+
+Workflow:
+
+1. Decide which commits are about to be pushed and pick the matching revset. For a typical single-commit push that's `@-`; for a multi-commit branch use `'<default-branch>..<branch>'`.
+2. **Tell the user signing is about to start** and that they'll need to touch their YubiKey, then run `jj sign`. Doing this on its own gives one clear moment to press the key, rather than a surprise prompt mid-push.
+3. Once signing succeeds, run `jj git push --bookmark <name>` — it should no longer need to sign.
+
+`jj sign` re-signs unconditionally (jj can't yet detect an existing signature), so re-running it is harmless if you're unsure whether a commit is signed.
 
 ## Commit message format
 
@@ -121,7 +143,8 @@ The choice mirrors the stacking-changes rule: it depends on whether reviewers ha
 jj git fetch
 jj rebase -d <default-branch>
 # resolve any conflicts (see Conflict markers section)
-jj git push --bookmark <branch> --allow-new   # force-push as needed
+jj sign -r '<default-branch>..<branch>'        # sign before pushing — tell the user to touch their YubiKey
+jj git push --bookmark <branch> --allow-new    # force-push as needed
 ```
 
 **Post-review (the PR is in review or has comments):** use a **merge commit via jj** — not a rebase, not a squash. An explicit merge preserves the history reviewers have already seen and records that the default branch was integrated, with a description documenting the resolution.
@@ -174,9 +197,10 @@ Merge-commit steps:
 
    Preserve the merge commit as a real merge — squashing or rebasing erases the "default branch was integrated here" signal.
 
-7. **Push:**
+7. **Sign, then push:**
 
    ```bash
+   jj sign -r '<default-branch>..<branch>'   # sign first — tell the user to touch their YubiKey
    jj git push --bookmark <branch>
    ```
 
@@ -234,9 +258,53 @@ After moving the changes out, the original commit retains only the structural me
 
 If `jj describe`-ing the source still references work that has moved out, update its message too — `jj describe <src> -m "..."` rewrites it and rebases descendants automatically.
 
+## Parallel working copies: `jj workspace`, not `git worktree`
+
+When you need a second working directory on disk — e.g. two agents editing the
+same repo at once, or running a long build in one tree while you keep editing in
+another — use **`jj workspace`**, never `git worktree`.
+
+```bash
+jj workspace add <path>        # new working dir sharing this repo's backend
+jj workspace list              # show all workspaces (each has its own @)
+jj workspace forget <name>     # detach a workspace; then rm its directory
+```
+
+What's actually true about jj workspaces, so you set expectations correctly:
+
+- **They share one repo backend.** All workspaces read/write the same
+  `.jj/repo` store and op-log. Every commit made in any workspace shows up in a
+  **single shared `jj log`** — they are *not* separate clones or databases.
+- **Each workspace has its own working-copy commit** (`@`), so the two
+  directories can sit on different revisions simultaneously without colliding on
+  disk. "Keeping work separate" here is a *filesystem* concern (don't stomp each
+  other's uncommitted edits), not a VCS-branching one — in jj every change is
+  already its own commit.
+- **There is no heavyweight "merge" to finish.** Because it's one repo, you
+  reconcile by ordinary `jj rebase` of the change onto the updated default
+  branch, then `jj bookmark move` + `jj git push`. A merge commit only enters if
+  the branch is already in review (see the rebase-vs-merge-commit section).
+  Conflicts arise only where the **same lines** were edited.
+
+### The colocated-repo trap (important)
+
+A repo can be **colocated**: a real `.git` directory *and* a real `.jj`
+directory both at the root (check with `ls -ld .git .jj`). In a colocated repo,
+**do not create a `git worktree`** — including via any agent/harness "worktree
+isolation" feature, which runs `git worktree add` under the hood. The new
+directory gets a `.git` pointer but **no `.jj`**, so jj does not manage it;
+commits made there are invisible to jj until a manual `jj git import`, and you're
+back to the desync this skill exists to prevent. Use `jj workspace add` instead.
+
+**Before reaching for parallel working copies at all, prefer sequencing.** If the
+two efforts touch overlapping files, running them in parallel doesn't avoid
+conflicts — it just defers them to integration time. A second workspace earns its
+keep only when the work is on **disjoint files** or must genuinely run
+concurrently. When in doubt, let one change land, then start the next on top.
+
 ## What not to do
 
-- Don't run `git commit`, `git checkout -b`, `git branch`, `git rebase`, or `git merge` in a jj repo — use the jj equivalents.
+- Don't run `git commit`, `git checkout -b`, `git branch`, `git rebase`, `git merge`, or `git worktree add` in a jj repo — use the jj equivalents (`git worktree` → `jj workspace add`; especially never in a colocated repo).
 - Don't squash or rebase a PR branch that is already in review; use the merge-commit flow. (Pre-review, rebase is fine.)
 - Don't use `git show <rev>:<path>` to read a file at a revision; use `jj file show -r <rev> <path>`.
 - Don't auto-mark PRs ready-for-review after pushing a merge resolution.
