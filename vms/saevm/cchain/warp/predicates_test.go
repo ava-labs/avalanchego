@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
@@ -53,12 +52,11 @@ func (predicater) VerifyPredicate(_ *precompileconfig.PredicateContext, pred pre
 }
 
 func newRules(contracts ...common.Address) *extras.Rules {
-	rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
-	rulesExtra := params.GetRulesExtra(rules)
+	predicaters := make(map[common.Address]precompileconfig.Predicater, len(contracts))
 	for _, addr := range contracts {
-		rulesExtra.Predicaters[addr] = predicater{}
+		predicaters[addr] = predicater{}
 	}
-	return rulesExtra
+	return &extras.Rules{Predicaters: predicaters}
 }
 
 func TestBlockPredicates(t *testing.T) {
@@ -346,10 +344,12 @@ func warpValidatorState(subnetID ids.ID, warpSet validators.WarpSet) *validators
 // newWarpRules returns rules with the production warp precompile registered at
 // its contract address.
 func newWarpRules() *extras.Rules {
-	rules := params.GetRulesExtra(params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0))
 	blockTime := uint64(0)
-	rules.Predicaters[corethwarp.ContractAddress] = corethwarp.NewDefaultConfig(&blockTime)
-	return rules
+	return &extras.Rules{
+		Predicaters: map[common.Address]precompileconfig.Predicater{
+			corethwarp.ContractAddress: corethwarp.NewDefaultConfig(&blockTime),
+		},
+	}
 }
 
 // BenchmarkBlockPredicates measures predicate verification of a block using the
