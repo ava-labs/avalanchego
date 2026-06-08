@@ -21,6 +21,7 @@ go_library(
     name = "cchain",
     srcs = [
         "api.go",
+        "config.go",
         "hooks.go",
         "vm.go",
     ],
@@ -77,6 +78,7 @@ go_test(
     name = "cchain_test",
     srcs = [
         "api_test.go",
+        "config_test.go",
         "hooks_test.go",
         "vm_test.go",
     ],

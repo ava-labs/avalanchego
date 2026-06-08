@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -71,8 +72,8 @@ type SUT struct {
 
 type (
 	sutConfig struct {
-		genesis     core.Genesis
-		configBytes []byte
+		genesis core.Genesis
+		config  Config
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -84,13 +85,10 @@ func withGenesisAllocFor(addrs ...common.Address) sutOption {
 	})
 }
 
-// withDesiredMinGasPriceWei configures the SUT's ACP-283 vote.
-func withDesiredMinGasPriceWei(t *testing.T, wei uint64) sutOption {
-	t.Helper()
-	bytes, err := json.Marshal(Config{DesiredMinGasPriceWei: &wei})
-	require.NoErrorf(t, err, "marshal Config")
+// withPriceTarget sets [Config.PriceTarget] on the SUT.
+func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.configBytes = bytes
+		c.config.PriceTarget = &p
 	})
 }
 
@@ -126,6 +124,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
+	configBytes, err := json.Marshal(cfg.config)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.config)
+
 	// The SAE mempool may push gossip transactions when they are issued.
 	appSender := &enginetest.Sender{
 		SendAppGossipF: func(context.Context, snowcommon.SendConfig, []byte) error {
@@ -140,7 +141,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		chainDB,
 		genesisBytes,
 		nil, // upgradeBytes
-		cfg.configBytes,
+		configBytes,
 		nil, // fxs
 		appSender,
 	), "%T.Initialize()", vm)
@@ -671,7 +672,7 @@ func TestRampMinPriceExponent(t *testing.T) {
 	sk := txtest.NewKey(t)
 	ctx, sut := newSUT(t,
 		withGenesisAllocFor(sk.EthAddress()),
-		withDesiredMinGasPriceWei(t, 1_000_000_000), // 1 nAVAX target.
+		withPriceTarget(1_000_000_000), // 1 nAVAX target.
 	)
 	w := newWallet(sk, sut.ctx, sut.Client)
 

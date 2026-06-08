@@ -66,14 +66,9 @@ func TestGasConfigAfter(t *testing.T) {
 			want: 1,
 		},
 		{
-			name:     "smallest_exponent_above_one_wei",
+			name:     "exponent_returns_its_price",
 			exponent: utils.PointerTo(dynamic.DesiredPriceExponent(2)),
 			want:     2,
-		},
-		{
-			name:     "saturated_exponent",
-			exponent: utils.PointerTo(dynamic.DesiredPriceExponent(math.MaxUint64)),
-			want:     math.MaxUint64,
 		},
 	}
 	for _, tt := range tests {
@@ -124,7 +119,7 @@ func TestBuildHeaderMinPriceExponent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newHooks(snowtest.Context(t, snowtest.CChainID), nil, txpool.NewPending(), tt.desired)
+			h := newHooks(snowtest.Context(t, snowtest.CChainID), nil, txpool.NewPending(), desiredParams{priceExponent: tt.desired})
 			header, err := h.BuildHeader(tt.parent)
 			require.NoError(t, err)
 			got := customtypes.GetHeaderExtra(header).MinPriceExponent
@@ -157,7 +152,7 @@ func TestBlockRebuilderFromMinPriceExponent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			block := newBlockWithMinPriceExponent(t, 1, parent.Hash(), tt.claimed)
-			h := newHooks(snowtest.Context(t, snowtest.CChainID), nil, txpool.NewPending(), nil)
+			h := newHooks(snowtest.Context(t, snowtest.CChainID), nil, txpool.NewPending(), desiredParams{})
 			rb, err := h.BlockRebuilderFrom(block)
 			require.NoError(t, err)
 			rebuilt, err := rb.BuildHeader(parent)

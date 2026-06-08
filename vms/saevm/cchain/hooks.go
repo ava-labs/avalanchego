@@ -47,11 +47,27 @@ type hooks struct {
 	state *cchainstate.State
 }
 
+// desiredParams bundles this node's votes for the dynamic consensus
+// parameters. A nil field means no vote.
+type desiredParams struct {
+	priceExponent *dynamic.PriceExponent
+}
+
+// desired returns c's user-facing targets as internal exponent votes.
+func (c Config) desired() desiredParams {
+	var d desiredParams
+	if c.PriceTarget != nil {
+		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
+		d.priceExponent = &e
+	}
+	return d
+}
+
 func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
 	pool *txpool.Pending,
-	desiredMinPriceExponent *dynamic.PriceExponent,
+	desired desiredParams,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -73,7 +89,7 @@ func newHooks(
 			ctx,
 			time.Now,
 			poolTxs,
-			desiredMinPriceExponent,
+			desired,
 		},
 		state,
 	}
@@ -101,7 +117,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return now
 		},
 		slices.Values(txs),
-		customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
+		desiredParams{priceExponent: customtypes.GetHeaderExtra(b.Header()).MinPriceExponent},
 	}, nil
 }
 
@@ -190,10 +206,10 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
 type builder struct {
-	ctx                     *snow.Context
-	now                     func() time.Time
-	potentialTxs            iter.Seq[*hookTx]
-	desiredMinPriceExponent *dynamic.PriceExponent
+	ctx          *snow.Context
+	now          func() time.Time
+	potentialTxs iter.Seq[*hookTx]
+	desired      desiredParams
 }
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
@@ -206,7 +222,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	if parentExtra.MinPriceExponent != nil {
 		minPriceExponent = *parentExtra.MinPriceExponent
 	}
-	minPriceExponent = minPriceExponent.Toward(b.desiredMinPriceExponent)
+	minPriceExponent = minPriceExponent.Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
