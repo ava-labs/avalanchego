@@ -207,7 +207,6 @@ func NewVM[T hook.Transaction](
 		vm.last.settled.Store(lastSettled)
 		vm.last.accepted.Store(head)
 		vm.preference.Store(head)
-		// [saexec.New] already records the initial executed height.
 		vm.metrics.markSettled(lastSettled.Height())
 	}
 
