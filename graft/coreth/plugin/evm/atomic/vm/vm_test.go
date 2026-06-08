@@ -277,17 +277,16 @@ func TestCommitAtomicTrieOnShutdown(t *testing.T) {
 	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 		ConfigJSON: `{"commit-interval": 4096}`,
 	})
+	key := vmtest.TestKeys[0]
 	require.NoError(t, addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
-		vmtest.TestShortIDAddrs[0]: 50_000_000,
+		key.Address(): 50_000_000,
 	}), "addUTXOs()")
 
 	// Accept one atomic import block below the commit interval, so the trie is
 	// not yet committed at its last accepted height.
-	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
+	importTx, err := vm.newImportTx(vm.Ctx.XChainID, key.EthAddress(), vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
 	require.NoError(t, err, "vm.newImportTx()")
 	require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx), "AtomicMempool.AddLocalTx()")
-	_, err = vm.WaitForEvent(ctx)
-	require.NoError(t, err, "vm.WaitForEvent()")
 	blk, err := vm.BuildBlock(ctx)
 	require.NoError(t, err, "vm.BuildBlock()")
 	require.NoError(t, blk.Verify(ctx), "blk.Verify()")
