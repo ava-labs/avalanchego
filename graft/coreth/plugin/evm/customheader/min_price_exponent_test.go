@@ -16,10 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
-func clampedToward(parent, target dynamic.PriceExponent) dynamic.PriceExponent {
-	return parent.Toward(&target)
-}
-
 func TestMinPriceExponent(t *testing.T) {
 	activatingHeliconConfig := *extras.TestHeliconChainConfig
 	const activationTime = uint64(1000)
@@ -70,7 +66,7 @@ func TestMinPriceExponent(t *testing.T) {
 			parent:    headerWithMinPriceExponent(1000, parentExponent),
 			timestamp: 1001,
 			desired:   utils.PointerTo(dynamic.PriceExponent(math.MaxUint64)),
-			want:      utils.PointerTo(clampedToward(parentExponent, math.MaxUint64)),
+			want:      utils.PointerTo(parentExponent.Toward(utils.PointerTo(dynamic.PriceExponent(math.MaxUint64)))),
 		},
 		{
 			name:      "desired_clamped_down",
@@ -78,7 +74,7 @@ func TestMinPriceExponent(t *testing.T) {
 			parent:    headerWithMinPriceExponent(1000, parentExponent),
 			timestamp: 1001,
 			desired:   utils.PointerTo(dynamic.PriceExponent(0)),
-			want:      utils.PointerTo(clampedToward(parentExponent, 0)),
+			want:      utils.PointerTo(parentExponent.Toward(utils.PointerTo(dynamic.PriceExponent(0)))),
 		},
 	}
 
