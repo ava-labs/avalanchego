@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -84,12 +85,12 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis     core.Genesis
-		nodeID      ids.NodeID
-		networkID   uint32
-		validators  set.Set[ids.NodeID]
-		now         func() time.Time
-		configBytes []byte
+		genesis    core.Genesis
+		nodeID     ids.NodeID
+		networkID  uint32
+		validators set.Set[ids.NodeID]
+		now        func() time.Time
+		config     Config
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -139,13 +140,10 @@ func withGenesisAllocFor(addrs ...common.Address) sutOption {
 	})
 }
 
-// withDesiredMinGasPriceWei configures the SUT's ACP-283 vote.
-func withDesiredMinGasPriceWei(t *testing.T, wei uint64) sutOption {
-	t.Helper()
-	bytes, err := json.Marshal(Config{DesiredMinGasPriceWei: &wei})
-	require.NoErrorf(t, err, "marshal Config")
+// withPriceTarget sets [Config.PriceTarget] on the SUT.
+func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.configBytes = bytes
+		c.config.PriceTarget = &p
 	})
 }
 
@@ -195,6 +193,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
+	configBytes, err := json.Marshal(cfg.config)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.config)
+
 	appSender := saetest.NewSender(tb, cfg.validators)
 
 	ctx := log.CancelOnError(tb.Context())
@@ -204,7 +205,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		chainDB,
 		genesisBytes,
 		nil, // upgradeBytes
-		cfg.configBytes,
+		configBytes,
 		nil, // fxs
 		appSender,
 	), "%T.Initialize()", vm)
@@ -1010,7 +1011,7 @@ func TestRampMinPriceExponent(t *testing.T) {
 	sk := txtest.NewKey(t)
 	ctx, sut := newSUT(t,
 		withGenesisAllocFor(sk.EthAddress()),
-		withDesiredMinGasPriceWei(t, 1_000_000_000), // 1 nAVAX target.
+		withPriceTarget(1_000_000_000), // 1 nAVAX target.
 	)
 	w := newWallet(sk, sut.ctx, sut.Client)
 

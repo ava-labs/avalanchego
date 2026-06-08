@@ -21,6 +21,7 @@ go_library(
     name = "cchain",
     srcs = [
         "api.go",
+        "config.go",
         "genesis.go",
         "gossip.go",
         "hooks.go",
@@ -96,6 +97,7 @@ go_test(
     name = "cchain_test",
     srcs = [
         "api_test.go",
+        "config_test.go",
         "genesis_test.go",
         "gossip_test.go",
         "hooks_test.go",
