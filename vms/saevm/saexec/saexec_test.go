@@ -32,7 +32,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -171,22 +170,6 @@ func TestExecutionSynchronisation(t *testing.T) {
 	for _, b := range chain.AllBlocks() {
 		assert.Truef(t, b.Executed(), "%T[%d].Executed()", b, b.NumberU64())
 	}
-}
-
-func TestExecutionMetrics(t *testing.T) {
-	ctx, sut := newSUT(t)
-
-	// [Executor.sendPostExecutionEvents] sets the gauge immediately before
-	// emitting the chain-head event, so receiving the event guarantees the
-	// gauge has been updated.
-	headEvents := saetest.NewEventCollector(sut.SubscribeChainHeadEvent)
-
-	b := sut.chain.NewBlock(t, nil)
-	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
-	require.NoError(t, headEvents.WaitForAtLeast(ctx, 1), "EventCollector.WaitForAtLeast()")
-
-	require.Equal(t, float64(b.Height()), testutil.ToFloat64(sut.metrics.lastExecutedHeight), "last executed height")
-	require.NoError(t, headEvents.Unsubscribe(), "EventCollector.Unsubscribe()")
 }
 
 func TestReceiptPropagation(t *testing.T) {

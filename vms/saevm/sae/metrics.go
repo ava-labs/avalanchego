@@ -5,10 +5,6 @@ package sae
 
 import "github.com/prometheus/client_golang/prometheus"
 
-// lastSettledHeightName names the gauge for the height of the last settled
-// block.
-const lastSettledHeightName = "last_settled_height"
-
 type metrics struct {
 	lastSettledHeight prometheus.Gauge
 }
@@ -16,7 +12,7 @@ type metrics struct {
 func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 	m := &metrics{
 		lastSettledHeight: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: lastSettledHeightName,
+			Name: "last_settled_height",
 			Help: "Height of the latest block that has settled.",
 		}),
 	}

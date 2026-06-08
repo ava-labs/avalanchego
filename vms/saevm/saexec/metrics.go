@@ -5,10 +5,6 @@ package saexec
 
 import "github.com/prometheus/client_golang/prometheus"
 
-// lastExecutedHeightName names the gauge for the height of the last block
-// that completed async execution.
-const lastExecutedHeightName = "last_executed_height"
-
 type metrics struct {
 	lastExecutedHeight prometheus.Gauge
 }
@@ -16,7 +12,7 @@ type metrics struct {
 func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 	m := &metrics{
 		lastExecutedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: lastExecutedHeightName,
+			Name: "last_executed_height",
 			Help: "Height of the latest block that completed async execution.",
 		}),
 	}
