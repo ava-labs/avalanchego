@@ -4417,7 +4417,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 
 	const weight = 1
 
-	// Use a single address to avoid needing sorted owner addresses.
+	// Use a single address to avoid needing sorted owner addresses. (focusing on testing the new transaction) (sorted owners is tested in TestCreateL1TxSyntacticVerify)
 	ownerAddrs := []ids.ShortID{testAddresses[0]}
 	validator := &txs.ConvertSubnetToL1Validator{
 		NodeID:  nodeID.Bytes(),

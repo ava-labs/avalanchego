@@ -871,7 +871,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 		// Start the genesis validator node without subnet tracking since
 		// the subnetID (= CreateL1Tx txID) is not known until after issuance.
-		tc.By("creating the genesis validator node")
+		tc.By("creating the genesis validator")
 		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
 
 		genesisNodePoP, err := subnetGenesisNode.GetProofOfPossession()

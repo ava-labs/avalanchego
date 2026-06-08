@@ -469,7 +469,7 @@ func (i *inputOutputGetter) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 	return nil
 }
 
-// Had to create a new function: 1. in case we remove ConvertSubnetToL1Tx. 2. because ConvertSubnetToL1Tx takes in an instance of *txs.ConvertSubnetToL1Tx
+// This function is to accommodate the new CreateL1Tx type.
 
 func (i *inputOutputGetter) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	i.getUTXOs(tx.BaseTx)

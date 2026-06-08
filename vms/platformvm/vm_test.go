@@ -873,7 +873,7 @@ func TestCreateL1Chain(t *testing.T) {
 	require.NoError(err)
 	require.Contains(subnetIDs, subnetID)
 
-	// Verify the chain was stored as a CreateL1Tx with the right fields
+	// Verify the chain was stored as a CreateL1Tx
 	chains, err := vm.state.GetChains(subnetID)
 	require.NoError(err)
 	require.Len(chains, 1)
