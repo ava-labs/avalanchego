@@ -17,7 +17,7 @@ func TestParseConfig(t *testing.T) {
 		name    string
 		in      []byte
 		want    Config
-		wantErr bool
+		wantErr error
 	}{
 		{
 			name: "empty_input",
@@ -37,17 +37,16 @@ func TestParseConfig(t *testing.T) {
 		{
 			name:    "invalid_json",
 			in:      []byte(`{not json`),
-			wantErr: true,
+			wantErr: errInvalidConfig,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseConfig(tt.in)
-			if tt.wantErr {
-				require.Error(t, err)
+			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantErr != nil {
 				return
 			}
-			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
 	}

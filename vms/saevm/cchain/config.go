@@ -5,10 +5,13 @@ package cchain
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
+
+var errInvalidConfig = errors.New("invalid config")
 
 // Config is the JSON configuration for the cchain VM.
 type Config struct {
@@ -27,7 +30,7 @@ func ParseConfig(b []byte) (Config, error) {
 		return c, nil
 	}
 	if err := json.Unmarshal(b, &c); err != nil {
-		return Config{}, fmt.Errorf("unmarshalling %T: %w", c, err)
+		return Config{}, fmt.Errorf("%w: %w", errInvalidConfig, err)
 	}
 	return c, nil
 }
