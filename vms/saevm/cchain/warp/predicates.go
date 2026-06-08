@@ -20,52 +20,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
-// PredicateBytes returns the marshalled predicate results of a block of
-// transactions.
-func PredicateBytes(
-	snowContext *snow.Context,
-	blockContext *block.Context, // MAY be nil
-	rules *extras.Rules,
-	txs []*types.Transaction,
-) ([]byte, error) {
-	results, err := verifyBlock(snowContext, blockContext, rules, txs)
-	if err != nil {
-		return nil, err
-	}
-	return results.Bytes()
-}
-
-type (
-	// lazy is a value computed on demand, when the returned function is called.
-	lazy[T any] = func() T
-	// lazyEntry is a key paired with a lazily-computed value.
-	lazyEntry[K comparable, V any] struct {
-		key   K
-		value lazy[V]
-	}
-)
-
-// collect resolves each entry's lazy value into a map. It returns nil if there
-// are no entries.
-func collect[K comparable, V any](entries []lazyEntry[K, V]) map[K]V {
-	if len(entries) == 0 {
-		return nil
-	}
-	m := make(map[K]V, len(entries))
-	for _, e := range entries {
-		m[e.key] = e.value()
-	}
-	return m
-}
-
 var errNoBlockContext = errors.New("no block context")
 
-// verifyBlock verifies the predicates of every transaction in the block.
+// VerifyBlock verifies the predicates of every transaction in the block.
 //
 // Every predicate is verified in its own goroutine on a single pool shared by
 // all transactions in the block, bounding the number of concurrent
 // verifications to the number of available CPUs.
-func verifyBlock(
+func VerifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
 	rules *extras.Rules,
@@ -102,6 +64,29 @@ func verifyBlock(
 		return nil, fmt.Errorf("waiting for results: %w", err)
 	}
 	return collect(results), nil
+}
+
+type (
+	// lazy is a value computed on demand, when the returned function is called.
+	lazy[T any] = func() T
+	// lazyEntry is a key paired with a lazily-computed value.
+	lazyEntry[K comparable, V any] struct {
+		key   K
+		value lazy[V]
+	}
+)
+
+// collect resolves each entry's lazy value into a map. It returns nil if there
+// are no entries.
+func collect[K comparable, V any](entries []lazyEntry[K, V]) map[K]V {
+	if len(entries) == 0 {
+		return nil
+	}
+	m := make(map[K]V, len(entries))
+	for _, e := range entries {
+		m[e.key] = e.value()
+	}
+	return m
 }
 
 // verifyTx enqueues the verification of a transaction's predicates onto eg.

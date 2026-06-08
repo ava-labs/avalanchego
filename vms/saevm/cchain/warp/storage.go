@@ -9,15 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-)
-
-var (
-	dbPrefix = []byte("warp")
-
-	_ precompileconfig.WarpMessageWriter = (*Storage)(nil)
 )
 
 // Storage persists and fetches warp messages.
@@ -28,34 +21,42 @@ type Storage struct {
 }
 
 // NewStorage creates a new Storage backed by the provided database.
-//
-// It allows providing additional messages that will be returned by GetMessage
-// but are not persisted in the database.
 func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 	overrides := make(map[ids.ID]*warp.UnsignedMessage, len(msgs))
 	for _, m := range msgs {
 		overrides[m.ID()] = m
 	}
-	const cacheSize = 500
+	const (
+		dbPrefix  = "warp"
+		cacheSize = 500
+	)
 	return &Storage{
-		db:        prefixdb.New(dbPrefix, db),
+		db:        prefixdb.New([]byte(dbPrefix), db),
 		cache:     lru.NewCache[ids.ID, *warp.UnsignedMessage](cacheSize),
 		overrides: overrides,
 	}
 }
 
-// AddMessage adds the provided message to storage.
-func (b *Storage) AddMessage(m *warp.UnsignedMessage) error {
-	id := m.ID()
-	if err := b.db.Put(id[:], m.Bytes()); err != nil {
-		return fmt.Errorf("writing message: %w", err)
+func (b *Storage) Add(ms ...*warp.UnsignedMessage) error {
+	batch := b.db.NewBatch()
+	for i, m := range ms {
+		id := m.ID()
+		if err := batch.Put(id[:], m.Bytes()); err != nil {
+			return fmt.Errorf("writing message %s (%d) to batch: %w", id, i, err)
+		}
 	}
-	b.cache.Put(id, m)
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("committing batch: %w", err)
+	}
+
+	// Cache after the DB write has succeeded to ensure the cache is consistent.
+	for _, m := range ms {
+		b.cache.Put(m.ID(), m)
+	}
 	return nil
 }
 
-// GetMessage returns the message with the given ID.
-func (b *Storage) GetMessage(id ids.ID) (*warp.UnsignedMessage, error) {
+func (b *Storage) Get(id ids.ID) (*warp.UnsignedMessage, error) {
 	if m, ok := b.cache.Get(id); ok {
 		return m, nil
 	}

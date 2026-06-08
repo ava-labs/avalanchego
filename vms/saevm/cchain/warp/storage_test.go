@@ -79,17 +79,17 @@ func TestStorage(t *testing.T) {
 			db := memdb.New()
 			s := NewStorage(db, test.overrides...)
 			for _, msg := range test.add {
-				require.NoError(t, s.AddMessage(msg))
+				require.NoError(t, s.Add(msg))
 			}
 
 			// Verify the message is fetchable.
-			msg, err := s.GetMessage(test.id)
+			msg, err := s.Get(test.id)
 			require.ErrorIs(t, err, test.wantErr)
 			require.Equal(t, test.want, msg)
 
 			// Verify the message was persisted.
 			s = NewStorage(db, test.overrides...)
-			msg, err = s.GetMessage(test.id)
+			msg, err = s.Get(test.id)
 			require.ErrorIs(t, err, test.wantErr)
 			require.Equal(t, test.want, msg)
 		})

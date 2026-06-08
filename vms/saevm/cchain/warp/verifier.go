@@ -49,7 +49,7 @@ func NewVerifier(backend Backend, storage *Storage) *Verifier {
 // Verify verifies that this node should sign m.
 func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte) *common.AppError {
 	id := m.ID()
-	_, err := v.storage.GetMessage(id)
+	_, err := v.storage.Get(id)
 	if err == nil {
 		return nil
 	}

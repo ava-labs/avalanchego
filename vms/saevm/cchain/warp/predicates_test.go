@@ -236,7 +236,7 @@ func TestBlockPredicates(t *testing.T) {
 				snowContext = snowtest.Context(t, snowtest.CChainID)
 				rules       = newRules(test.contracts...)
 			)
-			actual, err := verifyBlock(snowContext, test.blockContext, rules, test.txs)
+			actual, err := VerifyBlock(snowContext, test.blockContext, rules, test.txs)
 			require.ErrorIs(t, err, test.expectedErr)
 			require.Equal(t, test.expected, actual)
 		})
@@ -399,13 +399,13 @@ func BenchmarkBlockPredicates(b *testing.B) {
 
 				// Confirm the predicates verify before timing, so the benchmark
 				// measures the success path rather than an early failure.
-				results, err := verifyBlock(snowContext, blockContext, rules, txs)
+				results, err := VerifyBlock(snowContext, blockContext, rules, txs)
 				require.NoError(b, err)
 				require.Len(b, results, numTxs)
 				require.Equal(b, set.NewBits(), results[txs[0].Hash()][addr])
 
 				for b.Loop() {
-					_, _ = verifyBlock(snowContext, blockContext, rules, txs)
+					_, _ = VerifyBlock(snowContext, blockContext, rules, txs)
 				}
 			})
 		}
