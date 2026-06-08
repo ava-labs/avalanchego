@@ -90,6 +90,14 @@ func (a *accountTrie) hash() (common.Hash, error) {
 		a.reader = proposal.p
 		a.root = proposal.root
 	case a.pending != nil:
+		// Close all previous relics of revisions.
+		if err := a.reader.Drop(); err != nil {
+			a.fw.log.Warn("dropping previous trie reader", zap.Error(err))
+		}
+		if err := a.pending.p.Drop(); err != nil {
+			a.fw.log.Warn("dropping previous trie proposal", zap.Error(err))
+		}
+		a.pending = nil
 		// All changes in a previous proposal were reverted, so we can create a new reader from the parent root.
 		reader, err := a.fw.Firewood.Revision(ffi.Hash(a.parentRoot))
 		if err != nil {

@@ -24,9 +24,9 @@ All proposals are either explicitly freed (via `Drop`) or committed. Proposals a
 - `TrieDB.Close`: all pending and committable proposals are dropped before the database is closed.
 - `TrieDB.Commit`: proposals are committed in ancestor-first order; if any commit fails, the remaining proposals are dropped rather than leaked.
 - `TrieDB.trieHash`: immediately dropped when a proposal produces no state change (root is unchanged).
-- `accountTrie.hash`: the previous reader is dropped when a new proposal replaces it.
+- `accountTrie.hash`: the previous reader is dropped when a new proposal replaces it. Or, similarly, when all changes from a proposal are reverted.
 
-However, the `state.Trie` implementation does not have a `Close` method or anything similar, so any proposal or revision remaining within a trie can only be garbage collected. Because the account trie is only ever created by the `state.StateDB`, one must only allow these objects to be garbage collected prior to calling `TrieDB.Close()`.
+Revisions are freed when possible (e.g. in `accountTrie.hash` when unused), but in general, they will be freeed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Any proposal or revision remaining within a trie can only be garbage collected. The account trie is only ever created by the `state.StateDB`, so one must allow these objects to be garbage collected prior to calling `TrieDB.Close()`.
 
 ## Operation Model
 
