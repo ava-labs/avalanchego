@@ -40,6 +40,7 @@ var (
 	ErrInvalidID                     = errors.New("invalid ID")
 	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
+	ErrUnimplemented                 = errors.New("unimplemented")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -144,6 +145,14 @@ func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1Validator
 }
 
 func (*proposalTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
 	return ErrWrongTxType
 }
 
@@ -383,16 +392,26 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 
 		// Handle staker lifecycle.
-		e.onCommitState.DeleteCurrentValidator(stakerToReward)
-		e.onAbortState.DeleteCurrentValidator(stakerToReward)
+		if err := e.onCommitState.DeleteCurrentValidator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current validator from commit state: %w", err)
+		}
+
+		if err := e.onAbortState.DeleteCurrentValidator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current validator from abort state: %w", err)
+		}
 	case txs.DelegatorTx:
 		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
 
 		// Handle staker lifecycle.
-		e.onCommitState.DeleteCurrentDelegator(stakerToReward)
-		e.onAbortState.DeleteCurrentDelegator(stakerToReward)
+		if err := e.onCommitState.DeleteCurrentDelegator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current delegator from commit state: %w", err)
+		}
+
+		if err := e.onAbortState.DeleteCurrentDelegator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current delegator from abort state: %w", err)
+		}
 	default:
 		// Invariant: Permissioned stakers are removed by the advancement of
 		//            time and the current chain timestamp is == this staker's
@@ -412,6 +431,10 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 	return nil
+}
+
+func (*proposalTxExecutor) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	return ErrUnimplemented
 }
 
 func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {

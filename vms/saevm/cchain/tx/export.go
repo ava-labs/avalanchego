@@ -87,13 +87,13 @@ func AccountInputID(address common.Address, nonce uint64) ids.ID {
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
 // practice and allows for easier fuzzing.
-func (e *Export) burned(assetID ids.ID) (uint64, error) {
+func (e *Export) burned(avaxAssetID ids.ID) (nAVAX, error) {
 	var (
-		burned uint64
+		burned nAVAX
 		err    error
 	)
 	for _, in := range e.Ins {
-		if in.AssetID == assetID {
+		if in.AssetID == avaxAssetID {
 			burned, err = math.Add(burned, in.Amount)
 			if err != nil {
 				return 0, err
@@ -101,7 +101,7 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 		}
 	}
 	for _, out := range e.ExportedOutputs {
-		if out.Asset.ID == assetID {
+		if out.Asset.ID == avaxAssetID {
 			burned, err = math.Sub(burned, out.Out.Amount())
 			if err != nil {
 				return 0, err
@@ -215,7 +215,7 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 
 		// Even if no AVAX is debited, non-AVAX inputs MUST increment the nonce.
 		if in.AssetID == avaxAssetID {
-			amount := scaleAVAX(in.Amount)
+			amount := ScaleAVAX(in.Amount)
 			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &amount); overflow {
 				return op{}, fmt.Errorf("%w: for address %s", errOverflow, in.Address)
 			}
@@ -242,7 +242,7 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := c.Marshal(codecVersion, utxo)
+		utxoBytes, err := MarshalUTXO(utxo)
 		if err != nil {
 			return ids.ID{}, nil, err
 		}
