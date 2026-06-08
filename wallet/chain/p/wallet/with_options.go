@@ -309,7 +309,7 @@ func (w *withOptions) IssueAddAutoRenewedValidatorTx(
 	validatorAuthority *secp256k1fx.OutputOwners,
 	delegationShares uint32,
 	autoCompoundRewardShares uint32,
-	periodSeconds uint64,
+	period time.Duration,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	return w.wallet.IssueAddAutoRenewedValidatorTx(
@@ -321,7 +321,7 @@ func (w *withOptions) IssueAddAutoRenewedValidatorTx(
 		validatorAuthority,
 		delegationShares,
 		autoCompoundRewardShares,
-		periodSeconds,
+		period,
 		common.UnionOptions(w.options, options)...,
 	)
 }
@@ -329,13 +329,13 @@ func (w *withOptions) IssueAddAutoRenewedValidatorTx(
 func (w *withOptions) IssueSetAutoRenewedValidatorConfigTx(
 	txID ids.ID,
 	autoCompoundRewardShares uint32,
-	periodSeconds uint64,
+	period time.Duration,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	return w.wallet.IssueSetAutoRenewedValidatorConfigTx(
 		txID,
 		autoCompoundRewardShares,
-		periodSeconds,
+		period,
 		common.UnionOptions(w.options, options)...,
 	)
 }

@@ -339,7 +339,7 @@ type Builder interface {
 	//   validator will take from delegation rewards.
 	// - autoCompoundRewardShares specifies the fraction (out of 1,000,000) of
 	//   rewards to automatically restake at the end of each period.
-	// - periodSeconds is the duration of each validation cycle, in seconds.
+	// - period is the duration of each validation cycle.
 	NewAddAutoRenewedValidatorTx(
 		validatorNodeID ids.NodeID,
 		weight uint64,
@@ -349,7 +349,7 @@ type Builder interface {
 		validatorAuthority *secp256k1fx.OutputOwners,
 		delegationShares uint32,
 		autoCompoundRewardShares uint32,
-		periodSeconds uint64,
+		period time.Duration,
 		options ...common.Option,
 	) (*txs.AddAutoRenewedValidatorTx, error)
 
@@ -359,12 +359,12 @@ type Builder interface {
 	// - txID is the transaction ID of the auto-renewed validator to modify.
 	// - autoCompoundRewardShares specifies the new fraction (out of 1,000,000) of
 	//   rewards to automatically restake.
-	// - periodSeconds is the new duration of each validation cycle, in seconds. Set to
-	//   0 to trigger a graceful exit at the end of the current period.
+	// - period is the new duration of each validation cycle. Set to 0 to
+	//   trigger a graceful exit at the end of the current period.
 	NewSetAutoRenewedValidatorConfigTx(
 		txID ids.ID,
 		autoCompoundRewardShares uint32,
-		periodSeconds uint64,
+		period time.Duration,
 		options ...common.Option,
 	) (*txs.SetAutoRenewedValidatorConfigTx, error)
 }
@@ -1550,7 +1550,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 	validatorAuthority *secp256k1fx.OutputOwners,
 	delegationShares uint32,
 	autoCompoundRewardShares uint32,
-	periodSeconds uint64,
+	period time.Duration,
 	options ...common.Option,
 ) (*txs.AddAutoRenewedValidatorTx, error) {
 	toBurn := map[ids.ID]uint64{}
@@ -1624,7 +1624,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 		ValidatorAuthority:       validatorAuthority,
 		DelegationShares:         delegationShares,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
-		Period:                   periodSeconds,
+		Period:                   uint64(period / time.Second),
 	}
 
 	return tx, b.initCtx(tx)
@@ -1633,7 +1633,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 func (b *builder) NewSetAutoRenewedValidatorConfigTx(
 	txID ids.ID,
 	autoCompoundRewardShares uint32,
-	periodSeconds uint64,
+	period time.Duration,
 	options ...common.Option,
 ) (*txs.SetAutoRenewedValidatorConfigTx, error) {
 	toBurn := map[ids.ID]uint64{}
@@ -1688,7 +1688,7 @@ func (b *builder) NewSetAutoRenewedValidatorConfigTx(
 		TxID:                     txID,
 		Auth:                     auth,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
-		Period:                   periodSeconds,
+		Period:                   uint64(period / time.Second),
 	}
 	return tx, b.initCtx(tx)
 }

@@ -903,7 +903,7 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		delegationShares       uint32 = reward.PercentDenominator
 		autoCompoundShares     uint32 = 500_000
 		weight                        = 2 * units.Avax
-		periodSeconds          uint64 = 7 * 24 * 60 * 60
+		period                        = 7 * 24 * time.Hour
 
 		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
@@ -927,7 +927,7 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		validatorAuthority,
 		delegationShares,
 		autoCompoundShares,
-		periodSeconds,
+		period,
 	)
 	require.NoError(err)
 	require.Len(gotTx.StakeOuts, 1)
@@ -965,7 +965,7 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 		ValidatorAuthority:       validatorAuthority,
 		DelegationShares:         delegationShares,
 		AutoCompoundRewardShares: autoCompoundShares,
-		Period:                   periodSeconds,
+		Period:                   uint64(period / time.Second),
 	}
 	require.Equal(wantTx, gotTx)
 }
@@ -974,7 +974,7 @@ func TestSetAutoRenewedValidatorConfigTx(t *testing.T) {
 	var (
 		require                   = require.New(t)
 		autoCompoundShares uint32 = 750_000
-		periodSeconds      uint64 = 14 * 24 * 60 * 60
+		period                    = 14 * 24 * time.Hour
 
 		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
@@ -986,7 +986,7 @@ func TestSetAutoRenewedValidatorConfigTx(t *testing.T) {
 	gotTx, err := builder.NewSetAutoRenewedValidatorConfigTx(
 		validationID,
 		autoCompoundShares,
-		periodSeconds,
+		period,
 	)
 	require.NoError(err)
 	requireFeeIsCorrect(
@@ -1013,7 +1013,7 @@ func TestSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			SigIndices: []uint32{0},
 		},
 		AutoCompoundRewardShares: autoCompoundShares,
-		Period:                   periodSeconds,
+		Period:                   uint64(period / time.Second),
 	}
 	require.Equal(wantTx, gotTx)
 }

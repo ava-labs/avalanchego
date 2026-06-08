@@ -327,7 +327,7 @@ type Wallet interface {
 	//   validator will take from delegation rewards.
 	// - autoCompoundRewardShares specifies the fraction (out of 1,000,000)
 	//   of rewards to automatically restake at the end of each period.
-	// - periodSeconds is the duration of each validation cycle, in seconds.
+	// - period is the duration of each validation cycle.
 	IssueAddAutoRenewedValidatorTx(
 		validatorNodeID ids.NodeID,
 		weight uint64,
@@ -337,7 +337,7 @@ type Wallet interface {
 		validatorAuthority *secp256k1fx.OutputOwners,
 		delegationShares uint32,
 		autoCompoundRewardShares uint32,
-		periodSeconds uint64,
+		period time.Duration,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
@@ -349,12 +349,12 @@ type Wallet interface {
 	//   created the validator to modify.
 	// - autoCompoundRewardShares specifies the new fraction (out of
 	//   1,000,000) of rewards to automatically restake.
-	// - periodSeconds is the new duration of each validation cycle, in seconds. Set to
-	//   0 to trigger a graceful exit at the end of the current period.
+	// - period is the new duration of each validation cycle. Set to 0 to
+	//   trigger a graceful exit at the end of the current period.
 	IssueSetAutoRenewedValidatorConfigTx(
 		txID ids.ID,
 		autoCompoundRewardShares uint32,
-		periodSeconds uint64,
+		period time.Duration,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
@@ -664,7 +664,7 @@ func (w *wallet) IssueAddAutoRenewedValidatorTx(
 	validatorAuthority *secp256k1fx.OutputOwners,
 	delegationShares uint32,
 	autoCompoundRewardShares uint32,
-	periodSeconds uint64,
+	period time.Duration,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewAddAutoRenewedValidatorTx(
@@ -676,7 +676,7 @@ func (w *wallet) IssueAddAutoRenewedValidatorTx(
 		validatorAuthority,
 		delegationShares,
 		autoCompoundRewardShares,
-		periodSeconds,
+		period,
 		options...,
 	)
 	if err != nil {
@@ -688,13 +688,13 @@ func (w *wallet) IssueAddAutoRenewedValidatorTx(
 func (w *wallet) IssueSetAutoRenewedValidatorConfigTx(
 	txID ids.ID,
 	autoCompoundRewardShares uint32,
-	periodSeconds uint64,
+	period time.Duration,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewSetAutoRenewedValidatorConfigTx(
 		txID,
 		autoCompoundRewardShares,
-		periodSeconds,
+		period,
 		options...,
 	)
 	if err != nil {
