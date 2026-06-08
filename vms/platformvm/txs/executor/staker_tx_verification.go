@@ -1012,10 +1012,15 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return validator, nil
 	}
 
+	validatorRules, err := getValidatorRules(backend, chainState, autoRenewedStakerTx.SubnetID())
+	if err != nil {
+		return nil, fmt.Errorf("error getting validator rules: %w", err)
+	}
+
 	switch {
-	case tx.Period > 0 && tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
+	case tx.Period > 0 && tx.Period < uint64(validatorRules.minStakeDuration/time.Second):
 		return nil, ErrStakeTooShort
-	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
+	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
 		return nil, ErrStakeTooLong
 	}
 
@@ -1094,7 +1099,7 @@ func verifySpend(
 	return nil
 }
 
-func verifyRewardTx(chainState state.Chain, sTx *txs.Tx, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
+func verifyRewardTxAndGetStaker(chainState state.Chain, sTx *txs.Tx, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
 	if len(sTx.Creds) != 0 {
 		return nil, nil, errWrongNumberOfCredentials
 	}
