@@ -1,13 +1,14 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Implements ACP-226's dynamic minimum block delay, specified here:
-// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 package dynamic
 
 import "github.com/ava-labs/avalanchego/vms/components/gas"
 
 // DelayExponent encodes the minimum block delay.
+//
+// Implements ACP-226, specified here:
+// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 type DelayExponent uint64
 
 // Delay returns the minimum block delay in milliseconds.

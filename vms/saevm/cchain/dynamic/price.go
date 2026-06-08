@@ -1,8 +1,6 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Implements ACP-283's dynamic minimum gas price, specified here:
-// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md
 package dynamic
 
 import (
@@ -12,6 +10,9 @@ import (
 )
 
 // PriceExponent encodes the minimum gas price.
+//
+// Implements ACP-283, specified here:
+// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md
 type PriceExponent uint64
 
 // InitialPriceExponent is the C-chain's initial price exponent. The minimum

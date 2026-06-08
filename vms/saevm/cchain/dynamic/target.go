@@ -1,13 +1,14 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Implements ACP-176's dynamic gas target, specified here:
-// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
 package dynamic
 
 import "github.com/ava-labs/avalanchego/vms/components/gas"
 
 // TargetExponent encodes the target gas per second.
+//
+// Implements ACP-176, specified here:
+// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
 type TargetExponent uint64
 
 // Target returns the target gas per second.

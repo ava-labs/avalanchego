@@ -5,6 +5,7 @@ go_library(
     name = "dynamic",
     srcs = [
         "delay.go",
+        "doc.go",
         "math.go",
         "price.go",
         "target.go",
