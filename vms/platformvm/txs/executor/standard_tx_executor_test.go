@@ -4394,7 +4394,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		configOwner,
 		100_000,
 		200_000,
-		uint64(continuationPeriod/time.Second),
+		continuationPeriod,
 	)
 	require.NoError(t, err)
 
@@ -4566,7 +4566,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 				&secp256k1fx.OutputOwners{},
 				500_000,
 				300_000,
-				uint64(env.config.MinStakeDuration/time.Second),
+				env.config.MinStakeDuration,
 			)
 			require.NoError(t, got)
 
@@ -4596,13 +4596,13 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 	tests := []struct {
 		name                        string
-		newPeriod                   uint64
+		newPeriod                   time.Duration
 		newAutoCompoundRewardShares uint32
 	}{
 		{
 			name:                        "updated period and auto-compound reward shares",
 			newAutoCompoundRewardShares: uint32(300_000),
-			newPeriod:                   30 * 24 * 60 * 60,
+			newPeriod:                   30 * 24 * time.Hour,
 		},
 		{
 			name:                        "period 0 (exit requested)",
@@ -4636,7 +4636,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 				&secp256k1fx.OutputOwners{},
 				500_000,
 				300_000,
-				uint64((2*env.config.MinStakeDuration)/time.Second),
+				2*env.config.MinStakeDuration,
 			)
 			require.NoError(t, err)
 			env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
@@ -4728,7 +4728,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 			wantStakingInfo := initialStakingInfo
 			wantStakingInfo.AutoCompoundRewardShares = tt.newAutoCompoundRewardShares
-			wantStakingInfo.NextPeriod = tt.newPeriod
+			wantStakingInfo.NextPeriod = uint64(tt.newPeriod.Seconds())
 			require.Equal(t, wantStakingInfo, stakingInfo)
 
 			inputIDs := setAutoRenewedValidatorConfigTx.InputIDs()
@@ -4780,7 +4780,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		&secp256k1fx.OutputOwners{},
 		0,
 		0,
-		uint64(env.config.MinStakeDuration/time.Second),
+		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
 	env.state.AddTx(addPastContValidatorTx, status.Committed)
@@ -4794,7 +4794,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()}},
 		500_000,
 		300_000,
-		uint64((2*env.config.MinStakeDuration)/time.Second),
+		2*env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
 	env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
