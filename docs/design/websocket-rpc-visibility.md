@@ -381,7 +381,7 @@ hits in the PR.
 | Concern            | Location                                                                                | Mechanism                                                                                                                                           |
 | ------------------ | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | active / opened    | `trackCodec` (`server.go:138`)                                                          | inc `connections_active` + `connections_opened_total` on successful track                                                                           |
-| closed / duration  | `untrackCodec` (`server.go:149`)                                                        | dec `connections_active`, inc `connections_closed_total{reason}`, observe duration                                                                  |
+| closed / duration  | `untrackCodec` (`server.go:149`)                                                        | dec `connections_active`, inc `connections_closed_total{reason}`, observe duration; read the per-connection byte totals for the close log           |
 | bytes / messages   | codec read & write paths (`websocket.go:346`)                                           | inc `rpc_ws_{bytes,messages}_total{direction}` after `ReadJSON` / write                                                                             |
 | subscription open  | `addSubscriptions` (`handler.go:390`)                                                   | on non-nil `takeSubscription()` (actually registered), inc `subscriptions_active`+`subscriptions_opened_total{subscription}`                        |
 | subscription close | `unsubscribe` (`handler.go:677`) **and** `cancelServerSubscriptions` (`handler.go:402`) | dec `subscriptions_active`, inc `subscriptions_closed_total{subscription}` on both explicit-unsubscribe and connection-teardown paths               |
@@ -389,10 +389,16 @@ hits in the PR.
 | requests           | request dispatch (`handler.go:619-623`)                                                 | inc `rpc_requests_total{status,transport}`, observe `rpc_request_duration_seconds{...}`; for WS codecs also bump the per-connection request counter |
 | throttled          | `awaitLimit` (`handler.go:421`)                                                         | inc `rpc_ws_throttled_total` when the reservation `delay` is non-zero                                                                               |
 
-Per-connection counts (requests handled, subscriptions opened) are
-accumulated on a small per-connection counter held alongside the codec
-and observed once into their histograms in `untrackCodec`, so the hot
-path only does cheap atomic increments.
+Per-connection counts (requests handled, subscriptions opened, and
+bytes read / written) are accumulated on a small per-connection counter
+held alongside the codec, so the hot path only does cheap atomic
+increments. In `untrackCodec` the request/subscription counts are
+observed once into their histograms, and the byte totals are read back
+out to populate the `read_bytes` / `write_bytes` fields of the
+connection-closed log (see Logging). The byte increments are the same
+ones that feed `rpc_ws_bytes_total{direction}`; holding a per-connection
+copy is what lets the close log report each connection's totals (which
+the aggregate counter cannot attribute to a single IP).
 
 To measure lifetime, record a start timestamp when the codec is
 tracked. Two options:
@@ -434,7 +440,7 @@ to). Today neither event is logged usefully:
 | Event                          | Current state                                                                                                                                                                    | Desired                                                                 |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | WS connection opened (success) | **No log.** Only `log.Debug("WebSocket upgrade failed")` (`websocket.go:75`) on failure and `log.Warn("Rejected WebSocket connection")` (`websocket.go:120`) on origin rejection | `log.Info` with remote address, origin, user-agent                      |
-| WS connection closed           | No log                                                                                                                                                                           | `log.Info` with remote address, connection duration, and close `reason` |
+| WS connection closed           | No log                                                                                                                                                                           | `log.Info` with remote address, connection duration, close `reason`, and per-connection bytes read / written |
 | Subscription created           | **No dedicated log.** `eth_subscribe` only appears in the generic `log.Debug("Served "+msg.Method)` (`handler.go:582`), at `Info` only on error (`handler.go:580`)               | `log.Info` with subscription kind, ID, remote address                   |
 | Subscription cancelled         | No log                                                                                                                                                                           | `log.Debug` with subscription kind and ID                               |
 
@@ -448,8 +454,19 @@ Changes:
   `PeerInfo.HTTP` struct, `server.go:231-239`).
 - **Connection close:** add `log.Info("WebSocket connection closed", ...)`
   in `untrackCodec` (`server.go:149`), with remote address, the
-  lifetime computed for `rpc_ws_connection_duration_seconds`, and the
-  close `reason` (see Close-reason categorization).
+  lifetime computed for `rpc_ws_connection_duration_seconds`, the
+  close `reason` (see Close-reason categorization), and the
+  per-connection bytes read from / written to this connection over its
+  lifetime. The byte totals are emitted as discrete structured fields
+  (`read_bytes` / `write_bytes`) rather than baked into the message
+  string, alongside `RemoteAddr`, so an external consumer can parse and
+  **aggregate them by client IP**: offline log tooling (Loki, ELK, `jq`)
+  or a Grafana panel backed by Loki can `sum by (remote_addr)` over the
+  parsed fields to attribute bandwidth per client, with no Prometheus
+  cardinality cost. These are the same per-connection counts already
+  accumulated for `rpc_ws_bytes_total` (see below); the close log simply
+  also retains and reports the per-connection totals, which the
+  aggregate counter cannot break down by IP.
 - **Subscription created:** add a dedicated `log.Info("Subscription
   opened", "subscription", kind, "id", id, ...)` in `addSubscriptions`
   (`handler.go:390`), where `takeSubscription()` returns non-nil (i.e.
@@ -576,12 +593,14 @@ throttle work that would consume them (see Future Work).
 
 **Per-client analysis via logs.** These INFO logs are deliberately the
 per-client dimension that the metrics intentionally omit. Because each
-connection-open record carries `RemoteAddr`/`Origin`/`UserAgent` and
-each subscription record carries the client address and subscription
-kind, offline log aggregation (Loki, ELK, `jq` over rotated logs) can
-answer per-IP / per-client questions (top connecting IPs, repeat
-reconnect offenders, who subscribed to a given stream) without adding
-unbounded label cardinality to Prometheus. One INFO line per connect /
+connection-open record carries `RemoteAddr`/`Origin`/`UserAgent`, each
+connection-close record carries `RemoteAddr` plus the per-connection
+`read_bytes`/`write_bytes` totals, and each subscription record carries
+the client address and subscription kind, offline log aggregation (Loki,
+ELK, `jq` over rotated logs) can answer per-IP / per-client questions
+(top connecting IPs, repeat reconnect offenders, **bytes consumed per
+client IP**, who subscribed to a given stream) without adding unbounded
+label cardinality to Prometheus. One INFO line per connect /
 subscribe keeps the volume bounded by connection churn, not by request
 or notification rate.
 
@@ -678,7 +697,10 @@ top and are independently shippable.
 2. Wrap the encode/decode funcs in `newWebsocketCodec` to count bytes and
    messages; bump the per-connection request counter in
    `handler.handleCallMsg` (`handler.go:553`); accumulate per-connection
-   counts and observe them in `untrackCodec`.
+   request/subscription counts and observe their histograms in
+   `untrackCodec`. (Per-connection byte *retention* and the
+   connection-closed log move to Phase 7; the byte/message *counters* are
+   global and land here.)
 3. Test with a real in-process WebSocket connection (the pattern in
    `websocket_test.go`).
 
@@ -715,6 +737,24 @@ top and are independently shippable.
    `delay` is non-zero, before blocking; no-op when no limiter is set.
 3. Test that a tightly-configured limiter increments the counter while an
    unconfigured one leaves it at zero.
+
+### Phase 7: Connection and subscription logging
+
+Logging is a separate concern from the metric phases (see the Logging
+section), so it lands last, once all the metrics — including the Phase 3
+byte counters and the Phase 5 close `reason` — exist.
+
+1. Add INFO logs on connection open (after the WebSocket upgrade) and
+   connection close (`untrackCodec`), and on subscription open
+   (`addSubscriptions`); subscription cancel stays at Debug.
+2. For the connection-close log, retain the per-connection `read_bytes` /
+   `write_bytes` totals — accumulated on the same per-connection counters
+   introduced in Phase 3 for `rpc_ws_bytes_total` — and emit them as
+   structured fields alongside `RemoteAddr`, the connection duration, and
+   the close `reason` (Phase 5), so bandwidth can be aggregated by client
+   IP externally.
+3. Test that open/close/subscribe each log once at INFO with the expected
+   fields.
 
 ## Future Work
 
