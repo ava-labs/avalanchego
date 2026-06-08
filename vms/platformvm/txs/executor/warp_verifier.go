@@ -122,6 +122,18 @@ func (w *warpVerifier) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) er
 	return w.verify(tx.Message)
 }
 
+func (*warpVerifier) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+	return nil
+}
+
+func (*warpVerifier) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+	return nil
+}
+
+func (*warpVerifier) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+	return nil
+}
+
 func (w *warpVerifier) verify(message []byte) error {
 	msg, err := warp.ParseMessage(message)
 	if err != nil {

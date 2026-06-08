@@ -978,7 +978,7 @@ func FuzzAsOpCompatibility(f *testing.F) {
 			t.Skip("invalid tx")
 		}
 
-		oldTx := toOldTx(t, newTx)
+		oldTx := txtest.ToOld(t, newTx)
 		gasUsed, err := oldTx.UnsignedAtomicTx.GasUsed(true)
 		require.NoErrorf(t, err, "%T.GasUsed(true)", oldTx.UnsignedAtomicTx)
 
@@ -1113,7 +1113,7 @@ func TestAtomicRequests(t *testing.T) {
 
 func FuzzAtomicRequestsCompatibility(f *testing.F) {
 	fuzz(f, func(t *testing.T, newTx *Tx) {
-		oldTx := toOldTx(t, newTx)
+		oldTx := txtest.ToOld(t, newTx)
 		wantChainID, wantRequests, err := oldTx.UnsignedAtomicTx.AtomicOps()
 		require.NoErrorf(t, err, "%T.AtomicOps()", oldTx.UnsignedAtomicTx)
 
@@ -1374,7 +1374,7 @@ func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 		}
 
 		var (
-			oldTx = toOldTx(t, newTx)
+			oldTx = txtest.ToOld(t, newTx)
 			ctx   = &snow.Context{AVAXAssetID: avaxAssetID}
 		)
 		require.NoErrorf(t, oldTx.EVMStateTransfer(ctx, oldState), "%T.EVMStateTransfer()", oldTx)
@@ -1745,7 +1745,7 @@ func oldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
 func FuzzSanityCheckCompatibility(f *testing.F) {
 	ctx := mainnetContext()
 	fuzz(f, func(t *testing.T, newTx *Tx) {
-		oldTx := toOldTx(t, newTx)
+		oldTx := txtest.ToOld(t, newTx)
 		want := oldSanityCheck(oldTx, ctx) == nil
 		got := newTx.SanityCheck(ctx) == nil
 		assert.Equal(t, want, got, "%T.SanityCheck() == OldSanityCheck(%T)", newTx, oldTx)
@@ -1774,7 +1774,7 @@ func TestVerifyCredentials(t *testing.T) {
 		validInputID = validUTXOID.InputID()
 		validUTXOs   = []*chainsatomic.Element{{
 			Key:   validInputID[:],
-			Value: MarshalUTXO(t, validUTXO),
+			Value: txtest.MarshalUTXO(t, validUTXO),
 		}}
 
 		validImportTx = func() *Tx {

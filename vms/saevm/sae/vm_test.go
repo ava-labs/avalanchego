@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"math/rand/v2"
 	"net/http/httptest"
 	"os"
 	"sync"
@@ -46,11 +47,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -65,20 +68,7 @@ import (
 func TestMain(m *testing.M) {
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelError, true)))
 
-	goleak.VerifyTestMain(
-		m,
-		goleak.IgnoreCurrent(),
-		// ChainIndexer.Close() may check if the event loop is active before it is marked as active.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core.(*ChainIndexer).eventLoop"),
-		// diskLayer.Release() doesn't properly stop generation.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/state/snapshot.(*diskLayer).generate"),
-		// TxPool.Close() doesn't wait for its loop() method to signal termination.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/txpool.(*TxPool).loop.func2"),
-		// Not all filters subscriptions can be closed after the TxPool is closed.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).Logs.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewHeads.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewPendingTransactions.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
-	)
+	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
 // SUT is the system under test. Testing SHOULD be performed via the embedded
@@ -95,7 +85,7 @@ type SUT struct {
 	wallet  *saetest.Wallet
 	db      ethdb.Database
 	hooks   *hookstest.Stub
-	logger  *saetest.TBLogger
+	logger  *loggingtest.Logger
 
 	validators *validatorstest.State
 	sender     *enginetest.Sender
@@ -149,7 +139,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
 	})
 
-	logger := saetest.NewTBLogger(tb, conf.logLevel)
+	logger := loggingtest.New(tb, conf.logLevel)
 	ctx := logger.CancelOnError(tb.Context())
 	snowCtx := snowtest.Context(tb, chainID)
 	snowCtx.Log = logger
@@ -759,40 +749,139 @@ func TestSyntacticBlockChecks(t *testing.T) {
 		return time.Unix(now, 0)
 	}
 
+	bodyWithTx := types.Body{
+		Transactions: []*types.Transaction{
+			types.NewTx(&types.DynamicFeeTx{
+				To:        &zeroAddr,
+				Gas:       params.TxGas,
+				GasFeeCap: big.NewInt(1),
+				Value:     big.NewInt(1),
+			}),
+		},
+	}
+
 	tests := []struct {
-		name    string
-		header  *types.Header
-		wantErr error
+		name string
+		// mutate will receive a valid header for an empty body and should return a mutated version of it.
+		mutate      func(*types.Header) *types.Header
+		body        types.Body
+		withdrawals []*types.Withdrawal
+		wantErr     error
 	}{
 		{
+			name:   "valid_header", // base case for test setup
+			mutate: func(h *types.Header) *types.Header { return h },
+		},
+		{
 			name: "block_height_overflow_protection",
-			header: &types.Header{
-				Number: new(big.Int).Lsh(big.NewInt(1), 64),
+			mutate: func(h *types.Header) *types.Header {
+				h.Number = new(big.Int).Lsh(big.NewInt(1), 64)
+				return h
 			},
 			wantErr: errBlockHeightNotUint64,
 		},
 		{
 			name: "block_time_at_maximum",
-			header: &types.Header{
-				Number: big.NewInt(1),
-				Time:   now + maxFutureBlockSeconds,
+			mutate: func(h *types.Header) *types.Header {
+				h.Time = now + maxFutureBlockSeconds
+				return h
 			},
 		},
 		{
 			name: "block_time_after_maximum",
-			header: &types.Header{
-				Number: big.NewInt(1),
-				Time:   now + maxFutureBlockSeconds + 1,
+			mutate: func(h *types.Header) *types.Header {
+				h.Time = now + maxFutureBlockSeconds + 1
+				return h
 			},
 			wantErr: errBlockTooFarInFuture,
+		},
+		{
+			name: "invalid_tx_hash_empty",
+			mutate: func(h *types.Header) *types.Header {
+				h.TxHash = common.Hash{}
+				return h
+			},
+			wantErr: errTxHashMismatch,
+		},
+		{
+			name:    "invalid_tx_hash_nonempty",
+			mutate:  func(h *types.Header) *types.Header { return h }, // uses [types.EmptyTxsHash]
+			body:    bodyWithTx,                                       // contains a tx
+			wantErr: errTxHashMismatch,
+		},
+		{
+			name: "valid_tx_hash_nonempty",
+			mutate: func(h *types.Header) *types.Header {
+				h.TxHash = types.DeriveSha(types.Transactions(bodyWithTx.Transactions), saetest.TrieHasher())
+				return h
+			},
+			body: bodyWithTx,
+		},
+		{
+			name: "invalid_uncle_hash_empty",
+			mutate: func(h *types.Header) *types.Header {
+				h.UncleHash = common.Hash{}
+				return h
+			},
+			wantErr: errUncleHashMismatch,
+		},
+		{
+			name:   "invalid_uncle_hash_nonempty",
+			mutate: func(h *types.Header) *types.Header { return h }, // uses [types.EmptyUncleHash]
+			body: types.Body{
+				Uncles: []*types.Header{{}},
+			},
+			wantErr: errUncleHashMismatch,
+		},
+		{
+			name: "valid_uncle_hash_nonempty",
+			mutate: func(h *types.Header) *types.Header {
+				h.UncleHash = types.CalcUncleHash([]*types.Header{{}})
+				return h
+			},
+			body: types.Body{
+				Uncles: []*types.Header{{}},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "nil_withdrawals_nonnil_hash",
+			mutate: func(h *types.Header) *types.Header {
+				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
+				return h
+			},
+			wantErr: errWithdrawalHashMismatch,
+		},
+		{
+			name: "nonnil_withdrawals_nil_hash",
+			mutate: func(h *types.Header) *types.Header {
+				h.WithdrawalsHash = nil
+				return h
+			},
+			withdrawals: []*types.Withdrawal{},
+			wantErr:     errWithdrawalHashMismatch,
+		},
+		{
+			name: "nonnil_withdrawals_nonempty_hash",
+			mutate: func(h *types.Header) *types.Header {
+				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
+				return h
+			},
+			withdrawals: []*types.Withdrawal{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := blockstest.NewBlock(t, types.NewBlockWithHeader(tt.header), nil, nil)
+			hdr := tt.mutate(&types.Header{
+				Number:    big.NewInt(1),
+				UncleHash: types.EmptyUncleHash,
+				TxHash:    types.EmptyTxsHash,
+			})
+			ethB := types.NewBlockWithHeader(hdr).WithBody(tt.body).WithWithdrawals(tt.withdrawals)
+			b := blockstest.NewBlock(t, ethB, nil, nil)
 			_, err := sut.ParseBlock(ctx, b.Bytes())
-			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", tt.header.Number, tt.header.Time, uint64(now))
+			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", hdr.Number, hdr.Time, uint64(now))
 		})
 	}
 }
@@ -926,6 +1015,7 @@ func TestBlockSources(t *testing.T) {
 	settled := sut.runConsensusLoop(t)
 	vmTime.advanceToSettle(ctx, t, settled)
 	unsettled := sut.runConsensusLoop(t)
+	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
 
 	verified := sut.createAndVerifyBlock(t, unsettled)
 	unverified := sut.buildAndParseBlock(t, unwrap(t, verified))
@@ -985,5 +1075,44 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+func TestSettledGasTime(t *testing.T) {
+	const target = 1e7
+	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, opt, options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.Target = target
+	}))
+
+	const numBlocks = 100
+	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
+	bs := make([]*blocks.Block, 0, numBlocks+1)
+	bs = append(bs, sut.genesis)
+	for range numBlocks {
+		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        nil, // contract creation
+			Gas:       params.TxGasContractCreation,
+			GasFeeCap: big.NewInt(1),
+		}))
+		if rng.Int32N(2) == 0 {
+			vmTime.advanceToSettle(ctx, t, b)
+		}
+		bs = append(bs, b)
+	}
+
+	for i, b := range bs {
+		if i == 0 {
+			continue // genesis block has no [hook.SettledBy] struct.
+		}
+		settledHeight := sut.hooks.SettledBy(b.Header()).Height
+		settledBlock := bs[settledHeight]
+
+		want := settledBlock.ExecutedByGasTime()
+		got, err := hook.SettledGasTime(sut.hooks, settledBlock.Header(), b.Header())
+		require.NoErrorf(t, err, "SettledGasTime() for block %d (settled height %d)", b.Height(), settledHeight)
+		if diff := cmp.Diff(want, got, gastime.CmpOpt()); diff != "" {
+			t.Errorf("SettledGasTime() for block %d (settled at height %d) diff (-want +got):\n%s", b.Height(), settledHeight, diff)
+		}
 	}
 }

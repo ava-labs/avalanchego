@@ -37,17 +37,16 @@ type Config struct {
 	Registerer            prometheus.Registerer
 }
 
-func New(config Config, db *ffi.Database, targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
+func New(config Config, db *ffi.Database, targetRoot ids.ID, proofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
 	return newWithDB(
 		config,
 		&database{db},
 		targetRoot,
-		rangeProofClient,
-		changeProofClient,
+		proofClient,
 	)
 }
 
-func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.ID, rangeProofClient *p2p.Client, changeProofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
+func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.ID, proofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()
 	}
@@ -63,8 +62,7 @@ func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.
 			RangeProofMarshaler:   rangeProofMarshaler{},
 			ChangeProofMarshaler:  changeProofMarshaler{},
 			EmptyRoot:             ids.ID(types.EmptyRootHash),
-			RangeProofClient:      rangeProofClient,
-			ChangeProofClient:     changeProofClient,
+			ProofClient:           proofClient,
 			SimultaneousWorkLimit: config.SimultaneousWorkLimit,
 			Log:                   config.Log,
 			TargetRoot:            targetRoot,
