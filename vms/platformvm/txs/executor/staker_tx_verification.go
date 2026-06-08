@@ -899,29 +899,34 @@ func verifyAddAutoRenewedValidatorTx(
 		return nil
 	}
 
+	validatorRules, err := getValidatorRules(backend, chainState, tx.SubnetID())
+	if err != nil {
+		return err
+	}
+
 	switch {
-	case tx.Weight() < backend.Config.MinValidatorStake:
+	case tx.Weight() < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return ErrWeightTooSmall
 
-	case tx.Weight() > backend.Config.MaxValidatorStake:
+	case tx.Weight() > validatorRules.maxValidatorStake:
 		// Ensure validator isn't staking too much
 		return ErrWeightTooLarge
 
-	case tx.Shares() < backend.Config.MinDelegationFee:
+	case tx.Shares() < validatorRules.minDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
 		return ErrInsufficientDelegationFee
 
-	case tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
+	case tx.Period < uint64(validatorRules.minStakeDuration/time.Second):
 		// Ensure staking length is not too short
 		return ErrStakeTooShort
 
-	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
+	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
 		// Ensure staking length is not too long
 		return ErrStakeTooLong
 	}
 
-	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.NodeID())
+	_, err = GetValidator(chainState, constants.PrimaryNetworkID, tx.NodeID())
 	switch {
 	case err == nil:
 		return fmt.Errorf(
