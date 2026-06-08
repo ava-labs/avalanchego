@@ -24,7 +24,7 @@ use crate::proofs::eth::ACCOUNT_DEPTH_NIBBLES;
 use crate::{
     ChangeProofVerificationContext, Proof, ProofCollection, ProofError, ProofNode, RangeProof,
 };
-use firewood_metrics::firewood_counter;
+use firewood_metrics::{HistogramExt, firewood_counter, firewood_histogram};
 use firewood_storage::MemStore;
 use firewood_storage::{
     BranchNode, Child, Children, FileIoError, HashType, HashableShunt, HashedNodeReader,
@@ -1419,6 +1419,8 @@ impl<T: TrieReader> Merkle<T> {
         .transpose()?
         .unwrap_or_default();
 
+        firewood_histogram!(PROOF_KEYS, "kind" => "range").record_integer(key_values.len());
+
         Ok(RangeProof::new(start_proof, end_proof, key_values))
     }
 
@@ -1618,6 +1620,8 @@ impl<T: HashedNodeReader> Merkle<T> {
             .map(|key| self.prove(key))
             .transpose()?
             .unwrap_or_default();
+
+        firewood_histogram!(PROOF_KEYS, "kind" => "change").record_integer(batch_ops.len());
 
         Ok(ChangeProof::new(start_proof, end_proof, batch_ops))
     }

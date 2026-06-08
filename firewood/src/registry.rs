@@ -59,5 +59,7 @@ firewood_metrics::define_metrics! {
         BY_HASH_LOCK_WAIT_SECONDS = "firewood_by_hash_lock_wait_seconds" native(2.0, 160, 1e-9),
         /// Duration of submitting a revision to the persist worker channel
         PERSIST_SUBMIT_DURATION_SECONDS = "firewood_persist_submit_duration_seconds" native(2.0, 160, 1e-9),
+        /// Number of key/value pairs contained in a generated proof, by proof kind
+        PROOF_KEYS = "firewood_proof_keys" buckets([0.0, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0, 4096.0, 8192.0, 16_384.0, 32_768.0, 65_536.0, 131_072.0]),
     },
 }

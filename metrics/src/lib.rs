@@ -99,6 +99,27 @@ impl CounterExt for metrics::Counter {
     }
 }
 
+/// Extension methods for [`metrics::Histogram`] that accept integer metric values.
+///
+/// [`metrics::Histogram::record`] requires `f64`. Casting integers to `f64`
+/// triggers `cast_precision_loss` at every call site. `record_integer`
+/// centralises the cast — any precision loss for values above 2^52 is
+/// intentional and acceptable for instrumentation.
+///
+/// Implemented for `u64` and `usize`; the conversion trait is sealed so external
+/// crates cannot add further implementations.
+pub trait HistogramExt {
+    /// Records the histogram observation from any supported integer type,
+    /// converting to `f64` internally.
+    fn record_integer<T: gauge_value::GaugeValue>(&self, value: T);
+}
+
+impl HistogramExt for metrics::Histogram {
+    fn record_integer<T: gauge_value::GaugeValue>(&self, value: T) {
+        self.record(value.as_f64());
+    }
+}
+
 /// How a histogram metric is bucketed in the Prometheus exporter.
 ///
 /// Defined in `firewood-metrics` (which has no dependency on `metrics-exporter-prometheus`)
