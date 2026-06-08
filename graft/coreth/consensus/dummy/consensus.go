@@ -351,17 +351,6 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 	}
 	headerExtra.MinDelayExcess = minDelayExcess
 
-	minPriceExponent, err := customheader.MinPriceExponent(
-		configExtra,
-		parent,
-		header.Time,
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate min price exponent: %w", err)
-	}
-	headerExtra.MinPriceExponent = minPriceExponent
-
 	// commit the final state root
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 

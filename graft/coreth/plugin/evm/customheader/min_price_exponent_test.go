@@ -34,7 +34,6 @@ func TestMinPriceExponent(t *testing.T) {
 		timestamp uint64
 		desired   *dynamic.PriceExponent
 		want      *dynamic.PriceExponent
-		wantErr   error
 	}{
 		{
 			name:      "pre_helicon_ignores_desired",
@@ -49,13 +48,6 @@ func TestMinPriceExponent(t *testing.T) {
 			parent:    &types.Header{Time: activationTime - 1},
 			timestamp: activationTime + 1,
 			want:      utils.PointerTo(dynamic.InitialPriceExponent),
-		},
-		{
-			name:      "missing_parent_value",
-			config:    extras.TestHeliconChainConfig,
-			parent:    &types.Header{Time: 1000},
-			timestamp: 1001,
-			wantErr:   errParentMinPriceExponentNil,
 		},
 		{
 			name:      "carry_parent",
@@ -92,8 +84,7 @@ func TestMinPriceExponent(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := MinPriceExponent(test.config, test.parent, test.timestamp, test.desired)
-			require.ErrorIs(t, err, test.wantErr)
+			got := MinPriceExponent(test.config, test.parent, test.timestamp, test.desired)
 			require.Equal(t, test.want, got)
 		})
 	}
