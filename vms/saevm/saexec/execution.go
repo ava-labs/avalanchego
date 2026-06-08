@@ -292,13 +292,12 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	// post-execution state to no longer be consensus-critical.
 	e.Tracker.Track(root)
 
-	// The strict ordering of the following calls guarantees invariants that
-	// MUST NOT be broken:
+	// The strict ordering of the next 3 calls guarantees invariants that MUST
+	// NOT be broken:
 	//
 	// 1. [blocks.Block.MarkExecuted] guarantees disk then in-memory changes.
 	// 2. Internal indicator of last executed MUST follow in-memory change.
-	// 3. External indicators (events + metrics) of last executed MUST follow
-	//    the internal indicator.
+	// 3. External indicator of last executed MUST follow internal indicator.
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
