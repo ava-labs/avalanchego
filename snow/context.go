@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -97,4 +98,7 @@ type ConsensusContext struct {
 
 	// True iff this chain is currently state-syncing
 	StateSyncing utils.Atomic[bool]
+
+	// ChainHeightUpdater is used to update the chain height progress
+	ChainHeightUpdater *lock.ProgressSubscription[uint64]
 }
