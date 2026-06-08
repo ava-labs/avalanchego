@@ -273,12 +273,9 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 func TestCommitAtomicTrieOnShutdown(t *testing.T) {
 	ctx := t.Context()
 
-	const commitInterval = 4096
-	configJSON := fmt.Sprintf(`{"commit-interval": %d}`, commitInterval)
-
 	vm := newAtomicTestVM()
 	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		ConfigJSON: configJSON,
+		ConfigJSON: `{"commit-interval": 4096}`,
 	})
 	require.NoError(t, addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
 		vmtest.TestShortIDAddrs[0]: 50_000_000,
