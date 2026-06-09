@@ -57,7 +57,7 @@ sed -i -E "s|^;?\s*admin_password\s*=.*|admin_password = firewood_is_fast|" /etc
 cat > /etc/grafana/provisioning/datasources/prometheus.yml <<EOF
 apiVersion: 1
 datasources:
- - name: Prometheus
+  - name: Prometheus
     type: prometheus
     access: proxy
     orgId: 1
@@ -86,15 +86,25 @@ mkdir -p /var/lib/grafana/dashboards
 wget -O /var/lib/grafana/dashboards/firewood.json https://github.com/ava-labs/firewood/raw/refs/heads/main/benchmark/Grafana-dashboard.json
 wget -O /var/lib/grafana/dashboards/node_exporter_full.json https://grafana.com/api/dashboards/1860/revisions/latest/download
 
-# configure prometheus to scrape firewood
-if ! grep -q '^  - job_name: firewood$' /etc/prometheus/prometheus.yml; then
-  cat >> /etc/prometheus/prometheus.yml <<!
-  - job_name: firewood
+# Configure prometheus to scrape avalanchego. A full node (e.g. the `validator`
+# scenario) exposes all metrics -- including the C-chain/coreth and the firewood
+# metrics merged in under avalanche_evm_firewood_* -- at /ext/metrics on 9650.
+# The firewood library no longer runs its own :3000 exporter, so that job is
+# gone. The coreth :6060 job is kept for the standalone reexecution benchmark.
+if ! grep -q '^  - job_name: avalanchego$' /etc/prometheus/prometheus.yml; then
+  cat >> /etc/prometheus/prometheus.yml <<'!'
+  - job_name: avalanchego
+    metrics_path: /ext/metrics
     static_configs:
-      - targets: ['localhost:3000']
+      - targets: ['localhost:9650']
     metric_relabel_configs:
+      # coreth registers firewood's gatherer under avalanche_evm_firewood_, and
+      # firewood's own metrics already carry a firewood_ prefix, producing
+      # avalanche_evm_firewood_firewood_*. Strip the coreth-added prefix so the
+      # metrics keep their native registry names (firewood_*), matching the
+      # firewood dashboard.
       - source_labels: [__name__]
-        regex: '(.*)'
+        regex: 'avalanche_evm_firewood_firewood_(.+)'
         target_label: __name__
         replacement: 'firewood_$1'
   - job_name: coreth
