@@ -33,7 +33,7 @@ type backend struct {
 	common.ChainUTXOs
 
 	ownersLock sync.RWMutex
-	owners     map[ids.ID]fx.Owner // subnetID or validationID -> owner
+	owners     map[ids.ID]fx.Owner // subnetID, validationID, or auto-renewed validator txID -> owner
 }
 
 func NewBackend(utxos common.ChainUTXOs, owners map[ids.ID]fx.Owner) Backend {
