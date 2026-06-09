@@ -168,7 +168,7 @@ type Builder interface {
 		genesisData []byte,
 		chainID ids.ID,
 		address []byte,
-		validators []*txs.ConvertSubnetToL1Validator,
+		validators []*txs.CreateL1Validator,
 		options ...common.Option,
 	) (*txs.CreateL1Tx, error)
 
@@ -838,7 +838,7 @@ func (b *builder) NewCreateL1Tx(
 	genesisData []byte,
 	chainID ids.ID,
 	address []byte,
-	validators []*txs.ConvertSubnetToL1Validator,
+	validators []*txs.CreateL1Validator,
 	options ...common.Option,
 ) (*txs.CreateL1Tx, error) {
 	var avaxToBurn uint64
@@ -884,7 +884,7 @@ func (b *builder) NewCreateL1Tx(
 	bytesComplexity := gas.Dimensions{
 		gas.Bandwidth: additionalBytes,
 	}
-	validatorComplexity, err := fee.ConvertSubnetToL1ValidatorComplexity(validators...)
+	validatorComplexity, err := fee.CreateL1ValidatorComplexity(validators...)
 	if err != nil {
 		return nil, err
 	}

@@ -4,31 +4,46 @@
 package txs
 
 import (
+	"bytes"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 var _ UnsignedTx = (*CreateL1Tx)(nil)
 
 type CreateL1Tx struct {
+	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 
-	// Creating Chain Variables
-	ChainName   string   `serialize:"true" json:"chainName"`
-	VMID        ids.ID   `serialize:"true" json:"vmID"`
-	FxIDs       []ids.ID `serialize:"true" json:"fxIDs"`
-	GenesisData []byte   `serialize:"true" json:"genesisData"`
+	// A human readable name for the chain; need not be unique
+	ChainName string `serialize:"true" json:"chainName"`
 
-	// Validator Manager Variables
-	ManagerChainID ids.ID              `serialize:"true" json:"chainID"`
+	// ID of the VM running on the chain
+	VMID ids.ID `serialize:"true" json:"vmID"`
+
+	// IDs of the feature extensions running on the chain
+	FxIDs []ids.ID `serialize:"true" json:"fxIDs"`
+
+	// Byte representation of genesis state of the chain
+	GenesisData []byte `serialize:"true" json:"genesisData"`
+
+	// Chain where the L1 validator manager lives
+	ManagerChainID ids.ID `serialize:"true" json:"chainID"`
+
+	// Address of the L1 validator manager
 	ManagerAddress types.JSONByteSlice `serialize:"true" json:"address"`
 
-	// Initial Validators
-	Validators []*ConvertSubnetToL1Validator `serialize:"true" json:"validators"`
+	// Initial pay-as-you-go validators for the L1
+	Validators []*CreateL1Validator `serialize:"true" json:"validators"`
 }
 
 func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
@@ -68,16 +83,61 @@ func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
 }
 
 // BlockchainID returns the blockchainID for the chain created by this tx.
-// Defined as SHA256(subnetID || 0x00 || chainIndex) per ACP-191, where chainIndex is 0
-// since CreateL1Tx creates exactly one chain.
+// Defined as SHA256(subnetID || 0x00) per ACP-191.
 func (*CreateL1Tx) BlockchainID(subnetID ids.ID) ids.ID {
-	packer := wrappers.Packer{Bytes: make([]byte, ids.IDLen+1+wrappers.IntLen)}
+	packer := wrappers.Packer{Bytes: make([]byte, ids.IDLen+1)}
 	packer.PackFixedBytes(subnetID[:])
 	packer.PackByte(0x00)
-	packer.PackInt(0)
 	return hashing.ComputeHash256Array(packer.Bytes)
 }
 
 func (tx *CreateL1Tx) Visit(visitor Visitor) error {
 	return visitor.CreateL1Tx(tx)
+}
+
+type CreateL1Validator struct {
+	// NodeID of this validator
+	NodeID types.JSONByteSlice `serialize:"true" json:"nodeID"`
+	// Weight of this validator used when sampling
+	Weight uint64 `serialize:"true" json:"weight"`
+	// Initial balance for this validator
+	Balance uint64 `serialize:"true" json:"balance"`
+	// [Signer] is the BLS key for this validator.
+	// Note: We do not enforce that the BLS key is unique across all validators.
+	//       This means that validators can share a key if they so choose.
+	//       However, a NodeID + Subnet does uniquely map to a BLS key
+	Signer signer.ProofOfPossession `serialize:"true" json:"signer"`
+	// Leftover $AVAX from the [Balance] will be issued to this owner once it is
+	// removed from the validator set.
+	RemainingBalanceOwner message.PChainOwner `serialize:"true" json:"remainingBalanceOwner"`
+	// This owner has the authority to manually deactivate this validator.
+	DeactivationOwner message.PChainOwner `serialize:"true" json:"deactivationOwner"`
+}
+
+func (v *CreateL1Validator) Compare(o *CreateL1Validator) int {
+	return bytes.Compare(v.NodeID, o.NodeID)
+}
+
+func (v *CreateL1Validator) Verify() error {
+	if v.Weight == 0 {
+		return ErrZeroWeight
+	}
+	nodeID, err := ids.ToNodeID(v.NodeID)
+	if err != nil {
+		return err
+	}
+	if nodeID == ids.EmptyNodeID {
+		return errEmptyNodeID
+	}
+	return verify.All(
+		&v.Signer,
+		&secp256k1fx.OutputOwners{
+			Threshold: v.RemainingBalanceOwner.Threshold,
+			Addrs:     v.RemainingBalanceOwner.Addresses,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: v.DeactivationOwner.Threshold,
+			Addrs:     v.DeactivationOwner.Addresses,
+		},
+	)
 }

@@ -124,7 +124,7 @@ func TestCreateL1TxSerialization(t *testing.T) {
 				FxIDs:          []ids.ID{},
 				ManagerChainID: managerChainID,
 				ManagerAddress: managerAddress,
-				Validators:     []*ConvertSubnetToL1Validator{},
+				Validators:     []*CreateL1Validator{},
 			},
 			expectedBytes: []byte{
 				// Codec version
@@ -267,7 +267,7 @@ func TestCreateL1TxSerialization(t *testing.T) {
 				GenesisData:    []byte("genesis"),
 				ManagerChainID: managerChainID,
 				ManagerAddress: managerAddress,
-				Validators: []*ConvertSubnetToL1Validator{
+				Validators: []*CreateL1Validator{
 					{
 						NodeID:  nodeID[:],
 						Weight:  0x0102030405060708,
@@ -537,7 +537,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 		}
 		validVMID       = ids.GenerateTestID()
 		invalidAddress  = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
-		validValidators = []*ConvertSubnetToL1Validator{
+		validValidators = []*CreateL1Validator{
 			{
 				NodeID:                utils.RandomBytes(ids.NodeIDLen),
 				Weight:                1,
@@ -616,7 +616,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
 				VMID:   validVMID,
-				Validators: []*ConvertSubnetToL1Validator{
+				Validators: []*CreateL1Validator{
 					{
 						NodeID: []byte{
 							0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -640,7 +640,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
 				VMID:   validVMID,
-				Validators: []*ConvertSubnetToL1Validator{
+				Validators: []*CreateL1Validator{
 					{
 						NodeID: []byte{
 							0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -709,7 +709,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
 				VMID:   validVMID,
-				Validators: []*ConvertSubnetToL1Validator{
+				Validators: []*CreateL1Validator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                0,
@@ -726,7 +726,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
 				VMID:   validVMID,
-				Validators: []*ConvertSubnetToL1Validator{
+				Validators: []*CreateL1Validator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen + 1),
 						Weight:                1,
@@ -743,7 +743,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
 				VMID:   validVMID,
-				Validators: []*ConvertSubnetToL1Validator{
+				Validators: []*CreateL1Validator{
 					{
 						NodeID:                ids.EmptyNodeID[:],
 						Weight:                1,
@@ -760,7 +760,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
 				VMID:   validVMID,
-				Validators: []*ConvertSubnetToL1Validator{
+				Validators: []*CreateL1Validator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                1,
@@ -777,7 +777,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
 				VMID:   validVMID,
-				Validators: []*ConvertSubnetToL1Validator{
+				Validators: []*CreateL1Validator{
 					{
 						NodeID: utils.RandomBytes(ids.NodeIDLen),
 						Weight: 1,
@@ -796,7 +796,7 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx: validBaseTx,
 				VMID:   validVMID,
-				Validators: []*ConvertSubnetToL1Validator{
+				Validators: []*CreateL1Validator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                1,
@@ -858,11 +858,10 @@ func TestCreateL1TxBlockchainID(t *testing.T) {
 	}
 
 	// Compute the expected blockchainID manually per the ACP spec:
-	// SHA256(subnetID[32] || 0x00[1] || chainIndex[4]) = SHA256(37 bytes)
-	packer := wrappers.Packer{Bytes: make([]byte, ids.IDLen+1+wrappers.IntLen)}
+	// SHA256(subnetID[32] || 0x00[1]) = SHA256(33 bytes)
+	packer := wrappers.Packer{Bytes: make([]byte, ids.IDLen+1)}
 	packer.PackFixedBytes(subnetID[:])
 	packer.PackByte(0x00)
-	packer.PackInt(0)
 	expected := ids.ID(hashing.ComputeHash256Array(packer.Bytes))
 
 	tx := &CreateL1Tx{}
@@ -872,8 +871,8 @@ func TestCreateL1TxBlockchainID(t *testing.T) {
 	require.Equal(expected, blockchainID)
 
 	// Verify it differs from both the subnetID and validationID derivation.
-	// validationID = subnetID.Append(0) = SHA256(subnetID[32] || chainIndex[4])
-	// which is 36 bytes, the missing 0x00 byte makes them different.
+	// validationID = subnetID.Append(0) = SHA256(subnetID[32] || chainIndex[4]) = SHA256(36 bytes)
+	// blockchainID = SHA256(subnetID[32] || 0x00[1]) = SHA256(33 bytes), they are always distinct
 	validationID := subnetID.Append(0)
 	require.NotEqual(validationID, blockchainID)
 	require.NotEqual(subnetID, blockchainID)

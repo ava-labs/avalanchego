@@ -153,7 +153,7 @@ type Wallet interface {
 		genesisData []byte,
 		chainID ids.ID,
 		address []byte,
-		validators []*txs.ConvertSubnetToL1Validator,
+		validators []*txs.CreateL1Validator,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
@@ -466,7 +466,7 @@ func (w *wallet) IssueCreateL1Tx(
 	genesisData []byte,
 	chainID ids.ID,
 	address []byte,
-	validators []*txs.ConvertSubnetToL1Validator,
+	validators []*txs.CreateL1Validator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewCreateL1Tx(chainName, vmID, fxIDs, genesisData, chainID, address, validators, options...)

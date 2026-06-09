@@ -894,7 +894,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				genesisBytes,
 				managerChainID,
 				address,
-				[]*txs.ConvertSubnetToL1Validator{
+				[]*txs.CreateL1Validator{
 					{
 						NodeID:  subnetGenesisNode.NodeID.Bytes(),
 						Weight:  genesisWeight,

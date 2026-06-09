@@ -4419,7 +4419,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 
 	// Use a single address to avoid needing sorted owner addresses. (focusing on testing the new transaction) (sorted owners is tested in TestCreateL1TxSyntacticVerify)
 	ownerAddrs := []ids.ShortID{testAddresses[0]}
-	validator := &txs.ConvertSubnetToL1Validator{
+	validator := &txs.CreateL1Validator{
 		NodeID:  nodeID.Bytes(),
 		Weight:  weight,
 		Balance: 1,
@@ -4441,7 +4441,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 		genesisData,
 		managerChainID,
 		managerAddress,
-		[]*txs.ConvertSubnetToL1Validator{validator},
+		[]*txs.CreateL1Validator{validator},
 	)
 	require.NoError(t, err)
 
@@ -4481,7 +4481,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 					genesisData,
 					managerChainID,
 					managerAddress,
-					[]*txs.ConvertSubnetToL1Validator{validator},
+					[]*txs.CreateL1Validator{validator},
 					common.WithMemo([]byte("memo!")),
 				)
 				require.NoError(t, err)
@@ -4536,7 +4536,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 		{
 			name: "validators balance overflow",
 			tx: func() *txs.Tx {
-				overflowValidator := &txs.ConvertSubnetToL1Validator{
+				overflowValidator := &txs.CreateL1Validator{
 					NodeID:  types.JSONByteSlice(ids.ShortID{1}.Bytes()),
 					Weight:  1,
 					Balance: math.MaxUint64,
@@ -4567,7 +4567,7 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 					GenesisData:    genesisData,
 					ManagerChainID: managerChainID,
 					ManagerAddress: managerAddress,
-					Validators:     []*txs.ConvertSubnetToL1Validator{overflowValidator, validator},
+					Validators:     []*txs.CreateL1Validator{overflowValidator, validator},
 				}
 				utils.Sort(unsigned.Validators)
 				tx, err := txs.NewSigned(unsigned, txs.Codec, [][]*secp256k1.PrivateKey{{genesistest.DefaultFundedKeys[0]}})

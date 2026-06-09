@@ -844,7 +844,7 @@ func TestCreateL1Chain(t *testing.T) {
 		genesisData,
 		ids.Empty,
 		nil,
-		[]*txs.ConvertSubnetToL1Validator{
+		[]*txs.CreateL1Validator{
 			{
 				NodeID:  nodeID.Bytes(),
 				Weight:  1,

@@ -151,7 +151,7 @@ func (w *withOptions) IssueCreateL1Tx(
 	genesisData []byte,
 	chainID ids.ID,
 	address []byte,
-	validators []*txs.ConvertSubnetToL1Validator,
+	validators []*txs.CreateL1Validator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	return w.wallet.IssueCreateL1Tx(

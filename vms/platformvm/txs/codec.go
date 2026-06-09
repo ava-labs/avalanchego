@@ -49,6 +49,7 @@ func init() {
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
 			RegisterHeliconTypes(c),
+			RegisterCreateL1TxTypes(c),
 		)
 	}
 
@@ -128,7 +129,6 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&SetL1ValidatorWeightTx{}),
 		targetCodec.RegisterType(&IncreaseL1ValidatorBalanceTx{}),
 		targetCodec.RegisterType(&DisableL1ValidatorTx{}),
-		targetCodec.RegisterType(&CreateL1Tx{}),
 	)
 }
 
@@ -140,4 +140,10 @@ func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&SetAutoRenewedValidatorConfigTx{}),
 		targetCodec.RegisterType(&RewardAutoRenewedValidatorTx{}),
 	)
+}
+
+// RegisterCreateL1TxTypes registers CreateL1Tx.
+// TODO: update to the correct upgrade name once the target upgrade is finalized.
+func RegisterCreateL1TxTypes(targetCodec linearcodec.Codec) error {
+	return targetCodec.RegisterType(&CreateL1Tx{})
 }

@@ -77,6 +77,14 @@ const (
 		wrappers.IntLen + // deactivation owner threshold
 		wrappers.IntLen // deactivation owner num addresses
 
+	intrinsicCreateL1ValidatorBandwidth = wrappers.IntLen + // nodeID length
+		wrappers.LongLen + // weight
+		wrappers.LongLen + // balance
+		wrappers.IntLen + // remaining balance owner threshold
+		wrappers.IntLen + // remaining balance owner num addresses
+		wrappers.IntLen + // deactivation owner threshold
+		wrappers.IntLen // deactivation owner num addresses
+
 	intrinsicBLSAggregateCompute           = 5     // BLS public key aggregation time is around 5us
 	intrinsicBLSVerifyCompute              = 1_000 // BLS verification time is around 1000us
 	intrinsicBLSPublicKeyValidationCompute = 50    // BLS public key validation time is around 50us
@@ -92,6 +100,8 @@ const (
 	intrinsicInputDBWrite                      = 1
 	intrinsicOutputDBWrite                     = 1
 	intrinsicConvertSubnetToL1ValidatorDBWrite = 4 // weight diff + pub key diff + subnetID/nodeID + validationID
+
+	intrinsicCreateL1ValidatorDBWrite = 4 // weight diff + pub key diff + subnetID/nodeID + validationID
 )
 
 var (
@@ -383,6 +393,51 @@ func convertSubnetToL1ValidatorComplexity(l1Validator *txs.ConvertSubnetToL1Vali
 	complexity := gas.Dimensions{
 		gas.Bandwidth: intrinsicConvertSubnetToL1ValidatorBandwidth,
 		gas.DBWrite:   intrinsicConvertSubnetToL1ValidatorDBWrite,
+	}
+
+	signerComplexity, err := SignerComplexity(&l1Validator.Signer)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+
+	numAddresses := uint64(len(l1Validator.RemainingBalanceOwner.Addresses) + len(l1Validator.DeactivationOwner.Addresses))
+	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+	return complexity.Add(
+		&gas.Dimensions{
+			gas.Bandwidth: uint64(len(l1Validator.NodeID)),
+		},
+		&signerComplexity,
+		&gas.Dimensions{
+			gas.Bandwidth: addressBandwidth,
+		},
+	)
+}
+
+// ConvertSubnetToL1ValidatorComplexity returns the complexity the validators
+// add to a transaction.
+func CreateL1ValidatorComplexity(l1Validators ...*txs.CreateL1Validator) (gas.Dimensions, error) {
+	var complexity gas.Dimensions
+	for _, l1Validator := range l1Validators {
+		l1ValidatorComplexity, err := createL1ValidatorComplexity(l1Validator)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(&l1ValidatorComplexity)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+	}
+	return complexity, nil
+}
+
+func createL1ValidatorComplexity(l1Validator *txs.CreateL1Validator) (gas.Dimensions, error) {
+	complexity := gas.Dimensions{
+		gas.Bandwidth: intrinsicCreateL1ValidatorBandwidth,
+		gas.DBWrite:   intrinsicCreateL1ValidatorDBWrite,
 	}
 
 	signerComplexity, err := SignerComplexity(&l1Validator.Signer)
@@ -773,7 +828,7 @@ func (c *complexityVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
 	if err != nil {
 		return err
 	}
-	validatorComplexity, err := ConvertSubnetToL1ValidatorComplexity(tx.Validators...)
+	validatorComplexity, err := CreateL1ValidatorComplexity(tx.Validators...)
 	if err != nil {
 		return err
 	}

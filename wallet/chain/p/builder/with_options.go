@@ -162,7 +162,7 @@ func (w *withOptions) NewCreateL1Tx(
 	genesisData []byte,
 	chainID ids.ID,
 	address []byte,
-	validators []*txs.ConvertSubnetToL1Validator,
+	validators []*txs.CreateL1Validator,
 	options ...common.Option,
 ) (*txs.CreateL1Tx, error) {
 	return w.builder.NewCreateL1Tx(
