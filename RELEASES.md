@@ -4,10 +4,13 @@
 
 ### Metrics
 
-- Renamed Coreth and Subnet-EVM state-sync p2p metrics (`{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains):
+- Added `avalanche_{vmName}_sae_last_executed_height` and `avalanche_{vmName}_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
+- Renamed Coreth and Subnet-EVM state-sync p2p metrics:
   - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
   - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
   - `avalanche_{vmName}_eth_net_average_bandwidth` -> `avalanche_{vmName}_sdk_sync_peer_tracker_average_bandwidth`
+
+NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains
 
 ### Fixes
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
