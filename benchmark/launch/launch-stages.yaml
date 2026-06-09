@@ -192,6 +192,42 @@ stages:
     name: "Copy file(s) from {{ variables.src }} to s3://{{ variables.s3_bucket }}/{{ variables.dst }}"
     commands:
       - "s5cmd cp '{{ variables.src }}' 's3://{{ variables.s3_bucket }}/{{ variables.dst }}'"
+  # Download a full avalanchego data directory snapshot from S3. The snapshot
+  # layout (db/, chainData/, configs/chains/) maps directly onto avalanchego's
+  # --data-dir sub-defaults. The bucket's staking/ identity is intentionally
+  # skipped so the node generates a fresh NodeID on first boot.
+  download-node-state:
+    name: "Downloading node state from s3://{{ variables.state_bucket }}"
+    variables:
+      state_bucket: "firewood-fuji-state-sync"
+      data_dir: "{{ variables.nvme_base }}/ubuntu/data"
+      pruning_enabled: "true"
+      state_history: "32768"
+      commit_interval: "64"
+    commands:
+      - "sudo -u ubuntu mkdir -p {{ variables.data_dir }}/db {{ variables.data_dir }}/chainData {{ variables.data_dir }}/configs"
+      - "s5cmd cp 's3://{{ variables.state_bucket }}/db/*' {{ variables.data_dir }}/db/"
+      - "s5cmd cp 's3://{{ variables.state_bucket }}/chainData/*' {{ variables.data_dir }}/chainData/"
+      - "s5cmd cp 's3://{{ variables.state_bucket }}/configs/*' {{ variables.data_dir }}/configs/"
+      # The snapshot was produced by an archive node (pruning-enabled: false),
+      # which makes coreth open firewood in archival mode and maintain a
+      # root_store/ index. Force pruning mode and drop the restored archival
+      # index so it is not reopened.
+      - "jq '.[\"pruning-enabled\"] = {{ variables.pruning_enabled }} | .[\"state-history\"] = {{ variables.state_history }} | .[\"commit-interval\"] = {{ variables.commit_interval }}' {{ variables.data_dir }}/configs/chains/C/config.json > /tmp/c-config.json && mv /tmp/c-config.json {{ variables.data_dir }}/configs/chains/C/config.json"
+      - "rm -rf {{ variables.data_dir }}/chainData/*/firewood/root_store"
+      - "chown -R ubuntu:users {{ variables.data_dir }}"
+      - "chmod -R g=u {{ variables.data_dir }}"
+  # Start avalanchego as a Fuji node against the restored data directory. Runs
+  # in the foreground (backgrounded with `&`) logging to /var/log/bootstrap.log
+  # so `--follow follow-with-progress` can stream startup. A fresh staking key
+  # is generated under {{ variables.data_dir }}/staking on first boot.
+  run-validator:
+    name: "Starting Fuji validator from restored state"
+    variables:
+      data_dir: "{{ variables.nvme_base }}/ubuntu/data"
+      public_ip_resolution: "opendns"
+    commands:
+      - "sudo -u ubuntu -D {{ variables.nvme_base }}/ubuntu/avalanchego --login ./build/avalanchego --network-id=fuji --data-dir={{ variables.data_dir }} --public-ip-resolution-service={{ variables.public_ip_resolution }} --http-host=0.0.0.0 > /var/log/bootstrap.log 2>&1 &"
 
 scenarios:
   reexecute:
@@ -237,6 +273,21 @@ scenarios:
         variables:
           src: "{{ variables.nvme_base }}/ubuntu/exec-data/current-state/replay_50k_log_db"
           dst: "amin-replay-logs/replay_50k_log_db"
+  validator:
+    description: "Restore a Fuji node data directory from S3 and start a validator"
+    stages:
+      - rust-install
+      - ssm-agent
+      - clone-firewood
+      - setup-environment
+      - install-go-grafana
+      - clone-repos
+      - configure-go-modules
+      - build-firewood-ffi
+      - build-avalanchego
+      - install-s5cmd
+      - download-node-state
+      - run-validator
   snapshotter:
     description: "Execute and snapshot state at 1m, 10m, 20m, and 30m blocks"
     stages:

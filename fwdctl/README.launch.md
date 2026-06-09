@@ -216,6 +216,15 @@ Current embedded scenarios:
 - `reexecute`
 - `replay-log-gen`
 - `snapshotter`
+- `validator`
+
+The `validator` scenario restores a full avalanchego data directory from an S3
+snapshot and starts a Fuji node. It downloads `db/`, `chainData/`, and
+`configs/` from `s3://firewood-fuji-state-sync` (override with
+`--variable state_bucket=<bucket>`) into the node data dir
+(`--variable data_dir=<path>`, default `/mnt/nvme/ubuntu/data`), then launches
+avalanchego against the restored state. The snapshot's staking identity is
+intentionally skipped so the node generates a fresh NodeID on first boot.
 
 ## Operational behavior
 
