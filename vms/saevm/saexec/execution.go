@@ -30,13 +30,23 @@ import (
 
 var errExecutorClosed = errors.New("saexec.Executor closed")
 
+// queuedBlock pairs a queued block with the time it was enqueued so that
+// [Executor.processQueue] can record how long it waited before execution
+// started.
+type queuedBlock struct {
+	block      *blocks.Block
+	enqueuedAt time.Time
+}
+
 // Enqueue pushes a new block to the FIFO queue. If [Executor.Close] is called
 // before [blocks.Block.Executed] returns true then there is no guarantee that
 // the block will be executed.
 func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
+	enqueuedAt := time.Now()
 	e.createReceiptBuffers(block)
 	select {
-	case e.queue <- block:
+	case e.queue <- queuedBlock{block: block, enqueuedAt: enqueuedAt}:
+		e.metrics.addUnexecutedTxs(len(block.Transactions()))
 		if n := len(e.queue); n == cap(e.queue) {
 			// If this happens then increase the channel's buffer size.
 			e.log.Warn(
@@ -67,7 +77,9 @@ func (e *Executor) processQueue() {
 		case <-e.quit:
 			return
 
-		case block := <-e.queue:
+		case qb := <-e.queue:
+			block := qb.block
+			e.metrics.observeQueueWait(time.Since(qb.enqueuedAt))
 			log := e.log.With(
 				zap.Uint64("block_height", block.Height()),
 				zap.Uint64("block_time", block.BuildTime()),
@@ -107,7 +119,9 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		return fmt.Errorf("executing block built on parent %#x when last executed %#x", b.ParentHash(), last)
 	}
 
+	start := time.Now()
 	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
+	e.metrics.observeExecuteDuration(time.Since(start))
 	if err != nil {
 		return err
 	}
