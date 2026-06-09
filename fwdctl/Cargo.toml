@@ -1,6 +1,6 @@
 [package]
 name = "firewood-fwdctl"
-version = "0.5.0"
+version = "0.6.0"
 edition.workspace = true
 authors = [
      "Dan Laine <daniel.laine@avalabs.org>",
