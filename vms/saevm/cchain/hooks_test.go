@@ -18,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // newBlockGeneric builds a [*types.Block] whose ExtData encodes txs, using the
@@ -79,40 +77,6 @@ func newTamperedBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*
 	)
 }
 
-func TestParseAndVerifyBlockTxs(t *testing.T) {
-	w := newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
-	tx1 := w.newMinimalTx(t)
-
-	t.Run("valid", func(t *testing.T) {
-		require := require.New(t)
-
-		got, err := parseAndVerifyBlockTxs(newBlock(t, 1, common.Hash{}, tx1))
-		require.NoError(err)
-		require.Len(got, 1)
-		require.Equal(tx1.ID(), got[0].ID())
-	})
-
-	t.Run("valid_empty", func(t *testing.T) {
-		require := require.New(t)
-
-		// A block with no txs has empty extData, which hashes to
-		// EmptyExtDataHash; verification and parsing must both accept it.
-		got, err := parseAndVerifyBlockTxs(newBlock(t, 1, common.Hash{}))
-		require.NoError(err)
-		require.Empty(got)
-	})
-
-	t.Run("hash_mismatch", func(t *testing.T) {
-		require := require.New(t)
-
-		// newTamperedBlock carries tx1's extData but commits an ExtDataHash that
-		// does not match it. Verification must reject it, proving the committed
-		// hash is bound to this block's actual extData content.
-		_, err := parseAndVerifyBlockTxs(newTamperedBlock(t, 1, common.Hash{}, tx1))
-		require.ErrorIs(err, errExtDataHashMismatch)
-	})
-}
-
 func TestAncestorInputIDs(t *testing.T) {
 	var (
 		w       = newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
@@ -124,18 +88,12 @@ func TestAncestorInputIDs(t *testing.T) {
 		tx3     = w.newMinimalTx(t)
 		block3  = newBlock(t, 3, block2.Hash(), tx3)
 		block4  = newBlock(t, 4, block3.Hash())
-
-		// tampered is an ancestor whose committed ExtDataHash does not match
-		// its extData; tamperedChild points at it so the traversal parses it.
-		tampered      = newTamperedBlock(t, 1, genesis, tx1)
-		tamperedChild = newBlock(t, 2, tampered.Hash())
 	)
 
 	tests := []struct {
 		name    string
 		header  *types.Header
 		settled common.Hash
-		source  saetypes.BlockSource
 		want    set.Set[ids.ID]
 		wantErr error
 	}{
@@ -169,18 +127,6 @@ func TestAncestorInputIDs(t *testing.T) {
 			settled: common.Hash(ids.GenerateTestID()), // never matches
 			wantErr: errMissingBlock,
 		},
-		{
-			name:    "hash_mismatch",
-			header:  tamperedChild.Header(),
-			settled: genesis,
-			source: func(hash common.Hash, number uint64) (*types.Block, bool) {
-				if hash == tampered.Hash() && number == 1 {
-					return tampered, true
-				}
-				return nil, false
-			},
-			wantErr: errExtDataHashMismatch,
-		},
 	}
 	sharedSource := func(hash common.Hash, number uint64) (*types.Block, bool) {
 		for _, b := range []*types.Block{block1, block2, block3} {
@@ -192,16 +138,9 @@ func TestAncestorInputIDs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			source := tt.source
-			if source == nil {
-				source = sharedSource
-			}
-
-			got, err := ancestorInputIDs(tt.header, tt.settled, source)
-			require.ErrorIs(err, tt.wantErr, "ancestorInputIDs()")
-			require.Equal(tt.want, got, "ancestorInputIDs()")
+			got, err := ancestorInputIDs(tt.header, tt.settled, sharedSource)
+			require.ErrorIs(t, err, tt.wantErr, "ancestorInputIDs()")
+			require.Equal(t, tt.want, got, "ancestorInputIDs()")
 		})
 	}
 }

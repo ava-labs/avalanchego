@@ -77,9 +77,7 @@ func newHooks(
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], error) {
-	// BlockRebuilderFrom runs during verification of blocks received from peers,
-	// so this is the primary point at which tampered extData is rejected.
-	rawTxs, err := parseAndVerifyBlockTxs(b)
+	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -135,10 +133,7 @@ func (*hooks) BlockTime(h *types.Header) time.Time {
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	// EndOfBlockOps runs during both worst-case bounding and actual execution.
-	// Bootstrapping skips block verification entirely, so this can be the first
-	// point at which tampered extData is rejected.
-	txs, err := parseAndVerifyBlockTxs(b)
+	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -163,10 +158,7 @@ func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) e
 }
 
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
-	// AfterExecutingBlock runs after EndOfBlockOps in the same execution pass, so
-	// the extData has already been verified. Re-verifying here keeps every path
-	// that decodes extData self-checking rather than relying on call ordering.
-	txs, err := parseAndVerifyBlockTxs(b)
+	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}
@@ -294,24 +286,7 @@ func (b *builder) PotentialEndOfBlockOps(
 	}
 }
 
-var (
-	errMissingBlock        = errors.New("missing block")
-	errExtDataHashMismatch = errors.New("extData hash does not match header")
-)
-
-// parseAndVerifyBlockTxs verifies that the block's extData matches the
-// [ExtDataHash] committed to in the block header, then parses and returns the
-// cross-chain transactions stored in it. The build path sets this hash in
-// [builder.BuildBlock] via [customtypes.NewBlockWithExtData], so every path that
-// decodes extData must verify it to guarantee the extData has not been tampered
-// with.
-func parseAndVerifyBlockTxs(b *types.Block) ([]*tx.Tx, error) {
-	extData := customtypes.BlockExtData(b)
-	if want, got := customtypes.GetHeaderExtra(b.Header()).ExtDataHash, customtypes.CalcExtDataHash(extData); want != got {
-		return nil, fmt.Errorf("%w: header %s, extData %s", errExtDataHashMismatch, want, got)
-	}
-	return tx.ParseSlice(extData)
-}
+var errMissingBlock = errors.New("missing block")
 
 // ancestorInputIDs returns the set of input IDs of all cross-chain transactions
 // in the block range (h, settled), both exclusive.
@@ -324,9 +299,7 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
 		}
 
-		// Ancestors are traversed while building a block and may originate from
-		// peers, so their extData must be verified before it is trusted.
-		txs, err := parseAndVerifyBlockTxs(p)
+		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
 		if err != nil {
 			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}
@@ -360,7 +333,7 @@ func (*builder) BuildBlock(
 	// TODO(StephenButtolph): Encode settled in the block.
 	_ = settled
 	// The extDataHash committed to the header here is verified against the
-	// extData on every path that decodes it via [parseAndVerifyBlockTxs].
+	// extData at the parse boundary by [VM.ParseBlock].
 	return customtypes.NewBlockWithExtData(
 		header,
 		ethTxs,
