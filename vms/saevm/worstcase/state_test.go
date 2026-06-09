@@ -46,7 +46,6 @@ type SUT struct {
 
 const (
 	initialGasTarget = 1_000_000
-	initialBaseFee   = 10
 )
 
 func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
@@ -62,7 +61,7 @@ func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
 		config,
 		alloc,
 		blockstest.WithGasTarget(initialGasTarget),
-		blockstest.WithBaseFee(initialBaseFee),
+		blockstest.WithBaseFee(params.Wei),
 	)
 	hooks := hookstest.NewStub(initialGasTarget)
 	s, err := NewState(hooks, config, genesis, saetest.NewStateDBOpener(cache, nil))
@@ -107,12 +106,17 @@ func TestMultipleBlocks(t *testing.T) {
 
 	state := sut.State
 	lastHash := sut.genesis.Hash()
-	wantLatestEndTime := sut.genesis.ExecutedByGasTime().Clone()
 
-	const (
-		importedAmount = 10
-		gasFeeCap      = 2 * initialBaseFee
-	)
+	const maxExcessForPrice1 = 60_303_807
+	tm := state.clock
+	tm.TestOnlySetExcess(maxExcessForPrice1 + 1)
+	require.Equal(t, gas.Price(2), tm.Price())
+	tm.TestOnlySetExcess(maxExcessForPrice1)
+	require.Equal(t, gas.Price(1), tm.Price())
+
+	wantLatestEndTime := tm.Clone()
+
+	const importedAmount = 10
 	type op struct {
 		name    string
 		op      Op
@@ -130,13 +134,13 @@ func TestMultipleBlocks(t *testing.T) {
 		{
 			hooks:        hookstest.NewStub(2 * initialGasTarget), // Will double the target _after_ this block.
 			wantGasLimit: initialMaxBlockSize,
-			wantBaseFee:  uint256.NewInt(10),
+			wantBaseFee:  uint256.NewInt(1),
 			ops: []op{
 				{
 					name: "include_small_operation",
 					op: Op{
 						Gas:       gas.Gas(params.TxGas),
-						GasFeeCap: *uint256.NewInt(gasFeeCap),
+						GasFeeCap: *uint256.NewInt(1),
 						Burn: map[common.Address]hook.AccountDebit{
 							eoa: {},
 						},
@@ -147,7 +151,7 @@ func TestMultipleBlocks(t *testing.T) {
 					name: "would_exceed_limit",
 					op: Op{
 						Gas:       gas.Gas(initialMaxBlockSize - params.TxGas + 1),
-						GasFeeCap: *uint256.NewInt(gasFeeCap),
+						GasFeeCap: *uint256.NewInt(1),
 					},
 					wantErr: core.ErrGasLimitReached,
 				},
@@ -155,7 +159,7 @@ func TestMultipleBlocks(t *testing.T) {
 					name: "fill_block",
 					op: Op{
 						Gas:       gas.Gas(initialMaxBlockSize - params.TxGas),
-						GasFeeCap: *uint256.NewInt(gasFeeCap),
+						GasFeeCap: *uint256.NewInt(1),
 					},
 					wantErr: nil,
 				},
@@ -169,13 +173,13 @@ func TestMultipleBlocks(t *testing.T) {
 		{
 			hooks:        hookstest.NewStub(initialGasTarget), // Restore the target _after_ this block.
 			wantGasLimit: 2 * initialMaxBlockSize,
-			wantBaseFee:  uint256.NewInt(11),
+			wantBaseFee:  uint256.NewInt(2),
 			ops: []op{
 				{
 					name: "import",
 					op: Op{
 						Gas:       1,
-						GasFeeCap: *uint256.NewInt(gasFeeCap),
+						GasFeeCap: *uint256.NewInt(2),
 						Mint: map[common.Address]uint256.Int{
 							eoaNoBalance: *uint256.NewInt(importedAmount),
 						},
@@ -186,7 +190,7 @@ func TestMultipleBlocks(t *testing.T) {
 					name: "imported_funds_insufficient",
 					op: Op{
 						Gas:       1,
-						GasFeeCap: *uint256.NewInt(gasFeeCap),
+						GasFeeCap: *uint256.NewInt(2),
 						Burn: map[common.Address]AccountDebit{
 							eoaNoBalance: {
 								Amount:     *uint256.NewInt(importedAmount + 1),
@@ -200,7 +204,7 @@ func TestMultipleBlocks(t *testing.T) {
 					name: "spend_imported_funds",
 					op: Op{
 						Gas:       1,
-						GasFeeCap: *uint256.NewInt(gasFeeCap),
+						GasFeeCap: *uint256.NewInt(2),
 						Burn: map[common.Address]AccountDebit{
 							eoaNoBalance: {
 								Amount:     *uint256.NewInt(importedAmount),
@@ -219,29 +223,29 @@ func TestMultipleBlocks(t *testing.T) {
 		},
 		{
 			wantGasLimit: initialMaxBlockSize,
-			wantBaseFee:  uint256.NewInt(11),
+			wantBaseFee:  uint256.NewInt(2),
 			txsAfterOps: []*types.Transaction{
 				wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 					To:       &common.Address{},
 					Gas:      100_000,
-					GasPrice: big.NewInt(11),
+					GasPrice: big.NewInt(2),
 				}),
 				wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 					To:       &common.Address{},
 					Gas:      200_000,
-					GasPrice: big.NewInt(11),
+					GasPrice: big.NewInt(2),
 					Value:    big.NewInt(123_456),
 				}),
 				wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 					To:       nil,
 					Gas:      100_000,
-					GasPrice: big.NewInt(500), // charged in full
+					GasPrice: big.NewInt(10), // charged in full
 				}),
 				wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 					To:        &common.Address{},
 					Gas:       100_000,
 					GasTipCap: big.NewInt(1),
-					GasFeeCap: big.NewInt(11),
+					GasFeeCap: big.NewInt(100),
 				}),
 				wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 					// Irrelevant parameters that only need to be valid. Needed
@@ -249,16 +253,16 @@ func TestMultipleBlocks(t *testing.T) {
 					// the penultimate tx.
 					To:       &common.Address{},
 					Gas:      params.TxGas,
-					GasPrice: big.NewInt(11),
+					GasPrice: big.NewInt(2),
 				}),
 			},
 			wantMinSenderBalances: []map[common.Address]uint64{
 				// Before each tx:
 				{eoaViaTx: startingBalance},
-				{eoaViaTx: startingBalance - 11*100_000},
-				{eoaViaTx: startingBalance - 11*100_000 - (11*200_000 + 123_456)},
-				{eoaViaTx: startingBalance - 11*100_000 - (11*200_000 + 123_456) - 500*100_000},              // non-dynamic fee
-				{eoaViaTx: startingBalance - 11*100_000 - (11*200_000 + 123_456) - 500*100_000 - 11*100_000}, // dynamic fee: effective gas price = baseFee + gasTipCap
+				{eoaViaTx: startingBalance - 2*100_000},
+				{eoaViaTx: startingBalance - 2*100_000 - (2*200_000 + 123_456)},
+				{eoaViaTx: startingBalance - 2*100_000 - (2*200_000 + 123_456) - 10*100_000},             // non-dynamic fee
+				{eoaViaTx: startingBalance - 2*100_000 - (2*200_000 + 123_456) - 10*100_000 - 3*100_000}, // dynamic fee: effective gas price = baseFee + gasTipCap
 			},
 		},
 		{
@@ -267,7 +271,7 @@ func TestMultipleBlocks(t *testing.T) {
 			// fee.
 			time:         21,
 			wantGasLimit: initialMaxBlockSize,
-			wantBaseFee:  uint256.NewInt(9),
+			wantBaseFee:  uint256.NewInt(1),
 		},
 	}
 	for i, block := range tests {
@@ -285,12 +289,12 @@ func TestMultipleBlocks(t *testing.T) {
 		require.Equalf(t, block.wantBaseFee, state.BaseFee(), "base fee after StartBlock(%d)", i)
 		require.Equalf(t, block.wantGasLimit, state.GasLimit(), "gas limit after StartBlock(%d)", i)
 
-		for j, op := range block.ops {
+		for _, op := range block.ops {
 			gotErr := state.Apply(op.op)
-			require.ErrorIsf(t, gotErr, op.wantErr, "Apply(%s) error %d:%d", op.name, i, j)
+			require.ErrorIsf(t, gotErr, op.wantErr, "Apply(%s) error", op.name)
 		}
-		for j, tx := range block.txsAfterOps {
-			require.NoErrorf(t, state.ApplyTx(tx), "ApplyTx() %d:%d", i, j)
+		for _, tx := range block.txsAfterOps {
+			require.NoErrorf(t, state.ApplyTx(tx), "ApplyTx()")
 		}
 
 		got, err := state.FinishBlock()
@@ -347,7 +351,7 @@ func TestTransactionValidation(t *testing.T) {
 			name: "nonce_too_high",
 			tx: &types.LegacyTx{
 				Nonce:    1,
-				GasPrice: big.NewInt(initialBaseFee),
+				GasPrice: big.NewInt(1),
 				Gas:      params.TxGas,
 				To:       &common.Address{},
 			},
@@ -357,7 +361,7 @@ func TestTransactionValidation(t *testing.T) {
 			name:  "nonce_too_low",
 			nonce: 1,
 			tx: &types.LegacyTx{
-				GasPrice: big.NewInt(initialBaseFee),
+				GasPrice: big.NewInt(1),
 				Gas:      params.TxGas,
 				To:       &common.Address{},
 			},
@@ -368,7 +372,7 @@ func TestTransactionValidation(t *testing.T) {
 			nonce: math.MaxUint64,
 			tx: &types.LegacyTx{
 				Nonce:    math.MaxUint64,
-				GasPrice: big.NewInt(initialBaseFee),
+				GasPrice: big.NewInt(1),
 				Gas:      params.TxGas,
 				To:       &common.Address{},
 			},
@@ -389,7 +393,7 @@ func TestTransactionValidation(t *testing.T) {
 		{
 			name: "negative_value",
 			tx: &types.LegacyTx{
-				GasPrice: big.NewInt(initialBaseFee),
+				GasPrice: big.NewInt(1),
 				Gas:      params.TxGas,
 				To:       &common.Address{},
 				Value:    big.NewInt(-1),
@@ -409,7 +413,7 @@ func TestTransactionValidation(t *testing.T) {
 			name: "insufficient_funds",
 			tx: &types.LegacyTx{
 				Gas:      params.TxGas,
-				GasPrice: big.NewInt(initialBaseFee),
+				GasPrice: big.NewInt(1),
 				To:       &common.Address{},
 				Value:    big.NewInt(0),
 			},
@@ -421,7 +425,7 @@ func TestTransactionValidation(t *testing.T) {
 			name:    "gas_limit_exceeded",
 			balance: initialMaxBlockSize,
 			tx: &types.LegacyTx{
-				GasPrice: big.NewInt(initialBaseFee),
+				GasPrice: big.NewInt(1),
 				Gas:      initialMaxBlockSize + 1,
 				To:       &common.Address{},
 			},
@@ -457,7 +461,7 @@ func TestTransactionValidation(t *testing.T) {
 			name: "gas_tip_cap_very_high",
 			tx: &types.DynamicFeeTx{
 				GasTipCap: new(big.Int).Lsh(big.NewInt(1), 256),
-				GasFeeCap: big.NewInt(initialBaseFee),
+				GasFeeCap: big.NewInt(1),
 				Gas:       params.TxGas,
 				To:        &common.Address{},
 			},
@@ -466,8 +470,8 @@ func TestTransactionValidation(t *testing.T) {
 		{
 			name: "gas_tip_above_fee_cap",
 			tx: &types.DynamicFeeTx{
-				GasTipCap: big.NewInt(1 + initialBaseFee),
-				GasFeeCap: big.NewInt(initialBaseFee),
+				GasTipCap: big.NewInt(2),
+				GasFeeCap: big.NewInt(1),
 				Gas:       params.TxGas,
 				To:        &common.Address{},
 			},
@@ -485,7 +489,7 @@ func TestTransactionValidation(t *testing.T) {
 		},
 		{
 			name:    "dynamic_fee_insufficient_for_fee_cap",
-			balance: 300_000, // enough for effectiveGasPrice (10) * gas (21000) but not gasFeeCap (100) * gas (21000) = 2_100_000
+			balance: 100_000, // enough for effectiveGasPrice (1) * gas (21000) but not gasFeeCap (100) * gas (21000) = 2_100_000
 			tx: &types.DynamicFeeTx{
 				GasTipCap: big.NewInt(0),
 				GasFeeCap: big.NewInt(100),
@@ -499,7 +503,7 @@ func TestTransactionValidation(t *testing.T) {
 		{
 			name: "sender_not_eoa",
 			tx: &types.LegacyTx{
-				GasPrice: big.NewInt(initialBaseFee),
+				GasPrice: big.NewInt(1),
 				Gas:      params.TxGas,
 				To:       &common.Address{},
 			},
@@ -589,7 +593,7 @@ func TestStartBlockQueueFull(t *testing.T) {
 
 		err := state.Apply(Op{
 			Gas:       gas,
-			GasFeeCap: *uint256.NewInt(2 * initialBaseFee),
+			GasFeeCap: *uint256.NewInt(2),
 		})
 		require.NoError(t, err, "Apply()")
 
@@ -620,7 +624,7 @@ func TestStartBlockQueueFullDueToTargetChanges(t *testing.T) {
 
 	err := state.Apply(Op{
 		Gas:       initialMaxBlockSize,
-		GasFeeCap: *uint256.NewInt(initialBaseFee),
+		GasFeeCap: *uint256.NewInt(1),
 	})
 	require.NoError(t, err, "Apply()")
 
@@ -682,7 +686,7 @@ func TestCanExecuteTransactionHook(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tx := wallet.SetNonceAndSign(t, tt.account, &types.DynamicFeeTx{
-				GasFeeCap: big.NewInt(initialBaseFee),
+				GasFeeCap: big.NewInt(1),
 				Gas:       params.TxGas,
 				To:        &common.Address{},
 			})

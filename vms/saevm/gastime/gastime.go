@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
+	"github.com/ava-labs/libevm/libevm/testonly"
 )
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
@@ -124,6 +125,14 @@ func (tm *Time) Target() gas.Gas {
 // Excess returns the `x` variable of ACP-176.
 func (tm *Time) Excess() gas.Gas {
 	return tm.excess
+}
+
+// TestOnlySetExcess permanently overrides the [Time.Excess] but panics if
+// called outside of a testing environment. See [testonly.OrPanic].
+func (tm *Time) TestOnlySetExcess(x gas.Gas) {
+	testonly.OrPanic(func() {
+		tm.excess = x
+	})
 }
 
 // Price returns the price of a unit of gas, i.e. the "base fee", determined by
