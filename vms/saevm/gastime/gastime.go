@@ -44,11 +44,15 @@ type Time struct {
 // `target` * [TargetToRate] units of [gas.Gas] is equivalent to a tick of 1
 // second.
 func New(at time.Time, target gas.Gas, startingPrice gas.Price, c GasPriceConfig) (*Time, error) {
+	target = clampTarget(target)
+	excess := excessForPrice(startingPrice, excessScalingFactor(target, c))
+	return newFromExcess(at, target, excess, c)
+}
+
+func newFromExcess(at time.Time, target gas.Gas, excess gas.Gas, c GasPriceConfig) (*Time, error) {
 	pt := proxytime.Of[gas.Gas](at)
 	target = clampTarget(target)
 	pt.SetRate(rateOf(target))
-
-	excess := excessForPrice(startingPrice, excessScalingFactor(target, c))
 	return FromProxyTime(pt, excess, c)
 }
 
@@ -132,14 +136,13 @@ func (tm *Time) Price() gas.Price {
 
 // excessScalingFactor returns the K variable of ACP-103/176, i.e.
 // [GasPriceConfig.TargetToExcessScaling] * T, capped at [math.MaxUint64].
-//
-// TODO(StephenButtolph): Rather than capping this at MaxUint64, we should move
-// the evaluation of T * K into the exponential calculation. This would allow us
-// to never round any values during calculation of extreme inputs.
 func (tm *Time) excessScalingFactor() gas.Gas {
 	return excessScalingFactor(tm.target, tm.config)
 }
 
+// TODO(StephenButtolph): Rather than capping this at MaxUint64, we should move
+// the evaluation of T * K into the exponential calculation. This would allow us
+// to never round any values during calculation of extreme inputs.
 func excessScalingFactor(target gas.Gas, c GasPriceConfig) gas.Gas {
 	return intmath.BoundedMultiply(c.TargetToExcessScaling, target, math.MaxUint64)
 }

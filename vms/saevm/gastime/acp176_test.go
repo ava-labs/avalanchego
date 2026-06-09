@@ -41,7 +41,7 @@ func TestInvalidConfigRejected(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tm := mustNewFromExcess(t, time.Unix(42, 0), target, 0, DefaultGasPriceConfig())
+			tm := mustNew(t, time.Unix(42, 0), target, DefaultMinPrice, DefaultGasPriceConfig())
 
 			initialScaling := tm.config.TargetToExcessScaling
 			initialMinPrice := tm.config.MinPrice
@@ -59,11 +59,11 @@ func TestInvalidConfigRejected(t *testing.T) {
 // rather than BeforeBlock.
 func TestTargetUpdateTiming(t *testing.T) {
 	const (
-		initialTime           = 42
-		initialTarget gas.Gas = 1_600_000
-		initialExcess         = 1_234_567_890
+		initialTime             = 42
+		initialTarget gas.Gas   = 1_600_000
+		initialPrice  gas.Price = 20_000
 	)
-	tm := mustNewFromExcess(t, time.Unix(initialTime, 0), initialTarget, initialExcess, DefaultGasPriceConfig())
+	tm := mustNew(t, time.Unix(initialTime, 0), initialTarget, initialPrice, DefaultGasPriceConfig())
 	initialRate := tm.Rate()
 
 	const (
@@ -71,7 +71,6 @@ func TestTargetUpdateTiming(t *testing.T) {
 		newTarget = initialTarget + 100_000
 	)
 
-	initialPrice := tm.Price()
 	tm.BeforeBlock(time.Unix(newTime, 0))
 	assert.Equal(t, uint64(newTime), tm.Unix(), "Unix time advanced by BeforeBlock()")
 	assert.Equal(t, initialTarget, tm.Target(), "Target not changed by BeforeBlock()")

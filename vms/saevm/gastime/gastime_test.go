@@ -18,18 +18,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
-func mustNewFromExcess(tb testing.TB, at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceConfig) *Time {
+func mustNew(tb testing.TB, at time.Time, target gas.Gas, startingPrice gas.Price, c GasPriceConfig) *Time {
 	tb.Helper()
-	tm, err := newFromExcess(at, target, startingExcess, gasPriceConfig)
-	require.NoError(tb, err, "New(%v, %d, %d, %v)", at, target, startingExcess, gasPriceConfig)
+	tm, err := New(at, target, startingPrice, c)
+	require.NoError(tb, err, "New(%v, %d, %d, %v)", at, target, startingPrice, c)
 	return tm
 }
 
-func newFromExcess(at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceConfig) (*Time, error) {
-	pt := proxytime.Of[gas.Gas](at)
-	target = clampTarget(target)
-	pt.SetRate(rateOf(target))
-	return FromProxyTime(pt, startingExcess, gasPriceConfig)
+func mustNewFromExcess(tb testing.TB, at time.Time, target, startingExcess gas.Gas, gasPriceConfig GasPriceConfig) *Time {
+	tb.Helper()
+	tm, err := newFromExcess(at, target, startingExcess, gasPriceConfig)
+	require.NoError(tb, err, "newFromExcess(%v, %d, %d, %v)", at, target, startingExcess, gasPriceConfig)
+	return tm
 }
 
 func (tm *Time) cloneViaCanotoRoundTrip(tb testing.TB) *Time {
@@ -40,7 +40,7 @@ func (tm *Time) cloneViaCanotoRoundTrip(tb testing.TB) *Time {
 }
 
 func TestClone(t *testing.T) {
-	tm := mustNewFromExcess(t, time.Unix(42, 1), 1e6, 1e5, GasPriceConfig{TargetToExcessScaling: 100, MinPrice: 200})
+	tm := mustNew(t, time.Unix(42, 1), 1e6, 1e5, GasPriceConfig{TargetToExcessScaling: 100, MinPrice: 200})
 
 	if diff := cmp.Diff(tm, tm.Clone(), CmpOpt()); diff != "" {
 		t.Errorf("%T.Clone() diff (-want +got):\n%s", tm, diff)
@@ -111,7 +111,7 @@ func TestNewInitialState(t *testing.T) {
 			},
 		},
 		{
-			name:   "scaling in constructor not applied to starting excess",
+			name:   "scaling in constructor not applied to starting price",
 			unix:   100,
 			nanos:  TargetToRate,
 			target: 50 / TargetToRate,
@@ -123,14 +123,23 @@ func TestNewInitialState(t *testing.T) {
 				Price:              math.MaxUint64,
 			},
 		},
+		{
+			name:   "price is maintained",
+			price:  123_456,
+			target: 1e6 / TargetToRate,
+			want: state{
+				ConsumedThisSecond: frac(0, 1e6),
+				Target:             1e6 / TargetToRate,
+				Price:              123_456,
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tm := time.Unix(tt.unix, tt.nanos)
-			got, err := New(tm, tt.target, tt.price, DefaultGasPriceConfig())
-			require.NoError(t, err)
-			got.requireState(t, fmt.Sprintf("New(%v, %d, %d)", tm, tt.target, tt.price), tt.want, ignore)
+			got := mustNew(t, tm, tt.target, tt.price, DefaultGasPriceConfig())
+			got.requireState(t, fmt.Sprintf("New(%v, %d, %d, %v)", tm, tt.target, tt.price, DefaultGasPriceConfig()), tt.want, ignore)
 		})
 	}
 }
