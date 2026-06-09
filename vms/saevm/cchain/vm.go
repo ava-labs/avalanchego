@@ -13,16 +13,22 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"sync"
+	"time"
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -36,9 +42,15 @@ import (
 type VM struct {
 	*sae.VM // created by [VM.Initialize]
 
-	ctx    *snow.Context
-	state  *state.State
-	txpool *txpool.Txpool
+	// gossip frequencies are configurable to speed up testing.
+	pullGossipPeriod time.Duration
+	pushGossipPeriod time.Duration
+
+	ctx          *snow.Context
+	state        *state.State
+	txpool       *txpool.Txpool
+	gossipSet    *gossip.BloomSet[*gossipTx]
+	pushGossiper *gossip.PushGossiper[*gossipTx]
 
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
@@ -126,6 +138,61 @@ func (vm *VM) Initialize(
 		vm.txpool.Close()
 		return nil
 	})
+
+	reg, err := metrics.MakeAndRegister(snowCtx.Metrics, "cchain")
+	if err != nil {
+		return fmt.Errorf("making metrics: %w", err)
+	}
+	bloomMetrics, err := bloom.NewMetrics("gossip_bloom", reg)
+	if err != nil {
+		return fmt.Errorf("creating gossip bloom metrics: %w", err)
+	}
+	vm.gossipSet, err = gossip.NewBloomSet(
+		newGossipTxPool(vm.txpool),
+		gossip.BloomSetConfig{
+			Metrics: bloomMetrics,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("creating gossip bloom set: %w", err)
+	}
+	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
+		snowCtx.NodeID,
+		vm.Network,
+		vm.ValidatorPeers,
+		vm.gossipSet,
+		gossipMarshaller{},
+		gossip.SystemConfig{
+			Log:           snowCtx.Log,
+			Registry:      reg,
+			Namespace:     "gossip",
+			HandlerID:     p2p.AtomicTxGossipHandlerID,
+			RequestPeriod: vm.pullGossipPeriod,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("creating cross-chain tx gossip system: %w", err)
+	}
+	vm.pushGossiper = pushGossiper
+
+	if err := vm.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
+		return fmt.Errorf("registering cross-chain tx gossip handler: %w", err)
+	}
+
+	gossipCtx, cancelGossip := context.WithCancel(context.Background())
+	var gossipWG sync.WaitGroup
+	gossipWG.Go(func() {
+		gossip.Every(gossipCtx, snowCtx.Log, pullGossiper, vm.pullGossipPeriod)
+	})
+	gossipWG.Go(func() {
+		gossip.Every(gossipCtx, snowCtx.Log, pushGossiper, vm.pushGossipPeriod)
+	})
+	vm.onClose = append(vm.onClose, func(context.Context) error {
+		cancelGossip()
+		gossipWG.Wait()
+		return nil
+	})
+
 	return nil
 }
 
@@ -142,7 +209,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		return nil, fmt.Errorf("creating SAE handlers: %w", err)
 	}
 
-	service, err := newService(vm.ctx, vm.txpool, vm.state)
+	service, err := newService(vm.ctx, vm.gossipSet, vm.pushGossiper, vm.state)
 	if err != nil {
 		return nil, fmt.Errorf("creating avax service: %w", err)
 	}
