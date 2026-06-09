@@ -16,30 +16,28 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
-// rawVM is the block-lookup surface shared by *sae.VM and, via embedding,
-// *cchain.VM.
+// rawVM is the block-lookup surface common to the SAE and C-Chain VMs.
 type rawVM interface {
 	LastAccepted(context.Context) (ids.ID, error)
 	GetBlock(context.Context, ids.ID) (*blocks.Block, error)
 }
 
-// SUT is the VM-agnostic system under test. VM is the concrete raw VM type, so
-// each package reaches its own internals via [SUT.RawVM] while sharing the
-// helpers below.
+// SUT is the VM-agnostic system under test. The VM type parameter lets each
+// package reach its own internals through [SUT.RawVM].
 type SUT[VM rawVM] struct {
 	RawVM  VM
 	Logger *loggingtest.Logger
 }
 
-// Context returns a [context.Context], derived from the [testing.TB], that is
-// cancelled if the SUT's logger receives a log at [logging.Error] or higher.
+// Context returns a [testing.TB]-scoped context that is cancelled when the
+// logger records a log at [logging.Error] or above.
 //
 //nolint:thelper // Not a helper
 func (s *SUT[VM]) Context(tb testing.TB) context.Context {
 	return s.Logger.CancelOnError(tb.Context())
 }
 
-// LastAcceptedID returns the ID of the last-accepted block.
+// LastAcceptedID returns the last-accepted block's ID.
 func (s *SUT[VM]) LastAcceptedID(tb testing.TB) ids.ID {
 	tb.Helper()
 	id, err := s.RawVM.LastAccepted(s.Context(tb))
@@ -58,9 +56,8 @@ func (s *SUT[VM]) LastAcceptedBlock(tb testing.TB) *blocks.Block {
 	return b
 }
 
-// DialWS dials the websocket RPC endpoint at wsURL, returning the raw client
-// alongside an [ethclient.Client] built on top of it. The shared transport is
-// closed during [testing.TB] cleanup.
+// DialWS dials wsURL and returns the RPC client and an [ethclient.Client]
+// sharing its transport, which is closed during cleanup.
 func DialWS(tb testing.TB, wsURL string) (*rpc.Client, *ethclient.Client) {
 	tb.Helper()
 	rpcClient, err := rpc.Dial(wsURL)
