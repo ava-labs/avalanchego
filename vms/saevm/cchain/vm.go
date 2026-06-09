@@ -217,8 +217,10 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 
 	eth := b.EthBlock()
 	extData := customtypes.BlockExtData(eth)
-	if want, got := customtypes.GetHeaderExtra(eth.Header()).ExtDataHash, customtypes.CalcExtDataHash(extData); want != got {
-		return nil, fmt.Errorf("%w: header %s, extData %s", errExtDataHashMismatch, want, got)
+	claimed := customtypes.GetHeaderExtra(eth.Header()).ExtDataHash
+	actual := customtypes.CalcExtDataHash(extData)
+	if claimed != actual {
+		return nil, fmt.Errorf("%w: header %s, extData %s", errExtDataHashMismatch, claimed, actual)
 	}
 	return b, nil
 }
