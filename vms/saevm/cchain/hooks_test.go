@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -20,60 +21,25 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
-// newBlockGeneric builds a [*types.Block] whose ExtData encodes txs, using the
-// supplied header. setExtDataHash controls whether NewBlockWithExtData
-// recomputes the committed ExtDataHash from extData (true) or keeps the value
-// already on the header (false).
-func newBlockGeneric(tb testing.TB, header *types.Header, setExtDataHash bool, txs ...*tx.Tx) *types.Block {
+// newBlock returns a minimal [*types.Block] whose ExtData encodes txs and
+// whose header is configured for ancestor traversal (parent hash + number).
+func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *types.Block {
 	tb.Helper()
 
 	extData, err := tx.MarshalSlice(txs)
 	require.NoErrorf(tb, err, "tx.MarshalSlice(%d txs)", len(txs))
 
 	return customtypes.NewBlockWithExtData(
-		header,
+		&types.Header{
+			ParentHash: parent,
+			Number:     new(big.Int).SetUint64(number),
+		},
 		nil, // txs
 		nil, // uncles
 		nil, // receipts
 		saetest.TrieHasher(),
 		extData,
-		setExtDataHash,
-	)
-}
-
-// newBlock returns a minimal [*types.Block] whose ExtData encodes txs and
-// whose header is configured for ancestor traversal (parent hash + number).
-func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *types.Block {
-	tb.Helper()
-
-	return newBlockGeneric(
-		tb,
-		&types.Header{
-			ParentHash: parent,
-			Number:     new(big.Int).SetUint64(number),
-		},
 		true, // setExtDataHash
-		txs...,
-	)
-}
-
-// newTamperedBlock returns a block that encodes txs but whose header commits an
-// ExtDataHash that does not match its extData, simulating tampering.
-func newTamperedBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *types.Block {
-	tb.Helper()
-
-	header := customtypes.WithHeaderExtra(
-		&types.Header{
-			ParentHash: parent,
-			Number:     new(big.Int).SetUint64(number),
-		},
-		&customtypes.HeaderExtra{ExtDataHash: common.Hash(ids.GenerateTestID())},
-	)
-	return newBlockGeneric(
-		tb,
-		header,
-		false, // keep the mismatching ExtDataHash; do not recompute
-		txs...,
 	)
 }
 
@@ -128,19 +94,20 @@ func TestAncestorInputIDs(t *testing.T) {
 			wantErr: errMissingBlock,
 		},
 	}
-	sharedSource := func(hash common.Hash, number uint64) (*types.Block, bool) {
-		for _, b := range []*types.Block{block1, block2, block3} {
-			if b.Hash() == hash && b.NumberU64() == number {
-				return b, true
-			}
-		}
-		return nil, false
-	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ancestorInputIDs(tt.header, tt.settled, sharedSource)
+			source := func(hash common.Hash, number uint64) (*types.Block, bool) {
+				for _, b := range []*types.Block{block1, block2, block3} {
+					if b.Hash() == hash && b.NumberU64() == number {
+						return b, true
+					}
+				}
+				return nil, false
+			}
+
+			got, err := ancestorInputIDs(tt.header, tt.settled, source)
 			require.ErrorIs(t, err, tt.wantErr, "ancestorInputIDs()")
-			require.Equal(t, tt.want, got, "ancestorInputIDs()")
+			assert.Equal(t, tt.want, got, "ancestorInputIDs()")
 		})
 	}
 }

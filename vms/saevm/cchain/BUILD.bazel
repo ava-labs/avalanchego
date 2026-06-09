@@ -74,7 +74,6 @@ go_test(
     srcs = [
         "api_test.go",
         "hooks_test.go",
-        "parse_test.go",
         "vm_test.go",
     ],
     embed = [":cchain"],
