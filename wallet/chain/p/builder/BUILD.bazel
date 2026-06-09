@@ -28,6 +28,7 @@ go_library(
         "//vms/platformvm/txs",
         "//vms/platformvm/txs/fee",
         "//vms/secp256k1fx",
+        "//vms/types",
         "//wallet/subnet/primary/common",
     ],
 )
