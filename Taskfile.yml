@@ -51,7 +51,7 @@ tasks:
 
   bazel-fmt:
     desc: Format BUILD.bazel files with buildifier
-    cmd: '{{.NIX_RUN}} buildifier -r .'
+    cmd: '{{.NIX_RUN}} bazelisk run @buildifier_prebuilt//:buildifier -- -r .'
 
   bazel-generate-metadata:
     desc: Regenerate Bazel metadata for this source tree

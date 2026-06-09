@@ -8,6 +8,7 @@
 package saexec
 
 import (
+	"fmt"
 	"io"
 	"sync/atomic"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm/eventual"
 	"github.com/ava-labs/libevm/params"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -49,6 +51,7 @@ type Executor struct {
 	chainConfig  *params.ChainConfig
 	db           ethdb.Database
 	xdb          saetypes.ExecutionResults
+	metrics      *metrics
 }
 
 // New constructs and starts a new [Executor]. Call [Executor.Close] to release
@@ -66,10 +69,16 @@ func New(
 	saedbConfig saedb.Config,
 	hooks hook.Points,
 	log logging.Logger,
+	reg prometheus.Registerer,
 ) (*Executor, error) {
 	t, err := saedb.NewTracker(db, saedbConfig, lastExecuted.PostExecutionStateRoot(), log)
 	if err != nil {
 		return nil, err
+	}
+
+	m, err := newMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering saexec metrics: %w", err)
 	}
 
 	e := &Executor{
@@ -90,9 +99,11 @@ func New(
 		chainConfig: chainConfig,
 		db:          db,
 		xdb:         xdb,
+		metrics:     m,
 		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)
+	e.metrics.markExecuted(lastExecuted.Height())
 
 	go e.processQueue()
 	return e, nil

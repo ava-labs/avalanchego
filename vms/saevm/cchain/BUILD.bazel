@@ -130,6 +130,7 @@ go_test(
         "//utils/buffer",
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",
+        "//utils/bloom",
         "//utils/crypto/secp256k1",
         "//utils/json",
         "//utils/logging",
