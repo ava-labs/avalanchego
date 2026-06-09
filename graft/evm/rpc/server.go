@@ -76,6 +76,10 @@ type Server struct {
 // If [maximumDuration] > 0, the deadline of incoming requests is
 // [maximumDuration] in the future. Otherwise, no deadline is assigned to
 // incoming requests.
+//
+// [metricsRegistry] is where the server's native-Prometheus metric vectors are
+// registered. A nil registry disables metric registration: the server then
+// holds a nil *rpcMetrics whose methods are no-ops (see ws_metrics.go).
 func NewServer(maximumDuration time.Duration, metricsRegistry prometheus.Registerer) *Server {
 	server := &Server{
 		idgen:           randomIDGenerator(),
