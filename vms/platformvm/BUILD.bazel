@@ -115,6 +115,7 @@ go_test(
         "//snow/validators",
         "//subnets",
         "//upgrade/upgradetest",
+        "//utils",
         "//utils/bloom",
         "//utils/constants",
         "//utils/crypto/bls",

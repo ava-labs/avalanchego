@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
@@ -34,12 +35,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -59,6 +61,8 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
+var _ saetest.Peer = (*SUT)(nil)
+
 // SUT is the system under test for the cchain [VM]. It bundles the [VM]
 // itself and an HTTP [Client] connected to an in-process [httptest.Server].
 type SUT struct {
@@ -66,15 +70,43 @@ type SUT struct {
 	*Client
 
 	memory    *atomic.Memory
+	sender    *saetest.Sender
 	ethclient *ethclient.Client
 }
 
+func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
+func (s *SUT) Sender() *saetest.Sender { return s.sender }
+
 type (
 	sutConfig struct {
-		genesis core.Genesis
+		genesis    core.Genesis
+		nodeID     ids.NodeID
+		validators set.Set[ids.NodeID]
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
+// balance to each address.
+func withMaxAllocFor(addrs ...common.Address) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
+	})
+}
+
+// withNodeID overrides the SUT's randomly generated NodeID.
+func withNodeID(id ids.NodeID) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.nodeID = id
+	})
+}
+
+// withValidators adds each NodeID to the validator set with weight 1.
+func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.validators = vdrs
+	})
+}
 
 // newSUT initializes a cchain [VM], transitions it to [snow.NormalOp], and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
@@ -83,7 +115,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
 	var (
-		vm  = &VM{}
+		vm = &VM{
+			pullGossipPeriod: 100 * time.Millisecond,
+			pushGossipPeriod: 100 * time.Millisecond,
+		}
 		db  = memdb.New()
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
@@ -92,6 +127,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Difficulty: big.NewInt(0), // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
 			},
+			nodeID: ids.GenerateTestNodeID(),
 		}, opts...)
 	)
 
@@ -99,21 +135,18 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
 	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
+	snowCtx.NodeID = cfg.nodeID
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
+	saetest.SetValidators(tb, snowCtx.ValidatorState, cfg.validators)
 
 	chainDB := prefixdb.New([]byte("chain"), db)
 
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
-	// The SAE mempool may push gossip transactions when they are issued.
-	appSender := &enginetest.Sender{
-		SendAppGossipF: func(context.Context, snowcommon.SendConfig, []byte) error {
-			return nil
-		},
-	}
+	appSender := saetest.NewSender(tb, cfg.validators)
 
 	ctx := log.CancelOnError(tb.Context())
 	require.NoErrorf(tb, vm.Initialize(
@@ -134,6 +167,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	})
 	require.NoErrorf(tb, vm.SetState(ctx, snow.NormalOp), "%T.SetState(%s)", vm, snow.NormalOp)
 
+	// Avalanchego marks the local node as connected so that p2p protocols don't
+	// need to treat our node as a special case.
+	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
+
 	handlers, err := vm.CreateHandlers(ctx)
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
 
@@ -150,12 +187,16 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
 	tb.Cleanup(ethRPCClient.Close)
 
-	return ctx, &SUT{
+	sut := &SUT{
 		VM:        vm,
 		Client:    NewClient(server.URL),
 		memory:    memory,
+		sender:    appSender,
 		ethclient: ethclient.NewClient(ethRPCClient),
 	}
+	appSender.SetSelf(sut)
+	tb.Cleanup(appSender.Close)
+	return ctx, sut
 }
 
 // assertUTXOsExist asserts that reader chain can read the expected UTXOs from
@@ -296,6 +337,14 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	return id
 }
 
+func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
+	tb.Helper()
+
+	e, err := s.WaitForEvent(ctx)
+	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
+	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
+}
+
 // buildVerify builds and verifies a block on top of preferenceID.
 func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID) *blocks.Block {
 	tb.Helper()
@@ -305,10 +354,7 @@ func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.I
 	var blockCtx *block.Context
 	require.NoErrorf(tb, s.SetPreference(ctx, preferenceID, blockCtx), "%T.SetPreference()", s.VM)
 
-	e, err := s.WaitForEvent(ctx)
-	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
-	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
-
+	s.waitForPendingTxs(ctx, tb)
 	blk, err := s.BuildBlock(ctx, blockCtx)
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
 	require.NoErrorf(tb, s.VerifyBlock(ctx, blockCtx, blk), "%T.VerifyBlock()", s.VM)
