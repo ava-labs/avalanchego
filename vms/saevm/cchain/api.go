@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -32,9 +33,10 @@ import (
 // The type is unexported but its methods are exported because gorilla RPC
 // reflects on them to dispatch requests.
 type service struct {
-	ctx    *snow.Context
-	txpool *txpool.Txpool
-	state  *state.State
+	ctx          *snow.Context
+	gossipSet    *gossip.BloomSet[*gossipTx]
+	pushGossiper *gossip.PushGossiper[*gossipTx]
+	state        *state.State
 
 	chainAlias  string
 	hrp         string
@@ -43,7 +45,8 @@ type service struct {
 
 func newService(
 	ctx *snow.Context,
-	pool *txpool.Txpool,
+	gossipSet *gossip.BloomSet[*gossipTx],
+	pushGossiper *gossip.PushGossiper[*gossipTx],
 	db *state.State,
 ) (*service, error) {
 	chainAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
@@ -58,9 +61,10 @@ func newService(
 	}
 
 	return &service{
-		ctx:    ctx,
-		txpool: pool,
-		state:  db,
+		ctx:          ctx,
+		gossipSet:    gossipSet,
+		pushGossiper: pushGossiper,
+		state:        db,
 
 		chainAlias:  chainAlias,
 		hrp:         hrp,
@@ -217,11 +221,14 @@ func (s *service) IssueTx(_ *http.Request, args *api.FormattedTx, resp *api.JSON
 	if err != nil {
 		return err
 	}
-	if err := s.txpool.Add(t); err != nil {
+	gossipTx := toGossipTx(t)
+	if err := s.gossipSet.Add(gossipTx); err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
 		return fmt.Errorf("%w: %w", errIssuingTx, err)
 	}
 
-	// TODO(StephenButtolph): Push gossip the tx.
+	// Always push, even if already in the pool. Otherwise a malicious RPC could
+	// suppress a tx from being efficiently gossiped to validators.
+	s.pushGossiper.Add(gossipTx)
 
 	resp.TxID = t.ID()
 	return nil
