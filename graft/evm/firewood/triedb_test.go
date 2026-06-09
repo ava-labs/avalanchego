@@ -25,16 +25,19 @@ func newTestDatabase(t *testing.T) state.Database {
 
 func newTestDatabaseWithConfig(t *testing.T, cfg TrieDBConfig) state.Database {
 	t.Helper()
-
-	memdb := rawdb.NewMemoryDatabase()
-	tdb := triedb.NewDatabase(memdb, &triedb.Config{
+	triedbConfig := &triedb.Config{
 		DBOverride: cfg.BackendConstructor,
-	})
+	}
+	internalState := state.NewDatabaseWithConfig(
+		rawdb.NewMemoryDatabase(),
+		triedbConfig,
+	)
+	tdb := internalState.TrieDB().Backend().(*TrieDB)
 	t.Cleanup(func() {
 		require.NoError(t, tdb.Close())
 	})
 
-	return state.NewDatabaseWithNodeDB(memdb, tdb)
+	return NewStateAccessor(internalState, tdb)
 }
 
 func TestCommitEmptyGenesis(t *testing.T) {
