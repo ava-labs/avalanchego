@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -27,7 +26,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -897,51 +895,6 @@ var _ = blockstest.ModifyHeader((*blockNumSaver)(nil).store)
 
 func (e *blockNumSaver) store(h *types.Header) {
 	e.num = new(big.Int).Set(h.Number)
-}
-
-func TestSnapshotPersistence(t *testing.T) {
-	ctx, sut := newSUT(t)
-
-	e, chain, wallet := sut.Executor, sut.chain, sut.wallet
-
-	const n = 10
-	for range n {
-		b := chain.NewBlock(t, types.Transactions{
-			wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-				To:       &common.Address{},
-				Gas:      params.TxGas,
-				GasPrice: big.NewInt(1),
-			}),
-		})
-		require.NoError(t, e.Enqueue(ctx, b), "Enqueue()")
-	}
-	last := chain.Last()
-	require.NoErrorf(t, last.WaitUntilExecuted(ctx), "%T.Last().WaitUntilExecuted()", chain)
-
-	require.NoErrorf(t, e.Close(), "%T.Close()", e)
-	// [newSUT] creates a cleanup that also calls [Executor.Close], which isn't
-	// valid usage. The simplest workaround is to just replace the quit channel
-	// so it can be closed again.
-	e.quit = make(chan struct{})
-
-	// The crux of the test is whether we can recover the EOA nonce using only a
-	// new set of snapshots, recovered from the databases.
-	conf := snapshot.Config{
-		CacheSize: saedb.DefaultSnapshotCacheSizeMB,
-		NoBuild:   true, // i.e. MUST be loaded from disk
-	}
-	snaps, err := snapshot.New(conf, sut.db, triedb.NewDatabase(e.db, nil), last.PostExecutionStateRoot())
-	require.NoError(t, err, "snapshot.New(..., [post-execution state root of last-executed block])")
-	snap := snaps.Snapshot(last.PostExecutionStateRoot())
-	require.NotNilf(t, snap, "%T.Snapshot([post-execution state root of last-executed block])", snaps)
-
-	t.Run("snap.Account(EOA)", func(t *testing.T) {
-		eoa := wallet.Addresses()[0]
-		got, err := snap.Account(crypto.Keccak256Hash(eoa.Bytes()))
-		require.NoError(t, err)
-		require.NotNil(t, got) // yes, this is still possible with nil error
-		require.Equalf(t, uint64(n), got.Nonce, "%T.Nonce", got)
-	})
 }
 
 func TestHashDBStateRootAvailability(t *testing.T) {

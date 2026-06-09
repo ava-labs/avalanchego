@@ -21,12 +21,16 @@ func SetBlockExtra(b *ethtypes.Block, extra *BlockBodyExtra) {
 	extras.Block.Set(b, extra)
 }
 
+var _ ethtypes.BlockBodyPayload[*BlockBodyExtra] = (*BlockBodyExtra)(nil)
+
 // BlockBodyExtra is a struct containing extra fields used by Avalanche
 // in the [Block] and [Body].
 type BlockBodyExtra struct {
 	Version uint32
 	ExtData *[]byte
 }
+
+func (*BlockBodyExtra) PostRPCMarshal(*ethtypes.Block, map[string]any) {}
 
 // Copy deep copies the [BlockBodyExtra] `b` and returns it.
 // It is notably used in the following functions:

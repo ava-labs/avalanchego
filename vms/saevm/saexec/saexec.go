@@ -118,7 +118,7 @@ func (e *Executor) Close() error {
 	close(e.quit)
 	<-e.done
 
-	return e.Tracker.Close(e.LastExecuted().PostExecutionStateRoot())
+	return e.Tracker.Close()
 }
 
 // ChainConfig returns the config originally passed to [New].
