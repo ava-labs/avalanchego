@@ -130,7 +130,7 @@ func TestMulDiv(t *testing.T) {
 			a:       100,
 			b:       5,
 			c:       0,
-			wantErr: errDivideByZero,
+			wantErr: ErrDivideByZero,
 		},
 		{
 			name: "a is zero",
