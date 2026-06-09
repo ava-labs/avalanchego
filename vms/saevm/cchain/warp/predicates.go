@@ -101,8 +101,8 @@ func verifyTx(
 		results = append(results, result{
 			key: address,
 			value: verifyContract(
-				rules.Predicaters[address],
 				pc,
+				rules.Predicaters[address],
 				predicates,
 				eg,
 			),
@@ -119,8 +119,8 @@ func verifyTx(
 // It returns a function that assembles the contract's results; the function
 // must only be called after eg.Wait has returned.
 func verifyContract(
-	contract precompileconfig.Predicater,
 	pc *precompileconfig.PredicateContext,
+	contract precompileconfig.Predicater,
 	predicates []predicate.Predicate,
 	eg *errgroup.Group,
 ) lazy[set.Bits] {
