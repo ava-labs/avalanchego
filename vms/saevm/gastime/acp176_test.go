@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -840,68 +839,69 @@ func TestOscillatingMinPrice(t *testing.T) {
 }
 
 func BenchmarkPriceExcess(b *testing.B) {
+	// K = scaling * target.
 	benchmarks := []struct {
-		name string
-		p    gas.Price
-		k    *uint256.Int
+		name    string
+		p       gas.Price
+		scaling gas.Gas
+		target  gas.Gas
 	}{
-		{"p=1", 1, uint256.NewInt(87_000_000)},
-		{"small", 100, uint256.NewInt(87_000_000)},
-		{"medium", 1_000_000_000, uint256.NewInt(87_000_000)},
-		{"large", math.MaxUint64, uint256.NewInt(87_000_000)},
-		{"large_k", 1_000_000_000, uint256.NewInt(math.MaxUint64)},
-		{"wide_k", 1_000_000_000, new(uint256.Int).Mul(uint256.NewInt(1_000_000), uint256.NewInt(math.MaxUint64))},
-		{"slowest", math.MaxUint64, uint256.NewInt(1 << 58)},
+		{"p=1", 1, 87_000_000, 1},
+		{"small", 100, 87_000_000, 1},
+		{"medium", 1_000_000_000, 87_000_000, 1},
+		{"large", math.MaxUint64, 87_000_000, 1},
+		{"large_k", 1_000_000_000, math.MaxUint64, 1},
+		{"wide_k", 1_000_000_000, 1_000_000, math.MaxUint64},
+		{"slowest", math.MaxUint64, 1 << 58, 1},
 	}
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
 			for b.Loop() {
-				excessForPrice(bm.p, bm.k)
+				excessForPrice(bm.p, bm.scaling, bm.target)
 			}
 		})
 	}
 }
 
 func FuzzPriceExcess(f *testing.F) {
+	// K = scaling * target, which may exceed MaxUint64.
 	seeds := []struct {
-		p     gas.Price
-		kHigh uint64
-		kLow  uint64
+		p       gas.Price
+		scaling uint64
+		target  uint64
 	}{
-		{1, 0, 1},
-		{2, 0, 1},
-		{2, 0, 1_000_000_000},
-		{1_000_000_000, 0, 1},
-		{2, 0, math.MaxUint64},
-		{2, 1, 0},
+		{1, 1, 1},
+		{2, 1, 1},
+		{2, 1, 1_000_000_000},
+		{1_000_000_000, 1, 1},
+		{2, 1, math.MaxUint64},
 		{1_000_000_000, math.MaxUint64, math.MaxUint64},
-		{math.MaxUint64, 0, 1},
-		{math.MaxUint64, 0, math.MaxUint64},
+		{math.MaxUint64, 1, 1},
+		{math.MaxUint64, 1, math.MaxUint64},
 		{math.MaxUint64, math.MaxUint64, math.MaxUint64},
 	}
 	for _, s := range seeds {
-		f.Add(uint64(s.p), s.kHigh, s.kLow)
+		f.Add(uint64(s.p), s.scaling, s.target)
 	}
-	f.Fuzz(func(t *testing.T, pInt, kHigh, kLow uint64) {
+	f.Fuzz(func(t *testing.T, pInt, scalingInt, targetInt uint64) {
 		p := gas.Price(pInt)
 		if p == 0 {
 			t.Skip("ln(0) is undefined")
 		}
-		// uint256.Int stores 64-bit words little-endian.
-		k := uint256.Int{kLow, kHigh}
-		if k.IsZero() {
+		scaling, target := gas.Gas(scalingInt), gas.Gas(targetInt)
+		if scaling == 0 || target == 0 {
 			t.Skip("div by zero is undefined")
 		}
 
-		x := excessForPrice(p, &k)
-		gotP := calculatePrice(x, &k)
+		x := excessForPrice(p, scaling, target)
+		gotP := calculatePrice(x, scaling, target)
 		assert.LessOrEqual(t, gotP, p, "gotPrice <= wantPrice")
 
 		if gotP < p && x != math.MaxUint64 {
-			require.Greater(t, calculatePrice(x+1, &k), p, "calculatePrice(x+1) > wantPrice")
+			require.Greater(t, calculatePrice(x+1, scaling, target), p, "calculatePrice(x+1) > wantPrice")
 		}
 		if gotP == p && x != 0 {
-			require.Less(t, calculatePrice(x-1, &k), p, "calculatePrice(x-1) < wantPrice")
+			require.Less(t, calculatePrice(x-1, scaling, target), p, "calculatePrice(x-1) < wantPrice")
 		}
 	})
 }

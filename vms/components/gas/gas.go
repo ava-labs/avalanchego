@@ -88,23 +88,31 @@ func CalculatePrice(
 	return calculatePrice(minPrice, excess, &denominator)
 }
 
-// CalculatePriceWithExcessConversion is equivalent to [CalculatePrice], with
-// excessConversionConstant provided as a [uint256.Int] to allow values above
-// MaxUint64. excessConversionConstant MUST be in the range [1, MaxUint128].
+// CalculatePriceWithExcessConversion is equivalent to [CalculatePrice], except
+// that the excess conversion constant is supplied as the two factors whose
+// product forms it: targetToExcessScaling * target. Splitting it this way lets
+// the constant exceed [math.MaxUint64] while remaining bounded by MaxUint64^2 by
+// construction. The product MUST be non-zero.
 func CalculatePriceWithExcessConversion(
 	minPrice Price,
 	excess Gas,
-	excessConversionConstant *uint256.Int,
+	targetToExcessScaling Gas,
+	target Gas,
 ) Price {
-	return calculatePrice(minPrice, excess, excessConversionConstant)
+	var scaling, denominator uint256.Int
+	scaling.SetUint64(uint64(targetToExcessScaling)) // range is [0, MaxUint64]
+	denominator.SetUint64(uint64(target))            // range is [0, MaxUint64]
+	denominator.Mul(&denominator, &scaling)          // range is [0, MaxUint64^2]
+	return calculatePrice(minPrice, excess, &denominator)
 }
 
 // calculatePrice is the shared implementation of [CalculatePrice] and
 // [CalculatePriceWithExcessConversion].
 //
 // This implementation is optimized with the knowledge that any value greater
-// than MaxUint64 gets returned as MaxUint64. With denominator in [1, MaxUint128],
-// every intermediate value fits in a uint256.Int:
+// than MaxUint64 gets returned as MaxUint64. Both callers guarantee by
+// construction that denominator is in [1, MaxUint128], so every intermediate
+// value fits in a uint256.Int:
 //   - maxOutput (= denominator * MaxUint64) is below 2^192;
 //   - each term selected for multiplication is below maxOutput, so multiplying it
 //     by numerator (< 2^64) stays below 2^256;

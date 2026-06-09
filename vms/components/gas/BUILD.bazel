@@ -27,7 +27,6 @@ go_test(
     embed = [":gas"],
     deps = [
         "//utils/math",
-        "@com_github_holiman_uint256//:uint256",
         "@com_github_stretchr_testify//require",
     ],
 )

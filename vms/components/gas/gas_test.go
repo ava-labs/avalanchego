@@ -8,7 +8,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
 
@@ -183,43 +182,47 @@ func Test_CalculatePrice(t *testing.T) {
 }
 
 func Test_CalculatePriceWithExcessConversion(t *testing.T) {
-	maxUint64Times2 := new(uint256.Int).Mul(uint256.NewInt(2), uint256.NewInt(math.MaxUint64))
-	maxUint64Times4 := new(uint256.Int).Mul(uint256.NewInt(4), uint256.NewInt(math.MaxUint64))
-
 	tests := []struct {
-		name                     string
-		minPrice                 Price
-		excess                   Gas
-		excessConversionConstant *uint256.Int
-		want                     Price
+		name                  string
+		minPrice              Price
+		excess                Gas
+		targetToExcessScaling Gas
+		target                Gas
+		want                  Price
 	}{
 		{
-			name:                     "uint64_denominator_matches_calculate_price",
-			minPrice:                 10,
-			excess:                   10_000_000,
-			excessConversionConstant: uint256.NewInt(1_000_000),
-			want:                     CalculatePrice(10, 10_000_000, 1_000_000),
+			name:                  "uint64_denominator_matches_calculate_price",
+			minPrice:              10,
+			excess:                10_000_000,
+			targetToExcessScaling: 1_000_000,
+			target:                1,
+			want:                  CalculatePrice(10, 10_000_000, 1_000_000),
 		},
 		{
-			name:                     "two_max_uint64_denominator",
-			minPrice:                 10,
-			excess:                   math.MaxUint64,
-			excessConversionConstant: maxUint64Times2,
-			want:                     16,
+			// K = 2 * MaxUint64, exceeding MaxUint64.
+			name:                  "two_max_uint64_denominator",
+			minPrice:              10,
+			excess:                math.MaxUint64,
+			targetToExcessScaling: 2,
+			target:                math.MaxUint64,
+			want:                  16,
 		},
 		{
-			name:                     "four_max_uint64_denominator",
-			minPrice:                 10,
-			excess:                   math.MaxUint64,
-			excessConversionConstant: maxUint64Times4,
-			want:                     12,
+			// K = 4 * MaxUint64, exceeding MaxUint64.
+			name:                  "four_max_uint64_denominator",
+			minPrice:              10,
+			excess:                math.MaxUint64,
+			targetToExcessScaling: 4,
+			target:                math.MaxUint64,
+			want:                  12,
 		},
 		{
-			name:                     "caps_at_max_uint64",
-			minPrice:                 math.MaxUint64,
-			excess:                   math.MaxUint64,
-			excessConversionConstant: maxUint64Times2,
-			want:                     math.MaxUint64,
+			name:                  "caps_at_max_uint64",
+			minPrice:              math.MaxUint64,
+			excess:                math.MaxUint64,
+			targetToExcessScaling: 2,
+			target:                math.MaxUint64,
+			want:                  math.MaxUint64,
 		},
 	}
 
@@ -228,9 +231,10 @@ func Test_CalculatePriceWithExcessConversion(t *testing.T) {
 			got := CalculatePriceWithExcessConversion(
 				tt.minPrice,
 				tt.excess,
-				tt.excessConversionConstant,
+				tt.targetToExcessScaling,
+				tt.target,
 			)
-			require.Equal(t, tt.want, got, "CalculatePriceWithExcessConversion(%d, %d, %s)", tt.minPrice, tt.excess, tt.excessConversionConstant.Dec())
+			require.Equal(t, tt.want, got, "CalculatePriceWithExcessConversion(%d, %d, %d, %d)", tt.minPrice, tt.excess, tt.targetToExcessScaling, tt.target)
 		})
 	}
 }

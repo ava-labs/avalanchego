@@ -96,14 +96,14 @@ func mulAsUint256[T ~uint64](a, b T) uint256.Int {
 
 // enforceMinExcess bounds excess to be no less than excessForPrice(minPrice, k).
 func (tm *Time) enforceMinExcess() {
-	k := tm.excessScalingFactor()
+	scaling, target := tm.config.TargetToExcessScaling, tm.target
 	// Avoid the binary search in [excessForPrice] when the current excess
 	// already yields a price that satisfies the minimum.
-	if calculatePrice(tm.excess, &k) >= tm.config.MinPrice {
+	if calculatePrice(tm.excess, scaling, target) >= tm.config.MinPrice {
 		return
 	}
 
-	minExcess := excessForPrice(tm.config.MinPrice, &k)
+	minExcess := excessForPrice(tm.config.MinPrice, scaling, target)
 	tm.excess = max(tm.excess, minExcess)
 }
 
@@ -113,17 +113,17 @@ func (tm *Time) enforceMinExcess() {
 // that does so. Otherwise, it returns the greatest excess that still produces a
 // lower price, which can happen because of integer approximation or because the
 // required excess is above [math.MaxUint64].
-func excessForPrice(p gas.Price, k *uint256.Int) gas.Gas {
+func excessForPrice(p gas.Price, scaling, target gas.Gas) gas.Gas {
 	if p <= 1 {
 		return 0
 	}
-	// Binary search for the minimum x where calculatePrice(x, k) >= p.
+	// Binary search for the minimum x where calculatePrice(x, ...) >= p.
 	//
-	// calculatePrice(0, k) == 1 and p > 1, so lo > 0.
+	// calculatePrice(0, ...) == 1 and p > 1, so lo > 0.
 	lo, hi := gas.Gas(1), gas.Gas(math.MaxUint64)
 	for lo < hi {
 		mid := lo + (hi-lo)/2
-		if calculatePrice(mid, k) >= p {
+		if calculatePrice(mid, scaling, target) >= p {
 			hi = mid
 		} else {
 			lo = mid + 1
@@ -131,14 +131,14 @@ func excessForPrice(p gas.Price, k *uint256.Int) gas.Gas {
 	}
 	// If [calculatePrice] can't generate p exactly, honor the lower price
 	// expectation.
-	if calculatePrice(lo, k) > p {
+	if calculatePrice(lo, scaling, target) > p {
 		return lo - 1
 	}
 	return lo
 }
 
-// calculatePrice returns an integer approximation of e^(x/k), capped at
-// [math.MaxUint64].
-func calculatePrice(x gas.Gas, k *uint256.Int) gas.Price {
-	return gas.CalculatePriceWithExcessConversion(1, x, k)
+// calculatePrice returns an integer approximation of e^(x/(scaling*target)),
+// capped at [math.MaxUint64].
+func calculatePrice(x, scaling, target gas.Gas) gas.Price {
+	return gas.CalculatePriceWithExcessConversion(1, x, scaling, target)
 }
