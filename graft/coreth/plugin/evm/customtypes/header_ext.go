@@ -33,6 +33,8 @@ func WithHeaderExtra(h *ethtypes.Header, extra *HeaderExtra) *ethtypes.Header {
 	return h
 }
 
+var _ ethtypes.HeaderHooks = (*HeaderExtra)(nil)
+
 // HeaderExtra is a struct that contains extra fields used by Avalanche
 // in the block header.
 // This type uses [HeaderSerializable] to encode and decode the extra fields
@@ -105,6 +107,8 @@ func (h *HeaderExtra) DecodeJSON(eth *ethtypes.Header, input []byte) error {
 
 	return nil
 }
+
+func (*HeaderExtra) PostRPCMarshal(*ethtypes.Header, map[string]any) {}
 
 func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 	cp := &HeaderExtra{
