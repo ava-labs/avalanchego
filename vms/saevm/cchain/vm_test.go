@@ -47,7 +47,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -116,6 +115,10 @@ func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
+	// Run under the latest network upgrade rules by default.
+	chainConfig := cparams.Copy(saetest.ChainConfig())
+	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
+
 	var (
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -124,7 +127,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		db  = memdb.New()
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
-				Config:     saetest.ChainConfig(),
+				Config:     &chainConfig,
 				Timestamp:  saeparams.TauSeconds,
 				Difficulty: big.NewInt(0), // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
@@ -345,6 +348,30 @@ func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 	e, err := s.WaitForEvent(ctx)
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
 	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
+}
+
+// waitForPendingEthTxs blocks until at least want txs are pending in the eth
+// mempool, so the builder includes them all rather than racing promotion.
+func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, want int) {
+	tb.Helper()
+
+	backend := s.GethRPCBackends()
+	ch := make(chan core.NewTxsEvent, 1)
+	sub := backend.SubscribeNewTxsEvent(ch)
+	defer sub.Unsubscribe()
+
+	for {
+		if pending, _ := backend.Stats(); pending >= want {
+			return
+		}
+		select {
+		case <-ch:
+		case err := <-sub.Err():
+			require.NoErrorf(tb, err, "%T.SubscribeNewTxsEvent()", backend)
+		case <-ctx.Done():
+			tb.Fatalf("%v waiting for %d pending eth txs", context.Cause(ctx), want)
+		}
+	}
 }
 
 // buildVerify builds and verifies a block on top of preferenceID.
@@ -704,24 +731,17 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	sut.assertUTXOsMissing(t, destinationChain, sut.ctx.ChainID, exportedUTXOs...)
 }
 
-// TestMinGasConsumptionFloor asserts that the cchain VM charges
-// max(actualGasUsed, ceil(limit/Lambda)) per ACP-194.
+// TestMinGasConsumptionFloor asserts that the cchain VM charges the ACP-194
+// gas floor of max(actualGasUsed, ceil(gasLimit/2)).
 func TestMinGasConsumptionFloor(t *testing.T) {
-	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
-	sender := ethWallet.Addresses()[0]
-
-	// ACP-194 is gated by Helicon, which the default test config leaves
-	// unscheduled.
-	heliconConfig := cparams.Copy(saetest.ChainConfig())
-	cparams.WithExtra(&heliconConfig, extras.TestHeliconChainConfig)
+	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	sender := w.Addresses()[0]
 
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Config = &heliconConfig
 		c.genesis.Alloc = saetest.MaxAllocFor(sender)
 	}))
 
 	const highLimit = 1_000_000
-	recipient := common.Address{0xaa}
 	tests := []struct {
 		name        string
 		gasLimit    uint64
@@ -730,7 +750,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 		{
 			name:        "low_usage_charged_floor",
 			gasLimit:    highLimit,
-			wantGasUsed: hook.MinimumGasConsumption(highLimit),
+			wantGasUsed: highLimit / 2,
 		},
 		{
 			name:        "usage_above_floor_charged_actual",
@@ -742,13 +762,16 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	// A GasFeeCap of 1 pins the effective gas price to 1, so the AVAX burned
 	// equals the gas charged.
 	for _, tt := range tests {
-		stx := ethWallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-			To:        &recipient,
+		stx := w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
 			Gas:       tt.gasLimit,
 			GasFeeCap: big.NewInt(1),
 		})
 		require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, stx), "%T.SendTransaction(%s)", sut.ethclient, tt.name)
 	}
+
+	// Ensure every tx is pending so the builder includes them all in one block.
+	sut.waitForPendingEthTxs(ctx, t, len(tests))
 
 	preBalance := sut.balance(t, sender)
 	blk := sut.runConsensusLoop(ctx, t)
