@@ -9,12 +9,12 @@ import (
 	"math"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/testonly"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
-	"github.com/ava-labs/libevm/libevm/testonly"
 )
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
