@@ -4,13 +4,11 @@
 // Package dynamic implements the exponential integrators used to ramp
 // C-Chain consensus parameters smoothly between blocks.
 //
-// Each parameter is encoded as an exponent type (PriceExponent, DelayExponent,
-// TargetExponent) that exposes:
+// Each parameter is encoded as an exponent type ([PriceExponent],
+// [DelayExponent], [TargetExponent]) that exposes:
 //   - a reader that decodes the exponent to its parameter value.
 //   - Toward, which moves the exponent one clamped step toward a desired
 //     target (nil = no change).
 //   - a Desired* function that inverts the reader to find the smallest
 //     exponent yielding a desired value.
-//
-// The shared math primitives live in math.go.
 package dynamic
