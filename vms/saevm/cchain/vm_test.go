@@ -30,6 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
@@ -46,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -699,4 +702,70 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	// execution results to have been applied.
 	exportedUTXOs := txtest.ExportedUTXOs(signedExport.ID(), export)
 	sut.assertUTXOsMissing(t, destinationChain, sut.ctx.ChainID, exportedUTXOs...)
+}
+
+// TestMinGasConsumptionFloor asserts that the cchain VM charges
+// max(actualGasUsed, ceil(limit/Lambda)) per ACP-194.
+func TestMinGasConsumptionFloor(t *testing.T) {
+	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	sender := ethWallet.Addresses()[0]
+
+	// ACP-194 is gated by Helicon, which the default test config leaves
+	// unscheduled.
+	heliconConfig := cparams.Copy(saetest.ChainConfig())
+	cparams.WithExtra(&heliconConfig, extras.TestHeliconChainConfig)
+
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Config = &heliconConfig
+		c.genesis.Alloc = saetest.MaxAllocFor(sender)
+	}))
+
+	const highLimit = 1_000_000
+	recipient := common.Address{0xaa}
+	tests := []struct {
+		name        string
+		gasLimit    uint64
+		wantGasUsed uint64
+	}{
+		{
+			name:        "low_usage_charged_floor",
+			gasLimit:    highLimit,
+			wantGasUsed: hook.MinimumGasConsumption(highLimit),
+		},
+		{
+			name:        "usage_above_floor_charged_actual",
+			gasLimit:    ethparams.TxGas,
+			wantGasUsed: ethparams.TxGas,
+		},
+	}
+
+	// A GasFeeCap of 1 pins the effective gas price to 1, so the AVAX burned
+	// equals the gas charged.
+	for _, tt := range tests {
+		stx := ethWallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &recipient,
+			Gas:       tt.gasLimit,
+			GasFeeCap: big.NewInt(1),
+		})
+		require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, stx), "%T.SendTransaction(%s)", sut.ethclient, tt.name)
+	}
+
+	preBalance := sut.balance(t, sender)
+	blk := sut.runConsensusLoop(ctx, t)
+	receipts := blk.Receipts()
+	require.Lenf(t, receipts, len(tests), "%T.Receipts()", blk)
+
+	var totalCharged uint64
+	for i, tt := range tests {
+		receipt := receipts[i]
+		totalCharged += tt.wantGasUsed
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, types.ReceiptStatusSuccessful, receipt.Status, "tx status")
+			assert.Equal(t, tt.wantGasUsed, receipt.GasUsed, "gas charged")
+			assert.Equal(t, big.NewInt(1), receipt.EffectiveGasPrice, "effective gas price")
+		})
+	}
+
+	wantBalance := new(uint256.Int).Sub(&preBalance, uint256.NewInt(totalCharged))
+	assert.Equalf(t, *wantBalance, sut.balance(t, sender), "sender balance reflects gas charged")
 }
