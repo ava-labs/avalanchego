@@ -22,7 +22,10 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
     /// * `proof_node` - A branch proof node containing the key (as nibble
     ///   path components) and an optional value digest to reconcile.
     /// * `on_conflict` - Called only when the proof node's value and the
-    ///   existing branch value conflict. Returning `Ok(Some(value))` stores
+    ///   existing branch value conflict. It receives the proof node and the
+    ///   branch's current value (`None` if the branch holds no value, e.g.
+    ///   because the key is out of range or — for a tampered change proof —
+    ///   an in-range `Put` was omitted). Returning `Ok(Some(value))` stores
     ///   that value in the branch, `Ok(None)` clears the branch value, and
     ///   `Err(...)` aborts reconciliation with that error.
     ///
@@ -33,7 +36,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
     pub(crate) fn reconcile_branch_proof_node(
         &mut self,
         proof_node: &ProofNode,
-        on_conflict: impl FnOnce(&ProofNode) -> Result<Option<Value>, ProofError>,
+        on_conflict: impl FnOnce(&ProofNode, Option<&[u8]>) -> Result<Option<Value>, ProofError>,
     ) -> Result<(), ProofError> {
         let key_nibbles: Box<[u8]> = proof_node
             .key
@@ -61,13 +64,19 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
                 // In merkledb mode, large values (>= 32 bytes) are stored as
                 // hashes in serialized proofs. If the branch's value hashes to
                 // the same value, the proof and trie agree — no conflict.
-                // Otherwise fall through with proof_value = None:
-                //  - branch has no value: None == None → Ok(()), no callback.
-                //  - branch has mismatched value: None != Some(v) → callback.
-                match branch.value.as_deref() {
-                    Some(v) if digest.as_ref().verify(v) => return Ok(()),
-                    _ => None,
+                if matches!(branch.value.as_deref(), Some(v) if digest.as_ref().verify(v)) {
+                    return Ok(());
                 }
+                // Otherwise the proof asserts a (hashed) value the branch does
+                // not satisfy — *including* the case where the branch has no
+                // value at all. This must NOT be silently accepted by the
+                // `None == None` short-circuit below: a dropped in-range `Put`
+                // leaves the branch empty while the boundary proof still
+                // carries the omitted key's hash, so treating that as
+                // agreement would let a tampered change proof verify. Defer to
+                // `on_conflict` so the caller's in-range guard can reject it.
+                branch.value = on_conflict(proof_node, branch.value.as_deref())?;
+                return Ok(());
             }
             _ => None,
         };
@@ -97,7 +106,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
         }
 
         // Values differ — let the caller decide what to do.
-        branch.value = on_conflict(proof_node)?;
+        branch.value = on_conflict(proof_node, branch.value.as_deref())?;
         Ok(())
     }
 }

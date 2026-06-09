@@ -12,7 +12,7 @@ fn test_reconcile_branch_proof_node_creates_missing_branch_without_value() {
     let proof_node = test_branch_proof_node(&[0xa, 0xb, 0xc], None);
 
     merkle
-        .reconcile_branch_proof_node(&proof_node, |_| unreachable!())
+        .reconcile_branch_proof_node(&proof_node, |_, _| unreachable!())
         .unwrap();
 
     let node = merkle
@@ -33,7 +33,7 @@ fn test_reconcile_branch_proof_node_sets_missing_value_via_callback() {
 
     // Proof has a value but trie doesn't — callback resolves it.
     merkle
-        .reconcile_branch_proof_node(&proof_node, |pn| match &pn.value_digest {
+        .reconcile_branch_proof_node(&proof_node, |pn, _| match &pn.value_digest {
             Some(ValueDigest::Value(v)) => Ok(Some(v.clone())),
             _ => Ok(None),
         })
@@ -54,7 +54,7 @@ fn test_reconcile_branch_proof_node_clears_value_via_callback() {
 
     // Proof says no value, trie has one — callback returns None to clear it.
     merkle
-        .reconcile_branch_proof_node(&proof_node, |_| Ok(None))
+        .reconcile_branch_proof_node(&proof_node, |_, _| Ok(None))
         .unwrap();
 
     let node = merkle.get_node_from_nibbles(&[0xa, 0xb]).unwrap().unwrap();
@@ -73,7 +73,7 @@ fn test_reconcile_branch_proof_node_rejects_conflict_via_callback() {
 
     // Callback rejects the conflict.
     let err = merkle
-        .reconcile_branch_proof_node(&proof_node, |_| Err(ProofError::UnexpectedValue))
+        .reconcile_branch_proof_node(&proof_node, |_, _| Err(ProofError::UnexpectedValue))
         .unwrap_err();
     assert!(matches!(err, ProofError::UnexpectedValue));
 
@@ -119,7 +119,7 @@ fn test_reconcile_branch_proof_node_account_storage_root_relaxation(
     // fired: a storageRoot-only diff returns early with Ok and never consults
     // on_conflict; any other field difference falls through to the Err.
     let result =
-        merkle.reconcile_branch_proof_node(&proof_node, |_| Err(ProofError::UnexpectedValue));
+        merkle.reconcile_branch_proof_node(&proof_node, |_, _| Err(ProofError::UnexpectedValue));
 
     if expect_reconciled {
         result.expect("storageRoot-only diff must reconcile without conflict");

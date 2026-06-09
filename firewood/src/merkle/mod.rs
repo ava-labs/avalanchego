@@ -1004,17 +1004,21 @@ fn verify_range_proof_root_hash<H: ProofCollection<Node = ProofNode>>(
         //    proving trie doesn't have (e.g., empty range where no key-value
         //    pairs were inserted). Accept the proof's value.
         //  - ValueDigest::Hash: When the hash matches the branch value,
-        //    reconcile_branch_proof_node returns early (no callback). When
-        //    the branch has no value, None == None succeeds (no callback).
-        //    A hash mismatch with an existing branch value reaches the
-        //    callback and is rejected.
+        //    reconcile_branch_proof_node returns early (no callback). When the
+        //    branch has no value, the node is out of range — its subtree is
+        //    represented by the proof's stored hash, so we accept it with no
+        //    value (`Ok(None)`). A hash mismatch against an *existing* branch
+        //    value is a real conflict and is rejected. (In-range range-proof
+        //    keys are always present in `key_values`, so a missing branch
+        //    value here can only be out of range.)
         //  - ValueDigest::None: Unreachable — if the trie has a value, the
         //    proof node will carry Value or Hash, not None.
-        //
-        // The _ arm rejects defensively for both Hash mismatch and None.
-        proving_merkle.reconcile_branch_proof_node(proof_node, |pn| match &pn.value_digest {
-            Some(ValueDigest::Value(v)) => Ok(Some(v.clone())),
-            _ => Err(ProofError::UnexpectedValue),
+        proving_merkle.reconcile_branch_proof_node(proof_node, |pn, branch_value| {
+            match &pn.value_digest {
+                Some(ValueDigest::Value(v)) => Ok(Some(v.clone())),
+                _ if branch_value.is_none() => Ok(None),
+                _ => Err(ProofError::UnexpectedValue),
+            }
         })?;
         match proof_node_map.entry(proof_node.key.clone()) {
             std::collections::hash_map::Entry::Occupied(existing) => {
@@ -1133,13 +1137,16 @@ pub fn verify_change_proof_root_hash(
         .unwrap_or_default();
 
     for proof_node in start_nodes {
-        proving_merkle.reconcile_branch_proof_node(proof_node, |pn| {
+        proving_merkle.reconcile_branch_proof_node(proof_node, |pn, _branch_value| {
             let node_nibbles: Vec<u8> = pn.key.iter().map(|c| c.as_u8()).collect();
             // A start proof node is in-range if its key >= start_key. This
             // covers both inclusion proofs (key == start_key) and exclusion
             // proofs where the terminal node overshoots start_key to the
-            // nearest existing key. Value conflicts at in-range positions
-            // are real errors — the proposal already has the correct value.
+            // nearest existing key. Reaching this guard at an in-range
+            // position is always a real error: the proposal already holds the
+            // correct value, so the only way the proof node and branch
+            // disagree is tampering — e.g. a dropped in-range `Put` whose
+            // boundary proof still carries the omitted key's hash.
             if node_nibbles >= start_key_nibbles {
                 Err(ProofError::UnexpectedValue)
             } else {
@@ -1162,7 +1169,7 @@ pub fn verify_change_proof_root_hash(
         .unwrap_or_default();
 
     for proof_node in end_nodes {
-        proving_merkle.reconcile_branch_proof_node(proof_node, |pn| {
+        proving_merkle.reconcile_branch_proof_node(proof_node, |pn, _branch_value| {
             let node_nibbles: Vec<u8> = pn.key.iter().map(|c| c.as_u8()).collect();
             // Symmetric to the start proof: an end proof node is in-range
             // if its key <= end_key (covers exclusion proofs where the

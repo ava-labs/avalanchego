@@ -1008,6 +1008,119 @@ fn test_swapped_value_in_range_is_rejected() {
     );
 }
 
+/// A dropped in-range Put whose boundary node carries a `Hash` digest must be
+/// rejected when it hides behind a *left-edge* exclusion proof.
+///
+/// `start_key` `\x12\x30` is absent and shares a prefix with the new key
+/// `\x12\x34`, so the start exclusion proof descends to `\x12\x34`, making the
+/// terminal proof node carry a hash digest (value >= 32 bytes after
+/// serialization). Dropping Put `\x12\x34` leaves the proving branch empty
+/// while that boundary node still carries the hash, so the old reconcile
+/// silently accepted it (`None == None`). The second op (`\x90`) keeps the
+/// batch non-empty so the tamper reaches reconcile instead of the structural
+/// check.
+#[cfg(not(feature = "ethhash"))]
+#[test]
+fn test_crafted_dropped_hashed_put_behind_left_exclusion_rejected() {
+    let big = [0xabu8; 40]; // >= 32 bytes => Hash after serialization
+    // start: 0x90 only. end: add NEW key 0x1234 (large value) AND change 0x90
+    // (a second in-range op so the batch isn't empty after dropping 0x1234).
+    let (source, target, root1_target, _ds, _dt) = setup_source_target![(b"\x90", b"anchor")];
+    let (root1_source, root2) = setup_2nd_commit!(
+        source,
+        [
+            (b"\x12\x34" as &[u8], big.as_slice()),
+            (b"\x90", b"changed")
+        ]
+    );
+
+    let valid = source
+        .change_proof(root1_source, root2.clone(), Some(b"\x12\x30"), None, None)
+        .unwrap();
+
+    // Serialize so 0x1234's boundary node carries a Hash digest (value >= 32 bytes).
+    let mut buf = Vec::new();
+    valid.write_to_vec(&mut buf);
+    let valid = crate::api::FrozenChangeProof::from_slice(&buf).unwrap();
+
+    // Tamper: drop the in-range Put of 0x1234, keeping the 0x90 change.
+    let mut ops: Vec<BatchOp<Key, Value>> = valid.batch_ops().to_vec();
+    ops.retain(|op| !matches!(op, BatchOp::Put { key, .. } if key.as_ref() == b"\x12\x34"));
+    let crafted = FrozenChangeProof::new(
+        crate::Proof::new(valid.start_proof().as_ref().into()),
+        crate::Proof::new(valid.end_proof().as_ref().into()),
+        ops.into_boxed_slice(),
+    );
+
+    // The structural checks pass (the hash chain is intact); the reconcile
+    // in-range guard rejects the empty-branch-vs-Hash conflict.
+    let ctx =
+        verify_change_proof_structure(&crafted, root2, Some(b"\x12\x30"), None, None).unwrap();
+    let err = verify_and_check(&target, &crafted, &ctx, root1_target)
+        .expect_err("dropped in-range Put (hashed) behind a left exclusion must be rejected");
+    assert!(
+        matches!(
+            err,
+            api::Error::ProofError(crate::ProofError::UnexpectedValue)
+        ),
+        "expected UnexpectedValue, got {err:?}"
+    );
+}
+
+/// Mirror of the left-edge test for the *right* edge: `end_key` `\x12\x38` is
+/// absent and shares a prefix with the new key `\x12\x34`, so the end
+/// exclusion proof descends to `\x12\x34` and its terminal proof node carries
+/// the hash digest of the omitted value. Dropping Put `\x12\x34` leaves the
+/// proving branch empty while the end-proof boundary node still carries the
+/// hash; the empty-branch-vs-`Hash` conflict must route to the end-proof
+/// in-range guard (`\x12\x34` <= `end_key`) and be rejected. The second op
+/// (`\x10`, below the dropped key) keeps the batch non-empty.
+#[cfg(not(feature = "ethhash"))]
+#[test]
+fn test_crafted_dropped_hashed_put_behind_right_exclusion_rejected() {
+    let big = [0xabu8; 40]; // >= 32 bytes => Hash after serialization
+    let (source, target, root1_target, _ds, _dt) = setup_source_target![(b"\x10", b"anchor")];
+    let (root1_source, root2) = setup_2nd_commit!(
+        source,
+        [
+            (b"\x10" as &[u8], b"changed" as &[u8]),
+            (b"\x12\x34", big.as_slice())
+        ]
+    );
+
+    let valid = source
+        .change_proof(root1_source, root2.clone(), None, Some(b"\x12\x38"), None)
+        .unwrap();
+
+    // Serialize so 0x1234's boundary node carries a Hash digest (value >= 32 bytes).
+    let mut buf = Vec::new();
+    valid.write_to_vec(&mut buf);
+    let valid = crate::api::FrozenChangeProof::from_slice(&buf).unwrap();
+
+    // Tamper: drop the in-range Put of 0x1234, keeping the 0x10 change.
+    let mut ops: Vec<BatchOp<Key, Value>> = valid.batch_ops().to_vec();
+    ops.retain(|op| !matches!(op, BatchOp::Put { key, .. } if key.as_ref() == b"\x12\x34"));
+    let crafted = FrozenChangeProof::new(
+        crate::Proof::new(valid.start_proof().as_ref().into()),
+        crate::Proof::new(valid.end_proof().as_ref().into()),
+        ops.into_boxed_slice(),
+    );
+
+    // The structural checks pass (the hash chain is intact); the reconcile
+    // in-range guard rejects the empty-branch-vs-Hash conflict.
+    let ctx =
+        verify_change_proof_structure(&crafted, root2, None, Some(b"\x12\x38"), None).unwrap();
+    let err = verify_and_check(&target, &crafted, &ctx, root1_target)
+        .expect_err("dropped in-range Put (hashed) behind a right exclusion must be rejected");
+    assert!(
+        matches!(
+            err,
+            api::Error::ProofError(crate::ProofError::UnexpectedValue)
+        ),
+        "expected UnexpectedValue, got {err:?}"
+    );
+}
+
 /// Control test: a spurious Put for a non-existent in-range key is correctly
 /// rejected when the key falls in a subtree that is recomputed (not borrowed).
 #[test]
