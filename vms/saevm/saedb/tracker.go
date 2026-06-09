@@ -275,24 +275,10 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 }
 
 // Close releases all resources associated with the `[triedb.Database]`
-// and persists `lastRoot` to the snapshot layer. `lastRoot` should be a
-// recent state root.
-func (t *Tracker) Close(lastRoot common.Hash) error {
-	if t.snaps == nil {
-		return t.cache.TrieDB().Close()
+// and [snapshot.Tree], if applicable.
+func (t *Tracker) Close() error {
+	if t.snaps != nil {
+		t.snaps.Release()
 	}
-
-	defer t.snaps.Release()
-
-	// We don't use [snapshot.Tree.Journal] because re-orgs are impossible under
-	// SAE so we don't mind flattening all snapshot layers to disk. Note that
-	// calling `Cap([disk root], 0)` returns an error when it's actually a
-	// no-op, so we ensure there are changes.
-	if lastRoot != t.snaps.DiskRoot() {
-		if err := t.snaps.Cap(lastRoot, 0); err != nil {
-			return fmt.Errorf("snapshot.Tree.Cap([last post-execution state root], 0): %v", err)
-		}
-	}
-
-	return nil
+	return t.cache.TrieDB().Close()
 }
