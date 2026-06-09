@@ -7,7 +7,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v1.14.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.5.0
-	github.com/ava-labs/libevm v1.13.15-0.20260430210457-c891ff86e981
+	github.com/ava-labs/libevm v1.13.15-0.20260602011657-ad0081e3b988
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/gorilla/rpc v1.2.0
@@ -17,7 +17,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/goleak v1.3.0
 	golang.org/x/crypto v0.49.0
-	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
+	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	golang.org/x/sync v0.20.0
 	golang.org/x/time v0.12.0
 )

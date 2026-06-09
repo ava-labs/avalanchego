@@ -12,6 +12,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//tests",
+        "//tests/fixture/e2e",
         "//tests/load/contracts",
         "//utils/logging",
         "//utils/sampler",
@@ -19,7 +20,6 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",
-        "@com_github_ava_labs_libevm//ethclient",
         "@com_github_ava_labs_libevm//params",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",

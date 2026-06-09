@@ -2,13 +2,19 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "subnet",
-    srcs = ["xsvm.go"],
+    srcs = [
+        "subnet_evm.go",
+        "xsvm.go",
+    ],
+    embedsrcs = ["subnet-genesis.json"],
     importpath = "github.com/ava-labs/avalanchego/tests/fixture/subnet",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/coreth/params",
         "//tests/fixture/tmpnet",
         "//utils/constants",
         "//utils/crypto/secp256k1",
         "//vms/example/xsvm/genesis",
+        "@com_github_ava_labs_libevm//crypto",
     ],
 )

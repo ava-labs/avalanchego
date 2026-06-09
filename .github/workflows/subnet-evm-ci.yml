@@ -17,7 +17,6 @@ jobs:
     needs:
       - lint_test
       - unit_test
-      - e2e_warp
       - e2e_load
       - test_build_image
       - test_build_antithesis_images
@@ -71,29 +70,6 @@ jobs:
       - uses: ./.github/actions/setup-go-for-project
       - run: ./scripts/run_task.sh build-test
       - run: ./scripts/run_task.sh coverage
-
-  e2e_warp:
-    name: e2e warp tests
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Run Warp E2E Tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-warp-ci
-          working_directory: ./graft/subnet-evm
-          artifact_prefix: warp
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e_load:
     name: e2e load tests

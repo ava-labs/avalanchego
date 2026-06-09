@@ -39,7 +39,7 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 	old := extras
 	defer func() { extras = old }()
 
-	return ethtypes.WithTempRegisteredExtras[HeaderExtra, ethtypes.NOOPBlockBodyHooks, noopStateAccountExtras](
+	return ethtypes.WithTempRegisteredExtras(
 		lock,
 		func(e ethtypes.ExtraPayloads[*HeaderExtra, *ethtypes.NOOPBlockBodyHooks, noopStateAccountExtras]) error {
 			extras = e

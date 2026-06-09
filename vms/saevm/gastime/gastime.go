@@ -54,6 +54,22 @@ func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time,
 	return FromProxyTime(tm, startingExcess, c)
 }
 
+func New2(at time.Time, target gas.Gas, price gas.Price, c GasPriceConfig) (*Time, error) {
+	tm := proxytime.Of[gas.Gas](at)
+	target = clampTarget(target)
+	tm.SetRate(rateOf(target))
+
+	gt, err := FromProxyTime(tm, 0, c)
+	if err != nil {
+		return nil, err
+	}
+
+	k := gt.excessScalingFactor()
+	gt.excess = excessForPrice(price, k)
+	gt.enforceMinExcess()
+	return gt, nil
+}
+
 var errZeroTarget = errors.New("zero target not allowed")
 
 // FromProxyTime returns a new [Time] derived from the provided [proxytime.Time].

@@ -18,7 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestCopyHeader(t *testing.T) {
@@ -88,7 +90,11 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *common.Hash:
 				assertDifferentPointers(t, f, fieldCp)
-			case *acp226.DelayExcess:
+			case *dynamic.DelayExponent:
+				assertDifferentPointers(t, f, fieldCp)
+			case *dynamic.TargetExponent:
+				assertDifferentPointers(t, f, fieldCp)
+			case *gas.Gas:
 				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:
 				assertDifferentPointers(t, f, fieldCp)
@@ -326,7 +332,7 @@ func TestBlockGetters(t *testing.T) {
 				ExtDataGasUsed:   big.NewInt(1),
 				BlockGasCost:     big.NewInt(2),
 				TimeMilliseconds: utils.PointerTo[uint64](3),
-				MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
+				DelayExponent:    utils.PointerTo(dynamic.DelayExponent(4)),
 			},
 			blockExtra: &BlockBodyExtra{
 				Version: 3,

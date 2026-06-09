@@ -9,11 +9,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -24,7 +24,7 @@ type Test interface {
 type Worker struct {
 	PrivKey *ecdsa.PrivateKey
 	Nonce   uint64
-	Client  *ethclient.Client
+	Client  e2e.EthClient
 }
 
 type LoadGenerator struct {

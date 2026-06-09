@@ -5,21 +5,29 @@ package e2e
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/ava-labs/libevm/accounts/abi/bind"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
+	"github.com/ava-labs/libevm/ethclient/simulated"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -28,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	ethereum "github.com/ava-labs/libevm"
+	libevmcommon "github.com/ava-labs/libevm/common"
 )
 
 const (
@@ -44,9 +53,17 @@ const (
 
 	DefaultGasLimit = uint64(21000) // Standard gas limit
 
+	DefaultContractCallGasLimit = uint64(1_000_000)
+	DefaultDeployGasLimit       = uint64(5_000_000)
+
 	// Directory used to store private networks (specific to a single test)
 	// under the shared network dir.
 	PrivateNetworksDirName = "private_networks"
+)
+
+var (
+	DefaultGasFeeCap = big.NewInt(300_000_000_000) // 300 Gwei
+	DefaultGasTipCap = big.NewInt(1_000_000_000)   // 1 Gwei
 )
 
 // NewPrivateKey returns a new private key.
@@ -127,7 +144,7 @@ func GetWalletBalances(tc tests.TestContext, wallet *primary.Wallet) (uint64, ui
 }
 
 // Create a new eth client targeting the specified node URI.
-func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) *ethclient.Client {
+func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) EthClient {
 	tc.Log().Info("initializing a new eth client",
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("URI", nodeURI.URI),
@@ -136,7 +153,21 @@ func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) *ethclient.Clien
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
 	client, err := ethclient.Dial(uri)
 	require.NoError(tc, err)
-	return client
+	return NewE2EClient(client)
+}
+
+// NewKeyedTxOpts creates a bind.TransactOpts pre-populated with gas fields
+// (GasFeeCap, GasTipCap, GasLimit) to avoid pending-state RPC queries that
+// are not supported by all EVM backends (e.g. SAE).
+func NewKeyedTxOpts(key *ecdsa.PrivateKey, chainID *big.Int, gasLimit uint64) (*bind.TransactOpts, error) {
+	txOpts, err := bind.NewKeyedTransactorWithChainID(key, chainID)
+	if err != nil {
+		return nil, err
+	}
+	txOpts.GasFeeCap = new(big.Int).Set(DefaultGasFeeCap)
+	txOpts.GasTipCap = new(big.Int).Set(DefaultGasTipCap)
+	txOpts.GasLimit = gasLimit
+	return txOpts, nil
 }
 
 // Adds an ephemeral node intended to be used by a single test.
@@ -166,7 +197,7 @@ func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
 
 // Sends an eth transaction and waits for the transaction receipt from the
 // execution of the transaction.
-func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signedTx *types.Transaction) *types.Receipt {
+func SendEthTransaction(tc tests.TestContext, ethClient EthClient, signedTx *types.Transaction) *types.Receipt {
 	require := require.New(tc)
 
 	txID := signedTx.Hash()
@@ -199,7 +230,7 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 
 // Determines the suggested gas price for the configured client that will
 // maximize the chances of transaction acceptance.
-func SuggestGasPrice(tc tests.TestContext, ethClient *ethclient.Client) *big.Int {
+func SuggestGasPrice(tc tests.TestContext, ethClient EthClient) *big.Int {
 	gasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
 	require.NoError(tc, err)
 
@@ -215,7 +246,7 @@ func SuggestGasPrice(tc tests.TestContext, ethClient *ethclient.Client) *big.Int
 }
 
 // Helper simplifying use via an option of a gas price appropriate for testing.
-func WithSuggestedGasPrice(tc tests.TestContext, ethClient *ethclient.Client) common.Option {
+func WithSuggestedGasPrice(tc tests.TestContext, ethClient EthClient) common.Option {
 	baseFee := SuggestGasPrice(tc, ethClient)
 	return common.WithBaseFee(baseFee)
 }
@@ -375,4 +406,81 @@ func GetRepoRootPath(suffix string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSuffix(cwd, suffix), nil
+}
+
+// DefaultWarpSignatureRequestTimeout is the P2P message creator timeout used for
+// warp signature AppRequests (ACP-118).
+const DefaultWarpSignatureRequestTimeout = 10 * time.Second
+
+// FindP2PMessage pops messages from the deque until one is successfully parsed.
+// Non-matching messages are pushed back to the front of the deque.
+func FindP2PMessage[T any](
+	q buffer.BlockingDeque[*message.InboundMessage],
+	parser func(*message.InboundMessage) (T, bool, error),
+) (T, bool, error) {
+	var messagesToReprocess []*message.InboundMessage
+	defer func() {
+		slices.Reverse(messagesToReprocess)
+		for _, msg := range messagesToReprocess {
+			q.PushLeft(msg)
+		}
+	}()
+
+	for {
+		msg, ok := q.PopLeft()
+		if !ok {
+			return utils.Zero[T](), false, nil
+		}
+
+		parsed, ok, err := parser(msg)
+		if err != nil {
+			return utils.Zero[T](), false, err
+		}
+		if ok {
+			return parsed, true, nil
+		}
+
+		messagesToReprocess = append(messagesToReprocess, msg)
+	}
+}
+
+// EthClient is the JSON-RPC client surface required by tests/load ([load.Worker],
+// [load.Wallet]) and warp e2e ([subnetValidator].client).
+type EthClient interface {
+	simulated.Client
+	EstimateBaseFee(ctx context.Context) (*big.Int, error)
+}
+
+// ethClient is a wrapper around an ethclient.Client that allows for additional methods
+// required by tests/load ([load.Worker], [load.Wallet]) and warp e2e ([subnetValidator].client).
+type ethClient struct {
+	*ethclient.Client
+}
+
+var _ EthClient = (*ethClient)(nil)
+
+func NewE2EClient(client *ethclient.Client) *ethClient {
+	return &ethClient{Client: client}
+}
+
+func (w *ethClient) PendingNonceAt(ctx context.Context, account libevmcommon.Address) (uint64, error) {
+	var result hexutil.Uint64
+	client := w.Client
+	if err := client.Client().CallContext(ctx, &result, "eth_getTransactionCount", account, "pending"); err != nil {
+		return 0, err
+	}
+	return uint64(result), nil
+}
+
+// EstimateBaseFee tries to estimate the base fee for the next block if it were created
+// immediately. There is no guarantee that this will be the base fee used in the next block
+// or that the next base fee will be higher or lower than the returned value.
+func (w *ethClient) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
+	var hex hexutil.Big
+	client := w.Client
+	err := client.Client().CallContext(ctx, &hex, "eth_baseFee")
+	if err != nil {
+		return nil, err
+	}
+	return (*big.Int)(&hex), nil
 }

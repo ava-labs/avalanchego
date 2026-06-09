@@ -36,6 +36,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -68,6 +73,11 @@ type SUT struct {
 	*VM
 	*Client
 
+	// validatorKeys are populated when [withWarpValidators] is used and
+	// correspond, by index, to the BLS validator set returned by
+	// snowCtx.ValidatorState.GetWarpValidatorSets.
+	validatorKeys []*localsigner.LocalSigner
+
 	memory    *atomic.Memory
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
@@ -78,9 +88,10 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis    core.Genesis
-		nodeID     ids.NodeID
-		validators set.Set[ids.NodeID]
+		genesis        core.Genesis
+		nodeID         ids.NodeID
+		validators     set.Set[ids.NodeID]
+		warpValidators int
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -104,6 +115,16 @@ func withNodeID(id ids.NodeID) sutOption {
 func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.validators = vdrs
+	})
+}
+
+// withWarpValidators populates the warp validator set with n validators, each
+// holding a freshly generated BLS key and equal weight. The generated signers
+// are exposed on [SUT.validatorKeys] in the same order as the warp set, so
+// tests can produce valid aggregated signatures.
+func withWarpValidators(n int) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.warpValidators = n
 	})
 }
 
@@ -138,7 +159,12 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
-	saetest.SetValidators(tb, snowCtx.ValidatorState, cfg.validators)
+	vdrState := saetest.SetValidators(tb, snowCtx.ValidatorState, cfg.validators)
+
+	var validatorKeys []*localsigner.LocalSigner
+	if cfg.warpValidators > 0 {
+		validatorKeys = newWarpValidatorSet(tb, vdrState, snowCtx.SubnetID, cfg.warpValidators)
+	}
 
 	chainDB := prefixdb.New([]byte("chain"), db)
 
@@ -187,8 +213,11 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Cleanup(ethRPCClient.Close)
 
 	sut := &SUT{
-		VM:        vm,
-		Client:    NewClient(server.URL),
+		VM:     vm,
+		Client: NewClient(server.URL),
+
+		validatorKeys: validatorKeys,
+
 		memory:    memory,
 		sender:    appSender,
 		ethclient: ethclient.NewClient(ethRPCClient),
@@ -196,6 +225,62 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	appSender.SetSelf(sut)
 	tb.Cleanup(appSender.Close)
 	return ctx, sut
+}
+
+// newWarpValidatorSet generates n local BLS signers, registers them as a
+// single warp validator set on vdrState (under subnetID), and returns the
+// signers. The signers are returned in the same order as the (sorted) warp
+// set's Validators slice so that a BitSet covering bits 0..n-1 corresponds to
+// "every returned signer signed".
+func newWarpValidatorSet(
+	tb testing.TB,
+	vdrState *validatorstest.State,
+	subnetID ids.ID,
+	n int,
+) []*localsigner.LocalSigner {
+	tb.Helper()
+
+	const weightPerValidator uint64 = 50
+
+	type pair struct {
+		signer *localsigner.LocalSigner
+		warp   *validators.Warp
+	}
+	pairs := make([]pair, n)
+	warpValidators := make([]*validators.Warp, n)
+	for i := range n {
+		key, err := localsigner.New()
+		require.NoErrorf(tb, err, "localsigner.New()")
+		w := &validators.Warp{
+			PublicKey:      key.PublicKey(),
+			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(key.PublicKey()),
+			Weight:         weightPerValidator,
+			NodeIDs:        []ids.NodeID{ids.GenerateTestNodeID()},
+		}
+		pairs[i] = pair{signer: key, warp: w}
+		warpValidators[i] = w
+	}
+	warpSet := validators.WarpSet{
+		Validators:  warpValidators,
+		TotalWeight: weightPerValidator * uint64(n),
+	}
+	utils.Sort(warpSet.Validators)
+
+	vdrState.GetWarpValidatorSetsF = func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
+		return map[ids.ID]validators.WarpSet{
+			subnetID: warpSet,
+		}, nil
+	}
+	sortedSigners := make([]*localsigner.LocalSigner, n)
+	for i, v := range warpSet.Validators {
+		for _, p := range pairs {
+			if p.warp == v {
+				sortedSigners[i] = p.signer
+				break
+			}
+		}
+	}
+	return sortedSigners
 }
 
 // assertUTXOsExist asserts that reader chain can read the expected UTXOs from
@@ -348,9 +433,14 @@ func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID) *blocks.Block {
 	tb.Helper()
 
-	// TODO(StephenButtolph): When implementing Warp, we will need to provide
-	// meaningful block contexts.
-	var blockCtx *block.Context
+	return s.buildVerifyWithContext(ctx, tb, preferenceID, nil)
+}
+
+// buildVerifyWithContext builds and verifies a block on top of preferenceID.
+// blockCtx MAY be nil; warp tests need an explicit value (e.g. PChainHeight).
+func (s *SUT) buildVerifyWithContext(ctx context.Context, tb testing.TB, preferenceID ids.ID, blockCtx *block.Context) *blocks.Block {
+	tb.Helper()
+
 	require.NoErrorf(tb, s.SetPreference(ctx, preferenceID, blockCtx), "%T.SetPreference()", s.VM)
 
 	s.waitForPendingTxs(ctx, tb)
@@ -358,6 +448,14 @@ func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.I
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
 	require.NoErrorf(tb, s.VerifyBlock(ctx, blockCtx, blk), "%T.VerifyBlock()", s.VM)
 	return blk
+}
+
+// acceptAndExecute accepts blk and blocks until it has been executed.
+func (s *SUT) acceptAndExecute(ctx context.Context, tb testing.TB, blk *blocks.Block) {
+	tb.Helper()
+
+	require.NoErrorf(tb, s.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.VM)
+	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
 }
 
 // wallet builds and signs cross-chain transactions on behalf of a single key.
@@ -446,7 +544,7 @@ func (w *wallet) newImportTx(
 	sourceChain ids.ID,
 	to common.Address,
 	fee uint64,
-) (*tx.Tx, *tx.Import) {
+) *tx.Tx {
 	tb.Helper()
 
 	var (
@@ -488,7 +586,7 @@ func (w *wallet) newImportTx(
 			AssetID: avaxAssetID,
 		}},
 	}
-	return w.sign(tb, imp, len(inputs)), imp
+	return w.sign(tb, imp, len(inputs))
 }
 
 // sign wraps u in a [tx.Tx] with numCreds copies of a single-sig credential
@@ -577,7 +675,7 @@ func TestImport(t *testing.T) {
 		receiver = txtest.NewKey(t).EthAddress()
 	)
 	const txFee = 50
-	signedImport, _ := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	blk := sut.issueAndExecute(ctx, t, signedImport)
 	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())
@@ -621,9 +719,8 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		blocks[i] = block
 		preference = block.ID()
 	}
-	for i, block := range blocks {
-		require.NoErrorf(t, sut.AcceptBlock(ctx, block), "%T.AcceptBlock(%d)", sut.VM, i)
-		require.NoErrorf(t, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(%d)", block, i)
+	for _, block := range blocks {
+		sut.acceptAndExecute(ctx, t, block)
 		for _, tx := range blockTxs(t, block) {
 			sut.assertTxAccepted(ctx, t, tx, block.NumberU64())
 		}

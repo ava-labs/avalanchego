@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/cortina"
@@ -139,6 +140,13 @@ func (w *worker) setEtherbase(addr common.Address) {
 	w.coinbase = addr
 }
 
+func nextTimestamp(cc *extras.ChainConfig, parent *types.Header, now time.Time) time.Time {
+	if cc.IsHelicon(uint64(now.Unix())) {
+		now = time.Unix(int64(*cc.HeliconTimestamp-1), 0)
+	}
+	return customheader.GetNextTimestamp(parent, now)
+}
+
 // commitNewWork generates several new sealing tasks based on the parent block.
 func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateContext) (*types.Block, error) {
 	w.mu.RLock()
@@ -146,7 +154,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	var (
 		parent      = w.chain.CurrentBlock()
 		chainExtra  = params.GetExtra(w.chainConfig)
-		tstart      = customheader.GetNextTimestamp(parent, w.clock.Time())
+		tstart      = nextTimestamp(chainExtra, parent, w.clock.Time())
 		timestamp   = uint64(tstart.Unix())
 		timestampMS = uint64(tstart.UnixMilli())
 	)

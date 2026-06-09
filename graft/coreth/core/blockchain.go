@@ -1140,8 +1140,8 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 	if extraConfig.IsGranite(block.Time()) {
 		extraHeader := customtypes.GetHeaderExtra(block.Header())
-		if extraHeader.MinDelayExcess != nil {
-			delayExcess := *extraHeader.MinDelayExcess
+		if extraHeader.DelayExponent != nil {
+			delayExcess := *extraHeader.DelayExponent
 			latestMinDelayGauge.Update(int64(delayExcess.Delay()))
 			latestMinDelayExcessGauge.Update(int64(delayExcess))
 		}

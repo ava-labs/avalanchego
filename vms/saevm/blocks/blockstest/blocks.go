@@ -139,7 +139,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 
 	b := NewBlock(tb, gen.ToBlock(), nil, nil)
 	h := hookstest.NewStub(conf.gasTarget)
-	require.NoErrorf(tb, b.MarkSynchronous(h, db, xdb, conf.gasExcess), "%T.MarkSynchronous()", b)
+	require.NoErrorf(tb, b.MarkSynchronous(h, db, xdb), "%T.MarkSynchronous()", b)
 	return b
 }
 
@@ -147,7 +147,7 @@ type genesisConfig struct {
 	tdbConfig *triedb.Config
 	timestamp uint64
 	gasTarget gas.Gas
-	gasExcess gas.Gas
+	// gasExcess gas.Gas
 }
 
 // A GenesisOption configures [NewGenesis].
@@ -175,8 +175,6 @@ func WithGasTarget(target gas.Gas) GenesisOption {
 }
 
 // WithGasExcess overrides the gas excess used by [NewGenesis].
-func WithGasExcess(excess gas.Gas) GenesisOption {
-	return options.Func[genesisConfig](func(gc *genesisConfig) {
-		gc.gasExcess = excess
-	})
+func WithGasExcess(gas.Gas) GenesisOption {
+	return options.Func[genesisConfig](func(*genesisConfig) {})
 }

@@ -5,6 +5,7 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -29,36 +30,64 @@ func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Rece
 // hash, checking in-memory blocks first then falling back to the database.
 // Returns nils for blocks that are not yet executed.
 func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
-	blk, err := readByNumberOrHash(
+	type result struct {
+		receipts types.Receipts
+		block    *types.Block
+	}
+	r, err := readByNumberOrHash[result](
 		b,
 		numOrHash,
-		func(b *blocks.Block) *blocks.Block {
-			return b
+		func(b *blocks.Block) *result {
+			if !b.Executed() {
+				return &result{}
+			}
+			return &result{
+				receipts: b.Receipts(),
+				block:    b.EthBlock(),
+			}
 		},
-		func(db ethdb.Reader, h common.Hash, num uint64) (*blocks.Block, error) {
+		func(db ethdb.Reader, h common.Hash, num uint64) (*result, error) {
 			if num > b.LastExecuted().Height() {
 				return nil, blocks.ErrNotFound
 			}
-			blk, err := blocks.New(rawdb.ReadBlock(db, h, num), nil, nil, b.Logger())
+			rawBlk := rawdb.ReadBlock(db, h, num)
+			// TODO(StephenButtolph): Can panic after state-sync
+			if b.isSynchronous(rawBlk.NumberU64()) {
+				receipts := rawdb.ReadRawReceipts(db, rawBlk.Hash(), rawBlk.NumberU64())
+				if err := receipts.DeriveFields(
+					b.ChainConfig(),
+					rawBlk.Hash(),
+					rawBlk.NumberU64(),
+					rawBlk.Time(),
+					rawBlk.BaseFee(),
+					nil, // SAE does not support blob transactions.
+					rawBlk.Transactions(),
+				); err != nil {
+					return nil, fmt.Errorf("deriving receipt fields: %v", err)
+				}
+				return &result{
+					receipts: receipts,
+					block:    rawBlk,
+				}, nil
+			}
+
+			blk, err := blocks.New(rawBlk, nil, nil, b.Logger())
 			if err != nil {
 				return nil, err
 			}
 			if err := blk.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
 				return nil, err
 			}
-			return blk, nil
+			return &result{
+				receipts: blk.Receipts(),
+				block:    blk.EthBlock(),
+			}, nil
 		},
 	)
-	switch {
-	case err != nil:
-		// The use of [notFoundIsNil] in [readByNumberOrHash] means that we know
-		// this is a "real" error, not just [blocks.ErrNotFound].
+	if err != nil {
 		return nil, nil, err
-	case blk == nil || !blk.Executed():
-		return nil, nil, nil
-	default:
-		return blk.Receipts(), blk.EthBlock(), nil
 	}
+	return r.receipts, r.block, nil
 }
 
 type blockChainAPI struct {

@@ -348,6 +348,30 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 		return err
 	}
 
+	if extraConfig.IsHelicon(header.Time) {
+		return errors.New("expected to have transitioned to SAE prior to Helicon")
+	}
+
+	headerExtra := customtypes.GetHeaderExtra(header)
+	if headerExtra.TargetExponent != nil {
+		return fmt.Errorf("unexpected TargetExponent in header extra: %d", *headerExtra.TargetExponent)
+	}
+	if headerExtra.PriceExponent != nil {
+		return fmt.Errorf("unexpected PriceExponent in header extra: %d", *headerExtra.PriceExponent)
+	}
+	if headerExtra.SettledHeight != nil {
+		return fmt.Errorf("unexpected SettledHeight in header extra: %d", *headerExtra.SettledHeight)
+	}
+	if headerExtra.SettledGasUnix != nil {
+		return fmt.Errorf("unexpected SettledGasUnix in header extra: %d", *headerExtra.SettledGasUnix)
+	}
+	if headerExtra.SettledGasNumerator != nil {
+		return fmt.Errorf("unexpected SettledGasNumerator in header extra: %d", *headerExtra.SettledGasNumerator)
+	}
+	if headerExtra.SettledExcess != nil {
+		return fmt.Errorf("unexpected SettledExcess in header extra: %d", *headerExtra.SettledExcess)
+	}
+
 	// If the VM is not marked as bootstrapped the other chains may also be
 	// bootstrapping and not have populated the required indices. Since
 	// bootstrapping only verifies blocks that have been canonically accepted by

@@ -56,6 +56,8 @@ import (
 var (
 	//go:embed ExampleWarp.bin
 	exampleWarpBin string
+	// TODO: consider moving tests working with this ABI to a simulated_test in
+	// coreth/precompile/contracts/warp/simulated_test.go
 	//go:embed ExampleWarp.abi
 	exampleWarpABI string
 )

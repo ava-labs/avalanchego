@@ -87,6 +87,7 @@ var (
 	errMinStakeDurationAboveMax               = errors.New("max stake duration can't be less than min stake duration")
 	errStakeMaxConsumptionTooLarge            = fmt.Errorf("max stake consumption must be less than or equal to %d", reward.PercentDenominator)
 	errStakeMaxConsumptionBelowMin            = errors.New("stake max consumption can't be less than min stake consumption")
+	errStakeMinConsumptionBelowMin            = fmt.Errorf("min stake consumption must be at least %.2f%%", .025*reward.PercentDenominator/reward.PercentDenominator*100)
 	errStakeMintingPeriodBelowMin             = errors.New("stake minting period can't be less than max stake duration")
 	errCannotTrackPrimaryNetwork              = errors.New("cannot track primary network")
 	errStakingKeyContentUnset                 = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
@@ -826,6 +827,8 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 			return node.StakingConfig{}, errStakeMaxConsumptionTooLarge
 		case config.RewardConfig.MaxConsumptionRate < config.RewardConfig.MinConsumptionRate:
 			return node.StakingConfig{}, errStakeMaxConsumptionBelowMin
+		case config.RewardConfig.MinConsumptionRate < .025*reward.PercentDenominator:
+			return node.StakingConfig{}, errStakeMinConsumptionBelowMin
 		case config.RewardConfig.MintingPeriod < config.MaxStakeDuration:
 			return node.StakingConfig{}, errStakeMintingPeriodBelowMin
 		}

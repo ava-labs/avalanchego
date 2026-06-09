@@ -16,40 +16,52 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
-	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var _ hook.PointsG[*hookTx] = (*hooks)(nil)
 
 type hooks struct {
 	builder
-	state *cchainstate.State
+	state       *cchainstate.State
+	warpStorage *warp.Storage
 }
 
 func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
+	chainConfig *ethparams.ChainConfig,
+	initialDelayExponent dynamic.DelayExponent,
+	desired desiredParams,
 	pool *txpool.Pending,
+	warpStorage *warp.Storage,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -67,12 +79,16 @@ func newHooks(
 		}
 	}
 	return &hooks{
-		builder{
-			ctx,
-			time.Now,
-			poolTxs,
+		builder: builder{
+			ctx:                  ctx,
+			chainConfig:          chainConfig,
+			initialDelayExponent: initialDelayExponent,
+			now:                  time.Now,
+			desired:              desired,
+			potentialTxs:         poolTxs,
 		},
-		state,
+		state:       state,
+		warpStorage: warpStorage,
 	}
 }
 
@@ -91,13 +107,22 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		txs[i] = ht
 	}
 
-	now := h.BlockTime(b.Header())
+	header := b.Header()
+	headerExtra := customtypes.GetHeaderExtra(header)
+	now := h.BlockTime(header)
 	return &builder{
-		h.ctx,
-		func() time.Time {
+		ctx:                  h.ctx,
+		chainConfig:          h.chainConfig,
+		initialDelayExponent: h.initialDelayExponent,
+		now: func() time.Time {
 			return now
 		},
-		slices.Values(txs),
+		desired: desiredParams{
+			delayExponent:  headerExtra.DelayExponent,
+			targetExponent: headerExtra.TargetExponent,
+			priceExponent:  headerExtra.PriceExponent,
+		},
+		potentialTxs: slices.Values(txs),
 	}, nil
 }
 
@@ -114,22 +139,74 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 	}, nil
 }
 
-func (*hooks) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	// TODO(StephenButtolph): Extract parameters from the header.
-	return 1_000_000, gastime.GasPriceConfig{
-		TargetToExcessScaling: 87,
-		MinPrice:              1,
+const targetToExcessScaling = 87 // 87 ~= 60 / ln(2)
+
+func (h *hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+	config := corethparams.GetExtra(h.chainConfig)
+	te, err := targetExponent(config, hdr)
+	if err != nil {
+		h.ctx.Log.Error("failed to get target exponent",
+			zap.Stringer("blockHash", hdr.Hash()),
+			zap.Uint64("blockNumber", hdr.Number.Uint64()),
+			zap.Error(err),
+		)
+		te = 0
+	}
+
+	return te.Target(), gastime.GasPriceConfig{
+		TargetToExcessScaling: targetToExcessScaling,
+		MinPrice:              priceExponent(hdr).Price(),
 	}
 }
 
-func (*hooks) SettledBy(*types.Header) hook.Settled {
-	// TODO(StephenButtolph): Extract from the header.
-	return hook.Settled{}
+func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
+	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
+		return *te, nil
+	}
+	if !config.IsFortuna(h.Time) || h.Number.Cmp(common.Big0) == 0 {
+		return 0, nil
+	}
+
+	// The block might be the last synchronous block running with ACP-176.
+	state, err := acp176.ParseState(h.Extra)
+	if err != nil {
+		return 0, fmt.Errorf("parsing fee state: %w", err)
+	}
+	return dynamic.TargetExponent(state.TargetExcess), nil
+}
+
+func priceExponent(h *types.Header) dynamic.PriceExponent {
+	if pe := customtypes.GetHeaderExtra(h).PriceExponent; pe != nil {
+		return *pe
+	}
+	return 0
+}
+
+func (*hooks) SettledBy(h *types.Header) hook.Settled {
+	e := customtypes.GetHeaderExtra(h)
+	return hook.Settled{
+		Height:       maybe(e.SettledHeight),
+		GasUnix:      maybe(e.SettledGasUnix),
+		GasNumerator: maybe(e.SettledGasNumerator),
+		Excess:       maybe(e.SettledExcess),
+	}
+}
+
+func maybe[T any](p *T) T {
+	if p != nil {
+		return *p
+	}
+	return utils.Zero[T]()
 }
 
 func (*hooks) BlockTime(h *types.Header) time.Time {
-	// TODO(StephenButtolph): Extract milliseconds from the header.
-	return time.Unix(int64(h.Time), 0) //#nosec G115 -- Won't overflow for a few millennia
+	var ns int64
+	if msp := customtypes.GetHeaderExtra(h).TimeMilliseconds; msp != nil {
+		ms := *msp % 1000
+		frac := time.Duration(ms) * time.Millisecond //#nosec G115 -- ms is bounded to [0, 1000)
+		ns = frac.Nanoseconds()
+	}
+	return time.Unix(int64(h.Time), ns) //#nosec G115 -- Won't overflow for a few millennia
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
@@ -153,11 +230,28 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, _ *types.Transaction, r *types.Receipt) error {
+	var burned uint256.Int
+	burned.SetUint64(r.GasUsed)
+	burned.Mul(&burned, &baseFee)
+	db.AddBalance(constants.BlackholeAddr, &burned)
+	return nil
+}
+
+func (*hooks) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
 	return nil
 }
 
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
+	rules := h.chainConfig.Rules(b.Number(), corethparams.IsMergeTODO, b.Time())
+	acceptCtx := &precompileconfig.AcceptContext{
+		SnowCtx: h.ctx,
+		Warp:    h.warpStorage,
+	}
+	if err := warp.HandlePrecompileAccept(rules, acceptCtx, receipts); err != nil {
+		return fmt.Errorf("handling precompile accept for block %s (%d): %w", b.Hash(), b.NumberU64(), err)
+	}
+
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
@@ -173,36 +267,79 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 	if err := h.state.Apply(b.NumberU64(), txs); err != nil {
 		return fmt.Errorf("applying cross-chain state: %w", err)
 	}
-
-	// TODO(StephenButtolph): Persist produced warp messages.
-	_ = receipts
 	return nil
 }
 
 var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
+type desiredParams struct {
+	delayExponent  *dynamic.DelayExponent
+	targetExponent *dynamic.TargetExponent
+	priceExponent  *dynamic.PriceExponent
+}
+
 type builder struct {
-	ctx          *snow.Context
-	now          func() time.Time
+	ctx                  *snow.Context
+	chainConfig          *ethparams.ChainConfig
+	initialDelayExponent dynamic.DelayExponent
+
+	now func() time.Time
+	// When fields in [desiredParams] are set, the builder produces headers
+	// that move the corresponding network value toward the desired value.
+	desired      desiredParams
 	potentialTxs iter.Seq[*hookTx]
 }
+
+var errHeliconUnactivated = errors.New("helicon is not activated")
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
-	// TODO(StephenButtolph): Encode the ACP-176 target excess in the header.
-	// TODO(StephenButtolph): Encode the ACP-183 min price excess in the header.
-	// TODO(StephenButtolph): Enforce the minimum block time here.
+	now := b.now()
+	if !b.ctx.NetworkUpgrades.IsHeliconActivated(now) {
+		return nil, errHeliconUnactivated
+	}
+
+	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
+
+	de := b.initialDelayExponent
+	if pde := customtypes.GetHeaderExtra(parent).DelayExponent; pde != nil {
+		de = *pde
+	}
+
+	// Enforce block-building separation against the parent's MinDelayExcess.
+	{
+		parentTimeMS := customtypes.HeaderTimeMilliseconds(parent)
+		if nowMS < parentTimeMS {
+			return nil, fmt.Errorf("current time is before parent timestamp: now=%d parentTime=%d", nowMS, parentTimeMS)
+		}
+
+		delay := nowMS - parentTimeMS
+		minDelay := de.Delay()
+		if delay < minDelay {
+			return nil, fmt.Errorf("block building separation not satisfied: delay=%d minDelay=%d", delay, minDelay)
+		}
+	}
+
+	config := corethparams.GetExtra(b.chainConfig)
+	te, err := targetExponent(config, parent)
+	if err != nil {
+		return nil, fmt.Errorf("getting target exponent: %w", err)
+	}
+
+	de = de.Toward(b.desired.delayExponent)
+	te = te.Toward(b.desired.targetExponent)
+	pe := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
 			Coinbase:         constants.BlackholeAddr,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
-			Time:             uint64(b.now().Unix()), //#nosec G115 -- Known non-negative
-			BlobGasUsed:      new(uint64),
-			ExcessBlobGas:    new(uint64),
-			ParentBeaconRoot: new(common.Hash),
+			Time:             uint64(now.Unix()), //#nosec G115 -- Known non-negative
+			BlobGasUsed:      utils.PointerTo[uint64](0),
+			ExcessBlobGas:    utils.PointerTo[uint64](0),
+			ParentBeaconRoot: &common.Hash{},
 		},
 		&customtypes.HeaderExtra{
 			// Prior to SAE, ExtDataGasUsed included the gas cost of the
@@ -210,11 +347,11 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// included in [types.Header.GasUsed] with [hook.Op.Gas].
 			ExtDataGasUsed: big.NewInt(0),
 			// BlockGasCost has been set to 0 since the Granite upgrade.
-			BlockGasCost: big.NewInt(0),
-			// TODO(StephenButtolph): Encode the millisecond timestamp.
-			TimeMilliseconds: new(uint64),
-			// TODO(StephenButtolph): Encode the min-delay excess.
-			MinDelayExcess: new(acp226.DelayExcess),
+			BlockGasCost:     big.NewInt(0),
+			TimeMilliseconds: &nowMS,
+			DelayExponent:    &de,
+			TargetExponent:   &te,
+			PriceExponent:    &pe,
 		},
 	), nil
 }
@@ -228,7 +365,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 // SAE will perform additional checks on the transactions to ensure they are
 // valid with respect to the worst-case state.
 func (b *builder) PotentialEndOfBlockOps(
-	ctx context.Context,
+	_ context.Context,
 	building *types.Header,
 	settledHash common.Hash,
 	source saetypes.BlockSource,
@@ -286,7 +423,10 @@ func (b *builder) PotentialEndOfBlockOps(
 	}
 }
 
-var errMissingBlock = errors.New("missing block")
+var (
+	errMissingBlock = errors.New("missing block")
+	errEmptyBlock   = errors.New("empty block")
+)
 
 // ancestorInputIDs returns the set of input IDs of all cross-chain transactions
 // in the block range (h, settled), both exclusive.
@@ -311,7 +451,7 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 	return s, nil
 }
 
-func (*builder) BuildBlock(
+func (b *builder) BuildBlock(
 	header *types.Header,
 	blockCtx *block.Context,
 	ethTxs []*types.Transaction,
@@ -319,6 +459,10 @@ func (*builder) BuildBlock(
 	avaxTxs []*hookTx,
 	settled hook.Settled,
 ) (*types.Block, error) {
+	if len(ethTxs) == 0 && len(avaxTxs) == 0 {
+		return nil, errEmptyBlock
+	}
+
 	txs := make([]*tx.Tx, len(avaxTxs))
 	for i, avaxTx := range avaxTxs {
 		txs[i] = avaxTx.tx
@@ -328,12 +472,21 @@ func (*builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	// TODO(StephenButtolph): Encode warp predicate results in the header.
-	_ = blockCtx
-	// TODO(StephenButtolph): Encode settled in the block.
-	_ = settled
-	// TODO(StephenButtolph): Verify the extDataHash matches the hash of extData
-	// during parsing.
+	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
+	rulesExtra := corethparams.GetRulesExtra(rules)
+	predicateBytes, err := warp.PredicateBytes(b.ctx, blockCtx, rulesExtra, ethTxs)
+	if err != nil {
+		return nil, fmt.Errorf("generating predicates: %w", err)
+	}
+	// TODO(StephenButtolph): Should we only encode the predicate bytes when
+	// there is at least one predicate?
+	header.Extra = predicateBytes
+
+	headerExtra := customtypes.GetHeaderExtra(header)
+	headerExtra.SettledHeight = &settled.Height
+	headerExtra.SettledGasUnix = &settled.GasUnix
+	headerExtra.SettledGasNumerator = &settled.GasNumerator
+	headerExtra.SettledExcess = &settled.Excess
 	return customtypes.NewBlockWithExtData(
 		header,
 		ethTxs,

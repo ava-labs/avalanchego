@@ -241,6 +241,11 @@ func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr
 	return nil
 }
 
+// AfterExecutingTransaction is a no-op that always returns nil.
+func (*Stub) AfterExecutingTransaction(*state.StateDB, uint256.Int, *types.Transaction, *types.Receipt) error {
+	return nil
+}
+
 // BeforeExecutingBlock is a no-op that always returns nil.
 func (*Stub) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
 	return nil

@@ -14,37 +14,58 @@ import (
 	"net/http"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/core"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	avadb "github.com/ava-labs/avalanchego/database"
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 )
+
+const warpSignatureCacheSize = 512
+
+var ethDBPrefix = []byte("ethdb")
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
 	*sae.VM // created by [VM.Initialize]
 
-	// gossip frequencies are configurable to speed up testing.
-	pullGossipPeriod time.Duration
-	pushGossipPeriod time.Duration
+	// These are configurable to speed up testing.
+	pullGossipPeriod     time.Duration
+	pushGossipPeriod     time.Duration
+	initialDelayExponent dynamic.DelayExponent
 
 	ctx          *snow.Context
 	state        *state.State
@@ -52,13 +73,17 @@ type VM struct {
 	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
 
+	// TODO: Remove this.
+	hooks *hooks
+
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
 	onClose []func(context.Context) error
-}
 
-var ethDBPrefix = []byte("ethdb")
+	preference       atomic.Pointer[blocks.Block]
+	lastWaitForEvent utils.Atomic[time.Time]
+}
 
 // Initialize initializes the VM.
 func (vm *VM) Initialize(
@@ -79,9 +104,6 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	// TODO(StephenButtolph): Allow minimal user configuration via configBytes.
-	_ = configBytes
-
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
@@ -89,16 +111,37 @@ func (vm *VM) Initialize(
 	trieDBConfig := triedb.HashDefaults
 	trieDB := triedb.NewDatabase(ethDB, trieDBConfig)
 
-	// TODO(StephenButtolph): Replace this with Coreth's genesis format.
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
-		return fmt.Errorf("unmarshalling genesis: %w", err)
+	snowCtx.Log.Info("parsing genesis")
+	genesis, err := parseGenesis(snowCtx, genesisBytes)
+	if err != nil {
+		return fmt.Errorf("parsing genesis: %w", err)
 	}
-	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis)
+
+	snowCtx.Log.Info("establishing last synchronous block")
+	var lastSync *types.Block
+	lastSyncBytes, err := state.ReadLastSync(avaDB)
+	switch {
+	case err == nil:
+		lastSync = new(types.Block)
+		if err := rlp.DecodeBytes(lastSyncBytes, lastSync); err != nil {
+			return fmt.Errorf("decoding last sync block: %w", err)
+		}
+	case errors.Is(err, avadb.ErrNotFound):
+		lastSync = genesis.ToBlock()
+	default:
+		return fmt.Errorf("reading last sync block: %w", err)
+	}
+
+	snowCtx.Log.Info("setting up genesis",
+		zap.Stringer("lastID", ids.ID(lastSync.Hash())),
+		zap.Uint64("lastHeight", lastSync.NumberU64()),
+	)
+	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis, lastSync.Hash(), false)
 	if err != nil {
 		return fmt.Errorf("setting up genesis block: %w", err)
 	}
 
+	snowCtx.Log.Info("constructing cross-chain state")
 	vm.state, err = state.New(snowCtx, avaDB)
 	if err != nil {
 		return fmt.Errorf("creating cchain state: %w", err)
@@ -107,12 +150,44 @@ func (vm *VM) Initialize(
 		return vm.state.Close()
 	})
 
+	snowCtx.Log.Info("parsing user config")
+	userConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return fmt.Errorf("parsing user config: %w", err)
+	}
+
+	snowCtx.Log.Info("parsing warp message overrides")
+	warpMessages, err := userConfig.WarpMessages()
+	if err != nil {
+		return fmt.Errorf("parsing warp messages: %w", err)
+	}
+
+	var desired desiredParams
+	if userConfig.DelayTarget != nil {
+		desired.delayExponent = new(dynamic.DelayExponent)
+		*desired.delayExponent = dynamic.DesiredDelayExponent(*userConfig.DelayTarget)
+	}
+	if userConfig.GasTarget != nil {
+		desired.targetExponent = new(dynamic.TargetExponent)
+		*desired.targetExponent = dynamic.DesiredTargetExponent(*userConfig.GasTarget)
+	}
+	if userConfig.PriceTarget != nil {
+		desired.priceExponent = new(dynamic.PriceExponent)
+		*desired.priceExponent = dynamic.DesiredPriceExponent(*userConfig.PriceTarget)
+	}
+
 	pendingTxs := txpool.NewPending()
-	hooks := newHooks(
+	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
+	vm.hooks = newHooks(
 		snowCtx,
 		vm.state,
+		chainConfig,
+		vm.initialDelayExponent,
+		desired,
 		pendingTxs,
+		warpStorage,
 	)
+
 	mempoolConfig := legacypool.DefaultConfig
 	// Treat all transactions equally regardless of submission source — no
 	// preferential admission or pricing for locally-submitted txs.
@@ -121,9 +196,12 @@ func (vm *VM) Initialize(
 		MempoolConfig: mempoolConfig,
 		DBConfig: saedb.Config{
 			TrieDBConfig: trieDBConfig,
+			Archival:     !userConfig.Pruning,
 		},
 	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
+
+	snowCtx.Log.Info("constructing the sae VM")
+	vm.VM, err = sae.NewVM(ctx, vm.hooks, saeConfig, snowCtx, chainConfig, ethDB, lastSync, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
@@ -193,7 +271,51 @@ func (vm *VM) Initialize(
 		return nil
 	})
 
+	snowCtx.Log.Info("warp handlers")
+	warpVerifier := saewarp.NewVerifier(&blockClient{vm: vm.VM}, warpStorage)
+	warpHandler := acp118.NewCachedHandler(
+		lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
+		warpVerifier,
+		snowCtx.WarpSigner,
+	)
+	if err := vm.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+		return fmt.Errorf("registering warp signature handler: %w", err)
+	}
+
+	snowCtx.Log.Info("initialized saevm")
 	return nil
+}
+
+// parseGenesis decodes the genesis bytes into a [*core.Genesis] and populates
+// the Avalanche-specific config extras (network upgrades, Warp precompile
+// schedule, Ethereum upgrade alignment).
+func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
+	g := new(core.Genesis)
+	if err := json.Unmarshal(b, g); err != nil {
+		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
+	}
+
+	configExtra := corethparams.GetExtra(g.Config)
+	configExtra.AvalancheContext = extras.AvalancheContext{
+		SnowCtx: ctx,
+	}
+	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
+
+	// If Durango is scheduled, schedule the Warp Precompile at the same time.
+	if configExtra.DurangoBlockTimestamp != nil {
+		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
+			Config: warpcontract.NewDefaultConfig(configExtra.DurangoBlockTimestamp),
+		})
+	}
+	if err := configExtra.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid chain config: %w", err)
+	}
+
+	// Align the Ethereum upgrades to the Avalanche upgrades.
+	if err := corethparams.SetEthUpgrades(g.Config); err != nil {
+		return nil, fmt.Errorf("aligning Ethereum upgrades: %w", err)
+	}
+	return g, nil
 }
 
 const (
@@ -222,15 +344,53 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	return m, nil
 }
 
-// WaitForEvent waits for a transaction to be in the txpool or for the SAE VM to
-// produce an event.
-func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
-	// TODO(StephenButtolph): Do not busy loop with [common.PendingTxs]. The
-	// txpools are cleared after block execution, so we may still have
-	// transactions in the txpool while blocks containing those transactions are
-	// processing.
+func (vm *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
+	b, err := vm.GetBlock(ctx, id)
+	if err != nil {
+		return err
+	}
+	vm.preference.Store(b)
+	return vm.VM.SetPreference(ctx, id, bCtx)
+}
 
-	// TODO(StephenButtolph): Wait until the minimum block delay has passed.
+// Prevent busy looping when the chain is more advanced than the mempool.
+const waitForEventDelay = 100 * time.Millisecond
+
+var errNoPreference = errors.New("no preferred block")
+
+// WaitForEvent blocks until the SAE VM emits an event or the cross-chain
+// txpool has a pending transaction.
+func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	// Throttle to avoid busy looping if we appear ready to build but keep
+	// encountering errors.
+	{
+		defer func() {
+			vm.lastWaitForEvent.Set(time.Now())
+		}()
+
+		sinceLastCall := time.Since(vm.lastWaitForEvent.Get())
+		timeToWait := waitForEventDelay - sinceLastCall
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(timeToWait):
+		}
+	}
+
+	// Wait until we are allowed to build a block on top of the preference.
+	{
+		parent := vm.preference.Load()
+		if parent == nil {
+			return 0, errNoPreference
+		}
+
+		minTime := minNextBlockTime(parent.Header())
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(time.Until(minTime)):
+		}
+	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	type result struct {
@@ -253,6 +413,19 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	return r.msg, r.err
 }
 
+// minNextBlockTime returns the earliest wall-clock time at which a child of h
+// is allowed by h's [acp226.DelayExcess].
+func minNextBlockTime(h *types.Header) time.Time {
+	e := customtypes.GetHeaderExtra(h)
+	if e.DelayExponent == nil {
+		return time.Time{}
+	}
+
+	mde := *e.DelayExponent
+	delay := time.Duration(mde.Delay()) * time.Millisecond //#nosec G115 -- delay excess is verified by consensus
+	return customtypes.BlockTime(h).Add(delay)
+}
+
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse
 // order.
 //
@@ -264,4 +437,26 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	}
 	vm.onClose = nil
 	return errors.Join(errs...)
+}
+
+// blockClient adapts [sae.VM] to the [saewarp.BlockClient] interface.
+type blockClient struct {
+	vm *sae.VM
+}
+
+var _ saewarp.BlockClient = (*blockClient)(nil)
+
+func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
+	b, err := c.vm.GetBlock(ctx, blockID)
+	if err != nil {
+		return err
+	}
+	acceptedID, err := c.vm.GetBlockIDAtHeight(ctx, b.Height())
+	if err != nil {
+		return err
+	}
+	if acceptedID != blockID {
+		return avadb.ErrNotFound
+	}
+	return nil
 }

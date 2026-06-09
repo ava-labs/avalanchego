@@ -11,7 +11,8 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -38,11 +39,17 @@ func WithHeaderExtra(h *ethtypes.Header, extra *HeaderExtra) *ethtypes.Header {
 // This type uses [HeaderSerializable] to encode and decode the extra fields
 // along with the upstream type for compatibility with existing network blocks.
 type HeaderExtra struct {
-	ExtDataHash      common.Hash
-	ExtDataGasUsed   *big.Int
-	BlockGasCost     *big.Int
-	TimeMilliseconds *uint64
-	MinDelayExcess   *acp226.DelayExcess
+	ExtDataHash         common.Hash
+	ExtDataGasUsed      *big.Int
+	BlockGasCost        *big.Int
+	TimeMilliseconds    *uint64
+	DelayExponent       *dynamic.DelayExponent
+	TargetExponent      *dynamic.TargetExponent
+	PriceExponent       *dynamic.PriceExponent
+	SettledHeight       *uint64
+	SettledGasUnix      *uint64
+	SettledGasNumerator *gas.Gas
+	SettledExcess       *gas.Gas
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.
@@ -120,11 +127,69 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		m := *h.TimeMilliseconds
 		cp.TimeMilliseconds = &m
 	}
-	if h.MinDelayExcess != nil {
-		e := *h.MinDelayExcess
-		cp.MinDelayExcess = &e
+	if h.DelayExponent != nil {
+		e := *h.DelayExponent
+		cp.DelayExponent = &e
+	}
+	if h.TargetExponent != nil {
+		e := *h.TargetExponent
+		cp.TargetExponent = &e
+	}
+	if h.PriceExponent != nil {
+		e := *h.PriceExponent
+		cp.PriceExponent = &e
+	}
+	if h.SettledHeight != nil {
+		h := *h.SettledHeight
+		cp.SettledHeight = &h
+	}
+	if h.SettledGasUnix != nil {
+		g := *h.SettledGasUnix
+		cp.SettledGasUnix = &g
+	}
+	if h.SettledGasNumerator != nil {
+		g := *h.SettledGasNumerator
+		cp.SettledGasNumerator = &g
+	}
+	if h.SettledExcess != nil {
+		e := *h.SettledExcess
+		cp.SettledExcess = &e
 	}
 	SetHeaderExtra(dst, cp)
+}
+
+func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
+	m["extDataHash"] = h.ExtDataHash
+	if h.ExtDataGasUsed != nil {
+		m["extDataGasUsed"] = (*hexutil.Big)(h.ExtDataGasUsed)
+	}
+	if h.BlockGasCost != nil {
+		m["blockGasCost"] = (*hexutil.Big)(h.BlockGasCost)
+	}
+	if h.TimeMilliseconds != nil {
+		m["timestampMilliseconds"] = hexutil.Uint64(*h.TimeMilliseconds)
+	}
+	if h.DelayExponent != nil {
+		m["minDelayExcess"] = hexutil.Uint64(*h.DelayExponent)
+	}
+	if h.TargetExponent != nil {
+		m["targetExponent"] = hexutil.Uint64(*h.TargetExponent)
+	}
+	if h.PriceExponent != nil {
+		m["minPriceExponent"] = hexutil.Uint64(*h.PriceExponent)
+	}
+	if h.SettledHeight != nil {
+		m["settledHeight"] = hexutil.Uint64(*h.SettledHeight)
+	}
+	if h.SettledGasUnix != nil {
+		m["settledGasUnix"] = hexutil.Uint64(*h.SettledGasUnix)
+	}
+	if h.SettledGasNumerator != nil {
+		m["settledGasNumerator"] = hexutil.Uint64(*h.SettledGasNumerator)
+	}
+	if h.SettledExcess != nil {
+		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
+	}
 }
 
 func (h *HeaderSerializable) updateFromEth(eth *ethtypes.Header) {
@@ -176,7 +241,13 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.ExtDataGasUsed = extras.ExtDataGasUsed
 	h.BlockGasCost = extras.BlockGasCost
 	h.TimeMilliseconds = extras.TimeMilliseconds
-	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
+	h.DelayExponent = (*uint64)(extras.DelayExponent)
+	h.TargetExponent = (*uint64)(extras.TargetExponent)
+	h.PriceExponent = (*uint64)(extras.PriceExponent)
+	h.SettledHeight = extras.SettledHeight
+	h.SettledGasUnix = extras.SettledGasUnix
+	h.SettledGasNumerator = (*uint64)(extras.SettledGasNumerator)
+	h.SettledExcess = (*uint64)(extras.SettledExcess)
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -184,7 +255,13 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.ExtDataGasUsed = h.ExtDataGasUsed
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
-	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
+	extras.DelayExponent = (*dynamic.DelayExponent)(h.DelayExponent)
+	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
+	extras.PriceExponent = (*dynamic.PriceExponent)(h.PriceExponent)
+	extras.SettledHeight = h.SettledHeight
+	extras.SettledGasUnix = h.SettledGasUnix
+	extras.SettledGasNumerator = (*gas.Gas)(h.SettledGasNumerator)
+	extras.SettledExcess = (*gas.Gas)(h.SettledExcess)
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -242,27 +319,53 @@ type HeaderSerializable struct {
 	// TimeMilliseconds was added by Granite and is ignored in legacy headers.
 	TimeMilliseconds *uint64 `json:"timestampMilliseconds" rlp:"optional"`
 
-	// MinDelayExcess was added by Granite and is ignored in legacy headers.
+	// DelayExponent was added by Granite and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
+	DelayExponent *uint64 `json:"minDelayExcess" rlp:"optional"`
+
+	// TargetExponent was added by Helicon and is ignored in legacy headers.
+	// We use *uint64 type here to avoid rlpgen generating incorrect code
+	TargetExponent *uint64 `json:"targetExponent" rlp:"optional"`
+
+	// PriceExponent was added by Helicon and is ignored in legacy headers.
+	// We use *uint64 type here to avoid rlpgen generating incorrect code
+	PriceExponent *uint64 `json:"minPriceExponent" rlp:"optional"`
+
+	// SettledHeight was added by Helicon and is ignored in legacy headers.
+	SettledHeight *uint64 `json:"settledHeight" rlp:"optional"`
+
+	// SettledGasUnix was added by Helicon and is ignored in legacy headers.
+	SettledGasUnix *uint64 `json:"settledGasUnix" rlp:"optional"`
+
+	// SettledGasNumerator was added by Helicon and is ignored in legacy headers.
+	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
+
+	// SettledExcess was added by Helicon and is ignored in legacy headers.
+	SettledExcess *uint64 `json:"settledExcess" rlp:"optional"`
 }
 
 // field type overrides for gencodec
 type headerMarshaling struct {
-	Difficulty       *hexutil.Big
-	Number           *hexutil.Big
-	GasLimit         hexutil.Uint64
-	GasUsed          hexutil.Uint64
-	Time             hexutil.Uint64
-	Extra            hexutil.Bytes
-	BaseFee          *hexutil.Big
-	ExtDataGasUsed   *hexutil.Big
-	BlockGasCost     *hexutil.Big
-	Hash             common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
-	BlobGasUsed      *hexutil.Uint64
-	ExcessBlobGas    *hexutil.Uint64
-	TimeMilliseconds *hexutil.Uint64
-	MinDelayExcess   *hexutil.Uint64
+	Difficulty          *hexutil.Big
+	Number              *hexutil.Big
+	GasLimit            hexutil.Uint64
+	GasUsed             hexutil.Uint64
+	Time                hexutil.Uint64
+	Extra               hexutil.Bytes
+	BaseFee             *hexutil.Big
+	ExtDataGasUsed      *hexutil.Big
+	BlockGasCost        *hexutil.Big
+	Hash                common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
+	BlobGasUsed         *hexutil.Uint64
+	ExcessBlobGas       *hexutil.Uint64
+	TimeMilliseconds    *hexutil.Uint64
+	DelayExponent       *hexutil.Uint64
+	TargetExponent      *hexutil.Uint64
+	PriceExponent       *hexutil.Uint64
+	SettledHeight       *hexutil.Uint64
+	SettledGasUnix      *hexutil.Uint64
+	SettledGasNumerator *hexutil.Uint64
+	SettledExcess       *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its

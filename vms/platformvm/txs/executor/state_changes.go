@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/holiman/uint256"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -381,16 +383,48 @@ func advanceValidatorFeeState(
 	return changed, nil
 }
 
+const (
+	_heliconMinConsumptionRateReduction   = .025 * reward.PercentDenominator
+	_heliconMinConsumptionReductionPeriod = 30 * 24 * time.Hour
+)
+
+var (
+	heliconMinConsumptionRateReduction   = uint256.NewInt(_heliconMinConsumptionRateReduction)
+	heliconMinConsumptionReductionPeriod = uint256.NewInt(uint64(_heliconMinConsumptionReductionPeriod))
+)
+
 func GetRewardsCalculator(
 	backend *Backend,
-	parentState state.Chain,
+	state state.Chain,
 	subnetID ids.ID,
 ) (reward.Calculator, error) {
 	if subnetID == constants.PrimaryNetworkID {
-		return backend.Rewards, nil
+		currentTime := state.GetTimestamp()
+		if !backend.Config.UpgradeConfig.IsHeliconActivated(currentTime) {
+			return backend.Rewards, nil
+		}
+
+		heliconTime := backend.Config.UpgradeConfig.HeliconTime
+		fullyReducedTime := heliconTime.Add(_heliconMinConsumptionReductionPeriod)
+		rc := backend.Config.RewardConfig
+		if currentTime.Before(fullyReducedTime) {
+			var reduced uint256.Int
+			reduced.SetUint64(uint64(currentTime.Sub(heliconTime)))
+			reduced.Mul(&reduced, heliconMinConsumptionRateReduction)
+			reduced.Div(&reduced, heliconMinConsumptionReductionPeriod)
+
+			minConsumptionRate, err := math.Sub(rc.MinConsumptionRate, reduced.Uint64())
+			if err != nil {
+				return nil, fmt.Errorf("could not calculate min consumption rate: %w", err)
+			}
+			rc.MinConsumptionRate = minConsumptionRate
+		} else {
+			rc.MinConsumptionRate -= _heliconMinConsumptionRateReduction
+		}
+		return reward.NewCalculator(rc), nil
 	}
 
-	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
+	transformSubnet, err := GetTransformSubnetTx(state, subnetID)
 	if err != nil {
 		return nil, err
 	}

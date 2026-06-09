@@ -12,12 +12,7 @@ package_group(
     packages = [
         "//main",
         "//node",
-        "//tests/e2e",
-        "//tests/e2e/c",
-        "//tests/fixture/e2e",
-        "//tests/reexecute",
-        "//tests/reexecute/c",
-        "//tests/reexecute/chaos",
+        "//tests/...",
         "//vms/evm/emulate",
         "//vms/saevm/cchain/...",
         "//wallet/chain/c",

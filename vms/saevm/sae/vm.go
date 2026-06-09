@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
@@ -65,7 +64,7 @@ type VM struct {
 	preference atomic.Pointer[blocks.Block]
 	last       struct {
 		accepted, settled atomic.Pointer[blocks.Block]
-		synchronous       uint64
+		synchronous       *blocks.Block
 	}
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
@@ -98,8 +97,6 @@ type Config struct {
 	MempoolConfig legacypool.Config
 	DBConfig      saedb.Config
 	RPCConfig     rpc.Config
-
-	ExcessAfterLastSynchronous gas.Gas
 
 	Now func() time.Time // defaults to [time.Now] if nil
 }
@@ -158,10 +155,10 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("blocks.New([last synchronous], ...): %v", err)
 	}
-	vm.last.synchronous = lastSync.Height()
+	vm.last.synchronous = lastSync
 
 	{ // ==========  Sync -> Async  ==========
-		if err := lastSync.MarkSynchronous(hooks, db, xdb, cfg.ExcessAfterLastSynchronous); err != nil {
+		if err := lastSync.MarkSynchronous(hooks, db, xdb); err != nil {
 			return nil, fmt.Errorf("%T{genesis}.MarkSynchronous(): %v", lastSync, err)
 		}
 		if err := canonicaliseLastSynchronous(db, lastSync); err != nil {

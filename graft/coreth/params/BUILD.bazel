@@ -30,6 +30,7 @@ go_library(
         "//utils",
         "//utils/set",
         "//vms/evm/predicate",
+        "//vms/saevm/hook",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
@@ -43,6 +44,7 @@ graft_go_test(
     srcs = [
         "config_extra_test.go",
         "config_test.go",
+        "hooks_libevm_test.go",
         "protocol_params_test.go",
     ],
     embed = [":params"],
@@ -52,6 +54,7 @@ graft_go_test(
         "//utils",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )

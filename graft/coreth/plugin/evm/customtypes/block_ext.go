@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
@@ -105,6 +106,14 @@ func (b *BlockBodyExtra) BlockRLPFieldPointersForDecoding(block *ethtypes.BlockR
 	}
 }
 
+func (b *BlockBodyExtra) PostRPCMarshal(_ *ethtypes.Block, m map[string]any) {
+	var extData hexutil.Bytes
+	if b.ExtData != nil {
+		extData = *b.ExtData
+	}
+	m["blockExtraData"] = extData
+}
+
 func BlockExtData(b *ethtypes.Block) []byte {
 	if data := extras.Block.Get(b).ExtData; data != nil {
 		return *data
@@ -142,11 +151,11 @@ func BlockTimeMilliseconds(b *ethtypes.Block) *uint64 {
 }
 
 func BlockMinDelayExcess(b *ethtypes.Block) *acp226.DelayExcess {
-	e := GetHeaderExtra(b.Header()).MinDelayExcess
+	e := GetHeaderExtra(b.Header()).DelayExponent
 	if e == nil {
 		return nil
 	}
-	cp := *e
+	cp := acp226.DelayExcess(*e)
 	return &cp
 }
 

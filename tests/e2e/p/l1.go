@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"math"
-	"slices"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -25,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -60,8 +58,6 @@ const (
 
 	// Validator registration attempts expire 5 minutes after they are created
 	expiryDelay = 5 * time.Minute
-	// P2P message requests timeout after 10 seconds
-	p2pTimeout = 10 * time.Second
 
 	timeToAdvancePChainWindow = 5 * platformvmvalidators.RecentlyAcceptedWindowTTL / 4
 )
@@ -354,7 +350,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				})
 
 				tc.By("getting the signature response", func() {
-					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					signature, ok, err := e2e.FindP2PMessage(genesisPeerMessages, unwrapWarpSignature)
 					require.NoError(err)
 					require.True(ok)
 					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetToL1Conversion.Bytes()))
@@ -476,7 +472,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 
 			tc.By("getting the signature response")
-			registerL1ValidatorSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			registerL1ValidatorSignature, ok, err := e2e.FindP2PMessage(genesisPeerMessages, unwrapWarpSignature)
 			require.NoError(err)
 			require.True(ok)
 
@@ -581,7 +577,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				})
 
 				tc.By("getting the signature response", func() {
-					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					signature, ok, err := e2e.FindP2PMessage(genesisPeerMessages, unwrapWarpSignature)
 					require.NoError(err)
 					require.True(ok)
 					require.True(bls.Verify(genesisNodePK, signature, unsignedL1ValidatorRegistration.Bytes()))
@@ -616,7 +612,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 
 			tc.By("getting the signature response")
-			setL1ValidatorWeightSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			setL1ValidatorWeightSignature, ok, err := e2e.FindP2PMessage(genesisPeerMessages, unwrapWarpSignature)
 			require.NoError(err)
 			require.True(ok)
 
@@ -726,7 +722,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				})
 
 				tc.By("getting the signature response", func() {
-					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					signature, ok, err := e2e.FindP2PMessage(genesisPeerMessages, unwrapWarpSignature)
 					require.NoError(err)
 					require.True(ok)
 					require.True(bls.Verify(genesisNodePK, signature, unsignedL1ValidatorWeight.Bytes()))
@@ -827,7 +823,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				})
 
 				tc.By("getting the signature response", func() {
-					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					signature, ok, err := e2e.FindP2PMessage(genesisPeerMessages, unwrapWarpSignature)
 					require.NoError(err)
 					require.True(ok)
 					require.True(bls.Verify(genesisNodePK, signature, unsignedL1ValidatorRegistration.Bytes()))
@@ -850,7 +846,7 @@ func wrapWarpSignatureRequest(
 	p2pMessageFactory, err := p2pmessage.NewCreator(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
-		p2pTimeout,
+		e2e.DefaultWarpSignatureRequestTimeout,
 	)
 	if err != nil {
 		return nil, err
@@ -874,36 +870,6 @@ func wrapWarpSignatureRequest(
 			requestBytes,
 		),
 	)
-}
-
-func findMessage[T any](
-	q buffer.BlockingDeque[*p2pmessage.InboundMessage],
-	parser func(*p2pmessage.InboundMessage) (T, bool, error),
-) (T, bool, error) {
-	var messagesToReprocess []*p2pmessage.InboundMessage
-	defer func() {
-		slices.Reverse(messagesToReprocess)
-		for _, msg := range messagesToReprocess {
-			q.PushLeft(msg)
-		}
-	}()
-
-	for {
-		msg, ok := q.PopLeft()
-		if !ok {
-			return utils.Zero[T](), false, nil
-		}
-
-		parsed, ok, err := parser(msg)
-		if err != nil {
-			return utils.Zero[T](), false, err
-		}
-		if ok {
-			return parsed, true, nil
-		}
-
-		messagesToReprocess = append(messagesToReprocess, msg)
-	}
 }
 
 // unwrapWarpSignature assumes the only type of AppResponses that will be
