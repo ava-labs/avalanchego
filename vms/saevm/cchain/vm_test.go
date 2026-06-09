@@ -96,6 +96,14 @@ type (
 	sutOption = options.Option[sutConfig]
 )
 
+// withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
+// balance to each address.
+func withMaxAllocFor(addrs ...common.Address) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
+	})
+}
+
 // withNodeID overrides the SUT's randomly generated NodeID.
 func withNodeID(id ids.NodeID) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -413,6 +421,14 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	return id
 }
 
+func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
+	tb.Helper()
+
+	e, err := s.WaitForEvent(ctx)
+	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
+	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
+}
+
 // buildVerify builds and verifies a block on top of preferenceID.
 func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID) *blocks.Block {
 	tb.Helper()
@@ -427,10 +443,7 @@ func (s *SUT) buildVerifyWithContext(ctx context.Context, tb testing.TB, prefere
 
 	require.NoErrorf(tb, s.SetPreference(ctx, preferenceID, blockCtx), "%T.SetPreference()", s.VM)
 
-	e, err := s.WaitForEvent(ctx)
-	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
-	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
-
+	s.waitForPendingTxs(ctx, tb)
 	blk, err := s.BuildBlock(ctx, blockCtx)
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
 	require.NoErrorf(tb, s.VerifyBlock(ctx, blockCtx, blk), "%T.VerifyBlock()", s.VM)

@@ -9,9 +9,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
+// PriceExponent encodes the minimum gas price.
+//
+// Implements ACP-283, specified here:
+// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md
 type PriceExponent uint64
 
-// Price returns the gas price in aAVAX.
+// Price returns the minimum gas price in wei (aAVAX).
 //
 // Price = minimum * e^(p / conversionRate)
 func (p PriceExponent) Price() gas.Price {
@@ -44,9 +48,7 @@ func (p PriceExponent) Toward(desired *PriceExponent) PriceExponent {
 // DesiredPriceExponent calculates the optimal price exponent given the desired
 // gas price.
 func DesiredPriceExponent(desired gas.Price) PriceExponent {
-	// This could be solved with floating point math. However, it introduces
-	// inaccuracies. So, we use a binary search to find the closest integer
-	// solution.
+	// Binary search avoids the rounding error of a floating-point solution.
 	const maxExponent = math.MaxUint64 - 37 // conversionRate * ln(MaxUint64 / minimum) + 1
 	return search(maxExponent, func(guess PriceExponent) bool {
 		return guess.Price() >= desired

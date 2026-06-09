@@ -79,7 +79,7 @@ func (s *Sender) Close() {
 	s.wgLock.Unlock()
 
 	// We MUST NOT hold wgLock while waiting, since the sender goroutines can be
-	// reentrent.
+	// reentrant.
 	s.wg.Wait()
 }
 
@@ -135,22 +135,24 @@ func (s *Sender) sendAppRequest(to set.Set[ids.NodeID], requestID uint32, b []by
 }
 
 func (s *Sender) sendAppResponse(to ids.NodeID, requestID uint32, b []byte) {
+	_, selfID := s.getSelf()
 	peer, ok := s.getPeer(to)
 	if !ok {
+		s.tb.Errorf("sending AppResponse to unknown peer %s from %s", to, selfID)
 		return
 	}
 	ctx := s.tb.Context()
-	_, selfID := s.getSelf()
 	assert.NoErrorf(s.tb, peer.AppResponse(ctx, selfID, requestID, b), "%T.AppResponse(%s)", peer, selfID)
 }
 
 func (s *Sender) sendAppError(to ids.NodeID, requestID uint32, code int32, message string) {
+	_, selfID := s.getSelf()
 	peer, ok := s.getPeer(to)
 	if !ok {
+		s.tb.Errorf("sending AppError to unknown peer %s from %s", to, selfID)
 		return
 	}
 	ctx := s.tb.Context()
-	_, selfID := s.getSelf()
 	appErr := &common.AppError{
 		Code:    code,
 		Message: message,
@@ -229,7 +231,8 @@ func Connect[P Peer](tb testing.TB, peers ...P) {
 	}
 }
 
-// ConnectTo wires self to each peer, marking both sides as connected.
+// ConnectTo symmetrically wires self to each peer, marking both sides as
+// connected.
 func ConnectTo[P Peer](tb testing.TB, self P, peers ...P) {
 	tb.Helper()
 

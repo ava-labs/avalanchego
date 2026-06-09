@@ -5,6 +5,10 @@ package dynamic
 
 import "github.com/ava-labs/avalanchego/vms/components/gas"
 
+// DelayExponent encodes the minimum block delay.
+//
+// Implements ACP-226, specified here:
+// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 type DelayExponent uint64
 
 // Delay returns the minimum block delay in milliseconds.
@@ -27,6 +31,7 @@ func (d DelayExponent) Delay() uint64 {
 //
 // If desired is nil, d is returned unmodified.
 func (d DelayExponent) Toward(desired *DelayExponent) DelayExponent {
+	// Per ACP-226, the per-block exponent change is capped at 200.
 	const maxDiff = 200
 	return toward(d, desired, maxDiff)
 }
@@ -34,9 +39,7 @@ func (d DelayExponent) Toward(desired *DelayExponent) DelayExponent {
 // DesiredDelayExponent calculates the optimal delay exponent given the desired
 // delay.
 func DesiredDelayExponent(desired uint64) DelayExponent {
-	// This could be solved with floating point math. However, it introduces
-	// inaccuracies. So, we use a binary search to find the closest integer
-	// solution.
+	// Binary search avoids the rounding error of a floating-point solution.
 	const maxExponent = 46_516_320 // conversionRate * ln(MaxUint64 / minimum) + 1
 	return search(maxExponent, func(guess DelayExponent) bool {
 		return guess.Delay() >= desired

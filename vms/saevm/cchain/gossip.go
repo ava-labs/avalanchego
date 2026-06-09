@@ -48,9 +48,9 @@ func (p *gossipTxPool) Add(t *gossipTx) error {
 	return p.Txpool.Add(t.toTx())
 }
 
-func (p *gossipTxPool) Iterate(f func(*gossipTx) bool) {
+func (p *gossipTxPool) Iterate(yield func(*gossipTx) bool) {
 	for t := range p.Txpool.Iter() {
-		if !f(toGossipTx(t)) {
+		if !yield(toGossipTx(t)) {
 			return
 		}
 	}

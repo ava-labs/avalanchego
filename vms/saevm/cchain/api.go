@@ -227,7 +227,8 @@ func (s *service) IssueTx(_ *http.Request, args *api.FormattedTx, resp *api.JSON
 		return fmt.Errorf("%w: %w", errIssuingTx, err)
 	}
 
-	// Even if already in the pool from a peer's gossip, push it to peers.
+	// Always push, even if already in the pool. Otherwise a malicious RPC could
+	// suppress a tx from being efficiently gossiped to validators.
 	s.pushGossiper.Add(gossipTx)
 
 	resp.TxID = t.ID()

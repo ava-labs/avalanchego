@@ -5,6 +5,7 @@ package dynamic
 
 import "github.com/ava-labs/avalanchego/utils/math"
 
+// toward moves current at most maxDiff steps toward desired.
 func toward[T ~uint64](current T, desired *T, maxDiff T) T {
 	if desired == nil {
 		return current
@@ -19,9 +20,9 @@ func toward[T ~uint64](current T, desired *T, maxDiff T) T {
 	return current - change
 }
 
-// search returns the smallest v in [0, n) such that f(v) is true, assuming
-// that f(v) implies f(v+1) for v in [0, n). If no such v exists, search
-// returns n.
+// search returns the smallest v in [0, n) such that f(v) is true, assuming f
+// is monotonic: if f(v) is true, then f(w) is true for all w >= v. If no such
+// v exists, search returns n.
 func search[T ~uint64](n T, f func(T) bool) T {
 	lo, hi := T(0), n
 	for lo < hi {
