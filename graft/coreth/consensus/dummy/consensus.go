@@ -351,6 +351,14 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 	}
 	headerExtra.MinDelayExcess = minDelayExcess
 
+	// Set the min price exponent (ACP-283).
+	headerExtra.MinPriceExponent = customheader.MinPriceExponent(
+		configExtra,
+		parent,
+		header.Time,
+		nil,
+	)
+
 	// commit the final state root
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
