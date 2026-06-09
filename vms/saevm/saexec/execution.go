@@ -42,8 +42,9 @@ type queuedBlock struct {
 // before [blocks.Block.Executed] returns true then there is no guarantee that
 // the block will be executed.
 func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
-	enqueuedAt := time.Now()
 	e.createReceiptBuffers(block)
+
+	enqueuedAt := time.Now()
 	select {
 	case e.queue <- queuedBlock{block: block, enqueuedAt: enqueuedAt}:
 		e.metrics.addUnexecutedTxs(len(block.Transactions()))
