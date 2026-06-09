@@ -432,7 +432,7 @@ func NewBlockChain(
 		quit:              make(chan struct{}),
 		acceptedLogsCache: NewFIFOCache[common.Hash, [][]*types.Log](cacheConfig.AcceptedCacheSize),
 	}
-	bc.stateCache = state.NewDatabaseWithNodeDB(bc.db, bc.triedb)
+	bc.stateCache = extstate.NewDatabaseWithNodeDB(bc.db, bc.triedb)
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
@@ -2213,7 +2213,7 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	bc.hc.SetCurrentHeader(block.Header())
 
 	lastAcceptedHash := block.Hash()
-	bc.stateCache = state.NewDatabaseWithNodeDB(bc.db, bc.triedb)
+	bc.stateCache = extstate.NewDatabaseWithNodeDB(bc.db, bc.triedb)
 
 	if err := bc.loadLastState(lastAcceptedHash); err != nil {
 		return err
