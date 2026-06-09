@@ -181,6 +181,64 @@ func Test_CalculatePrice(t *testing.T) {
 	}
 }
 
+func Test_CalculatePriceWithExcessConversion(t *testing.T) {
+	tests := []struct {
+		name                  string
+		minPrice              Price
+		excess                Gas
+		targetToExcessScaling Gas
+		target                Gas
+		want                  Price
+	}{
+		{
+			name:                  "uint64_denominator_matches_calculate_price",
+			minPrice:              10,
+			excess:                10_000_000,
+			targetToExcessScaling: 1_000_000,
+			target:                1,
+			want:                  CalculatePrice(10, 10_000_000, 1_000_000),
+		},
+		{
+			// K = 2 * MaxUint64, exceeding MaxUint64.
+			name:                  "two_max_uint64_denominator",
+			minPrice:              10,
+			excess:                math.MaxUint64,
+			targetToExcessScaling: 2,
+			target:                math.MaxUint64,
+			want:                  16,
+		},
+		{
+			// K = 4 * MaxUint64, exceeding MaxUint64.
+			name:                  "four_max_uint64_denominator",
+			minPrice:              10,
+			excess:                math.MaxUint64,
+			targetToExcessScaling: 4,
+			target:                math.MaxUint64,
+			want:                  12,
+		},
+		{
+			name:                  "caps_at_max_uint64",
+			minPrice:              math.MaxUint64,
+			excess:                math.MaxUint64,
+			targetToExcessScaling: 2,
+			target:                math.MaxUint64,
+			want:                  math.MaxUint64,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CalculatePriceWithExcessConversion(
+				tt.minPrice,
+				tt.excess,
+				tt.targetToExcessScaling,
+				tt.target,
+			)
+			require.Equal(t, tt.want, got, "CalculatePriceWithExcessConversion(%d, %d, %d, %d)", tt.minPrice, tt.excess, tt.targetToExcessScaling, tt.target)
+		})
+	}
+}
+
 func Benchmark_CalculatePrice(b *testing.B) {
 	for _, test := range calculatePriceTests {
 		b.Run(fmt.Sprintf("%d*e^(%d/%d)=%d", test.minPrice, test.excess, test.excessConversionConstant, test.expected), func(b *testing.B) {
