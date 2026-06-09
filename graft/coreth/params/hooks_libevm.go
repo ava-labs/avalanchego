@@ -56,7 +56,7 @@ func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
 	if extras.Rules(r).IsHelicon {
 		return hook.MinimumGasConsumption(limit)
 	}
-	return 0
+	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
 }
 
 // AccessListGas computes the intrinsic gas for an access list.
