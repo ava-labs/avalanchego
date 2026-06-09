@@ -315,8 +315,20 @@ func (vm *VM) Shutdown(context.Context) error {
 	if vm.cancel != nil {
 		vm.cancel()
 	}
+	// Persist the atomic trie at the last accepted height before the inner VM
+	// closes the database, so the next startup need not re-index it from the
+	// atomic tx repository.
+	if vm.AtomicBackend != nil {
+		_, lastAcceptedHeight, err := vm.InnerVM.ReadLastAccepted()
+		if err != nil {
+			return err
+		}
+		if err := vm.AtomicBackend.CommitLastAccepted(lastAcceptedHeight); err != nil {
+			return err
+		}
+	}
 	if err := vm.InnerVM.Shutdown(context.Background()); err != nil {
-		log.Error("failed to shutdown inner VM", "err", err)
+		log.Error("shutting down inner VM", "err", err)
 	}
 	vm.shutdownWg.Wait()
 	return nil

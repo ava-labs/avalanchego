@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -40,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -55,7 +55,7 @@ type VM struct {
 	hooks   hook.Points
 	config  Config
 	snowCtx *snow.Context
-	metrics *prometheus.Registry
+	metrics *metrics
 
 	db  ethdb.Database
 	xdb saetypes.ExecutionResults
@@ -123,11 +123,20 @@ func NewVM[T hook.Transaction](
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+
+	reg, err := apimetrics.MakeAndRegister(snowCtx.Metrics, "sae")
+	if err != nil {
+		return nil, fmt.Errorf("registering sae metrics: %w", err)
+	}
+	m, err := newMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("registering sae metrics: %w", err)
+	}
 	vm := &VM{
 		hooks:   hooks,
 		config:  cfg,
 		snowCtx: snowCtx,
-		metrics: prometheus.NewRegistry(),
+		metrics: m,
 		db:      db,
 	}
 	defer func() {
@@ -135,10 +144,6 @@ func NewVM[T hook.Transaction](
 			retErr = errors.Join(retErr, vm.close())
 		}
 	}()
-
-	if err := snowCtx.Metrics.Register("sae", vm.metrics); err != nil {
-		return nil, err
-	}
 
 	xdb, err := hooks.ExecutionResultsDB(
 		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
@@ -180,6 +185,7 @@ func NewVM[T hook.Transaction](
 			cfg.DBConfig,
 			hooks,
 			snowCtx.Log,
+			reg,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("saexec.New(...): %v", err)
@@ -201,6 +207,7 @@ func NewVM[T hook.Transaction](
 		vm.last.settled.Store(lastSettled)
 		vm.last.accepted.Store(head)
 		vm.preference.Store(head)
+		vm.metrics.markSettled(lastSettled.Height())
 	}
 
 	{ // ==========  Mempool  ==========
@@ -214,11 +221,11 @@ func NewVM[T hook.Transaction](
 		}
 		vm.toClose = append(vm.toClose, txPool)
 
-		metrics, err := bloom.NewMetrics("mempool", vm.metrics)
+		bloomMetrics, err := bloom.NewMetrics("mempool", reg)
 		if err != nil {
 			return nil, err
 		}
-		conf := gossip.BloomSetConfig{Metrics: metrics}
+		conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
 		pool, err := txgossip.NewSet(txPool, conf)
 		if err != nil {
 			return nil, err
@@ -239,7 +246,7 @@ func NewVM[T hook.Transaction](
 	}
 
 	{ // ==========  P2P Gossip  ==========
-		network, peers, validatorPeers, err := newNetwork(snowCtx, sender, vm.metrics)
+		network, peers, validatorPeers, err := newNetwork(snowCtx, sender, reg)
 		if err != nil {
 			return nil, fmt.Errorf("newNetwork(...): %v", err)
 		}
@@ -253,7 +260,7 @@ func NewVM[T hook.Transaction](
 			txgossip.Marshaller{},
 			gossip.SystemConfig{
 				Log:           snowCtx.Log,
-				Registry:      vm.metrics,
+				Registry:      reg,
 				Namespace:     "gossip",
 				RequestPeriod: pullGossipPeriod,
 			},
