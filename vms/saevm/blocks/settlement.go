@@ -91,9 +91,10 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 	// itself. As the only reason to pass receipts here is for later settlement
 	// in another block, there is no need to pass anything meaningful as it
 	// would also require them to be received as an argument to MarkSynchronous.
-	target, cfg := hooks.GasConfigAfter(b.Header())
+	header := b.Header()
+	target, cfg := hooks.GasConfigAfter(header)
 	execTime, err := gastime.New(
-		hooks.BlockTime(b.Header()),
+		hooks.BlockTime(header),
 		// Target, excess, and config _after_ are a requirement of
 		// [Block.MarkExecuted].
 		target,

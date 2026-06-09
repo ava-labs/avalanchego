@@ -292,21 +292,23 @@ var errMissingBlock = errors.New("missing block")
 // in the block range (h, settled), both exclusive.
 func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
 	var s set.Set[ids.ID]
-	for h.ParentHash != settled {
-		parentNumber := h.Number.Uint64() - 1
-		p, ok := source(h.ParentHash, parentNumber)
+	parentHash := h.ParentHash
+	parentNumber := h.Number.Uint64() - 1
+	for parentHash != settled {
+		p, ok := source(parentHash, parentNumber)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
+			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, parentHash, parentNumber)
 		}
 
 		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
 		if err != nil {
-			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
+			return nil, fmt.Errorf("parsing txs: %s (%d): %w", parentHash, parentNumber, err)
 		}
 		for _, t := range txs {
 			s.Union(t.InputIDs())
 		}
-		h = p.Header()
+		parentHash = p.ParentHash()
+		parentNumber--
 	}
 	return s, nil
 }
