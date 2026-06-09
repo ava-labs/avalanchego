@@ -5,6 +5,10 @@ package dynamic
 
 import "github.com/ava-labs/avalanchego/vms/components/gas"
 
+// TargetExponent encodes the target gas per second.
+//
+// Implements ACP-176, specified here:
+// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/176-dynamic-evm-gas-limit-and-price-discovery-updates/README.md
 type TargetExponent uint64
 
 // Target returns the target gas per second.
@@ -27,6 +31,7 @@ func (t TargetExponent) Target() gas.Gas {
 //
 // If desired is nil, t is returned unmodified.
 func (t TargetExponent) Toward(desired *TargetExponent) TargetExponent {
+	// Per ACP-176, the per-block exponent change is capped at 2^15.
 	const maxDiff = 1 << 15
 	return toward(t, desired, maxDiff)
 }
@@ -34,9 +39,7 @@ func (t TargetExponent) Toward(desired *TargetExponent) TargetExponent {
 // DesiredTargetExponent calculates the optimal target exponent given the
 // desired target in gas.
 func DesiredTargetExponent(desired gas.Gas) TargetExponent {
-	// This could be solved with floating point math. However, it introduces
-	// inaccuracies. So, we use a binary search to find the closest integer
-	// solution.
+	// Binary search avoids the rounding error of a floating-point solution.
 	const maxExponent = 1_024_950_627 // conversionRate * ln(MaxUint64 / minimum) + 1
 	return search(maxExponent, func(guess TargetExponent) bool {
 		return guess.Target() >= desired
