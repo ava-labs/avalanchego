@@ -16,15 +16,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/core"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -36,7 +40,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	avadb "github.com/ava-labs/avalanchego/database"
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 )
+
+const warpSignatureCacheSize = 512
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
@@ -79,8 +88,14 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	// TODO(StephenButtolph): Allow minimal user configuration via configBytes.
-	_ = configBytes
+	userConfig, err := ParseConfig(configBytes)
+	if err != nil {
+		return fmt.Errorf("parsing user config: %w", err)
+	}
+	warpMessages, err := userConfig.WarpMessages()
+	if err != nil {
+		return fmt.Errorf("parsing warp messages: %w", err)
+	}
 
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
@@ -89,12 +104,12 @@ func (vm *VM) Initialize(
 	trieDBConfig := triedb.HashDefaults
 	trieDB := triedb.NewDatabase(ethDB, trieDBConfig)
 
-	// TODO(StephenButtolph): Replace this with Coreth's genesis format.
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
-		return fmt.Errorf("unmarshalling genesis: %w", err)
+	genesis, err := parseGenesis(snowCtx, genesisBytes)
+	if err != nil {
+		return fmt.Errorf("parsing genesis: %w", err)
 	}
-	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis)
+	// On a fresh chain the last-accepted block is genesis itself.
+	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis, genesis.ToBlock().Hash(), false)
 	if err != nil {
 		return fmt.Errorf("setting up genesis block: %w", err)
 	}
@@ -108,10 +123,13 @@ func (vm *VM) Initialize(
 	})
 
 	pendingTxs := txpool.NewPending()
+	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
 		snowCtx,
 		vm.state,
+		chainConfig,
 		pendingTxs,
+		warpStorage,
 	)
 	mempoolConfig := legacypool.DefaultConfig
 	// Treat all transactions equally regardless of submission source — no
@@ -193,7 +211,49 @@ func (vm *VM) Initialize(
 		return nil
 	})
 
+	warpVerifier := saewarp.NewVerifier(&blockClient{vm: vm.VM}, warpStorage)
+	warpHandler := acp118.NewCachedHandler(
+		lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
+		warpVerifier,
+		snowCtx.WarpSigner,
+	)
+	if err := vm.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+		return fmt.Errorf("registering warp signature handler: %w", err)
+	}
+
 	return nil
+}
+
+// parseGenesis decodes the genesis bytes into a [*core.Genesis] and populates
+// the Avalanche-specific config extras (network upgrades, Warp precompile
+// schedule, Ethereum upgrade alignment).
+func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
+	g := new(core.Genesis)
+	if err := json.Unmarshal(b, g); err != nil {
+		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
+	}
+
+	configExtra := corethparams.GetExtra(g.Config)
+	configExtra.AvalancheContext = extras.AvalancheContext{
+		SnowCtx: ctx,
+	}
+	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
+
+	// If Durango is scheduled, schedule the Warp Precompile at the same time.
+	if configExtra.DurangoBlockTimestamp != nil {
+		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
+			Config: warpcontract.NewDefaultConfig(configExtra.DurangoBlockTimestamp),
+		})
+	}
+	if err := configExtra.Verify(); err != nil {
+		return nil, fmt.Errorf("invalid chain config: %w", err)
+	}
+
+	// Align the Ethereum upgrades to the Avalanche upgrades.
+	if err := corethparams.SetEthUpgrades(g.Config); err != nil {
+		return nil, fmt.Errorf("aligning Ethereum upgrades: %w", err)
+	}
+	return g, nil
 }
 
 const (
@@ -264,4 +324,26 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	}
 	vm.onClose = nil
 	return errors.Join(errs...)
+}
+
+// blockClient adapts [sae.VM] to the [saewarp.Backend] interface.
+type blockClient struct {
+	vm *sae.VM
+}
+
+var _ saewarp.Backend = (*blockClient)(nil)
+
+func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
+	b, err := c.vm.GetBlock(ctx, blockID)
+	if err != nil {
+		return err
+	}
+	acceptedID, err := c.vm.GetBlockIDAtHeight(ctx, b.Height())
+	if err != nil {
+		return err
+	}
+	if acceptedID != blockID {
+		return avadb.ErrNotFound
+	}
+	return nil
 }
