@@ -38,9 +38,9 @@ thiserror.workspace = true
 typed-builder = "0.23.2"
 rayon = "1.12.0"
 parking_lot.workspace = true
-lender = "0.6.2"
+lender = "0.7.0"
 nonzero_ext = "0.3.0"
-sha3 = "0.10.9"
+sha3 = "0.12.0"
 smallvec.workspace = true
 
 [features]
@@ -66,11 +66,11 @@ rand.workspace = true
 tempfile.workspace = true
 test-case.workspace = true
 # Regular dependencies
-ctor = "0.6.3"
+ctor = "1.0.7"
 hash-db = "0.16.0"
 plain_hasher = "0.2.3"
 rlp = "0.6.1"
-sha3 = "0.10.9"
+sha3 = "0.12.0"
 
 [[bench]]
 name = "hashops"

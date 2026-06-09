@@ -3,8 +3,8 @@
 
 use crate::node::ExtendableBytes;
 use crate::node::branch::Serializable;
-use sha2::digest::generic_array::GenericArray;
-use sha2::digest::typenum;
+use sha2::digest::array::Array;
+use sha2::digest::consts::U32;
 use std::fmt::{self, Debug, Display, Formatter};
 
 /// An error that occurs when trying to convert a slice to a `TrieHash`
@@ -21,7 +21,7 @@ pub struct TrieHash([u8; 32]);
 /// Intentionally, there is no [`Default`] implementation for [`TrieHash`] to force
 /// the user to explicitly decide between an empty RLP hash or a hash of all zeros.
 ///
-/// These unfortunately cannot be `const` because the [`GenericArray`] type does
+/// These unfortunately cannot be `const` because the [`Array`] type does not
 /// provide a const constructor.
 impl TrieHash {
     /// Creates a new `TrieHash` from the default value, which is the all zeros.
@@ -89,8 +89,8 @@ impl TryFrom<&[u8]> for TrieHash {
     }
 }
 
-impl From<GenericArray<u8, typenum::U32>> for TrieHash {
-    fn from(value: GenericArray<u8, typenum::U32>) -> Self {
+impl From<Array<u8, U32>> for TrieHash {
+    fn from(value: Array<u8, U32>) -> Self {
         TrieHash(value.into())
     }
 }

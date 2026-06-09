@@ -158,8 +158,7 @@ impl<T: Hashable> Preimage for T {
             // to the raw value.
             let empty_root = Keccak256::digest(NULL_RLP);
             let account_value: Option<Box<[u8]>> = if is_account {
-                value_bytes
-                    .and_then(|bytes| replace_list_field(bytes, 2, empty_root.as_slice()).ok())
+                value_bytes.and_then(|bytes| replace_list_field(bytes, 2, empty_root.as_ref()).ok())
             } else {
                 None
             };
@@ -232,7 +231,7 @@ impl<T: Hashable> Preimage for T {
                     trace!("replacement hash {:?}", hex::encode(&replacement_hash));
 
                     let updated =
-                        replace_list_field(rlp_encoded_bytes, 2, replacement_hash.as_slice())
+                        replace_list_field(rlp_encoded_bytes, 2, replacement_hash.as_ref())
                             .unwrap_or_else(|_| Box::from(rlp_encoded_bytes));
                     trace!("updated encoded value {:02X?}", hex::encode(&updated));
                     updated
@@ -260,7 +259,7 @@ impl<T: Hashable> Preimage for T {
                     let hashed_bytes = Keccak256::digest(&updated_bytes);
                     let final_bytes = encode_list(&[
                         RlpItem::Bytes(&path),
-                        RlpItem::Bytes(hashed_bytes.as_slice()),
+                        RlpItem::Bytes(hashed_bytes.as_ref()),
                     ]);
                     trace!("pass 2 bytes {:02X?}", hex::encode(&final_bytes));
                     buf.update(&final_bytes);

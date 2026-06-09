@@ -581,10 +581,7 @@ mod tests {
 
         assert_eq!(
             TrieHash::default_root_hash(),
-            sha3::Keccak256::digest(rlp::NULL_RLP)
-                .as_slice()
-                .try_into()
-                .ok(),
+            Some(sha3::Keccak256::digest(rlp::NULL_RLP).into()),
         );
     }
 

@@ -178,7 +178,9 @@ mod batch_op;
 pub use firewood_storage::logger;
 
 #[cfg(all(test, feature = "logger"))]
-#[ctor::ctor]
+// SAFETY: Called pre-main in test builds only. Does not panic (try_init + ok),
+// uses thread-safe logger initialization, and only reads env vars (safe pre-main).
+#[ctor::ctor(unsafe)]
 /// `ctor` will ensure this function is invoked before any tests are run so we
 /// can initialize the logger consistently across all tests without having to
 /// manually call it in each test.

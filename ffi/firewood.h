@@ -103,7 +103,11 @@ typedef struct OwnedSlice_u8 OwnedBytes;
  * A result type returned from FFI functions return the database root hash. This
  * may or may not be after a mutation.
  */
-enum HashResult_Tag {
+enum HashResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to a database handle.
    */
@@ -130,7 +134,11 @@ enum HashResult_Tag {
    */
   HashResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum HashResult_Tag HashResult_Tag;
+#else
 typedef size_t HashResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct HashResult {
   HashResult_Tag tag;
@@ -194,7 +202,11 @@ typedef struct BorrowedSlice_u8 BorrowedBytes;
  * Callers should use the appropriate variant (`Put`, `Delete`, `DeleteRange`)
  * to express their intent.
  */
-enum BatchOp_Tag {
+enum BatchOp_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * Insert or update a key with a value.
    * The value may be empty (zero-length).
@@ -209,7 +221,11 @@ enum BatchOp_Tag {
    */
   BatchOp_DeleteRange,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum BatchOp_Tag BatchOp_Tag;
+#else
 typedef size_t BatchOp_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct BatchOp_Put_Body {
   BorrowedBytes key;
@@ -275,7 +291,11 @@ typedef struct BorrowedSlice_BatchOp BorrowedBatchOps;
  * The result type returned from an FFI function that returns no value but may
  * return an error.
  */
-enum VoidResult_Tag {
+enum VoidResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to the input handle.
    */
@@ -295,7 +315,11 @@ enum VoidResult_Tag {
    */
   VoidResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum VoidResult_Tag VoidResult_Tag;
+#else
 typedef size_t VoidResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct VoidResult {
   VoidResult_Tag tag;
@@ -309,7 +333,11 @@ typedef struct VoidResult {
 /**
  * A result type returned from FFI functions that create an code hash iterator
  */
-enum CodeIteratorResult_Tag {
+enum CodeIteratorResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to a proof handle.
    */
@@ -328,7 +356,11 @@ enum CodeIteratorResult_Tag {
    */
   CodeIteratorResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum CodeIteratorResult_Tag CodeIteratorResult_Tag;
+#else
 typedef size_t CodeIteratorResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct CodeIteratorResult_Ok_Body {
   /**
@@ -356,7 +388,11 @@ typedef struct CodeIteratorResult {
  * FFI methods and types can use this to represent optional values where `Optional<T>`
  * does not work due to it not having a C-compatible layout.
  */
-enum Maybe_OwnedBytes_Tag {
+enum Maybe_OwnedBytes_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * No value present.
    */
@@ -366,7 +402,11 @@ enum Maybe_OwnedBytes_Tag {
    */
   Maybe_OwnedBytes_Some_OwnedBytes,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum Maybe_OwnedBytes_Tag Maybe_OwnedBytes_Tag;
+#else
 typedef size_t Maybe_OwnedBytes_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct Maybe_OwnedBytes {
   Maybe_OwnedBytes_Tag tag;
@@ -395,7 +435,11 @@ typedef struct NextKeyRange {
   struct Maybe_OwnedBytes end_key;
 } NextKeyRange;
 
-enum NextKeyRangeResult_Tag {
+enum NextKeyRangeResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to the input handle.
    */
@@ -423,7 +467,11 @@ enum NextKeyRangeResult_Tag {
    */
   NextKeyRangeResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum NextKeyRangeResult_Tag NextKeyRangeResult_Tag;
+#else
 typedef size_t NextKeyRangeResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct NextKeyRangeResult {
   NextKeyRangeResult_Tag tag;
@@ -443,7 +491,11 @@ typedef struct NextKeyRangeResult {
  * FFI methods and types can use this to represent optional values where `Optional<T>`
  * does not work due to it not having a C-compatible layout.
  */
-enum Maybe_BorrowedBytes_Tag {
+enum Maybe_BorrowedBytes_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * No value present.
    */
@@ -453,7 +505,11 @@ enum Maybe_BorrowedBytes_Tag {
    */
   Maybe_BorrowedBytes_Some_BorrowedBytes,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum Maybe_BorrowedBytes_Tag Maybe_BorrowedBytes_Tag;
+#else
 typedef size_t Maybe_BorrowedBytes_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct Maybe_BorrowedBytes {
   Maybe_BorrowedBytes_Tag tag;
@@ -473,7 +529,11 @@ typedef struct Maybe_BorrowedBytes {
  *
  * [`fwd_free_change_proof`]: crate::fwd_free_change_proof
  */
-enum ChangeProofResult_Tag {
+enum ChangeProofResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to the input handle.
    */
@@ -505,7 +565,11 @@ enum ChangeProofResult_Tag {
    */
   ChangeProofResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum ChangeProofResult_Tag ChangeProofResult_Tag;
+#else
 typedef size_t ChangeProofResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct ChangeProofResult {
   ChangeProofResult_Tag tag;
@@ -528,7 +592,11 @@ typedef struct ChangeProofResult {
 /**
  * A result type returned from FFI functions that retrieve a single value.
  */
-enum ValueResult_Tag {
+enum ValueResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to a database handle.
    */
@@ -561,7 +629,11 @@ enum ValueResult_Tag {
    */
   ValueResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum ValueResult_Tag ValueResult_Tag;
+#else
 typedef size_t ValueResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct ValueResult {
   ValueResult_Tag tag;
@@ -581,7 +653,11 @@ typedef struct ValueResult {
 /**
  * A result type returned from FFI functions that create a reconstructed view.
  */
-enum ReconstructedResult_Tag {
+enum ReconstructedResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to an input handle.
    */
@@ -595,7 +671,11 @@ enum ReconstructedResult_Tag {
    */
   ReconstructedResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum ReconstructedResult_Tag ReconstructedResult_Tag;
+#else
 typedef size_t ReconstructedResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct ReconstructedResult_Ok_Body {
   /**
@@ -661,7 +741,11 @@ typedef struct CreateChangeProofArgs {
  *
  * [`fwd_free_range_proof`]: crate::fwd_free_range_proof
  */
-enum RangeProofResult_Tag {
+enum RangeProofResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to the input handle.
    */
@@ -693,7 +777,11 @@ enum RangeProofResult_Tag {
    */
   RangeProofResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum RangeProofResult_Tag RangeProofResult_Tag;
+#else
 typedef size_t RangeProofResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct RangeProofResult {
   RangeProofResult_Tag tag;
@@ -785,7 +873,11 @@ typedef struct VerifyRangeProofArgs {
  * A result type returned from FFI functions that create a proposal but do not
  * commit it to the database.
  */
-enum ProposalResult_Tag {
+enum ProposalResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to a database handle.
    */
@@ -806,7 +898,11 @@ enum ProposalResult_Tag {
    */
   ProposalResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum ProposalResult_Tag ProposalResult_Tag;
+#else
 typedef size_t ProposalResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct ProposalResult_Ok_Body {
   /**
@@ -984,7 +1080,11 @@ typedef struct OwnedNativeHistogram {
 /**
  * A C-compatible tagged union representing a metric value.
  */
-enum OwnedMetricValue_Tag {
+enum OwnedMetricValue_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   OwnedMetricValue_Counter,
   OwnedMetricValue_Gauge,
   OwnedMetricValue_Summary,
@@ -992,7 +1092,11 @@ enum OwnedMetricValue_Tag {
   OwnedMetricValue_NativeHistogram,
   OwnedMetricValue_Unknown,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum OwnedMetricValue_Tag OwnedMetricValue_Tag;
+#else
 typedef size_t OwnedMetricValue_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct OwnedMetricValue {
   OwnedMetricValue_Tag tag;
@@ -1065,7 +1169,11 @@ typedef struct OwnedSlice_OwnedMetricFamily OwnedRenderedMetrics;
  *
  * [`fwd_gather_rendered`]: crate::fwd_gather_rendered
  */
-enum RenderedMetricsResult_Tag {
+enum RenderedMetricsResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The metrics were successfully gathered.
    *
@@ -1086,7 +1194,11 @@ enum RenderedMetricsResult_Tag {
    */
   RenderedMetricsResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum RenderedMetricsResult_Tag RenderedMetricsResult_Tag;
+#else
 typedef size_t RenderedMetricsResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct RenderedMetricsResult {
   RenderedMetricsResult_Tag tag;
@@ -1103,7 +1215,11 @@ typedef struct RenderedMetricsResult {
 /**
  * A result type returned from FFI functions that get a revision
  */
-enum RevisionResult_Tag {
+enum RevisionResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to a database handle.
    */
@@ -1128,7 +1244,11 @@ enum RevisionResult_Tag {
    */
   RevisionResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum RevisionResult_Tag RevisionResult_Tag;
+#else
 typedef size_t RevisionResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct RevisionResult_Ok_Body {
   /**
@@ -1160,7 +1280,11 @@ typedef struct RevisionResult {
 /**
  * A result type returned from iterator FFI functions
  */
-enum KeyValueResult_Tag {
+enum KeyValueResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to an iterator handle.
    */
@@ -1189,7 +1313,11 @@ enum KeyValueResult_Tag {
    */
   KeyValueResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum KeyValueResult_Tag KeyValueResult_Tag;
+#else
 typedef size_t KeyValueResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct KeyValueResult {
   KeyValueResult_Tag tag;
@@ -1206,7 +1334,11 @@ typedef struct KeyValueResult {
 /**
  * A result type returned from iterator FFI functions
  */
-enum KeyValueBatchResult_Tag {
+enum KeyValueBatchResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to an iterator handle.
    */
@@ -1226,7 +1358,11 @@ enum KeyValueBatchResult_Tag {
    */
   KeyValueBatchResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum KeyValueBatchResult_Tag KeyValueBatchResult_Tag;
+#else
 typedef size_t KeyValueBatchResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct KeyValueBatchResult {
   KeyValueBatchResult_Tag tag;
@@ -1243,7 +1379,11 @@ typedef struct KeyValueBatchResult {
 /**
  * A result type returned from FFI functions that create an iterator
  */
-enum IteratorResult_Tag {
+enum IteratorResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The caller provided a null pointer to a revision/proposal handle.
    */
@@ -1262,7 +1402,11 @@ enum IteratorResult_Tag {
    */
   IteratorResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum IteratorResult_Tag IteratorResult_Tag;
+#else
 typedef size_t IteratorResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct IteratorResult_Ok_Body {
   /**
@@ -1287,7 +1431,11 @@ typedef struct IteratorResult {
 /**
  * The result type returned from the open or create database functions.
  */
-enum HandleResult_Tag {
+enum HandleResult_Tag
+#if __STDC_VERSION__ >= 202311L
+  : size_t
+#endif // __STDC_VERSION__ >= 202311L
+ {
   /**
    * The database was opened or created successfully and the handle is
    * returned as an opaque pointer.
@@ -1309,7 +1457,11 @@ enum HandleResult_Tag {
    */
   HandleResult_Err,
 };
+#if __STDC_VERSION__ >= 202311L
+typedef enum HandleResult_Tag HandleResult_Tag;
+#else
 typedef size_t HandleResult_Tag;
+#endif // __STDC_VERSION__ >= 202311L
 
 typedef struct HandleResult {
   HandleResult_Tag tag;

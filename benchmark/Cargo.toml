@@ -35,14 +35,20 @@ rand.workspace = true
 rand_distr.workspace = true
 sha2.workspace = true
 # Regular dependencies
-fastrace-opentelemetry = { version = "0.16.0" }
+fastrace-opentelemetry = { version = "0.18.0" }
 metrics-exporter-prometheus = { workspace = true, optional = true, features = ["http-listener"] }
-opentelemetry = "=0.31.0"
-opentelemetry-otlp = { version = "=0.31.0", features = ["grpc-tonic"] }
-opentelemetry-proto = "=0.31.0"
-opentelemetry_sdk = "=0.31.0"
+# These crates are also dependencies of `fastrace-opentelemetry` (pinned to
+# 0.18.0 above), and we must resolve to the same opentelemetry version it
+# requires — currently 0.32. Don't pin an exact version like "=0.32.0": drifting
+# from fastrace-opentelemetry's version pulls in two incompatible copies of
+# opentelemetry and causes build failures. If you bump fastrace-opentelemetry,
+# update these to match its new opentelemetry requirement.
+opentelemetry = "0.32"
+opentelemetry-otlp = { version = "0.32", features = ["grpc-tonic"] }
+opentelemetry-proto = "0.32"
+opentelemetry_sdk = "0.32"
 pretty-duration = "0.1.1"
-tikv-jemallocator = "0.6.1"
+tikv-jemallocator = "0.7.0"
 
 [dependencies.tokio]
 optional = true
