@@ -36,12 +36,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -112,15 +114,14 @@ func WithPrecompile(addr common.Address, precompile libevm.PrecompiledContract) 
 // other fields SHOULD instead be exposed as methods, such as [SUT.StateAt], to
 // avoid over-reliance on internal implementation details.
 type SUT struct {
+	*vmtest.SUT[*sae.VM]
 	block.ChainVM
 	*ethclient.Client
 	RPCClient *rpc.Client
 
-	RawVM   *sae.VM
 	Genesis *blocks.Block
 	Wallet  *saetest.Wallet
 	DB      ethdb.Database
-	Logger  *saetest.TBLogger
 
 	Validators *validatorstest.State
 	Sender     *enginetest.Sender
@@ -156,7 +157,7 @@ func NewSUT[T hook.Transaction](tb testing.TB, numAccounts uint, hooks hook.Poin
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
 	})
 
-	logger := saetest.NewTBLogger(tb, conf.LogLevel)
+	logger := loggingtest.New(tb, conf.LogLevel)
 	ctx := logger.CancelOnError(tb.Context())
 	snowCtx := snowtest.Context(tb, ChainID)
 	snowCtx.Log = logger
@@ -196,17 +197,16 @@ func NewSUT[T hook.Transaction](tb testing.TB, numAccounts uint, hooks hook.Poin
 	validators, ok := snowCtx.ValidatorState.(*validatorstest.State)
 	require.Truef(tb, ok, "unexpected type %T for snowCtx.ValidatorState", snowCtx.ValidatorState)
 	return ctx, &SUT{
+		SUT:       &vmtest.SUT[*sae.VM]{RawVM: vm.VM, Logger: logger},
 		ChainVM:   snow,
 		Client:    ethClient,
 		RPCClient: rpcClient,
-		RawVM:     vm.VM,
 		Genesis:   vm.LastSettledBlock(),
 		Wallet: saetest.NewWalletWithKeyChain(
 			keys,
 			types.LatestSigner(conf.Genesis.Config),
 		),
-		DB:     sae.NewEthDB(conf.DB),
-		Logger: logger,
+		DB: sae.NewEthDB(conf.DB),
 
 		Validators: validators,
 		Sender:     sender,
@@ -220,12 +220,8 @@ func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Clien
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", snow)
 	server := httptest.NewServer(handlers[sae.WSHTTPExtensionPath])
 	tb.Cleanup(server.Close)
-	rpcClient, err := rpc.Dial("ws://" + server.Listener.Addr().String())
-	require.NoErrorf(tb, err, "rpc.Dial(http.NewServer(%T.CreateHandlers()))", snow)
-	client := ethclient.NewClient(rpcClient)
-	tb.Cleanup(client.Close)
 
-	return rpcClient, client
+	return vmtest.DialWS(tb, "ws://"+server.Listener.Addr().String())
 }
 
 func marshalJSON(tb testing.TB, v any) []byte {
@@ -253,15 +249,6 @@ func (s *SUT) CallContext(ctx context.Context, result any, method string, args .
 
 func (s *SUT) NodeID() ids.NodeID {
 	return s.RawVM.NodeID()
-}
-
-// Context returns a [context.Context], derived from the [testing.TB], that is
-// cancelled if the SUT's default logger receives a log at [logging.Error] or
-// higher.
-//
-//nolint:thelper // Not a helper
-func (s *SUT) Context(tb testing.TB) context.Context {
-	return s.Logger.CancelOnError(tb.Context())
 }
 
 // MustSendTx guarantees all transactions are delivered to the mempool, which triggers
@@ -362,18 +349,6 @@ func (s *SUT) StateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	sdb, err := s.RawVM.StateDB(root)
 	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.RawVM)
 	return sdb
-}
-
-// LastAcceptedBlock is a convenience wrapper for calling [VM.GetBlock] with
-// the ID from [VM.LastAccepted] as an argument.
-func (s *SUT) LastAcceptedBlock(tb testing.TB) *blocks.Block {
-	tb.Helper()
-	ctx := s.Context(tb)
-	id, err := s.LastAccepted(ctx)
-	require.NoError(tb, err, "LastAccepted()")
-	b, err := s.GetBlock(ctx, id)
-	require.NoError(tb, err, "GetBlock(lastAcceptedID)")
-	return Unwrap(tb, b)
 }
 
 // Unwrap is a convenience (un)wrapper for calling [adaptor.Block.Unwrap] after

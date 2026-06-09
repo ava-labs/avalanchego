@@ -23,7 +23,7 @@ import (
 func (s *SUT) assertTxBloomContains(tb testing.TB, txIDs ...ids.ID) {
 	tb.Helper()
 
-	filter, salt := s.gossipSet.BloomFilter()
+	filter, salt := s.RawVM.gossipSet.BloomFilter()
 	for i, txID := range txIDs {
 		assert.Truef(tb, bloom.Contains(filter, txID[:], salt[:]), "bloom filter should contain %s (%d)", txID, i)
 	}
@@ -35,7 +35,7 @@ func (s *SUT) assertTxBloomContains(tb testing.TB, txIDs ...ids.ID) {
 func (s *SUT) assertTxBloomEmpty(tb testing.TB) {
 	tb.Helper()
 
-	filter, _ := s.gossipSet.BloomFilter()
+	filter, _ := s.RawVM.gossipSet.BloomFilter()
 	assert.Zero(tb, filter.Count(), "bloom filter should be empty")
 }
 

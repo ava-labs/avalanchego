@@ -64,7 +64,7 @@ func TestSuggestPriceOptions(t *testing.T) {
 
 	// This just asserts the round-tripping of the PriceOptions through the RPC.
 	// See testing of [saerpc.NewPriceOptions] for behavioral tests.
-	tip, err := sut.rawVM.GethRPCBackends().SuggestGasTipCap(t.Context())
+	tip, err := sut.RawVM.GethRPCBackends().SuggestGasTipCap(t.Context())
 	require.NoErrorf(t, err, "SuggestGasTipCap()")
 	doubleBaseFee := b.WorstCaseBounds().LatestEndTime.BaseFee().ToBig()
 	doubleBaseFee.Lsh(doubleBaseFee, 1)

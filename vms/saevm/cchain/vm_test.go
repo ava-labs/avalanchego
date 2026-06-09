@@ -47,12 +47,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
-	ethrpc "github.com/ava-labs/libevm/rpc"
 )
 
 func TestMain(m *testing.M) {
@@ -65,6 +65,7 @@ var _ saetest.Peer = (*SUT)(nil)
 // SUT is the system under test for the cchain [VM]. It bundles the [VM]
 // itself and an HTTP [Client] connected to an in-process [httptest.Server].
 type SUT struct {
+	*vmtest.SUT[*VM]
 	*VM
 	*Client
 
@@ -182,16 +183,15 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	const wsHTTPPath = cchainHTTPPrefix + "/ws"
 	wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
-	ethRPCClient, err := ethrpc.Dial(wsURI)
-	require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
-	tb.Cleanup(ethRPCClient.Close)
+	_, ethClient := vmtest.DialWS(tb, wsURI)
 
 	sut := &SUT{
+		SUT:       &vmtest.SUT[*VM]{RawVM: vm, Logger: log},
 		VM:        vm,
 		Client:    NewClient(server.URL),
 		memory:    memory,
 		sender:    appSender,
-		ethclient: ethclient.NewClient(ethRPCClient),
+		ethclient: ethClient,
 	}
 	appSender.SetSelf(sut)
 	tb.Cleanup(appSender.Close)
@@ -321,19 +321,9 @@ func (s *SUT) runConsensusLoop(ctx context.Context, tb testing.TB) *blocks.Block
 func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB) *blocks.Block {
 	tb.Helper()
 
-	lastAccepted := s.lastAccepted(ctx, tb)
-	blk := s.buildVerify(ctx, tb, lastAccepted)
+	blk := s.buildVerify(ctx, tb, s.LastAcceptedID(tb))
 	require.NoErrorf(tb, s.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.VM)
 	return blk
-}
-
-// lastAccepted returns the ID of the last-accepted block.
-func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
-	tb.Helper()
-
-	id, err := s.LastAccepted(ctx)
-	require.NoErrorf(tb, err, "%T.LastAccepted()", s.VM)
-	return id
 }
 
 func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
@@ -605,7 +595,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	}))
 
 	var (
-		preference = sut.lastAccepted(ctx, t)
+		preference = sut.LastAcceptedID(t)
 		blocks     = make([]*blocks.Block, len(keys))
 	)
 	for i, sk := range keys {
@@ -678,7 +668,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	)
 	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
 
-	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	blk := sut.buildVerify(ctx, t, sut.LastAcceptedID(t))
 	if diff := cmp.Diff(types.Transactions{tracedTx}, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
 		t.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
 	}

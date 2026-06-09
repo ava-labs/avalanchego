@@ -55,9 +55,9 @@ func TestRecoverFromDatabase(t *testing.T) {
 		// blocks before/after the thresholds. Everything in between is merely
 		// to advance the block number so is treated as a "quick" loop
 		// iteration.
-		last := src.lastAcceptedBlock(t)
+		last := src.LastAcceptedBlock(t)
 		height := last.Height()
-		quick := height < commitInterval && src.rawVM.last.settled.Load().Height() > 1
+		quick := height < commitInterval && src.RawVM.LastSettledBlock().Height() > 1
 		final = height > commitInterval
 
 		if !quick {
@@ -93,8 +93,8 @@ func TestRecoverFromDatabase(t *testing.T) {
 				return
 			}
 			t.Run("build_on_recovered_VM", func(t *testing.T) {
-				srcLast := src.lastAcceptedBlock(t)
-				sutLast := sut.lastAcceptedBlock(t)
+				srcLast := src.LastAcceptedBlock(t)
+				sutLast := sut.LastAcceptedBlock(t)
 				if diff := cmp.Diff(srcLast, sutLast, blocks.CmpOpt()); diff != "" {
 					t.Fatal(diff)
 				}
@@ -197,22 +197,22 @@ func TestRecoverSimple(t *testing.T) {
 			// must not be accessible, except at CommitTrieDBEvery boundaries
 			// where the settled state was written to disk.
 			t.Run("unavailable_outside_window", func(t *testing.T) {
-				lastSettled := sut.rawVM.last.settled.Load().NumberU64()
+				lastSettled := sut.RawVM.LastSettledBlock().NumberU64()
 				committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
-				lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
+				lastOnDisk, err := canonicalBlock(sut.RawVM.db, committedHeight)
 				require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
 
 				for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
-					ethB, err := canonicalBlock(sut.rawVM.db, i)
+					ethB, err := canonicalBlock(sut.RawVM.db, i)
 					require.NoErrorf(t, err, "canonicalBlock(%d)", i)
-					b, err := blocks.New(ethB, nil, nil, sut.logger)
+					b, err := blocks.New(ethB, nil, nil, sut.Logger)
 					require.NoErrorf(t, err, "blocks.New(): height %d", ethB.NumberU64())
-					require.NoErrorf(t, b.RestoreExecutionArtefacts(sut.rawVM.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig()), "%T.RestoreExecutionArtifacts(): %d", b, b.NumberU64())
+					require.NoErrorf(t, b.RestoreExecutionArtefacts(sut.RawVM.db, sut.RawVM.xdb, sut.RawVM.exec.ChainConfig()), "%T.RestoreExecutionArtifacts(): %d", b, b.NumberU64())
 
 					// If these states were available they would eventually
 					// result in an OOM as the triedb leaked memory.
 					root := b.PostExecutionStateRoot()
-					_, err = sut.rawVM.exec.StateDB(root)
+					_, err = sut.RawVM.exec.StateDB(root)
 					want := testerr.As(func(got *trie.MissingNodeError) string {
 						if got.NodeHash != root {
 							return fmt.Sprintf("%T for hash %#x", got, root)
@@ -220,7 +220,7 @@ func TestRecoverSimple(t *testing.T) {
 						return ""
 					})
 					if diff := testerr.Diff(err, want); diff != "" {
-						t.Errorf("%T.StateDB([post-execution root of block %d]) %s", sut.rawVM.exec, b.NumberU64(), diff)
+						t.Errorf("%T.StateDB([post-execution root of block %d]) %s", sut.RawVM.exec, b.NumberU64(), diff)
 					}
 				}
 			})
@@ -232,12 +232,12 @@ func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 	t.Helper()
 
 	t.Run("consensus_critical", func(t *testing.T) {
-		if diff := cmp.Diff(src.rawVM.consensusCritical.m, sut.rawVM.consensusCritical.m, blocks.CmpOpt()); diff != "" {
-			t.Errorf("%T.consensusCritical diff (-source +recovered):\n%s", src.rawVM, diff)
+		if diff := cmp.Diff(src.RawVM.consensusCritical.m, sut.RawVM.consensusCritical.m, blocks.CmpOpt()); diff != "" {
+			t.Errorf("%T.consensusCritical diff (-source +recovered):\n%s", src.RawVM, diff)
 		}
-		for _, b := range sut.rawVM.consensusCritical.m {
+		for _, b := range sut.RawVM.consensusCritical.m {
 			root := b.PostExecutionStateRoot()
-			_, err := sut.rawVM.exec.StateDB(root)
+			_, err := sut.RawVM.exec.StateDB(root)
 			assert.NoErrorf(t, err, "post-execution state root %#x of consensus-critical block[%d] with hash %#x", root, b.Height(), b.Hash())
 		}
 	})
@@ -249,8 +249,8 @@ func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 			"settled":  func(vm *VM) *blocks.Block { return vm.last.settled.Load() },
 		} {
 			t.Run(name, func(t *testing.T) {
-				got := fn(sut.rawVM)
-				want := fn(src.rawVM)
+				got := fn(sut.RawVM)
+				want := fn(src.RawVM)
 				if diff := cmp.Diff(want, got, blocks.CmpOpt()); diff != "" {
 					t.Errorf("(-want +got):\n%s", diff)
 				}
