@@ -92,6 +92,11 @@ pub(super) fn verify_and_check(
 
 // ── Test modules ──────────────────────────────────────────────────────────
 
+// Account partial-storage reconcile tests require ethhash: they rely on
+// Ethereum account semantics at depth 64, and most start from an empty trie
+// (whose root hash only exists under ethhash).
+#[cfg(feature = "ethhash")]
+mod account;
 mod attack;
 mod bounds;
 mod edge_cases;
