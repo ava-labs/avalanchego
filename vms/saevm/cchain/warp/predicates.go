@@ -23,10 +23,6 @@ import (
 var errNoBlockContext = errors.New("no block context")
 
 // VerifyBlock verifies the predicates of every transaction in the block.
-//
-// Every predicate is verified in its own goroutine on a single pool shared by
-// all transactions in the block, bounding the number of concurrent
-// verifications to the number of available CPUs.
 func VerifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
@@ -67,10 +63,9 @@ func VerifyBlock(
 }
 
 type (
-	// lazy is a value computed on demand, when the returned function is called.
-	lazy[T any] = func() T
-	// lazyEntry is a key paired with a lazily-computed value.
-	lazyEntry[K comparable, V any] struct {
+	// lazy defers the evaluation of a value.
+	lazy[T any]         = func() T
+	lazyEntry[K, V any] struct {
 		key   K
 		value lazy[V]
 	}
