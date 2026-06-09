@@ -1044,13 +1044,12 @@ func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		vdrWeight,
 		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
-		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
 		&secp256k1fx.OutputOwners{},
 		100_000,
 		400_000,
-		uint64(env.config.MinStakeDuration/time.Second),
+		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
 	env.state.AddTx(sValidatorTx, status.Committed)
@@ -1193,13 +1192,12 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		vdrWeight,
 		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
-		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
 		&secp256k1fx.OutputOwners{},
 		100_000,
 		400_000,
-		uint64(env.config.MinStakeDuration/time.Second),
+		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
 	env.state.AddTx(sValidatorTx, status.Committed)
@@ -1393,13 +1391,12 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 		ids.GenerateTestNodeID(),
 		vdrWeight,
 		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
-		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
 		&secp256k1fx.OutputOwners{},
 		100_000,
 		400_000,
-		uint64(env.config.MinStakeDuration/time.Second),
+		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
 	env.state.AddTx(sValidatorTx, status.Committed)
@@ -1623,13 +1620,12 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 		vdrNodeID,
 		vdrWeight,
 		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
-		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{vdrRewardAddress}},
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{vdrRewardAddress}},
 		&secp256k1fx.OutputOwners{},
 		delegationShares,
 		reward.PercentDenominator, // auto compound 100%
-		uint64(env.config.MinStakeDuration/time.Second),
+		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
 	env.state.AddTx(sValidatorTx, status.Committed)
