@@ -272,7 +272,7 @@ func TestClientWebsocketLargeMessage(t *testing.T) {
 	t.Skip("Flaky test from go-ethereum")
 
 	var (
-		srv     = NewServer(0)
+		srv     = NewServer(0, nil)
 		httpsrv = httptest.NewServer(srv.WebsocketHandler(nil))
 		wsURL   = "ws:" + strings.TrimPrefix(httpsrv.URL, "http:")
 	)

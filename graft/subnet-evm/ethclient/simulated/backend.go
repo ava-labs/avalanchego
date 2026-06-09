@@ -142,7 +142,7 @@ func newWithNode(stack *node.Node, conf *eth.Config, blockPeriod uint64) (*Backe
 	if err != nil {
 		return nil, err
 	}
-	server := rpc.NewServer(0)
+	server := rpc.NewServer(0, nil)
 	for _, api := range backend.APIs() {
 		if err := server.RegisterName(api.Namespace, api.Service); err != nil {
 			return nil, err

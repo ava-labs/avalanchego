@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/log"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const MetadataApi = "rpc"
@@ -64,6 +65,10 @@ type Server struct {
 	batchItemLimit     int
 	batchResponseLimit int
 	httpBodyLimit      int
+
+	// metrics holds the server's native-Prometheus metrics. Always non-nil; see
+	// ws_metrics.go.
+	metrics *rpcMetrics
 }
 
 // NewServer creates a new server instance with no registered handlers.
@@ -71,12 +76,17 @@ type Server struct {
 // If [maximumDuration] > 0, the deadline of incoming requests is
 // [maximumDuration] in the future. Otherwise, no deadline is assigned to
 // incoming requests.
-func NewServer(maximumDuration time.Duration) *Server {
+//
+// [metricsRegistry] is where the server's native-Prometheus metric vectors are
+// registered. A nil registry disables metric registration: newRPCMetrics still
+// returns a non-nil *rpcMetrics, but it registers nothing (see ws_metrics.go).
+func NewServer(maximumDuration time.Duration, metricsRegistry prometheus.Registerer) *Server {
 	server := &Server{
 		idgen:           randomIDGenerator(),
 		codecs:          make(map[ServerCodec]struct{}),
 		maximumDuration: maximumDuration,
 		httpBodyLimit:   defaultBodyLimit,
+		metrics:         newRPCMetrics(metricsRegistry),
 	}
 	server.run.Store(true)
 	// Register the default service providing meta information about the RPC service such

@@ -37,7 +37,7 @@ import (
 )
 
 func newTestServer() *Server {
-	server := NewServer(0)
+	server := NewServer(0, nil)
 	server.idgen = sequentialIDGenerator()
 	if err := server.RegisterName("test", new(testService)); err != nil {
 		panic(err)

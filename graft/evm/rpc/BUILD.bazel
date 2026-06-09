@@ -20,6 +20,7 @@ go_library(
         "testing.go",
         "types.go",
         "websocket.go",
+        "ws_metrics.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/rpc",
     visibility = ["//visibility:public"],
@@ -31,6 +32,7 @@ go_library(
         "@com_github_ava_labs_libevm//rpc",
         "@com_github_deckarep_golang_set_v2//:golang-set",
         "@com_github_gorilla_websocket//:websocket",
+        "@com_github_prometheus_client_golang//prometheus",
         "@org_golang_x_time//rate",
     ],
 )

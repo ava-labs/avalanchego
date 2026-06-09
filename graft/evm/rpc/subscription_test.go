@@ -71,7 +71,7 @@ func TestSubscriptions(t *testing.T) {
 		subCount          = len(namespaces)
 		notificationCount = 3
 
-		server                 = NewServer(0)
+		server                 = NewServer(0, nil)
 		clientConn, serverConn = net.Pipe()
 		out                    = json.NewEncoder(clientConn)
 		in                     = json.NewDecoder(clientConn)
