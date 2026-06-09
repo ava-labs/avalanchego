@@ -1378,12 +1378,12 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 
 	currentSupply, err := e.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	if err != nil {
-		return fmt.Errorf("getting current supply %w", err)
+		return fmt.Errorf("getting current supply: %w", err)
 	}
 
 	rewards, err := GetRewardsCalculator(e.backend, e.state, constants.PrimaryNetworkID)
 	if err != nil {
-		return fmt.Errorf("getting rewards calculator %w", err)
+		return fmt.Errorf("getting rewards calculator: %w", err)
 	}
 
 	duration := time.Duration(tx.Period) * time.Second
@@ -1395,7 +1395,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 
 	newCurrentSupply, err := math.Add(currentSupply, potentialReward)
 	if err != nil {
-		return fmt.Errorf("adding current supply %w", err)
+		return fmt.Errorf("adding current supply: %w", err)
 	}
 	e.state.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 
@@ -1411,7 +1411,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 		potentialReward,
 	)
 	if err != nil {
-		return fmt.Errorf("creating staker %w", err)
+		return fmt.Errorf("creating staker: %w", err)
 	}
 
 	if err := e.state.PutCurrentValidator(staker); err != nil {
