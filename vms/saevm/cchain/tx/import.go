@@ -74,13 +74,13 @@ func (i *Import) inputIDs() set.Set[ids.ID] {
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
 // practice and allows for easier fuzzing.
-func (i *Import) burned(assetID ids.ID) (uint64, error) {
+func (i *Import) burned(avaxAssetID ids.ID) (nAVAX, error) {
 	var (
-		burned uint64
+		burned nAVAX
 		err    error
 	)
 	for _, in := range i.ImportedInputs {
-		if in.Asset.ID == assetID {
+		if in.Asset.ID == avaxAssetID {
 			burned, err = math.Add(burned, in.In.Amount())
 			if err != nil {
 				return 0, err
@@ -88,7 +88,7 @@ func (i *Import) burned(assetID ids.ID) (uint64, error) {
 		}
 	}
 	for _, out := range i.Outs {
-		if out.AssetID == assetID {
+		if out.AssetID == avaxAssetID {
 			burned, err = math.Sub(burned, out.Amount)
 			if err != nil {
 				return 0, err
@@ -180,8 +180,8 @@ func (i *Import) verifyCredentials(sm chainsatomic.SharedMemory, creds []Credent
 		// includes signature verification. This is non-trivial, because
 		// transactions frequently contain duplicate signatures, which are
 		// currently being cached.
-		utxo := new(avax.UTXO)
-		if _, err := c.Unmarshal(utxoBytes[j], utxo); err != nil {
+		utxo, err := ParseUTXO(utxoBytes[j])
+		if err != nil {
 			return fmt.Errorf("%w (%d): %w", errUnmarshallingUTXO, j, err)
 		}
 		if utxo.Asset.ID != in.Asset.ID {
@@ -217,7 +217,7 @@ func (i *Import) asOp(avaxAssetID ids.ID) (op, error) {
 
 		var (
 			total  = mint[out.Address]
-			amount = scaleAVAX(out.Amount)
+			amount = ScaleAVAX(out.Amount)
 		)
 		if _, overflow := total.AddOverflow(&total, &amount); overflow {
 			return op{}, fmt.Errorf("%w: for address %s", errOverflow, out.Address)

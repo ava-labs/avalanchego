@@ -3,22 +3,12 @@
 
 package tx
 
-import (
-	"testing"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-)
-
 // These identifiers are all exported for usage by tx_test.go, which is compiled
 // in a separate package to allow for the usage of the txtest package.
 
 const X2CRate = _x2cRate
 
 var (
-	ScaleAVAX = scaleAVAX
-
 	// tx errors:
 	ErrWrongNetworkID          = errWrongNetworkID
 	ErrWrongChainID            = errWrongChainID
@@ -54,11 +44,3 @@ var (
 	ErrMismatchedAssetIDs     = errMismatchedAssetIDs
 	ErrVerifyingTransfer      = errVerifyingTransfer
 )
-
-func MarshalUTXO(tb testing.TB, utxo *avax.UTXO) []byte {
-	tb.Helper()
-
-	b, err := c.Marshal(codecVersion, utxo)
-	require.NoError(tb, err, "%T.Marshal(%T)", c, utxo)
-	return b
-}

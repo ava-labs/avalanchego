@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 
 // assertEquals asserts that [Pending.Len], [Pending.Has], [Pending.AwaitTxs],
 // and [Pending.Iter] all match the expected transactions.
-func (p *Pending) assertEquals(tb testing.TB, want ...*tx.Tx) {
+func (p *Pending) assertEquals(ctx context.Context, tb testing.TB, want ...*tx.Tx) {
 	tb.Helper()
 
 	assert.Equal(tb, len(want), p.Len(), "Len")
@@ -58,9 +58,9 @@ func (p *Pending) assertEquals(tb testing.TB, want ...*tx.Tx) {
 	}
 
 	if len(want) > 0 {
-		require.NoError(tb, p.AwaitTxs(tb.Context()), "%T.AwaitTxs()", p)
+		require.NoError(tb, p.AwaitTxs(ctx), "%T.AwaitTxs()", p)
 	} else {
-		ctx, cancel := context.WithCancel(tb.Context())
+		ctx, cancel := context.WithCancel(ctx)
 		go cancel()
 		err := p.AwaitTxs(ctx)
 		require.ErrorIs(tb, err, context.Canceled, "%T.AwaitTxs()", p)
@@ -131,14 +131,15 @@ const maxSize = 4
 
 // newSUT constructs a [Txpool] backed by a [backend]. The pool is closed via
 // [testing.TB.Cleanup].
-func newSUT(tb testing.TB, state libevm.StateReader) *SUT {
+func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 	tb.Helper()
 
 	backend := newBackend(state)
-	ctx := snowtest.Context(tb, snowtest.CChainID)
-	ctx.Log = loggingtest.New(tb, logging.Debug)
+	snowCtx := snowtest.Context(tb, snowtest.CChainID)
+	log := loggingtest.New(tb, logging.Debug)
+	snowCtx.Log = log
 	pool, err := New(
-		ctx,
+		snowCtx,
 		saetest.ChainConfig(),
 		NewPending(),
 		backend,
@@ -146,7 +147,7 @@ func newSUT(tb testing.TB, state libevm.StateReader) *SUT {
 	)
 	require.NoError(tb, err)
 	tb.Cleanup(pool.Close)
-	return &SUT{
+	return log.CancelOnError(tb.Context()), &SUT{
 		Txpool:  pool,
 		backend: backend,
 	}
@@ -480,14 +481,14 @@ func TestAdd(t *testing.T) {
 				sdb.SetNonce(addr, nonce)
 			}
 
-			sut := newSUT(t, sdb)
+			ctx, sut := newSUT(t, sdb)
 			for i, raw := range tt.init {
 				require.NoErrorf(t, sut.Add(raw), "%T.Add([%d])", sut, i)
 			}
 
 			err := sut.Add(tt.toAdd)
 			require.ErrorIsf(t, err, tt.wantErr, "%T.Add(%T)", sut, tt.toAdd)
-			sut.assertEquals(t, tt.want...)
+			sut.assertEquals(ctx, t, tt.want...)
 		})
 	}
 }
@@ -523,35 +524,35 @@ func TestUpdateEvictsConflicts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sdb := newState(t, sk)
-			sut := newSUT(t, sdb)
+			ctx, sut := newSUT(t, sdb)
 
 			require.NoErrorf(t, sut.Add(initTx), "%T.Add(%T)", sut, initTx)
-			sut.assertEquals(t, initTx)
+			sut.assertEquals(ctx, t, initTx)
 
 			sut.markAsExecuted(t, tt.block, sdb)
-			sut.assertEquals(t, tt.wantPool...)
+			sut.assertEquals(ctx, t, tt.wantPool...)
 		})
 	}
 }
 
 func TestStateUpdate(t *testing.T) {
 	noBalance := newState(t)
-	sut := newSUT(t, noBalance)
+	ctx, sut := newSUT(t, noBalance)
 
 	sk := newKey(t)
 	tx := newExport(t, []*secp256k1.PrivateKey{sk})
 	require.ErrorIsf(t, sut.Add(tx), errVerifyState, "%T.Add()", sut)
-	sut.assertEquals(t)
+	sut.assertEquals(ctx, t)
 
 	hasBalance := newState(t, sk)
 	sut.markAsExecuted(t, newBlock(t), hasBalance)
 	require.NoErrorf(t, sut.Add(tx), "%T.Add()", sut)
-	sut.assertEquals(t, tx)
+	sut.assertEquals(ctx, t, tx)
 }
 
 func TestHasUnknown(t *testing.T) {
 	sk := newKey(t)
-	sut := newSUT(t, newState(t, sk))
+	_, sut := newSUT(t, newState(t, sk))
 	require.Falsef(t, sut.Has(ids.GenerateTestID()), "%T.Has()", sut)
 
 	raw := newExport(t, []*secp256k1.PrivateKey{sk})
@@ -562,11 +563,11 @@ func TestHasUnknown(t *testing.T) {
 func TestAwaitTxs(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		sk := newKey(t)
-		sut := newSUT(t, newState(t, sk))
+		ctx, sut := newSUT(t, newState(t, sk))
 
 		done := make(chan error, 1)
 		go func() {
-			done <- sut.AwaitTxs(t.Context())
+			done <- sut.AwaitTxs(ctx)
 		}()
 
 		synctest.Wait()
