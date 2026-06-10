@@ -21,8 +21,7 @@ import (
 type backend set.Set[ids.ID]
 
 func (b backend) IsAccepted(_ context.Context, id ids.ID) error {
-	s := set.Set[ids.ID](b)
-	if !s.Contains(id) {
+	if s := set.Set[ids.ID](b); !s.Contains(id) {
 		return database.ErrNotFound
 	}
 	return nil
@@ -57,7 +56,7 @@ func TestVerifier(t *testing.T) {
 			},
 		},
 		{
-			name: "wrong_payload_type",
+			name: "unknown_message",
 			m:    addressedCallMsg,
 			want: &common.AppError{
 				Code: ParseErrCode,
