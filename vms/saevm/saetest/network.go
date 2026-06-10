@@ -251,8 +251,8 @@ func ConnectTo[P Peer](tb testing.TB, self P, peers ...P) {
 	}
 }
 
-// SetValidators makes state report each NodeID in vdrs as a validator with
-// weight 1 from GetValidatorSet.
+// SetValidators makes `state` report each NodeID in vdrs as a validator with
+// weight 1 when [validators.State.GetValidatorSet] is called.
 //
 // state MUST be a [validatorstest.State], which is the concrete type installed
 // by [snowtest.Context]. It is accepted as the [validators.State] interface
