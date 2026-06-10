@@ -1,14 +1,17 @@
 name: build-rpm-packages
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Tag to build RPMs for'
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag to build RPMs for'
         required: true
-  push:
-    tags:
-      - "v*"
   pull_request:
     paths:
       - ".github/packaging/**"
@@ -35,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.ref }}
 
       # When building an older tag via workflow_dispatch, the tag's
       # .github/packaging tree may be stale or absent. Replace it
@@ -44,15 +47,18 @@ jobs:
       # Split into two steps because actions/checkout (which provides
       # the master-side tree) and the cp (which applies it) cannot be
       # combined.
+      # Pinned to workflow_dispatch: under workflow_call the tag input is
+      # ALWAYS set, so a bare `inputs.tag` guard would run the overlay on
+      # every umbrella release as a pointless same-commit copy.
       - name: Overlay packaging scripts from workflow branch
-        if: github.event.inputs.tag
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tag }}
         uses: actions/checkout@v5
         with:
           path: .packaging-overlay
           sparse-checkout: .github/packaging
 
       - name: Apply packaging overlay
-        if: github.event.inputs.tag
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tag }}
         run: |
           rm -rf .github/packaging
           cp -r .packaging-overlay/.github/packaging .github/packaging
@@ -66,7 +72,7 @@ jobs:
         run: ./.github/packaging/scripts/workflow-setup-packaging.sh
         shell: bash
         env:
-          TAG_INPUT: ${{ github.event.inputs.tag }}
+          TAG_INPUT: ${{ inputs.tag }}
           GPG_PRIVATE_KEY: ${{ github.event_name != 'pull_request' && secrets.RPM_GPG_PRIVATE_KEY || '' }}
           RELEASE: ${{ github.event_name != 'pull_request' && 'true' || '' }}
 
