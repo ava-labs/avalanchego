@@ -226,10 +226,7 @@ func (vm *VM) settledBlockFromDB(db ethdb.Reader, hash common.Hash, num uint64) 
 	if err != nil {
 		return nil, err
 	}
-	// Excess is only used for executing the next block, which can never
-	// be the case if `b` isn't actually the last synchronous block, so
-	// passing the same value for all is OK.
-	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
+	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.xdb); err != nil {
 		return nil, err
 	}
 	return b, nil
