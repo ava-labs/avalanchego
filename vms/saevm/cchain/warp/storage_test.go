@@ -23,10 +23,10 @@ func newHash(tb testing.TB) (*warp.UnsignedMessage, *payload.Hash) {
 	p, err := payload.NewHash(
 		ids.GenerateTestID(),
 	)
-	require.NoError(tb, err)
+	require.NoError(tb, err, "payload.NewHash()")
 
 	m, err := warp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, p.Bytes())
-	require.NoError(tb, err)
+	require.NoError(tb, err, "warp.NewUnsignedMessage()")
 	return m, p
 }
 
@@ -35,10 +35,10 @@ func newAddressedCall(tb testing.TB) (*warp.UnsignedMessage, *payload.AddressedC
 		utils.RandomBytes(20),
 		[]byte("test"),
 	)
-	require.NoError(tb, err)
+	require.NoError(tb, err, "payload.NewAddressedCall()")
 
 	m, err := warp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, p.Bytes())
-	require.NoError(tb, err)
+	require.NoError(tb, err, "warp.NewUnsignedMessage()")
 	return m, p
 }
 
@@ -78,20 +78,17 @@ func TestStorage(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			db := memdb.New()
 			s := NewStorage(db, test.overrides...)
-			for _, msg := range test.add {
-				require.NoError(t, s.Add(msg))
-			}
+			require.NoErrorf(t, s.Add(test.add...), "%T.Add(%d)", s, len(test.add))
 
-			// Verify the message is fetchable.
 			msg, err := s.Get(test.id)
-			require.ErrorIs(t, err, test.wantErr)
-			require.Equal(t, test.want, msg)
+			require.ErrorIsf(t, err, test.wantErr, "%T.Get(%s)", s, test.id)
+			require.Equalf(t, test.want, msg, "%T.Get(%s)", s, test.id)
 
 			// Verify the message was persisted.
 			s = NewStorage(db, test.overrides...)
 			msg, err = s.Get(test.id)
-			require.ErrorIs(t, err, test.wantErr)
-			require.Equal(t, test.want, msg)
+			require.ErrorIsf(t, err, test.wantErr, "reloaded %T.Get(%s)", s, test.id)
+			require.Equalf(t, test.want, msg, "reloaded %T.Get(%s)", s, test.id)
 		})
 	}
 }
