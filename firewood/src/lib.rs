@@ -153,7 +153,11 @@ pub mod registry;
 /// ```
 pub mod proofs;
 
+/// `eth_getProof`-compatible proof export.
+pub mod eth_proof;
+
 // Re-export commonly used proof types at the crate root for ergonomic access
+pub use eth_proof::{EthProof, EthStorageProof, eth_get_proof};
 pub use merkle::{Key, Value, verify_change_proof_root_hash, verify_range_proof};
 pub use proofs::{
     ChangeProof, ChangeProofVerificationContext, EmptyProofCollection, InvalidHeader, KeyRange,

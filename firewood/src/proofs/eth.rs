@@ -26,6 +26,8 @@
 //! collapses encoded bytes into a hash, this module keeps the bytes so a
 //! verifier can walk them.
 
+use std::io::{Error, ErrorKind};
+
 use firewood_storage::eth_encoding::nibbles_to_eth_compact;
 use firewood_storage::{
     BranchNode, Children, HashType, PathComponent, RlpError, RlpItem, RlpList, ValueDigest,
@@ -34,6 +36,7 @@ use firewood_storage::{
 use sha3::{Digest, Keccak256};
 use smallvec::{SmallVec, smallvec};
 
+use crate::api;
 use crate::proofs::types::ProofNode;
 
 /// Path length in nibbles at which a node is treated as an Ethereum account
@@ -78,7 +81,10 @@ pub fn proof_node_to_mpt_rlp(node: &ProofNode) -> SmallVec<[Box<[u8]>; 2]> {
     if node.child_hashes.count() == 0 {
         // Leaf. For account leaves, splice the empty-trie storage root into
         // the account RLP value; the on-disk value may carry a stale or zero
-        // storageRoot on pre-hfix databases.
+        // storageRoot on pre-hfix databases. We always splice rather than
+        // conditioning on the source DB version: the keccak cost is
+        // negligible next to the trie-walk I/O, and threading an hfix flag
+        // down to the emitter isn't worth the API surface.
         let compact_path = nibbles_to_eth_compact(partial_path, true);
         let account_value: Option<Box<[u8]>> = if is_account {
             value_bytes.and_then(|bytes| {
@@ -158,52 +164,42 @@ pub fn proof_node_to_mpt_rlp(node: &ProofNode) -> SmallVec<[Box<[u8]>; 2]> {
     }
 }
 
-/// Build the synthetic storage-trie leaf for the "account with exactly one
-/// storage slot" case.
+/// Emit the byte-string whose Keccak-256 equals an account's `storageRoot`
+/// field for the multi-storage-child case.
 ///
-/// In Ethereum's storage trie a single entry is represented as one leaf at
-/// the trie root, whose path is the slot's 32-byte Keccak-hashed key. In
-/// Firewood the same data lives as a child of the account node (the account
-/// is a branch with one child). To produce the same `storageHash` the
-/// verifier expects, we synthesize an MPT leaf whose path is the branch
-/// nibble prepended to the storage child's partial path and whose value is
-/// the slot's stored bytes.
+/// In firewood the account node and its storage trie root are the *same*
+/// node — `child_hashes` are the storage trie's children. The canonical
+/// MPT encoding of that root is a 17-element branch with no value slot,
+/// and its keccak is what [`fix_account_storage_root_value`] splices into
+/// the account leaf.
 ///
-/// `storage_child` is the depth-65+ proof node returned by
-/// `single_key_proof(account_key ++ slot_key)`. The branch nibble is the
-/// first nibble of the storage child's full path past the account depth;
-/// the remaining nibbles are the child's partial path; the value is the
-/// child's `value_digest`.
+/// # Returns
 ///
-/// Returns `None` if `storage_child` does not start at the account depth
-/// boundary (the caller passed something other than the depth-65 storage
-/// child) or has no value to embed.
-///
-/// Reproduces the construction at `storage/src/hashers/ethhash.rs:263-277`.
-///
-/// Note: the design plan named this parameter `account_node`, but
-/// constructing the synthetic leaf requires the storage child's partial
-/// path and value, neither of which the account `ProofNode` carries
-/// (account `child_hashes` only hold hashes). Callers must pass the
-/// storage child directly.
+/// `Some(bytes)` when `account_node` has two or more storage children;
+/// `None` otherwise. Callers handle the other shapes separately: no
+/// storage → empty proof; a single child nibble → the account's lone child
+/// node is itself the storage root and is re-encoded directly.
 #[must_use]
-pub fn synth_storage_leaf_rlp(storage_child: &ProofNode) -> Option<Box<[u8]>> {
-    let full_path: &[PathComponent] = storage_child.key.as_ref();
-    let leaf_path = full_path.get(ACCOUNT_DEPTH_NIBBLES..)?;
-    if leaf_path.is_empty() {
+pub fn account_storage_root_rlp(account_node: &ProofNode) -> Option<Box<[u8]>> {
+    if account_node.child_hashes.count() < 2 {
         return None;
     }
-    let value_bytes = storage_child.value_digest.as_ref()?.value()?;
-    let compact_path = nibbles_to_eth_compact(leaf_path, true);
-    Some(encode_list(&[
-        RlpItem::Bytes(&compact_path),
-        RlpItem::Bytes(value_bytes),
-    ]))
+    let mut items: [RlpItem<'_>; BranchNode::MAX_CHILDREN + 1] =
+        [RlpItem::Empty; BranchNode::MAX_CHILDREN + 1];
+    for ((_, child), slot) in (&account_node.child_hashes)
+        .into_iter()
+        .zip(items.iter_mut())
+    {
+        *slot = proof_child_rlp_item(child.as_ref());
+    }
+    // The 17th slot stays empty: at the storage trie root there is no value.
+    Some(encode_list(&items))
 }
 
 /// Structured errors raised while decoding an account RLP value. Wrapped
-/// into [`crate::api::Error::InternalError`] at the public boundary so the
-/// firewood API surface keeps a single error type.
+/// into [`api::Error::IO`] with [`ErrorKind::InvalidData`] at the public
+/// boundary so the decode detail survives `Display` (the `InternalError`
+/// variant's `Display` is the bare "Internal error" and would drop it).
 #[derive(Debug, thiserror::Error)]
 enum AccountDecodeError {
     #[error("malformed account RLP: {0}")]
@@ -214,9 +210,9 @@ enum AccountDecodeError {
     Field(&'static str, RlpError),
 }
 
-impl From<AccountDecodeError> for crate::api::Error {
+impl From<AccountDecodeError> for api::Error {
     fn from(e: AccountDecodeError) -> Self {
-        crate::api::Error::InternalError(Box::new(e))
+        Error::new(ErrorKind::InvalidData, e).into()
     }
 }
 
@@ -224,9 +220,8 @@ impl From<AccountDecodeError> for crate::api::Error {
 ///
 /// `balance` is zero-padded big-endian to fit the JSON-RPC `quantity` shape
 /// without an extra allocation. `storage_root` is the storage trie root as
-/// encoded in the account leaf; callers that need the ethereum-canonical
-/// storage hash for an account with exactly one storage slot must override
-/// this with `Keccak256(synth_storage_leaf_rlp(...))`.
+/// encoded in the account leaf, after firewood's hashing fixup recomputes
+/// it from the account's storage children.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AccountFields {
     /// Transaction count for this account.
@@ -244,10 +239,11 @@ impl AccountFields {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::api::Error::InternalError`] if the RLP is malformed,
-    /// the field count is wrong, `nonce` is more than 8 bytes, `balance` is
-    /// more than 32 bytes, or either hash field is not exactly 32 bytes.
-    pub fn from_rlp(rlp_bytes: &[u8]) -> Result<Self, crate::api::Error> {
+    /// Returns [`api::Error::IO`] (kind `InvalidData`) if the RLP is
+    /// malformed, the field count is wrong, `nonce` is more than 8 bytes,
+    /// `balance` is more than 32 bytes, or either hash field is not exactly
+    /// 32 bytes.
+    pub fn from_rlp(rlp_bytes: &[u8]) -> Result<Self, api::Error> {
         Self::from_rlp_inner(rlp_bytes).map_err(Into::into)
     }
 
@@ -299,7 +295,7 @@ fn proof_child_rlp_item(child: Option<&HashType>) -> RlpItem<'_> {
 }
 
 #[cfg(test)]
-#[expect(clippy::indexing_slicing, clippy::unwrap_used, clippy::cast_sign_loss)]
+#[expect(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
     use super::*;
     use firewood_storage::{IntoHashType, PathBuf, RlpList, TrieHash, TriePathFromUnpackedBytes};
@@ -347,30 +343,6 @@ mod tests {
             fields[1].is_empty(),
             "missing value digest should produce an empty value field"
         );
-    }
-
-    #[test]
-    fn synth_storage_leaf_rlp_rejects_account_depth_node() {
-        // 64-nibble key has no storage portion.
-        let key: Vec<u8> = (0..64).map(|i| (i % 16) as u8).collect();
-        let account = leaf_proof_node(&key, b"account-rlp");
-        assert!(
-            synth_storage_leaf_rlp(&account).is_none(),
-            "synth requires the storage child, not the account node"
-        );
-    }
-
-    #[test]
-    fn synth_storage_leaf_rlp_rejects_node_without_value() {
-        // depth-65 node but no value.
-        let key: Vec<u8> = (0..65).map(|i| (i % 16) as u8).collect();
-        let node = ProofNode {
-            key: pathbuf_from_nibbles(&key),
-            partial_len: 64,
-            value_digest: None,
-            child_hashes: Children::new(),
-        };
-        assert!(synth_storage_leaf_rlp(&node).is_none());
     }
 
     fn hash_child(byte: u8) -> HashType {
@@ -546,37 +518,24 @@ mod tests {
     }
 
     #[test]
-    fn decode_account_public_wraps_internal_error() {
-        // The public API surface returns api::Error, wrapping AccountDecodeError.
+    fn decode_account_public_wraps_invalid_data() {
+        // The public API surface returns api::Error::IO(InvalidData), whose
+        // Display carries the decode detail through (InternalError's would
+        // drop it).
         let bytes = firewood_storage::encode_list(&[
             RlpItem::Bytes(&[0x01]),
             RlpItem::Bytes(&[0x02]),
             RlpItem::Bytes(&[0x03]),
         ]);
         let err = AccountFields::from_rlp(&bytes).expect_err("3 fields should fail");
-        assert!(matches!(err, crate::api::Error::InternalError(_)));
-    }
-
-    #[test]
-    fn synth_storage_leaf_rlp_emits_two_field_list() {
-        // A storage child at depth 65 (account depth + 1 nibble): branch
-        // nibble is full_path[64], the rest of the partial path is empty
-        // here for simplicity.
-        let mut key: Vec<u8> = (0..64).map(|i| (i % 16) as u8).collect();
-        key.push(7); // branch nibble
-        let child = ProofNode {
-            key: pathbuf_from_nibbles(&key),
-            partial_len: 64,
-            value_digest: Some(ValueDigest::Value(b"slot-value".as_slice().into())),
-            child_hashes: Children::new(),
-        };
-        let bytes = synth_storage_leaf_rlp(&child).expect("synthesized leaf");
-        let list = RlpList::parse(&bytes).unwrap();
-        let fields = list.fields().unwrap();
-        assert_eq!(fields.len(), 2);
-        assert_eq!(fields[1], b"slot-value");
-        // The encoded path should be a 1-nibble odd-leaf form: 0x37 (3 marks
-        // odd-leaf, 7 is the orphan nibble).
-        assert_eq!(fields[0], &[0x37][..]);
+        assert!(
+            matches!(&err, api::Error::IO(e) if e.kind() == ErrorKind::InvalidData),
+            "expected IO(InvalidData), got {err:?}"
+        );
+        assert!(
+            err.to_string()
+                .contains("account RLP has 3 fields, expected at least 4"),
+            "decode detail must survive Display, got {err}"
+        );
     }
 }
