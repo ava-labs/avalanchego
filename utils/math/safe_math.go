@@ -5,8 +5,11 @@ package math
 
 import (
 	"errors"
+	"math"
 
 	"golang.org/x/exp/constraints"
+
+	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 )
 
 var (
@@ -57,4 +60,34 @@ func Mul[T constraints.Unsigned](a, b T) (T, error) {
 
 func AbsDiff[T constraints.Unsigned](a, b T) T {
 	return max(a, b) - min(a, b)
+}
+
+// MulDiv computes (a * b) / c with full precision.
+// The result is rounded to the nearest integer.
+// Returns ErrDivideByZero if c is zero, or ErrOverflow if the result exceeds uint64.
+func MulDiv(a, b, c uint64) (uint64, error) {
+	// intmath.MulDiv reports a zero denominator as an overflow, so check it
+	// first to preserve the distinct error.
+	if c == 0 {
+		return 0, ErrDivideByZero
+	}
+
+	quo, rem, err := intmath.MulDiv(a, b, c)
+	if err != nil {
+		// intmath.MulDiv only fails when the quotient exceeds uint64.
+		return 0, ErrOverflow
+	}
+
+	// Round to nearest by checking whether the fractional part rem/c is less
+	// than 1/2. rem < c-rem ⟺ 2*rem < c, but can't overflow since rem < c.
+	if rem < c-rem {
+		return quo, nil
+	}
+
+	// The fractional part is at least 1/2, so round up. If quo is already
+	// MaxUint64, rounding up would overflow the result.
+	if quo == math.MaxUint64 {
+		return 0, ErrOverflow
+	}
+	return quo + 1, nil
 }
