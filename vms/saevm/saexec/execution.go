@@ -120,7 +120,9 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	}
 
 	start := time.Now()
-	defer e.metrics.observeExecuteDuration(time.Since(start))
+	defer func() {
+		e.metrics.observeExecuteDuration(time.Since(start))
+	}()
 	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
 		return err
