@@ -1,35 +1,53 @@
-// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
 package statesync
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 )
 
-var _ adaptor.SummaryProperties = (*summary)(nil)
+const syncCommitInterval = 4096
 
-type summary struct{}
+var _ adaptor.SummaryProperties = (*Summary)(nil)
 
-// Height implements [adaptor.SummaryProperties].
-func (*summary) Height() uint64 {
-	panic("unimplemented")
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
+// Summary is a canoto-encoded state sync summary. It identifies the block at
+// which a syncing node should begin fetching state, along with the state root
+// that the synced state must hash to.
+//
+//nolint:revive // struct-tag: canoto allows unexported fields
+type Summary struct {
+	height    uint64      `canoto:"uint,1"`
+	blockHash common.Hash `canoto:"fixed bytes,2"`
+
+	canotoData canotoData_Summary
 }
 
-// ID implements [adaptor.SummaryProperties].
-func (*summary) ID() ids.ID {
-	panic("unimplemented")
+// ParseStateSummary implements [adaptor.StateSyncable].
+func (*SummaryHandler) ParseStateSummary(_ context.Context, summaryBytes []byte) (*Summary, error) {
+	s := new(Summary)
+	if err := s.UnmarshalCanoto(summaryBytes); err != nil {
+		return nil, fmt.Errorf("parsing state summary: %w", err)
+	}
+	return s, nil
 }
 
 // Bytes implements [adaptor.SummaryProperties].
-func (*summary) Bytes() []byte {
-	panic("unimplemented")
+func (s *Summary) Bytes() []byte {
+	return s.MarshalCanoto()
 }
 
-// ParseStateSummary implements [adaptor.SyncableVM].
-func (*VM[T]) ParseStateSummary(context.Context, []byte) (*summary, error) {
-	panic("unimplemented")
+// Height implements [adaptor.SummaryProperties].
+func (s *Summary) Height() uint64 {
+	return s.height
+}
+
+// ID implements [adaptor.SummaryProperties].
+func (s *Summary) ID() ids.ID {
+	return ids.ID(s.blockHash)
 }

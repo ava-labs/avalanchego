@@ -30,17 +30,20 @@ type Network interface {
 // Snowman ChainVM. See the respective methods on [block.ChainVM] and [snowman.Block]
 // for detailed documentation.
 type ChainVM[BP BlockProperties] interface {
-	Network
+	Chain[BP]
 
 	// From [common.VM]
+	Network
 	health.Checker
 	Initialize(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, []*common.Fx, common.AppSender) error
-	SetState(ctx context.Context, state snow.State) error
-	Shutdown(context.Context) error
 	Version(context.Context) (string, error)
 	CreateHandlers(context.Context) (map[string]http.Handler, error)
 	NewHTTPHandler(ctx context.Context) (http.Handler, error)
+}
+
+type Chain[BP BlockProperties] interface {
 	WaitForEvent(ctx context.Context) (common.Message, error)
+	SetState(ctx context.Context, state snow.State) error
 
 	GetBlock(context.Context, ids.ID) (BP, error)
 	ParseBlock(context.Context, []byte) (BP, error)
@@ -54,6 +57,7 @@ type ChainVM[BP BlockProperties] interface {
 	SetPreference(context.Context, ids.ID, *block.Context) error // block.Context MAY be nil
 	LastAccepted(context.Context) (ids.ID, error)
 	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
+	Shutdown(context.Context) error
 }
 
 // BlockProperties is a read-only subset of [snowman.Block]. The state-modifying

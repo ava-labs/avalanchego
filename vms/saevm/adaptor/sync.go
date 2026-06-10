@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -24,6 +25,8 @@ type StateSyncable[SP SummaryProperties] interface {
 	GetStateSummary(context.Context, uint64) (SP, error)
 	ParseStateSummary(context.Context, []byte) (SP, error)
 	AcceptSummary(context.Context, SP) (block.StateSyncMode, error)
+
+	WaitForEvent(ctx context.Context) (common.Message, error)
 }
 
 // SummaryProperties is a read-only subset of [block.StateSummary].
