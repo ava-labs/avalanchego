@@ -47,14 +47,14 @@ CreateL1Tx is a new P-Chain standard transaction that atomically:
 ### Key Implementation details: 
 - No SubnetAuth is needed since the subnet is created atomically within the same transaction
 - The validationID for each initial validator is `subnetID.Append(validatorIndex)`, compatible with
-  existing validator manager contracts
--  After acceptance, a `SubnetToL1ConversionMessage` warp signature is available, ensuring
-  compatibility with existing validator manager infrastructure
-- The node's `createSubnet` startup path will be updated to handle both `*txs.CreateChainTx` and `*txs.CreateL1Tx`: When a node starts up, it calls `createSubnet` for each tracked subnet, which calls `state.GetChains` to retrieve all chains associated with that subnet and starts the corresponding chain VMs. Previously, `GetChains` only ever returned `*txs.CreateChainTx` transactions, so `createSubnet` only knew how to handle that type. Since `CreateL1Tx` creates its chain atomically (rather than through a separate `CreateChainTx`), the chain record stored in state is a `*txs.CreateL1Tx` instead. The fix adds a type switch in `createSubnet` that calls `CreateChain` for `*txs.CreateChainTx` and the new `CreateL1Chain` method for `*txs.CreateL1Tx`. `state.AddL1Chain` and `Diff.Apply` were also updated accordingly to ensure `CreateL1Tx` chains are stored and propagated through the state/diff layer correctly.
-- `Diff.Apply` will be similarly updated to correctly route `CreateL1Tx` chains to `state.AddL1Chain` rather
-  than `state.AddChain`
-- The critical entry for backwards compatibility is chains/{subnetID}/list/{txID}. Previously this prefix only ever
-  stored txIDs belonging to `CreateChainTx` transactions. `CreateL1Tx` stores its own `txID` under this same prefix, meaning `GetChains` now returns a `*txs.CreateL1Tx` instead of a `*txs.CreateChainTx` for L1s created this way. All callers of `GetChains` (`createSubnet` in `vm.go` and `Diff.Apply` in `diff.go`) were updated to handle both types via a type switch, preserving backwards compatibility with existing subnets and their `CreateChainTx` chains.
+existing validator manager contracts
+- After acceptance, a `SubnetToL1ConversionMessage` warp signature is available, ensuring
+compatibility with existing validator manager infrastructure
+- When a node starts up, it calls `createSubnet` for each tracked subnet, which calls `state.GetChains` to retrieve all chains  associated with that subnet and starts the corresponding chain VMs. 
+- Previously, `GetChains` only ever returned `*txs.CreateChainTx` transactions, so `createSubnet` only knew how to handle that type. Since `CreateL1Tx` creates its chain atomically (rather than through a separate `CreateChainTx`), the chain record stored in state is a `*txs.CreateL1Tx` instead. 
+- The fix adds a type switch in `createSubnet` that calls `CreateChain` for `*txs.CreateChainTx` and the new `CreateL1Chain` method for `*txs.CreateL1Tx`.
+- `state.AddL1Chain` and `Diff.Apply` were also updated accordingly to ensure `CreateL1Tx` chains are stored and propagated through the state/diff layer correctly
+- And since `CreateL1Tx` stores its own `txID` under the same prefix, `GetChains` now returns a `*txs.CreateL1Tx` instead of a `*txs.CreateChainTx` for L1s created this way, preserving backwards compatibility with existing subnets and their `CreateChainTx` chains.
 
 
 
