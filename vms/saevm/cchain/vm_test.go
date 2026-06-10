@@ -350,9 +350,11 @@ func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
 }
 
-// waitForPendingEthTxs blocks until at least want txs are pending in the eth
-// mempool, so the builder includes them all rather than racing promotion.
-func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, want int) {
+// waitForPendingEthTxs blocks until every tx is pending in the source the block
+// builder draws from, so the built block includes them all rather than racing
+// promotion. [GetPoolTransactions] resolves the same [txpool.Pool.Pending] set
+// used by [txgossip.Set.TransactionsByPriority] during block building.
+func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
 	backend := s.GethRPCBackends()
@@ -360,8 +362,18 @@ func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, want int)
 	sub := backend.SubscribeNewTxsEvent(ch)
 	defer sub.Unsubscribe()
 
+	want := set.NewSet[common.Hash](len(txs))
+	for _, tx := range txs {
+		want.Add(tx.Hash())
+	}
+
 	for {
-		if pending, _ := backend.Stats(); pending >= want {
+		pending, err := backend.GetPoolTransactions()
+		require.NoErrorf(tb, err, "%T.GetPoolTransactions()", backend)
+		for _, tx := range pending {
+			want.Remove(tx.Hash())
+		}
+		if want.Len() == 0 {
 			return
 		}
 		select {
@@ -369,7 +381,7 @@ func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, want int)
 		case err := <-sub.Err():
 			require.NoErrorf(tb, err, "%T.SubscribeNewTxsEvent()", backend)
 		case <-ctx.Done():
-			tb.Fatalf("%v waiting for %d pending eth txs", context.Cause(ctx), want)
+			tb.Fatalf("%v waiting for %d pending eth txs", context.Cause(ctx), want.Len())
 		}
 	}
 }
@@ -761,26 +773,32 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 
 	// A GasFeeCap of 1 pins the effective gas price to 1, so the AVAX burned
 	// equals the gas charged.
-	for _, tt := range tests {
-		stx := w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+	txs := make([]*types.Transaction, len(tests))
+	for i, tt := range tests {
+		txs[i] = w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       tt.gasLimit,
 			GasFeeCap: big.NewInt(1),
 		})
-		require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, stx), "%T.SendTransaction(%s)", sut.ethclient, tt.name)
+		require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, txs[i]), "%T.SendTransaction(%s)", sut.ethclient, tt.name)
 	}
 
 	// Ensure every tx is pending so the builder includes them all in one block.
-	sut.waitForPendingEthTxs(ctx, t, len(tests))
+	sut.waitForPendingEthTxs(ctx, t, txs...)
 
 	preBalance := sut.balance(t, sender)
 	blk := sut.runConsensusLoop(ctx, t)
-	receipts := blk.Receipts()
-	require.Lenf(t, receipts, len(tests), "%T.Receipts()", blk)
+	require.Lenf(t, blk.Receipts(), len(tests), "%T.Receipts()", blk)
+
+	receiptByTx := make(map[common.Hash]*types.Receipt, len(blk.Receipts()))
+	for _, r := range blk.Receipts() {
+		receiptByTx[r.TxHash] = r
+	}
 
 	var totalCharged uint64
 	for i, tt := range tests {
-		receipt := receipts[i]
+		receipt, ok := receiptByTx[txs[i].Hash()]
+		require.Truef(t, ok, "receipt for %s", tt.name)
 		totalCharged += tt.wantGasUsed
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, types.ReceiptStatusSuccessful, receipt.Status, "tx status")
