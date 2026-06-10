@@ -4,10 +4,7 @@
 package warp
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -19,48 +16,37 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-var (
-	validPredicate      = predicate.New([]byte{0})
-	invalidPredicate    = predicate.New([]byte{1})
-	errInvalidPredicate = errors.New("invalid predicate")
-)
-
-type predicater struct{}
-
-func (predicater) PredicateGas(predicate.Predicate, precompileconfig.Rules) (uint64, error) {
-	return 0, nil
-}
-
-func (predicater) VerifyPredicate(_ *precompileconfig.PredicateContext, pred predicate.Predicate) error {
-	if slices.Equal(pred, validPredicate) {
-		return nil
-	}
-	return errInvalidPredicate
-}
-
+// newRules returns rules with the warp precompile registered at each of the
+// given addresses.
 func newRules(contracts ...common.Address) *extras.Rules {
+	contract := corethwarp.NewDefaultConfig(utils.PointerTo[uint64](0))
+
 	predicaters := make(map[common.Address]precompileconfig.Predicater, len(contracts))
 	for _, addr := range contracts {
-		predicaters[addr] = predicater{}
+		predicaters[addr] = contract
 	}
-	return &extras.Rules{Predicaters: predicaters}
+	return &extras.Rules{
+		Predicaters: predicaters,
+	}
 }
 
 func TestBlockPredicates(t *testing.T) {
+	msg, _ := newAddressedCall(t)
 	var (
+		vdrs           = warptest.NewValidators(t, 2)
+		sourceSubnetID = ids.GenerateTestID()
+
+		validPredicate   = predicate.New(vdrs.Sign(t, msg).Bytes())
+		invalidPredicate = predicate.New(warptest.FakeSign(t, msg).Bytes())
+
 		addr0 = common.Address{0}
 		addr1 = common.Address{1}
 
@@ -230,125 +216,14 @@ func TestBlockPredicates(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var (
-				snowContext = snowtest.Context(t, snowtest.CChainID)
-				rules       = newRules(test.contracts...)
-			)
+			snowContext := snowtest.Context(t, snowtest.CChainID)
+			snowContext.ValidatorState = vdrs.State(sourceSubnetID)
+			rules := newRules(test.contracts...)
+
 			actual, err := VerifyBlock(snowContext, test.blockContext, rules, test.txs)
 			require.ErrorIs(t, err, test.expectedErr)
 			require.Equal(t, test.expected, actual)
 		})
-	}
-}
-
-// validatorSet is a set of BLS validators held in canonical (public-key-sorted)
-// order, so the signer bitset of a signature it produces lines up with the
-// validator set used to verify it.
-type validatorSet struct {
-	validators []*validators.Warp
-	signers    []bls.Signer // parallel to validators
-}
-
-// newValidatorSet creates numValidators BLS validators, each with weight 1.
-func newValidatorSet(tb testing.TB, numValidators int) validatorSet {
-	type keyedValidator struct {
-		vdr *validators.Warp
-		sk  bls.Signer
-	}
-	keyed := make([]keyedValidator, numValidators)
-	for i := range keyed {
-		sk, err := localsigner.New()
-		require.NoError(tb, err)
-		pk := sk.PublicKey()
-		keyed[i] = keyedValidator{
-			vdr: &validators.Warp{
-				PublicKey:      pk,
-				PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-				Weight:         1,
-				NodeIDs:        []ids.NodeID{ids.GenerateTestNodeID()},
-			},
-			sk: sk,
-		}
-	}
-	slices.SortFunc(keyed, func(a, b keyedValidator) int {
-		return a.vdr.Compare(b.vdr)
-	})
-
-	vs := validatorSet{
-		validators: make([]*validators.Warp, numValidators),
-		signers:    make([]bls.Signer, numValidators),
-	}
-	for i, kv := range keyed {
-		vs.validators[i] = kv.vdr
-		vs.signers[i] = kv.sk
-	}
-	return vs
-}
-
-// Sign aggregates a signature over msg from every validator in the set and
-// returns the resulting signed warp message.
-func (vs validatorSet) Sign(tb testing.TB, msg *avalancheWarp.UnsignedMessage) *avalancheWarp.Message {
-	blsSignatures := make([]*bls.Signature, len(vs.signers))
-	signerIndices := set.NewBits()
-	for i, sk := range vs.signers {
-		sig, err := sk.Sign(msg.Bytes())
-		require.NoError(tb, err)
-		blsSignatures[i] = sig
-		signerIndices.Add(i)
-	}
-
-	aggregateSignature, err := bls.AggregateSignatures(blsSignatures)
-	require.NoError(tb, err)
-	warpSignature := &avalancheWarp.BitSetSignature{
-		Signers: signerIndices.Bytes(),
-	}
-	copy(warpSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
-
-	signedMsg, err := avalancheWarp.NewMessage(msg, warpSignature)
-	require.NoError(tb, err)
-	return signedMsg
-}
-
-// ToWarp returns the validator set in the form expected during verification.
-func (vs validatorSet) ToWarp() validators.WarpSet {
-	return validators.WarpSet{
-		Validators:  vs.validators,
-		TotalWeight: uint64(len(vs.validators)),
-	}
-}
-
-// newUnsigned builds an unsigned warp message from a random source chain.
-func newUnsigned(tb testing.TB) *avalancheWarp.UnsignedMessage {
-	addressedCall, err := payload.NewAddressedCall([]byte{1, 2, 3}, []byte{4, 5, 6})
-	require.NoError(tb, err)
-	msg, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, ids.GenerateTestID(), addressedCall.Bytes())
-	require.NoError(tb, err)
-	return msg
-}
-
-// warpValidatorState returns a validator state that attributes every chain to
-// subnetID and serves warpSet as that subnet's warp validators.
-func warpValidatorState(subnetID ids.ID, warpSet validators.WarpSet) *validatorstest.State {
-	return &validatorstest.State{
-		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
-			return subnetID, nil
-		},
-		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
-			return map[ids.ID]validators.WarpSet{
-				subnetID: warpSet,
-			}, nil
-		},
-	}
-}
-
-// newWarpRules returns rules with the production warp precompile registered at
-// its contract address.
-func newWarpRules() *extras.Rules {
-	blockTime := uint64(0)
-	return &extras.Rules{
-		Predicaters: map[common.Address]precompileconfig.Predicater{
-			corethwarp.ContractAddress: corethwarp.NewDefaultConfig(&blockTime),
-		},
 	}
 }
 
@@ -368,17 +243,16 @@ func BenchmarkBlockPredicates(b *testing.B) {
 	for _, numTxs := range []int{1, 10, 100} {
 		for _, predicatesPerTx := range []int{1, 10, 100} {
 			b.Run(fmt.Sprintf("txs=%d/predicates_per_tx=%d", numTxs, predicatesPerTx), func(b *testing.B) {
-				vdrSet := newValidatorSet(b, numSigners)
+				vdrs := warptest.NewValidators(b, numSigners)
 				snowContext := snowtest.Context(b, snowtest.CChainID)
-				sourceSubnetID := ids.GenerateTestID()
-				snowContext.ValidatorState = warpValidatorState(sourceSubnetID, vdrSet.ToWarp())
+				snowContext.ValidatorState = vdrs.State(ids.GenerateTestID())
 
 				blockContext := &block.Context{}
 
-				rules := newWarpRules()
+				rules := newRules(addr)
 
-				signedMsg := vdrSet.Sign(b, newUnsigned(b))
-				pred := predicate.New(signedMsg.Bytes())
+				msg, _ := newAddressedCall(b)
+				pred := predicate.New(vdrs.Sign(b, msg).Bytes())
 				accessList := make(types.AccessList, predicatesPerTx)
 				for i := range accessList {
 					accessList[i] = types.AccessTuple{

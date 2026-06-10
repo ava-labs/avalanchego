@@ -36,20 +36,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -73,11 +68,6 @@ type SUT struct {
 	*VM
 	*Client
 
-	// validatorKeys are populated when [withWarpValidators] is used and
-	// correspond, by index, to the BLS validator set returned by
-	// snowCtx.ValidatorState.GetWarpValidatorSets.
-	validatorKeys []*localsigner.LocalSigner
-
 	memory    *atomic.Memory
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
@@ -88,10 +78,9 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis        core.Genesis
-		nodeID         ids.NodeID
-		validators     set.Set[ids.NodeID]
-		warpValidators int
+		genesis    core.Genesis
+		nodeID     ids.NodeID
+		validators *warptest.Validators
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -111,20 +100,10 @@ func withNodeID(id ids.NodeID) sutOption {
 	})
 }
 
-// withValidators adds each NodeID to the validator set with weight 1.
-func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
+// withValidators sets the SUT's validator set.
+func withValidators(vdrs *warptest.Validators) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.validators = vdrs
-	})
-}
-
-// withWarpValidators populates the warp validator set with n validators, each
-// holding a freshly generated BLS key and equal weight. The generated signers
-// are exposed on [SUT.validatorKeys] in the same order as the warp set, so
-// tests can produce valid aggregated signatures.
-func withWarpValidators(n int) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.warpValidators = n
 	})
 }
 
@@ -147,7 +126,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Difficulty: big.NewInt(0), // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
 			},
-			nodeID: ids.GenerateTestNodeID(),
+			nodeID:     ids.GenerateTestNodeID(),
+			validators: warptest.NewValidators(tb, 0),
 		}, opts...)
 	)
 
@@ -159,19 +139,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
-	vdrState := saetest.SetValidators(tb, snowCtx.ValidatorState, cfg.validators)
-
-	var validatorKeys []*localsigner.LocalSigner
-	if cfg.warpValidators > 0 {
-		validatorKeys = newWarpValidatorSet(tb, vdrState, snowCtx.SubnetID, cfg.warpValidators)
-	}
+	warptest.SetValidators(tb, snowCtx.ValidatorState, snowCtx.SubnetID, cfg.validators)
 
 	chainDB := prefixdb.New([]byte("chain"), db)
 
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
-	appSender := saetest.NewSender(tb, cfg.validators)
+	appSender := saetest.NewSender(tb, cfg.validators.NodeIDs())
 
 	ctx := log.CancelOnError(tb.Context())
 	require.NoErrorf(tb, vm.Initialize(
@@ -216,8 +191,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		VM:     vm,
 		Client: NewClient(server.URL),
 
-		validatorKeys: validatorKeys,
-
 		memory:    memory,
 		sender:    appSender,
 		ethclient: ethclient.NewClient(ethRPCClient),
@@ -225,62 +198,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	appSender.SetSelf(sut)
 	tb.Cleanup(appSender.Close)
 	return ctx, sut
-}
-
-// newWarpValidatorSet generates n local BLS signers, registers them as a
-// single warp validator set on vdrState (under subnetID), and returns the
-// signers. The signers are returned in the same order as the (sorted) warp
-// set's Validators slice so that a BitSet covering bits 0..n-1 corresponds to
-// "every returned signer signed".
-func newWarpValidatorSet(
-	tb testing.TB,
-	vdrState *validatorstest.State,
-	subnetID ids.ID,
-	n int,
-) []*localsigner.LocalSigner {
-	tb.Helper()
-
-	const weightPerValidator uint64 = 50
-
-	type pair struct {
-		signer *localsigner.LocalSigner
-		warp   *validators.Warp
-	}
-	pairs := make([]pair, n)
-	warpValidators := make([]*validators.Warp, n)
-	for i := range n {
-		key, err := localsigner.New()
-		require.NoErrorf(tb, err, "localsigner.New()")
-		w := &validators.Warp{
-			PublicKey:      key.PublicKey(),
-			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(key.PublicKey()),
-			Weight:         weightPerValidator,
-			NodeIDs:        []ids.NodeID{ids.GenerateTestNodeID()},
-		}
-		pairs[i] = pair{signer: key, warp: w}
-		warpValidators[i] = w
-	}
-	warpSet := validators.WarpSet{
-		Validators:  warpValidators,
-		TotalWeight: weightPerValidator * uint64(n),
-	}
-	utils.Sort(warpSet.Validators)
-
-	vdrState.GetWarpValidatorSetsF = func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
-		return map[ids.ID]validators.WarpSet{
-			subnetID: warpSet,
-		}, nil
-	}
-	sortedSigners := make([]*localsigner.LocalSigner, n)
-	for i, v := range warpSet.Validators {
-		for _, p := range pairs {
-			if p.warp == v {
-				sortedSigners[i] = p.signer
-				break
-			}
-		}
-	}
-	return sortedSigners
 }
 
 // assertUTXOsExist asserts that reader chain can read the expected UTXOs from

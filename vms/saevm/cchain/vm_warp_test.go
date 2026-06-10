@@ -7,7 +7,6 @@ import (
 	"context"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -23,110 +22,18 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/buffer"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
-
-// peer captures AppResponse, AppRequestFailed, and AppGossip messages and
-// exposes them for inspection.
-type peer struct {
-	id       ids.NodeID
-	sender   *saetest.Sender
-	response *buffer.UnboundedBlockingDeque[peerResponse]
-	gossip   *buffer.UnboundedBlockingDeque[peerGossip]
-}
-
-type peerResponse struct {
-	nodeID    ids.NodeID
-	requestID uint32
-	bytes     []byte
-	err       *snowcommon.AppError
-}
-
-type peerGossip struct {
-	nodeID ids.NodeID
-	bytes  []byte
-}
-
-// newPeer returns a [peer] with a fresh NodeID. vdrs is passed through to its
-// underlying [saetest.Sender].
-func newPeer(tb testing.TB, vdrs set.Set[ids.NodeID]) *peer {
-	p := &peer{
-		id:       ids.GenerateTestNodeID(),
-		sender:   saetest.NewSender(tb, vdrs),
-		response: buffer.NewUnboundedBlockingDeque[peerResponse](1),
-		gossip:   buffer.NewUnboundedBlockingDeque[peerGossip](1),
-	}
-	p.sender.SetSelf(p)
-	return p
-}
-
-// Response blocks until the peer captures an AppResponse or AppRequestFailed to
-// return.
-func (p *peer) Response() (ids.NodeID, uint32, []byte, *snowcommon.AppError) {
-	r, _ := p.response.PopLeft()
-	return r.nodeID, r.requestID, r.bytes, r.err
-}
-
-// Gossip blocks until the peer captures AppGossip to return.
-func (p *peer) Gossip(ctx context.Context) (ids.NodeID, []byte) {
-	r, _ := p.gossip.PopLeft()
-	return r.nodeID, r.bytes
-}
-
-func (p *peer) NodeID() ids.NodeID      { return p.id }
-func (p *peer) Sender() *saetest.Sender { return p.sender }
-
-func (p *peer) AppResponse(_ context.Context, from ids.NodeID, requestID uint32, b []byte) error {
-	p.response.PushRight(peerResponse{
-		nodeID:    from,
-		requestID: requestID,
-		bytes:     b,
-	})
-	return nil
-}
-
-func (p *peer) AppRequestFailed(_ context.Context, from ids.NodeID, requestID uint32, appErr *snowcommon.AppError) error {
-	p.response.PushRight(peerResponse{
-		nodeID:    from,
-		requestID: requestID,
-		err:       appErr,
-	})
-	return nil
-}
-
-func (p *peer) AppGossip(_ context.Context, nodeID ids.NodeID, b []byte) error {
-	p.gossip.PushRight(peerGossip{
-		nodeID: nodeID,
-		bytes:  b,
-	})
-	return nil
-}
-
-func (p *peer) AppRequest(ctx context.Context, from ids.NodeID, requestID uint32, _ time.Time, _ []byte) error {
-	return p.sender.SendAppError(
-		ctx,
-		from,
-		requestID,
-		p2p.ErrUnexpected.Code,
-		p2p.ErrUnexpected.Message,
-	)
-}
-
-func (*peer) Connected(context.Context, ids.NodeID, *version.Application) error { return nil }
-func (*peer) Disconnected(context.Context, ids.NodeID) error                    { return nil }
 
 // TestSendWarpMessage verifies that a warp message emitted by a tx is only
 // available for signing AFTER the block containing the tx has executed.
@@ -137,7 +44,7 @@ func TestSendWarpMessage(t *testing.T) {
 	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Alloc = saetest.MaxAllocFor(sender)
 	}))
-	capturer := newPeer(t, set.Set[ids.NodeID]{})
+	capturer := saetest.NewCapturingPeer(t, set.Set[ids.NodeID]{})
 	saetest.ConnectTo[saetest.Peer](t, sut, capturer)
 
 	payloadData := utils.RandomBytes(100)
@@ -189,11 +96,12 @@ func TestPredicateVerification(t *testing.T) {
 	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 	sender := ethWallet.Addresses()[0]
 
+	vdrs := warptest.NewValidators(t, 2)
 	ctx, sut := newSUT(t,
 		options.Func[sutConfig](func(c *sutConfig) {
 			c.genesis.Alloc = saetest.MaxAllocFor(sender)
 		}),
-		withWarpValidators(2),
+		withValidators(vdrs),
 	)
 
 	addressedPayload, err := payload.NewAddressedCall(sender.Bytes(), []byte{1, 2, 3})
@@ -217,25 +125,25 @@ func TestPredicateVerification(t *testing.T) {
 		{
 			name:           "valid warp message",
 			validPredicate: true,
-			signedMsg:      signWarpMessage(t, sut, addressedCallMessage),
+			signedMsg:      vdrs.Sign(t, addressedCallMessage),
 			txPayload:      addressedCallTxPayload,
 		},
 		{
 			name:           "invalid warp message",
 			validPredicate: false,
-			signedMsg:      fakeSignWarpMessage(t, addressedCallMessage),
+			signedMsg:      warptest.FakeSign(t, addressedCallMessage),
 			txPayload:      addressedCallTxPayload,
 		},
 		{
 			name:           "valid warp block hash",
 			validPredicate: true,
-			signedMsg:      signWarpMessage(t, sut, blockHashMessage),
+			signedMsg:      vdrs.Sign(t, blockHashMessage),
 			txPayload:      blockHashTxPayload,
 		},
 		{
 			name:           "invalid warp block hash",
 			validPredicate: false,
-			signedMsg:      fakeSignWarpMessage(t, blockHashMessage),
+			signedMsg:      warptest.FakeSign(t, blockHashMessage),
 			txPayload:      blockHashTxPayload,
 		},
 	}
@@ -299,46 +207,6 @@ func newUnsignedWarpMessage(t *testing.T, sut *SUT, payload []byte) *avalancheWa
 	return msg
 }
 
-// signWarpMessage produces a valid aggregated BLS signature over the message,
-// signed by every warp validator registered on the SUT.
-func signWarpMessage(t *testing.T, sut *SUT, unsigned *avalancheWarp.UnsignedMessage) *avalancheWarp.Message {
-	t.Helper()
-	require.NotEmpty(t, sut.validatorKeys, "SUT has no warp validators; use withWarpValidators")
-
-	sigs := make([]*bls.Signature, len(sut.validatorKeys))
-	for i, key := range sut.validatorKeys {
-		sig, err := key.Sign(unsigned.Bytes())
-		require.NoError(t, err)
-		sigs[i] = sig
-	}
-	aggregated, err := bls.AggregateSignatures(sigs)
-	require.NoError(t, err)
-
-	signers := set.NewBits()
-	for i := range sut.validatorKeys {
-		signers.Add(i)
-	}
-	warpSig := &avalancheWarp.BitSetSignature{Signers: signers.Bytes()}
-	copy(warpSig.Signature[:], bls.SignatureToBytes(aggregated))
-
-	signed, err := avalancheWarp.NewMessage(unsigned, warpSig)
-	require.NoError(t, err)
-	return signed
-}
-
-// fakeSignWarpMessage produces a syntactically-valid warp message with an
-// invalid signature, used for negative tests.
-func fakeSignWarpMessage(t *testing.T, unsigned *avalancheWarp.UnsignedMessage) *avalancheWarp.Message {
-	t.Helper()
-	warpSig := &avalancheWarp.BitSetSignature{
-		Signers:   set.NewBits().Bytes(),
-		Signature: [96]byte{1, 2, 3},
-	}
-	signed, err := avalancheWarp.NewMessage(unsigned, warpSig)
-	require.NoError(t, err)
-	return signed
-}
-
 // verifyWarpMessage sends an acp118 signature request to the SUT and asserts
 // that the response (delivered to capturer) matches the expected error code.
 // expected == 0 means "valid message, response is non-nil and error is nil".
@@ -346,7 +214,7 @@ func verifyWarpMessage(
 	ctx context.Context,
 	t *testing.T,
 	sut *SUT,
-	capturer *peer,
+	capturer *saetest.CapturingPeer,
 	payloadBytes []byte,
 	expected int32,
 ) {

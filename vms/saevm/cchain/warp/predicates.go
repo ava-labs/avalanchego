@@ -29,10 +29,6 @@ func VerifyBlock(
 	rules *extras.Rules,
 	txs []*types.Transaction,
 ) (predicate.BlockResults, error) {
-	if !rules.PredicatersExist() {
-		return nil, nil
-	}
-
 	type result = lazyEntry[common.Hash, predicate.PrecompileResults]
 	var (
 		results = make([]result, 0, len(txs))
@@ -53,7 +49,7 @@ func VerifyBlock(
 		}
 		results = append(results, result{
 			key:   tx.Hash(),
-			value: verifyTx(pc, rules, predicates, eg),
+			value: verifyTx(pc, rules.Predicaters, predicates, eg),
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -87,11 +83,10 @@ func collect[K comparable, V any](entries []lazyEntry[K, V]) map[K]V {
 // verifyTx enqueues the verification of a transaction's predicates onto eg.
 // Each predicate is verified in its own goroutine.
 //
-// It returns a function that assembles the predicate results; the function must
-// only be called after eg.Wait has returned.
+// The predicate results MUST be collected after eg.Wait has returned.
 func verifyTx(
 	pc *precompileconfig.PredicateContext,
-	rules *extras.Rules,
+	contracts map[common.Address]precompileconfig.Predicater,
 	predicatesByAddress map[common.Address][]predicate.Predicate,
 	eg *errgroup.Group,
 ) lazy[predicate.PrecompileResults] {
@@ -102,7 +97,7 @@ func verifyTx(
 			key: address,
 			value: verifyContract(
 				pc,
-				rules.Predicaters[address],
+				contracts[address],
 				predicates,
 				eg,
 			),
@@ -116,8 +111,7 @@ func verifyTx(
 // verifyContract enqueues the verification of each of a contract's predicates
 // onto eg. Each predicate is verified in its own goroutine.
 //
-// It returns a function that assembles the contract's results; the function
-// must only be called after eg.Wait has returned.
+// The results MUST be collected after eg.Wait has returned.
 func verifyContract(
 	pc *precompileconfig.PredicateContext,
 	contract precompileconfig.Predicater,
