@@ -48,8 +48,7 @@ const (
 
 // Verify verifies that this node should sign m.
 func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte) *common.AppError {
-	id := m.ID()
-	_, err := v.storage.Get(id)
+	_, err := v.storage.Get(m.ID())
 	if err == nil { // if NO error
 		return nil
 	}
