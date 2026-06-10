@@ -1,0 +1,231 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  # Hidden direct-publish opt-in. The active default is draft creation —
+  # direct publishing requires uncommenting the block below AND swapping
+  # the `draft:`/`make_latest:` lines in the publish job.
+  # workflow_dispatch:
+  #   inputs:
+  #     tag:
+  #       description: 'Tag to publish (non-draft) a release for'
+  #       required: true
+
+# Defense against force-pushed tag re-runs: serialize publishers for the
+# same tag ref. Tags are immutable absent --force, but if someone
+# force-pushes the same tag twice in quick succession, the concurrency
+# group ensures the second run waits and then hits the fail-closed
+# existence check.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Principle of least privilege. Default workflow scope to read-only. Each
+# fan-out job declares its own permissions to match the producer's actual
+# needs (id-token: write only for the AWS-OIDC producers). Two jobs override
+# to `contents: write`: `publish` (creates the release) and `validate-tag`
+# (see its permissions block for why a read-only check is not enough).
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  validate-tag:
+    runs-on: ubuntu-22.04
+    permissions:
+      # contents:write so the releases LISTING includes drafts — GitHub only
+      # returns draft releases to push-capable tokens, and drafts are this
+      # workflow's default output, so the most common duplicate (a re-run
+      # after a prior run already created the draft) is invisible to a
+      # read-only token and the fail-fast guard would fail open. No new
+      # exposure: `publish` already runs tag-controlled scripts with the
+      # same scope, so a malicious tag-pusher gains no capability here.
+      contents: write
+    outputs:
+      tag: ${{ steps.derive.outputs.tag }}
+      kind: ${{ steps.classify.outputs.kind }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Derive tag
+        id: derive
+        # Assignment-first so a resolver failure fails this step with its own
+        # diagnostic (`echo "tag=$(script)"` would swallow the exit code).
+        run: |
+          tag="$(./.github/workflows/release-resolve-tag.sh)"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        shell: bash
+
+      - name: Classify tag (stable vs prerelease)
+        id: classify
+        # Assignment-first: a swallowed classifier failure would leave `kind`
+        # empty, which downstream evaluates as "not prerelease" — i.e. an
+        # invalid tag would silently ship as a stable release.
+        run: |
+          kind="$(./.github/workflows/release-classify-tag.sh "$TAG")"
+          echo "kind=${kind}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ steps.derive.outputs.tag }}
+
+      - name: Fail if release already exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.derive.outputs.tag }}
+        run: ./.github/workflows/release-check-exists.sh "$TAG"
+
+      # Fail-fast if RELEASES.md has no section for the pushed tag. Critical
+      # placement in the fan-out variant — this check sits inside validate-tag,
+      # BEFORE the 30+ min build fan-out, so a missing release-notes entry
+      # costs ~100ms of runner time instead of blowing the full build matrix.
+      - name: Verify RELEASES.md has release notes for the tag
+        env:
+          TAG: ${{ steps.derive.outputs.tag }}
+        run: ./.github/workflows/release-assert-notes-exist.sh "$TAG"
+
+  build-rpms:
+    needs: validate-tag
+    uses: ./.github/workflows/build-rpm-release.yml
+    with:
+      tag: ${{ needs.validate-tag.outputs.tag }}
+    secrets: inherit
+    permissions:
+      contents: read
+
+  build-linux:
+    needs: validate-tag
+    uses: ./.github/workflows/build-linux-binaries.yml
+    with:
+      tag: ${{ needs.validate-tag.outputs.tag }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+
+  build-macos:
+    needs: validate-tag
+    uses: ./.github/workflows/build-macos-release.yml
+    with:
+      tag: ${{ needs.validate-tag.outputs.tag }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+
+  build-deb-amd64:
+    needs: validate-tag
+    uses: ./.github/workflows/build-ubuntu-amd64-release.yml
+    with:
+      tag: ${{ needs.validate-tag.outputs.tag }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+
+  build-deb-arm64:
+    needs: validate-tag
+    uses: ./.github/workflows/build-ubuntu-arm64-release.yml
+    with:
+      tag: ${{ needs.validate-tag.outputs.tag }}
+    secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
+
+  publish:
+    needs:
+      - validate-tag
+      - build-rpms
+      - build-linux
+      - build-macos
+      - build-deb-amd64
+      - build-deb-arm64
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.validate-tag.outputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Find previous tag in RELEASES.md
+        id: prev
+        # Assignment-first so the wrapper's fatal exit 2 ("tag not in
+        # RELEASES.md") fails this step instead of silently degrading into
+        # the benign empty-previous_tag case (`echo "k=$(script)"` swallows
+        # the substitution's exit code under bash -e).
+        run: |
+          prev="$(./.github/workflows/release-resolve-previous-tag.sh "$TAG")"
+          echo "previous_tag=${prev}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release body
+        run: ./.github/workflows/release-build-body.sh "$TAG" "$PREV_TAG" RELEASES.md > release-body.md
+        env:
+          PREV_TAG: ${{ steps.prev.outputs.previous_tag }}
+
+      - name: Download in-run artifacts
+        uses: actions/download-artifact@v6
+        with:
+          path: release-assets
+
+      - name: List artifacts before assembly
+        run: find release-assets -type f | sort
+
+      - name: Build publish-set from canonical manifest
+        run: ./.github/workflows/release-build-publish-set.sh "$TAG" release-assets publish-assets
+
+      - name: Assert publish-set equals manifest exactly
+        run: ./.github/workflows/release-assert-publish-set.sh "$TAG" publish-assets
+
+      # validate-tag ran release-check-exists.sh at the top of the workflow,
+      # but the window between that initial guard and this publish step is
+      # the full duration of the build matrix (often 30+ min). A manual
+      # `gh release create`, a retry from another workflow, or a sibling
+      # pipeline can create the release inside that window. Re-check
+      # immediately before softprops to fail closed if that has happened
+      # rather than overwrite or conflict with an existing release.
+      - name: Final pre-publish existence re-check
+        run: ./.github/workflows/release-check-exists.sh "$TAG"
+
+      - name: Create GitHub release (as draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          body_path: release-body.md
+          prerelease: ${{ needs.validate-tag.outputs.kind == 'prerelease' }}
+          fail_on_unmatched_files: true
+          files: |
+            publish-assets/*
+          # The workflow always lands the release as a DRAFT. A human
+          # publishes it via the GitHub UI after reviewing title, body,
+          # assets, and pre-release/latest flags. Drafts aren't visible
+          # to non-collaborators, so a mid-upload failure leaves an
+          # invisible partial-state that's safe to delete and retry.
+          draft: true
+          #
+          # `make_latest` is a publish-time global pointer — it asks
+          # GitHub to designate THIS release as the repository's /latest,
+          # which a draft can't satisfy because drafts aren't publicly
+          # addressable. We leave it OFF the active draft path so the
+          # human publisher can decide "set as latest" in the GitHub UI.
+          #
+          # HIDDEN DIRECT-PUBLISH OPT-IN (not the default):
+          # To skip the manual review step and publish immediately, set
+          # `draft: false` (or remove the line above — softprops defaults
+          # to published when `draft` is unset) AND uncomment make_latest.
+          # draft: false
+          # make_latest: ${{ needs.validate-tag.outputs.kind == 'stable' }}
+
+      # softprops/action-gh-release silently no-ops on duplicate
+      # filenames, so trust-but-verify the GitHub state matches what we
+      # expected to upload. Fails loudly so the release can be deleted
+      # +republished rather than left half-baked.
+      - name: Verify published release assets equal the manifest
+        run: ./.github/workflows/release-assert-published-assets.sh "$TAG"
