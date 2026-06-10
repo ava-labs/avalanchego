@@ -976,8 +976,8 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 		return 0, 0, err
 	}
 
-	// We can only restake [restakingAvailability], but have
-	// [totalRestakingRewards] = validationRewards + delegateeRewards. Split the
+	// We can only restake restakingAvailability, but have
+	// totalRestakingRewards = validationRewards + delegateeRewards. Split the
 	// available restaking space proportionally between them; anything that doesn't
 	// fit is withdrawn.
 	restakingValidationReward, err := math.MulDiv(validationRewards, restakingAvailability, totalRestakingRewards)
