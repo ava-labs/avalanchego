@@ -37,12 +37,12 @@ func newRules(contracts ...common.Address) *extras.Rules {
 	}
 }
 
-func TestBlockPredicates(t *testing.T) {
-	msg, _ := newAddressedCall(t)
+func TestVerifyBlock(t *testing.T) {
 	var (
 		vdrs           = warptest.NewValidators(t, 2)
 		sourceSubnetID = ids.GenerateTestID()
 
+		msg, _           = newAddressedCall(t)
 		validPredicate   = predicate.New(vdrs.Sign(t, msg).Bytes())
 		invalidPredicate = predicate.New(warptest.FakeSign(t, msg).Bytes())
 
@@ -226,14 +226,7 @@ func TestBlockPredicates(t *testing.T) {
 	}
 }
 
-// BenchmarkBlockPredicates measures predicate verification of a block using the
-// production warp precompile, so each predicate performs a real BLS aggregate
-// signature verification. The matrix varies the block size (txs) and the number
-// of predicates per transaction.
-//
-// It only depends on verifyBlock's stable signature, so the same benchmark
-// can be run on the sae-devnet-5 branch and compared with benchstat.
-func BenchmarkBlockPredicates(b *testing.B) {
+func BenchmarkVerifyBlock(b *testing.B) {
 	// The aggregate signature size barely affects verification time, so the
 	// number of signers is held fixed.
 	const numSigners = 10
