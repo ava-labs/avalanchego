@@ -5,11 +5,15 @@ version: '3'
 # once from this file's directory so the namespace can be invoked from any
 # working dir.
 
+# Vars are RELEASE_-prefixed (matching the packaging namespace's PACKAGING_
+# prefix): vars defined in an included Taskfile leak into the root namespace,
+# so an unprefixed NIX_RUN here would override the root Taskfile's NIX_RUN
+# and break every root task.
 vars:
   REPO_ROOT:
     sh: cd "{{.TASKFILE_DIR}}/../.." && pwd
-  NIX_RUN: '{{.REPO_ROOT}}/scripts/nix_run.sh'
-  WORKFLOWS_DIR: '{{.REPO_ROOT}}/.github/workflows'
+  RELEASE_NIX_RUN: '{{.REPO_ROOT}}/scripts/nix_run.sh'
+  RELEASE_WORKFLOWS_DIR: '{{.REPO_ROOT}}/.github/workflows'
 
 tasks:
   default:
@@ -22,53 +26,53 @@ tasks:
 
   classify-tag:
     desc: 'Classify TAG as stable or prerelease. Usage: task release:classify-tag -- v1.14.3'
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-classify-tag.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-classify-tag.sh {{.CLI_ARGS}}'
 
   check-exists:
     desc: 'Fail if a GitHub release already exists for TAG (draft-aware). Usage: task release:check-exists -- v1.14.3'
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-check-exists.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-check-exists.sh {{.CLI_ARGS}}'
 
   assert-notes-exist:
     desc: 'Assert RELEASES.md has a section for TAG. Usage: task release:assert-notes-exist -- v1.14.3'
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-assert-notes-exist.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-assert-notes-exist.sh {{.CLI_ARGS}}'
 
   extract-notes:
     desc: 'Print the RELEASES.md section body for TAG. Usage: task release:extract-notes -- v1.14.3'
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-extract-notes.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-extract-notes.sh {{.CLI_ARGS}}'
 
   previous-tag:
     desc: 'Print the prior tag from RELEASES.md (tri-state exit). Usage: task release:previous-tag -- v1.14.3'
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-previous-tag.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-previous-tag.sh {{.CLI_ARGS}}'
 
   resolve-previous-tag:
     desc: 'Wrapper that collapses the tri-state exit into (0 or 2). Usage: task release:resolve-previous-tag -- v1.14.3'
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-resolve-previous-tag.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-resolve-previous-tag.sh {{.CLI_ARGS}}'
 
   expected-manifest:
     desc: 'Print canonical expected-asset basenames for TAG. Usage: task release:expected-manifest -- v1.14.3'
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-expected-manifest.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-expected-manifest.sh {{.CLI_ARGS}}'
 
   build-body:
     desc: 'Build release body for TAG. Usage: task release:build-body -- v1.14.3 v1.14.2'
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-build-body.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-build-body.sh {{.CLI_ARGS}}'
 
   build-publish-set:
     desc: |
       Assemble publish-set from producer outputs.
       Usage: task release:build-publish-set -- v1.14.3 ./release-assets ./publish-assets
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-build-publish-set.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-build-publish-set.sh {{.CLI_ARGS}}'
 
   assert-publish-set:
     desc: |
       Assert publish-set directory equals the canonical manifest.
       Usage: task release:assert-publish-set -- v1.14.3 ./publish-assets
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-assert-publish-set.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-assert-publish-set.sh {{.CLI_ARGS}}'
 
   assert-published-assets:
     desc: |
       Re-query the live release and assert its assets equal the manifest.
       Usage: GH_REPO=ava-labs/avalanchego task release:assert-published-assets -- v1.14.3
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-assert-published-assets.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-assert-published-assets.sh {{.CLI_ARGS}}'
 
   # ----- Composites (script-backed; Taskfile stays thin) -----
 
@@ -78,13 +82,13 @@ tasks:
       (classify + check-exists + assert-notes-exist).
       Usage: GH_REPO=ava-labs/avalanchego task release:validate-tag -- v1.14.3
     cmds:
-      - '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-classify-tag.sh {{.CLI_ARGS}}'
-      - '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-check-exists.sh {{.CLI_ARGS}}'
-      - '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-assert-notes-exist.sh {{.CLI_ARGS}}'
+      - '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-classify-tag.sh {{.CLI_ARGS}}'
+      - '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-check-exists.sh {{.CLI_ARGS}}'
+      - '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-assert-notes-exist.sh {{.CLI_ARGS}}'
 
   dry-run:
     desc: |
       End-to-end local dry-run: validate-tag + previous-tag + body preview +
       manifest preview. Does NOT build artifacts; does NOT mutate GitHub.
       Usage: GH_REPO=ava-labs/avalanchego task release:dry-run -- v1.14.3
-    cmd: '{{.NIX_RUN}} {{.WORKFLOWS_DIR}}/release-dry-run.sh {{.CLI_ARGS}}'
+    cmd: '{{.RELEASE_NIX_RUN}} {{.RELEASE_WORKFLOWS_DIR}}/release-dry-run.sh {{.CLI_ARGS}}'
