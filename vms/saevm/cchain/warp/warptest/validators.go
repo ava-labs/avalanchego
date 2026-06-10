@@ -179,9 +179,9 @@ func SetValidators(tb testing.TB, state validators.State, subnetID ids.ID, vdrs 
 	}
 }
 
-// FakeSign returns msg with a syntactically valid but cryptographically
+// IncorrectlySign returns msg with a syntactically valid but cryptographically
 // invalid signature.
-func FakeSign(tb testing.TB, msg *warp.UnsignedMessage) *warp.Message {
+func IncorrectlySign(tb testing.TB, msg *warp.UnsignedMessage) *warp.Message {
 	tb.Helper()
 
 	signed, err := warp.NewMessage(

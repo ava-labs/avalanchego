@@ -131,7 +131,7 @@ func TestPredicateVerification(t *testing.T) {
 		{
 			name:           "invalid warp message",
 			validPredicate: false,
-			signedMsg:      warptest.FakeSign(t, addressedCallMessage),
+			signedMsg:      warptest.IncorrectlySign(t, addressedCallMessage),
 			txPayload:      addressedCallTxPayload,
 		},
 		{
@@ -143,7 +143,7 @@ func TestPredicateVerification(t *testing.T) {
 		{
 			name:           "invalid warp block hash",
 			validPredicate: false,
-			signedMsg:      warptest.FakeSign(t, blockHashMessage),
+			signedMsg:      warptest.IncorrectlySign(t, blockHashMessage),
 			txPayload:      blockHashTxPayload,
 		},
 	}

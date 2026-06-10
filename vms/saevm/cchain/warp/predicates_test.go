@@ -44,7 +44,7 @@ func TestVerifyBlock(t *testing.T) {
 
 		msg, _           = newAddressedCall(t)
 		validPredicate   = predicate.New(vdrs.Sign(t, msg).Bytes())
-		invalidPredicate = predicate.New(warptest.FakeSign(t, msg).Bytes())
+		invalidPredicate = predicate.New(warptest.IncorrectlySign(t, msg).Bytes())
 
 		addr0 = common.Address{0}
 		addr1 = common.Address{1}
