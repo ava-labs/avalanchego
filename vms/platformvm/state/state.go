@@ -1940,11 +1940,11 @@ func (s *State) loadCurrentValidators() error {
 		case *txs.AddAutoRenewedValidatorTx:
 			weight, err := safemath.Add(stakerTx.Weight(), metadata.AccruedValidationRewards)
 			if err != nil {
-				return fmt.Errorf("overflow computing weight: %w", err)
+				return fmt.Errorf("adding accrued validation rewards: %w", err)
 			}
 			weight, err = safemath.Add(weight, metadata.AccruedDelegateeRewards)
 			if err != nil {
-				return fmt.Errorf("overflow computing weight: %w", err)
+				return fmt.Errorf("adding accrued delegatee rewards: %w", err)
 			}
 
 			staker, err = NewStaker(
