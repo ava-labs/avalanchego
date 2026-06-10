@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -50,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -290,7 +288,7 @@ func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blo
 	tb.Helper()
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
-	return s.runConsensusLoop(ctx, tb)
+	return s.runConsensusLoop(tb)
 }
 
 // assertTxAccepted asserts that [Client.GetTx] returns the given tx at the
@@ -308,46 +306,22 @@ func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, 
 
 // runConsensusLoop builds a block on top of the last-accepted block, drives it
 // through verify+accept, and waits until it has been executed.
-func (s *SUT) runConsensusLoop(ctx context.Context, tb testing.TB) *blocks.Block {
+func (s *SUT) runConsensusLoop(tb testing.TB) *blocks.Block {
 	tb.Helper()
 
-	blk := s.buildVerifyAccept(ctx, tb)
-	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
+	blk := s.buildVerify(tb, s.LastAcceptedID(tb))
+	require.NoErrorf(tb, s.RawVM.AcceptBlock(s.Context(tb), blk), "%T.AcceptBlock()", s.RawVM)
+	require.NoErrorf(tb, blk.WaitUntilExecuted(s.Context(tb)), "%T.WaitUntilExecuted()", blk)
 	return blk
 }
 
-// buildVerifyAccept builds, verifies, and accepts a block on top of the
-// last-accepted block.
-func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB) *blocks.Block {
+// buildVerify waits for the issued txs to become pending, then builds and
+// verifies a block on top of preferenceID via the shared consensus helper.
+func (s *SUT) buildVerify(tb testing.TB, preferenceID ids.ID) *blocks.Block {
 	tb.Helper()
 
-	blk := s.buildVerify(ctx, tb, s.LastAcceptedID(tb))
-	require.NoErrorf(tb, s.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.VM)
-	return blk
-}
-
-func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
-	tb.Helper()
-
-	e, err := s.WaitForEvent(ctx)
-	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
-	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
-}
-
-// buildVerify builds and verifies a block on top of preferenceID.
-func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID) *blocks.Block {
-	tb.Helper()
-
-	// TODO(StephenButtolph): When implementing Warp, we will need to provide
-	// meaningful block contexts.
-	var blockCtx *block.Context
-	require.NoErrorf(tb, s.SetPreference(ctx, preferenceID, blockCtx), "%T.SetPreference()", s.VM)
-
-	s.waitForPendingTxs(ctx, tb)
-	blk, err := s.BuildBlock(ctx, blockCtx)
-	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
-	require.NoErrorf(tb, s.VerifyBlock(ctx, blockCtx, blk), "%T.VerifyBlock()", s.VM)
-	return blk
+	s.WaitForPendingTxs(tb)
+	return s.SUT.BuildVerify(tb, preferenceID)
 }
 
 // wallet builds and signs cross-chain transactions on behalf of a single key.
@@ -604,7 +578,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 
 		// Delaying acceptance ensures that already-issued txs are still in the
 		// mempool and are therefore (ineligible) candidates for inclusion here.
-		block := sut.buildVerify(ctx, t, preference)
+		block := sut.buildVerify(t, preference)
 		if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, block), txtest.CmpOpt()); diff != "" {
 			t.Errorf("%T txs (-want +got):\n%s", block, diff)
 		}
@@ -668,7 +642,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	)
 	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
 
-	blk := sut.buildVerify(ctx, t, sut.LastAcceptedID(t))
+	blk := sut.buildVerify(t, sut.LastAcceptedID(t))
 	if diff := cmp.Diff(types.Transactions{tracedTx}, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
 		t.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
 	}

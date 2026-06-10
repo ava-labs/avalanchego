@@ -414,18 +414,13 @@ func (s *SUT) createAndVerifyBlock(tb testing.TB, preference *blocks.Block, txs 
 	return b
 }
 
-// runConsensusLoopOnPreference is equivalent to [SUT.createAndVerifyBlock]
-// except that it also accepts the block with [VM.AcceptBlock]. It does NOT wait
-// for it to be executed; to do this automatically, set the [VM] to
-// [snow.Bootstrapping].
-//
-// There is no longer any need to wrap the block as an [adaptor.Block] so it is
-// returned in its raw form, unlike earlier steps in the consenus loop.
+// runConsensusLoopOnPreference sends txs, then builds, verifies, and accepts a
+// block on top of preference via the shared consensus helper. It does NOT wait
+// for execution - set the [VM] to [snow.Bootstrapping] for that.
 func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
-	b := s.createAndVerifyBlock(tb, preference, txs...)
-	require.NoErrorf(tb, b.Accept(s.Context(tb)), "%T.Accept()", b)
-	return unwrap(tb, b)
+	s.sendTxsAndWaitUntilPending(tb, txs...)
+	return s.RunConsensusLoopOnPreference(tb, preference.ID())
 }
 
 // runConsensusLoop is a convenience wrapper for

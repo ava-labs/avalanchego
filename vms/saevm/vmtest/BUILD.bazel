@@ -8,6 +8,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
         "//utils/logging/loggingtest",
         "//vms/saevm/blocks",
         "@com_github_ava_labs_libevm//ethclient",

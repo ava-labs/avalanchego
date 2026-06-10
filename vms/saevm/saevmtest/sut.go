@@ -287,63 +287,6 @@ func (s *SUT) WaitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
 	txgossiptest.WaitUntilPending(tb, s.Context(tb), s.RawVM.TxPool(), txs...)
 }
 
-// BuildAndParseBlock adds all `txs` to the mempool and ensures they are pending,
-// builds a new block and passes its bytes to [VM.ParseBlock], the result of
-// which is returned. This is equivalent to a validator having received valid
-// bytes from a peer, but with no element of consensus performed.
-//
-// A block at this stage is rarely useful and does not meet invariants required
-// of a [blocks.Block], hence its return as a [snowman.Block].
-func (s *SUT) BuildAndParseBlock(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) snowman.Block {
-	tb.Helper()
-	s.SendTxsAndWaitUntilPending(tb, txs...)
-
-	ctx := s.Context(tb)
-	require.NoError(tb, s.SetPreference(ctx, preference.ID()), "SetPreference()")
-
-	proposed, err := s.BuildBlock(ctx)
-	require.NoError(tb, err, "BuildBlock()")
-	b, err := s.ParseBlock(ctx, proposed.Bytes())
-	require.NoError(tb, err, "ParseBlock(BuildBlock().Bytes())")
-	return b
-}
-
-// CreateAndVerifyBlock calls [SUT.BuildAndParseBlock] with the provided
-// transactions. It verifies the block with [VM.VerifyBlock] (via the [adaptor])
-// before returning it.
-//
-// Although the block is now in a functional state, it is still returned as a
-// [snowman.Block] to expose its `Accept()` method, ensuring that we test via
-// the public API as exposed to the consensus engine.
-func (s *SUT) CreateAndVerifyBlock(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) snowman.Block {
-	tb.Helper()
-	b := s.BuildAndParseBlock(tb, preference, txs...)
-	require.NoErrorf(tb, b.Verify(s.Context(tb)), "%T.Verify()", b)
-	return b
-}
-
-// RunConsensusLoopOnPreference is equivalent to [SUT.CreateAndVerifyBlock]
-// except that it also accepts the block with [VM.AcceptBlock]. It does NOT wait
-// for it to be executed, to do this automatically set the [VM] to
-// [snow.Bootstrapping].
-//
-// There is no longer any need to wrap the block as an [adaptor.Block] so it is
-// returned in its raw form, unlike earlier steps in the consenus loop.
-func (s *SUT) RunConsensusLoopOnPreference(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) *blocks.Block {
-	tb.Helper()
-	b := s.CreateAndVerifyBlock(tb, preference, txs...)
-	require.NoErrorf(tb, b.Accept(s.Context(tb)), "%T.Accept()", b)
-	return Unwrap(tb, b)
-}
-
-// RunConsensusLoop is a convenience wrapper for
-// [SUT.RunConsensusLoopOnPreference], using [SUT.LastAcceptedBlock] as the
-// preference.
-func (s *SUT) RunConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks.Block {
-	tb.Helper()
-	return s.RunConsensusLoopOnPreference(tb, s.LastAcceptedBlock(tb), txs...)
-}
-
 func (s *SUT) StateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	tb.Helper()
 	sdb, err := s.RawVM.StateDB(root)

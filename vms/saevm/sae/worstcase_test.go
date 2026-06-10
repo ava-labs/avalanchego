@@ -198,7 +198,8 @@ func TestWorstCase(t *testing.T) {
 			}))
 		}
 
-		b := sut.RunConsensusLoop(t, txs...)
+		sut.SendTxsAndWaitUntilPending(t, txs...)
+		b := sut.RunConsensusLoop(t)
 		require.NoError(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		require.Lenf(t, b.Receipts(), len(precompileTests), "%T.Receipts()", b)
 		for i, r := range b.Receipts() {
