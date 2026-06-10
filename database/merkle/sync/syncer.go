@@ -149,10 +149,10 @@ type Config[R any, C any] struct {
 	RangeProofMarshaler  Marshaler[R]
 	ChangeProofMarshaler Marshaler[C]
 	ProofClient          *p2p.Client
-	TargetRoot           ids.ID
-	EmptyRoot            ids.ID // defaults to [ids.Empty] if not set
 
 	// Optional
+	TargetRoot            ids.ID
+	EmptyRoot             ids.ID
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	StateSyncNodes        []ids.NodeID
