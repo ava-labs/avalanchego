@@ -95,9 +95,14 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 	target, cfg := hooks.GasConfigAfter(b.Header())
 
 	// The base fee must be capped at [math.MaxUint64] to avoid overflow in the gastime.
-	baseFee := uint64(math.MaxUint64)
-	if bf := ethB.BaseFee(); bf.IsUint64() {
+	var baseFee uint64
+	switch bf := ethB.BaseFee(); {
+	case bf == nil:
+		baseFee = 0
+	case bf.IsUint64():
 		baseFee = bf.Uint64()
+	default:
+		baseFee = math.MaxUint64
 	}
 
 	execTime, err := gastime.New(
