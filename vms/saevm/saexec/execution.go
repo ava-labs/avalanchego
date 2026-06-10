@@ -44,10 +44,9 @@ type queuedBlock struct {
 func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	e.createReceiptBuffers(block)
 
-	enqueuedAt := time.Now()
 	select {
-	case e.queue <- queuedBlock{block: block, enqueuedAt: enqueuedAt}:
-		e.metrics.addUnexecutedTxs(len(block.Transactions()))
+	case e.queue <- queuedBlock{block: block, enqueuedAt: time.Now()}:
+		e.metrics.markEnqueued(block.EthBlock().GasLimit())
 		if n := len(e.queue); n == cap(e.queue) {
 			// If this happens then increase the channel's buffer size.
 			e.log.Warn(
@@ -122,12 +121,15 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 
 	start := time.Now()
 	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
-	e.metrics.observeExecuteDuration(time.Since(start))
 	if err != nil {
 		return err
 	}
 
-	return e.afterExecution(b, result)
+	// Time the full per-block cost: execution plus post-execution work (state
+	// commit, merkle hashing, and buffered-channel event sends).
+	err = e.afterExecution(b, result)
+	e.metrics.observeExecuteDuration(time.Since(start))
+	return err
 }
 
 type (
@@ -140,12 +142,13 @@ type (
 
 	// ExecutionResults holds the outputs of [Execute].
 	ExecutionResults struct {
-		BaseFee  *uint256.Int
-		StateDB  *state.StateDB
-		Signer   types.Signer
-		BlockCtx vm.BlockContext
-		Receipts types.Receipts
-		FinishBy struct {
+		BaseFee     *uint256.Int
+		StateDB     *state.StateDB
+		Signer      types.Signer
+		BlockCtx    vm.BlockContext
+		Receipts    types.Receipts
+		GasConsumed gas.Gas
+		FinishBy    struct {
 			Gas  *gastime.Time
 			Wall time.Time
 		}
@@ -281,11 +284,12 @@ func Execute(
 	)
 
 	r := &ExecutionResults{
-		BaseFee:  baseFee,
-		StateDB:  stateDB,
-		Signer:   signer,
-		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
-		Receipts: receipts,
+		BaseFee:     baseFee,
+		StateDB:     stateDB,
+		Signer:      signer,
+		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
+		Receipts:    receipts,
+		GasConsumed: blockGasConsumed,
 	}
 	r.FinishBy.Gas = gasClock
 	r.FinishBy.Wall = endTime
@@ -316,6 +320,7 @@ func (e *Executor) afterExecution(b *blocks.Block, r *ExecutionResults) error {
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
+	e.metrics.markExecuted(uint64(r.GasConsumed), b.EthBlock().GasLimit())
 	e.sendPostExecutionEvents(b.EthBlock(), r.Receipts) // (3)
 	return nil
 }

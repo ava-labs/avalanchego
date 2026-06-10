@@ -20,7 +20,17 @@ type metrics struct {
 	lastExecutedHeight   prometheus.Gauge
 	queueWaitDuration    prometheus.Histogram
 	executeBlockDuration prometheus.Histogram
-	unexecutedTxs        prometheus.Gauge
+
+	// executionQueueBlocks and executionQueueGasLimit track outstanding work:
+	// blocks accepted but not yet executed (including the one being executed),
+	// and the sum of their gas limits.
+	executionQueueBlocks   prometheus.Gauge
+	executionQueueGasLimit prometheus.Gauge
+
+	// executedGas is the actual gas consumed by executed blocks;
+	// executedGasLimit is the gas limit (worst-case gas) of those same blocks.
+	executedGas      prometheus.Counter
+	executedGasLimit prometheus.Counter
 }
 
 func newMetrics(reg prometheus.Registerer) (*metrics, error) {
@@ -36,23 +46,38 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 		}),
 		executeBlockDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Name:    "execute_block_duration_seconds",
-			Help:    "Wall-clock time to execute a single block, excluding state commit.",
+			Help:    "Wall-clock time to execute a single block, including state commit and post-execution work.",
 			Buckets: executeBlockBuckets,
 		}),
-		unexecutedTxs: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "unexecuted_txs",
-			Help: "Number of transactions in accepted blocks that have not yet completed execution.",
+		executionQueueBlocks: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "execution_queue_blocks",
+			Help: "Number of accepted blocks that have not yet completed execution.",
+		}),
+		executionQueueGasLimit: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "execution_queue_gas_limit",
+			Help: "Sum of the gas limits of accepted blocks that have not yet completed execution.",
+		}),
+		executedGas: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "executed_gas_total",
+			Help: "Cumulative gas actually consumed by executed blocks.",
+		}),
+		executedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "executed_gas_limit_total",
+			Help: "Cumulative gas limit (worst-case gas) of executed blocks.",
 		}),
 	}
 	return m, errors.Join(
 		reg.Register(m.lastExecutedHeight),
 		reg.Register(m.queueWaitDuration),
 		reg.Register(m.executeBlockDuration),
-		reg.Register(m.unexecutedTxs),
+		reg.Register(m.executionQueueBlocks),
+		reg.Register(m.executionQueueGasLimit),
+		reg.Register(m.executedGas),
+		reg.Register(m.executedGasLimit),
 	)
 }
 
-func (m *metrics) markExecuted(height uint64) {
+func (m *metrics) setLastExecutedHeight(height uint64) {
 	m.lastExecutedHeight.Set(float64(height))
 }
 
@@ -64,13 +89,19 @@ func (m *metrics) observeExecuteDuration(d time.Duration) {
 	m.executeBlockDuration.Observe(d.Seconds())
 }
 
-// addUnexecutedTxs records that n more transactions have been accepted but not
-// yet executed.
-func (m *metrics) addUnexecutedTxs(n int) {
-	m.unexecutedTxs.Add(float64(n))
+// markEnqueued records that a block with the given gas limit has been accepted
+// into the execution queue.
+func (m *metrics) markEnqueued(gasLimit uint64) {
+	m.executionQueueBlocks.Inc()
+	m.executionQueueGasLimit.Add(float64(gasLimit))
 }
 
-// subUnexecutedTxs records that n transactions have finished executing.
-func (m *metrics) subUnexecutedTxs(n int) {
-	m.unexecutedTxs.Sub(float64(n))
+// markExecuted records that a block with the given gas limit has finished
+// executing, having consumed gasConsumed gas. It removes the block from the
+// queue gauges and adds to the cumulative executed totals.
+func (m *metrics) markExecuted(gasConsumed, gasLimit uint64) {
+	m.executionQueueBlocks.Dec()
+	m.executionQueueGasLimit.Sub(float64(gasLimit))
+	m.executedGas.Add(float64(gasConsumed))
+	m.executedGasLimit.Add(float64(gasLimit))
 }

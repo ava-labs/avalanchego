@@ -10,8 +10,7 @@ import (
 )
 
 func (e *Executor) sendPostExecutionEvents(b *types.Block, receipts types.Receipts) {
-	e.metrics.markExecuted(b.NumberU64())
-	e.metrics.subUnexecutedTxs(len(b.Transactions()))
+	e.metrics.setLastExecutedHeight(b.NumberU64())
 	e.headEvents.Send(core.ChainHeadEvent{Block: b})
 
 	var n int

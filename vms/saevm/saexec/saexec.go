@@ -103,7 +103,7 @@ func New(
 		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)
-	e.metrics.markExecuted(lastExecuted.Height())
+	e.metrics.setLastExecutedHeight(lastExecuted.Height())
 
 	go e.processQueue()
 	return e, nil
