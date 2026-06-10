@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
+var _ Backend = (*backend)(nil)
+
 type backend set.Set[ids.ID]
 
 func (b backend) IsAccepted(_ context.Context, id ids.ID) error {
