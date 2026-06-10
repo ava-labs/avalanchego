@@ -103,6 +103,7 @@ go_test(
         "//version",
         "//vms/components/avax",
         "//vms/saevm/blocks",
+        "//vms/saevm/cchain/cchaintest",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/cmputils",

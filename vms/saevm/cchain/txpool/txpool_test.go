@@ -26,7 +26,6 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -35,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -168,50 +168,11 @@ func (s *SUT) markAsExecuted(tb testing.TB, block *types.Block, state libevm.Sta
 	// Sending a second event guarantees that this function returns after the
 	// pool's goroutine has processed the first event. We pass an empty block to
 	// avoid removing more conflicts after this function returns.
-	s.backend.markAsExecuted(newBlock(tb), state)
+	s.backend.markAsExecuted(cchaintest.NewTestBlock(tb), state)
 }
 
-// A blockOption configures the default block properties created by [newBlock].
-type blockOption = options.Option[blockProperties]
-
-type blockProperties struct {
-	ethTxs  []*types.Transaction
-	avaxTxs []*tx.Tx
-}
-
-func withEthTxs(txs ...*types.Transaction) blockOption {
-	return options.Func[blockProperties](func(p *blockProperties) {
-		p.ethTxs = txs
-	})
-}
-
-func withAvaxTxs(txs ...*tx.Tx) blockOption {
-	return options.Func[blockProperties](func(p *blockProperties) {
-		p.avaxTxs = txs
-	})
-}
-
-// blockHeight is the block number used by [newBlock].
+// blockHeight is the block number used when constructing the EIP-155 signer.
 var blockHeight = big.NewInt(1)
-
-func newBlock(tb testing.TB, opts ...blockOption) *types.Block {
-	tb.Helper()
-
-	props := options.ApplyTo(&blockProperties{}, opts...)
-	b, err := tx.MarshalSlice(props.avaxTxs)
-	require.NoErrorf(tb, err, "tx.MarshalSlice(%d)", len(props.avaxTxs))
-	return customtypes.NewBlockWithExtData(
-		&types.Header{
-			Number: blockHeight,
-		},
-		props.ethTxs,
-		nil, // uncles
-		nil, // receipts
-		saetest.TrieHasher(),
-		b,
-		true,
-	)
-}
 
 // An exportOption configures the default export properties created by
 // [newExport].
@@ -505,20 +466,20 @@ func TestUpdateEvictsConflicts(t *testing.T) {
 	}{
 		{
 			name: "no_conflicts_leave_pool_unchanged",
-			block: newBlock(
+			block: cchaintest.NewTestBlock(
 				t,
-				withEthTxs(newEth(t, newKey(t))),
-				withAvaxTxs(newExport(t, []*secp256k1.PrivateKey{newKey(t)})),
+				cchaintest.WithEthTxs(newEth(t, newKey(t))),
+				cchaintest.WithCrossChainTxs(newExport(t, []*secp256k1.PrivateKey{newKey(t)})),
 			),
 			wantPool: []*tx.Tx{initTx},
 		},
 		{
 			name:  "eth_tx_conflict_evicts_tx",
-			block: newBlock(t, withEthTxs(newEth(t, sk))),
+			block: cchaintest.NewTestBlock(t, cchaintest.WithEthTxs(newEth(t, sk))),
 		},
 		{
 			name:  "avax_tx_conflict_evicts_tx",
-			block: newBlock(t, withAvaxTxs(newExport(t, []*secp256k1.PrivateKey{sk}))),
+			block: cchaintest.NewTestBlock(t, cchaintest.WithCrossChainTxs(newExport(t, []*secp256k1.PrivateKey{sk}))),
 		},
 	}
 	for _, tt := range tests {
@@ -545,7 +506,7 @@ func TestStateUpdate(t *testing.T) {
 	sut.assertEquals(ctx, t)
 
 	hasBalance := newState(t, sk)
-	sut.markAsExecuted(t, newBlock(t), hasBalance)
+	sut.markAsExecuted(t, cchaintest.NewTestBlock(t), hasBalance)
 	require.NoErrorf(t, sut.Add(tx), "%T.Add()", sut)
 	sut.assertEquals(ctx, t, tx)
 }

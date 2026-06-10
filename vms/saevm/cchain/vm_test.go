@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -702,32 +703,6 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	sut.assertUTXOsMissing(t, destinationChain, sut.ctx.ChainID, exportedUTXOs...)
 }
 
-// newTamperedBlock returns a block that encodes txs but whose header commits an
-// ExtDataHash that does not match its extData, simulating tampering.
-func newTamperedBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *types.Block {
-	tb.Helper()
-
-	extData, err := tx.MarshalSlice(txs)
-	require.NoErrorf(tb, err, "tx.MarshalSlice(%d txs)", len(txs))
-
-	header := customtypes.WithHeaderExtra(
-		&types.Header{
-			ParentHash: parent,
-			Number:     new(big.Int).SetUint64(number),
-		},
-		&customtypes.HeaderExtra{ExtDataHash: common.Hash(ids.GenerateTestID())},
-	)
-	return customtypes.NewBlockWithExtData(
-		header,
-		nil, // txs
-		nil, // uncles
-		nil, // receipts
-		saetest.TrieHasher(),
-		extData,
-		false, // keep the mismatching ExtDataHash; do not recompute
-	)
-}
-
 // TestParseBlock verifies that the cchain ParseBlock override accepts
 // well-formed blocks and rejects blocks whose extData does not match the
 // ExtDataHash committed in the header.
@@ -745,17 +720,17 @@ func TestParseBlock(t *testing.T) {
 	}{
 		{
 			name:    "valid",
-			block:   newBlock(t, 1, common.Hash{}, tx1),
+			block:   cchaintest.NewBlock(t, 1, common.Hash{}, tx1),
 			wantTxs: []ids.ID{tx1.ID()},
 		},
 		{
 			name:    "valid_empty",
-			block:   newBlock(t, 1, common.Hash{}),
+			block:   cchaintest.NewBlock(t, 1, common.Hash{}),
 			wantTxs: []ids.ID{},
 		},
 		{
 			name:    "extdata_hash_mismatch",
-			block:   newTamperedBlock(t, 1, common.Hash{}, tx1),
+			block:   cchaintest.NewTamperedBlock(t, 1, common.Hash{}, tx1),
 			wantErr: errExtDataHashMismatch,
 		},
 	}
