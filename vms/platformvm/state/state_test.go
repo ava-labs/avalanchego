@@ -4335,10 +4335,10 @@ func TestLoadCurrentValidatorsWeight(t *testing.T) {
 
 	// Create and add a normal (permissionless) validator
 	normalStaker, normalTx := createStakerAndTx(t, subnetID, normalNodeID, startTime, endTime, normalWeight, potentialReward)
-	state.AddTx(normalTx, status.Committed)
 
 	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
+	d.AddTx(normalTx, status.Committed)
 	require.NoError(d.PutCurrentValidator(normalStaker))
 	require.NoError(d.Apply(state))
 
@@ -4346,7 +4346,6 @@ func TestLoadCurrentValidatorsWeight(t *testing.T) {
 	autoRenewedUnsigned := createAutoRenewedValidatorTx(t, autoRenewedNodeID, autoRenewedWeight, period, autoCompoundRewardShares)
 	autoRenewedTx := &txs.Tx{Unsigned: autoRenewedUnsigned}
 	require.NoError(autoRenewedTx.Initialize(txs.Codec))
-	state.AddTx(autoRenewedTx, status.Committed)
 
 	newPeriod := period * 2
 	newAutoCompoundRewardShares := autoCompoundRewardShares * 2
@@ -4363,6 +4362,7 @@ func TestLoadCurrentValidatorsWeight(t *testing.T) {
 
 	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
+	d.AddTx(autoRenewedTx, status.Committed)
 	require.NoError(d.PutCurrentValidator(autoRenewedStaker))
 	require.NoError(d.Apply(state))
 
@@ -4430,7 +4430,6 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 	autoRenewedUnsigned := createAutoRenewedValidatorTx(t, nodeID, weight, period, autoCompoundRewardShares)
 	autoRenewedTx := &txs.Tx{Unsigned: autoRenewedUnsigned}
 	require.NoError(autoRenewedTx.Initialize(txs.Codec))
-	state.AddTx(autoRenewedTx, status.Committed)
 
 	autoRenewedStaker, err := NewStaker(
 		autoRenewedTx.ID(),
@@ -4444,6 +4443,7 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 
 	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
+	d.AddTx(autoRenewedTx, status.Committed)
 	require.NoError(d.PutCurrentValidator(autoRenewedStaker))
 	require.NoError(d.Apply(state))
 	require.NoError(state.Commit())
@@ -4468,16 +4468,16 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(d.PutCurrentValidator(renewedStaker))
-	require.NoError(d.Apply(state))
 
 	// Update staking info with accrued rewards
-	require.NoError(state.SetStakingInfo(subnetID, nodeID, StakingInfo{
+	require.NoError(d.SetStakingInfo(subnetID, nodeID, StakingInfo{
 		AccruedValidationRewards: accruedRewards,
 		AccruedDelegateeRewards:  accruedDelRewards,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		NextPeriod:               period,
 	}))
 
+	require.NoError(d.Apply(state))
 	require.NoError(state.Commit())
 
 	// Reload state from the same database

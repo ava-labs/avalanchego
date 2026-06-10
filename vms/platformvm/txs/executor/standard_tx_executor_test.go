@@ -4493,55 +4493,55 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 	)
 
 	tests := []struct {
-		name  string
-		want  error
-		setup func(*txs.AddAutoRenewedValidatorTx, *state.Diff)
+		name   string
+		want   error
+		update func(*txs.AddAutoRenewedValidatorTx, *state.Diff)
 	}{
 		{
 			name: "invalid_upgrade",
-			setup: func(_ *txs.AddAutoRenewedValidatorTx, diff *state.Diff) {
+			update: func(_ *txs.AddAutoRenewedValidatorTx, diff *state.Diff) {
 				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
 			},
 			want: errHeliconUpgradeNotActive,
 		},
 		{
 			name: "weight_too_small",
-			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
+			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MinValidatorStake - 1
 			},
 			want: ErrWeightTooSmall,
 		},
 		{
 			name: "weight_too_large",
-			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
+			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MaxValidatorStake + 1
 			},
 			want: ErrWeightTooLarge,
 		},
 		{
 			name: "insufficient_delegation_fee",
-			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
+			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.DelegationShares = env.config.MinDelegationFee - 1
 			},
 			want: ErrInsufficientDelegationFee,
 		},
 		{
 			name: "stake_too_short",
-			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
+			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.Period = uint64(env.config.MinStakeDuration.Seconds()) - 1
 			},
 			want: ErrStakeTooShort,
 		},
 		{
 			name: "stake_too_long",
-			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
+			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.Period = uint64(env.config.MaxStakeDuration.Seconds()) + 1
 			},
 			want: ErrStakeTooLong,
 		},
 		{
 			name: "duplicate_validator",
-			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
+			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.ValidatorNodeID = genesistest.DefaultNodeIDs[0].Bytes()
 			},
 			want: ErrDuplicateValidator,
@@ -4572,8 +4572,8 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 			diff, got := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 			require.NoError(t, got)
 
-			if tt.setup != nil {
-				tt.setup(tx.Unsigned.(*txs.AddAutoRenewedValidatorTx), diff)
+			if tt.update != nil {
+				tt.update(tx.Unsigned.(*txs.AddAutoRenewedValidatorTx), diff)
 			}
 
 			_, _, _, got = StandardTx(
@@ -4634,7 +4634,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 				2*env.config.MinStakeDuration,
 			)
 			require.NoError(t, err)
-			env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
 
 			validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
 
@@ -4650,8 +4649,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			require.NoError(t, env.state.PutCurrentValidator(vdrStaker))
-
 			initialStakingInfo := state.StakingInfo{
 				DelegateeReward:          1,
 				AccruedValidationRewards: 2,
@@ -4659,7 +4656,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 				AutoCompoundRewardShares: 100_000,
 				NextPeriod:               validatorTx.Period,
 			}
-			require.NoError(t, env.state.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
 
 			fundingKey := genesistest.DefaultFundedKeys[0]
 			fundingAddr := fundingKey.Address()
@@ -4706,6 +4702,9 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 			require.NoError(t, err)
+			diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
+			require.NoError(t, diff.PutCurrentValidator(vdrStaker))
+			require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
 
 			_, _, _, err = StandardTx(
 				&env.backend,
@@ -4778,7 +4777,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
-	env.state.AddTx(addPastContValidatorTx, status.Committed)
 
 	addAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
 		nodeID,
@@ -4792,7 +4790,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		2*env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
-	env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
 
 	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
 
@@ -4808,7 +4805,12 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, env.state.PutCurrentValidator(staker))
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+	diff.AddTx(addPastContValidatorTx, status.Committed)
+	diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
+	require.NoError(t, diff.PutCurrentValidator(staker))
+	require.NoError(t, diff.Apply(env.state))
 
 	tests := []struct {
 		name        string
