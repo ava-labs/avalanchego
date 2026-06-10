@@ -41,7 +41,7 @@ func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 	}
 }
 
-// Add adds the given messages to storage.
+// Add writes the given messages to storage.
 func (b *Storage) Add(ms ...*warp.UnsignedMessage) error {
 	batch := b.db.NewBatch()
 	for i, m := range ms {
