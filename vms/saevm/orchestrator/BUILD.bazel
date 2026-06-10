@@ -13,9 +13,11 @@ go_library(
         "//snow",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
+        "//utils",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
         "//vms/saevm/network",
+        "@com_github_ava_labs_libevm//core/types",
     ],
 )
 
@@ -23,5 +25,18 @@ go_test(
     name = "orchestrator_test",
     srcs = ["orchestrator_test.go"],
     embed = [":orchestrator"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/enginetest",
+        "//snow/engine/snowman/block",
+        "//snow/snowtest",
+        "//vms/saevm/adaptor",
+        "//vms/saevm/blocks",
+        "//vms/saevm/network",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+    ],
 )
