@@ -120,16 +120,12 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	}
 
 	start := time.Now()
+	defer e.metrics.observeExecuteDuration(time.Since(start))
 	result, err := Execute(b, e, math.MaxInt, e.hooks, e.chainConfig, e.chainContext, e.receipts, log)
 	if err != nil {
 		return err
 	}
-
-	// Time the full per-block cost: execution plus post-execution work (state
-	// commit, merkle hashing, and buffered-channel event sends).
-	err = e.afterExecution(b, result)
-	e.metrics.observeExecuteDuration(time.Since(start))
-	return err
+	return e.afterExecution(b, result)
 }
 
 type (
