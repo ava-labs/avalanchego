@@ -4498,49 +4498,49 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 		setup func(*txs.AddAutoRenewedValidatorTx, *state.Diff)
 	}{
 		{
-			name: "invalid upgrade",
+			name: "invalid_upgrade",
 			setup: func(_ *txs.AddAutoRenewedValidatorTx, diff *state.Diff) {
 				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
 			},
 			want: errHeliconUpgradeNotActive,
 		},
 		{
-			name: "weight too small",
+			name: "weight_too_small",
 			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MinValidatorStake - 1
 			},
 			want: ErrWeightTooSmall,
 		},
 		{
-			name: "weight too large",
+			name: "weight_too_large",
 			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MaxValidatorStake + 1
 			},
 			want: ErrWeightTooLarge,
 		},
 		{
-			name: "insufficient delegation fee",
+			name: "insufficient_delegation_fee",
 			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.DelegationShares = env.config.MinDelegationFee - 1
 			},
 			want: ErrInsufficientDelegationFee,
 		},
 		{
-			name: "stake too short",
+			name: "stake_too_short",
 			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.Period = uint64(env.config.MinStakeDuration.Seconds()) - 1
 			},
 			want: ErrStakeTooShort,
 		},
 		{
-			name: "stake too long",
+			name: "stake_too_long",
 			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.Period = uint64(env.config.MaxStakeDuration.Seconds()) + 1
 			},
 			want: ErrStakeTooLong,
 		},
 		{
-			name: "duplicate validator",
+			name: "duplicate_validator",
 			setup: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.ValidatorNodeID = genesistest.DefaultNodeIDs[0].Bytes()
 			},
@@ -4595,12 +4595,12 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 		newAutoCompoundRewardShares uint32
 	}{
 		{
-			name:                        "updated period and auto-compound reward shares",
+			name:                        "updated_period_and_auto-compound_reward_shares",
 			newAutoCompoundRewardShares: uint32(300_000),
 			newPeriod:                   30 * 24 * time.Hour,
 		},
 		{
-			name:                        "period 0 (exit requested)",
+			name:                        "period_0_(exit_requested)",
 			newAutoCompoundRewardShares: uint32(300_000),
 			newPeriod:                   0,
 		},
@@ -4817,14 +4817,14 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		wantErr     error
 	}{
 		{
-			name: "invalid upgrade",
+			name: "invalid_upgrade",
 			updateState: func(_ testing.TB, diff *state.Diff) {
 				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
 			},
 			wantErr: errHeliconUpgradeNotActive,
 		},
 		{
-			name: "stopped validator",
+			name: "stopped_validator",
 			updateState: func(t testing.TB, diff *state.Diff) {
 				require.NoError(t, diff.DeleteCurrentValidator(&state.Staker{
 					TxID:     addAutoRenewedValidatorTx.ID(),
@@ -4835,42 +4835,42 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 			wantErr: errMissingValidator,
 		},
 		{
-			name: "missing staker tx",
+			name: "missing_staker_tx",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.TxID = ids.GenerateTestID()
 			},
 			wantErr: errMissingStakerTx,
 		},
 		{
-			name: "invalid staker tx",
+			name: "invalid_staker_tx",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.TxID = addPastContValidatorTx.ID()
 			},
 			wantErr: errInvalidStakerTx,
 		},
 		{
-			name: "invalid staker tx type",
+			name: "invalid_staker_tx_type",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.TxID = fixedStakerTxID
 			},
 			wantErr: errInvalidStakerTxType,
 		},
 		{
-			name: "stake too short",
+			name: "stake_too_short",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.Period = uint64(env.config.MinStakeDuration.Seconds()) - 1
 			},
 			wantErr: ErrStakeTooShort,
 		},
 		{
-			name: "stake too long",
+			name: "stake_too_long",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.Period = uint64(env.config.MaxStakeDuration.Seconds()) + 1
 			},
 			wantErr: ErrStakeTooLong,
 		},
 		{
-			name: "invalid auth",
+			name: "invalid_auth",
 			updateTx: func(t testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, sTx *txs.Tx) {
 				dummySig, err := genesistest.DefaultFundedKeys[1].SignHash([]byte{})
 				require.NoError(t, err)
@@ -4881,6 +4881,13 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 				}}
 			},
 			wantErr: secp256k1fx.ErrWrongSig,
+		},
+		{
+			name: "wrong_number_of_credentials",
+			updateTx: func(_ testing.TB, _ *txs.SetAutoRenewedValidatorConfigTx, sTx *txs.Tx) {
+				sTx.Creds = nil
+			},
+			wantErr: errWrongNumberOfCredentials,
 		},
 	}
 

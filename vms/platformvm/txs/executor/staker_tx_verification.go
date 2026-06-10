@@ -927,14 +927,14 @@ func verifyAddAutoRenewedValidatorTx(
 	}
 
 	_, err = GetValidator(chainState, constants.PrimaryNetworkID, tx.NodeID())
-	switch {
-	case err == nil:
+	switch err {
+	case nil:
 		return fmt.Errorf(
 			"%w: %s",
 			ErrDuplicateValidator,
 			tx.NodeID(),
 		)
-	case errors.Is(err, database.ErrNotFound):
+	case database.ErrNotFound:
 		// OK: validator not found
 
 	default:
@@ -980,7 +980,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
+		if err == database.ErrNotFound {
 			return nil, errMissingStakerTx
 		}
 
@@ -994,7 +994,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
+		if err == database.ErrNotFound {
 			return nil, errMissingValidator
 		}
 

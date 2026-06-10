@@ -95,7 +95,7 @@ func (s *Staker) Less(than *Staker) bool {
 }
 
 // NewCurrentStaker returns a current Staker built from a [txs.BoundedStaker]
-// transaction, deriving its EndTime and Weight from [staker].
+// transaction, deriving its EndTime and Weight.
 func NewCurrentStaker(
 	txID ids.ID,
 	staker txs.BoundedStaker,
