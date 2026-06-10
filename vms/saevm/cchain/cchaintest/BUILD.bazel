@@ -2,6 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "cchaintest",
+    testonly = True,
     srcs = ["blocks.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest",
     visibility = ["//visibility:public"],
