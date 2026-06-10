@@ -48,6 +48,8 @@ const (
 
 // Verify verifies that this node should sign m.
 func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte) *common.AppError {
+	// If the message was sent by the precompile, it will be available in
+	// storage.
 	_, err := v.storage.Get(m.ID())
 	if err == nil { // if NO error
 		return nil
@@ -59,6 +61,8 @@ func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte
 		}
 	}
 
+	// Block acceptance doesn't go through the precompile, so we need to check
+	// whether the message is for an accepted block.
 	p, err := payload.ParseHash(m.Payload)
 	if err != nil {
 		return &common.AppError{
