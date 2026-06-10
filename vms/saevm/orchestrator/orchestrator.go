@@ -52,6 +52,48 @@ type ChainVM interface {
 	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
 }
 
+type StateSyncConfig struct {
+	Enabled     *bool
+	NodeIDs     []ids.NodeID
+	StateScheme string
+}
+
+// SummaryHandler TODO integrate with Orchestrator.
+type SummaryHandler[SP adaptor.SummaryProperties] interface {
+	// Initialize provides the summary handler will all details necessary to
+	// state sync at [common.VM.Initialize] time.
+	Initialize(
+		ctx context.Context,
+		snowCtx *snow.Context,
+		cfg StateSyncConfig,
+		db database.Database,
+	) error
+
+	// GetBlock is the same as [ChainVM.GetBlock], but the block will only be
+	// used for its [adaptor.BlockProperties].
+	// Returns [database.ErrNotFound] if the block is not found.
+	GetBlock(context.Context, ids.ID) (*blocks.Block, error)
+	// LastAccepted returns the ID of the last accepted block on any previous
+	// run.
+	// TODO(alarso16): How do I return the genesis ID as defined in [common.VM.LastAccepted]?
+	LastAccepted(context.Context) (ids.ID, error)
+	// GetBlockIDAtHeight [database.ErrNotFound] if a block at [height] is not found.
+	GetBlockIDAtHeight(context.Context, uint64) (ids.ID, error)
+	// WaitForEvent will only be called if [SummaryHandler.AcceptSummary] returns
+	// [block.StateSyncStatic]. This function should block until the state sync is complete.
+	WaitForEvent(context.Context) (common.Message, error)
+	// Shutdown cancels any pending state sync operations and returns once they are complete.
+	Shutdown(context.Context) error
+
+	// StateSyncEnabled returns true if the summary handler expects
+	StateSyncEnabled(context.Context) (bool, error)
+	GetLastStateSummary(context.Context) (SP, error)
+	GetOngoingSyncStateSummary(context.Context) (SP, error)
+	GetStateSummary(context.Context, uint64) (SP, error)
+	ParseStateSummary(context.Context, []byte) (SP, error)
+	AcceptSummary(context.Context, SP) (block.StateSyncMode, error)
+}
+
 type orchestrator struct {
 	*network.Network
 	ChainVM

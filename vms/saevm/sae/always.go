@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
+	"github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 var _ orchestrator.ChainVM = (*SinceGenesis[hook.Transaction])(nil)
@@ -48,7 +49,7 @@ func (vm *SinceGenesis[_]) Initialize(
 	configBytes []byte,
 	network *network.Network,
 ) error {
-	db := newEthDB(avaDB)
+	db := types.NewEthDB(avaDB)
 	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
 
 	genesis := new(core.Genesis)

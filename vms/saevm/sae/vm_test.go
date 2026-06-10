@@ -209,7 +209,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		db:     newEthDB(conf.db),
+		db:     saetypes.NewEthDB(conf.db),
 		hooks:  conf.hooks,
 		logger: logger,
 
