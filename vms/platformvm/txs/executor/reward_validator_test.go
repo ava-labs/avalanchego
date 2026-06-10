@@ -892,7 +892,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardValidatorStakerType(t *testing.T) {
 	var (
-		env           = newEnvironment(t, upgradetest.Fortuna)
+		env           = newEnvironment(t, upgradetest.Latest)
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 		wallet        = newWallet(t, env, walletConfig{})
 	)
@@ -909,7 +909,6 @@ func TestRewardValidatorStakerType(t *testing.T) {
 		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
-	env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
 
 	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
 
@@ -925,14 +924,16 @@ func TestRewardValidatorStakerType(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, env.state.PutCurrentValidator(vdrStaker))
-	require.NoError(t, env.state.Commit())
-
-	require.NoError(t, env.state.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+	diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
+	require.NoError(t, diff.PutCurrentValidator(vdrStaker))
+	require.NoError(t, diff.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
 		NextPeriod: validatorTx.Period,
 	}))
-
-	env.state.SetTimestamp(vdrStaker.EndTime)
+	diff.SetTimestamp(vdrStaker.EndTime)
+	require.NoError(t, diff.Apply(env.state))
+	require.NoError(t, env.state.Commit())
 
 	err = ProposalTx(
 		&env.backend,
