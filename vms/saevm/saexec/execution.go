@@ -31,8 +31,8 @@ import (
 var errExecutorClosed = errors.New("saexec.Executor closed")
 
 // queuedBlock pairs a queued block with the time it was enqueued so that
-// [Executor.processQueue] can record how long it waited before execution
-// started.
+// [Executor.processQueue] can record how long it spent in the queue, from
+// acceptance until its execution completed.
 type queuedBlock struct {
 	block      *blocks.Block
 	enqueuedAt time.Time
@@ -79,7 +79,6 @@ func (e *Executor) processQueue() {
 
 		case qb := <-e.queue:
 			block := qb.block
-			e.metrics.observeQueueWait(time.Since(qb.enqueuedAt))
 			log := e.log.With(
 				zap.Uint64("block_height", block.Height()),
 				zap.Uint64("block_time", block.BuildTime()),
@@ -105,6 +104,7 @@ func (e *Executor) processQueue() {
 			if err != nil {
 				return
 			}
+			e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))
 		}
 	}
 }
