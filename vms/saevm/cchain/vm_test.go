@@ -716,17 +716,14 @@ func TestParseBlock(t *testing.T) {
 		name    string
 		block   *types.Block
 		wantErr error
-		wantTxs []ids.ID
 	}{
 		{
-			name:    "valid",
-			block:   cchaintest.NewBlock(t, 1, common.Hash{}, tx1),
-			wantTxs: []ids.ID{tx1.ID()},
+			name:  "valid",
+			block: cchaintest.NewBlock(t, 1, common.Hash{}, tx1),
 		},
 		{
-			name:    "valid_empty",
-			block:   cchaintest.NewBlock(t, 1, common.Hash{}),
-			wantTxs: []ids.ID{},
+			name:  "valid_empty",
+			block: cchaintest.NewBlock(t, 1, common.Hash{}),
 		},
 		{
 			name:    "extdata_hash_mismatch",
@@ -745,14 +742,7 @@ func TestParseBlock(t *testing.T) {
 				return
 			}
 
-			gotTxs, err := tx.ParseSlice(customtypes.BlockExtData(got.EthBlock()))
-			require.NoError(t, err, "tx.ParseSlice(extData)")
-
-			gotIDs := make([]ids.ID, len(gotTxs))
-			for i, txn := range gotTxs {
-				gotIDs[i] = txn.ID()
-			}
-			require.Equal(t, tt.wantTxs, gotIDs, "parsed cross-chain tx IDs")
+			require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
 		})
 	}
 }
