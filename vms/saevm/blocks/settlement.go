@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/big"
 	"slices"
 	"sync/atomic"
 	"time"
@@ -97,8 +96,7 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 
 	// The base fee must be capped at [math.MaxUint64] to avoid overflow in the gastime.
 	baseFee := uint64(math.MaxUint64)
-	maxFee := new(big.Int).SetUint64(math.MaxUint64)
-	if bf := ethB.BaseFee(); maxFee.Cmp(bf) > 0 {
+	if bf := ethB.BaseFee(); bf.IsUint64() {
 		baseFee = bf.Uint64()
 	}
 
