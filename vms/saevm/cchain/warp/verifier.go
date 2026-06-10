@@ -15,22 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
-// The error codes are returned by [Verifier.Verify] to identify why a message
-// was not signed.
-const (
-	StorageErrCode = iota + 1
-	ParseErrCode
-	NotAcceptedErrCode
-)
-
 var _ acp118.Verifier = (*Verifier)(nil)
-
-// Backend that the [Verifier] depends on to look for accepted blocks.
-type Backend interface {
-	// IsAccepted returns a non-nil error if the block with the given ID is not
-	// accepted.
-	IsAccepted(ctx context.Context, blockID ids.ID) error
-}
 
 // Verifier verifies that this node should sign a warp message.
 type Verifier struct {
@@ -45,6 +30,21 @@ func NewVerifier(backend Backend, storage *Storage) *Verifier {
 		storage: storage,
 	}
 }
+
+// Backend that the [Verifier] depends on to look for accepted blocks.
+type Backend interface {
+	// IsAccepted returns a non-nil error if the block with the given ID is not
+	// accepted.
+	IsAccepted(ctx context.Context, blockID ids.ID) error
+}
+
+// The error codes are returned by [Verifier.Verify] to identify why a message
+// was not signed.
+const (
+	StorageErrCode = iota + 1
+	ParseErrCode
+	NotAcceptedErrCode
+)
 
 // Verify verifies that this node should sign m.
 func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte) *common.AppError {
