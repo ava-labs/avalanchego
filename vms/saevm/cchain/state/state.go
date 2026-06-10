@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
@@ -31,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
-	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // These prefixes and keys are byte-compatible with the indices written by
@@ -86,7 +85,7 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 		// trie, we must use [prefixdb.NewNested] rather than [prefixdb.New] and
 		// not compress the prefix.
 		trieDB: triedb.NewDatabase(
-			rawdb.NewDatabase(evmdb.New(prefixdb.NewNested(triePrefix, db))),
+			saetypes.NewEthDB(prefixdb.NewNested(triePrefix, db)),
 			&triedb.Config{
 				HashDB: &hashdb.Config{
 					// This trie is append only, so we only need to cache the
