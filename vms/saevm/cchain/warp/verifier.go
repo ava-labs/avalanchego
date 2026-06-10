@@ -50,7 +50,7 @@ func NewVerifier(backend Backend, storage *Storage) *Verifier {
 func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte) *common.AppError {
 	id := m.ID()
 	_, err := v.storage.Get(id)
-	if err == nil {
+	if err == nil { // if NO error
 		return nil
 	}
 	if !errors.Is(err, database.ErrNotFound) {
