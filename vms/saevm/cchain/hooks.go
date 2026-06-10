@@ -332,8 +332,6 @@ func (*builder) BuildBlock(
 	_ = blockCtx
 	// TODO(StephenButtolph): Encode settled in the block.
 	_ = settled
-	// The extDataHash committed to the header here is verified against the
-	// extData at the parse boundary by [VM.ParseBlock].
 	return customtypes.NewBlockWithExtData(
 		header,
 		ethTxs,

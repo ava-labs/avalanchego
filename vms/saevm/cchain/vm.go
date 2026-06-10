@@ -217,6 +217,9 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 
 	eth := b.EthBlock()
 	extData := customtypes.BlockExtData(eth)
+	// TODO: Handle pre-AP1 blocks, which incorrectly did not set ExtDataHash.
+	// This isn't needed prior to Helicon, but will be required to fully remove
+	// coreth.
 	claimed := customtypes.GetHeaderExtra(eth.Header()).ExtDataHash
 	actual := customtypes.CalcExtDataHash(extData)
 	if claimed != actual {
