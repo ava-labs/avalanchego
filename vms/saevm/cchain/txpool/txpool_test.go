@@ -171,9 +171,6 @@ func (s *SUT) markAsExecuted(tb testing.TB, block *types.Block, state libevm.Sta
 	s.backend.markAsExecuted(cchaintest.NewTestBlock(tb), state)
 }
 
-// blockHeight is the block number used when constructing the EIP-155 signer.
-var blockHeight = big.NewInt(1)
-
 // An exportOption configures the default export properties created by
 // [newExport].
 type exportOption = options.Option[exportProperties]
@@ -277,7 +274,7 @@ func newKey(tb testing.TB) *secp256k1.PrivateKey {
 func newEth(tb testing.TB, key *secp256k1.PrivateKey) *types.Transaction {
 	tb.Helper()
 
-	signer := types.MakeSigner(saetest.ChainConfig(), blockHeight, 0)
+	signer := types.MakeSigner(saetest.ChainConfig(), big.NewInt(1), 0)
 	tx, err := types.SignNewTx(key.ToECDSA(), signer, &types.LegacyTx{
 		Gas: params.TxGas,
 		To:  &common.Address{},
