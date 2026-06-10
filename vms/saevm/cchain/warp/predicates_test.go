@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -20,14 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
-
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 )
 
 // newRules returns rules with the warp precompile registered at each of the
 // given addresses.
 func newRules(contracts ...common.Address) *extras.Rules {
-	contract := corethwarp.NewDefaultConfig(utils.PointerTo[uint64](0))
+	contract := warp.NewDefaultConfig(utils.PointerTo[uint64](0))
 
 	predicaters := make(map[common.Address]precompileconfig.Predicater, len(contracts))
 	for _, addr := range contracts {
@@ -239,24 +238,21 @@ func BenchmarkBlockPredicates(b *testing.B) {
 	// number of signers is held fixed.
 	const numSigners = 10
 
-	addr := corethwarp.ContractAddress
+	rules := newRules(warp.ContractAddress)
+	vdrs := warptest.NewValidators(b, numSigners)
+	snowContext := snowtest.Context(b, snowtest.CChainID)
+	snowContext.ValidatorState = vdrs.State(ids.GenerateTestID())
+	blockContext := &block.Context{}
+
+	msg, _ := newAddressedCall(b)
+	pred := predicate.New(vdrs.Sign(b, msg).Bytes())
 	for _, numTxs := range []int{1, 10, 100} {
 		for _, predicatesPerTx := range []int{1, 10, 100} {
 			b.Run(fmt.Sprintf("txs=%d/predicates_per_tx=%d", numTxs, predicatesPerTx), func(b *testing.B) {
-				vdrs := warptest.NewValidators(b, numSigners)
-				snowContext := snowtest.Context(b, snowtest.CChainID)
-				snowContext.ValidatorState = vdrs.State(ids.GenerateTestID())
-
-				blockContext := &block.Context{}
-
-				rules := newRules(addr)
-
-				msg, _ := newAddressedCall(b)
-				pred := predicate.New(vdrs.Sign(b, msg).Bytes())
 				accessList := make(types.AccessList, predicatesPerTx)
 				for i := range accessList {
 					accessList[i] = types.AccessTuple{
-						Address:     addr,
+						Address:     warp.ContractAddress,
 						StorageKeys: pred,
 					}
 				}
@@ -276,11 +272,20 @@ func BenchmarkBlockPredicates(b *testing.B) {
 				results, err := VerifyBlock(snowContext, blockContext, rules, txs)
 				require.NoError(b, err)
 				require.Len(b, results, numTxs)
-				require.Equal(b, set.NewBits(), results[txs[0].Hash()][addr])
+
+				wantTxResults := predicate.PrecompileResults{
+					warp.ContractAddress: set.NewBits(),
+				}
+				for _, txResults := range results {
+					require.Equal(b, wantTxResults, txResults)
+				}
 
 				for b.Loop() {
 					_, _ = VerifyBlock(snowContext, blockContext, rules, txs)
 				}
+
+				predicates := numTxs * predicatesPerTx
+				b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*predicates), "ns/predicate")
 			})
 		}
 	}
