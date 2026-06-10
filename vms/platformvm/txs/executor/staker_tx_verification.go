@@ -894,47 +894,37 @@ func verifyAddAutoRenewedValidatorTx(
 		return err
 	}
 
-	if !backend.Bootstrapped.Get() {
-		// Not bootstrapped yet -- don't need to do full verification.
-		return nil
-	}
-
-	validatorRules, err := getValidatorRules(backend, chainState, tx.SubnetID())
-	if err != nil {
-		return err
-	}
-
 	switch {
-	case tx.Weight() < validatorRules.minValidatorStake:
+	case tx.Weight() < backend.Config.MinValidatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return ErrWeightTooSmall
 
-	case tx.Weight() > validatorRules.maxValidatorStake:
+	case tx.Weight() > backend.Config.MaxValidatorStake:
 		// Ensure validator isn't staking too much
 		return ErrWeightTooLarge
 
-	case tx.Shares() < validatorRules.minDelegationFee:
+	case tx.Shares() < backend.Config.MinDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
 		return ErrInsufficientDelegationFee
 
-	case tx.Period < uint64(validatorRules.minStakeDuration/time.Second):
+	case tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
 		// Ensure staking length is not too short
 		return ErrStakeTooShort
 
-	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
+	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
 		// Ensure staking length is not too long
 		return ErrStakeTooLong
 	}
 
-	_, err = GetValidator(chainState, constants.PrimaryNetworkID, tx.NodeID())
-	switch {
-	case err == nil:
+	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.NodeID())
+	switch err {
+	case nil:
 		return fmt.Errorf(
 			"%w: %s",
 			ErrDuplicateValidator,
 			tx.NodeID(),
 		)
-	case errors.Is(err, database.ErrNotFound):
+	case database.ErrNotFound:
 		// OK: validator not found
 
 	default:
@@ -943,6 +933,11 @@ func verifyAddAutoRenewedValidatorTx(
 			tx.NodeID(),
 			err,
 		)
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return nil
 	}
 
 	if err := verifySpend(
@@ -980,7 +975,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
+		if err == database.ErrNotFound {
 			return nil, errMissingStakerTx
 		}
 
@@ -994,7 +989,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
+		if err == database.ErrNotFound {
 			return nil, errMissingValidator
 		}
 
@@ -1007,16 +1002,16 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return nil, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)
 	}
 
-	if !backend.Bootstrapped.Get() {
-		// Not bootstrapped yet -- don't need to do full verification.
-		return validator, nil
-	}
-
 	switch {
 	case tx.Period > 0 && tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
 		return nil, ErrStakeTooShort
 	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
 		return nil, ErrStakeTooLong
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return validator, nil
 	}
 
 	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth)

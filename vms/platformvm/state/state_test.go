@@ -2594,29 +2594,7 @@ func TestValidatorMetadataPersistsPreHelicon(t *testing.T) {
 	require := require.New(t)
 
 	db := memdb.New()
-	upgradeConfig := upgradetest.GetConfig(upgradetest.Granite)
-
-	state, err := New(
-		db,
-		genesistest.NewBytes(t, genesistest.Config{}),
-		prometheus.NewRegistry(),
-		validators.NewManager(),
-		upgradeConfig,
-		&config.Default,
-		&snow.Context{
-			NetworkID: constants.UnitTestID,
-			NodeID:    ids.GenerateTestNodeID(),
-			Log:       logging.NoLog{},
-		},
-		metrics.Noop,
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
-	)
-	require.NoError(err)
+	state := newTestState(t, db)
 
 	var (
 		subnetID          = constants.PrimaryNetworkID
@@ -2646,33 +2624,14 @@ func TestValidatorMetadataPersistsPreHelicon(t *testing.T) {
 
 	require.NoError(state.Commit())
 
-	reloadedState, err := New(
-		db,
-		genesistest.NewBytes(t, genesistest.Config{}),
-		prometheus.NewRegistry(),
-		validators.NewManager(),
-		upgradeConfig,
-		&config.Default,
-		&snow.Context{
-			NetworkID: constants.UnitTestID,
-			NodeID:    ids.GenerateTestNodeID(),
-			Log:       logging.NoLog{},
-		},
-		metrics.Noop,
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
-	)
+	state = newTestState(t, db)
 	require.NoError(err)
 
-	gotValidator, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
+	gotValidator, err := state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 	require.True(wantValidator.Equals(gotValidator))
 
-	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, nodeID)
+	gotStakingInfo, err := state.GetStakingInfo(subnetID, nodeID)
 	require.NoError(err)
 	require.Equal(wantStakingInfo, gotStakingInfo)
 }
@@ -2682,12 +2641,6 @@ func TestResolveValidatorMetadataCodec(t *testing.T) {
 		durangoTime = time.Unix(1000, 0)
 		heliconTime = time.Unix(2000, 0)
 	)
-
-	s := newTestState(t, memdb.New())
-	s.upgrades = upgrade.Config{
-		DurangoTime: durangoTime,
-		HeliconTime: heliconTime,
-	}
 
 	tests := []struct {
 		name      string
@@ -2700,17 +2653,17 @@ func TestResolveValidatorMetadataCodec(t *testing.T) {
 			want:      CodecVersion0,
 		},
 		{
-			name:      "Durango activated",
+			name:      "Durango_activated",
 			timestamp: durangoTime,
 			want:      CodecVersion1,
 		},
 		{
-			name:      "between Durango and Helicon",
+			name:      "between_Durango_and_Helicon",
 			timestamp: heliconTime.Add(-time.Second),
 			want:      CodecVersion1,
 		},
 		{
-			name:      "Helicon activated",
+			name:      "Helicon_activated",
 			timestamp: heliconTime,
 			want:      codecVersion2,
 		},
@@ -2723,6 +2676,12 @@ func TestResolveValidatorMetadataCodec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			s := newTestState(t, memdb.New())
+			s.upgrades = upgrade.Config{
+				DurangoTime: durangoTime,
+				HeliconTime: heliconTime,
+			}
+
 			s.SetTimestamp(tt.timestamp)
 			require.Equal(t, tt.want, s.resolveValidatorMetadataCodec())
 		})
@@ -4411,32 +4370,36 @@ func TestLoadCurrentValidatorsWeight(t *testing.T) {
 	// Commit the first block to persist both validators
 	require.NoError(state.Commit())
 
+	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+
 	// Set accrued rewards on the auto-renewed validator's metadata
-	require.NoError(state.SetStakingInfo(subnetID, autoRenewedNodeID, StakingInfo{
+	require.NoError(d.SetStakingInfo(subnetID, autoRenewedNodeID, StakingInfo{
 		AccruedValidationRewards: accruedRewards,
 		AccruedDelegateeRewards:  accruedDelRewards,
 		AutoCompoundRewardShares: newAutoCompoundRewardShares,
 		NextPeriod:               newPeriod,
 	}))
+	require.NoError(d.Apply(state))
 
 	// Commit again so the updated metadata is persisted
 	require.NoError(state.Commit())
 
 	// Reload state from the same database
-	reloadedState := newTestState(t, db)
+	state = newTestState(t, db)
 
 	// Verify the normal validator kept its original weight
-	gotNormal, err := reloadedState.GetCurrentValidator(subnetID, normalNodeID)
+	gotNormal, err := state.GetCurrentValidator(subnetID, normalNodeID)
 	require.NoError(err)
 	require.Equal(normalWeight, gotNormal.Weight)
 
 	// Verify the auto-renewed validator has weight = txWeight + accruedRewards + accruedDelegateeRewards
-	gotAutoRenewed, err := reloadedState.GetCurrentValidator(subnetID, autoRenewedNodeID)
+	gotAutoRenewed, err := state.GetCurrentValidator(subnetID, autoRenewedNodeID)
 	require.NoError(err)
 	wantWeight := autoRenewedWeight + accruedRewards + accruedDelRewards
 	require.Equal(wantWeight, gotAutoRenewed.Weight)
 
-	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, autoRenewedNodeID)
+	gotStakingInfo, err := state.GetStakingInfo(subnetID, autoRenewedNodeID)
 	require.NoError(err)
 	require.Equal(newPeriod, gotStakingInfo.NextPeriod)
 	require.Equal(newAutoCompoundRewardShares, gotStakingInfo.AutoCompoundRewardShares)
