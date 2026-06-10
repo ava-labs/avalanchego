@@ -37,6 +37,7 @@ func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 	}
 }
 
+// Add adds the given messages to storage.
 func (b *Storage) Add(ms ...*warp.UnsignedMessage) error {
 	batch := b.db.NewBatch()
 	for i, m := range ms {
@@ -56,6 +57,7 @@ func (b *Storage) Add(ms ...*warp.UnsignedMessage) error {
 	return nil
 }
 
+// Get returns the message with the given ID.
 func (b *Storage) Get(id ids.ID) (*warp.UnsignedMessage, error) {
 	if m, ok := b.cache.Get(id); ok {
 		return m, nil
