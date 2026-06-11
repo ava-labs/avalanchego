@@ -60,12 +60,12 @@ func TestSendWarpMessage(t *testing.T) {
 	addressedPayload, err := payload.NewAddressedCall(sender.Bytes(), payloadData)
 	require.NoError(t, err)
 	unsignedMessage := newUnsignedWarpMessage(t, sut, addressedPayload.Bytes())
-	verifyWarpMessage(ctx, t, sut, capturer, unsignedMessage.Bytes(), int32(warp.ParseErrCode))
+	verifyWarpMessage(ctx, t, sut, capturer, unsignedMessage.Bytes(), warp.ParseErrCode)
 
 	blockHashPayload, err := payload.NewHash(built.ID())
 	require.NoError(t, err)
 	blockMessage := newUnsignedWarpMessage(t, sut, blockHashPayload.Bytes())
-	verifyWarpMessage(ctx, t, sut, capturer, blockMessage.Bytes(), int32(warp.NotAcceptedErrCode))
+	verifyWarpMessage(ctx, t, sut, capturer, blockMessage.Bytes(), warp.NotAcceptedErrCode)
 
 	sut.acceptAndExecute(ctx, t, built)
 
