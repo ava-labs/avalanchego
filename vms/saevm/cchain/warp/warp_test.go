@@ -22,37 +22,36 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 
-func newHash(tb testing.TB) (*warp.UnsignedMessage, *payload.Hash) {
+func newHash(tb testing.TB) (*avalanchewarp.UnsignedMessage, *payload.Hash) {
 	p, err := payload.NewHash(
 		ids.GenerateTestID(),
 	)
 	require.NoError(tb, err, "payload.NewHash()")
 
-	m, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
+	m, err := avalanchewarp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
 	require.NoError(tb, err, "warp.NewUnsignedMessage()")
 	return m, p
 }
 
-func newAddressedCall(tb testing.TB) (*warp.UnsignedMessage, *payload.AddressedCall) {
+func newAddressedCall(tb testing.TB) (*avalanchewarp.UnsignedMessage, *payload.AddressedCall) {
 	p, err := payload.NewAddressedCall(
 		utils.RandomBytes(20),
 		[]byte("test"),
 	)
 	require.NoError(tb, err, "payload.NewAddressedCall()")
 
-	m, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
+	m, err := avalanchewarp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
 	require.NoError(tb, err, "warp.NewUnsignedMessage()")
 	return m, p
 }

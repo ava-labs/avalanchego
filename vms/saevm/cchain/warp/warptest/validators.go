@@ -125,7 +125,7 @@ func SetValidators(tb testing.TB, ctx *snow.Context, vdrs *Validators) {
 	require.Truef(tb, ok, "unexpected type %T for validator state", ctx.ValidatorState)
 	vdrState.GetWarpValidatorSetsF = func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
 		return map[ids.ID]validators.WarpSet{
-			ctx.SubnetID: validators.WarpSet{
+			ctx.SubnetID: {
 				Validators:  vdrs.validators,
 				TotalWeight: uint64(len(vdrs.validators)),
 			},
