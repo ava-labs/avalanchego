@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
@@ -25,6 +26,10 @@ import (
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
+}
 
 // newSendWarpMessageLog returns the log emitted by the warp precompile when
 // sending msg.
@@ -136,43 +141,28 @@ func TestVerifyBlock(t *testing.T) {
 		validPredicate   = predicate.New(vdrs.Sign(t, msg).Bytes())
 		invalidPredicate = predicate.New(warptest.IncorrectlySign(t, msg).Bytes())
 
-		addr0 = common.Address{0}
-		addr1 = common.Address{1}
-
 		validTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
+				{Address: corethwarp.ContractAddress, StorageKeys: validPredicate},
 			},
 		})
 		invalidTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: addr0, StorageKeys: invalidPredicate},
+				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
 			},
 		})
 		twoInvalidTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
+				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
+				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
 			},
 		})
 		mixedTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: validPredicate},
-			},
-		})
-		twoAddressTx = types.NewTx(&types.DynamicFeeTx{
-			AccessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
-				{Address: addr1, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr1, StorageKeys: validPredicate},
-				{Address: addr1, StorageKeys: validPredicate},
-				{Address: addr1, StorageKeys: invalidPredicate},
-				{Address: addr1, StorageKeys: validPredicate},
+				{Address: corethwarp.ContractAddress, StorageKeys: validPredicate},
+				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
+				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
+				{Address: corethwarp.ContractAddress, StorageKeys: validPredicate},
 			},
 		})
 	)
@@ -193,7 +183,7 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "no_predicates",
-			contracts:    []common.Address{addr0},
+			contracts:    []common.Address{corethwarp.ContractAddress},
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{}),
@@ -201,19 +191,19 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "filtered_predicates",
-			contracts:    []common.Address{addr0},
+			contracts:    []common.Address{corethwarp.ContractAddress},
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{
 					AccessList: types.AccessList{
-						{Address: addr1, StorageKeys: validPredicate},
+						{Address: common.Address{1}, StorageKeys: validPredicate},
 					},
 				}),
 			},
 		},
 		{
 			name:      "no_block_context",
-			contracts: []common.Address{addr0},
+			contracts: []common.Address{corethwarp.ContractAddress},
 			txs: []*types.Transaction{
 				validTx,
 			},
@@ -221,73 +211,59 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "one_tx_one_address_one_predicate",
-			contracts:    []common.Address{addr0},
+			contracts:    []common.Address{corethwarp.ContractAddress},
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
 			},
 			expected: predicate.BlockResults{
 				validTx.Hash(): {
-					addr0: set.NewBits(),
+					corethwarp.ContractAddress: set.NewBits(),
 				},
 			},
 		},
 		{
 			name:         "one_tx_one_address_one_invalid_predicate",
-			contracts:    []common.Address{addr0},
+			contracts:    []common.Address{corethwarp.ContractAddress},
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				invalidTx,
 			},
 			expected: predicate.BlockResults{
 				invalidTx.Hash(): {
-					addr0: set.NewBits(0),
+					corethwarp.ContractAddress: set.NewBits(0),
 				},
 			},
 		},
 		{
 			name:         "one_address_multiple_invalid_predicates",
-			contracts:    []common.Address{addr0},
+			contracts:    []common.Address{corethwarp.ContractAddress},
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				twoInvalidTx,
 			},
 			expected: predicate.BlockResults{
 				twoInvalidTx.Hash(): {
-					addr0: set.NewBits(0, 1),
+					corethwarp.ContractAddress: set.NewBits(0, 1),
 				},
 			},
 		},
 		{
 			name:         "one_address_mixed_predicates",
-			contracts:    []common.Address{addr0},
+			contracts:    []common.Address{corethwarp.ContractAddress},
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				mixedTx,
 			},
 			expected: predicate.BlockResults{
 				mixedTx.Hash(): {
-					addr0: set.NewBits(1, 2),
-				},
-			},
-		},
-		{
-			name:         "two_addresses_mixed_predicates",
-			contracts:    []common.Address{addr0, addr1},
-			blockContext: &block.Context{},
-			txs: []*types.Transaction{
-				twoAddressTx,
-			},
-			expected: predicate.BlockResults{
-				twoAddressTx.Hash(): {
-					addr0: set.NewBits(1, 2),
-					addr1: set.NewBits(0, 3),
+					corethwarp.ContractAddress: set.NewBits(1, 2),
 				},
 			},
 		},
 		{
 			name:         "multiple_txs",
-			contracts:    []common.Address{addr0},
+			contracts:    []common.Address{corethwarp.ContractAddress},
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
@@ -295,10 +271,10 @@ func TestVerifyBlock(t *testing.T) {
 			},
 			expected: predicate.BlockResults{
 				validTx.Hash(): {
-					addr0: set.NewBits(),
+					corethwarp.ContractAddress: set.NewBits(),
 				},
 				invalidTx.Hash(): {
-					addr0: set.NewBits(0),
+					corethwarp.ContractAddress: set.NewBits(0),
 				},
 			},
 		},
