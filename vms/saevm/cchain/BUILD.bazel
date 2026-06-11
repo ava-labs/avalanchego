@@ -95,6 +95,7 @@ go_test(
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//snow/snowtest",
+        "//utils",
         "//utils/bloom",
         "//utils/crypto/secp256k1",
         "//utils/logging",
