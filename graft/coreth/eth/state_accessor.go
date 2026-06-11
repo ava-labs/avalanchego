@@ -362,7 +362,7 @@ func (eth *Ethereum) reconstructGenesis() (*ffi.Reconstructed, error) {
 
 	rev, err := fwDB.Firewood.Revision(ffi.Hash(types.EmptyRootHash))
 	if err != nil {
-		return nil, fmt.Errorf("failed to open empty revision: %w", err)
+		return nil, fmt.Errorf("opening Firewood empty revision: %w", err)
 	}
 	recon, err := rev.Reconstruct(nil)
 	if dropErr := rev.Drop(); dropErr != nil {
