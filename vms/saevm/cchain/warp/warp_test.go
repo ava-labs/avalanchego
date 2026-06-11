@@ -70,11 +70,11 @@ func newSendWarpMessageLog(tb testing.TB, msg []byte) *types.Log {
 
 func TestFromReceipts(t *testing.T) {
 	var (
-		msg0, _ = newAddressedCall(t)
-		msg1, _ = newAddressedCall(t)
+		hash, _ = newHash(t)
+		call, _ = newAddressedCall(t)
 
-		warpLog0 = newSendWarpMessageLog(t, msg0.Bytes())
-		warpLog1 = newSendWarpMessageLog(t, msg1.Bytes())
+		warpHash = newSendWarpMessageLog(t, hash.Bytes())
+		warpCall = newSendWarpMessageLog(t, call.Bytes())
 		otherLog = &types.Log{
 			Address: common.Address{1},
 			Data:    []byte("not a warp message"),
@@ -104,28 +104,27 @@ func TestFromReceipts(t *testing.T) {
 		{
 			name: "single_message",
 			logs: [][]*types.Log{
-				{warpLog0},
+				{warpHash},
 			},
-			want: []*avalanchewarp.UnsignedMessage{msg0},
+			want: []*avalanchewarp.UnsignedMessage{hash},
 		},
 		{
 			name: "multiple_messages_in_order",
 			logs: [][]*types.Log{
-				{warpLog1, otherLog, warpLog0},
-				{otherLog, warpLog1},
+				{warpCall, otherLog, warpHash},
+				{otherLog, warpCall},
 			},
-			want: []*avalanchewarp.UnsignedMessage{msg1, msg0, msg1},
+			want: []*avalanchewarp.UnsignedMessage{call, hash, call},
 		},
 		{
 			name: "invalid_log_data",
 			logs: [][]*types.Log{
 				{
-					// 0xFFFF is not a registered codec version, so the event
-					// data unpacks but the message fails to parse.
-					newSendWarpMessageLog(t, []byte{0xFF, 0xFF}),
+					// nil is not a valid warp message format.
+					newSendWarpMessageLog(t, nil),
 				},
 			},
-			wantErr: codec.ErrUnknownVersion,
+			wantErr: codec.ErrCantUnpackVersion,
 		},
 	}
 	for _, test := range tests {
