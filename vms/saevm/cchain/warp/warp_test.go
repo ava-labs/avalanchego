@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -21,12 +21,102 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
+
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
+
+// newSendWarpMessageLog returns the log emitted by the warp precompile when
+// sending msg.
+func newSendWarpMessageLog(tb testing.TB, msg []byte) *types.Log {
+	topics, data, err := corethwarp.PackSendWarpMessageEvent(common.Address{}, common.Hash{}, msg)
+	require.NoErrorf(tb, err, "warp.PackSendWarpMessageEvent(..., %d bytes)", len(msg))
+	return &types.Log{
+		Address: corethwarp.ContractAddress,
+		Topics:  topics,
+		Data:    data,
+	}
+}
+
+func TestFromReceipts(t *testing.T) {
+	var (
+		msg0, _ = newAddressedCall(t)
+		msg1, _ = newAddressedCall(t)
+
+		warpLog0 = newSendWarpMessageLog(t, msg0.Bytes())
+		warpLog1 = newSendWarpMessageLog(t, msg1.Bytes())
+		otherLog = &types.Log{
+			Address: common.Address{1},
+			Data:    []byte("not a warp message"),
+		}
+	)
+	tests := []struct {
+		name    string
+		logs    [][]*types.Log
+		want    []*avalanchewarp.UnsignedMessage
+		wantErr error
+	}{
+		{
+			name: "no_receipts",
+		},
+		{
+			name: "no_logs",
+			logs: [][]*types.Log{
+				{},
+			},
+		},
+		{
+			name: "ignores_other_addresses",
+			logs: [][]*types.Log{
+				{otherLog},
+			},
+		},
+		{
+			name: "single_message",
+			logs: [][]*types.Log{
+				{warpLog0},
+			},
+			want: []*avalanchewarp.UnsignedMessage{msg0},
+		},
+		{
+			name: "multiple_messages_in_order",
+			logs: [][]*types.Log{
+				{warpLog1, otherLog, warpLog0},
+				{otherLog, warpLog1},
+			},
+			want: []*avalanchewarp.UnsignedMessage{msg1, msg0, msg1},
+		},
+		{
+			name: "invalid_log_data",
+			logs: [][]*types.Log{
+				{
+					// 0xFFFF is not a registered codec version, so the event
+					// data unpacks but the message fails to parse.
+					newSendWarpMessageLog(t, []byte{0xFF, 0xFF}),
+				},
+			},
+			wantErr: codec.ErrUnknownVersion,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			receipts := make([]*types.Receipt, len(test.logs))
+			for i, logs := range test.logs {
+				receipts[i] = &types.Receipt{
+					Logs: logs,
+				}
+			}
+			msgs, err := FromReceipts(receipts)
+			require.ErrorIs(t, err, test.wantErr, "FromReceipts()")
+			require.Equal(t, test.want, msgs, "FromReceipts()")
+		})
+	}
+}
 
 // newRules returns rules with the warp precompile registered at each of the
 // given addresses.
 func newRules(contracts ...common.Address) *extras.Rules {
-	contract := warp.NewDefaultConfig(utils.PointerTo[uint64](0))
+	contract := corethwarp.NewDefaultConfig(utils.PointerTo[uint64](0))
 
 	predicaters := make(map[common.Address]precompileconfig.Predicater, len(contracts))
 	for _, addr := range contracts {
@@ -220,8 +310,8 @@ func TestVerifyBlock(t *testing.T) {
 			rules := newRules(test.contracts...)
 
 			actual, err := VerifyBlock(snowContext, test.blockContext, rules, test.txs)
-			require.ErrorIs(t, err, test.expectedErr)
-			require.Equal(t, test.expected, actual)
+			require.ErrorIs(t, err, test.expectedErr, "VerifyBlock()")
+			require.Equal(t, test.expected, actual, "VerifyBlock()")
 		})
 	}
 }
@@ -231,7 +321,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 	// number of signers is held fixed.
 	const numSigners = 10
 
-	rules := newRules(warp.ContractAddress)
+	rules := newRules(corethwarp.ContractAddress)
 	vdrs := warptest.NewValidators(b, numSigners)
 	snowContext := snowtest.Context(b, snowtest.CChainID)
 	snowContext.ValidatorState = vdrs.State(ids.GenerateTestID())
@@ -245,7 +335,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 				accessList := make(types.AccessList, predicatesPerTx)
 				for i := range accessList {
 					accessList[i] = types.AccessTuple{
-						Address:     warp.ContractAddress,
+						Address:     corethwarp.ContractAddress,
 						StorageKeys: pred,
 					}
 				}
@@ -263,14 +353,14 @@ func BenchmarkVerifyBlock(b *testing.B) {
 				// Confirm the predicates verify before timing, so the benchmark
 				// measures the success path rather than an early failure.
 				results, err := VerifyBlock(snowContext, blockContext, rules, txs)
-				require.NoError(b, err)
-				require.Len(b, results, numTxs)
+				require.NoError(b, err, "VerifyBlock()")
+				require.Len(b, results, numTxs, "VerifyBlock() results length")
 
 				wantTxResults := predicate.PrecompileResults{
-					warp.ContractAddress: set.NewBits(),
+					corethwarp.ContractAddress: set.NewBits(),
 				}
-				for _, txResults := range results {
-					require.Equal(b, wantTxResults, txResults)
+				for txHash, txResults := range results {
+					require.Equalf(b, wantTxResults, txResults, "VerifyBlock()[%s] txResults", txHash)
 				}
 
 				for b.Loop() {
