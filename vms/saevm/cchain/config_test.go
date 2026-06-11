@@ -18,6 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
+func errIsType[T error]() testerr.Want {
+	return testerr.As(func(T) string { return "" })
+}
+
 func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -28,7 +32,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			name:    "invalid_json",
 			json:    "invalid",
-			wantErr: testerr.As(func(*json.SyntaxError) string { return "" }),
+			wantErr: errIsType[*json.SyntaxError](),
 		},
 		{
 			name: "empty_input",
@@ -47,11 +51,12 @@ func TestParseConfig(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Logf("parsing config:\n%s", test.json)
 			got, err := ParseConfig([]byte(test.json))
 			if diff := testerr.Diff(err, test.wantErr); diff != "" {
-				t.Errorf("ParseConfig(%s) error (-want +got)\n%s", test.json, diff)
+				t.Errorf("ParseConfig(...) error (-want +got)\n%s", diff)
 			}
-			require.Equalf(t, test.want, got, "ParseConfig(%s)", test.json)
+			require.Equal(t, test.want, got, "ParseConfig(...)")
 		})
 	}
 }
@@ -102,8 +107,8 @@ func TestConfig_WarpMessages(t *testing.T) {
 			}
 
 			got, err := c.WarpMessages()
-			require.ErrorIs(t, err, test.wantErr)
-			require.Equal(t, test.want, got)
+			require.ErrorIsf(t, err, test.wantErr, "%T.WarpMessages()", c)
+			require.Equalf(t, test.want, got, "%T.WarpMessages()", c)
 		})
 	}
 }
