@@ -72,12 +72,12 @@ func (s *Storage) Get(id ids.ID) (*warp.UnsignedMessage, error) {
 
 	bytes, err := s.db.Get(id[:])
 	if err != nil {
-		return nil, fmt.Errorf("loading message: %w", err)
+		return nil, fmt.Errorf("from db: %w", err)
 	}
 
 	m, err := warp.ParseUnsignedMessage(bytes)
 	if err != nil {
-		return nil, fmt.Errorf("parsing message: %w", err)
+		return nil, fmt.Errorf("while parsing: %w", err)
 	}
 	s.cache.Put(id, m)
 	return m, nil
