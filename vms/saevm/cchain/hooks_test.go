@@ -4,7 +4,6 @@
 package cchain
 
 import (
-	"math/big"
 	"testing"
 	"time"
 
@@ -13,37 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
-
-// newBlock returns a minimal [*types.Block] whose ExtData encodes txs and
-// whose header is configured for ancestor traversal (parent hash + number).
-func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *types.Block {
-	tb.Helper()
-
-	extData, err := tx.MarshalSlice(txs)
-	require.NoErrorf(tb, err, "tx.MarshalSlice(%d txs)", len(txs))
-
-	return customtypes.NewBlockWithExtData(
-		&types.Header{
-			ParentHash: parent,
-			Number:     new(big.Int).SetUint64(number),
-		},
-		nil, // txs
-		nil, // uncles
-		nil, // receipts
-		saetest.TrieHasher(),
-		extData,
-		true, // setExtDataHash
-	)
-}
 
 const (
 	testTimestampSeconds      uint64 = 1_700_000_000
@@ -122,12 +97,12 @@ func TestAncestorInputIDs(t *testing.T) {
 		w       = newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
 		genesis = common.Hash(ids.GenerateTestID())
 		tx1     = w.newMinimalTx(t)
-		block1  = newBlock(t, 1, genesis, tx1)
+		block1  = cchaintest.NewBlock(t, 1, genesis, tx1)
 		tx2     = w.newMinimalTx(t)
-		block2  = newBlock(t, 2, block1.Hash(), tx2)
+		block2  = cchaintest.NewBlock(t, 2, block1.Hash(), tx2)
 		tx3     = w.newMinimalTx(t)
-		block3  = newBlock(t, 3, block2.Hash(), tx3)
-		block4  = newBlock(t, 4, block3.Hash())
+		block3  = cchaintest.NewBlock(t, 3, block2.Hash(), tx3)
+		block4  = cchaintest.NewBlock(t, 4, block3.Hash())
 	)
 
 	tests := []struct {

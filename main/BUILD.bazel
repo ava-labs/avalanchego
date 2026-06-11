@@ -23,6 +23,7 @@ go_binary(
         # tests only by constraining the files with: //go:build !nocmpopts
         # If any identifiers leak then the binary won't build.
         "nocmpopts",
+        "prod",
     ],
     visibility = ["//visibility:public"],
     x_defs = {
