@@ -17,16 +17,16 @@ db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
 
 ## Rust Memory Management
 
-Firewood's CGo FFI exposes two types of Rust-owned heap objects: `ffi.Revision` and `ffi.Proposal`. Both must be explicitly freed to avoid leaking Rust memory — Go's garbage collector does not manage Rust allocations.
+Firewood's CGo FFI exposes two types of Rust-owned heap objects: `ffi.Revision` and `ffi.Proposal`. Both should be explicitly freed to avoid leaking Rust memory - otherwise we must rely on Go's garbage collector to eventually call `runtime.AddCleanup`.
 
-All proposals are either explicitly freed (via `Drop`) or committed. Proposals are dropped in the following functions:
+All proposals tracked by the `TrieDB` are either explicitly freed (via `Drop`) or committed. Proposals are dropped in the following functions:
 
 - `TrieDB.Close`: all pending and committable proposals are dropped before the database is closed.
 - `TrieDB.Commit`: proposals are committed in ancestor-first order; if any commit fails, the remaining proposals are dropped rather than leaked.
 - `TrieDB.trieHash`: immediately dropped when a proposal produces no state change (root is unchanged).
 - `accountTrie.hash`: the previous reader is dropped when a new proposal replaces it. Or, similarly, when all changes from a proposal are reverted.
 
-Revisions are freed when possible (e.g. in `accountTrie.hash` when unused), but in general, they will be freeed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Any proposal or revision remaining within a trie can only be garbage collected. The account trie is only ever created by the `state.StateDB`, so one must allow these objects to be garbage collected prior to calling `TrieDB.Close()`.
+Revisions are freed when possible (e.g. in `accountTrie.hash` when unused), but in general, they will be freed via `runtime.AddCleanup`, because the `state.Trie` implementation does not have a `Close` method or anything similar. Any proposal or revision remaining within a trie can only be garbage collected. The account trie is only ever created by the `state.StateDB`, so one must allow these objects to be garbage collected prior to calling `TrieDB.Close()`.
 
 ## Operation Model
 
@@ -53,8 +53,10 @@ Reads never reflect pending writes (see [Why reads aren't safe](#why-reads-arent
 ### Why `Commit` commits multiple proposals at once
 
 `TrieDB.Commit(root)` does not commit only the proposal for `root`. It walks back the entire chain of uncommitted ancestor proposals and commits them all in ancestor-first order before committing `root`.
-
-This is required because Firewood enforces strict ancestor ordering: a child proposal cannot be committed before its parent. The `DeferredCommitInterval` configuration deliberately delays disk commits to batch I/O, allowing multiple blocks' worth of proposals to accumulate as an in-memory linked list. When `Commit` is eventually called for a later root, all uncommitted ancestors are flushed in a single pass.
+This is required because Firewood enforces strict ancestor ordering: a child proposal cannot be committed before its parent.
+The `DeferredCommitInterval` configuration deliberately delays disk commits to batch I/O, allowing multiple blocks' worth of proposals to accumulate before persisting to disk.
+This differs from `HashDB`, which synchronously writes all nodes on `Commit()` for the provided state root.
+This allows Firewood a performance improvement, but it is recommended that users frequently call `Commit`, as it will not result in faster state growth.
 
 The `TrieDB` will never return an empty proposal, so there will never be ambiguity about which proposal represents `root`, unlike in the historical Firewood TrieDB. There will never be two proposals with the same root, since at minimum, a nonce is incremented.
 
@@ -83,3 +85,7 @@ What is the expected value of `val`? Should it be `nil`, since the account was d
 The important detail here is that the `state.StateDB` will never do read after writing. Maintaining a map of pending writes would cover most cases, but storage reads would also need to check whether the parent account has been prefix-deleted — which is difficult to track without the full trie context. Additionally, if an account is recreated after deletion, a naive pending-writes map could not determine whether storage should be considered deleted when read later. Even worse, if an account is deleted by the `state.StateDB`, the corresponding storages will never be explicitly deleted from the storage trie, so we have to rely on prefix deletions.
 
 For all these caveats, the only logical conclusion for compatibility is that the implementation of `state.Trie` must only guarantee that the `state.StateDB` functions correctly. Since it will not read after writing until `state.StateDB.IntermediateRoot` is called, we can rely on reading from an actual proposal/revision.
+
+### Relation to the snapshot
+
+The go-ethereum `snapshot.Tree` allows fast reads for HashDB by avoiding loading all intermediate merkle nodes into the trie by storing a flattened K/V layer. The `state.StateDB` allows configuring parallel prefetchers to load the data in asynchronously for faster hashing later. In Firewood, there is little benefit to this optimization due to the path-based storage scheme, and avoids the need to have a concurrent-safe trie, an iterator, and divorcing the storage trie from the account trie. Because these all complicate the implementation with no performance benefit, the snapshot is NOT supported with Firewood.

@@ -150,7 +150,7 @@ func (a *baseTrie) copy(reader trieReader) *baseTrie {
 	return &baseTrie{
 		reader:     reader,
 		root:       a.root,
-		hasChanges: a.hasChanges,
+		hasChanges: true,
 		updateOps:  slices.Clone(a.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
 	}
 }

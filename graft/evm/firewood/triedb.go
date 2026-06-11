@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/libevm/triedb/database"
 )
 
-const firewoodDir = "firewood"
+const FirewoodDir = "firewood"
 
 var (
 	_ triedb.DBConstructor = TrieDBConfig{}.BackendConstructor
@@ -145,7 +145,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(config.DatabaseDir, firewoodDir)
+	path := filepath.Join(config.DatabaseDir, FirewoodDir)
 
 	// The Firewood constructor will check that commitCount is nonzero.
 	minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)

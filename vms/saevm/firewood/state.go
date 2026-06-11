@@ -12,13 +12,13 @@ import (
 
 	// Need metrics registration from init function.
 	// TODO(alarso16): Move metrics initialization after deletion of graft.
-	graftfw "github.com/ava-labs/avalanchego/graft/evm/firewood"
+	graft "github.com/ava-labs/avalanchego/graft/evm/firewood"
 )
 
 var _ state.Database = (*stateAccessor)(nil)
 
 func init() {
-	var _ *graftfw.TrieDB // protect import for metrics registration
+	var _ *graft.TrieDB // protect import for metrics registration
 	state.RegisterDatabaseInterceptor(interceptor)
 }
 

@@ -29,9 +29,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	graft "github.com/ava-labs/avalanchego/graft/evm/firewood"
 )
 
-const firewoodDir = "firewood" // MUST match graft/evm/firewood/triedb.go
+const firewoodDir = graft.FirewoodDir
 
 var (
 	_ triedb.DBConstructor = TrieDBConfig{}.BackendConstructor
@@ -118,12 +120,12 @@ func validateDir(dir string) error {
 }
 
 // TrieDB is a triedb.DBOverride implementation backed by Firewood.
-// It acts as HashDB for backwards compatibility with most our code.
+// It acts as HashDB for backwards compatibility with most of our code.
 //
 // It MUST NOT be used for a synchronous EVM, because this implementation
 // relies on any proposal being created eventually being committed, as opposed
 // to the arbitrary DAG supported by `graft/evm/firewood`. Even in this
-// narrower use case, the behavior of the two implementations are NOT the same.
+// narrower use case, the behavior of the two implementations is NOT the same.
 //
 // TrieDB implements [triedb.HashDB], despite being a path-based storage
 // system, for easier compatibility with the rest of our codebase. Since
@@ -166,7 +168,6 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		options = append(options, ffi.WithRootStore())
 	}
 	if metrics.EnabledExpensive {
-		// TODO(alarso16): Does Firewood use this?
 		options = append(options, ffi.WithExpensiveMetrics())
 	}
 
@@ -174,6 +175,12 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	fw, err := ffi.New(path, ffi.EthereumNodeHashing, options...)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
+	}
+
+	if root := common.Hash(fw.Root()); root == types.EmptyRootHash {
+		config.Log.Debug("empty firewood database opened", zap.String("path", path))
+	} else {
+		config.Log.Debug("firewood database opened", zap.Stringer("root", root), zap.String("path", path))
 	}
 
 	return &TrieDB{
@@ -200,18 +207,25 @@ func (t *TrieDB) Close() error {
 		t.pending = nil
 	}
 
+	// Allow some time for garbage collection and disk persistence of the
+	// last committed revision.
 	go runtime.GC()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second) // allow some time for garbage collection.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	return errors.Join(err, t.Firewood.Close(ctx))
 }
 
-// Initialized indicates where any state has been committed, typically used to
+// Initialized indicates whether any state has been committed, typically used to
 // check if the genesis block has been committed.
 func (t *TrieDB) Initialized(genesisRoot common.Hash) bool {
+	// If the genesis root is empty, no state changes are necessary to Firewood,
+	// and thus the genesis state can be considered committed.
 	if genesisRoot == types.EmptyRootHash {
 		return true
 	}
+
+	// If the disk root is not empty, then we must have committed something,
+	// so we must have committed the genesis root, regardless of its value.
 	return common.Hash(t.Firewood.Root()) != types.EmptyRootHash
 }
 
@@ -241,7 +255,7 @@ func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, node
 	return nil
 }
 
-// Commit allows this proposal to be persisted to disk. The given root must have
+// Commit ensures the given root is persisted to disk. The given root MUST have
 // been previously provided to [TrieDB.Update]. any error returned from this
 // function should be treated as fatal.
 func (t *TrieDB) Commit(root common.Hash, report bool) error {
@@ -249,8 +263,10 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	if !ok {
 		// If this state root is available only on disk, we must have already committed it.
 		rev, err := t.Firewood.Revision(ffi.Hash(root))
-		if err != nil {
+		if errors.Is(err, ffi.ErrRevisionNotFound) {
 			return fmt.Errorf("no committable proposal found for root %s", root)
+		} else if err != nil {
+			return fmt.Errorf("retrieving revision for root %s: %w", root, err)
 		}
 		return rev.Drop()
 	}
@@ -314,12 +330,6 @@ func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*prop
 		return nil, false, fmt.Errorf("creating proposal: %w", err)
 	}
 
-	// If there are no state changes, we don't need to track this proposal.
-	// [TrieDB.Update] will never be called.
-	if proposal.Root() == ffi.Hash(parentRoot) {
-		return nil, true, proposal.Drop()
-	}
-
 	return &proposalRef{
 		p:      proposal,
 		root:   common.Hash(proposal.Root()),
@@ -329,11 +339,9 @@ func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*prop
 
 // trieCommit considers the provided proposal as canonical.
 // Should be called on [state.Trie.Commit].
+//
+// p MUST not be nil.
 func (t *TrieDB) trieCommit(p *proposalRef) {
-	if p == nil {
-		return
-	}
-
 	// add to linked list, since proposal is final.
 	if parent := p.parent; parent != nil {
 		if parent.p != nil {
@@ -343,6 +351,7 @@ func (t *TrieDB) trieCommit(p *proposalRef) {
 			p.parent = nil
 		}
 	}
+
 	t.pending = p
 }
 
@@ -351,7 +360,7 @@ func (t *TrieDB) trieCommit(p *proposalRef) {
 // During a [state.StateDB.Commit] operation, providing [rawdb.HashScheme] from
 // this function will prevent the statedb from trying to iterate over a self-
 // destructed account's storage trie, since Firewood will prefix-delete the
-// the storage trie and does not implement an iterator.
+// storage trie and does not implement an iterator.
 func (*TrieDB) Scheme() string {
 	var _ state.StateDB // protect import
 	return rawdb.HashScheme
