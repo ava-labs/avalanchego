@@ -56,9 +56,6 @@ func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
 //
 // Any proposals created by this method will be freed once the accountTrie
 // is garbage collected.
-//
-// If there are no changes since the last call, the cached root is returned.
-// On error, the zero hash is returned.
 func (a *accountTrie) Hash() common.Hash {
 	hash, err := a.hash()
 	if err != nil {
@@ -78,35 +75,19 @@ func (a *accountTrie) hash() (common.Hash, error) {
 	case err != nil:
 		return common.Hash{}, err
 	case !available:
-		// TODO(rodrigovillar): Create reconstruction for APIs
+		// TODO(#5506): Create [ffi.Reconstructed] to allow stateful RPCs.
 		return common.Hash{}, fmt.Errorf("base revision %#x is not proposable", a.parentRoot)
-	case proposal != nil:
-		// Best effort drop of previous reader.
-		// Use new proposal for all future reads.
-		if err := a.reader.Drop(); err != nil {
-			a.fw.log.Warn("dropping previous trie reader", zap.Error(err))
-		}
-		a.pending = proposal
-		a.reader = proposal.p
-		a.root = proposal.root
-	case a.pending != nil:
-		// Close all previous relics of revisions.
-		if err := a.reader.Drop(); err != nil {
-			a.fw.log.Warn("dropping previous trie reader", zap.Error(err))
-		}
-		if err := a.pending.p.Drop(); err != nil {
-			a.fw.log.Warn("dropping previous trie proposal", zap.Error(err))
-		}
-		a.pending = nil
-		// All changes in a previous proposal were reverted, so we can create a new reader from the parent root.
-		reader, err := a.fw.Firewood.Revision(ffi.Hash(a.parentRoot))
-		if err != nil {
-			return common.Hash{}, fmt.Errorf("reverting to previous trie reader: %w", err)
-		}
-		a.reader = reader
-		a.root = a.parentRoot
 	}
 
+	// Best effort drop of previous reader (and thus any associated proposal).
+	// Use new proposal for all future reads.
+	if err := a.reader.Drop(); err != nil {
+		a.fw.log.Warn("dropping previous trie reader", zap.Error(err))
+	}
+
+	a.pending = proposal
+	a.reader = proposal.p
+	a.root = proposal.root
 	a.hasChanges = false // Avoid re-hashing until next update
 	return a.root, nil
 }
@@ -120,10 +101,14 @@ func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	if err != nil {
 		return common.Hash{}, nil, err
 	}
-	a.fw.trieCommit(a.pending)
 
-	set := trienode.NewNodeSet(common.Hash{})
-	return hash, set, nil
+	// The [state.StateDB] will only call [triedb.Database.Update] if the returned root differs from the parent.
+	if hash == a.parentRoot {
+		return a.parentRoot, nil, nil
+	}
+
+	a.fw.trieCommit(a.pending)
+	return hash, trienode.NewNodeSet(common.Hash{}), nil
 }
 
 // Copy creates a copy of the [accountTrie].

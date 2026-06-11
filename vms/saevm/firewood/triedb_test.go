@@ -25,8 +25,11 @@ import (
 )
 
 func mustNewStateDB(t *testing.T, db state.Database, root common.Hash) *state.StateDB {
+	t.Helper()
+
 	st, err := state.New(root, db, nil)
-	require.NoError(t, err)
+	require.NoErrorf(t, err, "state.New(%s, %T)", root, db)
+
 	return st
 }
 
@@ -62,7 +65,7 @@ func newSUT(t *testing.T) *SUT {
 		DBOverride: cfg.BackendConstructor,
 	})
 	t.Cleanup(func() {
-		require.NoError(t, fwDB.TrieDB().Close())
+		require.NoError(t, fwDB.TrieDB().Close(), "firewood triedb.Close()")
 	})
 	hashDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -181,8 +184,13 @@ func (s *SUT) stateDBCommit(t *testing.T) {
 }
 
 func (s *SUT) diskCommit(t *testing.T) {
-	require.NoError(t, s.fwDB.TrieDB().Commit(s.lastRoot, false))
-	require.NoError(t, s.hashDB.TrieDB().Commit(s.lastRoot, false))
+	require.NoErrorf(t, s.fwDB.TrieDB().Commit(s.lastRoot, false), "triedb.Commit(%s)", s.lastRoot)
+	require.NoErrorf(t, s.hashDB.TrieDB().Commit(s.lastRoot, false), "triedb.Commit(%s)", s.lastRoot)
+}
+
+func (s *SUT) copyStateDB() {
+	s.fwState = s.fwState.Copy()
+	s.hashState = s.hashState.Copy()
 }
 
 const (
@@ -194,12 +202,39 @@ const (
 	opSetStorage                   // write a new storage slot on an existing account
 	opDeleteStorage                // zero out an existing storage slot on an existing account
 	opIntermediateRoot             // verify all account and storage hashes match the model
+	opCopyStateDB                  // copies statedb for future ops
 	maxOp
 )
 
 // FuzzStateDB compares the state root of an arbitrary sequence of operations on
 // a Firewood-backed [state.StateDB] against a reference HashDB.
 func FuzzStateDB(f *testing.F) {
+	f.Add([]byte{
+		opCreateAccount,
+		opStateDBCommit,
+	})
+	f.Add([]byte{
+		opCreateAccount,
+		opUpdateAccount,
+		opSetStorage,
+		opStateDBCommit,
+		opDiskCommit,
+	})
+	f.Add([]byte{
+		opCreateAccount,
+		opSetStorage,
+		opIntermediateRoot,
+		opDeleteStorage,
+		opStateDBCommit,
+	})
+	f.Add([]byte{
+		opCreateAccount,
+		opStateDBCommit,
+		opDeleteAccount,
+		opStateDBCommit,
+	})
+	f.Add([]byte{opStateDBCommit, opDiskCommit})
+
 	f.Fuzz(func(t *testing.T, steps []byte) {
 		sut := newSUT(t)
 		for _, step := range steps {
@@ -216,34 +251,36 @@ func FuzzStateDB(f *testing.F) {
 				t.Log("create account")
 				sut.createAccount()
 			case opUpdateAccount:
-				t.Log("update account")
 				if len(sut.model.addrs) > 0 {
+					t.Log("update account")
 					sut.updateAccount(param)
 				}
 			case opDeleteAccount:
-				t.Log("delete account")
 				if len(sut.model.addrs) > 0 {
+					t.Log("delete account")
 					sut.deleteAccount(param)
 				}
 			case opSetStorage:
-				t.Log("set storage")
 				if len(sut.model.addrs) > 0 {
+					t.Log("set storage")
 					sut.setStorage(param)
 				}
 			case opDeleteStorage:
-				t.Log("delete storage")
 				if len(sut.model.addrs) > 0 {
+					t.Log("delete storage")
 					sut.deleteStorage(param)
 				}
 			case opIntermediateRoot:
-				t.Log("check hashes")
+				t.Log("intermediate root")
 				sut.intermediateRoot(t)
+			case opCopyStateDB:
+				t.Log("copy StateDB")
+				sut.copyStateDB()
 			default:
 				t.Skip("invalid operation")
 			}
 		}
 		sut.intermediateRoot(t) // final flush to tries and verify all pending state
-		sut = nil               // allow garbage collection
 	})
 }
 
@@ -270,7 +307,7 @@ func TestGenesis(t *testing.T) {
 	_, _, err := core.SetupGenesisBlock(memDB, tdb, &g)
 	require.NoError(t, err)
 	require.True(t, tdb.Initialized(genesisRoot), "Genesis root should be initialized in the database after setup")
-	require.NoError(t, tdb.Close())
+	require.NoError(t, tdb.Close(), "triedb.Close()")
 
 	t.Run("recovery", func(t *testing.T) {
 		cfg.Log = loggingtest.New(t, logging.Debug)
@@ -278,7 +315,7 @@ func TestGenesis(t *testing.T) {
 			DBOverride: cfg.BackendConstructor,
 		})
 		require.True(t, tdb.Initialized(genesisRoot), "Genesis root should still be initialized in the database")
-		require.NoError(t, tdb.Close())
+		require.NoError(t, tdb.Close(), "triedb.Close()")
 	})
 }
 
@@ -288,11 +325,6 @@ func TestInvalidConfig(t *testing.T) {
 		cfg     func(TrieDBConfig) TrieDBConfig
 		wantErr error
 	}{
-		{
-			name:    "valid config",
-			cfg:     func(cfg TrieDBConfig) TrieDBConfig { return cfg },
-			wantErr: nil,
-		},
 		{
 			name: "empty directory",
 			cfg: func(cfg TrieDBConfig) TrieDBConfig {
@@ -334,14 +366,14 @@ func TestInvalidConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.cfg(DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug)))
 			_, err := New(cfg)
-			require.ErrorIs(t, err, tt.wantErr)
+			require.ErrorIs(t, err, tt.wantErr, "New()")
 		})
 	}
 }
 
-func TestNoLogger(t *testing.T) {
+func TestNoLoggerPanics(t *testing.T) {
 	cfg := DefaultConfig(t.TempDir(), nil)
 	require.Panics(t, func() {
 		_, _ = New(cfg)
-	})
+	}, "New()")
 }
