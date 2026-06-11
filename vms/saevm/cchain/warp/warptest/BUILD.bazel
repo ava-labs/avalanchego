@@ -7,9 +7,11 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
+        "//snow",
         "//snow/snowtest",
         "//snow/validators",
         "//snow/validators/validatorstest",
+        "//utils",
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",
         "//utils/set",
