@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	// Imported for [snowtest.Context] comment resolution.
+	"github.com/ava-labs/avalanchego/snow"
 	_ "github.com/ava-labs/avalanchego/snow/snowtest"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -79,14 +80,6 @@ func NewValidatorsWithNodeIDs(tb testing.TB, nodeIDs ...ids.NodeID) *Validators 
 	}
 }
 
-// Set returns the validator set in the form expected during verification.
-func (v *Validators) Set() validators.WarpSet {
-	return validators.WarpSet{
-		Validators:  v.validators,
-		TotalWeight: uint64(len(v.validators)),
-	}
-}
-
 // NodeIDs returns the NodeIDs of every validator in the set.
 func (v *Validators) NodeIDs() set.Set[ids.NodeID] {
 	nodeIDs := set.NewSet[ids.NodeID](len(v.validators))
@@ -94,22 +87,6 @@ func (v *Validators) NodeIDs() set.Set[ids.NodeID] {
 		nodeIDs.Add(vdr.NodeIDs...)
 	}
 	return nodeIDs
-}
-
-// ValidatorSet returns the validators in the form returned by
-// [validators.State.GetValidatorSet].
-func (v *Validators) ValidatorSet() map[ids.NodeID]*validators.GetValidatorOutput {
-	out := make(map[ids.NodeID]*validators.GetValidatorOutput, len(v.validators))
-	for _, vdr := range v.validators {
-		for _, nodeID := range vdr.NodeIDs {
-			out[nodeID] = &validators.GetValidatorOutput{
-				NodeID:    nodeID,
-				PublicKey: vdr.PublicKey,
-				Weight:    vdr.Weight,
-			}
-		}
-	}
-	return out
 }
 
 // Sign signs msg with every validator and returns the signed message with a
@@ -121,62 +98,23 @@ func (v *Validators) Sign(tb testing.TB, msg *warp.UnsignedMessage) *warp.Messag
 	signerIndices := set.NewBits()
 	for i, sk := range v.signers {
 		sig, err := sk.Sign(msg.Bytes())
-		require.NoError(tb, err)
+		require.NoErrorf(tb, err, "%T.Sign(...)", sk)
 		signatures[i] = sig
 		signerIndices.Add(i)
 	}
 
-	aggregateSignature, err := bls.AggregateSignatures(signatures)
-	require.NoError(tb, err)
-	warpSignature := &warp.BitSetSignature{
-		Signers: signerIndices.Bytes(),
-	}
-	copy(warpSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
+	aggSig, err := bls.AggregateSignatures(signatures)
+	require.NoError(tb, err, "bls.AggregateSignatures(...)")
 
-	signedMsg, err := warp.NewMessage(msg, warpSignature)
-	require.NoError(tb, err)
-	return signedMsg
-}
-
-// State returns a validator state that attributes every chain to subnetID and
-// serves v as that subnet's validator set, both regular and warp.
-func (v *Validators) State(subnetID ids.ID) *validatorstest.State {
-	return &validatorstest.State{
-		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
-			return subnetID, nil
+	signed, err := warp.NewMessage(
+		msg,
+		&warp.BitSetSignature{
+			Signers:   signerIndices.Bytes(),
+			Signature: [bls.SignatureLen]byte(bls.SignatureToBytes(aggSig)),
 		},
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			return v.ValidatorSet(), nil
-		},
-		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
-			return map[ids.ID]validators.WarpSet{
-				subnetID: v.Set(),
-			}, nil
-		},
-	}
-}
-
-// SetValidators makes state serve vdrs as subnetID's validator set, both
-// regular (GetValidatorSet) and warp (GetWarpValidatorSets).
-//
-// state MUST be a [validatorstest.State], which is the concrete type installed
-// by [snowtest.Context]. It is accepted as the [validators.State] interface
-// rather than the concrete type so that callers can pass
-// snowCtx.ValidatorState directly without each repeating the type assertion
-// this helper exists to share.
-func SetValidators(tb testing.TB, state validators.State, subnetID ids.ID, vdrs *Validators) {
-	tb.Helper()
-
-	vdrState, ok := state.(*validatorstest.State)
-	require.Truef(tb, ok, "unexpected type %T for validator state", state)
-	vdrState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		return vdrs.ValidatorSet(), nil
-	}
-	vdrState.GetWarpValidatorSetsF = func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
-		return map[ids.ID]validators.WarpSet{
-			subnetID: vdrs.Set(),
-		}, nil
-	}
+	)
+	require.NoError(tb, err, "warp.NewMessage(...)")
+	return signed
 }
 
 // IncorrectlySign returns msg with a syntactically valid but cryptographically
@@ -190,6 +128,39 @@ func IncorrectlySign(tb testing.TB, msg *warp.UnsignedMessage) *warp.Message {
 			Signers: set.NewBits().Bytes(),
 		},
 	)
-	require.NoError(tb, err)
+	require.NoError(tb, err, "warp.NewMessage(...)")
 	return signed
+}
+
+// SetValidators makes ctx serve vdrs as the local validator set for both
+// regular (GetValidatorSet) and warp (GetWarpValidatorSets).
+//
+// ctx.ValidatorState MUST be a [validatorstest.State], which is the concrete
+// type installed by [snowtest.Context].
+func SetValidators(tb testing.TB, ctx *snow.Context, vdrs *Validators) {
+	tb.Helper()
+
+	vdrState, ok := ctx.ValidatorState.(*validatorstest.State)
+	require.Truef(tb, ok, "unexpected type %T for validator state", ctx.ValidatorState)
+	vdrState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		out := make(map[ids.NodeID]*validators.GetValidatorOutput, len(vdrs.validators))
+		for _, vdr := range vdrs.validators {
+			for _, nodeID := range vdr.NodeIDs {
+				out[nodeID] = &validators.GetValidatorOutput{
+					NodeID:    nodeID,
+					PublicKey: vdr.PublicKey,
+					Weight:    vdr.Weight,
+				}
+			}
+		}
+		return out, nil
+	}
+	vdrState.GetWarpValidatorSetsF = func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
+		return map[ids.ID]validators.WarpSet{
+			ctx.SubnetID: validators.WarpSet{
+				Validators:  vdrs.validators,
+				TotalWeight: uint64(len(vdrs.validators)),
+			},
+		}, nil
+	}
 }

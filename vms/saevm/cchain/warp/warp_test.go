@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -134,8 +133,7 @@ func newRules(contracts ...common.Address) *extras.Rules {
 
 func TestVerifyBlock(t *testing.T) {
 	var (
-		vdrs           = warptest.NewValidators(t, 2)
-		sourceSubnetID = ids.GenerateTestID()
+		vdrs = warptest.NewValidators(t, 2)
 
 		msg, _           = newAddressedCall(t)
 		validPredicate   = predicate.New(vdrs.Sign(t, msg).Bytes())
@@ -282,7 +280,7 @@ func TestVerifyBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			snowContext := snowtest.Context(t, snowtest.CChainID)
-			snowContext.ValidatorState = vdrs.State(sourceSubnetID)
+			warptest.SetValidators(t, snowContext, vdrs)
 			rules := newRules(test.contracts...)
 
 			actual, err := VerifyBlock(snowContext, test.blockContext, rules, test.txs)
@@ -300,7 +298,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 	rules := newRules(corethwarp.ContractAddress)
 	vdrs := warptest.NewValidators(b, numSigners)
 	snowContext := snowtest.Context(b, snowtest.CChainID)
-	snowContext.ValidatorState = vdrs.State(ids.GenerateTestID())
+	warptest.SetValidators(b, snowContext, vdrs)
 	blockContext := &block.Context{}
 
 	msg, _ := newAddressedCall(b)
