@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
@@ -42,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
@@ -714,4 +716,48 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	// execution results to have been applied.
 	exportedUTXOs := txtest.ExportedUTXOs(signedExport.ID(), export)
 	sut.assertUTXOsMissing(t, destinationChain, sut.ctx.ChainID, exportedUTXOs...)
+}
+
+// TestParseBlock verifies that the cchain ParseBlock override accepts
+// well-formed blocks and rejects blocks whose extData does not match the
+// ExtDataHash committed in the header.
+func TestParseBlock(t *testing.T) {
+	ctx, sut := newSUT(t)
+
+	w := newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
+	tx1 := w.newMinimalTx(t)
+
+	tests := []struct {
+		name    string
+		block   *types.Block
+		wantErr error
+	}{
+		{
+			name:  "valid",
+			block: cchaintest.NewBlock(t, 1, common.Hash{}, tx1),
+		},
+		{
+			name:  "valid_empty",
+			block: cchaintest.NewBlock(t, 1, common.Hash{}),
+		},
+		{
+			name:    "extdata_hash_mismatch",
+			block:   cchaintest.NewTamperedBlock(t, 1, common.Hash{}, tx1),
+			wantErr: errExtDataHashMismatch,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf, err := rlp.EncodeToBytes(tt.block)
+			require.NoError(t, err, "rlp.EncodeToBytes(block)")
+
+			got, err := sut.ParseBlock(ctx, buf)
+			require.ErrorIs(t, err, tt.wantErr, "vm.ParseBlock(buf)")
+			if tt.wantErr != nil {
+				return
+			}
+
+			require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
+		})
+	}
 }

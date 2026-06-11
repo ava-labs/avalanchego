@@ -56,7 +56,11 @@ go_library(
         "//vms/components/gas",
         "//vms/evm/acp226",
         "//vms/evm/database",
+<<<<<<< HEAD
         "//vms/platformvm/warp",
+=======
+        "//vms/saevm/blocks",
+>>>>>>> StephenButtolph/warp-package
         "//vms/saevm/cchain/state",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/txpool",
@@ -123,6 +127,7 @@ go_test(
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "//vms/saevm/blocks",
+        "//vms/saevm/cchain/cchaintest",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/cchain/warp",
@@ -138,6 +143,7 @@ go_test(
         "@com_github_ava_labs_libevm//ethclient",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//rpc",
         "@com_github_google_go_cmp//cmp",
         "@com_github_holiman_uint256//:uint256",
