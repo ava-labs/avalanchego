@@ -638,7 +638,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 			endRoot,
 			int(request.KeyLimit),
 		)
-		s.metrics.proofVerified(proofTypeChange, time.Since(verificationStart), err)
+		s.metrics.observeVerification(proofTypeChange, time.Since(verificationStart), err)
 		if err != nil {
 			return fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
 		}
@@ -646,7 +646,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		// if the proof wasn't empty, apply changes to the sync DB
 		commitStart := time.Now()
 		nextKey, err := s.db.CommitChangeProof(ctx, endKey, changeProof)
-		s.metrics.proofCommitted(proofTypeChange, time.Since(commitStart), err)
+		s.metrics.observeCommit(proofTypeChange, time.Since(commitStart), err)
 		if err != nil {
 			s.setError(err)
 			return nil
@@ -698,14 +698,14 @@ func (s *Syncer[R, _]) verifyAndCommitRangeProof(
 ) error {
 	verificationStart := time.Now()
 	err := s.db.VerifyRangeProof(ctx, rangeProof, start, end, root, keyLimit)
-	s.metrics.proofVerified(proofTypeRange, time.Since(verificationStart), err)
+	s.metrics.observeVerification(proofTypeRange, time.Since(verificationStart), err)
 	if err != nil {
 		return err
 	}
 
 	commitStart := time.Now()
 	nextKey, err := s.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
-	s.metrics.proofCommitted(proofTypeRange, time.Since(commitStart), err)
+	s.metrics.observeCommit(proofTypeRange, time.Since(commitStart), err)
 	if err != nil {
 		s.setError(err)
 		return nil

@@ -134,7 +134,7 @@ func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *p
 			endKey,
 			keyLimit,
 		)
-		h.metrics.proofGenerated(proofTypeRange, time.Since(generationStart), err)
+		h.metrics.observeGeneration(proofTypeRange, time.Since(generationStart), err)
 		if err != nil {
 			if errors.Is(err, ErrInsufficientHistory) {
 				return nil, nil // drop request
@@ -194,7 +194,7 @@ func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *
 	for keyLimit > 0 {
 		generationStart := time.Now()
 		changeProof, err := h.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
-		h.metrics.proofGenerated(proofTypeChange, time.Since(generationStart), err)
+		h.metrics.observeGeneration(proofTypeChange, time.Since(generationStart), err)
 		if err != nil {
 			if !errors.Is(err, ErrInsufficientHistory) {
 				// We should only fail to get a change proof if we have insufficient history.

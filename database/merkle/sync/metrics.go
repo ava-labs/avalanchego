@@ -128,11 +128,11 @@ func (m *syncerMetrics) proofReceived(proofType string, numBytes int) {
 	m.receivedProofSizeBytes.WithLabelValues(proofType).Observe(float64(numBytes))
 }
 
-func (m *syncerMetrics) proofVerified(proofType string, duration time.Duration, err error) {
+func (m *syncerMetrics) observeVerification(proofType string, duration time.Duration, err error) {
 	m.proofVerificationTime.WithLabelValues(proofType, resultLabelFor(err)).Observe(duration.Seconds())
 }
 
-func (m *syncerMetrics) proofCommitted(proofType string, duration time.Duration, err error) {
+func (m *syncerMetrics) observeCommit(proofType string, duration time.Duration, err error) {
 	m.proofCommitTime.WithLabelValues(proofType, resultLabelFor(err)).Observe(duration.Seconds())
 }
 
@@ -173,10 +173,10 @@ func newHandlerMetrics(namespace string, reg prometheus.Registerer) (*handlerMet
 	return &m, err
 }
 
-// proofGenerated records one proof generation attempt, labeling it a failure
-// if err is non-nil. A failure includes a change proof attempt that falls
-// back to a range proof; the fallback records its own range attempt.
-func (m *handlerMetrics) proofGenerated(proofType string, duration time.Duration, err error) {
+// observeGeneration records one proof generation attempt, labeling it a
+// failure if err is non-nil. A failure includes a change proof attempt that
+// falls back to a range proof; the fallback records its own range attempt.
+func (m *handlerMetrics) observeGeneration(proofType string, duration time.Duration, err error) {
 	m.proofGenerationTime.WithLabelValues(proofType, resultLabelFor(err)).Observe(duration.Seconds())
 }
 
