@@ -42,9 +42,9 @@ func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 }
 
 // Add writes the given messages to storage.
-func (b *Storage) Add(ms ...*warp.UnsignedMessage) error {
+func (b *Storage) Add(msgs ...*warp.UnsignedMessage) error {
 	batch := b.db.NewBatch()
-	for i, m := range ms {
+	for i, m := range msgs {
 		id := m.ID()
 		if err := batch.Put(id[:], m.Bytes()); err != nil {
 			return fmt.Errorf("writing message %s (%d) to batch: %w", id, i, err)
@@ -55,7 +55,7 @@ func (b *Storage) Add(ms ...*warp.UnsignedMessage) error {
 	}
 
 	// Cache after the DB write has succeeded to ensure the cache is consistent.
-	for _, m := range ms {
+	for _, m := range msgs {
 		b.cache.Put(m.ID(), m)
 	}
 	return nil
