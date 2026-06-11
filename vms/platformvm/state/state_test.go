@@ -2614,10 +2614,9 @@ func TestValidatorMetadataPersistsPreHelicon(t *testing.T) {
 			potentialReward,
 		)
 	)
-	state.AddTx(tx, status.Committed)
-
 	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
+	diff.AddTx(tx, status.Committed)
 	require.NoError(diff.PutCurrentValidator(wantValidator))
 	require.NoError(diff.SetStakingInfo(subnetID, nodeID, wantStakingInfo))
 	require.NoError(diff.Apply(state))
