@@ -42,8 +42,8 @@ func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 }
 
 // Add writes the given messages to storage.
-func (b *Storage) Add(msgs ...*warp.UnsignedMessage) error {
-	batch := b.db.NewBatch()
+func (s *Storage) Add(msgs ...*warp.UnsignedMessage) error {
+	batch := s.db.NewBatch()
 	for i, m := range msgs {
 		id := m.ID()
 		if err := batch.Put(id[:], m.Bytes()); err != nil {
@@ -56,21 +56,21 @@ func (b *Storage) Add(msgs ...*warp.UnsignedMessage) error {
 
 	// Cache after the DB write has succeeded to ensure the cache is consistent.
 	for _, m := range msgs {
-		b.cache.Put(m.ID(), m)
+		s.cache.Put(m.ID(), m)
 	}
 	return nil
 }
 
 // Get returns the message with the given ID.
-func (b *Storage) Get(id ids.ID) (*warp.UnsignedMessage, error) {
-	if m, ok := b.cache.Get(id); ok {
+func (s *Storage) Get(id ids.ID) (*warp.UnsignedMessage, error) {
+	if m, ok := s.cache.Get(id); ok {
 		return m, nil
 	}
-	if m, ok := b.overrides[id]; ok {
+	if m, ok := s.overrides[id]; ok {
 		return m, nil
 	}
 
-	bytes, err := b.db.Get(id[:])
+	bytes, err := s.db.Get(id[:])
 	if err != nil {
 		return nil, fmt.Errorf("loading message: %w", err)
 	}
@@ -79,6 +79,6 @@ func (b *Storage) Get(id ids.ID) (*warp.UnsignedMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing message: %w", err)
 	}
-	b.cache.Put(id, m)
+	s.cache.Put(id, m)
 	return m, nil
 }
