@@ -216,7 +216,7 @@ func (vm *VM) Initialize(
 		warpVerifier,
 		snowCtx.WarpSigner,
 	)
-	if err := vm.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+	if err := vm.AddHandler(acp118.HandlerID, warpHandler); err != nil {
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
 
