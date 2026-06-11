@@ -128,8 +128,8 @@ func (*hooks) SettledBy(*types.Header) hook.Settled {
 }
 
 func (*hooks) BlockTime(h *types.Header) time.Time {
-	// TODO(StephenButtolph): Extract milliseconds from the header.
-	return time.Unix(int64(h.Time), 0) //#nosec G115 -- Won't overflow for a few millennia
+	ms := customtypes.HeaderTimeMilliseconds(h)
+	return time.UnixMilli(int64(ms)) //#nosec G115 -- Won't overflow for a few millennia
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
@@ -193,13 +193,14 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	// TODO(StephenButtolph): Encode the ACP-176 target excess in the header.
 	// TODO(StephenButtolph): Encode the ACP-183 min price excess in the header.
 	// TODO(StephenButtolph): Enforce the minimum block time here.
+	now := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
 			Coinbase:         constants.BlackholeAddr,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
-			Time:             uint64(b.now().Unix()), //#nosec G115 -- Known non-negative
+			Time:             now / 1000,
 			BlobGasUsed:      new(uint64),
 			ExcessBlobGas:    new(uint64),
 			ParentBeaconRoot: new(common.Hash),
@@ -210,9 +211,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// included in [types.Header.GasUsed] with [hook.Op.Gas].
 			ExtDataGasUsed: big.NewInt(0),
 			// BlockGasCost has been set to 0 since the Granite upgrade.
-			BlockGasCost: big.NewInt(0),
-			// TODO(StephenButtolph): Encode the millisecond timestamp.
-			TimeMilliseconds: new(uint64),
+			BlockGasCost:     big.NewInt(0),
+			TimeMilliseconds: &now,
 			// TODO(StephenButtolph): Encode the min-delay excess.
 			MinDelayExcess: new(acp226.DelayExcess),
 		},
