@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	// Imported for [snowtest.Context] comment resolution.
-	"github.com/ava-labs/avalanchego/snow"
 	_ "github.com/ava-labs/avalanchego/snow/snowtest"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -43,13 +43,6 @@ func NewValidators(tb testing.TB, n int) *Validators {
 	for i := range nodeIDs {
 		nodeIDs[i] = ids.GenerateTestNodeID()
 	}
-	return NewValidatorsWithNodeIDs(tb, nodeIDs...)
-}
-
-// NewValidatorsWithNodeIDs creates one validator per nodeID, each with weight
-// 1 and a freshly generated BLS key.
-func NewValidatorsWithNodeIDs(tb testing.TB, nodeIDs ...ids.NodeID) *Validators {
-	tb.Helper()
 
 	signers := make([]bls.Signer, len(nodeIDs))
 	for i := range signers {
@@ -78,15 +71,6 @@ func NewValidatorsWithNodeIDs(tb testing.TB, nodeIDs ...ids.NodeID) *Validators 
 		validators: vdrs,
 		signers:    signers,
 	}
-}
-
-// NodeIDs returns the NodeIDs of every validator in the set.
-func (v *Validators) NodeIDs() set.Set[ids.NodeID] {
-	nodeIDs := set.NewSet[ids.NodeID](len(v.validators))
-	for _, vdr := range v.validators {
-		nodeIDs.Add(vdr.NodeIDs...)
-	}
-	return nodeIDs
 }
 
 // Sign signs msg with every validator and returns the signed message with a
@@ -132,8 +116,8 @@ func IncorrectlySign(tb testing.TB, msg *warp.UnsignedMessage) *warp.Message {
 	return signed
 }
 
-// SetValidators makes ctx serve vdrs as the local validator set for both
-// regular (GetValidatorSet) and warp (GetWarpValidatorSets).
+// SetValidators makes ctx serve vdrs as the local validator set for
+// GetWarpValidatorSets.
 //
 // ctx.ValidatorState MUST be a [validatorstest.State], which is the concrete
 // type installed by [snowtest.Context].
@@ -142,19 +126,6 @@ func SetValidators(tb testing.TB, ctx *snow.Context, vdrs *Validators) {
 
 	vdrState, ok := ctx.ValidatorState.(*validatorstest.State)
 	require.Truef(tb, ok, "unexpected type %T for validator state", ctx.ValidatorState)
-	vdrState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		out := make(map[ids.NodeID]*validators.GetValidatorOutput, len(vdrs.validators))
-		for _, vdr := range vdrs.validators {
-			for _, nodeID := range vdr.NodeIDs {
-				out[nodeID] = &validators.GetValidatorOutput{
-					NodeID:    nodeID,
-					PublicKey: vdr.PublicKey,
-					Weight:    vdr.Weight,
-				}
-			}
-		}
-		return out, nil
-	}
 	vdrState.GetWarpValidatorSetsF = func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
 		return map[ids.ID]validators.WarpSet{
 			ctx.SubnetID: validators.WarpSet{
