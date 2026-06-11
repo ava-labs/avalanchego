@@ -52,15 +52,14 @@ func TestStorage(t *testing.T) {
 			s := NewStorage(db, test.overrides...)
 			require.NoErrorf(t, s.Add(test.add...), "%T.Add(%d)", s, len(test.add))
 
-			msg, err := s.Get(test.id)
-			require.ErrorIsf(t, err, test.wantErr, "%T.Get(%s)", s, test.id)
-			require.Equalf(t, test.want, msg, "%T.Get(%s)", s, test.id)
-
-			// Verify the message was persisted.
-			s = NewStorage(db, test.overrides...)
-			msg, err = s.Get(test.id)
-			require.ErrorIsf(t, err, test.wantErr, "reloaded %T.Get(%s)", s, test.id)
-			require.Equalf(t, test.want, msg, "reloaded %T.Get(%s)", s, test.id)
+			for _, name := range []string{"cache", "db"} {
+				t.Run(name, func(t *testing.T) {
+					msg, err := s.Get(test.id)
+					require.ErrorIsf(t, err, test.wantErr, "%T.Get(%s)", s, test.id)
+					require.Equalf(t, test.want, msg, "%T.Get(%s)", s, test.id)
+				})
+				s = NewStorage(db, test.overrides...)
+			}
 		})
 	}
 }
