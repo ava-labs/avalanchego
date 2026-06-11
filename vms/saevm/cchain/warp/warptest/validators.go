@@ -6,9 +6,7 @@
 package warptest
 
 import (
-	"bytes"
 	"context"
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -27,11 +26,10 @@ import (
 )
 
 // Validators is a BLS warp validator set held in canonical (public-key-sorted)
-// order, retaining each validator's signer so that the signer bitset of a
-// signature it produces lines up with the validator set used to verify it.
+// order.
 type Validators struct {
 	validators []*validators.Warp
-	signers    []bls.Signer // parallel to validators
+	signers    map[string]bls.Signer // pk bytes -> signer
 }
 
 // NewValidators creates n validators, each with weight 1, a fresh NodeID, and
@@ -51,29 +49,25 @@ func NewValidators(tb testing.TB, n int) *Validators {
 func NewValidatorsWithNodeIDs(tb testing.TB, nodeIDs ...ids.NodeID) *Validators {
 	tb.Helper()
 
-	signers := make([]bls.Signer, len(nodeIDs))
-	for i := range signers {
+	var (
+		vdrs    = make([]*validators.Warp, len(nodeIDs))
+		signers = make(map[string]bls.Signer, len(nodeIDs))
+	)
+	for i, nodeID := range nodeIDs {
 		sk, err := localsigner.New()
-		require.NoError(tb, err)
-		signers[i] = sk
-	}
-	slices.SortFunc(signers, func(a, b bls.Signer) int {
-		return bytes.Compare(
-			bls.PublicKeyToUncompressedBytes(a.PublicKey()),
-			bls.PublicKeyToUncompressedBytes(b.PublicKey()),
-		)
-	})
+		require.NoError(tb, err, "localsigner.New()")
 
-	vdrs := make([]*validators.Warp, len(nodeIDs))
-	for i, sk := range signers {
 		pk := sk.PublicKey()
+		pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 		vdrs[i] = &validators.Warp{
 			PublicKey:      pk,
-			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+			PublicKeyBytes: pkBytes,
 			Weight:         1,
-			NodeIDs:        []ids.NodeID{nodeIDs[i]},
+			NodeIDs:        []ids.NodeID{nodeID},
 		}
+		signers[string(pkBytes)] = sk
 	}
+	utils.Sort(vdrs)
 	return &Validators{
 		validators: vdrs,
 		signers:    signers,
@@ -94,22 +88,25 @@ func (v *Validators) NodeIDs() set.Set[ids.NodeID] {
 func (v *Validators) Sign(tb testing.TB, msg *warp.UnsignedMessage) *warp.Message {
 	tb.Helper()
 
-	signatures := make([]*bls.Signature, len(v.signers))
-	signerIndices := set.NewBits()
-	for i, sk := range v.signers {
+	var (
+		sigs    = make([]*bls.Signature, len(v.signers))
+		signers = set.NewBits()
+	)
+	for i, vdr := range v.validators {
+		sk := v.signers[string(vdr.PublicKeyBytes)]
 		sig, err := sk.Sign(msg.Bytes())
 		require.NoErrorf(tb, err, "%T.Sign(...)", sk)
-		signatures[i] = sig
-		signerIndices.Add(i)
+		sigs[i] = sig
+		signers.Add(i)
 	}
 
-	aggSig, err := bls.AggregateSignatures(signatures)
+	aggSig, err := bls.AggregateSignatures(sigs)
 	require.NoError(tb, err, "bls.AggregateSignatures(...)")
 
 	signed, err := warp.NewMessage(
 		msg,
 		&warp.BitSetSignature{
-			Signers:   signerIndices.Bytes(),
+			Signers:   signers.Bytes(),
 			Signature: [bls.SignatureLen]byte(bls.SignatureToBytes(aggSig)),
 		},
 	)
