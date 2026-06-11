@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	// Imported for [snowtest.Context] comment resolution.
-	"github.com/ava-labs/avalanchego/snow"
 	_ "github.com/ava-labs/avalanchego/snow/snowtest"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils"
