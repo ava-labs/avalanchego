@@ -64,11 +64,12 @@ pub use linear::{FileIoError, ReadableStorage, WritableStorage};
 pub use node::path::{NibblesIterator, Path};
 pub use node::{BranchNode, Child, Children, ChildrenSlots, LeafNode, Node, PathIterItem};
 pub use nodestore::{
-    AreaIndex, Committed, CommittedId, CommittedParentHash, HashedNodeReader, ImmutableProposal,
-    LinearAddress, Mutable, MutableKind, NodeHashAlgorithm, NodeHashAlgorithmTryFromIntError,
-    NodeReader, NodeStore, NodeStoreHeader, Parentable, Propose, Recon, Reconstructed,
-    ReconstructionSource, RootReader, TrieReader, fix_account_storage_root_value,
-    hash_node_as_storage_trie_root_for_node, hash_node_as_storage_trie_root_parts,
+    AreaIndex, Committed, CommittedId, CommittedParentHash, DeletedNodeTracking, HashedNodeReader,
+    ImmutableProposal, LinearAddress, Mutable, MutableKind, NodeHashAlgorithm,
+    NodeHashAlgorithmTryFromIntError, NodeReader, NodeStore, NodeStoreHeader, Parentable, Propose,
+    Recon, Reconstructed, ReconstructionSource, RootReader, TrieReader,
+    fix_account_storage_root_value, hash_node_as_storage_trie_root_for_node,
+    hash_node_as_storage_trie_root_parts,
 };
 pub use path::{
     ComponentIter, IntoSplitPath, JoinedPath, PackedBytes, PackedPathComponents, PackedPathRef,

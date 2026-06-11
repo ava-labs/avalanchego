@@ -3,7 +3,7 @@
 
 use crate::api::OptionalHashKeyExt;
 use crate::merkle::Merkle;
-use firewood_storage::{Committed, MemStore, NodeStore};
+use firewood_storage::{Committed, DeletedNodeTracking, MemStore, NodeStore};
 
 use super::*;
 use ethereum_types::H256;
@@ -695,7 +695,8 @@ fn test_range_proof_fixes_legacy_zeroed_storage_root() {
     let header = NodeStoreHeader::read_from_storage(&*storage).unwrap();
 
     // Re-open from the clobbered MemStore so all reads come from disk.
-    let merkle = Merkle::from(NodeStore::open(&header, storage).unwrap());
+    let merkle =
+        Merkle::from(NodeStore::open(&header, storage, DeletedNodeTracking::Enabled).unwrap());
 
     // Sanity check: the stored values now contain dummy zeros.
     for (k, _) in &*accounts {

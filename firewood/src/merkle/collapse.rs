@@ -408,13 +408,14 @@ impl<S: ReadableStorage> Merkle<NodeStore<Mutable<Propose>, S>> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use firewood_storage::MemStore;
+    use firewood_storage::{DeletedNodeTracking, MemStore};
 
     use super::*;
 
     fn create_test_merkle() -> Merkle<NodeStore<Mutable<Propose>, MemStore>> {
         let memstore = MemStore::default();
-        let nodestore = NodeStore::new_empty_proposal(memstore.into());
+        let nodestore =
+            NodeStore::new_empty_proposal(memstore.into(), DeletedNodeTracking::Enabled);
         Merkle { nodestore }
     }
 

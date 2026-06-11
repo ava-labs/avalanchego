@@ -656,6 +656,7 @@ pub mod test_utils {
 #[expect(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
+    use crate::DeletedNodeTracking;
     use crate::area_index;
     use crate::linear::memory::MemStore;
     use rand::seq::IteratorRandom;
@@ -684,7 +685,8 @@ mod tests {
     fn free_list_iterator() {
         let mut rng = crate::SeededRng::from_env_or_random();
         let memstore = MemStore::default();
-        let nodestore = NodeStore::new_empty_committed(memstore.into());
+        let nodestore =
+            NodeStore::new_empty_committed(memstore.into(), DeletedNodeTracking::Enabled);
 
         let area_index = rng.random_range(0..AreaIndex::NUM_AREA_SIZES as u8);
         let area_index_type = AreaIndex::try_from(area_index).unwrap();
@@ -737,7 +739,8 @@ mod tests {
     fn free_list_iter_with_metadata() {
         let rng = crate::SeededRng::from_env_or_random();
         let memstore = MemStore::default();
-        let nodestore = NodeStore::new_empty_committed(memstore.into());
+        let nodestore =
+            NodeStore::new_empty_committed(memstore.into(), DeletedNodeTracking::Enabled);
 
         let mut free_lists = FreeLists::default();
         let mut offset = NodeStoreHeader::SIZE;
@@ -863,7 +866,8 @@ mod tests {
         const AREA_INDEX2_PLUS_1: AreaIndex = area_index!(6);
 
         let memstore = MemStore::default();
-        let nodestore = NodeStore::new_empty_committed(memstore.into());
+        let nodestore =
+            NodeStore::new_empty_committed(memstore.into(), DeletedNodeTracking::Enabled);
 
         let mut free_lists = FreeLists::default();
         let mut offset = NodeStoreHeader::SIZE;

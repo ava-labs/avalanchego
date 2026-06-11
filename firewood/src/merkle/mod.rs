@@ -27,10 +27,10 @@ use crate::{
 use firewood_metrics::{HistogramExt, firewood_counter, firewood_histogram};
 use firewood_storage::MemStore;
 use firewood_storage::{
-    BranchNode, Child, Children, FileIoError, HashType, HashableShunt, HashedNodeReader,
-    ImmutableProposal, IntoHashType, LeafNode, MaybePersistedNode, Mutable, MutableKind,
-    NibblesIterator, Node, NodeStore, Path, PathBuf, PathComponent, Propose, ReadableStorage,
-    SharedNode, TrieHash, TrieReader, U4, ValueDigest,
+    BranchNode, Child, Children, DeletedNodeTracking, FileIoError, HashType, HashableShunt,
+    HashedNodeReader, ImmutableProposal, IntoHashType, LeafNode, MaybePersistedNode, Mutable,
+    MutableKind, NibblesIterator, Node, NodeStore, Path, PathBuf, PathComponent, Propose,
+    ReadableStorage, SharedNode, TrieHash, TrieReader, U4, ValueDigest,
 };
 use firewood_storage::{
     hash_node_as_storage_trie_root_for_node, hash_node_as_storage_trie_root_parts,
@@ -989,7 +989,7 @@ fn verify_range_proof_root_hash<H: ProofCollection<Node = ProofNode>>(
 ) -> Result<(), api::Error> {
     // Build in-memory merkle from key-value pairs
     let memstore = MemStore::default();
-    let nodestore = NodeStore::new_empty_proposal(memstore.into());
+    let nodestore = NodeStore::new_empty_proposal(memstore.into(), DeletedNodeTracking::Enabled);
     let mut proving_merkle: Merkle<NodeStore<Mutable<Propose>, MemStore>> = Merkle::from(nodestore);
 
     for (key, value) in key_values {

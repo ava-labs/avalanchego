@@ -654,7 +654,9 @@ impl<I: Iterator<Item = T>, T: KeyValuePair, K: KeyType> Iterator for FilteredKe
 mod tests {
     use super::*;
     use crate::merkle::Merkle;
-    use firewood_storage::{ImmutableProposal, MemStore, Mutable, NodeStore, Propose};
+    use firewood_storage::{
+        DeletedNodeTracking, ImmutableProposal, MemStore, Mutable, NodeStore, Propose,
+    };
     use std::sync::Arc;
     use test_case::test_case;
 
@@ -671,7 +673,7 @@ mod tests {
     pub(super) fn create_test_merkle() -> Merkle<NodeStore<Mutable<Propose>, MemStore>> {
         let memstore = MemStore::default();
         let memstore = Arc::new(memstore);
-        let nodestore = NodeStore::new_empty_proposal(memstore);
+        let nodestore = NodeStore::new_empty_proposal(memstore, DeletedNodeTracking::Enabled);
         Merkle::from(nodestore)
     }
 

@@ -8,7 +8,7 @@ use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use firewood::Merkle;
 use firewood::api::{Db as _, Proposal as _};
 use firewood::db::{BatchOp, DbConfig};
-use firewood_storage::{MemStore, NodeHashAlgorithm, NodeStore};
+use firewood_storage::{DeletedNodeTracking, MemStore, NodeHashAlgorithm, NodeStore};
 use pprof::ProfilerGuard;
 use rand::{RngExt, distr::Alphanumeric};
 use std::fs::File;
@@ -70,7 +70,8 @@ fn bench_merkle<const NKEYS: usize, const KEYSIZE: usize>(criterion: &mut Criter
             b.iter_batched(
                 || {
                     let store = Arc::new(MemStore::default());
-                    let nodestore = NodeStore::new_empty_proposal(store);
+                    let nodestore =
+                        NodeStore::new_empty_proposal(store, DeletedNodeTracking::Enabled);
                     let merkle = Merkle::from(nodestore);
 
                     let keys: Vec<Vec<u8>> =

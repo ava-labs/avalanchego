@@ -27,9 +27,9 @@ use firewood_metrics::{GaugeExt, firewood_counter, firewood_gauge, firewood_hist
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::RootStore;
 use firewood_storage::{
-    BranchNode, Committed, CommittedId, FileBacked, FileIoError, HashedNodeReader,
-    ImmutableProposal, Mutable, MutableKind, NodeHashAlgorithm, NodeStore, NodeStoreHeader,
-    Propose, Recon, TrieHash,
+    BranchNode, Committed, CommittedId, DeletedNodeTracking, FileBacked, FileIoError,
+    HashedNodeReader, ImmutableProposal, Mutable, MutableKind, NodeHashAlgorithm, NodeStore,
+    NodeStoreHeader, Propose, Recon, TrieHash,
 };
 
 pub(crate) const DB_FILE_NAME: &str = "firewood.db";
@@ -195,7 +195,17 @@ impl RevisionManager {
             }
             Err(err) => return Err(err.into()),
         };
-        let nodestore = Arc::new(NodeStore::open(&header, storage.clone())?);
+
+        let deleted_node_tracking = if config.root_store {
+            DeletedNodeTracking::Disabled
+        } else {
+            DeletedNodeTracking::Enabled
+        };
+        let nodestore = Arc::new(NodeStore::open(
+            &header,
+            storage.clone(),
+            deleted_node_tracking,
+        )?);
         let root_store = config
             .root_store
             .then(|| {
@@ -539,7 +549,15 @@ impl RevisionManager {
         //    against the file backing carried by the latest committed revision.
         if HashKey::default_root_hash().as_ref() == Some(&root_hash) {
             let storage = self.current_revision().storage().clone();
-            return Ok(Arc::new(NodeStore::new_empty_committed(storage)));
+            let deleted_node_tracking = if self.root_store.is_some() {
+                DeletedNodeTracking::Disabled
+            } else {
+                DeletedNodeTracking::Enabled
+            };
+            return Ok(Arc::new(NodeStore::new_empty_committed(
+                storage,
+                deleted_node_tracking,
+            )));
         }
 
         // 3. Check `RootStore` (if it exists).

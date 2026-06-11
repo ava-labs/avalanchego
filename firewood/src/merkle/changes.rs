@@ -577,8 +577,9 @@ mod tests {
     };
 
     use firewood_storage::{
-        Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, MemStore, Mutable,
-        NodeStore, Propose, SeededRng, TestRecorder, TrieReader,
+        Committed, DeletedNodeTracking, FileBacked, FileIoError, HashedNodeReader,
+        ImmutableProposal, MemStore, Mutable, NodeStore, Propose, SeededRng, TestRecorder,
+        TrieReader,
     };
     use lender::Lender;
     use std::{collections::HashSet, ops::Deref, path::PathBuf, sync::Arc};
@@ -624,7 +625,8 @@ mod tests {
 
     fn create_test_merkle() -> Merkle<NodeStore<Mutable<Propose>, MemStore>> {
         let memstore = MemStore::default();
-        let nodestore = NodeStore::new_empty_proposal(Arc::new(memstore));
+        let nodestore =
+            NodeStore::new_empty_proposal(Arc::new(memstore), DeletedNodeTracking::Enabled);
         Merkle::from(nodestore)
     }
 
