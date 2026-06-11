@@ -1,6 +1,8 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package warp handles the parsing, verification, and storage of Avalanche Warp
+// Messages.
 package warp
 
 import (
