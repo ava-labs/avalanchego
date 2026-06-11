@@ -8,19 +8,39 @@ package adaptor
 
 import (
 	"context"
+	"net/http"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
+type Network interface {
+	common.AppHandler
+	validators.Connector
+}
+
 // ChainVM defines the functionality required in order to be converted into a
-// Snowman VM. See the respective methods on [block.ChainVM] and [snowman.Block]
+// Snowman ChainVM. See the respective methods on [block.ChainVM] and [snowman.Block]
 // for detailed documentation.
 type ChainVM[BP BlockProperties] interface {
-	common.VM
+	Network
+
+	// From [common.VM]
+	health.Checker
+	Initialize(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, []*common.Fx, common.AppSender) error
+	SetState(ctx context.Context, state snow.State) error
+	Shutdown(context.Context) error
+	Version(context.Context) (string, error)
+	CreateHandlers(context.Context) (map[string]http.Handler, error)
+	NewHTTPHandler(ctx context.Context) (http.Handler, error)
+	WaitForEvent(ctx context.Context) (common.Message, error)
 
 	GetBlock(context.Context, ids.ID) (BP, error)
 	ParseBlock(context.Context, []byte) (BP, error)

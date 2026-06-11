@@ -14,16 +14,15 @@ import (
 // [block.StateSyncableVM] and [block.StateSummary] for more documentation.
 type SyncableVM[BP BlockProperties, SP SummaryProperties] interface {
 	ChainVM[BP]
-	SummaryAcceptor[SP]
+	StateSyncable[SP]
+}
 
+type StateSyncable[SP SummaryProperties] interface {
 	StateSyncEnabled(context.Context) (bool, error)
 	GetLastStateSummary(context.Context) (SP, error)
 	GetOngoingSyncStateSummary(context.Context) (SP, error)
 	GetStateSummary(context.Context, uint64) (SP, error)
 	ParseStateSummary(context.Context, []byte) (SP, error)
-}
-
-type SummaryAcceptor[SP SummaryProperties] interface {
 	AcceptSummary(context.Context, SP) (block.StateSyncMode, error)
 }
 
@@ -60,7 +59,7 @@ type syncAdaptor[BP BlockProperties, SP SummaryProperties] struct {
 // [Summary.Unwrap].
 type Summary[SP SummaryProperties] struct {
 	s  SP
-	vm SummaryAcceptor[SP]
+	vm StateSyncable[SP]
 }
 
 // Unwrap returns the underlying [SummaryProperties] of the [Summary].
