@@ -45,6 +45,8 @@ func VerifyBlock(
 			continue
 		}
 		if blockContext == nil {
+			// This can never happen after scheduling any goroutines, so this
+			// return doesn't cause any goroutine leaks.
 			return nil, errNoBlockContext
 		}
 		results = append(results, result{
