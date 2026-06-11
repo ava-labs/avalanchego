@@ -130,7 +130,7 @@ func IncorrectlySign(tb testing.TB, msg *warp.UnsignedMessage) *warp.Message {
 }
 
 // SetValidators makes ctx serve vdrs as the local validator set for both
-// regular (GetValidatorSet) and warp (GetWarpValidatorSets).
+// GetWarpValidatorSets and GetValidatorSet.
 //
 // ctx.ValidatorState MUST be a [validatorstest.State], which is the concrete
 // type installed by [snowtest.Context].
