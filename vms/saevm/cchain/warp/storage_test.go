@@ -11,13 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
-
-var sourceChainID = ids.GenerateTestID()
 
 func newHash(tb testing.TB) (*warp.UnsignedMessage, *payload.Hash) {
 	p, err := payload.NewHash(
@@ -25,7 +24,7 @@ func newHash(tb testing.TB) (*warp.UnsignedMessage, *payload.Hash) {
 	)
 	require.NoError(tb, err, "payload.NewHash()")
 
-	m, err := warp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, p.Bytes())
+	m, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
 	require.NoError(tb, err, "warp.NewUnsignedMessage()")
 	return m, p
 }
@@ -37,7 +36,7 @@ func newAddressedCall(tb testing.TB) (*warp.UnsignedMessage, *payload.AddressedC
 	)
 	require.NoError(tb, err, "payload.NewAddressedCall()")
 
-	m, err := warp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, p.Bytes())
+	m, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
 	require.NoError(tb, err, "warp.NewUnsignedMessage()")
 	return m, p
 }

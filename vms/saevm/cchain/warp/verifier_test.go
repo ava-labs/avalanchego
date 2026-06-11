@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -33,7 +34,7 @@ func TestVerifier(t *testing.T) {
 	addressedCallMsg, _ := newAddressedCall(t)
 	hashMsg, hash := newHash(t)
 
-	invalidPayloadMsg, err := warp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, nil)
+	invalidPayloadMsg, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, nil)
 	require.NoError(t, err)
 
 	tests := []struct {
