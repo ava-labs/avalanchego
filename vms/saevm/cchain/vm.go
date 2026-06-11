@@ -79,6 +79,15 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
+	// Treat all transactions equally regardless of submission source — no
+	// preferential admission or pricing for locally-submitted txs.
+	mempoolConfig := legacypool.DefaultConfig
+	mempoolConfig.NoLocals = true
+
+	saeConfig := sae.Config{
+		MempoolConfig: mempoolConfig,
+		DBConfig:      saedb.Config{},
+	}
 	// TODO(StephenButtolph): Allow minimal user configuration via configBytes.
 	_ = configBytes
 
@@ -86,8 +95,7 @@ func (vm *VM) Initialize(
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
-	trieDBConfig := triedb.HashDefaults
-	trieDB := triedb.NewDatabase(ethDB, trieDBConfig)
+	trieDB := triedb.NewDatabase(ethDB, saeConfig.DBConfig.TrieDBConfig(snowCtx))
 
 	// TODO(StephenButtolph): Replace this with Coreth's genesis format.
 	genesis := new(core.Genesis)
@@ -113,16 +121,7 @@ func (vm *VM) Initialize(
 		vm.state,
 		pendingTxs,
 	)
-	mempoolConfig := legacypool.DefaultConfig
-	// Treat all transactions equally regardless of submission source — no
-	// preferential admission or pricing for locally-submitted txs.
-	mempoolConfig.NoLocals = true
-	saeConfig := sae.Config{
-		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			TrieDBConfig: trieDBConfig,
-		},
-	}
+
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)

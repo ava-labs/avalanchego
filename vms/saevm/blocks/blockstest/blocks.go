@@ -15,7 +15,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -132,10 +131,14 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 		Alloc:     alloc,
 	}
 
-	tdb := state.NewDatabaseWithConfig(db, conf.tdbConfig).TrieDB()
-	_, hash, err := core.SetupGenesisBlock(db, tdb, gen)
+	tdb := triedb.NewDatabase(db, conf.tdbConfig)
+	defer func() {
+		if err := tdb.Close(); err != nil {
+			tb.Errorf("triedb.Database.Close(): %v", err)
+		}
+	}()
+	_, _, err := core.SetupGenesisBlock(db, tdb, gen)
 	require.NoError(tb, err, "core.SetupGenesisBlock()")
-	require.NoErrorf(tb, tdb.Commit(hash, true), "%T.Commit(core.SetupGenesisBlock(...))", tdb)
 
 	b := NewBlock(tb, gen.ToBlock(), nil, nil)
 	h := hookstest.NewStub(conf.gasTarget)

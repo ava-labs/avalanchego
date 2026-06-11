@@ -184,7 +184,7 @@ func NewVM[T hook.Transaction](
 			xdb,
 			cfg.DBConfig,
 			hooks,
-			snowCtx.Log,
+			snowCtx,
 			reg,
 		)
 		if err != nil {
