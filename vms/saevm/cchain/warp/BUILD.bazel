@@ -4,10 +4,9 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "warp",
     srcs = [
-        "predicates.go",
-        "receipts.go",
         "storage.go",
         "verifier.go",
+        "warp.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp",
     visibility = ["//visibility:public"],
@@ -36,12 +35,13 @@ go_library(
 go_test(
     name = "warp_test",
     srcs = [
-        "predicates_test.go",
         "storage_test.go",
         "verifier_test.go",
+        "warp_test.go",
     ],
     embed = [":warp"],
     deps = [
+        "//codec",
         "//database",
         "//database/memdb",
         "//graft/coreth/params/extras",
@@ -61,6 +61,7 @@ go_test(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
     ],
 )
 

@@ -11,35 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
-
-func newHash(tb testing.TB) (*warp.UnsignedMessage, *payload.Hash) {
-	p, err := payload.NewHash(
-		ids.GenerateTestID(),
-	)
-	require.NoError(tb, err, "payload.NewHash()")
-
-	m, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
-	require.NoError(tb, err, "warp.NewUnsignedMessage()")
-	return m, p
-}
-
-func newAddressedCall(tb testing.TB) (*warp.UnsignedMessage, *payload.AddressedCall) {
-	p, err := payload.NewAddressedCall(
-		utils.RandomBytes(20),
-		[]byte("test"),
-	)
-	require.NoError(tb, err, "payload.NewAddressedCall()")
-
-	m, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
-	require.NoError(tb, err, "warp.NewUnsignedMessage()")
-	return m, p
-}
 
 func TestStorage(t *testing.T) {
 	msg, _ := newAddressedCall(t)
@@ -79,15 +52,14 @@ func TestStorage(t *testing.T) {
 			s := NewStorage(db, test.overrides...)
 			require.NoErrorf(t, s.Add(test.add...), "%T.Add(%d)", s, len(test.add))
 
-			msg, err := s.Get(test.id)
-			require.ErrorIsf(t, err, test.wantErr, "%T.Get(%s)", s, test.id)
-			require.Equalf(t, test.want, msg, "%T.Get(%s)", s, test.id)
-
-			// Verify the message was persisted.
-			s = NewStorage(db, test.overrides...)
-			msg, err = s.Get(test.id)
-			require.ErrorIsf(t, err, test.wantErr, "reloaded %T.Get(%s)", s, test.id)
-			require.Equalf(t, test.want, msg, "reloaded %T.Get(%s)", s, test.id)
+			for _, name := range []string{"cache", "db"} {
+				t.Run(name, func(t *testing.T) {
+					msg, err := s.Get(test.id)
+					require.ErrorIsf(t, err, test.wantErr, "%T.Get(%s)", s, test.id)
+					require.Equalf(t, test.want, msg, "%T.Get(%s)", s, test.id)
+				})
+				s = NewStorage(db, test.overrides...)
+			}
 		})
 	}
 }

@@ -15,11 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -28,6 +31,29 @@ import (
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
+}
+
+func newHash(tb testing.TB) (*avalanchewarp.UnsignedMessage, *payload.Hash) {
+	p, err := payload.NewHash(
+		ids.GenerateTestID(),
+	)
+	require.NoError(tb, err, "payload.NewHash()")
+
+	m, err := avalanchewarp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
+	require.NoError(tb, err, "warp.NewUnsignedMessage()")
+	return m, p
+}
+
+func newAddressedCall(tb testing.TB) (*avalanchewarp.UnsignedMessage, *payload.AddressedCall) {
+	p, err := payload.NewAddressedCall(
+		utils.RandomBytes(20),
+		[]byte("test"),
+	)
+	require.NoError(tb, err, "payload.NewAddressedCall()")
+
+	m, err := avalanchewarp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
+	require.NoError(tb, err, "warp.NewUnsignedMessage()")
+	return m, p
 }
 
 // newSendWarpMessageLog returns the log emitted by the warp precompile when
@@ -44,11 +70,11 @@ func newSendWarpMessageLog(tb testing.TB, msg []byte) *types.Log {
 
 func TestFromReceipts(t *testing.T) {
 	var (
-		msg0, _ = newAddressedCall(t)
-		msg1, _ = newAddressedCall(t)
+		hash, _ = newHash(t)
+		call, _ = newAddressedCall(t)
 
-		warpLog0 = newSendWarpMessageLog(t, msg0.Bytes())
-		warpLog1 = newSendWarpMessageLog(t, msg1.Bytes())
+		warpHash = newSendWarpMessageLog(t, hash.Bytes())
+		warpCall = newSendWarpMessageLog(t, call.Bytes())
 		otherLog = &types.Log{
 			Address: common.Address{1},
 			Data:    []byte("not a warp message"),
@@ -78,28 +104,27 @@ func TestFromReceipts(t *testing.T) {
 		{
 			name: "single_message",
 			logs: [][]*types.Log{
-				{warpLog0},
+				{warpHash},
 			},
-			want: []*avalanchewarp.UnsignedMessage{msg0},
+			want: []*avalanchewarp.UnsignedMessage{hash},
 		},
 		{
 			name: "multiple_messages_in_order",
 			logs: [][]*types.Log{
-				{warpLog1, otherLog, warpLog0},
-				{otherLog, warpLog1},
+				{warpCall, otherLog, warpHash},
+				{otherLog, warpCall},
 			},
-			want: []*avalanchewarp.UnsignedMessage{msg1, msg0, msg1},
+			want: []*avalanchewarp.UnsignedMessage{call, hash, call},
 		},
 		{
 			name: "invalid_log_data",
 			logs: [][]*types.Log{
 				{
-					// 0xFFFF is not a registered codec version, so the event
-					// data unpacks but the message fails to parse.
-					newSendWarpMessageLog(t, []byte{0xFF, 0xFF}),
+					// nil is not a valid warp message format.
+					newSendWarpMessageLog(t, nil),
 				},
 			},
-			wantErr: codec.ErrUnknownVersion,
+			wantErr: codec.ErrCantUnpackVersion,
 		},
 	}
 	for _, test := range tests {
@@ -319,7 +344,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 					// A unique nonce gives every transaction a distinct hash,
 					// matching the per-tx work of a real block.
 					txs[i] = types.NewTx(&types.DynamicFeeTx{
-						Nonce:      uint64(i),
+						Nonce:      uint64(i), //#nosec G115 -- Known non-negative
 						AccessList: accessList,
 					})
 				}
