@@ -304,11 +304,10 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 }
 
 // trieHash creates a new proposal from either a committable proposal or the tip of the database.
-// Returns (non-nil, true, nil) if a proposal was successfully created.
-// Returns (nil, true, nil) when the ops produce no state change (nothing to track).
-// Returns (nil, false, nil) when the parent root exists but is not proposable.
-// Returns (nil, _, err) for any error.
-func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*proposalRef, bool, error) {
+// Returns (non-nil, nil) if a proposal was successfully created.
+// Returns (nil, nil) if the parent revision cannot be used as the base for a proposal.
+// Returns (nil, err) for any error.
+func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*proposalRef, error) {
 	parent, foundProposal := t.committable[parentRoot]
 	var propose func([]ffi.BatchOp) (*ffi.Proposal, error)
 	switch {
@@ -320,21 +319,21 @@ func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*prop
 	default:
 		// check if a reconstruction could be made
 		if rev, err := t.Firewood.Revision(ffi.Hash(parentRoot)); err == nil {
-			return nil, false, rev.Drop()
+			return nil, rev.Drop()
 		}
-		return nil, false, fmt.Errorf("parent root %+x not found in database", parentRoot)
+		return nil, fmt.Errorf("parent root %+x not found in database", parentRoot)
 	}
 
 	proposal, err := propose(batchOps)
 	if err != nil {
-		return nil, false, fmt.Errorf("creating proposal: %w", err)
+		return nil, fmt.Errorf("creating proposal: %w", err)
 	}
 
 	return &proposalRef{
 		p:      proposal,
 		root:   common.Hash(proposal.Root()),
 		parent: parent,
-	}, true, nil
+	}, nil
 }
 
 // trieCommit considers the provided proposal as canonical.

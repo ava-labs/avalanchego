@@ -70,11 +70,11 @@ func (a *accountTrie) hash() (common.Hash, error) {
 		return a.root, nil
 	}
 
-	proposal, available, err := a.fw.trieHash(a.parentRoot, a.updateOps)
+	proposal, err := a.fw.trieHash(a.parentRoot, a.updateOps)
 	switch {
 	case err != nil:
 		return common.Hash{}, err
-	case !available:
+	case proposal == nil:
 		// TODO(#5506): Create [ffi.Reconstructed] to allow stateful RPCs.
 		return common.Hash{}, fmt.Errorf("base revision %#x is not proposable", a.parentRoot)
 	}
