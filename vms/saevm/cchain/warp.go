@@ -15,12 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 )
 
-// warpBackend adapts [sae.VM] to the [warp.Backend] interface.
+var _ warp.Backend = (*warpBackend)(nil)
+
 type warpBackend struct {
 	vm *sae.VM
 }
-
-var _ warp.Backend = (*warpBackend)(nil)
 
 func (w *warpBackend) IsAccepted(ctx context.Context, blkID ids.ID) error {
 	b, err := w.vm.GetBlock(ctx, blkID)
