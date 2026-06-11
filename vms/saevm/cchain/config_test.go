@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/libevm/common/hexutil"
 )
 
 func TestParseConfig(t *testing.T) {
