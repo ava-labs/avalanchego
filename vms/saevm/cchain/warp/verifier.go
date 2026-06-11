@@ -6,6 +6,7 @@ package warp
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -43,13 +44,14 @@ type Backend interface {
 const (
 	StorageErrCode = iota + 1
 	ParseErrCode
+	UnknownMessageErrCode
 	NotAcceptedErrCode
 )
 
 // Verify verifies that this node should sign m.
 func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte) *common.AppError {
-	// If the message was sent by the precompile, it will be available in
-	// storage.
+	// If the message was sent by the precompile or registered as an off-chain
+	// message, it will be available in storage.
 	_, err := v.storage.Get(m.ID())
 	if err == nil { // if NO error
 		return nil
@@ -63,7 +65,7 @@ func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte
 
 	// Block acceptance doesn't go through the precompile, so we need to check
 	// whether the message is for an accepted block.
-	p, err := payload.ParseHash(m.Payload)
+	p, err := payload.Parse(m.Payload)
 	if err != nil {
 		return &common.AppError{
 			Code:    ParseErrCode,
@@ -71,7 +73,15 @@ func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte
 		}
 	}
 
-	if err := v.backend.IsAccepted(ctx, p.Hash); err != nil {
+	hash, ok := p.(*payload.Hash)
+	if !ok {
+		return &common.AppError{
+			Code:    UnknownMessageErrCode,
+			Message: fmt.Sprintf("unknown %T message", p),
+		}
+	}
+
+	if err := v.backend.IsAccepted(ctx, hash.Hash); err != nil {
 		return &common.AppError{
 			Code:    NotAcceptedErrCode,
 			Message: "block not marked as accepted: " + err.Error(),

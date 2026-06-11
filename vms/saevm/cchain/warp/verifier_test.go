@@ -61,7 +61,7 @@ func TestVerifier(t *testing.T) {
 			name: "unknown_message",
 			m:    addressedCallMsg,
 			want: &common.AppError{
-				Code: ParseErrCode,
+				Code: UnknownMessageErrCode,
 			},
 		},
 		{
