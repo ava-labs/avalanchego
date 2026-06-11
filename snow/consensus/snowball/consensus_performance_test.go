@@ -34,12 +34,12 @@ func TestDualAlphaOptimization(t *testing.T) {
 	dualAlphaNetwork := NewNetwork(SnowballFactory, params, numColors, source)
 
 	source.Seed(seed)
-	for i := 0; i < numNodes; i++ {
+	for range numNodes {
 		dualAlphaNetwork.AddNode(NewTree)
 	}
 
 	source.Seed(seed)
-	for i := 0; i < numNodes; i++ {
+	for range numNodes {
 		singleAlphaNetwork.AddNode(NewTree)
 	}
 
@@ -65,12 +65,12 @@ func TestTreeConvergenceOptimization(t *testing.T) {
 	flatNetwork := NewNetwork(SnowballFactory, params, numColors, source)
 
 	source.Seed(seed)
-	for i := 0; i < numNodes; i++ {
+	for range numNodes {
 		treeNetwork.AddNode(NewTree)
 	}
 
 	source.Seed(seed)
-	for i := 0; i < numNodes; i++ {
+	for range numNodes {
 		flatNetwork.AddNode(NewFlat)
 	}
 

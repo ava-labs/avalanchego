@@ -32,7 +32,7 @@ func TestConvergenceSnowFlakeSnowBall(t *testing.T) {
 
 		t.Run(fmt.Sprintf("%d nodes", numNodes), func(t *testing.T) {
 			n := NewNetwork(params, 10, prng.NewMT19937())
-			for i := 0; i < numNodes; i++ {
+			for i := range numNodes {
 				var sbFactory snowball.Factory
 				if i%2 == 0 {
 					sbFactory = snowball.SnowflakeFactory

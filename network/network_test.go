@@ -166,7 +166,7 @@ func newTestNetwork(t *testing.T, count int, baseConfig Config) (*testDialer, []
 		nodeIDs   = make([]ids.NodeID, count)
 		configs   = make([]*Config, count)
 	)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		ip, listener := dialer.NewListener()
 
 		tlsCert, err := staking.NewTLSCert()

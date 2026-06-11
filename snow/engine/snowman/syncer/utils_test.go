@@ -62,7 +62,7 @@ func buildTestPeers(t *testing.T, subnetID ids.ID) validators.Manager {
 	// We consider more than maxOutstandingBroadcastRequests peers to test
 	// capping the number of requests sent out.
 	vdrs := validators.NewManager()
-	for idx := 0; idx < 2*maxOutstandingBroadcastRequests; idx++ {
+	for range 2 * maxOutstandingBroadcastRequests {
 		beaconID := ids.GenerateTestNodeID()
 		require.NoError(t, vdrs.AddStaker(subnetID, beaconID, nil, ids.Empty, 1))
 	}

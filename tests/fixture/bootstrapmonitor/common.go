@@ -62,7 +62,7 @@ func setImageDetails(ctx context.Context, log logging.Logger, clientset *kuberne
 	}
 
 	// Create the JSON patch
-	patchData := []map[string]interface{}{
+	patchData := []map[string]any{
 		{
 			"op":    "replace",
 			"path":  "/spec/template/spec/containers/0/image",

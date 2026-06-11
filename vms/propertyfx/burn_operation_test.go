@@ -26,7 +26,7 @@ func TestBurnOperationNumberOfOutput(t *testing.T) {
 }
 
 func TestBurnOperationState(t *testing.T) {
-	intf := interface{}(&BurnOperation{})
+	intf := any(&BurnOperation{})
 	_, ok := intf.(verify.State)
 	require.False(t, ok)
 }

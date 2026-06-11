@@ -61,10 +61,10 @@ func (s *BlockChainAPI) CallDetailed(ctx context.Context, args TransactionArgs, 
 //
 // BadBlockArgs represents the entries in the list returned when bad blocks are queried.
 type BadBlockArgs struct {
-	Hash   common.Hash            `json:"hash"`
-	Block  map[string]interface{} `json:"block"`
-	RLP    string                 `json:"rlp"`
-	Reason *core.BadBlockReason   `json:"reason"`
+	Hash   common.Hash          `json:"hash"`
+	Block  map[string]any       `json:"block"`
+	RLP    string               `json:"rlp"`
+	Reason *core.BadBlockReason `json:"reason"`
 }
 
 // GetBadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
@@ -77,7 +77,7 @@ func (s *BlockChainAPI) GetBadBlocks(context.Context) ([]*BadBlockArgs, error) {
 	for i, block := range badBlocks {
 		var (
 			blockRlp  string
-			blockJSON map[string]interface{}
+			blockJSON map[string]any
 		)
 		if rlpBytes, err := rlp.EncodeToBytes(block); err != nil {
 			blockRlp = err.Error() // Hacky, but hey, it works

@@ -359,7 +359,7 @@ func (n *network) Send(
 // HealthCheck returns information about several network layer health checks.
 // 1) Information about health check results
 // 2) An error if the health check reports unhealthy
-func (n *network) HealthCheck(context.Context) (interface{}, error) {
+func (n *network) HealthCheck(context.Context) (any, error) {
 	n.peersLock.RLock()
 	connectedTo := n.connectedPeers.Len()
 	n.peersLock.RUnlock()
@@ -369,7 +369,7 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	// Make sure we're connected to at least the minimum number of peers
 	isConnected := connectedTo >= int(n.config.HealthConfig.MinConnectedPeers)
 	healthy := isConnected
-	details := map[string]interface{}{
+	details := map[string]any{
 		ConnectedPeersKey: connectedTo,
 	}
 

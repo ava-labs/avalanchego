@@ -601,12 +601,12 @@ func (*stateSyncer) Timeout(context.Context) error {
 	return nil
 }
 
-func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
+func (ss *stateSyncer) HealthCheck(ctx context.Context) (any, error) {
 	ss.Ctx.Lock.Lock()
 	defer ss.Ctx.Lock.Unlock()
 
 	vmIntf, vmErr := ss.VM.HealthCheck(ctx)
-	intf := map[string]interface{}{
+	intf := map[string]any{
 		"consensus": struct{}{},
 		"vm":        vmIntf,
 	}

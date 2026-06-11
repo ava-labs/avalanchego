@@ -96,7 +96,7 @@ func (m *Mapper) Map(
 // Retry port map up to maxRefreshRetries with a 1 second delay
 func (m *Mapper) retryMapPort(intPort, extPort uint16, desc string, timeout time.Duration) error {
 	var err error
-	for retryCnt := 0; retryCnt < maxRefreshRetries; retryCnt++ {
+	for retryCnt := range maxRefreshRetries {
 		err = m.r.MapPort(intPort, extPort, desc, timeout)
 		if err == nil {
 			return nil

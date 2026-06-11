@@ -57,7 +57,7 @@ func (r *request) Method() (string, error) {
 	return fmt.Sprintf("%s.%s%s", class, uppercaseRune, function[runeLen:]), nil
 }
 
-func (r *request) ReadRequest(args interface{}) error {
+func (r *request) ReadRequest(args any) error {
 	if err := r.CodecRequest.ReadRequest(args); err != nil {
 		return errInvalidArg
 	}

@@ -333,7 +333,7 @@ func testAtomicTx() (*txs.Tx, error) {
 func testDecisionTxs() ([]*txs.Tx, error) {
 	countTxs := 2
 	decisionTxs := make([]*txs.Tx, 0, countTxs)
-	for i := 0; i < countTxs; i++ {
+	for range countTxs {
 		// Create the tx
 		utx := &txs.CreateChainTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{

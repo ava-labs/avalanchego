@@ -537,7 +537,7 @@ func (s State) unoptimizedCostOf(c Config, seconds uint64) uint64 {
 		cost uint64
 		err  error
 	)
-	for i := uint64(0); i < seconds; i++ {
+	for range seconds {
 		s = s.AdvanceTime(c.Target, 1)
 
 		price := gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant)
@@ -552,7 +552,7 @@ func (s State) unoptimizedCostOf(c Config, seconds uint64) uint64 {
 // unoptimizedSecondsRemaining is a naive implementation of SecondsRemaining
 // that is used for differential fuzzing.
 func (s State) unoptimizedSecondsRemaining(c Config, maxSeconds uint64, fundsRemaining uint64) uint64 {
-	for seconds := uint64(0); seconds < maxSeconds; seconds++ {
+	for seconds := range maxSeconds {
 		s = s.AdvanceTime(c.Target, 1)
 
 		price := uint64(gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant))

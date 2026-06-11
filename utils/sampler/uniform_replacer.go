@@ -40,7 +40,7 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, bool) {
 	s.Reset()
 
 	results := make([]uint64, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		ret, hasNext := s.Next()
 		if !hasNext {
 			return nil, false

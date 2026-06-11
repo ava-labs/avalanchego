@@ -41,7 +41,7 @@ func NewFactory(
 	}
 }
 
-func (f *factory) New(log logging.Logger) (interface{}, error) {
+func (f *factory) New(log logging.Logger) (any, error) {
 	config := &subprocess.Config{
 		Stderr:           log,
 		Stdout:           log,

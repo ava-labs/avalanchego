@@ -21,7 +21,7 @@ type txInit struct {
 	fxs           []*fxs.ParsedFx
 }
 
-func (t *txInit) getFx(val interface{}) (int, error) {
+func (t *txInit) getFx(val any) (int, error) {
 	valType := reflect.TypeOf(val)
 	fx, exists := t.typeToFxIndex[valType]
 	if !exists {
@@ -32,7 +32,7 @@ func (t *txInit) getFx(val interface{}) (int, error) {
 
 // getParsedFx returns the parsedFx object for a given TransferableInput
 // or TransferableOutput object
-func (t *txInit) getParsedFx(val interface{}) (*fxs.ParsedFx, error) {
+func (t *txInit) getParsedFx(val any) (*fxs.ParsedFx, error) {
 	idx, err := t.getFx(val)
 	if err != nil {
 		return nil, err

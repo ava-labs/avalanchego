@@ -45,7 +45,7 @@ func IssueTxsToActivateProposerVMFork(
 	txSigner := types.LatestSignerForChainID(chainID)
 
 	// Send exactly 2 transactions, waiting for each to be included in a block
-	for i := 0; i < expectedBlockHeight; i++ {
+	for range expectedBlockHeight {
 		tx := types.NewTransaction(
 			nonce, addr, common.Big1, ethparams.TxGas, gasPrice, nil)
 		triggerTx, err := types.SignTx(tx, txSigner, fundedKey)

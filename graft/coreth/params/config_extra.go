@@ -112,7 +112,7 @@ func WithExtra(c *ChainConfig, extra *extras.ChainConfig) *ChainConfig {
 
 type ChainConfigWithUpgradesJSON struct {
 	ChainConfig
-	UpgradeConfig extras.UpgradeConfig `json:"upgrades,omitempty"`
+	UpgradeConfig extras.UpgradeConfig `json:"upgrades"`
 }
 
 // MarshalJSON implements json.Marshaler. This is a workaround for the fact that

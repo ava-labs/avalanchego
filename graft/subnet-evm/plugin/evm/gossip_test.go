@@ -117,7 +117,7 @@ func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*type
 	amount := big.NewInt(0)
 	gasLimit := uint64(37000)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		tx, _ := types.SignTx(
 			types.NewTransaction(
 				uint64(i),

@@ -825,9 +825,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	vm.shutdownWg.Add(1)
-	go func() {
-		defer vm.shutdownWg.Done()
+	vm.shutdownWg.Go(func() {
 		ticker := time.NewTicker(syncFrequency)
 		defer ticker.Stop()
 
@@ -841,17 +839,15 @@ func (vm *VM) onNormalOperationsStarted() error {
 				}
 			}
 		}
-	}()
+	})
 
 	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to initialize gossip eth tx pool: %w", err)
 	}
-	vm.shutdownWg.Add(1)
-	go func() {
+	vm.shutdownWg.Go(func() {
 		ethTxPool.Subscribe(ctx)
-		vm.shutdownWg.Done()
-	}()
+	})
 
 	handler, pullGossiper, pushGossiper, err := avalanchegossip.NewSystem(
 		vm.ctx.NodeID,
@@ -902,16 +898,12 @@ func (vm *VM) onNormalOperationsStarted() error {
 		vm.ethTxPullGossiper = pullGossiper
 	}
 
-	vm.shutdownWg.Add(1)
-	go func() {
+	vm.shutdownWg.Go(func() {
 		avalanchegossip.Every(ctx, vm.ctx.Log, ethTxPushGossiper, vm.config.PushGossipFrequency.Duration)
-		vm.shutdownWg.Done()
-	}()
-	vm.shutdownWg.Add(1)
-	go func() {
+	})
+	vm.shutdownWg.Go(func() {
 		avalanchegossip.Every(ctx, vm.ctx.Log, vm.ethTxPullGossiper, vm.config.PullGossipFrequency.Duration)
-		vm.shutdownWg.Done()
-	}()
+	})
 
 	return nil
 }
@@ -1135,7 +1127,7 @@ func (*VM) Version(context.Context) (string, error) {
 //   - The handler's functionality is defined by [service]
 //     [service] should be a gorilla RPC service (see https://www.gorillatoolkit.org/pkg/rpc/v2)
 //   - The name of the service is [name]
-func newHandler(name string, service interface{}) (http.Handler, error) {
+func newHandler(name string, service any) (http.Handler, error) {
 	server := avalancheRPC.NewServer()
 	server.RegisterCodec(avajson.NewCodec(), "application/json")
 	server.RegisterCodec(avajson.NewCodec(), "application/json;charset=UTF-8")
@@ -1244,15 +1236,13 @@ func (vm *VM) startContinuousProfiler() {
 	)
 	defer vm.profiler.Shutdown()
 
-	vm.shutdownWg.Add(1)
-	go func() {
-		defer vm.shutdownWg.Done()
+	vm.shutdownWg.Go(func() {
 		log.Info("Dispatching continuous profiler", "dir", vm.config.ContinuousProfilerDir, "freq", vm.config.ContinuousProfilerFrequency, "maxFiles", vm.config.ContinuousProfilerMaxFiles)
 		err := vm.profiler.Dispatch()
 		if err != nil {
 			log.Error("continuous profiler failed", "err", err)
 		}
-	}()
+	})
 	// Wait for shutdownChan to be closed
 	<-vm.shutdownChan
 }

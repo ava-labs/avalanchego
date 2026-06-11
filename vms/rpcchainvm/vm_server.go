@@ -520,7 +520,7 @@ func (vm *VMServer) Health(ctx context.Context, _ *emptypb.Empty) (*vmpb.HealthR
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
 	}
-	report := map[string]interface{}{
+	report := map[string]any{
 		"database": dbHealth,
 		"health":   vmHealth,
 	}

@@ -24,7 +24,7 @@ type codecRegistry struct {
 	typeToIndex map[reflect.Type]int
 }
 
-func (cr *codecRegistry) RegisterType(val interface{}) error {
+func (cr *codecRegistry) RegisterType(val any) error {
 	valType := reflect.TypeOf(val)
 	cr.typeToIndex[valType] = cr.index
 

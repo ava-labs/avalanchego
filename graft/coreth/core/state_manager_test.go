@@ -82,7 +82,7 @@ func TestNoPruningTrieWriter(t *testing.T) {
 	m := &MockTrieDB{}
 	w := NewTrieWriter(m, &CacheConfig{})
 	require := require.New(t)
-	for i := 0; i < tipBufferSize+1; i++ {
+	for i := range tipBufferSize + 1 {
 		bigI := big.NewInt(int64(i))
 		block := types.NewBlock(
 			&types.Header{

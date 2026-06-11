@@ -34,7 +34,7 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("proposervm"), func(
 			recipientKey := e2e.NewPrivateKey(tc)
 			recipientEthAddress := recipientKey.EthAddress()
 
-			for i := 0; i < 3; i++ {
+			for range 3 {
 				// Create and send a simple transaction to trigger block production
 				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
 				require.NoError(err)

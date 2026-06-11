@@ -49,7 +49,7 @@ func (th internalTxHeap) Swap(i, j int) {
 	th.items[j].index = j
 }
 
-func (th *internalTxHeap) Push(x interface{}) {
+func (th *internalTxHeap) Push(x any) {
 	entry := x.(*txEntry)
 	if th.Has(entry.id) {
 		return
@@ -58,7 +58,7 @@ func (th *internalTxHeap) Push(x interface{}) {
 	th.lookup[entry.id] = entry
 }
 
-func (th *internalTxHeap) Pop() interface{} {
+func (th *internalTxHeap) Pop() any {
 	n := len(th.items)
 	item := th.items[n-1]
 	th.items[n-1] = nil // avoid memory leak

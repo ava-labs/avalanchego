@@ -81,7 +81,7 @@ func TestStandardBlocks(t *testing.T) {
 func createTestTxs(cm codec.Manager) ([]*txs.Tx, error) {
 	countTxs := 1
 	testTxs := make([]*txs.Tx, 0, countTxs)
-	for i := 0; i < countTxs; i++ {
+	for range countTxs {
 		// Create the tx
 		tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,

@@ -104,7 +104,7 @@ func TestSortByHash(t *testing.T) {
 	require.Equal([]byte{1}, s[0])
 	require.Equal([]byte{2}, s[1])
 
-	for i := byte(0); i < 100; i++ {
+	for i := range byte(100) {
 		s = [][]byte{{i}, {i + 1}, {i + 2}}
 		SortByHash(s)
 		require.Len(s, 3)

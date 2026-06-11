@@ -124,7 +124,7 @@ func TestOperationSorting(t *testing.T) {
 }
 
 func TestOperationTxNotState(t *testing.T) {
-	intf := interface{}(&OperationTx{})
+	intf := any(&OperationTx{})
 	_, ok := intf.(verify.State)
 	require.False(t, ok)
 }

@@ -12,7 +12,7 @@ import (
 )
 
 func TestOwnedOutputState(t *testing.T) {
-	intf := interface{}(&OwnedOutput{})
+	intf := any(&OwnedOutput{})
 	_, ok := intf.(verify.State)
 	require.True(t, ok)
 }

@@ -124,7 +124,7 @@ func TestValueNodeDBIterator(t *testing.T) {
 	)
 
 	// Put key-node pairs.
-	for i := 0; i < cacheSize; i++ {
+	for i := range cacheSize {
 		key := ToKey([]byte{byte(i)})
 		node := &node{
 			dbNode: dbNode{

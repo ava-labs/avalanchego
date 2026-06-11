@@ -50,7 +50,7 @@ func TestSampleableSetClear(t *testing.T) {
 	require := require.New(t)
 
 	set := SampleableSet[int]{}
-	for i := 0; i < 25; i++ {
+	for i := range 25 {
 		set.Add(i)
 	}
 	set.Clear()

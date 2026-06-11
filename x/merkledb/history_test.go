@@ -104,7 +104,7 @@ func Test_History_Large(t *testing.T) {
 		t.Logf("seed for iter %d: %d", i, now)
 		r := rand.New(rand.NewSource(now))
 		// make sure they stay in sync
-		for x := 0; x < numIters; x++ {
+		for range numIters {
 			batch := db.NewBatch()
 			addkey := make([]byte, r.Intn(50))
 			_, err := r.Read(addkey)
@@ -725,7 +725,7 @@ func TestHistoryRecord(t *testing.T) {
 	th := newTrieHistory(maxHistoryLen)
 
 	changes := []*changeSummary{}
-	for i := 0; i < maxHistoryLen; i++ { // Fill the history
+	for i := range maxHistoryLen { // Fill the history
 		changes = append(changes, &changeSummary{rootID: ids.GenerateTestID()})
 
 		th.record(changes[i])

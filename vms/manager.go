@@ -20,7 +20,7 @@ var ErrNotFound = errors.New("not found")
 
 // A Factory creates new instances of a VM
 type Factory interface {
-	New(logging.Logger) (interface{}, error)
+	New(logging.Logger) (any, error)
 }
 
 // Manager tracks a collection of VM factories, their aliases, and their

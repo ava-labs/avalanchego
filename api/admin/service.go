@@ -47,7 +47,7 @@ type Config struct {
 	Log          logging.Logger
 	ProfileDir   string
 	LogFactory   logging.Factory
-	NodeConfig   interface{}
+	NodeConfig   any
 	DB           database.Database
 	ChainManager chains.Manager
 	HTTPServer   server.PathAdderWithReadLock
@@ -311,7 +311,7 @@ func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply 
 }
 
 // GetConfig returns the config that the node was started with.
-func (a *Admin) GetConfig(_ *http.Request, _ *struct{}, reply *interface{}) error {
+func (a *Admin) GetConfig(_ *http.Request, _ *struct{}, reply *any) error {
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "getConfig"),

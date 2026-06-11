@@ -361,7 +361,7 @@ func (db *Database) Close() error {
 	return updateError(db.DB.Close())
 }
 
-func (db *Database) HealthCheck(context.Context) (interface{}, error) {
+func (db *Database) HealthCheck(context.Context) (any, error) {
 	if db.closed.Get() {
 		return nil, database.ErrClosed
 	}

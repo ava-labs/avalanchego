@@ -20,7 +20,7 @@ type beaconManager struct {
 	router.ExternalHandler
 	beacons                     validators.Manager
 	requiredConns               int64
-	numConns                    int64
+	numConns                    atomic.Int64
 	onSufficientlyConnected     chan struct{}
 	onceOnSufficientlyConnected sync.Once
 }
@@ -29,7 +29,7 @@ func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Applic
 	_, isBeacon := b.beacons.GetValidator(constants.PrimaryNetworkID, nodeID)
 	if isBeacon &&
 		constants.PrimaryNetworkID == subnetID &&
-		atomic.AddInt64(&b.numConns, 1) >= b.requiredConns {
+		b.numConns.Add(1) >= b.requiredConns {
 		b.onceOnSufficientlyConnected.Do(func() {
 			close(b.onSufficientlyConnected)
 		})
@@ -39,7 +39,7 @@ func (b *beaconManager) Connected(nodeID ids.NodeID, nodeVersion *version.Applic
 
 func (b *beaconManager) Disconnected(nodeID ids.NodeID) {
 	if _, isBeacon := b.beacons.GetValidator(constants.PrimaryNetworkID, nodeID); isBeacon {
-		atomic.AddInt64(&b.numConns, -1)
+		b.numConns.Add(-1)
 	}
 	b.ExternalHandler.Disconnected(nodeID)
 }

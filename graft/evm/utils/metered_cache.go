@@ -26,7 +26,7 @@ type MeteredCache struct {
 	statsTime    metrics.Gauge
 
 	// count all operations to decide when to update stats
-	ops             uint64
+	ops             atomic.Uint64
 	updateFrequency uint64
 }
 
@@ -60,7 +60,7 @@ func (mc *MeteredCache) updateStatsIfNeeded() {
 	if mc.namespace == "" {
 		return
 	}
-	ops := atomic.AddUint64(&mc.ops, 1)
+	ops := mc.ops.Add(1)
 	if ops%mc.updateFrequency != 0 {
 		return
 	}

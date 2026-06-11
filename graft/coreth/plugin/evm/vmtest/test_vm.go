@@ -115,7 +115,7 @@ func OverrideSchemeConfig(scheme string, configJSON string) (string, error) {
 	}
 
 	// Parse existing config into a map to preserve only non-zero values
-	configMap := make(map[string]interface{})
+	configMap := make(map[string]any)
 	if len(configJSON) > 0 {
 		if err := json.Unmarshal([]byte(configJSON), &configMap); err != nil {
 			return "", err

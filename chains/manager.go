@@ -419,7 +419,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		healthCheckErr := fmt.Errorf("failed to create chain on subnet %s: %w", chainParams.SubnetID, err)
 		err := m.Health.RegisterHealthCheck(
 			chainAlias,
-			health.CheckerFunc(func(context.Context) (interface{}, error) {
+			health.CheckerFunc(func(context.Context) (any, error) {
 				return nil, healthCheckErr
 			}),
 			chainParams.SubnetID.String(),
@@ -1472,7 +1472,7 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 }
 
 func (m *manager) registerBootstrappedHealthChecks() error {
-	bootstrappedCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+	bootstrappedCheck := health.CheckerFunc(func(context.Context) (any, error) {
 		if subnetIDs := m.Subnets.Bootstrapping(); len(subnetIDs) != 0 {
 			return subnetIDs, errNotBootstrapped
 		}
@@ -1491,7 +1491,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		return nil
 	}
 
-	partialSyncCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+	partialSyncCheck := health.CheckerFunc(func(context.Context) (any, error) {
 		// Note: The health check is skipped during bootstrapping to allow a
 		// node to sync the network even if it was previously a validator.
 		if !m.IsBootstrapped(constants.PlatformChainID) {

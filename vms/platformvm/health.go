@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
+func (vm *VM) HealthCheck(context.Context) (any, error) {
 	localPrimaryValidator, err := vm.state.GetCurrentValidator(
 		constants.PrimaryNetworkID,
 		vm.ctx.NodeID,
