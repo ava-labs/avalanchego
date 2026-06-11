@@ -20,7 +20,20 @@ const (
 	proofTypeLabel  = "proof_type"
 	proofTypeRange  = "range"
 	proofTypeChange = "change"
+
+	resultLabel   = "result"
+	resultSuccess = "success"
+	resultFailure = "failure"
 )
+
+// resultLabelFor returns the result label value for an operation that
+// returned err.
+func resultLabelFor(err error) string {
+	if err != nil {
+		return resultFailure
+	}
+	return resultSuccess
+}
 
 var (
 	// durationBuckets span 1ms (fast proof operation) to ~8.2s (slow
@@ -76,15 +89,15 @@ func newSyncerMetrics(namespace string, reg prometheus.Registerer) (*syncerMetri
 		proofVerificationTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "proof_verification_seconds",
-			Help:      "time, in seconds, spent verifying each received proof",
+			Help:      "time, in seconds, spent verifying each received proof, labeled by result",
 			Buckets:   durationBuckets,
-		}, []string{proofTypeLabel}),
+		}, []string{proofTypeLabel, resultLabel}),
 		proofCommitTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "proof_commit_seconds",
-			Help:      "time, in seconds, spent committing each verified proof to the database",
+			Help:      "time, in seconds, spent committing each verified proof to the database, labeled by result",
 			Buckets:   durationBuckets,
-		}, []string{proofTypeLabel}),
+		}, []string{proofTypeLabel, resultLabel}),
 	}
 	m.requestKeyLimit.Set(DefaultRequestKeyLimit)
 	err := errors.Join(
@@ -115,12 +128,12 @@ func (m *syncerMetrics) proofReceived(proofType string, numBytes int) {
 	m.receivedProofSizeBytes.WithLabelValues(proofType).Observe(float64(numBytes))
 }
 
-func (m *syncerMetrics) proofVerified(proofType string, duration time.Duration) {
-	m.proofVerificationTime.WithLabelValues(proofType).Observe(duration.Seconds())
+func (m *syncerMetrics) proofVerified(proofType string, duration time.Duration, err error) {
+	m.proofVerificationTime.WithLabelValues(proofType, resultLabelFor(err)).Observe(duration.Seconds())
 }
 
-func (m *syncerMetrics) proofCommitted(proofType string, duration time.Duration) {
-	m.proofCommitTime.WithLabelValues(proofType).Observe(duration.Seconds())
+func (m *syncerMetrics) proofCommitted(proofType string, duration time.Duration, err error) {
+	m.proofCommitTime.WithLabelValues(proofType, resultLabelFor(err)).Observe(duration.Seconds())
 }
 
 // handlerMetrics observes the server side of proof sync: generating,
@@ -136,9 +149,9 @@ func newHandlerMetrics(namespace string, reg prometheus.Registerer) (*handlerMet
 		proofGenerationTime: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "proof_generation_seconds",
-			Help:      "time, in seconds, spent generating each proof; the count is the total number of proofs generated",
+			Help:      "time, in seconds, spent generating each proof, labeled by result; the count is the total number of generation attempts",
 			Buckets:   durationBuckets,
-		}, []string{proofTypeLabel}),
+		}, []string{proofTypeLabel, resultLabel}),
 		generatedProofSizeBytes: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "generated_proof_size_bytes",
@@ -160,8 +173,11 @@ func newHandlerMetrics(namespace string, reg prometheus.Registerer) (*handlerMet
 	return &m, err
 }
 
-func (m *handlerMetrics) proofGenerated(proofType string, duration time.Duration) {
-	m.proofGenerationTime.WithLabelValues(proofType).Observe(duration.Seconds())
+// proofGenerated records one proof generation attempt, labeling it a failure
+// if err is non-nil. A failure includes a change proof attempt that falls
+// back to a range proof; the fallback records its own range attempt.
+func (m *handlerMetrics) proofGenerated(proofType string, duration time.Duration, err error) {
+	m.proofGenerationTime.WithLabelValues(proofType, resultLabelFor(err)).Observe(duration.Seconds())
 }
 
 func (m *handlerMetrics) proofServed(proofType string, numBytes int) {

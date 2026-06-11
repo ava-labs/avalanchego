@@ -630,26 +630,27 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		s.metrics.proofReceived(proofTypeChange, len(responseBytes))
 
 		verificationStart := time.Now()
-		if err := s.db.VerifyChangeProof(
+		err = s.db.VerifyChangeProof(
 			ctx,
 			changeProof,
 			startKey,
 			endKey,
 			endRoot,
 			int(request.KeyLimit),
-		); err != nil {
+		)
+		s.metrics.proofVerified(proofTypeChange, time.Since(verificationStart), err)
+		if err != nil {
 			return fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
 		}
-		s.metrics.proofVerified(proofTypeChange, time.Since(verificationStart))
 
 		// if the proof wasn't empty, apply changes to the sync DB
 		commitStart := time.Now()
 		nextKey, err := s.db.CommitChangeProof(ctx, endKey, changeProof)
+		s.metrics.proofCommitted(proofTypeChange, time.Since(commitStart), err)
 		if err != nil {
 			s.setError(err)
 			return nil
 		}
-		s.metrics.proofCommitted(proofTypeChange, time.Since(commitStart))
 
 		s.completeWorkItem(work, nextKey, targetRootID)
 	case *pb.ProofResponse_RangeProof:
@@ -696,18 +697,19 @@ func (s *Syncer[R, _]) verifyAndCommitRangeProof(
 	keyLimit int,
 ) error {
 	verificationStart := time.Now()
-	if err := s.db.VerifyRangeProof(ctx, rangeProof, start, end, root, keyLimit); err != nil {
+	err := s.db.VerifyRangeProof(ctx, rangeProof, start, end, root, keyLimit)
+	s.metrics.proofVerified(proofTypeRange, time.Since(verificationStart), err)
+	if err != nil {
 		return err
 	}
-	s.metrics.proofVerified(proofTypeRange, time.Since(verificationStart))
 
 	commitStart := time.Now()
 	nextKey, err := s.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
+	s.metrics.proofCommitted(proofTypeRange, time.Since(commitStart), err)
 	if err != nil {
 		s.setError(err)
 		return nil
 	}
-	s.metrics.proofCommitted(proofTypeRange, time.Since(commitStart))
 
 	s.completeWorkItem(work, nextKey, targetRootID)
 	return nil
