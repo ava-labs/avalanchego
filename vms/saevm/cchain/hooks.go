@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
@@ -359,7 +360,14 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
-	header.Extra = warpValidityBytes
+
+	// TODO(StephenButtolph): Remove padding for the ACP-176 fee state. The fee
+	// state is incoded in other fields in SAE.
+	header.Extra = customheader.SetPredicateBytesInExtra(
+		rulesExtra.AvalancheRules,
+		header.Extra,
+		warpValidityBytes,
+	)
 
 	// TODO(StephenButtolph): Encode settled in the block.
 	_ = settled

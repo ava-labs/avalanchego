@@ -172,9 +172,6 @@ func PredicateBytesFromExtra(rules extras.AvalancheRules, extra []byte) []byte {
 	if rules.IsFortuna {
 		offset = acp176.StateSize
 	}
-	if rules.IsHelicon {
-		offset = 0
-	}
 
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
 	// to `offset`.
