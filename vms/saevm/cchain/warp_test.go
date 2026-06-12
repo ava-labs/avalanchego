@@ -91,6 +91,36 @@ func (s *SUT) assertWarpSigningRefusal(
 	assert.ErrorIsf(tb, appErr, want, "reason to refuse signing %s", msg.ID())
 }
 
+// newUnsignedWarpMessage wraps payloadBytes in an unsigned warp message sourced
+// from the SUT's chain.
+func (s *SUT) newUnsignedWarpMessage(tb testing.TB, payloadBytes []byte) *avalanchewarp.UnsignedMessage {
+	tb.Helper()
+
+	msg, err := avalanchewarp.NewUnsignedMessage(s.ctx.NetworkID, s.ctx.ChainID, payloadBytes)
+	require.NoError(tb, err, "avalanchewarp.NewUnsignedMessage(...)")
+	return msg
+}
+
+// newAddressedCallMessage returns an unsigned warp message, sourced from the
+// SUT's chain, with a [payload.AddressedCall] payload.
+func (s *SUT) newAddressedCallMessage(tb testing.TB, sourceAddress, payloadBytes []byte) *avalanchewarp.UnsignedMessage {
+	tb.Helper()
+
+	p, err := payload.NewAddressedCall(sourceAddress, payloadBytes)
+	require.NoError(tb, err, "payload.NewAddressedCall(...)")
+	return s.newUnsignedWarpMessage(tb, p.Bytes())
+}
+
+// newBlockHashMessage returns an unsigned warp message, sourced from the SUT's
+// chain, with a [payload.Hash] payload committing to blkID.
+func (s *SUT) newBlockHashMessage(tb testing.TB, blkID ids.ID) *avalanchewarp.UnsignedMessage {
+	tb.Helper()
+
+	p, err := payload.NewHash(blkID)
+	require.NoError(tb, err, "payload.NewHash(...)")
+	return s.newUnsignedWarpMessage(tb, p.Bytes())
+}
+
 // sendWarpTx signs and submits a tx from wallet's 0th account, calling the warp
 // precompile with input. If msg is non-nil, it is attached to the tx's access
 // list as a predicate.
@@ -121,36 +151,6 @@ func (s *SUT) sendWarpTx(
 	})
 	require.NoErrorf(tb, s.ethclient.SendTransaction(ctx, signedTx), "%T.SendTransaction(...)", s.ethclient)
 	return signedTx
-}
-
-// newUnsignedWarpMessage wraps payloadBytes in an unsigned warp message sourced
-// from the SUT's chain.
-func (s *SUT) newUnsignedWarpMessage(tb testing.TB, payloadBytes []byte) *avalanchewarp.UnsignedMessage {
-	tb.Helper()
-
-	msg, err := avalanchewarp.NewUnsignedMessage(s.ctx.NetworkID, s.ctx.ChainID, payloadBytes)
-	require.NoError(tb, err, "avalanchewarp.NewUnsignedMessage(...)")
-	return msg
-}
-
-// newAddressedCallMessage returns an unsigned warp message, sourced from the
-// SUT's chain, with a [payload.AddressedCall] payload.
-func (s *SUT) newAddressedCallMessage(tb testing.TB, sourceAddress, payloadBytes []byte) *avalanchewarp.UnsignedMessage {
-	tb.Helper()
-
-	p, err := payload.NewAddressedCall(sourceAddress, payloadBytes)
-	require.NoError(tb, err, "payload.NewAddressedCall(...)")
-	return s.newUnsignedWarpMessage(tb, p.Bytes())
-}
-
-// newBlockHashMessage returns an unsigned warp message, sourced from the SUT's
-// chain, with a [payload.Hash] payload committing to blkID.
-func (s *SUT) newBlockHashMessage(tb testing.TB, blkID ids.ID) *avalanchewarp.UnsignedMessage {
-	tb.Helper()
-
-	p, err := payload.NewHash(blkID)
-	require.NoError(tb, err, "payload.NewHash(...)")
-	return s.newUnsignedWarpMessage(tb, p.Bytes())
 }
 
 // assertPredicateResult asserts that the predicate results committed to blk's
