@@ -8,7 +8,6 @@ package cchain
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -24,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
@@ -38,13 +36,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	avadb "github.com/ava-labs/avalanchego/database"
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	saewarp "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 )
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
@@ -130,7 +126,7 @@ func (vm *VM) Initialize(
 	})
 
 	pendingTxs := txpool.NewPending()
-	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
+	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
 		snowCtx,
 		vm.state,
@@ -219,7 +215,7 @@ func (vm *VM) Initialize(
 	})
 
 	const warpSignatureCacheSize = 512
-	warpVerifier := saewarp.NewVerifier(&warpBackend{vm: vm.VM}, warpStorage)
+	warpVerifier := warp.NewVerifier(&warpBackend{vm: vm.VM}, warpStorage)
 	warpHandler := acp118.NewCachedHandler(
 		lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
 		warpVerifier,
@@ -230,38 +226,6 @@ func (vm *VM) Initialize(
 	}
 
 	return nil
-}
-
-// parseGenesis decodes the genesis bytes into a [*core.Genesis] and populates
-// the Avalanche-specific config extras (network upgrades, Warp precompile
-// schedule, Ethereum upgrade alignment).
-func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
-	g := new(core.Genesis)
-	if err := json.Unmarshal(b, g); err != nil {
-		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
-	}
-
-	configExtra := corethparams.GetExtra(g.Config)
-	configExtra.AvalancheContext = extras.AvalancheContext{
-		SnowCtx: ctx,
-	}
-	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
-
-	// If Durango is scheduled, schedule the Warp Precompile at the same time.
-	if configExtra.DurangoBlockTimestamp != nil {
-		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
-			Config: warpcontract.NewDefaultConfig(configExtra.DurangoBlockTimestamp),
-		})
-	}
-	if err := configExtra.Verify(); err != nil {
-		return nil, fmt.Errorf("invalid chain config: %w", err)
-	}
-
-	// Align the Ethereum upgrades to the Avalanche upgrades.
-	if err := corethparams.SetEthUpgrades(g.Config); err != nil {
-		return nil, fmt.Errorf("aligning Ethereum upgrades: %w", err)
-	}
-	return g, nil
 }
 
 // errExtDataHashMismatch is returned by [VM.ParseBlock] when a block's extData
