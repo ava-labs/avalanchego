@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
 	"github.com/stretchr/testify/require"
@@ -20,8 +19,7 @@ import (
 
 // Mempool is the subset of mempool behaviour [WaitUntilPending] needs: a
 // subscription to new-transaction events and a snapshot of the currently
-// pending transactions. It is satisfied directly by geth's RPC backend. Wrap a
-// raw [*txpool.TxPool] with [PoolMempool].
+// pending transactions. It is satisfied directly by geth's RPC backend.
 type Mempool interface {
 	SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription
 	GetPoolTransactions() (types.Transactions, error)
@@ -46,9 +44,9 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, mempool Mempool, txs .
 	}
 
 	for {
-		// Re-check on entry rather than relying solely on the subscription:
-		// this catches txs that became pending before we subscribed and any
-		// the subscription does not surface as a discrete event.
+		// Subscribing before the snapshot guarantees no promotion is missed,
+		// so each wakeup just re-derives the pending set from the authoritative
+		// source rather than tracking add-events that may be queued, not pending.
 		pending, err := mempool.GetPoolTransactions()
 		require.NoErrorf(tb, err, "%T.GetPoolTransactions()", mempool)
 		for _, tx := range pending {
@@ -60,35 +58,10 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, mempool Mempool, txs .
 
 		select {
 		case <-ctx.Done():
-			tb.Fatalf("%v waiting for %d pending txs in %T", context.Cause(ctx), want.Len(), mempool)
+			tb.Fatalf("%v waiting for %d pending txs %x in %T", context.Cause(ctx), want.Len(), want.List(), mempool)
 		case err := <-sub.Err():
 			tb.Fatalf("%T.SubscribeNewTxsEvent.Err() returned %v", mempool, err)
 		case <-txCh:
 		}
 	}
-}
-
-// PoolMempool adapts a raw [*txpool.TxPool] to the [Mempool] interface, for
-// callers that hold a pool directly rather than a geth RPC backend.
-func PoolMempool(pool *txpool.TxPool) Mempool {
-	return poolMempool{pool}
-}
-
-var _ Mempool = poolMempool{}
-
-type poolMempool struct {
-	pool *txpool.TxPool
-}
-
-func (m poolMempool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
-	return m.pool.SubscribeTransactions(ch, true /*reorgs ignored by legacypool*/)
-}
-
-func (m poolMempool) GetPoolTransactions() (types.Transactions, error) {
-	pendingByAddr, _ := m.pool.Content()
-	txs := make(types.Transactions, 0, len(pendingByAddr))
-	for _, list := range pendingByAddr {
-		txs = append(txs, list...)
-	}
-	return txs, nil
 }
