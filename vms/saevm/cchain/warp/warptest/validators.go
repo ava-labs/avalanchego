@@ -89,7 +89,7 @@ func (v *Validators) Sign(tb testing.TB, msg *warp.UnsignedMessage) *warp.Messag
 	tb.Helper()
 
 	var (
-		sigs    = make([]*bls.Signature, len(v.signers))
+		sigs    = make([]*bls.Signature, len(v.validators))
 		signers = set.NewBits()
 	)
 	for i, vdr := range v.validators {
