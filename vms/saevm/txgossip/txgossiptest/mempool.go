@@ -38,30 +38,38 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, mempool Mempool, txs .
 	sub := mempool.SubscribeNewTxsEvent(txCh)
 	defer sub.Unsubscribe()
 
-	want := set.NewSet[common.Hash](len(txs))
+	s := set.NewSet[common.Hash](len(txs))
 	for _, tx := range txs {
-		want.Add(tx.Hash())
+		s.Add(tx.Hash())
+	}
+
+	// Optimistically check the current mempool. Any tx promoted after this is
+	// caught by the subscription created above.
+	pendingTxs, err := mempool.GetPoolTransactions()
+	require.NoErrorf(tb, err, "%T.GetPoolTransactions()", mempool)
+	for _, tx := range pendingTxs {
+		s.Remove(tx.Hash())
+	}
+
+	if s.Len() == 0 {
+		// already found all txs
+		return
 	}
 
 	for {
-		// Subscribing before the snapshot guarantees no promotion is missed,
-		// so each wakeup just re-derives the pending set from the authoritative
-		// source rather than tracking add-events that may be queued, not pending.
-		pending, err := mempool.GetPoolTransactions()
-		require.NoErrorf(tb, err, "%T.GetPoolTransactions()", mempool)
-		for _, tx := range pending {
-			want.Remove(tx.Hash())
-		}
-		if want.Len() == 0 {
-			return
-		}
-
 		select {
 		case <-ctx.Done():
-			tb.Fatalf("%v waiting for %d pending txs %x in %T", context.Cause(ctx), want.Len(), want.List(), mempool)
+			tb.Fatalf("%v waiting for %d pending txs %x", context.Cause(ctx), s.Len(), s.List())
 		case err := <-sub.Err():
 			tb.Fatalf("%T.SubscribeNewTxsEvent.Err() returned %v", mempool, err)
-		case <-txCh:
+		case txEvent := <-txCh:
+			for _, tx := range txEvent.Txs {
+				s.Remove(tx.Hash())
+			}
+
+			if s.Len() == 0 {
+				return
+			}
 		}
 	}
 }

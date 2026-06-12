@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
 	"math/rand/v2"
@@ -448,9 +449,6 @@ func (m poolMempool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subs
 
 func (m poolMempool) GetPoolTransactions() (types.Transactions, error) {
 	pendingByAddr, _ := m.pool.Content()
-	txs := make(types.Transactions, 0, len(pendingByAddr))
-	for _, list := range pendingByAddr {
-		txs = append(txs, list...)
-	}
-	return txs, nil
+	txs := slices.Collect(maps.Values(pendingByAddr))
+	return slices.Concat(txs...), nil
 }
