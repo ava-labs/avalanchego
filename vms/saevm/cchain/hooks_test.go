@@ -4,19 +4,95 @@
 package cchain
 
 import (
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 )
+
+const (
+	testTimestampSeconds      uint64 = 1_700_000_000
+	testTimestampMilliseconds int64  = 1_700_000_000_123
+	testFallbackMilliseconds  int64  = 1_700_000_000_000
+)
+
+func TestBlockTime(t *testing.T) {
+	tests := []struct {
+		name   string
+		header *types.Header
+		wantMS int64
+	}{
+		{
+			name: "reads_milliseconds_from_extra",
+			header: customtypes.WithHeaderExtra(
+				&types.Header{Time: testTimestampSeconds},
+				&customtypes.HeaderExtra{
+					TimeMilliseconds: utils.PointerTo(uint64(testTimestampMilliseconds)),
+				},
+			),
+			wantMS: testTimestampMilliseconds,
+		},
+		{
+			name:   "falls_back_to_seconds_when_unset",
+			header: &types.Header{Time: testTimestampSeconds},
+			wantMS: testFallbackMilliseconds,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := (&hooks{}).BlockTime(tt.header)
+			require.Equal(t, time.UnixMilli(tt.wantMS), got, "hooks.BlockTime(%d)", tt.wantMS)
+			require.Equal(t, tt.wantMS, got.UnixMilli(), "hooks.BlockTime(%d).UnixMilli()", tt.wantMS)
+		})
+	}
+}
+
+func TestBuildHeaderEncodesMilliseconds(t *testing.T) {
+	b := &builder{
+		now: func() time.Time {
+			return time.UnixMilli(testTimestampMilliseconds)
+		},
+	}
+
+	header, err := b.BuildHeader(&types.Header{Number: big.NewInt(41)})
+	require.NoError(t, err, "builder.BuildHeader(nowMS=%d)", testTimestampMilliseconds)
+
+	require.Equal(t, uint64(testTimestampMilliseconds/1000), header.Time, "builder.BuildHeader(nowMS=%d).Time", testTimestampMilliseconds)
+
+	extra := customtypes.GetHeaderExtra(header)
+	require.NotNil(t, extra.TimeMilliseconds, "customtypes.GetHeaderExtra(BuildHeader(nowMS=%d)).TimeMilliseconds", testTimestampMilliseconds)
+	require.Equal(t, uint64(testTimestampMilliseconds), *extra.TimeMilliseconds, "builder.BuildHeader(nowMS=%d).TimeMilliseconds", testTimestampMilliseconds)
+
+	// Invariant enforced by customheader.VerifyTime.
+	require.Equal(t, header.Time, *extra.TimeMilliseconds/1000, "builder.BuildHeader(nowMS=%d) time invariant", testTimestampMilliseconds)
+}
+
+func TestBuildHeaderBlockTimeRoundTrip(t *testing.T) {
+	want := time.UnixMilli(testTimestampMilliseconds)
+	b := &builder{
+		now: func() time.Time {
+			return want
+		},
+	}
+
+	header, err := b.BuildHeader(&types.Header{Number: big.NewInt(1)})
+	require.NoError(t, err, "builder.BuildHeader(now=%d)", want.UnixMilli())
+
+	got := (&hooks{}).BlockTime(header)
+	require.Equal(t, want.UnixMilli(), got.UnixMilli(), "hooks.BlockTime(builder.BuildHeader(now=%d))", want.UnixMilli())
+}
 
 func TestAncestorInputIDs(t *testing.T) {
 	var (
