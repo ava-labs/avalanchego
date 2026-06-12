@@ -1,0 +1,471 @@
+name: Bazel Selector Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Benchmark variant to run'
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - baseline
+          - go-download
+          - binary-download
+          - image
+      scope:
+        description: 'Bazel test scope to benchmark'
+        required: true
+        default: subnet-evm
+        type: choice
+        options:
+          - main
+          - coreth
+          - subnet-evm
+      runner:
+        description: 'Runner label to execute the benchmark on'
+        required: true
+        default: ubuntu-24.04
+        type: string
+      base_sha:
+        description: 'Base SHA for BAZEL_IMPACTED_BASE_SHA'
+        required: true
+        type: string
+      bazelisk_url:
+        description: 'URL for the Bazelisk binary used by the binary-download variant'
+        required: false
+        default: 'https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-linux-amd64'
+        type: string
+      targeted_bazel_url:
+        description: 'URL for a prebuilt targeted-bazel binary used by the binary-download variant'
+        required: false
+        default: ''
+        type: string
+      impactedtests_url:
+        description: 'URL for a prebuilt impactedtests binary used by the binary-download variant'
+        required: false
+        default: ''
+        type: string
+      image_ref:
+        description: 'Container image reference for the image variant'
+        required: false
+        default: ''
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  define-matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.define-matrix.outputs.matrix }}
+    steps:
+      - name: Define matrix
+        id: define-matrix
+        shell: bash
+        env:
+          VARIANT: ${{ inputs.variant }}
+          TARGETED_BAZEL_URL: ${{ inputs.targeted_bazel_url }}
+          IMPACTEDTESTS_URL: ${{ inputs.impactedtests_url }}
+          IMAGE_REF: ${{ inputs.image_ref }}
+        run: |
+          set -euo pipefail
+
+          includes=()
+          add_variant() {
+            includes+=("{\"variant\":\"$1\"}")
+          }
+
+          case "$VARIANT" in
+            all)
+              add_variant baseline
+              add_variant go-download
+              if [[ -n "$TARGETED_BAZEL_URL" && -n "$IMPACTEDTESTS_URL" ]]; then
+                add_variant binary-download
+              else
+                echo "Skipping binary-download variant in 'all' mode because targeted_bazel_url and impactedtests_url were not both provided." >&2
+              fi
+              if [[ -n "$IMAGE_REF" ]]; then
+                add_variant image
+              else
+                echo "Skipping image variant in 'all' mode because image_ref was not provided." >&2
+              fi
+              ;;
+            baseline|go-download|binary-download|image)
+              add_variant "$VARIANT"
+              ;;
+            *)
+              echo "Unknown variant: $VARIANT" >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ ${#includes[@]} -eq 0 ]]; then
+            echo "No benchmark variants selected" >&2
+            exit 1
+          fi
+
+          matrix_json=$(printf '%s\n' "${includes[@]}" | jq -s '{include: .}')
+          {
+            echo 'matrix<<EOF'
+            echo "$matrix_json"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+  benchmark:
+    needs: define-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
+    runs-on: ${{ inputs.runner }}
+    env:
+      BAZEL_IMPACTED_BASE_SHA: ${{ inputs.base_sha }}
+      BENCHMARK_SCOPE: ${{ inputs.scope }}
+      VARIANT: ${{ matrix.variant }}
+      BAZELISK_URL: ${{ inputs.bazelisk_url }}
+      TARGETED_BAZEL_URL: ${{ inputs.targeted_bazel_url }}
+      IMPACTEDTESTS_URL: ${{ inputs.impactedtests_url }}
+      IMAGE_REF: ${{ inputs.image_ref }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve benchmark scope
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$BENCHMARK_SCOPE" in
+            main)
+              task_name='bazel-test-main'
+              selector_args='test //... -- -//graft/...'
+              ;;
+            coreth)
+              task_name='bazel-test-coreth'
+              selector_args='test //graft/coreth/... //graft/evm/...'
+              ;;
+            subnet-evm)
+              task_name='bazel-test-subnet-evm'
+              selector_args='test //graft/subnet-evm/...'
+              ;;
+            *)
+              echo "Unknown scope: $BENCHMARK_SCOPE" >&2
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "task_name=$task_name"
+            echo "selector_args=$selector_args"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Initialize benchmark metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .benchmark/bin
+          {
+            echo "variant=$VARIANT"
+            echo "scope=$BENCHMARK_SCOPE"
+            echo "runner=${{ inputs.runner }}"
+            echo "base_sha=$BAZEL_IMPACTED_BASE_SHA"
+            echo "task_name=${{ steps.scope.outputs.task_name }}"
+          } > .benchmark/summary.env
+          echo "TOTAL_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Start baseline install timer
+        if: ${{ matrix.variant == 'baseline' }}
+        shell: bash
+        run: echo "INSTALL_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Install nix baseline environment
+        if: ${{ matrix.variant == 'baseline' }}
+        uses: ./.github/actions/install-nix
+
+      - name: Finish baseline install timer
+        if: ${{ matrix.variant == 'baseline' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_end=$(date +%s)
+          echo "install_seconds=$((install_end - INSTALL_START))" >> .benchmark/summary.env
+
+      - name: Start baseline selector timer
+        if: ${{ matrix.variant == 'baseline' }}
+        shell: bash
+        run: echo "SELECTOR_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Run baseline selector
+        if: ${{ matrix.variant == 'baseline' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          nix develop --command go run ./tools/targeted-bazel ${{ steps.scope.outputs.selector_args }} 2>&1 | tee .benchmark/selector.log
+
+      - name: Finish baseline selector timer
+        if: ${{ always() && matrix.variant == 'baseline' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          selector_end=$(date +%s)
+          echo "selector_seconds=$((selector_end - SELECTOR_START))" >> .benchmark/summary.env
+
+      - name: Start go-download setup timer
+        if: ${{ matrix.variant == 'go-download' }}
+        shell: bash
+        run: echo "SETUP_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Set up Go for go-download selector
+        if: ${{ matrix.variant == 'go-download' }}
+        uses: ./.github/actions/setup-go-for-project
+
+      - name: Start go-download Java timer
+        if: ${{ matrix.variant == 'go-download' }}
+        shell: bash
+        run: echo "JAVA_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Ensure Java for go-download selector
+        if: ${{ matrix.variant == 'go-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v java >/dev/null 2>&1; then
+            echo "java_preinstalled=true" >> .benchmark/summary.env
+            java -version
+            exit 0
+          fi
+          echo "java_preinstalled=false" >> .benchmark/summary.env
+          sudo apt-get update
+          sudo apt-get install -y openjdk-21-jre-headless
+          java -version
+
+      - name: Finish go-download Java timer
+        if: ${{ always() && matrix.variant == 'go-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          java_end=$(date +%s)
+          echo "java_seconds=$((java_end - JAVA_START))" >> .benchmark/summary.env
+
+      - name: Ensure Bazelisk for go-download selector
+        if: ${{ matrix.variant == 'go-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL "$BAZELISK_URL" -o .benchmark/bin/bazel
+          chmod +x .benchmark/bin/bazel
+          echo "$PWD/.benchmark/bin" >> "$GITHUB_PATH"
+
+      - name: Finish go-download setup timer
+        if: ${{ always() && matrix.variant == 'go-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          setup_end=$(date +%s)
+          echo "setup_seconds=$((setup_end - SETUP_START))" >> .benchmark/summary.env
+
+      - name: Start go-download selector timer
+        if: ${{ matrix.variant == 'go-download' }}
+        shell: bash
+        run: echo "SELECTOR_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Run go-download selector
+        if: ${{ matrix.variant == 'go-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          go run ./tools/targeted-bazel ${{ steps.scope.outputs.selector_args }} 2>&1 | tee .benchmark/selector.log
+
+      - name: Finish go-download selector timer
+        if: ${{ always() && matrix.variant == 'go-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          selector_end=$(date +%s)
+          echo "selector_seconds=$((selector_end - SELECTOR_START))" >> .benchmark/summary.env
+
+      - name: Validate binary-download inputs
+        if: ${{ matrix.variant == 'binary-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$TARGETED_BAZEL_URL" || -z "$IMPACTEDTESTS_URL" ]]; then
+            echo "binary-download variant requires targeted_bazel_url and impactedtests_url" >&2
+            exit 1
+          fi
+
+      - name: Start binary setup timer
+        if: ${{ matrix.variant == 'binary-download' }}
+        shell: bash
+        run: echo "SETUP_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Start binary Java timer
+        if: ${{ matrix.variant == 'binary-download' }}
+        shell: bash
+        run: echo "JAVA_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Ensure Java for binary-download selector
+        if: ${{ matrix.variant == 'binary-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v java >/dev/null 2>&1; then
+            echo "java_preinstalled=true" >> .benchmark/summary.env
+            java -version
+            exit 0
+          fi
+          echo "java_preinstalled=false" >> .benchmark/summary.env
+          sudo apt-get update
+          sudo apt-get install -y openjdk-21-jre-headless
+          java -version
+
+      - name: Finish binary Java timer
+        if: ${{ matrix.variant == 'binary-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          java_end=$(date +%s)
+          echo "java_seconds=$((java_end - JAVA_START))" >> .benchmark/summary.env
+
+      - name: Download binary selector toolchain
+        if: ${{ matrix.variant == 'binary-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL "$BAZELISK_URL" -o .benchmark/bin/bazel
+          curl -fsSL "$TARGETED_BAZEL_URL" -o .benchmark/bin/targeted-bazel
+          curl -fsSL "$IMPACTEDTESTS_URL" -o .benchmark/bin/impactedtests
+          chmod +x .benchmark/bin/bazel .benchmark/bin/targeted-bazel .benchmark/bin/impactedtests
+          echo "$PWD/.benchmark/bin" >> "$GITHUB_PATH"
+
+      - name: Finish binary setup timer
+        if: ${{ matrix.variant == 'binary-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          setup_end=$(date +%s)
+          echo "setup_seconds=$((setup_end - SETUP_START))" >> .benchmark/summary.env
+
+      - name: Start binary selector timer
+        if: ${{ matrix.variant == 'binary-download' }}
+        shell: bash
+        run: echo "SELECTOR_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Run binary-download selector
+        if: ${{ matrix.variant == 'binary-download' }}
+        shell: bash
+        env:
+          IMPACTEDTESTS_BIN: ${{ github.workspace }}/.benchmark/bin/impactedtests
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          .benchmark/bin/targeted-bazel ${{ steps.scope.outputs.selector_args }} 2>&1 | tee .benchmark/selector.log
+
+      - name: Finish binary selector timer
+        if: ${{ always() && matrix.variant == 'binary-download' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          selector_end=$(date +%s)
+          echo "selector_seconds=$((selector_end - SELECTOR_START))" >> .benchmark/summary.env
+
+      - name: Validate image inputs
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$IMAGE_REF" ]]; then
+            echo "image variant requires image_ref" >&2
+            exit 1
+          fi
+
+      - name: Start image pull timer
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: echo "PULL_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Pull selector image
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: docker pull "$IMAGE_REF"
+
+      - name: Finish image pull timer
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pull_end=$(date +%s)
+          echo "pull_seconds=$((pull_end - PULL_START))" >> .benchmark/summary.env
+
+      - name: Start image selector timer
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: echo "SELECTOR_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Run image selector
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          docker run --rm \
+            -e BAZEL_IMPACTED_BASE_SHA="$BAZEL_IMPACTED_BASE_SHA" \
+            -e IMPACTEDTESTS_BIN=impactedtests \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            "$IMAGE_REF" \
+            targeted-bazel ${{ steps.scope.outputs.selector_args }} 2>&1 | tee .benchmark/selector.log
+
+      - name: Finish image selector timer
+        if: ${{ always() && matrix.variant == 'image' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          selector_end=$(date +%s)
+          echo "selector_seconds=$((selector_end - SELECTOR_START))" >> .benchmark/summary.env
+
+      - name: Finalize benchmark summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          total_end=$(date +%s)
+          echo "total_seconds=$((total_end - TOTAL_START))" >> .benchmark/summary.env
+
+          if [[ -f .benchmark/selector.log ]]; then
+            if grep -q '^No impacted Bazel test targets selected' .benchmark/selector.log; then
+              result=empty
+            else
+              result=non-empty
+            fi
+          else
+            result=missing-log
+          fi
+          echo "result=$result" >> .benchmark/summary.env
+
+          awk -F= '{printf "%s=%s\n", $1, $2}' .benchmark/summary.env | sort
+
+          jq -Rn '
+            reduce inputs as $line ({};
+              ($line | capture("(?<key>[^=]+)=(?<value>.*)")) as $pair
+              | .[$pair.key] = $pair.value
+            )
+          ' < <(sort .benchmark/summary.env) > .benchmark/summary.json
+
+      - name: Upload benchmark artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bazel-selector-benchmark-${{ matrix.variant }}-${{ inputs.scope }}
+          path: |
+            .benchmark/summary.env
+            .benchmark/summary.json
+            .benchmark/selector.log

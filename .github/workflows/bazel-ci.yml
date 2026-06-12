@@ -14,6 +14,20 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # - On PR runs, BAZEL_IMPACTED_BASE_SHA is set to enable jobs to target only Bazel
+  # targets impacted by the changes between BASE_SHA and the PR branch. In the event
+  # that a PR run gives a false-negative due to e.g an environmental dependency, the
+  # merge run should catch it.
+  #
+  # - On merge queue and post-merge runs, BAZEL_IMPACTED_BASE_SHA is not set. This
+  # ensures that jobs run against all Bazel targets regardless of what changed to
+  # avoid false-negatives e.g. due to an environmental dependency.
+  #
+  # - Jobs relying on BAZEL_IMPACTED_BASE_SHA must set `fetch-depth: 0` for
+  # actions/checkout to ensure the history includes both the PR merge commit and the
+  # base commit to compare against.
+  # TODO(marun) Maybe this should be conditional?
+  BAZEL_IMPACTED_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
 
 permissions:
   contents: read
@@ -26,6 +40,7 @@ jobs:
     if: ${{ always() }}
     needs:
       - check-metadata
+      - impactedtests-integration
       - unit-main
       - unit-coreth
       - unit-subnet-evm
@@ -70,35 +85,95 @@ jobs:
         shell: bash
         run: bazel fetch //...
 
+  impactedtests-integration:
+    needs: check-metadata
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run impactedtests integration test with Bazel
+        shell: bash
+        env:
+          IMPACTEDTESTS_SOURCE_REPO: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          bazelisk test \
+            --test_env=PATH \
+            --test_env=IMPACTEDTESTS_SOURCE_REPO \
+            //tools/impactedtests:integration_test
+
   unit-main:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Ensure sufficient history for bazel diff
       - uses: ./.github/actions/setup-bazel-repository-cache
-      - name: Run unit tests with Bazel
+      - name: Select impacted main-module unit tests
+        id: select
+        uses: ./.github/actions/select-bazel-tests
+        with:
+          manifest_path: .ci/unit-main-manifest.txt
+          scopes: |
+            //...
+            -//graft/...
+      - name: Run selective unit tests with Bazel
+        if: ${{ steps.select.outputs.execution_mode == 'selective' }}
         shell: bash
         run: ./scripts/run_task.sh bazel-test-main
+      - name: Run full unit tests with Bazel
+        if: ${{ steps.select.outputs.execution_mode == 'full' }}
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-main-full
 
   unit-coreth:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Ensure sufficient history for bazel diff
       - uses: ./.github/actions/setup-bazel-repository-cache
-      - name: Run coreth unit tests with Bazel
+      - name: Select impacted coreth/evm unit tests
+        id: select
+        uses: ./.github/actions/select-bazel-tests
+        with:
+          manifest_path: .ci/unit-coreth-manifest.txt
+          scopes: |
+            //graft/coreth/...
+            //graft/evm/...
+      - name: Run selective coreth unit tests with Bazel
+        if: ${{ steps.select.outputs.execution_mode == 'selective' }}
         shell: bash
         run: ./scripts/run_task.sh bazel-test-coreth
+      - name: Run full coreth unit tests with Bazel
+        if: ${{ steps.select.outputs.execution_mode == 'full' }}
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-coreth-full
 
   unit-subnet-evm:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Ensure sufficient history for bazel diff
       - uses: ./.github/actions/setup-bazel-repository-cache
-      - name: Run subnet-evm unit tests with Bazel
+      - name: Select impacted subnet-evm unit tests
+        id: select
+        uses: ./.github/actions/select-bazel-tests
+        with:
+          manifest_path: .ci/unit-subnet-evm-manifest.txt
+          scopes: |
+            //graft/subnet-evm/...
+      - name: Run selective subnet-evm unit tests with Bazel
+        if: ${{ steps.select.outputs.execution_mode == 'selective' }}
         shell: bash
         run: ./scripts/run_task.sh bazel-test-subnet-evm
+      - name: Run full subnet-evm unit tests with Bazel
+        if: ${{ steps.select.outputs.execution_mode == 'full' }}
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-subnet-evm-full
 
   e2e:
     needs: check-metadata

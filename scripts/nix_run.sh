@@ -30,9 +30,9 @@ if command -v "$1" > /dev/null 2>&1; then
   exec "$@"
 fi
 
-if [[ "$1" == "bazelisk" ]]; then
-  echo "Error: bazelisk not found on PATH and nix is not installed." >&2
-  echo "Install nix with './scripts/run_task.sh install-nix' or install bazelisk directly; see docs/bazel.md." >&2
+if [[ "$1" == "bazelisk" || "$1" == "bazel" ]]; then
+  echo "Error: bazel not found on PATH and nix is not installed." >&2
+  echo "Install nix with './scripts/run_task.sh install-nix' or install bazel directly; see docs/bazel.md." >&2
   exit 1
 fi
 

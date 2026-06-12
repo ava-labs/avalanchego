@@ -1,0 +1,52 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "impactedtests_lib",
+    srcs = [
+        "bazeldiff.go",
+        "flags.go",
+        "main.go",
+        "manifest.go",
+        "policy.go",
+        "range.go",
+        "scopes.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tools/impactedtests",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "impactedtests_bin",
+    embed = [":impactedtests_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "unit_test",
+    srcs = [
+        "bazeldiff_test.go",
+        "manifest_test.go",
+        "policy_test.go",
+        "range_test.go",
+    ],
+    embed = [":impactedtests_lib"],
+    deps = [
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "integration_test",
+    timeout = "long",
+    srcs = ["integration_test.go"],
+    data = [":impactedtests_bin"],
+    embed = [":impactedtests_lib"],
+    env = {
+        "IMPACTEDTESTS_TEST_BINARY": "$(rootpath :impactedtests_bin)",
+    },
+    tags = ["manual"],  # keep -- exercised by dedicated Bazel CI job
+    deps = [
+        "@com_github_stretchr_testify//require",
+    ],
+)

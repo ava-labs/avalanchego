@@ -1,0 +1,351 @@
+name: Bazel Execution Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Benchmark variant to run'
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - current-nix
+          - nix-store-cache
+          - image
+      scope:
+        description: 'Bazel test scope to benchmark'
+        required: true
+        default: subnet-evm
+        type: choice
+        options:
+          - main
+          - coreth
+          - subnet-evm
+      runner:
+        description: 'Runner label to execute the benchmark on'
+        required: true
+        default: ubuntu-24.04
+        type: string
+      task_mode:
+        description: 'Use the selective task or the full task for the chosen scope'
+        required: true
+        default: full
+        type: choice
+        options:
+          - selective
+          - full
+      base_sha:
+        description: 'Base SHA for BAZEL_IMPACTED_BASE_SHA when task_mode=selective'
+        required: false
+        default: ''
+        type: string
+      image_ref:
+        description: 'Container image reference for the image variant'
+        required: false
+        default: ''
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  define-matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.define-matrix.outputs.matrix }}
+    steps:
+      - name: Define matrix
+        id: define-matrix
+        shell: bash
+        env:
+          VARIANT: ${{ inputs.variant }}
+          IMAGE_REF: ${{ inputs.image_ref }}
+        run: |
+          set -euo pipefail
+
+          includes=()
+          add_variant() {
+            includes+=("{\"variant\":\"$1\"}")
+          }
+
+          case "$VARIANT" in
+            all)
+              add_variant current-nix
+              add_variant nix-store-cache
+              if [[ -n "$IMAGE_REF" ]]; then
+                add_variant image
+              else
+                echo "Skipping image variant in 'all' mode because image_ref was not provided." >&2
+              fi
+              ;;
+            current-nix|nix-store-cache|image)
+              add_variant "$VARIANT"
+              ;;
+            *)
+              echo "Unknown variant: $VARIANT" >&2
+              exit 1
+              ;;
+          esac
+
+          matrix_json=$(printf '%s\n' "${includes[@]}" | jq -s '{include: .}')
+          {
+            echo 'matrix<<EOF'
+            echo "$matrix_json"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+  benchmark:
+    needs: define-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
+    runs-on: ${{ inputs.runner }}
+    env:
+      VARIANT: ${{ matrix.variant }}
+      BENCHMARK_SCOPE: ${{ inputs.scope }}
+      TASK_MODE: ${{ inputs.task_mode }}
+      BAZEL_IMPACTED_BASE_SHA: ${{ inputs.base_sha }}
+      IMAGE_REF: ${{ inputs.image_ref }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve benchmark task
+        id: task
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$BENCHMARK_SCOPE:$TASK_MODE" in
+            main:selective)
+              task_name='bazel-test-main'
+              ;;
+            main:full)
+              task_name='bazel-test-main-full'
+              ;;
+            coreth:selective)
+              task_name='bazel-test-coreth'
+              ;;
+            coreth:full)
+              task_name='bazel-test-coreth-full'
+              ;;
+            subnet-evm:selective)
+              task_name='bazel-test-subnet-evm'
+              ;;
+            subnet-evm:full)
+              task_name='bazel-test-subnet-evm-full'
+              ;;
+            *)
+              echo "Unknown scope/task_mode: $BENCHMARK_SCOPE:$TASK_MODE" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "task_name=$task_name" >> "$GITHUB_OUTPUT"
+
+      - name: Validate selective mode inputs
+        if: ${{ inputs.task_mode == 'selective' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$BAZEL_IMPACTED_BASE_SHA" ]]; then
+            echo "base_sha is required when task_mode=selective" >&2
+            exit 1
+          fi
+
+      - name: Initialize benchmark metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .benchmark
+          {
+            echo "variant=$VARIANT"
+            echo "scope=$BENCHMARK_SCOPE"
+            echo "runner=${{ inputs.runner }}"
+            echo "task_mode=$TASK_MODE"
+            echo "task_name=${{ steps.task.outputs.task_name }}"
+            echo "base_sha=$BAZEL_IMPACTED_BASE_SHA"
+          } > .benchmark/summary.env
+          echo "TOTAL_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Start current-nix setup timer
+        if: ${{ matrix.variant == 'current-nix' }}
+        shell: bash
+        run: echo "SETUP_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Install current-nix environment
+        if: ${{ matrix.variant == 'current-nix' }}
+        uses: ./.github/actions/install-nix
+
+      - name: Warm dev shell for current-nix variant
+        if: ${{ matrix.variant == 'current-nix' }}
+        shell: bash
+        run: nix develop --command echo "current-nix-ready"
+
+      - name: Finish current-nix setup timer
+        if: ${{ always() && matrix.variant == 'current-nix' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          setup_end=$(date +%s)
+          echo "setup_seconds=$((setup_end - SETUP_START))" >> .benchmark/summary.env
+
+      - name: Start current-nix execution timer
+        if: ${{ matrix.variant == 'current-nix' }}
+        shell: bash
+        run: echo "EXEC_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Run current-nix benchmark task
+        if: ${{ matrix.variant == 'current-nix' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          nix develop --command task ${{ steps.task.outputs.task_name }} 2>&1 | tee .benchmark/execution.log
+
+      - name: Finish current-nix execution timer
+        if: ${{ always() && matrix.variant == 'current-nix' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec_end=$(date +%s)
+          echo "execution_seconds=$((exec_end - EXEC_START))" >> .benchmark/summary.env
+
+      - name: Start nix-store-cache setup timer
+        if: ${{ matrix.variant == 'nix-store-cache' }}
+        shell: bash
+        run: echo "SETUP_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Install nix for nix-store-cache variant
+        if: ${{ matrix.variant == 'nix-store-cache' }}
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f
+        with:
+          github_access_token: ${{ github.token }}
+
+      - name: Enable magic nix cache
+        if: ${{ matrix.variant == 'nix-store-cache' }}
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+
+      - name: Warm dev shell for nix-store-cache variant
+        if: ${{ matrix.variant == 'nix-store-cache' }}
+        shell: bash
+        run: nix develop --command echo "nix-store-cache-ready"
+
+      - name: Finish nix-store-cache setup timer
+        if: ${{ always() && matrix.variant == 'nix-store-cache' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          setup_end=$(date +%s)
+          echo "setup_seconds=$((setup_end - SETUP_START))" >> .benchmark/summary.env
+
+      - name: Start nix-store-cache execution timer
+        if: ${{ matrix.variant == 'nix-store-cache' }}
+        shell: bash
+        run: echo "EXEC_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Run nix-store-cache benchmark task
+        if: ${{ matrix.variant == 'nix-store-cache' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          nix develop --command task ${{ steps.task.outputs.task_name }} 2>&1 | tee .benchmark/execution.log
+
+      - name: Finish nix-store-cache execution timer
+        if: ${{ always() && matrix.variant == 'nix-store-cache' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec_end=$(date +%s)
+          echo "execution_seconds=$((exec_end - EXEC_START))" >> .benchmark/summary.env
+
+      - name: Validate image input
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$IMAGE_REF" ]]; then
+            echo "image_ref is required for the image variant" >&2
+            exit 1
+          fi
+
+      - name: Start image pull timer
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: echo "PULL_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Pull execution image
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: docker pull "$IMAGE_REF"
+
+      - name: Finish image pull timer
+        if: ${{ always() && matrix.variant == 'image' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pull_end=$(date +%s)
+          echo "pull_seconds=$((pull_end - PULL_START))" >> .benchmark/summary.env
+
+      - name: Start image execution timer
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: echo "EXEC_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Run image benchmark task
+        if: ${{ matrix.variant == 'image' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          docker run --rm \
+            -e BAZEL_IMPACTED_BASE_SHA="$BAZEL_IMPACTED_BASE_SHA" \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            "$IMAGE_REF" \
+            sh -lc "task ${{ steps.task.outputs.task_name }}" 2>&1 | tee .benchmark/execution.log
+
+      - name: Finish image execution timer
+        if: ${{ always() && matrix.variant == 'image' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec_end=$(date +%s)
+          echo "execution_seconds=$((exec_end - EXEC_START))" >> .benchmark/summary.env
+
+      - name: Finalize benchmark summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          total_end=$(date +%s)
+          echo "total_seconds=$((total_end - TOTAL_START))" >> .benchmark/summary.env
+          if [[ -f .benchmark/execution.log ]]; then
+            echo "result=completed" >> .benchmark/summary.env
+          else
+            echo "result=missing-log" >> .benchmark/summary.env
+          fi
+
+          awk -F= '{printf "%s=%s\n", $1, $2}' .benchmark/summary.env | sort
+
+          jq -Rn '
+            reduce inputs as $line ({};
+              ($line | capture("(?<key>[^=]+)=(?<value>.*)")) as $pair
+              | .[$pair.key] = $pair.value
+            )
+          ' < <(sort .benchmark/summary.env) > .benchmark/summary.json
+
+      - name: Upload benchmark artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bazel-execution-benchmark-${{ matrix.variant }}-${{ inputs.scope }}-${{ inputs.task_mode }}
+          path: |
+            .benchmark/summary.env
+            .benchmark/summary.json
+            .benchmark/execution.log
