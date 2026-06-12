@@ -190,9 +190,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Cleanup(ethRPCClient.Close)
 
 	sut := &SUT{
-		VM:     vm,
-		Client: NewClient(server.URL),
-
+		VM:        vm,
+		Client:    NewClient(server.URL),
 		memory:    memory,
 		sender:    appSender,
 		ethclient: ethclient.NewClient(ethRPCClient),
