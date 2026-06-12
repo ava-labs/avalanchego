@@ -288,7 +288,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 			})
 			built := sut.issueEthAndExecute(ctx, t, tx, withBlockContext(&block.Context{}))
 
-			// The warp logger emmitted a single log with the warp precompile's
+			// The warp logger emitted a single log with the warp precompile's
 			// response.
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
