@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -41,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor/executormock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
@@ -864,6 +866,123 @@ func TestGetValidatorsAt(t *testing.T) {
 	// include the new validator
 	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators)+1)
+}
+
+func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t)
+
+	nodeID := ids.GenerateTestNodeID()
+	startTime := service.vm.clock.Time()
+
+	const (
+		autoCompoundRewardShares = uint32(reward.PercentDenominator / 3)
+		potentialReward          = uint64(12_345)
+		period                   = defaultMinStakingDuration
+	)
+	periodSeconds := uint64(period / time.Second)
+	weight := service.vm.MinValidatorStake
+	endTime := startTime.Add(period)
+
+	rewardOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+	validatorAuthority := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	addAutoRenewedValidatorTx := &txs.AddAutoRenewedValidatorTx{
+		ValidatorNodeID:          types.JSONByteSlice(nodeID.Bytes()),
+		Signer:                   pop,
+		ValidatorRewardsOwner:    rewardOwner,
+		DelegatorRewardsOwner:    rewardOwner,
+		ValidatorAuthority:       validatorAuthority,
+		DelegationShares:         reward.PercentDenominator,
+		AutoCompoundRewardShares: autoCompoundRewardShares,
+		Period:                   periodSeconds,
+	}
+	tx := &txs.Tx{Unsigned: addAutoRenewedValidatorTx}
+	require.NoError(tx.Initialize(txs.Codec))
+
+	service.vm.ctx.Lock.Lock()
+	staker := &state.Staker{
+		TxID:            tx.ID(),
+		NodeID:          addAutoRenewedValidatorTx.NodeID(),
+		PublicKey:       pop.Key(),
+		SubnetID:        addAutoRenewedValidatorTx.SubnetID(),
+		Weight:          weight,
+		StartTime:       startTime,
+		EndTime:         endTime,
+		PotentialReward: potentialReward,
+		NextTime:        endTime,
+		Priority:        addAutoRenewedValidatorTx.CurrentPriority(),
+	}
+
+	require.NoError(service.vm.state.PutCurrentValidator(staker))
+	service.vm.state.AddTx(tx, status.Committed)
+	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
+		AutoCompoundRewardShares: autoCompoundRewardShares,
+		NextPeriod:               periodSeconds,
+	}))
+	require.NoError(service.vm.state.Commit())
+	service.vm.ctx.Lock.Unlock()
+
+	reply := GetCurrentValidatorsReply{}
+	require.NoError(service.GetCurrentValidators(&http.Request{}, &GetCurrentValidatorsArgs{
+		SubnetID: constants.PrimaryNetworkID,
+		NodeIDs:  []ids.NodeID{nodeID},
+	}, &reply))
+	require.Len(reply.Validators, 1)
+
+	gotValidator := reply.Validators[0].(pchainapi.PermissionlessValidator)
+
+	rewardOwnerAddr, err := service.addrManager.FormatLocalAddress(rewardOwner.Addrs[0])
+	require.NoError(err)
+	validatorAuthorityAddr, err := service.addrManager.FormatLocalAddress(validatorAuthority.Addrs[0])
+	require.NoError(err)
+
+	wantRewardOwner := &pchainapi.Owner{
+		Threshold: avajson.Uint32(rewardOwner.Threshold),
+		Addresses: []string{rewardOwnerAddr},
+	}
+	wantValidator := pchainapi.PermissionlessValidator{
+		Staker: pchainapi.Staker{
+			TxID:      tx.ID(),
+			StartTime: avajson.Uint64(startTime.Unix()),
+			EndTime:   avajson.Uint64(endTime.Unix()),
+			Weight:    avajson.Uint64(weight),
+			NodeID:    nodeID,
+		},
+		ValidationRewardOwner:  wantRewardOwner,
+		DelegationRewardOwner:  wantRewardOwner,
+		PotentialReward:        utils.PointerTo(avajson.Uint64(potentialReward)),
+		AccruedDelegateeReward: utils.PointerTo(avajson.Uint64(0)),
+		DelegationFee:          avajson.Float32(100),
+		Uptime:                 utils.PointerTo(avajson.Float32(100)),
+		Connected:              utils.PointerTo(false),
+		Signer: &signer.ProofOfPossession{
+			PublicKey:         pop.PublicKey,
+			ProofOfPossession: pop.ProofOfPossession,
+		},
+		AutoRenewedConfig: &pchainapi.AutoRenewedConfig{
+			ValidatorAuthority: &pchainapi.Owner{
+				Threshold: avajson.Uint32(validatorAuthority.Threshold),
+				Addresses: []string{validatorAuthorityAddr},
+			},
+			NextPeriod:               avajson.Uint64(periodSeconds),
+			AutoCompoundRewardShares: avajson.Uint32(autoCompoundRewardShares),
+		},
+		DelegatorCount:  utils.PointerTo(avajson.Uint64(0)),
+		DelegatorWeight: utils.PointerTo(avajson.Uint64(0)),
+		Delegators:      &[]pchainapi.PrimaryDelegator{},
+	}
+	require.Equal(wantValidator, gotValidator)
 }
 
 func TestGetValidatorsAtArgsMarshalling(t *testing.T) {

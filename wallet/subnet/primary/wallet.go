@@ -65,6 +65,9 @@ type WalletConfig struct {
 	// Validation IDs that the wallet should know about to be able to generate
 	// transactions.
 	ValidationIDs []ids.ID // optional
+	// Auto-renewed validator tx IDs that the wallet should know about to
+	// be able to generate SetAutoRenewedValidatorConfigTx transactions.
+	AutoRenewedValidatorTxIDs []ids.ID // optional
 }
 
 // MakeWallet returns a wallet that supports issuing transactions to the chains
@@ -96,7 +99,7 @@ func MakeWallet(
 		return nil, err
 	}
 
-	owners, err := avaxState.PClient.GetOwners(ctx, config.SubnetIDs, config.ValidationIDs)
+	owners, err := avaxState.PClient.GetOwners(ctx, config.SubnetIDs, config.ValidationIDs, config.AutoRenewedValidatorTxIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +150,7 @@ func MakePWallet(
 		return nil, err
 	}
 
-	owners, err := client.GetOwners(ctx, config.SubnetIDs, config.ValidationIDs)
+	owners, err := client.GetOwners(ctx, config.SubnetIDs, config.ValidationIDs, config.AutoRenewedValidatorTxIDs)
 	if err != nil {
 		return nil, err
 	}
