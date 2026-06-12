@@ -338,6 +338,7 @@ tasks:
     cmds:
       # Phase 1: Read-only checks (safe to parallelize)
       - task: _lint-readonly
+      - task: test-run-task-launcher
       # Phase 2: Tree-mutating checks (must be sequential to avoid
       # git index and bazel server contention)
       - task: check-yaml-fmt
@@ -366,6 +367,7 @@ tasks:
       - task: lint-saevm
       - task: lint-action
       - task: lint-shell
+      - task: test-run-task-launcher
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
@@ -525,6 +527,10 @@ tasks:
     desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.
     cmds:
       - cmd: '{{.NIX_RUN}} ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh'
+
+  test-run-task-launcher:
+    desc: Tests the run_task launcher behavior
+    cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'
 
   test-unit:
     desc: Runs unit tests
