@@ -212,8 +212,8 @@ func TestReceiveWarpMessage(t *testing.T) {
 
 	var (
 		sourceAddress    = common.Address{1, 2, 3}
-		payloadBytes     = []byte{4, 5, 6}
-		addressedCallMsg = sut.newAddressedCallMessage(t, sourceAddress[:], payloadBytes)
+		payload          = []byte{4, 5, 6}
+		addressedCallMsg = sut.newAddressedCallMessage(t, sourceAddress[:], payload)
 	)
 	getMessage, err := corethwarp.PackGetVerifiedWarpMessage(0)
 	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpMessage(...)")
@@ -243,7 +243,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 				Message: corethwarp.WarpMessage{
 					SourceChainID:       common.Hash(sut.ctx.ChainID),
 					OriginSenderAddress: sourceAddress,
-					Payload:             payloadBytes,
+					Payload:             payload,
 				},
 				Valid: true,
 			})),
@@ -288,6 +288,8 @@ func TestReceiveWarpMessage(t *testing.T) {
 			})
 			built := sut.issueEthAndExecute(ctx, t, tx, withBlockContext(&block.Context{}))
 
+			// The warp logger emmitted a single log with the warp precompile's
+			// response.
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
 			receipt := receipts[0]
