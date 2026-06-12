@@ -145,6 +145,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			Config:     saetest.ChainConfig(),
 			Alloc:      saetest.MaxAllocFor(keys.Addresses()...),
 			Timestamp:  saeparams.TauSeconds,
+			BaseFee:    big.NewInt(1),
 			Difficulty: big.NewInt(0), // irrelevant but required
 		},
 		db:     memdb.New(),

@@ -37,8 +37,14 @@ func TestGetChainConfig(t *testing.T) {
 	})
 }
 
+func withGenesisBaseFee(fee uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.BaseFee = new(big.Int).SetUint64(fee)
+	})
+}
+
 func TestBaseFee(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
+	ctx, sut := newSUT(t, 0, withGenesisBaseFee(params.InitialBaseFee))
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_baseFee",
 		want:   hexBig(params.InitialBaseFee),
@@ -52,7 +58,7 @@ func TestBaseFee(t *testing.T) {
 }
 
 func TestSuggestPriceOptions(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
+	ctx, sut := newSUT(t, 0, withGenesisBaseFee(params.InitialBaseFee))
 	// Before any blocks with worst-case bounds, the base fee falls back to the
 	// genesis base fee and the tip defaults to the minimum (no txs yet).
 	sut.testRPC(ctx, t, rpcTest{

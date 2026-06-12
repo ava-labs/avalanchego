@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
@@ -102,8 +101,6 @@ type Config struct {
 	DBConfig      saedb.Config
 	RPCConfig     rpc.Config
 
-	ExcessAfterLastSynchronous gas.Gas
-
 	Now func() time.Time // defaults to [time.Now] if nil
 }
 
@@ -164,7 +161,7 @@ func NewVM[T hook.Transaction](
 	vm.last.synchronous = lastSync.Height()
 
 	{ // ==========  Sync -> Async  ==========
-		if err := lastSync.MarkSynchronous(hooks, db, xdb, cfg.ExcessAfterLastSynchronous); err != nil {
+		if err := lastSync.MarkSynchronous(hooks, db, xdb); err != nil {
 			return nil, fmt.Errorf("%T{genesis}.MarkSynchronous(): %v", lastSync, err)
 		}
 		if err := canonicaliseLastSynchronous(db, lastSync); err != nil {

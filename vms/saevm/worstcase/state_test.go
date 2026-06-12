@@ -46,7 +46,6 @@ type SUT struct {
 
 const (
 	initialGasTarget = 1_000_000
-	initialExcess    = 60_303_807 // Maximum excess that results in gas price of 1
 )
 
 func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
@@ -62,7 +61,7 @@ func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
 		config,
 		alloc,
 		blockstest.WithGasTarget(initialGasTarget),
-		blockstest.WithGasExcess(initialExcess),
+		blockstest.WithBaseFee(params.Wei),
 	)
 	hooks := hookstest.NewStub(initialGasTarget)
 	s, err := NewState(hooks, config, genesis, saetest.NewStateDBOpener(cache, nil))
@@ -107,7 +106,15 @@ func TestMultipleBlocks(t *testing.T) {
 
 	state := sut.State
 	lastHash := sut.genesis.Hash()
-	wantLatestEndTime := sut.genesis.ExecutedByGasTime().Clone()
+
+	const maxExcessForPrice1 = 60_303_807
+	tm := state.clock
+	tm.TestOnlySetExcess(maxExcessForPrice1 + 1)
+	require.Equal(t, gas.Price(2), tm.Price())
+	tm.TestOnlySetExcess(maxExcessForPrice1)
+	require.Equal(t, gas.Price(1), tm.Price())
+
+	wantLatestEndTime := tm.Clone()
 
 	const importedAmount = 10
 	type op struct {
