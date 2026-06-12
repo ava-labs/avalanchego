@@ -356,9 +356,9 @@ type (
 
 // withBlockContext sets the [block.Context] used to set the preference and to
 // build and verify the block. If unset, a nil context is used.
-func withBlockContext(blockCtx *block.Context) blockOption {
+func withBlockContext(ctx *block.Context) blockOption {
 	return options.Func[blockConfig](func(c *blockConfig) {
-		c.context = blockCtx
+		c.context = ctx
 	})
 }
 
