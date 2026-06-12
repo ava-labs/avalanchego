@@ -11,6 +11,4 @@
 //     target (nil = no change).
 //   - a Desired* function that inverts the reader to find the smallest
 //     exponent yielding a desired value.
-//
-// The shared math primitives live in math.go.
 package dynamic

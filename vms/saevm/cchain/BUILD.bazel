@@ -11,7 +11,6 @@ package(default_visibility = [
 package_group(
     name = "external_consumers",
     packages = [
-        "//graft/coreth/core",
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/customtypes",
     ],

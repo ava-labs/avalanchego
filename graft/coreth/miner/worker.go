@@ -154,7 +154,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	// No Helicon blocks allowed
 	if chainExtra.IsHelicon(timestamp) && timestamp > 0 {
 		timestamp = *chainExtra.HeliconTimestamp - 1
-		timestampMS = (timestamp+1)*1000 - 1
+		timestampMS = timestamp*1000 + 999
 	}
 
 	header := &types.Header{

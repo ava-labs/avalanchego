@@ -59,7 +59,6 @@ go_library(
         "//vms/evm/acp226",
         "//vms/evm/predicate",
         "//vms/evm/sync/customrawdb",
-        "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/bitutil",
