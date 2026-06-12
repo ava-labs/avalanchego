@@ -6,6 +6,7 @@ package cchain
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -91,10 +92,10 @@ type (
 )
 
 // withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
-// balance to each address.
+// balance to each address, leaving the rest of the genesis allocation intact.
 func withMaxAllocFor(addrs ...common.Address) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
+		maps.Copy(c.genesis.Alloc, saetest.MaxAllocFor(addrs...))
 	})
 }
 
@@ -109,6 +110,17 @@ func withNodeID(id ids.NodeID) sutOption {
 func withValidators(vdrs *warptest.Validators) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.validators = vdrs
+	})
+}
+
+// withContract adds an account with the given runtime code to the SUT's
+// genesis, leaving the rest of the genesis allocation intact.
+func withContract(addr common.Address, code []byte) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc[addr] = types.Account{
+			Code:    code,
+			Balance: new(big.Int),
+		}
 	})
 }
 
@@ -333,6 +345,16 @@ func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx, opts
 	tb.Helper()
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
+	return s.runConsensusLoop(ctx, tb, opts...)
+}
+
+// issueAndExecute submits t through [ethclient.Client.SendTransaction] and
+// drives the consensus loop to produce, accept, and execute the next block,
+// which is returned.
+func (s *SUT) issueEthAndExecute(ctx context.Context, tb testing.TB, t *types.Transaction, opts ...blockOption) *blocks.Block {
+	tb.Helper()
+
+	require.NoErrorf(tb, s.ethclient.SendTransaction(ctx, t), "%T.SendTransaction(...)", s.ethclient)
 	return s.runConsensusLoop(ctx, tb, opts...)
 }
 
