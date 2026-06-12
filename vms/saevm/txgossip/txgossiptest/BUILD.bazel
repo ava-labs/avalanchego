@@ -12,5 +12,7 @@ go_library(
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/txpool",
         "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//event",
+        "@com_github_stretchr_testify//require",
     ],
 )
