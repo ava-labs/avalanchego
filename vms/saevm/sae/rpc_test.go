@@ -129,6 +129,17 @@ func testRPCGetter[
 	}
 
 	t.Run(underlyingRPCMethod, func(t *testing.T) {
+		// The server may hold the same block pointer as `want` and lazily
+		// write its atomic caches when marshalling responses, racing with
+		// [cmp.Diff] reading unexported fields. Comparing a deep copy
+		// avoids sharing memory with the server.
+		if b := (*types.Block)(want); b != nil {
+			encoded, err := rlp.EncodeToBytes(b)
+			require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", b)
+			cp := new(types.Block)
+			require.NoErrorf(t, rlp.DecodeBytes(encoded, cp), "rlp.DecodeBytes(rlp.EncodeToBytes(%T))", b)
+			want = T(cp)
+		}
 		got, err := get(ctx, arg)
 		t.Logf("%s(%v)", underlyingRPCMethod, arg)
 		require.NoErrorf(t, err, "%s(%v)", underlyingRPCMethod, arg)
@@ -265,7 +276,7 @@ func TestWeb3Namespace(t *testing.T) {
 func TestNetNamespace(t *testing.T) {
 	testRPCMethodsWithPeers := func(sut *SUT, wantPeerCount hexutil.Uint) {
 		t.Helper()
-		sut.testRPC(sut.context(t), t, []rpcTest{
+		sut.testRPC(sut.Context(t), t, []rpcTest{
 			{
 				method: "net_listening",
 				want:   true,
@@ -559,7 +570,7 @@ func TestEthGetters(t *testing.T) {
 		sut.testGetByUnknownNumber(ctx, t)
 	})
 
-	genesis := sut.lastAcceptedBlock(t)
+	genesis := sut.LastAcceptedBlock(t)
 
 	createTx := func(t *testing.T, to common.Address) *types.Transaction {
 		t.Helper()
@@ -701,7 +712,7 @@ func TestGetLogs(t *testing.T) {
 	})
 
 	ctx, sut := newSUT(t, 1, timeOpt, withBloomSectionSize(bloomSectionSize), withPrecompile(emitter, precompile))
-	genesis := sut.lastAcceptedBlock(t)
+	genesis := sut.LastAcceptedBlock(t)
 
 	txWithLog := func(t *testing.T) *types.Transaction {
 		t.Helper()
@@ -739,7 +750,7 @@ func TestGetLogs(t *testing.T) {
 	// Although the FiltersAPI will work without any blocks indexed, such a
 	// scenario would not test the functionality of the bloom indexer.
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		be := sut.rawVM.GethRPCBackends()
+		be := sut.RawVM.GethRPCBackends()
 		_, got := be.BloomStatus()
 		require.Equal(c, uint64(1), got, "%T.BloomStatus() sections", be)
 	}, 5*time.Second, 100*time.Millisecond, "bloom indexer never finished")
@@ -921,7 +932,7 @@ func TestGetReceipts(t *testing.T) {
 		return b, rs
 	}
 
-	genesis := sut.lastAcceptedBlock(t)
+	genesis := sut.LastAcceptedBlock(t)
 
 	onDisk, wantOnDisk := slice(t, 0, 2)
 	settled, wantSettled := slice(t, 2, 4)
@@ -1256,7 +1267,7 @@ func TestRPCTxFeeCap(t *testing.T) {
 				Gas:      params.TxGas,
 				GasPrice: tt.gasPrice,
 			})
-			err := sut.Client.SendTransaction(sut.context(t), tx)
+			err := sut.Client.SendTransaction(sut.Context(t), tx)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("SendTransaction() %s", diff)
 			}
@@ -1628,7 +1639,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		b := sut.runConsensusLoop(t)
 		vmTime.advanceToSettle(ctx, t, b)
 	}
-	_, ok := sut.rawVM.consensusCritical.Load(settled.Hash())
+	_, ok := sut.RawVM.consensusCritical.Load(settled.Hash())
 	require.False(t, ok, "settled block still in VM memory")
 
 	accepted := sut.runConsensusLoop(t)
@@ -1702,7 +1713,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chain := sut.rawVM.chain()
+			chain := sut.RawVM.chain()
 			gotNum, gotHash, err := blocks.ResolveRPCNumberOrHash(chain, tt.nOrH)
 			t.Logf("blocks.ResolveBlockNumberOrhash(%T, %+v)", chain, tt.nOrH) // avoids having to repeat in failure messages
 			require.ErrorIs(t, err, tt.wantErr)

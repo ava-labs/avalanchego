@@ -23,7 +23,7 @@ import (
 func (s *SUT) assertTxBloomContains(tb testing.TB, txIDs ...ids.ID) {
 	tb.Helper()
 
-	filter, salt := s.gossipSet.BloomFilter()
+	filter, salt := s.RawVM.gossipSet.BloomFilter()
 	for i, txID := range txIDs {
 		assert.Truef(tb, bloom.Contains(filter, txID[:], salt[:]), "bloom filter should contain %s (%d)", txID, i)
 	}
@@ -35,7 +35,7 @@ func (s *SUT) assertTxBloomContains(tb testing.TB, txIDs ...ids.ID) {
 func (s *SUT) assertTxBloomEmpty(tb testing.TB) {
 	tb.Helper()
 
-	filter, _ := s.gossipSet.BloomFilter()
+	filter, _ := s.RawVM.gossipSet.BloomFilter()
 	assert.Zero(tb, filter.Count(), "bloom filter should be empty")
 }
 
@@ -49,7 +49,7 @@ func TestPushGossip(t *testing.T) {
 		vdrs      = set.Of(vdrID)
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
-	vdrCtx, vdr := newSUT(t, withAlloc, withNodeID(vdrID), withValidators(vdrs))
+	_, vdr := newSUT(t, withAlloc, withNodeID(vdrID), withValidators(vdrs))
 	saetest.Connect(t, api, vdr)
 
 	w := newWallet(sk, api.ctx, api.Client)
@@ -57,7 +57,7 @@ func TestPushGossip(t *testing.T) {
 	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
 	api.assertTxBloomContains(t, stx.ID())
 
-	blk := vdr.runConsensusLoop(vdrCtx, t)
+	blk := vdr.runConsensusLoop(t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by validator after gossip (-want +got):\n%s", blk, diff)
 	}
@@ -75,7 +75,7 @@ func TestPullGossip(t *testing.T) {
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	_, vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
-	vdrBCtx, vdrB := newSUT(t, withAlloc, withNodeID(vdrIDB), withValidators(vdrs))
+	_, vdrB := newSUT(t, withAlloc, withNodeID(vdrIDB), withValidators(vdrs))
 	saetest.ConnectTo(t, api, vdrA) // api is not connected to vdrB
 	saetest.ConnectTo(t, vdrA, vdrB)
 
@@ -86,7 +86,7 @@ func TestPullGossip(t *testing.T) {
 
 	// Because vdrB isn't connected to api, vdrB can only learn about the
 	// transaction by pulling it from vdrA.
-	blk := vdrB.runConsensusLoop(vdrBCtx, t)
+	blk := vdrB.runConsensusLoop(t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
 	}
@@ -105,8 +105,8 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	vdrACtx, vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
-	vdrBCtx, vdrB := newSUT(t, withAlloc, withNodeID(vdrIDB)) // vdrB doesn't consider vdrA a validator
-	saetest.ConnectTo(t, api, vdrA)                           // api is not connected to vdrB
+	_, vdrB := newSUT(t, withAlloc, withNodeID(vdrIDB)) // vdrB doesn't consider vdrA a validator
+	saetest.ConnectTo(t, api, vdrA)                     // api is not connected to vdrB
 	saetest.ConnectTo(t, vdrA, vdrB)
 
 	w := newWallet(sk, api.ctx, api.Client)
@@ -116,7 +116,7 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 
 	// Ensure vdrA learned about stx before we reissue the tx so we don't race
 	// with the normal issuance path.
-	vdrA.waitForPendingTxs(vdrACtx, t)
+	vdrA.WaitForPendingTxs(t)
 
 	// Because vdrB doesn't consider vdrA a validator and isn't connected to
 	// api, vdrB can only learn about the transaction if vdrA pushes it.
@@ -125,7 +125,7 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 	require.NoErrorf(t, vdrA.IssueTx(vdrACtx, stx), "%T.IssueTx()", vdrA.VM)
 	vdrA.assertTxBloomContains(t, stx.ID())
 
-	blk := vdrB.runConsensusLoop(vdrBCtx, t)
+	blk := vdrB.runConsensusLoop(t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
 		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
 	}

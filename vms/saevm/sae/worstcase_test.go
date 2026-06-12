@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sae
+package sae_test
 
 import (
 	"encoding/binary"
@@ -26,10 +26,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saevmtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 type worstCaseFlags struct {
@@ -133,15 +137,15 @@ func TestWorstCase(t *testing.T) {
 	g := &guzzler{Addr: guzzle}
 	extras := g.register(t)
 
-	sutOpt := options.Func[sutConfig](func(c *sutConfig) {
+	sutOpt := options.Func[saevmtest.Config](func(c *saevmtest.Config) {
 		// Avoid polluting a global [params.ChainConfig] with our hooks.
-		config := *c.genesis.Config
-		c.genesis.Config = &config
+		config := *c.Genesis.Config
+		c.Genesis.Config = &config
 		extras.ChainConfig.Set(&config, g)
 
-		c.logLevel = logging.Warn
+		c.LogLevel = logging.Warn
 
-		for _, acc := range c.genesis.Alloc {
+		for _, acc := range c.Genesis.Alloc {
 			// Note that `acc` isn't a pointer, but `Balance` is.
 			acc.Balance.Set(flags.balance.ToBig())
 		}
@@ -151,7 +155,11 @@ func TestWorstCase(t *testing.T) {
 		// Although the precompile is part of the test harness, its behaviour is
 		// key to the correctness of the rest of the tests, so we run a few
 		// tests on it.
-		ctx, sut := newSUT(t, 1, sutOpt)
+		xdb := saetest.NewExecutionResultsDB()
+		hooks := hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(
+			func(string) (saetypes.ExecutionResults, error) { return xdb, nil },
+		))
+		ctx, sut := saevmtest.NewSUT(t, 1, hooks, sutOpt)
 
 		newU64 := func(u uint64) *uint64 {
 			return &u
@@ -182,7 +190,7 @@ func TestWorstCase(t *testing.T) {
 			if k := tt.keep; k != nil {
 				data = binary.BigEndian.AppendUint64(nil, *k)
 			}
-			txs = append(txs, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			txs = append(txs, sut.Wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 				To:        &guzzle,
 				GasFeeCap: big.NewInt(1),
 				Gas:       tt.limit,
@@ -190,7 +198,8 @@ func TestWorstCase(t *testing.T) {
 			}))
 		}
 
-		b := sut.runConsensusLoop(t, txs...)
+		sut.SendTxsAndWaitUntilPending(t, txs...)
+		b := sut.RunConsensusLoop(t)
 		require.NoError(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		require.Lenf(t, b.Receipts(), len(precompileTests), "%T.Receipts()", b)
 		for i, r := range b.Receipts() {
@@ -205,11 +214,16 @@ func TestWorstCase(t *testing.T) {
 		t.Run("fuzz", func(t *testing.T) {
 			t.Parallel()
 
-			timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+			timeOpt, vmTime := saevmtest.WithVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
-			ctx, sut := newSUT(t, flags.numAccounts, sutOpt, timeOpt)
+			xdb := saetest.NewExecutionResultsDB()
+			hooks := hookstest.NewStub(100e6,
+				hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) { return xdb, nil }),
+				hookstest.WithNow(vmTime.Now),
+			)
+			ctx, sut := saevmtest.NewSUT(t, flags.numAccounts, hooks, sutOpt, timeOpt)
 
-			addrs := sut.wallet.Addresses()
+			addrs := sut.Wallet.Addresses()
 			numEOAs := len(addrs)
 			addrs = append(addrs, guzzle)
 			guzzlerIdx := numEOAs
@@ -233,7 +247,7 @@ func TestWorstCase(t *testing.T) {
 						data = binary.BigEndian.AppendUint64(nil, rng.Uint64N(gasLim))
 					}
 
-					tx := sut.wallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
+					tx := sut.Wallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
 						To:        &addrs[to],
 						GasFeeCap: big.NewInt(1 + rng.Int64N(100)),
 						Gas:       gasLim,
@@ -242,16 +256,16 @@ func TestWorstCase(t *testing.T) {
 					})
 
 					if err := sut.SendTransaction(ctx, tx); err != nil {
-						sut.wallet.DecrementNonce(t, from)
+						sut.Wallet.DecrementNonce(t, from)
 						continue
 					}
-					sut.waitUntilTxsPending(t, tx)
+					sut.WaitUntilTxsPending(t, tx)
 				}
 
 				for accepted := false; !accepted; {
-					vmTime.advance(time.Millisecond * time.Duration(rng.IntN(1000*3*saeparams.TauSeconds)))
+					vmTime.Advance(time.Millisecond * time.Duration(rng.IntN(1000*3*saeparams.TauSeconds)))
 
-					require.NoError(t, sut.SetPreference(ctx, sut.lastAcceptedBlock(t).ID()), "SetPreference()")
+					require.NoError(t, sut.SetPreference(ctx, sut.LastAcceptedBlock(t).ID()), "SetPreference()")
 
 					switch b, err := sut.BuildBlock(ctx); {
 					case errors.Is(err, worstcase.ErrQueueFull):
@@ -264,7 +278,7 @@ func TestWorstCase(t *testing.T) {
 
 						// Ensure the execution results are available for future
 						// LastToSettleAt calls.
-						require.NoError(t, unwrap(t, b).WaitUntilExecuted(ctx), "WaitUntilExecuted()")
+						require.NoError(t, saevmtest.Unwrap(t, b).WaitUntilExecuted(ctx), "WaitUntilExecuted()")
 
 						accepted = true
 					}

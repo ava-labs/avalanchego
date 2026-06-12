@@ -18,7 +18,6 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
@@ -57,6 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -77,21 +77,20 @@ var _ saetest.Peer = (*SUT)(nil)
 // other fields SHOULD instead be exposed as methods, such as [SUT.stateAt], to
 // avoid over-reliance on internal implementation details.
 type SUT struct {
+	*vmtest.SUT[*VM]
 	block.ChainVM
 	*ethclient.Client
 	rpcClient *rpc.Client
 
-	rawVM   *VM
 	genesis *blocks.Block
 	wallet  *saetest.Wallet
 	db      ethdb.Database
 	hooks   *hookstest.Stub
-	logger  *loggingtest.Logger
 
 	sender *saetest.Sender
 }
 
-func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
+func (s *SUT) NodeID() ids.NodeID      { return s.RawVM.NodeID() }
 func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
@@ -190,7 +189,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	}
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		require.NoError(tb, vm.LastAcceptedBlock().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
 	})
 
 	// Avalanchego marks the local node as connected so that p2p protocols
@@ -199,18 +198,17 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	rpcClient, ethClient := dialRPC(ctx, tb, snow)
 	sut := &SUT{
+		SUT:       &vmtest.SUT[*VM]{RawVM: vm.VM, Logger: logger},
 		ChainVM:   snow,
 		Client:    ethClient,
 		rpcClient: rpcClient,
-		rawVM:     vm.VM,
-		genesis:   vm.last.settled.Load(),
+		genesis:   vm.LastSettledBlock(),
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		db:     newEthDB(conf.db),
-		hooks:  conf.hooks,
-		logger: logger,
+		db:    NewEthDB(conf.db),
+		hooks: conf.hooks,
 
 		sender: sender,
 	}
@@ -224,14 +222,10 @@ func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Clien
 
 	handlers, err := snow.CreateHandlers(ctx)
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", snow)
-	server := httptest.NewServer(handlers[wsHTTPExtensionPath])
+	server := httptest.NewServer(handlers[WSHTTPExtensionPath])
 	tb.Cleanup(server.Close)
-	rpcClient, err := rpc.Dial("ws://" + server.Listener.Addr().String())
-	require.NoErrorf(tb, err, "rpc.Dial(http.NewServer(%T.CreateHandlers()))", snow)
-	client := ethclient.NewClient(rpcClient)
-	tb.Cleanup(client.Close)
 
-	return rpcClient, client
+	return vmtest.DialWS(tb, "ws://"+server.Listener.Addr().String())
 }
 
 func marshalJSON(tb testing.TB, v any) []byte {
@@ -350,22 +344,13 @@ func registerPrecompiles(tb testing.TB, precompiles map[common.Address]libevm.Pr
 	h.Register(tb)
 }
 
-// context returns a [context.Context], derived from the [testing.TB], that is
-// cancelled if the SUT's default logger receives a log at [logging.Error] or
-// higher.
-//
-//nolint:thelper // Not a helper
-func (s *SUT) context(tb testing.TB) context.Context {
-	return s.logger.CancelOnError(tb.Context())
-}
-
 // mustSendTx guarantees all transactions are delivered to the mempool, which triggers
 // an asynchronous reorg to move all possible transactions from the source addresses
 // to the pending label.
 func (s *SUT) mustSendTx(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
-	ctx := s.context(tb)
+	ctx := s.Context(tb)
 	for _, tx := range txs {
 		require.NoErrorf(tb, s.Client.SendTransaction(ctx, tx), "%T.SendTransaction([%#x])", s.Client, tx.Hash())
 	}
@@ -392,7 +377,7 @@ func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transactio
 func (s *SUT) waitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
-	txgossiptest.WaitUntilPending(tb, s.context(tb), s.rawVM.mempool.Pool, txs...)
+	txgossiptest.WaitUntilPending(tb, s.Context(tb), s.RawVM.TxPool(), txs...)
 }
 
 // buildAndParseBlock adds all `txs` to the mempool and ensures they are pending,
@@ -406,7 +391,7 @@ func (s *SUT) buildAndParseBlock(tb testing.TB, preference *blocks.Block, txs ..
 	tb.Helper()
 	s.sendTxsAndWaitUntilPending(tb, txs...)
 
-	ctx := s.context(tb)
+	ctx := s.Context(tb)
 	require.NoError(tb, s.SetPreference(ctx, preference.ID()), "SetPreference()")
 
 	proposed, err := s.BuildBlock(ctx)
@@ -426,22 +411,17 @@ func (s *SUT) buildAndParseBlock(tb testing.TB, preference *blocks.Block, txs ..
 func (s *SUT) createAndVerifyBlock(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) snowman.Block {
 	tb.Helper()
 	b := s.buildAndParseBlock(tb, preference, txs...)
-	require.NoErrorf(tb, b.Verify(s.context(tb)), "%T.Verify()", b)
+	require.NoErrorf(tb, b.Verify(s.Context(tb)), "%T.Verify()", b)
 	return b
 }
 
-// runConsensusLoopOnPreference is equivalent to [SUT.createAndVerifyBlock]
-// except that it also accepts the block with [VM.AcceptBlock]. It does NOT wait
-// for it to be executed; to do this automatically, set the [VM] to
-// [snow.Bootstrapping].
-//
-// There is no longer any need to wrap the block as an [adaptor.Block] so it is
-// returned in its raw form, unlike earlier steps in the consenus loop.
+// runConsensusLoopOnPreference sends txs, then builds, verifies, and accepts a
+// block on top of preference via the shared consensus helper. It does NOT wait
+// for execution - set the [VM] to [snow.Bootstrapping] for that.
 func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
-	b := s.createAndVerifyBlock(tb, preference, txs...)
-	require.NoErrorf(tb, b.Accept(s.context(tb)), "%T.Accept()", b)
-	return unwrap(tb, b)
+	s.sendTxsAndWaitUntilPending(tb, txs...)
+	return s.RunConsensusLoopOnPreference(tb, preference.ID())
 }
 
 // runConsensusLoop is a convenience wrapper for
@@ -449,26 +429,14 @@ func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Blo
 // preference.
 func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
-	return s.runConsensusLoopOnPreference(tb, s.lastAcceptedBlock(tb), txs...)
+	return s.runConsensusLoopOnPreference(tb, s.LastAcceptedBlock(tb), txs...)
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	tb.Helper()
-	sdb, err := s.rawVM.exec.StateDB(root)
-	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.rawVM.exec)
+	sdb, err := s.RawVM.StateDB(root)
+	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.RawVM)
 	return sdb
-}
-
-// lastAcceptedBlock is a convenience wrapper for calling [VM.GetBlock] with
-// the ID from [VM.LastAccepted] as an argument.
-func (s *SUT) lastAcceptedBlock(tb testing.TB) *blocks.Block {
-	tb.Helper()
-	ctx := s.context(tb)
-	id, err := s.LastAccepted(ctx)
-	require.NoError(tb, err, "LastAccepted()")
-	b, err := s.GetBlock(ctx, id)
-	require.NoError(tb, err, "GetBlock(lastAcceptedID)")
-	return unwrap(tb, b)
 }
 
 // unwrap is a convenience (un)wrapper for calling [adaptor.Block.Unwrap] after
@@ -482,36 +450,6 @@ func unwrap(tb testing.TB, b snowman.Block) *blocks.Block {
 		tb.Fatalf("snowman.Block of concrete type %T", b)
 		return nil
 	}
-}
-
-// assertBlockHashInvariants MUST NOT be called concurrently with
-// [VM.AcceptBlock] as it depends on the last-accepted block. It also blocks
-// until said block has finished execution.
-func (s *SUT) assertBlockHashInvariants(ctx context.Context, t *testing.T) {
-	t.Helper()
-	t.Run("block_hash_invariants", func(t *testing.T) {
-		b := s.lastAcceptedBlock(t)
-		require.NoError(t, b.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
-		t.Logf("Last accepted (and executed) block: %d", b.Height())
-
-		for num, want := range map[rpc.BlockNumber]common.Hash{
-			rpc.BlockNumber(b.Number().Int64()): b.Hash(),
-			rpc.LatestBlockNumber:               b.Hash(),               // Because we've waited until it's executed
-			rpc.SafeBlockNumber:                 b.LastSettled().Hash(), // Safe from disk corruption, not re-org, as acceptance guarantees finality
-			rpc.FinalizedBlockNumber:            b.LastSettled().Hash(), // Because we maintain label monotonicity
-		} {
-			t.Run(num.String(), func(t *testing.T) {
-				got, err := s.Client.HeaderByNumber(ctx, big.NewInt(num.Int64()))
-				require.NoErrorf(t, err, "%T.HeaderByNumber(%v)", s.Client, num)
-				assert.Equalf(t, want, got.Hash(), "%T.HeaderByNumber(%v).Hash()", s.Client, num)
-			})
-		}
-
-		// The RPC implementation doesn't use the database to resolve the block
-		// labels above, so we still need to check them.
-		assert.Equal(t, b.Hash(), rawdb.ReadHeadBlockHash(s.db), "rawdb.ReadHeadBlockHash() MUST reflect last-executed block")
-		assert.Equal(t, b.LastSettled().Hash(), rawdb.ReadFinalizedBlockHash(s.db), "rawdb.ReadFinalizedBlockHash() MUST reflect last-settled block")
-	})
 }
 
 func TestIntegration(t *testing.T) {
@@ -716,7 +654,7 @@ func TestVerifyWhenBootstrapping(t *testing.T) {
 		c.hooks.Ops = []hookstest.Op{op}
 	}))
 
-	blk := sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t))
+	blk := sut.buildAndParseBlock(t, sut.LastAcceptedBlock(t))
 
 	// Sanity check that the op was included in the block.
 	ops, err := sut.hooks.EndOfBlockOps(unwrap(t, blk).EthBlock())
@@ -763,7 +701,7 @@ func TestSyntacticBlockChecks(t *testing.T) {
 	ctx, sut := newSUT(t, 0)
 
 	const now = 1e6
-	sut.rawVM.config.Now = func() time.Time {
+	sut.RawVM.config.Now = func() time.Time {
 		return time.Unix(now, 0)
 	}
 
@@ -911,7 +849,7 @@ func TestSemanticBlockChecks(t *testing.T) {
 		c.genesis.Timestamp = now
 	}), opt)
 
-	lastAccepted := sut.lastAcceptedBlock(t)
+	lastAccepted := sut.LastAcceptedBlock(t)
 	tests := []struct {
 		name           string
 		parentHash     common.Hash // defaults to lastAccepted Hash if zero
@@ -979,7 +917,7 @@ func TestSemanticBlockChecks(t *testing.T) {
 				saetest.TrieHasher(),
 			)
 			b := blockstest.NewBlock(t, ethB, nil, nil)
-			require.ErrorIs(t, sut.rawVM.VerifyBlock(ctx, nil, b), tt.wantErr, "VerifyBlock()")
+			require.ErrorIs(t, sut.RawVM.VerifyBlock(ctx, nil, b), tt.wantErr, "VerifyBlock()")
 		})
 	}
 }
@@ -988,7 +926,7 @@ func requireReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 	tb.Helper()
 	for _, sut := range nodes {
 		assert.Eventuallyf(tb, func() bool {
-			return sut.rawVM.mempool.Has(ids.ID(txHash))
+			return sut.RawVM.mempool.Has(ids.ID(txHash))
 		}, 5*time.Second, 100*time.Millisecond, "tx %x not gossiped to node %s", txHash, sut.NodeID())
 	}
 	if tb.Failed() {
@@ -999,7 +937,7 @@ func requireReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 func requireNotReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 	tb.Helper()
 	for _, sut := range nodes {
-		assert.False(tb, sut.rawVM.mempool.Has(ids.ID(txHash)), "tx %x was gossiped to node %s", txHash, sut.NodeID())
+		assert.False(tb, sut.RawVM.mempool.Has(ids.ID(txHash)), "tx %x was gossiped to node %s", txHash, sut.NodeID())
 	}
 	if tb.Failed() {
 		tb.FailNow()
@@ -1025,7 +963,7 @@ func TestBlockSources(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, 1, opt)
 
-	genesis := sut.lastAcceptedBlock(t)
+	genesis := sut.LastAcceptedBlock(t)
 	// Once a block is settled, its ancestors are only accessible from the
 	// database.
 	onDisk := sut.runConsensusLoop(t)
@@ -1072,23 +1010,23 @@ func TestBlockSources(t *testing.T) {
 				cmpopts.EquateEmpty(),
 			}
 			t.Run("EthBlockSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.ethBlockSource(tt.block.Hash(), tt.block.NumberU64())
-				require.Equalf(t, wantOK, gotOK, "%T.ethBlockSource(...)", sut.rawVM)
+				got, gotOK := sut.RawVM.ethBlockSource(tt.block.Hash(), tt.block.NumberU64())
+				require.Equalf(t, wantOK, gotOK, "%T.ethBlockSource(...)", sut.RawVM)
 				if !wantOK {
 					return
 				}
 				if diff := cmp.Diff(tt.block.EthBlock(), got, opts); diff != "" {
-					t.Errorf("%T.ethBlockSource(...) diff (-want +got)\n%s", sut.rawVM, diff)
+					t.Errorf("%T.ethBlockSource(...) diff (-want +got)\n%s", sut.RawVM, diff)
 				}
 			})
 			t.Run("HeaderSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.headerSource(tt.block.Hash(), tt.block.NumberU64())
-				require.Equalf(t, wantOK, gotOK, "%T.headerSource(...)", sut.rawVM)
+				got, gotOK := sut.RawVM.headerSource(tt.block.Hash(), tt.block.NumberU64())
+				require.Equalf(t, wantOK, gotOK, "%T.headerSource(...)", sut.RawVM)
 				if !wantOK {
 					return
 				}
 				if diff := cmp.Diff(tt.block.Header(), got, opts); diff != "" {
-					t.Errorf("%T.headerSource(...) diff (-want +got)\n%s", sut.rawVM, diff)
+					t.Errorf("%T.headerSource(...) diff (-want +got)\n%s", sut.RawVM, diff)
 				}
 			})
 		})

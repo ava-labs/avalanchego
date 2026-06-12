@@ -51,7 +51,7 @@ func (vm *SinceGenesis[_]) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	db := newEthDB(avaDB)
+	db := NewEthDB(avaDB)
 	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
 
 	genesis := new(core.Genesis)
