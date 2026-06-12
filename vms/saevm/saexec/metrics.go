@@ -3,10 +3,34 @@
 
 package saexec
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"errors"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
+
+// queueDurationBuckets span 1ms (executor keeping up) to ~131s (deep backlog).
+var queueDurationBuckets = prometheus.ExponentialBuckets(0.001, 2, 18)
+
+// executeBlockBuckets span 500µs (small block) to ~16s (large/slow block).
+var executeBlockBuckets = prometheus.ExponentialBuckets(0.0005, 2, 16)
 
 type metrics struct {
-	lastExecutedHeight prometheus.Gauge
+	lastExecutedHeight   prometheus.Gauge
+	queueDuration        prometheus.Histogram
+	executeBlockDuration prometheus.Histogram
+
+	// executionQueueBlocks and executionQueueGasLimit track outstanding work:
+	// blocks accepted but not yet executed (including the one being executed),
+	// and the sum of their gas limits.
+	executionQueueBlocks   prometheus.Gauge
+	executionQueueGasLimit prometheus.Gauge
+
+	// executedGas is the actual gas consumed by executed blocks;
+	// executedGasLimit is the gas limit (worst-case gas) of those same blocks.
+	executedGas      prometheus.Counter
+	executedGasLimit prometheus.Counter
 }
 
 func newMetrics(reg prometheus.Registerer) (*metrics, error) {
@@ -15,13 +39,69 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Name: "last_executed_height",
 			Help: "Height of the latest block that completed async execution.",
 		}),
+		queueDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "execution_queue_duration_seconds",
+			Help:    "Time from a block's acceptance into the execution queue until its execution completes.",
+			Buckets: queueDurationBuckets,
+		}),
+		executeBlockDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "execute_block_duration_seconds",
+			Help:    "Wall-clock time to execute a single block, including state commit and post-execution work.",
+			Buckets: executeBlockBuckets,
+		}),
+		executionQueueBlocks: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "execution_queue_blocks",
+			Help: "Number of accepted blocks that have not yet completed execution.",
+		}),
+		executionQueueGasLimit: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "execution_queue_gas_limit",
+			Help: "Sum of the gas limits of accepted blocks that have not yet completed execution.",
+		}),
+		executedGas: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "executed_gas_total",
+			Help: "Cumulative gas actually consumed by executed blocks.",
+		}),
+		executedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "executed_gas_limit_total",
+			Help: "Cumulative gas limit (worst-case gas) of executed blocks.",
+		}),
 	}
-	if err := reg.Register(m.lastExecutedHeight); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return m, errors.Join(
+		reg.Register(m.lastExecutedHeight),
+		reg.Register(m.queueDuration),
+		reg.Register(m.executeBlockDuration),
+		reg.Register(m.executionQueueBlocks),
+		reg.Register(m.executionQueueGasLimit),
+		reg.Register(m.executedGas),
+		reg.Register(m.executedGasLimit),
+	)
 }
 
-func (m *metrics) markExecuted(height uint64) {
+func (m *metrics) setLastExecutedHeight(height uint64) {
 	m.lastExecutedHeight.Set(float64(height))
+}
+
+func (m *metrics) observeQueueDuration(d time.Duration) {
+	m.queueDuration.Observe(d.Seconds())
+}
+
+func (m *metrics) observeExecuteDuration(d time.Duration) {
+	m.executeBlockDuration.Observe(d.Seconds())
+}
+
+// markEnqueued records that a block with the given gas limit has been accepted
+// into the execution queue.
+func (m *metrics) markEnqueued(gasLimit uint64) {
+	m.executionQueueBlocks.Inc()
+	m.executionQueueGasLimit.Add(float64(gasLimit))
+}
+
+// markExecuted records that a block with the given gas limit has finished
+// executing, having consumed gasConsumed gas. It removes the block from the
+// queue gauges and adds to the cumulative executed totals.
+func (m *metrics) markExecuted(gasConsumed, gasLimit uint64) {
+	m.executionQueueBlocks.Dec()
+	m.executionQueueGasLimit.Sub(float64(gasLimit))
+	m.executedGas.Add(float64(gasConsumed))
+	m.executedGasLimit.Add(float64(gasLimit))
 }

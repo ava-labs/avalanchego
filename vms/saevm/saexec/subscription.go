@@ -9,16 +9,17 @@ import (
 	"github.com/ava-labs/libevm/event"
 )
 
-func (e *Executor) sendPostExecutionEvents(b *types.Block, receipts types.Receipts) {
-	e.metrics.markExecuted(b.NumberU64())
+func (e *Executor) sendPostExecutionEvents(b *types.Block, results *ExecutionResults) {
+	e.metrics.markExecuted(uint64(results.GasConsumed), b.GasLimit())
+	e.metrics.setLastExecutedHeight(b.NumberU64())
 	e.headEvents.Send(core.ChainHeadEvent{Block: b})
 
 	var n int
-	for _, r := range receipts {
+	for _, r := range results.Receipts {
 		n += len(r.Logs)
 	}
 	logs := make([]*types.Log, 0, n)
-	for _, r := range receipts {
+	for _, r := range results.Receipts {
 		logs = append(logs, r.Logs...)
 	}
 	e.chainEvents.Send(core.ChainEvent{
