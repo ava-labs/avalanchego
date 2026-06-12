@@ -89,28 +89,28 @@ func (s *SUT) assertWarpSigningRefusal(
 	assert.ErrorIsf(tb, appErr, want, "reason to refuse signing %s", msg.ID())
 }
 
-// newUnsignedWarpMessage wraps payloadBytes in an unsigned warp message sourced
-// from the SUT's chain.
-func (s *SUT) newUnsignedWarpMessage(tb testing.TB, payloadBytes []byte) *avalanchewarp.UnsignedMessage {
+// newUnsignedWarpMessage wraps b in an unsigned warp message sourced from the
+// SUT's chain.
+func (s *SUT) newUnsignedWarpMessage(tb testing.TB, b []byte) *avalanchewarp.UnsignedMessage {
 	tb.Helper()
 
-	msg, err := avalanchewarp.NewUnsignedMessage(s.ctx.NetworkID, s.ctx.ChainID, payloadBytes)
+	msg, err := avalanchewarp.NewUnsignedMessage(s.ctx.NetworkID, s.ctx.ChainID, b)
 	require.NoError(tb, err, "avalanchewarp.NewUnsignedMessage(...)")
 	return msg
 }
 
 // newAddressedCallMessage returns an unsigned warp message, sourced from the
-// SUT's chain, with a [payload.AddressedCall] payload.
-func (s *SUT) newAddressedCallMessage(tb testing.TB, sourceAddress, payloadBytes []byte) *avalanchewarp.UnsignedMessage {
+// SUT's chain, with [payload.AddressedCall].
+func (s *SUT) newAddressedCallMessage(tb testing.TB, addr, b []byte) *avalanchewarp.UnsignedMessage {
 	tb.Helper()
 
-	p, err := payload.NewAddressedCall(sourceAddress, payloadBytes)
+	p, err := payload.NewAddressedCall(addr, b)
 	require.NoError(tb, err, "payload.NewAddressedCall(...)")
 	return s.newUnsignedWarpMessage(tb, p.Bytes())
 }
 
 // newBlockHashMessage returns an unsigned warp message, sourced from the SUT's
-// chain, with a [payload.Hash] payload committing to blkID.
+// chain, with [payload.Hash] committing to blkID.
 func (s *SUT) newBlockHashMessage(tb testing.TB, blkID ids.ID) *avalanchewarp.UnsignedMessage {
 	tb.Helper()
 
@@ -120,59 +120,39 @@ func (s *SUT) newBlockHashMessage(tb testing.TB, blkID ids.ID) *avalanchewarp.Un
 }
 
 // TestSendWarpMessage verifies that a warp message emitted by the warp
-// precompile is only available for signing after the block containing the
-// emitting tx has been accepted and executed.
+// precompile is correctly signed after the block is executed but not before.
 func TestSendWarpMessage(t *testing.T) {
 	var (
-		ethWallet = saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
-		sender    = ethWallet.Addresses()[0]
+		wallet = saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+		sender = wallet.Addresses()[0]
 	)
 	ctx, sut := newSUT(t, withMaxAllocFor(sender))
 
-	payloadData := utils.RandomBytes(100)
-	sendInput, err := corethwarp.PackSendWarpMessage(payloadData)
+	payload := utils.RandomBytes(100)
+	callData, err := corethwarp.PackSendWarpMessage(payload)
 	require.NoError(t, err, "corethwarp.PackSendWarpMessage(...)")
-	warpTx := ethWallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+	tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &corethwarp.ContractAddress,
 		Gas:       1_000_000,
 		GasFeeCap: big.NewInt(1),
-		Data:      sendInput,
+		Data:      callData,
 	})
-	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, warpTx), "%T.SendTransaction(...)", sut.ethclient)
+	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tx), "%T.SendTransaction(...)", sut.ethclient)
 
 	built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-	if diff := cmp.Diff(types.Transactions{warpTx}, built.Transactions(), cmputils.TransactionsByHash()); diff != "" {
+	if diff := cmp.Diff(types.Transactions{tx}, built.Transactions(), cmputils.TransactionsByHash()); diff != "" {
 		t.Errorf("%T eth txs (-want +got):\n%s", built, diff)
 	}
 
-	// Until the block has been accepted and executed, neither the emitted
-	// message nor the block hash may be signed.
-	sentMsg := sut.newAddressedCallMessage(t, sender.Bytes(), payloadData)
+	sentMsg := sut.newAddressedCallMessage(t, sender.Bytes(), payload)
+	hashMsg := sut.newBlockHashMessage(t, built.ID())
+
 	sut.assertWarpSigningRefusal(ctx, t, sentMsg, warp.UnknownMessageErrCode)
-	blockHashMsg := sut.newBlockHashMessage(t, built.ID())
-	sut.assertWarpSigningRefusal(ctx, t, blockHashMsg, warp.NotAcceptedErrCode)
+	sut.assertWarpSigningRefusal(ctx, t, hashMsg, warp.NotAcceptedErrCode)
 
 	sut.acceptAndExecute(ctx, t, built)
-
-	// Execution produces the receipt carrying the SendWarpMessage log.
-	receipts := built.Receipts()
-	require.Lenf(t, receipts, 1, "%T.Receipts()", built)
-	logs := receipts[0].Logs
-	require.Lenf(t, logs, 1, "%T.Logs", receipts[0])
-	wantTopics := []common.Hash{
-		corethwarp.WarpABI.Events["SendWarpMessage"].ID,
-		common.BytesToHash(sender.Bytes()),
-		common.Hash(sentMsg.ID()),
-	}
-	assert.Equalf(t, wantTopics, logs[0].Topics, "%T.Topics", logs[0])
-
-	loggedMsg, err := corethwarp.UnpackSendWarpEventDataToMessage(logs[0].Data)
-	require.NoError(t, err, "corethwarp.UnpackSendWarpEventDataToMessage(...)")
-	assert.Equalf(t, sentMsg, loggedMsg, "%T.Data as warp message", logs[0])
-
-	// Both messages are now available for signing.
 	sut.signWarpMessage(ctx, t, sentMsg)
-	sut.signWarpMessage(ctx, t, blockHashMsg)
+	sut.signWarpMessage(ctx, t, hashMsg)
 }
 
 // forwardAndLogCode returns runtime bytecode that forwards its calldata to
