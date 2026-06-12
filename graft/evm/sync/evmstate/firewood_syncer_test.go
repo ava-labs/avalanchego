@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -145,12 +146,12 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	// Create the mock P2P proofClient that serves range proofs and change proofs from the server DB.
 	// Use CorethCodec as the default - the firewood syncer uses p2p directly, not the message codec,
 	// so the codec choice only affects the code request handler which is auxiliary to these tests.
-	var (
-		codeRequestHandler = handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
-		serverDB           = dbFromState(t, serverState)
-		mockClient         = client.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
-		proofClient        = p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, syncer.NewGetProofHandler(serverDB))
-	)
+	codeRequestHandler := handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
+	serverDB := dbFromState(t, serverState)
+	mockClient := client.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
+	proofHandler, err := syncer.NewGetProofHandler(serverDB, prometheus.NewRegistry())
+	require.NoError(t, err, "syncer.NewGetProofHandler()")
+	proofClient := p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, proofHandler)
 
 	// Create the producer code queue.
 	codeQueue, err := code.NewQueue(clientState.DiskDB().(ethdb.Database))

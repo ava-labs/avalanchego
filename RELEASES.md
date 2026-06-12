@@ -9,6 +9,10 @@
   - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
   - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
   - `avalanche_{vmName}_eth_net_average_bandwidth` -> `avalanche_{vmName}_sdk_sync_peer_tracker_average_bandwidth`
+- Added Firewood state-sync proof metrics, labeled by `proof_type="range|change"`; the duration histograms are additionally labeled by `result="success|failure"`:
+  - Server-side histograms: `avalanche_{vmName}_sdk_sync_proof_generation_seconds`, `avalanche_{vmName}_sdk_sync_generated_proof_size_bytes`, and `avalanche_{vmName}_sdk_sync_proof_shrink_new_key_limit`
+  - Client-side histograms: `avalanche_{vmName}_sync_firewood_sync_proof_verification_seconds`, `avalanche_{vmName}_sync_firewood_sync_proof_commit_seconds`, and `avalanche_{vmName}_sync_firewood_sync_received_proof_size_bytes`
+  - Client-side gauge: `avalanche_{vmName}_sync_firewood_sync_request_key_limit`
 
 NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chains
 

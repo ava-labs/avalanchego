@@ -676,7 +676,11 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			return fmt.Errorf("expected a %T with %s scheme, got %T", tdb, customrawdb.FirewoodScheme, vm.eth.BlockChain().TrieDB().Backend())
 		}
 		n := vm.Network.P2PNetwork()
-		if err := n.AddHandler(p2p.FirewoodProofHandlerID, syncer.NewGetProofHandler(tdb.Firewood)); err != nil {
+		proofHandler, err := syncer.NewGetProofHandler(tdb.Firewood, vm.sdkMetrics)
+		if err != nil {
+			return fmt.Errorf("creating firewood proof handler: %w", err)
+		}
+		if err := n.AddHandler(p2p.FirewoodProofHandlerID, proofHandler); err != nil {
 			return fmt.Errorf("adding firewood proof handler: %w", err)
 		}
 	default:
