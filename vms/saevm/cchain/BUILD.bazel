@@ -116,6 +116,7 @@ go_test(
         "//utils",
         "//utils/bloom",
         "//utils/constants",
+        "//utils/crypto/bls",
         "//utils/crypto/secp256k1",
         "//utils/logging",
         "//utils/logging/loggingtest",

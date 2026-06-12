@@ -7,10 +7,11 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
@@ -22,143 +23,147 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-// TestSendWarpMessage verifies that a warp message emitted by a tx is only
-// available for signing AFTER the block containing the tx has executed.
+// TestSendWarpMessage verifies that a warp message emitted by the warp
+// precompile is only available for signing after the block containing the
+// emitting tx has been accepted and executed.
 func TestSendWarpMessage(t *testing.T) {
-	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
-	sender := ethWallet.Addresses()[0]
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	sender := wallet.Addresses()[0]
 
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(sender)
-	}))
-	capturer := saetest.NewCapturingPeer(t, set.Set[ids.NodeID]{})
+	ctx, sut := newSUT(t, withMaxAllocFor(sender))
+	capturer := saetest.NewCapturingPeer(t, nil /*vdrs*/)
 	saetest.ConnectTo[saetest.Peer](t, sut, capturer)
 
 	payloadData := utils.RandomBytes(100)
-	warpSendInput, err := corethwarp.PackSendWarpMessage(payloadData)
-	require.NoError(t, err)
-
-	sendWarpTx(ctx, t, sut, ethWallet, warpSendInput, nil /*no predicate*/)
+	sendInput, err := corethwarp.PackSendWarpMessage(payloadData)
+	require.NoError(t, err, "corethwarp.PackSendWarpMessage(...)")
+	warpTx := sendWarpTx(ctx, t, sut, wallet, sendInput, nil /*signedMsg*/)
 
 	built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-	require.Len(t, built.EthBlock().Transactions(), 1)
+	if diff := cmp.Diff(types.Transactions{warpTx}, built.Transactions(), cmputils.TransactionsByHash()); diff != "" {
+		t.Errorf("%T eth txs (-want +got):\n%s", built, diff)
+	}
 
-	// Before the block has executed the warp verifier has nothing to sign.
+	// Until the block has been accepted and executed, neither the emitted
+	// message nor the block hash may be signed.
 	addressedPayload, err := payload.NewAddressedCall(sender.Bytes(), payloadData)
-	require.NoError(t, err)
-	unsignedMessage := newUnsignedWarpMessage(t, sut, addressedPayload.Bytes())
-	verifyWarpMessage(ctx, t, sut, capturer, unsignedMessage.Bytes(), warp.UnknownMessageErrCode)
+	require.NoError(t, err, "payload.NewAddressedCall(...)")
+	sentMsg := newUnsignedWarpMessage(t, sut, addressedPayload.Bytes())
+	assertWarpNotSigned(ctx, t, sut, capturer, sentMsg, warp.UnknownMessageErrCode)
 
 	blockHashPayload, err := payload.NewHash(built.ID())
-	require.NoError(t, err)
-	blockMessage := newUnsignedWarpMessage(t, sut, blockHashPayload.Bytes())
-	verifyWarpMessage(ctx, t, sut, capturer, blockMessage.Bytes(), warp.NotAcceptedErrCode)
+	require.NoError(t, err, "payload.NewHash(...)")
+	blockHashMsg := newUnsignedWarpMessage(t, sut, blockHashPayload.Bytes())
+	assertWarpNotSigned(ctx, t, sut, capturer, blockHashMsg, warp.NotAcceptedErrCode)
 
 	sut.acceptAndExecute(ctx, t, built)
 
-	// Receipts are produced once the block has executed.
+	// Execution produces the receipt carrying the SendWarpMessage log.
 	receipts := built.Receipts()
 	require.Len(t, receipts, 1)
-	require.Len(t, receipts[0].Logs, 1)
+	logs := receipts[0].Logs
+	require.Len(t, logs, 1)
 	wantTopics := []common.Hash{
 		corethwarp.WarpABI.Events["SendWarpMessage"].ID,
 		common.BytesToHash(sender.Bytes()),
-		common.Hash(unsignedMessage.ID()),
+		common.Hash(sentMsg.ID()),
 	}
-	require.Equal(t, wantTopics, receipts[0].Logs[0].Topics)
+	require.Equal(t, wantTopics, logs[0].Topics)
 
-	loggedMessage, err := corethwarp.UnpackSendWarpEventDataToMessage(receipts[0].Logs[0].Data)
-	require.NoError(t, err)
-	require.Equal(t, unsignedMessage, loggedMessage)
+	loggedMsg, err := corethwarp.UnpackSendWarpEventDataToMessage(logs[0].Data)
+	require.NoError(t, err, "corethwarp.UnpackSendWarpEventDataToMessage(...)")
+	require.Equal(t, sentMsg, loggedMsg)
 
-	// Both messages should now verify cleanly.
-	verifyWarpMessage(ctx, t, sut, capturer, unsignedMessage.Bytes(), 0)
-	verifyWarpMessage(ctx, t, sut, capturer, blockMessage.Bytes(), 0)
+	// Both messages are now available for signing.
+	assertWarpSigned(ctx, t, sut, capturer, sentMsg)
+	assertWarpSigned(ctx, t, sut, capturer, blockHashMsg)
 }
 
 // TestPredicateVerification drives warp messages through the predicate path:
-// the tx carries the (signed) message in its access list, and the result is
-// recorded in the block header's predicate-results extra.
+// each tx carries a signed message in its access list, and the result of
+// verifying the signature is recorded in the block header's predicate results.
 func TestPredicateVerification(t *testing.T) {
-	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
-	sender := ethWallet.Addresses()[0]
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	sender := wallet.Addresses()[0]
 
 	vdrs := warptest.NewValidators(t, 2)
-	ctx, sut := newSUT(t,
-		options.Func[sutConfig](func(c *sutConfig) {
-			c.genesis.Alloc = saetest.MaxAllocFor(sender)
-		}),
-		withValidators(vdrs),
-	)
+	ctx, sut := newSUT(t, withMaxAllocFor(sender), withValidators(vdrs))
 
 	addressedPayload, err := payload.NewAddressedCall(sender.Bytes(), []byte{1, 2, 3})
-	require.NoError(t, err)
-	addressedCallMessage := newUnsignedWarpMessage(t, sut, addressedPayload.Bytes())
-	addressedCallTxPayload, err := corethwarp.PackGetVerifiedWarpMessage(0)
-	require.NoError(t, err)
+	require.NoError(t, err, "payload.NewAddressedCall(...)")
+	addressedCallMsg := newUnsignedWarpMessage(t, sut, addressedPayload.Bytes())
+	getMessageInput, err := corethwarp.PackGetVerifiedWarpMessage(0)
+	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpMessage(...)")
 
 	blockHashPayload, err := payload.NewHash(ids.GenerateTestID())
-	require.NoError(t, err)
-	blockHashMessage := newUnsignedWarpMessage(t, sut, blockHashPayload.Bytes())
-	blockHashTxPayload, err := corethwarp.PackGetVerifiedWarpBlockHash(0)
-	require.NoError(t, err)
+	require.NoError(t, err, "payload.NewHash(...)")
+	blockHashMsg := newUnsignedWarpMessage(t, sut, blockHashPayload.Bytes())
+	getBlockHashInput, err := corethwarp.PackGetVerifiedWarpBlockHash(0)
+	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpBlockHash(...)")
 
 	tests := []struct {
-		name           string
-		validPredicate bool
-		signedMsg      *avalanchewarp.Message
-		txPayload      []byte
+		name      string
+		msg       *avalanchewarp.Message
+		txInput   []byte
+		wantValid bool
 	}{
 		{
-			name:           "valid warp message",
-			validPredicate: true,
-			signedMsg:      vdrs.Sign(t, addressedCallMessage),
-			txPayload:      addressedCallTxPayload,
+			name:      "valid warp message",
+			msg:       vdrs.Sign(t, addressedCallMsg),
+			txInput:   getMessageInput,
+			wantValid: true,
 		},
 		{
-			name:           "invalid warp message",
-			validPredicate: false,
-			signedMsg:      warptest.IncorrectlySign(t, addressedCallMessage),
-			txPayload:      addressedCallTxPayload,
+			name:      "invalid warp message",
+			msg:       warptest.IncorrectlySign(t, addressedCallMsg),
+			txInput:   getMessageInput,
+			wantValid: false,
 		},
 		{
-			name:           "valid warp block hash",
-			validPredicate: true,
-			signedMsg:      vdrs.Sign(t, blockHashMessage),
-			txPayload:      blockHashTxPayload,
+			name:      "valid warp block hash",
+			msg:       vdrs.Sign(t, blockHashMsg),
+			txInput:   getBlockHashInput,
+			wantValid: true,
 		},
 		{
-			name:           "invalid warp block hash",
-			validPredicate: false,
-			signedMsg:      warptest.IncorrectlySign(t, blockHashMessage),
-			txPayload:      blockHashTxPayload,
+			name:      "invalid warp block hash",
+			msg:       warptest.IncorrectlySign(t, blockHashMsg),
+			txInput:   getBlockHashInput,
+			wantValid: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validateTx := sendWarpTx(ctx, t, sut, ethWallet, tt.txPayload, tt.signedMsg)
+			warpTx := sendWarpTx(ctx, t, sut, wallet, tt.txInput, tt.msg)
 
-			context := &block.Context{}
-			built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t), withBlockContext(context))
-			require.Len(t, built.EthBlock().Transactions(), 1)
+			// Txs carrying predicates can only be verified with a non-nil
+			// [block.Context].
+			built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t), withBlockContext(&block.Context{}))
+			if diff := cmp.Diff(types.Transactions{warpTx}, built.Transactions(), cmputils.TransactionsByHash()); diff != "" {
+				t.Errorf("%T eth txs (-want +got):\n%s", built, diff)
+			}
 
 			sut.acceptAndExecute(ctx, t, built)
-			assertPredicateResult(t, sut, built, validateTx, tt.validPredicate)
+			assertPredicateResult(t, sut, built, warpTx, tt.wantValid)
 
+			// The tx succeeds either way; a failed predicate is reported to the
+			// precompile, not treated as an execution failure.
 			receipts := built.Receipts()
 			require.Len(t, receipts, 1)
 			require.Equal(t, types.ReceiptStatusSuccessful, receipts[0].Status)
@@ -166,105 +171,141 @@ func TestPredicateVerification(t *testing.T) {
 	}
 }
 
-// sendWarpTx submits a tx that calls the warp precompile. If signedMessage is
-// non-nil it is attached to the tx access list as a predicate input.
+// sendWarpTx signs and submits a tx calling the warp precompile with input. If
+// msg is non-nil, it is attached to the tx's access list as a predicate.
 func sendWarpTx(
 	ctx context.Context,
-	t *testing.T,
+	tb testing.TB,
 	sut *SUT,
-	w *saetest.Wallet,
-	txPayload []byte,
-	signedMessage *avalanchewarp.Message,
+	wallet *saetest.Wallet,
+	input []byte,
+	msg *avalanchewarp.Message,
 ) *types.Transaction {
-	t.Helper()
+	tb.Helper()
 
 	var accessList types.AccessList
-	if signedMessage != nil {
+	if msg != nil {
 		accessList = types.AccessList{{
 			Address:     corethwarp.ContractAddress,
-			StorageKeys: predicate.New(signedMessage.Bytes()),
+			StorageKeys: predicate.New(msg.Bytes()),
 		}}
 	}
 
-	warpAddr := corethwarp.ContractAddress
-	signedTx := w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-		To:         &warpAddr,
+	contract := corethwarp.ContractAddress
+	signedTx := wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		To:         &contract,
 		Gas:        1_000_000,
 		GasFeeCap:  big.NewInt(225 * ethparams.GWei),
-		Value:      big.NewInt(0),
-		Data:       txPayload,
+		Data:       input,
 		AccessList: accessList,
 	})
-	require.NoError(t, sut.ethclient.SendTransaction(ctx, signedTx))
+	require.NoErrorf(tb, sut.ethclient.SendTransaction(ctx, signedTx), "%T.SendTransaction(...)", sut.ethclient)
 	return signedTx
 }
 
-// newUnsignedWarpMessage wraps payload into an unsigned warp message for the
-// SUT's chain.
-func newUnsignedWarpMessage(t *testing.T, sut *SUT, payload []byte) *avalanchewarp.UnsignedMessage {
-	t.Helper()
-	msg, err := avalanchewarp.NewUnsignedMessage(sut.ctx.NetworkID, sut.ctx.ChainID, payload)
-	require.NoError(t, err)
+// newUnsignedWarpMessage wraps payloadBytes in an unsigned warp message sourced
+// from the SUT's chain.
+func newUnsignedWarpMessage(tb testing.TB, sut *SUT, payloadBytes []byte) *avalanchewarp.UnsignedMessage {
+	tb.Helper()
+
+	msg, err := avalanchewarp.NewUnsignedMessage(sut.ctx.NetworkID, sut.ctx.ChainID, payloadBytes)
+	require.NoError(tb, err, "avalanchewarp.NewUnsignedMessage(...)")
 	return msg
 }
 
-// verifyWarpMessage sends an acp118 signature request to the SUT and asserts
-// that the response (delivered to capturer) matches the expected error code.
-// expected == 0 means "valid message, response is non-nil and error is nil".
-func verifyWarpMessage(
+// requestWarpSignature sends an ACP-118 signature request for msg to the SUT
+// and returns the response delivered to capturer.
+func requestWarpSignature(
 	ctx context.Context,
-	t *testing.T,
+	tb testing.TB,
 	sut *SUT,
 	capturer *saetest.CapturingPeer,
-	payloadBytes []byte,
-	expected int32,
-) {
-	t.Helper()
+	msg *avalanchewarp.UnsignedMessage,
+) ([]byte, *snowcommon.AppError) {
+	tb.Helper()
 
-	req := &sdk.SignatureRequest{Message: payloadBytes}
-	requestBytes, err := proto.Marshal(req)
-	require.NoError(t, err)
+	requestBytes, err := proto.Marshal(&sdk.SignatureRequest{Message: msg.Bytes()})
+	require.NoErrorf(tb, err, "proto.Marshal(%T)", &sdk.SignatureRequest{})
 
-	msg := p2p.PrefixMessage(p2p.ProtocolPrefix(acp118.HandlerID), requestBytes)
-	deadline, _ := ctx.Deadline()
-	require.NoError(t, sut.AppRequest(ctx, capturer.NodeID(), 1, deadline, msg))
+	request := p2p.PrefixMessage(p2p.ProtocolPrefix(acp118.HandlerID), requestBytes)
+	require.NoErrorf(tb, sut.AppRequest(
+		ctx,
+		capturer.NodeID(),
+		1,           // requestID
+		time.Time{}, // deadline; ignored by the ACP-118 handler
+		request,
+	), "%T.AppRequest()", sut.VM)
 
-	_, _, got, appErr := capturer.Response()
-	if expected == 0 {
-		require.NotNil(t, got)
-		return
-	}
-	require.Nil(t, got)
-	require.NotNil(t, appErr)
-	require.Equal(t, expected, appErr.Code)
+	_, _, responseBytes, appErr := capturer.Response()
+	return responseBytes, appErr
 }
 
-// assertPredicateResult parses the predicate result extra from blk's header
-// and asserts that validateTx's bit corresponds to expectValid.
+// assertWarpSigned asserts that the SUT signs msg on request and that the
+// response carries the SUT's BLS signature over msg.
+func assertWarpSigned(
+	ctx context.Context,
+	tb testing.TB,
+	sut *SUT,
+	capturer *saetest.CapturingPeer,
+	msg *avalanchewarp.UnsignedMessage,
+) {
+	tb.Helper()
+
+	responseBytes, appErr := requestWarpSignature(ctx, tb, sut, capturer, msg)
+	require.Nil(tb, appErr)
+
+	response := &sdk.SignatureResponse{}
+	require.NoErrorf(tb, proto.Unmarshal(responseBytes, response), "proto.Unmarshal(%T)", response)
+
+	sig, err := bls.SignatureFromBytes(response.Signature)
+	require.NoError(tb, err, "bls.SignatureFromBytes(...)")
+	require.True(tb, bls.Verify(sut.ctx.PublicKey, sig, msg.Bytes()), "bls.Verify(...)")
+}
+
+// assertWarpNotSigned asserts that the SUT refuses, with the given error code,
+// to sign msg.
+func assertWarpNotSigned(
+	ctx context.Context,
+	tb testing.TB,
+	sut *SUT,
+	capturer *saetest.CapturingPeer,
+	msg *avalanchewarp.UnsignedMessage,
+	wantErrCode int32,
+) {
+	tb.Helper()
+
+	_, appErr := requestWarpSignature(ctx, tb, sut, capturer, msg)
+	require.NotNil(tb, appErr)
+	require.Equal(tb, wantErrCode, appErr.Code)
+}
+
+// assertPredicateResult asserts that the predicate results committed to blk's
+// header record warpTx's predicate as valid or invalid.
 func assertPredicateResult(
-	t *testing.T,
+	tb testing.TB,
 	sut *SUT,
 	blk *blocks.Block,
-	validateTx *types.Transaction,
-	expectValid bool,
+	warpTx *types.Transaction,
+	wantValid bool,
 ) {
-	t.Helper()
+	tb.Helper()
 
+	ethBlock := blk.EthBlock()
 	chainConfig := sut.GethRPCBackends().ChainConfig()
-	rules := chainConfig.Rules(blk.EthBlock().Number(), params.IsMergeTODO, blk.EthBlock().Time())
-	rulesExtra := params.GetRulesExtra(rules)
-	headerPredicateBytes := customheader.PredicateBytesFromExtra(
-		rulesExtra.AvalancheRules,
-		blk.EthBlock().Extra(),
+	rules := chainConfig.Rules(ethBlock.Number(), params.IsMergeTODO, ethBlock.Time())
+	predicateBytes := customheader.PredicateBytesFromExtra(
+		params.GetRulesExtra(rules).AvalancheRules,
+		ethBlock.Extra(),
 	)
-	blockResults, err := predicate.ParseBlockResults(headerPredicateBytes)
-	require.NoError(t, err)
+	results, err := predicate.ParseBlockResults(predicateBytes)
+	require.NoError(tb, err, "predicate.ParseBlockResults(...)")
 
-	txBits := blockResults.Get(validateTx.Hash(), corethwarp.ContractAddress)
-	if expectValid {
-		require.Zero(t, txBits.Len())
+	// A set bit marks the index of a predicate that failed verification.
+	failed := results.Get(warpTx.Hash(), corethwarp.ContractAddress)
+	if wantValid {
+		require.Zero(tb, failed.Len())
 		return
 	}
-	require.Equal(t, 1, txBits.Len())
-	require.True(t, txBits.Contains(0))
+	require.Equal(tb, 1, failed.Len())
+	require.True(tb, failed.Contains(0))
 }
