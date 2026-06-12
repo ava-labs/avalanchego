@@ -102,14 +102,21 @@ func (vm *VM) Initialize(
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
 	trieDBConfig := triedb.HashDefaults
-	trieDB := triedb.NewDatabase(ethDB, trieDBConfig)
 
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
+	genesisBlock := genesis.ToBlock()
+
 	// On a fresh chain the last-accepted block is genesis itself.
-	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis, genesis.ToBlock().Hash(), false)
+	chainConfig, _, err := core.SetupGenesisBlock(
+		ethDB,
+		triedb.NewDatabase(ethDB, trieDBConfig),
+		genesis,
+		genesisBlock.Hash(),
+		false,
+	)
 	if err != nil {
 		return fmt.Errorf("setting up genesis block: %w", err)
 	}
@@ -141,7 +148,7 @@ func (vm *VM) Initialize(
 			TrieDBConfig: trieDBConfig,
 		},
 	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesisBlock, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
