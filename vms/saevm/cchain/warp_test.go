@@ -152,7 +152,8 @@ func TestPredicateVerification(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			validateTx := sendWarpTx(ctx, t, sut, ethWallet, tt.txPayload, tt.signedMsg)
 
-			built := sut.buildVerifyWithContext(ctx, t, sut.lastAccepted(ctx, t), &block.Context{PChainHeight: 0})
+			context := &block.Context{}
+			built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t), withBlockContext(context))
 			require.Len(t, built.EthBlock().Transactions(), 1)
 
 			sut.acceptAndExecute(ctx, t, built)

@@ -290,11 +290,11 @@ func (s *SUT) assertAccount(tb testing.TB, addr common.Address, wantNonce uint64
 
 // issueAndExecute submits t through [Client.IssueTx] and drives the consensus
 // loop to produce, accept, and execute the next block, which is returned.
-func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blocks.Block {
+func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx, opts ...blockOption) *blocks.Block {
 	tb.Helper()
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
-	return s.runConsensusLoop(ctx, tb)
+	return s.runConsensusLoop(ctx, tb, opts...)
 }
 
 // assertTxAccepted asserts that [Client.GetTx] returns the given tx at the
@@ -312,21 +312,21 @@ func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, 
 
 // runConsensusLoop builds a block on top of the last-accepted block, drives it
 // through verify+accept, and waits until it has been executed.
-func (s *SUT) runConsensusLoop(ctx context.Context, tb testing.TB) *blocks.Block {
+func (s *SUT) runConsensusLoop(ctx context.Context, tb testing.TB, opts ...blockOption) *blocks.Block {
 	tb.Helper()
 
-	blk := s.buildVerifyAccept(ctx, tb)
+	blk := s.buildVerifyAccept(ctx, tb, opts...)
 	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
 	return blk
 }
 
 // buildVerifyAccept builds, verifies, and accepts a block on top of the
 // last-accepted block.
-func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB) *blocks.Block {
+func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB, opts ...blockOption) *blocks.Block {
 	tb.Helper()
 
 	lastAccepted := s.lastAccepted(ctx, tb)
-	blk := s.buildVerify(ctx, tb, lastAccepted)
+	blk := s.buildVerify(ctx, tb, lastAccepted, opts...)
 	require.NoErrorf(tb, s.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.VM)
 	return blk
 }
@@ -348,24 +348,32 @@ func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
 }
 
-// buildVerify builds and verifies a block on top of preferenceID.
-func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID) *blocks.Block {
-	tb.Helper()
+type (
+	blockConfig struct {
+		context *block.Context
+	}
+	blockOption = options.Option[blockConfig]
+)
 
-	return s.buildVerifyWithContext(ctx, tb, preferenceID, nil)
+// withBlockContext sets the [block.Context] used to set the preference and to
+// build and verify the block. If unset, a nil context is used.
+func withBlockContext(blockCtx *block.Context) blockOption {
+	return options.Func[blockConfig](func(c *blockConfig) {
+		c.context = blockCtx
+	})
 }
 
-// buildVerifyWithContext builds and verifies a block on top of preferenceID.
-// blockCtx MAY be nil; warp tests need an explicit value (e.g. PChainHeight).
-func (s *SUT) buildVerifyWithContext(ctx context.Context, tb testing.TB, preferenceID ids.ID, blockCtx *block.Context) *blocks.Block {
+// buildVerify builds and verifies a block on top of preferenceID.
+func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID, opts ...blockOption) *blocks.Block {
 	tb.Helper()
 
-	require.NoErrorf(tb, s.SetPreference(ctx, preferenceID, blockCtx), "%T.SetPreference()", s.VM)
+	blockContext := options.As(opts...).context
+	require.NoErrorf(tb, s.SetPreference(ctx, preferenceID, blockContext), "%T.SetPreference()", s.VM)
 
 	s.waitForPendingTxs(ctx, tb)
-	blk, err := s.BuildBlock(ctx, blockCtx)
+	blk, err := s.BuildBlock(ctx, blockContext)
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
-	require.NoErrorf(tb, s.VerifyBlock(ctx, blockCtx, blk), "%T.VerifyBlock()", s.VM)
+	require.NoErrorf(tb, s.VerifyBlock(ctx, blockContext, blk), "%T.VerifyBlock()", s.VM)
 	return blk
 }
 
