@@ -71,6 +71,10 @@ func VerifyBlock(
 		if blockContext == nil {
 			// This can never happen after scheduling any goroutines, so this
 			// doesn't leak goroutines.
+			//
+			// This check exists inside the loop rather than outside so that we
+			// don't require a non-nil block context when there are no
+			// predicates to verify.
 			return nil, errNoBlockContext
 		}
 		results = append(results, result{
