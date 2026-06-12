@@ -129,6 +129,17 @@ func testRPCGetter[
 	}
 
 	t.Run(underlyingRPCMethod, func(t *testing.T) {
+		// The server may hold the same block pointer as `want` and lazily
+		// write its atomic caches when marshalling responses, racing with
+		// [cmp.Diff] reading unexported fields. Comparing a deep copy
+		// avoids sharing memory with the server.
+		if b := (*types.Block)(want); b != nil {
+			encoded, err := rlp.EncodeToBytes(b)
+			require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", b)
+			cp := new(types.Block)
+			require.NoErrorf(t, rlp.DecodeBytes(encoded, cp), "rlp.DecodeBytes(rlp.EncodeToBytes(%T))", b)
+			want = T(cp)
+		}
 		got, err := get(ctx, arg)
 		t.Logf("%s(%v)", underlyingRPCMethod, arg)
 		require.NoErrorf(t, err, "%s(%v)", underlyingRPCMethod, arg)
