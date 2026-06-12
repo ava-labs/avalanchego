@@ -103,6 +103,10 @@ type Backend interface {
 	StateAtTransaction(ctx context.Context, block *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, StateReleaseFunc, error)
 }
 
+type reconstructedFirewoodBackend interface {
+	ReconstructedFirewoodStateAtNextBlock(ctx context.Context, parent, nextBlock *types.Block, reexec uint64) (*state.StateDB, StateReleaseFunc, bool, error)
+}
+
 // baseAPI holds the collection of common methods for API and FileTracerAPI.
 type baseAPI struct {
 	backend Backend
@@ -554,12 +558,25 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 	if config != nil && config.Reexec != nil {
 		reexec = *config.Reexec
 	}
-	statedb, release, err := api.backend.StateAtNextBlock(ctx, parent, block, reexec, nil, true, false)
-	if err != nil {
-		return nil, err
+	var (
+		statedb                   *state.StateDB
+		release                   StateReleaseFunc
+		usesReconstructedFirewood bool
+	)
+	if firewoodBackend, ok := api.backend.(reconstructedFirewoodBackend); ok {
+		statedb, release, usesReconstructedFirewood, err = firewoodBackend.ReconstructedFirewoodStateAtNextBlock(ctx, parent, block, reexec)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !usesReconstructedFirewood {
+		statedb, release, err = api.backend.StateAtNextBlock(ctx, parent, block, reexec, nil, true, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 	defer release()
-	if _, ok := statedb.Database().TrieDB().Backend().(*firewood.TrieDB); ok {
+	if _, ok := statedb.Database().TrieDB().Backend().(*firewood.TrieDB); ok && !usesReconstructedFirewood {
 		return nil, errors.New("intermediate roots are not supported with firewood")
 	}
 

@@ -3617,6 +3617,16 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 			// revision; every historical query is served directly from disk.
 			vmConfig: `{
 				"state-scheme": "firewood",
+				"eth-apis": [
+					"eth",
+					"eth-filter",
+					"net",
+					"web3",
+					"internal-eth",
+					"internal-blockchain",
+					"internal-transaction",
+					"debug-tracer"
+				],
 				"snapshot-cache": 0,
 				"pruning-enabled": false,
 				"state-sync-enabled": false,
@@ -3633,6 +3643,16 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 			// re-execute forward.
 			vmConfig: `{
 				"state-scheme": "firewood",
+				"eth-apis": [
+					"eth",
+					"eth-filter",
+					"net",
+					"web3",
+					"internal-eth",
+					"internal-blockchain",
+					"internal-transaction",
+					"debug-tracer"
+				],
 				"snapshot-cache": 0,
 				"pruning-enabled": false,
 				"state-sync-enabled": false,
@@ -3757,6 +3777,16 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 					// An EOA-to-EOA transfer does not touch any storage slots, and should not produce an access list.
 					require.Emptyf(t, *accessListResult.Accesslist, "unexpected access list at block %d", blockNum)
 					require.Equalf(t, ethparams.TxGas, uint64(accessListResult.GasUsed), "unexpected gas used at block %d", blockNum)
+
+					// debug_intermediateRoots intentionally rejects genesis blocks.
+					if blockNum > 0 {
+						block := vm.blockChain.GetBlockByNumber(blockNum)
+						require.NotNilf(t, block, "missing block %d", blockNum)
+
+						var roots []common.Hash
+						require.NoErrorf(t, rpcClient.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "failed to get intermediate roots at block %d", blockNum)
+						require.Equalf(t, []common.Hash{block.Root()}, roots, "unexpected intermediate roots at block %d", blockNum)
+					}
 				}
 			})
 		})
