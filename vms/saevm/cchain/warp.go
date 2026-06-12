@@ -23,9 +23,8 @@ func (w *warpBackend) IsAccepted(ctx context.Context, blkID ids.ID) error {
 	if err != nil {
 		return fmt.Errorf("getting block: %w", err)
 	}
-	// Processing, and not yet accepted, blocks can be returned from GetBlock,
-	// so we need to additionally verify that the block is canonical for its
-	// height.
+	// Processing non-canonical blocks can be returned from GetBlock, so we MUST
+	// additionally verify that the block is canonical for its height.
 	height := b.Height()
 	acceptedID, err := w.vm.GetBlockIDAtHeight(ctx, height)
 	if err != nil {
