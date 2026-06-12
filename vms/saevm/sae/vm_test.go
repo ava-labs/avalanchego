@@ -392,7 +392,7 @@ func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transactio
 func (s *SUT) waitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
-	txgossiptest.WaitUntilPending(tb, s.context(tb), s.rawVM.mempool.Pool, txs...)
+	txgossiptest.WaitUntilPending(tb, s.context(tb), txgossiptest.PoolMempool(s.rawVM.mempool.Pool), txs...)
 }
 
 // buildAndParseBlock adds all `txs` to the mempool and ensures they are pending,

@@ -50,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -354,38 +355,12 @@ func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 
 // waitForPendingEthTxs blocks until every tx is pending in the source the block
 // builder draws from, so the built block includes them all rather than racing
-// promotion. [GetPoolTransactions] resolves the same [txpool.Pool.Pending] set
-// used by [txgossip.Set.TransactionsByPriority] during block building.
+// promotion. The geth RPC backend's [GetPoolTransactions] resolves the same
+// [txpool.Pool.Pending] set used by [txgossip.Set.TransactionsByPriority]
+// during block building.
 func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
-
-	backend := s.GethRPCBackends()
-	ch := make(chan core.NewTxsEvent, 1)
-	sub := backend.SubscribeNewTxsEvent(ch)
-	defer sub.Unsubscribe()
-
-	want := set.NewSet[common.Hash](len(txs))
-	for _, tx := range txs {
-		want.Add(tx.Hash())
-	}
-
-	for {
-		pending, err := backend.GetPoolTransactions()
-		require.NoErrorf(tb, err, "%T.GetPoolTransactions()", backend)
-		for _, tx := range pending {
-			want.Remove(tx.Hash())
-		}
-		if want.Len() == 0 {
-			return
-		}
-		select {
-		case <-ch:
-		case err := <-sub.Err():
-			require.NoErrorf(tb, err, "%T.SubscribeNewTxsEvent()", backend)
-		case <-ctx.Done():
-			tb.Fatalf("%v waiting for %d pending eth txs", context.Cause(ctx), want.Len())
-		}
-	}
+	txgossiptest.WaitUntilPending(tb, ctx, s.GethRPCBackends(), txs...)
 }
 
 // buildVerify builds and verifies a block on top of preferenceID.
