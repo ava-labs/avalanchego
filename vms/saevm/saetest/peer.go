@@ -50,6 +50,7 @@ func NewCapturingPeer(tb testing.TB, vdrs set.Set[ids.NodeID]) *CapturingPeer {
 		gossip:   buffer.NewUnboundedBlockingDeque[peerGossip](1),
 	}
 	p.sender.SetSelf(p)
+	tb.Cleanup(p.sender.Close)
 	return p
 }
 

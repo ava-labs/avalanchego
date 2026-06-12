@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"google.golang.org/protobuf/proto"
 
 	// Imported for [saexec.Execute] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
@@ -34,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -73,6 +75,7 @@ type SUT struct {
 	memory    *atomic.Memory
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
+	p2pclient *saetest.CapturingPeer
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -148,7 +151,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
-	appSender := saetest.NewSender(tb, cfg.validators.NodeIDs())
+	validatorIDs := cfg.validators.NodeIDs()
+	appSender := saetest.NewSender(tb, validatorIDs)
 
 	ctx := log.CancelOnError(tb.Context())
 	require.NoErrorf(tb, vm.Initialize(
@@ -195,10 +199,46 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		memory:    memory,
 		sender:    appSender,
 		ethclient: ethclient.NewClient(ethRPCClient),
+		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
 	}
 	appSender.SetSelf(sut)
 	tb.Cleanup(appSender.Close)
+	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
 	return ctx, sut
+}
+
+// appRequest sends request, from the SUT's p2pclient, to the SUT's p2p handler
+// registered with handlerID and unmarshals the reply into response.
+//
+// If the SUT instead responds with an [snowcommon.AppError], it is returned and
+// response is left untouched.
+func (s *SUT) appRequest(
+	ctx context.Context,
+	tb testing.TB,
+	handlerID uint64,
+	request proto.Message,
+	response proto.Message,
+) *snowcommon.AppError {
+	tb.Helper()
+
+	requestBytes, err := proto.Marshal(request)
+	require.NoErrorf(tb, err, "proto.Marshal(%T)", request)
+
+	prefixedRequest := p2p.PrefixMessage(p2p.ProtocolPrefix(handlerID), requestBytes)
+	require.NoErrorf(tb, s.AppRequest(
+		ctx,
+		s.p2pclient.NodeID(),
+		1,           // requestID
+		time.Time{}, // deadline
+		prefixedRequest,
+	), "%T.AppRequest(protocol %d)", s.VM, handlerID)
+
+	_, _, responseBytes, appErr := s.p2pclient.Response()
+	if appErr != nil {
+		return appErr
+	}
+	require.NoErrorf(tb, proto.Unmarshal(responseBytes, response), "proto.Unmarshal(%T)", response)
+	return nil
 }
 
 // assertUTXOsExist asserts that reader chain can read the expected UTXOs from
