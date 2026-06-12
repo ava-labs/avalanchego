@@ -6,9 +6,11 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -22,6 +24,13 @@ var (
 	ErrChildBlockEarlierThanParent     = errors.New("proposed timestamp before current chain time")
 	ErrChildBlockAfterStakerChangeTime = errors.New("proposed timestamp later than next staker change time")
 	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
+)
+
+const (
+	// ACP-285 lowers MinConsumptionRate by 2.5 percentage points (10% to 7.5%).
+	heliconMinConsumptionRateReduction uint64 = 25_000
+	// ACP-285 applies the MinConsumptionRate reduction linearly over this duration.
+	heliconMinConsumptionRateReductionPeriod = 30 * 24 * time.Hour
 )
 
 // VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time.
@@ -172,7 +181,7 @@ func advanceTimeTo(
 				return nil, false, err
 			}
 
-			rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
+			rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID, stakerToRemove.StartTime)
 			if err != nil {
 				return nil, false, err
 			}
@@ -385,11 +394,59 @@ func GetRewardsCalculator(
 	backend *Backend,
 	parentState state.Chain,
 	subnetID ids.ID,
+	stakeStartTime time.Time,
 ) (reward.Calculator, error) {
-	if subnetID == constants.PrimaryNetworkID {
-		return backend.Rewards, nil
+	if subnetID != constants.PrimaryNetworkID {
+		return getTransformedSubnetRewardsCalculator(backend, parentState, subnetID)
 	}
 
+	// ACP-285 linearly reduces MinConsumptionRate over a fixed ramp. The
+	// reduction is locked in when the staker enters the current set, so use
+	// stakeStartTime rather than the parent state timestamp.
+	cfg, err := GetHeliconRewardConfig(backend.Config.RewardConfig, backend.Config.UpgradeConfig, stakeStartTime)
+	if err != nil {
+		return nil, err
+	}
+	if cfg == backend.Config.RewardConfig {
+		// No reduction applies, so reuse the preconfigured calculator rather
+		// than rebuilding it.
+		return backend.Rewards, nil
+	}
+	return reward.NewCalculator(cfg), nil
+}
+
+// GetHeliconRewardConfig returns rewardConfig with the ACP-285 ramped
+// MinConsumptionRate reduction applied for a primary network staker that
+// entered the current set at stakeStartTime. Before Helicon, rewardConfig is
+// returned unchanged.
+func GetHeliconRewardConfig(
+	rewardConfig reward.Config,
+	upgradeConfig upgrade.Config,
+	stakeStartTime time.Time,
+) (reward.Config, error) {
+	if !upgradeConfig.IsHeliconActivated(stakeStartTime) {
+		return rewardConfig, nil
+	}
+
+	reduction := heliconRampedMinConsumptionRateReduction(stakeStartTime.Sub(upgradeConfig.HeliconTime))
+	minRate, err := math.Sub(rewardConfig.MinConsumptionRate, reduction)
+	if err != nil {
+		return reward.Config{}, fmt.Errorf(
+			"min consumption rate reduction (%d) exceeds configured min consumption rate (%d): %w",
+			reduction,
+			rewardConfig.MinConsumptionRate,
+			err,
+		)
+	}
+	rewardConfig.MinConsumptionRate = minRate
+	return rewardConfig, nil
+}
+
+func getTransformedSubnetRewardsCalculator(
+	backend *Backend,
+	parentState state.Chain,
+	subnetID ids.ID,
+) (reward.Calculator, error) {
 	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
 	if err != nil {
 		return nil, err
@@ -401,4 +458,22 @@ func GetRewardsCalculator(
 		MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
 		SupplyCap:          transformSubnet.MaximumSupply,
 	}), nil
+}
+
+// heliconRampedMinConsumptionRateReduction returns the MinConsumptionRate
+// reduction to apply for elapsed time after Helicon activation.
+func heliconRampedMinConsumptionRateReduction(elapsed time.Duration) uint64 {
+	if elapsed <= 0 {
+		return 0
+	}
+	if elapsed >= heliconMinConsumptionRateReductionPeriod {
+		return heliconMinConsumptionRateReduction
+	}
+
+	// ACP-285 ramps linearly from no reduction at Helicon activation to the full
+	// reduction after the ramp duration.
+	reduction := new(big.Int).SetUint64(heliconMinConsumptionRateReduction)
+	reduction.Mul(reduction, big.NewInt(int64(elapsed)))
+	reduction.Div(reduction, big.NewInt(int64(heliconMinConsumptionRateReductionPeriod)))
+	return reduction.Uint64()
 }

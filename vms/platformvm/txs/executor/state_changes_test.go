@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -526,4 +527,172 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 	gotSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 	require.Equal(t, initialSupply+wantDelegatorReward+wantValidatorReward, gotSupply)
+}
+
+func TestGetRewardsCalculatorHeliconReduction(t *testing.T) {
+	const (
+		stakeDuration            = 14 * 24 * time.Hour
+		transformedSubnetMinRate = 42_000
+		weight                   = units.MegaAvax
+		supply                   = 5 * units.MegaAvax
+	)
+	var (
+		heliconTime       = time.Unix(1_000_000, 0)
+		baseConfig        = genesis.MainnetParams.StakingConfig.RewardConfig
+		transformedSubnet = ids.GenerateTestID()
+		transformedState  = statetest.New(t, statetest.Config{})
+	)
+	transformedState.AddSubnetTransformation(&txs.Tx{Unsigned: &txs.TransformSubnetTx{
+		Subnet:             transformedSubnet,
+		MaxConsumptionRate: baseConfig.MaxConsumptionRate,
+		MinConsumptionRate: transformedSubnetMinRate,
+		MaximumSupply:      baseConfig.SupplyCap,
+	}})
+
+	tests := []struct {
+		name        string
+		subnetID    ids.ID
+		parentState state.Chain
+		startOffset time.Duration
+		wantMinRate uint64
+	}{
+		{
+			name:        "before_helicon",
+			subnetID:    constants.PrimaryNetworkID,
+			startOffset: -time.Second,
+			wantMinRate: 100_000,
+		},
+		{
+			name:        "at_helicon",
+			subnetID:    constants.PrimaryNetworkID,
+			wantMinRate: 100_000,
+		},
+		{
+			name:        "mid_ramp",
+			subnetID:    constants.PrimaryNetworkID,
+			startOffset: 15 * 24 * time.Hour,
+			wantMinRate: 87_500,
+		},
+		{
+			name:        "at_ramp_end",
+			subnetID:    constants.PrimaryNetworkID,
+			startOffset: heliconMinConsumptionRateReductionPeriod,
+			wantMinRate: 75_000,
+		},
+		{
+			name:        "transformed_subnet_unchanged",
+			subnetID:    transformedSubnet,
+			parentState: transformedState,
+			startOffset: heliconMinConsumptionRateReductionPeriod,
+			wantMinRate: transformedSubnetMinRate,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := baseConfig
+
+			rewards, err := GetRewardsCalculator(
+				&Backend{
+					Config: &config.Internal{
+						RewardConfig:  cfg,
+						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
+					},
+					Rewards: reward.NewCalculator(cfg),
+				},
+				tt.parentState,
+				tt.subnetID,
+				heliconTime.Add(tt.startOffset),
+			)
+			require.NoError(t, err)
+
+			wantConfig := cfg
+			wantConfig.MinConsumptionRate = tt.wantMinRate
+			wantReward := reward.NewCalculator(wantConfig).Calculate(
+				stakeDuration,
+				weight,
+				supply,
+			)
+
+			gotReward := rewards.Calculate(stakeDuration, weight, supply)
+			require.Equal(t, wantReward, gotReward)
+		})
+	}
+}
+
+func TestGetRewardsCalculatorHeliconReductionUnderflow(t *testing.T) {
+	var (
+		heliconTime = time.Unix(1_000_000, 0)
+		cfg         = genesis.MainnetParams.StakingConfig.RewardConfig
+	)
+	// Setting MinConsumptionRate below the full Helicon reduction should fail.
+	cfg.MinConsumptionRate = heliconMinConsumptionRateReduction - 1
+
+	_, err := GetRewardsCalculator(
+		&Backend{
+			Config: &config.Internal{
+				RewardConfig:  cfg,
+				UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
+			},
+		},
+		nil,
+		constants.PrimaryNetworkID,
+		heliconTime.Add(heliconMinConsumptionRateReductionPeriod),
+	)
+	require.ErrorIs(t, err, math.ErrUnderflow)
+}
+
+func TestAdvanceTimeHeliconMinConsumptionRateReduction(t *testing.T) {
+	const (
+		weight        = units.MegaAvax
+		stakeDuration = 14 * 24 * time.Hour
+	)
+
+	heliconTime := time.Unix(1_000_000, 0)
+	startTime := heliconTime.Add(15 * 24 * time.Hour)
+	nodeID := ids.GenerateTestNodeID()
+	baseConfig := genesis.MainnetParams.StakingConfig.RewardConfig
+	chainState := statetest.New(t, statetest.Config{})
+	chainState.SetTimestamp(heliconTime.Add(-time.Second))
+
+	require.NoError(t, chainState.PutPendingValidator(&state.Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    nodeID,
+		SubnetID:  constants.PrimaryNetworkID,
+		Weight:    weight,
+		StartTime: startTime,
+		EndTime:   startTime.Add(stakeDuration),
+		NextTime:  startTime,
+		Priority:  txs.PrimaryNetworkValidatorPendingPriority,
+	}))
+
+	supply, err := chainState.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	wantConfig := baseConfig
+	wantConfig.MinConsumptionRate = 87_500
+	wantReward := reward.NewCalculator(wantConfig).Calculate(
+		stakeDuration,
+		weight,
+		supply,
+	)
+
+	updated, err := AdvanceTimeTo(
+		&Backend{
+			Config: &config.Internal{
+				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+				RewardConfig:       baseConfig,
+				UpgradeConfig:      upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
+			},
+			Rewards: reward.NewCalculator(baseConfig),
+		},
+		chainState,
+		startTime,
+	)
+	require.NoError(t, err)
+	require.True(t, updated)
+
+	gotValidator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantReward, gotValidator.PotentialReward)
 }

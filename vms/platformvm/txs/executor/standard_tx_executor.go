@@ -1412,7 +1412,7 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 				return err
 			}
 
-			rewards, err := GetRewardsCalculator(e.backend, e.state, subnetID)
+			rewards, err := GetRewardsCalculator(e.backend, e.state, subnetID, chainTime)
 			if err != nil {
 				return err
 			}

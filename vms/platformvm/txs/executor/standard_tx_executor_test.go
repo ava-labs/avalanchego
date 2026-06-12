@@ -2125,6 +2125,72 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 	}
 }
 
+func TestStandardExecutorPutStakerHeliconMinRate(t *testing.T) {
+	var (
+		heliconTime = time.Unix(1_000_000, 0)
+		chainTime   = heliconTime.Add(15 * 24 * time.Hour)
+		nodeID      = ids.GenerateTestNodeID()
+	)
+
+	chainState := statetest.New(t, statetest.Config{})
+	chainState.SetTimestamp(chainTime)
+	onAcceptState, err := state.NewDiffOn(chainState, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	cfg := genesis.MainnetParams.StakingConfig.RewardConfig
+	weight := genesis.MainnetParams.StakingConfig.MinValidatorStake
+
+	supply, err := onAcceptState.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	// Calculate the expected reward 15 days after Helicon activation.
+	wantConfig := cfg
+	wantConfig.MinConsumptionRate = 87_500
+	wantReward := reward.NewCalculator(wantConfig).Calculate(
+		defaultMinStakingDuration,
+		weight,
+		supply,
+	)
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	stakerTx := &txs.AddPermissionlessValidatorTx{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(chainTime.Add(defaultMinStakingDuration).Unix()),
+			Wght:   weight,
+		},
+		Subnet: constants.PrimaryNetworkID,
+		Signer: pop,
+	}
+	executor := &standardTxExecutor{
+		backend: &Backend{
+			Config: &config.Internal{
+				RewardConfig:  cfg,
+				UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
+			},
+			Rewards: reward.NewCalculator(cfg),
+		},
+		tx: &txs.Tx{
+			Unsigned: stakerTx,
+			TxID:     ids.GenerateTestID(),
+		},
+		state: onAcceptState,
+	}
+	require.NoError(t, executor.putStaker(stakerTx))
+
+	gotValidator, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantReward, gotValidator.PotentialReward)
+
+	gotSupply, err := onAcceptState.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+	require.Equal(t, supply+wantReward, gotSupply)
+}
+
 func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	type test struct {
 		name            string
