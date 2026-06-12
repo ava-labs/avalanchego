@@ -88,7 +88,7 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	userConfig, err := ParseConfig(configBytes)
+	userConfig, err := parseConfig(configBytes)
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}

@@ -26,7 +26,7 @@ func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
 		json    string
-		want    Config
+		want    config
 		wantErr testerr.Want
 	}{
 		{
@@ -44,7 +44,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
-			want: Config{
+			want: config{
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},
@@ -52,7 +52,7 @@ func TestParseConfig(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Logf("parsing config:\n%s", test.json)
-			got, err := ParseConfig([]byte(test.json))
+			got, err := parseConfig([]byte(test.json))
 			if diff := testerr.Diff(err, test.wantErr); diff != "" {
 				t.Errorf("ParseConfig(...) error (-want +got)\n%s", diff)
 			}
@@ -99,7 +99,7 @@ func TestConfig_WarpMessages(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c := Config{
+			c := config{
 				WarpOffChainMessages: make([]hexutil.Bytes, len(test.bytes)),
 			}
 			for i, msgBytes := range test.bytes {
