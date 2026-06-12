@@ -10,14 +10,24 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/event"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// WaitUntilPending waits until all transactions provided are marked as pending in `pool`.
-func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, txs ...*types.Transaction) {
+// Mempool is the subset of mempool behaviour [WaitUntilPending] needs: a
+// subscription to new-transaction events and a snapshot of the currently
+// pending transactions. It is satisfied directly by geth's RPC backend.
+type Mempool interface {
+	SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription
+	GetPoolTransactions() (types.Transactions, error)
+}
+
+// WaitUntilPending waits until all transactions provided are marked as pending
+// in mempool.
+func WaitUntilPending(tb testing.TB, ctx context.Context, mempool Mempool, txs ...*types.Transaction) {
 	tb.Helper()
 
 	if len(txs) == 0 {
@@ -25,7 +35,7 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 	}
 
 	txCh := make(chan core.NewTxsEvent, 1) // size arbitrary
-	sub := pool.SubscribeTransactions(txCh, true /*reorgs but ignored by legacypool*/)
+	sub := mempool.SubscribeNewTxsEvent(txCh)
 	defer sub.Unsubscribe()
 
 	s := set.NewSet[common.Hash](len(txs))
@@ -33,13 +43,12 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 		s.Add(tx.Hash())
 	}
 
-	// Optimistically check current mempool - any reorgs after this will
-	// certainly be caught by the subscription.
-	pendingByAddr, _ := pool.Content()
-	for _, list := range pendingByAddr {
-		for _, tx := range list {
-			s.Remove(tx.Hash())
-		}
+	// Optimistically check the current mempool. Any tx promoted after this is
+	// caught by the subscription created above.
+	pendingTxs, err := mempool.GetPoolTransactions()
+	require.NoErrorf(tb, err, "%T.GetPoolTransactions()", mempool)
+	for _, tx := range pendingTxs {
+		s.Remove(tx.Hash())
 	}
 
 	if s.Len() == 0 {
@@ -50,9 +59,9 @@ func WaitUntilPending(tb testing.TB, ctx context.Context, pool *txpool.TxPool, t
 	for {
 		select {
 		case <-ctx.Done():
-			tb.Fatalf("%v waiting for %T.SubscribeTransactions()", context.Cause(ctx), pool)
+			tb.Fatalf("%v waiting for %d pending txs %x", context.Cause(ctx), s.Len(), s.List())
 		case err := <-sub.Err():
-			tb.Fatalf("%T.SubscribeTransactions.Err() returned %v", pool, err)
+			tb.Fatalf("%T.SubscribeNewTxsEvent.Err() returned %v", mempool, err)
 		case txEvent := <-txCh:
 			for _, tx := range txEvent.Txs {
 				s.Remove(tx.Hash())
