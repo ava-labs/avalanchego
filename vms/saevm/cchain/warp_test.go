@@ -33,7 +33,6 @@ import (
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // signWarpMessage requests the SUT to sign msg, verifies the signature, and
@@ -121,38 +120,6 @@ func (s *SUT) newBlockHashMessage(tb testing.TB, blkID ids.ID) *avalanchewarp.Un
 	return s.newUnsignedWarpMessage(tb, p.Bytes())
 }
 
-// sendWarpTx signs and submits a tx from wallet's 0th account, calling the warp
-// precompile with input. If msg is non-nil, it is attached to the tx's access
-// list as a predicate.
-func (s *SUT) sendWarpTx(
-	ctx context.Context,
-	tb testing.TB,
-	wallet *saetest.Wallet,
-	input []byte,
-	msg *avalanchewarp.Message,
-) *types.Transaction {
-	tb.Helper()
-
-	var accessList types.AccessList
-	if msg != nil {
-		accessList = types.AccessList{{
-			Address:     corethwarp.ContractAddress,
-			StorageKeys: predicate.New(msg.Bytes()),
-		}}
-	}
-
-	contract := corethwarp.ContractAddress
-	signedTx := wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
-		To:         &contract,
-		Gas:        1_000_000,
-		GasFeeCap:  big.NewInt(225 * ethparams.GWei),
-		Data:       input,
-		AccessList: accessList,
-	})
-	require.NoErrorf(tb, s.ethclient.SendTransaction(ctx, signedTx), "%T.SendTransaction(...)", s.ethclient)
-	return signedTx
-}
-
 // assertPredicateResult asserts that the predicate results committed to blk's
 // header record warpTx's predicate as valid or invalid.
 func (s *SUT) assertPredicateResult(
@@ -174,7 +141,7 @@ func (s *SUT) assertPredicateResult(
 	require.NoError(tb, err, "predicate.ParseBlockResults(...)")
 
 	// A set bit marks the index of a predicate that failed verification;
-	// [SUT.sendWarpTx] attaches at most one predicate.
+	// these tests attach at most one predicate per tx.
 	failed := results.Get(warpTx.Hash(), corethwarp.ContractAddress)
 	if wantValid {
 		assert.Zerof(tb, failed.Len(), "failed-predicate bits of tx %s", warpTx.Hash())
@@ -197,7 +164,13 @@ func TestSendWarpMessage(t *testing.T) {
 	payloadData := utils.RandomBytes(100)
 	sendInput, err := corethwarp.PackSendWarpMessage(payloadData)
 	require.NoError(t, err, "corethwarp.PackSendWarpMessage(...)")
-	warpTx := sut.sendWarpTx(ctx, t, ethWallet, sendInput, nil /*msg*/)
+	warpTx := ethWallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &corethwarp.ContractAddress,
+		Gas:       1_000_000,
+		GasFeeCap: big.NewInt(1),
+		Data:      sendInput,
+	})
+	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, warpTx), "%T.SendTransaction(...)", sut.ethclient)
 
 	built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 	if diff := cmp.Diff(types.Transactions{warpTx}, built.Transactions(), cmputils.TransactionsByHash()); diff != "" {
@@ -232,6 +205,19 @@ func TestSendWarpMessage(t *testing.T) {
 	// Both messages are now available for signing.
 	sut.signWarpMessage(ctx, t, sentMsg)
 	sut.signWarpMessage(ctx, t, blockHashMsg)
+}
+
+// warpAccessList returns an access list carrying each of messages for the warp
+// precompile.
+func warpAccessList(msgs ...*avalanchewarp.Message) types.AccessList {
+	al := make(types.AccessList, len(msgs))
+	for i, msg := range msgs {
+		al[i] = types.AccessTuple{
+			Address:     corethwarp.ContractAddress,
+			StorageKeys: predicate.New(msg.Bytes()),
+		}
+	}
+	return al
 }
 
 // TestPredicateVerification drives warp messages through the predicate path:
@@ -288,11 +274,23 @@ func TestPredicateVerification(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			warpTx := sut.sendWarpTx(ctx, t, ethWallet, tt.txInput, tt.msg)
+			warpTx := ethWallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+				To:         &corethwarp.ContractAddress,
+				Gas:        1_000_000,
+				GasFeeCap:  big.NewInt(1),
+				Data:       tt.txInput,
+				AccessList: warpAccessList(tt.msg),
+			})
+			require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, warpTx), "%T.SendTransaction(...)", sut.ethclient)
 
 			// Txs carrying predicates can only be verified with a non-nil
 			// [block.Context].
-			built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t), withBlockContext(&block.Context{}))
+			built := sut.buildVerify(
+				ctx,
+				t,
+				sut.lastAccepted(ctx, t),
+				withBlockContext(&block.Context{}),
+			)
 			if diff := cmp.Diff(types.Transactions{warpTx}, built.Transactions(), cmputils.TransactionsByHash()); diff != "" {
 				t.Errorf("%T eth txs (-want +got):\n%s", built, diff)
 			}
