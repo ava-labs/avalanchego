@@ -332,8 +332,6 @@ func (*builder) BuildBlock(
 	_ = blockCtx
 	// TODO(StephenButtolph): Encode settled in the block.
 	_ = settled
-	// TODO(StephenButtolph): Verify the extDataHash matches the hash of extData
-	// during parsing.
 	return customtypes.NewBlockWithExtData(
 		header,
 		ethTxs,
