@@ -195,3 +195,46 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+
+  # Observational benchmark only: keep this off the required aggregate so it
+  # can collect timing data without gating the rest of Bazel CI.
+  benchmark-remote-cache:
+    if: ${{ inputs.platform_name == 'linux-amd64' || inputs.platform_name == 'darwin-arm64' }}
+    needs: check-metadata
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install-nix
+      - name: Run Bazel remote cache benchmark
+        shell: nix develop --command bash -x {0}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          ./scripts/run_task.sh bazel-benchmark-remote-cache 2>&1 | tee artifacts/bazel-remote-cache-benchmark-${{ inputs.platform_name }}.log
+      - name: Publish Bazel remote cache benchmark summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_file="artifacts/bazel-remote-cache-benchmark-${{ inputs.platform_name }}.log"
+          if [[ ! -f "${log_file}" ]]; then
+            exit 0
+          fi
+
+          {
+            echo "## Bazel remote cache benchmark (${{ inputs.platform_name }})"
+            echo
+            echo '```text'
+            awk '
+              /^Setup result$/ {print; keep=1; next}
+              keep {print}
+            ' "${log_file}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload Bazel remote cache benchmark log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: bazel-remote-cache-benchmark-${{ inputs.platform_name }}
+          path: artifacts/bazel-remote-cache-benchmark-${{ inputs.platform_name }}.log
+          if-no-files-found: warn

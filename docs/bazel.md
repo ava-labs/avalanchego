@@ -928,6 +928,74 @@ That check includes the Bazel module metadata files, so lockfile drift is
 caught in the metadata phase rather than showing up later as a surprising
 working-tree mutation.
 
+### Remote Cache Benchmark
+
+The repo also includes `task bazel-benchmark-remote-cache`, a CI-style local
+benchmark for separating two distinct cache layers that are easy to conflate:
+
+- **Repository cache** (`bazel fetch //...`) for external dependency materialization
+- **Remote action cache** (`bazel-remote`) for reusing target build/test results
+
+The benchmark intentionally measures them in separate phases:
+
+1. **Setup**: run one measured setup command, currently `bazel fetch //...`,
+   into an otherwise empty temporary `repository_cache`
+2. **Per-command benchmark**: for each configured Bazel command, run three
+   fresh-output-base measurements against that populated `repository_cache`:
+   - no remote cache
+   - cold remote cache
+   - warm remote cache
+
+Fresh `--output_base` values are important because the benchmark is trying to
+model a CI worker that can reuse downloaded external dependencies while still
+starting each measured target command without local action/output state from a
+prior invocation.
+
+The current generalized task benchmarks:
+
+- `bazel build //main:avalanchego`
+- `bazel build --config=race //main:avalanchego`
+
+The fast `task bazel-benchmark-remote-cache-ids-test` smoke target remains
+useful for quick harness validation, but it uses an older pragmatic setup flow
+and is not the representative CI-style benchmark.
+
+Initial local validation on one developer workstation produced:
+
+- setup `fetch //...`: `46.663s`
+- `build //main:avalanchego`
+  - no-cache: `57.330s`
+  - cold-remote-cache: `60.668s`
+  - warm-remote-cache: `46.075s`
+- `build --config=race //main:avalanchego`
+  - no-cache: `56.862s`
+  - cold-remote-cache: `61.052s`
+  - warm-remote-cache: `29.980s`
+
+Those numbers are host-specific and should not be treated as stable targets;
+what matters is the shape of the comparison. In this initial run, the normal
+build only saved about 11s with a warm remote cache after paying about 3s to
+populate the cache, while the race build benefited much more. That suggests the
+next useful measurement is on the actual CI runner class, where fewer CPUs may
+increase the relative value of remote cache hits.
+
+The Bazel CI workflow therefore includes a non-required observational benchmark
+job on the Linux amd64 and macOS arm64 runners. It uploads the full benchmark
+log as an artifact so changes can be compared across branches and runner
+configurations.
+
+For the planned Firewood-from-source comparison, keep the experiment matrix
+explicit and compare like-for-like runs on the same CI runner class:
+
+- baseline branch vs Firewood-from-source branch
+- no remote cache vs cold remote cache vs warm remote cache
+- normal build vs race build
+- identical benchmark task and `fetch //...` setup phase
+
+That makes the resulting benchmark logs actionable when deciding whether added
+build work (for example, building Firewood from source) increases the payoff of
+remote caching enough to justify CI complexity.
+
 The GitHub Actions Bazel workflow also defines a single aggregate job,
 `bazel-required`, that depends on the other jobs in the workflow via
 `needs`.  Branch protection can require that one workflow-level job
