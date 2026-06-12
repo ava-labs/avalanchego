@@ -171,6 +171,7 @@ func (h *indexFileHeader) UnmarshalBinary(data []byte) error {
 // Database stores blockchain blocks on disk and provides methods to read and write blocks.
 type Database struct {
 	indexFile  *os.File
+	locks      *dbLocks
 	config     DatabaseConfig
 	header     indexFileHeader
 	log        logging.Logger
@@ -197,7 +198,7 @@ type Database struct {
 // Parameters:
 //   - config: Configuration parameters
 //   - log: Logger instance for structured logging
-func New(config DatabaseConfig, log logging.Logger) (database.HeightIndex, error) {
+func New(config DatabaseConfig, log logging.Logger) (_ database.HeightIndex, err error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -209,7 +210,6 @@ func New(config DatabaseConfig, log logging.Logger) (database.HeightIndex, error
 
 	// from benchmarks, zstd.BestSpeed is about 100% faster than the default
 	// compression level while giving us ~5% better compression ratio than Snappy.
-	var err error
 	compressor, err := compression.NewZstdCompressorWithLevel(math.MaxUint32, zstd.BestSpeed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize compressor: %w", err)
@@ -233,6 +233,21 @@ func New(config DatabaseConfig, log logging.Logger) (database.HeightIndex, error
 		zap.Int("maxDataFiles", config.MaxDataFiles),
 		zap.Uint16("blockCacheSize", config.BlockCacheSize),
 	)
+
+	// Locks must be acquired before any database file is opened or recovery is
+	// attempted; otherwise two processes can race on recovery and corrupt the index.
+	s.locks, err = acquireDBLocks(config.IndexDir, config.DataDir)
+	if err != nil {
+		s.log.Error("Failed to acquire directory lock", zap.Error(err))
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			if rErr := s.locks.Release(); rErr != nil {
+				s.log.Error("Failed to release directory lock after failed initialization", zap.Error(rErr))
+			}
+		}
+	}()
 
 	if err := s.openAndInitializeIndex(); err != nil {
 		s.log.Error("Failed to initialize database: failed to initialize index", zap.Error(err))
@@ -273,12 +288,17 @@ func (s *Database) Close() error {
 	}
 	s.closed = true
 
-	err := s.persistIndexHeader()
-	if err != nil {
-		s.log.Error("Failed to close database: failed to persist index header", zap.Error(err))
+	var err error
+	if pErr := s.persistIndexHeader(); pErr != nil {
+		s.log.Error("Failed to persist index header", zap.Error(pErr))
+		err = pErr
 	}
 
 	s.closeFiles()
+
+	if rErr := s.locks.Release(); rErr != nil {
+		s.log.Error("Failed to release directory lock", zap.Error(rErr))
+	}
 
 	s.log.Info("Block database closed successfully")
 	return err
@@ -907,9 +927,6 @@ func (s *Database) listDataFiles() (map[int]string, int, error) {
 
 func (s *Database) openAndInitializeIndex() error {
 	indexPath := filepath.Join(s.config.IndexDir, indexFileName)
-	if err := os.MkdirAll(s.config.IndexDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create index directory %s: %w", s.config.IndexDir, err)
-	}
 	openFlags := os.O_RDWR | os.O_CREATE
 	var err error
 	s.indexFile, err = os.OpenFile(indexPath, openFlags, defaultFilePermissions)
@@ -920,10 +937,6 @@ func (s *Database) openAndInitializeIndex() error {
 }
 
 func (s *Database) initializeDataFiles() error {
-	if err := os.MkdirAll(s.config.DataDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create data directory %s: %w", s.config.DataDir, err)
-	}
-
 	// Pre-load the data file for the next write offset.
 	nextOffset := s.nextDataWriteOffset.Load()
 	if nextOffset > 0 {
