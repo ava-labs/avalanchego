@@ -52,7 +52,7 @@ func TestStorage(t *testing.T) {
 			s := NewStorage(db, test.overrides...)
 			require.NoErrorf(t, s.Add(test.add...), "%T.Add(%d)", s, len(test.add))
 
-			for _, name := range []string{"cache", "db"} {
+			for _, name := range []string{"after_add", "fresh"} {
 				t.Run(name, func(t *testing.T) {
 					msg, err := s.Get(test.id)
 					require.ErrorIsf(t, err, test.wantErr, "%T.Get(%s)", s, test.id)
