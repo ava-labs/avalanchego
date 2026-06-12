@@ -109,9 +109,9 @@ func (s *SUT) newAddressedCallMessage(tb testing.TB, addr, b []byte) *avalanchew
 	return s.newUnsignedWarpMessage(tb, p.Bytes())
 }
 
-// newBlockHashMessage returns an unsigned warp message, sourced from the SUT's
+// newHashMessage returns an unsigned warp message, sourced from the SUT's
 // chain, with [payload.Hash] committing to blkID.
-func (s *SUT) newBlockHashMessage(tb testing.TB, blkID ids.ID) *avalanchewarp.UnsignedMessage {
+func (s *SUT) newHashMessage(tb testing.TB, blkID ids.ID) *avalanchewarp.UnsignedMessage {
 	tb.Helper()
 
 	p, err := payload.NewHash(blkID)
@@ -145,7 +145,7 @@ func TestSendWarpMessage(t *testing.T) {
 	}
 
 	sentMsg := sut.newAddressedCallMessage(t, sender.Bytes(), payload)
-	hashMsg := sut.newBlockHashMessage(t, built.ID())
+	hashMsg := sut.newHashMessage(t, built.ID())
 
 	sut.assertWarpSigningRefusal(ctx, t, sentMsg, warp.UnknownMessageErrCode)
 	sut.assertWarpSigningRefusal(ctx, t, hashMsg, warp.NotAcceptedErrCode)
@@ -220,7 +220,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 
 	var (
 		blkID        = ids.GenerateTestID()
-		blockHashMsg = sut.newBlockHashMessage(t, blkID)
+		blockHashMsg = sut.newHashMessage(t, blkID)
 	)
 	getHash, err := corethwarp.PackGetVerifiedWarpBlockHash(0)
 	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpBlockHash(...)")
@@ -236,7 +236,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 		want     []byte
 	}{
 		{
-			name:     "valid warp message",
+			name:     "valid_message",
 			msg:      vdrs.Sign(t, addressedCallMsg),
 			callData: getMessage,
 			want: must(corethwarp.PackGetVerifiedWarpMessageOutput(corethwarp.GetVerifiedWarpMessageOutput{
