@@ -30,8 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
-	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -48,7 +48,7 @@ func TestSendWarpMessage(t *testing.T) {
 	saetest.ConnectTo[saetest.Peer](t, sut, capturer)
 
 	payloadData := utils.RandomBytes(100)
-	warpSendInput, err := warpcontract.PackSendWarpMessage(payloadData)
+	warpSendInput, err := corethwarp.PackSendWarpMessage(payloadData)
 	require.NoError(t, err)
 
 	sendWarpTx(ctx, t, sut, ethWallet, warpSendInput, nil /*no predicate*/)
@@ -74,13 +74,13 @@ func TestSendWarpMessage(t *testing.T) {
 	require.Len(t, receipts, 1)
 	require.Len(t, receipts[0].Logs, 1)
 	wantTopics := []common.Hash{
-		warpcontract.WarpABI.Events["SendWarpMessage"].ID,
+		corethwarp.WarpABI.Events["SendWarpMessage"].ID,
 		common.BytesToHash(sender.Bytes()),
 		common.Hash(unsignedMessage.ID()),
 	}
 	require.Equal(t, wantTopics, receipts[0].Logs[0].Topics)
 
-	loggedMessage, err := warpcontract.UnpackSendWarpEventDataToMessage(receipts[0].Logs[0].Data)
+	loggedMessage, err := corethwarp.UnpackSendWarpEventDataToMessage(receipts[0].Logs[0].Data)
 	require.NoError(t, err)
 	require.Equal(t, unsignedMessage, loggedMessage)
 
@@ -107,19 +107,19 @@ func TestPredicateVerification(t *testing.T) {
 	addressedPayload, err := payload.NewAddressedCall(sender.Bytes(), []byte{1, 2, 3})
 	require.NoError(t, err)
 	addressedCallMessage := newUnsignedWarpMessage(t, sut, addressedPayload.Bytes())
-	addressedCallTxPayload, err := warpcontract.PackGetVerifiedWarpMessage(0)
+	addressedCallTxPayload, err := corethwarp.PackGetVerifiedWarpMessage(0)
 	require.NoError(t, err)
 
 	blockHashPayload, err := payload.NewHash(ids.GenerateTestID())
 	require.NoError(t, err)
 	blockHashMessage := newUnsignedWarpMessage(t, sut, blockHashPayload.Bytes())
-	blockHashTxPayload, err := warpcontract.PackGetVerifiedWarpBlockHash(0)
+	blockHashTxPayload, err := corethwarp.PackGetVerifiedWarpBlockHash(0)
 	require.NoError(t, err)
 
 	tests := []struct {
 		name           string
 		validPredicate bool
-		signedMsg      *avalancheWarp.Message
+		signedMsg      *avalanchewarp.Message
 		txPayload      []byte
 	}{
 		{
@@ -174,19 +174,19 @@ func sendWarpTx(
 	sut *SUT,
 	w *saetest.Wallet,
 	txPayload []byte,
-	signedMessage *avalancheWarp.Message,
+	signedMessage *avalanchewarp.Message,
 ) *types.Transaction {
 	t.Helper()
 
 	var accessList types.AccessList
 	if signedMessage != nil {
 		accessList = types.AccessList{{
-			Address:     warpcontract.ContractAddress,
+			Address:     corethwarp.ContractAddress,
 			StorageKeys: predicate.New(signedMessage.Bytes()),
 		}}
 	}
 
-	warpAddr := warpcontract.ContractAddress
+	warpAddr := corethwarp.ContractAddress
 	signedTx := w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:         &warpAddr,
 		Gas:        1_000_000,
@@ -201,9 +201,9 @@ func sendWarpTx(
 
 // newUnsignedWarpMessage wraps payload into an unsigned warp message for the
 // SUT's chain.
-func newUnsignedWarpMessage(t *testing.T, sut *SUT, payload []byte) *avalancheWarp.UnsignedMessage {
+func newUnsignedWarpMessage(t *testing.T, sut *SUT, payload []byte) *avalanchewarp.UnsignedMessage {
 	t.Helper()
-	msg, err := avalancheWarp.NewUnsignedMessage(sut.ctx.NetworkID, sut.ctx.ChainID, payload)
+	msg, err := avalanchewarp.NewUnsignedMessage(sut.ctx.NetworkID, sut.ctx.ChainID, payload)
 	require.NoError(t, err)
 	return msg
 }
@@ -260,7 +260,7 @@ func assertPredicateResult(
 	blockResults, err := predicate.ParseBlockResults(headerPredicateBytes)
 	require.NoError(t, err)
 
-	txBits := blockResults.Get(validateTx.Hash(), warpcontract.ContractAddress)
+	txBits := blockResults.Get(validateTx.Hash(), corethwarp.ContractAddress)
 	if expectValid {
 		require.Zero(t, txBits.Len())
 		return
