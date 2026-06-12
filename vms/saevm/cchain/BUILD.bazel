@@ -34,6 +34,7 @@ go_library(
         "//graft/coreth/core/extstate",
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
+        "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/constants",

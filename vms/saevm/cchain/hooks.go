@@ -362,7 +362,7 @@ func (b *builder) BuildBlock(
 	}
 
 	// TODO(StephenButtolph): Remove padding for the ACP-176 fee state. The fee
-	// state is incoded in other fields in SAE.
+	// state is encoded in other fields.
 	header.Extra = customheader.SetPredicateBytesInExtra(
 		rulesExtra.AvalancheRules,
 		header.Extra,
