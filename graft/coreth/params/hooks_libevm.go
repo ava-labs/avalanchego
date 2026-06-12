@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -50,9 +51,12 @@ func (RulesExtra) CanExecuteTransaction(_ common.Address, _ *common.Address, _ l
 	return nil
 }
 
-// MinimumGasConsumption is a no-op.
-func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
-	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
+// MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
+func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
+	if extras.Rules(r).IsHelicon {
+		return hook.MinimumGasConsumption(limit)
+	}
+	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
 }
 
 // AccessListGas computes the intrinsic gas for an access list.

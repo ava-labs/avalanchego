@@ -146,6 +146,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			Config:     saetest.ChainConfig(),
 			Alloc:      saetest.MaxAllocFor(keys.Addresses()...),
 			Timestamp:  saeparams.TauSeconds,
+			BaseFee:    big.NewInt(1),
 			Difficulty: big.NewInt(0), // irrelevant but required
 		},
 		db:     memdb.New(),
@@ -391,7 +392,7 @@ func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transactio
 func (s *SUT) waitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
-	txgossiptest.WaitUntilPending(tb, s.context(tb), s.rawVM.mempool.Pool, txs...)
+	txgossiptest.WaitUntilPending(tb, s.context(tb), s.rawVM.GethRPCBackends(), txs...)
 }
 
 // buildAndParseBlock adds all `txs` to the mempool and ensures they are pending,
