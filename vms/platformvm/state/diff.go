@@ -540,6 +540,17 @@ func (d *Diff) AddChain(createChainTx *txs.Tx) {
 	}
 }
 
+// Added to accommodate for createL1Tx.
+func (d *Diff) AddL1Chain(subnetID ids.ID, tx *txs.Tx) {
+	if d.addedChains == nil {
+		d.addedChains = map[ids.ID][]*txs.Tx{
+			subnetID: {tx},
+		}
+	} else {
+		d.addedChains[subnetID] = append(d.addedChains[subnetID], tx)
+	}
+}
+
 func (d *Diff) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	if tx, exists := d.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
@@ -709,9 +720,14 @@ func (d *Diff) Apply(baseState Chain) error {
 	for _, tx := range d.transformedSubnets {
 		baseState.AddSubnetTransformation(tx)
 	}
-	for _, chains := range d.addedChains {
+	for subnetID, chains := range d.addedChains {
 		for _, chain := range chains {
-			baseState.AddChain(chain)
+			switch chain.Unsigned.(type) {
+			case *txs.CreateChainTx:
+				baseState.AddChain(chain)
+			default:
+				baseState.AddL1Chain(subnetID, chain)
+			}
 		}
 	}
 	for _, tx := range d.addedTxs {

@@ -814,6 +814,131 @@ func TestCreateChain(t *testing.T) {
 	require.True(foundNewChain)
 }
 
+// TestCreateL1Chain verifies that issuing a CreateL1Tx:
+//   - commits the tx to state
+//   - registers the subnet ID in GetSubnetIDs
+//   - stores the chain under GetChains as a *txs.CreateL1Tx
+//   - allows createSubnet to process the chain without error
+func TestCreateL1Chain(t *testing.T) {
+	require := require.New(t)
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	var (
+		nodeID      = ids.GenerateTestNodeID()
+		vmID        = ids.GenerateTestID()
+		genesisData = []byte("genesis")
+	)
+
+	wallet := newWallet(t, vm, walletConfig{})
+	tx, err := wallet.IssueCreateL1Tx(
+		"Test L1",
+		vmID,
+		nil,
+		genesisData,
+		ids.Empty,
+		nil,
+		[]*txs.CreateL1Validator{
+			{
+				NodeID:  nodeID.Bytes(),
+				Weight:  1,
+				Balance: 1,
+				Signer:  *pop,
+			},
+		},
+	)
+	require.NoError(err)
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(tx))
+	vm.ctx.Lock.Lock()
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	txID := tx.ID()
+	subnetID := txID // subnetID == txID for CreateL1Tx
+
+	// Verify tx was committed
+	_, txStatus, err := vm.state.GetTx(txID)
+	require.NoError(err)
+	require.Equal(status.Committed, txStatus)
+
+	// Verify the subnet was registered
+	subnetIDs, err := vm.state.GetSubnetIDs()
+	require.NoError(err)
+	require.Contains(subnetIDs, subnetID)
+
+	// Verify the chain was stored as a CreateL1Tx
+	chains, err := vm.state.GetChains(subnetID)
+	require.NoError(err)
+	require.Len(chains, 1)
+	require.Equal(txID, chains[0].ID())
+	chainTx, ok := chains[0].Unsigned.(*txs.CreateL1Tx)
+	require.True(ok)
+	require.Equal(vmID, chainTx.VMID)
+	require.Equal(genesisData, chainTx.GenesisData)
+
+	// Verify createSubnet handles a CreateL1Tx without error
+	require.NoError(vm.createSubnet(subnetID))
+}
+
+// TestCreateSubnetChainTypes tests the createSubnet switch against
+// CreateChainTx and CreateL1Tx.
+func TestCreateSubnetChainTypes(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupChains func(vm *VM, subnetID ids.ID)
+		expectedErr error
+	}{
+		{
+			name: "CreateChainTx only",
+			setupChains: func(vm *VM, subnetID ids.ID) {
+				vm.state.AddChain(&txs.Tx{Unsigned: &txs.CreateChainTx{SubnetID: subnetID}})
+			},
+		},
+		{
+			name: "CreateL1Tx only",
+			setupChains: func(vm *VM, subnetID ids.ID) {
+				vm.state.AddL1Chain(subnetID, &txs.Tx{Unsigned: &txs.CreateL1Tx{}})
+			},
+		},
+		{
+			name: "mixed CreateChainTx and CreateL1Tx",
+			setupChains: func(vm *VM, subnetID ids.ID) {
+				vm.state.AddChain(&txs.Tx{Unsigned: &txs.CreateChainTx{SubnetID: subnetID}})
+				vm.state.AddL1Chain(subnetID, &txs.Tx{Unsigned: &txs.CreateL1Tx{}})
+			},
+		},
+		{
+			name: "unknown chain type returns error",
+			setupChains: func(vm *VM, subnetID ids.ID) {
+				vm.state.AddL1Chain(subnetID, &txs.Tx{Unsigned: &txs.CreateSubnetTx{}})
+			},
+			expectedErr: errUnknownChainType,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			vm, _, _ := defaultVM(t, upgradetest.Latest)
+			vm.ctx.Lock.Lock()
+			defer vm.ctx.Lock.Unlock()
+
+			subnetID := ids.GenerateTestID()
+			test.setupChains(vm, subnetID)
+
+			err := vm.createSubnet(subnetID)
+			require.ErrorIs(err, test.expectedErr)
+		})
+	}
+}
+
 // test where we:
 // 1) Create a subnet
 // 2) Add a validator to the subnet's current validator set

@@ -37,6 +37,7 @@ func init() {
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
 			RegisterHeliconTypes(c),
+			RegisterCreateL1TxTypes(c),
 		)
 	}
 
@@ -92,4 +93,10 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 // valid during the Helicon series of upgrades.
 func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
 	return txs.RegisterHeliconTypes(targetCodec)
+}
+
+// RegisterCreateL1TxTypes registers CreateL1Tx for block serialization.
+// TODO: update to the correct upgrade name once the target upgrade is finalized.
+func RegisterCreateL1TxTypes(targetCodec linearcodec.Codec) error {
+	return txs.RegisterCreateL1TxTypes(targetCodec)
 }

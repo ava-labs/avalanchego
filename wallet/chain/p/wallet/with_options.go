@@ -144,6 +144,28 @@ func (w *withOptions) IssueTransferSubnetOwnershipTx(
 	)
 }
 
+func (w *withOptions) IssueCreateL1Tx(
+	chainName string,
+	vmID ids.ID,
+	fxIDs []ids.ID,
+	genesisData []byte,
+	chainID ids.ID,
+	address []byte,
+	validators []*txs.CreateL1Validator,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueCreateL1Tx(
+		chainName,
+		vmID,
+		fxIDs,
+		genesisData,
+		chainID,
+		address,
+		validators,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *withOptions) IssueConvertSubnetToL1Tx(
 	subnetID ids.ID,
 	chainID ids.ID,
