@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm"
@@ -56,6 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -450,6 +452,41 @@ func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Blo
 func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
 	return s.runConsensusLoopOnPreference(tb, s.lastAcceptedBlock(tb), txs...)
+}
+
+// deployEscrow signs and runs a deploy tx for the escrow contract from
+// s.wallet[0], in its own consensus block. If depositVal is non-nil, a tx
+// depositing that value to balances[recv] is run in a subsequent block;
+// otherwise depositBlock is nil.
+func (s *SUT) deployEscrow(tb testing.TB, depositVal *big.Int) (
+	deployBlock, depositBlock *blocks.Block, escrowAddr, recv common.Address,
+) {
+	tb.Helper()
+	ctx := s.context(tb)
+	escrowAddr = crypto.CreateAddress(s.wallet.Addresses()[0], 0)
+	recv = common.Address{'r', 'e', 'c', 'v'}
+
+	sign := s.wallet.SetNonceAndSign
+
+	deployBlock = s.runConsensusLoop(tb, sign(tb, 0, &types.LegacyTx{
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     escrow.CreationCode(),
+	}))
+
+	if depositVal != nil {
+		depositBlock = s.runConsensusLoop(tb, sign(tb, 0, &types.LegacyTx{
+			To:       &escrowAddr,
+			Gas:      1e6,
+			GasPrice: big.NewInt(1),
+			Data:     escrow.CallDataToDeposit(recv),
+			Value:    depositVal,
+		}))
+	}
+	last := s.lastAcceptedBlock(tb)
+	require.NoErrorf(tb, last.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", last)
+
+	return deployBlock, depositBlock, escrowAddr, recv
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
