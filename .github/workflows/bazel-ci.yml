@@ -205,6 +205,31 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
+      - name: Measure representative cache-endpoint latency
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET_URL="https://prometheus-poc.avax-dev.network/"
+          for i in $(seq 1 10); do
+            curl -sS -o /dev/null \
+              -w "%{http_code} %{time_connect} %{time_appconnect} %{time_starttransfer} %{time_total}\n" \
+              "$TARGET_URL"
+          done | awk '
+          {
+            code[$1] += 1
+            connect += $2
+            tls += $3
+            ttfb += $4
+            total += $5
+            n += 1
+          }
+          END {
+            for (c in code) {
+              printf "http_code[%s]=%d\n", c, code[c]
+            }
+            printf "samples=%d avg_connect=%.1fms avg_tls=%.1fms avg_ttfb=%.1fms avg_total=%.1fms\n",
+              n, (connect/n)*1000, (tls/n)*1000, (ttfb/n)*1000, (total/n)*1000
+          }'
       - name: Run Bazel remote cache benchmark
         shell: nix develop --command bash -x {0}
         run: |

@@ -27,7 +27,8 @@ Runs three test invocations with fresh local Bazel state each time:
   3. warm remote cache (reuses the populated cache)
 
 The benchmark fails unless the warm remote-cache run is faster than both the
-no-cache and cold-cache runs.
+no-cache and cold-cache runs and Bazel reports that the test result was reused
+from cache instead of being executed again.
 EOF
 }
 
@@ -234,6 +235,13 @@ less_than() {
   awk -v left="$1" -v right="$2" 'BEGIN { exit !(left < right) }'
 }
 
+warm_run_reused_cached_test_result() {
+  local log_file="$1"
+
+  grep -q '(cached) PASSED' "${log_file}" \
+    && grep -q 'Executed 0 out of 1 test: 1 test passes\.' "${log_file}"
+}
+
 remote_cache_url="$(start_bazel_remote)"
 
 echo "Using temporary workspace: ${TMP_ROOT}"
@@ -275,10 +283,15 @@ if ! less_than "${warm_cache_time}" "${cold_cache_time}"; then
   echo "FAIL: warm remote cache was not faster than cold remote cache" >&2
   pass=false
 fi
+if ! warm_run_reused_cached_test_result "${LOG_DIR}/warm-remote-cache.log"; then
+  echo "FAIL: warm remote cache did not report a cached test result" >&2
+  pass=false
+fi
 
 if [[ "${pass}" != true ]]; then
   exit 1
 fi
 
 echo "PASS: warm remote cache was faster than both no cache and cold remote cache"
+echo "PASS: warm remote cache reused the cached test result (Executed 0 out of 1 test)"
 SUCCESS=true
