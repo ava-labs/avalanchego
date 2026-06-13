@@ -151,6 +151,12 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		timestampMS = uint64(tstart.UnixMilli())
 	)
 
+	// No Helicon blocks allowed
+	if chainExtra.IsHelicon(timestamp) && timestamp > 0 {
+		timestamp = *chainExtra.HeliconTimestamp - 1
+		timestampMS = timestamp*1000 + 999
+	}
+
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number, common.Big1),

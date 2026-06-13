@@ -57,6 +57,7 @@ var (
 	errParentBeaconRootNonEmpty            = errors.New("invalid non-empty parentBeaconRoot")
 	errBlobGasUsedNilInCancun              = errors.New("blob gas used must not be nil in Cancun")
 	errBlobsNotEnabled                     = errors.New("blobs not enabled on avalanche networks")
+	errIsHeliconBlock                      = errors.New("helicon blocks are not valid on pre-SAE C-Chain")
 )
 
 var (
@@ -339,8 +340,18 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 
 	header := b.ethBlock.Header()
+
+	// Coreth cannot verify Helicon blocks, but they still must be parsable.
+	if extraConfig.IsHelicon(header.Time) {
+		return fmt.Errorf("%w: %s at height %d", errIsHeliconBlock, header.Hash(), header.Number.Uint64())
+	}
+
 	// Ensure MinDelayExcess is consistent with rules and minimum block delay is enforced.
 	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
+		return err
+	}
+	// Ensure MinPriceExponent is not set before Helicon (ACP-283).
+	if err := customheader.VerifyMinPriceExponent(extraConfig, header); err != nil {
 		return err
 	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.
