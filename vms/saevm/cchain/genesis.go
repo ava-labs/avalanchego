@@ -18,14 +18,17 @@ import (
 
 // parseGenesis decodes the genesis bytes and populates the upgrade schedule.
 func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
-	g := new(core.Genesis)
-	if err := json.Unmarshal(b, g); err != nil {
+	var g core.Genesis
+	if err := json.Unmarshal(b, &g); err != nil {
 		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
 	}
 
 	// The JSON only specifies the chain-specific configuration; the upgrade
 	// schedule is configured by ctx.
-	chainID := g.Config.ChainID
+	var chainID *big.Int
+	if c := g.Config; c != nil {
+		chainID = c.ChainID
+	}
 	u := &ctx.NetworkUpgrades
 	g.Config = params.WithExtra(
 		&params.ChainConfig{
@@ -78,7 +81,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
 			},
 		},
 	)
-	return g, nil
+	return &g, nil
 }
 
 var (
