@@ -1,0 +1,48 @@
+# gazelle:ignore
+
+load("@firewood_crates//:defs.bzl", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+rust_library(
+    name = "firewood",
+    srcs = glob(["src/**/*.rs"]),
+    crate_features = [
+        "ethhash",
+        "logger",
+    ],
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    proc_macro_deps = [
+        "//firewood/firewood-macros",
+    ] + all_crate_deps(
+        proc_macro = True,
+        package_name = "firewood/firewood",
+    ),
+    visibility = ["//firewood:__subpackages__"],
+    deps = [
+        "//firewood/metrics:firewood-metrics",
+        "//firewood/storage:firewood-storage",
+    ] + all_crate_deps(package_name = "firewood/firewood"),
+)
+
+rust_library(
+    name = "firewood_merkledb",
+    srcs = glob(["src/**/*.rs"]),
+    crate_features = [
+        "logger",
+    ],
+    crate_name = "firewood",
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    proc_macro_deps = [
+        "//firewood/firewood-macros",
+    ] + all_crate_deps(
+        proc_macro = True,
+        package_name = "firewood/firewood",
+    ),
+    visibility = ["//firewood:__subpackages__"],
+    deps = [
+        "//firewood/metrics:firewood-metrics",
+        "//firewood/storage:firewood-storage_merkledb",
+    ] + all_crate_deps(package_name = "firewood/firewood"),
+)

@@ -1,0 +1,59 @@
+# gazelle:ignore
+
+load("@firewood_crates//:defs.bzl", "all_crate_deps")
+load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+cargo_build_script(
+    name = "storage_build_script",
+    srcs = ["build.rs"],
+    edition = "2024",
+    deps = all_crate_deps(
+        build = True,
+        package_name = "firewood/storage",
+    ),
+)
+
+rust_library(
+    name = "firewood-storage",
+    srcs = glob(["src/**/*.rs"]),
+    crate_features = [
+        "ethhash",
+        "logger",
+    ],
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        package_name = "firewood/storage",
+    ),
+    visibility = ["//firewood:__subpackages__"],
+    deps = [
+        "//firewood/metrics:firewood-metrics",
+        ":storage_build_script",
+    ] + all_crate_deps(package_name = "firewood/storage") + [
+        "@firewood_crates//:log",
+    ],
+)
+
+rust_library(
+    name = "firewood-storage_merkledb",
+    srcs = glob(["src/**/*.rs"]),
+    crate_features = [
+        "logger",
+    ],
+    crate_name = "firewood_storage",
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        package_name = "firewood/storage",
+    ),
+    visibility = ["//firewood:__subpackages__"],
+    deps = [
+        "//firewood/metrics:firewood-metrics",
+        ":storage_build_script",
+    ] + all_crate_deps(package_name = "firewood/storage") + [
+        "@firewood_crates//:log",
+    ],
+)

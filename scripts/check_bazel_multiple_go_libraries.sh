@@ -38,6 +38,7 @@ done < <(
     -path './.direnv' -prune -o \
     -path './bazel-*' -prune -o \
     -path './.bazel/patches/build_files' -prune -o \
+    -path './firewood/ffi/BUILD.bazel' -prune -o \
     -name 'BUILD.bazel' -type f -print0
 )
 
@@ -45,6 +46,8 @@ if (( failed )); then
   cat >&2 <<'EOF'
 Each BUILD.bazel file must define at most one go_library rule.
 Multiple go_library rules in one directory are usually stale metadata from a package rename or move.
+The firewood/ffi exception is intentional because it provides multiple published Go
+importpaths from one directory.
 Remove the duplicate rule and rerun:
   task bazel-check-metadata
 EOF
