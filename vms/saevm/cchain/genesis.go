@@ -129,6 +129,10 @@ func writeGenesis(
 	tdb *triedb.Database,
 	genesis *core.Genesis,
 ) (*types.Block, error) {
+	// TODO(StephenButtolph): While we are guaranteed for the trie write to have
+	// finished before writing the canonical hash to disk with hashdb or pathdb,
+	// firewood has separate syncronization guarantees. It could be possible for
+	// the genesis hash to be canonical without the state being on disk.
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == common.Hash{}) {
 		return genesis.Commit(db, tdb)
