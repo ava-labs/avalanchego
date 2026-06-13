@@ -113,8 +113,9 @@ load_command_array() {
 TMP_ROOT="$(mktemp -d -t bazel-remote-cache-bench.XXXXXX)"
 CACHE_DIR="${TMP_ROOT}/remote-cache"
 REPOSITORY_CACHE_DIR="${TMP_ROOT}/repository-cache"
+GO_REPOSITORY_MODCACHE_DIR="${TMP_ROOT}/go-mod-cache"
 LOG_DIR="${TMP_ROOT}/logs"
-mkdir -p "${CACHE_DIR}" "${REPOSITORY_CACHE_DIR}" "${LOG_DIR}"
+mkdir -p "${CACHE_DIR}" "${REPOSITORY_CACHE_DIR}" "${GO_REPOSITORY_MODCACHE_DIR}" "${LOG_DIR}"
 
 REMOTE_PID=""
 REMOTE_LOG=""
@@ -229,6 +230,13 @@ run_bazel_command() {
     --curses=no
     --show_progress_rate_limit=60
     "--repository_cache=${REPOSITORY_CACHE_DIR}"
+    # Gazelle go_repository keeps an internal per-output-base module cache by
+    # default, which defeats the goal of a shared setup phase when each measured
+    # run gets a fresh output base. Force it onto a host-level shared GOMODCACHE
+    # so `bazel fetch //...` can seed Go module downloads once per architecture
+    # and later fresh-output-base runs can reuse them without re-downloading.
+    "--repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1"
+    "--repo_env=GOMODCACHE=${GO_REPOSITORY_MODCACHE_DIR}"
     --disk_cache=)
 
   if [[ -n "${remote_cache}" ]]; then
@@ -276,6 +284,7 @@ less_than() {
 
 echo "Using temporary workspace: ${TMP_ROOT}"
 echo "Using repository cache: ${REPOSITORY_CACHE_DIR}"
+echo "Using go_repository mod cache: ${GO_REPOSITORY_MODCACHE_DIR}"
 
 # The setup phase models the CI cache-writer job from PR 5525: start from an
 # empty repository_cache, then measure a single command (typically `fetch //...`)
