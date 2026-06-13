@@ -15,28 +15,22 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  APPLE_CODESIGN_PKG_VERSION: "0.28.0"
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
+  # Build the macOS binaries on a native macOS runner. Apple notarization and
+  # GPG signing happen in the downstream sign-publish job on Linux.
   build-mac:
-    # Build release artifacts on the oldest macOS version still receiving Apple
-    # security updates to maximize the chance that shipped binaries remain usable
-    # on older supported macOS versions. CI validation can track newer macOS
-    # releases independently.
     runs-on: macos-14
     permissions:
-      id-token: write
       contents: read
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
-      # Runs a single command using the runners shell
       - name: Build the avalanchego binary
         run: ./scripts/run_task.sh build
 
@@ -44,34 +38,169 @@ jobs:
         working-directory: ./graft/subnet-evm
         run: ./scripts/run_task.sh build
 
+      - name: Upload macOS binaries
+        uses: actions/upload-artifact@v6
+        with:
+          name: macos-binaries
+          path: |
+            build/avalanchego
+            build/subnet-evm
+          retention-days: 1
+          if-no-files-found: error
+
+  # Apple-sign + notarize + GPG-sign + publish. Runs on Linux because
+  # indygreg/apple-code-sign-action is a JS action (node20) and the
+  # underlying rcodesign tool is cross-platform.
+  sign-publish:
+    runs-on: ubuntu-24.04
+    needs: build-mac
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download macOS binaries
+        uses: actions/download-artifact@v6
+        with:
+          name: macos-binaries
+          path: build
+
+      - name: Restore executable bits
+        run: chmod +x build/avalanchego build/subnet-evm
+
       - name: Try to get tag from git
         if: "${{ github.event.inputs.tag == '' }}"
-        id: get_tag_from_git
         run: |
           echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
-        id: get_tag_from_workflow
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          echo "TAG=${INPUT_TAG}" >> "$GITHUB_ENV"
         shell: bash
 
-      - name: Create avalanchego zip file
-        run: 7z a "avalanchego-macos-${TAG}.zip" build/avalanchego
-        env:
-          TAG: ${{ env.TAG }}
-
-      - name: Create subnet-evm zip file
-        run: 7z a "subnet-evm-macos-${TAG}.zip" build/subnet-evm
-        env:
-          TAG: ${{ env.TAG }}
-
-      - name: Install aws cli
+      - name: Install rcodesign and 7zip
         run: |
-          curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
-          sudo installer -pkg AWSCLIV2.pkg -target /
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends p7zip-full
+          ARCHIVE="apple-codesign-${APPLE_CODESIGN_PKG_VERSION}-x86_64-unknown-linux-musl"
+          # Release tag uses a slash separator (apple-codesign/0.28.0) which must
+          # be URL-encoded as %2F in the download path.
+          curl -fsSL -o /tmp/rcodesign.tar.gz \
+            "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${APPLE_CODESIGN_PKG_VERSION}/${ARCHIVE}.tar.gz"
+          tar -xzf /tmp/rcodesign.tar.gz -C /tmp/
+          sudo install "/tmp/${ARCHIVE}/rcodesign" /usr/local/bin/rcodesign
+          rcodesign --version
+        shell: bash
+
+      - name: Materialize Apple credentials
+        env:
+          APPLE_P12_FILE_B64: ${{ secrets.MACOS_SIGNING_PKCS12_BASE64 }}
+          APPLE_API_KEY_B64:  ${{ secrets.MACOS_NOTARIZATION_AUTH_KEY }}
+          APPLE_ISSUER:       ${{ secrets.MACOS_NOTARIZATION_ISSUER_ID }}
+          APPLE_KEY_ID:       ${{ secrets.MACOS_NOTARIZATION_KEY_ID }}
+        run: |
+          set -euo pipefail
+          p12="$(mktemp --suffix=.p12)"
+          chmod 600 "$p12"
+          printf '%s' "$APPLE_P12_FILE_B64" | base64 -d > "$p12"
+
+          p8="$(mktemp --suffix=.p8)"
+          chmod 600 "$p8"
+          printf '%s' "$APPLE_API_KEY_B64" | base64 -d > "$p8"
+
+          json="$(mktemp --suffix=.json)"
+          chmod 600 "$json"
+          rcodesign encode-app-store-connect-api-key \
+            --output-path "$json" \
+            "$APPLE_ISSUER" "$APPLE_KEY_ID" "$p8"
+
+          {
+            echo "APPLE_P12_FILE_PATH=$p12"
+            echo "APPLE_P8_FILE_PATH=$p8"
+            echo "APPLE_API_KEY_JSON_PATH=$json"
+          } >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Import GPG key
+        env:
+          RPM_GPG_PRIVATE_KEY: ${{ secrets.RPM_GPG_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          # Fail fast on an empty/unset secret rather than silently
+          # propagating to build-zip-pkg.sh's no-op signing branch
+          # (which would publish unsigned zips before the Upload step
+          # errors on the missing .sig).
+          if [[ -z "${RPM_GPG_PRIVATE_KEY:-}" ]]; then
+            echo "ERROR: RPM_GPG_PRIVATE_KEY secret is required but unset/empty" >&2
+            exit 1
+          fi
+          GPG_KEY_FILE="$(mktemp)"
+          chmod 600 "${GPG_KEY_FILE}"
+          printf '%s' "${RPM_GPG_PRIVATE_KEY}" > "${GPG_KEY_FILE}"
+          if [[ ! -s "${GPG_KEY_FILE}" ]]; then
+            echo "ERROR: GPG key file is empty after writing the secret" >&2
+            exit 1
+          fi
+          printf 'GPG_KEY_FILE=%s\n' "${GPG_KEY_FILE}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Apple-sign avalanchego binary
+        uses: indygreg/apple-code-sign-action@v1
+        with:
+          input_path: build/avalanchego
+          sign: true
+          notarize: false
+          p12_file: ${{ env.APPLE_P12_FILE_PATH }}
+          p12_password: ${{ secrets.MACOS_SIGNING_PASSWORD }}
+          sign_args: |
+            --code-signature-flags
+            runtime
+          rcodesign_version: ${{ env.APPLE_CODESIGN_PKG_VERSION }}
+
+      - name: Apple-sign subnet-evm binary
+        uses: indygreg/apple-code-sign-action@v1
+        with:
+          input_path: build/subnet-evm
+          sign: true
+          notarize: false
+          p12_file: ${{ env.APPLE_P12_FILE_PATH }}
+          p12_password: ${{ secrets.MACOS_SIGNING_PASSWORD }}
+          sign_args: |
+            --code-signature-flags
+            runtime
+          rcodesign_version: ${{ env.APPLE_CODESIGN_PKG_VERSION }}
+
+      - name: Build zips and GPG-sign
+        run: ./.github/workflows/build-zip-pkg.sh
+        env:
+          TAG: ${{ env.TAG }}
+          GPG_KEY_FILE: ${{ env.GPG_KEY_FILE }}
+          GPG_PASSPHRASE: ${{ secrets.RPM_GPG_PASSPHRASE }}
+
+      - name: Notarize avalanchego zip
+        uses: indygreg/apple-code-sign-action@v1
+        with:
+          input_path: avalanchego-macos-${{ env.TAG }}.zip
+          sign: false
+          notarize: true
+          app_store_connect_api_key_json_file: ${{ env.APPLE_API_KEY_JSON_PATH }}
+          rcodesign_version: ${{ env.APPLE_CODESIGN_PKG_VERSION }}
+
+      - name: Notarize subnet-evm zip
+        uses: indygreg/apple-code-sign-action@v1
+        with:
+          input_path: subnet-evm-macos-${{ env.TAG }}.zip
+          sign: false
+          notarize: true
+          app_store_connect_api_key_json_file: ${{ env.APPLE_API_KEY_JSON_PATH }}
+          rcodesign_version: ${{ env.APPLE_CODESIGN_PKG_VERSION }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -80,28 +209,39 @@ jobs:
           role-session-name: githubrolesession
           aws-region: us-east-1
 
-      - name: Upload avalanchego to S3
-        run: aws s3 cp avalanchego-macos-${{ env.TAG }}.zip "s3://${BUCKET}/macos/"
+      - name: Upload zips to S3
         env:
           BUCKET: ${{ secrets.BUCKET }}
-
-      - name: Upload subnet-evm to S3
-        run: aws s3 cp subnet-evm-macos-${{ env.TAG }}.zip "s3://${BUCKET}/macos/"
-        env:
-          BUCKET: ${{ secrets.BUCKET }}
+          TAG:    ${{ env.TAG }}
+        run: |
+          set -euo pipefail
+          for name in avalanchego subnet-evm; do
+            aws s3 cp "${name}-macos-${TAG}.zip"     "s3://${BUCKET}/macos/"
+            aws s3 cp "${name}-macos-${TAG}.zip.sig" "s3://${BUCKET}/macos/"
+          done
 
       - name: Save avalanchego as Github artifact
         uses: actions/upload-artifact@v6
         with:
           name: avalanchego-macos
-          path: avalanchego-macos-${{ env.TAG }}.zip
+          path: |
+            avalanchego-macos-${{ env.TAG }}.zip
+            avalanchego-macos-${{ env.TAG }}.zip.sig
 
       - name: Save subnet-evm as Github artifact
         uses: actions/upload-artifact@v6
         with:
           name: subnet-evm-macos
-          path: subnet-evm-macos-${{ env.TAG }}.zip
+          path: |
+            subnet-evm-macos-${{ env.TAG }}.zip
+            subnet-evm-macos-${{ env.TAG }}.zip.sig
 
       - name: Cleanup
+        if: always()
         run: |
+          rm -f \
+            "${GPG_KEY_FILE:-}" \
+            "${APPLE_P12_FILE_PATH:-}" \
+            "${APPLE_P8_FILE_PATH:-}" \
+            "${APPLE_API_KEY_JSON_PATH:-}"
           rm -rf ./build
