@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 )
 
+var errNoChainID = errors.New("genesis must specify a chain ID")
+
 // parseGenesis decodes the genesis bytes and populates the upgrade schedule.
 func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
 	var g core.Genesis
@@ -25,10 +28,10 @@ func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
 
 	// The JSON only specifies the chain-specific configuration; the upgrade
 	// schedule is configured by ctx.
-	var chainID *big.Int
-	if c := g.Config; c != nil {
-		chainID = c.ChainID
+	if g.Config == nil || g.Config.ChainID == nil {
+		return nil, errNoChainID
 	}
+	chainID := g.Config.ChainID
 	u := &ctx.NetworkUpgrades
 	g.Config = params.WithExtra(
 		&params.ChainConfig{
