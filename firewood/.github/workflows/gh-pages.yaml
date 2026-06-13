@@ -1,0 +1,110 @@
+name: gh-pages
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      # trigger if a pr touches the workflow definition to validate it, but not
+      # for other changes to avoid unnecessary builds.
+      - .github/workflows/gh-pages.yaml
+  # allow manual trigger because we cannot "retry" a deploy step
+  workflow_dispatch:
+  # Rebuild pages after benchmark workflow completes.
+  # Currently only scheduled runs (which run on main) trigger this.
+  # If we later add feature branch benchmarks, remove `branches` filter -
+  # data separation is handled in track-performance.yml (bench/ vs dev/bench/).
+  workflow_run:
+    workflows: ["C-Chain Reexecution Performance Tracking"]
+    types: [completed]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    # Only run on the canonical repo — forks don't have GitHub Pages
+    # configured and the deploy step fails.
+    # Also skip if triggered by failed workflow_run.
+    if: |
+      github.repository == 'ava-labs/firewood' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main # Always build docs from main
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # @stable
+      # caution: this is the same restore as in ci.yaml
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # @v2 -> v2.9.1
+        with:
+          save-if: "false"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.25
+      - name: Install doc2go
+        run: go install go.abhg.dev/doc2go@latest
+      - name: Build Rust docs
+        run: cargo doc --document-private-items --no-deps
+      - name: Build go docs
+        # `-C` changes the cwd of the process so relative paths resolve from
+        # inside the `ffi` directory. Explicitly using $(pwd) for clarity.
+        run: doc2go -C ffi -home github.com/ava-labs/firewood/ffi -out $(pwd)/target/doc/ffi ./...
+      - name: Copy static assets
+        run: cp -rv docs/assets target/doc/
+      # GitHub Pages deploys from a single source (overwrites, doesn't merge).
+      # Benchmark history lives on benchmark-data branch (for append-only storage).
+      # We merge both into _site/ so a single deployment serves docs + benchmarks.
+      # See track-performance.yml for how benchmark data is collected and stored.
+      #
+      # Structure on benchmark-data branch (see track-performance.yml for how this is populated):
+      #   bench/              - Official benchmark history (main branch only)
+      #   dev/bench/{branch}/ - Feature branch benchmarks (experimental)
+      - name: Include benchmark data
+        run: |
+          # Fetch benchmark-data branch (may not exist on first run)
+          if ! git fetch origin benchmark-data 2>/dev/null; then
+            echo "No benchmark-data branch yet, skipping"
+            exit 0
+          fi
+
+          # Extract benchmark directories from benchmark-data branch into target/doc/
+          git archive FETCH_HEAD | tar -vx -C target/doc/
+      - name: Generate landing page
+        run: |
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=firewood\">" > target/doc/index.html
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pages
+          path: target/doc
+          if-no-files-found: error
+          overwrite: true
+          include-hidden-files: true
+  deploy:
+    # Pull requests only validates the build step but does not actually deploy.
+    # Forks don't have Pages configured, so restrict to the canonical repo.
+    if: github.repository == 'ava-labs/firewood' && github.event_name != 'pull_request'
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download pages artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: pages
+          path: .
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: .
+      - name: Deploy to GitHub pages
+        id: deployment
+        uses: actions/deploy-pages@v5

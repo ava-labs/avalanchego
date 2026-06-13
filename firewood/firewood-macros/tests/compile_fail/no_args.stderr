@@ -1,0 +1,7 @@
+error: expected a registry constant identifier, e.g., #[metrics(MY_OPERATION)]
+ --> tests/compile_fail/no_args.rs:5:1
+  |
+5 | / fn function_without_args() -> Result<(), &'static str> {
+6 | |     Ok(())
+7 | | }
+  | |_^
