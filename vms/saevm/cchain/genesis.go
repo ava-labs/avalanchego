@@ -9,6 +9,12 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/triedb"
+
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
@@ -112,4 +118,32 @@ func londonBlock(chainID *big.Int) int64 {
 	default:
 		return 0
 	}
+}
+
+// writeGenesis commits the genesis block and chain config to db if the chain is
+// not already initialized. Otherwise it verifies that the stored genesis hash
+// matches and overwrites the stored chain config, which may schedule upgrades
+// that were not previously scheduled. It returns the genesis block.
+func writeGenesis(
+	db ethdb.Database,
+	tdb *triedb.Database,
+	genesis *core.Genesis,
+) (*types.Block, error) {
+	stored := rawdb.ReadCanonicalHash(db, 0)
+	if (stored == common.Hash{}) {
+		return genesis.Commit(db, tdb)
+	}
+
+	block := genesis.ToBlock()
+	if hash := block.Hash(); hash != stored {
+		return nil, &core.GenesisMismatchError{
+			Stored: stored,
+			New:    hash,
+		}
+	}
+
+	// TODO(StephenButtolph): Consider checking compatibility of the chain
+	// config against the last accepted block.
+	rawdb.WriteChainConfig(db, stored, genesis.Config)
+	return block, nil
 }

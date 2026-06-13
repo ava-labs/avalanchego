@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
@@ -103,18 +102,13 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
-	genesisBlock := genesis.ToBlock()
-
-	// On a fresh chain the last-accepted block is genesis itself.
-	chainConfig, _, err := core.SetupGenesisBlock(
+	genesisBlock, err := writeGenesis(
 		ethDB,
 		triedb.NewDatabase(ethDB, trieDBConfig),
 		genesis,
-		genesisBlock.Hash(),
-		false,
 	)
 	if err != nil {
-		return fmt.Errorf("setting up genesis block: %w", err)
+		return fmt.Errorf("writing genesis: %w", err)
 	}
 
 	vm.state, err = state.New(snowCtx, avaDB)
@@ -125,6 +119,7 @@ func (vm *VM) Initialize(
 		return vm.state.Close()
 	})
 
+	chainConfig := genesis.Config
 	pendingTxs := txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
