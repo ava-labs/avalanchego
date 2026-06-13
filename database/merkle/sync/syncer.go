@@ -51,6 +51,7 @@ var (
 	errInvalidChangeProof             = errors.New("failed to verify change proof")
 	errTooManyBytes                   = errors.New("response contains more than requested bytes")
 	errUnexpectedResponseType         = errors.New("unexpected response type")
+	errNoPeersAvailable               = errors.New("no peers available")
 )
 
 type priority byte
@@ -144,14 +145,18 @@ type Syncer[R any, C any] struct {
 
 // TODO remove non-config values out of this struct
 type Config[R any, C any] struct {
-	RangeProofMarshaler   Marshaler[R]
-	ChangeProofMarshaler  Marshaler[C]
-	ProofClient           *p2p.Client
+	// Required fields:
+	RangeProofMarshaler  Marshaler[R]
+	ChangeProofMarshaler Marshaler[C]
+	ProofClient          *p2p.Client
+	TargetRoot           ids.ID
+	EmptyRoot            ids.ID // defaults to [ids.Empty] if not set
+
+	// Optional
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
-	TargetRoot            ids.ID
-	EmptyRoot             ids.ID
 	StateSyncNodes        []ids.NodeID
+	PeerTracker           *p2p.PeerTracker
 }
 
 func NewSyncer[R any, C any](
@@ -418,15 +423,16 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) bool {
 		defer s.finishWorkItem()
 
-		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, err); err != nil {
+		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, appErr); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return
+			return false
 		}
+		return true
 	}
 
 	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
@@ -473,15 +479,16 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) bool {
 		defer s.finishWorkItem()
 
 		if err := s.handleRangeProofResponse(ctx, targetRootID, work, rangeReq, responseBytes, appErr); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return
+			return false
 		}
+		return true
 	}
 
 	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
@@ -493,22 +500,53 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	s.metrics.RequestMade()
 }
 
+type appResponseCallbackWithResult func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, err error) bool
+
+// toAppResponseCallback wraps the callback, discarding the bool return value.
+func (c appResponseCallbackWithResult) toAppResponseCallback() p2p.AppResponseCallback {
+	return func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
+		_ = c(ctx, nodeID, responseBytes, err)
+	}
+}
+
 func (s *Syncer[_, _]) sendRequest(
 	ctx context.Context,
 	client *p2p.Client,
 	requestBytes []byte,
-	onResponse p2p.AppResponseCallback,
+	onResponse appResponseCallbackWithResult,
 ) error {
-	if len(s.config.StateSyncNodes) == 0 {
-		return client.AppRequestAny(ctx, requestBytes, onResponse)
+	switch {
+	case len(s.config.StateSyncNodes) > 0:
+		nodeIdx := atomic.AddUint32(&s.stateSyncNodeIdx, 1)
+		nodeID := s.config.StateSyncNodes[nodeIdx%uint32(len(s.config.StateSyncNodes))]
+		return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse.toAppResponseCallback())
+	case s.config.PeerTracker != nil:
+		// TODO(alarso16): This logic should be pushed to the [p2p.Client] implementation.
+		return sendRequestWithPeerTracker(ctx, client, s.config.PeerTracker, requestBytes, onResponse)
+	default:
+		// Default to built-in selection from the [p2p.NodeSampler].
+		return client.AppRequestAny(ctx, requestBytes, onResponse.toAppResponseCallback())
 	}
+}
 
-	// Get the next nodeID to query using the [nodeIdx] offset.
-	// If we're out of nodes, loop back to 0.
-	// We do this try to query a different node each time if possible.
-	nodeIdx := atomic.AddUint32(&s.stateSyncNodeIdx, 1)
-	nodeID := s.config.StateSyncNodes[nodeIdx%uint32(len(s.config.StateSyncNodes))]
-	return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse)
+func sendRequestWithPeerTracker(ctx context.Context, c *p2p.Client, pt *p2p.PeerTracker, requestBytes []byte, onResponse appResponseCallbackWithResult) error {
+	nodeID, ok := pt.SelectPeer()
+	if !ok {
+		return errNoPeersAvailable
+	}
+	pt.RegisterRequest(nodeID)
+	start := time.Now()
+	return c.AppRequest(ctx, set.Of(nodeID), requestBytes, func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) {
+		timeToRespond := time.Since(start)
+		if success := onResponse(ctx, nodeID, responseBytes, appErr); !success {
+			pt.RegisterFailure(nodeID)
+			return
+		}
+
+		const epsilon = 1e-9 // avoid division by zero
+		bandwidth := float64(len(responseBytes)) / float64(timeToRespond.Seconds()+epsilon)
+		pt.RegisterResponse(nodeID, bandwidth)
+	})
 }
 
 func (s *Syncer[_, _]) retryWork(work *workItem) {
@@ -745,8 +783,13 @@ func (s *Syncer[_, _]) setError(err error) {
 	s.errLock.Lock()
 	defer s.errLock.Unlock()
 
+	if s.fatalError != nil {
+		return
+	}
+
 	s.config.Log.Error("sync errored", zap.Error(err))
 	s.fatalError = err
+
 	// Call in goroutine because we might be holding [s.workLock]
 	go func() {
 		s.workLock.Lock()
