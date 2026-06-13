@@ -805,6 +805,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		config.MaxValidatorStake = v.GetUint64(MaxValidatorStakeKey)
 		config.MinDelegatorStake = v.GetUint64(MinDelegatorStakeKey)
 		config.MinStakeDuration = v.GetDuration(MinStakeDurationKey)
+		config.HeliconMinStakeDuration = v.GetDuration(MinStakeDurationKey)
 		config.MaxStakeDuration = v.GetDuration(MaxStakeDurationKey)
 		config.RewardConfig.MaxConsumptionRate = v.GetUint64(StakeMaxConsumptionRateKey)
 		config.RewardConfig.MinConsumptionRate = v.GetUint64(StakeMinConsumptionRateKey)

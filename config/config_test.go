@@ -915,6 +915,39 @@ func TestGetStakingSigner(t *testing.T) {
 	}
 }
 
+func TestGetStakingConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		networkID   uint32
+		minStake    time.Duration
+		expectedErr error
+	}{
+		{
+			name:      "custom network defaults HeliconMinStakeDuration to MinStakeDuration",
+			networkID: constants.LocalID,
+			minStake:  30 * time.Minute,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			v := setupViperFlags()
+			v.Set(DataDirKey, t.TempDir())
+			v.Set(MinStakeDurationKey, tt.minStake)
+
+			config, err := getStakingConfig(v, tt.networkID)
+
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr == nil {
+				require.Equal(tt.minStake, config.MinStakeDuration)
+				require.Equal(tt.minStake, config.HeliconMinStakeDuration)
+			}
+		})
+	}
+}
+
 func TestGetDiskSpaceConfig(t *testing.T) {
 	tests := []struct {
 		name        string
