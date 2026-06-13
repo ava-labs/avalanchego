@@ -8,10 +8,16 @@ import (
 
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 // FirewoodScheme is the scheme for the Firewood storage scheme.
 const FirewoodScheme = "firewood"
+
+// FirewoodMetricsPrefix is the vm metrics gatherer prefix for Firewood both internal and FFI metrics.
+// It is derived from [FirewoodScheme] so the exported namespace stays aligned with the state scheme name.
+const FirewoodMetricsPrefix = FirewoodScheme + metric.NamespaceSeparator + "db"
 
 // errStateSchemeConflict indicates the provided state scheme conflicts with
 // what is on disk.
