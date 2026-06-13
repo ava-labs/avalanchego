@@ -29,6 +29,18 @@ tasks:
     desc: Build avalanchego with Bazel (race detection)
     cmd: '{{.NIX_RUN}} bazelisk build --config=race //main:avalanchego'
 
+  bazel-benchmark-remote-cache:
+    desc: Benchmark Bazel remote caching for CI-style avalanchego builds
+    cmd: >-
+      {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
+      --setup-args "fetch //..."
+      --benchmark-args "build //main:avalanchego"
+      --benchmark-args "build --config=race //main:avalanchego"
+
+  bazel-benchmark-remote-cache-ids-test:
+    desc: Benchmark Bazel remote caching for //ids:ids_test
+    cmd: '{{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache_ids_test.sh'
+
   bazel-build-opt:
     desc: Build avalanchego with Bazel (optimized)
     cmd: '{{.NIX_RUN}} bazelisk build --compilation_mode=opt //main:avalanchego'
