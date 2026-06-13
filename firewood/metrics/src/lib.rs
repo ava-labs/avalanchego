@@ -1,0 +1,802 @@
+// Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
+//! Shared metric helpers for Firewood.
+//!
+//! This crate provides:
+//! - Recording macros that are simple to use at callsites
+//! - Thread-local context for gating expensive metrics
+//!
+//! Each crate defines its own metric registry (e.g., `ffi::registry`, `storage::registry`).
+//!
+//! # Usage
+//!
+//! ```no_run
+//! # use firewood_metrics::firewood_counter;
+//!
+//! mod registry {
+//!     pub const OP_COUNT: &str = "op_count_total";
+//!     pub fn register() -> Vec<firewood_metrics::HistogramMetricConfig> { vec![] }
+//! }
+//!
+//! let _histogram_configs = registry::register();
+//! firewood_counter!(OP_COUNT).increment(1);
+//! ```
+//!
+//! # Macro overview
+//!
+//! All macros resolve the metric name via `crate::registry::NAME` in the calling
+//! crate. Pass a bare identifier (e.g. `OP_COUNT`), not a path:
+//!
+//! | Macro | Description |
+//! |-------|-------------|
+//! | `firewood_counter!(NAME).increment(v)` | Always increment a counter |
+//! | `firewood_counter!(expensive: NAME).increment(v)` | Increment only if expensive metrics enabled |
+//! | `firewood_gauge!(NAME).set(v as f64)` | Always set a gauge value |
+//! | `firewood_gauge!(expensive: NAME).set(v as f64)` | Set only if expensive metrics enabled |
+//!
+//! For registration, use the [`define_metrics!`] macro in your crate's registry module.
+
+use std::cell::Cell;
+
+/// Sealed helper for [`GaugeExt`]: integer types that can be stored in a gauge as `f64`.
+///
+/// The trait is `pub` within the module so [`GaugeExt`]'s generic bound compiles, but the
+/// module itself is private, preventing external crates from adding new implementations.
+mod gauge_value {
+    pub trait GaugeValue: Copy {
+        fn as_f64(self) -> f64;
+    }
+    impl GaugeValue for u64 {
+        #[allow(clippy::cast_precision_loss)]
+        fn as_f64(self) -> f64 {
+            self as f64
+        }
+    }
+    impl GaugeValue for usize {
+        #[allow(clippy::cast_precision_loss)]
+        fn as_f64(self) -> f64 {
+            self as f64
+        }
+    }
+}
+
+/// Extension methods for [`metrics::Gauge`] that accept integer metric values.
+///
+/// [`metrics::Gauge::set`] requires `f64`. Casting integers to `f64` triggers
+/// `cast_precision_loss` at every call site. `set_integer` centralises the cast
+/// — any precision loss for values above 2^52 is intentional and acceptable for
+/// instrumentation.
+///
+/// Implemented for `u64` and `usize`; the conversion trait is sealed so external crates
+/// cannot add further implementations.
+pub trait GaugeExt {
+    /// Sets the gauge from any supported integer type, converting to `f64` internally.
+    fn set_integer<T: gauge_value::GaugeValue>(&self, value: T);
+}
+
+impl GaugeExt for metrics::Gauge {
+    fn set_integer<T: gauge_value::GaugeValue>(&self, value: T) {
+        self.set(value.as_f64());
+    }
+}
+
+/// Extension methods for [`metrics::Counter`] that accept `f64` values.
+///
+/// [`metrics::Counter::increment`] requires `u64`. This trait adds `increment_f64`
+/// for callers that compute a measurement as `f64` (e.g. a duration scaled to a
+/// desired resolution). The value is truncated to `u64`; the caller accepts that
+/// any fractional part is discarded.
+pub trait CounterExt {
+    /// Increments the counter by `value` truncated to `u64`.
+    fn increment_f64(&self, value: f64);
+}
+
+impl CounterExt for metrics::Counter {
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    fn increment_f64(&self, value: f64) {
+        self.increment(value as u64);
+    }
+}
+
+/// Extension methods for [`metrics::Histogram`] that accept integer metric values.
+///
+/// [`metrics::Histogram::record`] requires `f64`. Casting integers to `f64`
+/// triggers `cast_precision_loss` at every call site. `record_integer`
+/// centralises the cast — any precision loss for values above 2^52 is
+/// intentional and acceptable for instrumentation.
+///
+/// Implemented for `u64` and `usize`; the conversion trait is sealed so external
+/// crates cannot add further implementations.
+pub trait HistogramExt {
+    /// Records the histogram observation from any supported integer type,
+    /// converting to `f64` internally.
+    fn record_integer<T: gauge_value::GaugeValue>(&self, value: T);
+}
+
+impl HistogramExt for metrics::Histogram {
+    fn record_integer<T: gauge_value::GaugeValue>(&self, value: T) {
+        self.record(value.as_f64());
+    }
+}
+
+/// How a histogram metric is bucketed in the Prometheus exporter.
+///
+/// Defined in `firewood-metrics` (which has no dependency on `metrics-exporter-prometheus`)
+/// so that per-crate metric registries can declare their preferred bucket strategy.
+/// The FFI crate translates these configs when building the Prometheus recorder.
+///
+/// Returned from `register()` functions generated by [`define_metrics!`].
+/// Only metrics with non-default configurations appear in the returned `Vec`.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum HistogramConfig {
+    /// Render as a classic Prometheus histogram with fixed upper-bound bucket boundaries.
+    Buckets(Vec<f64>),
+    /// Render as a native exponential histogram.
+    Native {
+        /// Base of the exponential bucket schema.
+        scale: f64,
+        /// Maximum number of buckets to maintain in each direction.
+        max_buckets: u32,
+        /// Minimum observation value placed into the zero bucket.
+        zero_threshold: f64,
+    },
+}
+
+/// Associates a metric name with a non-default histogram bucket configuration.
+///
+/// Returned from `register()` functions generated by [`define_metrics!`] so that
+/// callers can configure the Prometheus exporter without a direct dependency on it.
+/// All metrics are matched by full name when configuring the exporter.
+#[derive(Debug, Clone)]
+pub struct HistogramMetricConfig {
+    /// The full metric name (used as `Matcher::Full` when configuring the exporter).
+    pub name: &'static str,
+    /// How the histogram should be bucketed.
+    pub config: HistogramConfig,
+}
+
+/// Strips exactly one leading ASCII space from a doc string.
+///
+/// `///` doc comments are desugared to `#[doc = " text"]` by the Rust compiler — the
+/// space before the text is an artifact of the `/// ` syntax, not part of the description.
+/// This function removes that single leading space without affecting intentional indentation
+/// (two or more leading spaces are preserved as-is).
+///
+/// Used inside [`define_metrics!`] when forwarding descriptions to the `metrics::describe_*!`
+/// family of macros.
+#[must_use]
+pub fn strip_doc_leading_space(s: &str) -> &str {
+    s.strip_prefix(' ').unwrap_or(s)
+}
+
+/// Metric configuration context for the current thread.
+///
+/// This is set at API boundaries (e.g., FFI entrypoints) and read when deciding
+/// whether to record expensive metrics.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MetricsContext {
+    expensive_metrics_enabled: bool,
+}
+
+impl MetricsContext {
+    /// Create a new [`MetricsContext`].
+    #[must_use]
+    pub const fn new(expensive_metrics_enabled: bool) -> Self {
+        Self {
+            expensive_metrics_enabled,
+        }
+    }
+
+    /// Whether expensive metrics are enabled.
+    #[must_use]
+    pub const fn expensive_metrics_enabled(self) -> bool {
+        self.expensive_metrics_enabled
+    }
+}
+
+thread_local! {
+    static METRICS_CONTEXT: Cell<Option<MetricsContext>> = const { Cell::new(None) };
+}
+
+/// A guard that restores the previous thread-local [`MetricsContext`].
+#[derive(Debug)]
+pub struct MetricsContextGuard {
+    previous: Option<MetricsContext>,
+}
+
+impl Drop for MetricsContextGuard {
+    fn drop(&mut self) {
+        METRICS_CONTEXT.set(self.previous);
+    }
+}
+
+/// Sets the thread-local metrics context for the duration of the returned guard.
+#[must_use]
+pub fn set_metrics_context(context: Option<MetricsContext>) -> MetricsContextGuard {
+    let previous = METRICS_CONTEXT.replace(context);
+    MetricsContextGuard { previous }
+}
+
+/// Returns the current thread-local metrics context, if one is set.
+#[must_use]
+pub fn current_metrics_context() -> Option<MetricsContext> {
+    METRICS_CONTEXT.get()
+}
+
+/// Returns whether expensive metrics are enabled for the current thread.
+///
+/// If no context is set, this returns `false`.
+#[must_use]
+pub fn expensive_metrics_enabled() -> bool {
+    current_metrics_context().is_some_and(MetricsContext::expensive_metrics_enabled)
+}
+
+/// Defines metric name constants and a `register()` function from a single schema.
+///
+/// Each entry has the form `/// description\nIDENT = "metric.name"` and expands to:
+/// - A `pub(crate) const IDENT: &str = "metric.name"` referenced at recording callsites
+/// - A `::metrics::describe_counter!` / `::metrics::describe_gauge!` /
+///   `::metrics::describe_histogram!` call inside `register()`
+///
+/// Because the doc comment is used for both the constant and the describe call,
+/// the metric name and its description are guaranteed to stay in sync.
+///
+/// All three sections (`counters`, `gauges`, `histograms`) are optional — include only the
+/// sections your module actually uses. **Every entry must end with a trailing comma.**
+///
+/// # Histogram configuration
+///
+/// Histograms may include an optional bucket configuration after the metric name:
+///
+/// | Syntax | Behavior |
+/// |--------|----------|
+/// | `IDENT = "name",` | Default — rendered as a Prometheus summary |
+/// | `IDENT = "name" native(scale, max_buckets, zero_threshold),` | Native exponential histogram |
+/// | `IDENT = "name" buckets([b1, b2, ...]),` | Classic histogram with fixed buckets |
+///
+/// Non-default histogram configurations are returned from `register()` as a
+/// `Vec<`[`HistogramMetricConfig`]`>` so the caller can configure the Prometheus builder
+/// without depending on `metrics-exporter-prometheus`.
+///
+/// # Examples
+///
+/// ```rust
+/// firewood_metrics::define_metrics! {
+///     counters: {
+///         /// Total number of commits
+///         COMMITS_TOTAL  = "commits_total",
+///     },
+///     gauges: {
+///         /// Current number of revisions held in memory
+///         ACTIVE_REVISIONS = "active_revisions",
+///     },
+///     histograms: {
+///         /// Duration of operations in seconds (default summary)
+///         OP_DURATION_SECONDS = "op_duration_seconds",
+///         /// Duration of gather calls (native exponential histogram)
+///         GATHER_SECONDS = "gather_seconds" native(2.0, 160, 1e-9),
+///     },
+/// }
+/// ```
+///
+/// Sections that are not needed can be omitted entirely:
+///
+/// ```rust
+/// firewood_metrics::define_metrics! {
+///     counters: {
+///         /// Total number of commits
+///         COMMITS_TOTAL = "commits_total",
+///     },
+/// }
+/// ```
+#[macro_export]
+macro_rules! define_metrics {
+    // Entry point: all sections passed as raw token trees so that histogram entries
+    // can carry optional bucket-configuration tokens after the metric name.
+    // Every item within a section must end with a trailing comma.
+    (
+        $(
+            $section:ident: { $($items:tt)* },
+        )*
+    ) => {
+        $crate::define_metrics! {
+            @munch [] [] []
+            $(
+                $section: { $($items)* },
+            )*
+        }
+    };
+
+    // --- @munch arms ---
+
+    (
+        @munch [ $($decl:tt)* ] [ $($body:tt)* ] [ $($hcfg:tt)* ]
+        counters: {
+            $(
+                $(#[doc = $desc:literal])+
+                $id:ident = $name:literal,
+            )*
+        },
+        $($tt:tt)*
+    ) => {
+        $crate::define_metrics! {
+            @munch
+            [
+                // Metric name constants are intentionally crate-private. They are used
+                // only at recording callsites (firewood_counter!, firewood_gauge!) within
+                // the same crate. Exposing them as `pub` would make the metric name strings
+                // part of the crate's public API.
+                $($decl)*
+                $(
+                    #[doc = concat!($($desc),+)]
+                    pub(crate) const $id: &str = $name;
+                )*
+            ]
+            [
+                $($body)*
+                $(
+                    $crate::__private::metrics::describe_counter!($name, $crate::strip_doc_leading_space(concat!($($desc),+)));
+                )*
+            ]
+            [ $($hcfg)* ]
+            $($tt)*
+        }
+    };
+
+    (
+        @munch [ $($decl:tt)* ] [ $($body:tt)* ] [ $($hcfg:tt)* ]
+        gauges: {
+            $(
+                $(#[doc = $desc:literal])+
+                $id:ident = $name:literal,
+            )*
+        },
+        $($tt:tt)*
+    ) => {
+        $crate::define_metrics! {
+            @munch
+            [
+                // Metric name constants are intentionally crate-private. They are used
+                // only at recording callsites (firewood_counter!, firewood_gauge!) within
+                // the same crate. Exposing them as `pub` would make the metric name strings
+                // part of the crate's public API.
+                $($decl)*
+                $(
+                    #[doc = concat!($($desc),+)]
+                    pub(crate) const $id: &str = $name;
+                )*
+            ]
+            [
+                $($body)*
+                $(
+                    $crate::__private::metrics::describe_gauge!($name, $crate::strip_doc_leading_space(concat!($($desc),+)));
+                )*
+            ]
+            [ $($hcfg)* ]
+            $($tt)*
+        }
+    };
+
+    // Histogram section: delegate item-by-item to @munch_hist to support optional
+    // per-metric bucket configuration after the metric name.
+    (
+        @munch [ $($decl:tt)* ] [ $($body:tt)* ] [ $($hcfg:tt)* ]
+        histograms: { $($items:tt)* },
+        $($tt:tt)*
+    ) => {
+        $crate::define_metrics! {
+            @munch_hist [ $($decl)* ] [ $($body)* ] [ $($hcfg)* ]
+            { $($items)* }
+            $($tt)*
+        }
+    };
+
+    // Base case: emit the const declarations and the register() function.
+    (
+        @munch [ $($decl:tt)* ] [ $($body:tt)* ] [ $($hcfg:tt)* ]
+    ) => {
+        $($decl)*
+
+        /// Registers all metric descriptions with the global recorder and returns
+        /// histogram configurations for any histograms that use non-default bucketing.
+        ///
+        /// Pass the returned configs to the Prometheus builder (e.g. via
+        /// `set_buckets_for_metric` / `set_native_histogram_for_metric`) so that the
+        /// exporter does not need to be a dependency of this crate.
+        ///
+        /// Call once at startup before recording any metrics.
+        pub fn register() -> ::std::vec::Vec<$crate::HistogramMetricConfig> {
+            $($body)*
+            ::std::vec![$($hcfg)*]
+        }
+    };
+
+    // --- @munch_hist arms ---
+
+    // Empty histogram block: return to the main @munch loop.
+    (
+        @munch_hist [ $($decl:tt)* ] [ $($body:tt)* ] [ $($hcfg:tt)* ]
+        { }
+        $($tt:tt)*
+    ) => {
+        $crate::define_metrics! {
+            @munch [ $($decl)* ] [ $($body)* ] [ $($hcfg)* ]
+            $($tt)*
+        }
+    };
+
+    // Default histogram — no bucket config keyword; rendered as a Prometheus summary.
+    (
+        @munch_hist [ $($decl:tt)* ] [ $($body:tt)* ] [ $($hcfg:tt)* ]
+        {
+            $(#[doc = $desc:literal])+
+            $id:ident = $name:literal,
+            $($rest:tt)*
+        }
+        $($tt:tt)*
+    ) => {
+        $crate::define_metrics! {
+            @munch_hist
+            [
+                $($decl)*
+                #[doc = concat!($($desc),+)]
+                pub(crate) const $id: &str = $name;
+            ]
+            [
+                $($body)*
+                $crate::__private::metrics::describe_histogram!($name, $crate::strip_doc_leading_space(concat!($($desc),+)));
+            ]
+            [ $($hcfg)* ]
+            { $($rest)* }
+            $($tt)*
+        }
+    };
+
+    // Native exponential histogram: `IDENT = "name" native(scale, max_buckets, zero_threshold),`
+    (
+        @munch_hist [ $($decl:tt)* ] [ $($body:tt)* ] [ $($hcfg:tt)* ]
+        {
+            $(#[doc = $desc:literal])+
+            $id:ident = $name:literal native($scale:literal, $max_buckets:literal, $zero_threshold:literal),
+            $($rest:tt)*
+        }
+        $($tt:tt)*
+    ) => {
+        $crate::define_metrics! {
+            @munch_hist
+            [
+                $($decl)*
+                #[doc = concat!($($desc),+)]
+                pub(crate) const $id: &str = $name;
+            ]
+            [
+                $($body)*
+                $crate::__private::metrics::describe_histogram!($name, $crate::strip_doc_leading_space(concat!($($desc),+)));
+            ]
+            [
+                $($hcfg)*
+                $crate::HistogramMetricConfig {
+                    name: $name,
+                    config: $crate::HistogramConfig::Native {
+                        scale: $scale,
+                        max_buckets: $max_buckets,
+                        zero_threshold: $zero_threshold,
+                    },
+                },
+            ]
+            { $($rest)* }
+            $($tt)*
+        }
+    };
+
+    // Classic histogram with fixed buckets: `IDENT = "name" buckets([b1, b2, ...]),`
+    // The bucket list must be a bracket-delimited expression list, e.g. `[0.005, 0.01, 0.1]`.
+    (
+        @munch_hist [ $($decl:tt)* ] [ $($body:tt)* ] [ $($hcfg:tt)* ]
+        {
+            $(#[doc = $desc:literal])+
+            $id:ident = $name:literal buckets($buckets:tt),
+            $($rest:tt)*
+        }
+        $($tt:tt)*
+    ) => {
+        $crate::define_metrics! {
+            @munch_hist
+            [
+                $($decl)*
+                #[doc = concat!($($desc),+)]
+                pub(crate) const $id: &str = $name;
+            ]
+            [
+                $($body)*
+                $crate::__private::metrics::describe_histogram!($name, concat!($($desc),+));
+            ]
+            [
+                $($hcfg)*
+                $crate::HistogramMetricConfig {
+                    name: $name,
+                    config: $crate::HistogramConfig::Buckets(::std::vec!$buckets),
+                },
+            ]
+            { $($rest)* }
+            $($tt)*
+        }
+    };
+}
+
+/// Returns a counter handle for advanced operations.
+///
+/// Use for values that only ever increase: commit counts, error counts, byte
+/// totals. For float-valued measurements use [`CounterExt::increment_f64`]. Metric names should end in `_total` (e.g. `proposals_created_total`,
+/// `bytes_written_total`). For values that can go up or down use
+/// [`firewood_gauge!`] instead.
+///
+/// The metric name is resolved as `crate::registry::NAME` in the calling crate,
+/// so pass a bare identifier — not a path. See [`firewood_histogram!`] for an
+/// explanation of why `crate::registry` is used rather than `$crate::registry`.
+///
+/// # Usage
+/// ```no_run
+/// # use firewood_metrics::firewood_counter;
+///
+/// mod registry {
+///     pub const PROPOSALS_CREATED_TOTAL: &str = "proposals_created_total";
+///     pub const SLOW_PATH_TOTAL: &str = "slow_path_total";
+/// }
+///
+/// firewood_counter!(PROPOSALS_CREATED_TOTAL).increment(1);
+/// firewood_counter!(PROPOSALS_CREATED_TOTAL, "status" => "ok").increment(1);
+/// firewood_counter!(expensive: SLOW_PATH_TOTAL).increment(1);
+/// ```
+// `crate` in the expansion refers to the invocation crate, not `firewood_metrics` — see
+// the `firewood_histogram!` doc for the full explanation of why this is intentional.
+#[expect(
+    clippy::crate_in_macro_def,
+    reason = "intentional: `crate::registry` resolves in the calling crate, not in \
+              `firewood_metrics`. See the `firewood_histogram!` doc for the full rationale."
+)]
+#[macro_export]
+macro_rules! firewood_counter {
+    (expensive: $name:ident) => {
+        if $crate::expensive_metrics_enabled() {
+            $crate::__private::metrics::counter!(crate::registry::$name)
+        } else {
+            $crate::__private::metrics::Counter::noop()
+        }
+    };
+    (expensive: $name:ident, $($labels:tt)+) => {
+        if $crate::expensive_metrics_enabled() {
+            $crate::__private::metrics::counter!(crate::registry::$name, $($labels)+)
+        } else {
+            $crate::__private::metrics::Counter::noop()
+        }
+    };
+    ($name:ident) => {
+        $crate::__private::metrics::counter!(crate::registry::$name)
+    };
+    ($name:ident, $($labels:tt)+) => {
+        $crate::__private::metrics::counter!(crate::registry::$name, $($labels)+)
+    };
+}
+
+/// Returns a gauge handle for advanced operations.
+///
+/// Use for values that can go up or down: active revision counts, queue
+/// depths, cache sizes. Metric names should include the unit where applicable
+/// (e.g. `node_cache_bytes`, `active_revisions`). Do not use a `_total`
+/// suffix — that is reserved for counters. For values that only ever increase
+/// use [`firewood_counter!`] instead.
+///
+/// The metric name is resolved as `crate::registry::NAME` in the calling crate,
+/// so pass a bare identifier — not a path. See [`firewood_histogram!`] for an
+/// explanation of why `crate::registry` is used rather than `$crate::registry`.
+///
+/// # Usage
+/// ```no_run
+/// # use firewood_metrics::firewood_gauge;
+///
+/// mod registry {
+///     pub const ACTIVE_REVISIONS: &str = "active_revisions";
+///     pub const NODE_CACHE_BYTES: &str = "node_cache_bytes";
+///     pub const PENDING_PROPOSALS: &str = "pending_proposals";
+/// }
+///
+/// let count = 3_u64;
+/// let size = 1024_u64;
+/// firewood_gauge!(ACTIVE_REVISIONS).set(count as f64);
+/// firewood_gauge!(NODE_CACHE_BYTES, "tier" => "l1").set(size as f64);
+/// firewood_gauge!(expensive: PENDING_PROPOSALS).set(count as f64);
+/// // Gauge handles also support increment/decrement:
+/// firewood_gauge!(ACTIVE_REVISIONS).increment(1.0);
+/// firewood_gauge!(ACTIVE_REVISIONS).decrement(1.0);
+/// ```
+// `crate` in the expansion refers to the invocation crate — intentional; see `firewood_histogram!`.
+#[expect(
+    clippy::crate_in_macro_def,
+    reason = "intentional: `crate::registry` resolves in the calling crate, not in \
+              `firewood_metrics`. See the `firewood_histogram!` doc for the full rationale."
+)]
+#[macro_export]
+macro_rules! firewood_gauge {
+    (expensive: $name:ident) => {
+        if $crate::expensive_metrics_enabled() {
+            $crate::__private::metrics::gauge!(crate::registry::$name)
+        } else {
+            $crate::__private::metrics::Gauge::noop()
+        }
+    };
+    (expensive: $name:ident, $($labels:tt)+) => {
+        if $crate::expensive_metrics_enabled() {
+            $crate::__private::metrics::gauge!(crate::registry::$name, $($labels)+)
+        } else {
+            $crate::__private::metrics::Gauge::noop()
+        }
+    };
+    ($name:ident) => {
+        $crate::__private::metrics::gauge!(crate::registry::$name)
+    };
+    ($name:ident, $($labels:tt)+) => {
+        $crate::__private::metrics::gauge!(crate::registry::$name, $($labels)+)
+    };
+}
+
+/// Returns a histogram handle for recording a single observation.
+///
+/// Unlike counters and gauges, histograms always check the expensive metrics
+/// flag unless the `cheap:` prefix is used, since histogram recording typically
+/// involves more overhead (e.g. timing an operation, computing bucket counts).
+///
+/// ## Why `crate::registry` and not `$crate::registry`
+///
+/// In a `macro_rules!` expansion, `crate` refers to the crate **at the
+/// invocation site**, not the crate where the macro is defined. Using
+/// `crate::registry::$name` therefore resolves to each calling crate's own
+/// `registry` module, which is exactly what we want: each crate owns its metric
+/// name constants and the macro needs no knowledge of those paths. Using
+/// `$crate::registry` would instead look up `registry` inside
+/// `firewood_metrics` itself, which is wrong.
+///
+/// The metric name is resolved as `crate::registry::NAME` in the calling crate,
+/// so pass a bare identifier — not a path.
+///
+/// # Usage
+/// ```no_run
+/// # use firewood_metrics::firewood_histogram;
+///
+/// mod registry {
+///     pub const OP_DURATION_SECONDS: &str = "op_duration_seconds";
+///     pub const GATHER_DURATION_SECONDS: &str = "gather_duration_seconds";
+/// }
+///
+/// // Records only when expensive metrics are enabled:
+/// firewood_histogram!(OP_DURATION_SECONDS).record(1.23);
+///
+/// // Always records (e.g. for low-overhead infrastructure metrics):
+/// firewood_histogram!(cheap: GATHER_DURATION_SECONDS).record(0.01);
+/// ```
+// `crate` in the expansion refers to the invocation crate — intentional; see the doc above.
+#[expect(
+    clippy::crate_in_macro_def,
+    reason = "intentional: `crate::registry` resolves in the calling crate, not in \
+              `firewood_metrics`. The macro is designed this way so that each crate's own \
+              `registry` module is used without any path prefix at the call site."
+)]
+#[macro_export]
+macro_rules! firewood_histogram {
+    ($name:ident) => {
+        if $crate::expensive_metrics_enabled() {
+            $crate::__private::metrics::histogram!(crate::registry::$name)
+        } else {
+            $crate::__private::metrics::Histogram::noop()
+        }
+    };
+    ($name:ident, $($labels:tt)+) => {
+        if $crate::expensive_metrics_enabled() {
+            $crate::__private::metrics::histogram!(crate::registry::$name, $($labels)+)
+        } else {
+            $crate::__private::metrics::Histogram::noop()
+        }
+    };
+    (cheap: $name:ident) => {
+        $crate::__private::metrics::histogram!(crate::registry::$name)
+    };
+    (cheap: $name:ident, $($labels:tt)+) => {
+        $crate::__private::metrics::histogram!(crate::registry::$name, $($labels)+)
+    };
+}
+
+#[doc(hidden)]
+pub mod __private {
+    pub use ::metrics;
+}
+
+#[cfg(test)]
+mod tests {
+    #![expect(clippy::unwrap_used)]
+
+    use super::*;
+
+    fn isolated<F, R>(f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let _guard = set_metrics_context(None);
+        f()
+    }
+
+    #[test]
+    fn context_defaults_to_none() {
+        isolated(|| {
+            assert_eq!(current_metrics_context(), None);
+            assert!(!expensive_metrics_enabled());
+        });
+    }
+
+    #[test]
+    fn nested_guards_restore_in_correct_order() {
+        isolated(|| {
+            let outer = MetricsContext::new(false);
+            let inner = MetricsContext::new(true);
+
+            let guard1 = set_metrics_context(Some(outer));
+            {
+                let _guard2 = set_metrics_context(Some(inner));
+                assert_eq!(current_metrics_context(), Some(inner));
+            }
+            assert_eq!(current_metrics_context(), Some(outer));
+
+            drop(guard1);
+            assert_eq!(current_metrics_context(), None);
+        });
+    }
+
+    #[test]
+    fn spawned_thread_does_not_inherit_context() {
+        isolated(|| {
+            let ctx = MetricsContext::new(true);
+            let _guard = set_metrics_context(Some(ctx));
+            assert_eq!(current_metrics_context(), Some(ctx));
+
+            let child_ctx = std::thread::spawn(current_metrics_context).join().unwrap();
+
+            assert_eq!(
+                child_ctx, None,
+                "thread-local context must not leak to child threads"
+            );
+        });
+    }
+
+    #[test]
+    fn capture_and_set_propagates_context_to_spawned_thread() {
+        isolated(|| {
+            let ctx = MetricsContext::new(true);
+            let _guard = set_metrics_context(Some(ctx));
+
+            // Capture on the parent thread, just like persist_worker.rs does.
+            let captured = current_metrics_context();
+
+            let child_ctx = std::thread::spawn(move || {
+                // Before setting, the child has no context.
+                assert_eq!(current_metrics_context(), None);
+
+                let _inner_guard = set_metrics_context(captured);
+
+                // After setting, the child sees the propagated context.
+                current_metrics_context()
+            })
+            .join()
+            .unwrap();
+
+            assert_eq!(
+                child_ctx,
+                Some(ctx),
+                "captured context must be available in child thread after set_metrics_context"
+            );
+
+            // Parent context is unaffected.
+            assert_eq!(current_metrics_context(), Some(ctx));
+        });
+    }
+}
