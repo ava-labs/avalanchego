@@ -2021,9 +2021,10 @@ func TestL1Validators(t *testing.T) {
 					nodeID := l1Validator.effectiveNodeID()
 					vdr, ok := validatorSet[nodeID]
 					if !ok {
+						pk := l1Validator.effectivePublicKey()
 						vdr = &validators.GetValidatorOutput{
 							NodeID:    nodeID,
-							PublicKey: l1Validator.effectivePublicKey(),
+							PublicKey: pk,
 						}
 						validatorSet[nodeID] = vdr
 					}
