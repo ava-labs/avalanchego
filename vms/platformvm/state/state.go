@@ -2916,6 +2916,13 @@ func writeCurrentDelegatorDiff(
 	validatorDiff *diffValidator,
 	codecVersion uint16,
 ) error {
+	// Delete before adding so a same-TxID replacement ends with the new entry.
+	for _, staker := range validatorDiff.deletedDelegators {
+		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
+			return fmt.Errorf("failed to delete current staker: %w", err)
+		}
+	}
+
 	addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 	defer addedDelegatorIterator.Release()
 
@@ -2929,12 +2936,6 @@ func writeCurrentDelegatorDiff(
 		}
 		if err := writeDelegatorMetadata(currentDelegatorList, metadata, codecVersion); err != nil {
 			return fmt.Errorf("failed to write current delegator to list: %w", err)
-		}
-	}
-
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete current staker: %w", err)
 		}
 	}
 	return nil
@@ -2985,6 +2986,13 @@ func writePendingDiff(
 		}
 	}
 
+	// Delete before adding so a same-TxID replacement ends with the new entry.
+	for _, staker := range validatorDiff.deletedDelegators {
+		if err := pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
+			return fmt.Errorf("failed to delete pending delegator: %w", err)
+		}
+	}
+
 	addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 	defer addedDelegatorIterator.Release()
 	for addedDelegatorIterator.Next() {
@@ -2992,12 +3000,6 @@ func writePendingDiff(
 
 		if err := pendingDelegatorList.Put(staker.TxID[:], nil); err != nil {
 			return fmt.Errorf("failed to write pending delegator to list: %w", err)
-		}
-	}
-
-	for _, staker := range validatorDiff.deletedDelegators {
-		if err := pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
-			return fmt.Errorf("failed to delete pending delegator: %w", err)
 		}
 	}
 	return nil
