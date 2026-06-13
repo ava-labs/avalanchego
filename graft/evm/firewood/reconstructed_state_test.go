@@ -7,11 +7,21 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/stateconf"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
+
+// newReconstructedStateDatabase mirrors the wrapping performed by each VM's
+// extstate package when the trie database backend is a [ReconstructedTrieDB].
+func newReconstructedStateDatabase(reconTrieDB *triedb.Database) state.Database {
+	fw := reconTrieDB.Backend().(*ReconstructedTrieDB)
+	return NewReconstructedStateAccessor(state.NewDatabaseWithNodeDB(rawdb.NewMemoryDatabase(), reconTrieDB), fw)
+}
 
 func TestReconstructedRevisions(t *testing.T) {
 	r := require.New(t)
@@ -63,8 +73,8 @@ func TestReconstructedRevisions(t *testing.T) {
 		r.NoError(recon.Drop())
 	})
 
-	reconDB, err := NewReconstructedStateAccessor(db, recon, true /* computeRootOnHash */)
-	r.NoError(err)
+	reconTrieDB := NewReconstructedTrieDB(tdb, recon, true /* computeRootOnHash */)
+	reconDB := newReconstructedStateDatabase(reconTrieDB)
 
 	var (
 		newBalances = []*uint256.Int{
@@ -148,8 +158,8 @@ func TestReconstructedCopyTrie(t *testing.T) {
 		require.NoError(t, recon.Drop())
 	})
 
-	reconDB, err := NewReconstructedStateAccessor(db, recon, true /* computeRootOnHash */)
-	require.NoError(t, err)
+	reconTrieDB := NewReconstructedTrieDB(tdb, recon, true /* computeRootOnHash */)
+	reconDB := newReconstructedStateDatabase(reconTrieDB)
 
 	// Create the reconstructed trie to compare against.
 	reconTrie, err := reconDB.OpenTrie(initialRoot)
@@ -215,8 +225,8 @@ func TestReconstructedRevisionHashing(t *testing.T) {
 
 	// First, use the reconstructed view with computeRootOnHash=false so that Hash
 	// flushes pending writes but returns the cached root.
-	replayAccessor, err := NewReconstructedStateAccessor(db, recon, false /* computeRootOnHash */)
-	require.NoError(t, err)
+	replayTrieDB := NewReconstructedTrieDB(tdb, recon, false /* computeRootOnHash */)
+	replayAccessor := newReconstructedStateDatabase(replayTrieDB)
 	replayTrie, err := replayAccessor.OpenTrie(initialRoot)
 	require.NoError(t, err)
 	require.NoError(t, replayTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(200)}))
