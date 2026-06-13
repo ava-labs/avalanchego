@@ -19,16 +19,34 @@ This is being delivered across several PRs:
 
 - [#5027](https://github.com/ava-labs/avalanchego/pull/5027) — Subtree import of
   firewood. Periodically updated as the firewood repo receives changes up until cutover.
+  This PR proves the repository move itself: importing firewood under `firewood/` as a
+  git subtree while preserving upstream history and lineage metadata.
 - [#5050](https://github.com/ava-labs/avalanchego/pull/5050) — Build firewood from
-  source with Bazel. Hand-crafted BUILD.bazel files for the 5 crates in the runtime
-  build graph (ffi, firewood, storage, firewood-macros, metrics). Also adds lint
-  exclusions so avalanchego linters skip `firewood/`, a Rust toolchain version check
-  (`scripts/check_rust_version.sh`), and will migrate the firewood load and chaos test
-  jobs in a follow-up update.
+  source with Bazel. It replaces the pre-built `firewood-go-ethhash/ffi` Bazel patching
+  model with in-tree Rust builds via `rules_rust` and `crate_universe`, using
+  hand-written `BUILD.bazel` files for the 5 runtime crates needed by avalanchego. It
+  also adds lint exclusions so avalanchego linters skip `firewood/`, a Rust toolchain
+  version check (`scripts/check_rust_version.sh`), and leaves the remaining firewood
+  workspace crates outside the initial Bazel graph. This PR proves the hardest
+  technical integration point: building and testing the Go/C/Rust FFI from source
+  inside avalanchego.
 - [#5079](https://github.com/ava-labs/avalanchego/pull/5079) — Migrate firewood CI
-  workflows into the monorepo. Also adds `firewood/**` CODEOWNERS entries and Cargo
-  entries to avalanchego's dependabot config.
+  workflows into the monorepo. It adapts firewood's GitHub Actions to avalanchego's
+  layout, adds `firewood/**` CODEOWNERS entries and Cargo dependabot configuration, and
+  identifies the workflows that remain deferred or obsolete in the monorepo model,
+  including GH Pages, performance tracking, PR title enforcement, the golangci diff
+  check, and nix-based FFI builds. This PR proves the workflow, governance, and
+  repository-administration migration.
 - TBD — Refactor firewood's cross-repo benchmarking jobs (not yet started).
+
+These PRs are intended to prove out and derisk the migration plan. They should be read
+as validation work for the approach, not as assumptions about what has already landed.
+
+Taken together, these PRs validate the migration as three separable concerns:
+
+- subtree import and history preservation
+- source-built Rust FFI integration
+- CI, governance, and repository administration migration
 
 The remaining workspace crates (replay, triehash, fwdctl, benchmark) are dev/tooling
 crates not required by the Bazel build. The firewood team may want CI coverage for them
@@ -50,13 +68,15 @@ Once the PRs land, these capabilities will be in place:
 Avalanchego currently requires 2 approvals per PR. Firewood PRs today require 1
 approval within 1 business day (per CONTRIBUTING.md).
 
-- Short-term: rubberstamping by avalanchego team members can satisfy the second approval
-- Longer-term: CODEOWNERS scoping firewood team as required reviewers for `firewood/**`
-  would let their approvals satisfy the requirement without rubberstamps
-- **Decision needed:** Will the 2-approval requirement slow the firewood team down
-  enough to warrant changing the policy?
+- Need to confirm whether `firewood/**` CODEOWNERS approval already satisfies
+  avalanchego's approval policy for firewood-only changes
+- If not, decide whether policy changes are needed so firewood-only changes do not
+  require unnecessary extra approvals
+- **Decision needed:** Will the current approval policy slow the firewood team down
+  enough to warrant changing it?
 
 ### Breaking Changes Across the FFI Boundary
+!! Isn't there more detail here?
 
 Post-migration, firewood changes that break avalanchego will block the PR since
 avalanchego CI will fail.
@@ -79,6 +99,7 @@ Avalanchego does not enforce PR title format.
 - Adopt conventional commits repo-wide (bigger lift)
 
 ### Go Module Isolation and `go.work`
+!! This seems vague - what is the actual impact?
 
 The firewood FFI has its own `go.mod` files (`firewood/ffi/go.mod`,
 `firewood/ffi/tests/eth/go.mod`, `firewood/ffi/tests/firewood/go.mod`) that are
@@ -89,7 +110,85 @@ Developers running `go test` locally in firewood FFI directories need to be awar
 this — the root `go.work` file does not include these modules, and adding them would
 break the main build.
 
+#### Requirements and Options
+
+Observed behavior from local validation on 2026-03-24:
+
+- `GOWORK=/path/to/overlay.work` can redirect module resolution to local workspace
+  members outside the committed repo `go.work`.
+- `GOWORK=""` from the repo root still uses the committed `./go.work`, and
+  `GOWORK=off` still disables workspace mode entirely.
+- `gopls` follows the alternate workspace: `gopls check` succeeded with an overlay that
+  added an extra module and failed outside workspace mode for the same setup.
+- Repo-local package tests in the root module still passed in overlay, committed
+  workspace, and `GOWORK=off` modes.
+- These experiments validate the overlay mechanism itself. They do not yet validate the
+  exact `firewood/ffi/go.mod` layout described here, because those module files are not
+  present in this worktree snapshot.
+
+Requirements for the chosen strategy:
+
+- **CI must be able to validate coordinated avalanchego+firewood changes before
+  publication**: Bazel must be the authoritative integration path for source-built
+  firewood changes.
+- **Ordinary raw-Go workflows still need a supported path**: the published
+  `github.com/ava-labs/firewood-go-ethhash/ffi` module remains the compatibility layer
+  for non-Bazel workflows and downstream `go get` consumers.
+- **The raw-Go gating surface should be intentionally small**: when a backward-
+  incompatible firewood change is needed, the repo should be able to temporarily disable
+  a small, explicit set of published-module-based gates rather than a large fraction of
+  the CI system.
+- **Backward-compatible changes should remain non-disruptive**: the exceptional
+  disable/publish/bump/re-enable flow is only for intentionally incompatible FFI
+  changes.
+- **Process overhead should be minimized**: avoid staging branches or publication-before-
+  merge choreography as the default answer.
+
+Chosen strategy:
+
+- **Bazel has primacy** for the firewood-integrated build and test path. The in-tree
+  `./firewood` source is authoritative for integration testing and for catching
+  regressions introduced by firewood changes.
+- **Raw-Go support is preserved through the published module**. The repo continues to
+  support pure-Go workflows against `github.com/ava-labs/firewood-go-ethhash/ffi`, but
+  only for a deliberately minimal set of workflows.
+- **Backward-incompatible firewood changes use an exception flow**:
+  1. temporarily disable the small set of raw-Go / published-module-based gating jobs
+  2. merge the in-tree firewood + avalanchego change with Bazel coverage still active
+  3. publish an updated `firewood-go-ethhash/ffi` module
+  4. bump avalanchego to the newly published version
+  5. re-enable the raw-Go gating jobs
+
+This implies two supported consumption modes:
+
+- **Bazel / in-tree-source mode:** authoritative for CI, integration, and validation of
+  firewood changes against avalanchego
+- **Published-module mode:** authoritative for raw-Go workflows and downstream `go get`
+  consumers at coordinated release boundaries
+
+Rejected as the primary answer:
+
+- **Developer-local `GOWORK` overlays:** useful as an optional local convenience for
+  joint avalanchego+firewood iteration, but not sufficient as the repo-wide answer.
+  They do not solve CI or default post-merge workflows by themselves.
+- **Adding firewood FFI modules to the committed root `go.work`:** would redefine the
+  repo-wide workspace contract used by Bazel, `go work sync`, version checks, and
+  default IDE behavior.
+- **Staging branch / publish-before-merge choreography:** preserves the main branch's
+  raw-Go workflow more strictly, but adds ongoing branch and release-management process
+  that the project would prefer to avoid unless the lower-process strategy proves
+  unworkable.
+!! avalanchego uses the master branch, not main
+!! It should be clear that publication is at release boundaries. releases are required for breaking changes, but can also occur for non-breaking changes
+- **Coordinated dev/pre-release FFI publication before merge:** could keep ordinary
+  raw-Go workflows green on the main branch with less long-lived branch management than
+  a staging-only model, but it still adds publication choreography to the normal merge
+  path. The chosen strategy instead keeps publication as an exception path for breaking
+  changes only.
+
 ### Development Tooling
+
+!! The firewood team is responsible for their tooling since it only affects them. Not a migration consideration.
 
 Firewood uses tools not present in avalanchego's dev environment:
 - `just` (justfile task runner) — 10KB of recipes for builds, tests, releases, benchmarks
@@ -97,10 +196,120 @@ Firewood uses tools not present in avalanchego's dev environment:
 - `cargo-edit` — automated Cargo.toml version bumping
 - `cbindgen` — C header generation (currently committed, not build-time)
 - `cargo-nextest` — test runner used in CI
+!! Nix flake is superceded by bazel so nix flake and everything associated with it can be removed
 - `nix` flake for FFI builds (`ffi/flake.nix`)
 
 **Decision needed:** Add these to avalanchego's dev environment, or phase them out in
 favor of avalanchego equivalents (Taskfile, Bazel, etc.)?
+
+### Follow-Up Required: Reduce the Raw-Go Gating Surface
+
+The current `Taskfile.yml` surface area is broader than the desired end state for this
+strategy. Today, breaking firewood changes would affect more raw-Go workflows than we
+want to carry as temporary exceptions.
+
+To make the disable/publish/bump/re-enable flow safe and low-friction, follow-up work
+is required to reduce the authoritative raw-Go gating surface to a small, explicit list.
+The intended end state is:
+
+- Bazel is authoritative for firewood-integrated build and test coverage
+- published-module / raw-Go gates are minimal and explicitly enumerated
+- ideally, the remaining raw-Go gate surface is close to unit-test-oriented coverage
+
+Areas that currently still depend on raw Go and may need additional Bazel coverage or
+explicit exemption decisions include:
+
+- **Core build and test loops**: `build`, `build-race`, `test-unit`, `test-unit-fast`,
+  `test-e2e`, `test-e2e-ci`, `test-e2e-existing-ci`, `test-upgrade`, and several
+  antithesis tasks all compile or test Go binaries through `go build`, `go test`, or
+  `go run`, either directly in `Taskfile.yml` or via scripts such as
+  `scripts/build.sh` and `scripts/build_test.sh`.
+- **Auxiliary binaries used in workflows**: `build-bootstrap-monitor`,
+  `build-tmpnetctl`, `build-xsvm`, and `build-subnet-evm` all compile standalone Go
+  binaries or plugins outside the main avalanchego binary.
+!! I'm not sure i understand these issues. what does it have to do with firewood dependency? these all generate files that need to be committed to the tree to enable IDE and downstream usage.
+- **Code generation**: `generate-canoto`, `generate-load-contract-bindings`,
+  `generate-mocks`, and `generate-protobuf` depend on `go generate` or Go-specific code
+  generators. A Bazel-first workflow would need equivalent generation entrypoints or a
+  deliberate split where generation remains a raw-Go workflow.
+!! These areguably have nothing to do with bazel. I guess the point though is that some of them would be broken by breaking firewood changes? certainly go-mod-tidy?
+- **Module and workspace maintenance**: `go-mod-tidy`, `sync-go-work`,
+  `check-go-version`, `check-require-directives`, `check-require-directives-round-trip`,
+  `update-go-version`, and `tags-update-require-directives` all operate on `go.mod` or
+  `go.work` state. These are not replaced by Bazel automatically; they express repo
+  metadata and release-management workflows.
+!! What would be the impact of a breaking firewood change on golangci-lint and CI jobs that run it?
+- **Lint and static analysis**: `lint`, `lint-fix`, and part of `lint-all` use
+  golangci-lint and other Go-aware checks through `scripts/run_tool.sh`. A Bazel-only
+  build/test posture would still need a story for Go linting and repo policy checks.
+!! load and cchain- and export- would seem things that could rely on bazel instead easily enough.
+!! What would the impact be of a breaking firewood change on test-fuzz?
+- **Load, reexecution, fuzz, and benchmarking tools**: `test-load*`,
+  `test-cchain-reexecution`, `test-fuzz*`, and `export-cchain-block-range` invoke Go
+  programs with `go run` or `go test -fuzz`. These are user-facing workflows, not just
+  implementation details.
+!! Presumably all this image building could be replaced by bazel-driven image building?
+- **Image and packaging paths with Go dependencies**: `build-image`,
+  `build-xsvm-image`, `build-antithesis-images-*`, and `.github/packaging/Taskfile.yml`
+  query Go module metadata such as the repo's Go version, and some of the antithesis
+  image flows also run Go-based compose/config generators during image assembly.
+!! Polyrepo was to enable cross-repo testing pre-migration and won't need to exist afterwards
+!! What other tasks require go and what would the impact of a breaking firewood change on them?
+- **Polyrepo and release helpers**: `run-polyrepo` and some tag/update tasks rely on Go
+  commands as orchestration tools for dependency and release workflows.
+
+The current CI impact is therefore not hypothetical. If firewood made a backward-
+incompatible FFI change today and the published `firewood-go-ethhash/ffi` module lagged
+behind, the following jobs would be the most relevant breakage surface:
+
+- **Directly exposed core gates**:
+  - `Tests / Unit` in `.github/workflows/ci.yml` via `task test-unit`
+  - `Coreth / unit_test` in `.github/workflows/coreth-ci.yml`
+  - likely `Tests / Lint` in `.github/workflows/ci.yml`, because `golangci-lint`
+    type-checks against the raw Go module graph
+!! all these jobs could be converted to bazel
+- **Likely exposed integration gates**:
+  - `e2e`
+  - `e2e_post_latest`
+  - `e2e_existing_network`
+  - `Upgrade`
+  - `load`
+  - `load_kube_kind`
+!! Build and publication jobs could almost certainly be updated to use bazel
+  These still build or run avalanchego through raw-Go `build` / `build-race` /
+  `go run` paths rather than Bazel-built artifacts.
+- **Ancillary but definitely vulnerable workflows**:
+  - release / packaging jobs such as `build-linux-release`, `build-macos-release`, and
+    `publish_docker_image`
+!! These are slated for bazelification as part of PR 5050
+  - firewood-specific `firewood-load-test` and `firewood-chaos-test`
+!! This should be bazelifified
+  - the C-Chain reexecution benchmark workflows
+
+The most important mitigating fact is that `bazel-ci.yml` already provides Bazel-
+authoritative unit and e2e coverage for the main module, coreth/evm, and subnet-evm.
+That means the follow-up is not "Bazelize everything before migration." It is more
+targeted:
+
+- **Smallest critical surface**: make `bazel-ci` the authoritative presubmit signal and
+  treat raw-Go `Unit`, `Coreth unit_test`, and probably raw-Go `Lint` as the main jobs
+  that matter during a breaking-change exception
+- **Medium effort**: move the raw-Go e2e/load family to consume Bazel-built binaries,
+  similar to the existing Bazel e2e path
+- **Larger but lower-priority effort**: make release/image/subnet-evm packaging jobs
+  Bazel-driven, or explicitly keep them out of the critical gate surface during an
+  exception window
+- **Lowest priority**: scheduled firewood load/chaos/reexecution/benchmark workflows,
+  which can be temporarily exempted more easily than presubmit gates
+
+This breakdown is included primarily so non-firewood stakeholders can assess scope. The
+remaining work appears moderate rather than open-ended: there is a small mandatory
+presubmit surface, a medium-sized integration tail, and a larger ancillary tail that
+does not need to block the migration decision.
+
+This follow-up can happen either before the firewood migration lands or later, but it
+must happen before the first backward-incompatible firewood change makes the exception
+workflow operationally critical.
 
 ## CI & Quality Gates
 
@@ -136,8 +345,7 @@ differential fuzzing, and stale dependency checks. Bazel covers build+test for t
 crates, but pure-Rust quality gates (clippy, rustfmt, docs, fuzzing) have no Bazel
 equivalent.
 
-**Decision needed:** Run full Rust CI from avalanchego workflows, or rely on Bazel for
-what it covers and add targeted jobs for the rest?
+!! They don't need bazel equivalents, now and possibly ever. The current CI is intended to be maintained separately. Only the ffi layer enabling integration will be targeted by bazel initially.
 
 ### Lint Configuration
 
@@ -152,6 +360,7 @@ Firewood maintains its own lint configs that differ from avalanchego:
 - **License headers:** Firewood checks `.rs`, `.go`, `.h` files with its own template
   (`.github/firewood-check-license-headers.yaml`)
 
+!! Invisible how? CI jobs will enforce firewood lint rules if an avalanchego developer inadvertendly violates a rule
 Avalanchego linters will exclude `firewood/` via #5050 (`scripts/lint.sh`,
 `scripts/shellcheck.sh`, `scripts/lib_go_modules.sh`), so firewood lint runs
 separately through its own migrated CI workflows. This is intentional but means
@@ -165,6 +374,7 @@ These firewood-specific checks migrate with #5079:
 - markdownlint-cli2 for docs
 - Cache cleanup on PR close
 
+!! This should be maintained, the firewood team owns it.
 The golangci-lint diff validation (`expected-golangci-yaml-diff.yaml`) is deferred —
 its purpose is to ensure the Go lint config tracks expected deviations from an upstream
 baseline, and it may need rethinking in the monorepo context.
@@ -175,12 +385,14 @@ The Rust version and edition must match between `firewood/Cargo.toml` and
 `MODULE.bazel`. A CI check (`scripts/check_rust_version.sh`, wired into
 `task lint-all` via #5050) validates this.
 
+!! So long as this is validated by CI, why is this a concern?'t this validated in CI?
 - MSRV bumps in firewood require a coordinated `MODULE.bazel` update — easy to forget
 - **Decision needed:** Can the firewood team bump MSRV independently, or does it
   require avalanchego team sign-off since it affects the Bazel toolchain?
 
 ### Supply Chain Security
 
+!! Why is this a migration concern?
 Firewood does not currently use `cargo-deny` (no `deny.toml` exists in the repo).
 
 **Decision needed:** Should firewood's Cargo dependencies get supply-chain auditing
@@ -197,6 +409,7 @@ generate large diffs on dependency updates.
 
 ### Crates.io Publishing
 
+!! No change, firewood will continue to operate as before
 Firewood publishes crates to crates.io independently. Post-migration:
 
 - **Decision needed:** Continue publishing from the subtree?
@@ -210,6 +423,7 @@ Firewood publishes crates to crates.io independently. Post-migration:
 
 ### Static Library Publishing
 
+!! Yes continue publishing, not even a question. This enables both downstream consumers and pure golang development workflows
 The `firewood-go-ethhash` repo receives pre-built `.a` files via
 `attach-static-libs.yaml`, triggered on tag push. External Go consumers who don't use
 Bazel depend on this.
@@ -229,6 +443,7 @@ Firewood tags follow `v*.*.*` — same pattern as avalanchego, which would confl
 
 ### Docker / Container Builds
 
+!! Container builds will need to be updated to use bazel eventually. But for now will just be using the existing published firewood go module.
 Avalanchego's `Dockerfile` currently consumes firewood via pre-built static libraries
 (the `firewood-go-ethhash/ffi` Go module includes `.a` files). No Rust toolchain is
 needed in the container build.
@@ -242,6 +457,7 @@ If the build switches to compiling firewood from source (as Bazel does):
 
 ## Benchmarks & Performance Tracking
 
+!! What the fuck is this section even for? incoherent
 ### Benchmark CI
 
 - `benchmarks.yaml` — runs hashops and defer_persist benchmarks on main push (migrated
@@ -265,14 +481,15 @@ Firewood publishes two things to GitHub Pages:
 Benchmark data lives on a `benchmark-data` branch with append-only history, separating
 main results (`bench/`) from feature branches (`dev/bench/{branch}/`).
 
+!! The proposal is to publish to a new avalanchego location and add a 404 redirect to the old location
 **Decision needed:**
 - Continue publishing from archived firewood repo (docs go stale after migration)
 - Publish from avalanchego under a subpath
 - Set up redirects from old URLs
 - Migrate the `benchmark-data` branch or redesign the workflow
 
+!! Polyrepo is no longer needed post-migration
 ### Polyrepo / `FIREWOOD_REF` Workflow
-
 The benchmark workflows and `scripts/run_polyrepo.sh` currently support
 `FIREWOOD_REF=<commit>` for testing avalanchego against specific firewood commits
 (e.g., `FIREWOOD_REF=abc123 task run-polyrepo`). Post-migration, firewood is in-tree
@@ -304,6 +521,8 @@ Post-migration, these cross-repo workflows need tokens, permissions, and dispatc
 targets updated:
 - `attach-static-libs.yaml` pushes pre-built `.a` files to
   `ava-labs/firewood-go-ethhash` (uses `FIREWOOD_GO_GITHUB_TOKEN`)
+
+!! This will become unnecessary, a refactored job will operate entirely within this repo
 - `bench-cchain-reexecution.sh` triggers avalanchego benchmark workflows (uses
   `FIREWOOD_AVALANCHEGO_GITHUB_TOKEN` — may become unnecessary when benchmarks run
   in-repo)
@@ -316,10 +535,12 @@ Firewood CI workflows require these secrets to be created in avalanchego:
 
 - `CARGO_TOKEN` — crates.io publishing authentication
 - `FIREWOOD_GO_GITHUB_TOKEN` — write access to `ava-labs/firewood-go-ethhash`
+!! Unnecessary
 - `FIREWOOD_AVALANCHEGO_GITHUB_TOKEN` — triggering benchmark workflows (may become
   unnecessary post-migration)
 - AWS role assumption for chaos tests (S3 access)
 
+!! These are already in the avalanchego repo. They don't have to be mentioned by name, it should be sufficient to note that they are present
 The load/chaos test workflows also use monitoring secrets that likely already exist in
 avalanchego but should be confirmed:
 - `PROMETHEUS_URL`, `PROMETHEUS_PUSH_URL`, `PROMETHEUS_USERNAME`, `PROMETHEUS_PASSWORD`
@@ -337,8 +558,10 @@ whether to rotate to new credentials during migration or transfer existing value
   - PR type labels (enforced by `label-pull-requests.yaml`)
   - Milestone associations
   - `dependencies`, `security`, `github-actions` (from dependabot)
+!! Suggest keeping and prefixing so that firewood team can use their own
 - Issue templates (bug report, feature request) — merge into avalanchego's templates or
   keep firewood-specific ones?
+!! Why not check?
 - Does firewood have a security disclosure process (SECURITY.md or similar) that needs
   migrating or merging with avalanchego's?
 
@@ -347,6 +570,7 @@ whether to rotate to new credentials during migration or transfer existing value
 Milestones are repo-scoped in GitHub — firewood milestones will need to be recreated in
 avalanchego (or namespaced, e.g. "Firewood v0.3").
 
+!! Firewood milestones are separate
 **Decision needed:** Do firewood milestones coexist with avalanchego milestones, or
 merge into a unified scheme?
 
@@ -363,6 +587,7 @@ After cutover:
 
 ## Documentation Updates
 
+!! These changes should arguably be made as part of the migration, no tafterwards
 Post-migration, these docs need updating:
 - `firewood/README.md` — repository URL, import paths, build instructions
 - `firewood/CONTRIBUTING.md` — PR process, approval requirements, CI expectations
