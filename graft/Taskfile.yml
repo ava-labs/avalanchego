@@ -14,20 +14,30 @@ vars:
   STREVM_MODULE: github.com/ava-labs/strevm
 
 tasks:
-  default: '{{.NIX_RUN}} ../scripts/run_task.sh --list'
+  default: '{{.NIX_RUN}} {{.TASKFILE_DIR}}/../scripts/run_task.sh --list'
 
   # REPO_NAME-rewrite-imports:
   #   desc: Rewrite imports of out-of-tree REPO_NAME to in-tree REPO_NAME
-  #   cmd: bash ./scripts/rewrite-imports.sh {{.REPO_MODULE}}
+  #   cmd: bash {{.TASKFILE_DIR}}/scripts/rewrite-imports.sh {{.REPO_MODULE}}
 
   # REPO_NAME-subtree-merge:
-  #   desc: Perform git subtree merge of REPO_NAME into graft/REPO_NAME (commits)
-  #   cmd: bash ./scripts/subtree-merge.sh {{.REPO_MODULE}} BRANCH
+  #   desc: Perform git subtree merge of REPO_NAME into graft/REPO_NAME from a local source (commits)
+  #   cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh BRANCH {{.CLI_ARGS}} graft/REPO_NAME
+
+  firewood-subtree-merge:
+    desc: Perform git subtree merge of firewood into firewood from a local source (commits)
+    preconditions:
+      - sh: 'test -n "{{.CLI_ARGS}}"'
+        msg: "Usage: task graft:firewood-subtree-merge -- <source-path>"
+    cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh main {{.CLI_ARGS}} firewood
 
   strevm-rewrite-imports:
     desc: Rewrite imports of out-of-tree strevm ({{.STREVM_MODULE}}) to in-tree saevm
-    cmd: bash ./scripts/rewrite-imports.sh {{.STREVM_MODULE}} github.com/ava-labs/avalanchego/vms/saevm
+    cmd: bash {{.TASKFILE_DIR}}/scripts/rewrite-imports.sh {{.STREVM_MODULE}} github.com/ava-labs/avalanchego/vms/saevm
 
   strevm-subtree-merge:
-    desc: Perform git subtree merge of strevm into vms/saevm (commits)
-    cmd: bash ./scripts/subtree-merge.sh {{.STREVM_MODULE}} main vms/saevm
+    desc: Perform git subtree merge of strevm into vms/saevm from a local source (commits)
+    preconditions:
+      - sh: 'test -n "{{.CLI_ARGS}}"'
+        msg: "Usage: task graft:strevm-subtree-merge -- <source-path>"
+    cmd: bash {{.TASKFILE_DIR}}/scripts/subtree-merge.sh main {{.CLI_ARGS}} vms/saevm

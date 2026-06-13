@@ -2,88 +2,90 @@
 
 set -euo pipefail
 
-# Performs a git subtree merge of an external repository into a graft subdirectory and then commits the result.
+# Performs a git subtree merge of a local repository into a graft subdirectory.
 #
-# Usage: subtree-merge.sh <module-path> [version]
-# Example: subtree-merge.sh github.com/ava-labs/coreth
-# Example: subtree-merge.sh github.com/ava-labs/coreth 1a498175
-# Example: subtree-merge.sh github.com/ava-labs/coreth master evm
+# Usage: subtree-merge.sh <version> <source-path> <target-path>
+# Example: subtree-merge.sh main ../firewood firewood
 #
 # Arguments:
-#   module-path: The Go module path (e.g., github.com/ava-labs/coreth)
-#   version: (Optional) The version/tag/SHA to merge (can be a tag, branch, or commit SHA)
-#            If not provided, the version will be discovered from go.mod
-#   target-path: (Optional) The target path within the repository to merge into, relative to the repo root.
-#                If not provided, defaults to graft/[repo-name]
-#                Cannot be provided without providing version.
+#   version:     The version/tag/SHA to merge (can be a tag, branch, or commit SHA)
+#   source-path: Path to a local git repository, relative to this repository's
+#                root when not absolute.
+#   target-path: The target path within this repository, relative to its root.
 #
-# The repository URL is constructed by prepending https:// to the module path.
-# The target path is automatically derived as graft/[repo-name] where repo-name
-# is the last component of the module path, unless provided.
-#
-# What this script does:
-#   1. Constructs repository URL from module path
-#   2. Discovers version from go.mod if not provided
-#   3. Derives target path from module path (graft/[last-component])
-#   4. Validates that target path doesn't already exist
-#   5. Adds the external repo as a temporary git remote
-#   6. Performs a merge with 'ours' strategy (keeps our history, adds theirs)
-#   7. Reads the external repo's tree into the target subdirectory
-#   8. Commits the merge with a descriptive message
-#   9. Removes the temporary remote
+# The script refuses to overwrite an existing target path. Roll back the prior
+# subtree merge intentionally before retrying.
 
-if [ $# -lt 1 ] || [ $# -gt 3 ]; then
-  echo "Error:  one to three arguments required" >&2
-  echo "Usage: $0 <module-path> [version] [target-path]" >&2
-  echo "Example: $0 github.com/ava-labs/coreth" >&2
-  echo "Example: $0 github.com/ava-labs/coreth 1a498175" >&2
-  echo "Example: $0 github.com/ava-labs/coreth master evm" >&2
+if [ $# -ne 3 ]; then
+  echo "Error: three arguments required" >&2
+  echo "Usage: $0 <version> <source-path> <target-path>" >&2
+  echo "Example: $0 main ../firewood firewood" >&2
   exit 1
 fi
 
-MODULE_PATH="$1"
-
+VERSION="$1"
+SOURCE_PATH="$2"
+TARGET_PATH="$3"
 REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
+
+if [ -d "${REPO_ROOT}/${TARGET_PATH}" ]; then
+  echo "Error: target path ${TARGET_PATH} already exists." >&2
+  echo "Refusing to skip or overwrite an existing graft." >&2
+
+  MERGE_SUMMARY=$(git -C "${REPO_ROOT}" log -1 --format='%h %s' --merges -- "${TARGET_PATH}")
+  if [ -n "${MERGE_SUMMARY}" ]; then
+    echo "The most recent merge that changed ${TARGET_PATH} is:" >&2
+    echo "  ${MERGE_SUMMARY}" >&2
+  fi
+
+  echo "Roll back the previous subtree merge intentionally, then retry." >&2
+  exit 1
+fi
+
+if [ -z "${SOURCE_PATH}" ]; then
+  echo "Error: source path is required." >&2
+  exit 1
+fi
+
+if [[ "${SOURCE_PATH}" != /* ]]; then
+  SOURCE_PATH="${REPO_ROOT}/${SOURCE_PATH}"
+fi
+
+if [ ! -d "${SOURCE_PATH}" ]; then
+  echo "Error: source path ${SOURCE_PATH} does not exist." >&2
+  exit 1
+fi
+
+SOURCE_PATH=$(cd "${SOURCE_PATH}" && pwd)
+REPO_BASENAME="$(basename "${SOURCE_PATH}")"
+
+if ! SOURCE_REPO_ROOT=$(git -C "${SOURCE_PATH}" rev-parse --show-toplevel 2>/dev/null); then
+  echo "Error: source path ${SOURCE_PATH} is not a git repository." >&2
+  exit 1
+fi
+
+if [ "${SOURCE_PATH}" != "${SOURCE_REPO_ROOT}" ]; then
+  echo "Error: source path ${SOURCE_PATH} is not the root of a git repository." >&2
+  exit 1
+fi
+
 cd "${REPO_ROOT}"
 
-# Discover version from go.mod if not provided
-if [ $# -ge 2 ]; then
-  VERSION="$2"
-  echo "using provided version: ${VERSION}"
-else
-  echo "discovering version from go.mod"
-  VERSION="$(bash "${REPO_ROOT}/graft/scripts/get-module-version.sh" "${MODULE_PATH}")"
-  echo "discovered version: ${VERSION}"
-fi
+TEMP_REMOTE_NAME="subtree-${REPO_BASENAME}-$$"
 
-# Construct repository URL from module path
-REPO_URL="https://${MODULE_PATH}"
+cleanup() {
+  echo "removing ${TEMP_REMOTE_NAME} remote"
+  git remote remove "${TEMP_REMOTE_NAME}"
+}
+trap cleanup EXIT
 
-# Use graft/[repo-name] as target path, unless one is provided
-REPO_BASENAME="$(basename "${MODULE_PATH}")"
-if [ $# -eq 3 ]; then
-  TARGET_PATH="$3"
-else
-  # Extract repository name from module path
-  # Example: github.com/ava-labs/coreth -> coreth
-  TARGET_PATH="graft/${REPO_BASENAME}" 
-fi
-
-# Check if target path already exists
-if [ -d "${REPO_ROOT}/${TARGET_PATH}" ]; then
-  echo "Target path ${TARGET_PATH} already exists, skipping subtree merge"
-  exit 0
-fi
-
-REMOTE_NAME="${REPO_BASENAME}"
-
-echo "adding remote ${REMOTE_NAME} from ${REPO_URL}"
-git remote add -f "${REMOTE_NAME}" "${REPO_URL}"
+echo "using provided version: ${VERSION}"
+echo "adding temporary remote ${TEMP_REMOTE_NAME} from ${SOURCE_PATH}"
+git remote add "${TEMP_REMOTE_NAME}" "${SOURCE_PATH}"
+echo "fetching ${VERSION} from ${SOURCE_PATH}"
+git fetch "${TEMP_REMOTE_NAME}" "${VERSION}"
 
 echo "performing subtree merge of ${VERSION} into ${TARGET_PATH}"
-git subtree add --prefix="${TARGET_PATH}" "${REMOTE_NAME}" "${VERSION}"
-
-echo "removing ${REMOTE_NAME} remote"
-git remote remove "${REMOTE_NAME}"
+git subtree add --prefix="${TARGET_PATH}" "${TEMP_REMOTE_NAME}" "${VERSION}"
 
 echo "subtree merge of ${REPO_BASENAME} completed successfully"

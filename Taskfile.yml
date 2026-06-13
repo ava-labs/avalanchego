@@ -7,6 +7,8 @@
 version: '3'
 
 includes:
+  graft:
+    taskfile: graft/Taskfile.yml
   packaging:
     taskfile: .github/packaging/Taskfile.yml
 
