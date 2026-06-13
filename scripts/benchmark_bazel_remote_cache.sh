@@ -17,7 +17,7 @@ fi
 print_usage() {
   cat <<'EOF'
 Usage: scripts/benchmark_bazel_remote_cache.sh \
-  --setup-args 'fetch //...' \
+  --setup-args 'fetch --all' \
   --benchmark-args 'build //main:avalanchego' \
   [--benchmark-args 'build --config=race //main:avalanchego' ...]
 
@@ -115,6 +115,28 @@ CACHE_DIR="${TMP_ROOT}/remote-cache"
 REPOSITORY_CACHE_DIR="${TMP_ROOT}/repository-cache"
 LOG_DIR="${TMP_ROOT}/logs"
 mkdir -p "${CACHE_DIR}" "${REPOSITORY_CACHE_DIR}" "${LOG_DIR}"
+
+# This benchmark is intended to model CI workers talking to a remote cache
+# service that is not colocated with the runner. When latency simulation is
+# enabled in a future iteration, the local benchmark host should talk to
+# bazel-remote through a proxy that injects representative delay instead of
+# talking to bazel-remote directly.
+#
+# The representative delay should be measured separately from GitHub Actions
+# runners to an AWS us-east-1 hosted endpoint using curl. That measurement is
+# not part of the benchmark subject itself; it is only an input used to
+# approximate the runner-to-cache network distance we expect in deployment.
+#
+# The intended comparison for each benchmark command is:
+#   - no cache
+#   - HTTP remote cache, cold
+#   - HTTP remote cache, warm
+#   - gRPC remote cache, cold
+#   - gRPC remote cache, warm
+#
+# The point is to understand how much realistic cache latency changes Bazel
+# execution time and whether HTTP remains sufficient under that latency or
+# whether gRPC provides enough additional value to justify requiring it.
 
 REMOTE_PID=""
 REMOTE_LOG=""
@@ -278,7 +300,7 @@ echo "Using temporary workspace: ${TMP_ROOT}"
 echo "Using repository cache: ${REPOSITORY_CACHE_DIR}"
 
 # The setup phase models the CI cache-writer job from PR 5525: start from an
-# empty repository_cache, then measure a single command (typically `fetch //...`)
+# empty repository_cache, then measure a single command (typically `fetch --all`)
 # that populates only external dependency state. The per-benchmark runs then use
 # fresh output bases so local action/output state does not bleed across timings.
 setup_output_base="${TMP_ROOT}/output-base-setup"
