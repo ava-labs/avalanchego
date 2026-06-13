@@ -5,12 +5,15 @@ package resource
 
 import (
 	"math"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/process"
 	"go.uber.org/zap"
 
@@ -46,9 +49,18 @@ type DiskUser interface {
 	AvailableDiskPercentage() uint64
 }
 
+type MemoryUser interface {
+	// returns number of bytes available in system memory
+	AvailableMemoryBytes() uint64
+
+	// returns percentage of available memory
+	AvailableMemoryPercentage() uint64
+}
+
 type User interface {
 	CPUUser
 	DiskUser
+	MemoryUser
 }
 
 type ProcessTracker interface {
@@ -87,6 +99,10 @@ type manager struct {
 
 	availableDiskPercent uint64
 
+	availableMemoryBytes uint64
+
+	availableMemoryPercent uint64
+
 	closeOnce sync.Once
 	onClose   chan struct{}
 }
@@ -105,12 +121,14 @@ func NewManager(
 	}
 
 	m := &manager{
-		log:                  log,
-		processMetrics:       processMetrics,
-		processes:            make(map[int]*proc),
-		onClose:              make(chan struct{}),
-		availableDiskBytes:   math.MaxUint64,
-		availableDiskPercent: 100,
+		log:                    log,
+		processMetrics:         processMetrics,
+		processes:              make(map[int]*proc),
+		onClose:                make(chan struct{}),
+		availableDiskBytes:     math.MaxUint64,
+		availableDiskPercent:   100,
+		availableMemoryBytes:   math.MaxUint64,
+		availableMemoryPercent: 100,
 	}
 
 	go m.update(diskPath, frequency, cpuHalflife, diskHalflife)
@@ -145,6 +163,20 @@ func (m *manager) AvailableDiskPercentage() uint64 {
 	return m.availableDiskPercent
 }
 
+func (m *manager) AvailableMemoryBytes() uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.availableMemoryBytes
+}
+
+func (m *manager) AvailableMemoryPercentage() uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.availableMemoryPercent
+}
+
 func (m *manager) TrackProcess(pid int) {
 	p, err := process.NewProcess(int32(pid))
 	if err != nil {
@@ -173,6 +205,102 @@ func (m *manager) Shutdown() {
 	})
 }
 
+// getMemoryInfo attempts to get container-aware memory information.
+// In containerized environments (K8s, Docker), it reads cgroup limits directly.
+// Falls back to system-wide memory if cgroup reading fails or returns "max" (no limit).
+func getMemoryInfo() (availableBytes uint64, availablePercent uint64, err error) {
+	// Try cgroup v2 first (modern containers)
+	if memMax, memCurrent, cgroupErr := readCgroupV2Memory(); cgroupErr == nil {
+		// Successfully read cgroup v2 memory
+		if memMax > 0 && memMax != math.MaxUint64 {
+			available := memMax - memCurrent
+			percent := available * 100 / memMax
+			return available, percent, nil
+		}
+	}
+
+	// Try cgroup v1 (older containers)
+	if memLimit, memUsage, cgroupErr := readCgroupV1Memory(); cgroupErr == nil {
+		// Successfully read cgroup v1 memory
+		if memLimit > 0 && memLimit != math.MaxUint64 {
+			available := memLimit - memUsage
+			percent := available * 100 / memLimit
+			return available, percent, nil
+		}
+	}
+
+	// Fall back to system-wide memory (bare metal or no cgroup limits)
+	virtualMem, sysErr := mem.VirtualMemory()
+	if sysErr != nil {
+		return 0, 0, sysErr
+	}
+
+	return virtualMem.Available, virtualMem.Available * 100 / virtualMem.Total, nil
+}
+
+// readCgroupV2Memory reads memory usage from cgroup v2 (unified hierarchy).
+// Returns (limit, current_usage, error).
+func readCgroupV2Memory() (uint64, uint64, error) {
+	maxBytes, err := os.ReadFile("/sys/fs/cgroup/memory.max")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	maxStr := strings.TrimSpace(string(maxBytes))
+	if maxStr == "max" {
+		// No limit set
+		return math.MaxUint64, 0, nil
+	}
+
+	limit, err := strconv.ParseUint(maxStr, 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	currentBytes, err := os.ReadFile("/sys/fs/cgroup/memory.current")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	current, err := strconv.ParseUint(strings.TrimSpace(string(currentBytes)), 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return limit, current, nil
+}
+
+// readCgroupV1Memory reads memory usage from cgroup v1 (legacy hierarchy).
+// Returns (limit, current_usage, error).
+func readCgroupV1Memory() (uint64, uint64, error) {
+	limitBytes, err := os.ReadFile("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	limit, err := strconv.ParseUint(strings.TrimSpace(string(limitBytes)), 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// In cgroup v1, a very large value typically means no limit
+	if limit >= (1 << 62) {
+		return math.MaxUint64, 0, nil
+	}
+
+	usageBytes, err := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	usage, err := strconv.ParseUint(strings.TrimSpace(string(usageBytes)), 10, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return limit, usage, nil
+}
+
 func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife time.Duration) {
 	ticker := time.NewTicker(frequency)
 	defer ticker.Stop()
@@ -196,6 +324,14 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 			)
 		}
 
+		memAvailableBytes, memAvailablePercent, getMemErr := getMemoryInfo()
+		if getMemErr != nil {
+			m.log.Verbo("failed to lookup resource",
+				zap.String("resource", "system memory"),
+				zap.Error(getMemErr),
+			)
+		}
+
 		m.usageLock.Lock()
 		m.cpuUsage = oldCPUWeight*m.cpuUsage + currentScaledCPUUsage
 		m.readUsage = oldDiskWeight*m.readUsage + currentScaledReadUsage
@@ -204,6 +340,11 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		if getBytesErr == nil {
 			m.availableDiskBytes = availableBytes
 			m.availableDiskPercent = availablePercentage
+		}
+
+		if getMemErr == nil {
+			m.availableMemoryBytes = memAvailableBytes
+			m.availableMemoryPercent = memAvailablePercent
 		}
 
 		m.usageLock.Unlock()
