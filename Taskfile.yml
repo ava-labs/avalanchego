@@ -31,9 +31,12 @@ tasks:
 
   bazel-benchmark-remote-cache:
     desc: Benchmark Bazel remote caching for CI-style avalanchego builds and tests
+    # TODO(maru): Keep this setup fetch target union aligned with the benchmark
+    # args below. We intentionally hard-code the union for now because this
+    # harness is still exploratory and `fetch --all` pulls in irrelevant repos.
     cmd: >-
       {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
-      --setup-args "fetch --all"
+      --setup-args "fetch //main:avalanchego //... -- -//graft/..."
       --benchmark-args "build //main:avalanchego"
       --benchmark-args "build --config=race //main:avalanchego"
       --benchmark-args "test //... -- -//graft/..."

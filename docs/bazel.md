@@ -581,6 +581,17 @@ That persistence applies only to `repository_cache` and the shared Gazelle
 `BAZEL_REMOTE_CACHE_FRESH_SETUP_CACHE=1` to force a fully fresh setup-cache
 run.
 
+The current generalized task intentionally avoids `fetch --all` because that
+can pull in irrelevant transitive repos and toolchains unrelated to the
+benchmarked jobs. Instead, its setup phase hard-codes the current union of
+benchmarked target patterns:
+
+- `bazel fetch //main:avalanchego //... -- -//graft/...`
+
+TODO: keep that setup fetch union aligned with the benchmark command list until
+this exploratory harness either stabilizes enough to derive it mechanically or
+is replaced.
+
 The current generalized task benchmarks:
 
 - `bazel build //main:avalanchego`
