@@ -106,6 +106,9 @@ func measure(cfg config) (report, error) {
 	client := &http.Client{
 		Timeout:   cfg.timeout,
 		Transport: transport,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	samples := make([]sample, 0, cfg.samples)

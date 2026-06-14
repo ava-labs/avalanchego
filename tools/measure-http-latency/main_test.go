@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -44,4 +46,22 @@ func TestWriteTextReport(t *testing.T) {
 	})
 
 	require.Equal(t, "url=https://example.com\nsamples=2\nhttp_code[401]=2\navg_connect=88.4ms avg_tls=116.2ms avg_ttfb=232.1ms avg_total=233.4ms\n", buffer.String())
+}
+
+func TestMeasureDoesNotFollowRedirects(t *testing.T) {
+	t.Parallel()
+
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
+
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusMovedPermanently)
+	}))
+	defer redirect.Close()
+
+	report, err := measure(config{url: redirect.URL, samples: 1, timeout: 5 * time.Second, format: "json"})
+	require.NoError(t, err)
+	require.Equal(t, map[int]int{http.StatusMovedPermanently: 1}, report.StatusCodes)
 }
