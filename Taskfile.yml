@@ -29,6 +29,27 @@ tasks:
     desc: Build avalanchego with Bazel (race detection)
     cmd: '{{.NIX_RUN}} bazelisk build --config=race //main:avalanchego'
 
+  bazel-benchmark-remote-cache:
+    desc: Benchmark Bazel remote caching for CI-style avalanchego builds and tests
+    # TODO(maru): Keep this setup fetch target union aligned with the benchmark
+    # args below. We intentionally hard-code the union for now because this
+    # harness is still exploratory and `fetch --all` pulls in irrelevant repos.
+    cmd: >-
+      {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
+      --setup-args "fetch //main:avalanchego //... -- -//graft/..."
+      --benchmark-args "build //main:avalanchego"
+      --benchmark-args "build --config=race //main:avalanchego"
+      --benchmark-args "test //... -- -//graft/..."
+
+  bazel-benchmark-remote-cache-ids-test:
+    desc: Benchmark Bazel remote caching for //ids:ids_test
+    cmd: >-
+      {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
+      --setup-args "fetch //ids:ids_test"
+      --benchmark-args "test //ids:ids_test"
+      --warm-log-must-contain "(cached) PASSED"
+      --warm-log-must-contain "Executed 0 out of 1 test: 1 test passes."
+
   bazel-build-opt:
     desc: Build avalanchego with Bazel (optimized)
     cmd: '{{.NIX_RUN}} bazelisk build --compilation_mode=opt //main:avalanchego'
@@ -352,12 +373,16 @@ tasks:
   _lint-readonly:
     internal: true
     deps:
-      - lint
-      - lint-saevm
       - lint-action
       - lint-shell
       - check-go-version
       - check-require-directives
+    cmds:
+      # lint and lint-saevm both invoke golangci-lint, which aborts on
+      # concurrent runs. Keep the other read-only checks parallel via deps,
+      # but serialize the golangci-lint tasks here.
+      - task: lint
+      - task: lint-saevm
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one

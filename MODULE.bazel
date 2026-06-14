@@ -3,8 +3,8 @@ module(
     version = "0.0.0",
 )
 
-bazel_dep(name = "rules_go", version = "0.57.0", repo_name = "io_bazel_rules_go")
-bazel_dep(name = "gazelle", version = "0.45.0", repo_name = "bazel_gazelle")
+bazel_dep(name = "rules_go", version = "0.59.0", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "gazelle", version = "0.51.3", repo_name = "bazel_gazelle")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.2")
@@ -49,18 +49,17 @@ GO_OVERRIDES = {
     path = path,
 ) for path, o in GO_OVERRIDES.items()]
 
-# NOTE: Workspace modules (avalanchego, graft/*) are included in use_repo
-# because `bazel mod tidy` requires them, even though they're built locally.
+# Workspace modules (avalanchego, graft/*) are built from the local source
+# tree, so they do not need use_repo bindings here. Omitting those generated
+# local-path repos also keeps `bazel fetch --all` from traversing personal
+# workspace state like .agents/ and broken local symlinks while fetching all
+# imported external repos.
 use_repo(
     go_deps,
     "com_connectrpc_connect",
     "com_connectrpc_grpcreflect",
     "com_github_antithesishq_antithesis_sdk_go",
     "com_github_arr4n_shed",
-    "com_github_ava_labs_avalanchego",
-    "com_github_ava_labs_avalanchego_graft_coreth",
-    "com_github_ava_labs_avalanchego_graft_evm",
-    "com_github_ava_labs_avalanchego_graft_subnet_evm",
     "com_github_ava_labs_firewood_go_ethhash_ffi",
     "com_github_ava_labs_libevm",
     "com_github_ava_labs_simplex",

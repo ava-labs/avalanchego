@@ -513,6 +513,140 @@ That check includes the Bazel module metadata files, so lockfile drift is
 caught in the metadata phase rather than showing up later as a surprising
 working-tree mutation.
 
+### Remote Cache Benchmark
+
+The repo also includes `task bazel-benchmark-remote-cache`, a CI-style local
+benchmark for separating two distinct cache layers that are easy to conflate:
+
+- **Repository cache** (`bazel fetch --all`) for external dependency materialization
+- **Remote action cache** (`bazel-remote`) for reusing target build/test results
+
+The benchmark intentionally measures them in separate phases:
+
+1. **Setup**: run one measured setup command, currently `bazel fetch --all`,
+   into an otherwise empty temporary `repository_cache`
+2. **Per-command benchmark**: for each configured Bazel command, run fresh
+   output-base measurements against that populated `repository_cache`
+
+The benchmark is also intended to answer a second question: whether
+realistic cache-server latency changes the tradeoff between HTTP and gRPC
+remote caching enough that gRPC becomes necessary.
+
+To keep that question separate from transport guesswork, representative
+cache latency is measured before the benchmark from a public AWS us-east-1
+regional endpoint. The current approximation uses the repo-local
+`//tools/measure-http-latency` tool in `--mode=warm-h2`, which reuses a
+single connection and measures request-write to first-response-byte latency.
+That is a better no-server proxy for persistent gRPC behavior than cold
+TTFB, because it avoids repeatedly charging TCP/TLS setup costs that a warm
+channel would not pay.
+
+The harness now also validates that input against a local proxied path
+before the measured Bazel runs begin: it starts `bazel-remote`, starts
+`toxiproxy`, applies the measured latency to a proxied HTTP endpoint, and
+checks that the observed proxied warm reused-connection latency is within
+`BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS` of the measured target. This
+validation is skipped when `BAZEL_REMOTE_CACHE_LATENCY_MS` is set, because
+override mode is intended for fast local iteration rather than provenance.
+
+The benchmarked HTTP cache traffic itself now also flows through that
+latency-injecting proxy path for the cold and warm remote-cache runs, so the
+current HTTP results include the modeled representative cache distance. The
+next iteration is to add the parallel gRPC comparison under the same latency
+model.
+
+This is still an approximation of runner-to-us-east-1 network distance,
+not a claim that the public endpoint exactly matches the latency
+characteristics of a future EKS-hosted `bazel-remote`. It should be treated
+as a better steady-state transport proxy than cold-connect TTFB, not as a
+perfect simulation of a deployed cache service. Measuring against a real
+deployed cache service is the next planned refinement.
+
+For fast local iteration, the benchmark also supports an explicit latency
+override via `BAZEL_REMOTE_CACHE_LATENCY_MS`. When that override is set,
+the benchmark skips live measurement and any future proxy-path validation.
+
+The intended cached comparison for each configured command is:
+- no remote cache
+- HTTP remote cache, cold
+- HTTP remote cache, warm
+- gRPC remote cache, cold
+- gRPC remote cache, warm
+
+Fresh `--output_base` values are important because the benchmark is trying to
+model a CI worker that can reuse downloaded external dependencies while still
+starting each measured target command without local action/output state from a
+prior invocation.
+
+For local iteration, the generalized harness now reuses setup-side dependency
+state by default across runs via a persistent cache root under
+`~/.cache/av-bazel-remote-cache-benchmark/` (or `$XDG_CACHE_HOME` when set).
+That persistence applies only to `repository_cache` and the shared Gazelle
+`GOMODCACHE`, not to the benchmarked remote-cache contents. Set
+`BAZEL_REMOTE_CACHE_FRESH_SETUP_CACHE=1` to force a fully fresh setup-cache
+run.
+
+The current generalized task intentionally avoids `fetch --all` because that
+can pull in irrelevant transitive repos and toolchains unrelated to the
+benchmarked jobs. Instead, its setup phase hard-codes the current union of
+benchmarked target patterns:
+
+- `bazel fetch //main:avalanchego //... -- -//graft/...`
+
+TODO: keep that setup fetch union aligned with the benchmark command list until
+this exploratory harness either stabilizes enough to derive it mechanically or
+is replaced.
+
+The current generalized task benchmarks:
+
+- `bazel build //main:avalanchego`
+- `bazel build --config=race //main:avalanchego`
+- `bazel test //... -- -//graft/...`
+
+The fast `task bazel-benchmark-remote-cache-ids-test` smoke target remains
+useful for quick harness validation. It now reuses the same generalized
+benchmark script with a narrower `fetch //ids:ids_test` + `test //ids:ids_test`
+configuration and extra warm-log assertions proving cached test-result reuse.
+
+Initial local validation on one developer workstation produced:
+
+- setup `fetch --all`: `46.663s`
+- `build //main:avalanchego`
+  - no-cache: `57.330s`
+  - cold-remote-cache: `60.668s`
+  - warm-remote-cache: `46.075s`
+- `build --config=race //main:avalanchego`
+  - no-cache: `56.862s`
+  - cold-remote-cache: `61.052s`
+  - warm-remote-cache: `29.980s`
+
+Those numbers are host-specific and should not be treated as stable targets;
+what matters is the shape of the comparison. The benchmark now also includes
+`bazel test //... -- -//graft/...` so the same CI-style remote-cache comparison
+can answer whether unchanged main-module unit-test work is avoidable across
+fresh-output-base runs. That is the relevant signal when deciding how much value
+remote caching provides before introducing more targeted change-detection
+optimizations.
+
+The Bazel CI workflow therefore includes a non-required observational benchmark
+job on the Linux amd64 and macOS arm64 runners. It uploads the full benchmark
+log as an artifact so changes can be compared across branches and runner
+configurations.
+
+For the planned Firewood-from-source comparison, keep the experiment matrix
+explicit and compare like-for-like runs on the same CI runner class:
+
+- baseline branch vs Firewood-from-source branch
+- no remote cache vs cold remote cache vs warm remote cache
+- normal build vs race build vs main-module unit tests
+- identical benchmark task and `fetch --all` setup phase
+
+That makes the resulting benchmark logs actionable when deciding whether added
+build work (for example, building Firewood from source) increases the payoff of
+remote caching enough to justify CI complexity, and whether HTTP remains good
+enough under realistic cache latency or whether gRPC provides enough additional
+benefit to justify requiring it.
+
 The GitHub Actions Bazel workflow also defines a single aggregate job,
 `bazel-required`, that depends on the other jobs in the workflow via
 `needs`.  Branch protection can require that one workflow-level job

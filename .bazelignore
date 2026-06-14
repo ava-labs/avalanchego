@@ -1,3 +1,5 @@
 .direnv
+# Local agent skill symlinks are personal workspace state, not repo Bazel packages.
+.agents
 .bazel/patches/build_files
 bazel-avalanchego
