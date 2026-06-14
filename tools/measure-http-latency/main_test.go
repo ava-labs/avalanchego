@@ -103,5 +103,5 @@ func TestParseFlagsRejectsInvalidMode(t *testing.T) {
 	t.Parallel()
 
 	_, err := parseFlags([]string{"--url=https://example.com", "--mode=bad"})
-	require.ErrorContains(t, err, "--mode must be one of: cold, warm-h2")
+	require.ErrorIs(t, err, errInvalidMode)
 }
