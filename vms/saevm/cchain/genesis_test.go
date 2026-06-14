@@ -329,10 +329,14 @@ func TestWriteGenesis(t *testing.T) {
 			// should update the stored chain config.
 			name:            "schedule_upgrade",
 			initialUpgrades: upgradetest.GetConfig(upgradetest.Cortina),
-			restartUpgrades: upgradetest.GetConfigWithUpgradeTime(
-				upgradetest.Durango,
-				upgrade.InitiallyActiveTime.Add(time.Second),
-			),
+			restartUpgrades: func() upgrade.Config {
+				c := upgradetest.GetConfigWithUpgradeTime(
+					upgradetest.Durango,
+					upgrade.InitiallyActiveTime.Add(time.Second),
+				)
+				upgradetest.SetTimesTo(&c, upgradetest.Cortina, upgrade.InitiallyActiveTime)
+				return c
+			}(),
 			restartGenesis: localGenesis,
 		},
 	}
