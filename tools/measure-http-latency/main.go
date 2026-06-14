@@ -24,24 +24,30 @@ type config struct {
 	samples int
 	timeout time.Duration
 	format  string
+	mode    string
 }
 
 type sample struct {
-	StatusCode int           `json:"statusCode"`
-	Connect    time.Duration `json:"-"`
-	TLS        time.Duration `json:"-"`
-	TTFB       time.Duration `json:"-"`
-	Total      time.Duration `json:"-"`
+	StatusCode        int           `json:"statusCode"`
+	Connect           time.Duration `json:"-"`
+	TLS               time.Duration `json:"-"`
+	TTFB              time.Duration `json:"-"`
+	WriteToFirstByte  time.Duration `json:"-"`
+	Total             time.Duration `json:"-"`
+	ReusedConnection  bool          `json:"reusedConnection"`
 }
 
 type report struct {
-	URL          string      `json:"url"`
-	Samples      int         `json:"samples"`
-	StatusCodes  map[int]int `json:"statusCodes"`
-	AvgConnectMS float64     `json:"avgConnectMs"`
-	AvgTLSMS     float64     `json:"avgTlsMs"`
-	AvgTTFBMS    float64     `json:"avgTtfbMs"`
-	AvgTotalMS   float64     `json:"avgTotalMs"`
+	URL                   string      `json:"url"`
+	Mode                  string      `json:"mode"`
+	Samples               int         `json:"samples"`
+	ReusedSamples         int         `json:"reusedSamples"`
+	StatusCodes           map[int]int `json:"statusCodes"`
+	AvgConnectMS          float64     `json:"avgConnectMs"`
+	AvgTLSMS              float64     `json:"avgTlsMs"`
+	AvgTTFBMS             float64     `json:"avgTtfbMs"`
+	AvgWriteToFirstByteMS float64     `json:"avgWriteToFirstByteMs"`
+	AvgTotalMS            float64     `json:"avgTotalMs"`
 }
 
 func main() {
@@ -82,6 +88,7 @@ func parseFlags(args []string) (config, error) {
 	fs.IntVar(&cfg.samples, "samples", 10, "number of samples to collect")
 	fs.DurationVar(&cfg.timeout, "timeout", 10*time.Second, "per-request timeout")
 	fs.StringVar(&cfg.format, "format", "text", "output format: text or json")
+	fs.StringVar(&cfg.mode, "mode", "cold", "measurement mode: cold or warm-h2")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -96,6 +103,10 @@ func parseFlags(args []string) (config, error) {
 	if cfg.format != "text" && cfg.format != "json" {
 		return config{}, errors.New("--format must be one of: text, json")
 	}
+	cfg.mode = strings.ToLower(cfg.mode)
+	if cfg.mode != "cold" && cfg.mode != "warm-h2" {
+		return config{}, errors.New("--mode must be one of: cold, warm-h2")
+	}
 	if cfg.timeout <= 0 {
 		return config{}, errors.New("--timeout must be > 0")
 	}
@@ -105,7 +116,8 @@ func parseFlags(args []string) (config, error) {
 func measure(cfg config) (report, error) {
 	transport := &http.Transport{
 		Proxy:             http.ProxyFromEnvironment,
-		DisableKeepAlives: true,
+		DisableKeepAlives: cfg.mode == "cold",
+		ForceAttemptHTTP2: cfg.mode == "warm-h2",
 	}
 	client := &http.Client{
 		Timeout:   cfg.timeout,
@@ -117,24 +129,42 @@ func measure(cfg config) (report, error) {
 
 	samples := make([]sample, 0, cfg.samples)
 	statusCodes := make(map[int]int)
-	for range make([]struct{}, cfg.samples) {
-		s, err := collectSample(client, cfg.url)
+	reusedSamples := 0
+
+	attempts := cfg.samples
+	if cfg.mode == "warm-h2" {
+		attempts += cfg.samples + 2 // one warm-up request plus slack for occasional reconnects
+	}
+
+	for range make([]struct{}, attempts) {
+		s, err := collectSample(client, cfg.url, cfg.mode == "cold")
 		if err != nil {
 			return report{}, err
 		}
+		if cfg.mode == "warm-h2" && !s.ReusedConnection {
+			continue
+		}
 		samples = append(samples, s)
 		statusCodes[s.StatusCode]++
+		if s.ReusedConnection {
+			reusedSamples++
+		}
+		if len(samples) == cfg.samples {
+			return summarize(cfg.url, cfg.mode, samples, reusedSamples, statusCodes), nil
+		}
 	}
 
-	return summarize(cfg.url, samples, statusCodes), nil
+	return report{}, fmt.Errorf("collected %d/%d samples in %q mode", len(samples), cfg.samples, cfg.mode)
 }
 
-func collectSample(client *http.Client, url string) (sample, error) {
+func collectSample(client *http.Client, url string, forceClose bool) (sample, error) {
 	var (
-		start           time.Time
-		gotConnAt       time.Time
-		gotTLSHandshake time.Time
-		gotFirstByteAt  time.Time
+		start            time.Time
+		gotConnAt        time.Time
+		gotTLSHandshake  time.Time
+		wroteRequestAt   time.Time
+		gotFirstByteAt   time.Time
+		reusedConnection bool
 	)
 
 	trace := &httptrace.ClientTrace{
@@ -144,8 +174,17 @@ func collectSample(client *http.Client, url string) (sample, error) {
 		ConnectDone: func(_, _ string, _ error) {
 			gotConnAt = time.Now()
 		},
+		GotConn: func(info httptrace.GotConnInfo) {
+			reusedConnection = info.Reused
+			if start.IsZero() {
+				start = time.Now()
+			}
+		},
 		TLSHandshakeDone: func(_ tls.ConnectionState, _ error) {
 			gotTLSHandshake = time.Now()
+		},
+		WroteRequest: func(httptrace.WroteRequestInfo) {
+			wroteRequestAt = time.Now()
 		},
 		GotFirstResponseByte: func() {
 			gotFirstByteAt = time.Now()
@@ -157,7 +196,7 @@ func collectSample(client *http.Client, url string) (sample, error) {
 	if err != nil {
 		return sample{}, fmt.Errorf("build request: %w", err)
 	}
-	request.Close = true
+	request.Close = forceClose
 
 	if start.IsZero() {
 		start = time.Now()
@@ -172,7 +211,7 @@ func collectSample(client *http.Client, url string) (sample, error) {
 	end := time.Now()
 
 	if gotConnAt.IsZero() {
-		gotConnAt = end
+		gotConnAt = start
 	}
 	if gotTLSHandshake.IsZero() {
 		gotTLSHandshake = gotConnAt
@@ -181,24 +220,33 @@ func collectSample(client *http.Client, url string) (sample, error) {
 		gotFirstByteAt = end
 	}
 
+	if wroteRequestAt.IsZero() {
+		wroteRequestAt = gotConnAt
+	}
+
 	return sample{
-		StatusCode: response.StatusCode,
-		Connect:    gotConnAt.Sub(start),
-		TLS:        gotTLSHandshake.Sub(start),
-		TTFB:       gotFirstByteAt.Sub(start),
-		Total:      end.Sub(start),
+		StatusCode:       response.StatusCode,
+		Connect:          gotConnAt.Sub(start),
+		TLS:              gotTLSHandshake.Sub(start),
+		TTFB:             gotFirstByteAt.Sub(start),
+		WriteToFirstByte: gotFirstByteAt.Sub(wroteRequestAt),
+		Total:            end.Sub(start),
+		ReusedConnection: reusedConnection,
 	}, nil
 }
 
-func summarize(url string, samples []sample, statusCodes map[int]int) report {
+func summarize(url string, mode string, samples []sample, reusedSamples int, statusCodes map[int]int) report {
 	return report{
-		URL:          url,
-		Samples:      len(samples),
-		StatusCodes:  statusCodes,
-		AvgConnectMS: averageDurationMS(samples, func(s sample) time.Duration { return s.Connect }),
-		AvgTLSMS:     averageDurationMS(samples, func(s sample) time.Duration { return s.TLS }),
-		AvgTTFBMS:    averageDurationMS(samples, func(s sample) time.Duration { return s.TTFB }),
-		AvgTotalMS:   averageDurationMS(samples, func(s sample) time.Duration { return s.Total }),
+		URL:                   url,
+		Mode:                  mode,
+		Samples:               len(samples),
+		ReusedSamples:         reusedSamples,
+		StatusCodes:           statusCodes,
+		AvgConnectMS:          averageDurationMS(samples, func(s sample) time.Duration { return s.Connect }),
+		AvgTLSMS:              averageDurationMS(samples, func(s sample) time.Duration { return s.TLS }),
+		AvgTTFBMS:             averageDurationMS(samples, func(s sample) time.Duration { return s.TTFB }),
+		AvgWriteToFirstByteMS: averageDurationMS(samples, func(s sample) time.Duration { return s.WriteToFirstByte }),
+		AvgTotalMS:            averageDurationMS(samples, func(s sample) time.Duration { return s.Total }),
 	}
 }
 
@@ -215,16 +263,19 @@ func averageDurationMS(samples []sample, get func(sample) time.Duration) float64
 
 func writeTextReport(w io.Writer, report report) {
 	fmt.Fprintf(w, "url=%s\n", report.URL)
+	fmt.Fprintf(w, "mode=%s\n", report.Mode)
 	fmt.Fprintf(w, "samples=%d\n", report.Samples)
+	fmt.Fprintf(w, "reused_samples=%d\n", report.ReusedSamples)
 	for _, code := range sortedStatusCodes(report.StatusCodes) {
 		fmt.Fprintf(w, "http_code[%d]=%d\n", code, report.StatusCodes[code])
 	}
 	fmt.Fprintf(
 		w,
-		"avg_connect=%.1fms avg_tls=%.1fms avg_ttfb=%.1fms avg_total=%.1fms\n",
+		"avg_connect=%.1fms avg_tls=%.1fms avg_ttfb=%.1fms avg_write_to_first_byte=%.1fms avg_total=%.1fms\n",
 		report.AvgConnectMS,
 		report.AvgTLSMS,
 		report.AvgTTFBMS,
+		report.AvgWriteToFirstByteMS,
 		report.AvgTotalMS,
 	)
 }
