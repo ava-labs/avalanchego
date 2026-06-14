@@ -69,10 +69,9 @@ require_cmd() {
 }
 
 require_cmd awk
-require_cmd perl
 require_cmd grep
+require_cmd jq
 require_cmd mktemp
-require_cmd python3
 
 SETUP_ARGS_SPEC=""
 declare -a BENCHMARK_ARGS_SPECS=()
@@ -105,33 +104,31 @@ done
 # CLI accepts shell-style strings like 'build --config=race //main:avalanchego'.
 # We still parse those strings into argv before exec'ing bazelisk so quoting is
 # explicit and the actual command line remains readable in task definitions.
-parse_arg_spec() {
-  local spec="$1"
-  python3 - "$spec" <<'PY'
-import shlex
-import sys
-
-for arg in shlex.split(sys.argv[1]):
-    print(arg)
-PY
-}
-
-# Convert a single shell-style command string into a bash array. We accept this
-# small amount of shell-like parsing because the repo task codifies the command
-# strings; if the harness ever needs machine-generated argv with arbitrary data,
-# the interface should move to an argv-oriented delimiter format instead.
+#
+# This intentionally relies on shell-style parsing because the task layer owns
+# these strings. If the harness ever needs machine-generated argv with arbitrary
+# data, the interface should move to an argv-oriented delimiter format instead.
 declare -a PARSED_COMMAND_ARGS=()
 load_command_array() {
   local spec="$1"
 
-  mapfile -t PARSED_COMMAND_ARGS < <(parse_arg_spec "$spec")
+  eval "set -- ${spec}"
+  PARSED_COMMAND_ARGS=("$@")
   [[ ${#PARSED_COMMAND_ARGS[@]} -gt 0 ]] || die "command spec must not be empty: ${spec}"
 }
 
 TMP_ROOT="$(mktemp -d -t bazel-remote-cache-bench.XXXXXX)"
 CACHE_DIR="${TMP_ROOT}/remote-cache"
-REPOSITORY_CACHE_DIR="${TMP_ROOT}/repository-cache"
-GO_REPOSITORY_MODCACHE_DIR="${TMP_ROOT}/go-mod-cache"
+SETUP_CACHE_ROOT_DEFAULT="${XDG_CACHE_HOME:-${HOME}/.cache}/av-bazel-remote-cache-benchmark"
+SETUP_CACHE_ROOT="${BAZEL_REMOTE_CACHE_SETUP_CACHE_ROOT:-${SETUP_CACHE_ROOT_DEFAULT}}"
+USE_FRESH_SETUP_CACHE="${BAZEL_REMOTE_CACHE_FRESH_SETUP_CACHE:-0}"
+if [[ "${USE_FRESH_SETUP_CACHE}" == "1" ]]; then
+  REPOSITORY_CACHE_DIR="${TMP_ROOT}/repository-cache"
+  GO_REPOSITORY_MODCACHE_DIR="${TMP_ROOT}/go-mod-cache"
+else
+  REPOSITORY_CACHE_DIR="${SETUP_CACHE_ROOT}/repository-cache"
+  GO_REPOSITORY_MODCACHE_DIR="${SETUP_CACHE_ROOT}/go-mod-cache"
+fi
 LOG_DIR="${TMP_ROOT}/logs"
 mkdir -p "${CACHE_DIR}" "${REPOSITORY_CACHE_DIR}" "${GO_REPOSITORY_MODCACHE_DIR}" "${LOG_DIR}"
 
@@ -145,6 +142,8 @@ REPRESENTATIVE_LATENCY_MS=""
 # small tolerance of the measured target. Override mode skips that validation
 # because its purpose is fast local iteration, not provenance.
 REPRESENTATIVE_LATENCY_TOLERANCE_MS="${BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS:-15}"
+SETUP_TIMEOUT_SECONDS="${BAZEL_REMOTE_CACHE_SETUP_TIMEOUT_SECONDS:-0}"
+BENCHMARK_TIMEOUT_SECONDS="${BAZEL_REMOTE_CACHE_BENCHMARK_TIMEOUT_SECONDS:-0}"
 
 # This benchmark is intended to model CI workers talking to a remote cache
 # service that is not colocated with the runner. When latency simulation is
@@ -329,13 +328,62 @@ remove_output_base() {
   rm -rf "${output_base}"
 }
 
+FAIL_FAST_FETCH_PATTERN='An error occurred during the fetch of repository|i/o timeout|reading \.\./\.\./go\.mod|no such file or directory'
+
+run_logged_command() {
+  local timeout_seconds="$1"
+  local fail_fast_mode="$2"
+  local log_file="$3"
+  shift 3
+
+  : >"${log_file}"
+  "$@" >"${log_file}" 2>&1 &
+  local cmd_pid=$!
+  local start now matched_line
+
+  start="$(date +%s)"
+  while kill -0 "${cmd_pid}" >/dev/null 2>&1; do
+    if [[ "${fail_fast_mode}" == "1" ]]; then
+      matched_line="$(grep -m 1 -E "${FAIL_FAST_FETCH_PATTERN}" "${log_file}" || true)"
+      if [[ -n "${matched_line}" ]]; then
+        kill "${cmd_pid}" >/dev/null 2>&1 || true
+        wait "${cmd_pid}" >/dev/null 2>&1 || true
+        echo "error: fail-fast fetch failure detected: ${matched_line}" >&2
+        return 125
+      fi
+    fi
+
+    if [[ "${timeout_seconds}" != "0" ]]; then
+      now="$(date +%s)"
+      if (( now - start > timeout_seconds )); then
+        kill "${cmd_pid}" >/dev/null 2>&1 || true
+        wait "${cmd_pid}" >/dev/null 2>&1 || true
+        echo "error: command timed out after ${timeout_seconds}s" >&2
+        return 124
+      fi
+    fi
+
+    sleep 1
+  done
+
+  wait "${cmd_pid}"
+}
+
+print_failure_context() {
+  local log_file="$1"
+
+  grep -E '^(ERROR:|INFO: Repository )|i/o timeout|timed out|no such file or directory|reading ../../go.mod' "${log_file}" | head -n 40 >&2 || true
+}
+
 run_bazel_command() {
   local phase_name="$1"
   local command_spec="$2"
   local remote_cache="$3"
   local output_base="$4"
   local log_file="$5"
-  local start end elapsed
+  local timeout_seconds="$6"
+  local fail_fast_mode="$7"
+  local start end elapsed status
   local -a cmd
 
   load_command_array "${command_spec}"
@@ -381,9 +429,20 @@ run_bazel_command() {
   echo "output_base: ${output_base}" >&2
 
   start="$(now_seconds)"
-  if ! "${cmd[@]}" >"${log_file}" 2>&1; then
+  set +e
+  run_logged_command "${timeout_seconds}" "${fail_fast_mode}" "${log_file}" "${cmd[@]}"
+  status=$?
+  set -e
+  if [[ ${status} -ne 0 ]]; then
     echo "log: ${log_file}" >&2
+    print_failure_context "${log_file}"
     tail -n 40 "${log_file}" >&2 || true
+    if [[ ${status} -eq 124 ]]; then
+      die "${phase_name} timed out after ${timeout_seconds}s"
+    fi
+    if [[ ${status} -eq 125 ]]; then
+      die "${phase_name} hit a fail-fast fetch error"
+    fi
     die "${phase_name} failed"
   fi
   end="$(now_seconds)"
@@ -413,41 +472,19 @@ round_positive_ms_to_int() {
 extract_avg_ttfb_ms() {
   local latency_json_log="$1"
 
-  python3 - "${latency_json_log}" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], encoding='utf-8') as f:
-    report = json.load(f)
-
-print(f"{report['avgTtfbMs']:.1f}")
-PY
+  jq -r '.avgTtfbMs | tostring' "${latency_json_log}"
 }
 
 render_latency_text_report() {
   local latency_json_log="$1"
   local latency_text_log="$2"
 
-  python3 - "${latency_json_log}" >"${latency_text_log}" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], encoding='utf-8') as f:
-    report = json.load(f)
-
-print(f"url={report['url']}")
-print(f"samples={report['samples']}")
-for code in sorted(report['statusCodes'], key=lambda v: int(v)):
-    print(f"http_code[{code}]={report['statusCodes'][code]}")
-print(
-    "avg_connect={:.1f}ms avg_tls={:.1f}ms avg_ttfb={:.1f}ms avg_total={:.1f}ms".format(
-        report['avgConnectMs'],
-        report['avgTlsMs'],
-        report['avgTtfbMs'],
-        report['avgTotalMs'],
-    )
-)
-PY
+  {
+    jq -r '"url=\(.url)"' "${latency_json_log}"
+    jq -r '"samples=\(.samples)"' "${latency_json_log}"
+    jq -r '.statusCodes | to_entries | sort_by(.key | tonumber)[] | "http_code[\(.key)]=\(.value)"' "${latency_json_log}"
+    jq -r '"avg_connect=\(.avgConnectMs)ms avg_tls=\(.avgTlsMs)ms avg_ttfb=\(.avgTtfbMs)ms avg_total=\(.avgTotalMs)ms"' "${latency_json_log}"
+  } >"${latency_text_log}"
 }
 
 measure_http_latency() {
@@ -571,25 +608,35 @@ prepare_proxied_bazel_remote_http() {
   validation_remote_cache_dir="${CACHE_DIR}/latency-validation"
   mkdir -p "${validation_remote_cache_dir}"
 
+  TOXIPROXY_API_URL="$(start_toxiproxy "benchmark-toxiproxy.log")"
+  echo "Using toxiproxy API: ${TOXIPROXY_API_URL}"
+
   validation_remote_cache_url="$(start_bazel_remote "${validation_remote_cache_dir}" "latency-validation-bazel-remote.log")"
   echo "Using latency-validation bazel-remote: ${validation_remote_cache_url}"
-
-  TOXIPROXY_API_URL="$(start_toxiproxy "latency-validation-toxiproxy.log")"
-  echo "Using toxiproxy API: ${TOXIPROXY_API_URL}"
 
   validation_proxy_url="$(create_latency_proxy "${validation_remote_cache_url}" "latency-validation-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
   echo "Using proxied bazel-remote HTTP endpoint: ${validation_proxy_url}"
 
   validate_proxied_http_latency "${validation_proxy_url}"
 
-  stop_toxiproxy
   stop_bazel_remote
 }
 
 echo "Using temporary workspace: ${TMP_ROOT}"
 echo "Set DEBUG=1 to retain the temporary workspace for inspection"
+if [[ "${USE_FRESH_SETUP_CACHE}" == "1" ]]; then
+  echo "Using fresh setup caches for this run"
+else
+  echo "Using persistent setup caches rooted at: ${SETUP_CACHE_ROOT}"
+fi
 echo "Using repository cache: ${REPOSITORY_CACHE_DIR}"
 echo "Using go_repository mod cache: ${GO_REPOSITORY_MODCACHE_DIR}"
+if [[ "${SETUP_TIMEOUT_SECONDS}" != "0" ]]; then
+  printf 'Setup timeout backstop: %ss\n' "${SETUP_TIMEOUT_SECONDS}"
+fi
+if [[ "${BENCHMARK_TIMEOUT_SECONDS}" != "0" ]]; then
+  printf 'Per-benchmark timeout backstop: %ss\n' "${BENCHMARK_TIMEOUT_SECONDS}"
+fi
 determine_representative_latency_ms
 printf 'Representative cache latency input: %sms\n' "${REPRESENTATIVE_LATENCY_MS}"
 prepare_proxied_bazel_remote_http
@@ -599,7 +646,7 @@ prepare_proxied_bazel_remote_http
 # that populates only external dependency state. The per-benchmark runs then use
 # fresh output bases so local action/output state does not bleed across timings.
 setup_output_base="${TMP_ROOT}/output-base-setup"
-setup_time="$(run_bazel_command setup "${SETUP_ARGS_SPEC}" "" "${setup_output_base}" "${LOG_DIR}/setup.log")"
+setup_time="$(run_bazel_command setup "${SETUP_ARGS_SPEC}" "" "${setup_output_base}" "${LOG_DIR}/setup.log" "${SETUP_TIMEOUT_SECONDS}" 1)"
 remove_output_base "${setup_output_base}"
 
 echo
@@ -631,16 +678,21 @@ for index in "${!BENCHMARK_ARGS_SPECS[@]}"; do
   benchmark_remote_cache_dir="${CACHE_DIR}/benchmark-${index}"
   mkdir -p "${benchmark_remote_cache_dir}"
 
-  no_cache_time="$(run_bazel_command "no-cache (${label})" "${benchmark_spec}" "" "${no_cache_output_base}" "${LOG_DIR}/benchmark-${index}-no-cache.log")"
+  no_cache_time="$(run_bazel_command "no-cache (${label})" "${benchmark_spec}" "" "${no_cache_output_base}" "${LOG_DIR}/benchmark-${index}-no-cache.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
   remove_output_base "${no_cache_output_base}"
 
   remote_cache_url="$(start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${index}-bazel-remote.log")"
   echo "Using bazel-remote for benchmark ${index}: ${remote_cache_url}"
 
-  cold_cache_time="$(run_bazel_command "cold-remote-cache (${label})" "${benchmark_spec}" "${remote_cache_url}" "${cold_cache_output_base}" "${LOG_DIR}/benchmark-${index}-cold-remote.log")"
+  proxied_remote_cache_url="$(create_latency_proxy "${remote_cache_url}" "benchmark-${index}-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
+  echo "Using proxied bazel-remote HTTP endpoint for benchmark ${index}: ${proxied_remote_cache_url}"
+
+  cold_cache_time="$(run_bazel_command "cold-remote-cache (${label})" "${benchmark_spec}" "${proxied_remote_cache_url}" "${cold_cache_output_base}" "${LOG_DIR}/benchmark-${index}-cold-remote.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
   remove_output_base "${cold_cache_output_base}"
-  warm_cache_time="$(run_bazel_command "warm-remote-cache (${label})" "${benchmark_spec}" "${remote_cache_url}" "${warm_cache_output_base}" "${LOG_DIR}/benchmark-${index}-warm-remote.log")"
+  warm_cache_time="$(run_bazel_command "warm-remote-cache (${label})" "${benchmark_spec}" "${proxied_remote_cache_url}" "${warm_cache_output_base}" "${LOG_DIR}/benchmark-${index}-warm-remote.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
   remove_output_base "${warm_cache_output_base}"
+
+  stop_bazel_remote
 
   RESULT_LABELS+=("${label}")
   RESULT_NO_CACHE_TIMES+=("${no_cache_time}")

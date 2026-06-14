@@ -546,9 +546,11 @@ checks that the observed proxied average TTFB is within
 validation is skipped when `BAZEL_REMOTE_CACHE_LATENCY_MS` is set, because
 override mode is intended for fast local iteration rather than provenance.
 
-The next iteration is to route the benchmarked HTTP cache traffic itself
-through that validated proxy path, and only after that add the gRPC
-comparison.
+The benchmarked HTTP cache traffic itself now also flows through that
+latency-injecting proxy path for the cold and warm remote-cache runs, so the
+current HTTP results include the modeled representative cache distance. The
+next iteration is to add the parallel gRPC comparison under the same latency
+model.
 
 This is an intentionally coarse approximation of runner-to-us-east-1
 network distance, not a claim that the public endpoint exactly matches the
