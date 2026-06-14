@@ -536,10 +536,12 @@ To keep that question separate from transport guesswork, representative
 cache latency is measured before the benchmark from a public AWS us-east-1
 regional endpoint. The current approximation uses the repo-local
 `//tools/measure-http-latency` tool and takes average TTFB as the latency
-input for the benchmark. That measured latency is then intended to be
-injected into local benchmark traffic to `bazel-remote` so the harness can
-compare cache protocols under a realistic network model without needing a
-deployed cache server for every run.
+input for the benchmark. This is intentionally split from the next step:
+the harness first establishes and records the latency input, and a future
+iteration will then feed that measured value into `toxiproxy` so local
+benchmark traffic to `bazel-remote` actually experiences the modeled
+delay. That separation is deliberate so the latency source of truth is in
+place before proxy behavior depends on it.
 
 This is an intentionally coarse approximation of runner-to-us-east-1
 network distance, not a claim that the public endpoint exactly matches the

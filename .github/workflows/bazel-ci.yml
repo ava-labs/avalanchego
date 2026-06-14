@@ -124,13 +124,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix
-      - name: Measure representative cache-endpoint latency
-        shell: nix develop --command bash -x {0}
-        run: |
-          set -euo pipefail
-          bazelisk run //tools/measure-http-latency -- \
-            --url https://ec2.us-east-1.amazonaws.com/ \
-            --samples 10
       - name: Run Bazel remote cache benchmark
         shell: nix develop --command bash -x {0}
         run: |
