@@ -8,7 +8,6 @@ package cchain
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,16 +15,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -34,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
@@ -81,24 +83,32 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	// TODO(StephenButtolph): Allow minimal user configuration via configBytes.
-	_ = configBytes
+	userConfig, err := parseConfig(configBytes)
+	if err != nil {
+		return fmt.Errorf("parsing user config: %w", err)
+	}
+	warpMessages, err := userConfig.WarpMessages()
+	if err != nil {
+		return fmt.Errorf("parsing warp messages: %w", err)
+	}
 
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
 	trieDBConfig := triedb.HashDefaults
-	trieDB := triedb.NewDatabase(ethDB, trieDBConfig)
 
-	// TODO(StephenButtolph): Replace this with Coreth's genesis format.
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
-		return fmt.Errorf("unmarshalling genesis: %w", err)
-	}
-	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis)
+	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
-		return fmt.Errorf("setting up genesis block: %w", err)
+		return fmt.Errorf("parsing genesis: %w", err)
+	}
+	genesisBlock, err := writeGenesis(
+		ethDB,
+		triedb.NewDatabase(ethDB, trieDBConfig),
+		genesis,
+	)
+	if err != nil {
+		return fmt.Errorf("writing genesis: %w", err)
 	}
 
 	vm.state, err = state.New(snowCtx, avaDB)
@@ -109,11 +119,15 @@ func (vm *VM) Initialize(
 		return vm.state.Close()
 	})
 
+	chainConfig := genesis.Config
 	pendingTxs := txpool.NewPending()
+	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
 		snowCtx,
 		vm.state,
+		chainConfig,
 		pendingTxs,
+		warpStorage,
 	)
 	mempoolConfig := legacypool.DefaultConfig
 	// Treat all transactions equally regardless of submission source — no
@@ -125,7 +139,7 @@ func (vm *VM) Initialize(
 			TrieDBConfig: trieDBConfig,
 		},
 	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesisBlock, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
@@ -194,6 +208,17 @@ func (vm *VM) Initialize(
 		gossipWG.Wait()
 		return nil
 	})
+
+	const warpSignatureCacheSize = 512
+	warpVerifier := warp.NewVerifier(&warpBackend{vm: vm.VM}, warpStorage)
+	warpHandler := acp118.NewCachedHandler(
+		lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
+		warpVerifier,
+		snowCtx.WarpSigner,
+	)
+	if err := vm.AddHandler(acp118.HandlerID, warpHandler); err != nil {
+		return fmt.Errorf("registering warp signature handler: %w", err)
+	}
 
 	return nil
 }
