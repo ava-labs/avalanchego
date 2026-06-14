@@ -198,6 +198,8 @@ BENCHMARK_TIMEOUT_SECONDS="${BAZEL_REMOTE_CACHE_BENCHMARK_TIMEOUT_SECONDS:-0}"
 
 REMOTE_PID=""
 REMOTE_LOG=""
+REMOTE_HTTP_URL=""
+REMOTE_GRPC_TARGET=""
 TOXIPROXY_PID=""
 TOXIPROXY_LOG=""
 TOXIPROXY_API_URL=""
@@ -209,6 +211,8 @@ stop_bazel_remote() {
     wait "${REMOTE_PID}" >/dev/null 2>&1 || true
   fi
   REMOTE_PID=""
+  REMOTE_HTTP_URL=""
+  REMOTE_GRPC_TARGET=""
 }
 
 stop_toxiproxy() {
@@ -247,26 +251,28 @@ choose_port() {
 start_bazel_remote() {
   local cache_dir="$1"
   local log_name="$2"
-  local port attempts
+  local http_port grpc_port attempts
   attempts=10
 
   stop_bazel_remote
 
   for ((i = 1; i <= attempts; i++)); do
-    port="$(choose_port)"
+    http_port="$(choose_port)"
+    grpc_port="$(choose_port)"
     REMOTE_LOG="${LOG_DIR}/${log_name}"
 
     "${BAZEL_REMOTE_LAUNCHER[@]}" \
       --dir "${cache_dir}" \
       --max_size 5 \
-      --http_address "127.0.0.1:${port}" \
-      --grpc_address none \
+      --http_address "127.0.0.1:${http_port}" \
+      --grpc_address "127.0.0.1:${grpc_port}" \
       >"${REMOTE_LOG}" 2>&1 &
     REMOTE_PID=$!
 
     sleep 1
     if kill -0 "${REMOTE_PID}" >/dev/null 2>&1; then
-      echo "http://127.0.0.1:${port}"
+      REMOTE_HTTP_URL="http://127.0.0.1:${http_port}"
+      REMOTE_GRPC_TARGET="127.0.0.1:${grpc_port}"
       return 0
     fi
 
@@ -341,7 +347,7 @@ remove_output_base() {
   rm -rf "${output_base}"
 }
 
-FAIL_FAST_FETCH_PATTERN='An error occurred during the fetch of repository|i/o timeout|reading \.\./\.\./go\.mod|no such file or directory'
+FAIL_FAST_FETCH_PATTERN='An error occurred during the fetch of repository|Error in fail:|i/o timeout|reading \.\./\.\./go\.mod|copy_file_range: is a directory|no such file or directory'
 
 run_logged_command() {
   local timeout_seconds="$1"
@@ -385,7 +391,7 @@ run_logged_command() {
 print_failure_context() {
   local log_file="$1"
 
-  grep -E '^(ERROR:|INFO: Repository )|i/o timeout|timed out|no such file or directory|reading ../../go.mod' "${log_file}" | head -n 40 >&2 || true
+  grep -E '^(ERROR:|INFO: Repository )|Error in fail:|i/o timeout|timed out|copy_file_range: is a directory|no such file or directory|reading ../../go.mod' "${log_file}" | head -n 40 >&2 || true
 }
 
 run_bazel_command() {
@@ -542,20 +548,13 @@ within_tolerance() {
   '
 }
 
-proxy_upstream_address() {
-  local remote_cache_url="$1"
-  [[ "${remote_cache_url}" == http://* ]] || die "expected http remote cache URL, got: ${remote_cache_url}"
-  printf '%s\n' "${remote_cache_url#http://}"
-}
-
-create_latency_proxy() {
-  local remote_cache_url="$1"
+create_latency_proxy_for_address() {
+  local upstream_address="$1"
   local proxy_name="$2"
   local latency_ms="$3"
-  local listen_port upstream_address rounded_latency_ms
+  local listen_port rounded_latency_ms
 
   listen_port="$(choose_port)"
-  upstream_address="$(proxy_upstream_address "${remote_cache_url}")"
   rounded_latency_ms="$(round_positive_ms_to_int "${latency_ms}")"
 
   "${TOXIPROXY_CLI_LAUNCHER[@]}" --host "${TOXIPROXY_API_URL}" \
@@ -574,7 +573,24 @@ create_latency_proxy() {
     "${proxy_name}" \
     >/dev/null
 
-  printf 'http://127.0.0.1:%s\n' "${listen_port}"
+  printf '127.0.0.1:%s\n' "${listen_port}"
+}
+
+create_http_latency_proxy() {
+  local remote_cache_url="$1"
+  local proxy_name="$2"
+  local latency_ms="$3"
+
+  [[ "${remote_cache_url}" == http://* ]] || die "expected http remote cache URL, got: ${remote_cache_url}"
+  printf 'http://%s\n' "$(create_latency_proxy_for_address "${remote_cache_url#http://}" "${proxy_name}" "${latency_ms}")"
+}
+
+create_grpc_latency_proxy() {
+  local remote_cache_target="$1"
+  local proxy_name="$2"
+  local latency_ms="$3"
+
+  printf 'grpc://%s\n' "$(create_latency_proxy_for_address "${remote_cache_target}" "${proxy_name}" "${latency_ms}")"
 }
 
 validate_proxied_http_latency() {
@@ -641,11 +657,14 @@ prepare_proxied_bazel_remote_http() {
   TOXIPROXY_API_URL="$(start_toxiproxy "benchmark-toxiproxy.log")"
   echo "Using toxiproxy API: ${TOXIPROXY_API_URL}"
 
-  validation_remote_cache_url="$(start_bazel_remote "${validation_remote_cache_dir}" "latency-validation-bazel-remote.log")"
+  start_bazel_remote "${validation_remote_cache_dir}" "latency-validation-bazel-remote.log"
+  validation_remote_cache_url="${REMOTE_HTTP_URL}"
   echo "Using latency-validation bazel-remote: ${validation_remote_cache_url}"
 
-  validation_proxy_url="$(create_latency_proxy "${validation_remote_cache_url}" "latency-validation-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
+  validation_proxy_url="$(create_http_latency_proxy "${validation_remote_cache_url}" "latency-validation-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
   echo "Using proxied bazel-remote HTTP endpoint: ${validation_proxy_url}"
+
+  echo "Using latency-validation bazel-remote gRPC endpoint: ${REMOTE_GRPC_TARGET}"
 
   validate_proxied_http_latency "${validation_proxy_url}"
 
@@ -685,10 +704,30 @@ echo "------------"
 echo "command: bazelisk ${SETUP_ARGS_SPEC}"
 printf 'time: %ss\n' "${setup_time}"
 
+run_cached_pair() {
+  local phase_prefix="$1"
+  local benchmark_spec="$2"
+  local remote_cache="$3"
+  local cold_output_base="$4"
+  local warm_output_base="$5"
+  local cold_log_file="$6"
+  local warm_log_file="$7"
+  local cold_time warm_time
+
+  cold_time="$(run_bazel_command "${phase_prefix}-cold-remote-cache (${benchmark_spec})" "${benchmark_spec}" "${remote_cache}" "${cold_output_base}" "${cold_log_file}" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
+  remove_output_base "${cold_output_base}"
+  warm_time="$(run_bazel_command "${phase_prefix}-warm-remote-cache (${benchmark_spec})" "${benchmark_spec}" "${remote_cache}" "${warm_output_base}" "${warm_log_file}" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
+  remove_output_base "${warm_output_base}"
+
+  printf '%s\n%s\n' "${cold_time}" "${warm_time}"
+}
+
 declare -a RESULT_LABELS=()
 declare -a RESULT_NO_CACHE_TIMES=()
-declare -a RESULT_COLD_CACHE_TIMES=()
-declare -a RESULT_WARM_CACHE_TIMES=()
+declare -a RESULT_HTTP_COLD_TIMES=()
+declare -a RESULT_HTTP_WARM_TIMES=()
+declare -a RESULT_GRPC_COLD_TIMES=()
+declare -a RESULT_GRPC_WARM_TIMES=()
 all_passed=true
 
 for index in "${!BENCHMARK_ARGS_SPECS[@]}"; do
@@ -700,46 +739,96 @@ for index in "${!BENCHMARK_ARGS_SPECS[@]}"; do
   echo "========================================"
 
   no_cache_output_base="${TMP_ROOT}/output-base-benchmark-${index}-no-cache"
-  cold_cache_output_base="${TMP_ROOT}/output-base-benchmark-${index}-cold-remote"
-  warm_cache_output_base="${TMP_ROOT}/output-base-benchmark-${index}-warm-remote"
-  # Each benchmark command gets its own empty remote cache so the "cold" run is
-  # actually cold for that command instead of inheriting artifacts from a prior
-  # benchmark section.
+  http_cold_output_base="${TMP_ROOT}/output-base-benchmark-${index}-http-cold-remote"
+  http_warm_output_base="${TMP_ROOT}/output-base-benchmark-${index}-http-warm-remote"
+  grpc_cold_output_base="${TMP_ROOT}/output-base-benchmark-${index}-grpc-cold-remote"
+  grpc_warm_output_base="${TMP_ROOT}/output-base-benchmark-${index}-grpc-warm-remote"
+  # Each benchmark command gets its own empty remote cache so the protocol-
+  # specific cold/warm runs are actually cold for that command instead of
+  # inheriting artifacts from a prior benchmark section.
   benchmark_remote_cache_dir="${CACHE_DIR}/benchmark-${index}"
   mkdir -p "${benchmark_remote_cache_dir}"
 
   no_cache_time="$(run_bazel_command "no-cache (${label})" "${benchmark_spec}" "" "${no_cache_output_base}" "${LOG_DIR}/benchmark-${index}-no-cache.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
   remove_output_base "${no_cache_output_base}"
 
-  remote_cache_url="$(start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${index}-bazel-remote.log")"
-  echo "Using bazel-remote for benchmark ${index}: ${remote_cache_url}"
+  start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${index}-bazel-remote.log"
+  remote_cache_url="${REMOTE_HTTP_URL}"
+  remote_cache_grpc_target="${REMOTE_GRPC_TARGET}"
+  echo "Using bazel-remote HTTP endpoint for benchmark ${index}: ${remote_cache_url}"
+  echo "Using bazel-remote gRPC endpoint for benchmark ${index}: ${remote_cache_grpc_target}"
 
-  proxied_remote_cache_url="$(create_latency_proxy "${remote_cache_url}" "benchmark-${index}-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
-  echo "Using proxied bazel-remote HTTP endpoint for benchmark ${index}: ${proxied_remote_cache_url}"
+  proxied_http_remote_cache_url="$(create_http_latency_proxy "${remote_cache_url}" "benchmark-${index}-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
+  echo "Using proxied bazel-remote HTTP endpoint for benchmark ${index}: ${proxied_http_remote_cache_url}"
 
-  cold_cache_time="$(run_bazel_command "cold-remote-cache (${label})" "${benchmark_spec}" "${proxied_remote_cache_url}" "${cold_cache_output_base}" "${LOG_DIR}/benchmark-${index}-cold-remote.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
-  remove_output_base "${cold_cache_output_base}"
-  warm_cache_time="$(run_bazel_command "warm-remote-cache (${label})" "${benchmark_spec}" "${proxied_remote_cache_url}" "${warm_cache_output_base}" "${LOG_DIR}/benchmark-${index}-warm-remote.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
-  remove_output_base "${warm_cache_output_base}"
+  mapfile -t http_cache_times < <(run_cached_pair \
+    "http" \
+    "${benchmark_spec}" \
+    "${proxied_http_remote_cache_url}" \
+    "${http_cold_output_base}" \
+    "${http_warm_output_base}" \
+    "${LOG_DIR}/benchmark-${index}-http-cold-remote.log" \
+    "${LOG_DIR}/benchmark-${index}-http-warm-remote.log")
+  http_cold_time="${http_cache_times[0]}"
+  http_warm_time="${http_cache_times[1]}"
+
+  stop_bazel_remote
+  rm -rf "${benchmark_remote_cache_dir}"
+  mkdir -p "${benchmark_remote_cache_dir}"
+
+  start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${index}-grpc-bazel-remote.log"
+  remote_cache_url="${REMOTE_HTTP_URL}"
+  remote_cache_grpc_target="${REMOTE_GRPC_TARGET}"
+  echo "Using bazel-remote HTTP endpoint for benchmark ${index} gRPC pair: ${remote_cache_url}"
+  echo "Using bazel-remote gRPC endpoint for benchmark ${index} gRPC pair: ${remote_cache_grpc_target}"
+
+  proxied_grpc_remote_cache_url="$(create_grpc_latency_proxy "${remote_cache_grpc_target}" "benchmark-${index}-grpc-cache" "${REPRESENTATIVE_LATENCY_MS}")"
+  echo "Using proxied bazel-remote gRPC endpoint for benchmark ${index}: ${proxied_grpc_remote_cache_url}"
+
+  mapfile -t grpc_cache_times < <(run_cached_pair \
+    "grpc" \
+    "${benchmark_spec}" \
+    "${proxied_grpc_remote_cache_url}" \
+    "${grpc_cold_output_base}" \
+    "${grpc_warm_output_base}" \
+    "${LOG_DIR}/benchmark-${index}-grpc-cold-remote.log" \
+    "${LOG_DIR}/benchmark-${index}-grpc-warm-remote.log")
+  grpc_cold_time="${grpc_cache_times[0]}"
+  grpc_warm_time="${grpc_cache_times[1]}"
 
   stop_bazel_remote
 
   RESULT_LABELS+=("${label}")
   RESULT_NO_CACHE_TIMES+=("${no_cache_time}")
-  RESULT_COLD_CACHE_TIMES+=("${cold_cache_time}")
-  RESULT_WARM_CACHE_TIMES+=("${warm_cache_time}")
+  RESULT_HTTP_COLD_TIMES+=("${http_cold_time}")
+  RESULT_HTTP_WARM_TIMES+=("${http_warm_time}")
+  RESULT_GRPC_COLD_TIMES+=("${grpc_cold_time}")
+  RESULT_GRPC_WARM_TIMES+=("${grpc_warm_time}")
 
-  if ! less_than "${warm_cache_time}" "${no_cache_time}"; then
-    echo "FAIL: warm remote cache was not faster than no cache for: bazelisk ${label}" >&2
+  if ! less_than "${http_warm_time}" "${no_cache_time}"; then
+    echo "FAIL: warm HTTP remote cache was not faster than no cache for: bazelisk ${label}" >&2
     all_passed=false
   fi
-  if ! less_than "${warm_cache_time}" "${cold_cache_time}"; then
-    echo "FAIL: warm remote cache was not faster than cold remote cache for: bazelisk ${label}" >&2
+  if ! less_than "${http_warm_time}" "${http_cold_time}"; then
+    echo "FAIL: warm HTTP remote cache was not faster than cold HTTP remote cache for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
+  if ! less_than "${grpc_warm_time}" "${no_cache_time}"; then
+    echo "FAIL: warm gRPC remote cache was not faster than no cache for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
+  if ! less_than "${grpc_warm_time}" "${grpc_cold_time}"; then
+    echo "FAIL: warm gRPC remote cache was not faster than cold gRPC remote cache for: bazelisk ${label}" >&2
     all_passed=false
   fi
   if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]] \
-    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${index}-warm-remote.log"; then
-    echo "FAIL: warm remote cache log did not contain required patterns for: bazelisk ${label}" >&2
+    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${index}-http-warm-remote.log"; then
+    echo "FAIL: warm HTTP remote cache log did not contain required patterns for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
+  if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]] \
+    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${index}-grpc-warm-remote.log"; then
+    echo "FAIL: warm gRPC remote cache log did not contain required patterns for: bazelisk ${label}" >&2
     all_passed=false
   fi
 done
@@ -751,17 +840,19 @@ printf 'setup %-63s %8ss\n' "bazelisk ${SETUP_ARGS_SPEC}" "${setup_time}"
 for index in "${!RESULT_LABELS[@]}"; do
   echo
   echo "bazelisk ${RESULT_LABELS[index]}"
-  printf '  no-cache          %8ss\n' "${RESULT_NO_CACHE_TIMES[index]}"
-  printf '  cold-remote-cache %8ss\n' "${RESULT_COLD_CACHE_TIMES[index]}"
-  printf '  warm-remote-cache %8ss\n' "${RESULT_WARM_CACHE_TIMES[index]}"
+  printf '  no-cache   %20ss\n' "${RESULT_NO_CACHE_TIMES[index]}"
+  printf '  http-cold  %20ss\n' "${RESULT_HTTP_COLD_TIMES[index]}"
+  printf '  http-warm  %20ss\n' "${RESULT_HTTP_WARM_TIMES[index]}"
+  printf '  grpc-cold  %20ss\n' "${RESULT_GRPC_COLD_TIMES[index]}"
+  printf '  grpc-warm  %20ss\n' "${RESULT_GRPC_WARM_TIMES[index]}"
 done
 
 if [[ "${all_passed}" != true ]]; then
   exit 1
 fi
 
-echo "PASS: warm remote cache was faster than both no cache and cold remote cache for every benchmark command"
+echo "PASS: warm HTTP and gRPC remote cache runs were faster than both no cache and their corresponding cold remote cache runs for every benchmark command"
 if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]]; then
-  echo "PASS: warm remote cache logs contained all required patterns"
+  echo "PASS: warm HTTP and gRPC remote cache logs contained all required patterns"
 fi
 SUCCESS=true
