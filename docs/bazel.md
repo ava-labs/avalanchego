@@ -950,13 +950,16 @@ remote caching enough that gRPC becomes necessary.
 To keep that question separate from transport guesswork, representative
 cache latency is measured before the benchmark from a public AWS us-east-1
 regional endpoint. The current approximation uses the repo-local
-`//tools/measure-http-latency` tool and takes average TTFB as the latency
-input for the benchmark.
+`//tools/measure-http-latency` tool in `--mode=warm-h2`, which reuses a
+single connection and measures request-write to first-response-byte latency.
+That is a better no-server proxy for persistent gRPC behavior than cold
+TTFB, because it avoids repeatedly charging TCP/TLS setup costs that a warm
+channel would not pay.
 
 The harness now also validates that input against a local proxied path
 before the measured Bazel runs begin: it starts `bazel-remote`, starts
 `toxiproxy`, applies the measured latency to a proxied HTTP endpoint, and
-checks that the observed proxied average TTFB is within
+checks that the observed proxied warm reused-connection latency is within
 `BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS` of the measured target. This
 validation is skipped when `BAZEL_REMOTE_CACHE_LATENCY_MS` is set, because
 override mode is intended for fast local iteration rather than provenance.
@@ -967,10 +970,12 @@ current HTTP results include the modeled representative cache distance. The
 next iteration is to add the parallel gRPC comparison under the same latency
 model.
 
-This is an intentionally coarse approximation of runner-to-us-east-1
-network distance, not a claim that the public endpoint exactly matches the
-latency characteristics of a future EKS-hosted `bazel-remote`. Measuring
-against a real deployed cache service is the next planned refinement.
+This is still an approximation of runner-to-us-east-1 network distance,
+not a claim that the public endpoint exactly matches the latency
+characteristics of a future EKS-hosted `bazel-remote`. It should be treated
+as a better steady-state transport proxy than cold-connect TTFB, not as a
+perfect simulation of a deployed cache service. Measuring against a real
+deployed cache service is the next planned refinement.
 
 For fast local iteration, the benchmark also supports an explicit latency
 override via `BAZEL_REMOTE_CACHE_LATENCY_MS`. When that override is set,

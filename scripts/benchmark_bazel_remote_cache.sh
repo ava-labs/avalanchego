@@ -46,7 +46,7 @@ Bazel output state each time:
 
 Representative cache latency is determined before the benchmark starts unless
 BAZEL_REMOTE_CACHE_LATENCY_MS is set. In measured mode, the script runs
-`bazel run //tools/measure-http-latency` against
+`bazel run //tools/measure-http-latency -- --mode=warm-h2` against
 BAZEL_REMOTE_CACHE_LATENCY_URL (default: https://ec2.us-east-1.amazonaws.com/),
 then validates that a toxiproxy-induced HTTP path to bazel-remote is within
 BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS of the measured target.
@@ -165,12 +165,16 @@ BENCHMARK_TIMEOUT_SECONDS="${BAZEL_REMOTE_CACHE_BENCHMARK_TIMEOUT_SECONDS:-0}"
 # talking to bazel-remote directly.
 #
 # The representative delay is determined before each benchmark run. By default
-# the script measures average TTFB to a public AWS us-east-1 regional endpoint
-# using //tools/measure-http-latency.
+# the script measures warm reused-connection HTTP/2 request latency to a public
+# AWS us-east-1 regional endpoint using //tools/measure-http-latency in
+# --mode=warm-h2.
 #
 # Why this shape:
-# - average TTFB is a coarse but useful approximation of tiny request latency,
-#   which is the most relevant first-order effect for cache lookup traffic
+# - persistent gRPC is much closer to reused-connection request/response
+#   latency than to cold-connect TTFB, so warm-h2 is a better first-order proxy
+# - the tool measures request write -> first response byte on reused
+#   connections, which avoids repeatedly charging TCP/TLS setup costs that a
+#   warm gRPC channel would not pay
 # - a public regional AWS endpoint lets the benchmark approximate runner to
 #   us-east-1 network distance before a real deployed bazel-remote exists
 # - live measurement avoids stale hard-coded latency values as runner routing
@@ -180,10 +184,10 @@ BENCHMARK_TIMEOUT_SECONDS="${BAZEL_REMOTE_CACHE_BENCHMARK_TIMEOUT_SECONDS:-0}"
 #   measurement and future proxy-path validation
 #
 # Trade-off:
-# this does not claim to reproduce the exact latency of a future EKS-hosted
-# bazel-remote deployment. It is only a first-pass approximation of expected
-# regional network distance. Measuring against a real deployed bazel-remote is
-# the next planned refinement of the experiment.
+# this still does not claim to reproduce the exact behavior of a future
+# EKS-hosted bazel-remote deployment. It is a better no-server approximation of
+# steady-state cache request latency. Measuring against a real deployed
+# bazel-remote remains the next planned refinement of the experiment.
 #
 # The intended comparison for each benchmark command is:
 #   - no cache
@@ -500,10 +504,10 @@ round_positive_ms_to_int() {
   awk -v value="$1" 'BEGIN { printf "%d", int(value + 0.5) }'
 }
 
-extract_avg_ttfb_ms() {
+extract_representative_latency_ms() {
   local latency_json_log="$1"
 
-  jq -r '.avgTtfbMs | tostring' "${latency_json_log}"
+  jq -r '.avgWriteToFirstByteMs | tostring' "${latency_json_log}"
 }
 
 render_latency_text_report() {
@@ -512,9 +516,11 @@ render_latency_text_report() {
 
   {
     jq -r '"url=\(.url)"' "${latency_json_log}"
+    jq -r '"mode=\(.mode)"' "${latency_json_log}"
     jq -r '"samples=\(.samples)"' "${latency_json_log}"
+    jq -r '"reused_samples=\(.reusedSamples)"' "${latency_json_log}"
     jq -r '.statusCodes | to_entries | sort_by(.key | tonumber)[] | "http_code[\(.key)]=\(.value)"' "${latency_json_log}"
-    jq -r '"avg_connect=\(.avgConnectMs)ms avg_tls=\(.avgTlsMs)ms avg_ttfb=\(.avgTtfbMs)ms avg_total=\(.avgTotalMs)ms"' "${latency_json_log}"
+    jq -r '"avg_connect=\(.avgConnectMs)ms avg_tls=\(.avgTlsMs)ms avg_ttfb=\(.avgTtfbMs)ms avg_write_to_first_byte=\(.avgWriteToFirstByteMs)ms avg_total=\(.avgTotalMs)ms"' "${latency_json_log}"
   } >"${latency_text_log}"
 }
 
@@ -527,6 +533,7 @@ measure_http_latency() {
   echo "${label}"
   "${NIX_RUN}" bazelisk run //tools/measure-http-latency -- \
     --url "${url}" \
+    --mode warm-h2 \
     --samples "${REPRESENTATIVE_LATENCY_SAMPLES}" \
     --timeout "${REPRESENTATIVE_LATENCY_TIMEOUT}" \
     --format json \
@@ -611,7 +618,7 @@ validate_proxied_http_latency() {
     "${latency_json_log}" \
     "${latency_text_log}"
 
-  observed_latency_ms="$(extract_avg_ttfb_ms "${latency_json_log}")"
+  observed_latency_ms="$(extract_representative_latency_ms "${latency_json_log}")"
   printf 'proxy target latency: %sms\n' "${REPRESENTATIVE_LATENCY_MS}"
   printf 'proxy observed latency: %sms\n' "${observed_latency_ms}"
   printf 'proxy tolerance: %sms\n' "${REPRESENTATIVE_LATENCY_TOLERANCE_MS}"
@@ -645,7 +652,7 @@ determine_representative_latency_ms() {
     "${latency_json_log}" \
     "${latency_text_log}"
 
-  REPRESENTATIVE_LATENCY_MS="$(extract_avg_ttfb_ms "${latency_json_log}")"
+  REPRESENTATIVE_LATENCY_MS="$(extract_representative_latency_ms "${latency_json_log}")"
 }
 
 prepare_proxied_bazel_remote_http() {
