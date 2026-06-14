@@ -139,6 +139,11 @@ Local run of `task bazel-benchmark-remote-cache-ids-test` still passes and now
 also proves cached test-result reuse via Bazel output indicating the warm run
 executed `0 out of 1` tests.
 
+Important follow-up: the `ids_test` smoke script should be kept aligned with the
+generalized harness's shared-setup-cache behavior. In particular, it should use
+and preserve the same shared `GOMODCACHE` approach intentionally rather than as
+an accidental divergence from the generalized script.
+
 ## Why the benchmark is structured this way
 The benchmark is intentionally trying to model:
 - one setup phase per runner/architecture
@@ -331,6 +336,24 @@ Concretely, the next step should:
 5. keep the iteration loop scoped to `//ids:ids_test` until the proxied HTTP
    cache path is stable, then re-run the task-configured generalized benchmark
 6. stop there; do not yet add the gRPC benchmark matrix
+
+Additional findings to carry into the next session:
+- restoring shared `GOMODCACHE` support was consistent with the original intent
+  of commit `b1c2624d7a` (`Share Gazelle module cache across benchmark runs`)
+- the later loss of those flags appears to have been an accidental stale-base
+  overwrite, not a documented intentional reversal
+- setup-side dependency caches should be reusable across repeated local
+  benchmark invocations for faster iteration, but that reuse must be explicitly
+  opt-in and must apply only to setup state (`repository_cache` and shared
+  `GOMODCACHE`), not to the remote cache contents
+- remote cache directories must remain isolated per benchmark command because
+  the point of the benchmark is to measure the delta between no-cache, cold, and
+  warm cache behavior; reusing remote cache state would invalidate the cold-run
+  semantics
+- documentation should be de-duplicated: `docs/bazel.md` should remain the
+  canonical user-facing explanation of the Bazel benchmark model and shared
+  `GOMODCACHE` requirement, while this handoff should record investigation
+  status, regressions, decisions, and next steps and link back to the doc
 
 The purpose of that next step is to move from “latency injection is real” to
 “benchmarked cache behavior actually flows through the validated proxy path.”
