@@ -534,7 +534,7 @@ remote caching enough that gRPC becomes necessary.
 
 To keep that question separate from transport guesswork, representative
 cache latency is measured outside the benchmark from GitHub Actions
-runners to an AWS us-east-1 hosted endpoint using `curl`. That measured
+runners to a public AWS us-east-1 regional endpoint using `curl`. That measured
 latency is then injected into local benchmark traffic to `bazel-remote`
 so the harness can compare cache protocols under a realistic network
 model without needing a deployed cache server for every run.
