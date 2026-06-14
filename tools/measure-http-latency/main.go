@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -83,17 +84,17 @@ func parseFlags(args []string) (config, error) {
 		return config{}, err
 	}
 	if cfg.url == "" {
-		return config{}, fmt.Errorf("--url is required")
+		return config{}, errors.New("--url is required")
 	}
 	if cfg.samples <= 0 {
-		return config{}, fmt.Errorf("--samples must be > 0")
+		return config{}, errors.New("--samples must be > 0")
 	}
 	cfg.format = strings.ToLower(cfg.format)
 	if cfg.format != "text" && cfg.format != "json" {
-		return config{}, fmt.Errorf("--format must be one of: text, json")
+		return config{}, errors.New("--format must be one of: text, json")
 	}
 	if cfg.timeout <= 0 {
-		return config{}, fmt.Errorf("--timeout must be > 0")
+		return config{}, errors.New("--timeout must be > 0")
 	}
 	return cfg, nil
 }
