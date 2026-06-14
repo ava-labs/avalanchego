@@ -23,6 +23,8 @@ There is also supporting documentation and CI wiring:
 The generalized benchmark is task-configured with:
 - setup: `fetch --all`
 - benchmarks:
+  - `build //main:avalanchego`
+  - `build --config=race //main:avalanchego`
   - `test //... -- -//graft/...`
 
 For each benchmark command it currently measures:
@@ -39,6 +41,9 @@ Important behavior:
 - keeps temp workspace on failure for inspection
 - deletes successful output bases eagerly to reduce peak disk usage
 - measures representative cache latency at benchmark startup unless overridden
+- starts a temporary `bazel-remote` + `toxiproxy` validation path before the measured Bazel runs begin
+- in default measured mode, validates that the proxied HTTP path stays within `BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS` of the measured target
+- in override mode, still creates the proxied path but skips live measurement and proxy-path validation
 
 ## Important implementation detail discovered after initial rollout
 `repository_cache` alone was not sufficient for fresh-output-base reuse of Gazelle `go_repository` dependencies.
@@ -51,19 +56,19 @@ This showed up clearly on macOS CI in PR `5530`:
 
 The cause is that Gazelle `go_repository` normally keeps a per-output-base internal Go module cache, so a fresh `--output_base` can still trigger fresh Go module downloads even after `bazel fetch //...`.
 
-### Fix now in place
-Both benchmark scripts now force Gazelle to share a host-level Go module cache across setup and measured runs by passing:
+### Current fix in place
+The benchmark scripts again force Gazelle to share a host-level Go module cache
+across setup and measured runs with:
 - `--repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1`
 - `--repo_env=GOMODCACHE=<shared temp dir>`
-
-This is in addition to the shared Bazel `repository_cache`.
 
 Conceptually:
 - `repository_cache` handles Bazel-managed downloads
 - shared `GOMODCACHE` handles Gazelle `go_repository` module downloads
 - fresh `output_base` still isolates local action/output state
 
-This was the key missing piece needed to make the setup phase actually reduce repeated Go-module downloading across fresh output bases.
+This is current behavior in both benchmark scripts and should be treated as a
+required part of the harness rather than merely historical context.
 
 ## Current CI wiring
 `.github/workflows/bazel-ci.yml` now includes a non-required observational job:
@@ -88,29 +93,46 @@ The workflow now follows the repo pattern from `.github/workflows/ci.yml` by usi
 ### macOS benchmark failure in PR 5530
 The important failure was not the nix setup; it was the benchmark itself still attempting Go-module network resolution from a fresh output base.
 
-That failure is what motivated the shared `GOMODCACHE` change.
+That failure is what motivated the shared `GOMODCACHE` support that is now back
+in the scripts.
 
-If a future session sees a similar macOS failure, first verify whether the benchmark run includes both:
+If a future session sees a similar macOS failure, first verify whether the current benchmark run still includes both:
 - `--repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1`
 - `--repo_env=GOMODCACHE=...`
 
 ## Validated local results
 ### Generalized benchmark
 The generalized harness still works as a three-way benchmark and now also
-measures representative latency before the timed runs begin.
+measures representative latency before the timed runs begin, then validates a
+proxied HTTP path to `bazel-remote` against that target before the measured
+Bazel runs start.
 
 Validated local behaviors:
-- setup uses `fetch --all`
-- benchmark command is currently `test //... -- -//graft/...`
+- task-configured generalized benchmark setup is `fetch --all`
+- task-configured generalized benchmark commands are currently:
+  - `build //main:avalanchego`
+  - `build --config=race //main:avalanchego`
+  - `test //... -- -//graft/...`
 - default mode measures representative latency with
   `bazel run //tools/measure-http-latency`
-- override mode works with `BAZEL_REMOTE_CACHE_LATENCY_MS=<positive-ms>`
+- default mode also starts `bazel-remote` + `toxiproxy`, applies the measured
+  latency to a proxied HTTP endpoint, and verifies the observed proxied TTFB is
+  within `BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS` of the target
+- current validation probes the proxied `bazel-remote` HTTP root only to
+  measure request latency; the exact HTTP status code is not the signal of
+  interest there, only the observed TTFB through the proxy path
+- override mode works with `BAZEL_REMOTE_CACHE_LATENCY_MS=<positive-ms>` and
+  skips both live latency measurement and proxy-path validation
+- local smoke validation of the new toxiproxy path was performed with the
+  narrower command pair `fetch //ids:ids_test` + `test //ids:ids_test` to keep
+  iteration fast while validating the proxying mechanics
 - benchmark timing still behaves as expected for no-cache / cold / warm runs
 
-These numbers are host-specific; the important point is that the generalized
-flow now completes successfully with fresh output bases while reusing both
-repository cache and Gazelle module cache, and that it has a live latency
-measurement input ready for the next toxiproxy step.
+These numbers are host-specific; the important point is that the validated
+local smoke flow now has both a live latency measurement input and a validated
+proxied HTTP path ready for the next step of routing benchmark traffic through
+that proxy. A future session should still re-run the full task-configured
+benchmark after proxy routing is added.
 
 ### Smoke benchmark
 Local run of `task bazel-benchmark-remote-cache-ids-test` still passes and now
@@ -290,42 +312,43 @@ This work is intentionally split into phases:
    through the proxy
 4. only after the HTTP path is proven, add the gRPC comparison
 
-Step 1 is complete.
+Steps 1 and 2 are now complete.
 
 ## Immediate next implementation step
-The next session should wire `toxiproxy` into the setup phase of
+The next session should route the existing benchmarked HTTP cache traffic
+through the already-validated proxy path in
 `scripts/benchmark_bazel_remote_cache.sh`.
 
 Concretely, the next step should:
-1. start `bazel-remote` with an HTTP listener enabled
-2. start `toxiproxy`
-3. create a proxied HTTP endpoint in front of `bazel-remote`
-4. apply induced latency using the already-measured representative latency
-5. in default measured mode, validate that the proxied HTTP path is within
-   `BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS` of the measured target
-6. in override mode, skip live measurement and skip proxy-path validation
-7. use only the `//ids:ids_test` smoke benchmark while iterating on this work
-8. stop there; do not yet change the generalized benchmark run matrix
+1. keep the current representative-latency measurement and toxiproxy validation
+   step at benchmark startup
+2. replace direct benchmark HTTP cache URLs with the proxied endpoint for the
+   existing cold/warm HTTP runs
+3. preserve per-benchmark cache isolation so each cold/warm pair still starts
+   from an empty remote cache for that command
+4. confirm the no-cache / HTTP-cold / HTTP-warm behavior still looks sensible
+   under induced latency
+5. keep the iteration loop scoped to `//ids:ids_test` until the proxied HTTP
+   cache path is stable, then re-run the task-configured generalized benchmark
+6. stop there; do not yet add the gRPC benchmark matrix
 
-The purpose of that next step is only to prove that representative latency can
-be injected and observed reliably. It does not yet need to benchmark cache
-behavior through the proxy. Keeping the validation loop scoped to
-`//ids:ids_test` minimizes runtime and speeds up iteration while the proxying
-mechanics are still being established.
+The purpose of that next step is to move from “latency injection is real” to
+“benchmarked cache behavior actually flows through the validated proxy path.”
+Only after that should the benchmark expand to compare HTTP and gRPC.
 
-## Follow-up step after toxiproxy validation
-Once latency injection is validated in setup:
+## Follow-up step after proxied HTTP benchmarking
+Once the existing HTTP benchmark traffic is routed through the validated proxy:
 1. keep reusing the existing Bazel repository cache and shared Gazelle module
    cache during iteration so setup work does not dominate feedback time
-2. route the existing HTTP cold/warm benchmark traffic through the proxied
-   endpoint
-3. confirm the benchmark still behaves sensibly under induced latency
-4. only then enable the gRPC listener and expand the comparison matrix to:
+2. enable the gRPC listener and add the parallel gRPC proxying path
+3. expand the comparison matrix to:
    - no cache
    - HTTP cold
    - HTTP warm
    - gRPC cold
    - gRPC warm
+4. confirm the benchmark still behaves sensibly under induced latency for both
+   protocols
 
 ### Decision this should inform
 This comparison is meant to guide the practical choice between cache
@@ -341,8 +364,13 @@ protocols:
 A successful next iteration should:
 - measure and record representative CI-to-us-east-1 latency separately
 - feed that measured latency into `toxiproxy`
-- inject that latency into benchmarked cache traffic
-- produce timings for no-cache / HTTP cold-warm / gRPC cold-warm
+- inject that latency into benchmarked HTTP cache traffic
+- preserve the current no-cache / cold / warm comparison semantics while doing
+  so
+- re-validate the full task-configured generalized benchmark after the proxy
+  routing change
+- only after that, produce timings for no-cache / HTTP cold-warm / gRPC
+  cold-warm
 - make it easy to compare protocol behavior under the same latency model
 
 ## Open questions worth keeping in mind

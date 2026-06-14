@@ -58,13 +58,15 @@ require_cmd mktemp
 
 TMP_ROOT="$(mktemp -d -t bazel-remote-cache-bench.XXXXXX)"
 CACHE_DIR="${TMP_ROOT}/remote-cache"
+GO_REPOSITORY_MODCACHE_DIR="${TMP_ROOT}/go-mod-cache"
 REPOSITORY_CACHE_DIR="$(${NIX_RUN} bazelisk info repository_cache 2>/dev/null | tail -n 1)"
 [[ -n "${REPOSITORY_CACHE_DIR}" ]] || die "failed to determine Bazel repository cache path"
 LOG_DIR="${TMP_ROOT}/logs"
-mkdir -p "${CACHE_DIR}" "${LOG_DIR}"
+mkdir -p "${CACHE_DIR}" "${GO_REPOSITORY_MODCACHE_DIR}" "${LOG_DIR}"
 
 REMOTE_PID=""
 REMOTE_LOG=""
+KEEP_TMP="${DEBUG:-0}"
 SUCCESS=false
 cleanup() {
   if [[ -n "${REMOTE_PID}" ]] && kill -0 "${REMOTE_PID}" >/dev/null 2>&1; then
@@ -72,11 +74,16 @@ cleanup() {
     wait "${REMOTE_PID}" >/dev/null 2>&1 || true
   fi
 
-  if [[ "${SUCCESS}" == true ]]; then
-    chmod -R u+w "${TMP_ROOT}" >/dev/null 2>&1 || true
-    rm -rf "${TMP_ROOT}" >/dev/null 2>&1 || true
-  else
+  if [[ "${KEEP_TMP}" == "1" ]]; then
     echo "kept temporary workspace for inspection: ${TMP_ROOT}" >&2
+    return
+  fi
+
+  chmod -R u+w "${TMP_ROOT}" >/dev/null 2>&1 || true
+  rm -rf "${TMP_ROOT}" >/dev/null 2>&1 || true
+
+  if [[ "${SUCCESS}" != true ]]; then
+    echo "temporary workspace removed; re-run with DEBUG=1 to retain it for inspection" >&2
   fi
 }
 trap cleanup EXIT
@@ -161,6 +168,8 @@ prepare_seed_external_repositories() {
     --curses=no \
     --show_progress_rate_limit=60 \
     "--repository_cache=${REPOSITORY_CACHE_DIR}" \
+    "--repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1" \
+    "--repo_env=GOMODCACHE=${GO_REPOSITORY_MODCACHE_DIR}" \
     --disk_cache= \
     --remote_cache= \
     "${TARGET}" \
@@ -194,6 +203,8 @@ run_test() {
     --curses=no
     --show_progress_rate_limit=60
     "--repository_cache=${REPOSITORY_CACHE_DIR}"
+    "--repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1"
+    "--repo_env=GOMODCACHE=${GO_REPOSITORY_MODCACHE_DIR}"
     --disk_cache=
     "${TARGET}")
 
@@ -245,9 +256,11 @@ warm_run_reused_cached_test_result() {
 remote_cache_url="$(start_bazel_remote)"
 
 echo "Using temporary workspace: ${TMP_ROOT}"
+echo "Set DEBUG=1 to retain the temporary workspace for inspection"
 echo "Using target: ${TARGET}"
 echo "Using bazel-remote: ${remote_cache_url}"
 echo "Using repository cache: ${REPOSITORY_CACHE_DIR}"
+echo "Using go_repository mod cache: ${GO_REPOSITORY_MODCACHE_DIR}"
 
 seed_output_base="${TMP_ROOT}/output-base-seed"
 no_cache_output_base="${TMP_ROOT}/output-base-no-cache"
