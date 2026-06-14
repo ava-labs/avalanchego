@@ -170,6 +170,16 @@ The next intended comparison is not just cache/no-cache in isolation, but a matr
 
 The expectation is that if Firewood-from-source adds meaningful build work, the relative payoff of warm remote cache may increase.
 
+Current directionally useful takeaway: even before introducing affected-target
+reduction, the benchmarked full-workload jobs already appear capable of at
+least roughly 2x end-to-end speedup from warm remote caching when the cache is
+helping. If CI later executes only the affected subset of targets (for example,
+via `bazel-diff`), additional end-to-end gains may be possible because both
+executed work and the remaining cacheable surface area shrink. That said, the
+incremental benefit may not scale linearly if the reduced workload becomes more
+dominated by setup costs, startup overhead, or a smaller number of expensive
+cache misses.
+
 ## What a future session should read first
 Before changing anything, read:
 - `plans/bazel-remote-cache-benchmark-handoff.md`
