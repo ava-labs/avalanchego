@@ -22,7 +22,7 @@ There is also supporting documentation and CI wiring:
 
 ## What the generalized benchmark does now
 The generalized benchmark is task-configured with:
-- setup: `fetch --all`
+- setup: `fetch //main:avalanchego //... -- -//graft/...`
 - benchmarks:
   - `build //main:avalanchego`
   - `build --config=race //main:avalanchego`
@@ -30,20 +30,24 @@ The generalized benchmark is task-configured with:
 
 For each benchmark command it currently measures:
 1. no remote cache
-2. cold remote cache
-3. warm remote cache
+2. cold HTTP remote cache
+3. warm HTTP remote cache
+4. cold gRPC remote cache
+5. warm gRPC remote cache
 
 Important behavior:
 - measured setup phase first
+- setup intentionally avoids `fetch --all`; it hard-codes the current union of benchmark target patterns because `fetch --all` pulled irrelevant transitive repos and toolchains unrelated to the benchmarked jobs
 - fresh `--output_base` for every measured run
 - `--disk_cache=` to disable local disk cache
-- per-benchmark isolated temporary `bazel-remote` dir so each cold/warm pair is actually cold for that command
-- strict failure unless warm cache is faster than both no-cache and cold-cache
+- per-benchmark isolated temporary `bazel-remote` dir so each protocol-specific cold/warm pair is actually cold for that command
+- strict failure unless each warm cached run is faster than both no-cache and its corresponding cold cached run
 - keeps temp workspace on failure for inspection
 - deletes successful output bases eagerly to reduce peak disk usage
 - measures representative cache latency at benchmark startup unless overridden
 - starts a temporary `bazel-remote` + `toxiproxy` validation path before the measured Bazel runs begin
 - in default measured mode, validates that the proxied HTTP path stays within `BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS` of the measured target
+- benchmarked HTTP and gRPC cache traffic both flow through toxiproxy latency injection under the same representative latency model
 - in override mode, still creates the proxied path but skips live measurement and proxy-path validation
 
 ## Important implementation detail discovered after initial rollout
@@ -103,13 +107,13 @@ If a future session sees a similar macOS failure, first verify whether the curre
 
 ## Validated local results
 ### Generalized benchmark
-The generalized harness still works as a three-way benchmark and now also
-measures representative latency before the timed runs begin, then validates a
-proxied HTTP path to `bazel-remote` against that target before the measured
-Bazel runs start.
+The generalized harness now measures representative latency before the timed
+runs begin, validates a proxied HTTP path to `bazel-remote` against that
+measured target, and then benchmarks both HTTP and gRPC remote-cache traffic
+through toxiproxy under the same latency model.
 
 Validated local behaviors:
-- task-configured generalized benchmark setup is `fetch --all`
+- task-configured generalized benchmark setup is now `fetch //main:avalanchego //... -- -//graft/...`
 - task-configured generalized benchmark commands are currently:
   - `build //main:avalanchego`
   - `build --config=race //main:avalanchego`
@@ -124,19 +128,21 @@ Validated local behaviors:
   interest there, only the observed TTFB through the proxy path
 - override mode works with `BAZEL_REMOTE_CACHE_LATENCY_MS=<positive-ms>` and
   skips both live latency measurement and proxy-path validation
-- local smoke validation of the new toxiproxy path was performed with the
-  narrower command pair `fetch //ids:ids_test` + `test //ids:ids_test` to keep
-  iteration fast while validating the proxying mechanics
-- benchmark timing still behaves as expected for no-cache / cold / warm runs
+- the script now measures no-cache / HTTP cold-warm / gRPC cold-warm for each
+  benchmark command
+- benchmark timing still behaves as expected for those five cases on the smoke
+  target
 
 These numbers are host-specific; the important point is that the validated
 local smoke flow now has live latency measurement, a validated proxied HTTP
-path, and benchmarked HTTP cache traffic flowing through that proxy.
+path, and benchmarked HTTP and gRPC cache traffic flowing through toxiproxy.
 
 ### Smoke benchmark
 Local run of `task bazel-benchmark-remote-cache-ids-test` still passes and now
-also proves cached test-result reuse via Bazel output indicating the warm run
-executed `0 out of 1` tests.
+also proves cached test-result reuse via Bazel output indicating the warm runs
+executed `0 out of 1` tests. That smoke validation now covers both the warm
+HTTP and warm gRPC benchmark cases because both reuse the same shared script and
+warm-log assertions.
 
 The fast `ids_test` smoke task should stay as a thin parameterization of the
 same generalized harness so shared-setup-cache behavior stays aligned by
@@ -158,7 +164,7 @@ The measured benchmark phases then answer:
 ## Why this matters for Firewood work
 The next intended comparison is not just cache/no-cache in isolation, but a matrix like:
 - baseline branch vs Firewood-from-source branch
-- no remote cache vs cold remote cache vs warm remote cache
+- no remote cache vs HTTP cold/warm vs gRPC cold/warm
 - normal build vs race build
 - same CI runner class
 
@@ -315,22 +321,11 @@ This work is intentionally split into phases:
 
 Steps 1 and 2 are now complete.
 
-## Immediate next implementation step
-The benchmarked HTTP cache traffic now routes through the validated proxy path
-in `scripts/benchmark_bazel_remote_cache.sh`, and the narrow `ids_test` smoke
-entrypoint is now just a parameterized call into that same script.
-
-The next step should be to add the parallel gRPC comparison without regressing
-those properties:
-1. keep the current representative-latency measurement and toxiproxy validation
-   step at benchmark startup
-2. preserve per-benchmark cache isolation so each cold/warm pair still starts
-   from an empty remote cache for that command
-3. preserve the shared setup-cache model (`repository_cache` + shared
-   `GOMODCACHE`) across both the full and smoke entrypoints
-4. keep the iteration loop scoped to `//ids:ids_test` until the gRPC path is
-   stable, then re-run the task-configured generalized benchmark
-5. add gRPC cold/warm runs under the same latency model as the HTTP runs
+## Recent implementation results and remaining follow-up
+The benchmarked HTTP and gRPC cache traffic now both route through the
+validated proxy path in `scripts/benchmark_bazel_remote_cache.sh`, and the
+narrow `ids_test` smoke entrypoint remains just a parameterized call into that
+same script.
 
 Additional findings to carry into the next session:
 - restoring shared `GOMODCACHE` support was consistent with the original intent
@@ -343,17 +338,32 @@ Additional findings to carry into the next session:
   shared `GOMODCACHE`), not to the remote cache contents. Fresh setup caches
   should remain available via an explicit override for debugging.
 - remote cache directories must remain isolated per benchmark command because
-  the point of the benchmark is to measure the delta between no-cache, cold, and
-  warm cache behavior; reusing remote cache state would invalidate the cold-run
-  semantics
+  the point of the benchmark is to measure the delta between no-cache, HTTP
+  cold-warm, and gRPC cold-warm behavior; reusing remote cache state would
+  invalidate the cold-run semantics
+- `fetch --all` turned out to be the wrong setup command for this benchmark.
+  With `--experimental_ui_debug_all_events`, Bazel showed that `fetch --all`
+  was downloading many irrelevant transitive repos and cross-platform toolchain
+  artifacts (for example, extra JDKs and KSP inputs) unrelated to the
+  benchmarked jobs. That was the main reason local setup appeared to "stall"
+  behind repeated `Computing main repo mapping:` lines.
+- because this harness is still exploratory, the setup fetch is now hard-coded
+  to the current union of benchmarked target patterns instead of being derived
+  mechanically. Keep that union aligned with the benchmark command list until
+  the harness stabilizes enough to justify derivation or replacement.
 - documentation should be de-duplicated: `docs/bazel.md` should remain the
   canonical user-facing explanation of the Bazel benchmark model and shared
   `GOMODCACHE` requirement, while this handoff should record investigation
   status, regressions, decisions, and next steps and link back to the doc
-
-The purpose of that next step is to move from “latency injection is real” to
-“benchmarked cache behavior actually flows through the validated proxy path.”
-Only after that should the benchmark expand to compare HTTP and gRPC.
+- upgrading Gazelle to `0.51.3` stopped `bazel mod tidy` from re-adding local
+  `go.work` workspace modules (`avalanchego`, `graft/coreth`, `graft/evm`,
+  `graft/subnet-evm`) as generated `use_repo(...)` self-repos. Older Gazelle
+  behavior had made `fetch --all` even noisier by traversing those local-path
+  repos.
+- after the Gazelle upgrade, Bazel resolves `rules_go@0.59.0` through the
+  dependency graph while the root module still declares `rules_go@0.57.0`.
+  That emits a direct-dependency mismatch warning during module operations and
+  is a worthwhile follow-up for a later session.
 
 ## Follow-up step after proxied HTTP benchmarking
 Once the existing HTTP benchmark traffic is routed through the validated proxy:
@@ -383,16 +393,16 @@ protocols:
 A successful next iteration should:
 - measure and record representative CI-to-us-east-1 latency separately
 - feed that measured latency into `toxiproxy`
-- inject that latency into benchmarked HTTP cache traffic
-- preserve the current no-cache / cold / warm comparison semantics while doing
-  so
-- re-validate the full task-configured generalized benchmark after the proxy
-  routing change
-- only after that, produce timings for no-cache / HTTP cold-warm / gRPC
-  cold-warm
+- inject that latency into benchmarked HTTP and gRPC cache traffic
+- preserve the current no-cache / HTTP cold-warm / gRPC cold-warm comparison
+  semantics while doing so
+- re-validate the full task-configured generalized benchmark in a healthy
+  environment now that the setup fetch scope is narrowed
 - make it easy to compare protocol behavior under the same latency model
 
 ## Open questions worth keeping in mind
-- Is `fetch --all` the best possible setup command, or is there a narrower/faster command that still fully seeds the dependency state we care about?
+- Is the current hard-coded setup fetch union the right long-term shape, or
+  should the harness eventually derive it mechanically once the benchmark model
+  stabilizes?
 - Should the observational benchmark remain non-required forever, or become a required informational job later?
 - If CI runner networking remains flaky even after shared `GOMODCACHE`, should the benchmark artifact upload step become more failure-tolerant, or should the benchmark be temporarily scoped by platform?
