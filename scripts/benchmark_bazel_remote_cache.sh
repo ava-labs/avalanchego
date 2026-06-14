@@ -31,6 +31,11 @@ Bazel output state each time:
   - cold remote cache (empty cache; populates it)
   - warm remote cache (reuses the populated cache)
 
+Representative cache latency is determined before the benchmark starts unless
+BAZEL_REMOTE_CACHE_LATENCY_MS is set. In measured mode, the script runs
+`bazel run //tools/measure-http-latency` against
+BAZEL_REMOTE_CACHE_LATENCY_URL (default: https://ec2.us-east-1.amazonaws.com/).
+
 The benchmark fails unless the warm remote-cache run is faster than both the
 no-cache and cold-cache runs for every configured benchmark command.
 EOF
@@ -116,16 +121,25 @@ REPOSITORY_CACHE_DIR="${TMP_ROOT}/repository-cache"
 LOG_DIR="${TMP_ROOT}/logs"
 mkdir -p "${CACHE_DIR}" "${REPOSITORY_CACHE_DIR}" "${LOG_DIR}"
 
+DEFAULT_REPRESENTATIVE_LATENCY_URL="https://ec2.us-east-1.amazonaws.com/"
+REPRESENTATIVE_LATENCY_URL="${BAZEL_REMOTE_CACHE_LATENCY_URL:-${DEFAULT_REPRESENTATIVE_LATENCY_URL}}"
+REPRESENTATIVE_LATENCY_SAMPLES="${BAZEL_REMOTE_CACHE_LATENCY_SAMPLES:-10}"
+REPRESENTATIVE_LATENCY_TIMEOUT="${BAZEL_REMOTE_CACHE_LATENCY_TIMEOUT:-10s}"
+REPRESENTATIVE_LATENCY_OVERRIDE_MS="${BAZEL_REMOTE_CACHE_LATENCY_MS:-}"
+REPRESENTATIVE_LATENCY_MS=""
+
 # This benchmark is intended to model CI workers talking to a remote cache
 # service that is not colocated with the runner. When latency simulation is
 # enabled in a future iteration, the local benchmark host should talk to
 # bazel-remote through a proxy that injects representative delay instead of
 # talking to bazel-remote directly.
 #
-# The representative delay should be measured separately from GitHub Actions
-# runners to an AWS us-east-1 hosted endpoint using curl. That measurement is
-# not part of the benchmark subject itself; it is only an input used to
-# approximate the runner-to-cache network distance we expect in deployment.
+# The representative delay is determined before each benchmark run. By default
+# the script measures average TTFB to a public AWS us-east-1 regional endpoint
+# using //tools/measure-http-latency. That measurement is not part of the
+# benchmark subject itself; it is only an input used to approximate the
+# runner-to-cache network distance we expect in deployment. For fast local
+# iteration, set BAZEL_REMOTE_CACHE_LATENCY_MS to skip live measurement.
 #
 # The intended comparison for each benchmark command is:
 #   - no cache
@@ -296,8 +310,69 @@ less_than() {
   awk -v left="$1" -v right="$2" 'BEGIN { exit !(left < right) }'
 }
 
+greater_than_zero() {
+  awk -v value="$1" 'BEGIN { exit !(value > 0) }'
+}
+
+determine_representative_latency_ms() {
+  if [[ -n "${REPRESENTATIVE_LATENCY_OVERRIDE_MS}" ]]; then
+    greater_than_zero "${REPRESENTATIVE_LATENCY_OVERRIDE_MS}" || die "BAZEL_REMOTE_CACHE_LATENCY_MS must be > 0 when set"
+    REPRESENTATIVE_LATENCY_MS="${REPRESENTATIVE_LATENCY_OVERRIDE_MS}"
+    echo "Using representative cache latency override: ${REPRESENTATIVE_LATENCY_MS}ms"
+    return 0
+  fi
+
+  local latency_json_log latency_text_log
+  latency_json_log="${LOG_DIR}/representative-latency.json"
+  latency_text_log="${LOG_DIR}/representative-latency.txt"
+
+  echo "Measuring representative cache latency with bazel run //tools/measure-http-latency"
+  "${NIX_RUN}" bazelisk run //tools/measure-http-latency -- \
+    --url "${REPRESENTATIVE_LATENCY_URL}" \
+    --samples "${REPRESENTATIVE_LATENCY_SAMPLES}" \
+    --timeout "${REPRESENTATIVE_LATENCY_TIMEOUT}" \
+    --format json \
+    >"${latency_json_log}"
+
+  REPRESENTATIVE_LATENCY_MS="$(python3 - "${latency_json_log}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding='utf-8') as f:
+    report = json.load(f)
+
+print(f"{report['avgTtfbMs']:.1f}")
+PY
+)"
+
+  python3 - "${latency_json_log}" >"${latency_text_log}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding='utf-8') as f:
+    report = json.load(f)
+
+print(f"url={report['url']}")
+print(f"samples={report['samples']}")
+for code in sorted(report['statusCodes'], key=lambda v: int(v)):
+    print(f"http_code[{code}]={report['statusCodes'][code]}")
+print(
+    "avg_connect={:.1f}ms avg_tls={:.1f}ms avg_ttfb={:.1f}ms avg_total={:.1f}ms".format(
+        report['avgConnectMs'],
+        report['avgTlsMs'],
+        report['avgTtfbMs'],
+        report['avgTotalMs'],
+    )
+)
+PY
+
+  cat "${latency_text_log}"
+}
+
 echo "Using temporary workspace: ${TMP_ROOT}"
 echo "Using repository cache: ${REPOSITORY_CACHE_DIR}"
+determine_representative_latency_ms
+printf 'Representative cache latency input: %sms\n' "${REPRESENTATIVE_LATENCY_MS}"
 
 # The setup phase models the CI cache-writer job from PR 5525: start from an
 # empty repository_cache, then measure a single command (typically `fetch --all`)

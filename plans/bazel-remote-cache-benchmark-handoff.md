@@ -235,7 +235,7 @@ cache server.
 
 Instead:
 1. measure representative latency separately from GitHub Actions runners
-   to an AWS us-east-1 EKS-hosted endpoint using `curl`
+   to a public AWS us-east-1 regional endpoint using `curl`
 2. treat that measurement as the representative CI-to-cache distance
 3. induce that latency locally for all traffic between Bazel and
    `bazel-remote` using a proxy such as `toxiproxy`
@@ -266,7 +266,7 @@ protocols:
 
 ### Validation criteria
 A successful next iteration should:
-- measure and record representative CI-to-EKS latency separately
+- measure and record representative CI-to-us-east-1 latency separately
 - inject that latency into benchmarked cache traffic
 - produce timings for no-cache / HTTP cold-warm / gRPC cold-warm
 - make it easy to compare protocol behavior under the same latency model
