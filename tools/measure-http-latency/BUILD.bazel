@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 go_library(
     name = "measure_http_latency_lib",
     srcs = ["main.go"],
-    importpath = "github.com/ava-labs/avalanchego/cmd/measure-http-latency",
+    importpath = "github.com/ava-labs/avalanchego/tools/measure-http-latency",
     visibility = ["//visibility:private"],
 )
 

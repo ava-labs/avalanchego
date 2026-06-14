@@ -15,5 +15,5 @@ See `external/go.mod` for usage instructions.
 
 Custom commands specific to this repository should be implemented as
 subdirectories under `./tools`. Each command can have its own
-`main.go` and be invoked via `go run ./tools/<command>` or built as
-needed.
+`main.go` and be invoked via `go run ./tools/<command>` or `bazel run
+//tools/<command>`.
