@@ -6,14 +6,15 @@ Maintain and extend a Bazel remote-cache benchmark harness that models CI-style 
 - whether that payoff changes when build work increases (for example, Firewood-from-source)
 
 ## Current state
-There are now two benchmark entrypoints:
+There are now two benchmark entrypoints, both backed by the same generalized
+script:
 
 - Generalized CI-style benchmark:
   - task: `bazel-benchmark-remote-cache`
   - script: `scripts/benchmark_bazel_remote_cache.sh`
 - Fast smoke benchmark:
   - task: `bazel-benchmark-remote-cache-ids-test`
-  - script: `scripts/benchmark_bazel_remote_cache_ids_test.sh`
+  - script: `scripts/benchmark_bazel_remote_cache.sh`
 
 There is also supporting documentation and CI wiring:
 - docs: `docs/bazel.md`
@@ -57,18 +58,18 @@ This showed up clearly on macOS CI in PR `5530`:
 The cause is that Gazelle `go_repository` normally keeps a per-output-base internal Go module cache, so a fresh `--output_base` can still trigger fresh Go module downloads even after `bazel fetch //...`.
 
 ### Current fix in place
-The benchmark scripts again force Gazelle to share a host-level Go module cache
+The benchmark harness forces Gazelle to share a host-level Go module cache
 across setup and measured runs with:
 - `--repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1`
-- `--repo_env=GOMODCACHE=<shared temp dir>`
+- `--repo_env=GOMODCACHE=<shared cache dir>`
 
 Conceptually:
 - `repository_cache` handles Bazel-managed downloads
 - shared `GOMODCACHE` handles Gazelle `go_repository` module downloads
 - fresh `output_base` still isolates local action/output state
 
-This is current behavior in both benchmark scripts and should be treated as a
-required part of the harness rather than merely historical context.
+This is current behavior in the shared benchmark script and should be treated
+as a required part of the harness rather than merely historical context.
 
 ## Current CI wiring
 `.github/workflows/bazel-ci.yml` now includes a non-required observational job:
@@ -129,20 +130,17 @@ Validated local behaviors:
 - benchmark timing still behaves as expected for no-cache / cold / warm runs
 
 These numbers are host-specific; the important point is that the validated
-local smoke flow now has both a live latency measurement input and a validated
-proxied HTTP path ready for the next step of routing benchmark traffic through
-that proxy. A future session should still re-run the full task-configured
-benchmark after proxy routing is added.
+local smoke flow now has live latency measurement, a validated proxied HTTP
+path, and benchmarked HTTP cache traffic flowing through that proxy.
 
 ### Smoke benchmark
 Local run of `task bazel-benchmark-remote-cache-ids-test` still passes and now
 also proves cached test-result reuse via Bazel output indicating the warm run
 executed `0 out of 1` tests.
 
-Important follow-up: the `ids_test` smoke script should be kept aligned with the
-generalized harness's shared-setup-cache behavior. In particular, it should use
-and preserve the same shared `GOMODCACHE` approach intentionally rather than as
-an accidental divergence from the generalized script.
+The fast `ids_test` smoke task should stay as a thin parameterization of the
+same generalized harness so shared-setup-cache behavior stays aligned by
+construction rather than by manual duplication.
 
 ## Why the benchmark is structured this way
 The benchmark is intentionally trying to model:
@@ -170,7 +168,6 @@ The expectation is that if Firewood-from-source adds meaningful build work, the 
 Before changing anything, read:
 - `plans/bazel-remote-cache-benchmark-handoff.md`
 - `scripts/benchmark_bazel_remote_cache.sh`
-- `scripts/benchmark_bazel_remote_cache_ids_test.sh`
 - `tools/measure-http-latency/main.go`
 - `docs/bazel.md`
 - `.github/workflows/bazel-ci.yml`
@@ -187,7 +184,6 @@ current files before assuming older sections are still accurate.
 - `docs/bazel.md`
 - `.github/workflows/bazel-ci.yml`
 - `scripts/benchmark_bazel_remote_cache.sh`
-- `scripts/benchmark_bazel_remote_cache_ids_test.sh`
 - `tools/measure-http-latency/main.go`
 
 ## Commits created during this work
@@ -320,22 +316,21 @@ This work is intentionally split into phases:
 Steps 1 and 2 are now complete.
 
 ## Immediate next implementation step
-The next session should route the existing benchmarked HTTP cache traffic
-through the already-validated proxy path in
-`scripts/benchmark_bazel_remote_cache.sh`.
+The benchmarked HTTP cache traffic now routes through the validated proxy path
+in `scripts/benchmark_bazel_remote_cache.sh`, and the narrow `ids_test` smoke
+entrypoint is now just a parameterized call into that same script.
 
-Concretely, the next step should:
+The next step should be to add the parallel gRPC comparison without regressing
+those properties:
 1. keep the current representative-latency measurement and toxiproxy validation
    step at benchmark startup
-2. replace direct benchmark HTTP cache URLs with the proxied endpoint for the
-   existing cold/warm HTTP runs
-3. preserve per-benchmark cache isolation so each cold/warm pair still starts
+2. preserve per-benchmark cache isolation so each cold/warm pair still starts
    from an empty remote cache for that command
-4. confirm the no-cache / HTTP-cold / HTTP-warm behavior still looks sensible
-   under induced latency
-5. keep the iteration loop scoped to `//ids:ids_test` until the proxied HTTP
-   cache path is stable, then re-run the task-configured generalized benchmark
-6. stop there; do not yet add the gRPC benchmark matrix
+3. preserve the shared setup-cache model (`repository_cache` + shared
+   `GOMODCACHE`) across both the full and smoke entrypoints
+4. keep the iteration loop scoped to `//ids:ids_test` until the gRPC path is
+   stable, then re-run the task-configured generalized benchmark
+5. add gRPC cold/warm runs under the same latency model as the HTTP runs
 
 Additional findings to carry into the next session:
 - restoring shared `GOMODCACHE` support was consistent with the original intent
@@ -343,9 +338,10 @@ Additional findings to carry into the next session:
 - the later loss of those flags appears to have been an accidental stale-base
   overwrite, not a documented intentional reversal
 - setup-side dependency caches should be reusable across repeated local
-  benchmark invocations for faster iteration, but that reuse must be explicitly
-  opt-in and must apply only to setup state (`repository_cache` and shared
-  `GOMODCACHE`), not to the remote cache contents
+  benchmark invocations for faster iteration, and that reuse now defaults on
+  for local runs; it must apply only to setup state (`repository_cache` and
+  shared `GOMODCACHE`), not to the remote cache contents. Fresh setup caches
+  should remain available via an explicit override for debugging.
 - remote cache directories must remain isolated per benchmark command because
   the point of the benchmark is to measure the delta between no-cache, cold, and
   warm cache behavior; reusing remote cache state would invalidate the cold-run

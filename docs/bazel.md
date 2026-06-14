@@ -573,6 +573,14 @@ model a CI worker that can reuse downloaded external dependencies while still
 starting each measured target command without local action/output state from a
 prior invocation.
 
+For local iteration, the generalized harness now reuses setup-side dependency
+state by default across runs via a persistent cache root under
+`~/.cache/av-bazel-remote-cache-benchmark/` (or `$XDG_CACHE_HOME` when set).
+That persistence applies only to `repository_cache` and the shared Gazelle
+`GOMODCACHE`, not to the benchmarked remote-cache contents. Set
+`BAZEL_REMOTE_CACHE_FRESH_SETUP_CACHE=1` to force a fully fresh setup-cache
+run.
+
 The current generalized task benchmarks:
 
 - `bazel build //main:avalanchego`
@@ -580,8 +588,9 @@ The current generalized task benchmarks:
 - `bazel test //... -- -//graft/...`
 
 The fast `task bazel-benchmark-remote-cache-ids-test` smoke target remains
-useful for quick harness validation, but it uses an older pragmatic setup flow
-and is not the representative CI-style benchmark.
+useful for quick harness validation. It now reuses the same generalized
+benchmark script with a narrower `fetch //ids:ids_test` + `test //ids:ids_test`
+configuration and extra warm-log assertions proving cached test-result reuse.
 
 Initial local validation on one developer workstation produced:
 
