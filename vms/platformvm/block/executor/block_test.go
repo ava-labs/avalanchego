@@ -14,8 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/uptime/uptimemock"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -516,6 +518,122 @@ func TestBlockOptions(t *testing.T) {
 			options, err := blk.Options(t.Context())
 			require.NoError(err)
 			require.IsType(tt.expectedPreferenceType, options[0].(*Block).Block)
+		})
+	}
+}
+
+// TestBlockOptionsACP267UptimeRequirement verifies that ACP-267 raises the
+// Primary Network uptime requirement to 90% on mainnet/fuji for validations
+// starting on or after acp267StartTimeCutoff, while custom networks keep their
+// configured requirement.
+func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
+	tests := []struct {
+		name      string
+		networkID uint32
+		startTime time.Time
+		uptime    float64
+		want      block.Block
+	}{
+		{
+			name:      "mainnet pre-cutoff keeps 80%",
+			networkID: constants.MainnetID,
+			startTime: acp267StartTimeCutoff.Add(-time.Second),
+			uptime:    .85,
+			want:      &block.BanffCommitBlock{},
+		},
+		{
+			name:      "mainnet at cutoff requires 90%",
+			networkID: constants.MainnetID,
+			startTime: acp267StartTimeCutoff,
+			uptime:    .85,
+			want:      &block.BanffAbortBlock{},
+		},
+		{
+			name:      "mainnet post-cutoff meets 90%",
+			networkID: constants.MainnetID,
+			startTime: acp267StartTimeCutoff.Add(time.Hour),
+			uptime:    .9,
+			want:      &block.BanffCommitBlock{},
+		},
+		{
+			name:      "fuji post-cutoff requires 90%",
+			networkID: constants.FujiID,
+			startTime: acp267StartTimeCutoff.Add(time.Hour),
+			uptime:    .85,
+			want:      &block.BanffAbortBlock{},
+		},
+		{
+			// ACP-267 does not apply off mainnet/fuji: the configured 80%
+			// requirement is honored even after the cutoff.
+			name:      "custom network post-cutoff keeps configured 80%",
+			networkID: constants.UnitTestID,
+			startTime: acp267StartTimeCutoff.Add(time.Hour),
+			uptime:    .85,
+			want:      &block.BanffCommitBlock{},
+		},
+	}
+
+	const uptimeWindow = 1000 * time.Second
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				nodeID     = ids.GenerateTestNodeID()
+				stakerTxID = ids.GenerateTestID()
+				stakerTx   = &txs.Tx{
+					Unsigned: &txs.AddPermissionlessValidatorTx{
+						Validator: txs.Validator{NodeID: nodeID},
+						Subnet:    constants.PrimaryNetworkID,
+					},
+					TxID: stakerTxID,
+				}
+				staker = &state.Staker{
+					StartTime: tt.startTime,
+					NodeID:    nodeID,
+					SubnetID:  constants.PrimaryNetworkID,
+				}
+				now = tt.startTime.Add(uptimeWindow)
+			)
+
+			chainState := statetest.New(t, statetest.Config{})
+			chainState.AddTx(stakerTx, status.Committed)
+			require.NoError(t, chainState.PutCurrentValidator(staker))
+
+			clk := &mockable.Clock{}
+			clk.Set(now)
+			uptimeState := uptime.NewTestState()
+			uptimeState.AddNode(nodeID, tt.startTime)
+			require.NoError(t, uptimeState.SetUptime(nodeID, time.Duration(tt.uptime*float64(uptimeWindow)), now))
+
+			ctx := snowtest.Context(t, snowtest.PChainID)
+			ctx.NetworkID = tt.networkID
+
+			blk := &Block{
+				Block: &block.BanffProposalBlock{
+					ApricotProposalBlock: block.ApricotProposalBlock{
+						Tx: &txs.Tx{
+							Unsigned: &txs.RewardValidatorTx{
+								TxID: stakerTxID,
+							},
+						},
+					},
+				},
+				manager: &manager{
+					backend: &backend{
+						state: chainState,
+						ctx:   ctx,
+					},
+					txExecutorBackend: &executor.Backend{
+						Config: &config.Internal{
+							UptimePercentage: .8,
+						},
+						Uptimes: uptime.NewManager(uptimeState, clk),
+					},
+				},
+			}
+
+			options, err := blk.Options(t.Context())
+			require.NoError(t, err)
+			require.IsType(t, tt.want, options[0].(*Block).Block)
 		})
 	}
 }
