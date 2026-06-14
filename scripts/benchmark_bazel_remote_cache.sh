@@ -127,6 +127,10 @@ REPRESENTATIVE_LATENCY_SAMPLES="${BAZEL_REMOTE_CACHE_LATENCY_SAMPLES:-10}"
 REPRESENTATIVE_LATENCY_TIMEOUT="${BAZEL_REMOTE_CACHE_LATENCY_TIMEOUT:-10s}"
 REPRESENTATIVE_LATENCY_OVERRIDE_MS="${BAZEL_REMOTE_CACHE_LATENCY_MS:-}"
 REPRESENTATIVE_LATENCY_MS=""
+# Future toxiproxy validation should verify the proxied cache path stays within
+# a small tolerance of the measured target in default mode. Override mode skips
+# that validation because its purpose is fast local iteration, not provenance.
+REPRESENTATIVE_LATENCY_TOLERANCE_MS="${BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS:-15}"
 
 # This benchmark is intended to model CI workers talking to a remote cache
 # service that is not colocated with the runner. When latency simulation is
@@ -136,10 +140,24 @@ REPRESENTATIVE_LATENCY_MS=""
 #
 # The representative delay is determined before each benchmark run. By default
 # the script measures average TTFB to a public AWS us-east-1 regional endpoint
-# using //tools/measure-http-latency. That measurement is not part of the
-# benchmark subject itself; it is only an input used to approximate the
-# runner-to-cache network distance we expect in deployment. For fast local
-# iteration, set BAZEL_REMOTE_CACHE_LATENCY_MS to skip live measurement.
+# using //tools/measure-http-latency.
+#
+# Why this shape:
+# - average TTFB is a coarse but useful approximation of tiny request latency,
+#   which is the most relevant first-order effect for cache lookup traffic
+# - a public regional AWS endpoint lets the benchmark approximate runner to
+#   us-east-1 network distance before a real deployed bazel-remote exists
+# - live measurement avoids stale hard-coded latency values as runner routing
+#   and network conditions change over time
+# - BAZEL_REMOTE_CACHE_LATENCY_MS exists specifically for fast local iteration;
+#   when set, the script intentionally skips provenance-oriented live
+#   measurement and future proxy-path validation
+#
+# Trade-off:
+# this does not claim to reproduce the exact latency of a future EKS-hosted
+# bazel-remote deployment. It is only a first-pass approximation of expected
+# regional network distance. Measuring against a real deployed bazel-remote is
+# the next planned refinement of the experiment.
 #
 # The intended comparison for each benchmark command is:
 #   - no cache
@@ -319,6 +337,7 @@ determine_representative_latency_ms() {
     greater_than_zero "${REPRESENTATIVE_LATENCY_OVERRIDE_MS}" || die "BAZEL_REMOTE_CACHE_LATENCY_MS must be > 0 when set"
     REPRESENTATIVE_LATENCY_MS="${REPRESENTATIVE_LATENCY_OVERRIDE_MS}"
     echo "Using representative cache latency override: ${REPRESENTATIVE_LATENCY_MS}ms"
+    echo "Skipping live measurement and proxy-path validation because override mode is intended for fast local iteration."
     return 0
   fi
 

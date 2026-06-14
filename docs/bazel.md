@@ -533,11 +533,22 @@ realistic cache-server latency changes the tradeoff between HTTP and gRPC
 remote caching enough that gRPC becomes necessary.
 
 To keep that question separate from transport guesswork, representative
-cache latency is measured outside the benchmark from GitHub Actions
-runners to a public AWS us-east-1 regional endpoint using `curl`. That measured
-latency is then injected into local benchmark traffic to `bazel-remote`
-so the harness can compare cache protocols under a realistic network
-model without needing a deployed cache server for every run.
+cache latency is measured before the benchmark from a public AWS us-east-1
+regional endpoint. The current approximation uses the repo-local
+`//tools/measure-http-latency` tool and takes average TTFB as the latency
+input for the benchmark. That measured latency is then intended to be
+injected into local benchmark traffic to `bazel-remote` so the harness can
+compare cache protocols under a realistic network model without needing a
+deployed cache server for every run.
+
+This is an intentionally coarse approximation of runner-to-us-east-1
+network distance, not a claim that the public endpoint exactly matches the
+latency characteristics of a future EKS-hosted `bazel-remote`. Measuring
+against a real deployed cache service is the next planned refinement.
+
+For fast local iteration, the benchmark also supports an explicit latency
+override via `BAZEL_REMOTE_CACHE_LATENCY_MS`. When that override is set,
+the benchmark skips live measurement and any future proxy-path validation.
 
 The intended cached comparison for each configured command is:
 - no remote cache

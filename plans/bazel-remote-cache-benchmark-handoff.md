@@ -235,13 +235,27 @@ cache server.
 
 Instead:
 1. measure representative latency separately from GitHub Actions runners
-   to a public AWS us-east-1 regional endpoint using `curl`
+   to a public AWS us-east-1 regional endpoint
 2. treat that measurement as the representative CI-to-cache distance
 3. induce that latency locally for all traffic between Bazel and
    `bazel-remote` using a proxy such as `toxiproxy`
 
-The `curl` measurement is not part of the benchmark subject itself. It is
-only how the benchmark obtains a realistic latency input.
+Current design choices:
+- use a public AWS us-east-1 regional endpoint as the first-pass latency
+  approximation because it is available before a real deployed bazel-remote
+  exists
+- use average TTFB from the latency probe as the coarse latency input because
+  it best approximates the cost of small cache requests
+- measure latency live by default to avoid stale hard-coded values as runner
+  routing and network conditions change
+- allow an explicit latency override for fast local iteration, which skips the
+  provenance-oriented live measurement and any future proxy-path validation
+
+Trade-off:
+- this is intended to approximate runner-to-us-east-1 regional distance, not
+  to claim exact equivalence with a future EKS-hosted bazel-remote deployment
+- measuring against a real deployed bazel-remote is the next planned
+  refinement once the first-pass protocol comparison exists
 
 ### Intended benchmark matrix
 For each benchmark command, the intended comparison becomes:
