@@ -8,12 +8,17 @@ import (
 	"math/big"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
@@ -22,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 )
@@ -283,6 +289,110 @@ func TestParseGenesis(t *testing.T) {
 			}
 			if diff := cmp.Diff(test.want, g, opts); diff != "" {
 				t.Errorf("parseGenesis(%s) (-want +got)\n%s", test.genesis, diff)
+			}
+		})
+	}
+}
+
+func TestWriteGenesis(t *testing.T) {
+	var (
+		latest       = upgradetest.GetConfig(upgradetest.Latest)
+		localGenesis = genesis.LocalConfig.CChainGenesis
+		fujiGenesis  = genesis.FujiConfig.CChainGenesis
+	)
+	tests := []struct {
+		name            string
+		initialUpgrades upgrade.Config
+		restartUpgrades upgrade.Config
+		restartGenesis  string
+		wantErr         testerr.Want
+	}{
+		{
+			// The first write commits a fresh database; re-running against the
+			// already-initialized database, as on a restart, is idempotent.
+			name:            "restart",
+			initialUpgrades: latest,
+			restartUpgrades: latest,
+			restartGenesis:  localGenesis,
+		},
+		{
+			// A different network's genesis has a different state root, and
+			// therefore a different hash, than the one already stored.
+			name:            "mismatch",
+			initialUpgrades: latest,
+			restartUpgrades: latest,
+			restartGenesis:  fujiGenesis,
+			wantErr:         errIsType[*core.GenesisMismatchError](),
+		},
+		{
+			// Secheduling an upgrade should not modify the genesis block but
+			// should update the stored chain config.
+			name:            "schedule_upgrade",
+			initialUpgrades: upgradetest.GetConfig(upgradetest.Cortina),
+			restartUpgrades: upgradetest.GetConfigWithUpgradeTime(
+				upgradetest.Durango,
+				upgrade.InitiallyActiveTime.Add(time.Second),
+			),
+			restartGenesis: localGenesis,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+			tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+
+			g, err := parseGenesis(
+				&snow.Context{NetworkUpgrades: test.initialUpgrades},
+				[]byte(localGenesis),
+			)
+			require.NoError(t, err, "parseGenesis(initial)")
+
+			block, err := writeGenesis(db, tdb, g)
+			require.NoError(t, err, "writeGenesis(initial)")
+
+			genesisHash := block.Hash()
+			require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(initial)")
+
+			gotConfig := rawdb.ReadChainConfig(db, genesisHash)
+			cmpBaseConfig := cmp.Options{
+				cmpopts.IgnoreUnexported(params.ChainConfig{}),
+				cmputils.BigInts(),
+			}
+			if diff := cmp.Diff(g.Config, gotConfig, cmpBaseConfig); diff != "" {
+				t.Errorf("initial stored base config (-want +got)\n%s", diff)
+			}
+
+			cmpNetworkUpgrades := cmp.Transformer("networkUpgrades", func(c *params.ChainConfig) extras.NetworkUpgrades {
+				return params.GetExtra(c).NetworkUpgrades
+			})
+			if diff := cmp.Diff(g.Config, gotConfig, cmpNetworkUpgrades); diff != "" {
+				t.Errorf("initial stored network upgrades (-want +got)\n%s", diff)
+			}
+
+			// The restart runs on the initialized database. It must agree on
+			// the canonical block and store its own chain config.
+			g, err = parseGenesis(
+				&snow.Context{NetworkUpgrades: test.restartUpgrades},
+				[]byte(test.restartGenesis),
+			)
+			require.NoError(t, err, "parseGenesis(restart)")
+
+			block, err = writeGenesis(db, tdb, g)
+			if diff := testerr.Diff(err, test.wantErr); diff != "" {
+				t.Fatalf("writeGenesis(restart) error (-want +got)\n%s", diff)
+			}
+			require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(restart)")
+			if test.wantErr != nil {
+				return
+			}
+
+			require.Equal(t, genesisHash, block.Hash(), "writeGenesis(restart) block hash")
+			gotConfig = rawdb.ReadChainConfig(db, genesisHash)
+			if diff := cmp.Diff(g.Config, gotConfig, cmpBaseConfig); diff != "" {
+				t.Errorf("stored base config after restart (-want +got)\n%s", diff)
+			}
+			if diff := cmp.Diff(g.Config, gotConfig, cmpNetworkUpgrades); diff != "" {
+				t.Errorf("stored network upgrades after restart (-want +got)\n%s", diff)
 			}
 		})
 	}
