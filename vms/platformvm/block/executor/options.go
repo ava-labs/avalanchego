@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -31,10 +32,19 @@ var (
 	errFailedCalculatingUptime            = errors.New("failed calculating uptime")
 )
 
+// ACP-267 raises the Primary Network uptime requirement to 90% (from 80%) for
+// validations that start on or after acp267StartTimeCutoff.
+const acp267UptimeRequirement = .9
+
+// acp267StartTimeCutoff is the validation start time on or after which the
+// ACP-267 Primary Network uptime requirement applies (2026-04-01 UTC).
+var acp267StartTimeCutoff = time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
+
 // options supports build new option blocks
 type options struct {
 	// inputs populated before calling this struct's methods:
 	log                     logging.Logger
+	networkID               uint32
 	primaryUptimePercentage float64
 	uptimes                 uptime.Calculator
 	state                   state.Chain
@@ -173,6 +183,11 @@ func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
+	} else if constants.ProductionNetworkIDs.Contains(o.networkID) &&
+		!primaryNetworkValidator.StartTime.Before(acp267StartTimeCutoff) {
+		// ACP-267: on mainnet/fuji, validations that start on or after the cutoff
+		// must meet the higher Primary Network uptime requirement.
+		expectedUptimePercentage = acp267UptimeRequirement
 	}
 
 	uptime, err := o.uptimes.CalculateUptimePercentFrom(

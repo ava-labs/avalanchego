@@ -89,6 +89,7 @@ func (b *Block) Timestamp() time.Time {
 func (b *Block) Options(context.Context) ([2]snowman.Block, error) {
 	options := options{
 		log:                     b.manager.ctx.Log,
+		networkID:               b.manager.ctx.NetworkID,
 		primaryUptimePercentage: b.manager.txExecutorBackend.Config.UptimePercentage,
 		uptimes:                 b.manager.txExecutorBackend.Uptimes,
 		state:                   b.manager.backend.state,
