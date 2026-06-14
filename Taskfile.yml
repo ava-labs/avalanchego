@@ -373,12 +373,16 @@ tasks:
   _lint-readonly:
     internal: true
     deps:
-      - lint
-      - lint-saevm
       - lint-action
       - lint-shell
       - check-go-version
       - check-require-directives
+    cmds:
+      # lint and lint-saevm both invoke golangci-lint, which aborts on
+      # concurrent runs. Keep the other read-only checks parallel via deps,
+      # but serialize the golangci-lint tasks here.
+      - task: lint
+      - task: lint-saevm
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
