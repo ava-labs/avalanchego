@@ -30,7 +30,9 @@ print_usage() {
 Usage: scripts/benchmark_bazel_remote_cache.sh \
   --setup-args 'fetch --all' \
   --benchmark-args 'build //main:avalanchego' \
-  [--benchmark-args 'build --config=race //main:avalanchego' ...]
+  [--benchmark-args 'build --config=race //main:avalanchego' ...] \
+  [--warm-log-must-contain '(cached) PASSED'] \
+  [--warm-log-must-contain 'Executed 0 out of 1 test: 1 test passes.']
 
 Benchmark Bazel remote caching with a CI-style split between:
   1. one measured setup command that populates repository_cache
@@ -51,6 +53,11 @@ BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS of the measured target.
 
 The benchmark fails unless the warm remote-cache run is faster than both the
 no-cache and cold-cache runs for every configured benchmark command.
+
+By default, setup-side dependency caches are reused across local runs under
+`$XDG_CACHE_HOME/av-bazel-remote-cache-benchmark/` when `XDG_CACHE_HOME` is
+set, otherwise `~/.cache/av-bazel-remote-cache-benchmark/`.
+Set `BAZEL_REMOTE_CACHE_FRESH_SETUP_CACHE=1` to force fresh setup caches.
 EOF
 }
 
@@ -75,6 +82,7 @@ require_cmd mktemp
 
 SETUP_ARGS_SPEC=""
 declare -a BENCHMARK_ARGS_SPECS=()
+declare -a WARM_LOG_MUST_CONTAIN_PATTERNS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -88,6 +96,11 @@ while [[ $# -gt 0 ]]; do
       shift
       [[ $# -gt 0 ]] || die "--benchmark-args requires a value"
       BENCHMARK_ARGS_SPECS+=("$1")
+      ;;
+    --warm-log-must-contain)
+      shift
+      [[ $# -gt 0 ]] || die "--warm-log-must-contain requires a value"
+      WARM_LOG_MUST_CONTAIN_PATTERNS+=("$1")
       ;;
     *)
       print_usage >&2
@@ -461,6 +474,18 @@ less_than() {
   awk -v left="$1" -v right="$2" 'BEGIN { exit !(left < right) }'
 }
 
+warm_log_contains_all_patterns() {
+  local log_file="$1"
+  local pattern
+
+  for pattern in "${WARM_LOG_MUST_CONTAIN_PATTERNS[@]}"; do
+    if ! grep -F -q -- "${pattern}" "${log_file}"; then
+      echo "missing warm-log pattern: ${pattern}" >&2
+      return 1
+    fi
+  done
+}
+
 greater_than_zero() {
   awk -v value="$1" 'BEGIN { exit !(value > 0) }'
 }
@@ -593,6 +618,11 @@ determine_representative_latency_ms() {
   latency_json_log="${LOG_DIR}/representative-latency.json"
   latency_text_log="${LOG_DIR}/representative-latency.txt"
 
+  printf 'Representative latency probe: url=%s samples=%s timeout=%s\n' \
+    "${REPRESENTATIVE_LATENCY_URL}" \
+    "${REPRESENTATIVE_LATENCY_SAMPLES}" \
+    "${REPRESENTATIVE_LATENCY_TIMEOUT}"
+
   measure_http_latency \
     "Measuring representative cache latency with bazel run //tools/measure-http-latency" \
     "${REPRESENTATIVE_LATENCY_URL}" \
@@ -707,6 +737,11 @@ for index in "${!BENCHMARK_ARGS_SPECS[@]}"; do
     echo "FAIL: warm remote cache was not faster than cold remote cache for: bazelisk ${label}" >&2
     all_passed=false
   fi
+  if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]] \
+    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${index}-warm-remote.log"; then
+    echo "FAIL: warm remote cache log did not contain required patterns for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
 done
 
 echo
@@ -726,4 +761,7 @@ if [[ "${all_passed}" != true ]]; then
 fi
 
 echo "PASS: warm remote cache was faster than both no cache and cold remote cache for every benchmark command"
+if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]]; then
+  echo "PASS: warm remote cache logs contained all required patterns"
+fi
 SUCCESS=true

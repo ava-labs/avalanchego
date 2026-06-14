@@ -40,7 +40,12 @@ tasks:
 
   bazel-benchmark-remote-cache-ids-test:
     desc: Benchmark Bazel remote caching for //ids:ids_test
-    cmd: '{{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache_ids_test.sh'
+    cmd: >-
+      {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
+      --setup-args "fetch //ids:ids_test"
+      --benchmark-args "test //ids:ids_test"
+      --warm-log-must-contain "(cached) PASSED"
+      --warm-log-must-contain "Executed 0 out of 1 test: 1 test passes."
 
   bazel-build-opt:
     desc: Build avalanchego with Bazel (optimized)
