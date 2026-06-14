@@ -19,6 +19,13 @@ import (
 	"time"
 )
 
+const (
+	modeCold   = "cold"
+	modeWarmH2 = "warm-h2"
+)
+
+var errInvalidMode = errors.New("invalid mode")
+
 type config struct {
 	url     string
 	samples int
@@ -28,13 +35,13 @@ type config struct {
 }
 
 type sample struct {
-	StatusCode        int           `json:"statusCode"`
-	Connect           time.Duration `json:"-"`
-	TLS               time.Duration `json:"-"`
-	TTFB              time.Duration `json:"-"`
-	WriteToFirstByte  time.Duration `json:"-"`
-	Total             time.Duration `json:"-"`
-	ReusedConnection  bool          `json:"reusedConnection"`
+	StatusCode       int           `json:"statusCode"`
+	Connect          time.Duration `json:"-"`
+	TLS              time.Duration `json:"-"`
+	TTFB             time.Duration `json:"-"`
+	WriteToFirstByte time.Duration `json:"-"`
+	Total            time.Duration `json:"-"`
+	ReusedConnection bool          `json:"reusedConnection"`
 }
 
 type report struct {
@@ -88,7 +95,7 @@ func parseFlags(args []string) (config, error) {
 	fs.IntVar(&cfg.samples, "samples", 10, "number of samples to collect")
 	fs.DurationVar(&cfg.timeout, "timeout", 10*time.Second, "per-request timeout")
 	fs.StringVar(&cfg.format, "format", "text", "output format: text or json")
-	fs.StringVar(&cfg.mode, "mode", "cold", "measurement mode: cold or warm-h2")
+	fs.StringVar(&cfg.mode, "mode", modeCold, "measurement mode: cold or warm-h2")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -104,8 +111,8 @@ func parseFlags(args []string) (config, error) {
 		return config{}, errors.New("--format must be one of: text, json")
 	}
 	cfg.mode = strings.ToLower(cfg.mode)
-	if cfg.mode != "cold" && cfg.mode != "warm-h2" {
-		return config{}, errors.New("--mode must be one of: cold, warm-h2")
+	if cfg.mode != modeCold && cfg.mode != modeWarmH2 {
+		return config{}, fmt.Errorf("%w: %q (must be one of: %s, %s)", errInvalidMode, cfg.mode, modeCold, modeWarmH2)
 	}
 	if cfg.timeout <= 0 {
 		return config{}, errors.New("--timeout must be > 0")
@@ -116,8 +123,8 @@ func parseFlags(args []string) (config, error) {
 func measure(cfg config) (report, error) {
 	transport := &http.Transport{
 		Proxy:             http.ProxyFromEnvironment,
-		DisableKeepAlives: cfg.mode == "cold",
-		ForceAttemptHTTP2: cfg.mode == "warm-h2",
+		DisableKeepAlives: cfg.mode == modeCold,
+		ForceAttemptHTTP2: cfg.mode == modeWarmH2,
 	}
 	client := &http.Client{
 		Timeout:   cfg.timeout,
@@ -132,16 +139,16 @@ func measure(cfg config) (report, error) {
 	reusedSamples := 0
 
 	attempts := cfg.samples
-	if cfg.mode == "warm-h2" {
+	if cfg.mode == modeWarmH2 {
 		attempts += cfg.samples + 2 // one warm-up request plus slack for occasional reconnects
 	}
 
 	for range make([]struct{}, attempts) {
-		s, err := collectSample(client, cfg.url, cfg.mode == "cold")
+		s, err := collectSample(client, cfg.url, cfg.mode == modeCold)
 		if err != nil {
 			return report{}, err
 		}
-		if cfg.mode == "warm-h2" && !s.ReusedConnection {
+		if cfg.mode == modeWarmH2 && !s.ReusedConnection {
 			continue
 		}
 		samples = append(samples, s)
