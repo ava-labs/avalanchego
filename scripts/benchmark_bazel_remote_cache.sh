@@ -14,6 +14,17 @@ else
   exit 1
 fi
 
+if command -v toxiproxy-server >/dev/null 2>&1 && command -v toxiproxy-cli >/dev/null 2>&1; then
+  TOXIPROXY_SERVER_LAUNCHER=(toxiproxy-server)
+  TOXIPROXY_CLI_LAUNCHER=(toxiproxy-cli)
+elif command -v nix >/dev/null 2>&1; then
+  TOXIPROXY_SERVER_LAUNCHER=(nix shell nixpkgs#toxiproxy -c toxiproxy-server)
+  TOXIPROXY_CLI_LAUNCHER=(nix shell nixpkgs#toxiproxy -c toxiproxy-cli)
+else
+  echo "error: toxiproxy not found on PATH and nix is unavailable" >&2
+  exit 1
+fi
+
 print_usage() {
   cat <<'EOF'
 Usage: scripts/benchmark_bazel_remote_cache.sh \
@@ -34,7 +45,9 @@ Bazel output state each time:
 Representative cache latency is determined before the benchmark starts unless
 BAZEL_REMOTE_CACHE_LATENCY_MS is set. In measured mode, the script runs
 `bazel run //tools/measure-http-latency` against
-BAZEL_REMOTE_CACHE_LATENCY_URL (default: https://ec2.us-east-1.amazonaws.com/).
+BAZEL_REMOTE_CACHE_LATENCY_URL (default: https://ec2.us-east-1.amazonaws.com/),
+then validates that a toxiproxy-induced HTTP path to bazel-remote is within
+BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS of the measured target.
 
 The benchmark fails unless the warm remote-cache run is faster than both the
 no-cache and cold-cache runs for every configured benchmark command.
@@ -118,8 +131,9 @@ load_command_array() {
 TMP_ROOT="$(mktemp -d -t bazel-remote-cache-bench.XXXXXX)"
 CACHE_DIR="${TMP_ROOT}/remote-cache"
 REPOSITORY_CACHE_DIR="${TMP_ROOT}/repository-cache"
+GO_REPOSITORY_MODCACHE_DIR="${TMP_ROOT}/go-mod-cache"
 LOG_DIR="${TMP_ROOT}/logs"
-mkdir -p "${CACHE_DIR}" "${REPOSITORY_CACHE_DIR}" "${LOG_DIR}"
+mkdir -p "${CACHE_DIR}" "${REPOSITORY_CACHE_DIR}" "${GO_REPOSITORY_MODCACHE_DIR}" "${LOG_DIR}"
 
 DEFAULT_REPRESENTATIVE_LATENCY_URL="https://ec2.us-east-1.amazonaws.com/"
 REPRESENTATIVE_LATENCY_URL="${BAZEL_REMOTE_CACHE_LATENCY_URL:-${DEFAULT_REPRESENTATIVE_LATENCY_URL}}"
@@ -127,9 +141,9 @@ REPRESENTATIVE_LATENCY_SAMPLES="${BAZEL_REMOTE_CACHE_LATENCY_SAMPLES:-10}"
 REPRESENTATIVE_LATENCY_TIMEOUT="${BAZEL_REMOTE_CACHE_LATENCY_TIMEOUT:-10s}"
 REPRESENTATIVE_LATENCY_OVERRIDE_MS="${BAZEL_REMOTE_CACHE_LATENCY_MS:-}"
 REPRESENTATIVE_LATENCY_MS=""
-# Future toxiproxy validation should verify the proxied cache path stays within
-# a small tolerance of the measured target in default mode. Override mode skips
-# that validation because its purpose is fast local iteration, not provenance.
+# Default measured mode validates that the proxied cache path stays within a
+# small tolerance of the measured target. Override mode skips that validation
+# because its purpose is fast local iteration, not provenance.
 REPRESENTATIVE_LATENCY_TOLERANCE_MS="${BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS:-15}"
 
 # This benchmark is intended to model CI workers talking to a remote cache
@@ -172,6 +186,10 @@ REPRESENTATIVE_LATENCY_TOLERANCE_MS="${BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS:-
 
 REMOTE_PID=""
 REMOTE_LOG=""
+TOXIPROXY_PID=""
+TOXIPROXY_LOG=""
+TOXIPROXY_API_URL=""
+KEEP_TMP="${DEBUG:-0}"
 SUCCESS=false
 stop_bazel_remote() {
   if [[ -n "${REMOTE_PID}" ]] && kill -0 "${REMOTE_PID}" >/dev/null 2>&1; then
@@ -181,14 +199,29 @@ stop_bazel_remote() {
   REMOTE_PID=""
 }
 
+stop_toxiproxy() {
+  if [[ -n "${TOXIPROXY_PID}" ]] && kill -0 "${TOXIPROXY_PID}" >/dev/null 2>&1; then
+    kill "${TOXIPROXY_PID}" >/dev/null 2>&1 || true
+    wait "${TOXIPROXY_PID}" >/dev/null 2>&1 || true
+  fi
+  TOXIPROXY_PID=""
+  TOXIPROXY_API_URL=""
+}
+
 cleanup() {
+  stop_toxiproxy
   stop_bazel_remote
 
-  if [[ "${SUCCESS}" == true ]]; then
-    chmod -R u+w "${TMP_ROOT}" >/dev/null 2>&1 || true
-    rm -rf "${TMP_ROOT}" >/dev/null 2>&1 || true
-  else
+  if [[ "${KEEP_TMP}" == "1" ]]; then
     echo "kept temporary workspace for inspection: ${TMP_ROOT}" >&2
+    return
+  fi
+
+  chmod -R u+w "${TMP_ROOT}" >/dev/null 2>&1 || true
+  rm -rf "${TMP_ROOT}" >/dev/null 2>&1 || true
+
+  if [[ "${SUCCESS}" != true ]]; then
+    echo "temporary workspace removed; re-run with DEBUG=1 to retain it for inspection" >&2
   fi
 }
 trap cleanup EXIT
@@ -230,6 +263,39 @@ start_bazel_remote() {
   done
 
   die "failed to start bazel-remote; last log:\n$(tail -n 20 "${REMOTE_LOG}" 2>/dev/null || true)"
+}
+
+start_toxiproxy() {
+  local log_name="$1"
+  local port attempts
+  attempts=10
+
+  stop_toxiproxy
+
+  for ((i = 1; i <= attempts; i++)); do
+    port="$(choose_port)"
+    TOXIPROXY_LOG="${LOG_DIR}/${log_name}"
+    TOXIPROXY_API_URL="http://127.0.0.1:${port}"
+
+    "${TOXIPROXY_SERVER_LAUNCHER[@]}" \
+      -host 127.0.0.1 \
+      -port "${port}" \
+      >"${TOXIPROXY_LOG}" 2>&1 &
+    TOXIPROXY_PID=$!
+
+    sleep 1
+    if kill -0 "${TOXIPROXY_PID}" >/dev/null 2>&1 \
+      && "${TOXIPROXY_CLI_LAUNCHER[@]}" --host "${TOXIPROXY_API_URL}" list >/dev/null 2>&1; then
+      echo "${TOXIPROXY_API_URL}"
+      return 0
+    fi
+
+    wait "${TOXIPROXY_PID}" >/dev/null 2>&1 || true
+    TOXIPROXY_PID=""
+    TOXIPROXY_API_URL=""
+  done
+
+  die "failed to start toxiproxy; last log:\n$(tail -n 20 "${TOXIPROXY_LOG}" 2>/dev/null || true)"
 }
 
 now_seconds() {
@@ -283,6 +349,13 @@ run_bazel_command() {
     --curses=no
     --show_progress_rate_limit=60
     "--repository_cache=${REPOSITORY_CACHE_DIR}"
+    # Gazelle go_repository keeps an internal per-output-base module cache by
+    # default, which defeats the goal of a shared setup phase when each measured
+    # run gets a fresh output base. Force it onto a host-level shared GOMODCACHE
+    # so setup can seed Go module downloads once and later fresh-output-base
+    # runs can reuse them without re-downloading.
+    "--repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1"
+    "--repo_env=GOMODCACHE=${GO_REPOSITORY_MODCACHE_DIR}"
     --disk_cache=)
 
   if [[ -n "${remote_cache}" ]]; then
@@ -304,6 +377,7 @@ run_bazel_command() {
     echo "remote_cache: disabled" >&2
   fi
   echo "repository_cache: ${REPOSITORY_CACHE_DIR}" >&2
+  echo "go_repository mod cache: ${GO_REPOSITORY_MODCACHE_DIR}" >&2
   echo "output_base: ${output_base}" >&2
 
   start="$(now_seconds)"
@@ -332,28 +406,14 @@ greater_than_zero() {
   awk -v value="$1" 'BEGIN { exit !(value > 0) }'
 }
 
-determine_representative_latency_ms() {
-  if [[ -n "${REPRESENTATIVE_LATENCY_OVERRIDE_MS}" ]]; then
-    greater_than_zero "${REPRESENTATIVE_LATENCY_OVERRIDE_MS}" || die "BAZEL_REMOTE_CACHE_LATENCY_MS must be > 0 when set"
-    REPRESENTATIVE_LATENCY_MS="${REPRESENTATIVE_LATENCY_OVERRIDE_MS}"
-    echo "Using representative cache latency override: ${REPRESENTATIVE_LATENCY_MS}ms"
-    echo "Skipping live measurement and proxy-path validation because override mode is intended for fast local iteration."
-    return 0
-  fi
+round_positive_ms_to_int() {
+  awk -v value="$1" 'BEGIN { printf "%d", int(value + 0.5) }'
+}
 
-  local latency_json_log latency_text_log
-  latency_json_log="${LOG_DIR}/representative-latency.json"
-  latency_text_log="${LOG_DIR}/representative-latency.txt"
+extract_avg_ttfb_ms() {
+  local latency_json_log="$1"
 
-  echo "Measuring representative cache latency with bazel run //tools/measure-http-latency"
-  "${NIX_RUN}" bazelisk run //tools/measure-http-latency -- \
-    --url "${REPRESENTATIVE_LATENCY_URL}" \
-    --samples "${REPRESENTATIVE_LATENCY_SAMPLES}" \
-    --timeout "${REPRESENTATIVE_LATENCY_TIMEOUT}" \
-    --format json \
-    >"${latency_json_log}"
-
-  REPRESENTATIVE_LATENCY_MS="$(python3 - "${latency_json_log}" <<'PY'
+  python3 - "${latency_json_log}" <<'PY'
 import json
 import sys
 
@@ -362,7 +422,11 @@ with open(sys.argv[1], encoding='utf-8') as f:
 
 print(f"{report['avgTtfbMs']:.1f}")
 PY
-)"
+}
+
+render_latency_text_report() {
+  local latency_json_log="$1"
+  local latency_text_log="$2"
 
   python3 - "${latency_json_log}" >"${latency_text_log}" <<'PY'
 import json
@@ -384,14 +448,151 @@ print(
     )
 )
 PY
+}
 
+measure_http_latency() {
+  local label="$1"
+  local url="$2"
+  local latency_json_log="$3"
+  local latency_text_log="$4"
+
+  echo "${label}"
+  "${NIX_RUN}" bazelisk run //tools/measure-http-latency -- \
+    --url "${url}" \
+    --samples "${REPRESENTATIVE_LATENCY_SAMPLES}" \
+    --timeout "${REPRESENTATIVE_LATENCY_TIMEOUT}" \
+    --format json \
+    >"${latency_json_log}"
+
+  render_latency_text_report "${latency_json_log}" "${latency_text_log}"
   cat "${latency_text_log}"
 }
 
+within_tolerance() {
+  awk -v observed="$1" -v target="$2" -v tolerance="$3" '
+    BEGIN {
+      diff = observed - target
+      if (diff < 0) {
+        diff = -diff
+      }
+      exit !(diff <= tolerance)
+    }
+  '
+}
+
+proxy_upstream_address() {
+  local remote_cache_url="$1"
+  [[ "${remote_cache_url}" == http://* ]] || die "expected http remote cache URL, got: ${remote_cache_url}"
+  printf '%s\n' "${remote_cache_url#http://}"
+}
+
+create_latency_proxy() {
+  local remote_cache_url="$1"
+  local proxy_name="$2"
+  local latency_ms="$3"
+  local listen_port upstream_address rounded_latency_ms
+
+  listen_port="$(choose_port)"
+  upstream_address="$(proxy_upstream_address "${remote_cache_url}")"
+  rounded_latency_ms="$(round_positive_ms_to_int "${latency_ms}")"
+
+  "${TOXIPROXY_CLI_LAUNCHER[@]}" --host "${TOXIPROXY_API_URL}" \
+    create \
+    --listen "127.0.0.1:${listen_port}" \
+    --upstream "${upstream_address}" \
+    "${proxy_name}" \
+    >/dev/null
+
+  "${TOXIPROXY_CLI_LAUNCHER[@]}" --host "${TOXIPROXY_API_URL}" \
+    toxic add \
+    --type latency \
+    --downstream \
+    --toxicName "${proxy_name}-latency" \
+    --attribute "latency=${rounded_latency_ms}" \
+    "${proxy_name}" \
+    >/dev/null
+
+  printf 'http://127.0.0.1:%s\n' "${listen_port}"
+}
+
+validate_proxied_http_latency() {
+  local proxied_remote_cache_url="$1"
+  local latency_json_log latency_text_log observed_latency_ms
+
+  if [[ -n "${REPRESENTATIVE_LATENCY_OVERRIDE_MS}" ]]; then
+    echo "Skipping proxied HTTP latency validation because override mode is active."
+    return 0
+  fi
+
+  latency_json_log="${LOG_DIR}/proxied-bazel-remote-http-latency.json"
+  latency_text_log="${LOG_DIR}/proxied-bazel-remote-http-latency.txt"
+
+  measure_http_latency \
+    "Validating proxied bazel-remote HTTP latency" \
+    "${proxied_remote_cache_url}" \
+    "${latency_json_log}" \
+    "${latency_text_log}"
+
+  observed_latency_ms="$(extract_avg_ttfb_ms "${latency_json_log}")"
+  printf 'proxy target latency: %sms\n' "${REPRESENTATIVE_LATENCY_MS}"
+  printf 'proxy observed latency: %sms\n' "${observed_latency_ms}"
+  printf 'proxy tolerance: %sms\n' "${REPRESENTATIVE_LATENCY_TOLERANCE_MS}"
+
+  if ! within_tolerance "${observed_latency_ms}" "${REPRESENTATIVE_LATENCY_MS}" "${REPRESENTATIVE_LATENCY_TOLERANCE_MS}"; then
+    die "proxied bazel-remote HTTP latency ${observed_latency_ms}ms was not within ${REPRESENTATIVE_LATENCY_TOLERANCE_MS}ms of target ${REPRESENTATIVE_LATENCY_MS}ms"
+  fi
+}
+
+determine_representative_latency_ms() {
+  if [[ -n "${REPRESENTATIVE_LATENCY_OVERRIDE_MS}" ]]; then
+    greater_than_zero "${REPRESENTATIVE_LATENCY_OVERRIDE_MS}" || die "BAZEL_REMOTE_CACHE_LATENCY_MS must be > 0 when set"
+    REPRESENTATIVE_LATENCY_MS="${REPRESENTATIVE_LATENCY_OVERRIDE_MS}"
+    echo "Using representative cache latency override: ${REPRESENTATIVE_LATENCY_MS}ms"
+    echo "Skipping live measurement and proxy-path validation because override mode is intended for fast local iteration."
+    return 0
+  fi
+
+  local latency_json_log latency_text_log
+  latency_json_log="${LOG_DIR}/representative-latency.json"
+  latency_text_log="${LOG_DIR}/representative-latency.txt"
+
+  measure_http_latency \
+    "Measuring representative cache latency with bazel run //tools/measure-http-latency" \
+    "${REPRESENTATIVE_LATENCY_URL}" \
+    "${latency_json_log}" \
+    "${latency_text_log}"
+
+  REPRESENTATIVE_LATENCY_MS="$(extract_avg_ttfb_ms "${latency_json_log}")"
+}
+
+prepare_proxied_bazel_remote_http() {
+  local validation_remote_cache_dir validation_remote_cache_url validation_proxy_url
+
+  validation_remote_cache_dir="${CACHE_DIR}/latency-validation"
+  mkdir -p "${validation_remote_cache_dir}"
+
+  validation_remote_cache_url="$(start_bazel_remote "${validation_remote_cache_dir}" "latency-validation-bazel-remote.log")"
+  echo "Using latency-validation bazel-remote: ${validation_remote_cache_url}"
+
+  TOXIPROXY_API_URL="$(start_toxiproxy "latency-validation-toxiproxy.log")"
+  echo "Using toxiproxy API: ${TOXIPROXY_API_URL}"
+
+  validation_proxy_url="$(create_latency_proxy "${validation_remote_cache_url}" "latency-validation-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
+  echo "Using proxied bazel-remote HTTP endpoint: ${validation_proxy_url}"
+
+  validate_proxied_http_latency "${validation_proxy_url}"
+
+  stop_toxiproxy
+  stop_bazel_remote
+}
+
 echo "Using temporary workspace: ${TMP_ROOT}"
+echo "Set DEBUG=1 to retain the temporary workspace for inspection"
 echo "Using repository cache: ${REPOSITORY_CACHE_DIR}"
+echo "Using go_repository mod cache: ${GO_REPOSITORY_MODCACHE_DIR}"
 determine_representative_latency_ms
 printf 'Representative cache latency input: %sms\n' "${REPRESENTATIVE_LATENCY_MS}"
+prepare_proxied_bazel_remote_http
 
 # The setup phase models the CI cache-writer job from PR 5525: start from an
 # empty repository_cache, then measure a single command (typically `fetch --all`)

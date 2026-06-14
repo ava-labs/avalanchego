@@ -34,6 +34,8 @@ tasks:
     cmd: >-
       {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
       --setup-args "fetch --all"
+      --benchmark-args "build //main:avalanchego"
+      --benchmark-args "build --config=race //main:avalanchego"
       --benchmark-args "test //... -- -//graft/..."
 
   bazel-benchmark-remote-cache-ids-test:
