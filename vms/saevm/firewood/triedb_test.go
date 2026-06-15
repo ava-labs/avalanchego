@@ -22,6 +22,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func mustNewStateDB(t *testing.T, db state.Database, root common.Hash) *state.StateDB {
@@ -43,6 +44,11 @@ type accountModel struct {
 type fuzzModel struct {
 	accounts map[common.Address]*accountModel
 	addrs    []common.Address // live addresses ordered by creation time
+
+	// Per-transaction tracking, reset at every transaction boundary
+	// see [SUT.finaliseTx])
+	createdThisTx    set.Set[common.Address]
+	destructedThisTx []common.Address // addresses destructed this tx, eligible for resurrection
 }
 
 func (m *fuzzModel) selectAddr(param byte) common.Address {
@@ -79,7 +85,8 @@ func newSUT(t *testing.T) *SUT {
 		hashState: hashState,
 		lastRoot:  root,
 		model: &fuzzModel{
-			accounts: make(map[common.Address]*accountModel),
+			accounts:      make(map[common.Address]*accountModel),
+			createdThisTx: set.NewSet[common.Address](0),
 		},
 	}
 }
@@ -90,17 +97,47 @@ func (s *SUT) nextHash() common.Hash {
 	return crypto.Keccak256Hash(binary.BigEndian.AppendUint64(nil, s.counter))
 }
 
-func (s *SUT) createAccount() {
-	addr := common.BytesToAddress(s.nextHash().Bytes())
-	if _, exists := s.model.accounts[addr]; exists {
-		return // address collision — skip rather than reset an existing account
+// createAccount creates an account, modelling an EVM contract deployment. When
+// an account has been destructed earlier in the current transaction, that
+// accound could be resurrected.
+func (s *SUT) createAccount(param byte) {
+	if len(s.model.destructedThisTx) > 0 && param&1 == 0 {
+		s.recreateAccount(param >> 1)
+		return
 	}
+
+	addr := common.BytesToAddress(s.nextHash().Bytes())
 	bal := uint256.NewInt(100)
 	s.model.accounts[addr] = &accountModel{
 		nonce:   1,
 		balance: bal.Clone(),
 	}
 	s.model.addrs = append(s.model.addrs, addr)
+	s.model.createdThisTx.Add(addr)
+
+	s.fwState.CreateAccount(addr)
+	s.fwState.SetNonce(addr, 1)
+	s.fwState.SetBalance(addr, bal)
+	s.hashState.CreateAccount(addr)
+	s.hashState.SetNonce(addr, 1)
+	s.hashState.SetBalance(addr, bal)
+}
+
+func (s *SUT) recreateAccount(param byte) {
+	i := int(param) % len(s.model.destructedThisTx)
+	addr := s.model.destructedThisTx[i]
+	// Swap with last element and truncate (order doesn't matter for correctness).
+	last := len(s.model.destructedThisTx) - 1
+	s.model.destructedThisTx[i] = s.model.destructedThisTx[last]
+	s.model.destructedThisTx = s.model.destructedThisTx[:last]
+
+	bal := uint256.NewInt(100)
+	s.model.accounts[addr] = &accountModel{
+		nonce:   1,
+		balance: bal.Clone(),
+	}
+	s.model.addrs = append(s.model.addrs, addr)
+	s.model.createdThisTx.Add(addr)
 
 	s.fwState.CreateAccount(addr)
 	s.fwState.SetNonce(addr, 1)
@@ -122,18 +159,30 @@ func (s *SUT) updateAccount(param byte) {
 	s.hashState.SetBalance(addr, acc.balance)
 }
 
-func (s *SUT) deleteAccount(param byte) {
+// selfDestruct6780 models the SELFDESTRUCT opcode under EIP-6780. The call is
+// always issued to the StateDB (it is a legal operation on any account), but it
+// only actually destructs the account — and so only updates the model — when the
+// account was created in the current transaction. On a pre-existing account it
+// is a no-op and the account remains live.
+func (s *SUT) selfDestruct6780(param byte) {
 	i := int(param) % len(s.model.addrs)
 	addr := s.model.addrs[i]
+
+	s.fwState.Selfdestruct6780(addr)
+	s.hashState.Selfdestruct6780(addr)
+
+	if !s.model.createdThisTx.Contains(addr) {
+		return // not created this tx: Selfdestruct6780 is a no-op
+	}
+
 	delete(s.model.accounts, addr)
+	s.model.createdThisTx.Remove(addr)
+	s.model.destructedThisTx = append(s.model.destructedThisTx, addr)
 
 	// Swap with last element and truncate (order doesn't matter for correctness).
 	last := len(s.model.addrs) - 1
 	s.model.addrs[i] = s.model.addrs[last]
 	s.model.addrs = s.model.addrs[:last]
-
-	s.fwState.SelfDestruct(addr)
-	s.hashState.SelfDestruct(addr)
 }
 
 func (s *SUT) setStorage(param byte) {
@@ -163,10 +212,26 @@ func (s *SUT) deleteStorage(param byte) {
 	s.hashState.SetState(addr, key, common.Hash{})
 }
 
+// finaliseTx resets the model's per-transaction tracking to mirror
+// [state.StateDB.Finalise].
+// Any accounts created this transaction can no longer be selfdestructed,
+// and any accounts destructed this transaction can no longer be resurrected.
+func (s *SUT) finaliseTx() {
+	s.model.createdThisTx.Clear()
+	s.model.destructedThisTx = s.model.destructedThisTx[:0]
+}
+
+func (s *SUT) finalise() {
+	s.fwState.Finalise(true /* EIP-158 */)
+	s.hashState.Finalise(true /* EIP-158 */)
+	s.finaliseTx()
+}
+
 func (s *SUT) intermediateRoot(t *testing.T) {
 	fwRoot := s.fwState.IntermediateRoot(true /* EIP-158 */)
 	hashRoot := s.hashState.IntermediateRoot(true /* EIP-158 */)
 	require.Equal(t, hashRoot, fwRoot, "root mismatch")
+	s.finaliseTx() // IntermediateRoot calls Finalise
 }
 
 func (s *SUT) stateDBCommit(t *testing.T) {
@@ -181,6 +246,7 @@ func (s *SUT) stateDBCommit(t *testing.T) {
 
 	s.fwState = mustNewStateDB(t, s.fwDB, s.lastRoot)
 	s.hashState = mustNewStateDB(t, s.hashDB, s.lastRoot)
+	s.finaliseTx() // Commit calls Finalise
 }
 
 func (s *SUT) diskCommit(t *testing.T) {
@@ -196,9 +262,10 @@ func (s *SUT) copyStateDB() {
 const (
 	opStateDBCommit    byte = iota // commit pending changes; root changes iff state changed
 	opDiskCommit                   // flush pending, then commit a clean StateDB; root must be unchanged
-	opCreateAccount                // add a new account with a deterministic address
+	opCreateAccount                // deploy an account; resurrects a same-tx destructed account when one exists
 	opUpdateAccount                // increment nonce and balance of an existing account
-	opDeleteAccount                // delete an existing account via [state.StateDB.SelfDestruct]
+	opSelfDestruct6780             // SELFDESTRUCT (EIP-6780) an account; no-op unless created this tx
+	opFinalise                     // end the current transaction without computing a root
 	opSetStorage                   // write a new storage slot on an existing account
 	opDeleteStorage                // zero out an existing storage slot on an existing account
 	opIntermediateRoot             // verify all account and storage hashes match the model
@@ -227,13 +294,21 @@ func FuzzStateDB(f *testing.F) {
 		opDeleteStorage,
 		opStateDBCommit,
 	})
+	f.Add([]byte{opStateDBCommit, opDiskCommit})
 	f.Add([]byte{
 		opCreateAccount,
-		opStateDBCommit,
-		opDeleteAccount,
+		opFinalise,
+		opSelfDestruct6780,
 		opStateDBCommit,
 	})
-	f.Add([]byte{opStateDBCommit, opDiskCommit})
+	f.Add([]byte{
+		opCreateAccount,
+		opSetStorage,
+		opSelfDestruct6780,
+		opCreateAccount, // resurrects the just-destructed account
+		opSetStorage,
+		opStateDBCommit,
+	})
 
 	f.Fuzz(func(t *testing.T, steps []byte) {
 		sut := newSUT(t)
@@ -241,24 +316,18 @@ func FuzzStateDB(f *testing.F) {
 			op := step % maxOp
 			param := step / maxOp
 			switch op {
-			case opStateDBCommit:
-				t.Log("state.StateDB.Commit()")
-				sut.stateDBCommit(t)
-			case opDiskCommit:
-				t.Log("triedb.Commit()")
-				sut.diskCommit(t)
 			case opCreateAccount:
 				t.Log("create account")
-				sut.createAccount()
+				sut.createAccount(param)
 			case opUpdateAccount:
 				if len(sut.model.addrs) > 0 {
 					t.Log("update account")
 					sut.updateAccount(param)
 				}
-			case opDeleteAccount:
+			case opSelfDestruct6780:
 				if len(sut.model.addrs) > 0 {
 					t.Log("delete account")
-					sut.deleteAccount(param)
+					sut.selfDestruct6780(param)
 				}
 			case opSetStorage:
 				if len(sut.model.addrs) > 0 {
@@ -270,9 +339,18 @@ func FuzzStateDB(f *testing.F) {
 					t.Log("delete storage")
 					sut.deleteStorage(param)
 				}
+			case opFinalise:
+				t.Log("finalise (end transaction)")
+				sut.finalise()
 			case opIntermediateRoot:
-				t.Log("intermediate root")
+				t.Log("intermediate root (end transaction)")
 				sut.intermediateRoot(t)
+			case opStateDBCommit:
+				t.Log("commit (end block)")
+				sut.stateDBCommit(t)
+			case opDiskCommit:
+				t.Log("disk commit (previous block)")
+				sut.diskCommit(t)
 			case opCopyStateDB:
 				t.Log("copy StateDB")
 				sut.copyStateDB()
