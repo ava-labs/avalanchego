@@ -984,7 +984,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 			return nil, errMissingStakerTx
 		}
 
-		return nil, fmt.Errorf("error getting staker tx: %w", err)
+		return nil, fmt.Errorf("getting staker tx: %w", err)
 	}
 
 	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
@@ -998,7 +998,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 			return nil, errMissingValidator
 		}
 
-		return nil, fmt.Errorf("failed to get validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
+		return nil, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
 	}
 
 	if tx.TxID != validator.TxID {
