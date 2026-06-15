@@ -313,12 +313,17 @@ func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, 
 	assert.Equalf(tb, wantHeight, gotHeight, "%T.GetTx() block height", s.Client)
 }
 
-// runConsensusLoop waits for issued txs to become pending, then drives the
-// shared build+verify+accept loop and waits until the block has executed.
-func (s *SUT) runConsensusLoop(tb testing.TB) *blocks.Block {
+// runConsensusLoop sends any txs, builds+verifies+accepts a block, and waits
+// for execution. Without txs it waits for a pending-tx event, since cchain must
+// not build empty blocks.
+func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
 
-	s.WaitForPendingTxs(tb)
+	if len(txs) > 0 {
+		s.sendTxsAndWaitUntilPending(tb, txs...)
+	} else {
+		s.WaitForPendingTxs(tb)
+	}
 	blk := s.RunConsensusLoop(tb)
 	require.NoErrorf(tb, blk.WaitUntilExecuted(s.Context(tb)), "%T.WaitUntilExecuted()", blk)
 	return blk
@@ -341,6 +346,16 @@ func (s *SUT) buildVerify(tb testing.TB, preferenceID ids.ID) *blocks.Block {
 func (s *SUT) waitForPendingEthTxs(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 	txgossiptest.WaitUntilPending(tb, s.Context(tb), s.GethRPCBackends(), txs...)
+}
+
+// sendTxsAndWaitUntilPending submits each tx via the eth client and waits until
+// all are pending in the source the block builder draws from.
+func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transaction) {
+	tb.Helper()
+	for _, tx := range txs {
+		require.NoErrorf(tb, s.ethclient.SendTransaction(s.Context(tb), tx), "%T.SendTransaction()", s.ethclient)
+	}
+	s.waitForPendingEthTxs(tb, txs...)
 }
 
 // wallet builds and signs cross-chain transactions on behalf of a single key.
@@ -690,7 +705,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 	sender := w.Addresses()[0]
 
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+	_, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Alloc = saetest.MaxAllocFor(sender)
 	}))
 
@@ -721,14 +736,10 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 			Gas:       tt.gasLimit,
 			GasFeeCap: big.NewInt(1),
 		})
-		require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, txs[i]), "%T.SendTransaction(%s)", sut.ethclient, tt.name)
 	}
 
-	// Ensure every tx is pending so the builder includes them all in one block.
-	sut.waitForPendingEthTxs(t, txs...)
-
 	preBalance := sut.balance(t, sender)
-	blk := sut.runConsensusLoop(t)
+	blk := sut.runConsensusLoop(t, txs...)
 	require.Lenf(t, blk.Receipts(), len(tests), "%T.Receipts()", blk)
 
 	receiptByTx := make(map[common.Hash]*types.Receipt, len(blk.Receipts()))

@@ -50,7 +50,7 @@ func TestAcceptBlock(t *testing.T) {
 
 		b := sut.RunConsensusLoop(t)
 		unsettled = append(unsettled, b)
-		sut.AssertBlockHashInvariants(ctx, t)
+		sut.assertBlockHashInvariants(ctx, t)
 
 		lastSettled := b.LastSettled().Height()
 		var wantInMemory set.Set[uint64]

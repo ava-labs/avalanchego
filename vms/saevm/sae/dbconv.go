@@ -15,6 +15,6 @@ import (
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
 
-func NewEthDB(db database.Database) ethdb.Database {
+func newEthDB(db database.Database) ethdb.Database {
 	return rawdb.NewDatabase(evmdb.New(db))
 }

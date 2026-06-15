@@ -208,7 +208,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		db:    NewEthDB(conf.db),
+		db:    newEthDB(conf.db),
 		hooks: conf.hooks,
 
 		sender: sender,
@@ -223,7 +223,7 @@ func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Clien
 
 	handlers, err := snow.CreateHandlers(ctx)
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", snow)
-	server := httptest.NewServer(handlers[WSHTTPExtensionPath])
+	server := httptest.NewServer(handlers[wsHTTPExtensionPath])
 	tb.Cleanup(server.Close)
 
 	return vmtest.DialWS(tb, "ws://"+server.Listener.Addr().String())
@@ -440,7 +440,7 @@ func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	return sdb
 }
 
-func (s *SUT) AssertBlockHashInvariants(ctx context.Context, t *testing.T) {
+func (s *SUT) assertBlockHashInvariants(ctx context.Context, t *testing.T) {
 	t.Helper()
 	t.Run("block_hash_invariants", func(t *testing.T) {
 		b := s.LastAcceptedBlock(t)

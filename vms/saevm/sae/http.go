@@ -12,7 +12,7 @@ import (
 
 const (
 	rpcHTTPExtensionPath = "/rpc"
-	WSHTTPExtensionPath  = "/ws"
+	wsHTTPExtensionPath  = "/ws"
 )
 
 // CreateHandlers returns all VM-specific HTTP handlers to be exposed by the
@@ -25,7 +25,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		// handler to introduce CPU limiting and maximum request durations. We
 		// should either include those modifications into libevm, or determine
 		// that those restrictions were not required.
-		WSHTTPExtensionPath: s.WebsocketHandler([]string{"*"}),
+		wsHTTPExtensionPath: s.WebsocketHandler([]string{"*"}),
 	}, nil
 }
 
