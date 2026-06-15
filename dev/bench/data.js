@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781530957712,
+  "lastUpdate": 1781532157045,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -31395,6 +31395,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-pathdb-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
             "value": 54.27768899069654,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Tsvetan Dimitrov",
+            "username": "powerslider",
+            "email": "tsvetan.dimitrov23@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "0b0b57143c286b0653850a41839f4668f8e0b66e",
+          "message": "feat(sae): enforce ACP-194 minimum gas consumption floor (#5424)\n\nSigned-off-by: Tsvetan Dimitrov (tsvetan.dimitrov23@gmail.com)",
+          "timestamp": "2026-06-12T17:48:56Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/0b0b57143c286b0653850a41839f4668f8e0b66e"
+        },
+        "date": 1781532154233,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - mgas/s",
+            "value": 45.194261159931926,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - ms/ggas",
+            "value": 22126.703132975974,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_parse_ms/ggas",
+            "value": 67.83239910852578,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_verify_ms/ggas",
+            "value": 21904.298300921695,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
+            "value": 153.21748900453713,
             "unit": "block_accept_ms/ggas"
           }
         ]
