@@ -36,17 +36,17 @@ flowchart LR
 
     user -->|"① sendWarpMessage"| pre
     pre -->|"emits log with the<br/>unsigned message"| rcpt
-    rcpt -.->|"② after the block executes"| fr
+    rcpt -->|"② after the block executes"| fr
     fr -->|"Add"| store
-    rel -.->|"③ SignatureRequest<br/>(p2p, per validator)"| h
+    rel -->|"③ SignatureRequest<br/>(p2p, per validator)"| h
     h -->|"Verify"| v
     v -->|"Get"| store
     h -->|"on success: Sign"| sgn
     sgn -->|"BLS signature"| rel
     rel -->|"④ aggregate to a stake-weight<br/>quorum: signed message"| tx
-    tx -.->|"block verification"| vb
+    tx -->|"block verification"| vb
     vb -->|"per predicate"| vp
-    vb -.->|"results"| hdr
+    vb -->|"results"| hdr
     hdr -->|"read during execution"| gvm
 
     classDef pkg fill:#1d4ed8,stroke:#93c5fd,color:#fff
@@ -61,20 +61,25 @@ flowchart LR
 | Orange | EVM side: [warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) and [predicate handling](../../../evm/predicate/README.md) |
 | Purple | AvalancheGo platform: [ACP-118 handler](../../../../network/p2p/acp118/handler.go), BLS signer |
 | Gray | External actors |
-| Dashed edge | Wiring owned by the `cchain` VM that is not yet implemented |
 
 1. **Send** — a contract calls `sendWarpMessage` on the warp precompile, which packs the payload into an unsigned warp message and emits it as a log.
 2. **Persist** — after the block executes (under SAE, execution happens after acceptance), the VM collects every message in the block with [`FromReceipts`](./warp.go) and persists them with [`Storage.Add`](./storage.go).
 3. **Sign** — a relayer asks each validator for its signature over p2p ([ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request)). The handler consults [`Verifier.Verify`](./verifier.go), which checks `Storage`; on success the node responds with its BLS signature, and the relayer aggregates responses until a stake-weight quorum is reached.
 4. **Receive** — anyone submits a transaction on the receiver chain carrying the signed message in its access list. [`VerifyBlock`](./warp.go) checks the aggregate signature during block verification and the results are recorded in the block header, so execution can serve the message to contracts via `getVerifiedWarpMessage`.
 
-Every validator of the sender chain runs the full sender-chain stack, which is why the `Verifier` in stage ③ reads the same `Storage` its node populated in stage ②. The sender and receiver chains likewise run the same software: a single instance of this VM plays both ends of the diagram, sending some messages and receiving others.
+Every validator of the sender chain runs the full sender-chain stack, which is why the `Verifier` in stage ③ reads the same `Storage` its node populated in stage ②. Sender and receiver chains need not run identical software, but they share this logical flow — and a single instance of this VM plays both ends of the diagram, sending some messages and receiving others.
 
 ## Conceptual model
 
 ### What makes a message signable
 
-Two kinds of message can be signed, and the [`Verifier`](./verifier.go) checks for them in order:
+Three kinds of message can be signed:
+
+- **Precompile messages** — `AddressedCall` payloads the Warp contract emitted via `sendWarpMessage`.
+- **Block-hash attestations** — `Hash` payloads attesting that this chain accepted a given block.
+- **Off-chain messages** — messages the operator lists in the chain config for the node to sign, even though they were never emitted on chain.
+
+The [`Verifier`](./verifier.go) doesn't track these kinds explicitly; it validates a message by checking two sources in order:
 
 ```mermaid
 flowchart TD
@@ -108,7 +113,7 @@ flowchart TD
 
 Green means the node signs; red is the error code returned to the requester.
 
-The two paths into "sign" are the two provenances. Messages sent through the precompile are found in `Storage`, as are *off-chain messages* — messages the node is configured to sign even though they were never emitted on chain. Block-hash attestations take the fallback path: block acceptance never goes through the precompile, so the `Verifier` instead asks the VM whether the named block is accepted. Anything else is refused, with an error code that tells the requester why.
+The two `Storage`-backed kinds are indistinguishable to the `Verifier`: precompile and off-chain messages both live in `Storage`, so a single `Storage.Get` confirms either one. Only when that lookup misses does the `Verifier` fall back to the block-hash path — parsing the payload and asking the `Backend` whether the named block is accepted. Anything else — a corrupt payload, a non-`Hash` payload, or an `AddressedCall` absent from `Storage` — is refused with an error code that tells the requester why.
 
 ### Inbound messages are predicates
 
@@ -132,7 +137,7 @@ flowchart LR
     fal -->|"predicates keyed by<br/>precompile address"| vp
     bctx -->|"pins the source chain's<br/>validator set"| vp
     vp --> bits --> res
-    res -.->|"encoding pending"| hdr
+    res -->|"encoded into the header"| hdr
     hdr -->|"read during execution"| gvm
 
     classDef pkg fill:#1d4ed8,stroke:#93c5fd,color:#fff
@@ -155,13 +160,13 @@ The results — which predicates failed, per transaction — are encoded into th
 - **Database compatibility.** `Storage`'s on-disk layout must remain byte-compatible with coreth's warp database: the C-Chain transitions from coreth to this VM on the same database, and breaking the layout silently orphans every previously persisted message. This constraint only expires once the transition is far enough in the past that those messages no longer matter.
 - **Off-chain messages are memory-only on purpose.** They are operator-supplied configuration, not chain data, so the persisted set stays exactly what the precompile emitted — and an off-chain message is removed by simply not supplying it on the next construction.
 - **Predicate results are encoded in the header so warp messages are never verified during bootstrapping.** Verification needs the source chain's validator set, which isn't guaranteed to be available then — bootstrapping nodes must be able to rely on the recorded results instead of re-checking signatures.
-- **Pending VM wiring** (the dashed edges in the lifecycle diagram): persisting harvested messages in `(*hooks).AfterExecutingBlock`, encoding the predicate results into the header in `(*builder).BuildBlock` (both marked `TODO(StephenButtolph)` in [`../hooks.go`](../hooks.go)), and registering the ACP-118 handler with a `Backend` implementation at VM initialization. Persisting in `AfterExecutingBlock` preserves coreth's guarantee that only messages from accepted blocks are signable, because SAE executes blocks only after acceptance.
+- **VM wiring.** Harvested messages are persisted in `(*hooks).AfterExecutingBlock`, the predicate results are encoded into the header in `(*builder).BuildBlock` (both in [`../hooks.go`](../hooks.go)), and the ACP-118 handler is registered with a `Backend` implementation at VM initialization. Persisting in `AfterExecutingBlock` preserves coreth's guarantee that only messages from accepted blocks are signable, because SAE executes blocks only after acceptance.
 
 ## References
 
 Integration points:
 
-- [`../hooks.go`](../hooks.go) - `AfterExecutingBlock`, `BuildBlock` (pending wiring)
+- [`../hooks.go`](../hooks.go) - `AfterExecutingBlock`, `BuildBlock`
 
 Message format:
 

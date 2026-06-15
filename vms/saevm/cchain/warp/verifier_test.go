@@ -5,11 +5,11 @@ package warp
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -23,9 +23,11 @@ var _ Backend = (*backend)(nil)
 
 type backend set.Set[ids.ID]
 
+var errBlockNotAccepted = errors.New("block not accepted")
+
 func (b backend) IsAccepted(_ context.Context, id ids.ID) error {
 	if s := set.Set[ids.ID](b); !s.Contains(id) {
-		return database.ErrNotFound
+		return errBlockNotAccepted
 	}
 	return nil
 }
