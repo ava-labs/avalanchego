@@ -125,9 +125,10 @@ func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf(`{"continuous-profiler-dir": %q,"continuous-profiler-frequency": "500ms"}`, profilerDir)
+	fork := upgradetest.Latest
 	vm := newDefaultTestVM()
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork:       utils.PointerTo(upgradetest.Latest),
+		Fork:       &fork,
 		ConfigJSON: configJSON,
 	})
 	require.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
@@ -1760,11 +1761,12 @@ func (*testService) Echo(str string, i int, args *echoArgs) echoResult {
 // emulates server test
 func TestCreateHandlers(t *testing.T) {
 	var (
-		ctx = t.Context()
-		vm  = newDefaultTestVM()
+		ctx  = t.Context()
+		fork = upgradetest.Latest
+		vm   = newDefaultTestVM()
 	)
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork: utils.PointerTo(upgradetest.Latest),
+		Fork: &fork,
 	})
 	defer func() {
 		require.NoError(t, vm.Shutdown(ctx))
