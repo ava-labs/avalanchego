@@ -38,10 +38,10 @@ go_library(
         "//version",
         "//vms/components/gas",
         "//vms/evm/database",
-        "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
         "//vms/saevm/hook",
         "//vms/saevm/network",
+        "//vms/saevm/orchestrator",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
         "//vms/saevm/sae/rpc",
@@ -73,7 +73,6 @@ go_library(
 go_test(
     name = "sae_test",
     srcs = [
-        "always_test.go",
         "networked_test.go",
         "recovery_test.go",
         "rpc_custom_test.go",
@@ -106,6 +105,7 @@ go_test(
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",
+        "//vms/saevm/orchestrator",
         "//vms/saevm/params",
         "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
@@ -153,7 +153,6 @@ go_test(
     name = "flaky_tests",
     srcs = [
         "accept_block_test.go",
-        "always_test.go",
         "networked_test.go",
         "recovery_test.go",
         "rpc_custom_test.go",
