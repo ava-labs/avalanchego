@@ -1376,6 +1376,8 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 		return err
 	}
 
+	weight := tx.Weight()
+
 	currentSupply, err := e.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("getting current supply: %w", err)
@@ -1389,7 +1391,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 	duration := time.Duration(tx.Period) * time.Second
 	potentialReward := rewards.Calculate(
 		duration,
-		tx.Weight(),
+		weight,
 		currentSupply,
 	)
 
@@ -1407,7 +1409,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 		tx,
 		startTime,
 		endTime,
-		tx.Weight(),
+		weight,
 		potentialReward,
 	)
 	if err != nil {
