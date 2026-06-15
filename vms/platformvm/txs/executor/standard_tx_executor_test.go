@@ -4834,14 +4834,14 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 					SubnetID: constants.PrimaryNetworkID,
 				}))
 			},
-			wantErr: errMissingValidator,
+			wantErr: database.ErrNotFound,
 		},
 		{
 			name: "missing_staker_tx",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
 				tx.TxID = ids.GenerateTestID()
 			},
-			wantErr: errMissingStakerTx,
+			wantErr: database.ErrNotFound,
 		},
 		{
 			name: "invalid_staker_tx",

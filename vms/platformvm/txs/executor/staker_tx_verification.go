@@ -43,10 +43,8 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
-	errMissingStakerTx                 = errors.New("missing staker tx")
 	errInvalidStakerTxType             = errors.New("invalid staker tx type")
 	errInvalidStakerTx                 = errors.New("invalid staker tx")
-	errMissingValidator                = errors.New("missing validator")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -980,10 +978,6 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
-		if err == database.ErrNotFound {
-			return nil, errMissingStakerTx
-		}
-
 		return nil, fmt.Errorf("getting staker tx: %w", err)
 	}
 
@@ -994,10 +988,6 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
 	if err != nil {
-		if err == database.ErrNotFound {
-			return nil, errMissingValidator
-		}
-
 		return nil, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
 	}
 
