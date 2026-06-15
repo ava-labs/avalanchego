@@ -102,11 +102,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
-	genesisBlock, err := writeGenesis(
-		ethDB,
-		triedb.NewDatabase(ethDB, trieDBConfig),
-		genesis,
-	)
+	genesisBlock, err := setupGenesis(ethDB, trieDBConfig, genesis)
 	if err != nil {
 		return fmt.Errorf("writing genesis: %w", err)
 	}

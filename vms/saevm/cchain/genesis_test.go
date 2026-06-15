@@ -13,6 +13,7 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/triedb"
@@ -21,7 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -266,13 +266,13 @@ func TestParseGenesis(t *testing.T) {
 			name:    "no_config",
 			ctx:     localCtx,
 			genesis: `{"gasLimit":"0x5f5e100","difficulty":"0x0","alloc":{}}`,
-			wantErr: testerr.Is(errNoChainID),
+			wantErr: testerr.Is(errNoGenesisChainConfig),
 		},
 		{
 			name:    "no_chain_id",
 			ctx:     localCtx,
 			genesis: `{"config":{},"gasLimit":"0x5f5e100","difficulty":"0x0","alloc":{}}`,
-			wantErr: testerr.Is(errNoChainID),
+			wantErr: testerr.Is(errNoGenesisChainID),
 		},
 	}
 	for _, test := range tests {
@@ -343,7 +343,6 @@ func TestWriteGenesis(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
-			tdb := triedb.NewDatabase(db, triedb.HashDefaults)
 
 			g, err := parseGenesis(
 				&snow.Context{NetworkUpgrades: test.initialUpgrades},
@@ -351,7 +350,7 @@ func TestWriteGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 
-			block, err := writeGenesis(db, tdb, g)
+			block, err := setupGenesis(db, triedb.HashDefaults, g)
 			require.NoError(t, err, "writeGenesis(initial)")
 
 			genesisHash := block.Hash()
@@ -381,7 +380,7 @@ func TestWriteGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
-			block, err = writeGenesis(db, tdb, g)
+			block, err = setupGenesis(db, triedb.HashDefaults, g)
 			if diff := testerr.Diff(err, test.wantErr); diff != "" {
 				t.Fatalf("writeGenesis(restart) error (-want +got)\n%s", diff)
 			}
