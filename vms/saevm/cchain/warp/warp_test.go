@@ -205,9 +205,22 @@ func TestVerifyBlock(t *testing.T) {
 			},
 		},
 		{
+			name: "no_predicaters_no_context",
+			txs: []*types.Transaction{
+				validTx,
+			},
+		},
+		{
 			name:         "no_predicates",
 			contracts:    []common.Address{corethwarp.ContractAddress},
 			blockContext: &block.Context{},
+			txs: []*types.Transaction{
+				types.NewTx(&types.DynamicFeeTx{}),
+			},
+		},
+		{
+			name:      "no_predicates_no_context",
+			contracts: []common.Address{corethwarp.ContractAddress},
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{}),
 			},
@@ -225,7 +238,7 @@ func TestVerifyBlock(t *testing.T) {
 			},
 		},
 		{
-			name:      "no_block_context",
+			name:      "missing_block_context",
 			contracts: []common.Address{corethwarp.ContractAddress},
 			txs: []*types.Transaction{
 				validTx,
