@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 )
 
@@ -290,6 +291,48 @@ func TestParseGenesis(t *testing.T) {
 			if diff := cmp.Diff(test.want, g, opts); diff != "" {
 				t.Errorf("parseGenesis(%s) (-want +got)\n%s", test.genesis, diff)
 			}
+		})
+	}
+}
+
+// This test is intentionally a change detector: the genesis hash is part of
+// consensus, so any change to it would fork live networks.
+func TestGenesisHash(t *testing.T) {
+	tests := []struct {
+		name      string
+		networkID uint32
+		want      string
+	}{
+		{
+			name:      "mainnet",
+			networkID: constants.MainnetID,
+			want:      "0x31ced5b9beb7f8782b014660da0cb18cc409f121f408186886e1ca3e8eeca96b",
+		},
+		{
+			name:      "fuji",
+			networkID: constants.FujiID,
+			want:      "0x31ced5b9beb7f8782b014660da0cb18cc409f121f408186886e1ca3e8eeca96b",
+		},
+		{
+			name:      "local",
+			networkID: constants.LocalID,
+			want:      "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := &snow.Context{
+				NetworkUpgrades: upgrade.GetConfig(test.networkID),
+			}
+			genesis := genesis.GetConfig(test.networkID).CChainGenesis
+
+			g, err := parseGenesis(ctx, []byte(genesis))
+			require.NoError(t, err, "parseGenesis")
+
+			block, err := genesisToBlock(g)
+			require.NoError(t, err, "genesisToBlock")
+
+			require.Equal(t, common.HexToHash(test.want), block.Hash())
 		})
 	}
 }
