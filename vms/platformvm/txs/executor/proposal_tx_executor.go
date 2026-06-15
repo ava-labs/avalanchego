@@ -6,10 +6,11 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/intmath"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -17,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -43,6 +46,7 @@ var (
 	errShouldBeAutoRenewedStaker           = errors.New("expected auto renewed staker")
 	errShouldUseRewardAutoRenewedValidator = errors.New("auto-renewed validators must be rewarded with RewardAutoRenewedValidatorTx")
 	errInvalidTimestamp                    = errors.New("invalid timestamp")
+	errDivideByZero                        = errors.New("divide by zero")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -432,34 +436,33 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		return err
 	}
 
-	if stakingInfo.NextPeriod > 0 {
-		// Running auto-renewed staker: validator will continue to the next cycle.
-		// On commit: restake rewards (based on AutoCompoundRewardShares) and start new cycle.
-		// On abort: return stake + accrued rewards, forfeit current cycle's rewards.
-
-		// Create UTXOs for onAbortState.
-		if err = e.createUTXOsAutoRenewedValidatorOnAbort(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
-			return fmt.Errorf("failed to create UTXO auto-renewed validator on abort: %w", err)
-		}
-
-		// Set onCommitState.
-		if err = e.setOnCommitStateAutoRenewedValidatorRestake(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
+	// Graceful exit: validator requested to stop (Period == 0).
+	if stakingInfo.NextPeriod == 0 {
+		// Return stake + all rewards on both commit and abort paths.
+		if err := e.createUTXOsAutoRenewedValidatorOnGracefulExit(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
 			return err
 		}
 
-		// Early return because we don't need to do anything else.
+		// Handle staker lifecycle.
+		if err := e.onCommitState.DeleteCurrentValidator(stakerToReward); err != nil {
+			return fmt.Errorf("deleting current validator from commit state: %w", err)
+		}
+
 		return nil
 	}
 
-	// Graceful exit: validator requested to stop (Period == 0).
-	// Return stake + all rewards on both commit and abort paths.
-	if err := e.createUTXOsAutoRenewedValidatorOnGracefulExit(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
-		return err
+	// Running auto-renewed staker: validator will continue to the next cycle.
+	// On commit: restake rewards (based on AutoCompoundRewardShares) and start new cycle.
+	// On abort: return stake + accrued rewards, forfeit current cycle's rewards.
+
+	// Create UTXOs for onAbortState.
+	if err = e.createUTXOsAutoRenewedValidatorOnAbort(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
+		return fmt.Errorf("failed to create UTXO auto-renewed validator on abort: %w", err)
 	}
 
-	// Handle staker lifecycle.
-	if err := e.onCommitState.DeleteCurrentValidator(stakerToReward); err != nil {
-		return fmt.Errorf("deleting current validator from commit state: %w", err)
+	// Set onCommitState.
+	if err = e.setOnCommitStateAutoRenewedValidatorRestake(addAutoRenewedValidatorTx, stakerToReward, stakingInfo); err != nil {
+		return err
 	}
 
 	return nil
@@ -474,7 +477,7 @@ func (e *proposalTxExecutor) decreaseAbortStateCurrentSupply(stakerToReward *sta
 	if err != nil {
 		return err
 	}
-	newSupply, err := math.Sub(currentSupply, stakerToReward.PotentialReward)
+	newSupply, err := safemath.Sub(currentSupply, stakerToReward.PotentialReward)
 	if err != nil {
 		return err
 	}
@@ -688,7 +691,7 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	stakingInfo state.StakingInfo,
 ) error {
-	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
+	totalDelegateeRewards, err := safemath.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
 	if err != nil {
 		return err
 	}
@@ -765,12 +768,12 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 	newAccruedRewards := stakingInfo.AccruedValidationRewards
 	newWeight := validator.Weight
 	if restakingValidationRewards > 0 {
-		newAccruedRewards, err = math.Add(stakingInfo.AccruedValidationRewards, restakingValidationRewards)
+		newAccruedRewards, err = safemath.Add(stakingInfo.AccruedValidationRewards, restakingValidationRewards)
 		if err != nil {
 			return err
 		}
 
-		newWeight, err = math.Add(validator.Weight, restakingValidationRewards)
+		newWeight, err = safemath.Add(validator.Weight, restakingValidationRewards)
 		if err != nil {
 			return err
 		}
@@ -778,12 +781,12 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 
 	newAccruedDelegateeRewards := stakingInfo.AccruedDelegateeRewards
 	if restakingDelegateeRewards > 0 {
-		newAccruedDelegateeRewards, err = math.Add(stakingInfo.AccruedDelegateeRewards, restakingDelegateeRewards)
+		newAccruedDelegateeRewards, err = safemath.Add(stakingInfo.AccruedDelegateeRewards, restakingDelegateeRewards)
 		if err != nil {
 			return err
 		}
 
-		newWeight, err = math.Add(newWeight, restakingDelegateeRewards)
+		newWeight, err = safemath.Add(newWeight, restakingDelegateeRewards)
 		if err != nil {
 			return err
 		}
@@ -802,23 +805,23 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 			return err
 		}
 
-		newAccruedRewards, err = math.Sub(newAccruedRewards, excessValidationRewards)
+		newAccruedRewards, err = safemath.Sub(newAccruedRewards, excessValidationRewards)
 		if err != nil {
 			return err
 		}
 
-		newWeight, err = math.Sub(newWeight, excessValidationRewards)
+		newWeight, err = safemath.Sub(newWeight, excessValidationRewards)
 		if err != nil {
 			return err
 		}
 
 		if excessDelegateeRewards > 0 {
-			newAccruedDelegateeRewards, err = math.Sub(newAccruedDelegateeRewards, excessDelegateeRewards)
+			newAccruedDelegateeRewards, err = safemath.Sub(newAccruedDelegateeRewards, excessDelegateeRewards)
 			if err != nil {
 				return err
 			}
 
-			newWeight, err = math.Sub(newWeight, excessDelegateeRewards)
+			newWeight, err = safemath.Sub(newWeight, excessDelegateeRewards)
 			if err != nil {
 				return err
 			}
@@ -844,7 +847,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 		currentSupply,
 	)
 
-	newCurrentSupply, err := math.Add(currentSupply, potentialReward)
+	newCurrentSupply, err := safemath.Add(currentSupply, potentialReward)
 	if err != nil {
 		return err
 	}
@@ -904,12 +907,12 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 		return err
 	}
 
-	totalRewards, err := math.Add(validator.PotentialReward, stakingInfo.AccruedValidationRewards)
+	totalRewards, err := safemath.Add(validator.PotentialReward, stakingInfo.AccruedValidationRewards)
 	if err != nil {
 		return err
 	}
 
-	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
+	totalDelegateeRewards, err := safemath.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
 	if err != nil {
 		return err
 	}
@@ -950,6 +953,36 @@ func (e *proposalTxExecutor) newUTXO(
 	}, nil
 }
 
+// mulDivRound computes (a * b) / c with full precision.
+// The result is rounded to the nearest integer.
+// Panics if c is zero, or ErrOverflow if the result exceeds uint64.
+func mulDivRound(a, b, c uint64) (uint64, error) {
+	// intmath.MulDiv reports a zero denominator as an overflow, so check it
+	// first to preserve the distinct error.
+	if c == 0 {
+		return 0, errDivideByZero
+	}
+
+	quo, rem, err := intmath.MulDiv(a, b, c)
+	if err != nil {
+		return 0, err
+	}
+
+	// Round to nearest by checking whether the fractional part rem/c is less
+	// than 1/2. rem < c-rem ⟺ 2*rem < c, but can't overflow since rem < c.
+	if rem < c-rem {
+		return quo, nil
+	}
+
+	// The fractional part is at least 1/2, so round up. If quo is already
+	// MaxUint64, rounding up would overflow the result.
+	if quo == math.MaxUint64 {
+		return 0, intmath.ErrOverflow
+	}
+
+	return quo + 1, nil
+}
+
 // createOverflowUTXOs creates UTXOs for the excess rewards
 // that cannot be restaked because doing so would exceed MaxValidatorStake.
 //
@@ -965,13 +998,13 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 	oldWeight uint64,
 	outputIndexOffset uint32,
 ) (excessValidationRewards uint64, excessDelegateeRewards uint64, err error) {
-	totalRestakingRewards, err := math.Sub(newWeight, oldWeight)
+	totalRestakingRewards, err := safemath.Sub(newWeight, oldWeight)
 	if err != nil {
 		return 0, 0, err
 	}
 
 	// Calculate how much room we have to grow before hitting max stake.
-	restakingAvailability, err := math.Sub(e.backend.Config.MaxValidatorStake, oldWeight)
+	restakingAvailability, err := safemath.Sub(e.backend.Config.MaxValidatorStake, oldWeight)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -980,24 +1013,24 @@ func (e *proposalTxExecutor) createOverflowUTXOs(
 	// totalRestakingRewards = validationRewards + delegateeRewards. Split the
 	// available restaking space proportionally between them; anything that doesn't
 	// fit is withdrawn.
-	restakingValidationReward, err := math.MulDiv(validationRewards, restakingAvailability, totalRestakingRewards)
+	restakingValidationReward, err := mulDivRound(validationRewards, restakingAvailability, totalRestakingRewards)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	restakingDelegateeReward, err := math.Sub(restakingAvailability, restakingValidationReward)
+	restakingDelegateeReward, err := safemath.Sub(restakingAvailability, restakingValidationReward)
 	if err != nil {
 		return 0, 0, err
 	}
 
 	// validationRewards >= restakingValidationReward, but using math package as a defensive check.
-	excessValidationReward, err := math.Sub(validationRewards, restakingValidationReward)
+	excessValidationReward, err := safemath.Sub(validationRewards, restakingValidationReward)
 	if err != nil {
 		return 0, 0, err
 	}
 
 	// delegateeRewards >= restakingDelegateeReward, but using math package as a defensive check.
-	excessDelegateeReward, err := math.Sub(delegateeRewards, restakingDelegateeReward)
+	excessDelegateeReward, err := safemath.Sub(delegateeRewards, restakingDelegateeReward)
 	if err != nil {
 		return 0, 0, err
 	}

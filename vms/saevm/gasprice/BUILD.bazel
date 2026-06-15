@@ -13,7 +13,7 @@ go_library(
         "//cache/lru",
         "//utils/logging",
         "//vms/saevm/blocks",
-        "//vms/saevm/intmath",
+        "//intmath",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//event",

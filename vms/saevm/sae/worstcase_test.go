@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/intmath"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"

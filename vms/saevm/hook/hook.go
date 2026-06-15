@@ -24,10 +24,10 @@ import (
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/intmath"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"

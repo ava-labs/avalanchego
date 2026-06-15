@@ -11,7 +11,7 @@ go_library(
         "//snow/engine/snowman/block",
         "//vms/components/gas",
         "//vms/saevm/gastime",
-        "//vms/saevm/intmath",
+        "//intmath",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
         "//vms/saevm/types",

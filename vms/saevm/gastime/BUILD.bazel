@@ -15,7 +15,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vms/components/gas",
-        "//vms/saevm/intmath",
+        "//intmath",
         "//vms/saevm/proxytime",
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
