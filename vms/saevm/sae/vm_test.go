@@ -18,6 +18,7 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
@@ -437,6 +438,33 @@ func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	sdb, err := s.RawVM.StateDB(root)
 	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.RawVM)
 	return sdb
+}
+
+func (s *SUT) AssertBlockHashInvariants(ctx context.Context, t *testing.T) {
+	t.Helper()
+	t.Run("block_hash_invariants", func(t *testing.T) {
+		b := s.LastAcceptedBlock(t)
+		require.NoError(t, b.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
+		t.Logf("Last accepted (and executed) block: %d", b.Height())
+
+		for num, want := range map[rpc.BlockNumber]common.Hash{
+			rpc.BlockNumber(b.Number().Int64()): b.Hash(),
+			rpc.LatestBlockNumber:               b.Hash(),               // Because we've waited until it's executed
+			rpc.SafeBlockNumber:                 b.LastSettled().Hash(), // Safe from disk corruption, not re-org, as acceptance guarantees finality
+			rpc.FinalizedBlockNumber:            b.LastSettled().Hash(), // Because we maintain label monotonicity
+		} {
+			t.Run(num.String(), func(t *testing.T) {
+				got, err := s.Client.HeaderByNumber(ctx, big.NewInt(num.Int64()))
+				require.NoErrorf(t, err, "%T.HeaderByNumber(%v)", s.Client, num)
+				assert.Equalf(t, want, got.Hash(), "%T.HeaderByNumber(%v).Hash()", s.Client, num)
+			})
+		}
+
+		// The RPC implementation doesn't use the database to resolve the block
+		// labels above, so we still need to check them.
+		assert.Equal(t, b.Hash(), rawdb.ReadHeadBlockHash(s.db), "rawdb.ReadHeadBlockHash() MUST reflect last-executed block")
+		assert.Equal(t, b.LastSettled().Hash(), rawdb.ReadFinalizedBlockHash(s.db), "rawdb.ReadFinalizedBlockHash() MUST reflect last-settled block")
+	})
 }
 
 // unwrap is a convenience (un)wrapper for calling [adaptor.Block.Unwrap] after

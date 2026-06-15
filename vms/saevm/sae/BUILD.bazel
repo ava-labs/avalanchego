@@ -1,9 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
-# gazelle:exclude accept_block_test.go
-# gazelle:exclude worstcase_test.go
-
 go_library(
     name = "sae",
     srcs = [
@@ -74,6 +71,7 @@ go_library(
 go_test(
     name = "sae_test",
     srcs = [
+        "accept_block_test.go",
         "always_test.go",
         "networked_test.go",
         "recovery_test.go",
@@ -84,6 +82,7 @@ go_test(
         "rpc_test.go",
         "tx_test.go",
         "vm_test.go",
+        "worstcase_test.go",
     ],
     embed = [":sae"],
     deps = [
@@ -107,15 +106,16 @@ go_test(
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",
+        "//vms/saevm/intmath",
         "//vms/saevm/params",
         "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
         "//vms/saevm/saetest/escrow",
-        "//vms/saevm/saevmtest",
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/types",
         "//vms/saevm/vmtest",
+        "//vms/saevm/worstcase",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
@@ -153,6 +153,7 @@ go_test(
 go_test(
     name = "flaky_tests",
     srcs = [
+        "accept_block_test.go",
         "always_test.go",
         "networked_test.go",
         "recovery_test.go",
@@ -162,8 +163,9 @@ go_test(
         "rpc_stateful_test.go",
         "rpc_test.go",
         "vm_test.go",
+        "worstcase_test.go",
     ],
-    args = ["-test.run=TestSubscriptions"],
+    args = ["-test.run=TestSubscriptions|TestAcceptBlock|TestWorstCase"],
     embed = [":sae"],
     env = {"SAEVM_TEST_FLAKY": "1"},
     flaky = True,
@@ -187,6 +189,7 @@ go_test(
         "//vms/saevm/cmputils",
         "//vms/saevm/gastime",
         "//vms/saevm/hook/hookstest",
+        "//vms/saevm/intmath",
         "//vms/saevm/params",
         "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
@@ -195,6 +198,7 @@ go_test(
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/types",
         "//vms/saevm/vmtest",
+        "//vms/saevm/worstcase",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
@@ -225,43 +229,6 @@ go_test(
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
-    ],
-)
-
-# External-package flaky tests that drive the VM through saevmtest. Kept apart
-# from the targets that embed internal sae test sources so that saevmtest, which
-# imports sae, is recompiled by only one target.
-go_test(
-    name = "flaky_external_tests",
-    srcs = [
-        "accept_block_test.go",
-        "worstcase_test.go",
-    ],
-    args = ["-test.run=TestAcceptBlock|TestWorstCase"],
-    embed = [":sae"],
-    env = {"SAEVM_TEST_FLAKY": "1"},
-    flaky = True,
-    deps = [
-        "//snow",
-        "//utils/logging",
-        "//utils/set",
-        "//vms/saevm/blocks",
-        "//vms/saevm/hook/hookstest",
-        "//vms/saevm/intmath",
-        "//vms/saevm/params",
-        "//vms/saevm/saetest",
-        "//vms/saevm/saevmtest",
-        "//vms/saevm/types",
-        "//vms/saevm/worstcase",
-        "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//core/types",
-        "@com_github_ava_labs_libevm//core/vm",
-        "@com_github_ava_labs_libevm//libevm",
-        "@com_github_ava_labs_libevm//libevm/options",
-        "@com_github_ava_labs_libevm//params",
-        "@com_github_holiman_uint256//:uint256",
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
     ],
 )
 

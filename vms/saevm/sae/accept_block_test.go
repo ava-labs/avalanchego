@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sae_test
+package sae
 
 import (
 	"math/rand/v2"
@@ -16,12 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saevmtest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 func TestAcceptBlock(t *testing.T) {
@@ -39,24 +35,18 @@ func TestAcceptBlock(t *testing.T) {
 		require.Zero(t, blocks.InMemoryBlockCount(), "initial in-memory block count")
 	}, 5*time.Second, 50*time.Millisecond)
 
-	opt, vmTime := saevmtest.WithVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-
-	xdb := saetest.NewExecutionResultsDB()
-	hooks := hookstest.NewStub(100e6,
-		hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) { return xdb, nil }),
-		hookstest.WithNow(vmTime.Now),
-	)
-	ctx, sut := saevmtest.NewSUT(t, 1, hooks, opt)
+	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, opt)
 	// Causes [VM.AcceptBlock] to wait until the block has executed.
 	require.NoError(t, sut.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
 
-	unsettled := []*blocks.Block{sut.Genesis}
-	sut.Genesis = nil // allow it to be GCd when appropriate
+	unsettled := []*blocks.Block{sut.genesis}
+	sut.genesis = nil // allow it to be GCd when appropriate
 
 	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 	for range 100 {
 		ffMillis := 100 + rng.IntN(1000*(1+saeparams.TauSeconds))
-		vmTime.Advance(time.Millisecond * time.Duration(ffMillis))
+		vmTime.advance(time.Millisecond * time.Duration(ffMillis))
 
 		b := sut.RunConsensusLoop(t)
 		unsettled = append(unsettled, b)
