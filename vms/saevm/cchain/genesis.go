@@ -159,10 +159,13 @@ func londonBlock(chainID *big.Int) int64 {
 	}
 }
 
-// setupGenesis commits the genesis block and chain config to db if the genesis
-// state is not already present. Otherwise it updates the stored chain config
-// after verifying that the stored genesis hash matches, which may schedule
-// upgrades that were not previously scheduled. It returns the genesis block.
+// setupGenesis configures the database with the provided genesis.
+//
+// If the database was previously already initialized, setupGenesis verifies
+// that the same genesis hash would have been produced.
+//
+// Additionally, the chain config is updated to reflect any new upgrades that
+// have been scheduled.
 func setupGenesis(
 	db ethdb.Database,
 	trieConfig *triedb.Config,
@@ -199,11 +202,8 @@ func genesisToBlock(genesis *core.Genesis) (*types.Block, error) {
 	)
 }
 
-// initializeGenesis writes the genesis block, state, and chain config to db,
-// returning the genesis block.
-//
-// Writing the genesis block to the database guarantees that the initial state
-// is persisted.
+// initializeGenesis first writes the genesis state to disk, and then atomically
+// writes the rest of the genesis block's indicies along with the chain config.
 func initializeGenesis(
 	db ethdb.Database,
 	trieConfig *triedb.Config,
@@ -242,6 +242,8 @@ func writeGenesisState(
 	trieConfig *triedb.Config,
 	genesis *core.Genesis,
 ) (_ *types.Block, retErr error) {
+	// This function closes the trie database to ensure that resources are
+	// released and, more importantly, that all writes have been flushed.
 	tdb := triedb.NewDatabase(db, trieConfig)
 	defer func() {
 		retErr = errors.Join(retErr, tdb.Close())

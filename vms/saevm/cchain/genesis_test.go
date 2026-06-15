@@ -296,7 +296,9 @@ func TestParseGenesis(t *testing.T) {
 }
 
 // This test is intentionally a change detector: the genesis hash is part of
-// consensus, so any change to it would fork live networks.
+// consensus, so any change would break live networks.
+//
+// Only the local network genesis may change.
 func TestGenesisHash(t *testing.T) {
 	tests := []struct {
 		name      string
