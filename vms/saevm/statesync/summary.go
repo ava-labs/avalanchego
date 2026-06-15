@@ -4,32 +4,25 @@
 package statesync
 
 import (
-	"context"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 )
 
-var _ adaptor.SummaryProperties = (*summary)(nil)
+var _ adaptor.SummaryProperties = (*Summary)(nil)
 
-type summary struct{}
+type Summary struct{}
 
 // Height implements [adaptor.SummaryProperties].
-func (*summary) Height() uint64 {
+func (*Summary) Height() uint64 {
 	panic("unimplemented")
 }
 
 // ID implements [adaptor.SummaryProperties].
-func (*summary) ID() ids.ID {
+func (*Summary) ID() ids.ID {
 	panic("unimplemented")
 }
 
 // Bytes implements [adaptor.SummaryProperties].
-func (*summary) Bytes() []byte {
-	panic("unimplemented")
-}
-
-// ParseStateSummary implements [adaptor.SyncableVM].
-func (*VM[T]) ParseStateSummary(context.Context, []byte) (*summary, error) {
+func (*Summary) Bytes() []byte {
 	panic("unimplemented")
 }

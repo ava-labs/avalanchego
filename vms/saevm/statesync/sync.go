@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-// AcceptSummary implements [adaptor.SyncableVM].
-func (*VM[T]) AcceptSummary(context.Context, *summary) (block.StateSyncMode, error) {
+func (*SummaryHandler) AcceptSummary(context.Context, *Summary) (block.StateSyncMode, error) {
 	panic("unimplemented")
 }
