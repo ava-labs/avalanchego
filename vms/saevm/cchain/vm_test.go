@@ -313,13 +313,13 @@ func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, 
 	assert.Equalf(tb, wantHeight, gotHeight, "%T.GetTx() block height", s.Client)
 }
 
-// runConsensusLoop builds a block on top of the last-accepted block, drives it
-// through verify+accept, and waits until it has been executed.
+// runConsensusLoop waits for issued txs to become pending, then drives the
+// shared build+verify+accept loop and waits until the block has executed.
 func (s *SUT) runConsensusLoop(tb testing.TB) *blocks.Block {
 	tb.Helper()
 
-	blk := s.buildVerify(tb, s.LastAcceptedID(tb))
-	require.NoErrorf(tb, s.RawVM.AcceptBlock(s.Context(tb), blk), "%T.AcceptBlock()", s.RawVM)
+	s.WaitForPendingTxs(tb)
+	blk := s.RunConsensusLoop(tb)
 	require.NoErrorf(tb, blk.WaitUntilExecuted(s.Context(tb)), "%T.WaitUntilExecuted()", blk)
 	return blk
 }
