@@ -13,20 +13,17 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
+	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
 )
 
-var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis[hook.Transaction])(nil)
+var _ orchestrator.ChainVM = (*SinceGenesis[hook.Transaction])(nil)
 
 // SinceGenesis is a harness around a [VM], providing an `Initialize` method
 // that treats the chain as being asynchronous since genesis.
 type SinceGenesis[T hook.Transaction] struct {
 	*VM // created by [SinceGenesis.Initialize]
-	*network.Network
 
 	hooks  hook.PointsG[T]
 	config Config
@@ -48,10 +45,8 @@ func (vm *SinceGenesis[_]) Initialize(
 	snowCtx *snow.Context,
 	avaDB database.Database,
 	genesisBytes []byte,
-	upgradeBytes []byte,
 	configBytes []byte,
-	fxs []*common.Fx,
-	appSender common.AppSender,
+	network *network.Network,
 ) error {
 	db := newEthDB(avaDB)
 	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
@@ -65,11 +60,7 @@ func (vm *SinceGenesis[_]) Initialize(
 		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
 	}
 
-	vm.Network, err = network.New(snowCtx, appSender)
-	if err != nil {
-		return fmt.Errorf("network.New(...): %v", err)
-	}
-	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), vm.Network)
+	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), network)
 	if err != nil {
 		return err
 	}

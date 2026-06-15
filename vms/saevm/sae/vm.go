@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
 
-	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -40,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )

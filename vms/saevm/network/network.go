@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
-
-	"github.com/ava-labs/avalanchego/api/metrics"
 )
 
 var (

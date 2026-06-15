@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	// Imported for [saexec.Execute] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -49,6 +48,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	// Imported for [saexec.Execute] comment resolution.
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
+	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -72,6 +74,7 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*Client
+	*network.Network
 
 	memory    *atomic.Memory
 	sender    *saetest.Sender
@@ -156,8 +159,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	appSender := saetest.NewSender(tb, cfg.validators)
 
+	orchestrator := orchestrator.New(vm)
 	ctx := log.CancelOnError(tb.Context())
-	require.NoErrorf(tb, vm.Initialize(
+	require.NoErrorf(tb, orchestrator.Initialize(
 		ctx,
 		snowCtx,
 		chainDB,
@@ -171,16 +175,16 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		// The context is cancelled before cleanup is called, so we strip the
 		// cancellation.
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
+		require.NoErrorf(tb, orchestrator.Shutdown(ctx), "%T.Shutdown()", orchestrator)
 	})
-	require.NoErrorf(tb, vm.SetState(ctx, snow.NormalOp), "%T.SetState(%s)", vm, snow.NormalOp)
+	require.NoErrorf(tb, orchestrator.SetState(ctx, snow.NormalOp), "%T.SetState(%s)", orchestrator, snow.NormalOp)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
 	// need to treat our node as a special case.
-	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
+	require.NoErrorf(tb, orchestrator.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", orchestrator, snowCtx.NodeID)
 
-	handlers, err := vm.CreateHandlers(ctx)
-	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
+	handlers, err := orchestrator.CreateHandlers(ctx)
+	require.NoErrorf(tb, err, "%T.CreateHandlers()", orchestrator)
 
 	mux := http.NewServeMux()
 	for path, h := range handlers {
@@ -197,6 +201,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	sut := &SUT{
 		VM:        vm,
+		Network:   orchestrator.Network,
 		Client:    NewClient(server.URL),
 		memory:    memory,
 		sender:    appSender,

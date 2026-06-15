@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
+	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
@@ -41,10 +42,11 @@ import (
 	avadb "github.com/ava-labs/avalanchego/database"
 )
 
+var _ orchestrator.ChainVM = (*VM)(nil)
+
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
 	*sae.VM // created by [VM.Initialize]
-	*network.Network
 
 	// gossip frequencies are configurable to speed up testing.
 	pullGossipPeriod time.Duration
@@ -70,10 +72,8 @@ func (vm *VM) Initialize(
 	snowCtx *snow.Context,
 	avaDB avadb.Database,
 	genesisBytes []byte,
-	_ []byte,
 	configBytes []byte,
-	_ []*common.Fx,
-	appSender common.AppSender,
+	network *network.Network,
 ) (retErr error) {
 	defer func() {
 		if retErr != nil {
@@ -127,11 +127,7 @@ func (vm *VM) Initialize(
 			TrieDBConfig: trieDBConfig,
 		},
 	}
-	vm.Network, err = network.New(snowCtx, appSender)
-	if err != nil {
-		return fmt.Errorf("creating SAE network: %w", err)
-	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), vm.Network)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
@@ -166,8 +162,8 @@ func (vm *VM) Initialize(
 	}
 	gossipHandler, pullGossiper, pushGossiper, err := gossip.NewSystem(
 		snowCtx.NodeID,
-		vm.Network.Network,
-		vm.Network.ValidatorPeers,
+		network.Network,
+		network.ValidatorPeers,
 		vm.gossipSet,
 		gossipMarshaller{},
 		gossip.SystemConfig{
@@ -183,7 +179,7 @@ func (vm *VM) Initialize(
 	}
 	vm.pushGossiper = pushGossiper
 
-	if err := vm.Network.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
+	if err := network.AddHandler(p2p.AtomicTxGossipHandlerID, gossipHandler); err != nil {
 		return fmt.Errorf("registering cross-chain tx gossip handler: %w", err)
 	}
 

@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
@@ -154,7 +155,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
-	snow := adaptor.Convert(vm)
+	snow := adaptor.Convert(orchestrator.New(vm))
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "orchestrator",
+    srcs = ["orchestrator.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/orchestrator",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/health",
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//vms/saevm/adaptor",
+        "//vms/saevm/blocks",
+        "//vms/saevm/network",
+    ],
+)
