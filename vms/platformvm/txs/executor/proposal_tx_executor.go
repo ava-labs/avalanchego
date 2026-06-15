@@ -539,6 +539,13 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	e.onCommitState.AddUTXO(onCommitUtxo)
 	e.onCommitState.AddRewardUTXO(txID, onCommitUtxo)
 
+	// The delegatee reward is the validator's commission on rewards that were
+	// already paid out to its delegators when those delegators were rewarded.
+	// That commission was earned during the delegators' successful staking
+	// periods, so it is owed to the validator regardless of whether the
+	// validator met its own uptime requirement, which is why we also issue it on
+	// the abort path.
+	//
 	// Note: There is no [offset] if the RewardValidatorTx is
 	// aborted, because the validator reward is not awarded.
 	onAbortUtxo := &avax.UTXO{
@@ -685,6 +692,10 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	stakingInfo state.StakingInfo,
 ) error {
+	// DelegateeReward is the validator's commission on rewards already paid out to
+	// its delegators, earned during their successful staking periods, so it is owed
+	// to the validator even on the abort path, where the validator forfeits its own
+	// potential reward for failing to meet its eligibility requirements this cycle.
 	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
 	if err != nil {
 		return err
@@ -765,31 +776,24 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 		return err
 	}
 
-	newAccruedRewards := stakingInfo.AccruedValidationRewards
-	newWeight := validator.Weight
-	if restakingValidationRewards > 0 {
-		newAccruedRewards, err = math.Add(stakingInfo.AccruedValidationRewards, restakingValidationRewards)
-		if err != nil {
-			return err
-		}
-
-		newWeight, err = math.Add(validator.Weight, restakingValidationRewards)
-		if err != nil {
-			return err
-		}
+	newAccruedRewards, err := math.Add(stakingInfo.AccruedValidationRewards, restakingValidationRewards)
+	if err != nil {
+		return err
 	}
 
-	newAccruedDelegateeRewards := stakingInfo.AccruedDelegateeRewards
-	if restakingDelegateeRewards > 0 {
-		newAccruedDelegateeRewards, err = math.Add(stakingInfo.AccruedDelegateeRewards, restakingDelegateeRewards)
-		if err != nil {
-			return err
-		}
+	newWeight, err := math.Add(validator.Weight, restakingValidationRewards)
+	if err != nil {
+		return err
+	}
 
-		newWeight, err = math.Add(newWeight, restakingDelegateeRewards)
-		if err != nil {
-			return err
-		}
+	newAccruedDelegateeRewards, err := math.Add(stakingInfo.AccruedDelegateeRewards, restakingDelegateeRewards)
+	if err != nil {
+		return err
+	}
+
+	newWeight, err = math.Add(newWeight, restakingDelegateeRewards)
+	if err != nil {
+		return err
 	}
 
 	if newWeight > e.backend.Config.MaxValidatorStake {
@@ -815,16 +819,14 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 			return err
 		}
 
-		if excessDelegateeRewards > 0 {
-			newAccruedDelegateeRewards, err = math.Sub(newAccruedDelegateeRewards, excessDelegateeRewards)
-			if err != nil {
-				return err
-			}
+		newAccruedDelegateeRewards, err = math.Sub(newAccruedDelegateeRewards, excessDelegateeRewards)
+		if err != nil {
+			return err
+		}
 
-			newWeight, err = math.Sub(newWeight, excessDelegateeRewards)
-			if err != nil {
-				return err
-			}
+		newWeight, err = math.Sub(newWeight, excessDelegateeRewards)
+		if err != nil {
+			return err
 		}
 
 		// newWeight is equal to e.backend.Config.MaxValidatorStake.
@@ -912,6 +914,10 @@ func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnGracefulExit(
 		return err
 	}
 
+	// DelegateeReward is the validator's commission on rewards already paid out to
+	// its delegators, earned during their successful staking periods, so it is owed
+	// to the validator even on the abort path, where the validator forfeits its own
+	// potential reward for failing to meet its eligibility requirements this cycle.
 	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
 	if err != nil {
 		return err
