@@ -11,7 +11,7 @@ import (
 )
 
 // queueDurationBuckets span 1ms (executor keeping up) to ~16s (deep backlog).
-var queueDurationBuckets = prometheus.ExponentialBuckets(time.Millisecond.Seconds(), 2, 16)
+var queueDurationBuckets = prometheus.ExponentialBuckets(time.Millisecond.Seconds(), 2, 15)
 
 // executeBlockBuckets span 500µs (small block) to ~16s (large/slow block).
 var executeBlockBuckets = prometheus.ExponentialBuckets(500*time.Microsecond.Seconds(), 2, 16)
