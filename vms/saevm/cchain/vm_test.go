@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	// Imported for [saexec.Execute] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -49,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -73,9 +73,34 @@ type SUT struct {
 	*VM
 	*Client
 
+	snow      snowcommon.VM
 	memory    *atomic.Memory
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
+}
+
+func (s *SUT) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
+	return s.snow.AppGossip(ctx, nodeID, msg)
+}
+
+func (s *SUT) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	return s.snow.AppRequest(ctx, nodeID, requestID, deadline, request)
+}
+
+func (s *SUT) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *snowcommon.AppError) error {
+	return s.snow.AppRequestFailed(ctx, nodeID, requestID, appErr)
+}
+
+func (s *SUT) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+	return s.snow.AppResponse(ctx, nodeID, requestID, response)
+}
+
+func (s *SUT) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	return s.snow.Connected(ctx, nodeID, nodeVersion)
+}
+
+func (s *SUT) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	return s.snow.Disconnected(ctx, nodeID)
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -156,8 +181,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	appSender := saetest.NewSender(tb, cfg.validators)
 
+	snowVM := orchestrator.New(vm)
 	ctx := log.CancelOnError(tb.Context())
-	require.NoErrorf(tb, vm.Initialize(
+	require.NoErrorf(tb, snowVM.Initialize(
 		ctx,
 		snowCtx,
 		chainDB,
@@ -171,16 +197,16 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		// The context is cancelled before cleanup is called, so we strip the
 		// cancellation.
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
+		require.NoErrorf(tb, snowVM.Shutdown(ctx), "%T.Shutdown()", snowVM)
 	})
-	require.NoErrorf(tb, vm.SetState(ctx, snow.NormalOp), "%T.SetState(%s)", vm, snow.NormalOp)
+	require.NoErrorf(tb, snowVM.SetState(ctx, snow.NormalOp), "%T.SetState(%s)", snowVM, snow.NormalOp)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
 	// need to treat our node as a special case.
-	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
+	require.NoErrorf(tb, snowVM.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", snowVM, snowCtx.NodeID)
 
-	handlers, err := vm.CreateHandlers(ctx)
-	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
+	handlers, err := snowVM.CreateHandlers(ctx)
+	require.NoErrorf(tb, err, "%T.CreateHandlers()", snowVM)
 
 	mux := http.NewServeMux()
 	for path, h := range handlers {
@@ -198,6 +224,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	sut := &SUT{
 		VM:        vm,
 		Client:    NewClient(server.URL),
+		snow:      snowVM,
 		memory:    memory,
 		sender:    appSender,
 		ethclient: ethclient.NewClient(ethRPCClient),

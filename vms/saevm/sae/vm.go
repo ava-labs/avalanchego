@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
 
-	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -40,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -48,11 +48,11 @@ import (
 // which needs to be provided by a harness. In all cases, the harness MUST
 // provide a last-synchronous block, which MAY be the genesis.
 type VM struct {
-	network *network.Network
 	hooks   hook.Points
 	config  Config
 	snowCtx *snow.Context
 	metrics *metrics
+	peers   *p2p.Peers
 
 	db  ethdb.Database
 	xdb saetypes.ExecutionResults
@@ -127,12 +127,12 @@ func NewVM[T hook.Transaction](
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
 	vm := &VM{
-		network: network,
 		hooks:   hooks,
 		config:  cfg,
 		snowCtx: snowCtx,
 		metrics: m,
 		db:      db,
+		peers:   network.Peers,
 	}
 	defer func() {
 		if retErr != nil {
