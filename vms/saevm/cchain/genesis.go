@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
@@ -26,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
@@ -35,6 +33,8 @@ import (
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
+
+const genesisNumber = 0
 
 var (
 	errNoGenesisChainConfig       = errors.New("no genesis chainConfig")
@@ -62,7 +62,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
 		return nil, errNoGenesisChainConfig
 	case g.Config.ChainID == nil:
 		return nil, errNoGenesisChainID
-	case g.Number != 0:
+	case g.Number != genesisNumber:
 		return nil, fmt.Errorf("%w: %d", errNonZeroGenesisNumber, g.Number)
 	case g.GasUsed != 0:
 		return nil, fmt.Errorf("%w: %d", errNonZeroGenesisGasUsed, g.GasUsed)
@@ -168,7 +168,7 @@ func setupGenesis(
 	trieConfig *triedb.Config,
 	genesis *core.Genesis,
 ) (*types.Block, error) {
-	stored := rawdb.ReadCanonicalHash(db, 0)
+	stored := rawdb.ReadCanonicalHash(db, genesisNumber)
 	if (stored == common.Hash{}) {
 		return initializeGenesis(db, trieConfig, genesis)
 	}
@@ -191,10 +191,6 @@ func setupGenesis(
 	return block, nil
 }
 
-// genesisToBlock builds the genesis block without persisting its state to db,
-// for hash comparison. It mirrors coreth's core.Genesis.ToBlock, which is
-// unavailable for libevm's Genesis because the block construction is
-// Avalanche-specific. The state is flushed to a throwaway in-memory database.
 func genesisToBlock(genesis *core.Genesis) (*types.Block, error) {
 	return writeGenesisState(
 		rawdb.NewMemoryDatabase(),
@@ -206,14 +202,8 @@ func genesisToBlock(genesis *core.Genesis) (*types.Block, error) {
 // initializeGenesis writes the genesis block, state, and chain config to db,
 // returning the genesis block.
 //
-// It inlines [core.Genesis.Commit] (and the unexported core.Genesis.toBlock it
-// builds on), kept in sync with graft/coreth, so that the trie database can be
-// closed after the genesis state is flushed but before the canonical hash is
-// written. Closing first guarantees that a crash can never leave the canonical
-// hash on disk without the corresponding state, which matters for firewood: it
-// persists the trie independently of the canonical hash and only flushes it
-// durably on close. hashdb and pathdb flush the trie inline, so for them the
-// ordering is merely a no-op safeguard.
+// Writing the genesis block to the database guarantees that the initial state
+// is persisted.
 func initializeGenesis(
 	db ethdb.Database,
 	trieConfig *triedb.Config,
@@ -225,17 +215,27 @@ func initializeGenesis(
 	}
 
 	b := db.NewBatch()
+	hash := block.Hash()
+
 	rawdb.WriteBlock(b, block)
-	rawdb.WriteReceipts(b, block.Hash(), block.NumberU64(), nil)
-	rawdb.WriteCanonicalHash(b, block.Hash(), block.NumberU64())
-	rawdb.WriteHeadBlockHash(b, block.Hash())
-	rawdb.WriteHeadHeaderHash(b, block.Hash())
-	rawdb.WriteChainConfig(b, block.Hash(), genesis.Config)
+	rawdb.WriteReceipts(b, hash, genesisNumber, nil)
+	rawdb.WriteCanonicalHash(b, hash, genesisNumber)
+	rawdb.WriteFinalizedBlockHash(b, hash)
+	rawdb.WriteHeadBlockHash(b, hash)
+	rawdb.WriteHeadHeaderHash(b, hash)
+	rawdb.WriteChainConfig(b, hash, genesis.Config)
 	if err := b.Write(); err != nil {
 		return nil, fmt.Errorf("writing genesis block metadata: %w", err)
 	}
 	return block, nil
 }
+
+// When a precompile is activated, its account is marked as non-empty by setting
+// a nonce and code. This prevents the account from being cleaned up when the
+// statedb is finalized and allows it to be called from Solidity contracts.
+const precompileNonce = 1
+
+var precompileCode = []byte{0x1}
 
 func writeGenesisState(
 	db ethdb.Database,
@@ -256,10 +256,6 @@ func writeGenesisState(
 		return nil, err
 	}
 
-	// Mark any stateful precompiles enabled at genesis as non-empty accounts.
-	configExtra := corethparams.GetExtra(genesis.Config)
-	applyPrecompileActivations(configExtra, genesis.Timestamp, statedb)
-
 	for addr, account := range genesis.Alloc {
 		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
 		statedb.SetCode(addr, account.Code)
@@ -268,17 +264,24 @@ func writeGenesisState(
 			statedb.SetState(addr, key, value)
 		}
 	}
+	// If the Warp precompile is activated at genesis, mark it as a non-empty
+	// account.
+	if c := corethparams.GetExtra(genesis.Config); c.IsDurango(genesis.Timestamp) {
+		statedb.SetNonce(warp.ContractAddress, precompileNonce)
+		statedb.SetCode(warp.ContractAddress, precompileCode)
+	}
 
-	root := statedb.IntermediateRoot(false)
+	const deleteEmptyObjects = false
+	root := statedb.IntermediateRoot(deleteEmptyObjects)
 	block := newGenesisBlock(genesis, root)
 	triedbOpt := stateconf.WithTrieDBUpdatePayload(
 		common.Hash{},
 		block.Hash(),
 	)
-	if _, err := statedb.Commit(0, false, stateconf.WithTrieDBUpdateOpts(triedbOpt)); err != nil {
+	statedbOpt := stateconf.WithTrieDBUpdateOpts(triedbOpt)
+	if _, err := statedb.Commit(genesisNumber, deleteEmptyObjects, statedbOpt); err != nil {
 		return nil, fmt.Errorf("committing statedb: %w", err)
 	}
-	// Commit the generated state to the trie database if it is not empty.
 	if root != types.EmptyRootHash {
 		const logAsInfo = false
 		if err := tdb.Commit(root, logAsInfo); err != nil {
@@ -288,38 +291,8 @@ func writeGenesisState(
 	return block, nil
 }
 
-// applyPrecompileActivations marks every stateful precompile enabled at the
-// genesis timestamp as a non-empty account, matching coreth's genesis state.
-//
-// It is a leaned-down version of coreth's core.ApplyPrecompileActivations: the
-// C-Chain only ever configures the Warp precompile, whose Configure hook is a
-// no-op, so this writes the nonce and code that make the precompile address
-// callable but does not run any Configure hooks. A precompile that activates
-// here with state-writing configuration would diverge from coreth.
-func applyPrecompileActivations(c *extras.ChainConfig, timestamp uint64, statedb *state.StateDB) {
-	for _, module := range modules.RegisteredModules() {
-		for _, activatingConfig := range c.GetActivatingPrecompileConfigs(module.Address, nil, timestamp, c.PrecompileUpgrades) {
-			// If this transition disables a precompile, deconfigure it.
-			if activatingConfig.IsDisabled() {
-				log.Info("Disabling precompile", "name", module.ConfigKey)
-				statedb.SelfDestruct(module.Address)
-				// Finalise the SelfDestruct immediately so the contract state is
-				// wiped and can be re-configured within the same block.
-				statedb.Finalise(true)
-				continue
-			}
-			log.Info("Activating precompile", "name", module.ConfigKey)
-			// Mark the precompile address as non-empty (nonce + code) so it is
-			// not cleaned up when the statedb is finalized and can be called
-			// from Solidity contracts.
-			statedb.SetNonce(module.Address, 1)
-			statedb.SetCode(module.Address, []byte{0x1})
-		}
-	}
-}
-
 func newGenesisBlock(genesis *core.Genesis, root common.Hash) *types.Block {
-	header := &types.Header{
+	h := &types.Header{
 		ParentHash: common.Hash{},
 		// UncleHash is set by [types.NewBlock].
 		Coinbase: genesis.Coinbase,
@@ -340,38 +313,38 @@ func newGenesisBlock(genesis *core.Genesis, root common.Hash) *types.Block {
 		// WithdrawalsHash is not serialized by the libevm hooks, so it is
 		// always nil.
 	}
-	if header.Difficulty == nil {
-		header.Difficulty = ethparams.GenesisDifficulty
+	if h.Difficulty == nil {
+		h.Difficulty = ethparams.GenesisDifficulty
 	}
-	if header.GasLimit == 0 {
-		header.GasLimit = ethparams.GenesisGasLimit
+	if h.GasLimit == 0 {
+		h.GasLimit = ethparams.GenesisGasLimit
 	}
 
-	configExtra := corethparams.GetExtra(genesis.Config)
-	if configExtra.IsApricotPhase3(genesis.Timestamp) {
-		header.BaseFee = genesis.BaseFee
-		if header.BaseFee == nil {
-			header.BaseFee = big.NewInt(ap3.InitialBaseFee)
+	c := corethparams.GetExtra(genesis.Config)
+	if c.IsApricotPhase3(genesis.Timestamp) {
+		h.BaseFee = genesis.BaseFee
+		if h.BaseFee == nil {
+			h.BaseFee = big.NewInt(ap3.InitialBaseFee)
 		}
 	}
 
-	headerExtra := customtypes.GetHeaderExtra(header)
-	if configExtra.IsEtna(genesis.Timestamp) {
-		header.BlobGasUsed = new(uint64)
-		header.ExcessBlobGas = new(uint64)
-		header.ParentBeaconRoot = new(common.Hash)
+	headerExtra := customtypes.GetHeaderExtra(h)
+	if c.IsEtna(genesis.Timestamp) {
+		h.BlobGasUsed = new(uint64)
+		h.ExcessBlobGas = new(uint64)
+		h.ParentBeaconRoot = new(common.Hash)
 
 		headerExtra.ExtDataGasUsed = new(big.Int)
 		headerExtra.BlockGasCost = new(big.Int)
 	}
 
-	if configExtra.IsGranite(genesis.Timestamp) {
+	if c.IsGranite(genesis.Timestamp) {
 		headerExtra.TimeMilliseconds = avalancheutils.PointerTo(genesis.Timestamp * 1000)
 		headerExtra.MinDelayExcess = avalancheutils.PointerTo(acp226.InitialDelayExcess)
 	}
 
 	return types.NewBlock(
-		header,
+		h,
 		nil, // txs
 		nil, // uncles
 		nil, // receipts
