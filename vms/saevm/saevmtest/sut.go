@@ -284,7 +284,7 @@ func (s *SUT) SendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transactio
 func (s *SUT) WaitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
-	txgossiptest.WaitUntilPending(tb, s.Context(tb), s.RawVM.TxPool(), txs...)
+	txgossiptest.WaitUntilPending(tb, s.Context(tb), s.RawVM.GethRPCBackends(), txs...)
 }
 
 func (s *SUT) StateAt(tb testing.TB, root common.Hash) *state.StateDB {

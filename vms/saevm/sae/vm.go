@@ -434,10 +434,6 @@ func (vm *VM) StateDB(root common.Hash) (*state.StateDB, error) {
 	return vm.exec.StateDB(root)
 }
 
-func (vm *VM) TxPool() *txpool.TxPool {
-	return vm.mempool.Pool
-}
-
 func (vm *VM) NodeID() ids.NodeID {
 	return vm.snowCtx.NodeID
 }
