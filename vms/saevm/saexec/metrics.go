@@ -17,7 +17,11 @@ var queueDurationBuckets = prometheus.ExponentialBuckets(0.001, 2, 18)
 var executeBlockBuckets = prometheus.ExponentialBuckets(0.0005, 2, 16)
 
 type metrics struct {
-	lastExecutedHeight   prometheus.Gauge
+	lastExecutedHeight prometheus.Gauge
+
+	// queueDuration tracks a block's entire lifetime from acceptance into the
+	// queue until its execution completes, so executeBlockDuration is a subset
+	// of it: queueDuration = time spent in the queue + executeBlockDuration.
 	queueDuration        prometheus.Histogram
 	executeBlockDuration prometheus.Histogram
 
