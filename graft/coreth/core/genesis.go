@@ -378,17 +378,12 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *triedb.Database) (*types.Blo
 	if err := config.CheckConfigForkOrder(); err != nil {
 		return nil, err
 	}
-
-	b := db.NewBatch()
-	rawdb.WriteBlock(b, block)
-	rawdb.WriteReceipts(b, block.Hash(), block.NumberU64(), nil)
-	rawdb.WriteCanonicalHash(b, block.Hash(), block.NumberU64())
-	rawdb.WriteHeadBlockHash(b, block.Hash())
-	rawdb.WriteHeadHeaderHash(b, block.Hash())
-	rawdb.WriteChainConfig(b, block.Hash(), config)
-	if err := b.Write(); err != nil {
-		return nil, err
-	}
+	rawdb.WriteBlock(db, block)
+	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), nil)
+	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
+	rawdb.WriteHeadBlockHash(db, block.Hash())
+	rawdb.WriteHeadHeaderHash(db, block.Hash())
+	rawdb.WriteChainConfig(db, block.Hash(), config)
 	return block, nil
 }
 
