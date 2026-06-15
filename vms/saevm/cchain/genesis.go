@@ -176,41 +176,51 @@ func setupGenesis(
 	trieConfig *triedb.Config,
 	genesis *core.Genesis,
 ) (*types.Block, error) {
-	prevGenesisHash := rawdb.ReadCanonicalHash(db, genesisNumber)
-	if (prevGenesisHash == common.Hash{}) {
-		return initializeGenesis(db, trieConfig, genesis)
-	}
-
-	// If the chain is already initialized, the stored genesis hash must match.
 	block, err := genesisToBlock(genesis)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("converting genesis to block: %w", err)
 	}
-	if hash := block.Hash(); hash != prevGenesisHash {
+
+	// Ensure the stored genesis matches the provided genesis block.
+	hash := block.Hash()
+	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
+		if err := writeGenesisBlock(db, block, genesis.Config); err != nil {
+			return nil, fmt.Errorf("writing genesis block: %w", err)
+		}
+	} else if prev != hash {
 		return nil, &core.GenesisMismatchError{
-			Stored: prevGenesisHash,
+			Stored: prev,
 			New:    hash,
 		}
 	}
 
-	// Reject a chain config that could change the execution of blocks that have
-	// already been executed. The stored config was used to execute the head
-	// block, so it is the reference for compatibility.
-	prevChainConfig := rawdb.ReadChainConfig(db, prevGenesisHash)
-	if prevChainConfig == nil {
-		return nil, errNoStoredChainConfig
+	// Ensure the previous chain config and the new chain config defined the
+	// same rules for the head block. Otherwise the head block may have been
+	// executed incorrectly.
+	{
+		prev := rawdb.ReadChainConfig(db, hash)
+		if prev == nil {
+			return nil, errNoStoredChainConfig
+		}
+		head := rawdb.ReadHeadHeader(db)
+		if head == nil {
+			return nil, errNoHeadBlock
+		}
+		height, timestamp := head.Number.Uint64(), head.Time
+		if err := prev.CheckCompatible(genesis.Config, height, timestamp); err != nil {
+			return nil, fmt.Errorf("incompatible chain config: %w", err)
+		}
 	}
-	head := rawdb.ReadHeadHeader(db)
-	if head == nil {
-		return nil, errNoHeadBlock
-	}
-	height, timestamp := head.Number.Uint64(), head.Time
-	if err := prevChainConfig.CheckCompatible(genesis.Config, height, timestamp); err != nil {
-		return nil, fmt.Errorf("incompatible chain config: %w", err)
-	}
+	rawdb.WriteChainConfig(db, hash, genesis.Config)
 
-	rawdb.WriteChainConfig(db, prevGenesisHash, genesis.Config)
-	return block, nil
+	shouldWrite, err := shouldWriteGenesisState(db, trieConfig, block.Root())
+	if err != nil {
+		return nil, fmt.Errorf("checking for genesis state: %w", err)
+	}
+	if !shouldWrite {
+		return block, nil
+	}
+	return writeGenesisState(db, trieConfig, genesis)
 }
 
 func genesisToBlock(genesis *core.Genesis) (*types.Block, error) {
@@ -221,18 +231,7 @@ func genesisToBlock(genesis *core.Genesis) (*types.Block, error) {
 	)
 }
 
-// initializeGenesis first writes the genesis state to disk, and then atomically
-// writes the rest of the genesis block's indicies along with the chain config.
-func initializeGenesis(
-	db ethdb.Database,
-	trieConfig *triedb.Config,
-	genesis *core.Genesis,
-) (*types.Block, error) {
-	block, err := writeGenesisState(db, trieConfig, genesis)
-	if err != nil {
-		return nil, err
-	}
-
+func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.ChainConfig) error {
 	b := db.NewBatch()
 	hash := block.Hash()
 
@@ -242,11 +241,18 @@ func initializeGenesis(
 	rawdb.WriteFinalizedBlockHash(b, hash)
 	rawdb.WriteHeadBlockHash(b, hash)
 	rawdb.WriteHeadHeaderHash(b, hash)
-	rawdb.WriteChainConfig(b, hash, genesis.Config)
-	if err := b.Write(); err != nil {
-		return nil, fmt.Errorf("writing genesis block metadata: %w", err)
-	}
-	return block, nil
+	rawdb.WriteChainConfig(b, hash, config)
+	return b.Write()
+}
+
+func shouldWriteGenesisState(
+	db ethdb.Database,
+	trieConfig *triedb.Config,
+	root common.Hash,
+) (bool, error) {
+	tdb := triedb.NewDatabase(db, trieConfig)
+	initialized := tdb.Initialized(root)
+	return !initialized, tdb.Close()
 }
 
 // When a precompile is activated, its account is marked as non-empty by setting
