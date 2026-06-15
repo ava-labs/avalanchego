@@ -79,7 +79,7 @@ var (
 		c.NetworkUpgrades.HeliconTimestamp = utils.PointerTo[uint64](0)
 	})
 
-	TestChainConfig = copyConfig(TestGraniteChainConfig)
+	TestChainConfig = copyConfig(TestHeliconChainConfig)
 )
 
 func copyConfig(c *ChainConfig) *ChainConfig {

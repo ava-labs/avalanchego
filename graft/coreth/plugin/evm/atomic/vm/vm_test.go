@@ -1640,8 +1640,11 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			fork := upgradetest.Latest
 			vm := newAtomicTestVM()
-			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
+			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
+				Fork: &fork,
+			})
 			key := vmtest.TestKeys[0].ToECDSA()
 			address := vmtest.TestEthAddrs[0]
 

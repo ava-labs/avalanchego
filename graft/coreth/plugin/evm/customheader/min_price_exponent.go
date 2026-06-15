@@ -15,9 +15,9 @@ import (
 
 var errRemoteMinPriceExponentSet = errors.New("remote min price exponent should be nil")
 
-// VerifyMinPriceExponent rejects a pre-Helicon header carrying a
-// MinPriceExponent. Helicon headers are rejected wholesale in semanticVerify
-// before this check runs, so no positive verification happens here.
+// VerifyMinPriceExponent rejects a header carrying a MinPriceExponent. coreth
+// caps at Granite and never activates Helicon, so the field is always SAE's and
+// must never appear on a coreth block.
 func VerifyMinPriceExponent(
 	config *extras.ChainConfig,
 	header *types.Header,
