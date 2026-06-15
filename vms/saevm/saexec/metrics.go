@@ -37,8 +37,8 @@ type metrics struct {
 	executedGasCharged prometheus.Counter
 	executedGasLimit   prometheus.Counter
 
-	// acceptedWorstCaseGas is the gas limit (worst-case gas) of blocks counted
-	// at acceptance, the acceptance-side counterpart of executedGasLimit.
+	// acceptedWorstCaseGas is the gas limit (worst-case gas) of blocks entering
+	// the execution queue, the acceptance-side counterpart of executedGasLimit.
 	acceptedWorstCaseGas prometheus.Counter
 }
 
