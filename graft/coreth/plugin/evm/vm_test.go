@@ -1760,8 +1760,8 @@ func (*testService) Echo(str string, i int, args *echoArgs) echoResult {
 // emulates server test
 func TestCreateHandlers(t *testing.T) {
 	var (
-		ctx  = t.Context()
-		vm   = newDefaultTestVM()
+		ctx = t.Context()
+		vm  = newDefaultTestVM()
 	)
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 		Fork: utils.PointerTo(upgradetest.Latest),
