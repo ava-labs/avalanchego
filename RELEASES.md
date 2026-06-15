@@ -10,7 +10,7 @@
   - `avalanche_{vmName}_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, including state commit and post-execution work.
   - `avalanche_{vmName}_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
   - `avalanche_{vmName}_sae_execution_queue_gas_limit` (gauge): sum of the gas limits of accepted blocks that have not yet completed execution.
-  - `avalanche_{vmName}_sae_executed_gas_total` (counter): cumulative gas actually consumed by executed blocks.
+  - `avalanche_{vmName}_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks (transaction gas used plus end-of-block operation gas).
   - `avalanche_{vmName}_sae_executed_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of executed blocks.
 - Renamed Coreth and Subnet-EVM state-sync p2p metrics:
   - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`

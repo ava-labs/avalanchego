@@ -10,8 +10,7 @@ import (
 )
 
 func (e *Executor) sendPostExecutionEvents(b *types.Block, results *ExecutionResults) {
-	e.metrics.markExecuted(uint64(results.GasConsumed), b.GasLimit())
-	e.metrics.setLastExecutedHeight(b.NumberU64())
+	e.metrics.markExecuted(b.NumberU64(), uint64(results.GasConsumed), b.GasLimit())
 	e.headEvents.Send(core.ChainHeadEvent{Block: b})
 
 	var n int

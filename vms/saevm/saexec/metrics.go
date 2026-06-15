@@ -10,8 +10,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// queueDurationBuckets span 1ms (executor keeping up) to ~131s (deep backlog).
-var queueDurationBuckets = prometheus.ExponentialBuckets(time.Millisecond.Seconds(), 2, 18)
+// queueDurationBuckets span 1ms (executor keeping up) to ~16s (deep backlog).
+var queueDurationBuckets = prometheus.ExponentialBuckets(time.Millisecond.Seconds(), 2, 16)
 
 // executeBlockBuckets span 500µs (small block) to ~16s (large/slow block).
 var executeBlockBuckets = prometheus.ExponentialBuckets(500*time.Microsecond.Seconds(), 2, 16)
@@ -31,13 +31,14 @@ type metrics struct {
 	executionQueueBlocks   prometheus.Gauge
 	executionQueueGasLimit prometheus.Gauge
 
-	// executedGas is the actual gas consumed by executed blocks;
+	// executedGasCharged is the gas charged for executed blocks: transaction
+	// gas used plus end-of-block operation gas. It is not the eth gas used.
 	// executedGasLimit is the gas limit (worst-case gas) of those same blocks.
-	executedGas      prometheus.Counter
-	executedGasLimit prometheus.Counter
+	executedGasCharged prometheus.Counter
+	executedGasLimit   prometheus.Counter
 }
 
-func newMetrics(reg prometheus.Registerer) (*metrics, error) {
+func newMetrics(reg prometheus.Registerer, lastExecutedHeight uint64) (*metrics, error) {
 	m := &metrics{
 		lastExecutedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "last_executed_height",
@@ -45,7 +46,7 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 		}),
 		queueDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Name:    "execution_queue_duration_seconds",
-			Help:    "Time from a block's acceptance into the execution queue until its execution completes.",
+			Help:    "Time from a block's acceptance until its execution completes.",
 			Buckets: queueDurationBuckets,
 		}),
 		executeBlockDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
@@ -61,28 +62,25 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Name: "execution_queue_gas_limit",
 			Help: "Sum of the gas limits of accepted blocks that have not yet completed execution.",
 		}),
-		executedGas: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "executed_gas_total",
-			Help: "Cumulative gas actually consumed by executed blocks.",
+		executedGasCharged: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "executed_gas_charged_total",
+			Help: "Cumulative gas charged by executed blocks (transaction gas used plus end-of-block operation gas); this is not the eth gas used.",
 		}),
 		executedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "executed_gas_limit_total",
 			Help: "Cumulative gas limit (worst-case gas) of executed blocks.",
 		}),
 	}
+	m.lastExecutedHeight.Set(float64(lastExecutedHeight))
 	return m, errors.Join(
 		reg.Register(m.lastExecutedHeight),
 		reg.Register(m.queueDuration),
 		reg.Register(m.executeBlockDuration),
 		reg.Register(m.executionQueueBlocks),
 		reg.Register(m.executionQueueGasLimit),
-		reg.Register(m.executedGas),
+		reg.Register(m.executedGasCharged),
 		reg.Register(m.executedGasLimit),
 	)
-}
-
-func (m *metrics) setLastExecutedHeight(height uint64) {
-	m.lastExecutedHeight.Set(float64(height))
 }
 
 func (m *metrics) observeQueueDuration(d time.Duration) {
@@ -100,12 +98,14 @@ func (m *metrics) markEnqueued(gasLimit uint64) {
 	m.executionQueueGasLimit.Add(float64(gasLimit))
 }
 
-// markExecuted records that a block with the given gas limit has finished
-// executing, having consumed gasConsumed gas. It removes the block from the
-// queue gauges and adds to the cumulative executed totals.
-func (m *metrics) markExecuted(gasConsumed, gasLimit uint64) {
+// markExecuted records that the block at the given height, with the given gas
+// limit, has finished executing, having been charged gasCharged gas. It
+// advances the last-executed height, removes the block from the queue gauges,
+// and adds to the cumulative executed totals.
+func (m *metrics) markExecuted(height, gasCharged, gasLimit uint64) {
+	m.lastExecutedHeight.Set(float64(height))
 	m.executionQueueBlocks.Dec()
 	m.executionQueueGasLimit.Sub(float64(gasLimit))
-	m.executedGas.Add(float64(gasConsumed))
+	m.executedGasCharged.Add(float64(gasCharged))
 	m.executedGasLimit.Add(float64(gasLimit))
 }

@@ -76,7 +76,7 @@ func New(
 		return nil, err
 	}
 
-	m, err := newMetrics(reg)
+	m, err := newMetrics(reg, lastExecuted.Height())
 	if err != nil {
 		return nil, fmt.Errorf("registering saexec metrics: %w", err)
 	}
@@ -103,7 +103,6 @@ func New(
 		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)
-	e.metrics.setLastExecutedHeight(lastExecuted.Height())
 
 	go e.processQueue()
 	return e, nil
