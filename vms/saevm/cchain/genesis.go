@@ -159,6 +159,11 @@ func londonBlock(chainID *big.Int) int64 {
 	}
 }
 
+var (
+	errNoStoredChainConfig = errors.New("no stored chainConfig")
+	errNoHeadBlock         = errors.New("no head block")
+)
+
 // setupGenesis configures the database with the provided genesis.
 //
 // If the database was previously already initialized, setupGenesis verifies
@@ -171,8 +176,8 @@ func setupGenesis(
 	trieConfig *triedb.Config,
 	genesis *core.Genesis,
 ) (*types.Block, error) {
-	stored := rawdb.ReadCanonicalHash(db, genesisNumber)
-	if (stored == common.Hash{}) {
+	prevGenesisHash := rawdb.ReadCanonicalHash(db, genesisNumber)
+	if (prevGenesisHash == common.Hash{}) {
 		return initializeGenesis(db, trieConfig, genesis)
 	}
 
@@ -181,16 +186,30 @@ func setupGenesis(
 	if err != nil {
 		return nil, err
 	}
-	if hash := block.Hash(); hash != stored {
+	if hash := block.Hash(); hash != prevGenesisHash {
 		return nil, &core.GenesisMismatchError{
-			Stored: stored,
+			Stored: prevGenesisHash,
 			New:    hash,
 		}
 	}
 
-	// TODO(StephenButtolph): Consider checking compatibility of the chain
-	// config against the last accepted block.
-	rawdb.WriteChainConfig(db, stored, genesis.Config)
+	// Reject a chain config that could change the execution of blocks that have
+	// already been executed. The stored config was used to execute the head
+	// block, so it is the reference for compatibility.
+	prevChainConfig := rawdb.ReadChainConfig(db, prevGenesisHash)
+	if prevChainConfig == nil {
+		return nil, errNoStoredChainConfig
+	}
+	head := rawdb.ReadHeadHeader(db)
+	if head == nil {
+		return nil, errNoHeadBlock
+	}
+	height, timestamp := head.Number.Uint64(), head.Time
+	if err := prevChainConfig.CheckCompatible(genesis.Config, height, timestamp); err != nil {
+		return nil, fmt.Errorf("incompatible chain config: %w", err)
+	}
+
+	rawdb.WriteChainConfig(db, prevGenesisHash, genesis.Config)
 	return block, nil
 }
 

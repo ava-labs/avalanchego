@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/snow"
@@ -31,6 +30,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // TestParseGenesis locks in the C-Chain genesis of Mainnet, Fuji, and the Local
@@ -61,8 +63,8 @@ func TestParseGenesis(t *testing.T) {
 			ctx:     mainnetCtx,
 			genesis: genesis.MainnetConfig.CChainGenesis,
 			want: &core.Genesis{
-				Config: params.WithExtra(
-					&params.ChainConfig{
+				Config: corethparams.WithExtra(
+					&corethparams.ChainConfig{
 						ChainID:             big.NewInt(43114),
 						HomesteadBlock:      big.NewInt(0),
 						DAOForkBlock:        big.NewInt(0),
@@ -128,8 +130,8 @@ func TestParseGenesis(t *testing.T) {
 			ctx:     fujiCtx,
 			genesis: genesis.FujiConfig.CChainGenesis,
 			want: &core.Genesis{
-				Config: params.WithExtra(
-					&params.ChainConfig{
+				Config: corethparams.WithExtra(
+					&corethparams.ChainConfig{
 						ChainID:             big.NewInt(43113),
 						HomesteadBlock:      big.NewInt(0),
 						DAOForkBlock:        big.NewInt(0),
@@ -195,8 +197,8 @@ func TestParseGenesis(t *testing.T) {
 			ctx:     localCtx,
 			genesis: genesis.LocalConfig.CChainGenesis,
 			want: &core.Genesis{
-				Config: params.WithExtra(
-					&params.ChainConfig{
+				Config: corethparams.WithExtra(
+					&corethparams.ChainConfig{
 						ChainID:             big.NewInt(43112),
 						HomesteadBlock:      big.NewInt(0),
 						DAOForkBlock:        big.NewInt(0),
@@ -284,7 +286,7 @@ func TestParseGenesis(t *testing.T) {
 			}
 			opts := cmp.Options{
 				cmputils.BigInts(),
-				cmp.Comparer(func(a, b *params.ChainConfig) bool {
+				cmp.Comparer(func(a, b *corethparams.ChainConfig) bool {
 					return reflect.DeepEqual(a, b)
 				}),
 			}
@@ -384,6 +386,18 @@ func TestWriteGenesis(t *testing.T) {
 			}(),
 			restartGenesis: localGenesis,
 		},
+		{
+			// Rescheduling an upgrade that the head block has already activated
+			// is rejected, as it could change the execution of accepted blocks.
+			// Unscheduling Helicon leaves the genesis block unchanged (it is not
+			// active at genesis) so the conflict surfaces as a compatibility
+			// error rather than a genesis hash mismatch.
+			name:            "incompatible_upgrade",
+			initialUpgrades: latest,
+			restartUpgrades: upgradetest.GetConfig(upgradetest.Granite),
+			restartGenesis:  localGenesis,
+			wantErr:         errIsType[*ethparams.ConfigCompatError](),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -403,15 +417,15 @@ func TestWriteGenesis(t *testing.T) {
 
 			gotConfig := rawdb.ReadChainConfig(db, genesisHash)
 			cmpBaseConfig := cmp.Options{
-				cmpopts.IgnoreUnexported(params.ChainConfig{}),
+				cmpopts.IgnoreUnexported(corethparams.ChainConfig{}),
 				cmputils.BigInts(),
 			}
 			if diff := cmp.Diff(g.Config, gotConfig, cmpBaseConfig); diff != "" {
 				t.Errorf("initial stored base config (-want +got)\n%s", diff)
 			}
 
-			cmpNetworkUpgrades := cmp.Transformer("networkUpgrades", func(c *params.ChainConfig) extras.NetworkUpgrades {
-				return params.GetExtra(c).NetworkUpgrades
+			cmpNetworkUpgrades := cmp.Transformer("networkUpgrades", func(c *corethparams.ChainConfig) extras.NetworkUpgrades {
+				return corethparams.GetExtra(c).NetworkUpgrades
 			})
 			if diff := cmp.Diff(g.Config, gotConfig, cmpNetworkUpgrades); diff != "" {
 				t.Errorf("initial stored network upgrades (-want +got)\n%s", diff)
