@@ -4609,8 +4609,12 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			env := newEnvironment(t, upgradetest.Latest)
+			// Charge a non-zero fee so the config tx is funded with a real input
+			// and change output, letting us assert UTXO consumption/production below.
+			env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
+
 			var (
-				env           = newEnvironment(t, upgradetest.Latest)
 				wallet        = newWallet(t, env, walletConfig{})
 				feeCalculator = state.PickFeeCalculator(env.config, env.state)
 			)
@@ -4635,21 +4639,23 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 				2*env.config.MinStakeDuration,
 			)
 			require.NoError(t, err)
-
 			validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
 
-			startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
-			duration := time.Duration(validatorTx.Period) * time.Second
-			vdrStaker, err := state.NewStaker(
-				addAutoRenewedValidatorTx.ID(),
-				validatorTx,
-				startTime,
-				startTime.Add(duration),
-				validatorTx.Weight(),
-				uint64(1000000),
-			)
+			// Execute the AddAutoRenewedValidatorTx so the validator and the UTXOs
+			// it spends/creates are reflected in env.state. This keeps env.state in
+			// sync with the wallet's UTXO set, so the config tx is funded with a UTXO
+			// that actually exists during execution.
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 			require.NoError(t, err)
 
+			_, _, _, err = StandardTx(&env.backend, feeCalculator, addAutoRenewedValidatorTx, diff)
+			require.NoError(t, err)
+
+			// Record the tx so the config tx can look it up by ID during verification.
+			diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
+			require.NoError(t, diff.Apply(env.state))
+
+			// Seed non-zero values to verify they're preserved by the config update.
 			initialStakingInfo := state.StakingInfo{
 				DelegateeReward:          1,
 				AccruedValidationRewards: 2,
@@ -4665,10 +4671,23 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			// Before execution: the input UTXOs exist and the output UTXOs don't.
+			inputIDs := setAutoRenewedValidatorConfigTx.InputIDs()
+			require.NotEmpty(t, inputIDs)
+			for inputID := range inputIDs {
+				_, err := env.state.GetUTXO(inputID)
+				require.NoError(t, err)
+			}
+
+			outputUTXOs := setAutoRenewedValidatorConfigTx.UTXOs()
+			require.NotEmpty(t, outputUTXOs)
+			for _, outputUTXO := range outputUTXOs {
+				_, err := env.state.GetUTXO(outputUTXO.InputID())
+				require.ErrorIs(t, err, database.ErrNotFound)
+			}
+
+			diff, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 			require.NoError(t, err)
-			diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
-			require.NoError(t, diff.PutCurrentValidator(vdrStaker))
 			require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
 
 			_, _, _, err = StandardTx(
@@ -4689,6 +4708,18 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			wantStakingInfo.AutoCompoundRewardShares = newAutoCompoundRewardShares
 			wantStakingInfo.NextPeriod = uint64(tt.newPeriod.Seconds())
 			require.Equal(t, wantStakingInfo, stakingInfo)
+
+			// After execution: the input UTXOs are consumed and the change outputs are created.
+			for inputID := range inputIDs {
+				_, err := env.state.GetUTXO(inputID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+			}
+
+			for _, wantUTXO := range outputUTXOs {
+				gotUTXO, err := env.state.GetUTXO(wantUTXO.InputID())
+				require.NoError(t, err)
+				require.Equal(t, wantUTXO, gotUTXO)
+			}
 		})
 	}
 }
