@@ -115,6 +115,7 @@ go_test(
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/firewood",
+        "//graft/evm/utils",
         "//ids",
         "//network/p2p",
         "//network/p2p/acp118",

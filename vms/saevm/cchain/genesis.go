@@ -46,17 +46,19 @@ var (
 	errNonNilGenesisBlobGasUsed   = errors.New("non-nil genesis blobGasUsed")
 )
 
+type genesis core.Genesis
+
 // parseGenesis decodes the genesis bytes and populates the upgrade schedule.
-func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
+func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 	var g core.Genesis
 	if err := json.Unmarshal(b, &g); err != nil {
 		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
 	}
 
-	// The genesis is committed as block 0 with no execution history, so the
-	// fields that the Genesis type documents as for consensus tests only must
-	// be left at their zero values. BaseFee is exempt: it is a valid (if inert)
-	// genesis header field. See [flushGenesisState].
+	// Almost all of the fields in [core.Genesis] that are marked as testing
+	// only are explicitly disallowed. The only such field that is allowed to be
+	// configured is [core.Genesis.BaseFee], as SAE initializes the gas price
+	// to the last synchronous block's BaseFee.
 	switch {
 	case g.Config == nil:
 		return nil, errNoGenesisChainConfig
@@ -129,7 +131,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
 			},
 		},
 	)
-	return &g, nil
+	return (*genesis)(&g), nil
 }
 
 var (
@@ -161,31 +163,26 @@ func londonBlock(chainID *big.Int) int64 {
 
 var (
 	errNoStoredChainConfig = errors.New("no stored chainConfig")
-	errNoHeadBlock         = errors.New("no head block")
+	errNoHeadHeader        = errors.New("no head header")
 )
 
-// setupGenesis configures the database with the provided genesis.
+// setup configures the database with genesis.
 //
-// If the database was previously already initialized, setupGenesis verifies
-// that the same genesis hash would have been produced.
-//
-// Additionally, the chain config is updated to reflect any new upgrades that
-// have been scheduled.
-func setupGenesis(
-	db ethdb.Database,
-	trieConfig *triedb.Config,
-	genesis *core.Genesis,
-) (_ *types.Block, retErr error) {
-	block, err := genesisToBlock(genesis)
+// It verifies that the genesis is compatible with any previously setup genesis
+// state by checking the genesis block hash along with the rules used to execute
+// the head block.
+func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.Block, retErr error) {
+	block, err := g.toBlock()
 	if err != nil {
-		return nil, fmt.Errorf("converting genesis to block: %w", err)
+		return nil, fmt.Errorf("converting to block: %w", err)
 	}
 
-	// Ensure the stored genesis matches the provided genesis block.
+	// We can't exit early here. Even if the genesis block is on disk, the
+	// genesis state might not be.
 	hash := block.Hash()
 	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
-		if err := writeGenesisBlock(db, block, genesis.Config); err != nil {
-			return nil, fmt.Errorf("writing genesis block: %w", err)
+		if err := writeGenesisBlock(db, block, g.Config); err != nil {
+			return nil, fmt.Errorf("writing block: %w", err)
 		}
 	} else if prev != hash {
 		return nil, &core.GenesisMismatchError{
@@ -194,9 +191,8 @@ func setupGenesis(
 		}
 	}
 
-	// Ensure the previous chain config and the new chain config defined the
-	// same rules for the head block. Otherwise the head block may have been
-	// executed incorrectly.
+	// If the rules change for the head block, it may have been executed
+	// incorrectly.
 	{
 		prev := rawdb.ReadChainConfig(db, hash)
 		if prev == nil {
@@ -204,33 +200,35 @@ func setupGenesis(
 		}
 		head := rawdb.ReadHeadHeader(db)
 		if head == nil {
-			return nil, errNoHeadBlock
+			return nil, errNoHeadHeader
 		}
 		height, timestamp := head.Number.Uint64(), head.Time
-		if err := prev.CheckCompatible(genesis.Config, height, timestamp); err != nil {
+		if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
 			return nil, fmt.Errorf("incompatible chain config: %w", err)
 		}
 	}
-	rawdb.WriteChainConfig(db, hash, genesis.Config)
+	rawdb.WriteChainConfig(db, hash, g.Config)
 
 	tdb := triedb.NewDatabase(db, trieConfig)
 	defer func() {
 		retErr = errors.Join(retErr, tdb.Close())
 	}()
 
+	// Because some trie implementations prune old state, we need to defer to
+	// the trie to determine if the genesis was previously initialized.
 	if tdb.Initialized(block.Root()) {
 		return block, nil
 	}
-	return writeGenesisState(db, tdb, genesis)
+	return g.writeState(db, tdb)
 }
 
-func genesisToBlock(genesis *core.Genesis) (_ *types.Block, retErr error) {
+func (g *genesis) toBlock() (_ *types.Block, retErr error) {
 	db := rawdb.NewMemoryDatabase()
 	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
 	defer func() {
 		retErr = errors.Join(retErr, tdb.Close())
 	}()
-	return writeGenesisState(db, tdb, genesis)
+	return g.writeState(db, tdb)
 }
 
 func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.ChainConfig) error {
@@ -255,13 +253,9 @@ const precompileNonce = 1
 
 var precompileCode = []byte{0x1}
 
-// writeGenesisState commits the genesis allocation to the state database and
-// returns the resulting genesis block.
-func writeGenesisState(
-	db ethdb.Database,
-	tdb *triedb.Database,
-	genesis *core.Genesis,
-) (*types.Block, error) {
+// writeState commits the genesis allocation to the state database and returns
+// the resulting genesis block.
+func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (*types.Block, error) {
 	statedb, err := state.New(
 		types.EmptyRootHash,
 		extstate.NewDatabaseWithNodeDB(db, tdb),
@@ -271,7 +265,7 @@ func writeGenesisState(
 		return nil, err
 	}
 
-	for addr, account := range genesis.Alloc {
+	for addr, account := range g.Alloc {
 		if account.Balance != nil {
 			statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
 		}
@@ -281,16 +275,18 @@ func writeGenesisState(
 			statedb.SetState(addr, key, value)
 		}
 	}
-	// If the Warp precompile is activated at genesis, mark it as a non-empty
-	// account.
-	if c := corethparams.GetExtra(genesis.Config); c.IsDurango(genesis.Timestamp) {
+	// Precompile upgrades happen at the activation of the network upgrade. If
+	// the genesis timestamp is already after the Warp activation, then the
+	// state needs to reflect that or the precompile would never be marked as
+	// active.
+	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
 		statedb.SetNonce(warp.ContractAddress, precompileNonce)
 		statedb.SetCode(warp.ContractAddress, precompileCode)
 	}
 
 	const deleteEmptyObjects = true
 	root := statedb.IntermediateRoot(deleteEmptyObjects)
-	block := newGenesisBlock(genesis, root)
+	block := newGenesisBlock(g, root)
 	triedbOpt := stateconf.WithTrieDBUpdatePayload(
 		common.Hash{},
 		block.Hash(),
@@ -308,23 +304,23 @@ func writeGenesisState(
 	return block, nil
 }
 
-func newGenesisBlock(genesis *core.Genesis, root common.Hash) *types.Block {
+func newGenesisBlock(g *genesis, root common.Hash) *types.Block {
 	h := &types.Header{
 		ParentHash: common.Hash{},
 		// UncleHash is set by [types.NewBlock].
-		Coinbase: genesis.Coinbase,
+		Coinbase: g.Coinbase,
 		Root:     root,
 		// TxHash is set by [types.NewBlock].
 		// ReceiptHash is set by [types.NewBlock].
 		Bloom:      types.Bloom{},
-		Difficulty: genesis.Difficulty,
+		Difficulty: g.Difficulty,
 		Number:     new(big.Int),
-		GasLimit:   genesis.GasLimit,
+		GasLimit:   g.GasLimit,
 		GasUsed:    0,
-		Time:       genesis.Timestamp,
-		Extra:      genesis.ExtraData,
-		MixDigest:  genesis.Mixhash,
-		Nonce:      types.EncodeNonce(genesis.Nonce),
+		Time:       g.Timestamp,
+		Extra:      g.ExtraData,
+		MixDigest:  g.Mixhash,
+		Nonce:      types.EncodeNonce(g.Nonce),
 		// BaseFee, BlobGasUsed, ExcessBlobGas, and ParentBeaconRoot were all
 		// added in network upgrades, so they are optionally configured below.
 		// WithdrawalsHash is not serialized by the libevm hooks, so it is
@@ -334,16 +330,16 @@ func newGenesisBlock(genesis *core.Genesis, root common.Hash) *types.Block {
 		h.GasLimit = ethparams.GenesisGasLimit
 	}
 
-	c := corethparams.GetExtra(genesis.Config)
-	if c.IsApricotPhase3(genesis.Timestamp) {
-		h.BaseFee = genesis.BaseFee
+	c := corethparams.GetExtra(g.Config)
+	if c.IsApricotPhase3(g.Timestamp) {
+		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
 			h.BaseFee = big.NewInt(ap3.InitialBaseFee)
 		}
 	}
 
 	headerExtra := customtypes.GetHeaderExtra(h)
-	if c.IsEtna(genesis.Timestamp) {
+	if c.IsEtna(g.Timestamp) {
 		h.BlobGasUsed = new(uint64)
 		h.ExcessBlobGas = new(uint64)
 		h.ParentBeaconRoot = new(common.Hash)
@@ -352,8 +348,8 @@ func newGenesisBlock(genesis *core.Genesis, root common.Hash) *types.Block {
 		headerExtra.BlockGasCost = new(big.Int)
 	}
 
-	if c.IsGranite(genesis.Timestamp) {
-		headerExtra.TimeMilliseconds = avalancheutils.PointerTo(genesis.Timestamp * 1000)
+	if c.IsGranite(g.Timestamp) {
+		headerExtra.TimeMilliseconds = avalancheutils.PointerTo(g.Timestamp * 1000)
 		headerExtra.MinDelayExcess = avalancheutils.PointerTo(acp226.InitialDelayExcess)
 	}
 

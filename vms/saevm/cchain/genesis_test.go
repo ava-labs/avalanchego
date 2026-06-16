@@ -21,7 +21,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
@@ -32,16 +31,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 
+	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	evmutils "github.com/ava-labs/avalanchego/graft/evm/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
+func errIsType[T error]() testerr.Want {
+	return testerr.As(func(T) string { return "" })
+}
+
 // TestParseGenesis locks in the C-Chain genesis of Mainnet, Fuji, and the Local
-// network.
+// network as well as exercising invalid cases.
 //
-// It is intentionally a change detector, as any changes to the genesis
-// block would break live networks. Only the scheduling of new upgrades should
-// require changes to this test.
+// It is intentionally a change detector for the deployed networks, as any
+// changes would break them. Only the scheduling of new upgrades should require
+// changes to this test.
 func TestParseGenesis(t *testing.T) {
 	const nativeAssetContract = "0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033"
 	var (
@@ -49,8 +54,8 @@ func TestParseGenesis(t *testing.T) {
 		fujiCtx    = &snow.Context{NetworkUpgrades: upgrade.Fuji}
 		localCtx   = &snow.Context{NetworkUpgrades: upgrade.Default}
 
-		initiallyActive = utils.PointerTo[uint64](uint64(upgrade.InitiallyActiveTime.Unix()))
-		unscheduled     = utils.PointerTo[uint64](uint64(upgrade.UnscheduledActivationTime.Unix()))
+		initiallyActive = evmutils.TimeToNewUint64(upgrade.InitiallyActiveTime)
+		unscheduled     = evmutils.TimeToNewUint64(upgrade.UnscheduledActivationTime)
 	)
 	tests := []struct {
 		name    string
@@ -62,7 +67,7 @@ func TestParseGenesis(t *testing.T) {
 		{
 			name:    "mainnet",
 			ctx:     mainnetCtx,
-			genesis: genesis.MainnetConfig.CChainGenesis,
+			genesis: avalanchegenesis.MainnetConfig.CChainGenesis,
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
@@ -129,7 +134,7 @@ func TestParseGenesis(t *testing.T) {
 		{
 			name:    "fuji",
 			ctx:     fujiCtx,
-			genesis: genesis.FujiConfig.CChainGenesis,
+			genesis: avalanchegenesis.FujiConfig.CChainGenesis,
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
@@ -196,7 +201,7 @@ func TestParseGenesis(t *testing.T) {
 		{
 			name:    "local",
 			ctx:     localCtx,
-			genesis: genesis.LocalConfig.CChainGenesis,
+			genesis: avalanchegenesis.LocalConfig.CChainGenesis,
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
@@ -351,7 +356,7 @@ func TestParseGenesis(t *testing.T) {
 					return reflect.DeepEqual(a, b)
 				}),
 			}
-			if diff := cmp.Diff(test.want, g, opts); diff != "" {
+			if diff := cmp.Diff(test.want, (*core.Genesis)(g), opts); diff != "" {
 				t.Errorf("parseGenesis(%s) (-want +got)\n%s", test.genesis, diff)
 			}
 		})
@@ -359,7 +364,7 @@ func TestParseGenesis(t *testing.T) {
 }
 
 // This test is intentionally a change detector: the genesis hash is part of
-// consensus, so any change would break live networks.
+// consensus, so any change would break deployed networks.
 //
 // Only the local network genesis may change.
 func TestGenesisHash(t *testing.T) {
@@ -389,12 +394,12 @@ func TestGenesisHash(t *testing.T) {
 			ctx := &snow.Context{
 				NetworkUpgrades: upgrade.GetConfig(test.networkID),
 			}
-			genesis := genesis.GetConfig(test.networkID).CChainGenesis
+			genesis := avalanchegenesis.GetConfig(test.networkID).CChainGenesis
 
 			g, err := parseGenesis(ctx, []byte(genesis))
 			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
-			block, err := genesisToBlock(g)
+			block, err := g.toBlock()
 			require.NoErrorf(t, err, "genesisToBlock(%s)", genesis)
 			require.Equalf(t, common.HexToHash(test.want), block.Hash(), "genesisToBlock(%s).Hash()", genesis)
 		})
@@ -410,8 +415,8 @@ func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
 func TestSetupGenesis(t *testing.T) {
 	var (
 		latest       = upgradetest.GetConfig(upgradetest.Latest)
-		localGenesis = genesis.LocalConfig.CChainGenesis
-		fujiGenesis  = genesis.FujiConfig.CChainGenesis
+		localGenesis = avalanchegenesis.LocalConfig.CChainGenesis
+		fujiGenesis  = avalanchegenesis.FujiConfig.CChainGenesis
 	)
 	tests := []struct {
 		name            string
@@ -435,9 +440,9 @@ func TestSetupGenesis(t *testing.T) {
 		},
 		{
 			name:            "schedule_future_upgrade",
-			initialUpgrades: upgradetest.GetConfig(upgradetest.Cortina),
+			initialUpgrades: upgradetest.GetConfig(upgradetest.Latest - 1),
 			restartUpgrades: upgradeAt(
-				upgradetest.Durango,
+				upgradetest.Latest,
 				upgrade.InitiallyActiveTime.Add(time.Second),
 			),
 			restartGenesis: localGenesis,
@@ -445,11 +450,11 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "delay_future_upgrade",
 			initialUpgrades: upgradeAt(
-				upgradetest.Durango,
+				upgradetest.Latest,
 				upgrade.InitiallyActiveTime.Add(time.Second),
 			),
 			restartUpgrades: upgradeAt(
-				upgradetest.Durango,
+				upgradetest.Latest,
 				upgrade.InitiallyActiveTime.Add(2*time.Second),
 			),
 			restartGenesis: localGenesis,
@@ -457,12 +462,12 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "advance_future_upgrade",
 			initialUpgrades: upgradeAt(
-				upgradetest.Durango,
-				upgrade.InitiallyActiveTime.Add(time.Second),
+				upgradetest.Latest,
+				upgrade.InitiallyActiveTime.Add(2*time.Second),
 			),
 			restartUpgrades: upgradeAt(
-				upgradetest.Durango,
-				upgrade.InitiallyActiveTime.Add(2*time.Second),
+				upgradetest.Latest,
+				upgrade.InitiallyActiveTime.Add(time.Second),
 			),
 			restartGenesis: localGenesis,
 		},
@@ -472,6 +477,15 @@ func TestSetupGenesis(t *testing.T) {
 			restartUpgrades: upgradetest.GetConfig(upgradetest.Granite),
 			restartGenesis:  localGenesis,
 			wantErr:         errIsType[*ethparams.ConfigCompatError](),
+		},
+		{
+			name:            "schedule_precompiles",
+			initialUpgrades: upgradetest.GetConfig(upgradetest.Cortina),
+			restartUpgrades: upgradeAt(
+				upgradetest.Durango,
+				upgrade.InitiallyActiveTime.Add(time.Second),
+			),
+			restartGenesis: localGenesis,
 		},
 	}
 	for _, test := range tests {
@@ -502,7 +516,7 @@ func TestSetupGenesis(t *testing.T) {
 					)
 					require.NoError(t, err, "parseGenesis(initial)")
 
-					block, err := setupGenesis(db, trieConfig, g)
+					block, err := g.setup(db, trieConfig)
 					require.NoError(t, err, "writeGenesis(initial)")
 
 					genesisHash := block.Hash()
@@ -524,15 +538,15 @@ func TestSetupGenesis(t *testing.T) {
 						t.Errorf("initial stored network upgrades (-want +got)\n%s", diff)
 					}
 
-					// The restart runs on the initialized database. It must agree on
-					// the canonical block and store its own chain config.
+					// The restart runs on the initialized database. It must
+					// agree on the block hash and store its own chain config.
 					g, err = parseGenesis(
 						&snow.Context{NetworkUpgrades: test.restartUpgrades},
 						[]byte(test.restartGenesis),
 					)
 					require.NoError(t, err, "parseGenesis(restart)")
 
-					block, err = setupGenesis(db, trieConfig, g)
+					block, err = g.setup(db, trieConfig)
 					if diff := testerr.Diff(err, test.wantErr); diff != "" {
 						t.Fatalf("writeGenesis(restart) error (-want +got)\n%s", diff)
 					}
