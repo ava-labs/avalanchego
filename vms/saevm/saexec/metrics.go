@@ -37,9 +37,9 @@ type metrics struct {
 	executedGasCharged prometheus.Counter
 	executedGasLimit   prometheus.Counter
 
-	// acceptedWorstCaseGas is the gas limit (worst-case gas) of blocks entering
+	// acceptedGasLimit is the gas limit (worst-case gas) of blocks entering
 	// the execution queue, the acceptance-side counterpart of executedGasLimit.
-	acceptedWorstCaseGas prometheus.Counter
+	acceptedGasLimit prometheus.Counter
 }
 
 func newMetrics(reg prometheus.Registerer, lastExecutedHeight uint64) (*metrics, error) {
@@ -74,8 +74,8 @@ func newMetrics(reg prometheus.Registerer, lastExecutedHeight uint64) (*metrics,
 			Name: "executed_gas_limit_total",
 			Help: "Cumulative gas limit (worst-case gas) of executed blocks.",
 		}),
-		acceptedWorstCaseGas: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "accepted_worst_case_gas_total",
+		acceptedGasLimit: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "accepted_gas_limit_total",
 			Help: "Cumulative gas limit (worst-case gas) of blocks accepted into the execution queue.",
 		}),
 	}
@@ -88,7 +88,7 @@ func newMetrics(reg prometheus.Registerer, lastExecutedHeight uint64) (*metrics,
 		reg.Register(m.executionQueueGasLimit),
 		reg.Register(m.executedGasCharged),
 		reg.Register(m.executedGasLimit),
-		reg.Register(m.acceptedWorstCaseGas),
+		reg.Register(m.acceptedGasLimit),
 	)
 }
 
@@ -105,7 +105,7 @@ func (m *metrics) observeExecuteDuration(d time.Duration) {
 func (m *metrics) markEnqueued(gasLimit uint64) {
 	m.executionQueueBlocks.Inc()
 	m.executionQueueGasLimit.Add(float64(gasLimit))
-	m.acceptedWorstCaseGas.Add(float64(gasLimit))
+	m.acceptedGasLimit.Add(float64(gasLimit))
 }
 
 // markExecuted records that the block at the given height, with the given gas
