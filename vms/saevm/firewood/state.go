@@ -50,7 +50,7 @@ func (*stateAccessor) OpenStorageTrie(stateRoot common.Hash, addr common.Address
 	if !ok {
 		return nil, fmt.Errorf("invalid account trie type: %T", self)
 	}
-	return newStorageTrie(accountTrie.baseTrie), nil
+	return newStorageTrie(accountTrie.baseTrie, addr, accountRoot), nil
 }
 
 // CopyTrie returns a deep copy of the given trie.

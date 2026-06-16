@@ -47,6 +47,16 @@ Reads never reflect pending writes (see [Why reads aren't safe](#why-reads-arent
 - After a `SELFDESTRUCT`, storage reads return nothing correctly, because the prefix-deleted state is reflected in the proposal produced by the next `Hash()`.
 - If storage for a self-destructed account is read *before* the next `Hash()`, the old reader would still show the account's storage — but `state.StateDB` never reads storage for a self-destructed account before committing, so this edge case does not arise.
 
+### Same-block resurrection
+
+If an account is self-destructed and recreated within the same block, `state.StateDB` never calls `DeleteAccount` — the account is alive at commit time, so only `UpdateAccount` runs. Under `rawdb.HashScheme`, go-ethereum orphans the old storage through storage-root indirection; Firewood's flat keyspace has none, so the prior incarnation's slots would silently leak into the new state root.
+
+This stems from pre-Cancun `SELFDESTRUCT` semantics, under which any account could be fully deleted — storage included — and a new contract redeployed to the same address within the same block. EIP-6780 (active on the C-Chain) restricts full deletion to a contract created and self-destructed in the same transaction, so post-Cancun the only resurrection path is a single transaction that creates, self-destructs, and recreates the account. The detection below is hardfork-agnostic and covers both.
+
+The tries detect this from the account root: a value of exactly `types.EmptyRootHash` means `state.StateDB` believes the account has no storage. If storage for it still exists — in the backing reader, or already pending in the trie's update operations — it belongs to a destructed prior incarnation, and a `PrefixDelete` is emitted before the new incarnation writes any account or storage data. `OpenStorageTrie` only records the account root; the clear fires in `UpdateAccount` for recreations with no new storage, or before the storage trie's first mutation otherwise.
+
+Reverts and reads need no special handling. Because the tries observe state only at `Hash()`/`Commit()` boundaries — after the `state.StateDB` journal has settled — a reverted self-destruct or recreation never produces trie operations, and `state.StateDB` short-circuits storage reads of a destructed account before they reach the trie. At block scope, the `PrefixDelete` is an ordinary batch operation inside a proposal, so dropping the proposal discards it.
+
 ## Design Decisions
 
 ### Why `Commit` commits multiple proposals at once
