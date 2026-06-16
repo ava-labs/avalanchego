@@ -1,0 +1,41 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+go_library(
+    name = "external",
+    srcs = [
+        "codec.go",
+        "message.go",
+        "sidecar.go",
+        "verifier.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/warp/external",
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//ids",
+        "//network/p2p/acp118",
+        "//snow/engine/common",
+        "//utils/hashing",
+        "//utils/units",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+    ],
+)
+
+graft_go_test(
+    name = "external_test",
+    srcs = ["verifier_test.go"],
+    deps = [
+        ":external",
+        "//ids",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_stretchr_testify//require",
+    ],
+)

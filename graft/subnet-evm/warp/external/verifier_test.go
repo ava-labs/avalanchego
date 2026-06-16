@@ -12,8 +12,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/external"
 	"github.com/ava-labs/avalanchego/ids"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // mockSidecarClient is a hand-rolled SidecarClient for testing.
@@ -44,18 +45,17 @@ func buildExternalWarpMessage(t *testing.T, msg *external.ExternalMessage) *aval
 	return warpMsg
 }
 
-func buildValidMessage(t *testing.T) (*external.ExternalMessage, *avalancheWarp.UnsignedMessage) {
+func buildValidMessage(t *testing.T) *avalancheWarp.UnsignedMessage {
 	t.Helper()
 	msg, err := external.NewExternalMessage(
 		testChainType,
 		testAddress,
-		[]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
-			0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14},
+		make([]byte, 20),
 		42_000,
 		[]byte("hello from solana"),
 	)
 	require.NoError(t, err)
-	return msg, buildExternalWarpMessage(t, msg)
+	return buildExternalWarpMessage(t, msg)
 }
 
 // ExternalChainVerifier tests
@@ -68,7 +68,7 @@ func TestVerifier_InvalidOuterPayload(t *testing.T) {
 	warpMsg, err := avalancheWarp.NewUnsignedMessage(testNetworkID, testChainID, []byte("not a valid payload"))
 	require.NoError(t, err)
 
-	appErr := v.Verify(context.Background(), warpMsg, nil)
+	appErr := v.Verify(t.Context(), warpMsg, nil)
 	require.NotNil(t, appErr)
 	require.Equal(t, external.ParseErrCode, appErr.Code)
 }
@@ -83,7 +83,7 @@ func TestVerifier_NonAddressedCallPayload(t *testing.T) {
 	warpMsg, err := avalancheWarp.NewUnsignedMessage(testNetworkID, testChainID, hashPayload.Bytes())
 	require.NoError(t, err)
 
-	appErr := v.Verify(context.Background(), warpMsg, nil)
+	appErr := v.Verify(t.Context(), warpMsg, nil)
 	require.NotNil(t, appErr)
 	require.Equal(t, external.ParseErrCode, appErr.Code)
 }
@@ -98,7 +98,7 @@ func TestVerifier_NonExternalMessagePayload(t *testing.T) {
 	warpMsg, err := avalancheWarp.NewUnsignedMessage(testNetworkID, testChainID, ac.Bytes())
 	require.NoError(t, err)
 
-	appErr := v.Verify(context.Background(), warpMsg, nil)
+	appErr := v.Verify(t.Context(), warpMsg, nil)
 	require.NotNil(t, appErr)
 	require.Equal(t, external.ParseErrCode, appErr.Code)
 }
@@ -107,9 +107,9 @@ func TestVerifier_ChainTypeNotAllowed(t *testing.T) {
 	v := external.NewExternalChainVerifier(&mockSidecarClient{}, external.AllowedSources{
 		// "solana" is not registered.
 	})
-	_, warpMsg := buildValidMessage(t)
+	warpMsg := buildValidMessage(t)
 
-	appErr := v.Verify(context.Background(), warpMsg, nil)
+	appErr := v.Verify(t.Context(), warpMsg, nil)
 	require.NotNil(t, appErr)
 	require.Equal(t, external.VerifyErrCode, appErr.Code)
 }
@@ -120,9 +120,9 @@ func TestVerifier_SourceAddressNotAllowed(t *testing.T) {
 			"OtherProgram": {},
 		},
 	})
-	_, warpMsg := buildValidMessage(t)
+	warpMsg := buildValidMessage(t)
 
-	appErr := v.Verify(context.Background(), warpMsg, nil)
+	appErr := v.Verify(t.Context(), warpMsg, nil)
 	require.NotNil(t, appErr)
 	require.Equal(t, external.VerifyErrCode, appErr.Code)
 }
@@ -133,9 +133,9 @@ func TestVerifier_AllSourceAddressesAllowed(t *testing.T) {
 	v := external.NewExternalChainVerifier(sidecar, external.AllowedSources{
 		testChainType: {},
 	})
-	_, warpMsg := buildValidMessage(t)
+	warpMsg := buildValidMessage(t)
 
-	appErr := v.Verify(context.Background(), warpMsg, nil)
+	appErr := v.Verify(t.Context(), warpMsg, nil)
 	require.Nil(t, appErr)
 }
 
@@ -144,9 +144,9 @@ func TestVerifier_SidecarFails(t *testing.T) {
 	v := external.NewExternalChainVerifier(sidecar, external.AllowedSources{
 		testChainType: {testAddress: {}},
 	})
-	_, warpMsg := buildValidMessage(t)
+	warpMsg := buildValidMessage(t)
 
-	appErr := v.Verify(context.Background(), warpMsg, nil)
+	appErr := v.Verify(t.Context(), warpMsg, nil)
 	require.NotNil(t, appErr)
 	require.Equal(t, external.VerifyErrCode, appErr.Code)
 }
@@ -156,9 +156,9 @@ func TestVerifier_SidecarPasses(t *testing.T) {
 	v := external.NewExternalChainVerifier(sidecar, external.AllowedSources{
 		testChainType: {testAddress: {}},
 	})
-	_, warpMsg := buildValidMessage(t)
+	warpMsg := buildValidMessage(t)
 
-	appErr := v.Verify(context.Background(), warpMsg, nil)
+	appErr := v.Verify(t.Context(), warpMsg, nil)
 	require.Nil(t, appErr)
 }
 
@@ -168,10 +168,10 @@ func TestVerifier_JustificationPassedToSidecar(t *testing.T) {
 	v := external.NewExternalChainVerifier(sidecar, external.AllowedSources{
 		testChainType: {testAddress: {}},
 	})
-	_, warpMsg := buildValidMessage(t)
+	warpMsg := buildValidMessage(t)
 	justification := []byte("solana-tx-sig-abc123")
 
-	appErr := v.Verify(context.Background(), warpMsg, justification)
+	appErr := v.Verify(t.Context(), warpMsg, justification)
 	require.Nil(t, appErr)
 	require.NotNil(t, capturedEvent)
 	require.Equal(t, justification, capturedEvent.Justification)
