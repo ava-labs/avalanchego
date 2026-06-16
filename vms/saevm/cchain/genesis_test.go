@@ -392,12 +392,11 @@ func TestGenesisHash(t *testing.T) {
 			genesis := genesis.GetConfig(test.networkID).CChainGenesis
 
 			g, err := parseGenesis(ctx, []byte(genesis))
-			require.NoError(t, err, "parseGenesis")
+			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
 			block, err := genesisToBlock(g)
-			require.NoError(t, err, "genesisToBlock")
-
-			require.Equal(t, common.HexToHash(test.want), block.Hash())
+			require.NoErrorf(t, err, "genesisToBlock(%s)", genesis)
+			require.Equalf(t, common.HexToHash(test.want), block.Hash(), "genesisToBlock(%s).Hash()", genesis)
 		})
 	}
 }
@@ -422,24 +421,20 @@ func TestSetupGenesis(t *testing.T) {
 		wantErr         testerr.Want
 	}{
 		{
-			// The first write commits a fresh database; re-running against the
-			// already-initialized database, as on a restart, is idempotent.
-			name:            "restart",
+			name:            "same_genesis",
 			initialUpgrades: latest,
 			restartUpgrades: latest,
 			restartGenesis:  localGenesis,
 		},
 		{
-			// A different network's genesis has a different state root, and
-			// therefore a different hash, than the one already stored.
-			name:            "mismatch",
+			name:            "genesis_hash_mismatch",
 			initialUpgrades: latest,
 			restartUpgrades: latest,
 			restartGenesis:  fujiGenesis,
 			wantErr:         errIsType[*core.GenesisMismatchError](),
 		},
 		{
-			name:            "schedule_upgrade",
+			name:            "schedule_future_upgrade",
 			initialUpgrades: upgradetest.GetConfig(upgradetest.Cortina),
 			restartUpgrades: upgradeAt(
 				upgradetest.Durango,
@@ -472,11 +467,6 @@ func TestSetupGenesis(t *testing.T) {
 			restartGenesis: localGenesis,
 		},
 		{
-			// Rescheduling an upgrade that the head block has already activated
-			// is rejected, as it could change the execution of accepted blocks.
-			// Unscheduling Helicon leaves the genesis block unchanged (it is not
-			// active at genesis) so the conflict surfaces as a compatibility
-			// error rather than a genesis hash mismatch.
 			name:            "incompatible_upgrade",
 			initialUpgrades: latest,
 			restartUpgrades: upgradetest.GetConfig(upgradetest.Granite),
