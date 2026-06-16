@@ -266,9 +266,7 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (*types.Bl
 	}
 
 	for addr, account := range g.Alloc {
-		if account.Balance != nil {
-			statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
-		}
+		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
 		statedb.SetCode(addr, account.Code)
 		statedb.SetNonce(addr, account.Nonce)
 		for key, value := range account.Storage {
