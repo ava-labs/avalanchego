@@ -175,7 +175,7 @@ func setupGenesis(
 	db ethdb.Database,
 	trieConfig *triedb.Config,
 	genesis *core.Genesis,
-) (*types.Block, error) {
+) (_ *types.Block, retErr error) {
 	block, err := genesisToBlock(genesis)
 	if err != nil {
 		return nil, fmt.Errorf("converting genesis to block: %w", err)
@@ -213,22 +213,24 @@ func setupGenesis(
 	}
 	rawdb.WriteChainConfig(db, hash, genesis.Config)
 
-	shouldWrite, err := shouldWriteGenesisState(db, trieConfig, block.Root())
-	if err != nil {
-		return nil, fmt.Errorf("checking for genesis state: %w", err)
-	}
-	if !shouldWrite {
+	tdb := triedb.NewDatabase(db, trieConfig)
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+
+	if tdb.Initialized(block.Root()) {
 		return block, nil
 	}
-	return writeGenesisState(db, trieConfig, genesis)
+	return writeGenesisState(db, tdb, genesis)
 }
 
-func genesisToBlock(genesis *core.Genesis) (*types.Block, error) {
-	return writeGenesisState(
-		rawdb.NewMemoryDatabase(),
-		triedb.HashDefaults,
-		genesis,
-	)
+func genesisToBlock(genesis *core.Genesis) (_ *types.Block, retErr error) {
+	db := rawdb.NewMemoryDatabase()
+	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+	return writeGenesisState(db, tdb, genesis)
 }
 
 func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.ChainConfig) error {
@@ -245,16 +247,6 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 	return b.Write()
 }
 
-func shouldWriteGenesisState(
-	db ethdb.Database,
-	trieConfig *triedb.Config,
-	root common.Hash,
-) (bool, error) {
-	tdb := triedb.NewDatabase(db, trieConfig)
-	initialized := tdb.Initialized(root)
-	return !initialized, tdb.Close()
-}
-
 // When a precompile is activated, its account is marked as non-empty by setting
 // a nonce and code. This prevents the account from being cleaned up when the
 // statedb is finalized and allows it to be called from Solidity contracts.
@@ -262,18 +254,13 @@ const precompileNonce = 1
 
 var precompileCode = []byte{0x1}
 
+// writeGenesisState returns the genesis block because the genesis hash is
+// needed to write the state, and the block contains the genesis state root.
 func writeGenesisState(
 	db ethdb.Database,
-	trieConfig *triedb.Config,
+	tdb *triedb.Database,
 	genesis *core.Genesis,
-) (_ *types.Block, retErr error) {
-	// This function closes the trie database to ensure that resources are
-	// released and, more importantly, that all writes have been flushed.
-	tdb := triedb.NewDatabase(db, trieConfig)
-	defer func() {
-		retErr = errors.Join(retErr, tdb.Close())
-	}()
-
+) (*types.Block, error) {
 	statedb, err := state.New(
 		types.EmptyRootHash,
 		extstate.NewDatabaseWithNodeDB(db, tdb),
