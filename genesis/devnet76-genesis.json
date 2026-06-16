@@ -1,0 +1,87 @@
+{
+    "networkID": 76,
+    "allocations": [
+        {
+            "ethAddr": "0xC71A61a815e49d16C425482A342a367CD42E38a6",
+            "avaxAddr": "X-custom1v6vuwxjgr043sg0nuuhq70k6vgnule692fvnr9",
+            "initialAmount": 500000000000000000,
+            "unlockSchedule": [
+                {
+                    "amount": 100000000000000000,
+                    "locktime": 1633824000
+                },
+                {
+                    "amount": 100000000000000000,
+                    "locktime": 1633825000
+                },
+                {
+                    "amount": 100000000000000000,
+                    "locktime": 1633826000
+                },
+                {
+                    "amount": 100000000000000000,
+                    "locktime": 1633827000
+                },
+                {
+                    "amount": 100000000000000000,
+                    "locktime": 1633828000
+                }
+            ]
+        }
+    ],
+    "startTime": 1780000000,
+    "initialStakeDuration": 31530000,
+    "initialStakeDurationOffset": 5400,
+    "initialStakedFunds": [
+        "X-custom1v6vuwxjgr043sg0nuuhq70k6vgnule692fvnr9"
+    ],
+    "initialStakers": [
+        {
+            "nodeID": "NodeID-33vPoUZpwGbreWV34PQWonky8mtRxr8jb",
+            "rewardAddress": "X-custom1v6vuwxjgr043sg0nuuhq70k6vgnule692fvnr9",
+            "delegationFee": 62500,
+            "signer": {
+                "publicKey": "0x87e5b1f5390209f60472cbfe67ceb262206fd52f50adfdd09a53b487652d1fa6710468ec235b346016ac530ddefaeb1d",
+                "proofOfPossession": "0xaecdf7cea79ba92f9234470f5c6f985de57976d176824e7570417179d137ae6b064cdb0cc698aa7edfe253ff1aec476e0022f4050681892099322c7d0104d2dcaf01bccd3f9b9e349676110ae944ab269529bf9898e0c08c2c849d49b3dc3cd9"
+            }
+        },
+        {
+            "nodeID": "NodeID-CZhV9DwqSipAV57jbSZobXBrdgwGfdvGW",
+            "rewardAddress": "X-custom1v6vuwxjgr043sg0nuuhq70k6vgnule692fvnr9",
+            "delegationFee": 62500,
+            "signer": {
+                "publicKey": "0x94e78a206fd134cc78a665ba6f297cceb065e68a3b3d834a558d6d2670aa8fbfb5ac614a346a2013effd2ab1a560414e",
+                "proofOfPossession": "0x8a3f7c46ad94b23ca3462e0a3d7d025d14c49e6f7378356ec37772cc94d87665a9d049246c9ec43f9a7794f3a81f85b70ca7ceac7e83ff09716a2520426df3b090113b327bbd281e7fcdb3696d4ad87158017b36f0f30276693afa7e50696874"
+            }
+        },
+        {
+            "nodeID": "NodeID-Q7c4WdvecRnqDUNp4sFsMSWLtMpAHXDyK",
+            "rewardAddress": "X-custom1v6vuwxjgr043sg0nuuhq70k6vgnule692fvnr9",
+            "delegationFee": 62500,
+            "signer": {
+                "publicKey": "0xb4a968ef411fc680684837de1fa34a13b302059d935485e28667454c86b554f53a8d80f9ff7c9793d00338a302bc971c",
+                "proofOfPossession": "0x8f93af3c924a586744da65fa36ccbf8d488750d93975b5362bdec0929af4937c53e38e93967a0e060e817da2aa4e028016b3b3c1aed4aa5a106ebec8117945c0c457bc146e001e5468d553065ad37e55daf5d116de58882b44c53ec9be5b3cf1"
+            }
+        },
+        {
+            "nodeID": "NodeID-9J4syaEVq6oQPC8GbuHGQahRxnhemh8n",
+            "rewardAddress": "X-custom1v6vuwxjgr043sg0nuuhq70k6vgnule692fvnr9",
+            "delegationFee": 62500,
+            "signer": {
+                "publicKey": "0xb9a3c8aec0d587f92d6839f106d71db1b3481456632f0081ee7e8be38e2968cdd422bb19df75e32bc706b206a6f9e483",
+                "proofOfPossession": "0x80b27d2c49fc2883c06ca71790a4223b2661fe93f67587dd22a2a11d9f926f1a40982bad000479dde64fb38d6dc812450939d3eafab7f66d40184b811cb47717aeb99dff6d665c0a07e04a8dda4349bd9b8b33c817bb948b1412c1fb8b7b1faf"
+            }
+        },
+        {
+            "nodeID": "NodeID-P3H4yBTX7tpfGYawFDtsS4xxDpH9DeeUN",
+            "rewardAddress": "X-custom1v6vuwxjgr043sg0nuuhq70k6vgnule692fvnr9",
+            "delegationFee": 62500,
+            "signer": {
+                "publicKey": "0xabedd8a82a0149f575c0d3f12ad9496f84909e25d01eabb95a7bfb4eb823bc903ded7c023e8293fc7550b86c9c65a042",
+                "proofOfPossession": "0x94a4055c2e197a99c0a81807fa70e44653f915d29ae96d043dae28be6f816d86685b704559ad884407b9ee59804f03df142628c5d89f27f8c81b3353f42dcd8e545bf69ef94be53b423e5439665fc8ea44701357fccbe47d815a3b410fc3b795"
+            }
+        }
+    ],
+    "cChainGenesis": "{\"config\":{\"chainId\":43117,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"},\"2a17831425bc6d20084d1526b1001c451ed4c4a7\":{\"balance\":\"0x1431e0fae6d7217caa0000000\"},\"643f2454430e218750b5e6533d9c0e0dd50b8d68\":{\"balance\":\"0x1431e0fae6d7217caa0000000\"},\"7c5a8639f1e86f134f1e4239429f756a1441e322\":{\"balance\":\"0x1431e0fae6d7217caa0000000\"},\"b4ca6c121d6287af7ac7cb62ae33d2b054b9fc44\":{\"balance\":\"0x1431e0fae6d7217caa0000000\"},\"c71a61a815e49d16c425482a342a367cd42e38a6\":{\"balance\":\"0x1431e0fae6d7217caa0000000\"},\"d39f7fcec695349669cbd922eaf238a4f1ce03e5\":{\"balance\":\"0x1431e0fae6d7217caa0000000\"},\"d9d4f16a71e23edf8e2f2a1ebecd46b03177a22c\":{\"balance\":\"0x1431e0fae6d7217caa0000000\"},\"f9bfa4c45a8d830a591b3374320fd8ccf3fd75d4\":{\"balance\":\"0x1431e0fae6d7217caa0000000\"},\"fddef5cb0d09e483dbab587ba958657b79a42e58\":{\"balance\":\"0x1431e0fae6d7217caa0000000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"baseFeePerGas\":null,\"excessBlobGas\":null,\"blobGasUsed\":null}",
+    "message": "Here's to Helicon"
+}
