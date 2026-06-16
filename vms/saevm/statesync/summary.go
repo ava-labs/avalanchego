@@ -12,17 +12,14 @@ var _ adaptor.SummaryProperties = (*Summary)(nil)
 
 type Summary struct{}
 
-// Height implements [adaptor.SummaryProperties].
 func (*Summary) Height() uint64 {
 	panic("unimplemented")
 }
 
-// ID implements [adaptor.SummaryProperties].
 func (*Summary) ID() ids.ID {
 	panic("unimplemented")
 }
 
-// Bytes implements [adaptor.SummaryProperties].
 func (*Summary) Bytes() []byte {
 	panic("unimplemented")
 }
