@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -33,15 +32,17 @@ const (
 var (
 	_ txs.Visitor = (*proposalTxExecutor)(nil)
 
-	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
-	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
-	ErrInvalidState                  = errors.New("generated output isn't valid state")
-	ErrShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
-	ErrWrongTxType                   = errors.New("wrong transaction type")
-	ErrInvalidID                     = errors.New("invalid ID")
-	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
-	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
-	ErrUnimplemented                 = errors.New("unimplemented")
+	ErrRemoveStakerTooEarly                = errors.New("attempting to remove staker before their end time")
+	ErrRemoveWrongStaker                   = errors.New("attempting to remove wrong staker")
+	ErrInvalidState                        = errors.New("generated output isn't valid state")
+	ErrShouldBePermissionlessStaker        = errors.New("expected permissionless staker")
+	ErrWrongTxType                         = errors.New("wrong transaction type")
+	ErrInvalidID                           = errors.New("invalid ID")
+	ErrProposedAddStakerTxAfterBanff       = errors.New("staker transaction proposed after Banff")
+	ErrAdvanceTimeTxIssuedAfterBanff       = errors.New("AdvanceTimeTx issued after Banff")
+	errShouldBeAutoRenewedStaker           = errors.New("expected auto renewed staker")
+	errShouldUseRewardAutoRenewedValidator = errors.New("auto-renewed validators must be rewarded with RewardAutoRenewedValidatorTx")
+	errInvalidTimestamp                    = errors.New("invalid timestamp")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -344,8 +345,6 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return txs.ErrNilTx
 	case tx.TxID == ids.Empty:
 		return ErrInvalidID
-	case len(e.tx.Creds) != 0:
-		return errWrongNumberOfCredentials
 	}
 
 	stakerTx, stakerToReward, err := verifyRewardTxAndGetStaker(e.onCommitState, e.tx, tx)
@@ -357,6 +356,10 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	//            [txs.ValidatorTx] interface.
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
+		if _, ok := uStakerTx.(*txs.AddAutoRenewedValidatorTx); ok {
+			return errShouldUseRewardAutoRenewedValidator
+		}
+
 		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
