@@ -69,6 +69,7 @@ go_library(
         "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/registry",
         "//graft/subnet-evm/warp",
+        "//graft/subnet-evm/warp/external",
         "//ids",
         "//network/p2p",
         "//network/p2p/acp118",

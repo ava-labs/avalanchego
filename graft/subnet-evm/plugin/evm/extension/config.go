@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -148,6 +149,12 @@ type Config struct {
 	// Clock is the clock to use for time related operations.
 	// It's optional and can be nil
 	Clock *mockable.Clock
+	// ExternalChainVerifier, if non-nil, is composed with the existing warp
+	// backend to handle ACP-118 signature requests for events on external
+	// chains. It is routed messages whose payloads parse as ExternalMessage;
+	// all other messages continue to the existing warp backend unchanged.
+	// It's optional and can be nil.
+	ExternalChainVerifier acp118.Verifier
 }
 
 func (c *Config) Validate() error {

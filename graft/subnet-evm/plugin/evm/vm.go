@@ -66,6 +66,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/external"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -491,10 +492,21 @@ func (vm *VM) Initialize(
 
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
-	// Add p2p warp message warpHandler
+	// Native warp signature requests (ACP-118, handler ID 2).
 	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
 	if err = vm.P2PNetwork().AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
 		return err
+	}
+
+	// External chain attestation signature requests (handler ID 4). Only
+	// registered when an ExternalChainVerifier is configured. Uses a separate
+	// handler ID so routing is structural rather than content-based, keeping
+	// the two protocols independent and each independently testable.
+	if vm.extensionConfig.ExternalChainVerifier != nil {
+		externalHandler := acp118.NewCachedHandler(meteredCache, vm.extensionConfig.ExternalChainVerifier, vm.ctx.WarpSigner)
+		if err = vm.P2PNetwork().AddHandler(external.SignatureRequestHandlerID, externalHandler); err != nil {
+			return err
+		}
 	}
 
 	vm.stateSyncDone = make(chan struct{})
