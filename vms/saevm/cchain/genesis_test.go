@@ -21,7 +21,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
@@ -32,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 
+	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -66,7 +66,7 @@ func TestParseGenesis(t *testing.T) {
 		{
 			name:    "mainnet",
 			ctx:     mainnetCtx,
-			genesis: genesis.MainnetConfig.CChainGenesis,
+			genesis: avalanchegenesis.MainnetConfig.CChainGenesis,
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
@@ -133,7 +133,7 @@ func TestParseGenesis(t *testing.T) {
 		{
 			name:    "fuji",
 			ctx:     fujiCtx,
-			genesis: genesis.FujiConfig.CChainGenesis,
+			genesis: avalanchegenesis.FujiConfig.CChainGenesis,
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
@@ -200,7 +200,7 @@ func TestParseGenesis(t *testing.T) {
 		{
 			name:    "local",
 			ctx:     localCtx,
-			genesis: genesis.LocalConfig.CChainGenesis,
+			genesis: avalanchegenesis.LocalConfig.CChainGenesis,
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
@@ -393,12 +393,12 @@ func TestGenesisHash(t *testing.T) {
 			ctx := &snow.Context{
 				NetworkUpgrades: upgrade.GetConfig(test.networkID),
 			}
-			genesis := genesis.GetConfig(test.networkID).CChainGenesis
+			genesis := avalanchegenesis.GetConfig(test.networkID).CChainGenesis
 
 			g, err := parseGenesis(ctx, []byte(genesis))
 			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
-			block, err := genesisToBlock(g)
+			block, err := g.toBlock()
 			require.NoErrorf(t, err, "genesisToBlock(%s)", genesis)
 			require.Equalf(t, common.HexToHash(test.want), block.Hash(), "genesisToBlock(%s).Hash()", genesis)
 		})
@@ -414,8 +414,8 @@ func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
 func TestSetupGenesis(t *testing.T) {
 	var (
 		latest       = upgradetest.GetConfig(upgradetest.Latest)
-		localGenesis = genesis.LocalConfig.CChainGenesis
-		fujiGenesis  = genesis.FujiConfig.CChainGenesis
+		localGenesis = avalanchegenesis.LocalConfig.CChainGenesis
+		fujiGenesis  = avalanchegenesis.FujiConfig.CChainGenesis
 	)
 	tests := []struct {
 		name            string
@@ -439,9 +439,9 @@ func TestSetupGenesis(t *testing.T) {
 		},
 		{
 			name:            "schedule_future_upgrade",
-			initialUpgrades: upgradetest.GetConfig(upgradetest.Cortina),
+			initialUpgrades: upgradetest.GetConfig(upgradetest.Latest - 1),
 			restartUpgrades: upgradeAt(
-				upgradetest.Durango,
+				upgradetest.Latest,
 				upgrade.InitiallyActiveTime.Add(time.Second),
 			),
 			restartGenesis: localGenesis,
@@ -449,11 +449,11 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "delay_future_upgrade",
 			initialUpgrades: upgradeAt(
-				upgradetest.Durango,
+				upgradetest.Latest,
 				upgrade.InitiallyActiveTime.Add(time.Second),
 			),
 			restartUpgrades: upgradeAt(
-				upgradetest.Durango,
+				upgradetest.Latest,
 				upgrade.InitiallyActiveTime.Add(2*time.Second),
 			),
 			restartGenesis: localGenesis,
@@ -461,11 +461,11 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "advance_future_upgrade",
 			initialUpgrades: upgradeAt(
-				upgradetest.Durango,
+				upgradetest.Latest,
 				upgrade.InitiallyActiveTime.Add(time.Second),
 			),
 			restartUpgrades: upgradeAt(
-				upgradetest.Durango,
+				upgradetest.Latest,
 				upgrade.InitiallyActiveTime.Add(2*time.Second),
 			),
 			restartGenesis: localGenesis,
@@ -476,6 +476,15 @@ func TestSetupGenesis(t *testing.T) {
 			restartUpgrades: upgradetest.GetConfig(upgradetest.Granite),
 			restartGenesis:  localGenesis,
 			wantErr:         errIsType[*ethparams.ConfigCompatError](),
+		},
+		{
+			name:            "schedule_precompiles",
+			initialUpgrades: upgradetest.GetConfig(upgradetest.Cortina),
+			restartUpgrades: upgradeAt(
+				upgradetest.Durango,
+				upgrade.InitiallyActiveTime.Add(time.Second),
+			),
+			restartGenesis: localGenesis,
 		},
 	}
 	for _, test := range tests {
@@ -506,7 +515,7 @@ func TestSetupGenesis(t *testing.T) {
 					)
 					require.NoError(t, err, "parseGenesis(initial)")
 
-					block, err := setupGenesis(db, trieConfig, g)
+					block, err := g.setup(db, trieConfig)
 					require.NoError(t, err, "writeGenesis(initial)")
 
 					genesisHash := block.Hash()
@@ -536,7 +545,7 @@ func TestSetupGenesis(t *testing.T) {
 					)
 					require.NoError(t, err, "parseGenesis(restart)")
 
-					block, err = setupGenesis(db, trieConfig, g)
+					block, err = g.setup(db, trieConfig)
 					if diff := testerr.Diff(err, test.wantErr); diff != "" {
 						t.Fatalf("writeGenesis(restart) error (-want +got)\n%s", diff)
 					}
