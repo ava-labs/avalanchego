@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+go_library(
+    name = "sidecar",
+    srcs = [
+        "policy.go",
+        "rpc.go",
+        "rule.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/sidecar",
+    deps = [
+        "//graft/subnet-evm/warp/external",
+    ],
+)
+
+graft_go_test(
+    name = "sidecar_test",
+    srcs = [
+        "policy_test.go",
+        "rpc_test.go",
+    ],
+    embed = [":sidecar"],
+    deps = [
+        "//graft/subnet-evm/warp/external",
+        "@com_github_stretchr_testify//require",
+    ],
+)

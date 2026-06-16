@@ -24,8 +24,8 @@ func (s *stubRule) Validate(_ context.Context, _ *external.ExternalEvent) (bool,
 }
 
 var (
-	pass    = &stubRule{pass: true}
-	fail    = &stubRule{pass: false}
+	pass     = &stubRule{pass: true}
+	fail     = &stubRule{pass: false}
 	infraErr = &stubRule{err: errors.New("rpc timeout")}
 )
 
