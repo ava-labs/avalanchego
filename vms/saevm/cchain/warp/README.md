@@ -9,7 +9,7 @@ This package provides the pieces the VM needs to participate in that protocol: `
 ## Message lifecycle
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph SC["Sender chain"]
         user["Contract / EOA"]:::ext
         pre["Warp precompile"]:::evm
@@ -120,7 +120,7 @@ The two `Storage`-backed kinds are indistinguishable to the `Verifier`: precompi
 A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../evm/predicate/README.md)). Verifying it means checking the aggregate signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
 
 ```mermaid
-flowchart LR
+flowchart TD
     tx["Transaction<br/>access list"]:::ext
     fal["predicate.FromAccessList"]:::evm
     bctx["block.Context<br/>(P-Chain height)"]:::plat

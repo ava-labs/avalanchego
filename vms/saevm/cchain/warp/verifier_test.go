@@ -37,7 +37,7 @@ func TestVerifier(t *testing.T) {
 	hashMsg, hash := newHash(t)
 
 	invalidPayloadMsg, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, nil)
-	require.NoError(t, err)
+	require.NoErrorf(t, err, "warp.NewUnsignedMessage(%s, %s, nil)", constants.UnitTestID, snowtest.XChainID)
 
 	tests := []struct {
 		name           string
