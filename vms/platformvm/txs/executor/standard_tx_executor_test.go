@@ -4572,9 +4572,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 			diff, got := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 			require.NoError(t, got)
 
-			if tt.update != nil {
-				tt.update(tx.Unsigned.(*txs.AddAutoRenewedValidatorTx), diff)
-			}
+			tt.update(tx.Unsigned.(*txs.AddAutoRenewedValidatorTx), diff)
 
 			_, _, _, got = StandardTx(
 				&env.backend,
@@ -4589,20 +4587,23 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 }
 
 func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
+	const (
+		delegationShares            = uint32(500_000)
+		autoCompoundRewardShares    = uint32(300_000)
+		newAutoCompoundRewardShares = uint32(300_000)
+	)
+
 	tests := []struct {
-		name                        string
-		newPeriod                   time.Duration
-		newAutoCompoundRewardShares uint32
+		name      string
+		newPeriod time.Duration
 	}{
 		{
-			name:                        "updated_period_and_auto-compound_reward_shares",
-			newAutoCompoundRewardShares: uint32(300_000),
-			newPeriod:                   30 * 24 * time.Hour,
+			name:      "updated_period_and_auto-compound_reward_shares",
+			newPeriod: 30 * 24 * time.Hour,
 		},
 		{
-			name:                        "period_0_(exit_requested)",
-			newAutoCompoundRewardShares: uint32(300_000),
-			newPeriod:                   0,
+			name:      "period_0_(exit_requested)",
+			newPeriod: 0,
 		},
 	}
 
@@ -4629,8 +4630,8 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 				&secp256k1fx.OutputOwners{},
 				&secp256k1fx.OutputOwners{},
 				&secp256k1fx.OutputOwners{},
-				500_000,
-				300_000,
+				delegationShares,
+				autoCompoundRewardShares,
 				2*env.config.MinStakeDuration,
 			)
 			require.NoError(t, err)
@@ -4671,7 +4672,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 			unsignedTx, err := wallet.Builder().NewSetAutoRenewedValidatorConfigTx(
 				addAutoRenewedValidatorTx.TxID,
-				tt.newAutoCompoundRewardShares,
+				newAutoCompoundRewardShares,
 				tt.newPeriod,
 			)
 			require.NoError(t, err)
@@ -4721,7 +4722,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			require.NoError(t, err)
 
 			wantStakingInfo := initialStakingInfo
-			wantStakingInfo.AutoCompoundRewardShares = tt.newAutoCompoundRewardShares
+			wantStakingInfo.AutoCompoundRewardShares = newAutoCompoundRewardShares
 			wantStakingInfo.NextPeriod = uint64(tt.newPeriod.Seconds())
 			require.Equal(t, wantStakingInfo, stakingInfo)
 
