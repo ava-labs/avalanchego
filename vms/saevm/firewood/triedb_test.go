@@ -120,8 +120,8 @@ func (s *SUT) createAccount(param byte) {
 	if len(s.model.destructedThisTx) > 0 && param&1 == 0 {
 		// choose a previously destructed account to resurrect.
 		i := int(param>>1) % len(s.model.destructedThisTx)
-		s.model.destructedThisTx = removeUnordered(s.model.destructedThisTx, i)
 		addr = s.model.destructedThisTx[i]
+		s.model.destructedThisTx = removeUnordered(s.model.destructedThisTx, i)
 	} else {
 		addr = common.BytesToAddress(s.nextHash().Bytes())
 	}
@@ -398,7 +398,7 @@ func TestMultipleTries(t *testing.T) {
 	for i, sdb := range []*state.StateDB{sdb1, sdb2} {
 		sdb.CreateAccount(addr)
 		sdb.SetNonce(addr, 1)
-		sdb.SetBalance(addr, uint256.NewInt(uint64(i))) // different balance to force different root
+		sdb.SetBalance(addr, uint256.NewInt(uint64(i))) //#nosec G115 // different balance to force different root
 		_ = sdb.IntermediateRoot(true)                  // force proposal creation
 	}
 
@@ -421,7 +421,7 @@ func TestMultipleProposals(t *testing.T) {
 		sdb.CreateAccount(addr)
 		sdb.SetNonce(addr, 1)
 		sdb.SetBalance(addr, uint256.NewInt(0))
-		root, err := sdb.Commit(uint64(i), true)
+		root, err := sdb.Commit(uint64(i), true) //#nosec G115 // guaranteed to be positive
 		require.NoError(t, err, "sdb.Commit()")
 		lastRoot = root
 	}
