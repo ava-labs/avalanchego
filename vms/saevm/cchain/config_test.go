@@ -18,10 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
-func errIsType[T error]() testerr.Want {
-	return testerr.As(func(T) string { return "" })
-}
-
 func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
