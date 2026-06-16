@@ -26,13 +26,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	evmutils "github.com/ava-labs/avalanchego/graft/evm/utils"
+	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -82,27 +82,27 @@ func TestParseGenesis(t *testing.T) {
 						PetersburgBlock:     big.NewInt(0),
 						IstanbulBlock:       big.NewInt(0),
 						MuirGlacierBlock:    big.NewInt(0),
-						BerlinBlock:         big.NewInt(1640340),                 // AP2 activation block
-						LondonBlock:         big.NewInt(3308552),                 // AP3 activation block
-						ShanghaiTime:        utils.PointerTo[uint64](1709740800), // Durango
-						CancunTime:          utils.PointerTo[uint64](1734368400), // Etna
+						BerlinBlock:         big.NewInt(1640340),                          // AP2 activation block
+						LondonBlock:         big.NewInt(3308552),                          // AP3 activation block
+						ShanghaiTime:        avalancheutils.PointerTo[uint64](1709740800), // Durango
+						CancunTime:          avalancheutils.PointerTo[uint64](1734368400), // Etna
 					},
 					&extras.ChainConfig{
 						NetworkUpgrades: extras.NetworkUpgrades{
-							ApricotPhase1BlockTimestamp:     utils.PointerTo[uint64](1617199200),
-							ApricotPhase2BlockTimestamp:     utils.PointerTo[uint64](1620644400),
-							ApricotPhase3BlockTimestamp:     utils.PointerTo[uint64](1629813600),
-							ApricotPhase4BlockTimestamp:     utils.PointerTo[uint64](1632344400),
-							ApricotPhase5BlockTimestamp:     utils.PointerTo[uint64](1638468000),
-							ApricotPhasePre6BlockTimestamp:  utils.PointerTo[uint64](1662341400),
-							ApricotPhase6BlockTimestamp:     utils.PointerTo[uint64](1662494400),
-							ApricotPhasePost6BlockTimestamp: utils.PointerTo[uint64](1662519600),
-							BanffBlockTimestamp:             utils.PointerTo[uint64](1666108800),
-							CortinaBlockTimestamp:           utils.PointerTo[uint64](1682434800),
-							DurangoBlockTimestamp:           utils.PointerTo[uint64](1709740800),
-							EtnaTimestamp:                   utils.PointerTo[uint64](1734368400),
-							FortunaTimestamp:                utils.PointerTo[uint64](1744124400),
-							GraniteTimestamp:                utils.PointerTo[uint64](1763568000),
+							ApricotPhase1BlockTimestamp:     avalancheutils.PointerTo[uint64](1617199200),
+							ApricotPhase2BlockTimestamp:     avalancheutils.PointerTo[uint64](1620644400),
+							ApricotPhase3BlockTimestamp:     avalancheutils.PointerTo[uint64](1629813600),
+							ApricotPhase4BlockTimestamp:     avalancheutils.PointerTo[uint64](1632344400),
+							ApricotPhase5BlockTimestamp:     avalancheutils.PointerTo[uint64](1638468000),
+							ApricotPhasePre6BlockTimestamp:  avalancheutils.PointerTo[uint64](1662341400),
+							ApricotPhase6BlockTimestamp:     avalancheutils.PointerTo[uint64](1662494400),
+							ApricotPhasePost6BlockTimestamp: avalancheutils.PointerTo[uint64](1662519600),
+							BanffBlockTimestamp:             avalancheutils.PointerTo[uint64](1666108800),
+							CortinaBlockTimestamp:           avalancheutils.PointerTo[uint64](1682434800),
+							DurangoBlockTimestamp:           avalancheutils.PointerTo[uint64](1709740800),
+							EtnaTimestamp:                   avalancheutils.PointerTo[uint64](1734368400),
+							FortunaTimestamp:                avalancheutils.PointerTo[uint64](1744124400),
+							GraniteTimestamp:                avalancheutils.PointerTo[uint64](1763568000),
 							HeliconTimestamp:                unscheduled,
 						},
 						AvalancheContext: extras.AvalancheContext{
@@ -112,7 +112,7 @@ func TestParseGenesis(t *testing.T) {
 							PrecompileUpgrades: []extras.PrecompileUpgrade{
 								{
 									Config: warp.NewDefaultConfig(
-										utils.PointerTo[uint64](1709740800), // Durango
+										avalancheutils.PointerTo[uint64](1709740800), // Durango
 									),
 								},
 							},
@@ -149,27 +149,27 @@ func TestParseGenesis(t *testing.T) {
 						PetersburgBlock:     big.NewInt(0),
 						IstanbulBlock:       big.NewInt(0),
 						MuirGlacierBlock:    big.NewInt(0),
-						BerlinBlock:         big.NewInt(184985),                  // AP2 activation block
-						LondonBlock:         big.NewInt(805078),                  // AP3 activation block
-						ShanghaiTime:        utils.PointerTo[uint64](1707840000), // Durango
-						CancunTime:          utils.PointerTo[uint64](1732550400), // Etna
+						BerlinBlock:         big.NewInt(184985),                           // AP2 activation block
+						LondonBlock:         big.NewInt(805078),                           // AP3 activation block
+						ShanghaiTime:        avalancheutils.PointerTo[uint64](1707840000), // Durango
+						CancunTime:          avalancheutils.PointerTo[uint64](1732550400), // Etna
 					},
 					&extras.ChainConfig{
 						NetworkUpgrades: extras.NetworkUpgrades{
-							ApricotPhase1BlockTimestamp:     utils.PointerTo[uint64](1616767200),
-							ApricotPhase2BlockTimestamp:     utils.PointerTo[uint64](1620223200),
-							ApricotPhase3BlockTimestamp:     utils.PointerTo[uint64](1629140400),
-							ApricotPhase4BlockTimestamp:     utils.PointerTo[uint64](1631826000),
-							ApricotPhase5BlockTimestamp:     utils.PointerTo[uint64](1637766000),
-							ApricotPhasePre6BlockTimestamp:  utils.PointerTo[uint64](1662494400),
-							ApricotPhase6BlockTimestamp:     utils.PointerTo[uint64](1662494400),
-							ApricotPhasePost6BlockTimestamp: utils.PointerTo[uint64](1662530400),
-							BanffBlockTimestamp:             utils.PointerTo[uint64](1664805600),
-							CortinaBlockTimestamp:           utils.PointerTo[uint64](1680793200),
-							DurangoBlockTimestamp:           utils.PointerTo[uint64](1707840000),
-							EtnaTimestamp:                   utils.PointerTo[uint64](1732550400),
-							FortunaTimestamp:                utils.PointerTo[uint64](1741878000),
-							GraniteTimestamp:                utils.PointerTo[uint64](1761750000),
+							ApricotPhase1BlockTimestamp:     avalancheutils.PointerTo[uint64](1616767200),
+							ApricotPhase2BlockTimestamp:     avalancheutils.PointerTo[uint64](1620223200),
+							ApricotPhase3BlockTimestamp:     avalancheutils.PointerTo[uint64](1629140400),
+							ApricotPhase4BlockTimestamp:     avalancheutils.PointerTo[uint64](1631826000),
+							ApricotPhase5BlockTimestamp:     avalancheutils.PointerTo[uint64](1637766000),
+							ApricotPhasePre6BlockTimestamp:  avalancheutils.PointerTo[uint64](1662494400),
+							ApricotPhase6BlockTimestamp:     avalancheutils.PointerTo[uint64](1662494400),
+							ApricotPhasePost6BlockTimestamp: avalancheutils.PointerTo[uint64](1662530400),
+							BanffBlockTimestamp:             avalancheutils.PointerTo[uint64](1664805600),
+							CortinaBlockTimestamp:           avalancheutils.PointerTo[uint64](1680793200),
+							DurangoBlockTimestamp:           avalancheutils.PointerTo[uint64](1707840000),
+							EtnaTimestamp:                   avalancheutils.PointerTo[uint64](1732550400),
+							FortunaTimestamp:                avalancheutils.PointerTo[uint64](1741878000),
+							GraniteTimestamp:                avalancheutils.PointerTo[uint64](1761750000),
 							HeliconTimestamp:                unscheduled,
 						},
 						AvalancheContext: extras.AvalancheContext{
@@ -179,7 +179,7 @@ func TestParseGenesis(t *testing.T) {
 							PrecompileUpgrades: []extras.PrecompileUpgrade{
 								{
 									Config: warp.NewDefaultConfig(
-										utils.PointerTo[uint64](1707840000), // Durango
+										avalancheutils.PointerTo[uint64](1707840000), // Durango
 									),
 								},
 							},
@@ -407,6 +407,61 @@ func TestGenesisHash(t *testing.T) {
 	}
 }
 
+func TestHistoricalGenesisHashes(t *testing.T) {
+	hashes := [...]string{
+		// No changes.
+		upgradetest.NoUpgrades:    "0xd8a07966215173e9c4a5a5db8c337d2f717b41e24eb398eeb294caf1943d2556",
+		upgradetest.ApricotPhase1: "0xd8a07966215173e9c4a5a5db8c337d2f717b41e24eb398eeb294caf1943d2556",
+		upgradetest.ApricotPhase2: "0xd8a07966215173e9c4a5a5db8c337d2f717b41e24eb398eeb294caf1943d2556",
+
+		// Added the BaseFee
+		upgradetest.ApricotPhase3:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgradetest.ApricotPhase4:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgradetest.ApricotPhase5:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgradetest.ApricotPhasePre6:  "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgradetest.ApricotPhase6:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgradetest.ApricotPhasePost6: "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgradetest.Banff:             "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgradetest.Cortina:           "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+
+		// Added the Warp precompile
+		upgradetest.Durango: "0xd650b9947b759224835fb8c845f128cb9c8f016f72fec0e953d48c5872dd923a",
+
+		// Added various gas fields
+		upgradetest.Etna:    "0x17a7011ebbed7c97c7858cec856bd462a1fe9c216ef5f110b40c3b573dc84c6f",
+		upgradetest.Fortuna: "0x17a7011ebbed7c97c7858cec856bd462a1fe9c216ef5f110b40c3b573dc84c6f",
+
+		// Added milisecond timestamps
+		upgradetest.Granite: "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
+		upgradetest.Helicon: "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
+	}
+	var _ = hashes[upgradetest.Latest] // Enforce at compile time that all upgrades are present.
+
+	for _fork, hash := range hashes {
+		fork := upgradetest.Fork(_fork)
+		t.Run(fork.String(), func(t *testing.T) {
+			ctx := &snow.Context{
+				NetworkUpgrades: upgradetest.GetConfig(fork),
+			}
+			genesis := avalanchegenesis.LocalConfig.CChainGenesis
+			g, err := parseGenesis(ctx, []byte(genesis))
+			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
+
+			root, err := g.root()
+			require.NoErrorf(t, err, "%T.root()", g)
+			block := g.block(root)
+
+			// Debugging this test is basically impossible without the header.
+			{
+				headerJSON, err := json.MarshalIndent(block.Header(), "", "  ")
+				require.NoErrorf(t, err, "json.MarshalIndent(block.Header())")
+				t.Logf("header:\n%s", headerJSON)
+			}
+			require.Equalf(t, hash, block.Hash().String(), "%T.block().Hash()", g)
+		})
+	}
+}
+
 func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
 	c := upgradetest.GetConfigWithUpgradeTime(fork, t)
 	upgradetest.SetTimesTo(&c, fork-1, upgrade.InitiallyActiveTime)
@@ -414,89 +469,146 @@ func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
 }
 
 func TestSetupGenesis(t *testing.T) {
+	const emptyGenesis = `{
+		"config":{
+			"chainId":2
+		},
+		"gasLimit":"0x0",
+		"difficulty":"0x0",
+		"alloc":{}
+	}`
 	var (
 		latest       = upgradetest.GetConfig(upgradetest.Latest)
 		localGenesis = avalanchegenesis.LocalConfig.CChainGenesis
 		fujiGenesis  = avalanchegenesis.FujiConfig.CChainGenesis
 	)
+	type spec struct {
+		upgrades upgrade.Config
+		genesis  string
+	}
 	tests := []struct {
-		name            string
-		initialUpgrades upgrade.Config
-		restartUpgrades upgrade.Config
-		restartGenesis  string
-		wantErr         testerr.Want
+		name    string
+		initial spec
+		restart spec
+		wantErr testerr.Want
 	}{
 		{
-			name:            "same_genesis",
-			initialUpgrades: latest,
-			restartUpgrades: latest,
-			restartGenesis:  localGenesis,
+			name: "same_local_genesis",
+			initial: spec{
+				upgrades: latest,
+				genesis:  localGenesis,
+			},
+			restart: spec{
+				upgrades: latest,
+				genesis:  localGenesis,
+			},
 		},
 		{
-			name:            "genesis_hash_mismatch",
-			initialUpgrades: latest,
-			restartUpgrades: latest,
-			restartGenesis:  fujiGenesis,
-			wantErr:         errIsType[*core.GenesisMismatchError](),
+			name: "same_empty_genesis",
+			initial: spec{
+				upgrades: latest,
+				genesis:  emptyGenesis,
+			},
+			restart: spec{
+				upgrades: latest,
+				genesis:  emptyGenesis,
+			},
 		},
 		{
-			name:            "schedule_future_upgrade",
-			initialUpgrades: upgradetest.GetConfig(upgradetest.Latest - 1),
-			restartUpgrades: upgradeAt(
-				upgradetest.Latest,
-				upgrade.InitiallyActiveTime.Add(time.Second),
-			),
-			restartGenesis: localGenesis,
+			name: "genesis_hash_mismatch",
+			initial: spec{
+				upgrades: latest,
+				genesis:  localGenesis,
+			},
+			restart: spec{
+				upgrades: latest,
+				genesis:  fujiGenesis,
+			},
+			wantErr: errIsType[*core.GenesisMismatchError](),
+		},
+		{
+			name: "schedule_future_upgrade",
+			initial: spec{
+				upgrades: upgradetest.GetConfig(upgradetest.Latest - 1),
+				genesis:  localGenesis,
+			},
+			restart: spec{
+				upgrades: upgradeAt(
+					upgradetest.Latest,
+					upgrade.InitiallyActiveTime.Add(time.Second),
+				),
+				genesis: localGenesis,
+			},
 		},
 		{
 			name: "delay_future_upgrade",
-			initialUpgrades: upgradeAt(
-				upgradetest.Latest,
-				upgrade.InitiallyActiveTime.Add(time.Second),
-			),
-			restartUpgrades: upgradeAt(
-				upgradetest.Latest,
-				upgrade.InitiallyActiveTime.Add(2*time.Second),
-			),
-			restartGenesis: localGenesis,
+			initial: spec{
+				upgrades: upgradeAt(
+					upgradetest.Latest,
+					upgrade.InitiallyActiveTime.Add(time.Second),
+				),
+				genesis: localGenesis,
+			},
+			restart: spec{
+				upgrades: upgradeAt(
+					upgradetest.Latest,
+					upgrade.InitiallyActiveTime.Add(2*time.Second),
+				),
+				genesis: localGenesis,
+			},
 		},
 		{
 			name: "advance_future_upgrade",
-			initialUpgrades: upgradeAt(
-				upgradetest.Latest,
-				upgrade.InitiallyActiveTime.Add(2*time.Second),
-			),
-			restartUpgrades: upgradeAt(
-				upgradetest.Latest,
-				upgrade.InitiallyActiveTime.Add(time.Second),
-			),
-			restartGenesis: localGenesis,
+			initial: spec{
+				upgrades: upgradeAt(
+					upgradetest.Latest,
+					upgrade.InitiallyActiveTime.Add(2*time.Second),
+				),
+				genesis: localGenesis,
+			},
+			restart: spec{
+				upgrades: upgradeAt(
+					upgradetest.Latest,
+					upgrade.InitiallyActiveTime.Add(time.Second),
+				),
+				genesis: localGenesis,
+			},
 		},
 		{
-			name:            "incompatible_upgrade",
-			initialUpgrades: latest,
-			restartUpgrades: upgradetest.GetConfig(upgradetest.Granite),
-			restartGenesis:  localGenesis,
-			wantErr:         errIsType[*ethparams.ConfigCompatError](),
+			name: "incompatible_upgrade",
+			initial: spec{
+				upgrades: latest,
+				genesis:  localGenesis,
+			},
+			restart: spec{
+				upgrades: upgradetest.GetConfig(upgradetest.Granite),
+				genesis:  localGenesis,
+			},
+			wantErr: errIsType[*ethparams.ConfigCompatError](),
 		},
 		{
-			name:            "schedule_precompiles",
-			initialUpgrades: upgradetest.GetConfig(upgradetest.Cortina),
-			restartUpgrades: upgradeAt(
-				upgradetest.Durango,
-				upgrade.InitiallyActiveTime.Add(time.Second),
-			),
-			restartGenesis: localGenesis,
+			name: "schedule_precompiles",
+			initial: spec{
+				upgrades: upgradetest.GetConfig(upgradetest.Cortina),
+				genesis:  localGenesis,
+			},
+			restart: spec{
+				upgrades: upgradeAt(
+					upgradetest.Durango,
+					upgrade.InitiallyActiveTime.Add(time.Second),
+				),
+				genesis: localGenesis,
+			},
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			trieConfig := triedb.HashDefaults
 
 			g, err := parseGenesis(
-				&snow.Context{NetworkUpgrades: test.initialUpgrades},
-				[]byte(localGenesis),
+				&snow.Context{NetworkUpgrades: tt.initial.upgrades},
+				[]byte(tt.initial.genesis),
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 
@@ -525,17 +637,17 @@ func TestSetupGenesis(t *testing.T) {
 			// The restart runs on the initialized database. It must
 			// agree on the block hash and store its own chain config.
 			g, err = parseGenesis(
-				&snow.Context{NetworkUpgrades: test.restartUpgrades},
-				[]byte(test.restartGenesis),
+				&snow.Context{NetworkUpgrades: tt.restart.upgrades},
+				[]byte(tt.restart.genesis),
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
 			block, err = g.setup(db, trieConfig)
-			if diff := testerr.Diff(err, test.wantErr); diff != "" {
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("%T.setup(restart) error (-want +got)\n%s", g, diff)
 			}
 			require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(restart)")
-			if test.wantErr != nil {
+			if tt.wantErr != nil {
 				return
 			}
 
