@@ -185,4 +185,3 @@ func (c *captureSidecarClient) Verify(_ context.Context, event *external.Externa
 	*c.capture = event
 	return nil
 }
-
