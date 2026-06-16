@@ -1098,11 +1098,12 @@ func verifyRewardTxAndGetStaker(chainState state.Chain, sTx *txs.Tx, tx txs.Rewa
 	if err != nil {
 		return nil, nil, err
 	}
+	defer currentStakerIterator.Release()
+
 	if !currentStakerIterator.Next() {
 		return nil, nil, fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
 	}
 	stakerToReward := currentStakerIterator.Value()
-	currentStakerIterator.Release()
 
 	if stakerToReward.TxID != tx.StakerTxID() {
 		return nil, nil, fmt.Errorf(
