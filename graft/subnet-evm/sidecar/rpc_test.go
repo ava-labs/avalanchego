@@ -4,7 +4,6 @@
 package sidecar
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -17,9 +16,9 @@ import (
 
 const testTxSig = "5oBBwsRKNicfxqQnGnVwZCmCXtRCpkpxFSJBLRc7nHJ3XcC6nTgxj6HHpABcDeFgH"
 
-func buildEvent(t *testing.T, justification string, slot uint64) *external.ExternalEvent {
+func buildEvent(t *testing.T, justification string) *external.ExternalEvent {
 	t.Helper()
-	msg, err := external.NewExternalMessage("solana", "SomeProgram1111", []byte{0x01}, slot, []byte("payload"))
+	msg, err := external.NewExternalMessage("solana", "SomeProgram1111", []byte{0x01}, 42_000, []byte("payload"))
 	require.NoError(t, err)
 	return &external.ExternalEvent{
 		Message:       msg,
@@ -68,7 +67,7 @@ func TestRPC_TransactionNotFound(t *testing.T) {
 	})
 	defer srv.Close()
 
-	ok, err := ruleFor(t, srv.URL).Validate(context.Background(), buildEvent(t, testTxSig, 42_000))
+	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
 	require.NoError(t, err)
 	require.False(t, ok)
 }
@@ -79,7 +78,7 @@ func TestRPC_SlotMismatch(t *testing.T) {
 	})
 	defer srv.Close()
 
-	ok, err := ruleFor(t, srv.URL).Validate(context.Background(), buildEvent(t, testTxSig, 42_000))
+	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
 	require.NoError(t, err)
 	require.False(t, ok)
 }
@@ -100,7 +99,7 @@ func TestRPC_TransactionFailedOnChain(t *testing.T) {
 	})
 	defer srv.Close()
 
-	ok, err := ruleFor(t, srv.URL).Validate(context.Background(), buildEvent(t, testTxSig, slot))
+	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
 	require.NoError(t, err)
 	require.False(t, ok)
 }
@@ -116,7 +115,7 @@ func TestRPC_NilMeta(t *testing.T) {
 	})
 	defer srv.Close()
 
-	ok, err := ruleFor(t, srv.URL).Validate(context.Background(), buildEvent(t, testTxSig, slot))
+	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
 	require.NoError(t, err)
 	require.False(t, ok)
 }
@@ -127,8 +126,8 @@ func TestRPC_HTTPError(t *testing.T) {
 	})
 	defer srv.Close()
 
-	ok, err := ruleFor(t, srv.URL).Validate(context.Background(), buildEvent(t, testTxSig, 42_000))
-	require.Error(t, err)
+	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
+	require.ErrorContains(t, err, "RPC returned HTTP")
 	require.False(t, ok)
 }
 
@@ -138,8 +137,8 @@ func TestRPC_MalformedJSON(t *testing.T) {
 	})
 	defer srv.Close()
 
-	ok, err := ruleFor(t, srv.URL).Validate(context.Background(), buildEvent(t, testTxSig, 42_000))
-	require.Error(t, err)
+	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
+	require.ErrorContains(t, err, "decode RPC response")
 	require.False(t, ok)
 }
 
@@ -153,9 +152,8 @@ func TestRPC_RPCErrorField(t *testing.T) {
 	})
 	defer srv.Close()
 
-	ok, err := ruleFor(t, srv.URL).Validate(context.Background(), buildEvent(t, testTxSig, 42_000))
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "RPC error")
+	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
+	require.ErrorContains(t, err, "RPC error")
 	require.False(t, ok)
 }
 
@@ -165,19 +163,18 @@ func TestRPC_EmptyJustification(t *testing.T) {
 	})
 	defer srv.Close()
 
-	event := buildEvent(t, "", 42_000)
-	ok, err := ruleFor(t, srv.URL).Validate(context.Background(), event)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "justification is empty")
+	event := buildEvent(t, "")
+	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), event)
+	require.ErrorContains(t, err, "justification is empty")
 	require.False(t, ok)
 }
 
 func TestRPC_ServerUnreachable(t *testing.T) {
 	// Use a server that's immediately closed.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	srv.Close()
 
-	ok, err := ruleFor(t, srv.URL).Validate(context.Background(), buildEvent(t, testTxSig, 42_000))
-	require.Error(t, err)
+	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
+	require.ErrorContains(t, err, "RPC request")
 	require.False(t, ok)
 }

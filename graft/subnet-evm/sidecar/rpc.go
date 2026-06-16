@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -59,7 +60,7 @@ func newSolanaRPCValidationRuleWithClient(rpcURL, commitment string, client *htt
 func (r *SolanaRPCValidationRule) Validate(ctx context.Context, event *external.ExternalEvent) (bool, error) {
 	txSig := string(event.Justification)
 	if txSig == "" {
-		return false, fmt.Errorf("justification is empty: expected Solana transaction signature")
+		return false, errors.New("justification is empty: expected Solana transaction signature")
 	}
 
 	reqBody := solanaRPCRequest{

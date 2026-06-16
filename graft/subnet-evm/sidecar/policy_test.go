@@ -33,32 +33,30 @@ var testEvent = &external.ExternalEvent{}
 
 func TestPolicy_NoRules(t *testing.T) {
 	r := &ExternalInteropValidationRule{}
-	require.NoError(t, r.Verify(context.Background(), testEvent))
+	require.NoError(t, r.Verify(t.Context(), testEvent))
 }
 
 func TestPolicy_RequiredAllPass(t *testing.T) {
 	r := &ExternalInteropValidationRule{
 		Required: []ValidationRule{pass, pass},
 	}
-	require.NoError(t, r.Verify(context.Background(), testEvent))
+	require.NoError(t, r.Verify(t.Context(), testEvent))
 }
 
 func TestPolicy_RequiredOneFails(t *testing.T) {
 	r := &ExternalInteropValidationRule{
 		Required: []ValidationRule{pass, fail, pass},
 	}
-	err := r.Verify(context.Background(), testEvent)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "required rule 1")
+	err := r.Verify(t.Context(), testEvent)
+	require.ErrorContains(t, err, "required rule 1")
 }
 
 func TestPolicy_RequiredInfraErrorFails(t *testing.T) {
 	r := &ExternalInteropValidationRule{
 		Required: []ValidationRule{pass, infraErr},
 	}
-	err := r.Verify(context.Background(), testEvent)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "infrastructure error")
+	err := r.Verify(t.Context(), testEvent)
+	require.ErrorContains(t, err, "infrastructure error")
 }
 
 func TestPolicy_RequiredEarlyExitsBeforeQuorum(t *testing.T) {
@@ -70,8 +68,8 @@ func TestPolicy_RequiredEarlyExitsBeforeQuorum(t *testing.T) {
 		Quorum:    []ValidationRule{quorumRule},
 		MinQuorum: 1,
 	}
-	err := r.Verify(context.Background(), testEvent)
-	require.Error(t, err)
+	err := r.Verify(t.Context(), testEvent)
+	require.ErrorContains(t, err, "required rule 0")
 	require.False(t, quorumCalled)
 }
 
@@ -80,7 +78,7 @@ func TestPolicy_QuorumExactlyAtThreshold(t *testing.T) {
 		Quorum:    []ValidationRule{pass, fail, pass},
 		MinQuorum: 2,
 	}
-	require.NoError(t, r.Verify(context.Background(), testEvent))
+	require.NoError(t, r.Verify(t.Context(), testEvent))
 }
 
 func TestPolicy_QuorumBelowThreshold(t *testing.T) {
@@ -88,9 +86,8 @@ func TestPolicy_QuorumBelowThreshold(t *testing.T) {
 		Quorum:    []ValidationRule{pass, fail, fail},
 		MinQuorum: 2,
 	}
-	err := r.Verify(context.Background(), testEvent)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "quorum not met")
+	err := r.Verify(t.Context(), testEvent)
+	require.ErrorContains(t, err, "quorum not met")
 }
 
 func TestPolicy_QuorumInfraErrorAbstains(t *testing.T) {
@@ -99,7 +96,7 @@ func TestPolicy_QuorumInfraErrorAbstains(t *testing.T) {
 		Quorum:    []ValidationRule{pass, infraErr},
 		MinQuorum: 1,
 	}
-	require.NoError(t, r.Verify(context.Background(), testEvent))
+	require.NoError(t, r.Verify(t.Context(), testEvent))
 }
 
 func TestPolicy_QuorumAllInfraErrors(t *testing.T) {
@@ -107,9 +104,8 @@ func TestPolicy_QuorumAllInfraErrors(t *testing.T) {
 		Quorum:    []ValidationRule{infraErr, infraErr},
 		MinQuorum: 1,
 	}
-	err := r.Verify(context.Background(), testEvent)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "quorum not met")
+	err := r.Verify(t.Context(), testEvent)
+	require.ErrorContains(t, err, "quorum not met")
 }
 
 func TestPolicy_RequiredPassQuorumFails(t *testing.T) {
@@ -118,9 +114,8 @@ func TestPolicy_RequiredPassQuorumFails(t *testing.T) {
 		Quorum:    []ValidationRule{fail, fail},
 		MinQuorum: 1,
 	}
-	err := r.Verify(context.Background(), testEvent)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "quorum not met")
+	err := r.Verify(t.Context(), testEvent)
+	require.ErrorContains(t, err, "quorum not met")
 }
 
 // callTrackingRule wraps a ValidationRule and records whether Validate was called.
