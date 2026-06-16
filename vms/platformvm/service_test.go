@@ -924,12 +924,15 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		Priority:        addAutoRenewedValidatorTx.CurrentPriority(),
 	}
 
-	require.NoError(service.vm.state.PutCurrentValidator(staker))
-	service.vm.state.AddTx(tx, status.Committed)
-	require.NoError(service.vm.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
+	diff, err := state.NewDiffOn(service.vm.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+	diff.AddTx(tx, status.Committed)
+	require.NoError(diff.PutCurrentValidator(staker))
+	require.NoError(diff.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		NextPeriod:               periodSeconds,
 	}))
+	require.NoError(diff.Apply(service.vm.state))
 	require.NoError(service.vm.state.Commit())
 	service.vm.ctx.Lock.Unlock()
 
