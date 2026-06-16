@@ -55,6 +55,14 @@ func (m *fuzzModel) selectAddr(param byte) common.Address {
 	return m.addrs[int(param)%len(m.addrs)]
 }
 
+// removeUnordered removes the element at index i by swapping in the last
+// element and truncating. Order is not preserved.
+func removeUnordered[T any](s []T, i int) []T {
+	last := len(s) - 1
+	s[i] = s[last]
+	return s[:last]
+}
+
 type SUT struct {
 	fwDB, hashDB       state.Database
 	fwState, hashState *state.StateDB
@@ -105,32 +113,19 @@ func (s *SUT) createAccount(param byte) {
 		s.recreateAccount(param >> 1)
 		return
 	}
-
-	addr := common.BytesToAddress(s.nextHash().Bytes())
-	bal := uint256.NewInt(100)
-	s.model.accounts[addr] = &accountModel{
-		nonce:   1,
-		balance: bal.Clone(),
-	}
-	s.model.addrs = append(s.model.addrs, addr)
-	s.model.createdThisTx.Add(addr)
-
-	s.fwState.CreateAccount(addr)
-	s.fwState.SetNonce(addr, 1)
-	s.fwState.SetBalance(addr, bal)
-	s.hashState.CreateAccount(addr)
-	s.hashState.SetNonce(addr, 1)
-	s.hashState.SetBalance(addr, bal)
+	s.setupNewAccount(common.BytesToAddress(s.nextHash().Bytes()))
 }
 
 func (s *SUT) recreateAccount(param byte) {
 	i := int(param) % len(s.model.destructedThisTx)
 	addr := s.model.destructedThisTx[i]
-	// Swap with last element and truncate (order doesn't matter for correctness).
-	last := len(s.model.destructedThisTx) - 1
-	s.model.destructedThisTx[i] = s.model.destructedThisTx[last]
-	s.model.destructedThisTx = s.model.destructedThisTx[:last]
+	s.model.destructedThisTx = removeUnordered(s.model.destructedThisTx, i)
+	s.setupNewAccount(addr)
+}
 
+// setupNewAccount registers a freshly-created account (nonce 1, balance 100) in
+// the model and both StateDBs.
+func (s *SUT) setupNewAccount(addr common.Address) {
 	bal := uint256.NewInt(100)
 	s.model.accounts[addr] = &accountModel{
 		nonce:   1,
@@ -178,11 +173,7 @@ func (s *SUT) selfDestruct6780(param byte) {
 	delete(s.model.accounts, addr)
 	s.model.createdThisTx.Remove(addr)
 	s.model.destructedThisTx = append(s.model.destructedThisTx, addr)
-
-	// Swap with last element and truncate (order doesn't matter for correctness).
-	last := len(s.model.addrs) - 1
-	s.model.addrs[i] = s.model.addrs[last]
-	s.model.addrs = s.model.addrs[:last]
+	s.model.addrs = removeUnordered(s.model.addrs, i)
 }
 
 func (s *SUT) setStorage(param byte) {
@@ -203,10 +194,7 @@ func (s *SUT) deleteStorage(param byte) {
 	}
 	i := int(param) % len(storage)
 	key := storage[i]
-	// Swap with last element and truncate (order doesn't matter)
-	last := len(storage) - 1
-	storage[i] = storage[last]
-	s.model.accounts[addr].storage = storage[:last]
+	s.model.accounts[addr].storage = removeUnordered(storage, i)
 
 	s.fwState.SetState(addr, key, common.Hash{})
 	s.hashState.SetState(addr, key, common.Hash{})

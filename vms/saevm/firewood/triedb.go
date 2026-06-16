@@ -57,7 +57,6 @@ type TrieDBConfig struct {
 // The default config is:
 //   - CacheSizeBytes: 1MB
 //   - RevisionsInMemory: 128
-//   - CacheStrategy: [ffi.CacheAllReads]
 //   - DeferredCommitInterval: 64
 func DefaultConfig(dir string, log logging.Logger) TrieDBConfig {
 	return TrieDBConfig{
@@ -143,14 +142,14 @@ type TrieDB struct {
 	log logging.Logger
 }
 
-// A proposalRef is an element in a doubly-linked list of proposals.
-// Available in the [TrieDB.committable] map by state root, and linked together
-// by parent-child relationships.
+// A proposalRef is an element in a singly-linked list of proposals, available
+// in the [TrieDB.committable] map by state root and linked to its parent. A
+// committed proposal has a nil [proposalRef.p]; the commit walk relies on this
+// to stop at the most recent committed ancestor.
 type proposalRef struct {
 	p      *ffi.Proposal
 	root   common.Hash
 	parent *proposalRef
-	child  *proposalRef
 }
 
 func New(config TrieDBConfig) (*TrieDB, error) {
@@ -270,13 +269,10 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 		}
 		return rev.Drop()
 	}
-	if child := p.child; child != nil {
-		child.parent = nil // detach from doubly-linked list
-	}
-
-	// Walk back the proposal chain and collect all proposals to apply in order.
+	// Walk back the proposal chain and collect all uncommitted proposals to
+	// apply in order. A committed ancestor has a nil p, so the walk stops there.
 	var proposals []*ffi.Proposal
-	for cur := p; cur != nil; cur = cur.parent {
+	for cur := p; cur != nil && cur.p != nil; cur = cur.parent {
 		proposals = append(proposals, cur.p)
 		cur.p = nil
 		delete(t.committable, cur.root)
@@ -339,18 +335,10 @@ func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*prop
 // trieCommit considers the provided proposal as canonical.
 // Should be called on [state.Trie.Commit].
 //
-// p MUST not be nil.
+// p MUST not be nil. p.parent may reference an already-committed proposal (one
+// with a nil p); the commit walk stops at such ancestors, so no detach is
+// needed here.
 func (t *TrieDB) trieCommit(p *proposalRef) {
-	// add to linked list, since proposal is final.
-	if parent := p.parent; parent != nil {
-		if parent.p != nil {
-			parent.child = p
-		} else {
-			// parent proposal is already committed, detach from list
-			p.parent = nil
-		}
-	}
-
 	t.pending = p
 }
 

@@ -26,6 +26,20 @@ var (
 	_ trieReader = (*ffi.Proposal)(nil)
 )
 
+// accountKey returns the Firewood key for an account's leaf node.
+func accountKey(addr common.Address) []byte {
+	return crypto.Keccak256Hash(addr.Bytes()).Bytes()
+}
+
+// storageKey returns the Firewood key for a storage slot: the hashed account
+// address concatenated with the hashed storage key.
+func storageKey(addr common.Address, key []byte) []byte {
+	var combinedKey [2 * common.HashLength]byte
+	copy(combinedKey[:common.HashLength], crypto.Keccak256Hash(addr.Bytes()).Bytes())
+	copy(combinedKey[common.HashLength:], crypto.Keccak256Hash(key).Bytes())
+	return combinedKey[:]
+}
+
 // baseTrie contains the shared state and methods for all Firewood
 // trie implementations. It provides the read/write operations that are
 // identical between [accountTrie] and [storageTrie].
@@ -44,9 +58,7 @@ type baseTrie struct {
 // GetAccount returns the state account associated with an address.
 // Returns (nil, nil) if the account does not exist.
 func (a *baseTrie) GetAccount(addr common.Address) (*types.StateAccount, error) {
-	key := crypto.Keccak256Hash(addr.Bytes()).Bytes()
-
-	accountBytes, err := a.reader.Get(key)
+	accountBytes, err := a.reader.Get(accountKey(addr))
 	if err != nil {
 		return nil, err
 	}
@@ -63,20 +75,18 @@ func (a *baseTrie) GetAccount(addr common.Address) (*types.StateAccount, error) 
 
 // UpdateAccount replaces or creates the state account associated with an address.
 func (a *baseTrie) UpdateAccount(addr common.Address, account *types.StateAccount) error {
-	key := crypto.Keccak256Hash(addr.Bytes()).Bytes()
 	data, err := rlp.EncodeToBytes(account)
 	if err != nil {
 		return err
 	}
-	a.updateOps = append(a.updateOps, ffi.Put(key, data))
+	a.updateOps = append(a.updateOps, ffi.Put(accountKey(addr), data))
 	a.hasChanges = true
 	return nil
 }
 
 // DeleteAccount removes the state account associated with an address AND its storage trie.
 func (a *baseTrie) DeleteAccount(addr common.Address) error {
-	key := crypto.Keccak256Hash(addr.Bytes()).Bytes()
-	a.updateOps = append(a.updateOps, ffi.PrefixDelete(key))
+	a.updateOps = append(a.updateOps, ffi.PrefixDelete(accountKey(addr)))
 	a.hasChanges = true
 	return nil
 }
@@ -84,13 +94,7 @@ func (a *baseTrie) DeleteAccount(addr common.Address) error {
 // GetStorage returns the value associated with a storage key for a given account address.
 // Returns (nil, nil) if the slot does not exist.
 func (a *baseTrie) GetStorage(addr common.Address, key []byte) ([]byte, error) {
-	var combinedKey [2 * common.HashLength]byte
-	accountKey := crypto.Keccak256Hash(addr.Bytes()).Bytes()
-	storageKey := crypto.Keccak256Hash(key).Bytes()
-	copy(combinedKey[:common.HashLength], accountKey)
-	copy(combinedKey[common.HashLength:], storageKey)
-
-	storageBytes, err := a.reader.Get(combinedKey[:])
+	storageBytes, err := a.reader.Get(storageKey(addr, key))
 	if err != nil || storageBytes == nil {
 		return nil, err
 	}
@@ -102,31 +106,19 @@ func (a *baseTrie) GetStorage(addr common.Address, key []byte) ([]byte, error) {
 
 // UpdateStorage replaces or creates the value associated with a storage key for a given account address.
 func (a *baseTrie) UpdateStorage(addr common.Address, key []byte, value []byte) error {
-	var combinedKey [2 * common.HashLength]byte
-	accountKey := crypto.Keccak256Hash(addr.Bytes()).Bytes()
-	storageKey := crypto.Keccak256Hash(key).Bytes()
-	copy(combinedKey[:common.HashLength], accountKey)
-	copy(combinedKey[common.HashLength:], storageKey)
-
 	data, err := rlp.EncodeToBytes(value)
 	if err != nil {
 		return err
 	}
 
-	a.updateOps = append(a.updateOps, ffi.Put(combinedKey[:], data))
+	a.updateOps = append(a.updateOps, ffi.Put(storageKey(addr, key), data))
 	a.hasChanges = true
 	return nil
 }
 
 // DeleteStorage removes the value associated with a storage key for a given account address.
 func (a *baseTrie) DeleteStorage(addr common.Address, key []byte) error {
-	var combinedKey [2 * common.HashLength]byte
-	accountKey := crypto.Keccak256Hash(addr.Bytes()).Bytes()
-	storageKey := crypto.Keccak256Hash(key).Bytes()
-	copy(combinedKey[:common.HashLength], accountKey)
-	copy(combinedKey[common.HashLength:], storageKey)
-
-	a.updateOps = append(a.updateOps, ffi.Delete(combinedKey[:]))
+	a.updateOps = append(a.updateOps, ffi.Delete(storageKey(addr, key)))
 	a.hasChanges = true
 	return nil
 }
