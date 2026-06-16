@@ -194,8 +194,8 @@ func TestVerifyBlock(t *testing.T) {
 		contracts    []common.Address
 		blockContext *block.Context
 		txs          []*types.Transaction
-		expected     predicate.BlockResults
-		expectedErr  error
+		want         predicate.BlockResults
+		wantErr      error
 	}{
 		{
 			name:         "no_predicaters",
@@ -243,7 +243,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				validTx,
 			},
-			expectedErr: errNoBlockContext,
+			wantErr: errNoBlockContext,
 		},
 		{
 			name:         "one_tx_one_address_one_predicate",
@@ -252,7 +252,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				validTx,
 			},
-			expected: predicate.BlockResults{
+			want: predicate.BlockResults{
 				validTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(),
 				},
@@ -265,7 +265,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				invalidTx,
 			},
-			expected: predicate.BlockResults{
+			want: predicate.BlockResults{
 				invalidTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(0),
 				},
@@ -278,7 +278,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				twoInvalidTx,
 			},
-			expected: predicate.BlockResults{
+			want: predicate.BlockResults{
 				twoInvalidTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(0, 1),
 				},
@@ -291,7 +291,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				mixedTx,
 			},
-			expected: predicate.BlockResults{
+			want: predicate.BlockResults{
 				mixedTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(1, 2),
 				},
@@ -305,7 +305,7 @@ func TestVerifyBlock(t *testing.T) {
 				validTx,
 				invalidTx,
 			},
-			expected: predicate.BlockResults{
+			want: predicate.BlockResults{
 				validTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(),
 				},
@@ -321,9 +321,9 @@ func TestVerifyBlock(t *testing.T) {
 			warptest.SetValidators(t, snowContext, vdrs)
 			rules := newRules(test.contracts...)
 
-			actual, err := VerifyBlock(snowContext, test.blockContext, rules, test.txs)
-			require.ErrorIs(t, err, test.expectedErr, "VerifyBlock()")
-			require.Equal(t, test.expected, actual, "VerifyBlock()")
+			got, err := VerifyBlock(snowContext, test.blockContext, rules, test.txs)
+			require.ErrorIs(t, err, test.wantErr, "VerifyBlock()")
+			require.Equal(t, test.want, got, "VerifyBlock()")
 		})
 	}
 }

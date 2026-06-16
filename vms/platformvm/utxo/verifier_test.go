@@ -55,7 +55,7 @@ func TestGetInputOutputs(t *testing.T) {
 		wantErr          error
 	}{
 		{
-			name: "add auto-renewed validator",
+			name: "add_auto-renewed_validator",
 			tx: &txs.AddAutoRenewedValidatorTx{
 				BaseTx: txs.BaseTx{
 					BaseTx: avax.BaseTx{
@@ -69,7 +69,7 @@ func TestGetInputOutputs(t *testing.T) {
 			wantOutputs: []*avax.TransferableOutput{baseOut, stakeOut},
 		},
 		{
-			name: "set auto-renewed validator config",
+			name: "set_auto-renewed_validator_config",
 			tx: &txs.SetAutoRenewedValidatorConfigTx{
 				BaseTx: txs.BaseTx{
 					BaseTx: avax.BaseTx{
@@ -82,7 +82,7 @@ func TestGetInputOutputs(t *testing.T) {
 			wantOutputs: []*avax.TransferableOutput{baseOut},
 		},
 		{
-			name:    "reward auto-renewed validator",
+			name:    "reward_auto-renewed_validator",
 			tx:      &txs.RewardAutoRenewedValidatorTx{},
 			wantErr: ErrUnsupportedTxType,
 		},

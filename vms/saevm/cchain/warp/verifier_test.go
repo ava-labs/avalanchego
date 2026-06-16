@@ -37,32 +37,44 @@ func TestVerifier(t *testing.T) {
 	hashMsg, hash := newHash(t)
 
 	invalidPayloadMsg, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, nil)
-	require.NoError(t, err)
+	require.NoErrorf(t, err, "warp.NewUnsignedMessage(%s, %s, nil)", constants.UnitTestID, snowtest.XChainID)
 
 	tests := []struct {
-		name             string
-		acceptedBlocks   set.Set[ids.ID]
-		acceptedMessages []*warp.UnsignedMessage
-		m                *warp.UnsignedMessage
-		want             *common.AppError
+		name           string
+		acceptedBlocks set.Set[ids.ID]
+		storage        *Storage
+		m              *warp.UnsignedMessage
+		want           *common.AppError
 	}{
 		{
-			name: "known_message",
-			acceptedMessages: []*warp.UnsignedMessage{
-				addressedCallMsg,
-			},
-			m: addressedCallMsg,
+			name:    "known_message",
+			storage: NewStorage(memdb.New(), addressedCallMsg),
+			m:       addressedCallMsg,
 		},
 		{
-			name: "invalid_payload",
-			m:    invalidPayloadMsg,
+			name: "storage_error",
+			storage: func() *Storage {
+				db := memdb.New()
+				require.NoErrorf(t, db.Close(), "%T.Close()", db)
+				return NewStorage(db)
+			}(),
+			m: addressedCallMsg,
+			want: &common.AppError{
+				Code: StorageErrCode,
+			},
+		},
+		{
+			name:    "invalid_payload",
+			storage: NewStorage(memdb.New()),
+			m:       invalidPayloadMsg,
 			want: &common.AppError{
 				Code: ParseErrCode,
 			},
 		},
 		{
-			name: "unknown_message",
-			m:    addressedCallMsg,
+			name:    "unknown_message",
+			storage: NewStorage(memdb.New()),
+			m:       addressedCallMsg,
 			want: &common.AppError{
 				Code: UnknownMessageErrCode,
 			},
@@ -70,11 +82,13 @@ func TestVerifier(t *testing.T) {
 		{
 			name:           "accepted_block",
 			acceptedBlocks: set.Of(hash.Hash),
+			storage:        NewStorage(memdb.New()),
 			m:              hashMsg,
 		},
 		{
-			name: "unaccepted_block",
-			m:    hashMsg,
+			name:    "unaccepted_block",
+			storage: NewStorage(memdb.New()),
+			m:       hashMsg,
 			want: &common.AppError{
 				Code: NotAcceptedErrCode,
 			},
@@ -84,10 +98,10 @@ func TestVerifier(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			v := NewVerifier(
 				backend(test.acceptedBlocks),
-				NewStorage(memdb.New(), test.acceptedMessages...),
+				test.storage,
 			)
 			err := v.Verify(t.Context(), test.m, nil)
-			require.ErrorIs(t, err, test.want)
+			require.ErrorIsf(t, err, test.want, "%T.Verify(...)", v)
 		})
 	}
 }

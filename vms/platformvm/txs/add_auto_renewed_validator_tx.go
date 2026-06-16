@@ -160,11 +160,11 @@ func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
-		return fmt.Errorf("failed to verify BaseTx: %w", err)
+		return fmt.Errorf("verifying BaseTx: %w", err)
 	}
 
 	if err := verify.All(tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner, tx.ValidatorAuthority); err != nil {
-		return fmt.Errorf("failed to verify signer, rewards owners or validator authority: %w", err)
+		return fmt.Errorf("verifying signer, rewards owners or validator authority: %w", err)
 	}
 
 	if tx.Signer.Key() == nil {
@@ -173,7 +173,7 @@ func (tx *AddAutoRenewedValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 	for _, out := range tx.StakeOuts {
 		if err := out.Verify(); err != nil {
-			return fmt.Errorf("failed to verify output: %w", err)
+			return fmt.Errorf("verifying output: %w", err)
 		}
 	}
 

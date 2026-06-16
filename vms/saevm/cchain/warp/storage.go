@@ -21,6 +21,8 @@ type Storage struct {
 }
 
 // NewStorage creates a new Storage backed by the provided database.
+//
+// msgs are optional off-chain messages to keep in memory.
 func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 	overrides := make(map[ids.ID]*warp.UnsignedMessage, len(msgs))
 	for _, m := range msgs {
@@ -46,6 +48,8 @@ func (s *Storage) Add(msgs ...*warp.UnsignedMessage) error {
 	batch := s.db.NewBatch()
 	for i, m := range msgs {
 		id := m.ID()
+		// TODO(StephenButtolph): We never actually use the warp message bytes.
+		// We could store just the ID to save space.
 		if err := batch.Put(id[:], m.Bytes()); err != nil {
 			return fmt.Errorf("writing message %s (%d) to batch: %w", id, i, err)
 		}

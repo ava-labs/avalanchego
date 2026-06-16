@@ -151,6 +151,8 @@ func verifyContract(
 	failures := make([]bool, len(predicates))
 	for i, pred := range predicates {
 		eg.Go(func() error {
+			// TODO(StephenButtolph): Properly report unexpected errors when
+			// cleaning up the coreth precompile code.
 			failures[i] = contract.VerifyPredicate(pc, pred) != nil
 			return nil
 		})

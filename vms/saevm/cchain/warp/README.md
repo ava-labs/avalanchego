@@ -9,7 +9,7 @@ This package provides the pieces the VM needs to participate in that protocol: `
 ## Message lifecycle
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph SC["Sender chain"]
         user["Contract / EOA"]:::ext
         pre["Warp precompile"]:::evm
@@ -65,7 +65,7 @@ flowchart LR
 1. **Send** — a contract calls `sendWarpMessage` on the warp precompile, which packs the payload into an unsigned warp message and emits it as a log.
 2. **Persist** — after the block executes (under SAE, execution happens after acceptance), the VM collects every message in the block with [`FromReceipts`](./warp.go) and persists them with [`Storage.Add`](./storage.go).
 3. **Sign** — a relayer asks each validator for its signature over p2p ([ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request)). The handler consults [`Verifier.Verify`](./verifier.go), which checks `Storage`; on success the node responds with its BLS signature, and the relayer aggregates responses until a stake-weight quorum is reached.
-4. **Receive** — anyone submits a transaction on the receiver chain carrying the signed message in its access list. [`VerifyBlock`](./warp.go) checks the aggregate signature during block verification and the results are recorded in the block header, so execution can serve the message to contracts via `getVerifiedWarpMessage`.
+4. **Receive** — anyone submits a transaction on the receiver chain carrying the signed message in its access list. [`VerifyBlock`](./warp.go) checks the multi-signature during block verification and the results are recorded in the block header, so execution can serve the message to contracts via `getVerifiedWarpMessage`.
 
 Every validator of the sender chain runs the full sender-chain stack, which is why the `Verifier` in stage ③ reads the same `Storage` its node populated in stage ②. Sender and receiver chains need not run identical software, but they share this logical flow — and a single instance of this VM plays both ends of the diagram, sending some messages and receiving others.
 
@@ -73,7 +73,7 @@ Every validator of the sender chain runs the full sender-chain stack, which is w
 
 ### What makes a message signable
 
-Three kinds of message can be signed:
+Three message types can be signed:
 
 - **Precompile messages** — `AddressedCall` payloads the Warp contract emitted via `sendWarpMessage`.
 - **Block-hash attestations** — `Hash` payloads attesting that this chain accepted a given block.
@@ -117,10 +117,10 @@ The two `Storage`-backed kinds are indistinguishable to the `Verifier`: precompi
 
 ### Inbound messages are predicates
 
-A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../evm/predicate/README.md)). Verifying it means checking the aggregate signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
+A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../evm/predicate/README.md)). Verifying it means checking the multi-signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
 
 ```mermaid
-flowchart LR
+flowchart TD
     tx["Transaction<br/>access list"]:::ext
     fal["predicate.FromAccessList"]:::evm
     bctx["block.Context<br/>(P-Chain height)"]:::plat
@@ -150,7 +150,7 @@ The results — which predicates failed, per transaction — are encoded into th
 
 ### Easy to misunderstand
 
-- There are two unrelated "verify"s: `Verifier.Verify` decides whether this node should *sign* an outbound message; `VerifyBlock` checks the *aggregate signature* on inbound messages. They share no code path.
+- There are two unrelated "verify"s: `Verifier.Verify` decides whether this node should *sign* an outbound message; `VerifyBlock` checks the *multi-signature* on inbound messages. They share no code path.
 - `Verifier` doesn't check `NetworkID` or `SourceChainID` — the ACP-118 contract assigns those checks to the BLS signer.
 - `Storage` holds only unsigned messages; signatures are never persisted.
 - A message becomes signable only once the block that emitted it has been *executed* — under SAE, strictly after acceptance.
