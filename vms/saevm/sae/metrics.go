@@ -3,7 +3,13 @@
 
 package sae
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"errors"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+)
 
 type metrics struct {
 	lastSettledHeight prometheus.Gauge
@@ -16,10 +22,21 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Help: "Height of the latest block that has settled.",
 		}),
 	}
-	if err := reg.Register(m.lastSettledHeight); err != nil {
-		return nil, err
-	}
-	return m, nil
+	// Sampled at scrape time rather than via a setter like lastSettledHeight:
+	// the count changes through GC finalizers, with no event to update on.
+	inMemoryBlocks := prometheus.NewGaugeFunc(
+		prometheus.GaugeOpts{
+			Name: "in_memory_blocks",
+			Help: "Number of SAE blocks still live in memory (created but not yet garbage collected).",
+		},
+		func() float64 {
+			return float64(blocks.InMemoryBlockCount())
+		},
+	)
+	return m, errors.Join(
+		reg.Register(m.lastSettledHeight),
+		reg.Register(inMemoryBlocks),
+	)
 }
 
 func (m *metrics) markSettled(height uint64) {
