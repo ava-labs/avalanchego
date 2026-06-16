@@ -462,11 +462,11 @@ func TestSetupGenesis(t *testing.T) {
 			name: "advance_future_upgrade",
 			initialUpgrades: upgradeAt(
 				upgradetest.Latest,
-				upgrade.InitiallyActiveTime.Add(time.Second),
+				upgrade.InitiallyActiveTime.Add(2*time.Second),
 			),
 			restartUpgrades: upgradeAt(
 				upgradetest.Latest,
-				upgrade.InitiallyActiveTime.Add(2*time.Second),
+				upgrade.InitiallyActiveTime.Add(time.Second),
 			),
 			restartGenesis: localGenesis,
 		},
