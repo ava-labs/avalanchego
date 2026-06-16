@@ -43,29 +43,28 @@ var (
 // TrieDBConfig holds the configuration for creating a [TrieDB].
 type TrieDBConfig struct {
 	DatabaseDir       string
+	Log               logging.Logger
 	CacheSizeBytes    uint
 	RevisionsInMemory uint // must be >= 2
 	Archive           bool
 	// DeferredCommitInterval must be < RevisionsInMemory as otherwise, it's
 	// possible to reap the latest persisted revision.
 	DeferredCommitInterval uint64
-	Log                    logging.Logger
 	// TODO(alarso16): Something for metrics?
 }
 
 // DefaultConfig returns a sensible TrieDBConfig with the given directory.
 // The default config is:
-//   - CacheSizeBytes: 1MB
+//   - CacheSizeBytes: 1MiB
 //   - RevisionsInMemory: 128
-//   - CacheStrategy: [ffi.CacheAllReads]
 //   - DeferredCommitInterval: 64
 func DefaultConfig(dir string, log logging.Logger) TrieDBConfig {
 	return TrieDBConfig{
 		DatabaseDir:            dir,
-		CacheSizeBytes:         1024 * 1024, // 1MB
+		Log:                    log,
+		CacheSizeBytes:         1024 * 1024,
 		RevisionsInMemory:      128,
 		DeferredCommitInterval: 64,
-		Log:                    log,
 	}
 }
 
@@ -237,6 +236,7 @@ func (t *TrieDB) Initialized(genesisRoot common.Hash) bool {
 //nolint:revive // removing names loses context.
 func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set, _ ...stateconf.TrieDBUpdateOption) error {
 	possible := t.pending
+	t.pending = nil
 	if possible == nil {
 		// Update will never be called if no state change is proposed.
 		return fmt.Errorf("no pending proposal to update for root %s", root)
@@ -250,8 +250,22 @@ func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, node
 		return fmt.Errorf("proposal parent root %s does not match update parent %s", possible.parent.root, parent)
 	}
 
-	t.pending = nil
 	t.committable[root] = possible
+
+	if possible.parent == nil {
+		// parent is disk, base of linked list
+		return nil
+	}
+
+	parentRef := possible.parent
+	if parentRef.p != nil {
+		// parent hasn't been committed yet, link together in list
+		parentRef.child = possible
+	} else {
+		// parent proposal is already committed, detach from list
+		possible.parent = nil
+	}
+
 	return nil
 }
 
@@ -341,17 +355,8 @@ func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*prop
 //
 // p MUST not be nil.
 func (t *TrieDB) trieCommit(p *proposalRef) {
-	// add to linked list, since proposal is final.
-	if parent := p.parent; parent != nil {
-		if parent.p != nil {
-			parent.child = p
-		} else {
-			// parent proposal is already committed, detach from list
-			p.parent = nil
-		}
-	}
-
 	t.pending = p
+
 }
 
 // Scheme returns [rawdb.HashScheme] to identify the database.

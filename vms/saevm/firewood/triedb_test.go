@@ -25,6 +25,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+func mustNewDB(t *testing.T) state.Database {
+	t.Helper()
+
+	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
+	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
+		DBOverride: cfg.BackendConstructor,
+	})
+	t.Cleanup(func() {
+		require.NoError(t, db.TrieDB().Close(), "triedb.Close()")
+	})
+	return db
+}
+
 func mustNewStateDB(t *testing.T, db state.Database, root common.Hash) *state.StateDB {
 	t.Helper()
 
@@ -55,6 +68,14 @@ func (m *fuzzModel) selectAddr(param byte) common.Address {
 	return m.addrs[int(param)%len(m.addrs)]
 }
 
+// removeUnordered removes the element at index i by swapping in the last
+// element and truncating. Order is not preserved.
+func removeUnordered[T any](s []T, i int) []T {
+	last := len(s) - 1
+	s[i] = s[last]
+	return s[:last]
+}
+
 type SUT struct {
 	fwDB, hashDB       state.Database
 	fwState, hashState *state.StateDB
@@ -66,13 +87,7 @@ type SUT struct {
 }
 
 func newSUT(t *testing.T) *SUT {
-	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
-	fwDB := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
-		DBOverride: cfg.BackendConstructor,
-	})
-	t.Cleanup(func() {
-		require.NoError(t, fwDB.TrieDB().Close(), "firewood triedb.Close()")
-	})
+	fwDB := mustNewDB(t)
 	hashDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
 	root := types.EmptyRootHash
@@ -101,35 +116,15 @@ func (s *SUT) nextHash() common.Hash {
 // an account has been destructed earlier in the current transaction, that
 // accound could be resurrected.
 func (s *SUT) createAccount(param byte) {
+	var addr common.Address
 	if len(s.model.destructedThisTx) > 0 && param&1 == 0 {
-		s.recreateAccount(param >> 1)
-		return
+		// choose a previously destructed account to resurrect.
+		i := int(param>>1) % len(s.model.destructedThisTx)
+		s.model.destructedThisTx = removeUnordered(s.model.destructedThisTx, i)
+		addr = s.model.destructedThisTx[i]
+	} else {
+		addr = common.BytesToAddress(s.nextHash().Bytes())
 	}
-
-	addr := common.BytesToAddress(s.nextHash().Bytes())
-	bal := uint256.NewInt(100)
-	s.model.accounts[addr] = &accountModel{
-		nonce:   1,
-		balance: bal.Clone(),
-	}
-	s.model.addrs = append(s.model.addrs, addr)
-	s.model.createdThisTx.Add(addr)
-
-	s.fwState.CreateAccount(addr)
-	s.fwState.SetNonce(addr, 1)
-	s.fwState.SetBalance(addr, bal)
-	s.hashState.CreateAccount(addr)
-	s.hashState.SetNonce(addr, 1)
-	s.hashState.SetBalance(addr, bal)
-}
-
-func (s *SUT) recreateAccount(param byte) {
-	i := int(param) % len(s.model.destructedThisTx)
-	addr := s.model.destructedThisTx[i]
-	// Swap with last element and truncate (order doesn't matter for correctness).
-	last := len(s.model.destructedThisTx) - 1
-	s.model.destructedThisTx[i] = s.model.destructedThisTx[last]
-	s.model.destructedThisTx = s.model.destructedThisTx[:last]
 
 	bal := uint256.NewInt(100)
 	s.model.accounts[addr] = &accountModel{
@@ -178,11 +173,7 @@ func (s *SUT) selfDestruct6780(param byte) {
 	delete(s.model.accounts, addr)
 	s.model.createdThisTx.Remove(addr)
 	s.model.destructedThisTx = append(s.model.destructedThisTx, addr)
-
-	// Swap with last element and truncate (order doesn't matter for correctness).
-	last := len(s.model.addrs) - 1
-	s.model.addrs[i] = s.model.addrs[last]
-	s.model.addrs = s.model.addrs[:last]
+	s.model.addrs = removeUnordered(s.model.addrs, i)
 }
 
 func (s *SUT) setStorage(param byte) {
@@ -203,10 +194,7 @@ func (s *SUT) deleteStorage(param byte) {
 	}
 	i := int(param) % len(storage)
 	key := storage[i]
-	// Swap with last element and truncate (order doesn't matter)
-	last := len(storage) - 1
-	storage[i] = storage[last]
-	s.model.accounts[addr].storage = storage[:last]
+	s.model.accounts[addr].storage = removeUnordered(storage, i)
 
 	s.fwState.SetState(addr, key, common.Hash{})
 	s.hashState.SetState(addr, key, common.Hash{})
@@ -259,6 +247,7 @@ func (s *SUT) copyStateDB() {
 	s.hashState = s.hashState.Copy()
 }
 
+// TODO(#5539): support [*state.StateDB.SelfDestruct]
 const (
 	opStateDBCommit    byte = iota // commit pending changes; root changes iff state changed
 	opDiskCommit                   // flush pending, then commit a clean StateDB; root must be unchanged
@@ -395,6 +384,49 @@ func TestGenesis(t *testing.T) {
 		require.True(t, tdb.Initialized(genesisRoot), "Genesis root should still be initialized in the database")
 		require.NoError(t, tdb.Close(), "triedb.Close()")
 	})
+}
+
+// TestMultipleTries verifies that the TrieDB is not informed any changes
+// unless [state.StateDB.Commit] is called.
+// TODO(#5506): This should be safe concurrently as well.
+func TestMultipleTries(t *testing.T) {
+	db := mustNewDB(t)
+
+	sdb1 := mustNewStateDB(t, db, types.EmptyRootHash)
+	sdb2 := mustNewStateDB(t, db, types.EmptyRootHash)
+	addr := common.BytesToAddress([]byte{1})
+	for i, sdb := range []*state.StateDB{sdb1, sdb2} {
+		sdb.CreateAccount(addr)
+		sdb.SetNonce(addr, 1)
+		sdb.SetBalance(addr, uint256.NewInt(uint64(i))) // different balance to force different root
+		_ = sdb.IntermediateRoot(true)                  // force proposal creation
+	}
+
+	// Only one can be committed, choose first
+	root1, err := sdb1.Commit(0, true)
+	require.NoError(t, err, "sdb1.Commit()")
+	require.NoErrorf(t, db.TrieDB().Commit(root1, false), "triedb.Commit(%s)", root1)
+}
+
+// TestMultipleProposals verifies that a single [triedb.Commit] call
+// chains the commit of dependent proposals.
+func TestMultipleProposals(t *testing.T) {
+	db := mustNewDB(t)
+
+	const numBlocks = 5
+	lastRoot := types.EmptyRootHash
+	for i := range numBlocks {
+		addr := common.BytesToAddress([]byte{byte(i)})
+		sdb := mustNewStateDB(t, db, lastRoot)
+		sdb.CreateAccount(addr)
+		sdb.SetNonce(addr, 1)
+		sdb.SetBalance(addr, uint256.NewInt(0))
+		root, err := sdb.Commit(uint64(i), true)
+		require.NoError(t, err, "sdb.Commit()")
+		lastRoot = root
+	}
+
+	require.NoErrorf(t, db.TrieDB().Commit(lastRoot, false), "triedb.Commit(%s)", lastRoot)
 }
 
 func TestInvalidConfig(t *testing.T) {
