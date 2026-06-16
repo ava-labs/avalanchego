@@ -1476,3 +1476,144 @@ func verifyL1Conversion(
 	}
 	return nil
 }
+
+func (e *standardTxExecutor) CreateL1Tx(tx *txs.CreateL1Tx) error {
+	var (
+		currentTimestamp = e.state.GetTimestamp()
+		upgrades         = e.backend.Config.UpgradeConfig
+	)
+	// Needs to be updated according to the deployment upgrade.
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	var (
+		txID                     = e.tx.ID()
+		subnetID                 = txID
+		startTime                = uint64(currentTimestamp.Unix())
+		currentFees              = e.state.GetAccruedFees()
+		subnetToL1ConversionData = message.SubnetToL1ConversionData{
+			SubnetID:       subnetID,
+			ManagerChainID: tx.ManagerChainID,
+			ManagerAddress: tx.ManagerAddress,
+			Validators:     make([]message.SubnetToL1ConversionValidatorData, len(tx.Validators)),
+		}
+	)
+
+	for i, vdr := range tx.Validators {
+		nodeID, err := ids.ToNodeID(vdr.NodeID)
+		if err != nil {
+			return err
+		}
+
+		remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.RemainingBalanceOwner)
+		if err != nil {
+			return err
+		}
+		deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.DeactivationOwner)
+		if err != nil {
+			return err
+		}
+
+		l1Validator := state.L1Validator{
+			ValidationID:          subnetID.Append(uint32(i)),
+			SubnetID:              subnetID,
+			NodeID:                nodeID,
+			PublicKey:             bls.PublicKeyToUncompressedBytes(vdr.Signer.Key()),
+			RemainingBalanceOwner: remainingBalanceOwner,
+			DeactivationOwner:     deactivationOwner,
+			StartTime:             startTime,
+			Weight:                vdr.Weight,
+			MinNonce:              0,
+			EndAccumulatedFee:     0,
+		}
+		if vdr.Balance != 0 {
+			if gas.Gas(e.state.NumActiveL1Validators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+				return errMaxNumActiveValidators
+			}
+
+			l1Validator.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
+			if err != nil {
+				return err
+			}
+		}
+
+		if err := e.state.PutL1Validator(l1Validator); err != nil {
+			return err
+		}
+
+		subnetToL1ConversionData.Validators[i] = message.SubnetToL1ConversionValidatorData{
+			NodeID:       vdr.NodeID,
+			BLSPublicKey: vdr.Signer.PublicKey,
+			Weight:       vdr.Weight,
+		}
+	}
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("getting utxos %w", err)
+	}
+
+	fee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	producedAVAX, err = math.Add(producedAVAX, fee)
+	if err != nil {
+		return err
+	}
+
+	if err := e.backend.FlowChecker.VerifySpend(
+		tx,
+		e.state,
+		ins,
+		outs,
+		e.tx.Creds,
+		map[ids.ID]uint64{
+			e.backend.Ctx.AVAXAssetID: producedAVAX,
+		},
+	); err != nil {
+		return err
+	}
+
+	conversionID, err := message.SubnetToL1ConversionID(subnetToL1ConversionData)
+	if err != nil {
+		return err
+	}
+
+	// Consume the UTXOs
+	avax.Consume(e.state, tx.Ins)
+	// Produce the UTXOs
+	avax.Produce(e.state, txID, tx.Outs)
+	// Register the new subnet
+	e.state.AddSubnet(subnetID)
+	// L1 subnets have no traditional PoA owner. Set an empty owner so the
+	// GetSubnet API can find the subnet in state (will be removed when the service.go is removed. set an owner for now for testing purposes)
+	e.state.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{})
+	// Register the chain under the new subnet
+	e.state.AddL1Chain(subnetID, e.tx)
+	// Track the L1 conversion
+	e.state.SetSubnetToL1Conversion(
+		subnetID,
+		state.SubnetToL1Conversion{
+			ConversionID: conversionID,
+			ChainID:      tx.ManagerChainID,
+			Addr:         tx.ManagerAddress,
+		},
+	)
+
+	e.onAccept = func() {
+		e.backend.Config.CreateL1Chain(subnetID, tx)
+	}
+
+	return nil
+}

@@ -147,6 +147,7 @@ type Chain interface {
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
 
 	AddChain(createChainTx *txs.Tx)
+	AddL1Chain(subnetID ids.ID, tx *txs.Tx)
 
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
@@ -1201,6 +1202,15 @@ func (s *State) AddChain(createChainTxIntf *txs.Tx) {
 	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
 	if chains, cached := s.chainCache.Get(subnetID); cached {
 		chains = append(chains, createChainTxIntf)
+		s.chainCache.Put(subnetID, chains)
+	}
+}
+
+// Added to accommodate for CreateL1Tx
+func (s *State) AddL1Chain(subnetID ids.ID, tx *txs.Tx) {
+	s.addedChains[subnetID] = append(s.addedChains[subnetID], tx)
+	if chains, cached := s.chainCache.Get(subnetID); cached {
+		chains = append(chains, tx)
 		s.chainCache.Put(subnetID, chains)
 	}
 }

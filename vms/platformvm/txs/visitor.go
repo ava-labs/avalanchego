@@ -28,6 +28,8 @@ type Visitor interface {
 
 	// Etna Transactions:
 	ConvertSubnetToL1Tx(*ConvertSubnetToL1Tx) error
+	// ADDED (one transaction for creating subnet, creating chain, and coverting to L1)
+	CreateL1Tx(*CreateL1Tx) error
 	RegisterL1ValidatorTx(*RegisterL1ValidatorTx) error
 	SetL1ValidatorWeightTx(*SetL1ValidatorWeightTx) error
 	IncreaseL1ValidatorBalanceTx(*IncreaseL1ValidatorBalanceTx) error

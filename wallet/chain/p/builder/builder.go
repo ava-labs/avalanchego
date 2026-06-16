@@ -152,6 +152,27 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.TransferSubnetOwnershipTx, error)
 
+	// NewCreateL1Tx atomically creates a subnet, a chain, and converts the
+	// subnet to a Permissionless L1 in a single transaction.
+	//
+	// - [chainName] is the name of the chain
+	// - [vmID] is the ID of the VM the chain runs
+	// - [fxIDs] are the feature extensions the chain runs
+	// - [genesisData] is the genesis data for the chain
+	// - [chainID] specifies which chain the validator manager is deployed on
+	// - [address] specifies the address of the validator manager
+	// - [validators] specifies the initial L1 validators
+	NewCreateL1Tx(
+		chainName string,
+		vmID ids.ID,
+		fxIDs []ids.ID,
+		genesisData []byte,
+		chainID ids.ID,
+		address []byte,
+		validators []*txs.CreateL1Validator,
+		options ...common.Option,
+	) (*txs.CreateL1Tx, error)
+
 	// NewConvertSubnetToL1Tx converts the subnet to a Permissionless L1.
 	//
 	// - [subnetID] specifies the subnet to be converted
@@ -853,6 +874,104 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		Subnet:     subnetID,
 		Owner:      owner,
 		SubnetAuth: subnetAuth,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewCreateL1Tx(
+	chainName string,
+	vmID ids.ID,
+	fxIDs []ids.ID,
+	genesisData []byte,
+	chainID ids.ID,
+	address []byte,
+	validators []*txs.CreateL1Validator,
+	options ...common.Option,
+) (*txs.CreateL1Tx, error) {
+	var avaxToBurn uint64
+	for _, vdr := range validators {
+		var err error
+		avaxToBurn, err = math.Add(avaxToBurn, vdr.Balance)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var (
+		toBurn = map[ids.ID]uint64{
+			b.context.AVAXAssetID: avaxToBurn,
+		}
+		toStake = map[ids.ID]uint64{}
+		ops     = common.NewOptions(options)
+	)
+
+	memo := ops.Memo()
+
+	fxIDsBandwidth, err := math.Mul(uint64(len(fxIDs)), ids.IDLen)
+	if err != nil {
+		return nil, err
+	}
+	additionalBytes, err := math.Add(uint64(len(memo)), uint64(len(chainName)))
+	if err != nil {
+		return nil, err
+	}
+	additionalBytes, err = math.Add(additionalBytes, fxIDsBandwidth)
+	if err != nil {
+		return nil, err
+	}
+	additionalBytes, err = math.Add(additionalBytes, uint64(len(genesisData)))
+	if err != nil {
+		return nil, err
+	}
+	additionalBytes, err = math.Add(additionalBytes, uint64(len(address)))
+	if err != nil {
+		return nil, err
+	}
+
+	bytesComplexity := gas.Dimensions{
+		gas.Bandwidth: additionalBytes,
+	}
+	validatorComplexity, err := fee.CreateL1ValidatorComplexity(validators...)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicCreateL1TxComplexities.Add(
+		&bytesComplexity,
+		&validatorComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Sort(fxIDs)
+	utils.Sort(validators)
+	tx := &txs.CreateL1Tx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		ChainName:      chainName,
+		VMID:           vmID,
+		FxIDs:          fxIDs,
+		GenesisData:    genesisData,
+		ManagerChainID: chainID,
+		ManagerAddress: address,
+		Validators:     validators,
 	}
 	return tx, b.initCtx(tx)
 }

@@ -609,6 +609,44 @@ func TestDiffChain(t *testing.T) {
 	)
 }
 
+func TestDiffAddL1Chain(t *testing.T) {
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+	subnetID := ids.GenerateTestID()
+
+	// Initialize parent state with one CreateL1Tx chain
+	parentCreateL1Tx := &txs.Tx{
+		Unsigned: &txs.CreateL1Tx{
+			VMID: ids.GenerateTestID(),
+		},
+	}
+	state.AddL1Chain(subnetID, parentCreateL1Tx)
+
+	chains, err := state.GetChains(subnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{parentCreateL1Tx}, chains)
+
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+
+	// Add another CreateL1Tx chain via the diff
+	diffCreateL1Tx := &txs.Tx{
+		Unsigned: &txs.CreateL1Tx{
+			VMID: ids.GenerateTestID(),
+		},
+	}
+	diff.AddL1Chain(subnetID, diffCreateL1Tx)
+
+	// Apply diff — exercises the default branch in Diff.Apply that calls AddL1Chain
+	require.NoError(diff.Apply(state))
+
+	// Both chains should now be visible in the parent state
+	chains, err = state.GetChains(subnetID)
+	require.NoError(err)
+	require.Equal([]*txs.Tx{parentCreateL1Tx, diffCreateL1Tx}, chains)
+}
+
 func TestDiffTx(t *testing.T) {
 	require := require.New(t)
 
