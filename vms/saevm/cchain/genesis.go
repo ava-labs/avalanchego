@@ -15,12 +15,10 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
@@ -172,13 +170,14 @@ var (
 // state by checking the genesis block hash along with the rules used to execute
 // the head block.
 func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.Block, retErr error) {
-	block, err := g.toBlock()
+	root, err := g.root()
 	if err != nil {
-		return nil, fmt.Errorf("converting to block: %w", err)
+		return nil, fmt.Errorf("getting state root: %w", err)
 	}
 
 	// We can't exit early here. Even if the genesis block is on disk, the
 	// genesis state might not be.
+	block := g.block(root)
 	hash := block.Hash()
 	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
 		if err := writeGenesisBlock(db, block, g.Config); err != nil {
@@ -216,13 +215,15 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 
 	// Because some trie implementations prune old state, we need to defer to
 	// the trie to determine if the genesis was previously initialized.
-	if tdb.Initialized(block.Root()) {
-		return block, nil
+	if !tdb.Initialized(block.Root()) {
+		if _, err := g.writeState(db, tdb); err != nil {
+			return nil, fmt.Errorf("writing genesis state: %w", err)
+		}
 	}
-	return g.writeState(db, tdb)
+	return block, nil
 }
 
-func (g *genesis) toBlock() (_ *types.Block, retErr error) {
+func (g *genesis) root() (_ common.Hash, retErr error) {
 	db := rawdb.NewMemoryDatabase()
 	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
 	defer func() {
@@ -254,15 +255,15 @@ const precompileNonce = 1
 var precompileCode = []byte{0x1}
 
 // writeState commits the genesis allocation to the state database and returns
-// the resulting genesis block.
-func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (*types.Block, error) {
+// the state root.
+func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Hash, error) {
 	statedb, err := state.New(
 		types.EmptyRootHash,
-		extstate.NewDatabaseWithNodeDB(db, tdb),
+		state.NewDatabaseWithNodeDB(db, tdb),
 		nil,
 	)
 	if err != nil {
-		return nil, err
+		return common.Hash{}, err
 	}
 
 	for addr, account := range g.Alloc {
@@ -283,26 +284,20 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (*types.Bl
 	}
 
 	const deleteEmptyObjects = true
-	root := statedb.IntermediateRoot(deleteEmptyObjects)
-	block := newGenesisBlock(g, root)
-	triedbOpt := stateconf.WithTrieDBUpdatePayload(
-		common.Hash{},
-		block.Hash(),
-	)
-	statedbOpt := stateconf.WithTrieDBUpdateOpts(triedbOpt)
-	if _, err := statedb.Commit(genesisNumber, deleteEmptyObjects, statedbOpt); err != nil {
-		return nil, fmt.Errorf("committing statedb: %w", err)
+	root, err := statedb.Commit(genesisNumber, deleteEmptyObjects)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("committing statedb: %w", err)
 	}
 	if root != types.EmptyRootHash {
 		const logAsInfo = false
 		if err := tdb.Commit(root, logAsInfo); err != nil {
-			return nil, fmt.Errorf("committing triedb: %w", err)
+			return common.Hash{}, fmt.Errorf("committing triedb: %w", err)
 		}
 	}
-	return block, nil
+	return root, nil
 }
 
-func newGenesisBlock(g *genesis, root common.Hash) *types.Block {
+func (g *genesis) block(root common.Hash) *types.Block {
 	h := &types.Header{
 		ParentHash: common.Hash{},
 		// UncleHash is set by [types.NewBlock].

@@ -23,7 +23,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -399,9 +398,11 @@ func TestGenesisHash(t *testing.T) {
 			g, err := parseGenesis(ctx, []byte(genesis))
 			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
-			block, err := g.toBlock()
-			require.NoErrorf(t, err, "genesisToBlock(%s)", genesis)
-			require.Equalf(t, common.HexToHash(test.want), block.Hash(), "genesisToBlock(%s).Hash()", genesis)
+			root, err := g.root()
+			require.NoErrorf(t, err, "%T.root()", g)
+
+			block := g.block(root)
+			require.Equalf(t, common.HexToHash(test.want), block.Hash(), "%T.block().Hash()", g)
 		})
 	}
 }
@@ -490,80 +491,61 @@ func TestSetupGenesis(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			backends := []struct {
-				name   string
-				config *triedb.Config
-			}{
-				{
-					name:   "hashdb",
-					config: triedb.HashDefaults,
-				},
-				{
-					name: "firewood",
-					config: &triedb.Config{
-						DBOverride: firewood.DefaultConfig(t.TempDir()).BackendConstructor,
-					},
-				},
+			db := rawdb.NewMemoryDatabase()
+			trieConfig := triedb.HashDefaults
+
+			g, err := parseGenesis(
+				&snow.Context{NetworkUpgrades: test.initialUpgrades},
+				[]byte(localGenesis),
+			)
+			require.NoError(t, err, "parseGenesis(initial)")
+
+			block, err := g.setup(db, trieConfig)
+			require.NoErrorf(t, err, "%T.setup(initial)", g)
+
+			genesisHash := block.Hash()
+			require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(initial)")
+
+			gotConfig := rawdb.ReadChainConfig(db, genesisHash)
+			cmpBaseConfig := cmp.Options{
+				cmpopts.IgnoreUnexported(corethparams.ChainConfig{}),
+				cmputils.BigInts(),
 			}
-			for _, backend := range backends {
-				t.Run(backend.name, func(t *testing.T) {
-					db := rawdb.NewMemoryDatabase()
-					trieConfig := backend.config
+			if diff := cmp.Diff(g.Config, gotConfig, cmpBaseConfig); diff != "" {
+				t.Errorf("initial stored base config (-want +got)\n%s", diff)
+			}
 
-					g, err := parseGenesis(
-						&snow.Context{NetworkUpgrades: test.initialUpgrades},
-						[]byte(localGenesis),
-					)
-					require.NoError(t, err, "parseGenesis(initial)")
+			cmpNetworkUpgrades := cmp.Transformer("networkUpgrades", func(c *corethparams.ChainConfig) extras.NetworkUpgrades {
+				return corethparams.GetExtra(c).NetworkUpgrades
+			})
+			if diff := cmp.Diff(g.Config, gotConfig, cmpNetworkUpgrades); diff != "" {
+				t.Errorf("initial stored network upgrades (-want +got)\n%s", diff)
+			}
 
-					block, err := g.setup(db, trieConfig)
-					require.NoError(t, err, "writeGenesis(initial)")
+			// The restart runs on the initialized database. It must
+			// agree on the block hash and store its own chain config.
+			g, err = parseGenesis(
+				&snow.Context{NetworkUpgrades: test.restartUpgrades},
+				[]byte(test.restartGenesis),
+			)
+			require.NoError(t, err, "parseGenesis(restart)")
 
-					genesisHash := block.Hash()
-					require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(initial)")
+			block, err = g.setup(db, trieConfig)
+			if diff := testerr.Diff(err, test.wantErr); diff != "" {
+				t.Fatalf("%T.setup(restart) error (-want +got)\n%s", g, diff)
+			}
+			require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(restart)")
+			if test.wantErr != nil {
+				return
+			}
 
-					gotConfig := rawdb.ReadChainConfig(db, genesisHash)
-					cmpBaseConfig := cmp.Options{
-						cmpopts.IgnoreUnexported(corethparams.ChainConfig{}),
-						cmputils.BigInts(),
-					}
-					if diff := cmp.Diff(g.Config, gotConfig, cmpBaseConfig); diff != "" {
-						t.Errorf("initial stored base config (-want +got)\n%s", diff)
-					}
-
-					cmpNetworkUpgrades := cmp.Transformer("networkUpgrades", func(c *corethparams.ChainConfig) extras.NetworkUpgrades {
-						return corethparams.GetExtra(c).NetworkUpgrades
-					})
-					if diff := cmp.Diff(g.Config, gotConfig, cmpNetworkUpgrades); diff != "" {
-						t.Errorf("initial stored network upgrades (-want +got)\n%s", diff)
-					}
-
-					// The restart runs on the initialized database. It must
-					// agree on the block hash and store its own chain config.
-					g, err = parseGenesis(
-						&snow.Context{NetworkUpgrades: test.restartUpgrades},
-						[]byte(test.restartGenesis),
-					)
-					require.NoError(t, err, "parseGenesis(restart)")
-
-					block, err = g.setup(db, trieConfig)
-					if diff := testerr.Diff(err, test.wantErr); diff != "" {
-						t.Fatalf("writeGenesis(restart) error (-want +got)\n%s", diff)
-					}
-					require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(restart)")
-					if test.wantErr != nil {
-						return
-					}
-
-					require.Equal(t, genesisHash, block.Hash(), "writeGenesis(restart) block hash")
-					gotConfig = rawdb.ReadChainConfig(db, genesisHash)
-					if diff := cmp.Diff(g.Config, gotConfig, cmpBaseConfig); diff != "" {
-						t.Errorf("stored base config after restart (-want +got)\n%s", diff)
-					}
-					if diff := cmp.Diff(g.Config, gotConfig, cmpNetworkUpgrades); diff != "" {
-						t.Errorf("stored network upgrades after restart (-want +got)\n%s", diff)
-					}
-				})
+			require.Equal(t, genesisHash, block.Hash(), "%T.setup(restart).Hash()", g)
+			gotConfig = rawdb.ReadChainConfig(db, genesisHash)
+			if diff := cmp.Diff(g.Config, gotConfig, cmpBaseConfig); diff != "" {
+				t.Errorf("stored base config after restart (-want +got)\n%s", diff)
+			}
+			if diff := cmp.Diff(g.Config, gotConfig, cmpNetworkUpgrades); diff != "" {
+				t.Errorf("stored network upgrades after restart (-want +got)\n%s", diff)
 			}
 		})
 	}
