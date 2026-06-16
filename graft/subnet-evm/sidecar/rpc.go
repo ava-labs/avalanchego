@@ -14,6 +14,14 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/external"
 )
 
+var (
+	ErrEmptyJustification = errors.New("justification is empty: expected Solana transaction signature")
+	ErrHTTPStatus         = errors.New("unexpected HTTP status from RPC")
+	ErrHTTPRequest        = errors.New("RPC HTTP request failed")
+	ErrDecodeResponse     = errors.New("failed to decode RPC response")
+	ErrRPCError           = errors.New("RPC error")
+)
+
 var _ ValidationRule = (*SolanaRPCValidationRule)(nil)
 
 // SolanaRPCValidationRule verifies an external event by querying a Solana
@@ -60,7 +68,7 @@ func newSolanaRPCValidationRuleWithClient(rpcURL, commitment string, client *htt
 func (r *SolanaRPCValidationRule) Validate(ctx context.Context, event *external.ExternalEvent) (bool, error) {
 	txSig := string(event.Justification)
 	if txSig == "" {
-		return false, errors.New("justification is empty: expected Solana transaction signature")
+		return false, ErrEmptyJustification
 	}
 
 	reqBody := solanaRPCRequest{
@@ -90,21 +98,21 @@ func (r *SolanaRPCValidationRule) Validate(ctx context.Context, event *external.
 
 	resp, err := r.client.Do(httpReq)
 	if err != nil {
-		return false, fmt.Errorf("RPC request: %w", err)
+		return false, fmt.Errorf("%w: %w", ErrHTTPRequest, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("RPC returned HTTP %d", resp.StatusCode)
+		return false, fmt.Errorf("%w: HTTP %d", ErrHTTPStatus, resp.StatusCode)
 	}
 
 	var rpcResp solanaGetTransactionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
-		return false, fmt.Errorf("decode RPC response: %w", err)
+		return false, fmt.Errorf("%w: %w", ErrDecodeResponse, err)
 	}
 
 	if rpcResp.RPCError != nil {
-		return false, fmt.Errorf("RPC error %d: %s", rpcResp.RPCError.Code, rpcResp.RPCError.Message)
+		return false, fmt.Errorf("%w: code %d: %s", ErrRPCError, rpcResp.RPCError.Code, rpcResp.RPCError.Message)
 	}
 
 	// Null result: transaction not found or not yet at the requested

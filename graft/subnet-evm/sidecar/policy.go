@@ -5,9 +5,15 @@ package sidecar
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/external"
+)
+
+var (
+	ErrRequiredRuleFailed = errors.New("required rule failed")
+	ErrQuorumNotMet       = errors.New("quorum not met")
 )
 
 var _ external.SidecarClient = (*ExternalInteropValidationRule)(nil)
@@ -42,7 +48,7 @@ func (r *ExternalInteropValidationRule) Verify(ctx context.Context, event *exter
 			return fmt.Errorf("required rule %d: infrastructure error: %w", i, err)
 		}
 		if !ok {
-			return fmt.Errorf("required rule %d: verification failed", i)
+			return fmt.Errorf("required rule %d: %w", i, ErrRequiredRuleFailed)
 		}
 	}
 
@@ -59,7 +65,7 @@ func (r *ExternalInteropValidationRule) Verify(ctx context.Context, event *exter
 	}
 
 	if passed < r.MinQuorum {
-		return fmt.Errorf("quorum not met: %d of %d rules passed, need %d", passed, len(r.Quorum), r.MinQuorum)
+		return fmt.Errorf("%w: %d of %d rules passed, need %d", ErrQuorumNotMet, passed, len(r.Quorum), r.MinQuorum)
 	}
 
 	return nil

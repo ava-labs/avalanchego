@@ -127,7 +127,7 @@ func TestRPC_HTTPError(t *testing.T) {
 	defer srv.Close()
 
 	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
-	require.ErrorContains(t, err, "RPC returned HTTP")
+	require.ErrorIs(t, err, ErrHTTPStatus)
 	require.False(t, ok)
 }
 
@@ -138,7 +138,7 @@ func TestRPC_MalformedJSON(t *testing.T) {
 	defer srv.Close()
 
 	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
-	require.ErrorContains(t, err, "decode RPC response")
+	require.ErrorIs(t, err, ErrDecodeResponse)
 	require.False(t, ok)
 }
 
@@ -153,7 +153,7 @@ func TestRPC_RPCErrorField(t *testing.T) {
 	defer srv.Close()
 
 	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
-	require.ErrorContains(t, err, "RPC error")
+	require.ErrorIs(t, err, ErrRPCError)
 	require.False(t, ok)
 }
 
@@ -165,7 +165,7 @@ func TestRPC_EmptyJustification(t *testing.T) {
 
 	event := buildEvent(t, "")
 	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), event)
-	require.ErrorContains(t, err, "justification is empty")
+	require.ErrorIs(t, err, ErrEmptyJustification)
 	require.False(t, ok)
 }
 
@@ -175,6 +175,6 @@ func TestRPC_ServerUnreachable(t *testing.T) {
 	srv.Close()
 
 	ok, err := ruleFor(t, srv.URL).Validate(t.Context(), buildEvent(t, testTxSig))
-	require.ErrorContains(t, err, "RPC request")
+	require.ErrorIs(t, err, ErrHTTPRequest)
 	require.False(t, ok)
 }

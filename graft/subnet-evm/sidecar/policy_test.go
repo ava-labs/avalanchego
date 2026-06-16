@@ -24,9 +24,10 @@ func (s *stubRule) Validate(_ context.Context, _ *external.ExternalEvent) (bool,
 }
 
 var (
-	pass     = &stubRule{pass: true}
-	fail     = &stubRule{pass: false}
-	infraErr = &stubRule{err: errors.New("rpc timeout")}
+	pass         = &stubRule{pass: true}
+	fail         = &stubRule{pass: false}
+	infraErrSent = errors.New("rpc timeout")
+	infraErr     = &stubRule{err: infraErrSent}
 )
 
 var testEvent = &external.ExternalEvent{}
@@ -48,7 +49,7 @@ func TestPolicy_RequiredOneFails(t *testing.T) {
 		Required: []ValidationRule{pass, fail, pass},
 	}
 	err := r.Verify(t.Context(), testEvent)
-	require.ErrorContains(t, err, "required rule 1")
+	require.ErrorIs(t, err, ErrRequiredRuleFailed)
 }
 
 func TestPolicy_RequiredInfraErrorFails(t *testing.T) {
@@ -56,7 +57,7 @@ func TestPolicy_RequiredInfraErrorFails(t *testing.T) {
 		Required: []ValidationRule{pass, infraErr},
 	}
 	err := r.Verify(t.Context(), testEvent)
-	require.ErrorContains(t, err, "infrastructure error")
+	require.ErrorIs(t, err, infraErrSent)
 }
 
 func TestPolicy_RequiredEarlyExitsBeforeQuorum(t *testing.T) {
@@ -69,7 +70,7 @@ func TestPolicy_RequiredEarlyExitsBeforeQuorum(t *testing.T) {
 		MinQuorum: 1,
 	}
 	err := r.Verify(t.Context(), testEvent)
-	require.ErrorContains(t, err, "required rule 0")
+	require.ErrorIs(t, err, ErrRequiredRuleFailed)
 	require.False(t, quorumCalled)
 }
 
@@ -87,7 +88,7 @@ func TestPolicy_QuorumBelowThreshold(t *testing.T) {
 		MinQuorum: 2,
 	}
 	err := r.Verify(t.Context(), testEvent)
-	require.ErrorContains(t, err, "quorum not met")
+	require.ErrorIs(t, err, ErrQuorumNotMet)
 }
 
 func TestPolicy_QuorumInfraErrorAbstains(t *testing.T) {
@@ -105,7 +106,7 @@ func TestPolicy_QuorumAllInfraErrors(t *testing.T) {
 		MinQuorum: 1,
 	}
 	err := r.Verify(t.Context(), testEvent)
-	require.ErrorContains(t, err, "quorum not met")
+	require.ErrorIs(t, err, ErrQuorumNotMet)
 }
 
 func TestPolicy_RequiredPassQuorumFails(t *testing.T) {
@@ -115,7 +116,7 @@ func TestPolicy_RequiredPassQuorumFails(t *testing.T) {
 		MinQuorum: 1,
 	}
 	err := r.Verify(t.Context(), testEvent)
-	require.ErrorContains(t, err, "quorum not met")
+	require.ErrorIs(t, err, ErrQuorumNotMet)
 }
 
 // callTrackingRule wraps a ValidationRule and records whether Validate was called.
