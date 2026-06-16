@@ -120,8 +120,8 @@ func (s *SUT) createAccount(param byte) {
 	if len(s.model.destructedThisTx) > 0 && param&1 == 0 {
 		// choose a previously destructed account to resurrect.
 		i := int(param>>1) % len(s.model.destructedThisTx)
-		s.model.destructedThisTx = removeUnordered(s.model.destructedThisTx, i)
 		addr = s.model.destructedThisTx[i]
+		s.model.destructedThisTx = removeUnordered(s.model.destructedThisTx, i)
 	} else {
 		addr = common.BytesToAddress(s.nextHash().Bytes())
 	}
