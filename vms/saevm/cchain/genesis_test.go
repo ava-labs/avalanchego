@@ -431,11 +431,11 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		upgradetest.Etna:    "0x17a7011ebbed7c97c7858cec856bd462a1fe9c216ef5f110b40c3b573dc84c6f",
 		upgradetest.Fortuna: "0x17a7011ebbed7c97c7858cec856bd462a1fe9c216ef5f110b40c3b573dc84c6f",
 
-		// Added milisecond timestamps
+		// Added millisecond timestamps
 		upgradetest.Granite: "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
 		upgradetest.Helicon: "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
 	}
-	var _ = hashes[upgradetest.Latest] // Enforce at compile time that all upgrades are present.
+	_ = hashes[upgradetest.Latest] // Enforce completeness at compile time.
 
 	for _fork, hash := range hashes {
 		fork := upgradetest.Fork(_fork)
