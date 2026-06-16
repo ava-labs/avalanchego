@@ -248,14 +248,15 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 }
 
 // When a precompile is activated, its account is marked as non-empty by setting
-// a nonce and code. This prevents the account from being cleaned up when the
-// statedb is finalized and allows it to be called from Solidity contracts.
+// a nonce and code so it is not pruned as an empty account during state
+// finalization (EIP-161) and so it appears as a contract to EVM code
+// introspection (e.g. EXTCODESIZE/EXTCODEHASH).
 const precompileNonce = 1
 
 var precompileCode = []byte{0x1}
 
-// writeGenesisState returns the genesis block because the genesis hash is
-// needed to write the state, and the block contains the genesis state root.
+// writeGenesisState commits the genesis allocation to the state database and
+// returns the resulting genesis block.
 func writeGenesisState(
 	db ethdb.Database,
 	tdb *triedb.Database,
@@ -287,7 +288,7 @@ func writeGenesisState(
 		statedb.SetCode(warp.ContractAddress, precompileCode)
 	}
 
-	const deleteEmptyObjects = false
+	const deleteEmptyObjects = true
 	root := statedb.IntermediateRoot(deleteEmptyObjects)
 	block := newGenesisBlock(genesis, root)
 	triedbOpt := stateconf.WithTrieDBUpdatePayload(
@@ -328,9 +329,6 @@ func newGenesisBlock(genesis *core.Genesis, root common.Hash) *types.Block {
 		// added in network upgrades, so they are optionally configured below.
 		// WithdrawalsHash is not serialized by the libevm hooks, so it is
 		// always nil.
-	}
-	if h.Difficulty == nil {
-		h.Difficulty = ethparams.GenesisDifficulty
 	}
 	if h.GasLimit == 0 {
 		h.GasLimit = ethparams.GenesisGasLimit

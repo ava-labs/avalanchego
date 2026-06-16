@@ -267,16 +267,76 @@ func TestParseGenesis(t *testing.T) {
 			wantErr: errIsType[*json.SyntaxError](),
 		},
 		{
+			name:    "missing_required_fields",
+			ctx:     localCtx,
+			genesis: `{}`,
+			wantErr: testerr.Contains("missing required field"),
+		},
+		{
+			name:    "missing_gasLimit",
+			ctx:     localCtx,
+			genesis: `{"config":{"chainId":43112},"difficulty":"0x0","alloc":{}}`,
+			wantErr: testerr.Contains(`missing required field 'gasLimit'`),
+		},
+		{
+			name:    "missing_difficulty",
+			ctx:     localCtx,
+			genesis: `{"config":{"chainId":43112},"gasLimit":"0x0","alloc":{}}`,
+			wantErr: testerr.Contains(`missing required field 'difficulty'`),
+		},
+		{
+			name:    "null_difficulty_disallowed",
+			ctx:     localCtx,
+			genesis: `{"config":{"chainId":43112},"gasLimit":"0x0","difficulty":null,"alloc":{}}`,
+			wantErr: testerr.Contains(`missing required field 'difficulty'`),
+		},
+		{
+			name:    "missing_alloc",
+			ctx:     localCtx,
+			genesis: `{"config":{"chainId":43112},"gasLimit":"0x0","difficulty":"0x0"}`,
+			wantErr: testerr.Contains(`missing required field 'alloc'`),
+		},
+		{
 			name:    "no_config",
 			ctx:     localCtx,
-			genesis: `{"gasLimit":"0x5f5e100","difficulty":"0x0","alloc":{}}`,
+			genesis: `{"gasLimit":"0x0","difficulty":"0x0","alloc":{}}`,
 			wantErr: testerr.Is(errNoGenesisChainConfig),
 		},
 		{
 			name:    "no_chain_id",
 			ctx:     localCtx,
-			genesis: `{"config":{},"gasLimit":"0x5f5e100","difficulty":"0x0","alloc":{}}`,
+			genesis: `{"config":{},"gasLimit":"0x0","difficulty":"0x0","alloc":{}}`,
 			wantErr: testerr.Is(errNoGenesisChainID),
+		},
+		{
+			name:    "non_zero_number",
+			ctx:     localCtx,
+			genesis: `{"config":{"chainId":43112},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"number":"0x1"}`,
+			wantErr: testerr.Is(errNonZeroGenesisNumber),
+		},
+		{
+			name:    "non_zero_gas_used",
+			ctx:     localCtx,
+			genesis: `{"config":{"chainId":43112},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"gasUsed":"0x1"}`,
+			wantErr: testerr.Is(errNonZeroGenesisGasUsed),
+		},
+		{
+			name:    "nonzero_parent_hash",
+			ctx:     localCtx,
+			genesis: `{"config":{"chainId":43112},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"parentHash":"0x0100000000000000000000000000000000000000000000000000000000000000"}`,
+			wantErr: testerr.Is(errNonZeroGenesisParentHash),
+		},
+		{
+			name:    "non_nil_excess_blob_gas",
+			ctx:     localCtx,
+			genesis: `{"config":{"chainId":43112},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"excessBlobGas":"0x0"}`,
+			wantErr: testerr.Is(errNonNilGenesisExcessBlobGas),
+		},
+		{
+			name:    "non_nil_blob_gas_used",
+			ctx:     localCtx,
+			genesis: `{"config":{"chainId":43112},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"blobGasUsed":"0x0"}`,
+			wantErr: testerr.Is(errNonNilGenesisBlobGasUsed),
 		},
 	}
 	for _, test := range tests {
@@ -342,6 +402,12 @@ func TestGenesisHash(t *testing.T) {
 	}
 }
 
+func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
+	c := upgradetest.GetConfigWithUpgradeTime(fork, t)
+	upgradetest.SetTimesTo(&c, fork-1, upgrade.InitiallyActiveTime)
+	return c
+}
+
 func TestSetupGenesis(t *testing.T) {
 	var (
 		latest       = upgradetest.GetConfig(upgradetest.Latest)
@@ -373,18 +439,36 @@ func TestSetupGenesis(t *testing.T) {
 			wantErr:         errIsType[*core.GenesisMismatchError](),
 		},
 		{
-			// Secheduling an upgrade should not modify the genesis block but
-			// should update the stored chain config.
 			name:            "schedule_upgrade",
 			initialUpgrades: upgradetest.GetConfig(upgradetest.Cortina),
-			restartUpgrades: func() upgrade.Config {
-				c := upgradetest.GetConfigWithUpgradeTime(
-					upgradetest.Durango,
-					upgrade.InitiallyActiveTime.Add(time.Second),
-				)
-				upgradetest.SetTimesTo(&c, upgradetest.Cortina, upgrade.InitiallyActiveTime)
-				return c
-			}(),
+			restartUpgrades: upgradeAt(
+				upgradetest.Durango,
+				upgrade.InitiallyActiveTime.Add(time.Second),
+			),
+			restartGenesis: localGenesis,
+		},
+		{
+			name: "delay_future_upgrade",
+			initialUpgrades: upgradeAt(
+				upgradetest.Durango,
+				upgrade.InitiallyActiveTime.Add(time.Second),
+			),
+			restartUpgrades: upgradeAt(
+				upgradetest.Durango,
+				upgrade.InitiallyActiveTime.Add(2*time.Second),
+			),
+			restartGenesis: localGenesis,
+		},
+		{
+			name: "advance_future_upgrade",
+			initialUpgrades: upgradeAt(
+				upgradetest.Durango,
+				upgrade.InitiallyActiveTime.Add(time.Second),
+			),
+			restartUpgrades: upgradeAt(
+				upgradetest.Durango,
+				upgrade.InitiallyActiveTime.Add(2*time.Second),
+			),
 			restartGenesis: localGenesis,
 		},
 		{
