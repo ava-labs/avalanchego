@@ -41,11 +41,11 @@ func errIsType[T error]() testerr.Want {
 }
 
 // TestParseGenesis locks in the C-Chain genesis of Mainnet, Fuji, and the Local
-// network.
+// network as well as exercising invalid cases.
 //
-// It is intentionally a change detector, as any changes to the genesis
-// block would break live networks. Only the scheduling of new upgrades should
-// require changes to this test.
+// It is intentionally a change detector for the deployed networks, as any
+// changes would break them. Only the scheduling of new upgrades should require
+// changes to this test.
 func TestParseGenesis(t *testing.T) {
 	const nativeAssetContract = "0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033"
 	var (
@@ -363,7 +363,7 @@ func TestParseGenesis(t *testing.T) {
 }
 
 // This test is intentionally a change detector: the genesis hash is part of
-// consensus, so any change would break live networks.
+// consensus, so any change would break deployed networks.
 //
 // Only the local network genesis may change.
 func TestGenesisHash(t *testing.T) {
@@ -537,8 +537,8 @@ func TestSetupGenesis(t *testing.T) {
 						t.Errorf("initial stored network upgrades (-want +got)\n%s", diff)
 					}
 
-					// The restart runs on the initialized database. It must agree on
-					// the canonical block and store its own chain config.
+					// The restart runs on the initialized database. It must
+					// agree on the block hash and store its own chain config.
 					g, err = parseGenesis(
 						&snow.Context{NetworkUpgrades: test.restartUpgrades},
 						[]byte(test.restartGenesis),

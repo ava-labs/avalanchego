@@ -55,10 +55,10 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
 	}
 
-	// The genesis is committed as block 0 with no execution history, so the
-	// fields that the Genesis type documents as for consensus tests only must
-	// be left at their zero values. BaseFee is exempt: it is a valid (if inert)
-	// genesis header field. See [flushGenesisState].
+	// Almost all of the fields in [core.Genesis] that are marked as testing
+	// only are explicitly disallowed. The only such field that is allowed to be
+	// configured is [core.Genesis.BaseFee], as SAE initializes the gas price
+	// to the last synchronous block's BaseFee.
 	switch {
 	case g.Config == nil:
 		return nil, errNoGenesisChainConfig
@@ -166,20 +166,19 @@ var (
 	errNoHeadBlock         = errors.New("no head block")
 )
 
-// setup configures the database with the provided genesis.
+// setup configures the database with genesis.
 //
-// If the database was previously already initialized, setup verifies
-// that the same genesis hash would have been produced.
-//
-// Additionally, the chain config is updated to reflect any new upgrades that
-// have been scheduled.
+// It verifies that the genesis is compatible with any previously setup genesis
+// state by checking the genesis block hash along with the rules used to execute
+// the head block.
 func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.Block, retErr error) {
 	block, err := g.toBlock()
 	if err != nil {
 		return nil, fmt.Errorf("converting to block: %w", err)
 	}
 
-	// Ensure the stored genesis matches the provided genesis block.
+	// We can't exit early here. Even if the genesis block is on disk, the
+	// genesis state might not be.
 	hash := block.Hash()
 	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
 		if err := writeGenesisBlock(db, block, g.Config); err != nil {
@@ -192,9 +191,8 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 		}
 	}
 
-	// Ensure the previous chain config and the new chain config defined the
-	// same rules for the head block. Otherwise the head block may have been
-	// executed incorrectly.
+	// If the rules change for the head block, it may have been executed
+	// incorrectly.
 	{
 		prev := rawdb.ReadChainConfig(db, hash)
 		if prev == nil {
@@ -216,6 +214,8 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 		retErr = errors.Join(retErr, tdb.Close())
 	}()
 
+	// Because some trie implementations prune old state, we need to defer to
+	// the trie to determine if the genesis was previously initialized.
 	if tdb.Initialized(block.Root()) {
 		return block, nil
 	}
@@ -275,8 +275,10 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (*types.Bl
 			statedb.SetState(addr, key, value)
 		}
 	}
-	// If the Warp precompile is activated at genesis, mark it as a non-empty
-	// account.
+	// Precompile upgrades happen at the activation of the network upgrade. If
+	// the genesis timestamp is already after the Warp activation, then the
+	// state needs to reflect that or the precompile would never be marked as
+	// active.
 	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
 		statedb.SetNonce(warp.ContractAddress, precompileNonce)
 		statedb.SetCode(warp.ContractAddress, precompileCode)
