@@ -5,6 +5,7 @@ package firewood
 
 import (
 	"errors"
+	"maps"
 	"slices"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -14,18 +15,9 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
-
-func accountKey(addr common.Address) []byte {
-	return crypto.Keccak256Hash(addr.Bytes()).Bytes()
-}
-
-func storageKey(addr common.Address, key []byte) []byte {
-	var combinedKey [2 * common.HashLength]byte
-	copy(combinedKey[:common.HashLength], accountKey(addr))
-	copy(combinedKey[common.HashLength:], crypto.Keccak256Hash(key).Bytes())
-	return combinedKey[:]
-}
 
 type trieReader interface {
 	Get([]byte) ([]byte, error)
@@ -50,6 +42,63 @@ type baseTrie struct {
 
 	updateOps  []ffi.BatchOp
 	hasChanges bool
+
+	// cleared holds addresses whose current incarnation already had its stale
+	// storage prefix-deleted by [baseTrie.clearStaleStorage]. An entry is
+	// dropped once the incarnation's storage is flushed (an account Put with a
+	// non-empty root), letting the next incarnation fire again.
+	cleared set.Set[common.Address]
+	// storageOpsAfterClear holds addresses with storage writes in updateOps
+	// since the last PrefixDelete. The reader alone can't tell whether an
+	// account has storage: a copied trie reads the pre-block revision while its
+	// cloned updateOps may already carry storage writes.
+	storageOpsAfterClear set.Set[common.Address]
+}
+
+// accountKey returns the Firewood key of an account: keccak(addr).
+func accountKey(addr common.Address) []byte {
+	return crypto.Keccak256(addr.Bytes())
+}
+
+// storageKey returns the Firewood key of a storage slot:
+// keccak(addr) || keccak(key). An account's key prefixes its slots' keys, so
+// [baseTrie.DeleteAccount] removes all of its storage with one PrefixDelete.
+func storageKey(addr common.Address, key []byte) []byte {
+	return append(crypto.Keccak256(addr.Bytes()), crypto.Keccak256(key)...)
+}
+
+// clearStaleStorage removes a prior incarnation's storage when an account is
+// recreated after a same-block self-destruct. [state.StateDB] never calls
+// [state.Trie.DeleteAccount] for a destructed-then-recreated account: under
+// [rawdb.HashScheme] it orphans the old storage via storage-root indirection,
+// which Firewood's flat keyspace lacks. So infer it — if the StateDB believes
+// the account has no storage, any storage in the reader or pending updateOps
+// belongs to a prior incarnation and is prefix-deleted.
+//
+// MUST run before the address's new slots are appended to updateOps, and fires
+// at most once per incarnation: [accountTrie.Hash] replays all updateOps each
+// call, so a PrefixDelete after a live incarnation's slot writes would wipe them.
+func (a *baseTrie) clearStaleStorage(addr common.Address) error {
+	if a.cleared.Contains(addr) {
+		return nil
+	}
+
+	if !a.storageOpsAfterClear.Contains(addr) {
+		prev, err := a.GetAccount(addr)
+		if err != nil || prev == nil || prev.Root == types.EmptyRootHash {
+			return err // no prior incarnation, or no storage to clear
+		}
+	}
+
+	// DeleteAccount emits the PrefixDelete and updates the incarnation
+	// bookkeeping; the caller re-puts the account after this.
+	return a.DeleteAccount(addr)
+}
+
+// markStorageOp records that updateOps now contain a storage operation for the
+// address. See [baseTrie.storageOpsAfterClear].
+func (a *baseTrie) markStorageOp(addr common.Address) {
+	a.storageOpsAfterClear.Add(addr)
 }
 
 // GetAccount returns the state account associated with an address.
@@ -71,7 +120,20 @@ func (a *baseTrie) GetAccount(addr common.Address) (*types.StateAccount, error) 
 }
 
 // UpdateAccount replaces or creates the state account associated with an address.
+//
+// A same-block recreation with no new storage reaches the trie only here, so
+// [baseTrie.clearStaleStorage] runs before the account is written.
 func (a *baseTrie) UpdateAccount(addr common.Address, account *types.StateAccount) error {
+	if account.Root == types.EmptyRootHash {
+		if err := a.clearStaleStorage(addr); err != nil {
+			return err
+		}
+	} else {
+		// A non-empty root means this incarnation's storage was hashed, so a
+		// later [types.EmptyRootHash] signals a new incarnation that may fire again.
+		a.cleared.Remove(addr)
+	}
+
 	data, err := rlp.EncodeToBytes(account)
 	if err != nil {
 		return err
@@ -84,6 +146,8 @@ func (a *baseTrie) UpdateAccount(addr common.Address, account *types.StateAccoun
 // DeleteAccount removes the state account associated with an address AND its storage trie.
 func (a *baseTrie) DeleteAccount(addr common.Address) error {
 	a.updateOps = append(a.updateOps, ffi.PrefixDelete(accountKey(addr)))
+	a.cleared.Add(addr)
+	a.storageOpsAfterClear.Remove(addr)
 	a.hasChanges = true
 	return nil
 }
@@ -109,6 +173,7 @@ func (a *baseTrie) UpdateStorage(addr common.Address, key []byte, value []byte) 
 	}
 
 	a.updateOps = append(a.updateOps, ffi.Put(storageKey(addr, key), data))
+	a.markStorageOp(addr)
 	a.hasChanges = true
 	return nil
 }
@@ -116,6 +181,7 @@ func (a *baseTrie) UpdateStorage(addr common.Address, key []byte, value []byte) 
 // DeleteStorage removes the value associated with a storage key for a given account address.
 func (a *baseTrie) DeleteStorage(addr common.Address, key []byte) error {
 	a.updateOps = append(a.updateOps, ffi.Delete(storageKey(addr, key)))
+	a.markStorageOp(addr)
 	a.hasChanges = true
 	return nil
 }
@@ -137,10 +203,12 @@ func (*baseTrie) GetKey([]byte) []byte {
 // copy creates a copy of the baseTrie fields with the given reader.
 func (a *baseTrie) copy(reader trieReader) *baseTrie {
 	return &baseTrie{
-		reader:     reader,
-		root:       a.root,
-		hasChanges: true,
-		updateOps:  slices.Clone(a.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
+		reader:               reader,
+		root:                 a.root,
+		hasChanges:           true,
+		updateOps:            slices.Clone(a.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
+		cleared:              maps.Clone(a.cleared),
+		storageOpsAfterClear: maps.Clone(a.storageOpsAfterClear),
 	}
 }
 

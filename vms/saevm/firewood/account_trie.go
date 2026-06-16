@@ -43,6 +43,8 @@ func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
 		return nil, err
 	}
 	return &accountTrie{
+		// cleared and storageOpsAfterClear are left nil; set.Set treats a nil
+		// set as empty and self-initializes on first Add.
 		baseTrie:   &baseTrie{reader: reader, root: root},
 		parentRoot: root,
 		fw:         db,
