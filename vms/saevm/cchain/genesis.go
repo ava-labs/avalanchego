@@ -246,14 +246,6 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 	return b.Write()
 }
 
-// When a precompile is activated, its account is marked as non-empty by setting
-// a nonce and code so it is not pruned as an empty account during state
-// finalization (EIP-161) and so it appears as a contract to EVM code
-// introspection (e.g. EXTCODESIZE/EXTCODEHASH).
-const precompileNonce = 1
-
-var precompileCode = []byte{0x1}
-
 // writeState commits the genesis allocation to the state database and returns
 // the state root.
 func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Hash, error) {
@@ -278,9 +270,18 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	// the genesis timestamp is already after the Warp activation, then the
 	// state needs to reflect that or the precompile would never be marked as
 	// active.
+	//
+	// When a precompile is activated, its account is marked as non-empty by
+	// setting the nonce and code so it is not pruned as an empty account during
+	// state finalization (EIP-161) and so it appears as a contract to EVM code
+	// introspection (e.g. EXTCODESIZE/EXTCODEHASH).
+	const (
+		precompileNonce = 1
+		precompileCode  = "\x01"
+	)
 	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
 		statedb.SetNonce(warp.ContractAddress, precompileNonce)
-		statedb.SetCode(warp.ContractAddress, precompileCode)
+		statedb.SetCode(warp.ContractAddress, []byte(precompileCode))
 	}
 
 	const deleteEmptyObjects = true
@@ -288,11 +289,9 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("committing statedb: %w", err)
 	}
-	if root != types.EmptyRootHash {
-		const logAsInfo = false
-		if err := tdb.Commit(root, logAsInfo); err != nil {
-			return common.Hash{}, fmt.Errorf("committing triedb: %w", err)
-		}
+	const logAsInfo = false
+	if err := tdb.Commit(root, logAsInfo); err != nil {
+		return common.Hash{}, fmt.Errorf("committing triedb: %w", err)
 	}
 	return root, nil
 }
