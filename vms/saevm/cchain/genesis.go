@@ -271,7 +271,9 @@ func writeGenesisState(
 	}
 
 	for addr, account := range genesis.Alloc {
-		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
+		if account.Balance != nil {
+			statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
+		}
 		statedb.SetCode(addr, account.Code)
 		statedb.SetNonce(addr, account.Nonce)
 		for key, value := range account.Storage {
