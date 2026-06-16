@@ -6,7 +6,6 @@ package sae
 import (
 	"context"
 	"iter"
-	"math"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -66,15 +65,14 @@ func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
 }
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
-	nums, _ := rawdb.ReadAllCanonicalHashes(rec.db, parent.NumberU64()+1, math.MaxUint64, math.MaxInt)
-
 	return func(yield func(*blocks.Block, error) bool) {
-		for _, num := range nums {
-			b, err := rec.newCanonicalBlock(num, parent)
+		lastAcceptedHash := rawdb.ReadHeadFastBlockHash(rec.db)
+		for curr := parent; curr.Hash() != lastAcceptedHash; {
+			b, err := rec.newCanonicalBlock(curr.Height()+1, curr)
 			if !yield(b, err) || err != nil {
 				return
 			}
-			parent = b
+			curr = b
 		}
 	}
 }
