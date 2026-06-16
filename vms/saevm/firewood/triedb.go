@@ -356,7 +356,6 @@ func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*prop
 // p MUST not be nil.
 func (t *TrieDB) trieCommit(p *proposalRef) {
 	t.pending = p
-
 }
 
 // Scheme returns [rawdb.HashScheme] to identify the database.
