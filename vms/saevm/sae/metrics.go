@@ -22,16 +22,17 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Help: "Height of the latest block that has settled.",
 		}),
 	}
+	// Sampled at scrape time rather than via a setter like lastSettledHeight:
+	// the count changes through GC finalizers, with no event to update on.
+	inMemoryBlocks := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "in_memory_blocks",
+		Help: "Number of SAE blocks still live in memory (created but not yet garbage collected).",
+	}, func() float64 {
+		return float64(blocks.InMemoryBlockCount())
+	})
 	return m, errors.Join(
 		reg.Register(m.lastSettledHeight),
-		// Sampled at scrape time rather than via a setter like lastSettledHeight:
-		// the count changes through GC finalizers, with no event to update on.
-		reg.Register(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-			Name: "in_memory_blocks",
-			Help: "Number of SAE blocks still live in memory (created but not yet garbage collected).",
-		}, func() float64 {
-			return float64(blocks.InMemoryBlockCount())
-		})),
+		reg.Register(inMemoryBlocks),
 	)
 }
 
