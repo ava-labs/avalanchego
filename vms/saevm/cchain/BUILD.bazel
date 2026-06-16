@@ -159,7 +159,6 @@ go_test(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//ethclient",
-        "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//rlp",
