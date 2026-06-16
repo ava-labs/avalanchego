@@ -1376,6 +1376,8 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 		return err
 	}
 
+	weight := tx.Weight()
+
 	currentSupply, err := e.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("getting current supply: %w", err)
@@ -1389,7 +1391,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 	duration := time.Duration(tx.Period) * time.Second
 	potentialReward := rewards.Calculate(
 		duration,
-		tx.Weight(),
+		weight,
 		currentSupply,
 	)
 
@@ -1407,7 +1409,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 		tx,
 		startTime,
 		endTime,
-		tx.Weight(),
+		weight,
 		potentialReward,
 	)
 	if err != nil {
@@ -1450,14 +1452,14 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRene
 
 	stakingInfo, err := e.state.GetStakingInfo(validator.SubnetID, validator.NodeID)
 	if err != nil {
-		return fmt.Errorf("could not get staking info: %w", err)
+		return fmt.Errorf("getting staking info: %w", err)
 	}
 
 	stakingInfo.AutoCompoundRewardShares = tx.AutoCompoundRewardShares
 	stakingInfo.NextPeriod = tx.Period
 
 	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
-		return fmt.Errorf("could not set staking info: %w", err)
+		return fmt.Errorf("setting staking info: %w", err)
 	}
 
 	avax.Consume(e.state, tx.Ins)

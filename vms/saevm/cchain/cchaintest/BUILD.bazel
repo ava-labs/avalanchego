@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "cchaintest",
+    testonly = True,
+    srcs = ["blocks.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/plugin/evm/customtypes",
+        "//ids",
+        "//vms/saevm/cchain/tx",
+        "//vms/saevm/saetest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])

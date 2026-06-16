@@ -890,20 +890,22 @@ func TestDisableL1ValidatorTx(t *testing.T) {
 }
 
 func TestAddAutoRenewedValidatorTx(t *testing.T) {
+	const (
+		delegationShares   uint32 = reward.PercentDenominator
+		autoCompoundShares uint32 = 500_000
+		weight                    = 2 * units.Avax
+		period                    = 7 * 24 * time.Hour
+	)
 	var (
 		utxos = makeUTXOs(
 			1*units.NanoAvax, // small UTXO
 			9*units.Avax,     // large UTXO
 		)
 
-		require                       = require.New(t)
-		validationRewardsOwner        = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
-		delegationRewardsOwner        = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
-		validatorAuthority            = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
-		delegationShares       uint32 = reward.PercentDenominator
-		autoCompoundShares     uint32 = 500_000
-		weight                        = 2 * units.Avax
-		period                        = 7 * 24 * time.Hour
+		require                = require.New(t)
+		validationRewardsOwner = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
+		delegationRewardsOwner = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
+		validatorAuthority     = &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
 
 		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
@@ -971,10 +973,12 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 }
 
 func TestSetAutoRenewedValidatorConfigTx(t *testing.T) {
-	var (
-		require                   = require.New(t)
+	const (
 		autoCompoundShares uint32 = 750_000
 		period                    = 14 * 24 * time.Hour
+	)
+	var (
+		require = require.New(t)
 
 		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,

@@ -43,10 +43,8 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
-	errMissingStakerTx                 = errors.New("missing staker tx")
 	errInvalidStakerTxType             = errors.New("invalid staker tx type")
 	errInvalidStakerTx                 = errors.New("invalid staker tx")
-	errMissingValidator                = errors.New("missing validator")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -980,11 +978,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
-		if err == database.ErrNotFound {
-			return nil, errMissingStakerTx
-		}
-
-		return nil, fmt.Errorf("error getting staker tx: %w", err)
+		return nil, fmt.Errorf("getting staker tx: %w", err)
 	}
 
 	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
@@ -994,11 +988,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
 	if err != nil {
-		if err == database.ErrNotFound {
-			return nil, errMissingValidator
-		}
-
-		return nil, fmt.Errorf("failed to get validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
+		return nil, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
 	}
 
 	if tx.TxID != validator.TxID {
@@ -1014,7 +1004,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	validatorRules, err := getValidatorRules(backend, chainState, autoRenewedStakerTx.SubnetID())
 	if err != nil {
-		return nil, fmt.Errorf("error getting validator rules: %w", err)
+		return nil, fmt.Errorf("getting validator rules: %w", err)
 	}
 
 	switch {
@@ -1108,11 +1098,12 @@ func verifyRewardTxAndGetStaker(chainState state.Chain, sTx *txs.Tx, tx txs.Rewa
 	if err != nil {
 		return nil, nil, err
 	}
+	defer currentStakerIterator.Release()
+
 	if !currentStakerIterator.Next() {
 		return nil, nil, fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
 	}
 	stakerToReward := currentStakerIterator.Value()
-	currentStakerIterator.Release()
 
 	if stakerToReward.TxID != tx.StakerTxID() {
 		return nil, nil, fmt.Errorf(

@@ -23,6 +23,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -30,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -194,6 +196,36 @@ func (vm *VM) Initialize(
 	})
 
 	return nil
+}
+
+// errExtDataHashMismatch is returned by [VM.ParseBlock] when a block's extData
+// does not hash to the ExtDataHash committed in its header.
+var errExtDataHashMismatch = errors.New("extData hash does not match header")
+
+// ParseBlock parses buf via the embedded SAE VM and additionally verifies that
+// the block's extData matches the ExtDataHash committed in the header.
+//
+// The block ID is the header hash, which commits ExtDataHash, so a block whose
+// extData body was tampered keeps the same ID. This override is the boundary
+// that rejects such blocks before they are accepted, persisted, or executed;
+// the SAE VM's own ParseBlock is unaware of the C-Chain extData concept.
+func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
+	b, err := vm.VM.ParseBlock(ctx, buf)
+	if err != nil {
+		return nil, err
+	}
+
+	eth := b.EthBlock()
+	extData := customtypes.BlockExtData(eth)
+	// TODO: Handle pre-AP1 blocks, which incorrectly did not set ExtDataHash.
+	// This isn't needed prior to Helicon, but will be required to fully remove
+	// coreth.
+	claimed := customtypes.GetHeaderExtra(eth.Header()).ExtDataHash
+	actual := customtypes.CalcExtDataHash(extData)
+	if claimed != actual {
+		return nil, fmt.Errorf("%w: header %s, extData %s", errExtDataHashMismatch, claimed, actual)
+	}
+	return b, nil
 }
 
 const (
