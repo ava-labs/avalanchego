@@ -105,6 +105,7 @@ go_test(
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/firewood",
+        "//graft/evm/utils",
         "//ids",
         "//snow",
         "//snow/engine/common",

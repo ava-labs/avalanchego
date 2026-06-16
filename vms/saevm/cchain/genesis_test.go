@@ -33,6 +33,7 @@ import (
 
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	evmutils "github.com/ava-labs/avalanchego/graft/evm/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -53,8 +54,8 @@ func TestParseGenesis(t *testing.T) {
 		fujiCtx    = &snow.Context{NetworkUpgrades: upgrade.Fuji}
 		localCtx   = &snow.Context{NetworkUpgrades: upgrade.Default}
 
-		initiallyActive = utils.PointerTo[uint64](uint64(upgrade.InitiallyActiveTime.Unix()))
-		unscheduled     = utils.PointerTo[uint64](uint64(upgrade.UnscheduledActivationTime.Unix()))
+		initiallyActive = evmutils.TimeToNewUint64(upgrade.InitiallyActiveTime)
+		unscheduled     = evmutils.TimeToNewUint64(upgrade.UnscheduledActivationTime)
 	)
 	tests := []struct {
 		name    string
@@ -355,7 +356,7 @@ func TestParseGenesis(t *testing.T) {
 					return reflect.DeepEqual(a, b)
 				}),
 			}
-			if diff := cmp.Diff(test.want, g, opts); diff != "" {
+			if diff := cmp.Diff(test.want, (*core.Genesis)(g), opts); diff != "" {
 				t.Errorf("parseGenesis(%s) (-want +got)\n%s", test.genesis, diff)
 			}
 		})
