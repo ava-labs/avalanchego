@@ -140,11 +140,11 @@ func (s *SUT) nextHash() common.Hash {
 // [state.Trie.DeleteAccount].
 func (s *SUT) createAccount(param byte) {
 	var addr common.Address
-	if len(s.model.destructedThisTx) > 0 && param&1 == 0 {
+	if len(s.model.destructed) > 0 && param&1 == 0 {
 		// choose a previously destructed account to resurrect.
-		i := int(param>>1) % len(s.model.destructedThisTx)
-		addr = s.model.destructedThisTx[i]
-		s.model.destructedThisTx = removeUnordered(s.model.destructedThisTx, i)
+		i := int(param>>1) % len(s.model.destructed)
+		addr = s.model.destructed[i]
+		s.model.destructed = removeUnordered(s.model.destructed, i)
 	} else {
 		addr = common.BytesToAddress(s.nextHash().Bytes())
 	}
