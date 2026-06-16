@@ -21,6 +21,8 @@ type Storage struct {
 }
 
 // NewStorage creates a new Storage backed by the provided database.
+//
+// msgs are optional off-chain messages to keep in memory.
 func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 	overrides := make(map[ids.ID]*warp.UnsignedMessage, len(msgs))
 	for _, m := range msgs {
