@@ -30,6 +30,7 @@ type blockProperties struct {
 	ethTxs        []*types.Transaction
 	crossChainTxs []*tx.Tx
 	extDataHash   *common.Hash
+	version       uint32
 }
 
 // WithNumber sets the block's header number.
@@ -70,6 +71,15 @@ func WithMismatchedExtDataHash() BlockOption {
 	})
 }
 
+// WithBlockVersion sets the block's BlockBodyExtra Version. The default of 0 is
+// the only version accepted by the C-Chain ParseBlock; a non-zero value
+// simulates a block declaring an unsupported version.
+func WithBlockVersion(v uint32) BlockOption {
+	return options.Func[blockProperties](func(p *blockProperties) {
+		p.version = v
+	})
+}
+
 // NewTestBlock builds a [*types.Block] from the provided options. By default the
 // block has number 1, a zero parent hash, no Ethereum or cross-chain transactions,
 // and an ExtDataHash computed from its (empty) ExtData.
@@ -81,28 +91,27 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 	extData, err := tx.MarshalSlice(props.crossChainTxs)
 	require.NoErrorf(tb, err, "tx.MarshalSlice(%d txs)", len(props.crossChainTxs))
 
-	header := &types.Header{
-		ParentHash: props.parent,
-		Number:     new(big.Int).SetUint64(props.number),
-	}
-	setExtDataHash := true
+	// By default the header commits the ExtDataHash computed from the block's
+	// own ExtData; a caller-supplied hash overrides this to simulate tampering.
+	extDataHash := customtypes.CalcExtDataHash(extData)
 	if props.extDataHash != nil {
-		header = customtypes.WithHeaderExtra(
-			header,
-			&customtypes.HeaderExtra{ExtDataHash: *props.extDataHash},
-		)
-		setExtDataHash = false
+		extDataHash = *props.extDataHash
 	}
-
-	return customtypes.NewBlockWithExtData(
-		header,
-		props.ethTxs,
-		nil, // uncles
-		nil, // receipts
-		saetest.TrieHasher(),
-		extData,
-		setExtDataHash,
+	header := customtypes.WithHeaderExtra(
+		&types.Header{
+			ParentHash: props.parent,
+			Number:     new(big.Int).SetUint64(props.number),
+		},
+		&customtypes.HeaderExtra{ExtDataHash: extDataHash},
 	)
+
+	block := types.NewBlock(header, props.ethTxs, nil /* uncles */, nil /* receipts */, saetest.TrieHasher())
+	extDataCopy := slices.Clone(extData)
+	customtypes.SetBlockExtra(block, &customtypes.BlockBodyExtra{
+		Version: props.version,
+		ExtData: &extDataCopy,
+	})
+	return block
 }
 
 // NewBlock returns a block whose ExtData encodes txs and whose header is

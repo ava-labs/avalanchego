@@ -815,6 +815,11 @@ func TestParseBlock(t *testing.T) {
 			block:   cchaintest.NewTamperedBlock(t, 1, common.Hash{}, tx1),
 			wantErr: errExtDataHashMismatch,
 		},
+		{
+			name:    "invalid_version",
+			block:   cchaintest.NewTestBlock(t, cchaintest.WithBlockVersion(1)),
+			wantErr: errInvalidBlockVersion,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
