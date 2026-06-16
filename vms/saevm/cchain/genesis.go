@@ -163,7 +163,7 @@ func londonBlock(chainID *big.Int) int64 {
 
 var (
 	errNoStoredChainConfig = errors.New("no stored chainConfig")
-	errNoHeadBlock         = errors.New("no head block")
+	errNoHeadHeader        = errors.New("no head header")
 )
 
 // setup configures the database with genesis.
@@ -200,7 +200,7 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 		}
 		head := rawdb.ReadHeadHeader(db)
 		if head == nil {
-			return nil, errNoHeadBlock
+			return nil, errNoHeadHeader
 		}
 		height, timestamp := head.Number.Uint64(), head.Time
 		if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
