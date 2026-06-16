@@ -28,7 +28,7 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 		prometheus.GaugeOpts{
 			Name: "in_memory_blocks",
 			Help: "Number of SAE blocks still live in memory (created but not yet garbage collected).",
-		}, 
+		},
 		func() float64 {
 			return float64(blocks.InMemoryBlockCount())
 		},
