@@ -37,16 +37,21 @@ tasks:
     cmd: >-
       {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
       --setup-args "fetch //main:avalanchego //... -- -//graft/..."
-      --benchmark-args "build //main:avalanchego"
-      --benchmark-args "build --config=race //main:avalanchego"
-      --benchmark-args "test //... -- -//graft/..."
+      --build-benchmark-args "build //main:avalanchego"
+      --build-benchmark-args "build --config=race //main:avalanchego"
+      --test-benchmark-args "test //... -- -//graft/..."
+      --test-impacted-scope "//..."
+      --test-impacted-scope "-//graft/..."
+      --test-impacted-range "${BAZEL_IMPACTED_DIFF_RANGE:-${BAZEL_IMPACTED_BASE_SHA:-HEAD}..}"
 
   bazel-benchmark-remote-cache-ids-test:
-    desc: Benchmark Bazel remote caching for //ids:ids_test
+    desc: Benchmark Bazel remote caching and impacted-target selection for //ids:ids_test
     cmd: >-
       {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
       --setup-args "fetch //ids:ids_test"
-      --benchmark-args "test //ids:ids_test"
+      --test-benchmark-args "test //ids:ids_test"
+      --test-impacted-scope "//ids:ids_test"
+      --test-impacted-range "HEAD.."
       --warm-log-must-contain "(cached) PASSED"
       --warm-log-must-contain "Executed 0 out of 1 test: 1 test passes."
 

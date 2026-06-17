@@ -29,8 +29,10 @@ print_usage() {
   cat <<'EOF'
 Usage: scripts/benchmark_bazel_remote_cache.sh \
   --setup-args 'fetch --all' \
-  --benchmark-args 'build //main:avalanchego' \
-  [--benchmark-args 'build --config=race //main:avalanchego' ...] \
+  [--build-benchmark-args 'build //main:avalanchego' ...] \
+  [--test-benchmark-args 'test //... -- -//graft/...' ...] \
+  [--test-impacted-scope '//...' --test-impacted-scope '-//graft/...'] \
+  [--test-impacted-range 'HEAD..'] \
   [--warm-log-must-contain '(cached) PASSED'] \
   [--warm-log-must-contain 'Executed 0 out of 1 test: 1 test passes.']
 
@@ -38,11 +40,20 @@ Benchmark Bazel remote caching with a CI-style split between:
   1. one measured setup command that populates repository_cache
   2. one or more measured benchmark commands that reuse that repository_cache
 
-For each benchmark command, the script measures three runs with fresh local
+For build benchmark commands, the script measures five runs with fresh local
 Bazel output state each time:
   - no remote cache
-  - cold remote cache (empty cache; populates it)
-  - warm remote cache (reuses the populated cache)
+  - HTTP cold remote cache (empty cache; populates it)
+  - HTTP warm remote cache (reuses the populated cache)
+  - gRPC cold remote cache
+  - gRPC warm remote cache
+
+For test benchmark commands, the script measures four runs with fresh local
+Bazel output state each time:
+  - no remote cache
+  - HTTP cold remote cache
+  - HTTP warm remote cache
+  - impacted-target mode (selector time plus selected-test execution time)
 
 Representative cache latency is determined before the benchmark starts unless
 BAZEL_REMOTE_CACHE_LATENCY_MS is set. In measured mode, the script runs
@@ -51,8 +62,10 @@ BAZEL_REMOTE_CACHE_LATENCY_URL (default: https://ec2.us-east-1.amazonaws.com/),
 then validates that a toxiproxy-induced HTTP path to bazel-remote is within
 BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS of the measured target.
 
-The benchmark fails unless the warm remote-cache run is faster than both the
-no-cache and cold-cache runs for every configured benchmark command.
+The benchmark fails unless each warm remote-cache run is faster than both the
+corresponding no-cache and cold-cache runs for every configured cached
+benchmark command. Impacted-target timings are reported for comparison but are
+not treated as a pass/fail assertion.
 
 By default, setup-side dependency caches are reused across local runs under
 `$XDG_CACHE_HOME/av-bazel-remote-cache-benchmark/` when `XDG_CACHE_HOME` is
@@ -81,7 +94,10 @@ require_cmd jq
 require_cmd mktemp
 
 SETUP_ARGS_SPEC=""
-declare -a BENCHMARK_ARGS_SPECS=()
+declare -a BUILD_BENCHMARK_ARGS_SPECS=()
+declare -a TEST_BENCHMARK_ARGS_SPECS=()
+declare -a TEST_IMPACTED_SCOPES=()
+TEST_IMPACTED_RANGE=""
 declare -a WARM_LOG_MUST_CONTAIN_PATTERNS=()
 
 while [[ $# -gt 0 ]]; do
@@ -92,10 +108,26 @@ while [[ $# -gt 0 ]]; do
       [[ -z "${SETUP_ARGS_SPEC}" ]] || die "--setup-args may only be specified once"
       SETUP_ARGS_SPEC="$1"
       ;;
-    --benchmark-args)
+    --build-benchmark-args)
       shift
-      [[ $# -gt 0 ]] || die "--benchmark-args requires a value"
-      BENCHMARK_ARGS_SPECS+=("$1")
+      [[ $# -gt 0 ]] || die "--build-benchmark-args requires a value"
+      BUILD_BENCHMARK_ARGS_SPECS+=("$1")
+      ;;
+    --test-benchmark-args)
+      shift
+      [[ $# -gt 0 ]] || die "--test-benchmark-args requires a value"
+      TEST_BENCHMARK_ARGS_SPECS+=("$1")
+      ;;
+    --test-impacted-scope)
+      shift
+      [[ $# -gt 0 ]] || die "--test-impacted-scope requires a value"
+      TEST_IMPACTED_SCOPES+=("$1")
+      ;;
+    --test-impacted-range)
+      shift
+      [[ $# -gt 0 ]] || die "--test-impacted-range requires a value"
+      [[ -z "${TEST_IMPACTED_RANGE}" ]] || die "--test-impacted-range may only be specified once"
+      TEST_IMPACTED_RANGE="$1"
       ;;
     --warm-log-must-contain)
       shift
@@ -111,7 +143,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "${SETUP_ARGS_SPEC}" ]] || die "--setup-args is required"
-[[ ${#BENCHMARK_ARGS_SPECS[@]} -gt 0 ]] || die "at least one --benchmark-args is required"
+if [[ ${#BUILD_BENCHMARK_ARGS_SPECS[@]} -eq 0 && ${#TEST_BENCHMARK_ARGS_SPECS[@]} -eq 0 ]]; then
+  die "at least one --build-benchmark-args or --test-benchmark-args is required"
+fi
+if [[ ${#TEST_BENCHMARK_ARGS_SPECS[@]} -gt 0 && ${#TEST_IMPACTED_SCOPES[@]} -eq 0 ]]; then
+  die "at least one --test-impacted-scope is required when --test-benchmark-args is used"
+fi
 
 # Task definitions are the intended configuration layer for this script, so the
 # CLI accepts shell-style strings like 'build --config=race //main:avalanchego'.
@@ -398,24 +435,26 @@ print_failure_context() {
   grep -E '^(ERROR:|INFO: Repository )|Error in fail:|i/o timeout|timed out|copy_file_range: is a directory|no such file or directory|reading ../../go.mod' "${log_file}" | head -n 40 >&2 || true
 }
 
-run_bazel_command() {
+run_bazel_argv() {
   local phase_name="$1"
-  local command_spec="$2"
+  local command_text="$2"
   local remote_cache="$3"
   local output_base="$4"
   local log_file="$5"
   local timeout_seconds="$6"
   local fail_fast_mode="$7"
+  shift 7
   local start end elapsed status
-  local -a cmd
+  local -a cmd command_args
 
-  load_command_array "${command_spec}"
+  command_args=("$@")
+  [[ ${#command_args[@]} -gt 0 ]] || die "command argv must not be empty for phase ${phase_name}"
 
   # --output_base is a Bazel startup flag, but --repository_cache is a command
   # flag, so they must be placed on opposite sides of the subcommand token.
   cmd=("${NIX_RUN}" bazelisk
     "--output_base=${output_base}"
-    "${PARSED_COMMAND_ARGS[0]}"
+    "${command_args[0]}"
     --color=no
     --curses=no
     --show_progress_rate_limit=60
@@ -435,13 +474,13 @@ run_bazel_command() {
     cmd+=(--remote_cache=)
   fi
 
-  if [[ ${#PARSED_COMMAND_ARGS[@]} -gt 1 ]]; then
-    cmd+=("${PARSED_COMMAND_ARGS[@]:1}")
+  if [[ ${#command_args[@]} -gt 1 ]]; then
+    cmd+=("${command_args[@]:1}")
   fi
 
   echo >&2
   echo "==> ${phase_name}" >&2
-  echo "command: bazelisk ${command_spec}" >&2
+  echo "command: bazelisk ${command_text}" >&2
   if [[ -n "${remote_cache}" ]]; then
     echo "remote_cache: ${remote_cache}" >&2
   else
@@ -478,6 +517,27 @@ run_bazel_command() {
     echo "summary: ${summary}" >&2
   fi
   printf '%s\n' "${elapsed}"
+}
+
+run_bazel_command() {
+  local phase_name="$1"
+  local command_spec="$2"
+  local remote_cache="$3"
+  local output_base="$4"
+  local log_file="$5"
+  local timeout_seconds="$6"
+  local fail_fast_mode="$7"
+
+  load_command_array "${command_spec}"
+  run_bazel_argv \
+    "${phase_name}" \
+    "${command_spec}" \
+    "${remote_cache}" \
+    "${output_base}" \
+    "${log_file}" \
+    "${timeout_seconds}" \
+    "${fail_fast_mode}" \
+    "${PARSED_COMMAND_ARGS[@]}"
 }
 
 less_than() {
@@ -729,53 +789,170 @@ run_cached_pair() {
   printf '%s\n%s\n' "${cold_time}" "${warm_time}"
 }
 
-declare -a RESULT_LABELS=()
-declare -a RESULT_NO_CACHE_TIMES=()
-declare -a RESULT_HTTP_COLD_TIMES=()
-declare -a RESULT_HTTP_WARM_TIMES=()
-declare -a RESULT_GRPC_COLD_TIMES=()
-declare -a RESULT_GRPC_WARM_TIMES=()
-all_passed=true
+resolve_test_impacted_range() {
+  if [[ -n "${TEST_IMPACTED_RANGE}" ]]; then
+    printf '%s\n' "${TEST_IMPACTED_RANGE}"
+    return 0
+  fi
+  if [[ -n "${BAZEL_IMPACTED_DIFF_RANGE:-}" ]]; then
+    printf '%s\n' "${BAZEL_IMPACTED_DIFF_RANGE}"
+    return 0
+  fi
+  if [[ -n "${BAZEL_IMPACTED_BASE_SHA:-}" ]]; then
+    printf '%s..\n' "${BAZEL_IMPACTED_BASE_SHA}"
+    return 0
+  fi
+  printf 'HEAD..\n'
+}
 
-for index in "${!BENCHMARK_ARGS_SPECS[@]}"; do
-  benchmark_spec="${BENCHMARK_ARGS_SPECS[index]}"
-  label="${benchmark_spec}"
+resolve_bazel_built_file() {
+  local output_base="$1"
+  local label="$2"
+  local built_file
+
+  built_file="$("${NIX_RUN}" bazelisk "--output_base=${output_base}" cquery --output=files "${label}" 2>/dev/null)"
+  [[ -n "${built_file}" ]] || die "no built file found for ${label}"
+  if [[ "${built_file}" != /* ]]; then
+    built_file="${REPO_ROOT}/${built_file}"
+  fi
+  printf '%s\n' "${built_file}"
+}
+
+run_impacted_test_pair() {
+  local benchmark_index="$1"
+  local benchmark_spec="$2"
+  local selector_output_base="$3"
+  local selector_log_file="$4"
+  local execution_output_base="$5"
+  local execution_log_file="$6"
+  local impacted_range selector_time selector_build_time selector_exec_time execution_time target_count
+  local manifest_file selector_tool selector_start selector_end
+  local -a selector_args execution_args
+
+  impacted_range="$(resolve_test_impacted_range)"
+  manifest_file="${TMP_ROOT}/impacted-manifest-${benchmark_index}.txt"
+
+  selector_build_time="$(run_bazel_command \
+    "impacted-selector-build (${benchmark_spec})" \
+    "build //tools/impactedtests:impactedtests_bin" \
+    "" \
+    "${selector_output_base}" \
+    "${selector_log_file}" \
+    "${BENCHMARK_TIMEOUT_SECONDS}" \
+    0)"
+  selector_tool="$(resolve_bazel_built_file "${selector_output_base}" "//tools/impactedtests:impactedtests_bin")"
+
+  selector_args=(manifest --range "${impacted_range}" --output "${manifest_file}")
+  for scope in "${TEST_IMPACTED_SCOPES[@]}"; do
+    selector_args+=(--scope "${scope}")
+  done
+
+  echo >&2
+  echo "==> impacted-selector (${benchmark_spec})" >&2
+  echo "command: ${selector_tool} ${selector_args[*]}" >&2
+  echo "output_base: ${selector_output_base}" >&2
+
+  selector_start="$(now_seconds)"
+  set +e
+  run_logged_command "${BENCHMARK_TIMEOUT_SECONDS}" 0 "${selector_log_file}" "${selector_tool}" "${selector_args[@]}"
+  status=$?
+  set -e
+  if [[ ${status} -ne 0 ]]; then
+    echo "log: ${selector_log_file}" >&2
+    tail -n 40 "${selector_log_file}" >&2 || true
+    die "impacted-selector (${benchmark_spec}) failed"
+  fi
+  selector_end="$(now_seconds)"
+  selector_exec_time="$(format_seconds "${selector_start}" "${selector_end}")"
+  selector_time="$(add_times "${selector_build_time}" "${selector_exec_time}")"
+  echo "selector build time: ${selector_build_time}s" >&2
+  echo "selector execution time: ${selector_exec_time}s" >&2
+  echo "selector total time: ${selector_time}s" >&2
+  remove_output_base "${selector_output_base}"
+
+  if [[ ! -f "${manifest_file}" ]]; then
+    die "impacted selector did not write manifest file: ${manifest_file}"
+  fi
+
+  target_count="$(awk 'END { print NR }' "${manifest_file}")"
+  if [[ ! -s "${manifest_file}" ]]; then
+    execution_time="0.000"
+    printf '%s\n%s\n%s\n' "${selector_time}" "${execution_time}" "${target_count}"
+    return 0
+  fi
+
+  mapfile -t execution_args < "${manifest_file}"
+  execution_args=(test "${execution_args[@]}")
+  execution_time="$(run_bazel_argv \
+    "impacted-execution (${benchmark_spec})" \
+    "test $(paste -sd ' ' "${manifest_file}")" \
+    "" \
+    "${execution_output_base}" \
+    "${execution_log_file}" \
+    "${BENCHMARK_TIMEOUT_SECONDS}" \
+    0 \
+    "${execution_args[@]}")"
+  remove_output_base "${execution_output_base}"
+
+  printf '%s\n%s\n%s\n' "${selector_time}" "${execution_time}" "${target_count}"
+}
+
+add_times() {
+  awk -v left="$1" -v right="$2" 'BEGIN { printf "%.3f", (left + right) }'
+}
+
+declare -a BUILD_RESULT_LABELS=()
+declare -a BUILD_RESULT_NO_CACHE_TIMES=()
+declare -a BUILD_RESULT_HTTP_COLD_TIMES=()
+declare -a BUILD_RESULT_HTTP_WARM_TIMES=()
+declare -a BUILD_RESULT_GRPC_COLD_TIMES=()
+declare -a BUILD_RESULT_GRPC_WARM_TIMES=()
+declare -a TEST_RESULT_LABELS=()
+declare -a TEST_RESULT_NO_CACHE_TIMES=()
+declare -a TEST_RESULT_HTTP_COLD_TIMES=()
+declare -a TEST_RESULT_HTTP_WARM_TIMES=()
+declare -a TEST_RESULT_IMPACTED_SELECTOR_TIMES=()
+declare -a TEST_RESULT_IMPACTED_EXECUTION_TIMES=()
+declare -a TEST_RESULT_IMPACTED_TOTAL_TIMES=()
+declare -a TEST_RESULT_IMPACTED_TARGET_COUNTS=()
+all_passed=true
+benchmark_index=0
+
+for build_spec in "${BUILD_BENCHMARK_ARGS_SPECS[@]}"; do
+  label="${build_spec}"
 
   echo
-  echo "Benchmark: bazelisk ${label}"
+  echo "Build benchmark: bazelisk ${label}"
   echo "========================================"
 
-  no_cache_output_base="${TMP_ROOT}/output-base-benchmark-${index}-no-cache"
-  http_cold_output_base="${TMP_ROOT}/output-base-benchmark-${index}-http-cold-remote"
-  http_warm_output_base="${TMP_ROOT}/output-base-benchmark-${index}-http-warm-remote"
-  grpc_cold_output_base="${TMP_ROOT}/output-base-benchmark-${index}-grpc-cold-remote"
-  grpc_warm_output_base="${TMP_ROOT}/output-base-benchmark-${index}-grpc-warm-remote"
-  # Each benchmark command gets its own empty remote cache so the protocol-
-  # specific cold/warm runs are actually cold for that command instead of
-  # inheriting artifacts from a prior benchmark section.
-  benchmark_remote_cache_dir="${CACHE_DIR}/benchmark-${index}"
+  no_cache_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-no-cache"
+  http_cold_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-http-cold-remote"
+  http_warm_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-http-warm-remote"
+  grpc_cold_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-grpc-cold-remote"
+  grpc_warm_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-grpc-warm-remote"
+  benchmark_remote_cache_dir="${CACHE_DIR}/benchmark-${benchmark_index}"
   mkdir -p "${benchmark_remote_cache_dir}"
 
-  no_cache_time="$(run_bazel_command "no-cache (${label})" "${benchmark_spec}" "" "${no_cache_output_base}" "${LOG_DIR}/benchmark-${index}-no-cache.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
+  no_cache_time="$(run_bazel_command "no-cache (${label})" "${build_spec}" "" "${no_cache_output_base}" "${LOG_DIR}/benchmark-${benchmark_index}-no-cache.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
   remove_output_base "${no_cache_output_base}"
 
-  start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${index}-bazel-remote.log"
+  start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${benchmark_index}-bazel-remote.log"
   remote_cache_url="${REMOTE_HTTP_URL}"
   remote_cache_grpc_target="${REMOTE_GRPC_TARGET}"
-  echo "Using bazel-remote HTTP endpoint for benchmark ${index}: ${remote_cache_url}"
-  echo "Using bazel-remote gRPC endpoint for benchmark ${index}: ${remote_cache_grpc_target}"
+  echo "Using bazel-remote HTTP endpoint for benchmark ${benchmark_index}: ${remote_cache_url}"
+  echo "Using bazel-remote gRPC endpoint for benchmark ${benchmark_index}: ${remote_cache_grpc_target}"
 
-  proxied_http_remote_cache_url="$(create_http_latency_proxy "${remote_cache_url}" "benchmark-${index}-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
-  echo "Using proxied bazel-remote HTTP endpoint for benchmark ${index}: ${proxied_http_remote_cache_url}"
+  proxied_http_remote_cache_url="$(create_http_latency_proxy "${remote_cache_url}" "benchmark-${benchmark_index}-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
+  echo "Using proxied bazel-remote HTTP endpoint for benchmark ${benchmark_index}: ${proxied_http_remote_cache_url}"
 
   mapfile -t http_cache_times < <(run_cached_pair \
     "http" \
-    "${benchmark_spec}" \
+    "${build_spec}" \
     "${proxied_http_remote_cache_url}" \
     "${http_cold_output_base}" \
     "${http_warm_output_base}" \
-    "${LOG_DIR}/benchmark-${index}-http-cold-remote.log" \
-    "${LOG_DIR}/benchmark-${index}-http-warm-remote.log")
+    "${LOG_DIR}/benchmark-${benchmark_index}-http-cold-remote.log" \
+    "${LOG_DIR}/benchmark-${benchmark_index}-http-warm-remote.log")
   http_cold_time="${http_cache_times[0]}"
   http_warm_time="${http_cache_times[1]}"
 
@@ -783,34 +960,34 @@ for index in "${!BENCHMARK_ARGS_SPECS[@]}"; do
   rm -rf "${benchmark_remote_cache_dir}"
   mkdir -p "${benchmark_remote_cache_dir}"
 
-  start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${index}-grpc-bazel-remote.log"
+  start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${benchmark_index}-grpc-bazel-remote.log"
   remote_cache_url="${REMOTE_HTTP_URL}"
   remote_cache_grpc_target="${REMOTE_GRPC_TARGET}"
-  echo "Using bazel-remote HTTP endpoint for benchmark ${index} gRPC pair: ${remote_cache_url}"
-  echo "Using bazel-remote gRPC endpoint for benchmark ${index} gRPC pair: ${remote_cache_grpc_target}"
+  echo "Using bazel-remote HTTP endpoint for benchmark ${benchmark_index} gRPC pair: ${remote_cache_url}"
+  echo "Using bazel-remote gRPC endpoint for benchmark ${benchmark_index} gRPC pair: ${remote_cache_grpc_target}"
 
-  proxied_grpc_remote_cache_url="$(create_grpc_latency_proxy "${remote_cache_grpc_target}" "benchmark-${index}-grpc-cache" "${REPRESENTATIVE_LATENCY_MS}")"
-  echo "Using proxied bazel-remote gRPC endpoint for benchmark ${index}: ${proxied_grpc_remote_cache_url}"
+  proxied_grpc_remote_cache_url="$(create_grpc_latency_proxy "${remote_cache_grpc_target}" "benchmark-${benchmark_index}-grpc-cache" "${REPRESENTATIVE_LATENCY_MS}")"
+  echo "Using proxied bazel-remote gRPC endpoint for benchmark ${benchmark_index}: ${proxied_grpc_remote_cache_url}"
 
   mapfile -t grpc_cache_times < <(run_cached_pair \
     "grpc" \
-    "${benchmark_spec}" \
+    "${build_spec}" \
     "${proxied_grpc_remote_cache_url}" \
     "${grpc_cold_output_base}" \
     "${grpc_warm_output_base}" \
-    "${LOG_DIR}/benchmark-${index}-grpc-cold-remote.log" \
-    "${LOG_DIR}/benchmark-${index}-grpc-warm-remote.log")
+    "${LOG_DIR}/benchmark-${benchmark_index}-grpc-cold-remote.log" \
+    "${LOG_DIR}/benchmark-${benchmark_index}-grpc-warm-remote.log")
   grpc_cold_time="${grpc_cache_times[0]}"
   grpc_warm_time="${grpc_cache_times[1]}"
 
   stop_bazel_remote
 
-  RESULT_LABELS+=("${label}")
-  RESULT_NO_CACHE_TIMES+=("${no_cache_time}")
-  RESULT_HTTP_COLD_TIMES+=("${http_cold_time}")
-  RESULT_HTTP_WARM_TIMES+=("${http_warm_time}")
-  RESULT_GRPC_COLD_TIMES+=("${grpc_cold_time}")
-  RESULT_GRPC_WARM_TIMES+=("${grpc_warm_time}")
+  BUILD_RESULT_LABELS+=("${label}")
+  BUILD_RESULT_NO_CACHE_TIMES+=("${no_cache_time}")
+  BUILD_RESULT_HTTP_COLD_TIMES+=("${http_cold_time}")
+  BUILD_RESULT_HTTP_WARM_TIMES+=("${http_warm_time}")
+  BUILD_RESULT_GRPC_COLD_TIMES+=("${grpc_cold_time}")
+  BUILD_RESULT_GRPC_WARM_TIMES+=("${grpc_warm_time}")
 
   if ! less_than "${http_warm_time}" "${no_cache_time}"; then
     echo "FAIL: warm HTTP remote cache was not faster than no cache for: bazelisk ${label}" >&2
@@ -829,37 +1006,126 @@ for index in "${!BENCHMARK_ARGS_SPECS[@]}"; do
     all_passed=false
   fi
   if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]] \
-    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${index}-http-warm-remote.log"; then
+    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${benchmark_index}-http-warm-remote.log"; then
     echo "FAIL: warm HTTP remote cache log did not contain required patterns for: bazelisk ${label}" >&2
     all_passed=false
   fi
   if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]] \
-    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${index}-grpc-warm-remote.log"; then
+    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${benchmark_index}-grpc-warm-remote.log"; then
     echo "FAIL: warm gRPC remote cache log did not contain required patterns for: bazelisk ${label}" >&2
     all_passed=false
   fi
+
+  benchmark_index=$((benchmark_index + 1))
+done
+
+for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
+  label="${test_spec}"
+
+  echo
+  echo "Test benchmark: bazelisk ${label}"
+  echo "========================================"
+
+  no_cache_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-no-cache"
+  http_cold_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-http-cold-remote"
+  http_warm_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-http-warm-remote"
+  selector_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-impacted-selector"
+  impacted_execution_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-impacted-execution"
+  benchmark_remote_cache_dir="${CACHE_DIR}/benchmark-${benchmark_index}"
+  mkdir -p "${benchmark_remote_cache_dir}"
+
+  no_cache_time="$(run_bazel_command "no-cache (${label})" "${test_spec}" "" "${no_cache_output_base}" "${LOG_DIR}/benchmark-${benchmark_index}-no-cache.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
+  remove_output_base "${no_cache_output_base}"
+
+  start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${benchmark_index}-bazel-remote.log"
+  remote_cache_url="${REMOTE_HTTP_URL}"
+  echo "Using bazel-remote HTTP endpoint for benchmark ${benchmark_index}: ${remote_cache_url}"
+
+  proxied_http_remote_cache_url="$(create_http_latency_proxy "${remote_cache_url}" "benchmark-${benchmark_index}-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
+  echo "Using proxied bazel-remote HTTP endpoint for benchmark ${benchmark_index}: ${proxied_http_remote_cache_url}"
+
+  mapfile -t http_cache_times < <(run_cached_pair \
+    "http" \
+    "${test_spec}" \
+    "${proxied_http_remote_cache_url}" \
+    "${http_cold_output_base}" \
+    "${http_warm_output_base}" \
+    "${LOG_DIR}/benchmark-${benchmark_index}-http-cold-remote.log" \
+    "${LOG_DIR}/benchmark-${benchmark_index}-http-warm-remote.log")
+  http_cold_time="${http_cache_times[0]}"
+  http_warm_time="${http_cache_times[1]}"
+
+  stop_bazel_remote
+
+  mapfile -t impacted_times < <(run_impacted_test_pair \
+    "${benchmark_index}" \
+    "${test_spec}" \
+    "${selector_output_base}" \
+    "${LOG_DIR}/benchmark-${benchmark_index}-impacted-selector.log" \
+    "${impacted_execution_output_base}" \
+    "${LOG_DIR}/benchmark-${benchmark_index}-impacted-execution.log")
+  impacted_selector_time="${impacted_times[0]}"
+  impacted_execution_time="${impacted_times[1]}"
+  impacted_target_count="${impacted_times[2]}"
+  impacted_total_time="$(add_times "${impacted_selector_time}" "${impacted_execution_time}")"
+
+  TEST_RESULT_LABELS+=("${label}")
+  TEST_RESULT_NO_CACHE_TIMES+=("${no_cache_time}")
+  TEST_RESULT_HTTP_COLD_TIMES+=("${http_cold_time}")
+  TEST_RESULT_HTTP_WARM_TIMES+=("${http_warm_time}")
+  TEST_RESULT_IMPACTED_SELECTOR_TIMES+=("${impacted_selector_time}")
+  TEST_RESULT_IMPACTED_EXECUTION_TIMES+=("${impacted_execution_time}")
+  TEST_RESULT_IMPACTED_TOTAL_TIMES+=("${impacted_total_time}")
+  TEST_RESULT_IMPACTED_TARGET_COUNTS+=("${impacted_target_count}")
+
+  if ! less_than "${http_warm_time}" "${no_cache_time}"; then
+    echo "FAIL: warm HTTP remote cache was not faster than no cache for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
+  if ! less_than "${http_warm_time}" "${http_cold_time}"; then
+    echo "FAIL: warm HTTP remote cache was not faster than cold HTTP remote cache for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
+  if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]] \
+    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${benchmark_index}-http-warm-remote.log"; then
+    echo "FAIL: warm HTTP remote cache log did not contain required patterns for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
+
+  benchmark_index=$((benchmark_index + 1))
 done
 
 echo
 echo "Benchmark results"
 echo "-----------------"
 printf 'setup %-63s %8ss\n' "bazelisk ${SETUP_ARGS_SPEC}" "${setup_time}"
-for index in "${!RESULT_LABELS[@]}"; do
+for index in "${!BUILD_RESULT_LABELS[@]}"; do
   echo
-  echo "bazelisk ${RESULT_LABELS[index]}"
-  printf '  no-cache   %20ss\n' "${RESULT_NO_CACHE_TIMES[index]}"
-  printf '  http-cold  %20ss\n' "${RESULT_HTTP_COLD_TIMES[index]}"
-  printf '  http-warm  %20ss\n' "${RESULT_HTTP_WARM_TIMES[index]}"
-  printf '  grpc-cold  %20ss\n' "${RESULT_GRPC_COLD_TIMES[index]}"
-  printf '  grpc-warm  %20ss\n' "${RESULT_GRPC_WARM_TIMES[index]}"
+  echo "bazelisk ${BUILD_RESULT_LABELS[index]}"
+  printf '  no-cache   %20ss\n' "${BUILD_RESULT_NO_CACHE_TIMES[index]}"
+  printf '  http-cold  %20ss\n' "${BUILD_RESULT_HTTP_COLD_TIMES[index]}"
+  printf '  http-warm  %20ss\n' "${BUILD_RESULT_HTTP_WARM_TIMES[index]}"
+  printf '  grpc-cold  %20ss\n' "${BUILD_RESULT_GRPC_COLD_TIMES[index]}"
+  printf '  grpc-warm  %20ss\n' "${BUILD_RESULT_GRPC_WARM_TIMES[index]}"
+done
+for index in "${!TEST_RESULT_LABELS[@]}"; do
+  echo
+  echo "bazelisk ${TEST_RESULT_LABELS[index]}"
+  printf '  no-cache            %12ss\n' "${TEST_RESULT_NO_CACHE_TIMES[index]}"
+  printf '  http-cold           %12ss\n' "${TEST_RESULT_HTTP_COLD_TIMES[index]}"
+  printf '  http-warm           %12ss\n' "${TEST_RESULT_HTTP_WARM_TIMES[index]}"
+  printf '  impacted-selector   %12ss\n' "${TEST_RESULT_IMPACTED_SELECTOR_TIMES[index]}"
+  printf '  impacted-execution  %12ss\n' "${TEST_RESULT_IMPACTED_EXECUTION_TIMES[index]}"
+  printf '  impacted-total      %12ss\n' "${TEST_RESULT_IMPACTED_TOTAL_TIMES[index]}"
+  printf '  impacted-targets    %12s\n' "${TEST_RESULT_IMPACTED_TARGET_COUNTS[index]}"
 done
 
 if [[ "${all_passed}" != true ]]; then
   exit 1
 fi
 
-echo "PASS: warm HTTP and gRPC remote cache runs were faster than both no cache and their corresponding cold remote cache runs for every benchmark command"
+echo "PASS: warm remote cache runs were faster than both no cache and their corresponding cold remote cache runs for every cached benchmark command"
 if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]]; then
-  echo "PASS: warm HTTP and gRPC remote cache logs contained all required patterns"
+  echo "PASS: warm remote cache logs contained all required patterns"
 fi
 SUCCESS=true
