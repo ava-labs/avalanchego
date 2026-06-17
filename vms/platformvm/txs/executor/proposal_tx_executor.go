@@ -716,10 +716,10 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 	return nil
 }
 
-// createRewardsUTXOs adds reward UTXOs to state at output indices starting
+// createRewardsUTXOs adds reward UTXOs to chainState at output indices starting
 // after the tx's own outputs.
 //
-// It must be called at most once per state per execution: the output
+// It must be called at most once per chainState per execution: the output
 // indices are derived from len(e.tx.Unsigned.Outputs()) and do not account for
 // UTXOs a prior call already added to the same diff, so a second call would
 // reuse the same (txID, outputIndex) pairs and collide on UTXO IDs.
@@ -727,7 +727,7 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	validationRewards uint64,
 	delegateeRewards uint64,
-	state *state.Diff,
+	chainState *state.Diff,
 ) error {
 	avaxAsset := avax.Asset{ID: e.backend.Ctx.AVAXAssetID}
 	outputIndexOffset := uint32(len(e.tx.Unsigned.Outputs()))
@@ -738,8 +738,8 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 		if err != nil {
 			return err
 		}
-		state.AddUTXO(utxo)
-		state.AddRewardUTXO(e.tx.ID(), utxo)
+		chainState.AddUTXO(utxo)
+		chainState.AddRewardUTXO(e.tx.ID(), utxo)
 		outputIndexOffset++
 	}
 
@@ -749,8 +749,8 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 		if err != nil {
 			return err
 		}
-		state.AddUTXO(utxo)
-		state.AddRewardUTXO(e.tx.ID(), utxo)
+		chainState.AddUTXO(utxo)
+		chainState.AddRewardUTXO(e.tx.ID(), utxo)
 	}
 
 	return nil
