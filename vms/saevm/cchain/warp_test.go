@@ -53,7 +53,7 @@ func (s *SUT) signWarpMessage(
 		},
 		&response,
 	)
-	require.Nilf(tb, appErr, "signing %s", msg.ID())
+	require.Nilf(tb, appErr, "%T.appRequest(%d, %s)", s, acp118.HandlerID, msg.ID())
 
 	sig, err := bls.SignatureFromBytes(response.Signature)
 	require.NoError(tb, err, "bls.SignatureFromBytes(...)")
