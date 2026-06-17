@@ -67,6 +67,13 @@ func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
 	return func(yield func(*blocks.Block, error) bool) {
 		lastAcceptedHash := rawdb.ReadHeadFastBlockHash(rec.db)
+		if lastAcceptedHash == (common.Hash{}) {
+			// No blocks have been accepted in SAE, so any previously executed block MUST
+			// have been synchronous. Thus, the associated state MUST have been committed.
+			// Therefore, the set of accepted, unexecuted blocks is empty.
+			return
+		}
+
 		for curr := parent; curr.Hash() != lastAcceptedHash; {
 			b, err := rec.newCanonicalBlock(curr.Height()+1, curr)
 			if !yield(b, err) || err != nil {
