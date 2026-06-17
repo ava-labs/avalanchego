@@ -475,6 +475,276 @@ It should answer:
 That answer should clarify whether selective-target complexity is justified only
 for tests, while remote cache remains the primary optimization for builds.
 
+## Current findings from the impacted-target benchmark extension
+The exploratory benchmark was narrowed to the **best-case** question for tests:
+
+- populate a warm HTTP remote cache for `test //... -- -//graft/...`
+- rerun the same full-scope test command against that warm cache
+- compare that with an explicitly **empty** impacted-target range, where the
+  selector should return zero tests
+
+This is the comparison that matters when remote cache is assumed to exist
+anyway and impacted targets is being evaluated only as an additional
+optimization for the “run nothing” case.
+
+### Why only the best case matters here
+For this line of investigation, the important product question is not whether
+impacted targets helps in every case. Remote cache is already assumed to be the
+baseline optimization. Impacted targets is only interesting as an extra layer
+when the correct answer is that **no tests should run**.
+
+So the meaningful comparison is:
+- **warm full-scope Bazel test invocation**
+- versus
+- **impacted-target selection returning an empty set**
+
+If some tests actually need to run, remote cache is still required and the
+selective-target path has a much higher bar to justify its extra complexity.
+
+### Best-case benchmark results
+Observed CI results for the best-case empty-manifest comparison:
+
+#### linux-amd64
+- setup fetch: `56.965s`
+- warm-cache seed run: `779.380s`
+- warm-cache rerun: `95.668s`
+- impacted selector total: `71.491s`
+- impacted execution: `0.000s`
+- impacted selected targets: `0`
+
+Interpretation:
+- empty impacted-target selection beat warm full-scope cache reuse by about
+  `24s`
+- this is directionally meaningful but not dramatic; on Linux the best-case win
+  is roughly in the 20–25% range
+
+#### darwin-arm64
+- setup fetch: `100.579s`
+- warm-cache seed run: `1068.434s`
+- warm-cache rerun: `187.155s`
+- impacted selector total: `99.829s`
+- impacted execution: `0.000s`
+- impacted selected targets: `0`
+
+Interpretation:
+- empty impacted-target selection beat warm full-scope cache reuse by about
+  `87s`
+- the relative win is much larger on macOS because the warm full-scope Bazel
+  path is substantially more expensive there than the selector path
+
+### Non-best-case observation
+An earlier run against a **non-empty** impacted set selected a large number of
+main-module tests and showed the selective path performing worse than the warm
+full-scope cached run. That is consistent with the intended interpretation:
+- impacted targets is not attractive when many tests still need to run
+- the only case that really matters for deciding whether to add this complexity
+  is the empty-set best case
+
+### Practical takeaway so far
+Current takeaway from the exploratory benchmark:
+- warm remote cache already delivers large value on CI-style Bazel workloads
+- impacted-target selection appears to provide only a **modest** extra win on
+  Linux in the empty-set best case, though the macOS result is more favorable
+- this suggests selective-target complexity is not obviously compelling as a
+  universal in-job optimization over warm cache alone, at least in the current
+  GitHub Actions model
+
+### CI-architecture implication worth remembering
+This benchmark was run in a GitHub Actions workflow where jobs are declared
+statically, so the selector only competes with Bazel **inside an already
+created job**.
+
+A future dynamic-pipeline CI system (for example Buildkite) could use the same
+kind of change/impact analysis earlier, before most jobs are created. In that
+model, impacted-target selection could avoid per-job startup and setup costs in
+addition to Bazel execution costs. That likely makes change-based selection more
+attractive there than it appears in static-job GitHub Actions.
+
+Treat that as an architectural implication to revisit later rather than as a
+conclusion already proven by this benchmark.
+
+### What to preserve for future sessions
+The successful outcome of this exploratory work was learning that the benchmark
+must distinguish between:
+- the large already-demonstrated value of warm remote caching itself
+- the narrower incremental value of impacted-target selection on top of that
+
+Future follow-up should preserve and extend actual numbers for:
+- setup fetch cost
+- warm-cache seed cost
+- warm-cache rerun cost
+- empty impacted-target selector cost
+- any later repeated measurements needed to understand variance across runners
+
+If this work resumes later, the next likely need is not more architecture
+guessing but **more collected statistics** comparing caching versus not caching
+and, separately, the empty-set incremental benefit of impacted-target selection
+on top of caching.
+
+## Current benchmark/task state
+The benchmark harness and Taskfile are now intentionally split so future
+sessions do not have to rediscover the current operational shape:
+
+- `task bazel-benchmark-remote-cache`
+  - currently runs the **best-case test-only benchmark**
+  - scope: `test //... -- -//graft/...`
+  - comparison: warm cached full-scope rerun vs explicitly empty impacted set
+- `task bazel-benchmark-remote-cache-builds`
+  - currently runs the **build-only remote-cache matrix**
+  - workloads:
+    - `build //main:avalanchego`
+    - `build --config=race //main:avalanchego`
+- `task bazel-benchmark-remote-cache-ids-test`
+  - remains the narrow smoke task for quickly validating benchmark behavior on
+    `//ids:ids_test`
+
+This split exists because combining the full build matrix and the full test
+matrix into one PR benchmark job made CI runtime unreasonable for exploratory
+use. Future sessions should preserve that lesson unless they intentionally move
+these measurements into separate workflows, manual jobs, or another CI system.
+
+## CI/runtime lesson from this session
+A key operational finding from this work is that the benchmark questions should
+not all be forced into one PR job.
+
+What happened:
+- the benchmark initially expanded from build-only measurements into a combined
+  build+test benchmark
+- that produced hour-scale runtime and made the PR job look hung
+- the underlying problem was not the impacted-target idea itself; it was trying
+  to collect too many long-running measurements in a single observational job
+
+Practical implication:
+- keep the **best-case empty-set test comparison** small and focused
+- collect the **full cache matrix** for builds and tests separately when needed
+- treat broad statistics gathering as a deliberate follow-up exercise, not as
+  something that should automatically run inside one default PR benchmark job
+
+## Startup/readiness bug already found and fixed
+A Linux CI timeout during this work turned out not to be a mysterious Bazel
+hang, but a benchmark-script bug in daemon startup handling.
+
+Previous bug:
+- `start_bazel_remote` and `start_toxiproxy` launched long-lived background
+  daemons
+- after a single fixed sleep, the script called `wait` when readiness checks
+  were not yet passing
+- if a daemon was healthy but still starting, the script could block forever on
+  `wait` for a process that was not supposed to exit
+
+Current fix:
+- both helpers now poll readiness for a bounded period
+- `bazel-remote` readiness is checked via HTTP
+- `toxiproxy` readiness is checked via `toxiproxy-cli list`
+- the helpers only kill/wait when startup genuinely fails
+
+Future sessions should treat that bug as already understood. If a benchmark job
+appears stuck in similar early startup phases again, inspect readiness polling
+or the underlying services — not the old single-sleep-plus-wait behavior.
+
+## Full measurement set still desired
+The best-case empty-set comparison above answered one narrow exploratory
+question, but it is **not** the complete dataset needed for documenting the
+overall tradeoffs and recommending a direction.
+
+The broader numbers still needed are:
+
+### Remote-cache matrix for real Bazel workloads
+For representative CI workloads, collect:
+- no cache
+- HTTP cold
+- HTTP warm
+- gRPC cold
+- gRPC warm
+
+This should cover both:
+- build workloads
+- test workloads
+
+That dataset is what supports statements about:
+- the total value of remote caching itself
+- the difference between cold and warm cache behavior
+- whether HTTP is operationally sufficient
+- whether gRPC is worth the extra requirement/complexity
+
+### Impacted-target comparison layered on top of test workloads
+For test workloads, collect impacted-target measurements alongside the cache
+matrix, including at least:
+- impacted selector time
+- impacted execution time
+- impacted total time
+- impacted selected target count
+
+And preserve at least two selector scenarios:
+- **empty impacted set** — the best-case “run nothing” decision path
+- **non-empty impacted set** — so later writeups can show where the selective
+  path stops being competitive with warm cache
+
+## Recommended next steps for future data collection
+To support later documentation and recommendation writing, the next session on
+this work should collect and organize a fuller table of numbers rather than
+continuing to reshape the benchmark architecture.
+
+### 1. Re-run the full remote-cache matrix for builds
+Collect CI numbers for build workloads with:
+- no cache
+- HTTP cold
+- HTTP warm
+- gRPC cold
+- gRPC warm
+
+Suggested workloads:
+- `build //main:avalanchego`
+- `build --config=race //main:avalanchego`
+
+### 2. Re-run the full remote-cache matrix for tests
+Collect CI numbers for the representative test workload with:
+- no cache
+- HTTP cold
+- HTTP warm
+- gRPC cold
+- gRPC warm
+
+Suggested workload:
+- `test //... -- -//graft/...`
+
+This may need to run in a separate observational task/workflow from the current
+best-case benchmark if runtime becomes too large for one CI job.
+
+### 3. Preserve the best-case empty impacted-target comparison
+Keep collecting the empty-set comparison for the same test scope:
+- warm cached full-scope rerun
+- empty impacted-target selector path
+
+This is the key number for evaluating whether impacted targets is worth keeping
+as an incremental optimization on top of remote cache.
+
+### 4. Collect at least one non-empty impacted-target comparison
+Use a known range or fixture that selects a non-trivial but bounded test set so
+future documentation can show the contrast between:
+- empty impacted set
+- non-empty impacted set
+- warm cached full-scope execution
+
+### 5. Summarize results in a durable comparison table
+Future writeups should be able to cite one compact table containing, per runner
+class and workload:
+- setup fetch
+- no cache
+- HTTP cold
+- HTTP warm
+- gRPC cold
+- gRPC warm
+- impacted selector
+- impacted execution
+- impacted total
+- impacted target count
+
+That table is the artifact needed for documenting:
+- what remote caching buys on its own
+- how much more impacted targets buys, if anything
+- whether the additional selective-target complexity is justified
+
 ### New question
 The benchmark should answer:
 - how much remote-cache latency changes the payoff of cache hits
