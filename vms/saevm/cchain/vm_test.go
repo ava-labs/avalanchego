@@ -836,3 +836,36 @@ func TestParseBlock(t *testing.T) {
 		})
 	}
 }
+
+// TestSettledMarkerRoundTrip verifies that a block built by the VM carries the
+// settled marker in its header and that the marker survives RLP serialization
+// and re-parsing.
+func TestSettledMarkerRoundTrip(t *testing.T) {
+	sk := txtest.NewKey(t)
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc = saetest.MaxAllocFor(sk.EthAddress())
+	}))
+
+	w := newWallet(sk, sut.ctx, sut.Client)
+	signedExport := w.newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
+
+	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	eth := blk.EthBlock()
+
+	require.NotNilf(t, customtypes.GetHeaderExtra(eth.Header()).SettledHeight,
+		"settled marker encoded in built block")
+
+	var h hooks
+	want := h.SettledBy(eth.Header())
+	// Within Tau of genesis, the only settled block is genesis (height 0).
+	assert.Zerof(t, want.Height, "settled block height (genesis within Tau)")
+
+	buf, err := rlp.EncodeToBytes(eth)
+	require.NoError(t, err, "rlp.EncodeToBytes(block)")
+	parsed, err := sut.ParseBlock(ctx, buf)
+	require.NoErrorf(t, err, "%T.ParseBlock()", sut.VM)
+
+	require.Equal(t, want, h.SettledBy(parsed.EthBlock().Header()),
+		"settled marker survives serialization")
+}
