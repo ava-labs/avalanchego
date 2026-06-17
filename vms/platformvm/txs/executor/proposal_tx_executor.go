@@ -381,7 +381,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			return fmt.Errorf("deleting current validator from abort state: %w", err)
 		}
 	case txs.DelegatorTx:
-		if err := e.rewardDelegator(uStakerTx, stakerToReward); err != nil {
+		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
 
@@ -404,10 +404,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	return e.undoSupplyMintOnAbort(stakerToReward)
 }
 
-func (e *proposalTxExecutor) rewardValidatorTx(
-	uValidatorTx txs.ValidatorTx,
-	validator *state.Staker,
-) error {
+func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
 	var (
 		txID    = validator.TxID
 		stake   = uValidatorTx.Stake()
@@ -613,7 +610,7 @@ func (e *proposalTxExecutor) undoSupplyMintOnAbort(staker *state.Staker) error {
 	return nil
 }
 
-func (e *proposalTxExecutor) rewardDelegator(uDelegatorTx txs.DelegatorTx, delegator *state.Staker) error {
+func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, delegator *state.Staker) error {
 	var (
 		txID    = delegator.TxID
 		stake   = uDelegatorTx.Stake()
