@@ -106,10 +106,9 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 	)
 
 	block := types.NewBlock(header, props.ethTxs, nil /* uncles */, nil /* receipts */, saetest.TrieHasher())
-	extDataCopy := slices.Clone(extData)
 	customtypes.SetBlockExtra(block, &customtypes.BlockBodyExtra{
 		Version: props.version,
-		ExtData: &extDataCopy,
+		ExtData: &extData,
 	})
 	return block
 }
