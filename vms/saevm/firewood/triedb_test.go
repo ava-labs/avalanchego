@@ -428,11 +428,16 @@ func FuzzStateDB(f *testing.F) {
 			},
 		},
 	}
+	seedNames := make(map[string]string, len(seeds))
 	for _, seed := range seeds {
+		seedNames[string(seed.ops)] = seed.name
 		f.Add(seed.ops)
 	}
 
 	f.Fuzz(func(t *testing.T, steps []byte) {
+		if name, ok := seedNames[string(steps)]; ok {
+			t.Logf("seed: %s", name)
+		}
 		sut := newSUT(t)
 		for _, step := range steps {
 			op := step % maxOp
