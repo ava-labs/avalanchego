@@ -947,7 +947,7 @@ func TestRewardValidatorStakerType(t *testing.T) {
 
 func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 	var (
-		env           = newEnvironment(t, upgradetest.Fortuna)
+		env           = newEnvironment(t, upgradetest.Latest)
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
@@ -1034,7 +1034,7 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 
 func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 	var (
-		env           = newEnvironment(t, upgradetest.Fortuna)
+		env           = newEnvironment(t, upgradetest.Latest)
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
@@ -1182,7 +1182,7 @@ func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 
 func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 	var (
-		env           = newEnvironment(t, upgradetest.Fortuna)
+		env           = newEnvironment(t, upgradetest.Latest)
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
@@ -1381,7 +1381,7 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 
 func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 	var (
-		env           = newEnvironment(t, upgradetest.Fortuna)
+		env           = newEnvironment(t, upgradetest.Latest)
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
@@ -1580,7 +1580,7 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 // share, delegatee share is deferred to StakingInfo.DelegateeReward.
 func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	var (
-		env           = newEnvironment(t, upgradetest.Fortuna)
+		env           = newEnvironment(t, upgradetest.Latest)
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 
