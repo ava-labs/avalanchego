@@ -88,7 +88,6 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 // TODO(arr4n) refactor to avoid requiring DB writes.
 func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.ExecutionResults) error {
 	ethB := b.EthBlock()
-
 	// Receipts of a synchronous block have already been "settled" by the block
 	// itself. As the only reason to pass receipts here is for later settlement
 	// in another block, there is no need to pass anything meaningful as it
