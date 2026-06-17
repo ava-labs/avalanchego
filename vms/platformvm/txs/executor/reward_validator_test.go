@@ -1519,55 +1519,34 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 		require.Equal(t, uint64(2_333_333), validatorMutables.AccruedValidationRewards)
 		require.Equal(t, uint64(1_166_667), validatorMutables.AccruedDelegateeRewards)
 
-		// Check UTXOs for withdraws from auto-restake shares param
+		// Rewards not restaked are paid as one validation reward UTXO and one
+		// delegatee reward UTXO. These amounts include the shares the validator
+		// chose not to restake and the rewards above MaxValidatorStake.
 		{
-			withdrawnRewardsUTXOID := &avax.UTXOID{
+			validationRewardsUTXOID := &avax.UTXOID{
 				TxID:        rewardTx.ID(),
 				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())),
 			}
-			withdrawRewardsUTXO, err := onCommitState.GetUTXO(withdrawnRewardsUTXOID.InputID())
+			validationRewardsUTXO, err := onCommitState.GetUTXO(validationRewardsUTXOID.InputID())
 			require.NoError(t, err)
-			require.Equal(t, env.ctx.AVAXAssetID, withdrawRewardsUTXO.Asset.AssetID())
-			require.Equal(t, uint64(6_000_000), withdrawRewardsUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
-			require.True(t, validatorTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&withdrawRewardsUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+			require.Equal(t, env.ctx.AVAXAssetID, validationRewardsUTXO.Asset.AssetID())
+			require.Equal(t, uint64(8_666_667), validationRewardsUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+			require.True(t, validatorTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&validationRewardsUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
 
-			withdrawDelegateeRewardsUTXO := &avax.UTXOID{
+			delegateeRewardsUTXOID := &avax.UTXOID{
 				TxID:        rewardTx.ID(),
 				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 1,
 			}
-			withdrawDelegateeRewards, err := onCommitState.GetUTXO(withdrawDelegateeRewardsUTXO.InputID())
+			delegateeRewardsUTXO, err := onCommitState.GetUTXO(delegateeRewardsUTXOID.InputID())
 			require.NoError(t, err)
-			require.Equal(t, env.ctx.AVAXAssetID, withdrawDelegateeRewards.Asset.AssetID())
-			require.Equal(t, uint64(3_000_000), withdrawDelegateeRewards.Out.(*secp256k1fx.TransferOutput).Amount())
-			require.True(t, validatorTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&withdrawDelegateeRewards.Out.(*secp256k1fx.TransferOutput).OutputOwners))
-		}
-
-		// Check UTXOs for excess withdrawn
-		{
-			rewardUTXOID := &avax.UTXOID{
-				TxID:        rewardTx.ID(),
-				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 2,
-			}
-			rewardUTXO, err := onCommitState.GetUTXO(rewardUTXOID.InputID())
-			require.NoError(t, err)
-			require.Equal(t, env.ctx.AVAXAssetID, rewardUTXO.Asset.AssetID())
-			require.Equal(t, uint64(2_666_667), rewardUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
-			require.True(t, validatorTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&rewardUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
-
-			delegatingRewardsUTXOID := &avax.UTXOID{
-				TxID:        rewardTx.ID(),
-				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 3,
-			}
-			delegatingRewardsUTXO, err := onCommitState.GetUTXO(delegatingRewardsUTXOID.InputID())
-			require.NoError(t, err)
-			require.Equal(t, env.ctx.AVAXAssetID, delegatingRewardsUTXO.Asset.AssetID())
-			require.Equal(t, uint64(1_333_333), delegatingRewardsUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
-			require.True(t, validatorTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&delegatingRewardsUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+			require.Equal(t, env.ctx.AVAXAssetID, delegateeRewardsUTXO.Asset.AssetID())
+			require.Equal(t, uint64(4_333_333), delegateeRewardsUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+			require.True(t, validatorTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners).Equals(&delegateeRewardsUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
 
 			// No other UTXOs
 			utxoID := &avax.UTXOID{
 				TxID:        rewardTx.ID(),
-				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 4,
+				OutputIndex: uint32(len(rewardTx.Unsigned.Outputs())) + 2,
 			}
 			_, err = onCommitState.GetUTXO(utxoID.InputID())
 			require.ErrorIs(t, err, database.ErrNotFound)
@@ -1591,11 +1570,9 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 
 	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardTx.ID())
 	require.NoError(t, err)
-	require.Len(t, rewardUTXOs, 4)
-	require.Equal(t, uint64(6_000_000), rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
-	require.Equal(t, uint64(3_000_000), rewardUTXOs[1].Out.(*secp256k1fx.TransferOutput).Amount())
-	require.Equal(t, uint64(2_666_667), rewardUTXOs[2].Out.(*secp256k1fx.TransferOutput).Amount())
-	require.Equal(t, uint64(1_333_333), rewardUTXOs[3].Out.(*secp256k1fx.TransferOutput).Amount())
+	require.Len(t, rewardUTXOs, 2)
+	require.Equal(t, uint64(8_666_667), rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
+	require.Equal(t, uint64(4_333_333), rewardUTXOs[1].Out.(*secp256k1fx.TransferOutput).Amount())
 }
 
 // TestRewardDelegatorToAutoRenewedValidator tests the full delegator reward
