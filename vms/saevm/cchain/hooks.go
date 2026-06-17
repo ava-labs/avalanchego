@@ -128,8 +128,14 @@ func (*hooks) SettledBy(*types.Header) hook.Settled {
 }
 
 func (*hooks) BlockTime(h *types.Header) time.Time {
+	// Anchor the seconds component to h.Time so that the documented invariant
+	// BlockTime(h).Unix() == h.Time holds, taking only the sub-second component
+	// from TimeMilliseconds. This guards against malformed headers where
+	// TimeMilliseconds disagrees with Time (e.g. from a malicious peer), which
+	// would otherwise yield an unexpected block time.
 	ms := customtypes.HeaderTimeMilliseconds(h)
-	return time.UnixMilli(int64(ms)) //#nosec G115 -- Won't overflow for a few millennia
+	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
+	return time.Unix(int64(h.Time), subSecondNanos)            //#nosec G115 -- Won't overflow for a few millennia
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {

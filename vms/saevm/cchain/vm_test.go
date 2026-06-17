@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -745,4 +746,59 @@ func TestParseBlock(t *testing.T) {
 			require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
 		})
 	}
+}
+
+// TestVMBuildBlockEncodesMilliseconds verifies that a block built through the
+// full VM (rather than the builder directly) carries a TimeMilliseconds extra
+// that is consistent with Header.Time. Exact-value anchoring of BlockTime is
+// covered by the deterministic unit tests in hooks_test.go, since the VM's
+// builder clock is time.Now and cannot be injected here.
+func TestVMBuildBlockEncodesMilliseconds(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+
+	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	hdr := blk.Header()
+
+	extra := customtypes.GetHeaderExtra(hdr)
+	require.NotNil(t, extra.TimeMilliseconds, "VM-built block TimeMilliseconds")
+	require.Equal(t, hdr.Time, *extra.TimeMilliseconds/1000, "VM-built block Time == TimeMilliseconds/1000")
+}
+
+// TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a received
+// block whose Header.Time disagrees with TimeMilliseconds, as a malicious peer
+// might send. Such a block can never be reproduced by
+// [hook.BlockBuilder.BuildHeader], which always emits a consistent timestamp, so
+// VerifyBlock's rebuild-hash check rejects it. This guards the VM boundary
+// against the malformed-block case; the anchoring of BlockTime's seconds
+// component to Header.Time is covered by the unit tests in hooks_test.go.
+func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+
+	// Bump the seconds encoded in TimeMilliseconds without touching Header.Time,
+	// so Time != TimeMilliseconds/1000 while every other field stays valid.
+	hdr := types.CopyHeader(valid.Header())
+	extra := customtypes.GetHeaderExtra(hdr)
+	require.NotNil(t, extra.TimeMilliseconds, "valid block TimeMilliseconds")
+	mismatched := *extra.TimeMilliseconds + 1000
+	extra.TimeMilliseconds = &mismatched
+	customtypes.SetHeaderExtra(hdr, extra)
+
+	malformed := valid.EthBlock().WithSeal(hdr)
+	buf, err := rlp.EncodeToBytes(malformed)
+	require.NoError(t, err, "rlp.EncodeToBytes(malformed block)")
+
+	parsed, err := sut.ParseBlock(ctx, buf)
+	require.NoError(t, err, "vm.ParseBlock(malformed block)")
+
+	err = sut.VerifyBlock(ctx, nil, parsed)
+	require.ErrorIs(t, err, sae.ErrHashMismatch, "vm.VerifyBlock(malformed block)")
 }

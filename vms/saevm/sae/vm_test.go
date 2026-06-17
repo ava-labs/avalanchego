@@ -733,7 +733,7 @@ func TestVerifyWhenBootstrapping(t *testing.T) {
 	}{
 		{
 			consensusState: snow.NormalOp,
-			want:           errHashMismatch,
+			want:           ErrHashMismatch,
 		},
 		{
 			consensusState: snow.Bootstrapping,
@@ -950,7 +950,7 @@ func TestSemanticBlockChecks(t *testing.T) {
 			receipts: types.Receipts{
 				&types.Receipt{}, // Unexpected receipt
 			},
-			wantErr: errHashMismatch,
+			wantErr: ErrHashMismatch,
 		},
 	}
 

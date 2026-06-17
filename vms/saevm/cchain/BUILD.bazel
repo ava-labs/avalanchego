@@ -109,6 +109,7 @@ go_test(
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/cmputils",
         "//vms/saevm/params",
+        "//vms/saevm/sae",
         "//vms/saevm/saetest",
         "//vms/saevm/saexec",
         "//vms/secp256k1fx",
