@@ -1,5 +1,4 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "statesync",
@@ -15,11 +14,4 @@ go_library(
         "//snow/engine/snowman/block",
         "//vms/saevm/adaptor",
     ],
-)
-
-go_test(
-    name = "statesync_test",
-    srcs = ["sync_test.go"],
-    embed = [":statesync"],
-    deps = ["//vms/saevm/adaptor"],
 )

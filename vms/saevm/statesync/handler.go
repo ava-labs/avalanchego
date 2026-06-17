@@ -3,7 +3,13 @@
 
 package statesync
 
-import "context"
+import (
+	"context"
+
+	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
+)
+
+var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
 
 type SummaryHandler struct{}
 
