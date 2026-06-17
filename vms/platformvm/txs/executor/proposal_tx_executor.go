@@ -6,9 +6,11 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/intmath"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -18,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/intmath"
-	"math"
 )
 
 const (
@@ -35,18 +35,18 @@ const (
 var (
 	_ txs.Visitor = (*proposalTxExecutor)(nil)
 
-	ErrRemoveStakerTooEarly                = errors.New("attempting to remove staker before their end time")
-	ErrRemoveWrongStaker                   = errors.New("attempting to remove wrong staker")
-	ErrInvalidState                        = errors.New("generated output isn't valid state")
-	ErrShouldBePermissionlessStaker        = errors.New("expected permissionless staker")
-	ErrWrongTxType                         = errors.New("wrong transaction type")
-	ErrInvalidID                           = errors.New("invalid ID")
-	ErrProposedAddStakerTxAfterBanff       = errors.New("staker transaction proposed after Banff")
-	ErrAdvanceTimeTxIssuedAfterBanff       = errors.New("AdvanceTimeTx issued after Banff")
-	errShouldBeAutoRenewedStaker = errors.New("expected auto renewed staker")
-	errUnexpectedTxType          = errors.New("unexpected transaction type")
-	errInvalidTimestamp          = errors.New("invalid timestamp")
-	errDivideByZero                        = errors.New("divide by zero")
+	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
+	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
+	ErrInvalidState                  = errors.New("generated output isn't valid state")
+	ErrShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
+	ErrWrongTxType                   = errors.New("wrong transaction type")
+	ErrInvalidID                     = errors.New("invalid ID")
+	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
+	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
+	errShouldBeAutoRenewedStaker     = errors.New("expected auto renewed staker")
+	errUnexpectedTxType              = errors.New("unexpected transaction type")
+	errInvalidTimestamp              = errors.New("invalid timestamp")
+	errDivideByZero                  = errors.New("divide by zero")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -710,7 +710,7 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 	// DelegateeReward tracks pending commission from completed delegator periods.
 	// It is paid on the abort path along with accrued delegatee rewards, while the
 	// validator forfeits its own potential reward for this cycle.
-	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
+	totalDelegateeRewards, err := safemath.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
 	if err != nil {
 		return err
 	}

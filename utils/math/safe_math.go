@@ -5,6 +5,7 @@ package math
 
 import (
 	"errors"
+
 	"golang.org/x/exp/constraints"
 )
 
