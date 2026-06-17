@@ -870,7 +870,7 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 
 	// Bump the seconds encoded in TimeMilliseconds without touching Header.Time,
 	// so Time != TimeMilliseconds/1000 while every other field stays valid.
-	hdr := types.CopyHeader(valid.Header())
+	hdr := valid.Header()
 	extra := customtypes.GetHeaderExtra(hdr)
 	require.NotNil(t, extra.TimeMilliseconds, "valid block TimeMilliseconds")
 	mismatched := *extra.TimeMilliseconds + 1000
