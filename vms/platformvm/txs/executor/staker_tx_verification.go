@@ -1089,11 +1089,8 @@ func verifySpend(
 	return nil
 }
 
-func verifyRewardTxAndGetStaker(chainState state.Chain, sTx *txs.Tx, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
-	if len(sTx.Creds) != 0 {
-		return nil, nil, errWrongNumberOfCredentials
-	}
-
+// getNextStakerToReward returns the next staker to be removed and the corresponding tx that added it to the staker set.
+func getNextStakerToReward(chainState state.Chain, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
 	currentStakerIterator, err := chainState.GetCurrentStakerIterator()
 	if err != nil {
 		return nil, nil, err
