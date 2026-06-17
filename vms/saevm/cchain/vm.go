@@ -206,7 +206,7 @@ func (vm *VM) Initialize(
 	})
 
 	const warpSignatureCacheSize = 512
-	warpVerifier := warp.NewVerifier(&warpBackend{vm: vm.VM}, warpStorage)
+	warpVerifier := warp.NewVerifier(&warpBackend{vm.VM}, warpStorage)
 	warpHandler := acp118.NewCachedHandler(
 		lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
 		warpVerifier,
