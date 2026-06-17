@@ -27,7 +27,7 @@ func TestResolveJavaPathFallsBackToBazelJavaHome(t *testing.T) {
 	require.NoError(t, writeExecutableForTest(javaPath, "#!/bin/sh\nexit 0\n"))
 
 	bazelPath := filepath.Join(binDir, "bazel")
-	require.NoError(t, writeExecutableForTest(bazelPath, "#!/bin/sh\nprintf '%s\\n' \""+javaHome+"\"\n"))
+	require.NoError(t, writeExecutableForTest(bazelPath, "#!/bin/sh\nprintf 'INFO: Invocation ID: test\\n' >&2\nprintf '%s\\n' \""+javaHome+"\"\n"))
 
 	t.Setenv("PATH", binDir)
 

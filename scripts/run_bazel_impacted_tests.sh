@@ -109,7 +109,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-args=(go run ./tools/impactedtests manifest --range "$range_arg" --output "$impacted_tests")
+args=(./scripts/run_bazel_tool.sh //tools/impactedtests:impactedtests_bin manifest --range "$range_arg" --output "$impacted_tests")
 for scope in "${scopes[@]}"; do
   args+=(--scope "$scope")
 done

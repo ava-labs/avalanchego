@@ -50,7 +50,7 @@ runs:
         trap 'rm -rf "$selector_bin_dir"' EXIT
         ln -s "$(command -v bazelisk)" "$selector_bin_dir/bazel"
 
-        args=(go run ./tools/impactedtests manifest --range "${BAZEL_IMPACTED_BASE_SHA}.." --output "$MANIFEST_PATH")
+        args=(./scripts/run_bazel_tool.sh //tools/impactedtests:impactedtests_bin manifest --range "${BAZEL_IMPACTED_BASE_SHA}.." --output "$MANIFEST_PATH")
         while IFS= read -r scope; do
           if [[ -n "$scope" ]]; then
             args+=(--scope "$scope")

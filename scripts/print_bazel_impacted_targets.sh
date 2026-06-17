@@ -62,7 +62,7 @@ if [[ -z "$range_arg" ]]; then
   range_arg="${base_sha}.."
 fi
 
-args=(go run ./tools/impactedtests labels --range "$range_arg")
+args=(./scripts/run_bazel_tool.sh //tools/impactedtests:impactedtests_bin labels --range "$range_arg")
 if [[ -n "$output_path" ]]; then
   args+=(--output "$output_path")
 fi

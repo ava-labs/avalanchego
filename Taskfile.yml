@@ -93,7 +93,7 @@ tasks:
 
   bazel-test-coreth:
     desc: Run coreth/evm unit tests via targeted-bazel. Locally this behaves like plain bazel unless BAZEL_IMPACTED_BASE_SHA/BAZEL_IMPACTED_DIFF_RANGE is set; CI can set those env vars to enable selective execution.
-    cmd: '{{.NIX_RUN}} go run ./tools/targeted-bazel test //graft/coreth/... //graft/evm/...'
+    cmd: '{{.NIX_RUN}} ./scripts/run_targeted_bazel.sh test //graft/coreth/... //graft/evm/...'
 
   bazel-test-coreth-full:
     desc: Run the full coreth/evm Bazel unit test target set
@@ -123,7 +123,7 @@ tasks:
 
   bazel-test-main:
     desc: Run main module unit tests via targeted-bazel (excludes graft modules). Locally this behaves like plain bazel unless BAZEL_IMPACTED_BASE_SHA/BAZEL_IMPACTED_DIFF_RANGE is set; CI can set those env vars to enable selective execution.
-    cmd: '{{.NIX_RUN}} go run ./tools/targeted-bazel test //... -- -//graft/...'
+    cmd: '{{.NIX_RUN}} ./scripts/run_targeted_bazel.sh test //... -- -//graft/...'
 
   bazel-test-main-full:
     desc: Run the full main-module Bazel unit test target set (excludes graft modules)
@@ -131,7 +131,11 @@ tasks:
 
   bazel-test-subnet-evm:
     desc: Run subnet-evm unit tests via targeted-bazel. Locally this behaves like plain bazel unless BAZEL_IMPACTED_BASE_SHA/BAZEL_IMPACTED_DIFF_RANGE is set; CI can set those env vars to enable selective execution.
-    cmd: '{{.NIX_RUN}} go run ./tools/targeted-bazel test //graft/subnet-evm/...'
+    cmd: '{{.NIX_RUN}} ./scripts/run_targeted_bazel.sh test //graft/subnet-evm/...'
+
+  bazel-targeted:
+    desc: Run targeted-bazel with arbitrary arguments
+    cmd: '{{.NIX_RUN}} ./scripts/run_targeted_bazel.sh {{.CLI_ARGS}}'
 
   bazel-test-subnet-evm-full:
     desc: Run the full subnet-evm Bazel unit test target set

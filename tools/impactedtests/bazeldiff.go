@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -323,9 +324,15 @@ func runGit(ctx context.Context, dir string, args ...string) error {
 func commandOutput(ctx context.Context, dir string, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	output, err := cmd.Output()
 	if err != nil {
-		trimmed := strings.TrimSpace(string(output))
+		trimmedStdout := strings.TrimSpace(string(output))
+		trimmedStderr := strings.TrimSpace(stderr.String())
+		trimmed := strings.TrimSpace(strings.Join([]string{trimmedStdout, trimmedStderr}, ": "))
 		if trimmed == "" {
 			return "", err
 		}

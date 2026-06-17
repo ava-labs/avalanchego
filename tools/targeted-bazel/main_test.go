@@ -100,21 +100,22 @@ func TestDiffRangeFromEnvPrefersExplicitRange(t *testing.T) {
 }
 
 func TestImpactedTestsCommand(t *testing.T) {
-	const repoRoot = "/tmp/repo"
 	targetPatterns := []string{"//...", "-//graft/..."}
 	wantSelectorArgs := []string{"select", "--range", "abc123..", "--command", "test", "--policy", policyAuto, "--scope", "//...", "--scope", "-//graft/..."}
 
-	t.Run("defaults to go run", func(t *testing.T) {
+	t.Run("requires explicit binary", func(t *testing.T) {
 		t.Setenv("IMPACTEDTESTS_BIN", "")
 
-		cmd := impactedTestsCommand(repoRoot, "abc123..", "test", targetPatterns, policyAuto)
-		require.Equal(t, append([]string{"go", "run", "/tmp/repo/tools/impactedtests"}, wantSelectorArgs...), cmd.Args)
+		cmd, err := impactedTestsCommand("abc123..", "test", targetPatterns, policyAuto)
+		require.ErrorIs(t, err, errMissingImpactedTestsBin)
+		require.Nil(t, cmd)
 	})
 
 	t.Run("uses explicit binary when configured", func(t *testing.T) {
 		t.Setenv("IMPACTEDTESTS_BIN", "/tmp/bin/impactedtests")
 
-		cmd := impactedTestsCommand(repoRoot, "abc123..", "test", targetPatterns, policyAuto)
+		cmd, err := impactedTestsCommand("abc123..", "test", targetPatterns, policyAuto)
+		require.NoError(t, err)
 		require.Equal(t, append([]string{"/tmp/bin/impactedtests"}, wantSelectorArgs...), cmd.Args)
 	})
 }

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -16,6 +15,8 @@ const (
 	policyAuto       = "auto"
 	bazelTestCommand = "test"
 )
+
+var errMissingImpactedTestsBin = errors.New("IMPACTEDTESTS_BIN must be set to a Bazel-built impactedtests binary")
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -167,12 +168,10 @@ func isTargetPattern(arg string) bool {
 }
 
 func selectTargets(diffRange string, command string, targetPatterns []string, policy string) ([]string, error) {
-	repoRoot, err := repoRoot()
+	cmd, err := impactedTestsCommand(diffRange, command, targetPatterns, policy)
 	if err != nil {
-		return nil, fmt.Errorf("resolve repo root: %w", err)
+		return nil, err
 	}
-
-	cmd := impactedTestsCommand(repoRoot, diffRange, command, targetPatterns, policy)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		trimmed := strings.TrimSpace(string(output))
@@ -184,7 +183,7 @@ func selectTargets(diffRange string, command string, targetPatterns []string, po
 	return splitLines(strings.TrimSpace(string(output))), nil
 }
 
-func impactedTestsCommand(repoRoot string, diffRange string, command string, targetPatterns []string, policy string) *exec.Cmd {
+func impactedTestsCommand(diffRange string, command string, targetPatterns []string, policy string) (*exec.Cmd, error) {
 	args := make([]string, 0, 7+2*len(targetPatterns))
 	args = append(args, "select", "--range", diffRange, "--command", command, "--policy", policy)
 	for _, targetPattern := range targetPatterns {
@@ -192,24 +191,13 @@ func impactedTestsCommand(repoRoot string, diffRange string, command string, tar
 	}
 
 	if impactedTestsBin := os.Getenv("IMPACTEDTESTS_BIN"); impactedTestsBin != "" {
-		return exec.Command(impactedTestsBin, args...)
+		return exec.Command(impactedTestsBin, args...), nil
 	}
 
-	goArgs := append([]string{"run", filepath.Join(repoRoot, "tools", "impactedtests")}, args...)
-	return exec.Command("go", goArgs...)
-}
-
-func repoRoot() (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		trimmed := strings.TrimSpace(string(output))
-		if trimmed == "" {
-			return "", err
-		}
-		return "", fmt.Errorf("%w: %s", err, trimmed)
-	}
-	return strings.TrimSpace(string(output)), nil
+	// TODO(marun): Remove the need for targeted-bazel to shell out to our own
+	// impactedtests tool. Until then, Bazel-native callers should provide
+	// IMPACTEDTESTS_BIN pointing at a Bazel-built impactedtests binary.
+	return nil, errMissingImpactedTestsBin
 }
 
 func splitLines(content string) []string {

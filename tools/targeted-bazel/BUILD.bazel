@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "targeted_bazel_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/tools/targeted-bazel",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "targeted_bazel_bin",
+    embed = [":targeted_bazel_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "unit_test",
+    srcs = ["main_test.go"],
+    embed = [":targeted_bazel_lib"],
+    deps = [
+        "@com_github_stretchr_testify//require",
+    ],
+)

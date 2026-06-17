@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/fs"
@@ -83,12 +84,13 @@ func buildToolForTest(t *testing.T, repoRoot string) string {
 		return binaryPath
 	}
 
-	binaryDir := t.TempDir()
-	binaryPath := filepath.Join(binaryDir, "impactedtests")
-	cmd := exec.Command("go", "build", "-o", binaryPath, "./tools/impactedtests")
-	cmd.Dir = repoRoot
-	output, err := cmd.CombinedOutput()
-	require.NoError(t, execError("build impactedtests binary", err, output))
+	runCommandForTest(t, repoRoot, "bazel", "build", "//tools/impactedtests:impactedtests_bin")
+
+	binaryPath := strings.TrimSpace(runCommandForTest(t, repoRoot, "bazel", "cquery", "--output=files", "//tools/impactedtests:impactedtests_bin"))
+	require.NotEmpty(t, binaryPath)
+	if !filepath.IsAbs(binaryPath) {
+		binaryPath = filepath.Join(repoRoot, binaryPath)
+	}
 	return binaryPath
 }
 
@@ -121,10 +123,22 @@ func runToolForTest(t *testing.T, dir string, toolPath string, args ...string) s
 
 func runGitForTest(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	return runCommandForTest(t, dir, "git", args...)
+}
+
+func runCommandForTest(t *testing.T, dir string, name string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
-	require.NoError(t, execError("git", err, output))
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	output, err := cmd.Output()
+	if err != nil {
+		output = bytes.Join([][]byte{output, stderr.Bytes()}, []byte(": "))
+	}
+	require.NoError(t, execError(name, err, output))
 	return string(output)
 }
 

@@ -207,7 +207,7 @@ jobs:
         run: |
           set -euo pipefail
           set -o pipefail
-          nix develop --command go run ./tools/targeted-bazel ${{ steps.scope.outputs.selector_args }} 2>&1 | tee .benchmark/selector.log
+          nix develop --command ./scripts/run_task.sh task bazel-targeted -- ${{ steps.scope.outputs.selector_args }} 2>&1 | tee .benchmark/selector.log
 
       - name: Finish baseline selector timer
         if: ${{ always() && matrix.variant == 'baseline' }}
@@ -221,10 +221,6 @@ jobs:
         if: ${{ matrix.variant == 'go-download' }}
         shell: bash
         run: echo "SETUP_START=$(date +%s)" >> "$GITHUB_ENV"
-
-      - name: Set up Go for go-download selector
-        if: ${{ matrix.variant == 'go-download' }}
-        uses: ./.github/actions/setup-go-for-project
 
       - name: Start go-download Java timer
         if: ${{ matrix.variant == 'go-download' }}
@@ -282,7 +278,7 @@ jobs:
         run: |
           set -euo pipefail
           set -o pipefail
-          go run ./tools/targeted-bazel ${{ steps.scope.outputs.selector_args }} 2>&1 | tee .benchmark/selector.log
+          ./scripts/run_task.sh task bazel-targeted -- ${{ steps.scope.outputs.selector_args }} 2>&1 | tee .benchmark/selector.log
 
       - name: Finish go-download selector timer
         if: ${{ always() && matrix.variant == 'go-download' }}
