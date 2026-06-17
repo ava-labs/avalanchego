@@ -262,42 +262,50 @@ const (
 	maxOp
 )
 
-// FuzzStateDB compares the state root of an arbitrary sequence of operations on
+// FuzzStateRoot compares the state root of an arbitrary sequence of operations on
 // a Firewood-backed [state.StateDB] against a reference HashDB.
-func FuzzStateDB(f *testing.F) {
-	f.Add([]byte{
-		opCreateAccount,
-		opStateDBCommit,
-	})
-	f.Add([]byte{
-		opCreateAccount,
-		opUpdateAccount,
-		opSetStorage,
-		opStateDBCommit,
-		opDiskCommit,
-	})
-	f.Add([]byte{
-		opCreateAccount,
-		opSetStorage,
-		opIntermediateRoot,
-		opDeleteStorage,
-		opStateDBCommit,
-	})
-	f.Add([]byte{opStateDBCommit, opDiskCommit})
-	f.Add([]byte{
-		opCreateAccount,
-		opFinalise,
-		opSelfDestruct6780,
-		opStateDBCommit,
-	})
-	f.Add([]byte{
-		opCreateAccount,
-		opSetStorage,
-		opSelfDestruct6780,
-		opCreateAccount, // resurrects the just-destructed account
-		opSetStorage,
-		opStateDBCommit,
-	})
+func FuzzStateRoot(f *testing.F) {
+	tests := [][]byte{
+		{
+			opStateDBCommit,
+			opDiskCommit,
+		},
+		{
+			opCreateAccount,
+			opStateDBCommit,
+		},
+		{
+			opCreateAccount,
+			opUpdateAccount,
+			opSetStorage,
+			opStateDBCommit,
+			opDiskCommit,
+		},
+		{
+			opCreateAccount,
+			opSetStorage,
+			opIntermediateRoot,
+			opDeleteStorage,
+			opStateDBCommit,
+		},
+		{
+			opCreateAccount,
+			opFinalise,
+			opSelfDestruct6780,
+			opStateDBCommit,
+		},
+		{
+			opCreateAccount,
+			opSetStorage,
+			opSelfDestruct6780,
+			opCreateAccount, // resurrects the just-destructed account
+			opSetStorage,
+			opStateDBCommit,
+		},
+	}
+	for _, tt := range tests {
+		f.Add(tt)
+	}
 
 	f.Fuzz(func(t *testing.T, steps []byte) {
 		sut := newSUT(t)
