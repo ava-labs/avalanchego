@@ -90,6 +90,12 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
 	return func(yield func(*blocks.Block, error) bool) {
 		lastAcceptedHash := rawdb.ReadHeadFastBlockHash(rec.db)
+		if lastAcceptedHash == (common.Hash{}) {
+			// None of the libevm genesis, cchain genesis, or historical synchronous chains set this field.
+			// Thus, if a hash is not found on disk, the set of accepted asynchronous blocks is empty.
+			return
+		}
+
 		for curr := parent; curr.Hash() != lastAcceptedHash; {
 			b, err := rec.newCanonicalBlock(curr.Height()+1, curr)
 			if !yield(b, err) || err != nil {
