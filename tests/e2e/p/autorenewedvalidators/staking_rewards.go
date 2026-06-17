@@ -113,13 +113,12 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 				nodeID,
 				weight,
 				nodePOP,
-				pContext.AVAXAssetID,
 				validationRewardsOwner,
 				delegationRewardsOwner,
 				configOwner,
 				delegationShares,
 				autoCompoundedRewardShares,
-				uint64(stakingPeriod.Seconds()),
+				stakingPeriod,
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
@@ -227,7 +226,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			_, err := pWallet.IssueSetAutoRenewedValidatorConfigTx(
 				validatorTxID,
 				autoCompoundedRewardShares,
-				uint64(updatedStakingPeriod.Seconds()),
+				updatedStakingPeriod,
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
@@ -237,13 +236,10 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
 			require.NoError(err)
 			require.Len(validators, 1)
-			require.NotNil(validators[0].Period)
-			require.Equal(uint64(updatedStakingPeriod.Seconds()), *validators[0].Period)
-			require.NotNil(validators[0].AutoCompoundRewardShares)
-			require.Equal(autoCompoundedRewardShares, *validators[0].AutoCompoundRewardShares)
-			require.NotNil(validators[0].ValidatorAuthority)
-			require.Equal(uint32(1), validators[0].ValidatorAuthority.Threshold)
-			require.Equal([]ids.ShortID{keychain.Keys[0].Address()}, validators[0].ValidatorAuthority.Addresses)
+			require.Equal(uint64(updatedStakingPeriod.Seconds()), validators[0].AutoRenewedConfig.NextPeriod)
+			require.Equal(autoCompoundedRewardShares, validators[0].AutoRenewedConfig.AutoCompoundRewardShares)
+			require.Equal(uint32(1), validators[0].AutoRenewedConfig.ValidatorAuthority.Threshold)
+			require.Equal([]ids.ShortID{keychain.Keys[0].Address()}, validators[0].AutoRenewedConfig.ValidatorAuthority.Addresses)
 		})
 
 		tc.By("waiting for the first staking cycle to complete", func() {
@@ -309,7 +305,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			_, err := pWallet.IssueSetAutoRenewedValidatorConfigTx(
 				validatorTxID,
 				updatedAutoCompoundedRewardShares,
-				uint64(updatedStakingPeriod.Seconds()),
+				updatedStakingPeriod,
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
@@ -319,13 +315,10 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
 			require.NoError(err)
 			require.Len(validators, 1)
-			require.NotNil(validators[0].Period)
-			require.Equal(uint64(updatedStakingPeriod.Seconds()), *validators[0].Period)
-			require.NotNil(validators[0].AutoCompoundRewardShares)
-			require.Equal(updatedAutoCompoundedRewardShares, *validators[0].AutoCompoundRewardShares)
-			require.NotNil(validators[0].ValidatorAuthority)
-			require.Equal(uint32(1), validators[0].ValidatorAuthority.Threshold)
-			require.Equal([]ids.ShortID{keychain.Keys[0].Address()}, validators[0].ValidatorAuthority.Addresses)
+			require.Equal(uint64(updatedStakingPeriod.Seconds()), validators[0].AutoRenewedConfig.NextPeriod)
+			require.Equal(updatedAutoCompoundedRewardShares, validators[0].AutoRenewedConfig.AutoCompoundRewardShares)
+			require.Equal(uint32(1), validators[0].AutoRenewedConfig.ValidatorAuthority.Threshold)
+			require.Equal([]ids.ShortID{keychain.Keys[0].Address()}, validators[0].AutoRenewedConfig.ValidatorAuthority.Addresses)
 		})
 
 		tc.By("retrieving supply before adding delegator2")
@@ -514,13 +507,12 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 				nodeID,
 				weight,
 				nodePOP,
-				pContext.AVAXAssetID,
 				validationRewardsOwner,
 				delegationRewardsOwner,
 				configOwner,
 				delegationShares,
 				autoCompoundedRewardShares,
-				uint64(updatedStakingPeriod.Seconds()),
+				updatedStakingPeriod,
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
