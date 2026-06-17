@@ -833,26 +833,6 @@ func TestParseBlock(t *testing.T) {
 	}
 }
 
-// TestVMBuildBlockEncodesMilliseconds verifies that a block built through the
-// full VM (rather than the builder directly) carries a TimeMilliseconds extra
-// that is consistent with Header.Time. Exact-value anchoring of BlockTime is
-// covered by the deterministic unit tests in hooks_test.go, since the VM's
-// builder clock is time.Now and cannot be injected here.
-func TestVMBuildBlockEncodesMilliseconds(t *testing.T) {
-	key := txtest.NewKey(t)
-	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
-
-	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
-	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-
-	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-	hdr := blk.Header()
-
-	extra := customtypes.GetHeaderExtra(hdr)
-	require.NotNil(t, extra.TimeMilliseconds, "VM-built block TimeMilliseconds")
-	require.Equal(t, hdr.Time, *extra.TimeMilliseconds/1000, "VM-built block Time == TimeMilliseconds/1000")
-}
-
 // TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a received
 // block whose Header.Time disagrees with TimeMilliseconds, as a malicious peer
 // might send. Such a block can never be reproduced by

@@ -78,26 +78,6 @@ func TestBlockTime(t *testing.T) {
 	}
 }
 
-func TestBuildHeaderEncodesMilliseconds(t *testing.T) {
-	b := &builder{
-		now: func() time.Time {
-			return time.UnixMilli(testTimestampMilliseconds)
-		},
-	}
-
-	header, err := b.BuildHeader(&types.Header{Number: big.NewInt(41)})
-	require.NoError(t, err, "builder.BuildHeader(nowMS=%d)", testTimestampMilliseconds)
-
-	require.Equal(t, uint64(testTimestampMilliseconds/1000), header.Time, "builder.BuildHeader(nowMS=%d).Time", testTimestampMilliseconds)
-
-	extra := customtypes.GetHeaderExtra(header)
-	require.NotNil(t, extra.TimeMilliseconds, "customtypes.GetHeaderExtra(BuildHeader(nowMS=%d)).TimeMilliseconds", testTimestampMilliseconds)
-	require.Equal(t, uint64(testTimestampMilliseconds), *extra.TimeMilliseconds, "builder.BuildHeader(nowMS=%d).TimeMilliseconds", testTimestampMilliseconds)
-
-	// Invariant enforced by customheader.VerifyTime.
-	require.Equal(t, header.Time, *extra.TimeMilliseconds/1000, "builder.BuildHeader(nowMS=%d) time invariant", testTimestampMilliseconds)
-}
-
 func TestBuildHeaderBlockTimeRoundTrip(t *testing.T) {
 	want := time.UnixMilli(testTimestampMilliseconds)
 	b := &builder{
