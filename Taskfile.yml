@@ -30,18 +30,18 @@ tasks:
     cmd: '{{.NIX_RUN}} bazelisk build --config=race //main:avalanchego'
 
   bazel-benchmark-remote-cache:
-    desc: Benchmark Bazel test caching vs impacted-target selection for CI-style main-module unit tests
-    # Keep this setup fetch target union aligned with the test benchmark below.
-    # This exploratory task intentionally focuses on test-side minimization,
-    # where impacted-target selection is a meaningful alternative to warm-cache
-    # full-scope execution.
+    desc: Benchmark warm-cache reruns vs empty impacted-target selection for CI-style main-module unit tests
+    # This exploratory task intentionally measures the best-case test-side
+    # minimization question: if no tests should run, is it cheaper to discover
+    # that via a warm full-scope Bazel invocation or via an empty impacted set?
     cmd: >-
       {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
       --setup-args "fetch //... -- -//graft/..."
       --test-benchmark-args "test //... -- -//graft/..."
       --test-impacted-scope "//..."
       --test-impacted-scope "-//graft/..."
-      --test-impacted-range "${BAZEL_IMPACTED_DIFF_RANGE:-${BAZEL_IMPACTED_BASE_SHA:-HEAD}..}"
+      --test-best-case-only
+      --test-empty-impacted-range "${BAZEL_IMPACTED_BASE_SHA:-HEAD}..${BAZEL_IMPACTED_BASE_SHA:-HEAD}"
 
   bazel-benchmark-remote-cache-builds:
     desc: Benchmark Bazel remote caching for CI-style avalanchego builds
@@ -52,13 +52,14 @@ tasks:
       --build-benchmark-args "build --config=race //main:avalanchego"
 
   bazel-benchmark-remote-cache-ids-test:
-    desc: Benchmark Bazel remote caching and impacted-target selection for //ids:ids_test
+    desc: Benchmark warm-cache reruns vs empty impacted-target selection for //ids:ids_test
     cmd: >-
       {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
       --setup-args "fetch //ids:ids_test"
       --test-benchmark-args "test //ids:ids_test"
       --test-impacted-scope "//ids:ids_test"
-      --test-impacted-range "HEAD.."
+      --test-best-case-only
+      --test-empty-impacted-range "HEAD..HEAD"
       --warm-log-must-contain "(cached) PASSED"
       --warm-log-must-contain "Executed 0 out of 1 test: 1 test passes."
 

@@ -32,7 +32,9 @@ Usage: scripts/benchmark_bazel_remote_cache.sh \
   [--build-benchmark-args 'build //main:avalanchego' ...] \
   [--test-benchmark-args 'test //... -- -//graft/...' ...] \
   [--test-impacted-scope '//...' --test-impacted-scope '-//graft/...'] \
-  [--test-impacted-range 'HEAD..'] \
+  [--test-impacted-range 'BASE..HEAD'] \
+  [--test-empty-impacted-range 'BASE..BASE'] \
+  [--test-best-case-only] \
   [--warm-log-must-contain '(cached) PASSED'] \
   [--warm-log-must-contain 'Executed 0 out of 1 test: 1 test passes.']
 
@@ -48,12 +50,18 @@ Bazel output state each time:
   - gRPC cold remote cache
   - gRPC warm remote cache
 
-For test benchmark commands, the script measures four runs with fresh local
-Bazel output state each time:
+For test benchmark commands, the script normally measures four runs with fresh
+local Bazel output state each time:
   - no remote cache
   - HTTP cold remote cache
   - HTTP warm remote cache
   - impacted-target mode (selector time plus selected-test execution time)
+
+In `--test-best-case-only` mode, test commands instead measure only the best
+case the exploration cares about:
+  - HTTP seed run (populate warm remote cache)
+  - HTTP warm remote cache rerun
+  - impacted-target mode against an explicit empty impacted range
 
 Representative cache latency is determined before the benchmark starts unless
 BAZEL_REMOTE_CACHE_LATENCY_MS is set. In measured mode, the script runs
@@ -89,6 +97,7 @@ require_cmd() {
 }
 
 require_cmd awk
+require_cmd curl
 require_cmd grep
 require_cmd jq
 require_cmd mktemp
@@ -98,6 +107,8 @@ declare -a BUILD_BENCHMARK_ARGS_SPECS=()
 declare -a TEST_BENCHMARK_ARGS_SPECS=()
 declare -a TEST_IMPACTED_SCOPES=()
 TEST_IMPACTED_RANGE=""
+TEST_EMPTY_IMPACTED_RANGE=""
+TEST_BEST_CASE_ONLY=0
 declare -a WARM_LOG_MUST_CONTAIN_PATTERNS=()
 
 while [[ $# -gt 0 ]]; do
@@ -129,6 +140,15 @@ while [[ $# -gt 0 ]]; do
       [[ -z "${TEST_IMPACTED_RANGE}" ]] || die "--test-impacted-range may only be specified once"
       TEST_IMPACTED_RANGE="$1"
       ;;
+    --test-empty-impacted-range)
+      shift
+      [[ $# -gt 0 ]] || die "--test-empty-impacted-range requires a value"
+      [[ -z "${TEST_EMPTY_IMPACTED_RANGE}" ]] || die "--test-empty-impacted-range may only be specified once"
+      TEST_EMPTY_IMPACTED_RANGE="$1"
+      ;;
+    --test-best-case-only)
+      TEST_BEST_CASE_ONLY=1
+      ;;
     --warm-log-must-contain)
       shift
       [[ $# -gt 0 ]] || die "--warm-log-must-contain requires a value"
@@ -148,6 +168,9 @@ if [[ ${#BUILD_BENCHMARK_ARGS_SPECS[@]} -eq 0 && ${#TEST_BENCHMARK_ARGS_SPECS[@]
 fi
 if [[ ${#TEST_BENCHMARK_ARGS_SPECS[@]} -gt 0 && ${#TEST_IMPACTED_SCOPES[@]} -eq 0 ]]; then
   die "at least one --test-impacted-scope is required when --test-benchmark-args is used"
+fi
+if [[ "${TEST_BEST_CASE_ONLY}" == "1" && ${#TEST_BENCHMARK_ARGS_SPECS[@]} -gt 0 && -z "${TEST_EMPTY_IMPACTED_RANGE}" ]]; then
+  die "--test-empty-impacted-range is required when --test-best-case-only is used"
 fi
 
 # Task definitions are the intended configuration layer for this script, so the
@@ -292,8 +315,9 @@ choose_port() {
 start_bazel_remote() {
   local cache_dir="$1"
   local log_name="$2"
-  local http_port grpc_port attempts
+  local http_port grpc_port attempts readiness_checks
   attempts=10
+  readiness_checks=30
 
   stop_bazel_remote
 
@@ -310,14 +334,22 @@ start_bazel_remote() {
       >"${REMOTE_LOG}" 2>&1 &
     REMOTE_PID=$!
 
-    sleep 1
-    if kill -0 "${REMOTE_PID}" >/dev/null 2>&1; then
-      REMOTE_HTTP_URL="http://127.0.0.1:${http_port}"
-      REMOTE_GRPC_TARGET="127.0.0.1:${grpc_port}"
-      return 0
-    fi
+    for ((check = 1; check <= readiness_checks; check++)); do
+      if ! kill -0 "${REMOTE_PID}" >/dev/null 2>&1; then
+        break
+      fi
+      if curl --silent --show-error --max-time 2 "http://127.0.0.1:${http_port}" >/dev/null 2>&1; then
+        REMOTE_HTTP_URL="http://127.0.0.1:${http_port}"
+        REMOTE_GRPC_TARGET="127.0.0.1:${grpc_port}"
+        return 0
+      fi
+      sleep 1
+    done
 
-    wait "${REMOTE_PID}" >/dev/null 2>&1 || true
+    if [[ -n "${REMOTE_PID}" ]]; then
+      kill "${REMOTE_PID}" >/dev/null 2>&1 || true
+      wait "${REMOTE_PID}" >/dev/null 2>&1 || true
+    fi
     REMOTE_PID=""
   done
 
@@ -326,8 +358,9 @@ start_bazel_remote() {
 
 start_toxiproxy() {
   local log_name="$1"
-  local port attempts
+  local port attempts readiness_checks
   attempts=10
+  readiness_checks=30
 
   stop_toxiproxy
 
@@ -342,14 +375,21 @@ start_toxiproxy() {
       >"${TOXIPROXY_LOG}" 2>&1 &
     TOXIPROXY_PID=$!
 
-    sleep 1
-    if kill -0 "${TOXIPROXY_PID}" >/dev/null 2>&1 \
-      && "${TOXIPROXY_CLI_LAUNCHER[@]}" --host "${TOXIPROXY_API_URL}" list >/dev/null 2>&1; then
-      echo "${TOXIPROXY_API_URL}"
-      return 0
-    fi
+    for ((check = 1; check <= readiness_checks; check++)); do
+      if ! kill -0 "${TOXIPROXY_PID}" >/dev/null 2>&1; then
+        break
+      fi
+      if "${TOXIPROXY_CLI_LAUNCHER[@]}" --host "${TOXIPROXY_API_URL}" list >/dev/null 2>&1; then
+        echo "${TOXIPROXY_API_URL}"
+        return 0
+      fi
+      sleep 1
+    done
 
-    wait "${TOXIPROXY_PID}" >/dev/null 2>&1 || true
+    if [[ -n "${TOXIPROXY_PID}" ]]; then
+      kill "${TOXIPROXY_PID}" >/dev/null 2>&1 || true
+      wait "${TOXIPROXY_PID}" >/dev/null 2>&1 || true
+    fi
     TOXIPROXY_PID=""
     TOXIPROXY_API_URL=""
   done
@@ -790,6 +830,12 @@ run_cached_pair() {
 }
 
 resolve_test_impacted_range() {
+  local mode="$1"
+
+  if [[ "${mode}" == "empty" && -n "${TEST_EMPTY_IMPACTED_RANGE}" ]]; then
+    printf '%s\n' "${TEST_EMPTY_IMPACTED_RANGE}"
+    return 0
+  fi
   if [[ -n "${TEST_IMPACTED_RANGE}" ]]; then
     printf '%s\n' "${TEST_IMPACTED_RANGE}"
     return 0
@@ -821,15 +867,16 @@ resolve_bazel_built_file() {
 run_impacted_test_pair() {
   local benchmark_index="$1"
   local benchmark_spec="$2"
-  local selector_output_base="$3"
-  local selector_log_file="$4"
-  local execution_output_base="$5"
-  local execution_log_file="$6"
+  local impacted_mode="$3"
+  local selector_output_base="$4"
+  local selector_log_file="$5"
+  local execution_output_base="$6"
+  local execution_log_file="$7"
   local impacted_range selector_time selector_build_time selector_exec_time execution_time target_count
   local manifest_file selector_tool selector_start selector_end
   local -a selector_args execution_args
 
-  impacted_range="$(resolve_test_impacted_range)"
+  impacted_range="$(resolve_test_impacted_range "${impacted_mode}")"
   manifest_file="${TMP_ROOT}/impacted-manifest-${benchmark_index}.txt"
 
   selector_build_time="$(run_bazel_command \
@@ -881,6 +928,10 @@ run_impacted_test_pair() {
     return 0
   fi
 
+  if [[ "${impacted_mode}" == "empty" ]]; then
+    die "expected empty impacted-target manifest for ${benchmark_spec}, but selected ${target_count} targets"
+  fi
+
   mapfile -t execution_args < "${manifest_file}"
   execution_args=(test "${execution_args[@]}")
   execution_time="$(run_bazel_argv \
@@ -909,6 +960,7 @@ declare -a BUILD_RESULT_GRPC_COLD_TIMES=()
 declare -a BUILD_RESULT_GRPC_WARM_TIMES=()
 declare -a TEST_RESULT_LABELS=()
 declare -a TEST_RESULT_NO_CACHE_TIMES=()
+declare -a TEST_RESULT_HTTP_SEED_TIMES=()
 declare -a TEST_RESULT_HTTP_COLD_TIMES=()
 declare -a TEST_RESULT_HTTP_WARM_TIMES=()
 declare -a TEST_RESULT_IMPACTED_SELECTOR_TIMES=()
@@ -1026,6 +1078,8 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
   echo "Test benchmark: bazelisk ${label}"
   echo "========================================"
 
+  no_cache_time=""
+  http_seed_time=""
   no_cache_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-no-cache"
   http_cold_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-http-cold-remote"
   http_warm_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-http-warm-remote"
@@ -1034,8 +1088,10 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
   benchmark_remote_cache_dir="${CACHE_DIR}/benchmark-${benchmark_index}"
   mkdir -p "${benchmark_remote_cache_dir}"
 
-  no_cache_time="$(run_bazel_command "no-cache (${label})" "${test_spec}" "" "${no_cache_output_base}" "${LOG_DIR}/benchmark-${benchmark_index}-no-cache.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
-  remove_output_base "${no_cache_output_base}"
+  if [[ "${TEST_BEST_CASE_ONLY}" != "1" ]]; then
+    no_cache_time="$(run_bazel_command "no-cache (${label})" "${test_spec}" "" "${no_cache_output_base}" "${LOG_DIR}/benchmark-${benchmark_index}-no-cache.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
+    remove_output_base "${no_cache_output_base}"
+  fi
 
   start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${benchmark_index}-bazel-remote.log"
   remote_cache_url="${REMOTE_HTTP_URL}"
@@ -1054,12 +1110,20 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
     "${LOG_DIR}/benchmark-${benchmark_index}-http-warm-remote.log")
   http_cold_time="${http_cache_times[0]}"
   http_warm_time="${http_cache_times[1]}"
+  if [[ "${TEST_BEST_CASE_ONLY}" == "1" ]]; then
+    http_seed_time="${http_cold_time}"
+  fi
 
   stop_bazel_remote
 
+  impacted_mode="normal"
+  if [[ "${TEST_BEST_CASE_ONLY}" == "1" ]]; then
+    impacted_mode="empty"
+  fi
   mapfile -t impacted_times < <(run_impacted_test_pair \
     "${benchmark_index}" \
     "${test_spec}" \
+    "${impacted_mode}" \
     "${selector_output_base}" \
     "${LOG_DIR}/benchmark-${benchmark_index}-impacted-selector.log" \
     "${impacted_execution_output_base}" \
@@ -1071,6 +1135,7 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
 
   TEST_RESULT_LABELS+=("${label}")
   TEST_RESULT_NO_CACHE_TIMES+=("${no_cache_time}")
+  TEST_RESULT_HTTP_SEED_TIMES+=("${http_seed_time}")
   TEST_RESULT_HTTP_COLD_TIMES+=("${http_cold_time}")
   TEST_RESULT_HTTP_WARM_TIMES+=("${http_warm_time}")
   TEST_RESULT_IMPACTED_SELECTOR_TIMES+=("${impacted_selector_time}")
@@ -1078,7 +1143,7 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
   TEST_RESULT_IMPACTED_TOTAL_TIMES+=("${impacted_total_time}")
   TEST_RESULT_IMPACTED_TARGET_COUNTS+=("${impacted_target_count}")
 
-  if ! less_than "${http_warm_time}" "${no_cache_time}"; then
+  if [[ "${TEST_BEST_CASE_ONLY}" != "1" ]] && ! less_than "${http_warm_time}" "${no_cache_time}"; then
     echo "FAIL: warm HTTP remote cache was not faster than no cache for: bazelisk ${label}" >&2
     all_passed=false
   fi
@@ -1111,8 +1176,12 @@ done
 for index in "${!TEST_RESULT_LABELS[@]}"; do
   echo
   echo "bazelisk ${TEST_RESULT_LABELS[index]}"
-  printf '  no-cache            %12ss\n' "${TEST_RESULT_NO_CACHE_TIMES[index]}"
-  printf '  http-cold           %12ss\n' "${TEST_RESULT_HTTP_COLD_TIMES[index]}"
+  if [[ "${TEST_BEST_CASE_ONLY}" == "1" ]]; then
+    printf '  http-seed           %12ss\n' "${TEST_RESULT_HTTP_SEED_TIMES[index]}"
+  else
+    printf '  no-cache            %12ss\n' "${TEST_RESULT_NO_CACHE_TIMES[index]}"
+    printf '  http-cold           %12ss\n' "${TEST_RESULT_HTTP_COLD_TIMES[index]}"
+  fi
   printf '  http-warm           %12ss\n' "${TEST_RESULT_HTTP_WARM_TIMES[index]}"
   printf '  impacted-selector   %12ss\n' "${TEST_RESULT_IMPACTED_SELECTOR_TIMES[index]}"
   printf '  impacted-execution  %12ss\n' "${TEST_RESULT_IMPACTED_EXECUTION_TIMES[index]}"
@@ -1124,7 +1193,7 @@ if [[ "${all_passed}" != true ]]; then
   exit 1
 fi
 
-echo "PASS: warm remote cache runs were faster than both no cache and their corresponding cold remote cache runs for every cached benchmark command"
+echo "PASS: warm remote cache runs were faster than their corresponding comparison baseline for every cached benchmark command"
 if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]]; then
   echo "PASS: warm remote cache logs contained all required patterns"
 fi
