@@ -268,6 +268,213 @@ The next step is to evolve the generalized benchmark from a simple
 “remote cache helps or not” experiment into a protocol and latency
 comparison that better reflects the intended deployment shape.
 
+## Next planned extension: partition build-vs-test minimization comparisons
+The next benchmark change should explicitly partition **build workloads** from
+**test workloads** instead of forcing one uniform comparison matrix across all
+Bazel commands.
+
+### Why partition the benchmark
+The current generalized harness treats each benchmark entry as just “a Bazel
+command,” but the decision space is now different for builds and tests:
+
+- **Build workloads** (for example `build //main:avalanchego`) do not benefit
+  meaningfully from impacted-target reduction once the job is required. If CI
+  needs that binary, the build still has to happen in order to populate or
+  reuse action-cache entries. For builds, the important question remains how
+  much remote caching helps, and whether HTTP vs gRPC matters.
+- **Test workloads** can benefit from impacted-target selection because the
+  selected set may be empty or very small. For tests, the important comparison
+  is no longer only cache/no-cache/protocol, but also whether computing
+  impacted targets and possibly skipping test execution beats simply running the
+  full-scope test command against a warm remote cache.
+
+This means the benchmark should stop pretending that “impacted targets” is a
+symmetric dimension for both builds and tests. The likely product conclusion is
+that remote caching is the main lever for builds, while impacted-target
+selection is only plausibly worthwhile on the test side.
+
+### Benchmark shape to add next
+The next extension should keep the existing generalized script but add
+**workload-mode-aware benchmark entries**.
+
+#### Build entries
+Build-mode entries should keep the current full remote-cache matrix:
+- no remote cache
+- HTTP remote cache, cold
+- HTTP remote cache, warm
+- gRPC remote cache, cold
+- gRPC remote cache, warm
+
+This should continue to cover at least:
+- `build //main:avalanchego`
+- `build --config=race //main:avalanchego`
+
+No impacted-target comparison should be added for build entries.
+
+#### Test entries
+Test-mode entries should use a smaller matrix focused on the decision that now
+matters for tests:
+- no remote cache
+- HTTP remote cache, cold
+- HTTP remote cache, warm
+- impacted-target mode
+
+For the first iteration, **skip gRPC test benchmarking**. gRPC remains useful
+on the build side where protocol comparison is more interesting, but adding it
+for tests would increase script complexity without answering the main product
+question.
+
+The initial test entry should be the existing main-module unit-test workload:
+- `test //... -- -//graft/...`
+
+### What “impacted-target mode” should measure
+For each test-mode benchmark entry, the harness should measure a fourth case
+that uses the same test scope as the full benchmark command but executes via
+impacted-target selection.
+
+That impacted case should record:
+1. **selector time** — time to compute the impacted target manifest
+2. **selected target count** — how many test labels were selected
+3. **execution time** — zero if the manifest is empty; otherwise time to run
+   `bazel test` on the selected labels
+4. **total impacted time** — selector time + execution time
+
+The most important comparison is:
+- **full-scope warm HTTP cache**
+- vs **impacted-target total time**
+
+This is the real decision point for test CI minimization:
+- if impacted-target total is materially lower than warm-cache full-scope test
+  execution, test selection complexity may be justified
+- if the numbers are close, warm remote caching may already provide most of the
+  practical value without selective execution
+
+### Important fairness requirement
+The impacted-target comparison should use the same CI-style isolation model as
+other measured runs:
+- fresh `--output_base`
+- shared setup-side dependency caches only (`repository_cache` and shared
+  Gazelle `GOMODCACHE`)
+- no reuse of prior local Bazel action/output state
+
+That keeps the comparison honest:
+- **fresh worker + warm HTTP remote cache on the full test scope**
+- versus
+- **fresh worker + impacted-target selection for the same test scope**
+
+The benchmark should not let impacted-target mode cheat by reusing warmed local
+Bazel state that the full-cache benchmark cases do not get.
+
+### Configuration direction
+The script interface should evolve from “one uniform list of benchmark args” to
+“typed benchmark entries” or equivalent workload-specific flags.
+
+The current Taskfile should stay as the configuration layer for this script, so
+any new interface should remain practical to express from Task definitions.
+
+#### Proposed first-pass CLI shape
+The simplest likely interface is to keep one shared setup command and split the
+benchmark entrypoints by workload type:
+
+- `--build-benchmark-args '<bazel build ...>'`
+- `--test-benchmark-args '<bazel test ...>'`
+- `--test-impacted-scope '<scope>'`
+- `--test-impacted-range '<range>'` or environment-backed equivalent
+
+Intended semantics:
+- every `--build-benchmark-args` entry runs the existing build-style matrix:
+  no-cache / HTTP cold / HTTP warm / gRPC cold / gRPC warm
+- every `--test-benchmark-args` entry runs the test-style matrix:
+  no-cache / HTTP cold / HTTP warm / impacted-target
+- `--test-impacted-scope` values define the scope universe used by the
+  impacted-target selector for all configured test entries in the first
+  iteration
+- `--test-impacted-range` defines the git diff range used for impacted-target
+  selection; if this is omitted, implementation should likely support the same
+  environment-backed base-SHA model already used by the impacted-target helper
+  scripts
+
+This first pass intentionally supports one shared impacted-target scope set for
+all configured test entries. That is sufficient for the initial use case with a
+single test workload (`test //... -- -//graft/...`) and keeps the bash parsing
+manageable.
+
+If later benchmark coverage needs per-test-entry selector scopes, the interface
+can graduate to a more structured entry format after the first iteration proves
+useful.
+
+#### Proposed first vertical slice
+To minimize implementation risk, the first change should wire up only:
+- existing build entries unchanged:
+  - `build //main:avalanchego`
+  - `build --config=race //main:avalanchego`
+- one test entry with impacted-target comparison:
+  - `test //... -- -//graft/...`
+- one matching impacted-target scope set:
+  - `//...`
+  - `-//graft/...`
+
+That keeps the setup fetch union unchanged for the first pass and lets the new
+logic prove itself on one test workload before expanding to more selective test
+scopes.
+
+#### Proposed script behavior for test entries
+For each test entry, after the no-cache / HTTP cold / HTTP warm runs:
+1. measure selector start/end time
+2. invoke the existing impacted-target machinery for the configured scope set
+3. record the selected target count
+4. if the manifest is empty:
+   - record execution time as `0`
+   - record total impacted-target time as selector time only
+5. if the manifest is non-empty:
+   - run `bazel test` on exactly the selected labels with a fresh output base
+   - record execution time and total impacted-target time
+
+The script output for test entries should therefore gain explicit lines for:
+- `impacted-selector`
+- `impacted-execution`
+- `impacted-total`
+- `impacted-target-count`
+
+#### Proposed implementation constraints
+The first implementation should:
+- reuse the existing helper scripts/tooling for impacted-target computation
+  rather than duplicating selector logic inside the benchmark script
+- preserve current build-entry result formatting and pass/fail semantics
+- avoid introducing impacted-target logic into build entries just for symmetry
+- keep gRPC out of the test matrix for now
+
+That yields a small, reviewable change set while still producing the comparison
+needed to decide whether test-side impacted-target pruning is worth the added
+complexity over warm remote caching.
+
+### Validation criteria for this next step
+A successful implementation of this extension should:
+- preserve the current build benchmark behavior and protocol comparison
+- add at least one test-mode benchmark entry that measures impacted-target mode
+  alongside no-cache / HTTP cold / HTTP warm
+- ensure the impacted-target selection uses the same scope as the corresponding
+  full test benchmark command
+- report selector time, selected target count, execution time, and total
+  impacted-target time
+- make it easy to compare **warm HTTP full-scope test execution** against
+  **impacted-target execution** on the same CI runner class
+
+### Decision this extension should inform
+This extension is meant to answer a narrower but more actionable question than
+“does remote cache help?”
+
+It should answer:
+- for test workloads, is it better to compute impacted targets and sometimes
+  skip almost all work, or to rely on warm remote caching for the full test
+  scope?
+- for build workloads, does the inability to shrink the required top-level
+  target set mean remote cache should remain the only optimization under
+  consideration?
+
+That answer should clarify whether selective-target complexity is justified only
+for tests, while remote cache remains the primary optimization for builds.
+
 ### New question
 The benchmark should answer:
 - how much remote-cache latency changes the payoff of cache hits
