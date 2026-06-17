@@ -10,9 +10,7 @@ package(default_visibility = [
 
 package_group(
     name = "external_consumers",
-    packages = [
-        "//node",
-    ],
+    packages = [],
 )
 
 go_library(
@@ -38,7 +36,6 @@ go_library(
         "//graft/coreth/params/extras",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contracts/warp",
-        "//graft/coreth/precompile/precompileconfig",
         "//graft/evm/constants",
         "//graft/evm/utils/rpc",
         "//ids",
@@ -111,6 +108,7 @@ go_test(
         "//database/memdb",
         "//database/prefixdb",
         "//graft/coreth/params",
+        "//graft/coreth/params/extras",
         "//graft/coreth/plugin/evm",
         "//graft/coreth/plugin/evm/customheader",
         "//graft/coreth/plugin/evm/customtypes",
@@ -130,7 +128,6 @@ go_test(
         "//utils/buffer",
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",
-        "//utils/bloom",
         "//utils/crypto/secp256k1",
         "//utils/json",
         "//utils/logging",
@@ -143,6 +140,7 @@ go_test(
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "//vms/saevm/blocks",
+        "//vms/saevm/cchain/cchaintest",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/cchain/warp",
@@ -150,6 +148,7 @@ go_test(
         "//vms/saevm/params",
         "//vms/saevm/saetest",
         "//vms/saevm/saexec",
+        "//vms/saevm/txgossip/txgossiptest",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
@@ -157,6 +156,7 @@ go_test(
         "@com_github_ava_labs_libevm//ethclient",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//rpc",
         "@com_github_google_go_cmp//cmp",
         "@com_github_holiman_uint256//:uint256",

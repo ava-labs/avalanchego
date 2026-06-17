@@ -123,6 +123,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 	tb.Helper()
 	conf := &genesisConfig{
 		gasTarget: math.MaxUint64,
+		baseFee:   params.GWei,
 	}
 	options.ApplyTo(conf, opts...)
 
@@ -130,6 +131,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 		Config:    config,
 		Timestamp: conf.timestamp,
 		Alloc:     alloc,
+		BaseFee:   new(big.Int).SetUint64(conf.baseFee),
 	}
 
 	tdb := state.NewDatabaseWithConfig(db, conf.tdbConfig).TrieDB()
@@ -147,7 +149,7 @@ type genesisConfig struct {
 	tdbConfig *triedb.Config
 	timestamp uint64
 	gasTarget gas.Gas
-	// gasExcess gas.Gas
+	baseFee   uint64
 }
 
 // A GenesisOption configures [NewGenesis].
@@ -174,7 +176,9 @@ func WithGasTarget(target gas.Gas) GenesisOption {
 	})
 }
 
-// WithGasExcess overrides the gas excess used by [NewGenesis].
-func WithGasExcess(gas.Gas) GenesisOption {
-	return options.Func[genesisConfig](func(*genesisConfig) {})
+// WithBaseFee overrides the base fee used by [NewGenesis].
+func WithBaseFee(baseFee uint64) GenesisOption {
+	return options.Func[genesisConfig](func(gc *genesisConfig) {
+		gc.baseFee = baseFee
+	})
 }

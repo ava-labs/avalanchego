@@ -318,6 +318,47 @@ func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
 	return g, nil
 }
 
+var (
+	// errInvalidBlockVersion is returned by [VM.ParseBlock] when a block's
+	// BlockBodyExtra carries a Version other than 0, the only supported version.
+	errInvalidBlockVersion = errors.New("invalid block version")
+	// errExtDataHashMismatch is returned by [VM.ParseBlock] when a block's extData
+	// does not hash to the ExtDataHash committed in its header.
+	errExtDataHashMismatch = errors.New("extData hash does not match header")
+)
+
+// ParseBlock parses buf via the embedded SAE VM and additionally performs the
+// C-Chain syntactic checks that the SAE VM is unaware of: that the block's
+// BlockBodyExtra Version is 0 (the only supported version) and that its extData
+// matches the ExtDataHash committed in the header.
+//
+// The block ID is the header hash. The header neither hashes the body's Version
+// nor its extData bytes (it commits only ExtDataHash), so a block with a
+// tampered Version or extData keeps the same ID. This override is the boundary
+// that rejects such blocks before they are accepted, persisted, or executed.
+func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
+	b, err := vm.VM.ParseBlock(ctx, buf)
+	if err != nil {
+		return nil, err
+	}
+
+	eth := b.EthBlock()
+	if version := customtypes.BlockVersion(eth); version != 0 {
+		return nil, fmt.Errorf("%w: %d", errInvalidBlockVersion, version)
+	}
+
+	extData := customtypes.BlockExtData(eth)
+	// TODO: Handle pre-AP1 blocks, which incorrectly did not set ExtDataHash.
+	// This isn't needed prior to Helicon, but will be required to fully remove
+	// coreth.
+	claimed := customtypes.GetHeaderExtra(eth.Header()).ExtDataHash
+	actual := customtypes.CalcExtDataHash(extData)
+	if claimed != actual {
+		return nil, fmt.Errorf("%w: header %s, extData %s", errExtDataHashMismatch, claimed, actual)
+	}
+	return b, nil
+}
+
 const (
 	avaxServiceName       = "avax"
 	avaxHTTPExtensionPath = "/" + avaxServiceName
@@ -439,12 +480,12 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// blockClient adapts [sae.VM] to the [saewarp.BlockClient] interface.
+// blockClient adapts [sae.VM] to the [saewarp.Backend] interface.
 type blockClient struct {
 	vm *sae.VM
 }
 
-var _ saewarp.BlockClient = (*blockClient)(nil)
+var _ saewarp.Backend = (*blockClient)(nil)
 
 func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
 	b, err := c.vm.GetBlock(ctx, blockID)

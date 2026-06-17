@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -243,13 +242,12 @@ func (*hooks) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block
 }
 
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
-	rules := h.chainConfig.Rules(b.Number(), corethparams.IsMergeTODO, b.Time())
-	acceptCtx := &precompileconfig.AcceptContext{
-		SnowCtx: h.ctx,
-		Warp:    h.warpStorage,
+	msgs, err := warp.FromReceipts(receipts)
+	if err != nil {
+		return fmt.Errorf("extracting warp messages from block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
-	if err := warp.HandlePrecompileAccept(rules, acceptCtx, receipts); err != nil {
-		return fmt.Errorf("handling precompile accept for block %s (%d): %w", b.Hash(), b.NumberU64(), err)
+	if err := h.warpStorage.Add(msgs...); err != nil {
+		return fmt.Errorf("storing warp messages for block %s (%d): %w", b.Hash(), b.NumberU64(), err)
 	}
 
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
@@ -474,9 +472,13 @@ func (b *builder) BuildBlock(
 
 	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
 	rulesExtra := corethparams.GetRulesExtra(rules)
-	predicateBytes, err := warp.PredicateBytes(b.ctx, blockCtx, rulesExtra, ethTxs)
+	blockResults, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
 	if err != nil {
-		return nil, fmt.Errorf("generating predicates: %w", err)
+		return nil, fmt.Errorf("verifying block predicates: %w", err)
+	}
+	predicateBytes, err := blockResults.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("marshaling predicate results: %w", err)
 	}
 	// TODO(StephenButtolph): Should we only encode the predicate bytes when
 	// there is at least one predicate?

@@ -9,17 +9,9 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
-
-const (
-	dbPrefix  = "warp"
-	cacheSize = 500
-)
-
-var _ precompileconfig.WarpMessageWriter = (*Storage)(nil)
 
 // Storage persists and fetches warp messages.
 type Storage struct {
@@ -29,11 +21,21 @@ type Storage struct {
 }
 
 // NewStorage creates a new Storage backed by the provided database.
+//
+// msgs are optional off-chain messages to keep in memory.
 func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 	overrides := make(map[ids.ID]*warp.UnsignedMessage, len(msgs))
 	for _, m := range msgs {
 		overrides[m.ID()] = m
 	}
+	const (
+		// dbPrefix matches coreth's warpDB prefix to ensure the same underlying
+		// database structure during the VM transition. Coreth similarly uses
+		// [prefixdb.New], not [prefixdb.NewNested], so that behavior MUST be
+		// maintained here as well.
+		dbPrefix  = "warp"
+		cacheSize = 500
+	)
 	return &Storage{
 		db:        prefixdb.New([]byte(dbPrefix), db),
 		cache:     lru.NewCache[ids.ID, *warp.UnsignedMessage](cacheSize),
@@ -41,32 +43,46 @@ func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 	}
 }
 
-func (b *Storage) AddMessage(m *warp.UnsignedMessage) error {
-	id := m.ID()
-	if err := b.db.Put(id[:], m.Bytes()); err != nil {
-		return fmt.Errorf("writing message: %w", err)
+// Add writes the given messages to storage.
+func (s *Storage) Add(msgs ...*warp.UnsignedMessage) error {
+	batch := s.db.NewBatch()
+	for i, m := range msgs {
+		id := m.ID()
+		// TODO(StephenButtolph): We never actually use the warp message bytes.
+		// We could store just the ID to save space.
+		if err := batch.Put(id[:], m.Bytes()); err != nil {
+			return fmt.Errorf("writing message %s (%d) to batch: %w", id, i, err)
+		}
 	}
-	b.cache.Put(id, m)
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("committing batch: %w", err)
+	}
+
+	// Cache after the DB write has succeeded to ensure the cache is consistent.
+	for _, m := range msgs {
+		s.cache.Put(m.ID(), m)
+	}
 	return nil
 }
 
-func (b *Storage) GetMessage(id ids.ID) (*warp.UnsignedMessage, error) {
-	if m, ok := b.cache.Get(id); ok {
+// Get returns the message with the given ID.
+func (s *Storage) Get(id ids.ID) (*warp.UnsignedMessage, error) {
+	if m, ok := s.cache.Get(id); ok {
 		return m, nil
 	}
-	if m, ok := b.overrides[id]; ok {
+	if m, ok := s.overrides[id]; ok {
 		return m, nil
 	}
 
-	bytes, err := b.db.Get(id[:])
+	bytes, err := s.db.Get(id[:])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("from db: %w", err)
 	}
 
 	m, err := warp.ParseUnsignedMessage(bytes)
 	if err != nil {
-		return nil, fmt.Errorf("parsing message %s: %w", id, err)
+		return nil, fmt.Errorf("while parsing: %w", err)
 	}
-	b.cache.Put(id, m)
+	s.cache.Put(id, m)
 	return m, nil
 }

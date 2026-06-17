@@ -11,37 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
-
-const networkID uint32 = 54321
-
-var sourceChainID = ids.GenerateTestID()
-
-func newHash(tb testing.TB) (*warp.UnsignedMessage, *payload.Hash) {
-	p, err := payload.NewHash(
-		ids.GenerateTestID(),
-	)
-	require.NoError(tb, err)
-
-	m, err := warp.NewUnsignedMessage(networkID, sourceChainID, p.Bytes())
-	require.NoError(tb, err)
-	return m, p
-}
-
-func newAddressedCall(tb testing.TB) (*warp.UnsignedMessage, *payload.AddressedCall) {
-	p, err := payload.NewAddressedCall(
-		utils.RandomBytes(20),
-		[]byte("test"),
-	)
-	require.NoError(tb, err)
-
-	m, err := warp.NewUnsignedMessage(networkID, sourceChainID, p.Bytes())
-	require.NoError(tb, err)
-	return m, p
-}
 
 func TestStorage(t *testing.T) {
 	msg, _ := newAddressedCall(t)
@@ -79,20 +50,16 @@ func TestStorage(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			db := memdb.New()
 			s := NewStorage(db, test.overrides...)
-			for _, msg := range test.add {
-				require.NoError(t, s.AddMessage(msg))
+			require.NoErrorf(t, s.Add(test.add...), "%T.Add(%d)", s, len(test.add))
+
+			for _, name := range []string{"after_add", "fresh"} {
+				t.Run(name, func(t *testing.T) {
+					msg, err := s.Get(test.id)
+					require.ErrorIsf(t, err, test.wantErr, "%T.Get(%s)", s, test.id)
+					require.Equalf(t, test.want, msg, "%T.Get(%s)", s, test.id)
+				})
+				s = NewStorage(db, test.overrides...)
 			}
-
-			// Verify the message is fetchable.
-			msg, err := s.GetMessage(test.id)
-			require.ErrorIs(t, err, test.wantErr)
-			require.Equal(t, test.want, msg)
-
-			// Verify the message was persisted.
-			s = NewStorage(db, test.overrides...)
-			msg, err = s.GetMessage(test.id)
-			require.ErrorIs(t, err, test.wantErr)
-			require.Equal(t, test.want, msg)
 		})
 	}
 }

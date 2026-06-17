@@ -16,67 +16,75 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
-const (
-	StorageErrCode = iota + 1
-	ParseErrCode
-	TypeErrCode
-	VerifyErrCode
-)
-
 var _ acp118.Verifier = (*Verifier)(nil)
 
-type BlockClient interface {
-	IsAccepted(ctx context.Context, blockID ids.ID) error
-}
-
-// Verifier verifies whether this node should be willing to sign a warp message.
+// Verifier verifies that this node should sign a warp message.
 type Verifier struct {
-	blocks  BlockClient
+	backend Backend
 	storage *Storage
 }
 
 // NewVerifier returns an ACP-118 message verifier.
-func NewVerifier(blocks BlockClient, storage *Storage) *Verifier {
+func NewVerifier(backend Backend, storage *Storage) *Verifier {
 	return &Verifier{
-		blocks:  blocks,
+		backend: backend,
 		storage: storage,
 	}
 }
 
-// Verify verifies that this node should sign the unsigned warp message.
+// Backend that the [Verifier] depends on to look for accepted blocks.
+type Backend interface {
+	// IsAccepted returns a non-nil error if the block with the given ID is not
+	// accepted.
+	IsAccepted(ctx context.Context, blockID ids.ID) error
+}
+
+// The error codes are returned by [Verifier.Verify] to identify why a message
+// was not signed.
+const (
+	StorageErrCode = iota + 1
+	ParseErrCode
+	UnknownMessageErrCode
+	NotAcceptedErrCode
+)
+
+// Verify verifies that this node should sign m.
 func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte) *common.AppError {
-	id := m.ID()
-	_, err := v.storage.GetMessage(id)
-	if err == nil {
+	// If the message was sent by the precompile or registered as an off-chain
+	// message, it will be available in storage.
+	_, err := v.storage.Get(m.ID())
+	if err == nil { // if NO error
 		return nil
 	}
 	if !errors.Is(err, database.ErrNotFound) {
 		return &common.AppError{
 			Code:    StorageErrCode,
-			Message: fmt.Sprintf("failed to get message %s: %s", id, err.Error()),
+			Message: "loading message: " + err.Error(),
 		}
 	}
 
-	parsed, err := payload.Parse(m.Payload)
+	// Block acceptance doesn't go through the precompile, so we need to check
+	// whether the message is for an accepted block.
+	p, err := payload.Parse(m.Payload)
 	if err != nil {
 		return &common.AppError{
 			Code:    ParseErrCode,
-			Message: "failed to parse payload: " + err.Error(),
+			Message: "parsing payload: " + err.Error(),
 		}
 	}
 
-	p, ok := parsed.(*payload.Hash)
+	hash, ok := p.(*payload.Hash)
 	if !ok {
 		return &common.AppError{
-			Code:    TypeErrCode,
-			Message: fmt.Sprintf("wrong payload type: %T", p),
+			Code:    UnknownMessageErrCode,
+			Message: fmt.Sprintf("unknown %T message", p),
 		}
 	}
 
-	if err := v.blocks.IsAccepted(ctx, p.Hash); err != nil {
+	if err := v.backend.IsAccepted(ctx, hash.Hash); err != nil {
 		return &common.AppError{
-			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("failed to get block %s: %s", p.Hash, err.Error()),
+			Code:    NotAcceptedErrCode,
+			Message: "block not marked as accepted: " + err.Error(),
 		}
 	}
 	return nil

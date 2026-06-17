@@ -5,31 +5,29 @@ package warp
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-type blocks struct {
-	accepted set.Set[ids.ID]
-}
+var _ Backend = (*backend)(nil)
 
-func newBlocks(ids ...ids.ID) blocks {
-	return blocks{
-		set.Of(ids...),
-	}
-}
+type backend set.Set[ids.ID]
 
-func (b blocks) IsAccepted(_ context.Context, id ids.ID) error {
-	if !b.accepted.Contains(id) {
-		return database.ErrNotFound
+var errBlockNotAccepted = errors.New("block not accepted")
+
+func (b backend) IsAccepted(_ context.Context, id ids.ID) error {
+	if s := set.Set[ids.ID](b); !s.Contains(id) {
+		return errBlockNotAccepted
 	}
 	return nil
 }
@@ -38,60 +36,72 @@ func TestVerifier(t *testing.T) {
 	addressedCallMsg, _ := newAddressedCall(t)
 	hashMsg, hash := newHash(t)
 
-	invalidPayloadMsg, err := warp.NewUnsignedMessage(networkID, sourceChainID, nil)
-	require.NoError(t, err)
+	invalidPayloadMsg, err := warp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, nil)
+	require.NoErrorf(t, err, "warp.NewUnsignedMessage(%s, %s, nil)", constants.UnitTestID, snowtest.XChainID)
 
 	tests := []struct {
-		name             string
-		acceptedBlocks   []ids.ID
-		acceptedMessages []*warp.UnsignedMessage
-		m                *warp.UnsignedMessage
-		want             *common.AppError
+		name           string
+		acceptedBlocks set.Set[ids.ID]
+		storage        *Storage
+		m              *warp.UnsignedMessage
+		want           *common.AppError
 	}{
 		{
-			name: "known_message",
-			acceptedMessages: []*warp.UnsignedMessage{
-				addressedCallMsg,
-			},
-			m: addressedCallMsg,
+			name:    "known_message",
+			storage: NewStorage(memdb.New(), addressedCallMsg),
+			m:       addressedCallMsg,
 		},
 		{
-			name: "invalid_payload",
-			m:    invalidPayloadMsg,
+			name: "storage_error",
+			storage: func() *Storage {
+				db := memdb.New()
+				require.NoErrorf(t, db.Close(), "%T.Close()", db)
+				return NewStorage(db)
+			}(),
+			m: addressedCallMsg,
+			want: &common.AppError{
+				Code: StorageErrCode,
+			},
+		},
+		{
+			name:    "invalid_payload",
+			storage: NewStorage(memdb.New()),
+			m:       invalidPayloadMsg,
 			want: &common.AppError{
 				Code: ParseErrCode,
 			},
 		},
 		{
-			name: "wrong_payload_type",
-			m:    addressedCallMsg,
+			name:    "unknown_message",
+			storage: NewStorage(memdb.New()),
+			m:       addressedCallMsg,
 			want: &common.AppError{
-				Code: TypeErrCode,
+				Code: UnknownMessageErrCode,
 			},
 		},
 		{
-			name: "accepted_block",
-			acceptedBlocks: []ids.ID{
-				hash.Hash,
-			},
-			m: hashMsg,
+			name:           "accepted_block",
+			acceptedBlocks: set.Of(hash.Hash),
+			storage:        NewStorage(memdb.New()),
+			m:              hashMsg,
 		},
 		{
-			name: "unaccepted_block",
-			m:    hashMsg,
+			name:    "unaccepted_block",
+			storage: NewStorage(memdb.New()),
+			m:       hashMsg,
 			want: &common.AppError{
-				Code: VerifyErrCode,
+				Code: NotAcceptedErrCode,
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			v := NewVerifier(
-				newBlocks(test.acceptedBlocks...),
-				NewStorage(memdb.New(), test.acceptedMessages...),
+				backend(test.acceptedBlocks),
+				test.storage,
 			)
 			err := v.Verify(t.Context(), test.m, nil)
-			require.ErrorIs(t, err, test.want)
+			require.ErrorIsf(t, err, test.want, "%T.Verify(...)", v)
 		})
 	}
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
@@ -30,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
@@ -48,12 +50,15 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -134,6 +139,10 @@ func withWarpValidators(n int) sutOption {
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
+	// Run under the latest network upgrade rules by default.
+	chainConfig := cparams.Copy(saetest.ChainConfig())
+	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
+
 	var (
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -142,7 +151,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		db  = memdb.New()
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
-				Config:     saetest.ChainConfig(),
+				Config:     &chainConfig,
 				Timestamp:  saeparams.TauSeconds,
 				Difficulty: big.NewInt(0), // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
@@ -427,6 +436,16 @@ func (s *SUT) waitForPendingTxs(ctx context.Context, tb testing.TB) {
 	e, err := s.WaitForEvent(ctx)
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.VM)
 	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.VM)
+}
+
+// waitForPendingEthTxs blocks until every tx is pending in the source the block
+// builder draws from, so the built block includes them all rather than racing
+// promotion. The geth RPC backend's [GetPoolTransactions] resolves the same
+// [txpool.Pool.Pending] set used by [txgossip.Set.TransactionsByPriority]
+// during block building.
+func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
+	tb.Helper()
+	txgossiptest.WaitUntilPending(tb, ctx, s.GethRPCBackends(), txs...)
 }
 
 // buildVerify builds and verifies a block on top of preferenceID.
@@ -796,4 +815,121 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	// execution results to have been applied.
 	exportedUTXOs := txtest.ExportedUTXOs(signedExport.ID(), export)
 	sut.assertUTXOsMissing(t, destinationChain, sut.ctx.ChainID, exportedUTXOs...)
+}
+
+// TestMinGasConsumptionFloor asserts that the cchain VM charges the ACP-194
+// gas floor of max(actualGasUsed, ceil(gasLimit/2)).
+func TestMinGasConsumptionFloor(t *testing.T) {
+	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	sender := w.Addresses()[0]
+
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc = saetest.MaxAllocFor(sender)
+	}))
+
+	const highLimit = 1_000_000
+	tests := []struct {
+		name        string
+		gasLimit    uint64
+		wantGasUsed uint64
+	}{
+		{
+			name:        "low_usage_charged_floor",
+			gasLimit:    highLimit,
+			wantGasUsed: highLimit / 2,
+		},
+		{
+			name:        "usage_above_floor_charged_actual",
+			gasLimit:    ethparams.TxGas,
+			wantGasUsed: ethparams.TxGas,
+		},
+	}
+
+	// A GasFeeCap of 1 pins the effective gas price to 1, so the AVAX burned
+	// equals the gas charged.
+	txs := make([]*types.Transaction, len(tests))
+	for i, tt := range tests {
+		txs[i] = w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       tt.gasLimit,
+			GasFeeCap: big.NewInt(1),
+		})
+		require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, txs[i]), "%T.SendTransaction(%s)", sut.ethclient, tt.name)
+	}
+
+	// Ensure every tx is pending so the builder includes them all in one block.
+	sut.waitForPendingEthTxs(ctx, t, txs...)
+
+	preBalance := sut.balance(t, sender)
+	blk := sut.runConsensusLoop(ctx, t)
+	require.Lenf(t, blk.Receipts(), len(tests), "%T.Receipts()", blk)
+
+	receiptByTx := make(map[common.Hash]*types.Receipt, len(blk.Receipts()))
+	for _, r := range blk.Receipts() {
+		receiptByTx[r.TxHash] = r
+	}
+
+	var totalCharged uint64
+	for i, tt := range tests {
+		receipt, ok := receiptByTx[txs[i].Hash()]
+		require.Truef(t, ok, "receipt for %s", tt.name)
+		totalCharged += tt.wantGasUsed
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, types.ReceiptStatusSuccessful, receipt.Status, "tx status")
+			assert.Equal(t, tt.wantGasUsed, receipt.GasUsed, "gas charged")
+			assert.Equal(t, big.NewInt(1), receipt.EffectiveGasPrice, "effective gas price")
+		})
+	}
+
+	wantBalance := new(uint256.Int).Sub(&preBalance, uint256.NewInt(totalCharged))
+	assert.Equalf(t, *wantBalance, sut.balance(t, sender), "sender balance reflects gas charged")
+}
+
+// TestParseBlock verifies that the cchain ParseBlock override accepts
+// well-formed blocks and rejects blocks with an unsupported (non-zero) version
+// or whose extData does not match the ExtDataHash committed in the header.
+func TestParseBlock(t *testing.T) {
+	ctx, sut := newSUT(t)
+
+	w := newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
+	tx1 := w.newMinimalTx(t)
+
+	tests := []struct {
+		name    string
+		block   *types.Block
+		wantErr error
+	}{
+		{
+			name:  "valid",
+			block: cchaintest.NewBlock(t, 1, common.Hash{}, tx1),
+		},
+		{
+			name:  "valid_empty",
+			block: cchaintest.NewBlock(t, 1, common.Hash{}),
+		},
+		{
+			name:    "extdata_hash_mismatch",
+			block:   cchaintest.NewTamperedBlock(t, 1, common.Hash{}, tx1),
+			wantErr: errExtDataHashMismatch,
+		},
+		{
+			name:    "invalid_version",
+			block:   cchaintest.NewTestBlock(t, cchaintest.WithBlockVersion(1)),
+			wantErr: errInvalidBlockVersion,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf, err := rlp.EncodeToBytes(tt.block)
+			require.NoError(t, err, "rlp.EncodeToBytes(block)")
+
+			got, err := sut.ParseBlock(ctx, buf)
+			require.ErrorIs(t, err, tt.wantErr, "vm.ParseBlock(buf)")
+			if tt.wantErr != nil {
+				return
+			}
+
+			require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
+		})
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"sync/atomic"
 	"time"
@@ -94,17 +95,23 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 	// would also require them to be received as an argument to MarkSynchronous.
 	target, cfg := hooks.GasConfigAfter(b.Header())
 
-	var price gas.Price
-	if fee := ethB.BaseFee(); fee != nil && fee.IsUint64() {
-		price = gas.Price(fee.Uint64())
+	// The base fee must be capped at [math.MaxUint64] to avoid overflow in the gastime.
+	var baseFee uint64
+	switch bf := ethB.BaseFee(); {
+	case bf == nil:
+		baseFee = 0
+	case bf.IsUint64():
+		baseFee = bf.Uint64()
+	default:
+		baseFee = math.MaxUint64
 	}
 
-	execTime, err := gastime.New2(
+	execTime, err := gastime.New(
 		hooks.BlockTime(b.Header()),
 		// Target, excess, and config _after_ are a requirement of
 		// [Block.MarkExecuted].
 		target,
-		price,
+		gas.Price(baseFee),
 		cfg,
 	)
 	if err != nil {
@@ -115,9 +122,8 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 		receiptRoot:   ethB.ReceiptHash(),
 		stateRootPost: ethB.Root(),
 	}
-	if err := e.setBaseFee(ethB.BaseFee()); err != nil {
-		return err
-	}
+	e.baseFee.SetUint64(baseFee)
+
 	if err := b.markExecuted(db.NewBatch(), xdb, e, false, nil); err != nil {
 		return err
 	}

@@ -173,6 +173,11 @@ func BlockTime(eth *ethtypes.Header) time.Time {
 	return time.Unix(int64(eth.Time), 0)
 }
 
+// TODO(JonathanOppenheimer): take options instead of the positional
+// arguments, most of which are frequently nil/zero at call sites.
+//
+// Note: this code will get deleted but we may bring a simiar helper into
+// SAE.
 func NewBlockWithExtData(
 	header *ethtypes.Header, txs []*ethtypes.Transaction, uncles []*ethtypes.Header, receipts []*ethtypes.Receipt,
 	hasher ethtypes.TrieHasher, extdata []byte, recalc bool,
