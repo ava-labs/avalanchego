@@ -155,10 +155,10 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
-	snow := orchestrator.New(vm)
+	snowVM := orchestrator.New(vm)
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
+		require.NoError(tb, snowVM.Shutdown(ctx), "Shutdown()")
 	})
 
 	logger := loggingtest.New(tb, conf.logLevel)
@@ -170,7 +170,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	sender := saetest.NewSender(tb, conf.validators)
 
-	require.NoError(tb, snow.Initialize(
+	require.NoError(tb, snowVM.Initialize(
 		ctx,
 		snowCtx,
 		conf.db,
@@ -180,6 +180,9 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		nil, // Fxs
 		sender,
 	), "Initialize()")
+
+	require.NoError(tb, snowVM.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
+	require.NoError(tb, snowVM.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	if len(conf.precompiles) > 0 {
 		// All precompile registrations must occur after the VM is initialized,
@@ -196,11 +199,11 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	// Avalanchego marks the local node as connected so that p2p protocols
 	// don't need to treat our node as a special case.
-	require.NoErrorf(tb, snow.Connected(ctx, snowCtx.NodeID, version.Current), "Connected(%s)", snowCtx.NodeID)
+	require.NoErrorf(tb, snowVM.Connected(ctx, snowCtx.NodeID, version.Current), "Connected(%s)", snowCtx.NodeID)
 
-	rpcClient, ethClient := dialRPC(ctx, tb, snow)
+	rpcClient, ethClient := dialRPC(ctx, tb, snowVM)
 	sut := &SUT{
-		ChainVM:   snow,
+		ChainVM:   snowVM,
 		Client:    ethClient,
 		rpcClient: rpcClient,
 		rawVM:     vm.VM,

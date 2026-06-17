@@ -14,12 +14,6 @@ import (
 	_ "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-// TODO(alarso16): This needs to be verified to be a multiple the configured
-// commit interval in the non-Firewood case. Can this be safely done in this
-// package, or must it be done on the VM? Does this need to match the interval
-// used by coreth?
-const syncCommitInterval = 4096
-
 var _ adaptor.SummaryProperties = (*Summary)(nil)
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
