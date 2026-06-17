@@ -876,8 +876,8 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 }
 
 // TestParseBlock verifies that the cchain ParseBlock override accepts
-// well-formed blocks and rejects blocks whose extData does not match the
-// ExtDataHash committed in the header.
+// well-formed blocks and rejects blocks with an unsupported (non-zero) version
+// or whose extData does not match the ExtDataHash committed in the header.
 func TestParseBlock(t *testing.T) {
 	ctx, sut := newSUT(t)
 
@@ -901,6 +901,11 @@ func TestParseBlock(t *testing.T) {
 			name:    "extdata_hash_mismatch",
 			block:   cchaintest.NewTamperedBlock(t, 1, common.Hash{}, tx1),
 			wantErr: errExtDataHashMismatch,
+		},
+		{
+			name:    "invalid_version",
+			block:   cchaintest.NewTestBlock(t, cchaintest.WithBlockVersion(1)),
+			wantErr: errInvalidBlockVersion,
 		},
 	}
 	for _, tt := range tests {
