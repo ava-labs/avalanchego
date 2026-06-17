@@ -487,3 +487,40 @@ func TestNoLoggerPanics(t *testing.T) {
 		_, _ = New(cfg)
 	}, "New()")
 }
+
+func TestReadSafety(t *testing.T) {
+	db := mustNewDB(t)
+
+	var (
+		addrWithDeletedKey = common.BytesToAddress([]byte{1})
+		deletedKey         = common.BytesToHash([]byte{1})
+		createdAddr        = common.BytesToAddress([]byte{2})
+		createdKey         = common.BytesToHash([]byte{2})
+		val                = common.BytesToHash([]byte{3})
+		bal                = uint256.NewInt(100)
+	)
+
+	// Tx1
+	sdb := mustNewStateDB(t, db, types.EmptyRootHash)
+	sdb.CreateAccount(addrWithDeletedKey)
+	sdb.SetNonce(addrWithDeletedKey, 1)
+	sdb.SetBalance(addrWithDeletedKey, bal)
+	sdb.SetState(addrWithDeletedKey, deletedKey, val)
+	_ = sdb.IntermediateRoot(true)
+
+	// Tx2
+	sdb.SetState(addrWithDeletedKey, deletedKey, common.Hash{}) // delete the key
+	sdb.CreateAccount(createdAddr)
+	sdb.SetNonce(createdAddr, 1)
+	sdb.SetBalance(createdAddr, bal)
+	sdb.SetState(createdAddr, createdKey, val)
+	_ = sdb.IntermediateRoot(true)
+
+	require.Equal(t, common.Hash{}, sdb.GetState(addrWithDeletedKey, deletedKey), "deleted key should be zero")
+	require.Equal(t, val, sdb.GetState(createdAddr, createdKey), "created key should have value")
+
+	for _, addr := range []common.Address{addrWithDeletedKey, createdAddr} {
+		gotBal := sdb.GetBalance(addr)
+		require.Zerof(t, gotBal.Cmp(bal), "%s balance: got %#x, want %#x", addr, gotBal, bal)
+	}
+}
