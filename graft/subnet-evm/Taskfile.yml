@@ -108,8 +108,8 @@ tasks:
     cmds:
       # Phase 1: Read-only checks that are safe to parallelize.
       - task: _lint-readonly-parallel
-      # Phase 2: Tree-mutating checks must be sequential to avoid git
-      # index and bazel server contention.
+      # Phase 2: Tree-mutating checks must be sequential to avoid races
+      # while rewriting generated files and verifying a clean git state.
       - task: _lint-tree-mutating-serial
 
   _lint-readonly-parallel:
