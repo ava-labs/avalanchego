@@ -26,8 +26,8 @@ func (s *stubRule) Validate(_ context.Context, _ *external.ExternalEvent) (bool,
 var (
 	pass         = &stubRule{pass: true}
 	fail         = &stubRule{pass: false}
-	infraErrSent = errors.New("rpc timeout")
-	infraErr     = &stubRule{err: infraErrSent}
+	errRPCTimeout = errors.New("rpc timeout")
+	infraErr      = &stubRule{err: errRPCTimeout}
 )
 
 var testEvent = &external.ExternalEvent{}
@@ -57,7 +57,7 @@ func TestPolicy_RequiredInfraErrorFails(t *testing.T) {
 		Required: []ValidationRule{pass, infraErr},
 	}
 	err := r.Verify(t.Context(), testEvent)
-	require.ErrorIs(t, err, infraErrSent)
+	require.ErrorIs(t, err, errRPCTimeout)
 }
 
 func TestPolicy_RequiredEarlyExitsBeforeQuorum(t *testing.T) {

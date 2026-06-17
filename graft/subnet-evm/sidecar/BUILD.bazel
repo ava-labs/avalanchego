@@ -9,7 +9,6 @@ package(default_visibility = [
 go_library(
     name = "sidecar",
     srcs = [
-        "config.go",
         "policy.go",
         "rpc.go",
         "rule.go",
@@ -23,7 +22,6 @@ go_library(
 graft_go_test(
     name = "sidecar_test",
     srcs = [
-        "config_test.go",
         "policy_test.go",
         "rpc_test.go",
     ],
