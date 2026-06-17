@@ -69,7 +69,7 @@ func newPeer(tb testing.TB, vdrs set.Set[ids.NodeID]) *peer {
 		response: buffer.NewUnboundedBlockingDeque[peerResponse](1),
 		gossip:   buffer.NewUnboundedBlockingDeque[peerGossip](1),
 	}
-	p.sender.SetSelf(p)
+	p.sender.SetSelf(tb, p)
 	return p
 }
 
