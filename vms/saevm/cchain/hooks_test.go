@@ -22,16 +22,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 )
 
-const (
-	testTimestampSeconds      uint64 = 1_700_000_000
-	testTimestampMilliseconds int64  = 1_700_000_000_123
-	testFallbackMilliseconds  int64  = 1_700_000_000_000
-	// Seconds component disagrees with testTimestampSeconds, but the sub-second
-	// component (123ms) matches testTimestampMilliseconds.
-	testMismatchedMilliseconds int64 = 1_800_000_000_123
-)
-
 func TestBlockTime(t *testing.T) {
+	const (
+		testTimestampSeconds      uint64 = 1_700_000_000
+		testTimestampMilliseconds int64  = 1_700_000_000_123
+		testFallbackMilliseconds  int64  = 1_700_000_000_000
+		// Seconds component disagrees with testTimestampSeconds, but the
+		// sub-second component (123ms) matches testTimestampMilliseconds.
+		testMismatchedMilliseconds int64 = 1_800_000_000_123
+	)
+
 	tests := []struct {
 		name   string
 		header *types.Header
@@ -79,7 +79,7 @@ func TestBlockTime(t *testing.T) {
 }
 
 func TestBuildHeaderBlockTimeRoundTrip(t *testing.T) {
-	want := time.UnixMilli(testTimestampMilliseconds)
+	want := time.UnixMilli(1_700_000_000_123)
 	b := &builder{
 		now: func() time.Time {
 			return want
