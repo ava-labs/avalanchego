@@ -57,6 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -155,7 +156,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
-	snow := adaptor.Convert(orchestrator.New(vm))
+	snow := adaptor.Convert(orchestrator.New(vm, parser{}, &statesync.SummaryHandler{}))
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")

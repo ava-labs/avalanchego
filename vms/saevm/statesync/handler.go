@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var _ orchestrator.SummaryHandler[*Summary] = (*SummaryHandler)(nil)
@@ -27,6 +29,7 @@ type SummaryHandler struct {
 	cfg     orchestrator.StateSyncConfig
 	db      ethdb.Database
 	snowCtx *snow.Context
+	genesis *ethtypes.Block
 
 	stateSyncDone chan struct{}
 }
@@ -36,6 +39,7 @@ func (h *SummaryHandler) Initialize(
 	snowCtx *snow.Context,
 	cfg orchestrator.StateSyncConfig,
 	db database.Database,
+	genesis *ethtypes.Block,
 ) error {
 	h.cfg = cfg
 	h.db = types.NewEthDB(db)
@@ -88,14 +92,19 @@ func (h *SummaryHandler) GetStateSummary(_ context.Context, height uint64) (*Sum
 }
 
 func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, error) {
-	height := rawdb.ReadHeaderNumber(h.db, common.Hash(id))
-	if height == nil {
-		return nil, database.ErrNotFound
-	}
-	ethB := rawdb.ReadBlock(h.db, common.Hash(id), *height)
-	if ethB == nil {
-		// This indicates a database inconsistency, so we don't need to return [database.ErrNotFound] directly.
-		return nil, fmt.Errorf("%w: block not found for %s:%d", database.ErrNotFound, id, *height)
+	var ethB *ethtypes.Block
+	if id == ids.ID(h.genesis.Hash()) {
+		ethB = h.genesis
+	} else {
+		height := rawdb.ReadHeaderNumber(h.db, common.Hash(id))
+		if height == nil {
+			return nil, database.ErrNotFound
+		}
+		ethB := rawdb.ReadBlock(h.db, common.Hash(id), *height)
+		if ethB == nil {
+			// This indicates a database inconsistency, so we don't need to return [database.ErrNotFound] directly.
+			return nil, fmt.Errorf("%w: block not found for %s:%d", database.ErrNotFound, id, *height)
+		}
 	}
 
 	return blocks.New(ethB, nil, nil, h.snowCtx.Log)
@@ -104,12 +113,15 @@ func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, 
 func (h *SummaryHandler) LastAccepted(context.Context) (ids.ID, error) {
 	hash, err := h.lastHash()
 	if err != nil {
-		return ids.ID{}, err
+		hash = h.genesis.Hash()
 	}
 	return ids.ID(hash), nil
 }
 
 func (h *SummaryHandler) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
+	if height == 0 {
+		return ids.ID(h.genesis.Hash()), nil
+	}
 	hash := rawdb.ReadCanonicalHash(h.db, height)
 	if hash == (common.Hash{}) {
 		return ids.ID{}, database.ErrNotFound

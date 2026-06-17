@@ -25,6 +25,7 @@ import (
 	"go.uber.org/goleak"
 
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -48,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+
 	// Imported for [saexec.Execute] comment resolution.
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
@@ -159,7 +161,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	appSender := saetest.NewSender(tb, cfg.validators)
 
-	orchestrator := orchestrator.New(vm)
+	orchestrator := orchestrator.New(vm, parser{}, &statesync.SummaryHandler{})
 	ctx := log.CancelOnError(tb.Context())
 	require.NoErrorf(tb, orchestrator.Initialize(
 		ctx,

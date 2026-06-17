@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -42,7 +43,32 @@ import (
 	avadb "github.com/ava-labs/avalanchego/database"
 )
 
-var _ orchestrator.ChainVM = (*VM)(nil)
+var (
+	_ orchestrator.ChainVM[Config] = (*VM)(nil)
+	_ orchestrator.Parser[Config]  = parser{}
+)
+
+type parser struct{}
+
+// ParseConfig implements [orchestrator.Parser].
+func (p parser) ParseConfig([]byte) (Config, error) {
+	return Config{}, nil
+}
+
+// ParseGenesis implements [orchestrator.Parser].
+func (p parser) ParseGenesis(bytes []byte) (*types.Block, error) {
+	genesis := new(core.Genesis)
+	if err := json.Unmarshal(bytes, genesis); err != nil {
+		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
+	}
+	// TODO use coreth version
+	return genesis.ToBlock(), nil
+}
+
+// TODO
+type Config struct {
+	orchestrator.VMConfig
+}
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
@@ -72,7 +98,7 @@ func (vm *VM) Initialize(
 	snowCtx *snow.Context,
 	avaDB avadb.Database,
 	genesisBytes []byte,
-	configBytes []byte,
+	config Config,
 	network *network.Network,
 ) (retErr error) {
 	defer func() {
@@ -84,7 +110,7 @@ func (vm *VM) Initialize(
 	vm.ctx = snowCtx
 
 	// TODO(StephenButtolph): Allow minimal user configuration via configBytes.
-	_ = configBytes
+	_ = config
 
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the

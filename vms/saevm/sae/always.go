@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/core"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -19,7 +20,24 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-var _ orchestrator.ChainVM = (*SinceGenesis[hook.Transaction])(nil)
+var (
+	_ orchestrator.ChainVM[Config] = (*SinceGenesis[hook.Transaction])(nil)
+	_ orchestrator.Parser[Config]  = parser{}
+)
+
+type parser struct{}
+
+func (parser) ParseConfig(configBytes []byte) (Config, error) {
+	return Config{}, nil
+}
+
+func (parser) ParseGenesis(genesisBytes []byte) (*ethtypes.Block, error) {
+	genesis := new(core.Genesis)
+	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
+		return nil, fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
+	}
+	return genesis.ToBlock(), nil
+}
 
 // SinceGenesis is a harness around a [VM], providing an `Initialize` method
 // that treats the chain as being asynchronous since genesis.
@@ -46,7 +64,7 @@ func (vm *SinceGenesis[_]) Initialize(
 	snowCtx *snow.Context,
 	avaDB database.Database,
 	genesisBytes []byte,
-	configBytes []byte,
+	_ Config, // Supplied in [NewSinceGenesis]
 	network *network.Network,
 ) error {
 	db := types.NewEthDB(avaDB)

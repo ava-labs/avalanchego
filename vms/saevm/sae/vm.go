@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
+	"github.com/ava-labs/avalanchego/vms/saevm/orchestrator"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
@@ -97,6 +98,10 @@ type Config struct {
 	RPCConfig     rpc.Config
 
 	Now func() time.Time // defaults to [time.Now] if nil
+}
+
+func (c Config) StateSyncConfig() orchestrator.StateSyncConfig {
+	return orchestrator.StateSyncConfig{}
 }
 
 // NewVM returns a new [VM] that is ready for use immediately upon return.
