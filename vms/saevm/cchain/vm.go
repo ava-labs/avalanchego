@@ -104,7 +104,7 @@ func (vm *VM) Initialize(
 	}
 	genesisBlock, err := genesis.setup(ethDB, trieDBConfig)
 	if err != nil {
-		return fmt.Errorf("writing genesis: %w", err)
+		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
 	vm.state, err = state.New(snowCtx, avaDB)
