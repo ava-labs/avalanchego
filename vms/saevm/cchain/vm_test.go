@@ -230,6 +230,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 //
 // If the SUT instead responds with an [snowcommon.AppError], it is returned and
 // response is left untouched.
+//
+// appRequest is not thread-safe and should only be called from a single
+// goroutine at a time.
 func (s *SUT) appRequest(
 	ctx context.Context,
 	tb testing.TB,

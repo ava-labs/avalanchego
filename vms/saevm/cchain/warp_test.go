@@ -182,8 +182,8 @@ func forwardAndLogCode(callee common.Address) []byte {
 	)
 }
 
-// warpAccessList returns an access list carrying each of messages for the warp
-// precompile.
+// warpAccessList returns an access list carrying each of the messages for the
+// warp precompile.
 func warpAccessList(msgs ...*avalanchewarp.Message) types.AccessList {
 	al := make(types.AccessList, len(msgs))
 	for i, msg := range msgs {
@@ -195,8 +195,8 @@ func warpAccessList(msgs ...*avalanchewarp.Message) types.AccessList {
 	return al
 }
 
-// TestReceiveWarpMessage verifies that warp messages are correctly verified
-// delivered by the warp precompile.
+// TestReceiveWarpMessage verifies that warp messages are correctly delivered by
+// the warp precompile.
 func TestReceiveWarpMessage(t *testing.T) {
 	var (
 		wallet     = saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))

@@ -353,7 +353,7 @@ func (b *builder) BuildBlock(
 	// TODO(StephenButtolph): Replace the predicate bytes format with an
 	// efficiently packed canoto message. The current format is extremely
 	// inefficient. There are 6 bytes of constant overhead, along with
-	// unecessarily including the constract address and tx hash. The warp
+	// unnecessarily including the contract address and tx hash. The warp
 	// contract address is a constant, and the tx hash should be replaced with
 	// the tx index.
 	warpValidityBytes, err := warpValidity.Bytes()
