@@ -695,10 +695,9 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	stakingInfo state.StakingInfo,
 ) error {
-	// DelegateeReward is the validator's commission on rewards already paid out to
-	// its delegators, earned during their successful staking periods, so it is owed
-	// to the validator even on the abort path, where the validator forfeits its own
-	// potential reward for failing to meet its eligibility requirements this cycle.
+	// DelegateeReward tracks pending commission from completed delegator periods.
+	// It is paid on the abort path along with accrued delegatee rewards, while the
+	// validator forfeits its own potential reward for this cycle.
 	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
 	if err != nil {
 		return err
