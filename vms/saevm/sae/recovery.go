@@ -97,6 +97,12 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
 	return func(yield func(*blocks.Block, error) bool) {
 		lastAcceptedHash := rawdb.ReadHeadFastBlockHash(rec.db)
+		if lastAcceptedHash == (common.Hash{}) {
+			// SAE writes this hash on [VM.AcceptBlock], so the set of accepted,
+			// asynchronous blocks MUST be empty.
+			return
+		}
+
 		for curr := parent; curr.Hash() != lastAcceptedHash; {
 			b, err := rec.newCanonicalBlock(curr.Height()+1, curr)
 			if !yield(b, err) || err != nil {
