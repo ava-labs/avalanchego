@@ -195,17 +195,24 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-// errExtDataHashMismatch is returned by [VM.ParseBlock] when a block's extData
-// does not hash to the ExtDataHash committed in its header.
-var errExtDataHashMismatch = errors.New("extData hash does not match header")
+var (
+	// errInvalidBlockVersion is returned by [VM.ParseBlock] when a block's
+	// BlockBodyExtra carries a Version other than 0, the only supported version.
+	errInvalidBlockVersion = errors.New("invalid block version")
+	// errExtDataHashMismatch is returned by [VM.ParseBlock] when a block's extData
+	// does not hash to the ExtDataHash committed in its header.
+	errExtDataHashMismatch = errors.New("extData hash does not match header")
+)
 
-// ParseBlock parses buf via the embedded SAE VM and additionally verifies that
-// the block's extData matches the ExtDataHash committed in the header.
+// ParseBlock parses buf via the embedded SAE VM and additionally performs the
+// C-Chain syntactic checks that the SAE VM is unaware of: that the block's
+// BlockBodyExtra Version is 0 (the only supported version) and that its extData
+// matches the ExtDataHash committed in the header.
 //
-// The block ID is the header hash, which commits ExtDataHash, so a block whose
-// extData body was tampered keeps the same ID. This override is the boundary
-// that rejects such blocks before they are accepted, persisted, or executed;
-// the SAE VM's own ParseBlock is unaware of the C-Chain extData concept.
+// The block ID is the header hash. The header neither hashes the body's Version
+// nor its extData bytes (it commits only ExtDataHash), so a block with a
+// tampered Version or extData keeps the same ID. This override is the boundary
+// that rejects such blocks before they are accepted, persisted, or executed.
 func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
 	b, err := vm.VM.ParseBlock(ctx, buf)
 	if err != nil {
@@ -213,6 +220,10 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 	}
 
 	eth := b.EthBlock()
+	if version := customtypes.BlockVersion(eth); version != 0 {
+		return nil, fmt.Errorf("%w: %d", errInvalidBlockVersion, version)
+	}
+
 	extData := customtypes.BlockExtData(eth)
 	// TODO: Handle pre-AP1 blocks, which incorrectly did not set ExtDataHash.
 	// This isn't needed prior to Helicon, but will be required to fully remove
