@@ -1021,13 +1021,42 @@ func TestGossip(t *testing.T) {
 	requireNotReceiveTx(t, n.nonValidators[1:], tx.Hash())
 }
 
+var errInjectedRead = errors.New("injected read failure")
+
+type corruptHeightIndex struct {
+	database.HeightIndex
+
+	mu        sync.RWMutex
+	corrupted set.Set[uint64]
+}
+
+// corrupt makes future reads of height fail with [errInjectedRead].
+func (f *corruptHeightIndex) corrupt(height uint64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.corrupted.Add(height)
+}
+
+func (f *corruptHeightIndex) Get(height uint64) ([]byte, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	if f.corrupted.Contains(height) {
+		return nil, errInjectedRead
+	}
+	return f.HeightIndex.Get(height)
+}
+
 func TestBlockSources(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 1, opt)
+	xdb := &corruptHeightIndex{HeightIndex: saetest.NewHeightIndexDB()}
+	ctx, sut := newSUT(t, 1, opt, withExecResultsDB(xdb))
 
 	genesis := sut.lastAcceptedBlock(t)
 	// Once a block is settled, its ancestors are only accessible from the
 	// database.
+	corrupted := sut.runConsensusLoop(t)
 	onDisk := sut.runConsensusLoop(t)
 	settled := sut.runConsensusLoop(t)
 	vmTime.advanceToSettle(ctx, t, settled)
@@ -1037,17 +1066,20 @@ func TestBlockSources(t *testing.T) {
 	verified := sut.createAndVerifyBlock(t, unsettled)
 	unverified := sut.buildAndParseBlock(t, unwrap(t, verified))
 
+	xdb.corrupt(corrupted.Height())
 	tests := []struct {
 		name            string
 		block           *blocks.Block
 		wantGetBlockErr testerr.Want
+		wantSourceOK    bool
 	}{
-		{"genesis", genesis, nil},
-		{"on_disk", onDisk, nil},
-		{"settled_in_memory", settled, nil},
-		{"unsettled", unsettled, nil},
-		{"verified", unwrap(t, verified), nil},
-		{"unverified", unwrap(t, unverified), testerr.Equals(database.ErrNotFound)},
+		{"genesis", genesis, nil, true},
+		{"corrupted", corrupted, testerr.Is(errInjectedRead), true}, // sources don't read execution results
+		{"on_disk", onDisk, nil, true},
+		{"settled_in_memory", settled, nil, true},
+		{"unsettled", unsettled, nil, true},
+		{"verified", unwrap(t, verified), nil, true},
+		{"unverified", unwrap(t, unverified), testerr.Equals(database.ErrNotFound), false},
 	}
 
 	for _, tt := range tests {
@@ -1065,7 +1097,6 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 
-			wantOK := tt.wantGetBlockErr == nil
 			opts := cmp.Options{
 				cmputils.Blocks(),
 				cmputils.Headers(),
@@ -1073,8 +1104,8 @@ func TestBlockSources(t *testing.T) {
 			}
 			t.Run("EthBlockSource", func(t *testing.T) {
 				got, gotOK := sut.rawVM.ethBlockSource(tt.block.Hash(), tt.block.NumberU64())
-				require.Equalf(t, wantOK, gotOK, "%T.ethBlockSource(...)", sut.rawVM)
-				if !wantOK {
+				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.ethBlockSource(...)", sut.rawVM)
+				if !tt.wantSourceOK {
 					return
 				}
 				if diff := cmp.Diff(tt.block.EthBlock(), got, opts); diff != "" {
@@ -1083,8 +1114,8 @@ func TestBlockSources(t *testing.T) {
 			})
 			t.Run("HeaderSource", func(t *testing.T) {
 				got, gotOK := sut.rawVM.headerSource(tt.block.Hash(), tt.block.NumberU64())
-				require.Equalf(t, wantOK, gotOK, "%T.headerSource(...)", sut.rawVM)
-				if !wantOK {
+				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.headerSource(...)", sut.rawVM)
+				if !tt.wantSourceOK {
 					return
 				}
 				if diff := cmp.Diff(tt.block.Header(), got, opts); diff != "" {
