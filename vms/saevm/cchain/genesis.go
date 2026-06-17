@@ -170,14 +170,13 @@ var (
 // state by checking the genesis block hash along with the rules used to execute
 // the head block.
 func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.Block, retErr error) {
-	root, err := g.root()
+	block, err := g.block()
 	if err != nil {
-		return nil, fmt.Errorf("getting state root: %w", err)
+		return nil, fmt.Errorf("constructing genesis block: %w", err)
 	}
 
 	// We can't exit early here. Even if the genesis block is on disk, the
 	// genesis state might not be.
-	block := g.block(root)
 	hash := block.Hash()
 	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
 		if err := writeGenesisBlock(db, block, g.Config); err != nil {
@@ -223,15 +222,6 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 	return block, nil
 }
 
-func (g *genesis) root() (_ common.Hash, retErr error) {
-	db := rawdb.NewMemoryDatabase()
-	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
-	defer func() {
-		retErr = errors.Join(retErr, tdb.Close())
-	}()
-	return g.writeState(db, tdb)
-}
-
 func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.ChainConfig) error {
 	b := db.NewBatch()
 	hash := block.Hash()
@@ -246,57 +236,12 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 	return b.Write()
 }
 
-// writeState commits the genesis allocation to the state database and returns
-// the state root.
-func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Hash, error) {
-	statedb, err := state.New(
-		types.EmptyRootHash,
-		state.NewDatabaseWithNodeDB(db, tdb),
-		nil,
-	)
+func (g *genesis) block() (*types.Block, error) {
+	root, err := g.root()
 	if err != nil {
-		return common.Hash{}, err
+		return nil, fmt.Errorf("computing state root: %w", err)
 	}
 
-	for addr, account := range g.Alloc {
-		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
-		statedb.SetCode(addr, account.Code)
-		statedb.SetNonce(addr, account.Nonce)
-		for key, value := range account.Storage {
-			statedb.SetState(addr, key, value)
-		}
-	}
-	// Precompile upgrades happen at the activation of the network upgrade. If
-	// the genesis timestamp is already after the Warp activation, then the
-	// state needs to reflect that or the precompile would never be marked as
-	// active.
-	//
-	// When a precompile is activated, its account is marked as non-empty by
-	// setting the nonce and code so it is not pruned as an empty account during
-	// state finalization (EIP-161) and so it appears as a contract to EVM code
-	// introspection (e.g. EXTCODESIZE/EXTCODEHASH).
-	const (
-		precompileNonce = 1
-		precompileCode  = "\x01"
-	)
-	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
-		statedb.SetNonce(warp.ContractAddress, precompileNonce)
-		statedb.SetCode(warp.ContractAddress, []byte(precompileCode))
-	}
-
-	const deleteEmptyObjects = true
-	root, err := statedb.Commit(genesisNumber, deleteEmptyObjects)
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("committing statedb: %w", err)
-	}
-	const logAsInfo = false
-	if err := tdb.Commit(root, logAsInfo); err != nil {
-		return common.Hash{}, fmt.Errorf("committing triedb: %w", err)
-	}
-	return root, nil
-}
-
-func (g *genesis) block(root common.Hash) *types.Block {
 	h := &types.Header{
 		ParentHash: common.Hash{},
 		// UncleHash is set by [types.NewBlock].
@@ -351,5 +296,64 @@ func (g *genesis) block(root common.Hash) *types.Block {
 		nil, // uncles
 		nil, // receipts
 		trie.NewStackTrie(nil),
+	), nil
+}
+
+func (g *genesis) root() (_ common.Hash, retErr error) {
+	db := rawdb.NewMemoryDatabase()
+	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+	return g.writeState(db, tdb)
+}
+
+// writeState commits the genesis allocation to the state database and returns
+// the state root.
+func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Hash, error) {
+	statedb, err := state.New(
+		types.EmptyRootHash,
+		state.NewDatabaseWithNodeDB(db, tdb),
+		nil,
 	)
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	for addr, account := range g.Alloc {
+		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
+		statedb.SetCode(addr, account.Code)
+		statedb.SetNonce(addr, account.Nonce)
+		for key, value := range account.Storage {
+			statedb.SetState(addr, key, value)
+		}
+	}
+	// Precompile upgrades happen at the activation of the network upgrade. If
+	// the genesis timestamp is already after the Warp activation, then the
+	// state needs to reflect that or the precompile would never be marked as
+	// active.
+	//
+	// When a precompile is activated, its account is marked as non-empty by
+	// setting the nonce and code so it is not pruned as an empty account during
+	// state finalization (EIP-161) and so it appears as a contract to EVM code
+	// introspection (e.g. EXTCODESIZE/EXTCODEHASH).
+	const (
+		precompileNonce = 1
+		precompileCode  = "\x01"
+	)
+	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
+		statedb.SetNonce(warp.ContractAddress, precompileNonce)
+		statedb.SetCode(warp.ContractAddress, []byte(precompileCode))
+	}
+
+	const deleteEmptyObjects = true
+	root, err := statedb.Commit(genesisNumber, deleteEmptyObjects)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("committing statedb: %w", err)
+	}
+	const logAsInfo = false
+	if err := tdb.Commit(root, logAsInfo); err != nil {
+		return common.Hash{}, fmt.Errorf("committing triedb: %w", err)
+	}
+	return root, nil
 }

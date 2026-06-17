@@ -398,10 +398,8 @@ func TestGenesisHash(t *testing.T) {
 			g, err := parseGenesis(ctx, []byte(genesis))
 			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
-			root, err := g.root()
-			require.NoErrorf(t, err, "%T.root()", g)
-
-			block := g.block(root)
+			block, err := g.block()
+			require.NoErrorf(t, err, "%T.block()", g)
 			require.Equalf(t, common.HexToHash(test.want), block.Hash(), "%T.block().Hash()", g)
 		})
 	}
@@ -447,9 +445,8 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 			g, err := parseGenesis(ctx, []byte(genesis))
 			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
-			root, err := g.root()
-			require.NoErrorf(t, err, "%T.root()", g)
-			block := g.block(root)
+			block, err := g.block()
+			require.NoErrorf(t, err, "%T.block()", g)
 
 			// Debugging this test is basically impossible without the header.
 			{
