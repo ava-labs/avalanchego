@@ -34,6 +34,8 @@ Usage: scripts/benchmark_bazel_remote_cache.sh \
   [--test-impacted-scope '//...' --test-impacted-scope '-//graft/...'] \
   [--test-impacted-range 'BASE..HEAD'] \
   [--test-empty-impacted-range 'BASE..BASE'] \
+  [--test-include-grpc] \
+  [--skip-test-impacted] \
   [--test-best-case-only] \
   [--warm-log-must-contain '(cached) PASSED'] \
   [--warm-log-must-contain 'Executed 0 out of 1 test: 1 test passes.']
@@ -56,6 +58,13 @@ local Bazel output state each time:
   - HTTP cold remote cache
   - HTTP warm remote cache
   - impacted-target mode (selector time plus selected-test execution time)
+
+Add `--test-include-grpc` to extend that test matrix with:
+  - gRPC cold remote cache
+  - gRPC warm remote cache
+
+Add `--skip-test-impacted` to omit impacted-target measurement entirely when a
+job only needs the cache matrix.
 
 In `--test-best-case-only` mode, test commands instead measure only the best
 case the exploration cares about:
@@ -108,6 +117,8 @@ declare -a TEST_BENCHMARK_ARGS_SPECS=()
 declare -a TEST_IMPACTED_SCOPES=()
 TEST_IMPACTED_RANGE=""
 TEST_EMPTY_IMPACTED_RANGE=""
+TEST_INCLUDE_GRPC=0
+SKIP_TEST_IMPACTED=0
 TEST_BEST_CASE_ONLY=0
 declare -a WARM_LOG_MUST_CONTAIN_PATTERNS=()
 
@@ -146,6 +157,12 @@ while [[ $# -gt 0 ]]; do
       [[ -z "${TEST_EMPTY_IMPACTED_RANGE}" ]] || die "--test-empty-impacted-range may only be specified once"
       TEST_EMPTY_IMPACTED_RANGE="$1"
       ;;
+    --test-include-grpc)
+      TEST_INCLUDE_GRPC=1
+      ;;
+    --skip-test-impacted)
+      SKIP_TEST_IMPACTED=1
+      ;;
     --test-best-case-only)
       TEST_BEST_CASE_ONLY=1
       ;;
@@ -166,8 +183,11 @@ done
 if [[ ${#BUILD_BENCHMARK_ARGS_SPECS[@]} -eq 0 && ${#TEST_BENCHMARK_ARGS_SPECS[@]} -eq 0 ]]; then
   die "at least one --build-benchmark-args or --test-benchmark-args is required"
 fi
-if [[ ${#TEST_BENCHMARK_ARGS_SPECS[@]} -gt 0 && ${#TEST_IMPACTED_SCOPES[@]} -eq 0 ]]; then
-  die "at least one --test-impacted-scope is required when --test-benchmark-args is used"
+if [[ ${#TEST_BENCHMARK_ARGS_SPECS[@]} -gt 0 && "${SKIP_TEST_IMPACTED}" != "1" && ${#TEST_IMPACTED_SCOPES[@]} -eq 0 ]]; then
+  die "at least one --test-impacted-scope is required when test impacted-target measurement is enabled"
+fi
+if [[ "${TEST_BEST_CASE_ONLY}" == "1" && "${SKIP_TEST_IMPACTED}" == "1" ]]; then
+  die "--skip-test-impacted cannot be combined with --test-best-case-only"
 fi
 if [[ "${TEST_BEST_CASE_ONLY}" == "1" && ${#TEST_BENCHMARK_ARGS_SPECS[@]} -gt 0 && -z "${TEST_EMPTY_IMPACTED_RANGE}" ]]; then
   die "--test-empty-impacted-range is required when --test-best-case-only is used"
@@ -963,6 +983,8 @@ declare -a TEST_RESULT_NO_CACHE_TIMES=()
 declare -a TEST_RESULT_HTTP_SEED_TIMES=()
 declare -a TEST_RESULT_HTTP_COLD_TIMES=()
 declare -a TEST_RESULT_HTTP_WARM_TIMES=()
+declare -a TEST_RESULT_GRPC_COLD_TIMES=()
+declare -a TEST_RESULT_GRPC_WARM_TIMES=()
 declare -a TEST_RESULT_IMPACTED_SELECTOR_TIMES=()
 declare -a TEST_RESULT_IMPACTED_EXECUTION_TIMES=()
 declare -a TEST_RESULT_IMPACTED_TOTAL_TIMES=()
@@ -1080,9 +1102,17 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
 
   no_cache_time=""
   http_seed_time=""
+  grpc_cold_time=""
+  grpc_warm_time=""
+  impacted_selector_time=""
+  impacted_execution_time=""
+  impacted_total_time=""
+  impacted_target_count=""
   no_cache_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-no-cache"
   http_cold_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-http-cold-remote"
   http_warm_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-http-warm-remote"
+  grpc_cold_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-grpc-cold-remote"
+  grpc_warm_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-grpc-warm-remote"
   selector_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-impacted-selector"
   impacted_execution_output_base="${TMP_ROOT}/output-base-benchmark-${benchmark_index}-impacted-execution"
   benchmark_remote_cache_dir="${CACHE_DIR}/benchmark-${benchmark_index}"
@@ -1095,7 +1125,9 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
 
   start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${benchmark_index}-bazel-remote.log"
   remote_cache_url="${REMOTE_HTTP_URL}"
+  remote_cache_grpc_target="${REMOTE_GRPC_TARGET}"
   echo "Using bazel-remote HTTP endpoint for benchmark ${benchmark_index}: ${remote_cache_url}"
+  echo "Using bazel-remote gRPC endpoint for benchmark ${benchmark_index}: ${remote_cache_grpc_target}"
 
   proxied_http_remote_cache_url="$(create_http_latency_proxy "${remote_cache_url}" "benchmark-${benchmark_index}-http-cache" "${REPRESENTATIVE_LATENCY_MS}")"
   echo "Using proxied bazel-remote HTTP endpoint for benchmark ${benchmark_index}: ${proxied_http_remote_cache_url}"
@@ -1116,28 +1148,59 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
 
   stop_bazel_remote
 
-  impacted_mode="normal"
-  if [[ "${TEST_BEST_CASE_ONLY}" == "1" ]]; then
-    impacted_mode="empty"
+  if [[ "${TEST_INCLUDE_GRPC}" == "1" ]]; then
+    rm -rf "${benchmark_remote_cache_dir}"
+    mkdir -p "${benchmark_remote_cache_dir}"
+
+    start_bazel_remote "${benchmark_remote_cache_dir}" "benchmark-${benchmark_index}-grpc-bazel-remote.log"
+    remote_cache_url="${REMOTE_HTTP_URL}"
+    remote_cache_grpc_target="${REMOTE_GRPC_TARGET}"
+    echo "Using bazel-remote HTTP endpoint for benchmark ${benchmark_index} gRPC pair: ${remote_cache_url}"
+    echo "Using bazel-remote gRPC endpoint for benchmark ${benchmark_index} gRPC pair: ${remote_cache_grpc_target}"
+
+    proxied_grpc_remote_cache_url="$(create_grpc_latency_proxy "${remote_cache_grpc_target}" "benchmark-${benchmark_index}-grpc-cache" "${REPRESENTATIVE_LATENCY_MS}")"
+    echo "Using proxied bazel-remote gRPC endpoint for benchmark ${benchmark_index}: ${proxied_grpc_remote_cache_url}"
+
+    mapfile -t grpc_cache_times < <(run_cached_pair \
+      "grpc" \
+      "${test_spec}" \
+      "${proxied_grpc_remote_cache_url}" \
+      "${grpc_cold_output_base}" \
+      "${grpc_warm_output_base}" \
+      "${LOG_DIR}/benchmark-${benchmark_index}-grpc-cold-remote.log" \
+      "${LOG_DIR}/benchmark-${benchmark_index}-grpc-warm-remote.log")
+    grpc_cold_time="${grpc_cache_times[0]}"
+    grpc_warm_time="${grpc_cache_times[1]}"
+
+    stop_bazel_remote
   fi
-  mapfile -t impacted_times < <(run_impacted_test_pair \
-    "${benchmark_index}" \
-    "${test_spec}" \
-    "${impacted_mode}" \
-    "${selector_output_base}" \
-    "${LOG_DIR}/benchmark-${benchmark_index}-impacted-selector.log" \
-    "${impacted_execution_output_base}" \
-    "${LOG_DIR}/benchmark-${benchmark_index}-impacted-execution.log")
-  impacted_selector_time="${impacted_times[0]}"
-  impacted_execution_time="${impacted_times[1]}"
-  impacted_target_count="${impacted_times[2]}"
-  impacted_total_time="$(add_times "${impacted_selector_time}" "${impacted_execution_time}")"
+
+  if [[ "${SKIP_TEST_IMPACTED}" != "1" ]]; then
+    impacted_mode="normal"
+    if [[ "${TEST_BEST_CASE_ONLY}" == "1" ]]; then
+      impacted_mode="empty"
+    fi
+    mapfile -t impacted_times < <(run_impacted_test_pair \
+      "${benchmark_index}" \
+      "${test_spec}" \
+      "${impacted_mode}" \
+      "${selector_output_base}" \
+      "${LOG_DIR}/benchmark-${benchmark_index}-impacted-selector.log" \
+      "${impacted_execution_output_base}" \
+      "${LOG_DIR}/benchmark-${benchmark_index}-impacted-execution.log")
+    impacted_selector_time="${impacted_times[0]}"
+    impacted_execution_time="${impacted_times[1]}"
+    impacted_target_count="${impacted_times[2]}"
+    impacted_total_time="$(add_times "${impacted_selector_time}" "${impacted_execution_time}")"
+  fi
 
   TEST_RESULT_LABELS+=("${label}")
   TEST_RESULT_NO_CACHE_TIMES+=("${no_cache_time}")
   TEST_RESULT_HTTP_SEED_TIMES+=("${http_seed_time}")
   TEST_RESULT_HTTP_COLD_TIMES+=("${http_cold_time}")
   TEST_RESULT_HTTP_WARM_TIMES+=("${http_warm_time}")
+  TEST_RESULT_GRPC_COLD_TIMES+=("${grpc_cold_time}")
+  TEST_RESULT_GRPC_WARM_TIMES+=("${grpc_warm_time}")
   TEST_RESULT_IMPACTED_SELECTOR_TIMES+=("${impacted_selector_time}")
   TEST_RESULT_IMPACTED_EXECUTION_TIMES+=("${impacted_execution_time}")
   TEST_RESULT_IMPACTED_TOTAL_TIMES+=("${impacted_total_time}")
@@ -1151,9 +1214,23 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
     echo "FAIL: warm HTTP remote cache was not faster than cold HTTP remote cache for: bazelisk ${label}" >&2
     all_passed=false
   fi
+  if [[ "${TEST_INCLUDE_GRPC}" == "1" ]] && [[ "${TEST_BEST_CASE_ONLY}" != "1" ]] && ! less_than "${grpc_warm_time}" "${no_cache_time}"; then
+    echo "FAIL: warm gRPC remote cache was not faster than no cache for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
+  if [[ "${TEST_INCLUDE_GRPC}" == "1" ]] && ! less_than "${grpc_warm_time}" "${grpc_cold_time}"; then
+    echo "FAIL: warm gRPC remote cache was not faster than cold gRPC remote cache for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
   if [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]] \
     && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${benchmark_index}-http-warm-remote.log"; then
     echo "FAIL: warm HTTP remote cache log did not contain required patterns for: bazelisk ${label}" >&2
+    all_passed=false
+  fi
+  if [[ "${TEST_INCLUDE_GRPC}" == "1" ]] \
+    && [[ ${#WARM_LOG_MUST_CONTAIN_PATTERNS[@]} -gt 0 ]] \
+    && ! warm_log_contains_all_patterns "${LOG_DIR}/benchmark-${benchmark_index}-grpc-warm-remote.log"; then
+    echo "FAIL: warm gRPC remote cache log did not contain required patterns for: bazelisk ${label}" >&2
     all_passed=false
   fi
 
@@ -1183,10 +1260,16 @@ for index in "${!TEST_RESULT_LABELS[@]}"; do
     printf '  http-cold           %12ss\n' "${TEST_RESULT_HTTP_COLD_TIMES[index]}"
   fi
   printf '  http-warm           %12ss\n' "${TEST_RESULT_HTTP_WARM_TIMES[index]}"
-  printf '  impacted-selector   %12ss\n' "${TEST_RESULT_IMPACTED_SELECTOR_TIMES[index]}"
-  printf '  impacted-execution  %12ss\n' "${TEST_RESULT_IMPACTED_EXECUTION_TIMES[index]}"
-  printf '  impacted-total      %12ss\n' "${TEST_RESULT_IMPACTED_TOTAL_TIMES[index]}"
-  printf '  impacted-targets    %12s\n' "${TEST_RESULT_IMPACTED_TARGET_COUNTS[index]}"
+  if [[ "${TEST_INCLUDE_GRPC}" == "1" ]]; then
+    printf '  grpc-cold           %12ss\n' "${TEST_RESULT_GRPC_COLD_TIMES[index]}"
+    printf '  grpc-warm           %12ss\n' "${TEST_RESULT_GRPC_WARM_TIMES[index]}"
+  fi
+  if [[ "${SKIP_TEST_IMPACTED}" != "1" ]]; then
+    printf '  impacted-selector   %12ss\n' "${TEST_RESULT_IMPACTED_SELECTOR_TIMES[index]}"
+    printf '  impacted-execution  %12ss\n' "${TEST_RESULT_IMPACTED_EXECUTION_TIMES[index]}"
+    printf '  impacted-total      %12ss\n' "${TEST_RESULT_IMPACTED_TOTAL_TIMES[index]}"
+    printf '  impacted-targets    %12s\n' "${TEST_RESULT_IMPACTED_TARGET_COUNTS[index]}"
+  fi
 done
 
 if [[ "${all_passed}" != true ]]; then

@@ -51,6 +51,38 @@ tasks:
       --build-benchmark-args "build //main:avalanchego"
       --build-benchmark-args "build --config=race //main:avalanchego"
 
+  bazel-benchmark-remote-cache-tests:
+    desc: Benchmark Bazel remote caching for CI-style main-module unit tests
+    cmd: >-
+      {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
+      --setup-args "fetch //... -- -//graft/..."
+      --test-benchmark-args "test //... -- -//graft/..."
+      --test-include-grpc
+      --skip-test-impacted
+
+  bazel-benchmark-remote-cache-impacted-nonempty:
+    desc: Benchmark warm-cache reruns vs a guaranteed non-empty impacted-target selection for CI-style main-module unit tests
+    # Append a comment to a shared main-module utility file so the impacted
+    # selector sees a stable non-empty working-tree diff via the open-ended
+    # HEAD.. range without relying on historical commits from this checkout.
+    cmd: |
+      {{.NIX_RUN}} bash -euo pipefail -c '
+        target_file="utils/atomic.go"
+        cleanup() {
+          git checkout -- "$target_file"
+        }
+        trap cleanup EXIT
+
+        printf "\n// bazel remote cache benchmark non-empty impacted change\n" >> "$target_file"
+
+        ./scripts/benchmark_bazel_remote_cache.sh \
+          --setup-args "fetch //... -- -//graft/..." \
+          --test-benchmark-args "test //... -- -//graft/..." \
+          --test-impacted-scope "//..." \
+          --test-impacted-scope "-//graft/..." \
+          --test-impacted-range "HEAD.."
+      '
+
   bazel-benchmark-remote-cache-ids-test:
     desc: Benchmark warm-cache reruns vs empty impacted-target selection for //ids:ids_test
     cmd: >-
