@@ -707,11 +707,10 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	stakingInfo state.StakingInfo,
 ) error {
-	// DelegateeReward is the validator's commission on rewards already paid out to
-	// its delegators, earned during their successful staking periods, so it is owed
-	// to the validator even on the abort path, where the validator forfeits its own
-	// potential reward for failing to meet its eligibility requirements this cycle.
-	totalDelegateeRewards, err := safemath.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
+	// DelegateeReward tracks pending commission from completed delegator periods.
+	// It is paid on the abort path along with accrued delegatee rewards, while the
+	// validator forfeits its own potential reward for this cycle.
+	totalDelegateeRewards, err := math.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
 	if err != nil {
 		return err
 	}
@@ -728,10 +727,10 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 	return nil
 }
 
-// createRewardsUTXOs adds reward UTXOs to state at output indices starting
+// createRewardsUTXOs adds reward UTXOs to chainState at output indices starting
 // after the tx's own outputs.
 //
-// It must be called at most once per state per execution: the output
+// It must be called at most once per chainState per execution: the output
 // indices are derived from len(e.tx.Unsigned.Outputs()) and do not account for
 // UTXOs a prior call already added to the same diff, so a second call would
 // reuse the same (txID, outputIndex) pairs and collide on UTXO IDs.
@@ -739,7 +738,7 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	validationRewards uint64,
 	delegateeRewards uint64,
-	state *state.Diff,
+	chainState *state.Diff,
 ) error {
 	avaxAsset := avax.Asset{ID: e.backend.Ctx.AVAXAssetID}
 	outputIndexOffset := uint32(len(e.tx.Unsigned.Outputs()))
@@ -750,8 +749,8 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 		if err != nil {
 			return err
 		}
-		state.AddUTXO(utxo)
-		state.AddRewardUTXO(e.tx.ID(), utxo)
+		chainState.AddUTXO(utxo)
+		chainState.AddRewardUTXO(e.tx.ID(), utxo)
 		outputIndexOffset++
 	}
 
@@ -761,8 +760,8 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 		if err != nil {
 			return err
 		}
-		state.AddUTXO(utxo)
-		state.AddRewardUTXO(e.tx.ID(), utxo)
+		chainState.AddUTXO(utxo)
+		chainState.AddRewardUTXO(e.tx.ID(), utxo)
 	}
 
 	return nil
@@ -783,6 +782,9 @@ func (e *proposalTxExecutor) setOnCommitRestakeValidator(
 	validator *state.Staker,
 	stakingInfo state.StakingInfo,
 ) error {
+	// Ignore the withdrawn portions from reward.Split because the restaked
+	// amounts may be capped below. Withdrawn rewards are computed later from the
+	// difference between total rewards and the amounts actually restaked.
 	restakingValidationRewards, _ := reward.Split(validator.PotentialReward, stakingInfo.AutoCompoundRewardShares)
 	restakingDelegateeRewards, _ := reward.Split(stakingInfo.DelegateeReward, stakingInfo.AutoCompoundRewardShares)
 
