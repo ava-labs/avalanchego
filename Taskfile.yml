@@ -30,19 +30,26 @@ tasks:
     cmd: '{{.NIX_RUN}} bazelisk build --config=race //main:avalanchego'
 
   bazel-benchmark-remote-cache:
-    desc: Benchmark Bazel remote caching for CI-style avalanchego builds and tests
-    # TODO(maru): Keep this setup fetch target union aligned with the benchmark
-    # args below. We intentionally hard-code the union for now because this
-    # harness is still exploratory and `fetch --all` pulls in irrelevant repos.
+    desc: Benchmark Bazel test caching vs impacted-target selection for CI-style main-module unit tests
+    # Keep this setup fetch target union aligned with the test benchmark below.
+    # This exploratory task intentionally focuses on test-side minimization,
+    # where impacted-target selection is a meaningful alternative to warm-cache
+    # full-scope execution.
     cmd: >-
       {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
-      --setup-args "fetch //main:avalanchego //... -- -//graft/..."
-      --build-benchmark-args "build //main:avalanchego"
-      --build-benchmark-args "build --config=race //main:avalanchego"
+      --setup-args "fetch //... -- -//graft/..."
       --test-benchmark-args "test //... -- -//graft/..."
       --test-impacted-scope "//..."
       --test-impacted-scope "-//graft/..."
       --test-impacted-range "${BAZEL_IMPACTED_DIFF_RANGE:-${BAZEL_IMPACTED_BASE_SHA:-HEAD}..}"
+
+  bazel-benchmark-remote-cache-builds:
+    desc: Benchmark Bazel remote caching for CI-style avalanchego builds
+    cmd: >-
+      {{.NIX_RUN}} ./scripts/benchmark_bazel_remote_cache.sh
+      --setup-args "fetch //main:avalanchego"
+      --build-benchmark-args "build //main:avalanchego"
+      --build-benchmark-args "build --config=race //main:avalanchego"
 
   bazel-benchmark-remote-cache-ids-test:
     desc: Benchmark Bazel remote caching and impacted-target selection for //ids:ids_test
