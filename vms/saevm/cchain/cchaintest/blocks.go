@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
@@ -24,14 +25,15 @@ import (
 type BlockOption = options.Option[blockProperties]
 
 type blockProperties struct {
-	number        uint64
-	timestamp     uint64
-	parent        common.Hash
-	ethTxs        []*types.Transaction
-	crossChainTxs []*tx.Tx
-	extData       *[]byte
-	extDataHash   *common.Hash
-	version       uint32
+	number           uint64
+	timestamp        uint64
+	parent           common.Hash
+	ethTxs           []*types.Transaction
+	crossChainTxs    []*tx.Tx
+	extData          *[]byte
+	extDataHash      *common.Hash
+	minPriceExponent *dynamic.PriceExponent
+	version          uint32
 }
 
 // WithNumber sets the block's header number.
@@ -85,11 +87,18 @@ func WithExtDataHash(h common.Hash) BlockOption {
 }
 
 // WithBlockVersion sets the block's BlockBodyExtra Version. The default of 0 is
-// the only version accepted by the C-Chain ParseBlock; a non-zero value
+// the only version accepted by the C-Chain ParseBlock. A non-zero value
 // simulates a block declaring an unsupported version.
 func WithBlockVersion(v uint32) BlockOption {
 	return options.Func[blockProperties](func(p *blockProperties) {
 		p.version = v
+	})
+}
+
+// WithMinPriceExponent commits exp as the block header's ACP-283 MinPriceExponent.
+func WithMinPriceExponent(exp dynamic.PriceExponent) BlockOption {
+	return options.Func[blockProperties](func(p *blockProperties) {
+		p.minPriceExponent = &exp
 	})
 }
 
@@ -108,7 +117,7 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 	}
 
 	// By default the header commits the ExtDataHash computed from the block's
-	// own ExtData; a caller-supplied hash overrides this to simulate tampering.
+	// own ExtData. A caller-supplied hash overrides this to simulate tampering.
 	extDataHash := customtypes.CalcExtDataHash(extData)
 	if props.extDataHash != nil {
 		extDataHash = *props.extDataHash
@@ -119,7 +128,10 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 			Number:     new(big.Int).SetUint64(props.number),
 			Time:       props.timestamp,
 		},
-		&customtypes.HeaderExtra{ExtDataHash: extDataHash},
+		&customtypes.HeaderExtra{
+			ExtDataHash:      extDataHash,
+			MinPriceExponent: props.minPriceExponent,
+		},
 	)
 
 	block := types.NewBlock(header, props.ethTxs, nil /* uncles */, nil /* receipts */, saetest.TrieHasher())

@@ -22,10 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 // When TimeMilliseconds is unset, BlockTime falls back to Header.Time's seconds.
@@ -145,7 +143,11 @@ func TestBlockRebuilderFromMinPriceExponent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			block := newBlockWithMinPriceExponent(t, 1, parent.Hash(), tt.claimed)
+			block := cchaintest.NewTestBlock(t,
+				cchaintest.WithNumber(1),
+				cchaintest.WithParent(parent.Hash()),
+				cchaintest.WithMinPriceExponent(tt.claimed),
+			)
 			h := newHooks(snowtest.Context(t, snowtest.CChainID), nil, txpool.NewPending(), time.Now, desiredParams{})
 			rb, err := h.BlockRebuilderFrom(block)
 			require.NoError(t, err)
@@ -156,26 +158,6 @@ func TestBlockRebuilderFromMinPriceExponent(t *testing.T) {
 			assert.Equalf(t, tt.want, *got, "rebuilder BuildHeader()")
 		})
 	}
-}
-
-// newBlockWithMinPriceExponent returns a parseable block whose header carries
-// the given MinPriceExponent.
-func newBlockWithMinPriceExponent(tb testing.TB, number uint64, parent common.Hash, exp dynamic.PriceExponent) *types.Block {
-	tb.Helper()
-
-	extData, err := tx.MarshalSlice(nil)
-	require.NoErrorf(tb, err, "tx.MarshalSlice()")
-
-	header := customtypes.WithHeaderExtra(
-		&types.Header{
-			ParentHash: parent,
-			Number:     new(big.Int).SetUint64(number),
-		},
-		&customtypes.HeaderExtra{MinPriceExponent: &exp},
-	)
-	return customtypes.NewBlockWithExtData(
-		header, nil, nil, nil, saetest.TrieHasher(), extData, true,
-	)
 }
 
 func TestAncestorInputIDs(t *testing.T) {
