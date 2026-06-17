@@ -44,6 +44,8 @@ var (
 	errNonNilGenesisBlobGasUsed   = errors.New("non-nil genesis blobGasUsed")
 )
 
+// genesis is defined as a new type to prevent similar looking, but incorrect,
+// libevm genesis functions from being used inadvertently.
 type genesis core.Genesis
 
 // parseGenesis decodes the genesis bytes and populates the upgrade schedule.
