@@ -4,18 +4,23 @@
 package cchain
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 func TestAncestorInputIDs(t *testing.T) {
@@ -85,4 +90,61 @@ func TestAncestorInputIDs(t *testing.T) {
 			assert.Equal(t, tt.want, got, "ancestorInputIDs()")
 		})
 	}
+}
+
+func TestBuildBlockSettledRoundTrip(t *testing.T) {
+	tests := []struct {
+		name    string
+		settled hook.Settled
+	}{
+		{
+			name:    "zero",
+			settled: hook.Settled{},
+		},
+		{
+			name: "nonzero",
+			settled: hook.Settled{
+				Height:       7,
+				GasUnix:      1_000,
+				GasNumerator: gas.Gas(3),
+				Excess:       gas.Gas(42),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			header := customtypes.WithHeaderExtra(
+				&types.Header{
+					Number:           big.NewInt(1),
+					BlobGasUsed:      new(uint64),
+					ExcessBlobGas:    new(uint64),
+					ParentBeaconRoot: new(common.Hash),
+				},
+				&customtypes.HeaderExtra{},
+			)
+
+			var b builder
+			block, err := b.BuildBlock(header, nil, nil, nil, nil, tt.settled)
+			require.NoError(t, err, "builder.BuildBlock()")
+
+			// RLP round-trip the header to prove the marker is committed in the
+			// hashed header, not just attached in memory.
+			enc, err := rlp.EncodeToBytes(block.Header())
+			require.NoError(t, err, "rlp.EncodeToBytes(header)")
+			decoded := new(types.Header)
+			require.NoError(t, rlp.DecodeBytes(enc, decoded), "rlp.DecodeBytes(header)")
+
+			var h hooks
+			require.Equal(t, tt.settled, h.SettledBy(decoded), "hooks.SettledBy() after round-trip")
+		})
+	}
+}
+
+func TestSettledByAbsent(t *testing.T) {
+	header := customtypes.WithHeaderExtra(
+		&types.Header{Number: big.NewInt(1)},
+		&customtypes.HeaderExtra{},
+	)
+	var h hooks
+	require.Equal(t, hook.Settled{}, h.SettledBy(header), "hooks.SettledBy() with no marker")
 }
