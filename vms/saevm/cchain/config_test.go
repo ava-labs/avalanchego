@@ -16,23 +16,23 @@ func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
 		in      []byte
-		want    Config
+		want    config
 		wantErr error
 	}{
 		{
 			name: "empty_input",
 			in:   nil,
-			want: Config{},
+			want: config{},
 		},
 		{
 			name: "empty_json_object",
 			in:   []byte(`{}`),
-			want: Config{},
+			want: config{},
 		},
 		{
 			name: "price_target",
 			in:   []byte(`{"min-price-target":1000}`),
-			want: Config{PriceTarget: utils.PointerTo(gas.Price(1000))},
+			want: config{PriceTarget: utils.PointerTo(gas.Price(1000))},
 		},
 		{
 			name:    "invalid_json",
@@ -42,7 +42,7 @@ func TestParseConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseConfig(tt.in)
+			got, err := parseConfig(tt.in)
 			require.ErrorIs(t, err, tt.wantErr)
 			if tt.wantErr != nil {
 				return

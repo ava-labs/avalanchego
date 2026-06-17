@@ -13,8 +13,8 @@ import (
 
 var errInvalidConfig = errors.New("invalid config")
 
-// Config is the JSON configuration for the cchain VM.
-type Config struct {
+// config is the JSON configuration for the cchain VM.
+type config struct {
 	// PriceTarget is the minimum gas price (in aAVAX) this node enforces when
 	// building blocks under ACP-283. nil means follow the parent block.
 	PriceTarget *gas.Price `json:"min-price-target,omitempty"`
@@ -23,14 +23,14 @@ type Config struct {
 	// TODO(powerslider): add GasTarget *gas.Gas (ACP-176) when wiring lands.
 }
 
-// ParseConfig decodes b into a [Config]. An empty input yields the zero Config.
-func ParseConfig(b []byte) (Config, error) {
-	var c Config
+// parseConfig decodes b into a [config]. An empty input yields the zero config.
+func parseConfig(b []byte) (config, error) {
+	var c config
 	if len(b) == 0 {
 		return c, nil
 	}
 	if err := json.Unmarshal(b, &c); err != nil {
-		return Config{}, fmt.Errorf("%w: %w", errInvalidConfig, err)
+		return config{}, fmt.Errorf("%w: %w", errInvalidConfig, err)
 	}
 	return c, nil
 }

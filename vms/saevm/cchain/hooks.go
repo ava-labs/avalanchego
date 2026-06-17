@@ -54,7 +54,7 @@ type desiredParams struct {
 }
 
 // desired returns c's user-facing targets as internal exponent votes.
-func (c Config) desired() desiredParams {
+func (c config) desired() desiredParams {
 	var d desiredParams
 	if c.PriceTarget != nil {
 		e := dynamic.DesiredPriceExponent(*c.PriceTarget)

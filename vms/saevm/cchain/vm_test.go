@@ -90,7 +90,7 @@ type (
 		networkID  uint32
 		validators set.Set[ids.NodeID]
 		now        func() time.Time
-		config     Config
+		vmConfig   config
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -140,10 +140,10 @@ func withGenesisAllocFor(addrs ...common.Address) sutOption {
 	})
 }
 
-// withPriceTarget sets [Config.PriceTarget] on the SUT.
+// withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.config.PriceTarget = &p
+		c.vmConfig.PriceTarget = &p
 	})
 }
 
@@ -193,8 +193,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
-	configBytes, err := json.Marshal(cfg.config)
-	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.config)
+	configBytes, err := json.Marshal(cfg.vmConfig)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.vmConfig)
 
 	appSender := saetest.NewSender(tb, cfg.validators)
 

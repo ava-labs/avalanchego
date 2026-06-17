@@ -90,7 +90,7 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	cfg, err := ParseConfig(configBytes)
+	cfg, err := parseConfig(configBytes)
 	if err != nil {
 		return fmt.Errorf("parsing config: %w", err)
 	}
