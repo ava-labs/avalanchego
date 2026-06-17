@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"math/big"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -76,14 +77,40 @@ func removeUnordered[T any](s []T, i int) []T {
 	return s[:last]
 }
 
+// clone returns a deep copy of the model, used to restore it on revert.
+func (m *fuzzModel) clone() *fuzzModel {
+	accounts := make(map[common.Address]*accountModel, len(m.accounts))
+	for addr, acc := range m.accounts {
+		accounts[addr] = &accountModel{
+			nonce:   acc.nonce,
+			balance: acc.balance.Clone(),
+			storage: slices.Clone(acc.storage),
+		}
+	}
+	return &fuzzModel{
+		accounts:         accounts,
+		addrs:            slices.Clone(m.addrs),
+		createdThisTx:    set.Of(m.createdThisTx.List()...),
+		destructedThisTx: slices.Clone(m.destructedThisTx),
+	}
+}
+
+// snapshotRef pairs the snapshot IDs of both databases with the model state
+// at the time the snapshot was taken.
+type snapshotRef struct {
+	fwID, hashID int
+	model        *fuzzModel
+}
+
 type SUT struct {
 	fwDB, hashDB       state.Database
 	fwState, hashState *state.StateDB
 
-	lastRoot common.Hash
-	blockNum uint64
-	counter  uint64 // drives deterministic address/key generation
-	model    *fuzzModel
+	lastRoot  common.Hash
+	blockNum  uint64
+	counter   uint64 // drives deterministic address/key generation
+	model     *fuzzModel
+	snapshots []snapshotRef
 }
 
 func newSUT(t *testing.T) *SUT {
@@ -200,6 +227,51 @@ func (s *SUT) deleteStorage(param byte) {
 	s.hashState.SetState(addr, key, common.Hash{})
 }
 
+// getStorage reads a committed storage slot — either one that was previously
+// written, or a never-written one. The returned values are deliberately NOT
+// compared: trie-level read semantics are limited (see "Why reads aren't
+// safe" in the README). The read itself MUST NOT mutate state; the root
+// comparisons in later operations verify this.
+func (s *SUT) getStorage(param byte) {
+	addr := s.model.selectAddr(param)
+	key := s.nextHash() // a slot that was never written
+	if storage := s.model.accounts[addr].storage; len(storage) > 0 && param%2 == 0 {
+		key = storage[int(param)%len(storage)]
+	}
+
+	s.fwState.GetCommittedState(addr, key)
+	s.hashState.GetCommittedState(addr, key)
+}
+
+// snapshot records a [state.StateDB.Snapshot] on both databases together with
+// a copy of the model, so a later revert restores all three in lockstep.
+func (s *SUT) snapshot() {
+	s.snapshots = append(s.snapshots, snapshotRef{
+		fwID:   s.fwState.Snapshot(),
+		hashID: s.hashState.Snapshot(),
+		model:  s.model.clone(),
+	})
+}
+
+// revertToSnapshot reverts both databases and the model to a previously
+// recorded snapshot. The chosen snapshot and all later ones are discarded,
+// matching [state.StateDB.RevertToSnapshot], which invalidates them.
+func (s *SUT) revertToSnapshot(param byte) {
+	i := int(param) % len(s.snapshots)
+	ref := s.snapshots[i]
+	s.fwState.RevertToSnapshot(ref.fwID)
+	s.hashState.RevertToSnapshot(ref.hashID)
+	s.model = ref.model
+	s.snapshots = s.snapshots[:i]
+}
+
+// dropSnapshots discards all recorded snapshots. Snapshots MUST NOT be
+// reverted across a transaction boundary or a Copy, mirroring the EVM, which
+// only reverts within a single transaction.
+func (s *SUT) dropSnapshots() {
+	s.snapshots = nil
+}
+
 // finaliseTx resets the model's per-transaction tracking to mirror
 // [state.StateDB.Finalise].
 // Any accounts created this transaction can no longer be selfdestructed,
@@ -210,12 +282,14 @@ func (s *SUT) finaliseTx() {
 }
 
 func (s *SUT) finalise() {
+	s.dropSnapshots()
 	s.fwState.Finalise(true /* EIP-158 */)
 	s.hashState.Finalise(true /* EIP-158 */)
 	s.finaliseTx()
 }
 
 func (s *SUT) intermediateRoot(t *testing.T) {
+	s.dropSnapshots()
 	fwRoot := s.fwState.IntermediateRoot(true /* EIP-158 */)
 	hashRoot := s.hashState.IntermediateRoot(true /* EIP-158 */)
 	require.Equal(t, hashRoot, fwRoot, "root mismatch")
@@ -223,6 +297,7 @@ func (s *SUT) intermediateRoot(t *testing.T) {
 }
 
 func (s *SUT) stateDBCommit(t *testing.T) {
+	s.dropSnapshots()
 	hashRoot, err := s.hashState.Commit(s.blockNum, true /* EIP-158 */)
 	require.NoError(t, err)
 	fwRoot, err := s.fwState.Commit(s.blockNum, true /* EIP-158 */)
@@ -243,61 +318,119 @@ func (s *SUT) diskCommit(t *testing.T) {
 }
 
 func (s *SUT) copyStateDB() {
+	s.dropSnapshots()
 	s.fwState = s.fwState.Copy()
 	s.hashState = s.hashState.Copy()
 }
 
 // TODO(#5539): support [*state.StateDB.SelfDestruct]
 const (
-	opStateDBCommit    byte = iota // commit pending changes; root changes iff state changed
-	opDiskCommit                   // flush pending, then commit a clean StateDB; root must be unchanged
-	opCreateAccount                // deploy an account; resurrects a same-tx destructed account when one exists
+	// Account ops.
+	opCreateAccount    byte = iota // deploy an account; resurrects a same-tx destructed account when one exists
 	opUpdateAccount                // increment nonce and balance of an existing account
 	opSelfDestruct6780             // SELFDESTRUCT (EIP-6780) an account; no-op unless created this tx
-	opFinalise                     // end the current transaction without computing a root
-	opSetStorage                   // write a new storage slot on an existing account
-	opDeleteStorage                // zero out an existing storage slot on an existing account
-	opIntermediateRoot             // verify all account and storage hashes match the model
-	opCopyStateDB                  // copies statedb for future ops
+	// Storage ops.
+	opSetStorage    // write a new storage slot on an existing account
+	opDeleteStorage // zero out an existing storage slot on an existing account
+	opGetStorage    // read a committed storage slot; must not mutate state
+	// Snapshot ops.
+	opSnapshot         // record a snapshot of both databases and the model
+	opRevertToSnapshot // revert both databases and the model to a recorded snapshot
+	// Lifecycle ops.
+	opFinalise         // end the current transaction without computing a root
+	opIntermediateRoot // verify all account and storage hashes match the model
+	opStateDBCommit    // commit pending changes; root changes iff state changed
+	opDiskCommit       // flush pending, then commit a clean StateDB; root must be unchanged
+	opCopyStateDB      // copies statedb for future ops
 	maxOp
 )
 
 // FuzzStateDB compares the state root of an arbitrary sequence of operations on
 // a Firewood-backed [state.StateDB] against a reference HashDB.
 func FuzzStateDB(f *testing.F) {
-	f.Add([]byte{
-		opCreateAccount,
-		opStateDBCommit,
-	})
-	f.Add([]byte{
-		opCreateAccount,
-		opUpdateAccount,
-		opSetStorage,
-		opStateDBCommit,
-		opDiskCommit,
-	})
-	f.Add([]byte{
-		opCreateAccount,
-		opSetStorage,
-		opIntermediateRoot,
-		opDeleteStorage,
-		opStateDBCommit,
-	})
-	f.Add([]byte{opStateDBCommit, opDiskCommit})
-	f.Add([]byte{
-		opCreateAccount,
-		opFinalise,
-		opSelfDestruct6780,
-		opStateDBCommit,
-	})
-	f.Add([]byte{
-		opCreateAccount,
-		opSetStorage,
-		opSelfDestruct6780,
-		opCreateAccount, // resurrects the just-destructed account
-		opSetStorage,
-		opStateDBCommit,
-	})
+	seeds := []struct {
+		name string
+		ops  []byte
+	}{
+		{name: "create then commit", ops: []byte{opCreateAccount, opStateDBCommit}},
+		{
+			name: "update, store, then flush to disk",
+			ops:  []byte{opCreateAccount, opUpdateAccount, opSetStorage, opStateDBCommit, opDiskCommit},
+		},
+		{
+			name: "store, hash, delete storage, commit",
+			ops:  []byte{opCreateAccount, opSetStorage, opIntermediateRoot, opDeleteStorage, opStateDBCommit},
+		},
+		{name: "empty commits", ops: []byte{opStateDBCommit, opDiskCommit}},
+		{
+			// Copy must carry forward pending (uncommitted) changes so that
+			// the copy commits the same root the original would have.
+			name: "copy with pending changes then commit",
+			ops: []byte{
+				opCreateAccount, opSetStorage,
+				opCopyStateDB,
+				opSetStorage, opStateDBCommit,
+			},
+		},
+		{
+			// Once the transaction is finalised the account is no longer
+			// "created this tx", so the SELFDESTRUCT is a no-op.
+			name: "self-destruct after finalise is a no-op",
+			ops:  []byte{opCreateAccount, opFinalise, opSelfDestruct6780, opStateDBCommit},
+		},
+		{
+			// The prior incarnation's storage was never committed, so the
+			// resurrected account starts empty.
+			name: "same-tx self-destruct then resurrect",
+			ops: []byte{
+				opCreateAccount, opSetStorage,
+				opSelfDestruct6780,
+				opCreateAccount, // resurrects the just-destructed account
+				opSetStorage, opStateDBCommit,
+			},
+		},
+		{
+			// Reading a never-written slot opens a storage trie with no
+			// subsequent account write; the read must not affect the root.
+			name: "read a never-written slot",
+			ops: []byte{
+				opCreateAccount, opStateDBCommit,
+				opGetStorage, opStateDBCommit,
+			},
+		},
+		{
+			// Reading a written slot must not affect the root either.
+			name: "read a written slot",
+			ops: []byte{
+				opCreateAccount, opSetStorage, opStateDBCommit,
+				opGetStorage, opStateDBCommit,
+			},
+		},
+		{
+			// Reverting a storage write must restore the pre-snapshot root.
+			name: "reverted storage write",
+			ops: []byte{
+				opCreateAccount, opSetStorage, opStateDBCommit,
+				opSnapshot, opSetStorage,
+				opRevertToSnapshot, opStateDBCommit,
+			},
+		},
+		{
+			// A fully reverted same-tx self-destruct and resurrection never
+			// reaches the trie; the committed root must equal the pre-snapshot
+			// root.
+			name: "reverted same-tx self-destruct and resurrect",
+			ops: []byte{
+				opCreateAccount, opSetStorage,
+				opSnapshot,
+				opSelfDestruct6780, opCreateAccount,
+				opRevertToSnapshot, opStateDBCommit,
+			},
+		},
+	}
+	for _, seed := range seeds {
+		f.Add(seed.ops)
+	}
 
 	f.Fuzz(func(t *testing.T, steps []byte) {
 		sut := newSUT(t)
@@ -327,6 +460,19 @@ func FuzzStateDB(f *testing.F) {
 				if len(sut.model.addrs) > 0 {
 					t.Log("delete storage")
 					sut.deleteStorage(param)
+				}
+			case opGetStorage:
+				if len(sut.model.addrs) > 0 {
+					t.Log("get storage")
+					sut.getStorage(param)
+				}
+			case opSnapshot:
+				t.Log("snapshot")
+				sut.snapshot()
+			case opRevertToSnapshot:
+				if len(sut.snapshots) > 0 {
+					t.Log("revert to snapshot")
+					sut.revertToSnapshot(param)
 				}
 			case opFinalise:
 				t.Log("finalise (end transaction)")
