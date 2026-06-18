@@ -120,14 +120,14 @@ func (a *baseTrie) DeleteStorage(addr common.Address, key []byte) error {
 	return nil
 }
 
-// UpdateContractCode implements state.Trie.
+// UpdateContractCode returns nil.
 // Contract code is controlled by rawdb, so we don't need to do anything here.
 // This always returns nil.
 func (*baseTrie) UpdateContractCode(common.Address, common.Hash, []byte) error {
 	return nil
 }
 
-// GetKey implements state.Trie.
+// GetKey returns nil.
 // Preimages are not supported in Firewood.
 // It always returns nil.
 func (*baseTrie) GetKey([]byte) []byte {
@@ -139,7 +139,7 @@ func (a *baseTrie) copy(reader trieReader) *baseTrie {
 	return &baseTrie{
 		reader:     reader,
 		root:       a.root,
-		hasChanges: true,
+		hasChanges: len(a.updateOps) > 0,
 		updateOps:  slices.Clone(a.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
 	}
 }
@@ -149,15 +149,14 @@ var (
 	errProveNotImplemented        = errors.New("Prove not implemented for Firewood")
 )
 
-// NodeIterator implements state.Trie.
+// NodeIterator returns an error.
 // Firewood does not support iterating over internal nodes.
 // This always returns an error.
 func (*baseTrie) NodeIterator([]byte) (trie.NodeIterator, error) {
 	return nil, errNodeIteratorNotImplemented
 }
 
-// Prove implements state.Trie.
-// Firewood does not support providing key proofs.
+// Prove is not yet supported.
 // This always returns an error.
 func (*baseTrie) Prove([]byte, ethdb.KeyValueWriter) error {
 	return errProveNotImplemented

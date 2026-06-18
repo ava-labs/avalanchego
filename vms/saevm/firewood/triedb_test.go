@@ -20,6 +20,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -56,7 +57,7 @@ type accountModel struct {
 
 type fuzzModel struct {
 	accounts map[common.Address]*accountModel
-	addrs    []common.Address // live addresses ordered by creation time
+	addrs    []common.Address
 
 	// Per-transaction tracking, reset at every transaction boundary
 	// see [SUT.finaliseTx])
@@ -66,14 +67,6 @@ type fuzzModel struct {
 
 func (m *fuzzModel) selectAddr(param byte) common.Address {
 	return m.addrs[int(param)%len(m.addrs)]
-}
-
-// removeUnordered removes the element at index i by swapping in the last
-// element and truncating. Order is not preserved.
-func removeUnordered[T any](s []T, i int) []T {
-	last := len(s) - 1
-	s[i] = s[last]
-	return s[:last]
 }
 
 type SUT struct {
@@ -121,7 +114,7 @@ func (s *SUT) createAccount(param byte) {
 		// choose a previously destructed account to resurrect.
 		i := int(param>>1) % len(s.model.destructedThisTx)
 		addr = s.model.destructedThisTx[i]
-		s.model.destructedThisTx = removeUnordered(s.model.destructedThisTx, i)
+		s.model.destructedThisTx = utils.DeleteIndex(s.model.destructedThisTx, i)
 	} else {
 		addr = common.BytesToAddress(s.nextHash().Bytes())
 	}
@@ -173,7 +166,7 @@ func (s *SUT) selfDestruct6780(param byte) {
 	delete(s.model.accounts, addr)
 	s.model.createdThisTx.Remove(addr)
 	s.model.destructedThisTx = append(s.model.destructedThisTx, addr)
-	s.model.addrs = removeUnordered(s.model.addrs, i)
+	s.model.addrs = utils.DeleteIndex(s.model.addrs, i)
 }
 
 func (s *SUT) setStorage(param byte) {
@@ -194,7 +187,7 @@ func (s *SUT) deleteStorage(param byte) {
 	}
 	i := int(param) % len(storage)
 	key := storage[i]
-	s.model.accounts[addr].storage = removeUnordered(storage, i)
+	s.model.accounts[addr].storage = utils.DeleteIndex(storage, i)
 
 	s.fwState.SetState(addr, key, common.Hash{})
 	s.hashState.SetState(addr, key, common.Hash{})
@@ -224,9 +217,9 @@ func (s *SUT) intermediateRoot(t *testing.T) {
 
 func (s *SUT) stateDBCommit(t *testing.T) {
 	hashRoot, err := s.hashState.Commit(s.blockNum, true /* EIP-158 */)
-	require.NoError(t, err)
+	require.NoError(t, err, "hashState.Commit()")
 	fwRoot, err := s.fwState.Commit(s.blockNum, true /* EIP-158 */)
-	require.NoError(t, err)
+	require.NoError(t, err, "fwState.Commit()")
 	require.Equal(t, hashRoot, fwRoot, "root mismatch after commit")
 
 	s.lastRoot = fwRoot
@@ -249,15 +242,15 @@ func (s *SUT) copyStateDB() {
 
 // TODO(#5539): support [*state.StateDB.SelfDestruct]
 const (
-	opStateDBCommit    byte = iota // commit pending changes; root changes iff state changed
-	opDiskCommit                   // flush pending, then commit a clean StateDB; root must be unchanged
-	opCreateAccount                // deploy an account; resurrects a same-tx destructed account when one exists
+	opCreateAccount    byte = iota // deploy an account; resurrects a same-tx destructed account when one exists
 	opUpdateAccount                // increment nonce and balance of an existing account
 	opSelfDestruct6780             // SELFDESTRUCT (EIP-6780) an account; no-op unless created this tx
-	opFinalise                     // end the current transaction without computing a root
 	opSetStorage                   // write a new storage slot on an existing account
 	opDeleteStorage                // zero out an existing storage slot on an existing account
+	opFinalise                     // end the current transaction without computing a root
 	opIntermediateRoot             // verify all account and storage hashes match the model
+	opStateDBCommit                // commit pending changes; root changes iff state changed
+	opDiskCommit                   // flush pending, then commit a clean StateDB; root must be unchanged
 	opCopyStateDB                  // copies statedb for future ops
 	maxOp
 )
@@ -380,7 +373,7 @@ func TestGenesis(t *testing.T) {
 	require.False(t, tdb.Initialized(genesisRoot), "Genesis root should not be initialized in the database")
 
 	_, _, err := core.SetupGenesisBlock(memDB, tdb, &g)
-	require.NoError(t, err)
+	require.NoError(t, err, "SetupGenesisBlock()")
 	require.True(t, tdb.Initialized(genesisRoot), "Genesis root should be initialized in the database after setup")
 	require.NoError(t, tdb.Close(), "triedb.Close()")
 

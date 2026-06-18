@@ -39,6 +39,7 @@ go_test(
     srcs = ["triedb_test.go"],
     embed = [":firewood"],
     deps = [
+        "//utils",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//utils/set",

@@ -15,7 +15,7 @@ import (
 
 var _ state.Trie = (*accountTrie)(nil)
 
-// accountTrie implements [state.Trie] for managing account states.
+// accountTrie should be used as a [state.Trie] for managing account states.
 // Although it fulfills the [state.Trie] interface, it has some important differences:
 //  1. [accountTrie.Commit] is not used as expected in the state package. The [storageTrie] doesn't return
 //     values, and we thus rely on the shared [baseTrie]. Additionally, no [trienode.NodeSet] is
@@ -34,7 +34,7 @@ type accountTrie struct {
 	*baseTrie
 	parentRoot common.Hash
 	pending    *proposalRef
-	fw         *TrieDB
+	tdb        *TrieDB
 }
 
 func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
@@ -45,7 +45,7 @@ func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
 	return &accountTrie{
 		baseTrie:   &baseTrie{reader: reader, root: root},
 		parentRoot: root,
-		fw:         db,
+		tdb:        db,
 	}, nil
 }
 
@@ -56,10 +56,13 @@ func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
 //
 // Any proposals created by this method will be freed once the accountTrie
 // is garbage collected.
+//
+// Hash cannot return an error, so if any error is encountered, it will be
+// logged at error level and the zero hash is returned.
 func (a *accountTrie) Hash() common.Hash {
 	hash, err := a.hash()
 	if err != nil {
-		a.fw.log.Error("hashing account trie", zap.Error(err))
+		a.tdb.log.Error("hashing account trie", zap.Error(err))
 		return common.Hash{}
 	}
 	return hash
@@ -70,7 +73,7 @@ func (a *accountTrie) hash() (common.Hash, error) {
 		return a.root, nil
 	}
 
-	proposal, err := a.fw.trieHash(a.parentRoot, a.updateOps)
+	proposal, err := a.tdb.trieHash(a.parentRoot, a.updateOps)
 	switch {
 	case err != nil:
 		return common.Hash{}, err
@@ -82,7 +85,7 @@ func (a *accountTrie) hash() (common.Hash, error) {
 	// Best effort drop of previous reader (and thus any associated proposal).
 	// Use new proposal for all future reads.
 	if err := a.reader.Drop(); err != nil {
-		a.fw.log.Warn("dropping previous trie reader", zap.Error(err))
+		a.tdb.log.Warn("dropping previous trie reader", zap.Error(err))
 	}
 
 	a.pending = proposal
@@ -107,20 +110,20 @@ func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 		return a.parentRoot, nil, nil
 	}
 
-	a.fw.trieCommit(a.pending)
+	a.tdb.trieCommit(a.pending)
 	return hash, trienode.NewNodeSet(common.Hash{}), nil
 }
 
 // Copy creates a copy of the [accountTrie].
 func (a *accountTrie) Copy() *accountTrie {
-	reader, err := a.fw.Firewood.Revision(ffi.Hash(a.parentRoot))
+	reader, err := a.tdb.Firewood.Revision(ffi.Hash(a.parentRoot))
 	if err != nil {
-		a.fw.log.Error("creating trie copy", zap.Error(err))
+		a.tdb.log.Error("creating trie copy", zap.Error(err))
 		return nil
 	}
 	return &accountTrie{
 		baseTrie:   a.baseTrie.copy(reader),
 		parentRoot: a.parentRoot,
-		fw:         a.fw,
+		tdb:        a.tdb,
 	}
 }

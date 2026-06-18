@@ -21,12 +21,13 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/metrics"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/database"
 	"go.uber.org/zap"
+
+	_ "github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -50,7 +51,7 @@ type TrieDBConfig struct {
 	// DeferredCommitInterval must be < RevisionsInMemory as otherwise, it's
 	// possible to reap the latest persisted revision.
 	DeferredCommitInterval uint64
-	// TODO(alarso16): Something for metrics?
+	// TODO(alarso16): Should metrics match the old implementation? Do we need libevm's registration?
 }
 
 // DefaultConfig returns a sensible TrieDBConfig with the given directory.
@@ -68,7 +69,7 @@ func DefaultConfig(dir string, log logging.Logger) TrieDBConfig {
 	}
 }
 
-// BackendConstructor implements the [triedb.DBConstructor] interface.
+// BackendConstructor can be supplied as a [triedb.DBConstructor].
 // It creates a new Firewood database with the given configuration.
 // Any error during creation will cause the program to exit.
 func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
@@ -306,13 +307,11 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 		err = proposal.Commit()
 	}
 
-	var log logging.Func
+	log := t.log.Debug
 	if report {
 		log = t.log.Info
-	} else {
-		log = t.log.Debug
 	}
-	log("committing proposal", zap.Stringer("root", root), zap.Int("numProposals", len(proposals)), zap.Error(err))
+	log("committing proposal", zap.Stringer("root", root), zap.Int("numProposals", len(proposals)))
 
 	return err
 }
@@ -371,10 +370,9 @@ func (*TrieDB) Scheme() string {
 
 var errReaderNotSupported = errors.New("TrieDB does not support creating a trie reader")
 
-// Reader implements [triedb.Backend]. This is expected to be used by a [trie.Trie],
+// Reader satisfies [triedb.Backend]. This is expected to be used by a [trie.Trie],
 // so Firewood does not need to support this.
 func (*TrieDB) Reader(common.Hash) (database.Reader, error) {
-	var _ trie.Trie // protect import
 	return nil, errReaderNotSupported
 }
 
