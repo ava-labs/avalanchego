@@ -44,14 +44,14 @@ import (
 )
 
 var (
-	_ orchestrator.ChainVM[Config] = (*VM)(nil)
-	_ orchestrator.Parser[Config]  = parser{}
+	_ orchestrator.ChainVM = (*VM)(nil)
+	_ orchestrator.Parser  = parser{}
 )
 
 type parser struct{}
 
 // ParseConfig implements [orchestrator.Parser].
-func (p parser) ParseConfig([]byte) (Config, error) {
+func (p parser) ParseConfig([]byte) (orchestrator.VMConfig, error) {
 	return Config{}, nil
 }
 
@@ -98,7 +98,7 @@ func (vm *VM) Initialize(
 	snowCtx *snow.Context,
 	avaDB avadb.Database,
 	genesisBytes []byte,
-	config Config,
+	config orchestrator.VMConfig,
 	network *network.Network,
 ) (retErr error) {
 	defer func() {

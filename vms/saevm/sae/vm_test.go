@@ -156,10 +156,10 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	}, opts...)
 
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
-	snow := adaptor.Convert(orchestrator.New(vm, parser{}, &statesync.SummaryHandler{}))
+	chainVM := adaptor.Convert(orchestrator.New(vm, parser{}, &statesync.SummaryHandler{}))
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
+		require.NoError(tb, chainVM.Shutdown(ctx), "Shutdown()")
 	})
 
 	logger := loggingtest.New(tb, conf.logLevel)
@@ -171,7 +171,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	sender := saetest.NewSender(tb, conf.validators)
 
-	require.NoError(tb, snow.Initialize(
+	require.NoError(tb, chainVM.Initialize(
 		ctx,
 		snowCtx,
 		conf.db,
@@ -181,6 +181,12 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		nil, // Fxs
 		sender,
 	), "Initialize()")
+
+	// The orchestrator builds the chain lazily on the bootstrapping transition,
+	// so drive the lifecycle as the engine would before the chain is used.
+	// NormalOp leaves the same consensus gating as an unset state.
+	require.NoError(tb, chainVM.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
+	require.NoError(tb, chainVM.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	if len(conf.precompiles) > 0 {
 		// All precompile registrations must occur after the VM is initialized,
@@ -197,11 +203,11 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	// Avalanchego marks the local node as connected so that p2p protocols
 	// don't need to treat our node as a special case.
-	require.NoErrorf(tb, snow.Connected(ctx, snowCtx.NodeID, version.Current), "Connected(%s)", snowCtx.NodeID)
+	require.NoErrorf(tb, chainVM.Connected(ctx, snowCtx.NodeID, version.Current), "Connected(%s)", snowCtx.NodeID)
 
-	rpcClient, ethClient := dialRPC(ctx, tb, snow)
+	rpcClient, ethClient := dialRPC(ctx, tb, chainVM)
 	sut := &SUT{
-		ChainVM:   snow,
+		ChainVM:   chainVM,
 		Client:    ethClient,
 		rpcClient: rpcClient,
 		rawVM:     vm.VM,

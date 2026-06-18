@@ -21,13 +21,13 @@ import (
 )
 
 var (
-	_ orchestrator.ChainVM[Config] = (*SinceGenesis[hook.Transaction])(nil)
-	_ orchestrator.Parser[Config]  = parser{}
+	_ orchestrator.ChainVM = (*SinceGenesis[hook.Transaction])(nil)
+	_ orchestrator.Parser  = parser{}
 )
 
 type parser struct{}
 
-func (parser) ParseConfig(configBytes []byte) (Config, error) {
+func (parser) ParseConfig(configBytes []byte) (orchestrator.VMConfig, error) {
 	return Config{}, nil
 }
 
@@ -64,7 +64,7 @@ func (vm *SinceGenesis[_]) Initialize(
 	snowCtx *snow.Context,
 	avaDB database.Database,
 	genesisBytes []byte,
-	_ Config, // Supplied in [NewSinceGenesis]
+	_ orchestrator.VMConfig, // the VM config is supplied in [NewSinceGenesis]
 	network *network.Network,
 ) error {
 	db := types.NewEthDB(avaDB)

@@ -100,7 +100,7 @@ func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, 
 		if height == nil {
 			return nil, database.ErrNotFound
 		}
-		ethB := rawdb.ReadBlock(h.db, common.Hash(id), *height)
+		ethB = rawdb.ReadBlock(h.db, common.Hash(id), *height)
 		if ethB == nil {
 			// This indicates a database inconsistency, so we don't need to return [database.ErrNotFound] directly.
 			return nil, fmt.Errorf("%w: block not found for %s:%d", database.ErrNotFound, id, *height)
