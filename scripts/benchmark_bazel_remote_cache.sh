@@ -235,7 +235,11 @@ else
   GO_REPOSITORY_MODCACHE_DIR="${SETUP_CACHE_ROOT}/go-mod-cache"
 fi
 LOG_DIR="${TMP_ROOT}/logs"
+ARTIFACT_DIR="${BAZEL_REMOTE_CACHE_ARTIFACT_DIR:-}"
 mkdir -p "${CACHE_DIR}" "${REPOSITORY_CACHE_DIR}" "${GO_REPOSITORY_MODCACHE_DIR}" "${LOG_DIR}"
+if [[ -n "${ARTIFACT_DIR}" ]]; then
+  mkdir -p "${ARTIFACT_DIR}"
+fi
 
 DEFAULT_REPRESENTATIVE_LATENCY_URL="https://ec2.us-east-1.amazonaws.com/"
 REPRESENTATIVE_LATENCY_URL="${BAZEL_REMOTE_CACHE_LATENCY_URL:-${DEFAULT_REPRESENTATIVE_LATENCY_URL}}"
@@ -320,9 +324,39 @@ stop_toxiproxy() {
   TOXIPROXY_API_URL=""
 }
 
+write_artifacts() {
+  [[ -n "${ARTIFACT_DIR}" ]] || return 0
+
+  local metadata_file
+  metadata_file="${ARTIFACT_DIR}/metadata.txt"
+
+  mkdir -p "${ARTIFACT_DIR}"
+  rm -rf "${ARTIFACT_DIR}/logs"
+  cp -R "${LOG_DIR}" "${ARTIFACT_DIR}/logs"
+
+  {
+    echo "tmp_root=${TMP_ROOT}"
+    echo "success=${SUCCESS}"
+    echo
+    echo "== df -h =="
+    df -h "${TMP_ROOT}" "${REPO_ROOT}" 2>&1 || true
+    echo
+    echo "== du -sh =="
+    du -sh "${CACHE_DIR}" "${REPOSITORY_CACHE_DIR}" "${GO_REPOSITORY_MODCACHE_DIR}" "${LOG_DIR}" 2>&1 || true
+    echo
+    echo "== output-bases =="
+    local path
+    for path in "${TMP_ROOT}"/output-base-*; do
+      [[ -e "${path}" ]] || continue
+      du -sh "${path}" 2>&1 || true
+    done
+  } >"${metadata_file}"
+}
+
 cleanup() {
   stop_toxiproxy
   stop_bazel_remote
+  write_artifacts
 
   if [[ "${KEEP_TMP}" == "1" ]]; then
     echo "kept temporary workspace for inspection: ${TMP_ROOT}" >&2

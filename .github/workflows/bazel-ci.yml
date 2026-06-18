@@ -221,19 +221,26 @@ jobs:
     name: benchmark-remote-cache (${{ matrix.benchmark.id }})
     steps:
       - uses: actions/checkout@v5
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        if: ${{ inputs.platform_name == 'linux-amd64' }}
+        with:
+          tool-cache: true
+          docker-images: true
       - uses: ./.github/actions/install-nix
       - name: Run Bazel remote cache benchmark (${{ matrix.benchmark.id }})
         shell: nix develop --command bash -x {0}
         run: |
           set -euo pipefail
-          mkdir -p artifacts
-          ./scripts/run_task.sh ${{ matrix.benchmark.task }} 2>&1 | tee artifacts/bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}.log
+          artifact_dir="artifacts/bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}"
+          mkdir -p "${artifact_dir}"
+          BAZEL_REMOTE_CACHE_ARTIFACT_DIR="${artifact_dir}/diagnostics" \
+            ./scripts/run_task.sh ${{ matrix.benchmark.task }} 2>&1 | tee "${artifact_dir}/summary.log"
       - name: Publish Bazel remote cache benchmark summary
         if: ${{ always() }}
         shell: bash
         run: |
           set -euo pipefail
-          log_file="artifacts/bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}.log"
+          log_file="artifacts/bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}/summary.log"
           if [[ ! -f "${log_file}" ]]; then
             exit 0
           fi
@@ -253,5 +260,5 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}
-          path: artifacts/bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}.log
+          path: artifacts/bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}
           if-no-files-found: warn
