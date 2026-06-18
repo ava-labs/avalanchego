@@ -109,10 +109,10 @@ func RestoreSettledBlock(eth *types.Block, log logging.Logger, db ethdb.Database
 		return nil, err
 	}
 	if err := b.RestoreExecutionArtefacts(db, xdb, config); err != nil {
-		return nil, fmt.Errorf("restoring to executed state: %v", err)
+		return nil, fmt.Errorf("restoring to executed state: %w", err)
 	}
 	if err := b.markSettled(nil); err != nil {
-		return nil, fmt.Errorf("restoring to settled state: %v", err)
+		return nil, fmt.Errorf("restoring to settled state: %w", err)
 	}
 	if err := b.CheckInvariants(Settled); err != nil {
 		return nil, err
