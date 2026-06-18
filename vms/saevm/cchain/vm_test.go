@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -58,7 +59,6 @@ import (
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
 	ethrpc "github.com/ava-labs/libevm/rpc"
 )
@@ -146,7 +146,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
 				Config:     &chainConfig,
-				Timestamp:  saeparams.TauSeconds,
+				Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()),
 				Difficulty: big.NewInt(0), // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
 			},
@@ -354,17 +354,6 @@ func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx, opts
 	tb.Helper()
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
-	return s.runConsensusLoop(ctx, tb, opts...)
-}
-
-// issueAndExecute submits t through [ethclient.Client.SendTransaction] and
-// drives the consensus loop to produce, accept, and execute the next block,
-// which is returned.
-func (s *SUT) issueEthAndExecute(ctx context.Context, tb testing.TB, t *types.Transaction, opts ...blockOption) *blocks.Block {
-	tb.Helper()
-
-	require.NoErrorf(tb, s.ethclient.SendTransaction(ctx, t), "%T.SendTransaction(...)", s.ethclient)
-	s.waitForPendingEthTxs(ctx, tb, t)
 	return s.runConsensusLoop(ctx, tb, opts...)
 }
 

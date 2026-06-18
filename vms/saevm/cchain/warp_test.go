@@ -9,7 +9,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/google/go-cmp/cmp"
@@ -22,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -195,51 +198,95 @@ func warpAccessList(msgs ...*avalanchewarp.Message) types.AccessList {
 	return al
 }
 
-// TestReceiveWarpMessage verifies that warp messages are correctly delivered by
-// the warp precompile.
+// TestReceiveWarpMessage verifies that the intrinsic gas accounts for warp
+// messages and that the warp precompile correctly delivers messages.
 func TestReceiveWarpMessage(t *testing.T) {
+	const numTests = 8
 	var (
-		wallet     = saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
-		sender     = wallet.Addresses()[0]
+		wallet     = saetest.NewUNSAFEWallet(t, numTests, types.LatestSigner(saetest.ChainConfig()))
 		vdrs       = warptest.NewValidators(t, 2)
 		warpLogger = common.Address{'l', 'o', 'g', 'g', 'e', 'r'}
 	)
 	ctx, sut := newSUT(t,
-		withMaxAllocFor(sender),
+		withMaxAllocFor(wallet.Addresses()...),
 		withContract(warpLogger, forwardAndLogCode(corethwarp.ContractAddress)),
 		withValidators(vdrs),
 	)
+
+	getMessage, err := corethwarp.PackGetVerifiedWarpMessage(0)
+	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpMessage(...)")
+	getHash, err := corethwarp.PackGetVerifiedWarpBlockHash(0)
+	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpBlockHash(...)")
 
 	var (
 		sourceAddress    = common.Address{1, 2, 3}
 		payload          = []byte{4, 5, 6}
 		addressedCallMsg = sut.newAddressedCallMessage(t, sourceAddress[:], payload)
-	)
-	getMessage, err := corethwarp.PackGetVerifiedWarpMessage(0)
-	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpMessage(...)")
 
-	var (
 		blkID        = ids.GenerateTestID()
 		blockHashMsg = sut.newHashMessage(t, blkID)
-	)
-	getHash, err := corethwarp.PackGetVerifiedWarpBlockHash(0)
-	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpBlockHash(...)")
 
+		emptyMsg = vdrs.Sign(t, sut.newAddressedCallMessage(t, sourceAddress[:], nil))
+		largeMsg = vdrs.Sign(t, sut.newAddressedCallMessage(t, sourceAddress[:], make([]byte, 5*units.KiB)))
+	)
+
+	// The C-Chain modifies the intrinsic gas of transactions to charge for warp
+	// message verification and serialization rather than storage reads. For
+	// small messages this increases the intrinsic gas. For large messages this
+	// decreases the intrinsic gas.
+	const (
+		emptyWarpIntrinsicGas = 149_764
+		largeWarpIntrinsicGas = 231_684
+		e2eGas                = 1_000_000 // Enough for the call to succeed
+	)
 	must := func(b []byte, err error) []byte {
 		require.NoError(t, err)
 		return b
 	}
-	tests := []struct {
-		name     string
-		msg      *avalanchewarp.Message
-		callData []byte
-		want     []byte
+	tests := [numTests]struct {
+		name         string
+		msg          *avalanchewarp.Message
+		callData     []byte
+		gas          uint64
+		wantIssueErr testerr.Want
+		wantStatus   uint64
+		wantLogData  []byte
 	}{
 		{
-			name:     "valid_message",
-			msg:      vdrs.Sign(t, addressedCallMsg),
-			callData: getMessage,
-			want: must(corethwarp.PackGetVerifiedWarpMessageOutput(corethwarp.GetVerifiedWarpMessageOutput{
+			name:         "empty_message_underfunded",
+			msg:          emptyMsg,
+			callData:     getMessage,
+			gas:          emptyWarpIntrinsicGas - 1,
+			wantIssueErr: testerr.Contains(core.ErrIntrinsicGas.Error()),
+		},
+		{
+			name:       "empty_message_minimally_funded",
+			msg:        emptyMsg,
+			callData:   getMessage,
+			gas:        emptyWarpIntrinsicGas,
+			wantStatus: types.ReceiptStatusFailed,
+		},
+		{
+			name:         "large_message_underfunded",
+			msg:          largeMsg,
+			callData:     getMessage,
+			gas:          largeWarpIntrinsicGas - 1,
+			wantIssueErr: testerr.Contains(core.ErrIntrinsicGas.Error()),
+		},
+		{
+			name:       "large_message_minimally_funded",
+			msg:        largeMsg,
+			callData:   getMessage,
+			gas:        largeWarpIntrinsicGas,
+			wantStatus: types.ReceiptStatusFailed,
+		},
+		{
+			name:       "valid_message",
+			msg:        vdrs.Sign(t, addressedCallMsg),
+			callData:   getMessage,
+			gas:        e2eGas,
+			wantStatus: types.ReceiptStatusSuccessful,
+			wantLogData: must(corethwarp.PackGetVerifiedWarpMessageOutput(corethwarp.GetVerifiedWarpMessageOutput{
 				Message: corethwarp.WarpMessage{
 					SourceChainID:       common.Hash(sut.ctx.ChainID),
 					OriginSenderAddress: sourceAddress,
@@ -249,18 +296,22 @@ func TestReceiveWarpMessage(t *testing.T) {
 			})),
 		},
 		{
-			name:     "invalid_message",
-			msg:      warptest.IncorrectlySign(t, addressedCallMsg),
-			callData: getMessage,
-			want: must(corethwarp.PackGetVerifiedWarpMessageOutput(corethwarp.GetVerifiedWarpMessageOutput{
+			name:       "invalid_message",
+			msg:        warptest.IncorrectlySign(t, addressedCallMsg),
+			callData:   getMessage,
+			gas:        e2eGas,
+			wantStatus: types.ReceiptStatusSuccessful,
+			wantLogData: must(corethwarp.PackGetVerifiedWarpMessageOutput(corethwarp.GetVerifiedWarpMessageOutput{
 				Valid: false,
 			})),
 		},
 		{
-			name:     "valid_hash",
-			msg:      vdrs.Sign(t, blockHashMsg),
-			callData: getHash,
-			want: must(corethwarp.PackGetVerifiedWarpBlockHashOutput(corethwarp.GetVerifiedWarpBlockHashOutput{
+			name:       "valid_hash",
+			msg:        vdrs.Sign(t, blockHashMsg),
+			callData:   getHash,
+			gas:        e2eGas,
+			wantStatus: types.ReceiptStatusSuccessful,
+			wantLogData: must(corethwarp.PackGetVerifiedWarpBlockHashOutput(corethwarp.GetVerifiedWarpBlockHashOutput{
 				WarpBlockHash: corethwarp.WarpBlockHash{
 					SourceChainID: common.Hash(sut.ctx.ChainID),
 					BlockHash:     common.Hash(blkID),
@@ -269,35 +320,47 @@ func TestReceiveWarpMessage(t *testing.T) {
 			})),
 		},
 		{
-			name:     "invalid_hash",
-			msg:      warptest.IncorrectlySign(t, blockHashMsg),
-			callData: getHash,
-			want: must(corethwarp.PackGetVerifiedWarpBlockHashOutput(corethwarp.GetVerifiedWarpBlockHashOutput{
+			name:       "invalid_hash",
+			msg:        warptest.IncorrectlySign(t, blockHashMsg),
+			callData:   getHash,
+			gas:        e2eGas,
+			wantStatus: types.ReceiptStatusSuccessful,
+			wantLogData: must(corethwarp.PackGetVerifiedWarpBlockHashOutput(corethwarp.GetVerifiedWarpBlockHashOutput{
 				Valid: false,
 			})),
 		},
 	}
-	for _, tt := range tests {
+	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			tx := wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
 				To:         &warpLogger,
-				Gas:        1_000_000,
+				Gas:        tt.gas,
 				GasFeeCap:  big.NewInt(1),
 				Data:       tt.callData,
 				AccessList: warpAccessList(tt.msg),
 			})
-			built := sut.issueEthAndExecute(ctx, t, tx, withBlockContext(&block.Context{}))
+			err := sut.ethclient.SendTransaction(ctx, tx)
+			if diff := testerr.Diff(err, tt.wantIssueErr); diff != "" {
+				t.Fatalf("%T.SendTransaction(...) error (-want +got)\n%s", sut.ethclient, diff)
+			}
+			if err != nil {
+				return
+			}
 
-			// The warp logger emitted a single log with the warp precompile's
-			// response.
+			sut.waitForPendingEthTxs(ctx, t, tx)
+			built := sut.runConsensusLoop(ctx, t, withBlockContext(&block.Context{}))
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
 			receipt := receipts[0]
-			assert.Equalf(t, types.ReceiptStatusSuccessful, receipt.Status, "%T.Status", receipt)
+			assert.Equalf(t, tt.wantStatus, receipt.Status, "%T.Status", receipt)
+			if receipt.Status == types.ReceiptStatusFailed {
+				return
+			}
+
 			logs := receipt.Logs
 			require.Lenf(t, logs, 1, "%T.Logs", receipt)
 			log := logs[0]
-			assert.Equalf(t, tt.want, log.Data, "%T.Data (warp precompile output)", log)
+			assert.Equalf(t, tt.wantLogData, log.Data, "%T.Data (warp precompile output)", log)
 		})
 	}
 }
