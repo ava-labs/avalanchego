@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "context.go",
         "execution.go",
+        "metrics.go",
         "receipts.go",
         "saexec.go",
         "subscription.go",
@@ -32,6 +33,7 @@ go_library(
         "@com_github_ava_labs_libevm//libevm/eventual",
         "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
+        "@com_github_prometheus_client_golang//prometheus",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -72,6 +74,7 @@ go_test(
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
         "@com_github_holiman_uint256//:uint256",
+        "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",

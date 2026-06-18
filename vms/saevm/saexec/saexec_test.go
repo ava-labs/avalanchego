@@ -31,6 +31,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -105,7 +106,13 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
-	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, blockstest.WithTrieDBConfig(tdbConfig), blockstest.WithGasTarget(sutCfg.hooks.Target))
+
+	genOpts := []blockstest.GenesisOption{
+		blockstest.WithTrieDBConfig(tdbConfig),
+		blockstest.WithGasTarget(sutCfg.hooks.Target),
+		blockstest.WithBaseFee(1),
+	}
+	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, genOpts...)
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),
@@ -118,7 +125,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		Archival:           sutCfg.archival,
 		TrieCommitInterval: sutCfg.commitInterval,
 	}
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger)
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -1035,7 +1042,7 @@ func TestArchivalStoresAll(t *testing.T) {
 	t.Run("recover", func(t *testing.T) {
 		// Restart the chain to remove the TrieDB cache.
 		src := blocks.Source(chain.GetBlock)
-		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log)
+		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log, prometheus.NewRegistry())
 		require.NoError(t, err, "New()")
 		t.Cleanup(func() {
 			require.NoErrorf(t, e.Close(), "%T.Close()", e)

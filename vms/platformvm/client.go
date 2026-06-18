@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -639,8 +641,41 @@ func (c *Client) GetDeactivationOwners(ctx context.Context, validationIDs ...ids
 	return deactivationOwners, nil
 }
 
-// GetOwners returns the union of GetSubnetOwners and GetDeactivationOwners.
-func (c *Client) GetOwners(ctx context.Context, subnetIDs []ids.ID, validationIDs []ids.ID) (map[ids.ID]fx.Owner, error) {
+// getAutoRenewedValidatorAuthorities returns a map of auto-renewed validator
+// tx ID to validator authority.
+func (c *Client) getAutoRenewedValidatorAuthorities(
+	ctx context.Context,
+	txIDs ...ids.ID,
+) (map[ids.ID]fx.Owner, error) {
+	owners := make(map[ids.ID]fx.Owner, len(txIDs))
+	for _, txID := range txIDs {
+		txBytes, err := c.GetTx(ctx, txID)
+		if err != nil {
+			return nil, err
+		}
+
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		addTx, ok := tx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+		if !ok {
+			return nil, fmt.Errorf("expected AddAutoRenewedValidatorTx but got %T for txID %s", tx.Unsigned, txID)
+		}
+		owners[txID] = addTx.ValidatorAuthority
+	}
+	return owners, nil
+}
+
+// GetOwners returns the union of GetSubnetOwners, GetDeactivationOwners, and
+// getAutoRenewedValidatorAuthorities.
+func (c *Client) GetOwners(
+	ctx context.Context,
+	subnetIDs []ids.ID,
+	validationIDs []ids.ID,
+	autoRenewedValidatorTxIDs []ids.ID,
+) (map[ids.ID]fx.Owner, error) {
 	subnetOwners, err := c.GetSubnetOwners(ctx, subnetIDs...)
 	if err != nil {
 		return nil, err
@@ -649,9 +684,14 @@ func (c *Client) GetOwners(ctx context.Context, subnetIDs []ids.ID, validationID
 	if err != nil {
 		return nil, err
 	}
+	validatorAuthorities, err := c.getAutoRenewedValidatorAuthorities(ctx, autoRenewedValidatorTxIDs...)
+	if err != nil {
+		return nil, err
+	}
 
-	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
+	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners)+len(validatorAuthorities))
 	maps.Copy(owners, subnetOwners)
 	maps.Copy(owners, deactivationOwners)
+	maps.Copy(owners, validatorAuthorities)
 	return owners, nil
 }
