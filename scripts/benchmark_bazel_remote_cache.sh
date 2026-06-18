@@ -57,7 +57,8 @@ local Bazel output state each time:
   - no remote cache
   - HTTP cold remote cache
   - HTTP warm remote cache
-  - impacted-target mode (selector time plus selected-test execution time)
+  - impacted-target mode (selector time plus selected-test execution time
+    against the same warmed HTTP remote cache)
 
 Add `--test-include-grpc` to extend that test matrix with:
   - gRPC cold remote cache
@@ -888,10 +889,11 @@ run_impacted_test_pair() {
   local benchmark_index="$1"
   local benchmark_spec="$2"
   local impacted_mode="$3"
-  local selector_output_base="$4"
-  local selector_log_file="$5"
-  local execution_output_base="$6"
-  local execution_log_file="$7"
+  local execution_remote_cache="$4"
+  local selector_output_base="$5"
+  local selector_log_file="$6"
+  local execution_output_base="$7"
+  local execution_log_file="$8"
   local impacted_range selector_time selector_build_time selector_exec_time execution_time target_count
   local manifest_file selector_tool selector_start selector_end
   local -a selector_args execution_args
@@ -957,7 +959,7 @@ run_impacted_test_pair() {
   execution_time="$(run_bazel_argv \
     "impacted-execution (${benchmark_spec})" \
     "test $(paste -sd ' ' "${manifest_file}")" \
-    "" \
+    "${execution_remote_cache}" \
     "${execution_output_base}" \
     "${execution_log_file}" \
     "${BENCHMARK_TIMEOUT_SECONDS}" \
@@ -1184,6 +1186,7 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
       "${benchmark_index}" \
       "${test_spec}" \
       "${impacted_mode}" \
+      "${proxied_http_remote_cache_url}" \
       "${selector_output_base}" \
       "${LOG_DIR}/benchmark-${benchmark_index}-impacted-selector.log" \
       "${impacted_execution_output_base}" \
