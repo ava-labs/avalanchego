@@ -258,7 +258,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (*blocks.Block, error) {
 	if errors.Is(err, blocks.ErrNotFound) {
 		return nil, database.ErrNotFound
 	}
-	return b, nil
+	return b, err
 }
 
 // GetBlockIDAtHeight returns the accepted block at the given height, or
