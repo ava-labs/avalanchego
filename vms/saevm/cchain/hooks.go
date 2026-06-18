@@ -78,16 +78,16 @@ func newHooks(
 		}
 	}
 	return &hooks{
-		builder: builder{
-			ctx:                  ctx,
-			chainConfig:          chainConfig,
-			initialDelayExponent: initialDelayExponent,
-			now:                  time.Now,
-			desired:              desired,
-			potentialTxs:         poolTxs,
+		builder{
+			ctx,
+			chainConfig,
+			initialDelayExponent,
+			time.Now,
+			desired,
+			poolTxs,
 		},
-		state:       state,
-		warpStorage: warpStorage,
+		state,
+		warpStorage,
 	}
 }
 
@@ -110,18 +110,18 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 	headerExtra := customtypes.GetHeaderExtra(header)
 	now := h.BlockTime(header)
 	return &builder{
-		ctx:                  h.ctx,
-		chainConfig:          h.chainConfig,
-		initialDelayExponent: h.initialDelayExponent,
-		now: func() time.Time {
+		h.ctx,
+		h.chainConfig,
+		h.initialDelayExponent,
+		func() time.Time {
 			return now
 		},
-		desired: desiredParams{
+		desiredParams{
 			delayExponent:  headerExtra.DelayExponent,
 			targetExponent: headerExtra.TargetExponent,
 			priceExponent:  headerExtra.PriceExponent,
 		},
-		potentialTxs: slices.Values(txs),
+		slices.Values(txs),
 	}, nil
 }
 
@@ -138,8 +138,6 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 	}, nil
 }
 
-const targetToExcessScaling = 87 // 87 ~= 60 / ln(2)
-
 func (h *hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	config := corethparams.GetExtra(h.chainConfig)
 	te, err := targetExponent(config, hdr)
@@ -153,7 +151,7 @@ func (h *hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConf
 	}
 
 	return te.Target(), gastime.GasPriceConfig{
-		TargetToExcessScaling: targetToExcessScaling,
+		TargetToExcessScaling: 87, // 87 ~= 60 / ln(2)
 		MinPrice:              priceExponent(hdr).Price(),
 	}
 }
@@ -242,14 +240,6 @@ func (*hooks) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block
 }
 
 func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
-	msgs, err := warp.FromReceipts(receipts)
-	if err != nil {
-		return fmt.Errorf("extracting warp messages from block %s (%d): %w", b.Hash(), b.NumberU64(), err)
-	}
-	if err := h.warpStorage.Add(msgs...); err != nil {
-		return fmt.Errorf("storing warp messages for block %s (%d): %w", b.Hash(), b.NumberU64(), err)
-	}
-
 	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
@@ -264,6 +254,14 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 
 	if err := h.state.Apply(b.NumberU64(), txs); err != nil {
 		return fmt.Errorf("applying cross-chain state: %w", err)
+	}
+
+	messages, err := warp.FromReceipts(receipts)
+	if err != nil {
+		return fmt.Errorf("parsing warp messages from receipts: %w", err)
+	}
+	if err := h.warpStorage.Add(messages...); err != nil {
+		return fmt.Errorf("storing warp messages from receipts: %w", err)
 	}
 	return nil
 }
@@ -335,9 +333,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
 			Time:             uint64(now.Unix()), //#nosec G115 -- Known non-negative
-			BlobGasUsed:      utils.PointerTo[uint64](0),
-			ExcessBlobGas:    utils.PointerTo[uint64](0),
-			ParentBeaconRoot: &common.Hash{},
+			BlobGasUsed:      new(uint64),
+			ExcessBlobGas:    new(uint64),
+			ParentBeaconRoot: new(common.Hash),
 		},
 		&customtypes.HeaderExtra{
 			// Prior to SAE, ExtDataGasUsed included the gas cost of the
@@ -472,17 +470,22 @@ func (b *builder) BuildBlock(
 
 	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
 	rulesExtra := corethparams.GetRulesExtra(rules)
-	blockResults, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
+	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
 	if err != nil {
-		return nil, fmt.Errorf("verifying block predicates: %w", err)
+		return nil, fmt.Errorf("verifying warp messages: %w", err)
 	}
-	predicateBytes, err := blockResults.Bytes()
+
+	// TODO(StephenButtolph): Replace the predicate bytes format with an
+	// efficiently packed canoto message. The current format is extremely
+	// inefficient. There are 6 bytes of constant overhead, along with
+	// unnecessarily including the contract address and tx hash. The warp
+	// contract address is a constant, and the tx hash should be replaced with
+	// the tx index.
+	warpValidityBytes, err := warpValidity.Bytes()
 	if err != nil {
 		return nil, fmt.Errorf("marshaling predicate results: %w", err)
 	}
-	// TODO(StephenButtolph): Should we only encode the predicate bytes when
-	// there is at least one predicate?
-	header.Extra = predicateBytes
+	header.Extra = warpValidityBytes
 
 	headerExtra := customtypes.GetHeaderExtra(header)
 	headerExtra.SettledHeight = &settled.Height
