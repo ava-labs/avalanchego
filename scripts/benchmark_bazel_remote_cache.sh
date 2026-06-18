@@ -530,6 +530,7 @@ run_bazel_argv() {
     --color=no
     --curses=no
     --show_progress_rate_limit=60
+    --verbose_failures
     "--repository_cache=${REPOSITORY_CACHE_DIR}"
     # Gazelle go_repository keeps an internal per-output-base module cache by
     # default, which defeats the goal of a shared setup phase when each measured
