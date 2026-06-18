@@ -8,10 +8,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
+        "//intmath",
         "//snow/engine/snowman/block",
         "//vms/components/gas",
         "//vms/saevm/gastime",
-        "//intmath",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
         "//vms/saevm/types",

@@ -11,9 +11,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cache/lru",
+        "//intmath",
         "//utils/logging",
         "//vms/saevm/blocks",
-        "//intmath",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//event",
