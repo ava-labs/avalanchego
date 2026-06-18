@@ -864,6 +864,8 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	parsed, err := sut.ParseBlock(ctx, buf)
 	require.NoError(t, err, "vm.ParseBlock(malformed block)")
 
+	// When VerifyBlock rebuilds the parsed block, it recomputes the header
+	// timestamps, which makes the hash check fail.
 	err = sut.VerifyBlock(ctx, nil, parsed)
 	require.ErrorIs(t, err, sae.ErrHashMismatch, "vm.VerifyBlock(malformed block)")
 }
