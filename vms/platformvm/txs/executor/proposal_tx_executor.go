@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/database"
 )
 
 const (
@@ -402,6 +403,48 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	return e.undoSupplyMintOnAbort(stakerToReward)
+}
+
+// getNextStakerToReward returns the next staker to be removed and the corresponding tx that added it to the staker set.
+func getNextStakerToReward(chainState state.Chain, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
+	currentStakerIterator, err := chainState.GetCurrentStakerIterator()
+	if err != nil {
+		return nil, nil, err
+	}
+	defer currentStakerIterator.Release()
+
+	if !currentStakerIterator.Next() {
+		return nil, nil, fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
+	}
+	stakerToReward := currentStakerIterator.Value()
+
+	if stakerToReward.TxID != tx.StakerTxID() {
+		return nil, nil, fmt.Errorf(
+			"%w: %s != %s",
+			ErrRemoveWrongStaker,
+			stakerToReward.TxID,
+			tx.StakerTxID(),
+		)
+	}
+
+	// Verify that the chain's timestamp is the validator's end time
+	currentChainTime := chainState.GetTimestamp()
+	if !stakerToReward.EndTime.Equal(currentChainTime) {
+		return nil, nil, fmt.Errorf(
+			"%w: TxID = %s with %s < %s",
+			ErrRemoveStakerTooEarly,
+			tx.StakerTxID(),
+			currentChainTime,
+			stakerToReward.EndTime,
+		)
+	}
+
+	stakerTx, _, err := chainState.GetTx(stakerToReward.TxID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get next removed staker tx: %w", err)
+	}
+
+	return stakerTx, stakerToReward, nil
 }
 
 func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
