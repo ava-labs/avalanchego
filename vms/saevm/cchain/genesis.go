@@ -206,8 +206,10 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 		if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
 			return nil, fmt.Errorf("incompatible chain config: %w", err)
 		}
+		// We will be executing new blocks based on the new chain config, so we
+		// need to keep it up-to-date in the database for the next restart.
+		rawdb.WriteChainConfig(db, hash, g.Config)
 	}
-	rawdb.WriteChainConfig(db, hash, g.Config)
 
 	tdb := triedb.NewDatabase(db, trieConfig)
 	defer func() {
@@ -270,7 +272,7 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	c := corethparams.GetExtra(g.Config)
-	if c.IsApricotPhase3(g.Timestamp) {
+	if c.IsApricotPhase3(g.Timestamp) { // Also called London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
 			h.BaseFee = big.NewInt(ap3.InitialBaseFee)
@@ -278,7 +280,7 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	headerExtra := customtypes.GetHeaderExtra(h)
-	if c.IsEtna(g.Timestamp) {
+	if c.IsEtna(g.Timestamp) { // Also called Cancun
 		h.BlobGasUsed = new(uint64)
 		h.ExcessBlobGas = new(uint64)
 		h.ParentBeaconRoot = new(common.Hash)
