@@ -447,6 +447,23 @@ func getNextStakerToReward(chainState state.Chain, tx txs.RewardTx) (*txs.Tx, *s
 	return stakerTx, stakerToReward, nil
 }
 
+// undoSupplyMintOnAbort removes the staker's potential reward from
+// the abort branch of a reward proposal. Potential rewards are added
+// optimistically to the current supply when the validator is added so they
+// must be deducted on abort if the validator is not eligible for rewards.
+func (e *proposalTxExecutor) undoSupplyMintOnAbort(staker *state.Staker) error {
+	currentSupply, err := e.onAbortState.GetCurrentSupply(staker.SubnetID)
+	if err != nil {
+		return err
+	}
+	newSupply, err := safemath.Sub(currentSupply, staker.PotentialReward)
+	if err != nil {
+		return err
+	}
+	e.onAbortState.SetCurrentSupply(staker.SubnetID, newSupply)
+	return nil
+}
+
 func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
 	var (
 		txID    = validator.TxID
@@ -638,23 +655,6 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		return err
 	}
 
-	return nil
-}
-
-// undoSupplyMintOnAbort removes the staker's potential reward from
-// the abort branch of a reward proposal. Potential rewards are added
-// optimistically to the current supply when the validator is added so they
-// must be deducted on abort if the validator is not eligible for rewards.
-func (e *proposalTxExecutor) undoSupplyMintOnAbort(staker *state.Staker) error {
-	currentSupply, err := e.onAbortState.GetCurrentSupply(staker.SubnetID)
-	if err != nil {
-		return err
-	}
-	newSupply, err := safemath.Sub(currentSupply, staker.PotentialReward)
-	if err != nil {
-		return err
-	}
-	e.onAbortState.SetCurrentSupply(staker.SubnetID, newSupply)
 	return nil
 }
 
