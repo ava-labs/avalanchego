@@ -47,10 +47,9 @@ func NewClient(n *p2p.Network, handlerID uint64) *p2p.Client {
 	return n.NewClient(handlerID, noopSampler{})
 }
 
-// Send picks a peer via [p2p.PeerTracker.SelectPeer] and forwards req
-// to it. On error, Outcome is nil and the peer has already been
-// scored. Selection is explicit (not [p2p.Client.AppRequestAny]) so
-// RegisterRequest pairs with the eventual Success or Failure call.
+// Send selects a peer and forwards req to it. Outcome is nil on error.
+// With no peer available it returns errNoPeers unscored, otherwise it
+// scores per [SendTo].
 func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*Outcome, error) {
 	nodeID, ok := d.peers.SelectPeer()
 	if !ok {
@@ -59,8 +58,9 @@ func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*
 	return d.SendTo(ctx, nodeID, req, resp)
 }
 
-// SendTo sends req to nodeID. On error, Outcome is nil and the peer
-// has already been scored.
+// SendTo sends req to nodeID. Outcome is nil on error. The peer is
+// scored a failure only after the request is registered, so a pre-send
+// marshal or context error returns unscored.
 func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

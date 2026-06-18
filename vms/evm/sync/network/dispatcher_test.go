@@ -29,7 +29,11 @@ func TestDispatcher_SendTo(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1, 2, 3}}}
-	c := newTestClient[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](t, ctx, nodeID, want)
+	wantBytes, err := proto.Marshal(want)
+	require.NoError(t, err)
+	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+		t, ctx, nodeID, echoHandler(wantBytes), newTestPeerTracker(t, nodeID),
+	)
 
 	got := &syncpb.GetLeafResponse{}
 	outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, got)
@@ -190,18 +194,6 @@ func newTestDispatcher[Req, Resp proto.Message](
 ) *Dispatcher[Req, Resp] {
 	t.Helper()
 	return NewDispatcher[Req, Resp](p2ptest.NewSelfClient(t, ctx, nodeID, h), peers)
-}
-
-func newTestClient[Req, Resp proto.Message](
-	t *testing.T,
-	ctx context.Context,
-	nodeID ids.NodeID,
-	resp Resp,
-) *Dispatcher[Req, Resp] {
-	t.Helper()
-	respBytes, err := proto.Marshal(resp)
-	require.NoError(t, err)
-	return newTestDispatcher[Req, Resp](t, ctx, nodeID, echoHandler(respBytes), newTestPeerTracker(t, nodeID))
 }
 
 func newRegisteredTracker(t *testing.T, nodeID ids.NodeID) (*prometheus.Registry, *p2p.PeerTracker) {
