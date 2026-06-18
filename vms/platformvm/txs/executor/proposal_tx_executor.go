@@ -857,12 +857,12 @@ func (e *proposalTxExecutor) restakeOnCommit(
 
 	// Compound the restaked rewards into the validator's weight and accrued
 	// reward totals.
-	newWeight, err := safemath.Add(validator.Weight, restakingValidationRewards)
+	nextWeight, err := safemath.Add(validator.Weight, restakingValidationRewards)
 	if err != nil {
 		return err
 	}
 
-	newWeight, err = safemath.Add(newWeight, restakingDelegateeRewards)
+	nextWeight, err = safemath.Add(nextWeight, restakingDelegateeRewards)
 	if err != nil {
 		return err
 	}
@@ -888,28 +888,28 @@ func (e *proposalTxExecutor) restakeOnCommit(
 	}
 
 	duration := time.Duration(stakingInfo.NextPeriod) * time.Second
-	potentialReward := rewards.Calculate(
+	nextPotentialReward := rewards.Calculate(
 		duration,
-		newWeight,
+		nextWeight,
 		currentSupply,
 	)
 
-	newCurrentSupply, err := safemath.Add(currentSupply, potentialReward)
+	newCurrentSupply, err := safemath.Add(currentSupply, nextPotentialReward)
 	if err != nil {
 		return err
 	}
 
 	e.onCommitState.SetCurrentSupply(validator.SubnetID, newCurrentSupply)
 
-	endTime := validator.EndTime.Add(duration)
+	nextEndTime := validator.EndTime.Add(duration)
 
 	// Update validator by deleting and putting back.
 	renewedValidator := *validator
-	renewedValidator.StartTime = renewedValidator.EndTime
-	renewedValidator.EndTime = endTime
-	renewedValidator.NextTime = endTime
-	renewedValidator.PotentialReward = potentialReward
-	renewedValidator.Weight = newWeight
+	renewedValidator.StartTime = validator.EndTime
+	renewedValidator.EndTime = nextEndTime
+	renewedValidator.NextTime = nextEndTime
+	renewedValidator.PotentialReward = nextPotentialReward
+	renewedValidator.Weight = nextWeight
 
 	if err := e.onCommitState.DeleteCurrentValidator(validator); err != nil {
 		return fmt.Errorf("failed to delete validator from commit state: %w", err)
