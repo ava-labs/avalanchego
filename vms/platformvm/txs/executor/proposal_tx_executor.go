@@ -582,15 +582,15 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 
 	// The validator is eligible to auto-restake.
 	//
-	// If a validator is not eligible for rewards, unstake its assets and mint any
+	// If a validator is not eligible for rewards, unstake its tokens and mint any
 	// accrued rewards, forfeiting any potential rewards from the current cycle.
 	unstakeUTXOs(addAutoRenewedValidatorTx, staker.TxID, e.onAbortState)
 	if err := e.mintRewardsOnAbort(addAutoRenewedValidatorTx, stakingInfo); err != nil {
 		return err
 	}
 
-	// If a validator is eligible for rewards, restake its assets for another
-	// subsequent staking cycle.
+	// If a validator is eligible for rewards, restake its tokens for another
+	// staking cycle.
 	if err = e.restakeOnCommit(addAutoRenewedValidatorTx, staker, stakingInfo); err != nil {
 		return err
 	}

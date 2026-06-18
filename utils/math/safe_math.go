@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	ErrOverflow     = errors.New("overflow")
-	ErrUnderflow    = errors.New("underflow")
+	ErrOverflow  = errors.New("overflow")
+	ErrUnderflow = errors.New("underflow")
 
 	// Deprecated: Add64 is deprecated. Use Add[uint64] instead.
 	Add64 = Add[uint64]
