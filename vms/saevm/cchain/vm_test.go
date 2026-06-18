@@ -839,12 +839,7 @@ func TestParseBlock(t *testing.T) {
 }
 
 // TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a received
-// block whose Header.Time disagrees with TimeMilliseconds, as a malicious peer
-// might send. Such a block can never be reproduced by
-// [hook.BlockBuilder.BuildHeader], which always emits a consistent timestamp, so
-// VerifyBlock's rebuild-hash check rejects it. This guards the VM boundary
-// against the malformed-block case; the anchoring of BlockTime's seconds
-// component to Header.Time is covered by the unit tests in hooks_test.go.
+// block whose Header.Time disagrees with TimeMilliseconds.
 func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	key := txtest.NewKey(t)
 	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
