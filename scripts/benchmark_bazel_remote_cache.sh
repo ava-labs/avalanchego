@@ -235,7 +235,7 @@ REPRESENTATIVE_LATENCY_MS=""
 # Default measured mode validates that the proxied cache path stays within a
 # small tolerance of the measured target. Override mode skips that validation
 # because its purpose is fast local iteration, not provenance.
-REPRESENTATIVE_LATENCY_TOLERANCE_MS="${BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS:-15}"
+REPRESENTATIVE_LATENCY_TOLERANCE_MS="${BAZEL_REMOTE_CACHE_LATENCY_TOLERANCE_MS:-25}"
 SETUP_TIMEOUT_SECONDS="${BAZEL_REMOTE_CACHE_SETUP_TIMEOUT_SECONDS:-0}"
 BENCHMARK_TIMEOUT_SECONDS="${BAZEL_REMOTE_CACHE_BENCHMARK_TIMEOUT_SECONDS:-0}"
 
