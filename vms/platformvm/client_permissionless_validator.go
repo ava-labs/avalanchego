@@ -62,6 +62,16 @@ type ClientPermissionlessValidator struct {
 	DelegatorCount  *uint64
 	DelegatorWeight *uint64
 	Delegators      []ClientDelegator
+
+	// Auto-renewed validator config, if applicable.
+	AutoRenewedConfig *ClientAutoRenewedConfig
+}
+
+// ClientAutoRenewedConfig holds auto-renewed validator config fields.
+type ClientAutoRenewedConfig struct {
+	ValidatorAuthority       *ClientOwner
+	NextPeriod               uint64
+	AutoCompoundRewardShares uint32
 }
 
 // ClientDelegator is the repr. of a delegator sent over client
@@ -175,6 +185,11 @@ func getClientPrimaryOrSubnetValidator(apiValidator api.PermissionlessValidator)
 		}
 	}
 
+	autoRenewedConfig, err := apiAutoRenewedConfigToClient(apiValidator.AutoRenewedConfig)
+	if err != nil {
+		return ClientPermissionlessValidator{}, err
+	}
+
 	return ClientPermissionlessValidator{
 		ClientStaker:           apiStakerToClientStaker(apiValidator.Staker),
 		ValidationRewardOwner:  validationRewardOwner,
@@ -188,5 +203,23 @@ func getClientPrimaryOrSubnetValidator(apiValidator api.PermissionlessValidator)
 		DelegatorCount:         (*uint64)(apiValidator.DelegatorCount),
 		DelegatorWeight:        (*uint64)(apiValidator.DelegatorWeight),
 		Delegators:             clientDelegators,
+		AutoRenewedConfig:      autoRenewedConfig,
+	}, nil
+}
+
+func apiAutoRenewedConfigToClient(cfg *api.AutoRenewedConfig) (*ClientAutoRenewedConfig, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+
+	validatorAuthority, err := apiOwnerToClientOwner(cfg.ValidatorAuthority)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ClientAutoRenewedConfig{
+		ValidatorAuthority:       validatorAuthority,
+		NextPeriod:               uint64(cfg.NextPeriod),
+		AutoCompoundRewardShares: uint32(cfg.AutoCompoundRewardShares),
 	}, nil
 }

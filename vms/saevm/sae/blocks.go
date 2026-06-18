@@ -175,7 +175,7 @@ func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	if got, want := lastSettled.PostExecutionStateRoot(), b.SettledStateRoot(); got != want {
 		return fmt.Errorf("%w: got %#x ; want %#x", errSettledRootMismatch, got, want)
 	}
-	if got, want := lastSettled.NumberU64(), vm.hooks.SettledHeight(header); got != want {
+	if got, want := lastSettled.NumberU64(), vm.hooks.SettledBy(header).Height; got != want {
 		return fmt.Errorf("%w: got %d ; want %d", errSettledHeightMismatch, got, want)
 	}
 	if err := b.SetAncestors(parent, lastSettled); err != nil {
@@ -226,10 +226,7 @@ func (vm *VM) settledBlockFromDB(db ethdb.Reader, hash common.Hash, num uint64) 
 	if err != nil {
 		return nil, err
 	}
-	// Excess is only used for executing the next block, which can never
-	// be the case if `b` isn't actually the last synchronous block, so
-	// passing the same value for all is OK.
-	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
+	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.xdb); err != nil {
 		return nil, err
 	}
 	return b, nil

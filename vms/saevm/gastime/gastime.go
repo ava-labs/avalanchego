@@ -5,6 +5,7 @@
 package gastime
 
 import (
+	"errors"
 	"math"
 	"time"
 
@@ -42,25 +43,40 @@ type Time struct {
 // New returns a new [Time], derived from a [time.Time]. The consumption of
 // `target` * [TargetToRate] units of [gas.Gas] is equivalent to a tick of 1
 // second.
-func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time, error) {
+func New(at time.Time, target gas.Gas, startingPrice gas.Price, c GasPriceConfig) (*Time, error) {
+	target = clampTarget(target)
+	excess := excessForPrice(startingPrice, excessScalingFactor(target, c.TargetToExcessScaling))
+	return newFromExcess(at, target, excess, c)
+}
+
+func newFromExcess(at time.Time, target gas.Gas, excess gas.Gas, c GasPriceConfig) (*Time, error) {
+	pt := proxytime.Of[gas.Gas](at)
+	target = clampTarget(target)
+	pt.SetRate(rateOf(target))
+	return FromProxyTime(pt, excess, c)
+}
+
+var errZeroTarget = errors.New("zero target not allowed")
+
+// FromProxyTime returns a new [Time] derived from the provided [proxytime.Time].
+// The provided time MUST have a rate corresponding to the target.
+func FromProxyTime(tm *proxytime.Time[gas.Gas], excess gas.Gas, c GasPriceConfig) (*Time, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
 
-	tm := proxytime.Of[gas.Gas](at)
-	target = clampTarget(target)
-	tm.SetRate(rateOf(target))
-
-	// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
-	// meaningfully provide. We should instead take in startingPrice.
 	if c.StaticPricing {
-		startingExcess = 0
+		excess = 0
 	}
 
+	target := tm.Rate() / TargetToRate
+	if target == 0 {
+		return nil, errZeroTarget
+	}
 	t := &Time{
 		Time:   tm,
 		target: target,
-		excess: startingExcess,
+		excess: excess,
 		config: c,
 	}
 	t.enforceMinExcess()
@@ -120,12 +136,15 @@ func (tm *Time) Price() gas.Price {
 
 // excessScalingFactor returns the K variable of ACP-103/176, i.e.
 // [GasPriceConfig.TargetToExcessScaling] * T, capped at [math.MaxUint64].
-//
+func (tm *Time) excessScalingFactor() gas.Gas {
+	return excessScalingFactor(tm.target, tm.config.TargetToExcessScaling)
+}
+
 // TODO(StephenButtolph): Rather than capping this at MaxUint64, we should move
 // the evaluation of T * K into the exponential calculation. This would allow us
 // to never round any values during calculation of extreme inputs.
-func (tm *Time) excessScalingFactor() gas.Gas {
-	return intmath.BoundedMultiply(tm.config.TargetToExcessScaling, tm.target, math.MaxUint64)
+func excessScalingFactor(target gas.Gas, scalingFactor gas.Gas) gas.Gas {
+	return intmath.BoundedMultiply(target, scalingFactor, math.MaxUint64)
 }
 
 // BaseFee is equivalent to [Time.Price], returning the result as a uint256 for

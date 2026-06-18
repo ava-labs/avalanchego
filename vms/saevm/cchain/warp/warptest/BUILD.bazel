@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "warptest",
+    srcs = ["validators.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//snow/snowtest",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//utils",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/set",
+        "//vms/platformvm/warp",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])

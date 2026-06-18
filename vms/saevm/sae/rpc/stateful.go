@@ -27,14 +27,23 @@ import (
 var noopRelease tracers.StateReleaseFunc = func() {}
 
 // noEndOfBlockOps wraps [hook.Points] to suppress
-// [hook.Points.EndOfBlockOps], used by the tracer to skip end-of-block
-// operations during partial replay.
+// [hook.Points.EndOfBlockOps] and [hook.Points.AfterExecutingBlock], used by
+// the tracer to skip end-of-block operations during partial replay.
+//
+// TODO(StephenButtolph): Properly abstract execution to not rely on method
+// suppression. It is fragile and could result in accidentially modifying the
+// block state or even disk state during tracing.
 type noEndOfBlockOps struct {
 	hook.Points
 }
 
 // EndOfBlockOps always returns nil.
 func (noEndOfBlockOps) EndOfBlockOps(*types.Block) ([]hook.Op, error) { return nil, nil }
+
+// AfterExecutingBlock always returns nil.
+func (noEndOfBlockOps) AfterExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
+	return nil
+}
 
 func (b *backend) RPCEVMTimeout() time.Duration {
 	return b.config.EVMTimeout
@@ -195,7 +204,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		block,
 		b,
 		txIndex,
-		noEndOfBlockOps{Points: b.Hooks()},
+		noEndOfBlockOps{b.Hooks()},
 		b.ChainConfig(),
 		b.ChainContext(),
 		&saexec.NullReceiptStore{},

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -90,7 +91,7 @@ func TestSettlementInvariants(t *testing.T) {
 		assert.NoError(t, b.WaitUntilSettled(t.Context()), "WaitUntilSettled()")
 		assert.NoError(t, b.CheckInvariants(Settled), "CheckInvariants(Settled)")
 
-		rec := saetest.NewLogRecorder(logging.Warn)
+		rec := loggingtest.NewRecorder(logging.Warn)
 		b.log = rec
 		assertNumErrorLogs := func(t *testing.T, want int) {
 			t.Helper()
@@ -107,7 +108,7 @@ func TestSettlementInvariants(t *testing.T) {
 			t.FailNow()
 		}
 
-		want := []*saetest.LogRecord{
+		want := []*loggingtest.Record{
 			{
 				Level: logging.Error,
 				Msg:   getParentOfSettledErrMsg,
@@ -351,8 +352,7 @@ func TestLastToSettleAt(t *testing.T) {
 		require.Equal(t, proxytime.FractionalSecond[gas.Gas]{Numerator: 1, Denominator: 10}, tm.Fraction())
 		blocks[24].markExecutedForTests(t, db, xdb, tm)
 
-		partiallyExecutedAt := proxytime.New[gas.Gas](27, 100)
-		partiallyExecutedAt.Tick(1)
+		partiallyExecutedAt := proxytime.New[gas.Gas](27, 1, 100)
 		blocks[25].SetInterimExecutionTime(partiallyExecutedAt)
 
 		tests = append(tests, testCase{

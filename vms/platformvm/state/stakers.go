@@ -54,13 +54,11 @@ type CurrentStakers interface {
 	// SetStakingInfo updates the mutable staking info for nodeID on subnetID.
 	//
 	// This returns an error if the validator is not in the validator set.
-	// TODO should support sets in the same block that a validator is added.
 	SetStakingInfo(subnetID ids.ID, nodeID ids.NodeID, stakingInfo StakingInfo) error
 
 	// GetStakingInfo returns the mutable staking info for nodeID on subnetID.
 	//
 	// This returns an error if the validator is not in the validator set.
-	// TODO should support gets in the same block that a validator is added.
 	GetStakingInfo(subnetID ids.ID, nodeID ids.NodeID) (StakingInfo, error)
 
 	// GetCurrentDelegatorIterator returns the delegators associated with the
