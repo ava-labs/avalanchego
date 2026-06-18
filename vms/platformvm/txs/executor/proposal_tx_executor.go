@@ -9,6 +9,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/intmath"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -20,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/database"
 )
 
 const (
