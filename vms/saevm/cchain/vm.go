@@ -42,16 +42,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	avadb "github.com/ava-labs/avalanchego/database"
-	saewarp "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 )
-
-const warpSignatureCacheSize = 512
-
-var ethDBPrefix = []byte("ethdb")
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
@@ -79,6 +75,8 @@ type VM struct {
 	preference       atomic.Pointer[blocks.Block]
 	lastWaitForEvent utils.Atomic[time.Time]
 }
+
+var ethDBPrefix = []byte("ethdb")
 
 // Initialize initializes the VM.
 func (vm *VM) Initialize(
@@ -173,7 +171,7 @@ func (vm *VM) Initialize(
 	}
 
 	pendingTxs := txpool.NewPending()
-	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
+	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	vm.hooks = newHooks(
 		snowCtx,
 		vm.state,
@@ -268,7 +266,8 @@ func (vm *VM) Initialize(
 	})
 
 	snowCtx.Log.Info("warp handlers")
-	warpVerifier := saewarp.NewVerifier(&blockClient{vm: vm.VM}, warpStorage)
+	const warpSignatureCacheSize = 512
+	warpVerifier := warp.NewVerifier(&blockClient{vm: vm.VM}, warpStorage)
 	warpHandler := acp118.NewCachedHandler(
 		lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
 		warpVerifier,
@@ -445,12 +444,12 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// blockClient adapts [sae.VM] to the [saewarp.Backend] interface.
+// blockClient adapts [sae.VM] to the [warp.Backend] interface.
 type blockClient struct {
 	vm *sae.VM
 }
 
-var _ saewarp.Backend = (*blockClient)(nil)
+var _ warp.Backend = (*blockClient)(nil)
 
 func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
 	b, err := c.vm.GetBlock(ctx, blockID)
