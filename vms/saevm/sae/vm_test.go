@@ -1023,7 +1023,7 @@ func TestGossip(t *testing.T) {
 
 var errInjectedRead = errors.New("injected read failure")
 
-type corruptHeightIndex struct {
+type corruptableHeightIndex struct {
 	database.HeightIndex
 
 	mu        sync.RWMutex
@@ -1031,26 +1031,26 @@ type corruptHeightIndex struct {
 }
 
 // corrupt makes future reads of height fail with [errInjectedRead].
-func (f *corruptHeightIndex) corrupt(height uint64) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (c *corruptableHeightIndex) corrupt(height uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	f.corrupted.Add(height)
+	c.corrupted.Add(height)
 }
 
-func (f *corruptHeightIndex) Get(height uint64) ([]byte, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+func (c *corruptableHeightIndex) Get(height uint64) ([]byte, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-	if f.corrupted.Contains(height) {
+	if c.corrupted.Contains(height) {
 		return nil, errInjectedRead
 	}
-	return f.HeightIndex.Get(height)
+	return c.HeightIndex.Get(height)
 }
 
 func TestBlockSources(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	xdb := &corruptHeightIndex{HeightIndex: saetest.NewHeightIndexDB()}
+	xdb := &corruptableHeightIndex{HeightIndex: saetest.NewHeightIndexDB()}
 	ctx, sut := newSUT(t, 1, opt, withExecResultsDB(xdb))
 
 	genesis := sut.lastAcceptedBlock(t)
@@ -1074,7 +1074,7 @@ func TestBlockSources(t *testing.T) {
 		wantSourceOK    bool
 	}{
 		{"genesis", genesis, nil, true},
-		{"corrupted", corrupted, testerr.Is(errInjectedRead), true}, // sources don't read execution results
+		{"corrupted", corrupted, testerr.Is(errInjectedRead), true /*sources don't read execution results*/},
 		{"on_disk", onDisk, nil, true},
 		{"settled_in_memory", settled, nil, true},
 		{"unsettled", unsettled, nil, true},
