@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -51,14 +52,16 @@ import (
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
+const NumKeys = 5
+
 const (
-	numKeys = 5
 	// initialCChainFunding is the per-worker C-Chain top-up in wei (10 AVAX),
-	// enough for over 100k self-transfers at typical gas prices.
+	// enough for over 100k self-transfers at typical gas prices. A 4-hour
+	// Antithesis run peaked around 120 self-transfers per worker.
 	initialCChainFunding = 10 * params.Ether
 	cChainTransferAmount = 10_000 // wei
-	// txConfirmationTimeout bounds a single tx's confirmation across all nodes.
-	// Generous enough to tolerate Antithesis fault-injection slowdowns.
+	// txConfirmationTimeout bounds the total time spent waiting for a tx receipt
+	// across all nodes.
 	txConfirmationTimeout = 60 * time.Second
 )
 
@@ -92,14 +95,15 @@ func main() {
 
 	genesisWorkload := &workload{
 		id:        0,
-		log:       tests.NewDefaultLogger("worker 0"),
+		log:       tests.NewDefaultLogger(fmt.Sprintf("worker %d", 0)),
 		wallet:    wallet,
 		addrs:     set.Of(genesis.EWOQKey.Address()),
 		uris:      c.URIs,
 		cChainKey: genesis.EWOQKey.ToECDSA(),
 	}
+	require.NoError(genesisWorkload.initializeCChain(ctx, nil), "failed to initialize genesis C-Chain clients")
 
-	workloads := make([]*workload, numKeys)
+	workloads := make([]*workload, NumKeys)
 	workloads[0] = genesisWorkload
 
 	var (
@@ -108,7 +112,7 @@ func main() {
 		genesisXContext = genesisXBuilder.Context()
 		avaxAssetID     = genesisXContext.AVAXAssetID
 	)
-	for workerID := 1; workerID < numKeys; workerID++ {
+	for i := 1; i < NumKeys; i++ {
 		key, err := secp256k1.NewPrivateKey()
 		require.NoError(err, "failed to generate key")
 
@@ -138,7 +142,7 @@ func main() {
 
 		require.NoError(genesisWorkload.confirmXChainTx(ctx, baseTx), "failed to confirm initial funding X-chain baseTx")
 
-		uri := c.URIs[workerID%len(c.URIs)]
+		uri := c.URIs[i%len(c.URIs)]
 		kc := secp256k1fx.NewKeychain(key)
 		walletSyncStartTime := time.Now()
 		wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: uri})
@@ -146,19 +150,28 @@ func main() {
 			zap.Duration("duration", time.Since(walletSyncStartTime)),
 		)
 
-		workloads[workerID] = &workload{
-			id:        workerID,
-			log:       tests.NewDefaultLogger(fmt.Sprintf("worker %d", workerID)),
+		cChainKey, err := crypto.ToECDSA(crypto.Keccak256([]byte("C-Chain worker"), []byte(strconv.Itoa(i))))
+		require.NoError(err, "failed to generate C-Chain key")
+		require.NoError(
+			genesisWorkload.fundCChainAddress(ctx, crypto.PubkeyToAddress(cChainKey.PublicKey), initialCChainFunding),
+			"failed to fund C-Chain worker",
+		)
+
+		worker := &workload{
+			id:        i,
+			log:       tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
 			wallet:    wallet,
 			addrs:     set.Of(addr),
 			uris:      c.URIs,
-			cChainKey: newFundedCChainKey(ctx, tc, workerID, genesisWorkload),
+			cChainKey: cChainKey,
 		}
+		require.NoError(worker.initializeCChain(ctx, genesisWorkload.cChainID), "failed to initialize C-Chain clients")
+		workloads[i] = worker
 	}
 
 	lifecycle.SetupComplete(map[string]any{
 		"msg":        "initialized workers",
-		"numWorkers": numKeys,
+		"numWorkers": NumKeys,
 	})
 
 	for _, w := range workloads[1:] {
@@ -191,30 +204,35 @@ func (w *workload) newTestContext(ctx context.Context) *tests.SimpleTestContext 
 	)
 }
 
-func (w *workload) cChainClient(uri string) (*ethclient.Client, error) {
-	if w.cChainClients == nil {
-		w.cChainClients = make(map[string]*ethclient.Client)
+func (w *workload) initializeCChain(ctx context.Context, chainID *big.Int) error {
+	w.cChainClients = make(map[string]*ethclient.Client, len(w.uris))
+	for _, uri := range w.uris {
+		client, err := ethclient.Dial(cChainRPCURI(uri))
+		if err != nil {
+			return fmt.Errorf("failed to dial C-Chain RPC on %s: %w", uri, err)
+		}
+		w.cChainClients[uri] = client
 	}
+
+	if chainID == nil {
+		client, err := w.cChainClient(w.uris[0])
+		if err != nil {
+			return err
+		}
+		chainID, err = client.ChainID(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to fetch C-Chain chain ID: %w", err)
+		}
+	}
+	w.cChainID = new(big.Int).Set(chainID)
+	return nil
+}
+
+func (w *workload) cChainClient(uri string) (*ethclient.Client, error) {
 	if client, ok := w.cChainClients[uri]; ok {
 		return client, nil
 	}
-	client, err := ethclient.Dial(cChainRPCURI(uri))
-	if err != nil {
-		return nil, err
-	}
-	w.cChainClients[uri] = client
-	return client, nil
-}
-
-func (w *workload) fetchCChainID(ctx context.Context, client *ethclient.Client) (*big.Int, error) {
-	if w.cChainID == nil {
-		chainID, err := client.ChainID(ctx)
-		if err != nil {
-			return nil, err
-		}
-		w.cChainID = chainID
-	}
-	return w.cChainID, nil
+	return nil, fmt.Errorf("missing C-Chain RPC client for %s", uri)
 }
 
 func (w *workload) run(ctx context.Context) {
@@ -886,19 +904,6 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 	)
 }
 
-func newFundedCChainKey(ctx context.Context, tc *tests.SimpleTestContext, workerID int, funder *workload) *ecdsa.PrivateKey {
-	require := require.New(tc)
-
-	key, err := crypto.ToECDSA(crypto.Keccak256([]byte("C-Chain worker"), []byte(strconv.Itoa(workerID))))
-	require.NoError(err, "failed to generate C-Chain key")
-
-	require.NoError(
-		funder.fundCChainAddress(ctx, crypto.PubkeyToAddress(key.PublicKey), initialCChainFunding),
-		"failed to fund C-Chain worker",
-	)
-	return key
-}
-
 func cChainRPCURI(nodeURI string) string {
 	return nodeURI + "/ext/bc/C/rpc"
 }
@@ -911,7 +916,7 @@ func (w *workload) issueCChainTransfer(ctx context.Context) {
 	uri := w.uris[w.id%len(w.uris)]
 	client, err := w.cChainClient(uri)
 	if err != nil {
-		w.log.Warn("failed to dial C-Chain RPC", zap.String("uri", uri), zap.Error(err))
+		w.log.Warn("failed to get C-Chain RPC client", zap.String("uri", uri), zap.Error(err))
 		return
 	}
 
@@ -949,7 +954,7 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 	for _, uri := range w.uris {
 		client, err := w.cChainClient(uri)
 		if err != nil {
-			return fmt.Errorf("failed to dial C-Chain RPC on %s: %w", uri, err)
+			return fmt.Errorf("failed to get C-Chain RPC client for %s: %w", uri, err)
 		}
 
 		receipt, err := bind.WaitMined(ctx, client, tx)
@@ -958,6 +963,10 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 		}
 
 		if receipt.Status != types.ReceiptStatusSuccessful {
+			// A failed receipt should be unreachable for this workload. These are
+			// funded EOA self-transfers with the accepted nonce, no calldata, and
+			// the intrinsic transfer gas limit, so once included they have no
+			// contract/revert path and are expected to succeed.
 			assert.Unreachable("C-Chain transaction failed", map[string]any{
 				"worker": w.id,
 				"uri":    uri,
@@ -986,9 +995,8 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, to ethcommon.Address, value *big.Int) (*types.Transaction, error) {
 	senderAddr := crypto.PubkeyToAddress(w.cChainKey.PublicKey)
 
-	chainID, err := w.fetchCChainID(ctx, client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch C-Chain chain ID: %w", err)
+	if w.cChainID == nil {
+		return nil, errors.New("missing C-Chain chain ID")
 	}
 	acceptedNonce, err := client.AcceptedNonceAt(ctx, senderAddr)
 	if err != nil {
@@ -1007,6 +1015,7 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 		new(big.Int).Mul(estimatedBaseFee, big.NewInt(2)),
 	)
 
+	chainID := new(big.Int).Set(w.cChainID)
 	signer := types.LatestSignerForChainID(chainID)
 	tx, err := types.SignNewTx(w.cChainKey, signer, &types.DynamicFeeTx{
 		ChainID:   chainID,
@@ -1031,7 +1040,7 @@ func (w *workload) fundCChainAddress(ctx context.Context, recipientAddr ethcommo
 	uri := w.uris[0]
 	client, err := w.cChainClient(uri)
 	if err != nil {
-		return fmt.Errorf("failed to dial C-Chain RPC: %w", err)
+		return fmt.Errorf("failed to get C-Chain RPC client: %w", err)
 	}
 
 	tx, err := w.sendCChainTx(ctx, client, recipientAddr, new(big.Int).SetUint64(amount))
