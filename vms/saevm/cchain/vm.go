@@ -175,7 +175,6 @@ func (vm *VM) Initialize(
 		pendingTxs,
 		warpStorage,
 	)
-
 	mempoolConfig := legacypool.DefaultConfig
 	// Treat all transactions equally regardless of submission source — no
 	// preferential admission or pricing for locally-submitted txs.
@@ -267,7 +266,7 @@ func (vm *VM) Initialize(
 		warpVerifier,
 		snowCtx.WarpSigner,
 	)
-	if err := vm.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
+	if err := vm.AddHandler(acp118.HandlerID, warpHandler); err != nil {
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
 
@@ -275,7 +274,6 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-// parseGenesis decodes the genesis bytes into a [*core.Genesis] and populates
 var (
 	// errInvalidBlockVersion is returned by [VM.ParseBlock] when a block's
 	// BlockBodyExtra carries a Version other than 0, the only supported version.
@@ -352,9 +350,6 @@ func (vm *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context)
 	return vm.VM.SetPreference(ctx, id, bCtx)
 }
 
-// Prevent busy looping when the chain is more advanced than the mempool.
-const waitForEventDelay = 100 * time.Millisecond
-
 var errNoPreference = errors.New("no preferred block")
 
 // WaitForEvent blocks until the SAE VM emits an event or the cross-chain
@@ -367,8 +362,9 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 			vm.lastWaitForEvent.Set(time.Now())
 		}()
 
+		const minimumDelay = 100 * time.Millisecond
 		sinceLastCall := time.Since(vm.lastWaitForEvent.Get())
-		timeToWait := waitForEventDelay - sinceLastCall
+		timeToWait := minimumDelay - sinceLastCall
 		select {
 		case <-ctx.Done():
 			return 0, ctx.Err()
