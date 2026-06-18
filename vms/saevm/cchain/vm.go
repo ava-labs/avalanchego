@@ -8,7 +8,6 @@ package cchain
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -27,8 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
@@ -49,8 +46,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	avadb "github.com/ava-labs/avalanchego/database"
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	saewarp "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 )
 
@@ -109,13 +104,19 @@ func (vm *VM) Initialize(
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
 	trieDBConfig := triedb.HashDefaults
-	trieDB := triedb.NewDatabase(ethDB, trieDBConfig)
 
 	snowCtx.Log.Info("parsing genesis")
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
+
+	snowCtx.Log.Info("setting up genesis")
+	genesisBlock, err := genesis.setup(ethDB, trieDBConfig)
+	if err != nil {
+		return fmt.Errorf("setting up genesis block: %w", err)
+	}
+	chainConfig := genesis.Config
 
 	snowCtx.Log.Info("establishing last synchronous block")
 	var lastSync *types.Block
@@ -127,19 +128,14 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("decoding last sync block: %w", err)
 		}
 	case errors.Is(err, avadb.ErrNotFound):
-		lastSync = genesis.ToBlock()
+		lastSync = genesisBlock
 	default:
 		return fmt.Errorf("reading last sync block: %w", err)
 	}
-
-	snowCtx.Log.Info("setting up genesis",
+	snowCtx.Log.Info("established last synchronous block",
 		zap.Stringer("lastID", ids.ID(lastSync.Hash())),
 		zap.Uint64("lastHeight", lastSync.NumberU64()),
 	)
-	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis, lastSync.Hash(), false)
-	if err != nil {
-		return fmt.Errorf("setting up genesis block: %w", err)
-	}
 
 	snowCtx.Log.Info("constructing cross-chain state")
 	vm.state, err = state.New(snowCtx, avaDB)
@@ -287,37 +283,6 @@ func (vm *VM) Initialize(
 }
 
 // parseGenesis decodes the genesis bytes into a [*core.Genesis] and populates
-// the Avalanche-specific config extras (network upgrades, Warp precompile
-// schedule, Ethereum upgrade alignment).
-func parseGenesis(ctx *snow.Context, b []byte) (*core.Genesis, error) {
-	g := new(core.Genesis)
-	if err := json.Unmarshal(b, g); err != nil {
-		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
-	}
-
-	configExtra := corethparams.GetExtra(g.Config)
-	configExtra.AvalancheContext = extras.AvalancheContext{
-		SnowCtx: ctx,
-	}
-	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
-
-	// If Durango is scheduled, schedule the Warp Precompile at the same time.
-	if configExtra.DurangoBlockTimestamp != nil {
-		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{
-			Config: warpcontract.NewDefaultConfig(configExtra.DurangoBlockTimestamp),
-		})
-	}
-	if err := configExtra.Verify(); err != nil {
-		return nil, fmt.Errorf("invalid chain config: %w", err)
-	}
-
-	// Align the Ethereum upgrades to the Avalanche upgrades.
-	if err := corethparams.SetEthUpgrades(g.Config); err != nil {
-		return nil, fmt.Errorf("aligning Ethereum upgrades: %w", err)
-	}
-	return g, nil
-}
-
 var (
 	// errInvalidBlockVersion is returned by [VM.ParseBlock] when a block's
 	// BlockBodyExtra carries a Version other than 0, the only supported version.
