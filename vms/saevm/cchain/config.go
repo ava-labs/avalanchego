@@ -11,11 +11,10 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-
-	avawarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-type Config struct {
+type config struct {
 	// GasTarget is the target gas per second that this node will attempt to use
 	// when creating blocks. If this config is not specified, the node will
 	// default to use the parent block's target gas per second.
@@ -36,13 +35,15 @@ type Config struct {
 	Pruning bool `json:"pruning-enabled"`
 
 	// WarpOffChainMessages encodes off-chain messages (unrelated to any
-	// on-chain event ie. block or AddressedCall) that the node should be
-	// willing to sign.
+	// on-chain event ie. block or AddressedCall) that the node is willing to
+	// sign.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
 }
 
-func ParseConfig(b []byte) (Config, error) {
-	c := Config{
+// parseConfig parses b as a JSON-encoded [config]. This should be preferred
+// over [json.Unmarshal] because it correctly populates default values.
+func parseConfig(b []byte) (config, error) {
+	c := config{
 		Pruning: true,
 	}
 	if len(b) == 0 {
@@ -50,17 +51,19 @@ func ParseConfig(b []byte) (Config, error) {
 	}
 
 	if err := json.Unmarshal(b, &c); err != nil {
-		return Config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
 	}
 	return c, nil
 }
 
 var errParsingWarpMessage = errors.New("parsing warp message")
 
-func (c Config) WarpMessages() ([]*avawarp.UnsignedMessage, error) {
-	msgs := make([]*avawarp.UnsignedMessage, len(c.WarpOffChainMessages))
+// WarpMessages parses and returns the messages encoded in
+// [config.WarpOffChainMessages].
+func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
+	msgs := make([]*warp.UnsignedMessage, len(c.WarpOffChainMessages))
 	for i, bytes := range c.WarpOffChainMessages {
-		msg, err := avawarp.ParseUnsignedMessage(bytes)
+		msg, err := warp.ParseUnsignedMessage(bytes)
 		if err != nil {
 			return nil, fmt.Errorf("%w: at index %d: %w", errParsingWarpMessage, i, err)
 		}

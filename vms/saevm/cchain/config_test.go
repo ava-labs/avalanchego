@@ -52,7 +52,7 @@ func TestConfig_WarpMessages(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var c Config
+			var c config
 			for _, msgBytes := range test.bytes {
 				c.WarpOffChainMessages = append(c.WarpOffChainMessages, msgBytes)
 			}

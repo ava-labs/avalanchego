@@ -147,7 +147,7 @@ func (vm *VM) Initialize(
 	})
 
 	snowCtx.Log.Info("parsing user config")
-	userConfig, err := ParseConfig(configBytes)
+	userConfig, err := parseConfig(configBytes)
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
