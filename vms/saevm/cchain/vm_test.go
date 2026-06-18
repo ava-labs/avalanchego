@@ -49,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -87,6 +86,7 @@ type (
 		genesis    core.Genesis
 		nodeID     ids.NodeID
 		validators set.Set[ids.NodeID]
+		now        func() time.Time
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -110,6 +110,14 @@ func withNodeID(id ids.NodeID) sutOption {
 func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.validators = vdrs
+	})
+}
+
+// withTime fixes the SUT's clock at now, controlling the block-building and
+// consensus time of both the cchain hooks and the underlying [sae.VM].
+func withTime(now time.Time) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.now = func() time.Time { return now }
 	})
 }
 
@@ -139,6 +147,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			nodeID: ids.GenerateTestNodeID(),
 		}, opts...)
 	)
+	// A nil now leaves [VM.Initialize] to default the clock to [time.Now].
+	vm.now = cfg.now
 
 	// The VM and shared memory MUST share an underlying database so that
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
@@ -865,7 +875,31 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	require.NoError(t, err, "vm.ParseBlock(malformed block)")
 
 	// When VerifyBlock rebuilds the parsed block, it recomputes the header
-	// timestamps, which makes the hash check fail.
+	// timestamps, which makes the hash check fail. sae's hash-mismatch error is
+	// unexported, so match on its text rather than the sentinel.
 	err = sut.VerifyBlock(ctx, nil, parsed)
-	require.ErrorIs(t, err, sae.ErrHashMismatch, "vm.VerifyBlock(malformed block)")
+	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
+}
+
+// Verifies a built block splits its timestamp: seconds in Header.Time, the full
+// millisecond instant in TimeMilliseconds.
+func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
+	key := txtest.NewKey(t)
+	// A non-zero sub-second component (123ms) proves milliseconds survive the
+	// round-trip.
+	const (
+		wantMilliseconds = 1_700_000_000_123
+		wantSeconds      = wantMilliseconds / 1000
+	)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), withTime(time.UnixMilli(wantMilliseconds)))
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+	// VerifyBlock rebuilds via BlockTime(header) and requires a matching hash, so
+	// the decode round-trip is covered here without asserting BlockTime directly.
+	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+
+	hdr := blk.Header()
+	require.Equal(t, uint64(wantSeconds), hdr.Time, "built block Header.Time (seconds)")
+	require.Equal(t, uint64(wantMilliseconds), customtypes.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
 }

@@ -111,11 +111,7 @@ func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Bloc
 var (
 	errUnknownParent     = errors.New("unknown parent")
 	errBlockHeightTooLow = errors.New("block height too low")
-	// ErrHashMismatch is returned by [VM.VerifyBlock] when the block rebuilt
-	// from a received header does not hash to the received block. This rejects
-	// malformed blocks, e.g. one whose Time and TimeMilliseconds disagree, since
-	// [hook.BlockBuilder.BuildHeader] only ever emits consistent headers.
-	ErrHashMismatch = errors.New("hash mismatch")
+	errHashMismatch      = errors.New("hash mismatch")
 )
 
 // VerifyBlock validates the block and, if successful, populates its ancestry.
@@ -147,7 +143,7 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 			zap.Reflect("block", b.Header()),
 			zap.Reflect("rebuilt", rebuilt.Header()),
 		)
-		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", ErrHashMismatch, reH, verH)
+		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", errHashMismatch, reH, verH)
 	}
 	if err := b.CopyAncestorsFrom(rebuilt); err != nil {
 		return err

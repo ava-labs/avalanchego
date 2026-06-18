@@ -4,93 +4,32 @@
 package cchain
 
 import (
-	"math/big"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 )
 
+// When TimeMilliseconds is unset, BlockTime falls back to Header.Time's seconds.
+// The VM always sets TimeMilliseconds, so this legacy decode path is only
+// reachable by exercising the hook directly.
 func TestBlockTime(t *testing.T) {
-	const (
-		testTimestampSeconds      uint64 = 1_700_000_000
-		testTimestampMilliseconds int64  = 1_700_000_000_123
-		testFallbackMilliseconds  int64  = 1_700_000_000_000
-		// Seconds component disagrees with testTimestampSeconds, but the
-		// sub-second component (123ms) matches testTimestampMilliseconds.
-		testMismatchedMilliseconds int64 = 1_800_000_000_123
-	)
+	const testTimestampSeconds uint64 = 1_700_000_000
 
-	tests := []struct {
-		name   string
-		header *types.Header
-		wantMS int64
-	}{
-		{
-			name: "reads_milliseconds_from_extra",
-			header: customtypes.WithHeaderExtra(
-				&types.Header{Time: testTimestampSeconds},
-				&customtypes.HeaderExtra{
-					TimeMilliseconds: utils.PointerTo(uint64(testTimestampMilliseconds)),
-				},
-			),
-			wantMS: testTimestampMilliseconds,
-		},
-		{
-			name:   "falls_back_to_seconds_when_unset",
-			header: &types.Header{Time: testTimestampSeconds},
-			wantMS: testFallbackMilliseconds,
-		},
-		{
-			// A malicious peer may send a header whose TimeMilliseconds
-			// disagrees with Time. BlockTime must still satisfy the documented
-			// invariant that the returned time's Unix() matches Time, keeping
-			// only the sub-second component from TimeMilliseconds.
-			name: "anchors_seconds_to_header_time_when_mismatched",
-			header: customtypes.WithHeaderExtra(
-				&types.Header{Time: testTimestampSeconds},
-				&customtypes.HeaderExtra{
-					TimeMilliseconds: utils.PointerTo(uint64(testMismatchedMilliseconds)),
-				},
-			),
-			wantMS: testTimestampMilliseconds,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := (&hooks{}).BlockTime(tt.header)
-			require.Equal(t, time.UnixMilli(tt.wantMS), got, "hooks.BlockTime(%d)", tt.wantMS)
-			require.Equal(t, tt.wantMS, got.UnixMilli(), "hooks.BlockTime(%d).UnixMilli()", tt.wantMS)
-			// Documented invariant: BlockTime(h).Unix() == h.Time.
-			require.Equal(t, tt.wantMS/1000, got.Unix(), "hooks.BlockTime(%d).Unix()", tt.wantMS)
-		})
-	}
-}
-
-func TestBuildHeaderBlockTimeRoundTrip(t *testing.T) {
-	want := time.UnixMilli(1_700_000_000_123)
-	b := &builder{
-		now: func() time.Time {
-			return want
-		},
-	}
-
-	header, err := b.BuildHeader(&types.Header{Number: big.NewInt(1)})
-	require.NoError(t, err, "builder.BuildHeader(now=%d)", want.UnixMilli())
+	header := &types.Header{Time: testTimestampSeconds}
 
 	got := (&hooks{}).BlockTime(header)
-	require.Equal(t, want.UnixMilli(), got.UnixMilli(), "hooks.BlockTime(builder.BuildHeader(now=%d))", want.UnixMilli())
+	require.Equal(t, int64(testTimestampSeconds)*1000, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
+	// Documented invariant: BlockTime(h).Unix() == h.Time.
+	require.Equal(t, int64(testTimestampSeconds), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
 }
 
 func TestAncestorInputIDs(t *testing.T) {

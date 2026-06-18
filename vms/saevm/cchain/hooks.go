@@ -50,6 +50,7 @@ func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
 	pool *txpool.Pending,
+	now func() time.Time,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -69,7 +70,7 @@ func newHooks(
 	return &hooks{
 		builder{
 			ctx,
-			time.Now,
+			now,
 			poolTxs,
 		},
 		state,
