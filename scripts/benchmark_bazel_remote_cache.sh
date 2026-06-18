@@ -1148,6 +1148,26 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
     http_seed_time="${http_cold_time}"
   fi
 
+  if [[ "${SKIP_TEST_IMPACTED}" != "1" ]]; then
+    impacted_mode="normal"
+    if [[ "${TEST_BEST_CASE_ONLY}" == "1" ]]; then
+      impacted_mode="empty"
+    fi
+    mapfile -t impacted_times < <(run_impacted_test_pair \
+      "${benchmark_index}" \
+      "${test_spec}" \
+      "${impacted_mode}" \
+      "${proxied_http_remote_cache_url}" \
+      "${selector_output_base}" \
+      "${LOG_DIR}/benchmark-${benchmark_index}-impacted-selector.log" \
+      "${impacted_execution_output_base}" \
+      "${LOG_DIR}/benchmark-${benchmark_index}-impacted-execution.log")
+    impacted_selector_time="${impacted_times[0]}"
+    impacted_execution_time="${impacted_times[1]}"
+    impacted_target_count="${impacted_times[2]}"
+    impacted_total_time="$(add_times "${impacted_selector_time}" "${impacted_execution_time}")"
+  fi
+
   stop_bazel_remote
 
   if [[ "${TEST_INCLUDE_GRPC}" == "1" ]]; then
@@ -1175,26 +1195,6 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
     grpc_warm_time="${grpc_cache_times[1]}"
 
     stop_bazel_remote
-  fi
-
-  if [[ "${SKIP_TEST_IMPACTED}" != "1" ]]; then
-    impacted_mode="normal"
-    if [[ "${TEST_BEST_CASE_ONLY}" == "1" ]]; then
-      impacted_mode="empty"
-    fi
-    mapfile -t impacted_times < <(run_impacted_test_pair \
-      "${benchmark_index}" \
-      "${test_spec}" \
-      "${impacted_mode}" \
-      "${proxied_http_remote_cache_url}" \
-      "${selector_output_base}" \
-      "${LOG_DIR}/benchmark-${benchmark_index}-impacted-selector.log" \
-      "${impacted_execution_output_base}" \
-      "${LOG_DIR}/benchmark-${benchmark_index}-impacted-execution.log")
-    impacted_selector_time="${impacted_times[0]}"
-    impacted_execution_time="${impacted_times[1]}"
-    impacted_target_count="${impacted_times[2]}"
-    impacted_total_time="$(add_times "${impacted_selector_time}" "${impacted_execution_time}")"
   fi
 
   TEST_RESULT_LABELS+=("${label}")
