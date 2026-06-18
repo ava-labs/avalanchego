@@ -342,9 +342,9 @@ func (*builder) BuildBlock(
 	// TODO(StephenButtolph): Encode warp predicate results in the header.
 	_ = blockCtx
 
-	// Encode the settled block marker into the header so that [hooks.SettledBy]
-	// can recover it from the header alone. gas.Gas is a uint64 alias; the
-	// HeaderExtra stores plain uint64 to keep coreth ignorant of SAE types.
+	// Encode the settled block marker into the header so [hooks.SettledBy] can
+	// recover it. HeaderExtra stores plain uint64 to keep coreth ignorant of
+	// SAE types.
 	gasNumerator := uint64(settled.GasNumerator)
 	excess := uint64(settled.Excess)
 	he := customtypes.GetHeaderExtra(header)

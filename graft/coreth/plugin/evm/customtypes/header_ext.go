@@ -44,10 +44,6 @@ type HeaderExtra struct {
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
 
-	// SettledHeight, SettledGasUnix, SettledGasNumerator and SettledExcess
-	// encode the SAE settled block marker (see vms/saevm/hook.Settled). They
-	// are set together by the SAE C-Chain producer and are nil on legacy /
-	// non-SAE headers.
 	SettledHeight       *uint64
 	SettledGasUnix      *uint64
 	SettledGasNumerator *uint64
@@ -279,8 +275,6 @@ type HeaderSerializable struct {
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
 
-	// SettledHeight, SettledGasUnix, SettledGasNumerator and SettledExcess
-	// encode the SAE settled block marker and are ignored in legacy headers.
 	SettledHeight       *uint64 `json:"settledHeight"       rlp:"optional"`
 	SettledGasUnix      *uint64 `json:"settledGasUnix"      rlp:"optional"`
 	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
