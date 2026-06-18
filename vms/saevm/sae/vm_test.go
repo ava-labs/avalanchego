@@ -446,10 +446,6 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 	return s.runConsensusLoopOnPreference(tb, s.lastAcceptedBlock(tb), txs...)
 }
 
-// escrowRecipient is the address whose balance is credited by
-// [SUT.depositToEscrow].
-var escrowRecipient = common.Address{'r', 'e', 'c', 'v'}
-
 // deployEscrow signs and runs a deploy tx for the escrow contract from
 // s.wallet[0], in its own consensus block, returning the block and the
 // deployed contract address.
@@ -468,9 +464,9 @@ func (s *SUT) deployEscrow(tb testing.TB) (deployBlock *blocks.Block, escrowAddr
 }
 
 // depositToEscrow signs and runs a tx depositing depositVal to
-// balances[escrowRecipient] on the escrow contract at escrowAddr, in its own
+// balances[recipient] on the escrow contract at escrowAddr, in its own
 // consensus block, returning the block.
-func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr common.Address, depositVal *big.Int) (depositBlock *blocks.Block) {
+func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) (depositBlock *blocks.Block) {
 	tb.Helper()
 	ctx := s.context(tb)
 
@@ -478,7 +474,7 @@ func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr common.Address, depositV
 		To:       &escrowAddr,
 		Gas:      1e6,
 		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(escrowRecipient),
+		Data:     escrow.CallDataToDeposit(recipient),
 		Value:    depositVal,
 	}))
 	require.NoErrorf(tb, depositBlock.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", depositBlock)

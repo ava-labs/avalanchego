@@ -97,8 +97,9 @@ func TestDebugTrace(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
 	const escrowDepositVal = 42
+	recipient := common.Address{'r', 'e', 'c', 'v'}
 	deployBlock, escrowAddr := sut.deployEscrow(t)
-	depositBlock := sut.depositToEscrow(t, escrowAddr, big.NewInt(escrowDepositVal))
+	depositBlock := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 	deployTxHash := deployBlock.Transactions()[0].Hash()
 	depositTxHash := depositBlock.Transactions()[0].Hash()
 
@@ -138,7 +139,7 @@ func TestDebugTrace(t *testing.T) {
 					Op:    vm.LOG1.String(),
 					Depth: 1,
 					Stack: utils.PointerTo([]string{
-						escrow.DepositEvent(escrowRecipient, uint256.NewInt(escrowDepositVal)).Topics[0].String(),
+						escrow.DepositEvent(recipient, uint256.NewInt(escrowDepositVal)).Topics[0].String(),
 						"0x40", "0x80", // arbitrary memory locations selected by Solidity
 					}),
 				}},
@@ -202,12 +203,13 @@ func TestStatefulRPCs(t *testing.T) {
 	ctx, sut := newSUT(t, 1, opt)
 
 	const escrowDepositVal = 42
+	recipient := common.Address{'r', 'e', 'c', 'v'}
 	_, escrowAddr := sut.deployEscrow(t)
-	b := sut.depositToEscrow(t, escrowAddr, big.NewInt(escrowDepositVal))
+	b := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 	callMsg := ethereum.CallMsg{
 		From: sut.wallet.Addresses()[0],
 		To:   &escrowAddr,
-		Data: escrow.CallDataForBalance(escrowRecipient),
+		Data: escrow.CallDataForBalance(recipient),
 	}
 
 	vmTime.advanceToSettle(ctx, t, b)
@@ -218,7 +220,7 @@ func TestStatefulRPCs(t *testing.T) {
 	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
 	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
 
-	storageKey := escrowBalanceStorageKey(escrowRecipient)
+	storageKey := escrowBalanceStorageKey(recipient)
 	storageKeyHex := storageKey.Hex()
 
 	gc := gethclient.New(sut.rpcClient)
@@ -295,11 +297,12 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 	gc := gethclient.New(sut.rpcClient)
 
+	recipient := common.Address{'r', 'e', 'c', 'v'}
 	_, escrowAddr := sut.deployEscrow(t)
 	callMsg := ethereum.CallMsg{
 		From: sut.wallet.Addresses()[0],
 		To:   &escrowAddr,
-		Data: escrow.CallDataForBalance(escrowRecipient),
+		Data: escrow.CallDataForBalance(recipient),
 	}
 	requireCallSucceedsWithGas := func(t *testing.T, msg ethereum.CallMsg, gas uint64) {
 		t.Helper()
@@ -322,7 +325,7 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 
 		wantAccessList := &types.AccessList{{
 			Address:     escrowAddr,
-			StorageKeys: []common.Hash{escrowBalanceStorageKey(escrowRecipient)},
+			StorageKeys: []common.Hash{escrowBalanceStorageKey(recipient)},
 		}}
 		require.Equal(t, wantAccessList, accessList, "CreateAccessList() access list")
 
