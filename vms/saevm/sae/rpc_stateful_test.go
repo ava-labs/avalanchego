@@ -16,8 +16,11 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/ethclient/gethclient"
+	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -215,12 +218,7 @@ func TestStatefulRPCs(t *testing.T) {
 	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
 	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
 
-	// Storage key for balances[escrowRecipient] at mapping slot 0:
-	// keccak256(abi.encode(address, uint256(0)))
-	storageKey := crypto.Keccak256Hash(
-		common.LeftPadBytes(escrowRecipient.Bytes(), 32),
-		common.Hash{}.Bytes(),
-	)
+	storageKey := escrowBalanceStorageKey(escrowRecipient)
 	storageKeyHex := storageKey.Hex()
 
 	gc := gethclient.New(sut.rpcClient)
@@ -275,13 +273,16 @@ func TestStatefulRPCs(t *testing.T) {
 				got, err := gc.GetProof(ctx, escrowAddr, []string{storageKeyHex}, blockNum)
 				require.NoError(t, err, "GetProof()")
 				require.NotNil(t, got, "GetProof() result")
-
-				assert.NotEmpty(t, got.AccountProof, "GetProof() accountProof")
 				require.Zero(t, wantBalance.Cmp(got.Balance), "GetProof() balance: want %d, got %s", wantBalance, got.Balance)
-
 				require.Len(t, got.StorageProof, 1, "GetProof() storageProof length")
-				assert.NotEmpty(t, got.StorageProof[0].Proof, "GetProof() storageProof[0].Proof")
 				require.Zero(t, wantStorageValue.Cmp(got.StorageProof[0].Value), "GetProof() storageProof[0].Value: want %d, got %s", wantStorageValue, got.StorageProof[0].Value)
+
+				account := requireProvenAccount(t, b.PostExecutionStateRoot(), escrowAddr, got.AccountProof)
+				assert.Zero(t, wantBalance.Cmp(account.Balance.ToBig()), "proven account balance")
+				assert.Equal(t, got.StorageHash, account.Root, "proven account storage root")
+
+				provenValue := requireProvenStorageValue(t, account.Root, storageKey, got.StorageProof[0].Proof)
+				assert.Zero(t, wantStorageValue.Cmp(provenValue), "proven storage value: want %d, got %s", wantStorageValue, provenValue)
 			})
 		})
 	}
@@ -292,6 +293,7 @@ func TestStatefulRPCs(t *testing.T) {
 // the latest block: eth_estimateGas and eth_createAccessList.
 func TestStatefulRPCsLatestOnly(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
+	gc := gethclient.New(sut.rpcClient)
 
 	_, escrowAddr := sut.deployEscrow(t)
 	callMsg := ethereum.CallMsg{
@@ -299,41 +301,75 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 		To:   &escrowAddr,
 		Data: escrow.CallDataForBalance(escrowRecipient),
 	}
+	requireCallSucceedsWithGas := func(t *testing.T, msg ethereum.CallMsg, gas uint64) {
+		t.Helper()
 
-	storageKey := crypto.Keccak256Hash(
-		common.LeftPadBytes(escrowRecipient.Bytes(), 32),
-		common.Hash{}.Bytes(),
-	)
+		msg.Gas = gas
+		_, err := sut.CallContract(ctx, msg, nil)
+		require.NoErrorf(t, err, "CallContract() with gas %d", gas)
+	}
 
 	t.Run("eth_estimateGas", func(t *testing.T) {
 		gas, err := sut.EstimateGas(ctx, callMsg)
 		require.NoError(t, err, "EstimateGas()")
-
-		// Verify the reported gas is sufficient to execute the call.
-		msg := callMsg
-		msg.Gas = gas
-		_, err = sut.CallContract(ctx, msg, nil)
-		require.NoErrorf(t, err, "CallContract() with EstimateGas() result (%d)", gas)
+		requireCallSucceedsWithGas(t, callMsg, gas)
 	})
 
 	t.Run("eth_createAccessList", func(t *testing.T) {
-		gc := gethclient.New(sut.rpcClient)
-		al, gas, errMsg, err := gc.CreateAccessList(ctx, callMsg)
+		accessList, gas, errMsg, err := gc.CreateAccessList(ctx, callMsg)
 		require.NoError(t, err, "CreateAccessList()")
-		assert.Empty(t, errMsg, "CreateAccessList() error message")
+		require.Empty(t, errMsg, "CreateAccessList() error message")
 
-		wantAccessList := types.AccessList{{
+		wantAccessList := &types.AccessList{{
 			Address:     escrowAddr,
-			StorageKeys: []common.Hash{storageKey},
+			StorageKeys: []common.Hash{escrowBalanceStorageKey(escrowRecipient)},
 		}}
-		assert.Equal(t, &wantAccessList, al, "CreateAccessList() access list")
+		require.Equal(t, wantAccessList, accessList, "CreateAccessList() access list")
 
-		// Verify the reported gas is sufficient to execute the call with the returned
-		// access list applied.
 		msg := callMsg
-		msg.AccessList = *al
-		msg.Gas = gas
-		_, err = sut.CallContract(ctx, msg, nil)
-		require.NoErrorf(t, err, "CallContract() with CreateAccessList() gas (%d) and access list", gas)
+		msg.AccessList = *accessList
+		requireCallSucceedsWithGas(t, msg, gas)
 	})
+}
+
+func requireProvenAccount(tb testing.TB, root common.Hash, addr common.Address, proof []string) types.StateAccount {
+	tb.Helper()
+
+	accountRLP := requireProvenTrieValue(tb, root, crypto.Keccak256(addr.Bytes()), proof)
+	var account types.StateAccount
+	require.NoError(tb, rlp.DecodeBytes(accountRLP, &account), "decode proven account")
+	return account
+}
+
+func requireProvenStorageValue(tb testing.TB, root common.Hash, key common.Hash, proof []string) *big.Int {
+	tb.Helper()
+
+	storageRLP := requireProvenTrieValue(tb, root, crypto.Keccak256(key.Bytes()), proof)
+	var value big.Int
+	require.NoError(tb, rlp.DecodeBytes(storageRLP, &value), "decode proven storage value")
+	return &value
+}
+
+func requireProvenTrieValue(tb testing.TB, root common.Hash, key []byte, proof []string) []byte {
+	tb.Helper()
+
+	proofDB := memorydb.New()
+	for _, node := range proof {
+		blob := common.FromHex(node)
+		require.NoError(tb, proofDB.Put(crypto.Keccak256(blob), blob))
+	}
+
+	value, err := trie.VerifyProof(root, key, proofDB)
+	require.NoError(tb, err, "VerifyProof()")
+	require.NotNil(tb, value, "proof value")
+	return value
+}
+
+// escrowBalanceStorageKey returns the storage key for balances[recipient] at
+// mapping slot 0.
+func escrowBalanceStorageKey(recipient common.Address) common.Hash {
+	return crypto.Keccak256Hash(
+		common.LeftPadBytes(recipient.Bytes(), 32),
+		common.Hash{}.Bytes(),
+	)
 }
