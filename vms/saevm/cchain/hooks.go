@@ -163,6 +163,10 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 }
 
 func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+	// TODO(StephenButtolph): If the genesis was configured to be pre-Durango
+	// and this block is the first post-Durango block, we need to activate the
+	// Warp precompile. This case does not happen on Mainnet, Fuji, or the Local
+	// network, but could happen on a custom network.
 	return nil
 }
 
