@@ -541,6 +541,9 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		// Return stake + all rewards on both commit and abort paths.
 		unstakeUTXOs(addAutoRenewedValidatorTx, staker.TxID, e.onCommitState, e.onAbortState)
 
+		// Even if the validator is not eligible for the potential reward of the
+		// current cycle, they would have been eligible for every previous cycle
+		// so they must be minted on the abort path.
 		if err := e.mintRewardsOnAbort(addAutoRenewedValidatorTx, stakingInfo); err != nil {
 			return err
 		}
@@ -559,6 +562,8 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 			return err
 		}
 
+		// If the validator is eligible for rewards, give them the potential reward of the current cycle +
+		// the rewards of all preivous cycles.
 		if err = e.mintRewards(
 			addAutoRenewedValidatorTx,
 			totalRewards,
@@ -720,7 +725,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 // auto-renewed validator. This includes accrued validation rewards and
 // all delegatee rewards (accrued + pending).
 func (e *proposalTxExecutor) mintRewardsOnAbort(
-	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	tx *txs.AddAutoRenewedValidatorTx,
 	stakingInfo state.StakingInfo,
 ) error {
 	// DelegateeReward tracks pending commission from completed delegator periods.
@@ -732,7 +737,7 @@ func (e *proposalTxExecutor) mintRewardsOnAbort(
 	}
 
 	if err = e.mintRewards(
-		addAutoRenewedValidatorTx,
+		tx,
 		stakingInfo.AccruedValidationRewards,
 		totalDelegateeRewards,
 		e.onAbortState,
@@ -751,7 +756,7 @@ func (e *proposalTxExecutor) mintRewardsOnAbort(
 // UTXOs a prior call already added to the same diff, so a second call would
 // reuse the same (txID, outputIndex) pairs and collide on UTXO IDs.
 func (e *proposalTxExecutor) mintRewards(
-	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	tx *txs.AddAutoRenewedValidatorTx,
 	validationRewards uint64,
 	delegateeRewards uint64,
 	chainState *state.Diff,
@@ -761,7 +766,7 @@ func (e *proposalTxExecutor) mintRewards(
 
 	// Create UTXOs for validation rewards.
 	if validationRewards > 0 {
-		utxo, err := e.newUTXO(validationRewards, addAutoRenewedValidatorTx.ValidationRewardsOwner(), e.tx.ID(), outputIndexOffset, avaxAsset)
+		utxo, err := e.newUTXO(validationRewards, tx.ValidationRewardsOwner(), e.tx.ID(), outputIndexOffset, avaxAsset)
 		if err != nil {
 			return err
 		}
@@ -772,7 +777,7 @@ func (e *proposalTxExecutor) mintRewards(
 
 	// Create UTXOs for delegatee rewards.
 	if delegateeRewards > 0 {
-		utxo, err := e.newUTXO(delegateeRewards, addAutoRenewedValidatorTx.DelegationRewardsOwner(), e.tx.ID(), outputIndexOffset, avaxAsset)
+		utxo, err := e.newUTXO(delegateeRewards, tx.DelegationRewardsOwner(), e.tx.ID(), outputIndexOffset, avaxAsset)
 		if err != nil {
 			return err
 		}
@@ -794,7 +799,7 @@ func (e *proposalTxExecutor) mintRewards(
 //  4. Increases validator weight and accrued rewards by the restaking portion
 //  5. Updates the validator state
 func (e *proposalTxExecutor) restakeOnCommit(
-	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	tx *txs.AddAutoRenewedValidatorTx,
 	validator *state.Staker,
 	stakingInfo state.StakingInfo,
 ) error {
@@ -842,7 +847,7 @@ func (e *proposalTxExecutor) restakeOnCommit(
 	}
 
 	if err := e.mintRewards(
-		addAutoRenewedValidatorTx,
+		tx,
 		withdrawingRewards,
 		withdrawingDelegateeRewards,
 		e.onCommitState,
