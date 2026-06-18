@@ -218,7 +218,7 @@ func TestStatefulRPCs(t *testing.T) {
 	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
 	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
 
-	storageKey := escrowBalanceStorageKey(recipient)
+	storageKey := escrow.StorageKeyForBalance(recipient)
 	storageKeyHex := storageKey.Hex()
 
 	gc := gethclient.New(sut.rpcClient)
@@ -323,7 +323,7 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 
 		wantAccessList := &types.AccessList{{
 			Address:     escrowAddr,
-			StorageKeys: []common.Hash{escrowBalanceStorageKey(recipient)},
+			StorageKeys: []common.Hash{escrow.StorageKeyForBalance(recipient)},
 		}}
 		require.Equal(t, wantAccessList, accessList, "CreateAccessList() access list")
 
@@ -362,15 +362,5 @@ func requireProvenTrieValue(tb testing.TB, root common.Hash, key []byte, proof [
 
 	value, err := trie.VerifyProof(root, key, proofDB)
 	require.NoError(tb, err, "VerifyProof()")
-	require.NotNil(tb, value, "proof value")
 	return value
-}
-
-// escrowBalanceStorageKey returns the storage key for balances[recipient] at
-// mapping slot 0.
-func escrowBalanceStorageKey(recipient common.Address) common.Hash {
-	return crypto.Keccak256Hash(
-		common.LeftPadBytes(recipient.Bytes(), 32),
-		common.Hash{}.Bytes(),
-	)
 }

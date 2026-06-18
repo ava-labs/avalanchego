@@ -458,11 +458,11 @@ func (s *SUT) deployEscrow(tb testing.TB) (*blocks.Block, common.Address, *types
 		GasPrice: big.NewInt(1),
 		Data:     escrow.CreationCode(),
 	})
-	deployBlock := s.runConsensusLoop(tb, tx)
-	require.NoErrorf(tb, deployBlock.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", deployBlock)
-	require.Equalf(tb, tx.Hash(), deployBlock.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", deployBlock)
+	block := s.runConsensusLoop(tb, tx)
+	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
+	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return deployBlock, crypto.CreateAddress(s.wallet.Addresses()[0], 0), tx
+	return block, crypto.CreateAddress(s.wallet.Addresses()[0], 0), tx
 }
 
 // depositToEscrow signs and runs a tx depositing depositVal to
@@ -479,11 +479,11 @@ func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Addres
 		Data:     escrow.CallDataToDeposit(recipient),
 		Value:    depositVal,
 	})
-	depositBlock := s.runConsensusLoop(tb, tx)
-	require.NoErrorf(tb, depositBlock.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", depositBlock)
-	require.Equalf(tb, tx.Hash(), depositBlock.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", depositBlock)
+	block := s.runConsensusLoop(tb, tx)
+	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
+	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return depositBlock, tx
+	return block, tx
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
