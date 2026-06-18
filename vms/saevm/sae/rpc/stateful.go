@@ -189,7 +189,7 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing parent block: %v", err)
 	}
-	if err := parent.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
+	if err := parent.RestoreExecutionArtefacts(b.Hooks(), b.DB(), b.XDB(), b.ChainConfig()); err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("parent %T.RestoreExecutionArtefacts(...): %v", parent, err)
 	}
 

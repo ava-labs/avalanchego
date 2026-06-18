@@ -207,7 +207,7 @@ func TestRecoverSimple(t *testing.T) {
 					require.NoErrorf(t, err, "canonicalBlock(%d)", i)
 					b, err := blocks.New(ethB, nil, nil, sut.logger)
 					require.NoErrorf(t, err, "blocks.New(): height %d", ethB.NumberU64())
-					require.NoErrorf(t, b.RestoreExecutionArtefacts(sut.rawVM.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig()), "%T.RestoreExecutionArtifacts(): %d", b, b.NumberU64())
+					require.NoErrorf(t, b.RestoreExecutionArtefacts(sut.hooks, sut.rawVM.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig()), "%T.RestoreExecutionArtifacts(): %d", b, b.NumberU64())
 
 					// If these states were available they would eventually
 					// result in an OOM as the triedb leaked memory.

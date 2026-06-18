@@ -59,7 +59,7 @@ func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+	if err := b.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
 		return nil, err
 	}
 	return b, nil
@@ -143,7 +143,7 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
 					return err
 				}
 				chain = append(chain, parent)

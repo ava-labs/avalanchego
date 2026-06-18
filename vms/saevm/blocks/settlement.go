@@ -12,14 +12,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
-	"github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 type ancestry struct {
@@ -83,15 +81,28 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 //
 // Unlike [Block.MarkExecuted], MarkSynchronous does not call
 // [Block.SetAsHeadBlock], which MUST be done by the caller, i.f.f. the chain
-// has not yet commenced asynchronous execution.
-//
-// TODO(arr4n) refactor to avoid requiring DB writes.
-func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.ExecutionResults) error {
+// has not yet commenced asynchronous execution. A synchronous block's execution
+// results are reconstructed from its header (see [synchronousExecutionResults])
+// and are therefore not persisted to disk.
+func (b *Block) MarkSynchronous(hooks hook.Points) error {
+	e, err := b.synchronousExecutionResults(hooks)
+	if err != nil {
+		return err
+	}
+
+	if err := b.markExecutedAfterDiskArtefacts(e, nil); err != nil {
+		return err
+	}
+	b.synchronous = true
+	return b.markSettled(nil)
+}
+
+// synchronousExecutionResults derives the post-execution artefacts of a
+// synchronous  block directly from its header. Unlike asynchronously executed
+// blocks, synchronous blocks do not persist their execution results to disk,
+// but the executions results are thus available in the header.
+func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
 	ethB := b.EthBlock()
-	// Receipts of a synchronous block have already been "settled" by the block
-	// itself. As the only reason to pass receipts here is for later settlement
-	// in another block, there is no need to pass anything meaningful as it
-	// would also require them to be received as an argument to MarkSynchronous.
 	target, cfg := hooks.GasConfigAfter(b.Header())
 
 	// The base fee must be capped at [math.MaxUint64] to avoid overflow in the gastime.
@@ -114,7 +125,7 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 		cfg,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	e := &executionResults{
 		byGas:         *execTime.Clone(),
@@ -122,12 +133,7 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 		stateRootPost: ethB.Root(),
 	}
 	e.baseFee.SetUint64(baseFee)
-
-	if err := b.markExecuted(db.NewBatch(), xdb, e, false, nil); err != nil {
-		return err
-	}
-	b.synchronous = true
-	return b.markSettled(nil)
+	return e, nil
 }
 
 // WaitUntilSettled blocks until either [Block.MarkSettled] is called or the

@@ -29,8 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
-
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // An EthBlockOption configures the default block properties created by
@@ -119,7 +117,7 @@ func WithLogger(l logging.Logger) BlockOption {
 // returns wraps [core.Genesis.ToBlock] with [NewBlock]. It assumes a nil
 // [triedb.Config] unless overridden by a [WithTrieDBConfig]. The block is
 // marked as both executed and synchronous.
-func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig, alloc types.GenesisAlloc, opts ...GenesisOption) *blocks.Block {
+func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, alloc types.GenesisAlloc, opts ...GenesisOption) *blocks.Block {
 	tb.Helper()
 	conf := &genesisConfig{
 		gasTarget: math.MaxUint64,
@@ -141,7 +139,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 
 	b := NewBlock(tb, gen.ToBlock(), nil, nil)
 	h := hookstest.NewStub(conf.gasTarget)
-	require.NoErrorf(tb, b.MarkSynchronous(h, db, xdb), "%T.MarkSynchronous()", b)
+	require.NoErrorf(tb, b.MarkSynchronous(h), "%T.MarkSynchronous()", b)
 	return b
 }
 

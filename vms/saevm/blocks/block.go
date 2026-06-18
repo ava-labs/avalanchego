@@ -21,6 +21,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -103,12 +104,12 @@ func New(eth *types.Block, parent, lastSettled *Block, log logging.Logger) (*Blo
 // RestoreSettledBlock constructs a new block with [New] and restores it to an
 // settled state before returning it. By definition of being settled, the
 // returned block also includes post-execution artefacts.
-func RestoreSettledBlock(eth *types.Block, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
+func RestoreSettledBlock(hooks hook.Points, eth *types.Block, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
 	b, err := New(eth, nil, nil, log)
 	if err != nil {
 		return nil, err
 	}
-	if err := b.RestoreExecutionArtefacts(db, xdb, config); err != nil {
+	if err := b.RestoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
 		return nil, fmt.Errorf("restoring to executed state: %w", err)
 	}
 	if err := b.markSettled(nil); err != nil {

@@ -21,8 +21,10 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -121,7 +123,7 @@ func (b *Block) MarkExecuted(
 
 	batch := db.NewBatch()
 	rawdb.WriteReceipts(batch, b.Hash(), b.NumberU64(), receipts)
-	return b.markExecuted(batch, xdb, e, true, lastExecuted)
+	return b.markExecuted(batch, xdb, e, lastExecuted)
 }
 
 var errMarkBlockExecutedAgain = errors.New("block re-marked as executed")
@@ -135,14 +137,14 @@ var errMarkBlockExecutedAgain = errors.New("block re-marked as executed")
 //
 // The batch is `Write()`n (yeah, it's a word now) after all disk artefacts are
 // persisted.
-func (b *Block) markExecuted(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults, setAsHeadBlock bool, lastExecuted *atomic.Pointer[Block]) error {
-	if err := b.markExecutedOnDisk(batch, xdb, e, setAsHeadBlock); err != nil {
+func (b *Block) markExecuted(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults, lastExecuted *atomic.Pointer[Block]) error {
+	if err := b.markExecutedOnDisk(batch, xdb, e); err != nil {
 		return err
 	}
 	return b.markExecutedAfterDiskArtefacts(e, lastExecuted)
 }
 
-func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults, setAsHeadBlock bool) error {
+func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults) error {
 	n := b.NumberU64()
 	if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
 		return err
@@ -150,9 +152,7 @@ func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResu
 	if err := xdb.Sync(n, n); err != nil {
 		return err
 	}
-	if setAsHeadBlock {
-		b.SetAsHeadBlock(batch)
-	}
+	b.SetAsHeadBlock(batch)
 	return batch.Write()
 }
 
@@ -256,9 +256,16 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
 // said function was originally called.
-func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+// If no execution results are found, the block is assumed to be synchronous.
+func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	e, err := loadExecutionResults(xdb, b.NumberU64())
-	if err != nil {
+	switch {
+	case errors.Is(err, database.ErrNotFound):
+		if e, err = b.synchronousExecutionResults(hooks); err != nil {
+			return err
+		}
+		b.synchronous = true
+	case err != nil:
 		return err
 	}
 	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
