@@ -112,8 +112,7 @@ func (vm *VM) Initialize(
 	}
 	vm.chainConfig = genesis.Config
 
-	genesisBlock, err := genesis.setup(ethDB, trieDBConfig)
-	if err != nil {
+	if err := genesis.setup(ethDB, trieDBConfig); err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
@@ -147,7 +146,7 @@ func (vm *VM) Initialize(
 		},
 		Now: vm.now,
 	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, genesisBlock, appSender)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
