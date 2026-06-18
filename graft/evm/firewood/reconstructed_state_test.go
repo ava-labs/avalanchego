@@ -17,10 +17,9 @@ import (
 )
 
 // newReconstructedStateDatabase mirrors the wrapping performed by each VM's
-// extstate package when the trie database backend is a [ReconstructedTrieDB].
+// extstate package when the trie database backend is a reconstructed view.
 func newReconstructedStateDatabase(reconTrieDB *triedb.Database) state.Database {
-	fw := reconTrieDB.Backend().(*ReconstructedTrieDB)
-	return NewReconstructedStateAccessor(state.NewDatabaseWithNodeDB(rawdb.NewMemoryDatabase(), reconTrieDB), fw)
+	return NewStateAccessor(state.NewDatabaseWithNodeDB(rawdb.NewMemoryDatabase(), reconTrieDB))
 }
 
 func TestReconstructedRevisions(t *testing.T) {

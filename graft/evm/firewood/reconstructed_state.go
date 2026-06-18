@@ -18,18 +18,17 @@ var _ state.Database = (*reconstructedStateAccessor)(nil)
 // and OpenStorageTrie to return reconstructed tries backed by an [ffi.Reconstructed].
 //
 // The [ffi.Reconstructed] view is mutated in place by trie operations, so it must
-// not be used concurrently. Instances are constructed by
-// [NewReconstructedStateAccessor] when the trie database backend is a
-// [ReconstructedTrieDB]; see [NewReconstructedTrieDB].
+// not be used concurrently. Instances are constructed by [NewStateAccessor] when
+// the trie database backend is a [reconstructedTrieDB]; see [NewReconstructedTrieDB].
 type reconstructedStateAccessor struct {
 	state.Database
 	recon             *ffi.Reconstructed
 	computeRootOnHash bool
 }
 
-// NewReconstructedStateAccessor wraps db so that trie operations are served by
+// newReconstructedStateAccessor wraps db so that trie operations are served by
 // the reconstructed view backing fw.
-func NewReconstructedStateAccessor(db state.Database, fw *ReconstructedTrieDB) state.Database {
+func newReconstructedStateAccessor(db state.Database, fw *reconstructedTrieDB) state.Database {
 	return &reconstructedStateAccessor{
 		Database:          db,
 		recon:             fw.recon,

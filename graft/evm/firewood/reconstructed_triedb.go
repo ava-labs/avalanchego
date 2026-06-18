@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/libevm/triedb/database"
 )
 
-var _ triedb.DBOverride = (*ReconstructedTrieDB)(nil)
+var _ triedb.DBOverride = (*reconstructedTrieDB)(nil)
 
 // NewReconstructedTrieDB returns a trie database whose state trie operations are
 // backed by recon. The database is intended for temporary reconstruction only:
@@ -31,7 +31,7 @@ var _ triedb.DBOverride = (*ReconstructedTrieDB)(nil)
 func NewReconstructedTrieDB(source *TrieDB, recon *ffi.Reconstructed, computeRootOnHash bool) *triedb.Database {
 	return triedb.NewDatabase(rawdb.NewMemoryDatabase(), &triedb.Config{
 		DBOverride: func(ethdb.Database) triedb.DBOverride {
-			return &ReconstructedTrieDB{
+			return &reconstructedTrieDB{
 				source:            source,
 				recon:             recon,
 				computeRootOnHash: computeRootOnHash,
@@ -40,57 +40,56 @@ func NewReconstructedTrieDB(source *TrieDB, recon *ffi.Reconstructed, computeRoo
 	})
 }
 
-// ReconstructedTrieDB is the trie database backend created by
-// [NewReconstructedTrieDB]. It is exported only so that state database
-// constructors can detect it via [triedb.Database.Backend] and wrap the
-// database with [NewReconstructedStateAccessor]; it is not intended to be
-// constructed directly.
-type ReconstructedTrieDB struct {
+// reconstructedTrieDB is the trie database backend created by
+// [NewReconstructedTrieDB]. [NewStateAccessor] detects it via
+// [triedb.Database.Backend] and wraps the database with the reconstructed
+// state accessor.
+type reconstructedTrieDB struct {
 	source            *TrieDB
 	recon             *ffi.Reconstructed
 	computeRootOnHash bool
 }
 
-func (r *ReconstructedTrieDB) Scheme() string {
+func (r *reconstructedTrieDB) Scheme() string {
 	return r.source.Scheme()
 }
 
-func (r *ReconstructedTrieDB) Initialized(genesisRoot common.Hash) bool {
+func (r *reconstructedTrieDB) Initialized(genesisRoot common.Hash) bool {
 	return common.Hash(r.recon.Root()) == genesisRoot
 }
 
-func (*ReconstructedTrieDB) Size() (common.StorageSize, common.StorageSize) {
+func (*reconstructedTrieDB) Size() (common.StorageSize, common.StorageSize) {
 	return 0, 0
 }
 
-func (r *ReconstructedTrieDB) Update(root, _ common.Hash, _ uint64, _ *trienode.MergedNodeSet, _ *triestate.Set, _ ...stateconf.TrieDBUpdateOption) error {
+func (r *reconstructedTrieDB) Update(root, _ common.Hash, _ uint64, _ *trienode.MergedNodeSet, _ *triestate.Set, _ ...stateconf.TrieDBUpdateOption) error {
 	return r.validateRoot(root)
 }
 
-func (r *ReconstructedTrieDB) Commit(root common.Hash, _ bool) error {
+func (r *reconstructedTrieDB) Commit(root common.Hash, _ bool) error {
 	return r.validateRoot(root)
 }
 
-func (*ReconstructedTrieDB) Close() error {
+func (*reconstructedTrieDB) Close() error {
 	return nil
 }
 
-func (*ReconstructedTrieDB) Cap(common.StorageSize) error {
+func (*reconstructedTrieDB) Cap(common.StorageSize) error {
 	return nil
 }
 
-func (*ReconstructedTrieDB) Reference(common.Hash, common.Hash) {}
+func (*reconstructedTrieDB) Reference(common.Hash, common.Hash) {}
 
-func (*ReconstructedTrieDB) Dereference(common.Hash) {}
+func (*reconstructedTrieDB) Dereference(common.Hash) {}
 
-func (r *ReconstructedTrieDB) Reader(root common.Hash) (database.Reader, error) {
+func (r *reconstructedTrieDB) Reader(root common.Hash) (database.Reader, error) {
 	if err := r.validateRoot(root); err != nil {
 		return nil, err
 	}
 	return &reconstructedReader{reconstructed: r.recon}, nil
 }
 
-func (r *ReconstructedTrieDB) validateRoot(root common.Hash) error {
+func (r *reconstructedTrieDB) validateRoot(root common.Hash) error {
 	// In replay mode, the reconstructed trie intentionally reports a stale
 	// (cached) root while recon advances, so the caller's root will not match
 	// recon.Root(). The final root is validated once after replay instead.

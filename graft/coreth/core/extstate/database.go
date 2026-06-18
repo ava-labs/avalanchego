@@ -13,21 +13,10 @@ import (
 
 func NewDatabaseWithConfig(db ethdb.Database, config *triedb.Config) state.Database {
 	coredb := state.NewDatabaseWithConfig(db, config)
-	return wrapIfFirewood(coredb)
+	return firewood.NewStateAccessor(coredb)
 }
 
 func NewDatabaseWithNodeDB(db ethdb.Database, triedb *triedb.Database) state.Database {
 	coredb := state.NewDatabaseWithNodeDB(db, triedb)
-	return wrapIfFirewood(coredb)
-}
-
-func wrapIfFirewood(db state.Database) state.Database {
-	switch fw := db.TrieDB().Backend().(type) {
-	case *firewood.TrieDB:
-		return firewood.NewStateAccessor(db, fw)
-	case *firewood.ReconstructedTrieDB:
-		return firewood.NewReconstructedStateAccessor(db, fw)
-	default:
-		return db
-	}
+	return firewood.NewStateAccessor(coredb)
 }
