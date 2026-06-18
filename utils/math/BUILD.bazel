@@ -16,7 +16,6 @@ go_library(
     deps = [
         "//ids",
         "//utils/heap",
-        "//vms/saevm/intmath",
         "@org_golang_x_exp//constraints",
     ],
 )

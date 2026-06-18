@@ -890,59 +890,119 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
 }
 
-func TestRewardValidatorStakerType(t *testing.T) {
-	var (
-		env           = newEnvironment(t, upgradetest.Latest)
-		feeCalculator = state.PickFeeCalculator(env.config, env.state)
-		wallet        = newWallet(t, env, walletConfig{})
-	)
-
-	addAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
-		ids.GenerateTestNodeID(),
-		env.config.MinValidatorStake,
-		must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
-		&secp256k1fx.OutputOwners{},
-		&secp256k1fx.OutputOwners{},
-		&secp256k1fx.OutputOwners{},
-		reward.PercentDenominator,
-		reward.PercentDenominator,
-		env.config.MinStakeDuration,
-	)
-	require.NoError(t, err)
-
-	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
-
+// TestRewardValidatorStakerTypeError verifies that RewardValidatorTx rejects stakers
+// it does not reward: an auto-renewed validator (which must be rewarded through
+// RewardAutoRenewedValidatorTx) and a permissioned subnet validator (which is
+// never rewarded and should already have been removed by the advancement of
+// time). Both reach the dispatch default and must surface errUnexpectedStakerTxType.
+func TestRewardValidatorStakerTypeError(t *testing.T) {
 	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
-	duration := time.Duration(validatorTx.Period) * time.Second
-	vdrStaker, err := state.NewStaker(
-		addAutoRenewedValidatorTx.ID(),
-		validatorTx,
-		startTime,
-		startTime.Add(duration),
-		validatorTx.Weight(),
-		uint64(1000000),
-	)
-	require.NoError(t, err)
 
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-	diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
-	require.NoError(t, diff.PutCurrentValidator(vdrStaker))
-	require.NoError(t, diff.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
-		NextPeriod: validatorTx.Period,
-	}))
-	diff.SetTimestamp(vdrStaker.EndTime)
-	require.NoError(t, diff.Apply(env.state))
-	require.NoError(t, env.state.Commit())
+	tests := []struct {
+		name string
+		// setup builds the staker tx and the corresponding current-validator
+		// staker. The caller adds them to state. Staking info is intentionally
+		// left at its zero value: both stakers are rejected at the dispatch
+		// default before it is ever read.
+		setup func(t *testing.T, env *environment) (*txs.Tx, *state.Staker)
+	}{
+		{
+			name: "auto-renewed validator",
+			setup: func(t *testing.T, env *environment) (*txs.Tx, *state.Staker) {
+				wallet := newWallet(t, env, walletConfig{})
 
-	err = ProposalTx(
-		&env.backend,
-		feeCalculator,
-		must[*txs.Tx](t)(newRewardValidatorTx(t, addAutoRenewedValidatorTx.ID())),
-		must[*state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
-		must[*state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
-	)
-	require.ErrorIs(t, err, errShouldUseRewardAutoRenewedValidator)
+				addAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+					ids.GenerateTestNodeID(),
+					env.config.MinValidatorStake,
+					must[*signer.ProofOfPossession](t)(signer.NewProofOfPossession(must[*localsigner.LocalSigner](t)(localsigner.New()))),
+					&secp256k1fx.OutputOwners{},
+					&secp256k1fx.OutputOwners{},
+					&secp256k1fx.OutputOwners{},
+					reward.PercentDenominator,
+					reward.PercentDenominator,
+					env.config.MinStakeDuration,
+				)
+				require.NoError(t, err)
+
+				validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+
+				duration := time.Duration(validatorTx.Period) * time.Second
+				vdrStaker, err := state.NewStaker(
+					addAutoRenewedValidatorTx.ID(),
+					validatorTx,
+					startTime,
+					startTime.Add(duration),
+					validatorTx.Weight(),
+					uint64(1000000),
+				)
+				require.NoError(t, err)
+
+				return addAutoRenewedValidatorTx, vdrStaker
+			},
+		},
+		{
+			name: "permissioned subnet validator",
+			setup: func(t *testing.T, env *environment) (*txs.Tx, *state.Staker) {
+				subnetID := testSubnet1.ID()
+				wallet := newWallet(t, env, walletConfig{
+					subnetIDs: []ids.ID{subnetID},
+				})
+
+				endTime := startTime.Add(env.config.MinStakeDuration)
+				addSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
+					&txs.SubnetValidator{
+						Validator: txs.Validator{
+							NodeID: ids.GenerateTestNodeID(),
+							Start:  uint64(startTime.Unix()),
+							End:    uint64(endTime.Unix()),
+							Wght:   genesistest.DefaultValidatorWeight,
+						},
+						Subnet: subnetID,
+					},
+				)
+				require.NoError(t, err)
+
+				subnetValidatorTx := addSubnetValidatorTx.Unsigned.(*txs.AddSubnetValidatorTx)
+
+				vdrStaker, err := state.NewStaker(
+					addSubnetValidatorTx.ID(),
+					subnetValidatorTx,
+					startTime,
+					endTime,
+					subnetValidatorTx.Weight(),
+					0,
+				)
+				require.NoError(t, err)
+
+				return addSubnetValidatorTx, vdrStaker
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			env := newEnvironment(t, upgradetest.Latest)
+			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+
+			addTx, staker := test.setup(t, env)
+
+			diff := must[*state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed))
+			diff.AddTx(addTx, status.Committed)
+			require.NoError(t, diff.PutCurrentValidator(staker))
+			diff.SetTimestamp(staker.EndTime)
+			require.NoError(t, diff.Apply(env.state))
+			require.NoError(t, env.state.Commit())
+
+			err := ProposalTx(
+				&env.backend,
+				feeCalculator,
+				must[*txs.Tx](t)(newRewardValidatorTx(t, addTx.ID())),
+				must[*state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onCommitState
+				must[*state.Diff](t)(state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)), // onAbortState
+			)
+			require.ErrorIs(t, err, errUnexpectedStakerTxType)
+		})
+	}
 }
 
 func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
