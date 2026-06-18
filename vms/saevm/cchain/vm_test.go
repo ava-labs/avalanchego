@@ -146,8 +146,8 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
 				Config:     &chainConfig,
-				Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()),
-				Difficulty: big.NewInt(0), // irrelevant but required to marshal
+				Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), //#nosec G115 -- Known non-negative
+				Difficulty: big.NewInt(0),                              // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
 			},
 			nodeID:     ids.GenerateTestNodeID(),
