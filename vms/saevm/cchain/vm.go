@@ -64,9 +64,6 @@ type VM struct {
 	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
 
-	// TODO: Remove this.
-	hooks *hooks
-
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
@@ -96,6 +93,15 @@ func (vm *VM) Initialize(
 	}()
 
 	vm.ctx = snowCtx
+
+	userConfig, err := parseConfig(configBytes)
+	if err != nil {
+		return fmt.Errorf("parsing user config: %w", err)
+	}
+	warpMessages, err := userConfig.WarpMessages()
+	if err != nil {
+		return fmt.Errorf("parsing warp messages: %w", err)
+	}
 
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
@@ -144,18 +150,6 @@ func (vm *VM) Initialize(
 		return vm.state.Close()
 	})
 
-	snowCtx.Log.Info("parsing user config")
-	userConfig, err := parseConfig(configBytes)
-	if err != nil {
-		return fmt.Errorf("parsing user config: %w", err)
-	}
-
-	snowCtx.Log.Info("parsing warp message overrides")
-	warpMessages, err := userConfig.WarpMessages()
-	if err != nil {
-		return fmt.Errorf("parsing warp messages: %w", err)
-	}
-
 	var desired desiredParams
 	if userConfig.DelayTarget != nil {
 		desired.delayExponent = new(dynamic.DelayExponent)
@@ -172,7 +166,7 @@ func (vm *VM) Initialize(
 
 	pendingTxs := txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
-	vm.hooks = newHooks(
+	hooks := newHooks(
 		snowCtx,
 		vm.state,
 		chainConfig,
@@ -195,7 +189,7 @@ func (vm *VM) Initialize(
 	}
 
 	snowCtx.Log.Info("constructing the sae VM")
-	vm.VM, err = sae.NewVM(ctx, vm.hooks, saeConfig, snowCtx, chainConfig, ethDB, lastSync, appSender)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, lastSync, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
@@ -267,7 +261,7 @@ func (vm *VM) Initialize(
 
 	snowCtx.Log.Info("warp handlers")
 	const warpSignatureCacheSize = 512
-	warpVerifier := warp.NewVerifier(&blockClient{vm: vm.VM}, warpStorage)
+	warpVerifier := warp.NewVerifier(&warpBackend{vm.VM}, warpStorage)
 	warpHandler := acp118.NewCachedHandler(
 		lru.NewCache[ids.ID, []byte](warpSignatureCacheSize),
 		warpVerifier,
@@ -442,26 +436,4 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	}
 	vm.onClose = nil
 	return errors.Join(errs...)
-}
-
-// blockClient adapts [sae.VM] to the [warp.Backend] interface.
-type blockClient struct {
-	vm *sae.VM
-}
-
-var _ warp.Backend = (*blockClient)(nil)
-
-func (c *blockClient) IsAccepted(ctx context.Context, blockID ids.ID) error {
-	b, err := c.vm.GetBlock(ctx, blockID)
-	if err != nil {
-		return err
-	}
-	acceptedID, err := c.vm.GetBlockIDAtHeight(ctx, b.Height())
-	if err != nil {
-		return err
-	}
-	if acceptedID != blockID {
-		return avadb.ErrNotFound
-	}
-	return nil
 }
