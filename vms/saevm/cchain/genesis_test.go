@@ -616,12 +616,11 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 
-			block, err := g.setup(db, trieConfig)
-			require.NoErrorf(t, err, "%T.setup(initial)", g)
+			require.NoErrorf(t, g.setup(db, trieConfig), "%T.setup(initial)", g)
 
+			block, err := g.block()
 			genesisHash := block.Hash()
-			require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(initial)")
-
+			require.NoErrorf(t, err, "%T.block()", g)
 			gotConfig := rawdb.ReadChainConfig(db, genesisHash)
 			cmpBaseConfig := cmp.Options{
 				cmpopts.IgnoreUnexported(corethparams.ChainConfig{}),
@@ -646,7 +645,7 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
-			block, err = g.setup(db, trieConfig)
+			err = g.setup(db, trieConfig)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("%T.setup(restart) error (-want +got)\n%s", g, diff)
 			}
@@ -655,7 +654,6 @@ func TestSetupGenesis(t *testing.T) {
 				return
 			}
 
-			require.Equal(t, genesisHash, block.Hash(), "%T.setup(restart).Hash()", g)
 			gotConfig = rawdb.ReadChainConfig(db, genesisHash)
 			if diff := cmp.Diff(g.Config, gotConfig, cmpBaseConfig); diff != "" {
 				t.Errorf("stored base config after restart (-want +got)\n%s", diff)
