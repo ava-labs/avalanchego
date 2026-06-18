@@ -171,10 +171,10 @@ var (
 // It verifies that the genesis is compatible with any previously setup genesis
 // state by checking the genesis block hash along with the rules used to execute
 // the head block.
-func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.Block, retErr error) {
+func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
 	block, err := g.block()
 	if err != nil {
-		return nil, fmt.Errorf("constructing genesis block: %w", err)
+		return fmt.Errorf("constructing genesis block: %w", err)
 	}
 
 	// We can't exit early here. Even if the genesis block is on disk, the
@@ -182,10 +182,10 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 	hash := block.Hash()
 	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
 		if err := writeGenesisBlock(db, block, g.Config); err != nil {
-			return nil, fmt.Errorf("writing block: %w", err)
+			return fmt.Errorf("writing block: %w", err)
 		}
 	} else if prev != hash {
-		return nil, &core.GenesisMismatchError{
+		return &core.GenesisMismatchError{
 			Stored: prev,
 			New:    hash,
 		}
@@ -196,15 +196,15 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 	{
 		prev := rawdb.ReadChainConfig(db, hash)
 		if prev == nil {
-			return nil, errNoStoredChainConfig
+			return errNoStoredChainConfig
 		}
 		head := rawdb.ReadHeadHeader(db)
 		if head == nil {
-			return nil, errNoHeadHeader
+			return errNoHeadHeader
 		}
 		height, timestamp := head.Number.Uint64(), head.Time
 		if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
-			return nil, fmt.Errorf("incompatible chain config: %w", err)
+			return fmt.Errorf("incompatible chain config: %w", err)
 		}
 		// We will be executing new blocks based on the new chain config, so we
 		// need to keep it up-to-date in the database for the next restart.
@@ -220,10 +220,10 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 	// the trie to determine if the genesis was previously initialized.
 	if !tdb.Initialized(block.Root()) {
 		if _, err := g.writeState(db, tdb); err != nil {
-			return nil, fmt.Errorf("writing genesis state: %w", err)
+			return fmt.Errorf("writing genesis state: %w", err)
 		}
 	}
-	return block, nil
+	return nil
 }
 
 func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.ChainConfig) error {
