@@ -483,7 +483,7 @@ func (b *builder) BuildBlock(
 	// the tx index.
 	warpValidityBytes, err := warpValidity.Bytes()
 	if err != nil {
-		return nil, fmt.Errorf("marshaling predicate results: %w", err)
+		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
 	header.Extra = warpValidityBytes
 
