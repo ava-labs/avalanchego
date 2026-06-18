@@ -5,9 +5,11 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -15,6 +17,8 @@ import (
 )
 
 var (
+	_ p2p.Handler = (*Handler[*emptypb.Empty, *emptypb.Empty])(nil)
+
 	errMalformedRequest = &common.AppError{
 		Code:    p2p.ErrUnexpected.Code,
 		Message: "malformed proto request",
@@ -35,8 +39,11 @@ type ProtoMessage interface {
 // Responder is the per-RPC contract behind [Handler]. Return values:
 //
 //	(resp, nil) deliver resp to the peer
-//	(zero, nil) drop (application-level reject)
-//	(zero, err) server bug, surfaces as [p2p.ErrUnexpected]
+//	(zero, nil) drop, no response is sent
+//	(zero, err) send err back to the peer. Return a [common.AppError] for a
+//	            request-level rejection such as an unknown block or a missing
+//	            state root. Any other error is treated as a server fault and
+//	            surfaces as [p2p.ErrUnexpected].
 type Responder[Req, Resp ProtoMessage] interface {
 	Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, error)
 }
@@ -61,6 +68,10 @@ func (h *Handler[Req, Resp]) AppRequest(ctx context.Context, nodeID ids.NodeID, 
 
 	resp, err := h.responder.Respond(ctx, nodeID, req)
 	if err != nil {
+		var appErr *common.AppError
+		if errors.As(err, &appErr) {
+			return nil, appErr
+		}
 		return nil, p2p.ErrUnexpected
 	}
 	var zero Resp
