@@ -36,6 +36,7 @@ Usage: scripts/benchmark_bazel_remote_cache.sh \
   [--test-empty-impacted-range 'BASE..BASE'] \
   [--test-include-grpc] \
   [--skip-test-impacted] \
+  [--test-warm-vs-impacted-only] \
   [--test-best-case-only] \
   [--warm-log-must-contain '(cached) PASSED'] \
   [--warm-log-must-contain 'Executed 0 out of 1 test: 1 test passes.']
@@ -59,6 +60,9 @@ local Bazel output state each time:
   - HTTP warm remote cache
   - impacted-target mode (selector time plus selected-test execution time
     against the same warmed HTTP remote cache)
+
+Add `--test-warm-vs-impacted-only` to skip the no-cache baseline and treat the
+HTTP cold run only as a seed step for the warm-cache comparison.
 
 Add `--test-include-grpc` to extend that test matrix with:
   - gRPC cold remote cache
@@ -120,6 +124,7 @@ TEST_IMPACTED_RANGE=""
 TEST_EMPTY_IMPACTED_RANGE=""
 TEST_INCLUDE_GRPC=0
 SKIP_TEST_IMPACTED=0
+TEST_WARM_VS_IMPACTED_ONLY=0
 TEST_BEST_CASE_ONLY=0
 declare -a WARM_LOG_MUST_CONTAIN_PATTERNS=()
 
@@ -164,6 +169,9 @@ while [[ $# -gt 0 ]]; do
     --skip-test-impacted)
       SKIP_TEST_IMPACTED=1
       ;;
+    --test-warm-vs-impacted-only)
+      TEST_WARM_VS_IMPACTED_ONLY=1
+      ;;
     --test-best-case-only)
       TEST_BEST_CASE_ONLY=1
       ;;
@@ -189,6 +197,9 @@ if [[ ${#TEST_BENCHMARK_ARGS_SPECS[@]} -gt 0 && "${SKIP_TEST_IMPACTED}" != "1" &
 fi
 if [[ "${TEST_BEST_CASE_ONLY}" == "1" && "${SKIP_TEST_IMPACTED}" == "1" ]]; then
   die "--skip-test-impacted cannot be combined with --test-best-case-only"
+fi
+if [[ "${TEST_BEST_CASE_ONLY}" == "1" && "${TEST_WARM_VS_IMPACTED_ONLY}" == "1" ]]; then
+  die "--test-warm-vs-impacted-only is redundant with --test-best-case-only"
 fi
 if [[ "${TEST_BEST_CASE_ONLY}" == "1" && ${#TEST_BENCHMARK_ARGS_SPECS[@]} -gt 0 && -z "${TEST_EMPTY_IMPACTED_RANGE}" ]]; then
   die "--test-empty-impacted-range is required when --test-best-case-only is used"
@@ -1120,7 +1131,7 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
   benchmark_remote_cache_dir="${CACHE_DIR}/benchmark-${benchmark_index}"
   mkdir -p "${benchmark_remote_cache_dir}"
 
-  if [[ "${TEST_BEST_CASE_ONLY}" != "1" ]]; then
+  if [[ "${TEST_BEST_CASE_ONLY}" != "1" && "${TEST_WARM_VS_IMPACTED_ONLY}" != "1" ]]; then
     no_cache_time="$(run_bazel_command "no-cache (${label})" "${test_spec}" "" "${no_cache_output_base}" "${LOG_DIR}/benchmark-${benchmark_index}-no-cache.log" "${BENCHMARK_TIMEOUT_SECONDS}" 0)"
     remove_output_base "${no_cache_output_base}"
   fi
@@ -1144,7 +1155,7 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
     "${LOG_DIR}/benchmark-${benchmark_index}-http-warm-remote.log")
   http_cold_time="${http_cache_times[0]}"
   http_warm_time="${http_cache_times[1]}"
-  if [[ "${TEST_BEST_CASE_ONLY}" == "1" ]]; then
+  if [[ "${TEST_BEST_CASE_ONLY}" == "1" || "${TEST_WARM_VS_IMPACTED_ONLY}" == "1" ]]; then
     http_seed_time="${http_cold_time}"
   fi
 
@@ -1209,7 +1220,7 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
   TEST_RESULT_IMPACTED_TOTAL_TIMES+=("${impacted_total_time}")
   TEST_RESULT_IMPACTED_TARGET_COUNTS+=("${impacted_target_count}")
 
-  if [[ "${TEST_BEST_CASE_ONLY}" != "1" ]] && ! less_than "${http_warm_time}" "${no_cache_time}"; then
+  if [[ "${TEST_BEST_CASE_ONLY}" != "1" && "${TEST_WARM_VS_IMPACTED_ONLY}" != "1" ]] && ! less_than "${http_warm_time}" "${no_cache_time}"; then
     echo "FAIL: warm HTTP remote cache was not faster than no cache for: bazelisk ${label}" >&2
     all_passed=false
   fi
@@ -1217,7 +1228,7 @@ for test_spec in "${TEST_BENCHMARK_ARGS_SPECS[@]}"; do
     echo "FAIL: warm HTTP remote cache was not faster than cold HTTP remote cache for: bazelisk ${label}" >&2
     all_passed=false
   fi
-  if [[ "${TEST_INCLUDE_GRPC}" == "1" ]] && [[ "${TEST_BEST_CASE_ONLY}" != "1" ]] && ! less_than "${grpc_warm_time}" "${no_cache_time}"; then
+  if [[ "${TEST_INCLUDE_GRPC}" == "1" ]] && [[ "${TEST_BEST_CASE_ONLY}" != "1" ]] && [[ "${TEST_WARM_VS_IMPACTED_ONLY}" != "1" ]] && ! less_than "${grpc_warm_time}" "${no_cache_time}"; then
     echo "FAIL: warm gRPC remote cache was not faster than no cache for: bazelisk ${label}" >&2
     all_passed=false
   fi
@@ -1256,7 +1267,7 @@ done
 for index in "${!TEST_RESULT_LABELS[@]}"; do
   echo
   echo "bazelisk ${TEST_RESULT_LABELS[index]}"
-  if [[ "${TEST_BEST_CASE_ONLY}" == "1" ]]; then
+  if [[ "${TEST_BEST_CASE_ONLY}" == "1" || "${TEST_WARM_VS_IMPACTED_ONLY}" == "1" ]]; then
     printf '  http-seed           %12ss\n' "${TEST_RESULT_HTTP_SEED_TIMES[index]}"
   else
     printf '  no-cache            %12ss\n' "${TEST_RESULT_NO_CACHE_TIMES[index]}"

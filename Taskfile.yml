@@ -61,7 +61,7 @@ tasks:
       --skip-test-impacted
 
   bazel-benchmark-remote-cache-impacted-nonempty:
-    desc: Benchmark warm-cache reruns vs a guaranteed non-empty impacted-target selection for CI-style main-module unit tests
+    desc: Benchmark warm full-scope cache reruns vs a guaranteed non-empty impacted-target selection for CI-style main-module unit tests
     # Append a comment to a shared main-module utility file so the impacted
     # selector sees a stable non-empty working-tree diff via the open-ended
     # HEAD.. range without relying on historical commits from this checkout.
@@ -80,7 +80,8 @@ tasks:
           --test-benchmark-args "test //... -- -//graft/..." \
           --test-impacted-scope "//..." \
           --test-impacted-scope "-//graft/..." \
-          --test-impacted-range "HEAD.."
+          --test-impacted-range "HEAD.." \
+          --test-warm-vs-impacted-only
       '
 
   bazel-benchmark-remote-cache-ids-test:
