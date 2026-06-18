@@ -447,39 +447,43 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 }
 
 // deployEscrow signs and runs a deploy tx for the escrow contract from
-// s.wallet[0], in its own consensus block, returning the block and the
-// deployed contract address.
-func (s *SUT) deployEscrow(tb testing.TB) (*blocks.Block, common.Address) {
+// s.wallet[0], in its own consensus block, returning the block, the deployed
+// contract address, and the deploy tx.
+func (s *SUT) deployEscrow(tb testing.TB) (*blocks.Block, common.Address, *types.Transaction) {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	deployBlock := s.runConsensusLoop(tb, s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
 		Gas:      1e6,
 		GasPrice: big.NewInt(1),
 		Data:     escrow.CreationCode(),
-	}))
+	})
+	deployBlock := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, deployBlock.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", deployBlock)
+	require.Equalf(tb, tx.Hash(), deployBlock.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", deployBlock)
 
-	return deployBlock, crypto.CreateAddress(s.wallet.Addresses()[0], 0)
+	return deployBlock, crypto.CreateAddress(s.wallet.Addresses()[0], 0), tx
 }
 
 // depositToEscrow signs and runs a tx depositing depositVal to
 // balances[recipient] on the escrow contract at escrowAddr, in its own
-// consensus block, returning the block.
-func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) *blocks.Block {
+// consensus block, returning the block and the deposit tx.
+func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) (*blocks.Block, *types.Transaction) {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	depositBlock := s.runConsensusLoop(tb, s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
 		To:       &escrowAddr,
 		Gas:      1e6,
 		GasPrice: big.NewInt(1),
 		Data:     escrow.CallDataToDeposit(recipient),
 		Value:    depositVal,
-	}))
+	})
+	depositBlock := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, depositBlock.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", depositBlock)
+	require.Equalf(tb, tx.Hash(), depositBlock.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", depositBlock)
 
-	return depositBlock
+	return depositBlock, tx
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {

@@ -98,10 +98,8 @@ func TestDebugTrace(t *testing.T) {
 
 	const escrowDepositVal = 42
 	recipient := common.Address{'r', 'e', 'c', 'v'}
-	deployBlock, escrowAddr := sut.deployEscrow(t)
-	depositBlock := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
-	deployTxHash := deployBlock.Transactions()[0].Hash()
-	depositTxHash := depositBlock.Transactions()[0].Hash()
+	deployBlock, escrowAddr, deployTx := sut.deployEscrow(t)
+	depositBlock, depositTx := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 
 	// Specifying the entire trace would be excessive and uninformative so we
 	// select a precise location of an event associated with the deposit()
@@ -123,7 +121,7 @@ func TestDebugTrace(t *testing.T) {
 		Error  string                  `json:"error"`
 	}{
 		{
-			TxHash: deployTxHash,
+			TxHash: deployTx.Hash(),
 			Result: &logger.ExecutionResult{
 				Gas:         deployBlock.Receipts()[0].GasUsed,
 				ReturnValue: common.Bytes2Hex(escrow.ByteCode()),
@@ -131,7 +129,7 @@ func TestDebugTrace(t *testing.T) {
 			},
 		},
 		{
-			TxHash: depositTxHash,
+			TxHash: depositTx.Hash(),
 			Result: &logger.ExecutionResult{
 				Gas: depositBlock.Receipts()[0].GasUsed,
 				StructLogs: []logger.StructLogRes{{
@@ -204,8 +202,8 @@ func TestStatefulRPCs(t *testing.T) {
 
 	const escrowDepositVal = 42
 	recipient := common.Address{'r', 'e', 'c', 'v'}
-	_, escrowAddr := sut.deployEscrow(t)
-	b := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
+	_, escrowAddr, _ := sut.deployEscrow(t)
+	b, _ := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 	callMsg := ethereum.CallMsg{
 		From: sut.wallet.Addresses()[0],
 		To:   &escrowAddr,
@@ -298,7 +296,7 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 	gc := gethclient.New(sut.rpcClient)
 
 	recipient := common.Address{'r', 'e', 'c', 'v'}
-	_, escrowAddr := sut.deployEscrow(t)
+	_, escrowAddr, _ := sut.deployEscrow(t)
 	callMsg := ethereum.CallMsg{
 		From: sut.wallet.Addresses()[0],
 		To:   &escrowAddr,
