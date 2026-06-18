@@ -94,7 +94,8 @@ func TestDebugTrace(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
 	const escrowDepositVal = 42
-	deployBlock, depositBlock, _, recv := sut.deployEscrow(t, big.NewInt(escrowDepositVal))
+	deployBlock, escrowAddr := sut.deployEscrow(t)
+	depositBlock := sut.depositToEscrow(t, escrowAddr, big.NewInt(escrowDepositVal))
 	deployTxHash := deployBlock.Transactions()[0].Hash()
 	depositTxHash := depositBlock.Transactions()[0].Hash()
 
@@ -134,7 +135,7 @@ func TestDebugTrace(t *testing.T) {
 					Op:    vm.LOG1.String(),
 					Depth: 1,
 					Stack: utils.PointerTo([]string{
-						escrow.DepositEvent(recv, uint256.NewInt(escrowDepositVal)).Topics[0].String(),
+						escrow.DepositEvent(escrowRecipient, uint256.NewInt(escrowDepositVal)).Topics[0].String(),
 						"0x40", "0x80", // arbitrary memory locations selected by Solidity
 					}),
 				}},
@@ -198,11 +199,12 @@ func TestStatefulRPCs(t *testing.T) {
 	ctx, sut := newSUT(t, 1, opt)
 
 	const escrowDepositVal = 42
-	_, b, escrowAddr, recv := sut.deployEscrow(t, big.NewInt(escrowDepositVal))
+	_, escrowAddr := sut.deployEscrow(t)
+	b := sut.depositToEscrow(t, escrowAddr, big.NewInt(escrowDepositVal))
 	callMsg := ethereum.CallMsg{
 		From: sut.wallet.Addresses()[0],
 		To:   &escrowAddr,
-		Data: escrow.CallDataForBalance(recv),
+		Data: escrow.CallDataForBalance(escrowRecipient),
 	}
 
 	vmTime.advanceToSettle(ctx, t, b)
@@ -213,10 +215,10 @@ func TestStatefulRPCs(t *testing.T) {
 	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
 	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
 
-	// Storage key for balances[recv] at mapping slot 0:
+	// Storage key for balances[escrowRecipient] at mapping slot 0:
 	// keccak256(abi.encode(address, uint256(0)))
 	storageKey := crypto.Keccak256Hash(
-		common.LeftPadBytes(recv.Bytes(), 32),
+		common.LeftPadBytes(escrowRecipient.Bytes(), 32),
 		common.Hash{}.Bytes(),
 	)
 	storageKeyHex := storageKey.Hex()
@@ -291,17 +293,27 @@ func TestStatefulRPCs(t *testing.T) {
 func TestStatefulRPCsLatestOnly(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
-	_, _, escrowAddr, recv := sut.deployEscrow(t, nil)
+	_, escrowAddr := sut.deployEscrow(t)
 	callMsg := ethereum.CallMsg{
 		From: sut.wallet.Addresses()[0],
 		To:   &escrowAddr,
-		Data: escrow.CallDataForBalance(recv),
+		Data: escrow.CallDataForBalance(escrowRecipient),
 	}
 
+	storageKey := crypto.Keccak256Hash(
+		common.LeftPadBytes(escrowRecipient.Bytes(), 32),
+		common.Hash{}.Bytes(),
+	)
+
 	t.Run("eth_estimateGas", func(t *testing.T) {
-		got, err := sut.EstimateGas(ctx, callMsg)
+		gas, err := sut.EstimateGas(ctx, callMsg)
 		require.NoError(t, err, "EstimateGas()")
-		assert.Positive(t, got, "EstimateGas() result")
+
+		// Verify the reported gas is sufficient to execute the call.
+		msg := callMsg
+		msg.Gas = gas
+		_, err = sut.CallContract(ctx, msg, nil)
+		require.NoErrorf(t, err, "CallContract() with EstimateGas() result (%d)", gas)
 	})
 
 	t.Run("eth_createAccessList", func(t *testing.T) {
@@ -309,7 +321,19 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 		al, gas, errMsg, err := gc.CreateAccessList(ctx, callMsg)
 		require.NoError(t, err, "CreateAccessList()")
 		assert.Empty(t, errMsg, "CreateAccessList() error message")
-		assert.NotEmpty(t, al, "CreateAccessList() access list")
-		assert.Positive(t, gas, "CreateAccessList() gasUsed")
+
+		wantAccessList := types.AccessList{{
+			Address:     escrowAddr,
+			StorageKeys: []common.Hash{storageKey},
+		}}
+		assert.Equal(t, &wantAccessList, al, "CreateAccessList() access list")
+
+		// Verify the reported gas is sufficient to execute the call with the returned
+		// access list applied.
+		msg := callMsg
+		msg.AccessList = *al
+		msg.Gas = gas
+		_, err = sut.CallContract(ctx, msg, nil)
+		require.NoErrorf(t, err, "CallContract() with CreateAccessList() gas (%d) and access list", gas)
 	})
 }

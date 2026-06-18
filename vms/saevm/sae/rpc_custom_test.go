@@ -137,7 +137,8 @@ func TestCallDetailed(t *testing.T) {
 	}))
 
 	const escrowDepositVal = 42
-	_, _, escrowAddr, recv := sut.deployEscrow(t, big.NewInt(escrowDepositVal))
+	_, escrowAddr := sut.deployEscrow(t)
+	sut.depositToEscrow(t, escrowAddr, big.NewInt(escrowDepositVal))
 
 	const revertWith = 12345
 	revertAsPanic := slices.Concat(
@@ -158,7 +159,7 @@ func TestCallDetailed(t *testing.T) {
 			args: []any{
 				map[string]any{
 					"to":   escrowAddr,
-					"data": hexutil.Encode(escrow.CallDataForBalance(recv)),
+					"data": hexutil.Encode(escrow.CallDataForBalance(escrowRecipient)),
 				},
 				latest,
 			},
