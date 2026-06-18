@@ -70,7 +70,7 @@ func TestParseGenesis(t *testing.T) {
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
-						ChainID:             big.NewInt(43114),
+						ChainID:             mainnetChainID,
 						HomesteadBlock:      big.NewInt(0),
 						DAOForkBlock:        big.NewInt(0),
 						DAOForkSupport:      true,
@@ -137,7 +137,7 @@ func TestParseGenesis(t *testing.T) {
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
-						ChainID:             big.NewInt(43113),
+						ChainID:             fujiChainID,
 						HomesteadBlock:      big.NewInt(0),
 						DAOForkBlock:        big.NewInt(0),
 						DAOForkSupport:      true,
