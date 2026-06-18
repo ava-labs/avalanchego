@@ -32,15 +32,22 @@ func TestParseConfig(t *testing.T) {
 		},
 		{
 			name: "empty_input",
+			want: config{
+				Pruning: true,
+			},
 		},
 		{
 			name: "empty_object",
 			json: `{}`,
+			want: config{
+				Pruning: true,
+			},
 		},
 		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
 			want: config{
+				Pruning:              true,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},
