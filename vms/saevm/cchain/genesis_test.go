@@ -450,8 +450,9 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 
 			// Debugging this test is basically impossible without the header.
 			{
-				headerJSON, err := json.MarshalIndent(block.Header(), "", "  ")
-				require.NoErrorf(t, err, "json.MarshalIndent(block.Header())")
+				header := block.Header()
+				headerJSON, err := json.MarshalIndent(header, "", "\t")
+				require.NoErrorf(t, err, "json.MarshalIndent(%T)", header)
 				t.Logf("header:\n%s", headerJSON)
 			}
 			require.Equalf(t, hash, block.Hash().String(), "%T.block().Hash()", g)
