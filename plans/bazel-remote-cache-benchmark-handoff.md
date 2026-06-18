@@ -505,49 +505,78 @@ selective-target path has a much higher bar to justify its extra complexity.
 Observed CI results for the best-case empty-manifest comparison:
 
 #### linux-amd64
-- setup fetch: `56.965s`
-- warm-cache seed run: `779.380s`
-- warm-cache rerun: `95.668s`
-- impacted selector total: `71.491s`
+- setup fetch: `57.002s`
+- warm-cache seed run: `784.869s`
+- warm-cache rerun: `155.843s`
+- impacted selector total: `72.501s`
 - impacted execution: `0.000s`
 - impacted selected targets: `0`
 
 Interpretation:
 - empty impacted-target selection beat warm full-scope cache reuse by about
-  `24s`
-- this is directionally meaningful but not dramatic; on Linux the best-case win
-  is roughly in the 20–25% range
+  `83s`
+- in the empty-set case, selector-only work remains materially cheaper than a
+  full-scope Bazel test invocation even when the cache is already warm
 
 #### darwin-arm64
-- setup fetch: `100.579s`
-- warm-cache seed run: `1068.434s`
-- warm-cache rerun: `187.155s`
-- impacted selector total: `99.829s`
+- setup fetch: `72.869s`
+- warm-cache seed run: `815.079s`
+- warm-cache rerun: `151.536s`
+- impacted selector total: `78.840s`
 - impacted execution: `0.000s`
 - impacted selected targets: `0`
 
 Interpretation:
 - empty impacted-target selection beat warm full-scope cache reuse by about
-  `87s`
-- the relative win is much larger on macOS because the warm full-scope Bazel
-  path is substantially more expensive there than the selector path
+  `73s`
+- the empty-set path is again substantially cheaper than a warm full-scope test
+  rerun
 
-### Non-best-case observation
-An earlier run against a **non-empty** impacted set selected a large number of
-main-module tests and showed the selective path performing worse than the warm
-full-scope cached run. That is consistent with the intended interpretation:
-- impacted targets is not attractive when many tests still need to run
-- the only case that really matters for deciding whether to add this complexity
-  is the empty-set best case
+### Non-empty warm-cache-plus-impacted observation
+A follow-up run changed the benchmark so that the impacted execution path also
+used the same warmed HTTP remote cache as the full-scope comparison. That is
+closer to the real intended decision:
+- **warm full-scope test against remote cache**
+- versus
+- **selector time + warm-cached impacted execution**
+
+Observed CI results for a guaranteed non-empty impacted set (`187` selected
+main-module tests) were unexpectedly bad:
+
+#### linux-amd64
+- setup fetch: `57.944s`
+- no-cache full scope: `698.631s`
+- warm full-scope HTTP rerun: `127.834s`
+- impacted selector total: `67.450s`
+- impacted execution: `2947.970s`
+- impacted total: `3015.420s`
+- impacted selected targets: `187`
+
+#### darwin-arm64
+- setup fetch: `88.691s`
+- no-cache full scope: `727.354s`
+- warm full-scope HTTP rerun: `235.108s`
+- impacted selector total: `76.427s`
+- impacted execution: `4286.423s`
+- impacted total: `4362.850s`
+- impacted selected targets: `187`
+
+Interpretation:
+- this is not a small loss; the non-empty impacted path is **dramatically**
+  worse than the warm full-scope cached run
+- the result is suspicious enough that it should not yet be treated as a clean
+  product conclusion about impacted targets themselves
+- the likely next step is to diagnose why the impacted execution path appears
+  not to be reusing the warmed cache as expected
 
 ### Practical takeaway so far
 Current takeaway from the exploratory benchmark:
 - warm remote cache already delivers large value on CI-style Bazel workloads
-- impacted-target selection appears to provide only a **modest** extra win on
-  Linux in the empty-set best case, though the macOS result is more favorable
-- this suggests selective-target complexity is not obviously compelling as a
-  universal in-job optimization over warm cache alone, at least in the current
-  GitHub Actions model
+- empty impacted-target selection still looks attractive as an incremental
+  optimization on top of warm cache when the correct answer is to run nothing
+- non-empty impacted execution currently behaves far worse than expected even
+  when wired to the warmed cache, which is now a debugging/investigation
+  question rather than a settled product conclusion
 
 ### CI-architecture implication worth remembering
 This benchmark was run in a GitHub Actions workflow where jobs are declared
@@ -697,6 +726,43 @@ Suggested workloads:
 - `build //main:avalanchego`
 - `build --config=race //main:avalanchego`
 
+Most recent CI results:
+
+#### linux-amd64
+- setup fetch: `47.774s`
+- `build //main:avalanchego`
+  - no cache: `170.328s`
+  - HTTP cold: `183.403s`
+  - HTTP warm: `53.389s`
+  - gRPC cold: `187.437s`
+  - gRPC warm: `55.484s`
+- `build --config=race //main:avalanchego`
+  - no cache: `168.326s`
+  - HTTP cold: `180.292s`
+  - HTTP warm: `52.432s`
+  - gRPC cold: `182.428s`
+  - gRPC warm: `55.417s`
+
+#### darwin-arm64
+- setup fetch: `97.547s`
+- `build //main:avalanchego`
+  - no cache: `243.880s`
+  - HTTP cold: `192.711s`
+  - HTTP warm: `71.841s`
+  - gRPC cold: `177.089s`
+  - gRPC warm: `82.376s`
+- `build --config=race //main:avalanchego`
+  - no cache: `144.282s`
+  - HTTP cold: `171.946s`
+  - HTTP warm: `70.422s`
+  - gRPC cold: `178.412s`
+  - gRPC warm: `79.994s`
+
+Current read:
+- warm remote cache is a large win on builds on both runner classes
+- HTTP and gRPC are close on Linux, while HTTP was somewhat better in these
+  macOS runs
+
 ### 2. Re-run the full remote-cache matrix for tests
 Collect CI numbers for the representative test workload with:
 - no cache
@@ -708,8 +774,28 @@ Collect CI numbers for the representative test workload with:
 Suggested workload:
 - `test //... -- -//graft/...`
 
-This may need to run in a separate observational task/workflow from the current
-best-case benchmark if runtime becomes too large for one CI job.
+Most recent CI results:
+
+#### linux-amd64
+- setup fetch: `46.724s`
+- no cache: `578.923s`
+- HTTP cold: `726.087s`
+- HTTP warm: `152.662s`
+- gRPC cold: `715.104s`
+- gRPC warm: `181.744s`
+
+#### darwin-arm64
+- setup fetch: `71.581s`
+- no cache: `683.514s`
+- HTTP cold: `779.001s`
+- HTTP warm: `148.855s`
+- gRPC cold: `887.568s`
+- gRPC warm: `160.074s`
+
+Current read:
+- warm remote cache is a large win on tests on both runner classes
+- in this benchmark, HTTP warm cache outperformed gRPC warm cache on both
+  platforms
 
 ### 3. Preserve the best-case empty impacted-target comparison
 Keep collecting the empty-set comparison for the same test scope:
