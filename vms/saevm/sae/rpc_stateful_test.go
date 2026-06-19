@@ -275,9 +275,9 @@ func TestStatefulRPCs(t *testing.T) {
 				got, err := gc.GetProof(ctx, escrowAddr, []string{storageKeyHex}, blockNum)
 				require.NoError(t, err, "GetProof()")
 				require.NotNil(t, got, "GetProof() result")
-				require.Zero(t, wantBalance.Cmp(got.Balance), "GetProof() balance: want %d, got %s", wantBalance, got.Balance)
+				assert.Zero(t, wantBalance.Cmp(got.Balance), "GetProof() balance: want %d, got %s", wantBalance, got.Balance)
 				require.Len(t, got.StorageProof, 1, "GetProof() storageProof length")
-				require.Zero(t, wantStorageValue.Cmp(got.StorageProof[0].Value), "GetProof() storageProof[0].Value: want %d, got %s", wantStorageValue, got.StorageProof[0].Value)
+				assert.Zero(t, wantStorageValue.Cmp(got.StorageProof[0].Value), "GetProof() storageProof[0].Value: want %d, got %s", wantStorageValue, got.StorageProof[0].Value)
 
 				account := requireProvenAccount(t, b.PostExecutionStateRoot(), escrowAddr, got.AccountProof)
 				assert.Zero(t, wantBalance.Cmp(account.Balance.ToBig()), "proven account balance")
