@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -106,7 +107,7 @@ func TestGetAtomicTxStatus(t *testing.T) {
 		got, err := sut.getTxStatus(ctx, stx.ID())
 		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
 		want := TxStatus{
-			Status: Unknown,
+			Status: choices.Unknown,
 		}
 		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
 	})
@@ -116,7 +117,7 @@ func TestGetAtomicTxStatus(t *testing.T) {
 		got, err := sut.getTxStatus(ctx, stx.ID())
 		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
 		want := TxStatus{
-			Status: Accepted,
+			Status: choices.Accepted,
 			Height: utils.PointerTo(json.Uint64(blk.NumberU64())),
 		}
 		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)

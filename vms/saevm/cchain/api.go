@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -398,8 +399,8 @@ func (c *Client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 // It MUST be exported for gorilla RPC to publicly expose
 // [service.GetAtomicTxStatus].
 type TxStatus struct {
-	Status Status       `json:"status"`
-	Height *json.Uint64 `json:"blockHeight,omitempty"`
+	Status choices.Status `json:"status"`
+	Height *json.Uint64   `json:"blockHeight,omitempty"`
 }
 
 // GetAtomicTxStatus reports whether txID has been accepted on the C-Chain and,
@@ -418,49 +419,15 @@ func (s *service) GetAtomicTxStatus(_ *http.Request, a *api.JSONTxID, r *TxStatu
 
 	_, height, err := s.state.GetTx(a.TxID)
 	if errors.Is(err, database.ErrNotFound) {
-		r.Status = Unknown
+		r.Status = choices.Unknown
 		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("%w: %w", errFetchingTx, err)
 	}
 
-	r.Status = Accepted
+	r.Status = choices.Accepted
 	r.Height = (*json.Uint64)(&height)
-	return nil
-}
-
-// Status is the lifecycle state of a cross-chain transaction.
-type Status uint32
-
-const (
-	Unknown Status = iota
-	Accepted
-)
-
-var errInvalidStatus = errors.New("invalid status")
-
-func (s Status) MarshalJSON() ([]byte, error) {
-	switch s {
-	case Unknown:
-		return []byte(`"Unknown"`), nil
-	case Accepted:
-		return []byte(`"Accepted"`), nil
-	default:
-		return nil, errInvalidStatus
-	}
-}
-
-func (s *Status) UnmarshalJSON(b []byte) error {
-	switch string(b) {
-	case `null`:
-	case `"Unknown"`:
-		*s = Unknown
-	case `"Accepted"`:
-		*s = Accepted
-	default:
-		return errInvalidStatus
-	}
 	return nil
 }
 
