@@ -225,10 +225,7 @@ func TestStatefulRPCs(t *testing.T) {
 
 	gc := gethclient.New(sut.rpcClient)
 
-	wantBalance := big.NewInt(escrowDepositVal)
-	wantStorageValue := big.NewInt(escrowDepositVal)
 	wantStorageBytes := uint256.NewInt(escrowDepositVal).PaddedBytes(32)
-	wantCode := escrow.ByteCode()
 
 	tests := []struct {
 		name string
@@ -256,13 +253,15 @@ func TestStatefulRPCs(t *testing.T) {
 			t.Run("eth_getBalance", func(t *testing.T) {
 				got, err := sut.BalanceAt(ctx, escrowAddr, blockNum)
 				require.NoError(t, err, "BalanceAt()")
-				require.Zero(t, wantBalance.Cmp(got), "BalanceAt(): want %d, got %s", wantBalance, got)
+
+				want := big.NewInt(escrowDepositVal)
+				require.Zero(t, want.Cmp(got), "BalanceAt(): want %d, got %s", want, got)
 			})
 
 			t.Run("eth_getCode", func(t *testing.T) {
 				got, err := sut.CodeAt(ctx, escrowAddr, blockNum)
 				require.NoError(t, err, "CodeAt()")
-				assert.Equal(t, wantCode, got, "CodeAt() result")
+				assert.Equal(t, escrow.ByteCode(), got, "CodeAt() result")
 			})
 
 			t.Run("eth_getStorageAt", func(t *testing.T) {
@@ -275,16 +274,7 @@ func TestStatefulRPCs(t *testing.T) {
 				got, err := gc.GetProof(ctx, escrowAddr, []string{storageKeyHex}, blockNum)
 				require.NoError(t, err, "GetProof()")
 				require.NotNil(t, got, "GetProof() result")
-				assert.Zero(t, wantBalance.Cmp(got.Balance), "GetProof() balance: want %d, got %s", wantBalance, got.Balance)
-				require.Len(t, got.StorageProof, 1, "GetProof() storageProof length")
-				assert.Zero(t, wantStorageValue.Cmp(got.StorageProof[0].Value), "GetProof() storageProof[0].Value: want %d, got %s", wantStorageValue, got.StorageProof[0].Value)
-
-				account := requireProvenAccount(t, b.PostExecutionStateRoot(), escrowAddr, got.AccountProof)
-				assert.Zero(t, wantBalance.Cmp(account.Balance.ToBig()), "proven account balance")
-				assert.Equal(t, got.StorageHash, account.Root, "proven account storage root")
-
-				provenValue := requireProvenStorageValue(t, account.Root, storageKey, got.StorageProof[0].Proof)
-				assert.Zero(t, wantStorageValue.Cmp(provenValue), "proven storage value: want %d, got %s", wantStorageValue, provenValue)
+				verifyProof(t, b.PostExecutionStateRoot(), got)
 			})
 		})
 	}
@@ -336,31 +326,47 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 	})
 }
 
-func requireProvenAccount(tb testing.TB, root common.Hash, addr common.Address, proof []string) types.StateAccount {
+func verifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResult) {
 	tb.Helper()
 
-	accountRLP := requireProvenTrieValue(tb, root, crypto.Keccak256(addr.Bytes()), proof)
+	account := proveAccount(tb, root, proof.Address, proof.AccountProof)
+	assert.Zero(tb, proof.Balance.Cmp(account.Balance.ToBig()), "proven account balance")
+	assert.Equal(tb, proof.CodeHash, account.CodeHash, "proven account code hash")
+	assert.Equal(tb, proof.Nonce, account.Nonce, "proven account nonce")
+	assert.Equal(tb, proof.StorageHash, account.Root, "proven account storage root")
+
+	for _, sp := range proof.StorageProof {
+		provenValue := proveStorageValue(tb, account.Root, common.HexToHash(sp.Key), sp.Proof)
+		assert.Zero(tb, sp.Value.Cmp(provenValue), "proven storage value: want %d, got %s", sp.Value, provenValue)
+	}
+}
+
+func proveAccount(tb testing.TB, root common.Hash, addr common.Address, nodes []string) types.StateAccount {
+	tb.Helper()
+
+	accountRLP := proveTrieValue(tb, root, crypto.Keccak256(addr.Bytes()), nodes)
 	var account types.StateAccount
 	require.NoError(tb, rlp.DecodeBytes(accountRLP, &account), "decode proven account")
 	return account
 }
 
-func requireProvenStorageValue(tb testing.TB, root common.Hash, key common.Hash, proof []string) *big.Int {
+func proveStorageValue(tb testing.TB, root common.Hash, key common.Hash, nodes []string) *big.Int {
 	tb.Helper()
 
-	storageRLP := requireProvenTrieValue(tb, root, crypto.Keccak256(key.Bytes()), proof)
+	storageRLP := proveTrieValue(tb, root, crypto.Keccak256(key.Bytes()), nodes)
 	var value big.Int
 	require.NoError(tb, rlp.DecodeBytes(storageRLP, &value), "decode proven storage value")
 	return &value
 }
 
-func requireProvenTrieValue(tb testing.TB, root common.Hash, key []byte, proof []string) []byte {
+func proveTrieValue(tb testing.TB, root common.Hash, key []byte, nodes []string) []byte {
 	tb.Helper()
 
 	proofDB := memorydb.New()
-	for _, node := range proof {
-		blob := common.FromHex(node)
-		require.NoErrorf(tb, proofDB.Put(crypto.Keccak256(blob), blob), "%T.Put(proof node)", proofDB)
+	for _, nodeStr := range nodes {
+		nodeBytes := common.FromHex(nodeStr)
+		nodeHash := crypto.Keccak256(nodeBytes)
+		require.NoErrorf(tb, proofDB.Put(nodeHash, nodeBytes), "%T.Put(proof node)", proofDB)
 	}
 
 	value, err := trie.VerifyProof(root, key, proofDB)
