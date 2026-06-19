@@ -23,6 +23,20 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
+// When TimeMilliseconds is unset, BlockTime falls back to Header.Time's seconds.
+// The VM always sets TimeMilliseconds, so this legacy decode path is only
+// reachable by exercising the hook directly.
+func TestBlockTime(t *testing.T) {
+	const testTimestampSeconds uint64 = 1_700_000_000
+
+	header := &types.Header{Time: testTimestampSeconds}
+
+	got := (&hooks{}).BlockTime(header)
+	require.Equal(t, int64(testTimestampSeconds)*1000, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
+	// Documented invariant: BlockTime(h).Unix() == h.Time.
+	require.Equal(t, int64(testTimestampSeconds), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
+}
+
 func TestAncestorInputIDs(t *testing.T) {
 	var (
 		w       = newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
