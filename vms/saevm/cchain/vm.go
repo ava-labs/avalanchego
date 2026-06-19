@@ -46,6 +46,9 @@ type VM struct {
 	pullGossipPeriod time.Duration
 	pushGossipPeriod time.Duration
 
+	// now is the clock provided to the [sae.VM] and is used for block building.
+	now func() time.Time
+
 	ctx          *snow.Context
 	state        *state.State
 	txpool       *txpool.Txpool
@@ -110,6 +113,7 @@ func (vm *VM) Initialize(
 		snowCtx,
 		vm.state,
 		pendingTxs,
+		vm.now,
 	)
 	mempoolConfig := legacypool.DefaultConfig
 	// Treat all transactions equally regardless of submission source — no
@@ -120,6 +124,7 @@ func (vm *VM) Initialize(
 		DBConfig: saedb.Config{
 			TrieDBConfig: trieDBConfig,
 		},
+		Now: vm.now,
 	}
 	chainConfig := genesis.Config
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesisBlock, appSender)
