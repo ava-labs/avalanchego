@@ -132,11 +132,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
 
 	var (
-		vm = &VM{
-			pullGossipPeriod: 100 * time.Millisecond,
-			pushGossipPeriod: 100 * time.Millisecond,
-		}
-		db  = memdb.New()
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
 				Config:     &chainConfig,
@@ -145,10 +140,15 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Alloc:      types.GenesisAlloc{},
 			},
 			nodeID: ids.GenerateTestNodeID(),
+			now:    time.Now,
 		}, opts...)
+		vm = &VM{
+			pullGossipPeriod: 100 * time.Millisecond,
+			pushGossipPeriod: 100 * time.Millisecond,
+			now:              cfg.now,
+		}
+		db = memdb.New()
 	)
-	// A nil now leaves [VM.Initialize] to default the clock to [time.Now].
-	vm.now = cfg.now
 
 	// The VM and shared memory MUST share an underlying database so that
 	// [atomic.SharedMemory.Apply] writes to the VM DB.

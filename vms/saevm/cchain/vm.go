@@ -108,10 +108,6 @@ func (vm *VM) Initialize(
 		return vm.state.Close()
 	})
 
-	if vm.now == nil {
-		vm.now = time.Now
-	}
-
 	pendingTxs := txpool.NewPending()
 	hooks := newHooks(
 		snowCtx,
