@@ -93,6 +93,7 @@ go_test(
     ],
     embed = [":cchain"],
     deps = [
+        "//api",
         "//chains/atomic",
         "//database",
         "//database/memdb",
@@ -115,6 +116,7 @@ go_test(
         "//utils/bloom",
         "//utils/constants",
         "//utils/crypto/secp256k1",
+        "//utils/json",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//utils/set",
