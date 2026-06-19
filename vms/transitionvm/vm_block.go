@@ -12,7 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var _ snowman.Block = (*preBlock)(nil)
+var (
+	_ snowman.Block           = (*preBlock)(nil)
+	_ block.WithVerifyContext = (*preBlock)(nil)
+)
 
 type preBlock struct {
 	snowman.Block
@@ -25,6 +28,46 @@ func (p *preBlock) Verify(ctx context.Context) error {
 	p.v.transitionLock.RLock()
 	defer p.v.transitionLock.RUnlock()
 
+	if err := p.verifyPreTransition(ctx); err != nil {
+		return err
+	}
+	return p.Block.Verify(ctx)
+}
+
+// ShouldVerifyWithContext forwards to the inner block so that blocks requiring
+// the P-Chain context (e.g. ICM predicate verification) are still verified with
+// it while wrapped by the transition VM. Blocks that don't implement
+// [block.WithVerifyContext] never require a context.
+func (p *preBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
+	blkWithCtx, ok := p.Block.(block.WithVerifyContext)
+	if !ok {
+		return false, nil
+	}
+	return blkWithCtx.ShouldVerifyWithContext(ctx)
+}
+
+var errBlockDoesNotImplementWithVerifyContext = errors.New("block does not implement WithVerifyContext")
+
+// VerifyWithContext forwards to the inner block's VerifyWithContext, applying
+// the same pre-transition parent check as [preBlock.Verify].
+func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Context) error {
+	p.v.transitionLock.RLock()
+	defer p.v.transitionLock.RUnlock()
+
+	if err := p.verifyPreTransition(ctx); err != nil {
+		return err
+	}
+	blkWithCtx, ok := p.Block.(block.WithVerifyContext)
+	if !ok {
+		return errBlockDoesNotImplementWithVerifyContext
+	}
+	return blkWithCtx.VerifyWithContext(ctx, blockCtx)
+}
+
+// verifyPreTransition ensures the block's parent is a pre-transition block.
+//
+// Callers must hold p.v.transitionLock.
+func (p *preBlock) verifyPreTransition(ctx context.Context) error {
 	parent, err := p.v.current.chain.GetBlock(ctx, p.Parent())
 	if err != nil {
 		return err
@@ -34,7 +77,7 @@ func (p *preBlock) Verify(ctx context.Context) error {
 	if parentTime := parent.Timestamp(); !parentTime.Before(p.v.transitionTime) {
 		return errPreTransitionBlockAfterTransition
 	}
-	return p.Block.Verify(ctx)
+	return nil
 }
 
 // Accept is basically the only function that does not immediately prevent
