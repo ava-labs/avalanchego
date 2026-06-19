@@ -96,9 +96,10 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 func TestDebugTrace(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
+	deployBlock, escrowAddr, deployTx := sut.deployEscrow(t)
+
 	const escrowDepositVal = 42
 	recipient := common.Address{'r', 'e', 'c', 'v'}
-	deployBlock, escrowAddr, deployTx := sut.deployEscrow(t)
 	depositBlock, depositTx := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 
 	// Specifying the entire trace would be excessive and uninformative so we
@@ -200,9 +201,10 @@ func TestStatefulRPCs(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, 1, opt)
 
+	_, escrowAddr, _ := sut.deployEscrow(t)
+
 	const escrowDepositVal = 42
 	recipient := common.Address{'r', 'e', 'c', 'v'}
-	_, escrowAddr, _ := sut.deployEscrow(t)
 	b, _ := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 	callMsg := ethereum.CallMsg{
 		From: sut.wallet.Addresses()[0],
