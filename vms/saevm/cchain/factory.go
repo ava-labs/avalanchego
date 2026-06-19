@@ -20,5 +20,6 @@ func (*Factory) New(logger logging.Logger) (interface{}, error) {
 	return adaptor.Convert(&VM{
 		pullGossipPeriod: time.Second,
 		pushGossipPeriod: 100 * time.Millisecond,
+		now:              time.Now,
 	}), nil
 }
