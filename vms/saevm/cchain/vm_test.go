@@ -894,10 +894,9 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), withTime(time.UnixMilli(wantMilliseconds)))
 
 	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
-	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
 	// VerifyBlock rebuilds via BlockTime(header) and requires a matching hash, so
 	// the decode round-trip is covered here without asserting BlockTime directly.
-	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	blk := sut.issueAndExecute(ctx, t, stx)
 
 	hdr := blk.Header()
 	require.Equal(t, uint64(wantSeconds), hdr.Time, "built block Header.Time (seconds)")
