@@ -10,7 +10,10 @@ package(default_visibility = [
 
 package_group(
     name = "external_consumers",
-    packages = [],
+    packages = [
+        "//node",
+        "//vms/transitionvm",
+    ],
 )
 
 go_library(
