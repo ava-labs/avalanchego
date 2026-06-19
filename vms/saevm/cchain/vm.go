@@ -17,12 +17,16 @@ import (
 
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -97,6 +101,25 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
+	snowCtx.Log.Info("establishing last synchronous block")
+	var lastSync *types.Block
+	lastSyncBytes, err := state.ReadLastSync(avaDB)
+	switch {
+	case err == nil:
+		lastSync = new(types.Block)
+		if err := rlp.DecodeBytes(lastSyncBytes, lastSync); err != nil {
+			return fmt.Errorf("decoding last sync block: %w", err)
+		}
+	case errors.Is(err, avadb.ErrNotFound):
+		lastSync = genesisBlock
+	default:
+		return fmt.Errorf("reading last sync block: %w", err)
+	}
+	snowCtx.Log.Info("established last synchronous block",
+		zap.Stringer("lastID", ids.ID(lastSync.Hash())),
+		zap.Uint64("lastHeight", lastSync.NumberU64()),
+	)
+
 	vm.state, err = state.New(snowCtx, avaDB)
 	if err != nil {
 		return fmt.Errorf("creating cchain state: %w", err)
@@ -122,7 +145,7 @@ func (vm *VM) Initialize(
 		},
 	}
 	chainConfig := genesis.Config
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesisBlock, appSender)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, lastSync, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
