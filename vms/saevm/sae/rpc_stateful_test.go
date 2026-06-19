@@ -225,6 +225,7 @@ func TestStatefulRPCs(t *testing.T) {
 
 	gc := gethclient.New(sut.rpcClient)
 
+	wantStorageValue := big.NewInt(escrowDepositVal)
 	wantStorageBytes := uint256.NewInt(escrowDepositVal).PaddedBytes(32)
 
 	tests := []struct {
@@ -253,9 +254,7 @@ func TestStatefulRPCs(t *testing.T) {
 			t.Run("eth_getBalance", func(t *testing.T) {
 				got, err := sut.BalanceAt(ctx, escrowAddr, blockNum)
 				require.NoError(t, err, "BalanceAt()")
-
-				want := big.NewInt(escrowDepositVal)
-				require.Zero(t, want.Cmp(got), "BalanceAt(): want %d, got %s", want, got)
+				require.Zero(t, wantStorageValue.Cmp(got), "BalanceAt(): want %d, got %s", wantStorageValue, got)
 			})
 
 			t.Run("eth_getCode", func(t *testing.T) {
@@ -274,7 +273,14 @@ func TestStatefulRPCs(t *testing.T) {
 				got, err := gc.GetProof(ctx, escrowAddr, []string{storageKeyHex}, blockNum)
 				require.NoError(t, err, "GetProof()")
 				require.NotNil(t, got, "GetProof() result")
+
 				verifyProof(t, b.PostExecutionStateRoot(), got)
+				assert.Equal(t, escrowAddr, got.Address, "GetProof().Address")
+
+				require.Len(t, got.StorageProof, 1, "len(GetProof().StorageProof)")
+				storage := got.StorageProof[0]
+				assert.Equal(t, storageKeyHex, storage.Key, "GetProof().StorageProof[0].Key")
+				assert.Zero(t, wantStorageValue.Cmp(storage.Value), "GetProof().StorageProof[0].Value")
 			})
 		})
 	}
@@ -331,7 +337,7 @@ func verifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResul
 
 	account := proveAccount(tb, root, proof.Address, proof.AccountProof)
 	assert.Zero(tb, proof.Balance.Cmp(account.Balance.ToBig()), "proven account balance")
-	assert.Equal(tb, proof.CodeHash, account.CodeHash, "proven account code hash")
+	assert.Equal(tb, proof.CodeHash[:], account.CodeHash, "proven account code hash")
 	assert.Equal(tb, proof.Nonce, account.Nonce, "proven account nonce")
 	assert.Equal(tb, proof.StorageHash, account.Root, "proven account storage root")
 
