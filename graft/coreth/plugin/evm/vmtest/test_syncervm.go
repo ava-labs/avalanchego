@@ -195,7 +195,7 @@ func stateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 
 		stateSyncDisabledConfigJSON, err := OverrideSchemeConfig(scheme, `{"state-sync-enabled":false}`)
 		require.NoError(t, err, "OverrideSchemeConfig()")
-		genesisJSON := []byte(GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))
+		genesisJSON := []byte(GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Granite]))
 		require.NoError(t, syncDisabledVM.Initialize(
 			t.Context(),
 			testSyncVMSetup.syncerVM.SnowCtx,
@@ -288,7 +288,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	// This is necessary to support fetching a state summary.
 	config := fmt.Sprintf(`{"commit-interval": %d, "state-history": %d, "state-sync-commit-interval": %d}`, test.SyncableInterval, test.SyncableInterval, test.SyncableInterval)
 	serverVM, cb := testSetup.NewVM()
-	fork := upgradetest.Latest
+	fork := upgradetest.Granite
 	serverTest := SetupTestVM(t, serverVM, TestVMConfig{
 		Fork:       &fork,
 		ConfigJSON: config,

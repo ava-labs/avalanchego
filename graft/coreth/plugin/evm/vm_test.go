@@ -110,7 +110,7 @@ func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf(`{"continuous-profiler-dir": %q,"continuous-profiler-frequency": "500ms"}`, profilerDir)
-	fork := upgradetest.Latest
+	fork := upgradetest.Granite
 	vm := newDefaultTestVM()
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 		Fork:       &fork,
@@ -1713,7 +1713,7 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
+			fork := upgradetest.Granite
 			if testCase.Fork != nil {
 				fork = *testCase.Fork
 			}
@@ -1747,7 +1747,7 @@ func (*testService) Echo(str string, i int, args *echoArgs) echoResult {
 func TestCreateHandlers(t *testing.T) {
 	var (
 		ctx  = t.Context()
-		fork = upgradetest.Latest
+		fork = upgradetest.Granite
 		vm   = newDefaultTestVM()
 	)
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
@@ -2208,7 +2208,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			fork := upgradetest.Latest
+			fork := upgradetest.Granite
 
 			vm := newDefaultTestVM()
 			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{

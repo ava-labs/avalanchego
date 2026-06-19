@@ -307,7 +307,7 @@ func TestCommitAtomicTrieOnShutdown(t *testing.T) {
 		ctx,     // context
 		tvm.Ctx, // chain context
 		tvm.DB,  // database
-		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])), // genesis bytes
+		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Granite])), // genesis bytes
 		nil,           // upgrade bytes
 		nil,           // config bytes
 		nil,           // fxs
@@ -1640,7 +1640,7 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
+			fork := upgradetest.Granite
 			vm := newAtomicTestVM()
 			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 				Fork: &fork,
