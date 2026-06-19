@@ -11,6 +11,7 @@ go_library(
         "vm_current.go",
         "vm_http.go",
         "vm_network.go",
+        "vm_state_sync.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/transitionvm",
     visibility = ["//visibility:public"],
