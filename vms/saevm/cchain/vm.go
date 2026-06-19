@@ -48,8 +48,7 @@ type VM struct {
 	pullGossipPeriod time.Duration
 	pushGossipPeriod time.Duration
 
-	// now is the clock used for block building; configurable to control time in
-	// testing. Defaults to [time.Now] when nil.
+	// now is the clock provided to the [sae.VM] and is used for block building.
 	now func() time.Time
 
 	ctx          *snow.Context
