@@ -10,10 +10,29 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/libevm/libevm/options"
 )
+
+// getTxStatus exposes the deprecated [service.GetAtomicTxStatus] endpoint.
+func (c *Client) getTxStatus(ctx context.Context, txID ids.ID) (TxStatus, error) {
+	resp := TxStatus{}
+	err := c.r.SendRequest(
+		ctx,
+		"avax.getAtomicTxStatus",
+		&api.JSONTxID{
+			TxID: txID,
+		},
+		&resp,
+	)
+	return resp, err
+}
 
 // getAllUTXOs drains [Client.GetUTXOs] for addrs by walking pages of size limit
 // until a short page signals the end of the result set.
@@ -72,6 +91,36 @@ func TestGetTxNotFound(t *testing.T) {
 
 	_, _, err := sut.GetTx(ctx, ids.GenerateTestID())
 	require.ErrorContainsf(t, err, errFetchingTx.Error(), "%T.GetTx()", sut.Client)
+}
+
+// TestGetAtomicTxStatus exercises the deprecated avax.getAtomicTxStatus
+// endpoint on both the unknown and accepted branches.
+func TestGetAtomicTxStatus(t *testing.T) {
+	sk := txtest.NewKey(t)
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc = saetest.MaxAllocFor(sk.EthAddress())
+	}))
+
+	stx := newWallet(sk, sut.ctx, sut.Client).newMinimalTx(t)
+	t.Run("before_execution", func(t *testing.T) {
+		got, err := sut.getTxStatus(ctx, stx.ID())
+		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
+		want := TxStatus{
+			Status: Unknown,
+		}
+		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
+	})
+
+	blk := sut.issueAndExecute(ctx, t, stx)
+	t.Run("after_execution", func(t *testing.T) {
+		got, err := sut.getTxStatus(ctx, stx.ID())
+		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
+		want := TxStatus{
+			Status: Accepted,
+			Height: utils.PointerTo(json.Uint64(blk.NumberU64())),
+		}
+		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
+	})
 }
 
 // TestGetUTXOsPagination asserts that walking [Client.GetUTXOs] yields each
