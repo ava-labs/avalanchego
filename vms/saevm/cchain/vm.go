@@ -8,7 +8,6 @@ package cchain
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
@@ -92,16 +90,14 @@ func (vm *VM) Initialize(
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
 	trieDBConfig := triedb.HashDefaults
-	trieDB := triedb.NewDatabase(ethDB, trieDBConfig)
 
-	// TODO(StephenButtolph): Replace this with Coreth's genesis format.
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
-		return fmt.Errorf("unmarshalling genesis: %w", err)
-	}
-	chainConfig, _, err := core.SetupGenesisBlock(ethDB, trieDB, genesis)
+	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
-		return fmt.Errorf("setting up genesis block: %w", err)
+		return fmt.Errorf("parsing genesis: %w", err)
+	}
+	genesisBlock, err := genesis.setup(ethDB, trieDBConfig)
+	if err != nil {
+		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
 	vm.state, err = state.New(snowCtx, avaDB)
@@ -134,7 +130,8 @@ func (vm *VM) Initialize(
 		},
 		Now: vm.now,
 	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesis.ToBlock(), appSender)
+	chainConfig := genesis.Config
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesisBlock, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
