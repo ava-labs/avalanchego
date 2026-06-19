@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm"
@@ -56,6 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
 
@@ -431,6 +433,46 @@ func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Blo
 func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
 	return s.runConsensusLoopOnPreference(tb, s.LastAcceptedBlock(tb), txs...)
+}
+
+// deployEscrow signs and runs a deploy tx for the escrow contract from
+// s.wallet[0], in its own consensus block, returning the block, the deployed
+// contract address, and the deploy tx.
+func (s *SUT) deployEscrow(tb testing.TB) (*blocks.Block, common.Address, *types.Transaction) {
+	tb.Helper()
+	ctx := s.Context(tb)
+
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     escrow.CreationCode(),
+	})
+	block := s.runConsensusLoop(tb, tx)
+	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
+	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
+
+	return block, crypto.CreateAddress(s.wallet.Addresses()[0], 0), tx
+}
+
+// depositToEscrow signs and runs a tx depositing depositVal to
+// balances[recipient] on the escrow contract at escrowAddr, in its own
+// consensus block, returning the block and the deposit tx.
+func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) (*blocks.Block, *types.Transaction) {
+	tb.Helper()
+	ctx := s.Context(tb)
+
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
+		To:       &escrowAddr,
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     escrow.CallDataToDeposit(recipient),
+		Value:    depositVal,
+	})
+	block := s.runConsensusLoop(tb, tx)
+	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
+	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
+
+	return block, tx
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
