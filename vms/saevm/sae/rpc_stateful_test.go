@@ -357,7 +357,7 @@ func requireProvenTrieValue(tb testing.TB, root common.Hash, key []byte, proof [
 	proofDB := memorydb.New()
 	for _, node := range proof {
 		blob := common.FromHex(node)
-		require.NoError(tb, proofDB.Put(crypto.Keccak256(blob), blob))
+		require.NoErrorf(tb, proofDB.Put(crypto.Keccak256(blob), blob), "%T.Put(proof node)", proofDB)
 	}
 
 	value, err := trie.VerifyProof(root, key, proofDB)
