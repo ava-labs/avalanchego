@@ -297,8 +297,9 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 	gc := gethclient.New(sut.rpcClient)
 
-	recipient := common.Address{'r', 'e', 'c', 'v'}
 	_, escrowAddr, _ := sut.deployEscrow(t)
+
+	recipient := common.Address{'r', 'e', 'c', 'v'}
 	callMsg := ethereum.CallMsg{
 		From: sut.wallet.Addresses()[0],
 		To:   &escrowAddr,
