@@ -29,35 +29,60 @@ func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Rece
 // hash, checking in-memory blocks first then falling back to the database.
 // Returns nils for blocks that are not yet executed.
 func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
-	blk, err := readByNumberOrHash(
+	type blockAndReceipts struct {
+		block    *types.Block
+		receipts []*types.Receipt
+	}
+
+	res, err := readByNumberOrHash(
 		b,
 		numOrHash,
-		func(b *blocks.Block) *blocks.Block {
-			return b
-		},
-		func(db ethdb.Reader, h common.Hash, num uint64) (*blocks.Block, error) {
-			if num > b.LastExecuted().Height() {
-				return nil, blocks.ErrNotFound
+		func(blk *blocks.Block) *blockAndReceipts {
+			if !blk.Executed() {
+				return nil
 			}
-			blk, err := blocks.New(rawdb.ReadBlock(db, h, num), nil, nil, b.Logger())
+			return &blockAndReceipts{
+				block:    blk.EthBlock(),
+				receipts: blk.Receipts(),
+			}
+		},
+		func(db ethdb.Reader, hash common.Hash, num uint64) (*blockAndReceipts, error) {
+			if num > b.LastExecuted().Height() {
+				return nil, nil
+			}
+
+			ethB := rawdb.ReadBlock(db, hash, num)
+
+			if b.WasSynchronous(num) {
+				return &blockAndReceipts{
+					block:    ethB,
+					receipts: rawdb.ReadReceipts(db, hash, num, ethB.Time(), b.ChainConfig()),
+				}, nil
+			}
+
+			blk, err := blocks.New(ethB, nil, nil, b.Logger())
 			if err != nil {
 				return nil, err
 			}
 			if err := blk.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
 				return nil, err
 			}
-			return blk, nil
+			return &blockAndReceipts{
+				block:    blk.EthBlock(),
+				receipts: blk.Receipts(),
+			}, nil
 		},
 	)
+
 	switch {
 	case err != nil:
 		// The use of [notFoundIsNil] in [readByNumberOrHash] means that we know
 		// this is a "real" error, not just [blocks.ErrNotFound].
 		return nil, nil, err
-	case blk == nil || !blk.Executed():
+	case res == nil:
 		return nil, nil, nil
 	default:
-		return blk.Receipts(), blk.EthBlock(), nil
+		return res.receipts, res.block, nil
 	}
 }
 

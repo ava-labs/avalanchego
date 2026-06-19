@@ -41,6 +41,7 @@ type Chain interface {
 	ChainConfig() *params.ChainConfig
 
 	// Consensus and block-building
+	WasSynchronous(uint64) bool
 	Peers() *p2p.Peers
 	Mempool() *txgossip.Set
 	blocks.Chain

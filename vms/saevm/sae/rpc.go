@@ -38,6 +38,7 @@ type chain struct {
 
 func (c chain) Logger() logging.Logger         { return c.VM.snowCtx.Log }
 func (c chain) Hooks() hook.Points             { return c.hooks }
+func (c chain) WasSynchronous(n uint64) bool   { return n <= c.VM.last.synchronous }
 func (c chain) DB() ethdb.Database             { return c.db }
 func (c chain) XDB() saetypes.ExecutionResults { return c.xdb }
 func (c chain) Mempool() *txgossip.Set         { return c.mempool }
