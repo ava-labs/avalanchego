@@ -267,6 +267,43 @@ func (s *service) GetAtomicTx(_ *http.Request, args *api.GetTxArgs, resp *GetTxR
 	return nil
 }
 
+// TxStatus is the response returned by [service.GetAtomicTxStatus].
+//
+// It MUST be exported for gorilla RPC to publicly expose
+// [service.GetAtomicTxStatus].
+type TxStatus struct {
+	Status choices.Status `json:"status"`
+	Height *json.Uint64   `json:"blockHeight,omitempty"`
+}
+
+// GetAtomicTxStatus reports whether txID has been accepted on the C-Chain and,
+// if so, the block height at which it was accepted.
+//
+// Deprecated: prefer [service.GetAtomicTx], which returns the transaction along
+// with its height in a single call. This endpoint reflects whether the tx has
+// been written to state, which can briefly precede the corresponding block
+// being fully executed.
+func (s *service) GetAtomicTxStatus(_ *http.Request, args *api.JSONTxID, resp *TxStatus) error {
+	s.ctx.Log.Debug("deprecated API called",
+		zap.String("service", "avax"),
+		zap.String("method", "getAtomicTxStatus"),
+		zap.Stringer("txID", args.TxID),
+	)
+
+	_, height, err := s.state.GetTx(args.TxID)
+	if errors.Is(err, database.ErrNotFound) {
+		resp.Status = choices.Unknown
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %w", errFetchingTx, err)
+	}
+
+	resp.Status = choices.Accepted
+	resp.Height = (*json.Uint64)(&height)
+	return nil
+}
+
 // Client interacts with the avax API served by the C-Chain.
 type Client struct {
 	r rpc.EndpointRequester
@@ -392,43 +429,6 @@ func (c *Client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 		return nil, 0, err
 	}
 	return t, uint64(resp.Height), nil
-}
-
-// TxStatus is the response returned by [service.GetAtomicTxStatus].
-//
-// It MUST be exported for gorilla RPC to publicly expose
-// [service.GetAtomicTxStatus].
-type TxStatus struct {
-	Status choices.Status `json:"status"`
-	Height *json.Uint64   `json:"blockHeight,omitempty"`
-}
-
-// GetAtomicTxStatus reports whether txID has been accepted on the C-Chain and,
-// if so, the block height at which it was accepted.
-//
-// Deprecated: prefer [service.GetAtomicTx], which returns the transaction along
-// with its height in a single call. This endpoint reflects whether the tx has
-// been written to state, which can briefly precede the corresponding block
-// being fully executed.
-func (s *service) GetAtomicTxStatus(_ *http.Request, a *api.JSONTxID, r *TxStatus) error {
-	s.ctx.Log.Debug("deprecated API called",
-		zap.String("service", "avax"),
-		zap.String("method", "getAtomicTxStatus"),
-		zap.Stringer("txID", a.TxID),
-	)
-
-	_, height, err := s.state.GetTx(a.TxID)
-	if errors.Is(err, database.ErrNotFound) {
-		r.Status = choices.Unknown
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("%w: %w", errFetchingTx, err)
-	}
-
-	r.Status = choices.Accepted
-	r.Height = (*json.Uint64)(&height)
-	return nil
 }
 
 func encodeTx(t *tx.Tx, encoding formatting.Encoding) (string, error) {
