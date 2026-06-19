@@ -276,11 +276,14 @@ func TestStatefulRPCs(t *testing.T) {
 
 				verifyProof(t, b.PostExecutionStateRoot(), got)
 				assert.Equal(t, escrowAddr, got.Address, "GetProof().Address")
+				assert.Zerof(t, wantStorageValue.Cmp(got.Balance), "GetProof().Balance: want %d, got %s", wantStorageValue, got.Balance)
+				assert.Equal(t, crypto.Keccak256Hash(escrow.ByteCode()), got.CodeHash, "GetProof().CodeHash")
+				assert.Equal(t, uint64(1), got.Nonce, "GetProof().Nonce")
 
 				require.Len(t, got.StorageProof, 1, "len(GetProof().StorageProof)")
 				storage := got.StorageProof[0]
 				assert.Equal(t, storageKeyHex, storage.Key, "GetProof().StorageProof[0].Key")
-				assert.Zero(t, wantStorageValue.Cmp(storage.Value), "GetProof().StorageProof[0].Value")
+				assert.Zerof(t, wantStorageValue.Cmp(storage.Value), "GetProof().StorageProof[0].Value: want %d, got %s", wantStorageValue, storage.Value)
 			})
 		})
 	}
@@ -336,14 +339,14 @@ func verifyProof(tb testing.TB, root common.Hash, proof *gethclient.AccountResul
 	tb.Helper()
 
 	account := proveAccount(tb, root, proof.Address, proof.AccountProof)
-	assert.Zero(tb, proof.Balance.Cmp(account.Balance.ToBig()), "proven account balance")
+	assert.Zerof(tb, account.Balance.ToBig().Cmp(proof.Balance), "proven account balance: proven %d, claimed %s", account.Balance.ToBig(), proof.Balance)
 	assert.Equal(tb, proof.CodeHash[:], account.CodeHash, "proven account code hash")
 	assert.Equal(tb, proof.Nonce, account.Nonce, "proven account nonce")
 	assert.Equal(tb, proof.StorageHash, account.Root, "proven account storage root")
 
 	for _, sp := range proof.StorageProof {
-		provenValue := proveStorageValue(tb, account.Root, common.HexToHash(sp.Key), sp.Proof)
-		assert.Zero(tb, sp.Value.Cmp(provenValue), "proven storage value: want %d, got %s", sp.Value, provenValue)
+		value := proveStorageValue(tb, account.Root, common.HexToHash(sp.Key), sp.Proof)
+		assert.Zerof(tb, sp.Value.Cmp(value), "proven storage value: proven %d, claimed %s", value, sp.Value)
 	}
 }
 
