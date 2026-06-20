@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781974267652,
+  "lastUpdate": 1781981781077,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -32946,6 +32946,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_accept_ms/ggas",
             "value": 710.9037503463142,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "331bcfb106f5cc67c24d7d87b49594c36d29e49e",
+          "message": "fix(saevm): Remove flaky bloom inclusion check (#5562)",
+          "timestamp": "2026-06-19T16:59:52Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/331bcfb106f5cc67c24d7d87b49594c36d29e49e"
+        },
+        "date": 1781981775186,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - mgas/s",
+            "value": 29.072299852655203,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - ms/ggas",
+            "value": 34397.00350740119,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_parse_ms/ggas",
+            "value": 65.08584754104626,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_verify_ms/ggas",
+            "value": 34284.81361560077,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
+            "value": 45.59143901749432,
             "unit": "block_accept_ms/ggas"
           }
         ]
