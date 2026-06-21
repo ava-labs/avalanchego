@@ -16,11 +16,11 @@ import (
 	"sync"
 	"time"
 
-	_ "embed"
-
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
