@@ -22,6 +22,10 @@ go_library(
         "hooks.go",
         "vm.go",
     ],
+    embedsrcs = [
+        "extdata-fuji.json",
+        "extdata-mainnet.json",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain",
     deps = [
         "//api",

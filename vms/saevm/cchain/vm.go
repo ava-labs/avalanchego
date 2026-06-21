@@ -8,12 +8,15 @@ package cchain
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"slices"
 	"sync"
 	"time"
+
+	_ "embed"
 
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
@@ -26,8 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -36,6 +39,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	avadb "github.com/ava-labs/avalanchego/database"
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	ethcommon "github.com/ava-labs/libevm/common"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
@@ -50,6 +57,7 @@ type VM struct {
 	now func() time.Time
 
 	ctx          *snow.Context
+	chainConfig  *ethparams.ChainConfig
 	state        *state.State
 	txpool       *txpool.Txpool
 	gossipSet    *gossip.BloomSet[*gossipTx]
@@ -71,8 +79,8 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
-	_ []*common.Fx,
-	appSender common.AppSender,
+	_ []*snowcommon.Fx,
+	appSender snowcommon.AppSender,
 ) (retErr error) {
 	defer func() {
 		if retErr != nil {
@@ -95,6 +103,8 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
+	vm.chainConfig = genesis.Config
+
 	genesisBlock, err := genesis.setup(ethDB, trieDBConfig)
 	if err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
@@ -126,15 +136,14 @@ func (vm *VM) Initialize(
 		},
 		Now: vm.now,
 	}
-	chainConfig := genesis.Config
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, chainConfig, ethDB, genesisBlock, appSender)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, genesisBlock, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
 	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 	const maxTxPoolSize = 1024
-	vm.txpool, err = txpool.New(snowCtx, chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
+	vm.txpool, err = txpool.New(snowCtx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
 	if err != nil {
 		return fmt.Errorf("creating txpool: %w", err)
 	}
@@ -204,10 +213,34 @@ var (
 	// errInvalidBlockVersion is returned by [VM.ParseBlock] when a block's
 	// BlockBodyExtra carries a Version other than 0, the only supported version.
 	errInvalidBlockVersion = errors.New("invalid block version")
-	// errExtDataHashMismatch is returned by [VM.ParseBlock] when a block's extData
-	// does not hash to the ExtDataHash committed in its header.
+	// errExtDataUnexpectedHash is returned by [VM.ParseBlock] when a block's
+	// extData does not correspond to the hardcoded ExtDataHash.
+	errExtDataUnexpectedHash = errors.New("extData hash does not match expected value")
+	// errExtDataHashMismatch is returned by [VM.ParseBlock] when a block's
+	// extData does not hash to the ExtDataHash committed in its header.
 	errExtDataHashMismatch = errors.New("extData hash does not match header")
+
+	//go:embed extdata-fuji.json
+	fujiExtDataHashes []byte
+	//go:embed extdata-mainnet.json
+	mainnetExtDataHashes []byte
+	extDataHashes        map[uint32]map[uint64]ethcommon.Hash
 )
+
+func init() {
+	mainnet := make(map[uint64]ethcommon.Hash)
+	if err := json.Unmarshal(mainnetExtDataHashes, &mainnet); err != nil {
+		panic(err)
+	}
+	fuji := make(map[uint64]ethcommon.Hash)
+	if err := json.Unmarshal(fujiExtDataHashes, &fuji); err != nil {
+		panic(err)
+	}
+	extDataHashes = map[uint32]map[uint64]ethcommon.Hash{
+		constants.MainnetID: mainnet,
+		constants.FujiID:    fuji,
+	}
+}
 
 // ParseBlock parses buf via the embedded SAE VM and additionally performs the
 // C-Chain syntactic checks that the SAE VM is unaware of: that the block's
@@ -218,6 +251,10 @@ var (
 // nor its extData bytes (it commits only ExtDataHash), so a block with a
 // tampered Version or extData keeps the same ID. This override is the boundary
 // that rejects such blocks before they are accepted, persisted, or executed.
+//
+// Genesis (block 0) always uses the pre-ApricotPhase1 extData rules regardless
+// of chain config: its legacy header left ExtDataHash empty, and bootstrapping
+// re-parses the full ancestry including genesis, so it must be accepted here.
 func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
 	b, err := vm.VM.ParseBlock(ctx, buf)
 	if err != nil {
@@ -229,14 +266,23 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 		return nil, fmt.Errorf("%w: %d", errInvalidBlockVersion, version)
 	}
 
-	extData := customtypes.BlockExtData(eth)
-	// TODO: Handle pre-AP1 blocks, which incorrectly did not set ExtDataHash.
-	// This isn't needed prior to Helicon, but will be required to fully remove
-	// coreth.
-	claimed := customtypes.GetHeaderExtra(eth.Header()).ExtDataHash
-	actual := customtypes.CalcExtDataHash(extData)
-	if claimed != actual {
-		return nil, fmt.Errorf("%w: header %s, extData %s", errExtDataHashMismatch, claimed, actual)
+	var (
+		extData        = customtypes.BlockExtData(eth)
+		actualHash     = customtypes.CalcExtDataHash(extData)
+		wantHeaderHash = actualHash
+	)
+	if eth.NumberU64() == 0 || !corethparams.GetExtra(vm.chainConfig).IsApricotPhase1(eth.Time()) {
+		wantHeaderHash = ethcommon.Hash{}
+		wantHash := customtypes.EmptyExtDataHash
+		if want, ok := extDataHashes[vm.ctx.NetworkID][eth.NumberU64()]; ok {
+			wantHash = want
+		}
+		if actualHash != wantHash {
+			return nil, fmt.Errorf("%w: have %x, want %x", errExtDataUnexpectedHash, actualHash, wantHash)
+		}
+	}
+	if got := customtypes.GetHeaderExtra(eth.Header()).ExtDataHash; got != wantHeaderHash {
+		return nil, fmt.Errorf("%w: have %x, want %x", errExtDataHashMismatch, got, wantHeaderHash)
 	}
 	return b, nil
 }
@@ -269,7 +315,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 
 // WaitForEvent waits for a transaction to be in the txpool or for the SAE VM to
 // produce an event.
-func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	// TODO(StephenButtolph): Do not busy loop with [common.PendingTxs]. The
 	// txpools are cleared after block execution, so we may still have
 	// transactions in the txpool while blocks containing those transactions are
@@ -279,7 +325,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 
 	ctx, cancel := context.WithCancel(ctx)
 	type result struct {
-		msg common.Message
+		msg snowcommon.Message
 		err error
 	}
 	results := make(chan result, 2)
@@ -291,7 +337,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	go func() {
 		defer cancel()
 		err := vm.txpool.AwaitTxs(ctx)
-		results <- result{common.PendingTxs, err}
+		results <- result{snowcommon.PendingTxs, err}
 	}()
 
 	r := <-results
