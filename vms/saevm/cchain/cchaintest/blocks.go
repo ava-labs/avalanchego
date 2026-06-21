@@ -41,10 +41,7 @@ func WithNumber(n uint64) BlockOption {
 	})
 }
 
-// WithTimestamp sets the block's header timestamp (in seconds), which selects
-// the network upgrade whose rules govern the block — notably whether
-// [github.com/ava-labs/avalanchego/vms/saevm/cchain.VM.ParseBlock] enforces the
-// post-ApricotPhase1 ExtDataHash commitment.
+// WithTimestamp sets the block's header timestamp (in seconds).
 func WithTimestamp(t uint64) BlockOption {
 	return options.Func[blockProperties](func(p *blockProperties) {
 		p.timestamp = t
