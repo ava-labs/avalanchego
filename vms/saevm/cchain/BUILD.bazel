@@ -10,7 +10,9 @@ package(default_visibility = [
 
 package_group(
     name = "external_consumers",
-    packages = [],
+    packages = [
+        "//tests/e2e/p",
+    ],
 )
 
 go_library(
