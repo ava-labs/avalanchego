@@ -49,6 +49,7 @@ go_library(
         "//vms/platformvm/warp/message",
         "//vms/platformvm/warp/payload",
         "//vms/proposervm",
+        "//vms/saevm/cchain",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary/common",
         "@com_github_mitchellh_mapstructure//:mapstructure",
