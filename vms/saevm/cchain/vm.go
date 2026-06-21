@@ -230,11 +230,11 @@ var (
 func init() {
 	mainnet := make(map[uint64]ethcommon.Hash)
 	if err := json.Unmarshal(mainnetExtDataHashes, &mainnet); err != nil {
-		panic(err)
+		panic(fmt.Errorf("unmarshalling extdata-mainnet.json: %w", err))
 	}
 	fuji := make(map[uint64]ethcommon.Hash)
 	if err := json.Unmarshal(fujiExtDataHashes, &fuji); err != nil {
-		panic(err)
+		panic(fmt.Errorf("unmarshalling extdata-fuji.json: %w", err))
 	}
 	extDataHashes = map[uint32]map[uint64]ethcommon.Hash{
 		constants.MainnetID: mainnet,
@@ -316,7 +316,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 // WaitForEvent waits for a transaction to be in the txpool or for the SAE VM to
 // produce an event.
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
-	// TODO(StephenButtolph): Do not busy loop with [common.PendingTxs]. The
+	// TODO(StephenButtolph): Do not busy loop with [snowcommon.PendingTxs]. The
 	// txpools are cleared after block execution, so we may still have
 	// transactions in the txpool while blocks containing those transactions are
 	// processing.
