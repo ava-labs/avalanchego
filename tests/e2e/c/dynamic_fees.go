@@ -115,11 +115,16 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			zap.Uint64("gasLimit", gasLimit),
 		)
 
+		// Nonces are tracked locally avoid making implicit assumptions of API
+		// ordering behavior. Transactions MAY be marked as executed before the
+		// block that includes them is fully executed. It is not safe to assume
+		// that the "latest" block's nonce has updated to reflect a transaction
+		// whose receipt has been returned.
+		nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
+		require.NoError(err)
+
 		var contractAddress common.Address
 		tc.By("deploying an expensive contract", func() {
-			// Create transaction
-			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
-			require.NoError(err)
 			compiledContract := common.Hex2Bytes(consumeGasCompiledContract)
 			tx := types.NewTx(&types.DynamicFeeTx{
 				ChainID:   cChainID,
@@ -137,6 +142,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 
 			contractAddress = receipt.ContractAddress
+			nonce++
 		})
 
 		initialGasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
@@ -180,9 +186,6 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 					zap.Stringer("targetPrice", targetGasPrice),
 				)
 
-				// Create the transaction
-				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
-				require.NoError(err)
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   cChainID,
 					Nonce:     nonce,
@@ -198,6 +201,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 				// The transaction should have run out of gas
 				require.Equal(types.ReceiptStatusFailed, receipt.Status)
+
+				nonce++
 
 				// The gas price will be checked at the start of the next iteration
 				return false
@@ -229,9 +234,6 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 					zap.Stringer("newPrice", gasPrice),
 				)
 
-				// Create the transaction
-				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
-				require.NoError(err)
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   cChainID,
 					Nonce:     nonce,
@@ -245,6 +247,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				signedTx := sign(tx)
 				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 				require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+
+				nonce++
 
 				// The gas price will be checked at the start of the next iteration
 				return false
