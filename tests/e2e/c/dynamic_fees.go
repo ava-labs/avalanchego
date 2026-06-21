@@ -115,11 +115,11 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			zap.Uint64("gasLimit", gasLimit),
 		)
 
-		// Nonces are tracked locally avoid making implicit assumptions of API
-		// ordering behavior. Transactions MAY be marked as executed before the
-		// block that includes them is fully executed. It is not safe to assume
-		// that the "latest" block's nonce has updated to reflect a transaction
-		// whose receipt has been returned.
+		// Nonces are tracked locally to avoid making implicit assumptions about
+		// API ordering behavior. Transactions MAY be marked as executed before
+		// the block that includes them is fully executed. It is not safe to
+		// assume that the "latest" block's nonce has been updated to reflect a
+		// transaction whose receipt has been returned.
 		nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
 		require.NoError(err)
 
