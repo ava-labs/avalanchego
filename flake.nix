@@ -36,6 +36,7 @@
           packages = with pkgs; [
             # Build requirements
             bazelisk
+            bazel-remote
             (runCommand "bazel" {} ''mkdir -p $out/bin && ln -s ${bazelisk}/bin/bazelisk $out/bin/bazel'')
             git
 

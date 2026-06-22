@@ -195,3 +195,70 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+
+  # Observational benchmarks only: keep these off the required aggregate so
+  # they can collect timing data without gating the rest of Bazel CI.
+  benchmark-remote-cache:
+    if: ${{ inputs.platform_name == 'linux-amd64' || inputs.platform_name == 'darwin-arm64' }}
+    needs: check-metadata
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        benchmark:
+          - id: builds
+            title: build cache matrix
+            task: bazel-benchmark-remote-cache-builds
+          - id: tests
+            title: test cache matrix
+            task: bazel-benchmark-remote-cache-tests
+          - id: impacted-empty
+            title: empty impacted comparison
+            task: bazel-benchmark-remote-cache
+          - id: impacted-nonempty
+            title: non-empty impacted comparison
+            task: bazel-benchmark-remote-cache-impacted-nonempty
+    name: benchmark-remote-cache (${{ matrix.benchmark.id }})
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        if: ${{ inputs.platform_name == 'linux-amd64' }}
+        with:
+          tool-cache: true
+          docker-images: true
+      - uses: ./.github/actions/install-nix
+      - name: Run Bazel remote cache benchmark (${{ matrix.benchmark.id }})
+        shell: nix develop --command bash -x {0}
+        run: |
+          set -euo pipefail
+          artifact_dir="artifacts/bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}"
+          mkdir -p "${artifact_dir}"
+          BAZEL_REMOTE_CACHE_ARTIFACT_DIR="${artifact_dir}/diagnostics" \
+            ./scripts/run_task.sh ${{ matrix.benchmark.task }} 2>&1 | tee "${artifact_dir}/summary.log"
+      - name: Publish Bazel remote cache benchmark summary
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_file="artifacts/bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}/summary.log"
+          if [[ ! -f "${log_file}" ]]; then
+            exit 0
+          fi
+
+          {
+            echo "## Bazel remote cache benchmark: ${{ matrix.benchmark.title }} (${{ inputs.platform_name }})"
+            echo
+            echo '```text'
+            awk '
+              /^Setup result$/ {print; keep=1; next}
+              keep {print}
+            ' "${log_file}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload Bazel remote cache benchmark log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}
+          path: artifacts/bazel-remote-cache-benchmark-${{ matrix.benchmark.id }}-${{ inputs.platform_name }}
+          if-no-files-found: warn
