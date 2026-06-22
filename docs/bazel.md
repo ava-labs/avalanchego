@@ -18,6 +18,10 @@ tasks can be executed without a nix shell which in CI avoids the cost of nix ins
 
 ## Quick Start
 
+For the current CI benchmark findings around remote caching and impacted-target
+execution, see [docs/bazel-remote-cache-benchmark.md](./bazel-remote-cache-benchmark.md).
+
+
 ```bash
 # Build the main binary
 task bazel-build
