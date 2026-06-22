@@ -8,7 +8,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/plugin/evm/customtypes",
-        "//ids",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/saetest",
         "@com_github_ava_labs_libevm//common",
