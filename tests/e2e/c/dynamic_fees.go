@@ -140,7 +140,6 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			signedTx := sign(tx)
 			receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
-			nonce++
 
 			contractAddress = receipt.ContractAddress
 			nonce++
@@ -202,7 +201,6 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 				// The transaction should have run out of gas
 				require.Equal(types.ReceiptStatusFailed, receipt.Status)
-				nonce++
 
 				nonce++
 
@@ -249,7 +247,6 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				signedTx := sign(tx)
 				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 				require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
-				nonce++
 
 				nonce++
 
