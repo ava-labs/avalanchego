@@ -373,11 +373,11 @@ func (s *SUT) assertAccount(tb testing.TB, addr common.Address, wantNonce uint64
 
 // issueAndExecute submits t through [Client.IssueTx] and drives the consensus
 // loop to produce, accept, and execute the next block, which is returned.
-func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx, opts ...blockOption) *blocks.Block {
+func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blocks.Block {
 	tb.Helper()
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
-	return s.runConsensusLoop(ctx, tb, opts...)
+	return s.runConsensusLoop(ctx, tb)
 }
 
 // assertTxAccepted asserts that [Client.GetTx] returns the given tx at the
