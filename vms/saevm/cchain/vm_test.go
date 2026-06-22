@@ -1030,11 +1030,9 @@ func TestGasRefundsDisabled(t *testing.T) {
 		}),
 	)
 
-	// Charging the call:
-	//   - base TxGas (no calldata, no access list)
-	//   - two PUSH0s == 2 * vm.GasQuickStep
-	//   - clearing a cold, originally-nonzero slot == SstoreResetGasEIP2200
-	const wantGasUsed = ethparams.TxGas + 2*vm.GasQuickStep + ethparams.SstoreResetGasEIP2200
+	const wantGasUsed = ethparams.TxGas + // Intrinsic gas
+		2*vm.GasQuickStep + // two PUSH0s
+		ethparams.SstoreResetGasEIP2200 // SSTORE reset gas
 	tx := w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &contract,
 		Gas:       wantGasUsed,
