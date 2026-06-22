@@ -7,12 +7,16 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+
+	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	cchainwarp "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 )
 
-var _ warp.Backend = (*warpBackend)(nil)
+var _ cchainwarp.Backend = (*warpBackend)(nil)
 
 type warpBackend struct {
 	vm *sae.VM
@@ -34,4 +38,18 @@ func (w *warpBackend) IsAccepted(ctx context.Context, blkID ids.ID) error {
 		return fmt.Errorf("conflicting block %s was accepted at height %d", acceptedID, height)
 	}
 	return nil
+}
+
+func registerWarpHandler(
+	vm *sae.VM,
+	storage *cchainwarp.Storage,
+	signer avalanchewarp.Signer,
+) error {
+	const cacheSize = 512
+	handler := acp118.NewCachedHandler(
+		lru.NewCache[ids.ID, []byte](cacheSize),
+		cchainwarp.NewVerifier(&warpBackend{vm}, storage),
+		signer,
+	)
+	return vm.AddHandler(acp118.HandlerID, handler)
 }

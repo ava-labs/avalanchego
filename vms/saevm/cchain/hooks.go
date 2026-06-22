@@ -61,6 +61,7 @@ func newHooks(
 	desired desiredParams,
 	pool *txpool.Pending,
 	warpStorage *warp.Storage,
+	now func() time.Time,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -82,7 +83,7 @@ func newHooks(
 			ctx,
 			chainConfig,
 			initialDelayExponent,
-			time.Now,
+			now,
 			desired,
 			poolTxs,
 		},
@@ -197,13 +198,14 @@ func maybe[T any](p *T) T {
 }
 
 func (*hooks) BlockTime(h *types.Header) time.Time {
-	var ns int64
-	if msp := customtypes.GetHeaderExtra(h).TimeMilliseconds; msp != nil {
-		ms := *msp % 1000
-		frac := time.Duration(ms) * time.Millisecond //#nosec G115 -- ms is bounded to [0, 1000)
-		ns = frac.Nanoseconds()
-	}
-	return time.Unix(int64(h.Time), ns) //#nosec G115 -- Won't overflow for a few millennia
+	// Anchor the seconds component to h.Time so that the documented invariant
+	// BlockTime(h).Unix() == h.Time holds, taking only the sub-second component
+	// from TimeMilliseconds. This guards against malformed headers where
+	// TimeMilliseconds disagrees with Time (e.g. from a malicious peer), which
+	// would otherwise yield an unexpected block time.
+	ms := customtypes.HeaderTimeMilliseconds(h)
+	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
+	return time.Unix(int64(h.Time), subSecondNanos)            //#nosec G115 -- Won't overflow for a few millennia
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
@@ -236,6 +238,10 @@ func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, 
 }
 
 func (*hooks) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
+	// TODO(StephenButtolph): If the genesis was configured to be pre-Durango
+	// and this block is the first post-Durango block, we need to activate the
+	// Warp precompile. This case does not happen on Mainnet, Fuji, or the Local
+	// network, but could happen on a custom network.
 	return nil
 }
 
@@ -332,7 +338,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			Coinbase:         constants.BlackholeAddr,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
-			Time:             uint64(now.Unix()), //#nosec G115 -- Known non-negative
+			Time:             nowMS / 1000,
 			BlobGasUsed:      new(uint64),
 			ExcessBlobGas:    new(uint64),
 			ParentBeaconRoot: new(common.Hash),

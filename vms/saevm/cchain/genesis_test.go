@@ -70,7 +70,7 @@ func TestParseGenesis(t *testing.T) {
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
-						ChainID:             big.NewInt(43114),
+						ChainID:             mainnetChainID,
 						HomesteadBlock:      big.NewInt(0),
 						DAOForkBlock:        big.NewInt(0),
 						DAOForkSupport:      true,
@@ -137,7 +137,7 @@ func TestParseGenesis(t *testing.T) {
 			want: &core.Genesis{
 				Config: corethparams.WithExtra(
 					&corethparams.ChainConfig{
-						ChainID:             big.NewInt(43113),
+						ChainID:             fujiChainID,
 						HomesteadBlock:      big.NewInt(0),
 						DAOForkBlock:        big.NewInt(0),
 						DAOForkSupport:      true,
@@ -450,8 +450,9 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 
 			// Debugging this test is basically impossible without the header.
 			{
-				headerJSON, err := json.MarshalIndent(block.Header(), "", "  ")
-				require.NoErrorf(t, err, "json.MarshalIndent(block.Header())")
+				header := block.Header()
+				headerJSON, err := json.MarshalIndent(header, "", "\t")
+				require.NoErrorf(t, err, "json.MarshalIndent(%T)", header)
 				t.Logf("header:\n%s", headerJSON)
 			}
 			require.Equalf(t, hash, block.Hash().String(), "%T.block().Hash()", g)

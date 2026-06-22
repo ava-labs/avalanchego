@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -334,6 +335,43 @@ func (s *service) GetAtomicTx(_ *http.Request, args *api.GetTxArgs, resp *GetTxR
 	}
 	resp.Encoding = args.Encoding
 	resp.Height = json.Uint64(height)
+	return nil
+}
+
+// TxStatus is the response returned by [service.GetAtomicTxStatus].
+//
+// It MUST be exported for gorilla RPC to publicly expose
+// [service.GetAtomicTxStatus].
+type TxStatus struct {
+	Status choices.Status `json:"status"`
+	Height *json.Uint64   `json:"blockHeight,omitempty"`
+}
+
+// GetAtomicTxStatus reports whether txID has been accepted on the C-Chain and,
+// if so, the block height at which it was accepted.
+//
+// Deprecated: prefer [service.GetAtomicTx], which returns the transaction along
+// with its height in a single call. This endpoint reflects whether the tx has
+// been written to state, which can briefly precede the corresponding block
+// being fully executed.
+func (s *service) GetAtomicTxStatus(_ *http.Request, args *api.JSONTxID, resp *TxStatus) error {
+	s.ctx.Log.Debug("deprecated API called",
+		zap.String("service", "avax"),
+		zap.String("method", "getAtomicTxStatus"),
+		zap.Stringer("txID", args.TxID),
+	)
+
+	_, height, err := s.state.GetTx(args.TxID)
+	if errors.Is(err, database.ErrNotFound) {
+		resp.Status = choices.Unknown
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %w", errFetchingTx, err)
+	}
+
+	resp.Status = choices.Accepted
+	resp.Height = (*json.Uint64)(&height)
 	return nil
 }
 
