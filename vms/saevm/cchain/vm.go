@@ -276,10 +276,6 @@ func init() {
 // nor its extData bytes (it commits only ExtDataHash), so a block with a
 // tampered Version or extData keeps the same ID. This override is the boundary
 // that rejects such blocks before they are accepted, persisted, or executed.
-//
-// Genesis (block 0) always uses the pre-ApricotPhase1 extData rules regardless
-// of chain config: its legacy header left ExtDataHash empty, and bootstrapping
-// re-parses the full ancestry including genesis, so it must be accepted here.
 func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
 	b, err := vm.VM.ParseBlock(ctx, buf)
 	if err != nil {
