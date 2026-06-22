@@ -13,10 +13,14 @@ import (
 
 func NewDatabaseWithConfig(db ethdb.Database, config *triedb.Config) state.Database {
 	coredb := state.NewDatabaseWithConfig(db, config)
+	// NewStateAccessor wraps coredb only when its trie database backend is
+	// Firewood; for any other backend it returns coredb unchanged.
 	return firewood.NewStateAccessor(coredb)
 }
 
 func NewDatabaseWithNodeDB(db ethdb.Database, triedb *triedb.Database) state.Database {
 	coredb := state.NewDatabaseWithNodeDB(db, triedb)
+	// NewStateAccessor wraps coredb only when its trie database backend is
+	// Firewood; for any other backend it returns coredb unchanged.
 	return firewood.NewStateAccessor(coredb)
 }

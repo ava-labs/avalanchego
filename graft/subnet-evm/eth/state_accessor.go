@@ -340,8 +340,6 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		)
 	}
 
-	// Reopen a clean StateDB against the same reconstructed view, now with normal
-	// root computation enabled for callers.
 	returnTrieDB := firewood.NewReconstructedTrieDB(fwDB, recon, true /* computeRootOnHash */)
 	cache, err = state.New(header.Root, extstate.NewDatabaseWithNodeDB(eth.chainDb, returnTrieDB), nil)
 	if err != nil {
@@ -377,7 +375,9 @@ func (eth *Ethereum) reconstructGenesis() (*ffi.Reconstructed, error) {
 	// the reconstructed trie serves all reads and writes.
 	genesisTrieDB := firewood.NewReconstructedTrieDB(fwDB, recon, true /* computeRootOnHash */)
 	if _, err := eth.config.Genesis.Commit(rawdb.NewMemoryDatabase(), genesisTrieDB); err != nil {
-		recon.Drop()
+		if dropErr := recon.Drop(); dropErr != nil {
+			log.Warn("Failed to drop reconstructed view", "err", dropErr)
+		}
 		return nil, err
 	}
 	return recon, nil
