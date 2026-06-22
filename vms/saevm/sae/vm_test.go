@@ -440,8 +440,8 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	}
 
 	txBytes := heavyTxs[0].Size() + maxTxRLPHeaderLen
-	wantTxs := int(maxBlockTxBytes / txBytes)
-	require.Less(t, wantTxs, numTxs, "fixture must supply more transactions than fit in the byte budget")
+	wantTxs := maxBlockTxBytes / txBytes
+	require.Less(t, wantTxs, uint64(numTxs), "fixture must supply more transactions than fit in the byte budget")
 
 	// Bypass mempool admission filtering so the builder backstop is exercised.
 	errs := sut.rawVM.mempool.Pool.Add(heavyTxs, true /*local*/, false /*sync*/)
@@ -452,7 +452,7 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	require.NoError(t, err, "blockBuilder.build()")
 
 	builtTxs := built.Transactions()
-	require.Len(t, builtTxs, wantTxs, "built block included unexpected transaction count")
+	require.Equal(t, wantTxs, uint64(len(builtTxs)), "built block included unexpected transaction count")
 	for i, tx := range builtTxs {
 		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
 	}

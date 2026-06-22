@@ -283,8 +283,8 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			continue
 		}
 
-		// Skip transactions that would push the block past its serialized-byte budget
-		// so it can always be gossiped, even if mempool admission accepted more bytes
+		// Skip transactions that would push the EVM transactions past their
+		// serialized-byte budget, even if mempool admission accepted more bytes
 		// than the gas-per-byte rule intends.
 		//
 		// A transaction's contribution to the block body is its

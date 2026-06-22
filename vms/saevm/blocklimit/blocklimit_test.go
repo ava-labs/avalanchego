@@ -94,6 +94,11 @@ func TestEligible(t *testing.T) {
 			gasLimit:   1,
 			blockLimit: 1 << 32,
 		},
+		{
+			name:     "zeroBlockGasLimit",
+			size:     100,
+			gasLimit: 1_000,
+		},
 	}
 
 	for _, tt := range tests {
