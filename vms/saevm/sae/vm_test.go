@@ -131,6 +131,8 @@ var chainID = ids.GenerateTestID()
 func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
+	const testGasTarget = 4_000_000
+
 	mempoolConf := legacypool.DefaultConfig // copies
 	mempoolConf.Journal = "/dev/null"
 
@@ -138,7 +140,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	xdb := saetest.NewExecutionResultsDB()
 	conf := options.ApplyTo(&sutConfig{
-		hooks: hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+		hooks: hookstest.NewStub(testGasTarget, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
 			return xdb, nil
 		})),
 		vmConfig: Config{
@@ -423,13 +425,9 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	const (
 		numTxs       = 20
 		calldataSize = 120 * units.KiB
-		gasTarget    = 4_000_000
 	)
 	opt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	gasTargetOpt := options.Func[sutConfig](func(c *sutConfig) {
-		c.hooks.Target = gasTarget
-	})
-	ctx, sut := newSUT(t, numTxs, opt, gasTargetOpt)
+	ctx, sut := newSUT(t, numTxs, opt)
 
 	heavyTxs := make([]*types.Transaction, numTxs)
 	for i := range heavyTxs {
