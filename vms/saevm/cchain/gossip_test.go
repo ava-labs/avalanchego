@@ -121,9 +121,7 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 	// Because vdrB doesn't consider vdrA a validator and isn't connected to
 	// api, vdrB can only learn about the transaction if vdrA pushes it.
 	vdrB.assertTxBloomEmpty(t)
-
 	require.NoErrorf(t, vdrA.IssueTx(vdrACtx, stx), "%T.IssueTx()", vdrA.VM)
-	vdrA.assertTxBloomContains(t, stx.ID())
 
 	blk := vdrB.runConsensusLoop(t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {

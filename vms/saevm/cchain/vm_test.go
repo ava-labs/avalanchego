@@ -85,6 +85,7 @@ type (
 		genesis    core.Genesis
 		nodeID     ids.NodeID
 		validators set.Set[ids.NodeID]
+		now        func() time.Time
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -111,6 +112,14 @@ func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 	})
 }
 
+// withTime fixes the SUT's clock at now, controlling the block-building and
+// consensus time of both the cchain hooks and the underlying [sae.VM].
+func withTime(now time.Time) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.now = func() time.Time { return now }
+	})
+}
+
 // newSUT initializes a cchain [VM], transitions it to [snow.NormalOp], and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
 // [NewClient] expects.
@@ -122,11 +131,6 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
 
 	var (
-		vm = &VM{
-			pullGossipPeriod: 100 * time.Millisecond,
-			pushGossipPeriod: 100 * time.Millisecond,
-		}
-		db  = memdb.New()
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
 				Config:     &chainConfig,
@@ -135,7 +139,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Alloc:      types.GenesisAlloc{},
 			},
 			nodeID: ids.GenerateTestNodeID(),
+			now:    time.Now,
 		}, opts...)
+		vm = &VM{
+			pullGossipPeriod: 100 * time.Millisecond,
+			pushGossipPeriod: 100 * time.Millisecond,
+			now:              cfg.now,
+		}
+		db = memdb.New()
 	)
 
 	// The VM and shared memory MUST share an underlying database so that
@@ -810,4 +821,59 @@ func TestParseBlock(t *testing.T) {
 			require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
 		})
 	}
+}
+
+// TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a received
+// block whose Header.Time disagrees with TimeMilliseconds.
+func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+
+	// Bump the seconds encoded in TimeMilliseconds without touching Header.Time,
+	// so Time != TimeMilliseconds/1000 while every other field stays valid.
+	hdr := valid.Header()
+	extra := customtypes.GetHeaderExtra(hdr)
+	require.NotNil(t, extra.TimeMilliseconds, "valid block TimeMilliseconds")
+	mismatched := *extra.TimeMilliseconds + 1000
+	extra.TimeMilliseconds = &mismatched
+	customtypes.SetHeaderExtra(hdr, extra)
+
+	malformed := valid.EthBlock().WithSeal(hdr)
+	buf, err := rlp.EncodeToBytes(malformed)
+	require.NoError(t, err, "rlp.EncodeToBytes(malformed block)")
+
+	parsed, err := sut.ParseBlock(ctx, buf)
+	require.NoError(t, err, "vm.ParseBlock(malformed block)")
+
+	// When VerifyBlock rebuilds the parsed block, it recomputes the header
+	// timestamps, which makes the hash check fail. sae's hash-mismatch error is
+	// unexported, so match on its text rather than the sentinel.
+	err = sut.VerifyBlock(ctx, nil, parsed)
+	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
+}
+
+// Verifies a built block splits its timestamp: seconds in Header.Time, the full
+// millisecond instant in TimeMilliseconds.
+func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
+	key := txtest.NewKey(t)
+	// A non-zero sub-second component (123ms) proves milliseconds survive the
+	// round-trip.
+	const (
+		wantMilliseconds = 1_700_000_000_123
+		wantSeconds      = wantMilliseconds / 1000
+	)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), withTime(time.UnixMilli(wantMilliseconds)))
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	// VerifyBlock rebuilds via BlockTime(header) and requires a matching hash, so
+	// the decode round-trip is covered here without asserting BlockTime directly.
+	blk := sut.issueAndExecute(ctx, t, stx)
+
+	hdr := blk.Header()
+	require.Equal(t, uint64(wantSeconds), hdr.Time, "built block Header.Time (seconds)")
+	require.Equal(t, uint64(wantMilliseconds), customtypes.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
 }
