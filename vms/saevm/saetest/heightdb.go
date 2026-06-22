@@ -6,10 +6,29 @@ package saetest
 import (
 	"slices"
 	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
 )
+
+// CopyDB returns an in-memory copy of src, used to hand a fresh VM the persisted
+// state of a prior one without sharing the live database.
+func CopyDB(tb testing.TB, src database.Database) database.Database {
+	tb.Helper()
+
+	dst := memdb.New()
+	it := src.NewIterator()
+	defer it.Release()
+	for it.Next() {
+		require.NoErrorf(tb, dst.Put(it.Key(), it.Value()), "%T.Put() during database copy", dst)
+	}
+	require.NoErrorf(tb, it.Error(), "%T.Error() after database copy", it)
+	return dst
+}
 
 // A ClonableHeightIndex extends [database.HeightIndex] with the ability to
 // clone itself.

@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -80,7 +79,7 @@ func TestRecoverFromDatabase(t *testing.T) {
 			continue
 		}
 		t.Run("recover", func(t *testing.T) {
-			newDB := copyDB(t, srcDB)
+			newDB := saetest.CopyDB(t, srcDB)
 
 			sutCtx, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 				c.db = newDB
@@ -180,7 +179,7 @@ func TestRecoverSimple(t *testing.T) {
 				require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 			}
 
-			newDB := copyDB(t, srcDB)
+			newDB := saetest.CopyDB(t, srcDB)
 			_, sut := newSUT(t, 1, sutOpt, withExecResultsDB(srcHDB.Clone()), withCommitInterval(commitInterval), options.Func[sutConfig](func(c *sutConfig) {
 				c.db = newDB
 				c.logLevel = logging.Warn
@@ -257,17 +256,4 @@ func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 			})
 		}
 	})
-}
-
-func copyDB(t *testing.T, srcDB database.Database) database.Database {
-	t.Helper()
-
-	newDB := memdb.New()
-	it := srcDB.NewIterator()
-	for it.Next() {
-		require.NoErrorf(t, newDB.Put(it.Key(), it.Value()), "%T.Put() during database copy", newDB)
-	}
-	require.NoErrorf(t, it.Error(), "%T.Error() after database copy", it)
-
-	return newDB
 }

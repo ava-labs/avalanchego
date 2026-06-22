@@ -87,9 +87,19 @@ type (
 		nodeID     ids.NodeID
 		validators set.Set[ids.NodeID]
 		now        func() time.Time
+		db         database.Database
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withDB initializes the SUT's VM against an existing database rather than a
+// fresh one, enabling restart simulations that reuse a prior VM's persisted
+// state.
+func withDB(db database.Database) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.db = db
+	})
+}
 
 // withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
 // balance to each address.
@@ -172,13 +182,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			},
 			nodeID: ids.GenerateTestNodeID(),
 			now:    time.Now,
+			db:     memdb.New(),
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
 			pushGossipPeriod: 100 * time.Millisecond,
 			now:              cfg.now,
 		}
-		db = memdb.New()
+		db = cfg.db
 	)
 
 	// The VM and shared memory MUST share an underlying database so that
@@ -946,6 +957,62 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	// unexported, so match on its text rather than the sentinel.
 	err = sut.VerifyBlock(ctx, nil, parsed)
 	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
+}
+
+// Bootstrapping verifies blocks by hash rather than rebuilding them, so the VM
+// validates the settled marker by decoding it via [hooks.SettledBy] — a path
+// NormalOp verification never takes. Settling a real (height 1) block makes the
+// decode observable: an absent or broken marker decodes to the degenerate height
+// 0 and fails the check.
+func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
+	key := txtest.NewKey(t)
+	timeOpt, clock := withVMTime(time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt)
+	w := newWallet(key, sut.ctx, sut.Client)
+
+	// Advance past Tau so blk2 settles blk1 (height 1) rather than genesis.
+	blk1 := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	clock.advanceToSettle(ctx, t, blk1)
+
+	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
+	blk2 := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+
+	require.NoErrorf(t, sut.SetState(ctx, snow.Bootstrapping), "%T.SetState(%s)", sut.VM, snow.Bootstrapping)
+	require.NoErrorf(t, sut.VerifyBlock(ctx, nil, blk2), "%T.VerifyBlock() during bootstrapping", sut.VM)
+	require.Equal(t, blk1.ID(), blk2.LastSettled().ID(), "settled block after bootstrapping verify")
+}
+
+// Recovery (run when a fresh VM initializes over a populated database) decodes
+// the last-accepted block's settled marker via [hooks.SettledBy] to decide which
+// post-execution state roots to retain — the only path that reaches SettledBy on
+// restart. Settling a real block beforehand yields a non-zero settled height,
+// and continuing to build afterwards confirms the recovered state is usable.
+func TestRecoverSettledStateAfterRestart(t *testing.T) {
+	key := txtest.NewKey(t)
+	alloc := withMaxAllocFor(key.EthAddress())
+
+	srcTimeOpt, srcClock := withVMTime(time.Unix(saeparams.TauSeconds, 0))
+	srcDB := memdb.New()
+	srcCtx, src := newSUT(t, alloc, srcTimeOpt, withDB(srcDB))
+	w := newWallet(key, src.ctx, src.Client)
+
+	// blk2 (height 2) settles blk1 (height 1).
+	blk1 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
+	srcClock.advanceToSettle(srcCtx, t, blk1)
+	blk2 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
+	require.Equal(t, uint64(2), blk2.Height(), "source head height")
+
+	// Restart over a copy of the persisted database; recovery runs here.
+	restartTimeOpt, restartClock := withVMTime(srcClock.now())
+	restartCtx, restarted := newSUT(t, alloc, restartTimeOpt, withDB(saetest.CopyDB(t, srcDB)))
+	require.Equal(t, blk2.ID(), restarted.lastAccepted(restartCtx, t), "recovered last-accepted block")
+
+	// Exports are account-nonce based and don't query the client, so the source
+	// wallet can be reused to sign against the restarted VM.
+	restartClock.advanceToSettle(restartCtx, t, blk2)
+	blk3 := restarted.issueAndExecute(restartCtx, t, w.newMinimalTx(t))
+	require.Equal(t, uint64(3), blk3.Height(), "post-restart block height")
+	require.Equal(t, blk2.ID(), blk3.LastSettled().ID(), "post-restart settled block")
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full

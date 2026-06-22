@@ -15,6 +15,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//database",
+        "//database/memdb",
         "//ids",
         "//snow/engine/common",
         "//snow/snowtest",
