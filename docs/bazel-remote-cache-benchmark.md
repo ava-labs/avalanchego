@@ -113,6 +113,42 @@ was stopped too early. That bug is fixed.
 - Once the full-scope test rerun is mostly remote-cache hits, selector cost plus
   separate impacted execution usually does not pay for itself.
 
+## Firewood-from-source context
+PR `5530` (`Add Bazel remote cache benchmark task for firewood`) validated the
+same core point on a Firewood-from-source branch, where Bazel builds were much
+more expensive.
+
+Reference run:
+- GitHub Actions run `27456887507`
+
+Build-only benchmark results from that run:
+
+### linux-amd64
+- setup: `74.419s`
+- `build //main:avalanchego`
+  - no cache: `370.858s`
+  - HTTP warm: `54.919s`
+- `build --config=race //main:avalanchego`
+  - no cache: `368.786s`
+  - HTTP warm: `54.225s`
+
+### darwin-arm64
+- setup: `86.115s`
+- `build //main:avalanchego`
+  - no cache: `303.376s`
+  - HTTP warm: `55.305s`
+- `build --config=race //main:avalanchego`
+  - no cache: `291.600s`
+  - HTTP warm: `56.121s`
+
+Compared with the current non-Firewood branch measurements, the uncached build
+cost on PR `5530` was roughly 2x higher, while warm-cache reruns remained in
+roughly the same ~45-56s range.
+
+That means remote caching is especially valuable when build work increases: it
+turns a branch that is dramatically more expensive without cache into one whose
+warm reruns are still close to the normal branch.
+
 ## Important caveat
 This conclusion is specific to static-job GitHub Actions.
 
