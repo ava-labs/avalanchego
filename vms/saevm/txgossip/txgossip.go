@@ -9,6 +9,7 @@ package txgossip
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool"
@@ -17,7 +18,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
 )
+
+// errInsufficientGasPerByte is returned for a transaction that carries fewer
+// than x/M gas per serialized byte. See [blocklimit.Eligible].
+var errInsufficientGasPerByte = errors.New("insufficient gas per serialized byte")
 
 var _ gossip.Gossipable = Transaction{}
 
@@ -64,8 +70,15 @@ type Set struct {
 
 // NewSet returns a new Set. Use [gossip.BloomSet.Add] or [Set.SendTx] to add
 // transactions to the pool, which SHOULD NOT be populated directly.
-func NewSet(pool *txpool.TxPool, config gossip.BloomSetConfig) (*Set, error) {
-	s := &txSet{pool}
+func NewSet(
+	pool *txpool.TxPool,
+	blockGasLimit func() uint64,
+	config gossip.BloomSetConfig,
+) (*Set, error) {
+	s := &txSet{
+		pool:          pool,
+		blockGasLimit: blockGasLimit,
+	}
 	bs, err := gossip.NewBloomSet(s, config)
 	if err != nil {
 		return nil, err
@@ -80,7 +93,8 @@ func NewSet(pool *txpool.TxPool, config gossip.BloomSetConfig) (*Set, error) {
 var _ gossip.Set[Transaction] = (*txSet)(nil)
 
 type txSet struct {
-	pool *txpool.TxPool
+	pool          *txpool.TxPool
+	blockGasLimit func() uint64
 }
 
 func (s *txSet) Add(tx Transaction) error {
@@ -93,8 +107,32 @@ func (s *txSet) Add(tx Transaction) error {
 	return errors.Join(errs...)
 }
 
+// addToPool adds the eligible transactions (see [blocklimit.Eligible]) to the
+// pool. A transaction's entry is the pool's result for it, while a rejected
+// transaction's entry is [errInsufficientGasPerByte] and it never reaches the pool
 func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
-	return s.pool.Add(txs, local, false /*sync*/)
+	blockGasLimit := s.blockGasLimit()
+
+	errs := make([]error, len(txs))
+	eligible := make([]*types.Transaction, 0, len(txs))
+	eligibleIdx := make([]int, 0, len(txs))
+	for i, tx := range txs {
+		if blocklimit.Eligible(tx.Size(), tx.Gas(), blockGasLimit) {
+			eligible = append(eligible, tx)
+			eligibleIdx = append(eligibleIdx, i)
+			continue
+		}
+		errs[i] = fmt.Errorf("%w: %d gas over %d serialized bytes for a block gas limit of %d",
+			errInsufficientGasPerByte, tx.Gas(), tx.Size(), blockGasLimit)
+	}
+
+	if len(eligible) == 0 {
+		return errs
+	}
+	for j, err := range s.pool.Add(eligible, local, false /*sync*/) {
+		errs[eligibleIdx[j]] = err
+	}
+	return errs
 }
 
 func (s *txSet) Has(id ids.ID) bool {

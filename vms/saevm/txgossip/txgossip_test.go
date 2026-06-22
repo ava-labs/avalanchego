@@ -47,7 +47,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 )
+
+const testGasTarget = 4_000_000
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(
@@ -83,11 +86,29 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	genesis := blockstest.NewGenesis(t, db, xdb, config, saetest.MaxAllocFor(wallet.Addresses()...))
+	genesis := blockstest.NewGenesis(
+		t,
+		db,
+		xdb,
+		config,
+		saetest.MaxAllocFor(wallet.Addresses()...),
+		blockstest.WithGasTarget(testGasTarget),
+		blockstest.WithBaseFee(params.Wei),
+	)
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, saedb.Config{}, hookstest.NewStub(1e6), logger, prometheus.NewRegistry())
+	exec, err := saexec.New(
+		genesis,
+		src.AsHeaderSource(),
+		config,
+		db,
+		xdb,
+		saedb.Config{},
+		hookstest.NewStub(testGasTarget),
+		logger,
+		prometheus.NewRegistry(),
+	)
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)
@@ -95,7 +116,9 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())
 	pool := newTxPool(t, bc)
-	set, err := NewSet(pool, gossip.BloomSetConfig{})
+	set, err := NewSet(pool, func() uint64 {
+		return uint64(worstcase.SafeMaxBlockSize(exec.LastExecuted().ExecutedByGasTime()))
+	}, gossip.BloomSetConfig{})
 	require.NoError(t, err, "NewSet()")
 	t.Cleanup(func() {
 		assert.NoErrorf(t, pool.Close(), "%T.Close()", pool)
@@ -119,6 +142,79 @@ func newTxPool(t *testing.T, bc BlockChain) *txpool.TxPool {
 	p, err := txpool.New(1, bc, subs)
 	require.NoError(t, err, "txpool.New()")
 	return p
+}
+
+func TestSetRejectsLowGasPerByte(t *testing.T) {
+	const (
+		numAccounts       = 4
+		zeroCalldataBytes = 10_000
+	)
+	s := newSUT(t, numAccounts)
+
+	transfer := func(account int) *types.Transaction {
+		return s.wallet.SetNonceAndSign(t, account, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(100),
+			GasTipCap: big.NewInt(1),
+		})
+	}
+	calldataHeavy := func(account int) *types.Transaction {
+		return s.wallet.SetNonceAndSign(t, account, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas + params.TxDataZeroGas*zeroCalldataBytes,
+			GasFeeCap: big.NewInt(100),
+			GasTipCap: big.NewInt(1),
+			Data:      make([]byte, zeroCalldataBytes),
+		})
+	}
+
+	tests := []struct {
+		name    string
+		tx      *types.Transaction
+		call    string
+		submit  func(*types.Transaction) error
+		wantErr error
+	}{
+		{
+			name:   "gossip/eligible",
+			tx:     transfer(0),
+			call:   "Add(Transaction)",
+			submit: func(tx *types.Transaction) error { return s.Add(Transaction{tx}) },
+		},
+		{
+			name:    "gossip/ineligible",
+			tx:      calldataHeavy(1),
+			call:    "Add(Transaction)",
+			submit:  func(tx *types.Transaction) error { return s.Add(Transaction{tx}) },
+			wantErr: errInsufficientGasPerByte,
+		},
+		{
+			name:   "rpc/eligible",
+			tx:     transfer(2),
+			call:   "SendTx(ctx, tx)",
+			submit: func(tx *types.Transaction) error { return s.SendTx(t.Context(), tx) },
+		},
+		{
+			name:    "rpc/ineligible",
+			tx:      calldataHeavy(3),
+			call:    "SendTx(ctx, tx)",
+			submit:  func(tx *types.Transaction) error { return s.SendTx(t.Context(), tx) },
+			wantErr: errInsufficientGasPerByte,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.submit(tt.tx)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr, tt.call)
+				require.Falsef(t, s.Has(Transaction{tt.tx}.GossipID()), "Has(Transaction.GossipID()) after %s", tt.call)
+				return
+			}
+			require.NoError(t, err, tt.call)
+		})
+	}
 }
 
 func TestExecutorIntegration(t *testing.T) {

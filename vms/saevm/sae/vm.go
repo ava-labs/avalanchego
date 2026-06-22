@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
+	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -223,7 +224,10 @@ func NewVM[T hook.Transaction](
 			return nil, err
 		}
 		conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
-		pool, err := txgossip.NewSet(txPool, conf)
+		blockGasLimit := func() uint64 {
+			return uint64(worstcase.SafeMaxBlockSize(vm.exec.LastExecuted().ExecutedByGasTime()))
+		}
+		pool, err := txgossip.NewSet(txPool, blockGasLimit, conf)
 		if err != nil {
 			return nil, err
 		}

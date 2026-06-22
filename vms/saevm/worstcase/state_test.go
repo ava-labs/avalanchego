@@ -9,6 +9,7 @@ import (
 	"math"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
@@ -86,6 +87,40 @@ type (
 	Op           = hook.Op
 	AccountDebit = hook.AccountDebit
 )
+
+func TestSafeMaxBlockSize(t *testing.T) {
+	// ω_B = R·τ·λ = 20T, so the limit is 20x the target.
+	tests := []struct {
+		name   string
+		target gas.Gas
+		want   gas.Gas
+	}{
+		{
+			name:   "floorTarget", // ACP-176 target floor (1M gas/s)
+			target: 1_000_000,
+			want:   20_000_000,
+		},
+		{
+			name:   "doubleFloorTarget",
+			target: 2_000_000,
+			want:   40_000_000,
+		},
+		{
+			name:   "liveTarget", // current live C-Chain target (~4M gas/s)
+			target: 4_000_000,
+			want:   80_000_000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := gastime.DefaultGasPriceConfig()
+			clock, err := gastime.New(time.Unix(0, 0), tt.target, cfg.MinPrice, cfg)
+			require.NoError(t, err, "gastime.New()")
+			require.Equal(t, tt.want, SafeMaxBlockSize(clock), "SafeMaxBlockSize(clock with target=%d)", tt.target)
+		})
+	}
+}
 
 func TestMultipleBlocks(t *testing.T) {
 	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))

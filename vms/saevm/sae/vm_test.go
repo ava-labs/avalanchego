@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -416,6 +417,47 @@ func (s *SUT) buildAndParseBlock(tb testing.TB, preference *blocks.Block, txs ..
 	b, err := s.ParseBlock(ctx, proposed.Bytes())
 	require.NoError(tb, err, "ParseBlock(BuildBlock().Bytes())")
 	return b
+}
+
+func TestBuildBlockByteBackstop(t *testing.T) {
+	const (
+		numTxs       = 20
+		calldataSize = 120 * units.KiB
+		gasTarget    = 4_000_000
+	)
+	opt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	gasTargetOpt := options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.Target = gasTarget
+	})
+	ctx, sut := newSUT(t, numTxs, opt, gasTargetOpt)
+
+	heavyTxs := make([]*types.Transaction, numTxs)
+	for i := range heavyTxs {
+		heavyTxs[i] = sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas + params.TxDataZeroGas*calldataSize,
+			GasFeeCap: big.NewInt(1),
+			Data:      make([]byte, calldataSize),
+		})
+	}
+
+	txBytes := heavyTxs[0].Size() + maxTxRLPHeaderLen
+	wantTxs := int(maxBlockTxBytes / txBytes)
+	require.Less(t, wantTxs, numTxs, "fixture must supply more transactions than fit in the byte budget")
+
+	// Bypass mempool admission filtering so the builder backstop is exercised.
+	errs := sut.rawVM.mempool.Pool.Add(heavyTxs, true /*local*/, false /*sync*/)
+	require.NoError(t, errors.Join(errs...), "TxPool.Add()")
+	txgossiptest.WaitUntilPending(t, ctx, sut.rawVM.GethRPCBackends(), heavyTxs...)
+
+	built, err := sut.rawVM.blockBuilder.build(ctx, nil, sut.genesis)
+	require.NoError(t, err, "blockBuilder.build()")
+
+	builtTxs := built.Transactions()
+	require.Len(t, builtTxs, wantTxs, "built block included unexpected transaction count")
+	for i, tx := range builtTxs {
+		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
+	}
 }
 
 // createAndVerifyBlock calls [SUT.buildAndParseBlock] with the provided
