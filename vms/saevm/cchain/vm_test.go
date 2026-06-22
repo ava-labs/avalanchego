@@ -992,9 +992,8 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 
 // Bootstrapping verifies blocks by hash rather than rebuilding them, so the VM
 // validates the settled marker by decoding it via [hooks.SettledBy] — a path
-// NormalOp verification never takes. Settling a real (height 1) block makes the
-// decode observable: an absent or broken marker decodes to the degenerate height
-// 0 and fails the check.
+// NormalOp verification never takes. This test settles a real (height 1) block
+// so the decoded marker is non-genesis and can be asserted after VerifyBlock.
 func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	key := txtest.NewKey(t)
 	timeOpt, clock := withVMTime(time.Unix(saeparams.TauSeconds, 0))
