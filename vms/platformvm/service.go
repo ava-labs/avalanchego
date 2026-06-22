@@ -1236,17 +1236,38 @@ func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatus
 
 func (s *Service) nodeValidates(blockchainID ids.ID) bool {
 	chainTx, _, err := s.vm.state.GetTx(blockchainID)
+	if err == nil {
+		if chain, ok := chainTx.Unsigned.(*txs.CreateChainTx); ok {
+			_, isValidator := s.vm.Validators.GetValidator(chain.SubnetID, s.vm.ctx.NodeID)
+			return isValidator
+		}
+	}
+
+	// For CreateL1Tx chains, the chainID = SHA256(subnetID || 0x00) and is
+	// not the same as the txID, so GetTx above fails. Find the subnetID by
+	// scanning all known subnets for a CreateL1Tx whose derived BlockchainID
+	// matches, then check the in-memory validator set.
+	subnetIDs, err := s.vm.state.GetSubnetIDs()
 	if err != nil {
 		return false
 	}
-
-	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
-	if !ok {
-		return false
+	for _, subnetID := range subnetIDs {
+		chains, err := s.vm.state.GetChains(subnetID)
+		if err != nil {
+			continue
+		}
+		for _, tx := range chains {
+			l1Tx, ok := tx.Unsigned.(*txs.CreateL1Tx)
+			if !ok {
+				continue
+			}
+			if l1Tx.BlockchainID(subnetID) == blockchainID {
+				_, isValidator := s.vm.Validators.GetValidator(subnetID, s.vm.ctx.NodeID)
+				return isValidator
+			}
+		}
 	}
-
-	_, isValidator := s.vm.Validators.GetValidator(chain.SubnetID, s.vm.ctx.NodeID)
-	return isValidator
+	return false
 }
 
 func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.ID) (bool, error) {

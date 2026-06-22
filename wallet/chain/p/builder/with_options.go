@@ -158,7 +158,6 @@ func (w *withOptions) NewTransferSubnetOwnershipTx(
 func (w *withOptions) NewCreateL1Tx(
 	chainName string,
 	vmID ids.ID,
-	fxIDs []ids.ID,
 	genesisData []byte,
 	chainID ids.ID,
 	address []byte,
@@ -168,7 +167,6 @@ func (w *withOptions) NewCreateL1Tx(
 	return w.builder.NewCreateL1Tx(
 		chainName,
 		vmID,
-		fxIDs,
 		genesisData,
 		chainID,
 		address,

@@ -157,7 +157,6 @@ type Builder interface {
 	//
 	// - [chainName] is the name of the chain
 	// - [vmID] is the ID of the VM the chain runs
-	// - [fxIDs] are the feature extensions the chain runs
 	// - [genesisData] is the genesis data for the chain
 	// - [chainID] specifies which chain the validator manager is deployed on
 	// - [address] specifies the address of the validator manager
@@ -165,7 +164,6 @@ type Builder interface {
 	NewCreateL1Tx(
 		chainName string,
 		vmID ids.ID,
-		fxIDs []ids.ID,
 		genesisData []byte,
 		chainID ids.ID,
 		address []byte,
@@ -881,7 +879,6 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 func (b *builder) NewCreateL1Tx(
 	chainName string,
 	vmID ids.ID,
-	fxIDs []ids.ID,
 	genesisData []byte,
 	chainID ids.ID,
 	address []byte,
@@ -907,15 +904,8 @@ func (b *builder) NewCreateL1Tx(
 
 	memo := ops.Memo()
 
-	fxIDsBandwidth, err := math.Mul(uint64(len(fxIDs)), ids.IDLen)
-	if err != nil {
-		return nil, err
-	}
+
 	additionalBytes, err := math.Add(uint64(len(memo)), uint64(len(chainName)))
-	if err != nil {
-		return nil, err
-	}
-	additionalBytes, err = math.Add(additionalBytes, fxIDsBandwidth)
 	if err != nil {
 		return nil, err
 	}
@@ -955,7 +945,6 @@ func (b *builder) NewCreateL1Tx(
 		return nil, err
 	}
 
-	utils.Sort(fxIDs)
 	utils.Sort(validators)
 	tx := &txs.CreateL1Tx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -967,7 +956,6 @@ func (b *builder) NewCreateL1Tx(
 		}},
 		ChainName:      chainName,
 		VMID:           vmID,
-		FxIDs:          fxIDs,
 		GenesisData:    genesisData,
 		ManagerChainID: chainID,
 		ManagerAddress: address,

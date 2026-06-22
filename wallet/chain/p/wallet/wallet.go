@@ -518,7 +518,7 @@ func (w *wallet) IssueCreateL1Tx(
 	validators []*txs.CreateL1Validator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewCreateL1Tx(chainName, vmID, fxIDs, genesisData, chainID, address, validators, options...)
+	utx, err := w.builder.NewCreateL1Tx(chainName, vmID, genesisData, chainID, address, validators, options...)
 	if err != nil {
 		return nil, err
 	}

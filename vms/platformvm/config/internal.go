@@ -123,6 +123,5 @@ func (c *Internal) CreateL1Chain(subnetID ids.ID, tx *txs.CreateL1Tx) {
 		SubnetID:    subnetID,
 		GenesisData: tx.GenesisData,
 		VMID:        tx.VMID,
-		FxIDs:       tx.FxIDs,
 	})
 }

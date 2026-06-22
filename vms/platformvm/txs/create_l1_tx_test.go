@@ -121,7 +121,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 			tx: &CreateL1Tx{
 				BaseTx:         baseWithInput,
 				VMID:           vmID,
-				FxIDs:          []ids.ID{},
 				ManagerChainID: managerChainID,
 				ManagerAddress: managerAddress,
 				Validators:     []*CreateL1Validator{},
@@ -172,8 +171,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-				// number of fxIDs
-				0x00, 0x00, 0x00, 0x00,
 				// length of genesis data
 				0x00, 0x00, 0x00, 0x00,
 				// manager chain ID
@@ -263,7 +260,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 				},
 				ChainName:      "Test L1",
 				VMID:           vmID,
-				FxIDs:          []ids.ID{avaxAssetID},
 				GenesisData:    []byte("genesis"),
 				ManagerChainID: managerChainID,
 				ManagerAddress: managerAddress,
@@ -426,13 +422,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-				// number of fxIDs
-				0x00, 0x00, 0x00, 0x01,
-				// fxIDs[0] = avaxAssetID
-				0x21, 0xe6, 0x73, 0x17, 0xcb, 0xc4, 0xbe, 0x2a,
-				0xeb, 0x00, 0x67, 0x7a, 0xd6, 0x46, 0x27, 0x78,
-				0xa8, 0xf5, 0x22, 0x74, 0xb9, 0xd6, 0x05, 0xdf,
-				0x25, 0x91, 0xb2, 0x30, 0x27, 0xa8, 0x7d, 0xff,
 				// length of genesis data "genesis" = 7
 				0x00, 0x00, 0x00, 0x07,
 				// genesis data "genesis"
@@ -660,32 +649,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			expectedErr: ErrConvertValidatorsNotSortedAndUnique,
 		},
 		{
-			name: "fxIDs not sorted",
-			tx: &CreateL1Tx{
-				BaseTx: validBaseTx,
-				VMID:   validVMID,
-				FxIDs: []ids.ID{
-					{0x02},
-					{0x01},
-				},
-				Validators: validValidators,
-			},
-			expectedErr: errFxIDsNotSortedAndUnique,
-		},
-		{
-			name: "duplicate fxIDs",
-			tx: &CreateL1Tx{
-				BaseTx: validBaseTx,
-				VMID:   validVMID,
-				FxIDs: []ids.ID{
-					{0x01},
-					{0x01},
-				},
-				Validators: validValidators,
-			},
-			expectedErr: errFxIDsNotSortedAndUnique,
-		},
-		{
 			name: "genesis too long",
 			tx: &CreateL1Tx{
 				BaseTx:      validBaseTx,
@@ -825,7 +788,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 				BaseTx:         validBaseTx,
 				ChainName:      "Test L1",
 				VMID:           validVMID,
-				FxIDs:          []ids.ID{{0x01}, {0x02}},
 				GenesisData:    make([]byte, units.KiB),
 				ManagerChainID: ids.GenerateTestID(),
 				ManagerAddress: make([]byte, 20),

@@ -206,7 +206,6 @@ var (
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.ShortLen + // chainName length
 			ids.IDLen + // vmID
-			wrappers.IntLen + // num fxIDs
 			wrappers.IntLen + // genesis length
 			ids.IDLen + // managerChainID
 			wrappers.IntLen + // address length
@@ -410,6 +409,7 @@ func ConvertSubnetToL1ValidatorComplexity(l1Validators ...*txs.ConvertSubnetToL1
 	}
 	return complexity, nil
 }
+
 
 func convertSubnetToL1ValidatorComplexity(l1Validator *txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
 	complexity := gas.Dimensions{
@@ -827,11 +827,7 @@ func (c *complexityVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 }
 
 func (c *complexityVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
-	bandwidth, err := math.Mul(uint64(len(tx.FxIDs)), ids.IDLen)
-	if err != nil {
-		return err
-	}
-	bandwidth, err = math.Add(bandwidth, uint64(len(tx.ChainName)))
+	bandwidth, err := math.Add(uint64(0), uint64(len(tx.ChainName)))
 	if err != nil {
 		return err
 	}

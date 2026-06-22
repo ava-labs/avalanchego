@@ -74,9 +74,6 @@
 	"memo": "0xf09f98850a77656c6c2074686174277301234521",
 	"chainName": "Test L1",
 	"vmID": "2JCAK2GqZnY28qrRHTiHFmkWPaec7vaMvaWDgG9XgpVRnsEdk8",
-	"fxIDs": [
-		"FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z"
-	],
 	"genesisData": "Z2VuZXNpcw==",
 	"chainID": "NfebWJbJMmUpduqFCF8i1m5pstbVYLP1gGHbacrevXZMhpVMy",
 	"address": "0x000000000000000000000000000000000000dead",

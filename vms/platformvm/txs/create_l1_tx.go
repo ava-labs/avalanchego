@@ -30,8 +30,6 @@ type CreateL1Tx struct {
 	// ID of the VM running on the chain
 	VMID ids.ID `serialize:"true" json:"vmID"`
 
-	// IDs of the feature extensions running on the chain
-	FxIDs []ids.ID `serialize:"true" json:"fxIDs"`
 
 	// Byte representation of genesis state of the chain
 	GenesisData []byte `serialize:"true" json:"genesisData"`
@@ -63,8 +61,6 @@ func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrConvertMustIncludeValidators
 	case !utils.IsSortedAndUnique(tx.Validators):
 		return ErrConvertValidatorsNotSortedAndUnique
-	case !utils.IsSortedAndUnique(tx.FxIDs):
-		return errFxIDsNotSortedAndUnique
 	case len(tx.GenesisData) > MaxGenesisLen:
 		return errGenesisTooLong
 	}
