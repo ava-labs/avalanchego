@@ -110,11 +110,11 @@ Taken when the validator did not meet uptime requirements, regardless of `NextPe
 
 ## UTXO Creation
 
-Attached to `AddAutoRenewedValidatorTx`:
+Referencing `AddAutoRenewedValidatorTx`:
 
 - Initial stake outputs, returned when the validator stops.
 
-Attached to `RewardAutoRenewedValidatorTx`:
+Referencing `RewardAutoRenewedValidatorTx`:
 
 - Withdrawal portion of rewards, based on `AutoCompoundRewardShares`.
 - Overflow rewards when restaking would exceed `MaxValidatorStake`.

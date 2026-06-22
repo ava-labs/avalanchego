@@ -5,15 +5,15 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/uptime/uptimemock"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -27,19 +27,40 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
+var _ uptime.Calculator = testUptimeCalculator{}
+
+// testUptimeCalculator is a local [uptime.Calculator] for tests that returns a
+// fixed uptime percentage (or error), avoiding the need for a generated mock.
+type testUptimeCalculator struct {
+	percent float64
+	err     error
+}
+
+func (c testUptimeCalculator) CalculateUptime(ids.NodeID) (time.Duration, time.Time, error) {
+	return 0, time.Time{}, c.err
+}
+
+func (c testUptimeCalculator) CalculateUptimePercent(ids.NodeID) (float64, error) {
+	return c.percent, c.err
+}
+
+func (c testUptimeCalculator) CalculateUptimePercentFrom(ids.NodeID, time.Time) (float64, error) {
+	return c.percent, c.err
+}
+
 func TestBlockOptions(t *testing.T) {
 	type test struct {
 		name                   string
-		blkF                   func(*gomock.Controller) *Block
+		blkF                   func() *Block
 		expectedPreferenceType block.Block
 	}
 
 	tests := []test{
 		{
 			name: "apricot proposal block; commit preferred",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				state := statetest.New(t, statetest.Config{})
-				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes := testUptimeCalculator{}
 
 				manager := &manager{
 					backend: &backend{
@@ -63,9 +84,9 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; invalid proposal tx",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				state := statetest.New(t, statetest.Config{})
-				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes := testUptimeCalculator{}
 
 				manager := &manager{
 					backend: &backend{
@@ -95,9 +116,9 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; missing tx",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				stakerTxID := ids.GenerateTestID()
-				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes := testUptimeCalculator{}
 
 				state := statetest.New(t, statetest.Config{})
 
@@ -131,7 +152,7 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; error fetching staker tx; db closed",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				stakerTxID := ids.GenerateTestID()
 
 				db := memdb.New()
@@ -140,7 +161,7 @@ func TestBlockOptions(t *testing.T) {
 				})
 				require.NoError(t, db.Close())
 
-				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes := testUptimeCalculator{}
 
 				manager := &manager{
 					backend: &backend{
@@ -172,7 +193,7 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; unexpected staker tx type",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				stakerTxID := ids.GenerateTestID()
 				stakerTx := &txs.Tx{
 					TxID:     stakerTxID,
@@ -181,7 +202,7 @@ func TestBlockOptions(t *testing.T) {
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes := testUptimeCalculator{}
 
 				manager := &manager{
 					backend: &backend{
@@ -213,7 +234,7 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; missing primary network validator",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
@@ -231,7 +252,7 @@ func TestBlockOptions(t *testing.T) {
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
-				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes := testUptimeCalculator{}
 
 				manager := &manager{
 					backend: &backend{
@@ -263,7 +284,7 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; failed calculating primary network uptime",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
@@ -288,8 +309,7 @@ func TestBlockOptions(t *testing.T) {
 				state.AddTx(stakerTx, status.Committed)
 				require.NoError(t, state.PutCurrentValidator(staker))
 
-				uptimes := uptimemock.NewCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(0.0, database.ErrNotFound)
+				uptimes := testUptimeCalculator{err: database.ErrNotFound}
 
 				manager := &manager{
 					backend: &backend{
@@ -321,7 +341,7 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; failed fetching subnet transformation",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
@@ -341,7 +361,7 @@ func TestBlockOptions(t *testing.T) {
 						NodeID:    nodeID,
 					}
 				)
-				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes := testUptimeCalculator{}
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
@@ -378,7 +398,7 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; prefers commit",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
@@ -405,8 +425,7 @@ func TestBlockOptions(t *testing.T) {
 					}
 				)
 
-				uptimes := uptimemock.NewCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.5, nil)
+				uptimes := testUptimeCalculator{percent: .5}
 
 				state := statetest.New(t, statetest.Config{})
 				state.AddTx(stakerTx, status.Committed)
@@ -444,7 +463,7 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; prefers abort",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
@@ -476,8 +495,7 @@ func TestBlockOptions(t *testing.T) {
 				require.NoError(t, state.PutCurrentValidator(staker))
 
 				state.AddSubnetTransformation(transformSubnetTx)
-				uptimes := uptimemock.NewCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.5, nil)
+				uptimes := testUptimeCalculator{percent: .5}
 				manager := &manager{
 					backend: &backend{
 						state: state,
@@ -508,7 +526,7 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; reward auto-renewed validator; sufficient uptime; prefer commit",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
@@ -529,9 +547,6 @@ func TestBlockOptions(t *testing.T) {
 				state.AddTx(stakerTx, status.Committed)
 				require.NoError(t, state.PutCurrentValidator(staker))
 
-				uptimes := uptimemock.NewCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.9, nil)
-
 				manager := &manager{
 					backend: &backend{
 						state: state,
@@ -541,7 +556,7 @@ func TestBlockOptions(t *testing.T) {
 						Config: &config.Internal{
 							UptimePercentage: .8,
 						},
-						Uptimes: uptimes,
+						Uptimes: testUptimeCalculator{percent: .9},
 					},
 				}
 
@@ -562,7 +577,7 @@ func TestBlockOptions(t *testing.T) {
 		},
 		{
 			name: "banff proposal block; reward auto-renewed validator; insufficient uptime; prefer abort",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
 					nodeID     = ids.GenerateTestNodeID()
@@ -583,8 +598,7 @@ func TestBlockOptions(t *testing.T) {
 				state.AddTx(stakerTx, status.Committed)
 				require.NoError(t, state.PutCurrentValidator(staker))
 
-				uptimes := uptimemock.NewCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.5, nil)
+				uptimes := testUptimeCalculator{percent: .5}
 
 				manager := &manager{
 					backend: &backend{
@@ -618,10 +632,9 @@ func TestBlockOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
 			require := require.New(t)
 
-			blk := tt.blkF(ctrl)
+			blk := tt.blkF()
 			options, err := blk.Options(t.Context())
 			require.NoError(err)
 			require.IsType(tt.expectedPreferenceType, options[0].(*Block).Block)
