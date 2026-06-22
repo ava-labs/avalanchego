@@ -251,10 +251,6 @@ func init() {
 // nor its extData bytes (it commits only ExtDataHash), so a block with a
 // tampered Version or extData keeps the same ID. This override is the boundary
 // that rejects such blocks before they are accepted, persisted, or executed.
-//
-// Genesis (block 0) always uses the pre-ApricotPhase1 extData rules regardless
-// of chain config: its legacy header left ExtDataHash empty, and bootstrapping
-// re-parses the full ancestry including genesis, so it must be accepted here.
 func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
 	b, err := vm.VM.ParseBlock(ctx, buf)
 	if err != nil {
@@ -268,18 +264,21 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 
 	var (
 		extData        = customtypes.BlockExtData(eth)
-		actualHash     = customtypes.CalcExtDataHash(extData)
-		wantHeaderHash = actualHash
+		calculatedHash = customtypes.CalcExtDataHash(extData)
+		wantHeaderHash = calculatedHash
 	)
-	if eth.NumberU64() == 0 || !corethparams.GetExtra(vm.chainConfig).IsApricotPhase1(eth.Time()) {
-		wantHeaderHash = ethcommon.Hash{}
+	// For genesis and pre-ApricotPhase1 blocks, the header's ExtDataHash is
+	// expected to be empty with the actual data expected to be committed to in
+	// [extDataHashes].
+	if height := eth.NumberU64(); height == 0 || !corethparams.GetExtra(vm.chainConfig).IsApricotPhase1(eth.Time()) {
 		wantHash := customtypes.EmptyExtDataHash
-		if want, ok := extDataHashes[vm.ctx.NetworkID][eth.NumberU64()]; ok {
+		if want, ok := extDataHashes[vm.ctx.NetworkID][height]; ok {
 			wantHash = want
 		}
-		if actualHash != wantHash {
-			return nil, fmt.Errorf("%w: have %x, want %x", errExtDataUnexpectedHash, actualHash, wantHash)
+		if calculatedHash != wantHash {
+			return nil, fmt.Errorf("%w: have %x, want %x", errExtDataUnexpectedHash, calculatedHash, wantHash)
 		}
+		wantHeaderHash = ethcommon.Hash{}
 	}
 	if got := customtypes.GetHeaderExtra(eth.Header()).ExtDataHash; got != wantHeaderHash {
 		return nil, fmt.Errorf("%w: have %x, want %x", errExtDataHashMismatch, got, wantHeaderHash)
