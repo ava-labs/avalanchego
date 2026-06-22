@@ -37,9 +37,9 @@ import (
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-// signWarpMessage requests the SUT to sign msg, verifies the signature, and
-// returns the signature.
-func (s *SUT) signWarpMessage(
+// signAndVerifyWarpMessage requests the SUT to sign msg, verifies the
+// signature, and returns the signature.
+func (s *SUT) signAndVerifyWarpMessage(
 	ctx context.Context,
 	tb testing.TB,
 	msg *avalanchewarp.UnsignedMessage,
@@ -154,8 +154,8 @@ func TestSendWarpMessage(t *testing.T) {
 	sut.assertWarpSigningRefusal(ctx, t, hashMsg, warp.NotAcceptedErrCode)
 
 	sut.acceptAndExecute(ctx, t, built)
-	sut.signWarpMessage(ctx, t, sentMsg)
-	sut.signWarpMessage(ctx, t, hashMsg)
+	sut.signAndVerifyWarpMessage(ctx, t, sentMsg)
+	sut.signAndVerifyWarpMessage(ctx, t, hashMsg)
 }
 
 // forwardAndLogCode returns runtime bytecode that forwards its calldata to
