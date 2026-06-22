@@ -133,43 +133,18 @@ func withNetworkID(id uint32) sutOption {
 	})
 }
 
-// vmTime is a mutable clock for tests that need to control the VM's notion of
-// "now" — most notably to advance past [saeparams.Tau] so that a real
-// (non-genesis) block settles.
-type vmTime struct {
-	time.Time
-}
-
-func (t *vmTime) now() time.Time { return t.Time }
-
-func (t *vmTime) set(n time.Time) { t.Time = n }
-
-// advanceToSettle advances the clock such that the next call to [vmTime.now] is
-// at or after the time required to settle b. Note that at least one more
-// accepted [blocks.Block] is still required to actually settle b.
-func (t *vmTime) advanceToSettle(ctx context.Context, tb testing.TB, b *blocks.Block) {
-	tb.Helper()
-	require.NoErrorf(tb, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	// cchain truncates a block's timestamp to millisecond resolution (see
-	// [hooks.BlockTime]), so round the target up to the next millisecond to
-	// guarantee the next built block's time is still at or after the settlement
-	// threshold once truncated.
-	to := b.ExecutedByGasTime().AsTime().Add(saeparams.Tau + time.Millisecond - time.Nanosecond).Truncate(time.Millisecond)
-	if t.Before(to) {
-		t.set(to)
-	}
-}
-
 // withVMTime fixes the SUT's clock at startTime, controlling the block-building
 // and consensus time of both the cchain hooks and the underlying [sae.VM], and
 // returns a handle that lets the test move the clock forward (e.g. past Tau to
-// settle a real block).
-func withVMTime(startTime time.Time) (sutOption, *vmTime) {
-	t := &vmTime{Time: startTime}
-	opt := options.Func[sutConfig](func(c *sutConfig) {
-		c.now = t.now
+// settle a real block). cchain records block timestamps at millisecond
+// resolution (see [hooks.BlockTime]), so the clock rounds settle targets up to
+// the next millisecond.
+func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
+	c := saetest.NewClock(startTime, time.Millisecond)
+	opt := options.Func[sutConfig](func(cfg *sutConfig) {
+		cfg.now = c.Now
 	})
-	return opt, t
+	return opt, c
 }
 
 // newSUT initializes a cchain [VM], transitions it to [snow.NormalOp], and
@@ -982,42 +957,6 @@ func TestParseBlock(t *testing.T) {
 	}
 }
 
-// TestSettledMarkerRoundTrip verifies that the settled-block marker a built
-// block carries in its header points at the correct settled block. It exercises
-// both settlement of the genesis block (the only block settled within Tau of
-// genesis) and, after advancing past Tau, settlement of a real (non-genesis)
-// block, observing the marker's effect via [blocks.Block.LastSettled].
-func TestSettledMarker(t *testing.T) {
-	sk := txtest.NewKey(t)
-	timeOpt, clock := withVMTime(time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()), timeOpt)
-
-	w := newWallet(sk, sut.ctx, sut.Client)
-
-	// Before any block is built, the last-accepted block is genesis.
-	genesisID := sut.lastAccepted(ctx, t)
-
-	// Build, verify, accept, and execute the first block (height 1). Within Tau
-	// of genesis it settles genesis (height 0), and it is the block a later block
-	// will settle once the clock advances.
-	blk1 := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-	require.Equal(t, uint64(1), blk1.Height(), "first built block height")
-
-	// Within Tau of genesis, the only settled block is genesis (height 0).
-	genesisSettled := blk1.LastSettled()
-	require.Zerof(t, genesisSettled.Height(), "settled block height (genesis within Tau)")
-	require.Equal(t, genesisID, genesisSettled.ID(), "settled block (genesis within Tau)")
-
-	// Advance past Tau so the next block settles blk1 — a real, non-genesis
-	// block — rather than genesis.
-	clock.advanceToSettle(ctx, t, blk1)
-	blk2 := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-
-	realSettled := blk2.LastSettled()
-	require.NotZerof(t, realSettled.Height(), "settled block height (real block)")
-	require.Equal(t, blk1.ID(), realSettled.ID(), "settled block (real block)")
-}
-
 // TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a received
 // block whose Header.Time disagrees with TimeMilliseconds.
 func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
@@ -1064,7 +1003,7 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 
 	// Advance past Tau so blk2 settles blk1 (height 1) rather than genesis.
 	blk1 := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-	clock.advanceToSettle(ctx, t, blk1)
+	clock.AdvanceToSettle(ctx, t, blk1)
 
 	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
 	blk2 := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
@@ -1090,18 +1029,18 @@ func TestRecoverSettledStateAfterRestart(t *testing.T) {
 
 	// blk2 (height 2) settles blk1 (height 1).
 	blk1 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
-	srcClock.advanceToSettle(srcCtx, t, blk1)
+	srcClock.AdvanceToSettle(srcCtx, t, blk1)
 	blk2 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
 	require.Equal(t, uint64(2), blk2.Height(), "source head height")
 
 	// Restart over a copy of the persisted database; recovery runs here.
-	restartTimeOpt, restartClock := withVMTime(srcClock.now())
+	restartTimeOpt, restartClock := withVMTime(srcClock.Now())
 	restartCtx, restarted := newSUT(t, alloc, restartTimeOpt, withDB(saetest.CopyDB(t, srcDB)))
 	require.Equal(t, blk2.ID(), restarted.lastAccepted(restartCtx, t), "recovered last-accepted block")
 
 	// Exports are account-nonce based and don't query the client, so the source
 	// wallet can be reused to sign against the restarted VM.
-	restartClock.advanceToSettle(restartCtx, t, blk2)
+	restartClock.AdvanceToSettle(restartCtx, t, blk2)
 	blk3 := restarted.issueAndExecute(restartCtx, t, w.newMinimalTx(t))
 	require.Equal(t, uint64(3), blk3.Height(), "post-restart block height")
 	require.Equal(t, blk2.ID(), blk3.LastSettled().ID(), "post-restart settled block")

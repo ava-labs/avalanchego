@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -106,7 +105,11 @@ func TestAncestorInputIDs(t *testing.T) {
 	}
 }
 
-func TestBuildBlockSettledRoundTrip(t *testing.T) {
+// Verifies that [builder.BuildBlock] writes the settled marker into the header
+// and [hooks.SettledBy] reads it back. The all-zero case is encoded as non-nil
+// zero pointers, distinct from an absent marker (see [TestSettledByAbsent]). The
+// RLP codec for these header fields is covered by coreth's customtypes tests.
+func TestBuildBlockSettledMarker(t *testing.T) {
 	tests := []struct {
 		name    string
 		settled hook.Settled
@@ -141,15 +144,8 @@ func TestBuildBlockSettledRoundTrip(t *testing.T) {
 			block, err := b.BuildBlock(header, nil, nil, nil, nil, tt.settled)
 			require.NoError(t, err, "builder.BuildBlock()")
 
-			// RLP round-trip the header to prove the marker is committed in the
-			// hashed header, not just attached in memory.
-			enc, err := rlp.EncodeToBytes(block.Header())
-			require.NoError(t, err, "rlp.EncodeToBytes(header)")
-			decoded := new(types.Header)
-			require.NoError(t, rlp.DecodeBytes(enc, decoded), "rlp.DecodeBytes(header)")
-
 			var h hooks
-			require.Equal(t, tt.settled, h.SettledBy(decoded), "hooks.SettledBy() after round-trip")
+			require.Equal(t, tt.settled, h.SettledBy(block.Header()), "hooks.SettledBy()")
 		})
 	}
 }

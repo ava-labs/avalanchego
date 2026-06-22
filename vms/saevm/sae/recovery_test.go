@@ -68,7 +68,7 @@ func TestRecoverFromDatabase(t *testing.T) {
 			}))
 		}
 
-		vmTime.advance(850 * time.Millisecond)
+		vmTime.Advance(850 * time.Millisecond)
 		b := src.runConsensusLoop(t)
 		if !quick {
 			require.Len(t, b.Transactions(), 1, "transactions in block")
@@ -170,7 +170,7 @@ func TestRecoverSimple(t *testing.T) {
 			}))
 
 			for range tt.numBlocks {
-				vmTime.advance(850 * time.Millisecond)
+				vmTime.Advance(850 * time.Millisecond)
 				b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 					To:        &common.Address{},
 					Gas:       params.TxGas,
