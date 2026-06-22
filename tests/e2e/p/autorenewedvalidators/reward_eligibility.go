@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ = e2e.DescribePChain("[Auto Renewed Validators] [Reward Eligibility]", func() {
+var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", func() {
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
