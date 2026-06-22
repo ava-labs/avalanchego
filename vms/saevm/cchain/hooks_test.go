@@ -105,56 +105,55 @@ func TestAncestorInputIDs(t *testing.T) {
 	}
 }
 
-// Verifies that [builder.BuildBlock] writes the settled marker into the header
-// and [hooks.SettledBy] reads it back. The all-zero case is encoded as non-nil
-// zero pointers, distinct from an absent marker (see [TestSettledByAbsent]). The
-// RLP codec for these header fields is covered by coreth's customtypes tests.
-func TestBuildBlockSettledMarker(t *testing.T) {
+// Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
+// writes into the header, and returns the zero marker when the header carries
+// none. The all-zero marker is encoded as non-nil zero pointers, distinct from
+// an absent marker. The RLP codec for these header fields is covered by coreth's
+// customtypes tests.
+func TestSettledBy(t *testing.T) {
+	newHeader := func() *types.Header {
+		return customtypes.WithHeaderExtra(&types.Header{Number: big.NewInt(1)}, &customtypes.HeaderExtra{})
+	}
+	// built returns the header of a block built carrying the given settled marker.
+	built := func(t *testing.T, settled hook.Settled) *types.Header {
+		t.Helper()
+		var b builder
+		block, err := b.BuildBlock(newHeader(), nil, nil, nil, nil, settled)
+		require.NoError(t, err, "builder.BuildBlock()")
+		return block.Header()
+	}
+
+	nonzero := hook.Settled{
+		Height:       7,
+		GasUnix:      1_000,
+		GasNumerator: gas.Gas(3),
+		Excess:       gas.Gas(42),
+	}
 	tests := []struct {
-		name    string
-		settled hook.Settled
+		name   string
+		header *types.Header
+		want   hook.Settled
 	}{
 		{
-			name:    "zero",
-			settled: hook.Settled{},
+			name:   "absent_marker",
+			header: newHeader(),
+			want:   hook.Settled{},
 		},
 		{
-			name: "nonzero",
-			settled: hook.Settled{
-				Height:       7,
-				GasUnix:      1_000,
-				GasNumerator: gas.Gas(3),
-				Excess:       gas.Gas(42),
-			},
+			name:   "zero",
+			header: built(t, hook.Settled{}),
+			want:   hook.Settled{},
+		},
+		{
+			name:   "nonzero",
+			header: built(t, nonzero),
+			want:   nonzero,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			header := customtypes.WithHeaderExtra(
-				&types.Header{
-					Number:           big.NewInt(1),
-					BlobGasUsed:      new(uint64),
-					ExcessBlobGas:    new(uint64),
-					ParentBeaconRoot: new(common.Hash),
-				},
-				&customtypes.HeaderExtra{},
-			)
-
-			var b builder
-			block, err := b.BuildBlock(header, nil, nil, nil, nil, tt.settled)
-			require.NoError(t, err, "builder.BuildBlock()")
-
 			var h hooks
-			require.Equal(t, tt.settled, h.SettledBy(block.Header()), "hooks.SettledBy()")
+			require.Equal(t, tt.want, h.SettledBy(tt.header), "hooks.SettledBy()")
 		})
 	}
-}
-
-func TestSettledByAbsent(t *testing.T) {
-	header := customtypes.WithHeaderExtra(
-		&types.Header{Number: big.NewInt(1)},
-		&customtypes.HeaderExtra{},
-	)
-	var h hooks
-	require.Equal(t, hook.Settled{}, h.SettledBy(header), "hooks.SettledBy() with no marker")
 }
