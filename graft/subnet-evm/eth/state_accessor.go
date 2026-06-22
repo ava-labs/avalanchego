@@ -255,7 +255,7 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	// Establish the base reconstructed view and the starting point for replay.
 	if reachedGenesis {
 		// Genesis state is not in Firewood; rebuild it from the genesis spec.
-		genesisRecon, err := eth.reconstructGenesis()
+		genesisRecon, err := eth.reconstructGenesis(fwDB)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -264,7 +264,9 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		// optional re-execution.
 		genesisBlock := eth.blockchain.GetBlockByNumber(0)
 		if genesisBlock == nil {
-			genesisRecon.Drop()
+			if dropErr := genesisRecon.Drop(); dropErr != nil {
+				log.Warn("Failed to drop reconstructed view", "err", dropErr)
+			}
 			return nil, nil, errors.New("genesis block not found")
 		}
 		recon = genesisRecon
@@ -275,17 +277,10 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 		}
 
 		// Create the initial reconstructed revision from the base revision.
-		baseRoot := current.Root
-		rev, err := fwDB.Firewood.Revision(ffi.Hash(baseRoot))
+		var err error
+		recon, err = reconstructRevision(fwDB, current.Root)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to open base revision at %s: %w", baseRoot.Hex(), err)
-		}
-		recon, err = rev.Reconstruct(nil)
-		if err := rev.Drop(); err != nil {
-			log.Warn("Failed to drop revision", "root", baseRoot.Hex(), "err", err)
-		}
-		if err != nil {
-			return nil, nil, fmt.Errorf("initial reconstruction: %w", err)
+			return nil, nil, err
 		}
 	}
 	release = func() { recon.Drop() }
@@ -349,25 +344,29 @@ func (eth *Ethereum) firewoodState(ctx context.Context, header *types.Header, re
 	return cache, release, nil
 }
 
-// reconstructGenesis builds a reconstructed Firewood view populated with the
-// committed genesis state. Genesis state is not stored in Firewood, so it is
-// rebuilt from the genesis spec on top of the empty revision.
-func (eth *Ethereum) reconstructGenesis() (*ffi.Reconstructed, error) {
-	fwDB, ok := eth.blockchain.TrieDB().Backend().(*firewood.TrieDB)
-	if !ok {
-		return nil, errors.New("expected Firewood backend for genesis reconstruction")
-	}
-
-	rev, err := fwDB.Firewood.Revision(ffi.Hash(types.EmptyRootHash))
+// reconstructRevision opens the Firewood revision at root and returns a
+// reconstructed view seeded from it.
+func reconstructRevision(fwDB *firewood.TrieDB, root common.Hash) (*ffi.Reconstructed, error) {
+	rev, err := fwDB.Firewood.Revision(ffi.Hash(root))
 	if err != nil {
-		return nil, fmt.Errorf("opening Firewood empty revision: %w", err)
+		return nil, fmt.Errorf("opening revision at %s: %w", root.Hex(), err)
 	}
 	recon, err := rev.Reconstruct(nil)
 	if dropErr := rev.Drop(); dropErr != nil {
-		log.Warn("Failed to drop revision", "root", types.EmptyRootHash.Hex(), "err", dropErr)
+		log.Warn("Failed to drop revision", "root", root.Hex(), "err", dropErr)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("genesis reconstruction: %w", err)
+		return nil, fmt.Errorf("reconstructing revision at %s: %w", root.Hex(), err)
+	}
+	return recon, nil
+}
+
+// reconstructGenesis builds a Firewood reconstructed revision populated with
+// the committed genesis state.
+func (eth *Ethereum) reconstructGenesis(fwDB *firewood.TrieDB) (*ffi.Reconstructed, error) {
+	recon, err := reconstructRevision(fwDB, types.EmptyRootHash)
+	if err != nil {
+		return nil, err
 	}
 
 	// Commit the genesis allocation into the reconstructed view. Root hashing is enabled
