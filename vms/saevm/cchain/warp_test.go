@@ -353,7 +353,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
 			receipt := receipts[0]
 			assert.Equalf(t, tt.wantStatus, receipt.Status, "%T.Status", receipt)
-			if receipt.Status == types.ReceiptStatusFailed {
+			if receipt.Status != types.ReceiptStatusSuccessful {
 				return
 			}
 
