@@ -613,7 +613,7 @@ func executeTx(
 }
 
 // getNextStakerToReward returns the next staker txID to remove from the staking
-// set with a RewardValidatorTx/RewardAutoRenewedValidatorTx rather than an AdvanceTimeTx. [chainTimestamp]
+// set with a [txs.RewardValidatorTx]/[txs.RewardAutoRenewedValidatorTx] rather than an [txs.AdvanceTimeTx]. [chainTimestamp]
 // is the timestamp of the chain at the time this validator would be getting
 // removed and is used to calculate [shouldReward].
 // Returns:
@@ -656,6 +656,10 @@ func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
 	return tx, tx.SyntacticVerify(ctx)
 }
 
+// newRewardTxForStaker returns the reward tx appropriate for the given staker.
+// Only validators added with an [txs.AddAutoRenewedValidatorTx] can be
+// auto-renewed, and thus are rewarded with a [txs.RewardAutoRenewedValidatorTx];
+// all other stakers are rewarded with a [txs.RewardValidatorTx].
 func newRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Time) (*txs.Tx, error) {
 	if _, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx); ok {
 		return newRewardAutoRenewedValidatorTx(ctx, stakerTx.ID(), uint64(timestamp.Unix()))
@@ -664,6 +668,10 @@ func newRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Ti
 	return NewRewardValidatorTx(ctx, stakerTx.ID())
 }
 
+// newRewardAutoRenewedValidatorTx returns a signed
+// [txs.RewardAutoRenewedValidatorTx] for the staker with the given txID. The
+// timestamp disambiguates reward txs across cycles, since an auto-renewed
+// validator keeps the same txID.
 func newRewardAutoRenewedValidatorTx(ctx *snow.Context, txID ids.ID, timestamp uint64) (*txs.Tx, error) {
 	utx := &txs.RewardAutoRenewedValidatorTx{TxID: txID, Timestamp: timestamp}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
