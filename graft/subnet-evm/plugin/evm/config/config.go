@@ -21,6 +21,16 @@ type (
 	}
 )
 
+// OracleSidecarConfig holds operator-supplied settings for the oracle sidecar verifier.
+type OracleSidecarConfig struct {
+	// Endpoint is the HTTP base URL of the sidecar process, e.g. "http://127.0.0.1:9900".
+	// If empty, the oracle verifier is not initialized from JSON config.
+	Endpoint string `json:"endpoint"`
+	// AllowedSources maps source type to allowed source addresses.
+	// An empty slice means all addresses for that source type are permitted.
+	AllowedSources map[string][]string `json:"allowed-sources"`
+}
+
 // Config ...
 type Config struct {
 	// Airdrop
@@ -187,6 +197,9 @@ type Config struct {
 
 	// Database Scheme
 	StateScheme string `json:"state-scheme"`
+
+	// Oracle is the configuration for the oracle sidecar verifier.
+	Oracle OracleSidecarConfig `json:"oracle"`
 }
 
 // GetConfig returns a new config object with the default values set and the

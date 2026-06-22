@@ -22,6 +22,7 @@ go_library(
         "//graft/subnet-evm/plugin/evm/config",
         "//ids",
         "//network/p2p",
+        "//network/p2p/acp118",
         "//snow/consensus/snowman",
         "//snow/engine/common",
         "//snow/engine/snowman/block",

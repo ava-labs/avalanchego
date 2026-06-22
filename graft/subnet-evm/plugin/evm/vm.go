@@ -69,6 +69,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
+	p2poracle "github.com/ava-labs/avalanchego/network/p2p/oracle/validator"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -495,6 +496,38 @@ func (vm *VM) Initialize(
 	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
 	if err = vm.P2PNetwork().AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
 		return err
+	}
+
+	if vm.extensionConfig.OracleVerifier != nil {
+		oracleCache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
+		oracleMeteredCache, err := metercacher.New("oracle_signature_cache", vm.sdkMetrics, oracleCache)
+		if err != nil {
+			return fmt.Errorf("failed to create oracle signature cache: %w", err)
+		}
+		oracleHandler := acp118.NewCachedHandler(oracleMeteredCache, vm.extensionConfig.OracleVerifier, vm.ctx.WarpSigner)
+		if err = vm.P2PNetwork().AddHandler(p2poracle.SignatureRequestHandlerID, oracleHandler); err != nil {
+			return err
+		}
+	} else if vm.config.Oracle.Endpoint != "" {
+		allowed := make(p2poracle.AllowedSources, len(vm.config.Oracle.AllowedSources))
+		for sourceType, addrs := range vm.config.Oracle.AllowedSources {
+			set := make(map[string]struct{}, len(addrs))
+			for _, a := range addrs {
+				set[a] = struct{}{}
+			}
+			allowed[sourceType] = set
+		}
+		sidecar := p2poracle.NewHTTPSidecarClient(vm.config.Oracle.Endpoint, nil)
+		oracleVerifier := p2poracle.NewOracleVerifier(sidecar, allowed)
+		oracleCache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
+		oracleMeteredCache, err := metercacher.New("oracle_signature_cache", vm.sdkMetrics, oracleCache)
+		if err != nil {
+			return fmt.Errorf("failed to create oracle signature cache: %w", err)
+		}
+		oracleHandler := acp118.NewCachedHandler(oracleMeteredCache, oracleVerifier, vm.ctx.WarpSigner)
+		if err = vm.P2PNetwork().AddHandler(p2poracle.SignatureRequestHandlerID, oracleHandler); err != nil {
+			return err
+		}
 	}
 
 	vm.stateSyncDone = make(chan struct{})

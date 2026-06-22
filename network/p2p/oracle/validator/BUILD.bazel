@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "validator",
+    srcs = [
+        "http_sidecar_client.go",
+        "mock_sidecar_client.go",
+        "verifier.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/network/p2p/oracle/validator",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//network/p2p/acp118",
+        "//network/p2p/oracle",
+        "//snow/engine/common",
+        "//vms/platformvm/warp",
+    ],
+)
+
+go_test(
+    name = "validator_test",
+    srcs = [
+        "http_sidecar_client_test.go",
+        "verifier_test.go",
+    ],
+    embed = [":validator"],
+    deps = [
+        "//ids",
+        "//network/p2p/oracle",
+        "//vms/platformvm/warp",
+        "@com_github_stretchr_testify//require",
+    ],
+)
