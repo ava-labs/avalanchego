@@ -27,7 +27,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	// Imported for [saexec.Execute] comment resolution.
-	"github.com/ava-labs/avalanchego/upgrade"
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
