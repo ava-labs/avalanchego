@@ -168,10 +168,10 @@ func TestRPCExtras(t *testing.T) {
 		blockHash   = eth.Hash()
 		extra       = customtypes.GetHeaderExtra(blk.Header())
 	)
-	require.NotNil(t, extra.ExtDataGasUsed, "header ExtDataGasUsed")
-	require.NotNil(t, extra.BlockGasCost, "header BlockGasCost")
-	require.NotNil(t, extra.TimeMilliseconds, "header TimeMilliseconds")
-	require.NotNil(t, extra.MinDelayExcess, "header MinDelayExcess")
+	require.NotNilf(t, extra.ExtDataGasUsed, "%T.ExtDataGasUsed", extra)
+	require.NotNilf(t, extra.BlockGasCost, "%T.BlockGasCost", extra)
+	require.NotNilf(t, extra.TimeMilliseconds, "%T.TimeMilliseconds", extra)
+	require.NotNilf(t, extra.MinDelayExcess, "%T.MinDelayExcess", extra)
 	wantHeaderExtras := map[string]string{
 		"extDataHash":           extra.ExtDataHash.Hex(),
 		"extDataGasUsed":        hexutil.EncodeBig(extra.ExtDataGasUsed),
