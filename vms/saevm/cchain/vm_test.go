@@ -339,7 +339,35 @@ func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blo
 	tb.Helper()
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
-	return s.runConsensusLoop(ctx, tb)
+	blk := s.runConsensusLoop(ctx, tb)
+	s.waitForTxpoolToSettle(ctx, tb, t)
+	return blk
+}
+
+// waitForTxpoolToSettle blocks until the txpool has processed t's block and
+// evicted t. The pool updates the verification state used by [Txpool.Add]
+// asynchronously, via its ChainHeadEvent subscription, after
+// [blocks.Block.WaitUntilExecuted] has already returned. It does so atomically
+// with evicting the included tx, so observing the eviction guarantees a
+// subsequent [Client.IssueTx] verifies against the post-execution state rather
+// than a stale one (e.g. a nonce that hasn't yet been incremented).
+func (s *SUT) waitForTxpoolToSettle(ctx context.Context, tb testing.TB, t *tx.Tx) {
+	tb.Helper()
+
+	// Bound the wait so buggy code that never advances the pool fails fast with
+	// a clear message rather than hanging until the test-wide timeout.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	for s.txpool.Has(t.ID()) {
+		select {
+		case <-ctx.Done():
+			require.NoErrorf(tb, ctx.Err(), "waiting for txpool to evict %s", t.ID())
+		case <-ticker.C:
+		}
+	}
 }
 
 // assertTxAccepted asserts that [Client.GetTx] returns the given tx at the
