@@ -39,7 +39,7 @@ type Executor struct {
 	log        logging.Logger
 	hooks      hook.Points
 
-	queue        chan *blocks.Block
+	queue        chan queuedBlock
 	lastExecuted atomic.Pointer[blocks.Block]
 
 	headEvents  event.FeedOf[core.ChainHeadEvent]
@@ -76,7 +76,7 @@ func New(
 		return nil, err
 	}
 
-	m, err := newMetrics(reg)
+	m, err := newMetrics(reg, lastExecuted.Height())
 	if err != nil {
 		return nil, fmt.Errorf("registering saexec metrics: %w", err)
 	}
@@ -90,7 +90,7 @@ func New(
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
-		queue: make(chan *blocks.Block, 2*saedbConfig.CommitInterval()),
+		queue: make(chan queuedBlock, 2*saedbConfig.CommitInterval()),
 		chainContext: &chainContext{
 			headerSrc,
 			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
@@ -103,7 +103,6 @@ func New(
 		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)
-	e.metrics.markExecuted(lastExecuted.Height())
 
 	go e.processQueue()
 	return e, nil
