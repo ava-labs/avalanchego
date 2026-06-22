@@ -9,21 +9,17 @@ import (
 
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 )
 
 var errRemoteMinPriceExponentSet = errors.New("remote min price exponent should be nil")
 
-// VerifyMinPriceExponent rejects a header carrying a MinPriceExponent. coreth
-// caps at Granite and never activates Helicon, so the field is always SAE's and
-// must never appear on a coreth block.
-func VerifyMinPriceExponent(
-	config *extras.ChainConfig,
-	header *types.Header,
-) error {
-	remote := customtypes.GetHeaderExtra(header).MinPriceExponent
-	if !config.IsHelicon(header.Time) && remote != nil {
+// VerifyMinPriceExponent rejects any coreth block carrying a MinPriceExponent.
+// The field belongs to SAE. semanticVerify only runs on coreth's own
+// block.Verify, so coreth never verifies a post-SAE block and the field must
+// always be absent.
+func VerifyMinPriceExponent(header *types.Header) error {
+	if customtypes.GetHeaderExtra(header).MinPriceExponent != nil {
 		return fmt.Errorf("%w: %s", errRemoteMinPriceExponentSet, header.Hash())
 	}
 	return nil
