@@ -79,7 +79,6 @@ go_test(
         "//snow/engine/snowman/block",
         "//snow/snowtest",
         "//snow/uptime",
-        "//snow/uptime/uptimemock",
         "//snow/validators",
         "//upgrade",
         "//upgrade/upgradetest",
