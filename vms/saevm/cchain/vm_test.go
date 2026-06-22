@@ -27,7 +27,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	// Imported for [saexec.Execute] comment resolution.
-	"github.com/ava-labs/avalanchego/upgrade"
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -373,11 +373,11 @@ func (s *SUT) assertAccount(tb testing.TB, addr common.Address, wantNonce uint64
 
 // issueAndExecute submits t through [Client.IssueTx] and drives the consensus
 // loop to produce, accept, and execute the next block, which is returned.
-func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx, opts ...blockOption) *blocks.Block {
+func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blocks.Block {
 	tb.Helper()
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
-	return s.runConsensusLoop(ctx, tb, opts...)
+	return s.runConsensusLoop(ctx, tb)
 }
 
 // assertTxAccepted asserts that [Client.GetTx] returns the given tx at the
