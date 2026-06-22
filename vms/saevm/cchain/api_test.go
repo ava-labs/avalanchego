@@ -23,7 +23,7 @@ import (
 
 // getTxStatus exposes the deprecated [service.GetAtomicTxStatus] endpoint.
 func (c *Client) getTxStatus(ctx context.Context, txID ids.ID) (TxStatus, error) {
-	resp := TxStatus{}
+	var resp TxStatus
 	err := c.r.SendRequest(
 		ctx,
 		"avax.getAtomicTxStatus",

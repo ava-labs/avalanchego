@@ -12,6 +12,7 @@ package_group(
     name = "external_consumers",
     packages = [
         "//node",
+        "//tests/e2e/p",
         "//vms/transitionvm",
     ],
 )
