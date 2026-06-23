@@ -25,6 +25,13 @@ func buildWarpMessage(t *testing.T, msg *oracle.OracleMessage) *warp.UnsignedMes
 	return um
 }
 
+// TestSignatureRequestHandlerID asserts that oracle attestation is registered at
+// handler ID 4, distinct from the native warp handler ID (2). This constant is
+// the shared contract between validators and icm-services' OracleSignatureAggregator.
+func TestSignatureRequestHandlerID(t *testing.T) {
+	require.Equal(t, uint64(4), SignatureRequestHandlerID)
+}
+
 func TestOracleVerifier_ValidPath(t *testing.T) {
 	msg, err := oracle.NewOracleMessage("solana", "addr1", []byte{1, 2, 3}, 100, 1, []byte("payload"))
 	require.NoError(t, err)
