@@ -23,5 +23,6 @@ func (*Factory) New(logger logging.Logger) (interface{}, error) {
 		pullGossipPeriod:     time.Second,
 		pushGossipPeriod:     100 * time.Millisecond,
 		initialDelayExponent: dynamic.DelayExponent(acp226.InitialDelayExcess),
+		now:                  time.Now,
 	}), nil
 }

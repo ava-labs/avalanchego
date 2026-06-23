@@ -1545,7 +1545,6 @@ func TestWaitForEvent(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name     string
-		Fork     *upgradetest.Fork
 		testCase func(*testing.T, *VM)
 	}{
 		{
@@ -1712,9 +1711,7 @@ func TestWaitForEvent(t *testing.T) {
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			vm := newDefaultTestVM()
-			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-				Fork: testCase.Fork,
-			})
+			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 			testCase.testCase(t, vm)
 			require.NoError(t, vm.Shutdown(t.Context()))
 		})
