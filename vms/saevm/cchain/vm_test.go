@@ -201,7 +201,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	const wsHTTPPath = cchainHTTPPrefix + "/ws"
 	wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
-	_, ethClient := vmtest.DialWS(tb, wsURI)
+	_, ethClient := vmtest.Dial(tb, wsURI)
 
 	sut := &SUT{
 		SUT:       &vmtest.SUT[*VM]{RawVM: vm, Logger: log},

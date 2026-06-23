@@ -57,7 +57,7 @@ func TestRecoverFromDatabase(t *testing.T) {
 		// iteration.
 		last := src.LastAcceptedBlock(t)
 		height := last.Height()
-		quick := height < commitInterval && src.RawVM.LastSettledBlock().Height() > 1
+		quick := height < commitInterval && src.RawVM.lastSettledBlock().Height() > 1
 		final = height > commitInterval
 
 		if !quick {
@@ -197,7 +197,7 @@ func TestRecoverSimple(t *testing.T) {
 			// must not be accessible, except at CommitTrieDBEvery boundaries
 			// where the settled state was written to disk.
 			t.Run("unavailable_outside_window", func(t *testing.T) {
-				lastSettled := sut.RawVM.LastSettledBlock().NumberU64()
+				lastSettled := sut.RawVM.lastSettledBlock().NumberU64()
 				committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
 				lastOnDisk, err := canonicalBlock(sut.RawVM.db, committedHeight)
 				require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)

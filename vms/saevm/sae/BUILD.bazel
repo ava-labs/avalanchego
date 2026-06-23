@@ -32,7 +32,6 @@ go_library(
         "//snow/engine/snowman/block",
         "//utils",
         "//utils/bloom",
-        "//utils/crypto/bls",
         "//utils/logging",
         "//version",
         "//vms/components/gas",

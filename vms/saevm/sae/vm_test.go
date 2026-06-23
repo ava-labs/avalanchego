@@ -93,7 +93,7 @@ type SUT struct {
 	sender *saetest.Sender
 }
 
-func (s *SUT) NodeID() ids.NodeID      { return s.RawVM.NodeID() }
+func (s *SUT) NodeID() ids.NodeID      { return s.RawVM.nodeID() }
 func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
@@ -192,7 +192,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	}
 	tb.Cleanup(func() {
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, vm.LastAcceptedBlock().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		require.NoError(tb, vm.lastAcceptedBlock().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
 	})
 
 	// Avalanchego marks the local node as connected so that p2p protocols
@@ -205,7 +205,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		ChainVM:   snow,
 		Client:    ethClient,
 		rpcClient: rpcClient,
-		genesis:   vm.LastSettledBlock(),
+		genesis:   vm.lastSettledBlock(),
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
 			types.LatestSigner(conf.genesis.Config),
@@ -228,7 +228,7 @@ func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Clien
 	server := httptest.NewServer(handlers[wsHTTPExtensionPath])
 	tb.Cleanup(server.Close)
 
-	return vmtest.DialWS(tb, "ws://"+server.Listener.Addr().String())
+	return vmtest.Dial(tb, "ws://"+server.Listener.Addr().String())
 }
 
 func marshalJSON(tb testing.TB, v any) []byte {
@@ -477,7 +477,7 @@ func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Addres
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	tb.Helper()
-	sdb, err := s.RawVM.StateDB(root)
+	sdb, err := s.RawVM.stateDB(root)
 	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.RawVM)
 	return sdb
 }

@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -422,24 +421,20 @@ func (*VM) Version(context.Context) (string, error) {
 	return version.Current.String(), nil
 }
 
-func (vm *VM) LastAcceptedBlock() *blocks.Block {
+func (vm *VM) lastAcceptedBlock() *blocks.Block {
 	return vm.last.accepted.Load()
 }
 
-func (vm *VM) LastSettledBlock() *blocks.Block {
+func (vm *VM) lastSettledBlock() *blocks.Block {
 	return vm.last.settled.Load()
 }
 
-func (vm *VM) StateDB(root common.Hash) (*state.StateDB, error) {
+func (vm *VM) stateDB(root common.Hash) (*state.StateDB, error) {
 	return vm.exec.StateDB(root)
 }
 
-func (vm *VM) NodeID() ids.NodeID {
+func (vm *VM) nodeID() ids.NodeID {
 	return vm.snowCtx.NodeID
-}
-
-func (vm *VM) PublicKey() *bls.PublicKey {
-	return vm.snowCtx.PublicKey
 }
 
 func (vm *VM) log() logging.Logger {

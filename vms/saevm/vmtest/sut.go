@@ -12,11 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-
-	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // rawVM is the native block API common to the SAE and C-Chain VMs. Both expose
@@ -28,7 +27,7 @@ type rawVM interface {
 	AcceptBlock(context.Context, *blocks.Block) error
 	LastAccepted(context.Context) (ids.ID, error)
 	GetBlock(context.Context, ids.ID) (*blocks.Block, error)
-	WaitForEvent(context.Context) (snowcommon.Message, error)
+	WaitForEvent(context.Context) (common.Message, error)
 }
 
 // SUT is the VM-agnostic system under test. The VM type parameter lets each
@@ -71,7 +70,7 @@ func (s *SUT[VM]) WaitForPendingTxs(tb testing.TB) {
 	tb.Helper()
 	msg, err := s.RawVM.WaitForEvent(s.Context(tb))
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.RawVM)
-	require.Equalf(tb, snowcommon.PendingTxs, msg, "%T.WaitForEvent() message", s.RawVM)
+	require.Equalf(tb, common.PendingTxs, msg, "%T.WaitForEvent() message", s.RawVM)
 }
 
 // BuildVerify builds a block on top of preferenceID and verifies it, without a
@@ -102,12 +101,12 @@ func (s *SUT[VM]) RunConsensusLoop(tb testing.TB) *blocks.Block {
 	return s.RunConsensusLoopOnPreference(tb, s.LastAcceptedID(tb))
 }
 
-// DialWS dials wsURL and returns the RPC client and an [ethclient.Client]
-// sharing its transport, which is closed during cleanup.
-func DialWS(tb testing.TB, wsURL string) (*rpc.Client, *ethclient.Client) {
+// Dial dials url and returns the RPC client and an [ethclient.Client] sharing
+// its transport, which is closed during cleanup.
+func Dial(tb testing.TB, url string) (*rpc.Client, *ethclient.Client) {
 	tb.Helper()
-	rpcClient, err := rpc.Dial(wsURL)
-	require.NoErrorf(tb, err, "rpc.Dial(%q)", wsURL)
+	rpcClient, err := rpc.Dial(url)
+	require.NoErrorf(tb, err, "rpc.Dial(%q)", url)
 	tb.Cleanup(rpcClient.Close)
 	return rpcClient, ethclient.NewClient(rpcClient)
 }
