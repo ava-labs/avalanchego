@@ -90,9 +90,20 @@ type (
 		validators set.Set[ids.NodeID]
 		now        func() time.Time
 		db         database.Database
+		state      snow.State
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withState controls the consensus state the SUT's VM is left in after
+// initialization. Defaults to [snow.NormalOp]. Use [snow.Bootstrapping] to
+// model a node that is still catching up and has not yet entered normal
+// operation (e.g. verifying blocks received from peers during bootstrap).
+func withState(state snow.State) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.state = state
+	})
+}
 
 // withDB initializes the SUT's VM against an existing database rather than a
 // fresh one, enabling restart simulations that reuse a prior VM's persisted
@@ -147,7 +158,8 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	return opt, c
 }
 
-// newSUT initializes a cchain [VM], transitions it to [snow.NormalOp], and
+// newSUT initializes a cchain [VM], transitions it to the configured
+// [snow.State] (default [snow.NormalOp]), and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
 // [NewClient] expects.
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
@@ -169,6 +181,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			networkID: constants.UnitTestID,
 			now:       time.Now,
 			db:        memdb.New(),
+			state:     snow.NormalOp,
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -213,7 +226,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
 	})
-	require.NoErrorf(tb, vm.SetState(ctx, snow.NormalOp), "%T.SetState(%s)", vm, snow.NormalOp)
+	require.NoErrorf(tb, vm.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
 	// need to treat our node as a special case.
@@ -340,18 +353,19 @@ func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blo
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
 	blk := s.runConsensusLoop(ctx, tb)
-	s.waitForTxpoolToSettle(ctx, tb, t)
+	s.waitForTxPoolStateUpdate(ctx, tb, t)
 	return blk
 }
 
-// waitForTxpoolToSettle blocks until the txpool has processed t's block and
-// evicted t. The pool updates the verification state used by [Txpool.Add]
-// asynchronously, via its ChainHeadEvent subscription, after
-// [blocks.Block.WaitUntilExecuted] has already returned. It does so atomically
-// with evicting the included tx, so observing the eviction guarantees a
-// subsequent [Client.IssueTx] verifies against the post-execution state rather
-// than a stale one (e.g. a nonce that hasn't yet been incremented).
-func (s *SUT) waitForTxpoolToSettle(ctx context.Context, tb testing.TB, t *tx.Tx) {
+// waitForTxPoolStateUpdate blocks until the txpool's verification state has
+// been updated to reflect t's executed block, observed by t's eviction. The pool
+// updates the verification state used by [Txpool.Add] asynchronously, via its
+// ChainHeadEvent subscription, after [blocks.Block.WaitUntilExecuted] has
+// already returned. It does so atomically with evicting the included tx, so
+// observing the eviction guarantees a subsequent [Client.IssueTx] verifies
+// against the post-execution state rather than a stale one (e.g. a nonce that
+// hasn't yet been incremented).
+func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx.Tx) {
 	tb.Helper()
 
 	// Bound the wait so buggy code that never advances the pool fails fast with
@@ -1018,26 +1032,85 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
 }
 
-// Bootstrapping verifies blocks by hash rather than rebuilding them, so the VM
-// validates the settled marker by decoding it via [hooks.SettledBy] — a path
-// NormalOp verification never takes. This test settles a real (height 1) block
-// so the decoded marker is non-genesis and can be asserted after VerifyBlock.
+// During bootstrapping the consensus engine has already filtered blocks to be
+// hash-valid, so [VM.VerifyBlock] does not rebuild them. What it does verify is
+// a cross-check that the settled marker decoded from the header
+// ([hooks.SettledBy]) agrees with the independently-recomputed last-settled
+// block ([lastToSettle]); a mismatch returns errSettledHeightMismatch. This
+// test drives that path on a block built by a different VM (as in bootstrap),
+// asserting both that a correct marker passes and that a tampered one is
+// rejected.
 func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	key := txtest.NewKey(t)
-	timeOpt, clock := withVMTime(time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt)
-	w := newWallet(key, sut.ctx, sut.Client)
+	alloc := withMaxAllocFor(key.EthAddress())
 
-	// Advance past Tau so blk2 settles blk1 (height 1) rather than genesis.
-	blk1 := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-	clock.AdvanceToSettle(ctx, t, blk1)
+	// Build blocks at/after the ApricotPhase1 fork so their cross-chain extData
+	// is committed via the header's ExtDataHash (and thus survives the cchain
+	// [VM.ParseBlock] gate when the receiver re-parses blk3 off the wire). A
+	// pre-AP1 block's extData is instead expected in the recorded hash set that
+	// UnitTestID lacks. The fork time is read from a throwaway VM's resolved
+	// chain config rather than [extras.TestChainConfig] because [VM.Initialize]
+	// applies the network's canonical upgrade schedule on top of the genesis.
+	_, cfgProbe := newSUT(t, alloc)
+	ap1Time := *cparams.GetExtra(cfgProbe.chainConfig).ApricotPhase1BlockTimestamp
+	srcTimeOpt, srcClock := withVMTime(time.Unix(int64(ap1Time), 0)) //#nosec G115 -- ap1Time fork timestamp won't overflow for millennia
+	srcDB := memdb.New()
+	srcCtx, src := newSUT(t, alloc, srcTimeOpt, withDB(srcDB))
+	w := newWallet(key, src.ctx, src.Client)
 
-	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
-	blk2 := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	// blk2 (height 2) settles blk1 (height 1); both are accepted into srcDB.
+	blk1 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
+	srcClock.AdvanceToSettle(srcCtx, t, blk1)
+	blk2 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
+	require.Equal(t, uint64(2), blk2.Height(), "source blk2 height")
 
-	require.NoErrorf(t, sut.SetState(ctx, snow.Bootstrapping), "%T.SetState(%s)", sut.VM, snow.Bootstrapping)
-	require.NoErrorf(t, sut.VerifyBlock(ctx, nil, blk2), "%T.VerifyBlock() during bootstrapping", sut.VM)
-	require.Equal(t, blk1.ID(), blk2.LastSettled().ID(), "settled block after bootstrapping verify")
+	// blk3 (height 3) settles blk2. Build+verify it on the source but do NOT
+	// accept it, so it does not land in srcDB; the receiver will verify it as a
+	// block "received from a peer".
+	srcClock.AdvanceToSettle(srcCtx, t, blk2)
+	require.NoErrorf(t, src.IssueTx(srcCtx, w.newMinimalTx(t)), "%T.IssueTx()", src.Client)
+	blk3 := src.buildVerify(srcCtx, t, src.lastAccepted(srcCtx, t))
+	require.Equal(t, uint64(3), blk3.Height(), "source blk3 height")
+	require.Equal(t, blk2.ID(), blk3.LastSettled().ID(), "source blk3 settled block")
+
+	// Receiver: a fresh VM born in Bootstrapping over a copy of srcDB. It has
+	// blk1+blk2 accepted (last-accepted = blk2) but has never seen blk3.
+	rcvTimeOpt, _ := withVMTime(srcClock.Now())
+	rcvCtx, rcv := newSUT(t, alloc, rcvTimeOpt, withDB(saetest.CopyDB(t, srcDB)), withState(snow.Bootstrapping))
+	require.Equal(t, blk2.ID(), rcv.lastAccepted(rcvCtx, t), "receiver last-accepted before verify")
+
+	// Happy path: the correct marker (SettledHeight == 2) verifies during
+	// bootstrapping.
+	good, err := rcv.ParseBlock(rcvCtx, blk3Bytes(t, blk3))
+	require.NoErrorf(t, err, "%T.ParseBlock(blk3)", rcv.VM)
+	require.NoErrorf(t, rcv.VerifyBlock(rcvCtx, nil, good), "%T.VerifyBlock(blk3) during bootstrapping", rcv.VM)
+	require.Equal(t, blk2.ID(), good.LastSettled().ID(), "receiver blk3 settled block")
+
+	// Tampered marker: bump SettledHeight so it disagrees with the recomputed
+	// last-settled height. Bootstrapping does not rebuild by hash, so this is
+	// caught specifically by the settled-marker cross-check.
+	hdr := blk3.Header()
+	extra := customtypes.GetHeaderExtra(hdr)
+	require.NotNil(t, extra.SettledHeight, "blk3 SettledHeight")
+	bad := *extra.SettledHeight + 1
+	extra.SettledHeight = &bad
+	customtypes.SetHeaderExtra(hdr, extra)
+	tampered := blk3.EthBlock().WithSeal(hdr)
+	buf, err := rlp.EncodeToBytes(tampered)
+	require.NoError(t, err, "rlp.EncodeToBytes(tampered blk3)")
+
+	parsed, err := rcv.ParseBlock(rcvCtx, buf)
+	require.NoErrorf(t, err, "%T.ParseBlock(tampered blk3)", rcv.VM)
+	err = rcv.VerifyBlock(rcvCtx, nil, parsed)
+	require.ErrorContains(t, err, "settled height mismatch", "%T.VerifyBlock(tampered blk3)", rcv.VM)
+}
+
+// blk3Bytes RLP-encodes a built block as it would arrive over the wire.
+func blk3Bytes(t *testing.T, blk *blocks.Block) []byte {
+	t.Helper()
+	buf, err := rlp.EncodeToBytes(blk.EthBlock())
+	require.NoError(t, err, "rlp.EncodeToBytes(block)")
+	return buf
 }
 
 // Recovery (run when a fresh VM initializes over a populated database) decodes

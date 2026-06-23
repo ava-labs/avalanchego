@@ -6,6 +6,7 @@ go_library(
     testonly = True,
     srcs = [
         "clock.go",
+        "db.go",
         "goleak.go",
         "heightdb.go",
         "network.go",
