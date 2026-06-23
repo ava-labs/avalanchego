@@ -49,10 +49,11 @@ type Backend interface {
 type Txpool struct {
 	*Pending
 
-	snowCtx *snow.Context
-	sub     event.Subscription
-	maxSize int
-	wg      sync.WaitGroup
+	snowCtx       *snow.Context
+	sub           event.Subscription
+	maxSize       int
+	blockGasLimit func() uint64
+	wg            sync.WaitGroup
 
 	// stateLock is ordered before [Pending.lock]. Acquiring stateLock with
 	// [Pending.lock] held will deadlock.
@@ -66,6 +67,10 @@ type Txpool struct {
 // reached, [Txpool.Add] evicts the lowest-fee transaction in favor of a
 // strictly higher-fee incoming transaction.
 //
+// blockGasLimit returns the gas limit x of the next block to be built. It is
+// used to floor a transaction's gas by its serialized size (see [tx.Tx.AsOp]),
+// so that pool fee ordering tracks the gas the block builder will charge.
+//
 // [Txpool.Close] MUST be called during shutdown to release allocated resources.
 func New(
 	snowCtx *snow.Context,
@@ -73,9 +78,13 @@ func New(
 	pending *Pending,
 	chain Backend,
 	maxSize int,
+	blockGasLimit func() uint64,
 ) (*Txpool, error) {
 	if maxSize <= 0 {
 		return nil, fmt.Errorf("maxSize must be > 0: %d", maxSize)
+	}
+	if blockGasLimit == nil {
+		return nil, errNilBlockGasLimit
 	}
 
 	// executed is unbuffered to guarantee that the pool never holds a reference
@@ -93,11 +102,12 @@ func New(
 	// state must be populated after [Backend.SubscribeChainHeadEvent] is called
 	// to ensure we do not miss an update.
 	p := &Txpool{
-		Pending: pending,
-		snowCtx: snowCtx,
-		sub:     sub,
-		maxSize: maxSize,
-		state:   state,
+		Pending:       pending,
+		snowCtx:       snowCtx,
+		sub:           sub,
+		maxSize:       maxSize,
+		blockGasLimit: blockGasLimit,
+		state:         state,
 	}
 	p.wg.Go(func() {
 		p.updateState(chainConfig, chain, executed)
@@ -165,6 +175,7 @@ var (
 	// already in the pool.
 	ErrAlreadyKnown = errors.New("transaction already in pool")
 
+	errNilBlockGasLimit  = errors.New("blockGasLimit must not be nil")
 	errSanityCheck       = errors.New("sanity check")
 	errVerifyCredentials = errors.New("credential verification")
 	errVerifyState       = errors.New("state verification")
@@ -183,7 +194,7 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 		return fmt.Errorf("%w: %w", errSanityCheck, err)
 	}
 
-	t, err := newTxData(tx, p.snowCtx.AVAXAssetID)
+	t, err := newTxData(tx, p.snowCtx.AVAXAssetID, p.blockGasLimit())
 	if err != nil {
 		return err
 	}
@@ -384,10 +395,8 @@ type txData struct {
 
 var errAsOp = errors.New("as op")
 
-func newTxData(tx *tx.Tx, avaxAssetID ids.ID) (*txData, error) {
-	// Disable the byte floor (x=0): the target block's gas limit is unknown at
-	// admission. See [tx.Tx.AsOp].
-	op, err := tx.AsOp(avaxAssetID, 0)
+func newTxData(tx *tx.Tx, avaxAssetID ids.ID, blockGasLimit uint64) (*txData, error) {
+	op, err := tx.AsOp(avaxAssetID, blockGasLimit)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errAsOp, err)
 	}

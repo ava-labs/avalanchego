@@ -224,10 +224,7 @@ func NewVM[T hook.Transaction](
 			return nil, err
 		}
 		conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
-		blockGasLimit := func() uint64 {
-			return uint64(worstcase.SafeMaxBlockSize(vm.exec.LastExecuted().ExecutedByGasTime()))
-		}
-		pool, err := txgossip.NewSet(txPool, blockGasLimit, conf)
+		pool, err := txgossip.NewSet(txPool, vm.BlockGasLimit, conf)
 		if err != nil {
 			return nil, err
 		}
@@ -397,6 +394,12 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 func (vm *VM) numPendingTxs() int {
 	p, _ := vm.mempool.Pool.Stats()
 	return p
+}
+
+// BlockGasLimit returns the gas limit x of the next block to be built, derived
+// from the last-executed block's gas time.
+func (vm *VM) BlockGasLimit() uint64 {
+	return uint64(worstcase.SafeMaxBlockSize(vm.exec.LastExecuted().ExecutedByGasTime()))
 }
 
 // SetState notifies the VM of a transition in the state lifecycle.
