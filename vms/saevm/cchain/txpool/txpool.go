@@ -188,11 +188,6 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 		return err
 	}
 
-	// TODO:(StephenButtolph): We need to enforce a maximum gas amount here
-	// Atomic transactions bypass the EVM mempool's gas-per-byte block-size
-	// filter and the builder's serialized-byte backstop, which both cover only
-	// EVM transactions.
-
 	// We must verify the tx against a state that is at least as high as the
 	// last block processed by the pool subscription.
 	//
