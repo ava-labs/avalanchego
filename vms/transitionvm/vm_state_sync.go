@@ -15,53 +15,33 @@ func (v *VM) StateSyncEnabled(ctx context.Context) (bool, error) {
 	v.transitionLock.RLock()
 	defer v.transitionLock.RUnlock()
 
-	ssVM, ok := v.current.chain.(block.StateSyncableVM)
-	if !ok {
-		return false, nil
-	}
-	return ssVM.StateSyncEnabled(ctx)
+	return v.current.chain.StateSyncEnabled(ctx)
 }
 
 func (v *VM) GetOngoingSyncStateSummary(ctx context.Context) (block.StateSummary, error) {
 	v.transitionLock.RLock()
 	defer v.transitionLock.RUnlock()
 
-	ssVM, ok := v.current.chain.(block.StateSyncableVM)
-	if !ok {
-		return nil, block.ErrStateSyncableVMNotImplemented
-	}
-	return ssVM.GetOngoingSyncStateSummary(ctx)
+	return v.current.chain.GetOngoingSyncStateSummary(ctx)
 }
 
 func (v *VM) GetLastStateSummary(ctx context.Context) (block.StateSummary, error) {
 	v.transitionLock.RLock()
 	defer v.transitionLock.RUnlock()
 
-	ssVM, ok := v.current.chain.(block.StateSyncableVM)
-	if !ok {
-		return nil, block.ErrStateSyncableVMNotImplemented
-	}
-	return ssVM.GetLastStateSummary(ctx)
+	return v.current.chain.GetLastStateSummary(ctx)
 }
 
 func (v *VM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	v.transitionLock.RLock()
 	defer v.transitionLock.RUnlock()
 
-	ssVM, ok := v.current.chain.(block.StateSyncableVM)
-	if !ok {
-		return nil, block.ErrStateSyncableVMNotImplemented
-	}
-	return ssVM.ParseStateSummary(ctx, summaryBytes)
+	return v.current.chain.ParseStateSummary(ctx, summaryBytes)
 }
 
 func (v *VM) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
 	v.transitionLock.RLock()
 	defer v.transitionLock.RUnlock()
 
-	ssVM, ok := v.current.chain.(block.StateSyncableVM)
-	if !ok {
-		return nil, block.ErrStateSyncableVMNotImplemented
-	}
-	return ssVM.GetStateSummary(ctx, summaryHeight)
+	return v.current.chain.GetStateSummary(ctx, summaryHeight)
 }

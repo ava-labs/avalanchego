@@ -28,6 +28,7 @@ type Chain interface {
 	block.ChainVM
 	block.BuildBlockWithContextChainVM
 	block.SetPreferenceWithContextChainVM
+	block.StateSyncableVM
 }
 
 type VM struct {

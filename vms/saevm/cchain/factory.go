@@ -6,6 +6,7 @@ package cchain
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
@@ -17,9 +18,17 @@ type Factory struct{}
 
 func (*Factory) New(logger logging.Logger) (interface{}, error) {
 	logger.Info("Creating new SAE VM")
-	return adaptor.Convert(&VM{
+	vm := &VM{
 		pullGossipPeriod: time.Second,
 		pushGossipPeriod: 100 * time.Millisecond,
 		now:              time.Now,
-	}), nil
+	}
+	type fullVM struct {
+		adaptor.ChainVMWithContext
+		block.StateSyncableVM
+	}
+	return fullVM{
+		adaptor.Convert(vm),
+		adaptor.ConvertStateSync(vm),
+	}, nil
 }
