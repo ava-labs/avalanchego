@@ -69,7 +69,7 @@ func TestConfig_WarpMessages(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		bytes   [][]byte
+		bytes   []hexutil.Bytes
 		want    []*warp.UnsignedMessage
 		wantErr error
 	}{
@@ -79,27 +79,24 @@ func TestConfig_WarpMessages(t *testing.T) {
 		},
 		{
 			name:  "single_message",
-			bytes: [][]byte{msg.Bytes()},
+			bytes: []hexutil.Bytes{msg.Bytes()},
 			want:  []*warp.UnsignedMessage{msg},
 		},
 		{
 			name:  "multiple_messages",
-			bytes: [][]byte{msg.Bytes(), msg.Bytes()},
+			bytes: []hexutil.Bytes{msg.Bytes(), msg.Bytes()},
 			want:  []*warp.UnsignedMessage{msg, msg},
 		},
 		{
 			name:    "invalid_message",
-			bytes:   [][]byte{{0xff}},
+			bytes:   []hexutil.Bytes{{0xff}},
 			wantErr: errParsingWarpMessage,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			c := config{
-				WarpOffChainMessages: make([]hexutil.Bytes, len(test.bytes)),
-			}
-			for i, msgBytes := range test.bytes {
-				c.WarpOffChainMessages[i] = msgBytes
+				WarpOffChainMessages: test.bytes,
 			}
 
 			got, err := c.WarpMessages()
