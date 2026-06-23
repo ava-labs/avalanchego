@@ -295,11 +295,8 @@ func (g *genesis) block() (*types.Block, error) {
 		headerExtra.MinDelayExcess = avalancheutils.PointerTo(acp226.InitialDelayExcess)
 	}
 
-	// Seed the ACP-283 price exponent non-nil at genesis so the optional RLP
-	// field is already present and a later field cannot retroactively change
-	// the genesis hash.
 	if c.IsHelicon(g.Timestamp) {
-		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.PriceExponent(0))
+		headerExtra.MinPriceExponent = new(dynamic.PriceExponent)
 	}
 
 	return types.NewBlock(
