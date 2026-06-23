@@ -45,7 +45,6 @@ go_library(
         "//vms/platformvm/warp/message",
         "//vms/platformvm/warp/payload",
         "//vms/secp256k1fx",
-        "@com_github_holiman_uint256//:uint256",
         "@org_uber_go_zap//:zap",
     ],
 )
