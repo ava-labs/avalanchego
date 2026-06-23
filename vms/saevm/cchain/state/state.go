@@ -7,7 +7,6 @@ package state
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -29,8 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -136,22 +133,6 @@ func rootKey(height uint64) []byte {
 	return prefixdb.PrefixKey(commitPrefix, database.PackUInt64(height))
 }
 
-var (
-	//go:embed bonus_blocks.json
-	bonusBlocksJSON []byte
-	bonusBlocks     set.Set[uint64]
-)
-
-func init() {
-	if err := json.Unmarshal(bonusBlocksJSON, &bonusBlocks); err != nil {
-		panic(err)
-	}
-}
-
-func isBonusBlock(networkID uint32, height uint64) bool {
-	return networkID == constants.MainnetID && bonusBlocks.Contains(height)
-}
-
 // Apply persists the txs accepted at height. It applies their atomic
 // operations to the trie, indexes the txs by ID, and applies the atomic
 // operations to shared memory.
@@ -178,19 +159,8 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("applying trie on root %s: %w", s.currentRoot, err)
 	}
 
-	isBonus := isBonusBlock(s.snowCtx.NetworkID, height)
 	batch := s.db.NewBatch()
 	for _, t := range txs {
-		if isBonus {
-			txID := t.ID()
-			has, err := s.db.Has(txKey(txID))
-			if err != nil {
-				return fmt.Errorf("checking for existing tx %s: %w", txID, err)
-			}
-			if has {
-				continue
-			}
-		}
 		if err := writeTx(batch, height, t); err != nil {
 			return fmt.Errorf("writing tx %s: %w", t.ID(), err)
 		}
@@ -202,15 +172,11 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 		return fmt.Errorf("writing root: %w", err)
 	}
 
-	// There was originally a bug in Coreth that allowed a handful of invalid
-	// blocks to be accepted on mainnet. To canonicalize this behavior, bonus
-	// blocks do not consume their operations from shared memory.
-	if isBonus {
-		ops = nil
-	}
-
 	// Committing the batch atomically with shared memory prevents duplicate
 	// shared memory operations in the event of a crash.
+	//
+	// TODO(StephenButtolph): Skip applying shared memory operations for bonus
+	// blocks.
 	if err := s.snowCtx.SharedMemory.Apply(ops, batch); err != nil {
 		return fmt.Errorf("applying shared memory: %w", err)
 	}

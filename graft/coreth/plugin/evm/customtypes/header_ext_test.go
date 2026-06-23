@@ -180,6 +180,8 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *dynamic.TargetExponent:
 				assertNonZero(t, f)
+			case *dynamic.PriceExponent:
+				assertNonZero(t, f)
 			case *gas.Gas:
 				assertNonZero(t, f)
 			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:

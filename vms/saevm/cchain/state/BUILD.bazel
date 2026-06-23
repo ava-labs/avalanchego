@@ -13,7 +13,6 @@ go_library(
         "genesis.go",
         "state.go",
     ],
-    embedsrcs = ["bonus_blocks.json"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/state",
     deps = [
         "//chains/atomic",
@@ -24,8 +23,6 @@ go_library(
         "//graft/coreth/plugin/evm/atomic/state",
         "//ids",
         "//snow",
-        "//utils/constants",
-        "//utils/set",
         "//utils/units",
         "//utils/wrappers",
         "//vms/evm/database",
