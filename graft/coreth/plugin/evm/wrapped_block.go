@@ -339,8 +339,14 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 
 	header := b.ethBlock.Header()
+
 	// Ensure MinDelayExcess is consistent with rules and minimum block delay is enforced.
 	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
+		return err
+	}
+	// Ensure MinPriceExponent is unset. The ACP-283 field belongs to SAE and
+	// must never appear on a coreth block.
+	if err := customheader.VerifyMinPriceExponent(header); err != nil {
 		return err
 	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.
@@ -351,13 +357,12 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	if extraConfig.IsHelicon(header.Time) {
 		return errors.New("expected to have transitioned to SAE prior to Helicon")
 	}
-
 	headerExtra := customtypes.GetHeaderExtra(header)
 	if headerExtra.TargetExponent != nil {
 		return fmt.Errorf("unexpected TargetExponent in header extra: %d", *headerExtra.TargetExponent)
 	}
-	if headerExtra.PriceExponent != nil {
-		return fmt.Errorf("unexpected PriceExponent in header extra: %d", *headerExtra.PriceExponent)
+	if headerExtra.MinPriceExponent != nil {
+		return fmt.Errorf("unexpected MinPriceExponent in header extra: %d", *headerExtra.MinPriceExponent)
 	}
 	if headerExtra.SettledHeight != nil {
 		return fmt.Errorf("unexpected SettledHeight in header extra: %d", *headerExtra.SettledHeight)

@@ -341,10 +341,14 @@ tasks:
   lint-all:
     desc: Runs all lint checks
     cmds:
-      # Phase 1: Read-only checks (safe to parallelize)
-      - task: _lint-readonly
-      # Phase 2: Tree-mutating checks (must be sequential to avoid
-      # git index and bazel server contention)
+      # Phase 1: Read-only checks that are safe to parallelize.
+      - task: _lint-readonly-parallel
+      # Phase 2: Read-only checks that must be serialized because
+      # some tools (e.g. golangci-lint) are not safe to run
+      # concurrently.
+      - task: _lint-readonly-serial
+      # Phase 3: Tree-mutating checks must be sequential to avoid git
+      # index and bazel server contention.
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-require-directives-round-trip
@@ -354,15 +358,21 @@ tasks:
     desc: Runs gosec with G115 enabled on vms/saevm
     cmd: '{{.NIX_RUN}} ./scripts/run_tool.sh golangci-lint run --config .gosec-golangci.yml ./vms/saevm/...'
 
-  _lint-readonly:
+  _lint-readonly-parallel:
     internal: true
     deps:
-      - lint
-      - lint-saevm
       - lint-action
       - lint-shell
       - check-go-version
       - check-require-directives
+
+  _lint-readonly-serial:
+    internal: true
+    cmds:
+      # lint and lint-saevm both invoke golangci-lint which aborts on
+      # concurrent runs.
+      - task: lint
+      - task: lint-saevm
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one

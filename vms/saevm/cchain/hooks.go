@@ -121,7 +121,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		desiredParams{
 			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 			targetExponent: headerExtra.TargetExponent,
-			priceExponent:  headerExtra.PriceExponent,
+			priceExponent:  headerExtra.MinPriceExponent,
 		},
 		slices.Values(txs),
 	}, nil
@@ -175,7 +175,7 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 }
 
 func priceExponent(h *types.Header) dynamic.PriceExponent {
-	if pe := customtypes.GetHeaderExtra(h).PriceExponent; pe != nil {
+	if pe := customtypes.GetHeaderExtra(h).MinPriceExponent; pe != nil {
 		return *pe
 	}
 	return 0
@@ -354,7 +354,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			TimeMilliseconds: &nowMS,
 			MinDelayExcess:   (*acp226.DelayExcess)(&de),
 			TargetExponent:   &te,
-			PriceExponent:    &pe,
+			MinPriceExponent: &pe,
 		},
 	), nil
 }

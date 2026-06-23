@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
@@ -39,8 +40,8 @@ func TestHeaderRLP(t *testing.T) {
 	require.Equal(t, wantHex, hex.EncodeToString(got), "Header RLP")
 
 	header, _ := headerWithNonZeroFields()
-	gotHashHex := header.Hash().Hex()
-	require.Equal(t, "0x"+wantHashHex, gotHashHex, "Header.Hash()")
+	wantHash := crypto.Keccak256Hash(common.FromHex(wantHex))
+	require.Equal(t, wantHash, header.Hash(), "Header.Hash()")
 }
 
 func TestHeaderJSON(t *testing.T) {
@@ -120,7 +121,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		TimeMilliseconds:    utils.PointerTo[uint64](24),
 		MinDelayExcess:      utils.PointerTo(acp226.DelayExcess(25)),
 		TargetExponent:      utils.PointerTo(dynamic.TargetExponent(26)),
-		PriceExponent:       utils.PointerTo(dynamic.PriceExponent(27)),
+		MinPriceExponent:    utils.PointerTo(dynamic.PriceExponent(27)),
 		SettledHeight:       utils.PointerTo[uint64](28),
 		SettledGasUnix:      utils.PointerTo[uint64](29),
 		SettledGasNumerator: utils.PointerTo[gas.Gas](30),

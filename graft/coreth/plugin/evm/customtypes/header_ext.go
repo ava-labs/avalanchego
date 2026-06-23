@@ -46,7 +46,7 @@ type HeaderExtra struct {
 	TimeMilliseconds    *uint64
 	MinDelayExcess      *acp226.DelayExcess
 	TargetExponent      *dynamic.TargetExponent
-	PriceExponent       *dynamic.PriceExponent
+	MinPriceExponent    *dynamic.PriceExponent
 	SettledHeight       *uint64
 	SettledGasUnix      *uint64
 	SettledGasNumerator *gas.Gas
@@ -136,9 +136,9 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		e := *h.TargetExponent
 		cp.TargetExponent = &e
 	}
-	if h.PriceExponent != nil {
-		e := *h.PriceExponent
-		cp.PriceExponent = &e
+	if h.MinPriceExponent != nil {
+		e := *h.MinPriceExponent
+		cp.MinPriceExponent = &e
 	}
 	if h.SettledHeight != nil {
 		h := *h.SettledHeight
@@ -176,8 +176,8 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	if h.TargetExponent != nil {
 		m["targetExponent"] = hexutil.Uint64(*h.TargetExponent)
 	}
-	if h.PriceExponent != nil {
-		m["minPriceExponent"] = hexutil.Uint64(*h.PriceExponent)
+	if h.MinPriceExponent != nil {
+		m["minPriceExponent"] = hexutil.Uint64(*h.MinPriceExponent)
 	}
 	if h.SettledHeight != nil {
 		m["settledHeight"] = hexutil.Uint64(*h.SettledHeight)
@@ -244,7 +244,7 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.TimeMilliseconds = extras.TimeMilliseconds
 	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
 	h.TargetExponent = (*uint64)(extras.TargetExponent)
-	h.PriceExponent = (*uint64)(extras.PriceExponent)
+	h.MinPriceExponent = (*uint64)(extras.MinPriceExponent)
 	h.SettledHeight = extras.SettledHeight
 	h.SettledGasUnix = extras.SettledGasUnix
 	h.SettledGasNumerator = (*uint64)(extras.SettledGasNumerator)
@@ -258,7 +258,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.TimeMilliseconds = h.TimeMilliseconds
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
 	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
-	extras.PriceExponent = (*dynamic.PriceExponent)(h.PriceExponent)
+	extras.MinPriceExponent = (*dynamic.PriceExponent)(h.MinPriceExponent)
 	extras.SettledHeight = h.SettledHeight
 	extras.SettledGasUnix = h.SettledGasUnix
 	extras.SettledGasNumerator = (*gas.Gas)(h.SettledGasNumerator)
@@ -328,9 +328,9 @@ type HeaderSerializable struct {
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	TargetExponent *uint64 `json:"targetExponent" rlp:"optional"`
 
-	// PriceExponent was added by Helicon and is ignored in legacy headers.
+	// MinPriceExponent was added by Helicon and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	PriceExponent *uint64 `json:"minPriceExponent" rlp:"optional"`
+	MinPriceExponent *uint64 `json:"minPriceExponent" rlp:"optional"`
 
 	// SettledHeight was added by Helicon and is ignored in legacy headers.
 	SettledHeight *uint64 `json:"settledHeight" rlp:"optional"`
@@ -362,7 +362,7 @@ type headerMarshaling struct {
 	TimeMilliseconds    *hexutil.Uint64
 	MinDelayExcess      *hexutil.Uint64
 	TargetExponent      *hexutil.Uint64
-	PriceExponent       *hexutil.Uint64
+	MinPriceExponent    *hexutil.Uint64
 	SettledHeight       *hexutil.Uint64
 	SettledGasUnix      *hexutil.Uint64
 	SettledGasNumerator *hexutil.Uint64
