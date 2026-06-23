@@ -577,9 +577,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			// Etna and Fortuna share a genesis (no extra seeded fields), so
 			// un-scheduling Fortuna isolates the fork-incompatibility error
-			// without tripping a genesis-hash mismatch. A Helicon downgrade
-			// cannot be used here because Helicon seeds the price exponent, so
-			// its genesis differs from the prior fork.
+			// without tripping a genesis-hash mismatch.
 			name: "incompatible_upgrade",
 			initial: spec{
 				upgrades: upgradetest.GetConfig(upgradetest.Fortuna),
