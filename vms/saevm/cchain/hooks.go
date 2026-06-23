@@ -352,14 +352,11 @@ func (*builder) BuildBlock(
 	// Encode the settled block marker into the header so [hooks.SettledBy] can
 	// recover it. HeaderExtra stores plain uint64 to keep coreth ignorant of
 	// SAE types.
-	gasNumerator := uint64(settled.GasNumerator)
-	excess := uint64(settled.Excess)
 	he := customtypes.GetHeaderExtra(header)
 	he.SettledHeight = &settled.Height
 	he.SettledGasUnix = &settled.GasUnix
-	he.SettledGasNumerator = &gasNumerator
-	he.SettledExcess = &excess
-	customtypes.SetHeaderExtra(header, he)
+	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
+	he.SettledExcess = (*uint64)(&settled.Excess)
 
 	return customtypes.NewBlockWithExtData(
 		header,
