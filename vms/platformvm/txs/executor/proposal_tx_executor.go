@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/intmath"
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -39,14 +39,13 @@ var (
 	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
 	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
 	ErrInvalidState                  = errors.New("generated output isn't valid state")
-	ErrShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
 	ErrWrongTxType                   = errors.New("wrong transaction type")
 	ErrInvalidID                     = errors.New("invalid ID")
 	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 	errShouldBeAutoRenewedStaker     = errors.New("expected auto renewed staker")
-	errUnexpectedTxType              = errors.New("unexpected transaction type")
 	errInvalidTimestamp              = errors.New("invalid timestamp")
+	errUnexpectedStakerTxType        = errors.New("unexpected staker transaction type")
 	errDivideByZero                  = errors.New("divide by zero")
 )
 
@@ -359,17 +358,13 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 
-	// Invariant: A [txs.DelegatorTx] does not also implement the
-	//            [txs.ValidatorTx] interface.
+	// Dispatch on the concrete staker type. Only these four are rewarded here.
+	//
+	// [*txs.AddAutoRenewedValidatorTx] also implements [txs.ValidatorTx] but is
+	// rewarded through RewardAutoRenewedValidatorTx.
 	switch uStakerTx := stakerTx.Unsigned.(type) {
-	case txs.ValidatorTx:
-		switch uStakerTx.(type) {
-		case *txs.AddValidatorTx, *txs.AddPermissionlessValidatorTx:
-		default:
-			return fmt.Errorf("%w: %T", errUnexpectedTxType, uStakerTx)
-		}
-
-		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {
+	case *txs.AddValidatorTx, *txs.AddPermissionlessValidatorTx:
+		if err := e.rewardValidatorTx(uStakerTx.(txs.ValidatorTx), stakerToReward); err != nil {
 			return err
 		}
 
@@ -381,8 +376,8 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		if err := e.onAbortState.DeleteCurrentValidator(stakerToReward); err != nil {
 			return fmt.Errorf("deleting current validator from abort state: %w", err)
 		}
-	case txs.DelegatorTx:
-		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
+	case *txs.AddDelegatorTx, *txs.AddPermissionlessDelegatorTx:
+		if err := e.rewardDelegatorTx(uStakerTx.(txs.DelegatorTx), stakerToReward); err != nil {
 			return err
 		}
 
@@ -395,56 +390,10 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			return fmt.Errorf("deleting current delegator from abort state: %w", err)
 		}
 	default:
-		// Invariant: Permissioned stakers are removed by the advancement of
-		//            time and the current chain timestamp is == this staker's
-		//            EndTime. This means only permissionless stakers should be
-		//            left in the staker set.
-		return ErrShouldBePermissionlessStaker
+		return fmt.Errorf("%w: %T", errUnexpectedStakerTxType, uStakerTx)
 	}
 
 	return e.undoSupplyMintOnAbort(stakerToReward)
-}
-
-// getNextStakerToReward returns the next staker to be removed and the corresponding tx that added it to the staker set.
-func getNextStakerToReward(chainState state.Chain, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
-	currentStakerIterator, err := chainState.GetCurrentStakerIterator()
-	if err != nil {
-		return nil, nil, err
-	}
-	defer currentStakerIterator.Release()
-
-	if !currentStakerIterator.Next() {
-		return nil, nil, fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
-	}
-	stakerToReward := currentStakerIterator.Value()
-
-	if stakerToReward.TxID != tx.StakerTxID() {
-		return nil, nil, fmt.Errorf(
-			"%w: %s != %s",
-			ErrRemoveWrongStaker,
-			stakerToReward.TxID,
-			tx.StakerTxID(),
-		)
-	}
-
-	// Verify that the chain's timestamp is the validator's end time
-	currentChainTime := chainState.GetTimestamp()
-	if !stakerToReward.EndTime.Equal(currentChainTime) {
-		return nil, nil, fmt.Errorf(
-			"%w: TxID = %s with %s < %s",
-			ErrRemoveStakerTooEarly,
-			tx.StakerTxID(),
-			currentChainTime,
-			stakerToReward.EndTime,
-		)
-	}
-
-	stakerTx, _, err := chainState.GetTx(stakerToReward.TxID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get next removed staker tx: %w", err)
-	}
-
-	return stakerTx, stakerToReward, nil
 }
 
 // undoSupplyMintOnAbort removes the staker's potential reward from
@@ -764,7 +713,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	return nil
 }
 
-// mintRewardsOnAbort creates reward UTXOs on the abort state for an
+// createAbortRewardUTXOs creates reward UTXOs on the abort state for an
 // auto-renewed validator. This includes accrued validation rewards and
 // all delegatee rewards (accrued + pending).
 func (e *proposalTxExecutor) mintRewardsOnAbort(
@@ -900,12 +849,12 @@ func (e *proposalTxExecutor) restakeOnCommit(
 
 	// Compound the restaked rewards into the validator's weight and accrued
 	// reward totals.
-	nextWeight, err := safemath.Add(validator.Weight, restakingValidationRewards)
+	newWeight, err := safemath.Add(validator.Weight, restakingValidationRewards)
 	if err != nil {
 		return err
 	}
 
-	nextWeight, err = safemath.Add(nextWeight, restakingDelegateeRewards)
+	newWeight, err = safemath.Add(newWeight, restakingDelegateeRewards)
 	if err != nil {
 		return err
 	}
@@ -931,28 +880,28 @@ func (e *proposalTxExecutor) restakeOnCommit(
 	}
 
 	duration := time.Duration(stakingInfo.NextPeriod) * time.Second
-	nextPotentialReward := rewards.Calculate(
+	newPotentialReward := rewards.Calculate(
 		duration,
-		nextWeight,
+		newWeight,
 		currentSupply,
 	)
 
-	newCurrentSupply, err := safemath.Add(currentSupply, nextPotentialReward)
+	newCurrentSupply, err := safemath.Add(currentSupply, newPotentialReward)
 	if err != nil {
 		return err
 	}
 
 	e.onCommitState.SetCurrentSupply(validator.SubnetID, newCurrentSupply)
 
-	nextEndTime := validator.EndTime.Add(duration)
+	newEndTime := validator.EndTime.Add(duration)
 
 	// Update validator by deleting and putting back.
 	renewedValidator := *validator
-	renewedValidator.StartTime = validator.EndTime
-	renewedValidator.EndTime = nextEndTime
-	renewedValidator.NextTime = nextEndTime
-	renewedValidator.PotentialReward = nextPotentialReward
-	renewedValidator.Weight = nextWeight
+	renewedValidator.StartTime = renewedValidator.EndTime
+	renewedValidator.EndTime = newEndTime
+	renewedValidator.NextTime = newEndTime
+	renewedValidator.PotentialReward = newPotentialReward
+	renewedValidator.Weight = newWeight
 
 	if err := e.onCommitState.DeleteCurrentValidator(validator); err != nil {
 		return fmt.Errorf("failed to delete validator from commit state: %w", err)
@@ -972,35 +921,6 @@ func (e *proposalTxExecutor) restakeOnCommit(
 	}
 
 	return nil
-}
-
-// MulDiv computes (a * b) / c with full precision.
-// The result is rounded to the nearest integer.
-// Returns ErrDivideByZero if c is zero, or ErrOverflow if the result exceeds uint64.
-func mulDivRound(a, b, c uint64) (uint64, error) {
-	// intmath.MulDiv reports a zero denominator as an overflow, so check it
-	// first to preserve the distinct error.
-	if c == 0 {
-		return 0, errDivideByZero
-	}
-
-	quo, rem, err := intmath.MulDiv(a, b, c)
-	if err != nil {
-		return 0, err
-	}
-
-	// Round to nearest by checking whether the fractional part rem/c is less
-	// than 1/2. rem < c-rem ⟺ 2*rem < c, but can't overflow since rem < c.
-	if rem < c-rem {
-		return quo, nil
-	}
-
-	// The fractional part is at least 1/2, so round up. If quo is already
-	// MaxUint64, rounding up would overflow the result.
-	if quo == math.MaxUint64 {
-		return 0, intmath.ErrOverflow
-	}
-	return quo + 1, nil
 }
 
 // newUTXO creates a reward UTXO with the specified parameters.
@@ -1051,4 +971,74 @@ func unstakeUTXOs(stakerTx txs.PermissionlessStaker, txID ids.ID, states ...*sta
 			s.AddUTXO(utxo)
 		}
 	}
+}
+
+func getNextStakerToReward(chainState state.Chain, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
+	currentStakerIterator, err := chainState.GetCurrentStakerIterator()
+	if err != nil {
+		return nil, nil, err
+	}
+	defer currentStakerIterator.Release()
+
+	if !currentStakerIterator.Next() {
+		return nil, nil, fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
+	}
+	stakerToReward := currentStakerIterator.Value()
+
+	if stakerToReward.TxID != tx.StakerTxID() {
+		return nil, nil, fmt.Errorf(
+			"%w: %s != %s",
+			ErrRemoveWrongStaker,
+			stakerToReward.TxID,
+			tx.StakerTxID(),
+		)
+	}
+
+	// Verify that the chain's timestamp is the validator's end time
+	currentChainTime := chainState.GetTimestamp()
+	if !stakerToReward.EndTime.Equal(currentChainTime) {
+		return nil, nil, fmt.Errorf(
+			"%w: TxID = %s with %s < %s",
+			ErrRemoveStakerTooEarly,
+			tx.StakerTxID(),
+			currentChainTime,
+			stakerToReward.EndTime,
+		)
+	}
+
+	stakerTx, _, err := chainState.GetTx(stakerToReward.TxID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get next removed staker tx: %w", err)
+	}
+
+	return stakerTx, stakerToReward, nil
+}
+
+// mulDivRound computes (a * b) / c with full precision.
+// The result is rounded to the nearest integer.
+// Returns errDivideByZero if c is zero, or intmath.ErrOverflow if the result exceeds uint64.
+func mulDivRound(a, b, c uint64) (uint64, error) {
+	// intmath.MulDiv reports a zero denominator as an overflow, so check it
+	// first to preserve the distinct error.
+	if c == 0 {
+		return 0, errDivideByZero
+	}
+
+	quo, rem, err := intmath.MulDiv(a, b, c)
+	if err != nil {
+		return 0, err
+	}
+
+	// Round to nearest by checking whether the fractional part rem/c is less
+	// than 1/2. rem < c-rem ⟺ 2*rem < c, but can't overflow since rem < c.
+	if rem < c-rem {
+		return quo, nil
+	}
+
+	// The fractional part is at least 1/2, so round up. If quo is already
+	// MaxUint64, rounding up would overflow the result.
+	if quo == math.MaxUint64 {
+		return 0, intmath.ErrOverflow
+	}
+	return quo + 1, nil
 }

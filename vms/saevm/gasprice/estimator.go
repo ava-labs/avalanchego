@@ -24,6 +24,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/intmath"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 

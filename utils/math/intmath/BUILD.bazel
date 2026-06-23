@@ -4,7 +4,7 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "intmath",
     srcs = ["intmath.go"],
-    importpath = "github.com/ava-labs/avalanchego/intmath",
+    importpath = "github.com/ava-labs/avalanchego/utils/math/intmath",
     visibility = ["//visibility:public"],
     deps = ["@org_golang_x_exp//constraints"],
 )
