@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
@@ -50,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -73,13 +71,10 @@ type SUT struct {
 	*VM
 	*Client
 
-	memory    *atomic.Memory
-	sender    *saetest.Sender
-	ethclient *ethclient.Client
+	memory *atomic.Memory
 }
 
-func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
-func (s *SUT) Sender() *saetest.Sender { return s.sender }
+func (s *SUT) NodeID() ids.NodeID { return s.ctx.NodeID }
 
 type (
 	sutConfig struct {
@@ -216,12 +211,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	_, ethClient := vmtest.Dial(tb, wsURI)
 
 	sut := &SUT{
-		SUT:       &vmtest.SUT[*VM]{RawVM: vm, Logger: log},
-		VM:        vm,
-		Client:    NewClient(server.URL),
-		memory:    memory,
-		sender:    appSender,
-		ethclient: ethClient,
+		SUT:    &vmtest.SUT[*VM]{RawVM: vm, EthClient: ethClient, AppSender: appSender, Logger: log},
+		VM:     vm,
+		Client: NewClient(server.URL),
+		memory: memory,
 	}
 	appSender.SetSelf(sut)
 	tb.Cleanup(appSender.Close)
@@ -343,7 +336,7 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 	tb.Helper()
 
 	if len(txs) > 0 {
-		s.sendTxsAndWaitUntilPending(tb, txs...)
+		s.SendTxsAndWaitUntilPending(tb, txs...)
 	} else {
 		s.WaitForPendingTxs(tb)
 	}
@@ -359,26 +352,6 @@ func (s *SUT) buildVerify(tb testing.TB, preferenceID ids.ID) *blocks.Block {
 
 	s.WaitForPendingTxs(tb)
 	return s.SUT.BuildVerify(tb, preferenceID)
-}
-
-// waitForPendingEthTxs blocks until every tx is pending in the source the block
-// builder draws from, so the built block includes them all rather than racing
-// promotion. The geth RPC backend's [GetPoolTransactions] resolves the same
-// [txpool.Pool.Pending] set used by [txgossip.Set.TransactionsByPriority]
-// during block building.
-func (s *SUT) waitForPendingEthTxs(tb testing.TB, txs ...*types.Transaction) {
-	tb.Helper()
-	txgossiptest.WaitUntilPending(tb, s.Context(tb), s.GethRPCBackends(), txs...)
-}
-
-// sendTxsAndWaitUntilPending submits each tx via the eth client and waits until
-// all are pending in the source the block builder draws from.
-func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transaction) {
-	tb.Helper()
-	for _, tx := range txs {
-		require.NoErrorf(tb, s.ethclient.SendTransaction(s.Context(tb), tx), "%T.SendTransaction()", s.ethclient)
-	}
-	s.waitForPendingEthTxs(tb, txs...)
 }
 
 // wallet builds and signs cross-chain transactions on behalf of a single key.
@@ -680,7 +653,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		Gas:      ethparams.TxGas,
 		GasPrice: big.NewInt(1),
 	})
-	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.ethclient, tracedTx.Hash())
+	require.NoErrorf(t, sut.EthClient.SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.EthClient, tracedTx.Hash())
 
 	// Export gives us observable external state.
 	var (

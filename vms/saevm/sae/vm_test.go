@@ -58,7 +58,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
-	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -89,12 +88,9 @@ type SUT struct {
 	wallet  *saetest.Wallet
 	db      ethdb.Database
 	hooks   *hookstest.Stub
-
-	sender *saetest.Sender
 }
 
-func (s *SUT) NodeID() ids.NodeID      { return s.RawVM.nodeID() }
-func (s *SUT) Sender() *saetest.Sender { return s.sender }
+func (s *SUT) NodeID() ids.NodeID { return s.RawVM.nodeID() }
 
 type (
 	sutConfig struct {
@@ -201,7 +197,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	rpcClient, ethClient := dialRPC(ctx, tb, snow)
 	sut := &SUT{
-		SUT:       &vmtest.SUT[*VM]{RawVM: vm.VM, Logger: logger},
+		SUT:       &vmtest.SUT[*VM]{RawVM: vm.VM, EthClient: ethClient, AppSender: sender, Logger: logger},
 		ChainVM:   snow,
 		Client:    ethClient,
 		rpcClient: rpcClient,
@@ -212,8 +208,6 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		),
 		db:    newEthDB(conf.db),
 		hooks: conf.hooks,
-
-		sender: sender,
 	}
 	sender.SetSelf(sut)
 	tb.Cleanup(sender.Close)
@@ -347,42 +341,6 @@ func registerPrecompiles(tb testing.TB, precompiles map[common.Address]libevm.Pr
 	h.Register(tb)
 }
 
-// mustSendTx guarantees all transactions are delivered to the mempool, which triggers
-// an asynchronous reorg to move all possible transactions from the source addresses
-// to the pending label.
-func (s *SUT) mustSendTx(tb testing.TB, txs ...*types.Transaction) {
-	tb.Helper()
-
-	ctx := s.Context(tb)
-	for _, tx := range txs {
-		require.NoErrorf(tb, s.Client.SendTransaction(ctx, tx), "%T.SendTransaction([%#x])", s.Client, tx.Hash())
-	}
-}
-
-// sendTxsAndWaitUntilPending sends all `txs` to the mempool, and waits for
-// each to be marked as pending.
-//
-// WARNING: if there is a block executing concurrently with this method,
-// the pending state of the transactions may not be accurately reflected,
-// resulting in a timeout.
-func (s *SUT) sendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transaction) {
-	tb.Helper()
-
-	s.mustSendTx(tb, txs...)
-	s.waitUntilTxsPending(tb, txs...)
-}
-
-// waitUntilTxsPending waits until all `txs` are marked as pending in the mempool.
-//
-// WARNING: if there is a block executing concurrently with this method,
-// the pending state of the transactions may not be accurately reflected,
-// resulting in a timeout.
-func (s *SUT) waitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
-	tb.Helper()
-
-	txgossiptest.WaitUntilPending(tb, s.Context(tb), s.RawVM.GethRPCBackends(), txs...)
-}
-
 // buildAndParseBlock adds all `txs` to the mempool and ensures they are pending,
 // builds a new block and passes its bytes to [VM.ParseBlock], the result of
 // which is returned. This is equivalent to a validator having received valid
@@ -392,7 +350,7 @@ func (s *SUT) waitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
 // of a [blocks.Block], hence its return as a [snowman.Block].
 func (s *SUT) buildAndParseBlock(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) snowman.Block {
 	tb.Helper()
-	s.sendTxsAndWaitUntilPending(tb, txs...)
+	s.SendTxsAndWaitUntilPending(tb, txs...)
 
 	ctx := s.Context(tb)
 	require.NoError(tb, s.SetPreference(ctx, preference.ID()), "SetPreference()")
@@ -423,7 +381,7 @@ func (s *SUT) createAndVerifyBlock(tb testing.TB, preference *blocks.Block, txs 
 // for execution - set the [VM] to [snow.Bootstrapping] for that.
 func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
-	s.sendTxsAndWaitUntilPending(tb, txs...)
+	s.SendTxsAndWaitUntilPending(tb, txs...)
 	return s.RunConsensusLoopOnPreference(tb, preference.ID())
 }
 
@@ -548,7 +506,7 @@ func TestIntegration(t *testing.T) {
 			GasFeeCap: big.NewInt(1),
 			Value:     transfer.ToBig(),
 		})
-		sut.sendTxsAndWaitUntilPending(t, tx)
+		sut.SendTxsAndWaitUntilPending(t, tx)
 	}
 
 	select {
@@ -1024,7 +982,7 @@ func TestGossip(t *testing.T) {
 		GasFeeCap: big.NewInt(1),
 		Value:     big.NewInt(1),
 	})
-	api.mustSendTx(t, tx)
+	api.MustSendTx(t, tx)
 	requireReceiveTx(t, n.validators, tx.Hash())
 	requireNotReceiveTx(t, n.nonValidators[1:], tx.Hash())
 }

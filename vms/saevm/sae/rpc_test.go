@@ -209,7 +209,7 @@ func TestSubscriptions(t *testing.T) {
 	mustSendTx := func(tx *types.Transaction) {
 		t.Helper()
 
-		sut.mustSendTx(t, tx)
+		sut.MustSendTx(t, tx)
 		require.Equal(t, tx.Hash(), <-newTxs, "tx hash from newPendingTransactions subscription")
 	}
 
@@ -333,8 +333,8 @@ func TestTxPoolNamespace(t *testing.T) {
 	queuedTx := makeTx(queuedAccount)
 	queuedRPCTx := ethapi.NewRPCPendingTransaction(queuedTx, nil, saetest.ChainConfig())
 
-	sut.mustSendTx(t, queuedTx, pendingTx)
-	sut.waitUntilTxsPending(t, pendingTx)
+	sut.MustSendTx(t, queuedTx, pendingTx)
+	sut.WaitUntilTxsPending(t, pendingTx)
 
 	// TODO: This formatting is copied from libevm, consider exposing it somehow
 	// or removing the dependency on the exact format.
@@ -478,7 +478,7 @@ func TestFilterAPIs(t *testing.T) {
 		GasPrice: big.NewInt(1),
 		Gas:      1e6,
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 	sut.testRPC(ctx, t, rpcTest{
 		method:     "eth_getFilterChanges",
 		args:       []any{txFilterID},
@@ -659,8 +659,8 @@ func TestMempoolTxGetters(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.mustSendTx(t, pendingTx, queuedTx)
-	sut.waitUntilTxsPending(t, pendingTx)
+	sut.MustSendTx(t, pendingTx, queuedTx)
+	sut.WaitUntilTxsPending(t, pendingTx)
 
 	for _, tt := range []struct {
 		name string
@@ -859,7 +859,7 @@ func TestEthPendingTransactions(t *testing.T) {
 		GasFeeCap: big.NewInt(1),
 		Value:     big.NewInt(100),
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 
 	// eth_pendingTransactions filters results to only transactions from
 	// accounts configured in the AccountManager, which is always empty.
@@ -1079,7 +1079,7 @@ func TestGetTransactionCount(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_getTransactionCount",
@@ -1154,7 +1154,7 @@ func TestFillTransaction(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_fillTransaction",
@@ -1176,7 +1176,7 @@ func TestResend(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_resend",

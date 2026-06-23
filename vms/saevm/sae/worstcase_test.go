@@ -190,7 +190,7 @@ func TestWorstCase(t *testing.T) {
 			}))
 		}
 
-		sut.sendTxsAndWaitUntilPending(t, txs...)
+		sut.SendTxsAndWaitUntilPending(t, txs...)
 		b := sut.RunConsensusLoop(t)
 		require.NoError(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		require.Lenf(t, b.Receipts(), len(precompileTests), "%T.Receipts()", b)
@@ -245,7 +245,7 @@ func TestWorstCase(t *testing.T) {
 						sut.wallet.DecrementNonce(t, from)
 						continue
 					}
-					sut.waitUntilTxsPending(t, tx)
+					sut.WaitUntilTxsPending(t, tx)
 				}
 
 				for accepted := false; !accepted; {

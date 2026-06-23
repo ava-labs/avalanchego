@@ -61,7 +61,7 @@ func TestRecoverFromDatabase(t *testing.T) {
 		final = height > commitInterval
 
 		if !quick {
-			src.sendTxsAndWaitUntilPending(t, src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			src.SendTxsAndWaitUntilPending(t, src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 				To:       nil,                      // execute `Data` as code for contract "construction"
 				Data:     []byte{byte(vm.INVALID)}, // revert and consume all gas
 				Gas:      params.TxGas + params.CreateGas + params.TxDataNonZeroGasFrontier + rng.Uint64N(2e6),

@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
@@ -16,6 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
+	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 )
 
 // rawVM is the native block API common to the SAE and C-Chain VMs. Both expose
@@ -28,15 +32,21 @@ type rawVM interface {
 	LastAccepted(context.Context) (ids.ID, error)
 	GetBlock(context.Context, ids.ID) (*blocks.Block, error)
 	WaitForEvent(context.Context) (common.Message, error)
+	GethRPCBackends() saerpc.GethBackends
 }
 
 // SUT is the VM-agnostic system under test. The VM type parameter lets each
 // package reach its own internals through [SUT.RawVM] while sharing the
 // consensus helpers below.
 type SUT[VM rawVM] struct {
-	RawVM  VM
-	Logger *loggingtest.Logger
+	RawVM     VM
+	EthClient *ethclient.Client
+	AppSender *saetest.Sender
+	Logger    *loggingtest.Logger
 }
+
+// Sender returns the mock app-message sender, satisfying [saetest.Peer].
+func (s *SUT[VM]) Sender() *saetest.Sender { return s.AppSender }
 
 // Context returns a [testing.TB]-scoped context that is cancelled when the
 // logger records a log at [logging.Error] or above.
@@ -71,6 +81,30 @@ func (s *SUT[VM]) WaitForPendingTxs(tb testing.TB) {
 	msg, err := s.RawVM.WaitForEvent(s.Context(tb))
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.RawVM)
 	require.Equalf(tb, common.PendingTxs, msg, "%T.WaitForEvent() message", s.RawVM)
+}
+
+// MustSendTx submits each tx via the eth client, failing the test on error.
+func (s *SUT[VM]) MustSendTx(tb testing.TB, txs ...*types.Transaction) {
+	tb.Helper()
+	ctx := s.Context(tb)
+	for _, tx := range txs {
+		require.NoErrorf(tb, s.EthClient.SendTransaction(ctx, tx), "%T.SendTransaction([%#x])", s.EthClient, tx.Hash())
+	}
+}
+
+// WaitUntilTxsPending blocks until all txs are pending in the source the block
+// builder draws from.
+func (s *SUT[VM]) WaitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) {
+	tb.Helper()
+	txgossiptest.WaitUntilPending(tb, s.Context(tb), s.RawVM.GethRPCBackends(), txs...)
+}
+
+// SendTxsAndWaitUntilPending submits each tx and waits until all are pending in
+// the source the block builder draws from.
+func (s *SUT[VM]) SendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transaction) {
+	tb.Helper()
+	s.MustSendTx(tb, txs...)
+	s.WaitUntilTxsPending(tb, txs...)
 }
 
 // BuildVerify builds a block on top of preferenceID and verifies it, without a
