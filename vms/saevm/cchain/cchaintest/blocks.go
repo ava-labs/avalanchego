@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
@@ -26,9 +25,11 @@ type BlockOption = options.Option[blockProperties]
 
 type blockProperties struct {
 	number        uint64
+	timestamp     uint64
 	parent        common.Hash
 	ethTxs        []*types.Transaction
 	crossChainTxs []*tx.Tx
+	extData       *[]byte
 	extDataHash   *common.Hash
 	version       uint32
 }
@@ -37,6 +38,13 @@ type blockProperties struct {
 func WithNumber(n uint64) BlockOption {
 	return options.Func[blockProperties](func(p *blockProperties) {
 		p.number = n
+	})
+}
+
+// WithTimestamp sets the block's header timestamp (in seconds).
+func WithTimestamp(t uint64) BlockOption {
+	return options.Func[blockProperties](func(p *blockProperties) {
+		p.timestamp = t
 	})
 }
 
@@ -62,11 +70,16 @@ func WithCrossChainTxs(txs ...*tx.Tx) BlockOption {
 	})
 }
 
-// WithMismatchedExtDataHash commits a random ExtDataHash that does not match the
-// block's ExtData and disables recomputation, simulating a tampered block.
-func WithMismatchedExtDataHash() BlockOption {
+// WithExtData sets the raw ExtData bytes for the block.
+func WithExtData(data []byte) BlockOption {
 	return options.Func[blockProperties](func(p *blockProperties) {
-		h := common.Hash(ids.GenerateTestID())
+		p.extData = &data
+	})
+}
+
+// WithExtDataHash uses h during block building and disables recomputation.
+func WithExtDataHash(h common.Hash) BlockOption {
+	return options.Func[blockProperties](func(p *blockProperties) {
 		p.extDataHash = &h
 	})
 }
@@ -81,8 +94,8 @@ func WithBlockVersion(v uint32) BlockOption {
 }
 
 // NewTestBlock builds a [*types.Block] from the provided options. By default the
-// block has number 1, a zero parent hash, no Ethereum or cross-chain transactions,
-// and an ExtDataHash computed from its (empty) ExtData.
+// block has number 1, a zero parent hash and timestamp, no Ethereum or
+// cross-chain transactions, and an ExtDataHash computed from its (empty) ExtData.
 func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 	tb.Helper()
 
@@ -90,6 +103,9 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 
 	extData, err := tx.MarshalSlice(props.crossChainTxs)
 	require.NoErrorf(tb, err, "tx.MarshalSlice(%d txs)", len(props.crossChainTxs))
+	if props.extData != nil {
+		extData = *props.extData
+	}
 
 	// By default the header commits the ExtDataHash computed from the block's
 	// own ExtData; a caller-supplied hash overrides this to simulate tampering.
@@ -101,6 +117,7 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 		&types.Header{
 			ParentHash: props.parent,
 			Number:     new(big.Int).SetUint64(props.number),
+			Time:       props.timestamp,
 		},
 		&customtypes.HeaderExtra{ExtDataHash: extDataHash},
 	)
@@ -118,16 +135,4 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 func NewBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *types.Block {
 	tb.Helper()
 	return NewTestBlock(tb, WithNumber(number), WithParent(parent), WithCrossChainTxs(txs...))
-}
-
-// NewTamperedBlock returns a block that encodes txs but whose header commits an
-// ExtDataHash that does not match its ExtData, simulating tampering.
-func NewTamperedBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *types.Block {
-	tb.Helper()
-	return NewTestBlock(tb,
-		WithNumber(number),
-		WithParent(parent),
-		WithCrossChainTxs(txs...),
-		WithMismatchedExtDataHash(),
-	)
 }

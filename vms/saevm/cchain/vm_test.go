@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -84,6 +85,7 @@ type (
 	sutConfig struct {
 		genesis    core.Genesis
 		nodeID     ids.NodeID
+		networkID  uint32
 		validators set.Set[ids.NodeID]
 		now        func() time.Time
 	}
@@ -109,6 +111,14 @@ func withNodeID(id ids.NodeID) sutOption {
 func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.validators = vdrs
+	})
+}
+
+// withNetworkID overrides the SUT's network ID, which controls which recorded
+// extData hash set [VM.ParseBlock] consults for pre-ApricotPhase1 blocks.
+func withNetworkID(id uint32) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.networkID = id
 	})
 }
 
@@ -138,8 +148,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Difficulty: big.NewInt(0), // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
 			},
-			nodeID: ids.GenerateTestNodeID(),
-			now:    time.Now,
+			nodeID:    ids.GenerateTestNodeID(),
+			networkID: constants.UnitTestID,
+			now:       time.Now,
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -154,6 +165,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	snowCtx.NodeID = cfg.nodeID
+	snowCtx.NetworkID = cfg.networkID
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
@@ -778,33 +790,113 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 // well-formed blocks and rejects blocks with an unsupported (non-zero) version
 // or whose extData does not match the ExtDataHash committed in the header.
 func TestParseBlock(t *testing.T) {
-	ctx, sut := newSUT(t)
+	ctx, sut := newSUT(t, withNetworkID(constants.FujiID))
 
-	w := newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
-	tx1 := w.newMinimalTx(t)
+	genesisID, err := sut.LastAccepted(ctx)
+	require.NoError(t, err, "vm.LastAccepted()")
+	genesisBlk, err := sut.GetBlock(ctx, genesisID)
+	require.NoError(t, err, "vm.GetBlock(genesisID)")
 
+	key := txtest.NewKey(t)
+	w := newWallet(key, sut.ctx, nil)
+	stx := w.newMinimalTx(t)
+
+	ap1Time := *cparams.GetExtra(sut.chainConfig).ApricotPhase1BlockTimestamp
+
+	const (
+		preAP1WithDataHeight    = 1
+		preAP1WithoutDataHeight = 3
+	)
 	tests := []struct {
 		name    string
 		block   *types.Block
 		wantErr error
 	}{
 		{
-			name:  "valid",
-			block: cchaintest.NewBlock(t, 1, common.Hash{}, tx1),
+			name: "invalid_version",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithBlockVersion(1),
+			),
+			wantErr: errInvalidBlockVersion,
 		},
 		{
-			name:  "valid_empty",
-			block: cchaintest.NewBlock(t, 1, common.Hash{}),
+			name:  "genesis",
+			block: genesisBlk.EthBlock(),
 		},
 		{
-			name:    "extdata_hash_mismatch",
-			block:   cchaintest.NewTamperedBlock(t, 1, common.Hash{}, tx1),
+			name: "genesis_with_nonzero_header",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithNumber(0),
+			),
 			wantErr: errExtDataHashMismatch,
 		},
 		{
-			name:    "invalid_version",
-			block:   cchaintest.NewTestBlock(t, cchaintest.WithBlockVersion(1)),
-			wantErr: errInvalidBlockVersion,
+			name: "genesis_with_extdata",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithNumber(0),
+				cchaintest.WithCrossChainTxs(stx),
+			),
+			wantErr: errExtDataUnexpectedHash,
+		},
+		{
+			name: "pre_ap1_with_extdata",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithNumber(preAP1WithDataHeight),
+				cchaintest.WithTimestamp(ap1Time-1),
+				cchaintest.WithExtDataHash(common.Hash{}),
+				// See Fuji block #1's canonical representation for the source
+				// of the bytes.
+				cchaintest.WithExtData(common.FromHex("0x000000000000000000057fc93d85c6d62c5b2ac0b519c87010ea5294012d1e407030d6acd0021cac10d5ab68eb1ee142a05cfe768c36e11f0b596db5a3c6c77aabe665dad9e638ca94f70000000106eb57070eed14d04c3e6fcfec2b670c7bbece079ad1ff97dd407e416796aea6000000013d9bdac0ed1d761330cf680efdeb1a42159eb387d6d2950c96f7d28f61bbe2aa00000005000000003b9aca00000000010000000000000001572f4d80f10f663b5049f789546f25f70bb62a7f000000003b9aca003d9bdac0ed1d761330cf680efdeb1a42159eb387d6d2950c96f7d28f61bbe2aa000000010000000900000001c1b8fcb9824bf9fde4d506768250a40fde0027a7eed23ad89ea49a87fce892df5b082103b08bbc5d20b3c107ad33dfc880fbbb96cfa0bf8752e5c93b979bad6200")),
+			),
+		},
+		{
+			name: "pre_ap1_missing_extdata",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithNumber(preAP1WithDataHeight),
+				cchaintest.WithTimestamp(ap1Time-1),
+				cchaintest.WithExtDataHash(common.Hash{}),
+			),
+			wantErr: errExtDataUnexpectedHash,
+		},
+		{
+			name: "pre_ap1_without_extdata",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithNumber(preAP1WithoutDataHeight),
+				cchaintest.WithTimestamp(ap1Time-1),
+				cchaintest.WithExtDataHash(common.Hash{}),
+			),
+		},
+		{
+			name: "pre_ap1_unexpected_extdata",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithNumber(preAP1WithoutDataHeight),
+				cchaintest.WithTimestamp(ap1Time-1),
+				cchaintest.WithExtDataHash(common.Hash{}),
+				cchaintest.WithCrossChainTxs(stx),
+			),
+			wantErr: errExtDataUnexpectedHash,
+		},
+		{
+			name: "post_ap1_without_data",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithTimestamp(ap1Time),
+			),
+		},
+		{
+			name: "post_ap1_with_data",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithTimestamp(ap1Time),
+				cchaintest.WithCrossChainTxs(stx),
+			),
+		},
+		{
+			name: "post_ap1_with_extdata_hash_mismatch",
+			block: cchaintest.NewTestBlock(t,
+				cchaintest.WithTimestamp(ap1Time),
+				cchaintest.WithCrossChainTxs(stx),
+				cchaintest.WithExtDataHash(common.Hash{1}),
+			),
+			wantErr: errExtDataHashMismatch,
 		},
 	}
 	for _, tt := range tests {
@@ -831,7 +923,7 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 
 	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
 	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	valid := sut.buildVerify(t, sut.LastAcceptedID(t))
 
 	// Bump the seconds encoded in TimeMilliseconds without touching Header.Time,
 	// so Time != TimeMilliseconds/1000 while every other field stays valid.
