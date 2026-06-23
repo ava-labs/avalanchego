@@ -242,7 +242,7 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.ExtDataGasUsed = extras.ExtDataGasUsed
 	h.BlockGasCost = extras.BlockGasCost
 	h.TimeMilliseconds = extras.TimeMilliseconds
-	h.DelayExponent = (*uint64)(extras.MinDelayExcess)
+	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
 	h.TargetExponent = (*uint64)(extras.TargetExponent)
 	h.PriceExponent = (*uint64)(extras.PriceExponent)
 	h.SettledHeight = extras.SettledHeight
@@ -256,7 +256,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.ExtDataGasUsed = h.ExtDataGasUsed
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
-	extras.MinDelayExcess = (*acp226.DelayExcess)(h.DelayExponent)
+	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
 	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
 	extras.PriceExponent = (*dynamic.PriceExponent)(h.PriceExponent)
 	extras.SettledHeight = h.SettledHeight
@@ -320,9 +320,9 @@ type HeaderSerializable struct {
 	// TimeMilliseconds was added by Granite and is ignored in legacy headers.
 	TimeMilliseconds *uint64 `json:"timestampMilliseconds" rlp:"optional"`
 
-	// DelayExponent was added by Granite and is ignored in legacy headers.
+	// MinDelayExcess was added by Granite and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	DelayExponent *uint64 `json:"minDelayExcess" rlp:"optional"`
+	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
 
 	// TargetExponent was added by Helicon and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code

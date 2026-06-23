@@ -73,7 +73,7 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 	enc.ExcessBlobGas = (*hexutil.Uint64)(h.ExcessBlobGas)
 	enc.ParentBeaconRoot = h.ParentBeaconRoot
 	enc.TimeMilliseconds = (*hexutil.Uint64)(h.TimeMilliseconds)
-	enc.DelayExponent = (*hexutil.Uint64)(h.DelayExponent)
+	enc.DelayExponent = (*hexutil.Uint64)(h.MinDelayExcess)
 	enc.TargetExponent = (*hexutil.Uint64)(h.TargetExponent)
 	enc.PriceExponent = (*hexutil.Uint64)(h.PriceExponent)
 	enc.SettledHeight = (*hexutil.Uint64)(h.SettledHeight)
@@ -206,7 +206,7 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 		h.TimeMilliseconds = (*uint64)(dec.TimeMilliseconds)
 	}
 	if dec.DelayExponent != nil {
-		h.DelayExponent = (*uint64)(dec.DelayExponent)
+		h.MinDelayExcess = (*uint64)(dec.DelayExponent)
 	}
 	if dec.TargetExponent != nil {
 		h.TargetExponent = (*uint64)(dec.TargetExponent)

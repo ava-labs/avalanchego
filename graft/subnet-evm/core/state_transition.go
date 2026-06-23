@@ -430,15 +430,16 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 }
 
 func (st *StateTransition) refundGas(subnetEVM bool) uint64 {
-	// Apply refund counter, capped to half of the used gas.
-	refund := st.gasUsed() / 2
-	if refund > st.state.GetRefund() {
-		refund = st.state.GetRefund()
+	var refund uint64
+	// Inspired by: https://gist.github.com/holiman/460f952716a74eeb9ab358bb1836d821#gistcomment-3642048
+	if !subnetEVM {
+		// Apply refund counter, capped to half of the used gas.
+		refund = st.gasUsed() / 2
+		if refund > st.state.GetRefund() {
+			refund = st.state.GetRefund()
+		}
+		st.gasRemaining += refund
 	}
-	if subnetEVM {
-		refund = 0 // Inspired by: https://gist.github.com/holiman/460f952716a74eeb9ab358bb1836d821#gistcomment-3642048
-	}
-	st.gasRemaining += refund
 
 	// Return ETH for remaining gas, exchanged at the original rate.
 	remaining := uint256.NewInt(st.gasRemaining)

@@ -155,7 +155,7 @@ func BlockMinDelayExcess(b *ethtypes.Block) *acp226.DelayExcess {
 	if e == nil {
 		return nil
 	}
-	cp := acp226.DelayExcess(*e)
+	cp := *e
 	return &cp
 }
 
