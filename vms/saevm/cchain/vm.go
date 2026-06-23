@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
-	"go.uber.org/zap"
 
 	_ "embed"
 
@@ -29,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -114,7 +112,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
-	snowCtx.Log.Info("establishing last synchronous block")
 	var lastSync *types.Block
 	lastSyncBytes, err := state.ReadLastSync(avaDB)
 	switch {
@@ -128,10 +125,6 @@ func (vm *VM) Initialize(
 	default:
 		return fmt.Errorf("reading last sync block: %w", err)
 	}
-	snowCtx.Log.Info("established last synchronous block",
-		zap.Stringer("lastID", ids.ID(lastSync.Hash())),
-		zap.Uint64("lastHeight", lastSync.NumberU64()),
-	)
 
 	vm.state, err = state.New(snowCtx, avaDB)
 	if err != nil {
