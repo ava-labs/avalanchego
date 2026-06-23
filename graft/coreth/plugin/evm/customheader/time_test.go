@@ -346,7 +346,7 @@ func generateHeaderWithMinDelayExcessAndTime(timeSeconds uint64, timeMillisecond
 		},
 		&customtypes.HeaderExtra{
 			TimeMilliseconds: timeMilliseconds,
-			DelayExponent:    (*dynamic.DelayExponent)(minDelayExcess),
+			MinDelayExcess:   (*dynamic.DelayExponent)(minDelayExcess),
 		},
 	)
 }

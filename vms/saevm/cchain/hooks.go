@@ -118,7 +118,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return now
 		},
 		desiredParams{
-			delayExponent:  headerExtra.DelayExponent,
+			delayExponent:  headerExtra.MinDelayExcess,
 			targetExponent: headerExtra.TargetExponent,
 			priceExponent:  headerExtra.PriceExponent,
 		},
@@ -305,7 +305,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 
 	de := b.initialDelayExponent
-	if pde := customtypes.GetHeaderExtra(parent).DelayExponent; pde != nil {
+	if pde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pde != nil {
 		de = *pde
 	}
 
@@ -351,7 +351,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			DelayExponent:    &de,
+			MinDelayExcess:   &de,
 			TargetExponent:   &te,
 			PriceExponent:    &pe,
 		},

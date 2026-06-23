@@ -117,7 +117,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		ExtDataGasUsed:      big.NewInt(22),
 		BlockGasCost:        big.NewInt(23),
 		TimeMilliseconds:    utils.PointerTo[uint64](24),
-		DelayExponent:       utils.PointerTo(dynamic.DelayExponent(25)),
+		MinDelayExcess:      utils.PointerTo(dynamic.DelayExponent(25)),
 		TargetExponent:      utils.PointerTo(dynamic.TargetExponent(26)),
 		PriceExponent:       utils.PointerTo(dynamic.PriceExponent(27)),
 		SettledHeight:       utils.PointerTo[uint64](28),

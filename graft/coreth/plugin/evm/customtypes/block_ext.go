@@ -151,7 +151,7 @@ func BlockTimeMilliseconds(b *ethtypes.Block) *uint64 {
 }
 
 func BlockMinDelayExcess(b *ethtypes.Block) *acp226.DelayExcess {
-	e := GetHeaderExtra(b.Header()).DelayExponent
+	e := GetHeaderExtra(b.Header()).MinDelayExcess
 	if e == nil {
 		return nil
 	}

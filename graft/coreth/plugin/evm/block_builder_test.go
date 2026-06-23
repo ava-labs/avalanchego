@@ -149,7 +149,7 @@ func createGraniteTestHeader(parentHash common.Hash, timeMilliseconds uint64, mi
 
 	extra := &customtypes.HeaderExtra{
 		TimeMilliseconds: &timeMilliseconds,
-		DelayExponent:    (*dynamic.DelayExponent)(&minDelayExcess),
+		MinDelayExcess:   (*dynamic.DelayExponent)(&minDelayExcess),
 	}
 	customtypes.SetHeaderExtra(header, extra)
 

@@ -292,7 +292,7 @@ func (g *genesis) block() (*types.Block, error) {
 
 	if c.IsGranite(g.Timestamp) {
 		headerExtra.TimeMilliseconds = avalancheutils.PointerTo(g.Timestamp * 1000)
-		headerExtra.DelayExponent = avalancheutils.PointerTo(dynamic.DelayExponent(acp226.InitialDelayExcess))
+		headerExtra.MinDelayExcess = avalancheutils.PointerTo(dynamic.DelayExponent(acp226.InitialDelayExcess))
 	}
 
 	return types.NewBlock(

@@ -449,11 +449,11 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 // is allowed by h's [acp226.DelayExcess].
 func minNextBlockTime(h *types.Header) time.Time {
 	e := customtypes.GetHeaderExtra(h)
-	if e.DelayExponent == nil {
+	if e.MinDelayExcess == nil {
 		return time.Time{}
 	}
 
-	mde := *e.DelayExponent
+	mde := *e.MinDelayExcess
 	delay := time.Duration(mde.Delay()) * time.Millisecond //#nosec G115 -- delay excess is verified by consensus
 	return customtypes.BlockTime(h).Add(delay)
 }

@@ -332,7 +332,7 @@ func TestBlockGetters(t *testing.T) {
 				ExtDataGasUsed:   big.NewInt(1),
 				BlockGasCost:     big.NewInt(2),
 				TimeMilliseconds: utils.PointerTo[uint64](3),
-				DelayExponent:    utils.PointerTo(dynamic.DelayExponent(4)),
+				MinDelayExcess:   utils.PointerTo(dynamic.DelayExponent(4)),
 			},
 			blockExtra: &BlockBodyExtra{
 				Version: 3,

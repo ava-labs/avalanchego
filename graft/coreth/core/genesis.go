@@ -341,8 +341,8 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 			headerExtra.TimeMilliseconds = new(uint64)
 			*headerExtra.TimeMilliseconds = g.Timestamp * 1000
 
-			headerExtra.DelayExponent = new(dynamic.DelayExponent)
-			*headerExtra.DelayExponent = dynamic.DelayExponent(acp226.InitialDelayExcess)
+			headerExtra.MinDelayExcess = new(dynamic.DelayExponent)
+			*headerExtra.MinDelayExcess = dynamic.DelayExponent(acp226.InitialDelayExcess)
 		}
 	}
 

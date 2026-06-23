@@ -43,7 +43,7 @@ type HeaderExtra struct {
 	ExtDataGasUsed      *big.Int
 	BlockGasCost        *big.Int
 	TimeMilliseconds    *uint64
-	DelayExponent       *dynamic.DelayExponent
+	MinDelayExcess      *dynamic.DelayExponent
 	TargetExponent      *dynamic.TargetExponent
 	PriceExponent       *dynamic.PriceExponent
 	SettledHeight       *uint64
@@ -127,9 +127,9 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		m := *h.TimeMilliseconds
 		cp.TimeMilliseconds = &m
 	}
-	if h.DelayExponent != nil {
-		e := *h.DelayExponent
-		cp.DelayExponent = &e
+	if h.MinDelayExcess != nil {
+		e := *h.MinDelayExcess
+		cp.MinDelayExcess = &e
 	}
 	if h.TargetExponent != nil {
 		e := *h.TargetExponent
@@ -169,8 +169,8 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	if h.TimeMilliseconds != nil {
 		m["timestampMilliseconds"] = hexutil.Uint64(*h.TimeMilliseconds)
 	}
-	if h.DelayExponent != nil {
-		m["minDelayExcess"] = hexutil.Uint64(*h.DelayExponent)
+	if h.MinDelayExcess != nil {
+		m["minDelayExcess"] = hexutil.Uint64(*h.MinDelayExcess)
 	}
 	if h.TargetExponent != nil {
 		m["targetExponent"] = hexutil.Uint64(*h.TargetExponent)
@@ -241,7 +241,7 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.ExtDataGasUsed = extras.ExtDataGasUsed
 	h.BlockGasCost = extras.BlockGasCost
 	h.TimeMilliseconds = extras.TimeMilliseconds
-	h.DelayExponent = (*uint64)(extras.DelayExponent)
+	h.DelayExponent = (*uint64)(extras.MinDelayExcess)
 	h.TargetExponent = (*uint64)(extras.TargetExponent)
 	h.PriceExponent = (*uint64)(extras.PriceExponent)
 	h.SettledHeight = extras.SettledHeight
@@ -255,7 +255,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.ExtDataGasUsed = h.ExtDataGasUsed
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
-	extras.DelayExponent = (*dynamic.DelayExponent)(h.DelayExponent)
+	extras.MinDelayExcess = (*dynamic.DelayExponent)(h.DelayExponent)
 	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
 	extras.PriceExponent = (*dynamic.PriceExponent)(h.PriceExponent)
 	extras.SettledHeight = h.SettledHeight
