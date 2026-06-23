@@ -18,8 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
 // rawVM is the native block API common to the SAE and C-Chain VMs. Both expose
