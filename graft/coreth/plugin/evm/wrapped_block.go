@@ -339,8 +339,14 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 
 	header := b.ethBlock.Header()
+
 	// Ensure MinDelayExcess is consistent with rules and minimum block delay is enforced.
 	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
+		return err
+	}
+	// Ensure MinPriceExponent is unset. The ACP-283 field belongs to SAE and
+	// must never appear on a coreth block.
+	if err := customheader.VerifyMinPriceExponent(header); err != nil {
 		return err
 	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.
