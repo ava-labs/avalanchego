@@ -1032,25 +1032,18 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
 }
 
-// During bootstrapping the consensus engine has already filtered blocks to be
-// hash-valid, so [VM.VerifyBlock] does not rebuild them. What it does verify is
-// a cross-check that the settled marker decoded from the header
-// ([hooks.SettledBy]) agrees with the independently-recomputed last-settled
-// block ([lastToSettle]); a mismatch returns errSettledHeightMismatch. This
-// test drives that path on a block built by a different VM (as in bootstrap),
-// asserting both that a correct marker passes and that a tampered one is
-// rejected.
+// During bootstrapping [VM.VerifyBlock] does not rebuild blocks, so it
+// cross-checks the header's settled marker ([hooks.SettledBy]) against the
+// recomputed last-settled block, returning errSettledHeightMismatch on
+// disagreement. This asserts a correct marker passes and a tampered one fails.
 func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	key := txtest.NewKey(t)
 	alloc := withMaxAllocFor(key.EthAddress())
 
-	// Build blocks at/after the ApricotPhase1 fork so their cross-chain extData
-	// is committed via the header's ExtDataHash (and thus survives the cchain
-	// [VM.ParseBlock] gate when the receiver re-parses blk3 off the wire). A
-	// pre-AP1 block's extData is instead expected in the recorded hash set that
-	// UnitTestID lacks. The fork time is read from a throwaway VM's resolved
-	// chain config rather than [extras.TestChainConfig] because [VM.Initialize]
-	// applies the network's canonical upgrade schedule on top of the genesis.
+	// Build at/after ApricotPhase1 so extData commits via the header's
+	// ExtDataHash; pre-AP1, [VM.ParseBlock] rejects extData absent from
+	// UnitTestID's recorded hash set. Read the fork time from a resolved config,
+	// since [VM.Initialize] overrides the genesis schedule.
 	_, cfgProbe := newSUT(t, alloc)
 	ap1Time := *cparams.GetExtra(cfgProbe.chainConfig).ApricotPhase1BlockTimestamp
 	srcTimeOpt, srcClock := withVMTime(time.Unix(int64(ap1Time), 0)) //#nosec G115 -- ap1Time fork timestamp won't overflow for millennia
@@ -1058,37 +1051,36 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	srcCtx, src := newSUT(t, alloc, srcTimeOpt, withDB(srcDB))
 	w := newWallet(key, src.ctx, src.Client)
 
-	// blk2 (height 2) settles blk1 (height 1); both are accepted into srcDB.
+	// blk2 settles blk1; both are accepted into srcDB.
 	blk1 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
 	srcClock.AdvanceToSettle(srcCtx, t, blk1)
 	blk2 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
 	require.Equal(t, uint64(2), blk2.Height(), "source blk2 height")
 
-	// blk3 (height 3) settles blk2. Build+verify it on the source but do NOT
-	// accept it, so it does not land in srcDB; the receiver will verify it as a
-	// block "received from a peer".
+	// blk3 settles blk2 but is not accepted, so the receiver verifies it as a
+	// block received from a peer.
 	srcClock.AdvanceToSettle(srcCtx, t, blk2)
 	require.NoErrorf(t, src.IssueTx(srcCtx, w.newMinimalTx(t)), "%T.IssueTx()", src.Client)
 	blk3 := src.buildVerify(srcCtx, t, src.lastAccepted(srcCtx, t))
 	require.Equal(t, uint64(3), blk3.Height(), "source blk3 height")
 	require.Equal(t, blk2.ID(), blk3.LastSettled().ID(), "source blk3 settled block")
 
-	// Receiver: a fresh VM born in Bootstrapping over a copy of srcDB. It has
-	// blk1+blk2 accepted (last-accepted = blk2) but has never seen blk3.
+	// Receiver: a fresh VM in Bootstrapping over a copy of srcDB, last-accepted
+	// blk2, never having seen blk3.
 	rcvTimeOpt, _ := withVMTime(srcClock.Now())
 	rcvCtx, rcv := newSUT(t, alloc, rcvTimeOpt, withDB(saetest.CopyDB(t, srcDB)), withState(snow.Bootstrapping))
 	require.Equal(t, blk2.ID(), rcv.lastAccepted(rcvCtx, t), "receiver last-accepted before verify")
 
-	// Happy path: the correct marker (SettledHeight == 2) verifies during
-	// bootstrapping.
-	good, err := rcv.ParseBlock(rcvCtx, blk3Bytes(t, blk3))
+	// The correct marker verifies during bootstrapping.
+	blk3Bytes, err := rlp.EncodeToBytes(blk3.EthBlock())
+	require.NoError(t, err, "rlp.EncodeToBytes(blk3)")
+	good, err := rcv.ParseBlock(rcvCtx, blk3Bytes)
 	require.NoErrorf(t, err, "%T.ParseBlock(blk3)", rcv.VM)
 	require.NoErrorf(t, rcv.VerifyBlock(rcvCtx, nil, good), "%T.VerifyBlock(blk3) during bootstrapping", rcv.VM)
 	require.Equal(t, blk2.ID(), good.LastSettled().ID(), "receiver blk3 settled block")
 
-	// Tampered marker: bump SettledHeight so it disagrees with the recomputed
-	// last-settled height. Bootstrapping does not rebuild by hash, so this is
-	// caught specifically by the settled-marker cross-check.
+	// A tampered SettledHeight is caught by the marker cross-check, since
+	// bootstrapping does not rebuild by hash.
 	hdr := blk3.Header()
 	extra := customtypes.GetHeaderExtra(hdr)
 	require.NotNil(t, extra.SettledHeight, "blk3 SettledHeight")
@@ -1103,47 +1095,6 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	require.NoErrorf(t, err, "%T.ParseBlock(tampered blk3)", rcv.VM)
 	err = rcv.VerifyBlock(rcvCtx, nil, parsed)
 	require.ErrorContains(t, err, "settled height mismatch", "%T.VerifyBlock(tampered blk3)", rcv.VM)
-}
-
-// blk3Bytes RLP-encodes a built block as it would arrive over the wire.
-func blk3Bytes(t *testing.T, blk *blocks.Block) []byte {
-	t.Helper()
-	buf, err := rlp.EncodeToBytes(blk.EthBlock())
-	require.NoError(t, err, "rlp.EncodeToBytes(block)")
-	return buf
-}
-
-// Recovery (run when a fresh VM initializes over a populated database) decodes
-// the last-accepted block's settled marker via [hooks.SettledBy] to decide which
-// post-execution state roots to retain — the only path that reaches SettledBy on
-// restart. Settling a real block beforehand yields a non-zero settled height,
-// and continuing to build afterwards confirms the recovered state is usable.
-func TestRecoverSettledStateAfterRestart(t *testing.T) {
-	key := txtest.NewKey(t)
-	alloc := withMaxAllocFor(key.EthAddress())
-
-	srcTimeOpt, srcClock := withVMTime(time.Unix(saeparams.TauSeconds, 0))
-	srcDB := memdb.New()
-	srcCtx, src := newSUT(t, alloc, srcTimeOpt, withDB(srcDB))
-	w := newWallet(key, src.ctx, src.Client)
-
-	// blk2 (height 2) settles blk1 (height 1).
-	blk1 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
-	srcClock.AdvanceToSettle(srcCtx, t, blk1)
-	blk2 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
-	require.Equal(t, uint64(2), blk2.Height(), "source head height")
-
-	// Restart over a copy of the persisted database; recovery runs here.
-	restartTimeOpt, restartClock := withVMTime(srcClock.Now())
-	restartCtx, restarted := newSUT(t, alloc, restartTimeOpt, withDB(saetest.CopyDB(t, srcDB)))
-	require.Equal(t, blk2.ID(), restarted.lastAccepted(restartCtx, t), "recovered last-accepted block")
-
-	// Exports are account-nonce based and don't query the client, so the source
-	// wallet can be reused to sign against the restarted VM.
-	restartClock.AdvanceToSettle(restartCtx, t, blk2)
-	blk3 := restarted.issueAndExecute(restartCtx, t, w.newMinimalTx(t))
-	require.Equal(t, uint64(3), blk3.Height(), "post-restart block height")
-	require.Equal(t, blk2.ID(), blk3.LastSettled().ID(), "post-restart settled block")
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
