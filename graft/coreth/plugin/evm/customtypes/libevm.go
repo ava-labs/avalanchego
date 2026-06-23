@@ -36,7 +36,7 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 	old := extras
 	defer func() { extras = old }()
 
-	return ethtypes.WithTempRegisteredExtras(
+	return ethtypes.WithTempRegisteredExtras[HeaderExtra, BlockBodyExtra, isMultiCoin](
 		lock,
 		func(e ethtypes.ExtraPayloads[*HeaderExtra, *BlockBodyExtra, isMultiCoin]) error {
 			extras = e
