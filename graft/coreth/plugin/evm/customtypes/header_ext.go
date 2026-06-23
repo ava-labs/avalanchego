@@ -360,7 +360,7 @@ type headerMarshaling struct {
 	BlobGasUsed         *hexutil.Uint64
 	ExcessBlobGas       *hexutil.Uint64
 	TimeMilliseconds    *hexutil.Uint64
-	DelayExponent       *hexutil.Uint64
+	MinDelayExcess      *hexutil.Uint64
 	TargetExponent      *hexutil.Uint64
 	PriceExponent       *hexutil.Uint64
 	SettledHeight       *hexutil.Uint64
