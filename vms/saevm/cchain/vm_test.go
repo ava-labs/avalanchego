@@ -1094,7 +1094,7 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	parsed, err := rcv.ParseBlock(rcvCtx, buf)
 	require.NoErrorf(t, err, "%T.ParseBlock(tampered blk3)", rcv.VM)
 	err = rcv.VerifyBlock(rcvCtx, nil, parsed)
-	require.ErrorContains(t, err, "settled height mismatch", "%T.VerifyBlock(tampered blk3)", rcv.VM)
+	require.Contains(t, err.Error(), "settled height mismatch", "%T.VerifyBlock(tampered blk3)", rcv.VM)
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
