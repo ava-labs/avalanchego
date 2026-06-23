@@ -29,6 +29,27 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+const (
+	autoRenewedValidatorWeight                          = defaultMinValidatorStake
+	autoRenewedValidatorPotentialReward          uint64 = 10_000_000
+	autoRenewedValidatorDelegateeReward          uint64 = 5_000_000
+	autoRenewedValidatorAccruedValidationRewards uint64 = 1_000_000
+	autoRenewedValidatorAccruedDelegateeRewards  uint64 = 500_000
+	autoRenewedValidatorDelegationRewardShares   uint32 = reward.PercentDenominator / 10
+	autoRenewedValidatorAutoCompoundRewardShares uint32 = 4 * reward.PercentDenominator / 10
+)
+
+var defaultRewardAutoRenewedValidatorConfig = rewardAutoRenewedValidatorConfig{
+	weight:                   autoRenewedValidatorWeight,
+	potentialReward:          autoRenewedValidatorPotentialReward,
+	delegateeReward:          autoRenewedValidatorDelegateeReward,
+	accruedValidationRewards: autoRenewedValidatorAccruedValidationRewards,
+	accruedDelegateeRewards:  autoRenewedValidatorAccruedDelegateeRewards,
+	delegationRewardShares:   autoRenewedValidatorDelegationRewardShares,
+	autoCompoundRewardShares: autoRenewedValidatorAutoCompoundRewardShares,
+	restake:                  true,
+}
+
 func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
 	utx := &txs.RewardValidatorTx{TxID: txID}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
@@ -82,12 +103,12 @@ func requireNoOutputUTXO(t testing.TB, chain state.Chain, txID ids.ID, outputInd
 
 // requireStakeReturned asserts that each of the validator's stake outputs
 // is returned as a UTXO with the original amount.
-func requireStakeReturned(t testing.TB, chain state.Chain, addTx *txs.Tx, uAddTx *txs.AddAutoRenewedValidatorTx) {
+func requireStakeReturned(t testing.TB, chain state.Chain, addTxID ids.ID, uAddTx *txs.AddAutoRenewedValidatorTx) {
 	t.Helper()
 
 	for i, stakeOut := range uAddTx.StakeOuts {
 		utxoID := avax.UTXOID{
-			TxID:        addTx.ID(),
+			TxID:        addTxID,
 			OutputIndex: uint32(len(uAddTx.Outputs()) + i),
 		}
 		utxo, err := chain.GetUTXO(utxoID.InputID())
@@ -95,6 +116,13 @@ func requireStakeReturned(t testing.TB, chain state.Chain, addTx *txs.Tx, uAddTx
 		require.Equal(t, stakeOut.Out.Amount(), utxo.Out.(*secp256k1fx.TransferOutput).Amt)
 	}
 }
+
+// Output index layout of a RewardAutoRenewedValidatorTx's reward UTXOs. The tx
+// itself has no outputs, so its reward UTXOs occupy the first output indices.
+const (
+	validationRewardOutputIndex = 0
+	delegateeRewardOutputIndex  = 1
+)
 
 // rewardAutoRenewedValidatorConfig parameterizes rewardAutoRenewedValidator.
 type rewardAutoRenewedValidatorConfig struct {
@@ -110,6 +138,14 @@ type rewardAutoRenewedValidatorConfig struct {
 	restake bool
 }
 
+func (r rewardAutoRenewedValidatorResult) validationRewardsOwner() *secp256k1fx.OutputOwners {
+	return r.uAddTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners)
+}
+
+func (r rewardAutoRenewedValidatorResult) delegatorRewardsOwner() *secp256k1fx.OutputOwners {
+	return r.uAddTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners)
+}
+
 // restakedReward returns the portion of amount that is restaked based on the
 // configured auto-compound shares, before any MaxValidatorStake capping.
 func (c rewardAutoRenewedValidatorConfig) restakedReward(amount uint64) uint64 {
@@ -121,16 +157,15 @@ func (c rewardAutoRenewedValidatorConfig) restakedReward(amount uint64) uint64 {
 // rewardAutoRenewedValidatorResult holds the results produced while rewarding an
 // auto-renewed validator at the end of its period.
 type rewardAutoRenewedValidatorResult struct {
-	addTx         *txs.Tx
 	uAddTx        *txs.AddAutoRenewedValidatorTx
-	rewardTx      *txs.Tx
+	addTxID       ids.ID
+	rewardTxID    ids.ID
 	onCommitState *state.Diff
 	onAbortState  *state.Diff
 }
 
 // rewardAutoRenewedValidator sets up an auto-renewed validator at the end
-// of its period, executes the RewardAutoRenewedValidatorTx against fresh commit
-// and abort diffs, and returns the resulting artifacts for assertion.
+// of its period, executes the [txs.RewardAutoRenewedValidatorTx] and returns the resulting artifacts for assertion.
 func rewardAutoRenewedValidator(
 	t testing.TB,
 	env *environment,
@@ -142,6 +177,9 @@ func rewardAutoRenewedValidator(
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
 
 	addTx, err := wallet.IssueAddAutoRenewedValidatorTx(
 		ids.GenerateTestNodeID(),
@@ -155,10 +193,10 @@ func rewardAutoRenewedValidator(
 		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
-	env.state.AddTx(addTx, status.Committed)
+	diff.AddTx(addTx, status.Committed)
 
 	uAddTx := addTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
-	avax.Produce(env.state, addTx.ID(), uAddTx.Outputs())
+	avax.Produce(diff, addTx.ID(), uAddTx.Outputs())
 
 	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
 	duration := time.Duration(uAddTx.Period) * time.Second
@@ -172,7 +210,7 @@ func rewardAutoRenewedValidator(
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, env.state.PutCurrentValidator(staker))
+	require.NoError(t, diff.PutCurrentValidator(staker))
 
 	stakingInfo := state.StakingInfo{
 		DelegateeReward:          cfg.delegateeReward,
@@ -183,9 +221,11 @@ func rewardAutoRenewedValidator(
 	if cfg.restake {
 		stakingInfo.NextPeriod = uAddTx.Period
 	}
-	require.NoError(t, env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, stakingInfo))
+	require.NoError(t, diff.SetStakingInfo(staker.SubnetID, staker.NodeID, stakingInfo))
 
-	env.state.SetTimestamp(staker.EndTime)
+	diff.SetTimestamp(staker.EndTime)
+
+	require.NoError(t, diff.Apply(env.state))
 	require.NoError(t, env.state.Commit())
 
 	rewardTx := newRewardAutoRenewedValidatorTx(t, addTx.ID(), uint64(env.state.GetTimestamp().Unix()))
@@ -202,9 +242,9 @@ func rewardAutoRenewedValidator(
 	))
 
 	return rewardAutoRenewedValidatorResult{
-		addTx:         addTx,
 		uAddTx:        uAddTx,
-		rewardTx:      rewardTx,
+		addTxID:       addTx.ID(),
+		rewardTxID:    rewardTx.TxID,
 		onCommitState: onCommitState,
 		onAbortState:  onAbortState,
 	}
@@ -1177,6 +1217,9 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
 
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
 	addPermissionlessValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -1193,7 +1236,7 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 		reward.PercentDenominator,
 	)
 	require.NoError(t, err)
-	env.state.AddTx(addPermissionlessValidatorTx, status.Committed)
+	diff.AddTx(addPermissionlessValidatorTx, status.Committed)
 
 	uAddPermissionlessValidatorTx := addPermissionlessValidatorTx.Unsigned.(*txs.AddPermissionlessValidatorTx)
 	staker, err := state.NewCurrentStaker(
@@ -1203,8 +1246,10 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 		uint64(1000000),
 	)
 	require.NoError(t, err)
-	require.NoError(t, env.state.PutCurrentValidator(staker))
-	env.state.SetTimestamp(staker.EndTime)
+	require.NoError(t, diff.PutCurrentValidator(staker))
+	diff.SetTimestamp(staker.EndTime)
+
+	require.NoError(t, diff.Apply(env.state))
 
 	tests := []struct {
 		name                string
@@ -1261,23 +1306,9 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
-	cfg := rewardAutoRenewedValidatorConfig{
-		weight:                   env.config.MaxValidatorStake - 500_000,
-		potentialReward:          10_000_000,
-		delegateeReward:          5_000_000,
-		accruedValidationRewards: 1_000_000,
-		accruedDelegateeRewards:  500_000,
-		delegationRewardShares:   100_000,
-		autoCompoundRewardShares: 400_000,
-		restake:                  false, // graceful stop
-	}
+	cfg := defaultRewardAutoRenewedValidatorConfig
+	cfg.restake = false // graceful stop
 	rewardResult := rewardAutoRenewedValidator(t, env, cfg)
-
-	var (
-		valOwner      = rewardResult.uAddTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners)
-		delOwner      = rewardResult.uAddTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners)
-		numRewardOuts = len(rewardResult.rewardTx.Unsigned.Outputs())
-	)
 
 	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
@@ -1300,21 +1331,37 @@ func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 		_, err = stateTest.diff.GetCurrentValidator(rewardResult.uAddTx.SubnetID(), rewardResult.uAddTx.NodeID())
 		require.ErrorIs(t, err, database.ErrNotFound)
 
-		requireStakeReturned(t, stateTest.diff, rewardResult.addTx, rewardResult.uAddTx)
+		requireStakeReturned(t, stateTest.diff, rewardResult.addTxID, rewardResult.uAddTx)
 
-		requireOutputUTXO(t, stateTest.diff, rewardResult.rewardTx.ID(), numRewardOuts, env.ctx.AVAXAssetID, stateTest.wantValidationRewards, valOwner)
-		requireOutputUTXO(t, stateTest.diff, rewardResult.rewardTx.ID(), numRewardOuts+1, env.ctx.AVAXAssetID, cfg.delegateeReward+cfg.accruedDelegateeRewards, delOwner)
+		requireOutputUTXO(
+			t,
+			stateTest.diff,
+			rewardResult.rewardTxID,
+			validationRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			stateTest.wantValidationRewards,
+			rewardResult.validationRewardsOwner(),
+		)
+		requireOutputUTXO(
+			t,
+			stateTest.diff,
+			rewardResult.rewardTxID,
+			delegateeRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			cfg.delegateeReward+cfg.accruedDelegateeRewards,
+			rewardResult.delegatorRewardsOwner(),
+		)
 
 		// No additional contiguous UTXOs for the validator or reward txs.
-		requireNoOutputUTXO(t, stateTest.diff, rewardResult.addTx.ID(), len(rewardResult.uAddTx.Outputs())+len(rewardResult.uAddTx.StakeOuts))
-		requireNoOutputUTXO(t, stateTest.diff, rewardResult.rewardTx.ID(), numRewardOuts+2)
+		requireNoOutputUTXO(t, stateTest.diff, rewardResult.addTxID, len(rewardResult.uAddTx.Outputs())+len(rewardResult.uAddTx.StakeOuts))
+		requireNoOutputUTXO(t, stateTest.diff, rewardResult.rewardTxID, delegateeRewardOutputIndex+1)
 	}
 
 	// Verify reward UTXOs are correctly tracked via GetRewardUTXOs.
 	require.NoError(t, rewardResult.onCommitState.Apply(env.state))
 	require.NoError(t, env.state.Commit())
 
-	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardResult.rewardTx.ID())
+	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardResult.rewardTxID)
 	require.NoError(t, err)
 	require.Len(t, rewardUTXOs, 2)
 	require.Equal(t, cfg.potentialReward+cfg.accruedValidationRewards, rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
@@ -1324,24 +1371,8 @@ func TestRewardAutoRenewedValidatorTxGracefulStop(t *testing.T) {
 func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
-	cfg := rewardAutoRenewedValidatorConfig{
-		weight:                   env.config.MinValidatorStake,
-		potentialReward:          10_000_000,
-		delegateeReward:          5_000_000,
-		accruedValidationRewards: 1_000_000,
-		accruedDelegateeRewards:  500_000,
-		delegationRewardShares:   100_000,
-		autoCompoundRewardShares: 400_000,
-		restake:                  true,
-	}
+	cfg := defaultRewardAutoRenewedValidatorConfig
 	rewardResult := rewardAutoRenewedValidator(t, env, cfg)
-
-	var (
-		rewardTx      = rewardResult.rewardTx
-		valOwner      = rewardResult.uAddTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners)
-		delOwner      = rewardResult.uAddTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners)
-		numRewardOuts = len(rewardTx.Unsigned.Outputs())
-	)
 
 	// The new weight stays below MaxValidatorStake, so the restaked rewards are
 	// not capped. The remainder of each reward is paid out as a UTXO.
@@ -1362,14 +1393,30 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 		_, err := rewardResult.onAbortState.GetCurrentValidator(rewardResult.uAddTx.SubnetID(), rewardResult.uAddTx.NodeID())
 		require.ErrorIs(t, err, database.ErrNotFound)
 
-		requireStakeReturned(t, rewardResult.onAbortState, rewardResult.addTx, rewardResult.uAddTx)
+		requireStakeReturned(t, rewardResult.onAbortState, rewardResult.addTxID, rewardResult.uAddTx)
 
-		requireOutputUTXO(t, rewardResult.onAbortState, rewardTx.ID(), numRewardOuts, env.ctx.AVAXAssetID, cfg.accruedValidationRewards, valOwner)
-		requireOutputUTXO(t, rewardResult.onAbortState, rewardTx.ID(), numRewardOuts+1, env.ctx.AVAXAssetID, wantAbortDelegateeRewardUTXOAmount, delOwner)
+		requireOutputUTXO(
+			t,
+			rewardResult.onAbortState,
+			rewardResult.rewardTxID,
+			validationRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			cfg.accruedValidationRewards,
+			rewardResult.validationRewardsOwner(),
+		)
+		requireOutputUTXO(
+			t,
+			rewardResult.onAbortState,
+			rewardResult.rewardTxID,
+			delegateeRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			wantAbortDelegateeRewardUTXOAmount,
+			rewardResult.delegatorRewardsOwner(),
+		)
 
 		// No additional contiguous UTXOs for the validator or reward txs.
-		requireNoOutputUTXO(t, rewardResult.onAbortState, rewardResult.addTx.ID(), len(rewardResult.uAddTx.Outputs())+len(rewardResult.uAddTx.StakeOuts))
-		requireNoOutputUTXO(t, rewardResult.onAbortState, rewardTx.ID(), numRewardOuts+2)
+		requireNoOutputUTXO(t, rewardResult.onAbortState, rewardResult.addTxID, len(rewardResult.uAddTx.Outputs())+len(rewardResult.uAddTx.StakeOuts))
+		requireNoOutputUTXO(t, rewardResult.onAbortState, rewardResult.rewardTxID, delegateeRewardOutputIndex+1)
 
 		abortSupply, err := rewardResult.onAbortState.GetCurrentSupply(constants.PrimaryNetworkID)
 		require.NoError(t, err)
@@ -1389,12 +1436,28 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 		require.Equal(t, wantAccruedDelegateeRewards, stakingInfo.AccruedDelegateeRewards)
 
 		// Check UTXOs for withdraws from auto-restake shares param.
-		requireOutputUTXO(t, rewardResult.onCommitState, rewardTx.ID(), numRewardOuts, env.ctx.AVAXAssetID, wantValidationRewardUTXOAmount, valOwner)
-		requireOutputUTXO(t, rewardResult.onCommitState, rewardTx.ID(), numRewardOuts+1, env.ctx.AVAXAssetID, wantDelegateeRewardUTXOAmount, delOwner)
+		requireOutputUTXO(
+			t,
+			rewardResult.onCommitState,
+			rewardResult.rewardTxID,
+			validationRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			wantValidationRewardUTXOAmount,
+			rewardResult.validationRewardsOwner(),
+		)
+		requireOutputUTXO(
+			t,
+			rewardResult.onCommitState,
+			rewardResult.rewardTxID,
+			delegateeRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			wantDelegateeRewardUTXOAmount,
+			rewardResult.delegatorRewardsOwner(),
+		)
 
 		// No overflow UTXOs — new weight is below MaxValidatorStake.
-		requireNoOutputUTXO(t, rewardResult.onCommitState, rewardTx.ID(), numRewardOuts+2)
-		requireNoOutputUTXO(t, rewardResult.onCommitState, rewardResult.addTx.ID(), len(rewardResult.uAddTx.Outputs()))
+		requireNoOutputUTXO(t, rewardResult.onCommitState, rewardResult.rewardTxID, delegateeRewardOutputIndex+1)
+		requireNoOutputUTXO(t, rewardResult.onCommitState, rewardResult.addTxID, len(rewardResult.uAddTx.Outputs()))
 
 		commitSupply, err := rewardResult.onCommitState.GetCurrentSupply(constants.PrimaryNetworkID)
 		require.NoError(t, err)
@@ -1405,7 +1468,7 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 	require.NoError(t, rewardResult.onCommitState.Apply(env.state))
 	require.NoError(t, env.state.Commit())
 
-	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardTx.ID())
+	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardResult.rewardTxID)
 	require.NoError(t, err)
 	require.Len(t, rewardUTXOs, 2)
 	require.Equal(t, wantValidationRewardUTXOAmount, rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
@@ -1413,21 +1476,12 @@ func TestRewardAutoRenewedValidatorTxRestake(t *testing.T) {
 }
 
 func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
+	const restakingCapacity uint64 = 2_000_000
+
 	env := newEnvironment(t, upgradetest.Latest)
 
-	const restakingCapacity uint64 = 2_000_000
-	vdrWeight := env.config.MaxValidatorStake - restakingCapacity
-
-	cfg := rewardAutoRenewedValidatorConfig{
-		weight:                   vdrWeight,
-		potentialReward:          10_000_000,
-		delegateeReward:          5_000_000,
-		accruedValidationRewards: 1_000_000,
-		accruedDelegateeRewards:  500_000,
-		delegationRewardShares:   reward.PercentDenominator / 10,
-		autoCompoundRewardShares: 4 * reward.PercentDenominator / 10,
-		restake:                  true,
-	}
+	cfg := defaultRewardAutoRenewedValidatorConfig
+	cfg.weight = env.config.MaxValidatorStake - restakingCapacity
 
 	// On commit, the validator is configured to restake autoCompoundRewardShares
 	// of the validation and pending delegatee rewards. Because this would exceed
@@ -1447,13 +1501,6 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 
 	rewardResult := rewardAutoRenewedValidator(t, env, cfg)
 
-	var (
-		rewardTx      = rewardResult.rewardTx
-		valOwner      = rewardResult.uAddTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners)
-		delOwner      = rewardResult.uAddTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners)
-		numRewardOuts = len(rewardTx.Unsigned.Outputs())
-	)
-
 	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 
@@ -1462,14 +1509,30 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 		_, err := rewardResult.onAbortState.GetCurrentValidator(rewardResult.uAddTx.SubnetID(), rewardResult.uAddTx.NodeID())
 		require.ErrorIs(t, err, database.ErrNotFound)
 
-		requireStakeReturned(t, rewardResult.onAbortState, rewardResult.addTx, rewardResult.uAddTx)
+		requireStakeReturned(t, rewardResult.onAbortState, rewardResult.addTxID, rewardResult.uAddTx)
 
-		requireOutputUTXO(t, rewardResult.onAbortState, rewardTx.ID(), numRewardOuts, env.ctx.AVAXAssetID, cfg.accruedValidationRewards, valOwner)
-		requireOutputUTXO(t, rewardResult.onAbortState, rewardTx.ID(), numRewardOuts+1, env.ctx.AVAXAssetID, wantAbortDelegateeRewardUTXOAmount, delOwner)
+		requireOutputUTXO(
+			t,
+			rewardResult.onAbortState,
+			rewardResult.rewardTxID,
+			validationRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			cfg.accruedValidationRewards,
+			rewardResult.validationRewardsOwner(),
+		)
+		requireOutputUTXO(
+			t,
+			rewardResult.onAbortState,
+			rewardResult.rewardTxID,
+			delegateeRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			wantAbortDelegateeRewardUTXOAmount,
+			rewardResult.delegatorRewardsOwner(),
+		)
 
 		// No additional contiguous UTXOs for the validator or reward txs.
-		requireNoOutputUTXO(t, rewardResult.onAbortState, rewardResult.addTx.ID(), len(rewardResult.uAddTx.Outputs())+len(rewardResult.uAddTx.StakeOuts))
-		requireNoOutputUTXO(t, rewardResult.onAbortState, rewardTx.ID(), numRewardOuts+2)
+		requireNoOutputUTXO(t, rewardResult.onAbortState, rewardResult.addTxID, len(rewardResult.uAddTx.Outputs())+len(rewardResult.uAddTx.StakeOuts))
+		requireNoOutputUTXO(t, rewardResult.onAbortState, rewardResult.rewardTxID, delegateeRewardOutputIndex+1)
 
 		abortSupply, err := rewardResult.onAbortState.GetCurrentSupply(constants.PrimaryNetworkID)
 		require.NoError(t, err)
@@ -1484,7 +1547,7 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 		stakingInfo, err := rewardResult.onCommitState.GetStakingInfo(rewardResult.uAddTx.SubnetID(), rewardResult.uAddTx.NodeID())
 		require.NoError(t, err)
 
-		require.Equal(t, vdrWeight+wantRestakedValidationRewards+wantRestakedDelegateeRewards, validator.Weight)
+		require.Equal(t, cfg.weight+wantRestakedValidationRewards+wantRestakedDelegateeRewards, validator.Weight)
 		require.Equal(t, env.config.MaxValidatorStake, validator.Weight)
 		require.Equal(t, wantAccruedValidationRewards, stakingInfo.AccruedValidationRewards)
 		require.Equal(t, wantAccruedDelegateeRewards, stakingInfo.AccruedDelegateeRewards)
@@ -1492,12 +1555,28 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 		// Rewards not restaked are paid as one validation reward UTXO and one
 		// delegatee reward UTXO. These amounts include the shares the validator
 		// chose not to restake and the rewards above MaxValidatorStake.
-		requireOutputUTXO(t, rewardResult.onCommitState, rewardTx.ID(), numRewardOuts, env.ctx.AVAXAssetID, wantValidationRewardUTXOAmount, valOwner)
-		requireOutputUTXO(t, rewardResult.onCommitState, rewardTx.ID(), numRewardOuts+1, env.ctx.AVAXAssetID, wantDelegateeRewardUTXOAmount, delOwner)
+		requireOutputUTXO(
+			t,
+			rewardResult.onCommitState,
+			rewardResult.rewardTxID,
+			validationRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			wantValidationRewardUTXOAmount,
+			rewardResult.validationRewardsOwner(),
+		)
+		requireOutputUTXO(
+			t,
+			rewardResult.onCommitState,
+			rewardResult.rewardTxID,
+			delegateeRewardOutputIndex,
+			env.ctx.AVAXAssetID,
+			wantDelegateeRewardUTXOAmount,
+			rewardResult.delegatorRewardsOwner(),
+		)
 
 		// No additional contiguous UTXOs for the validator or reward txs.
-		requireNoOutputUTXO(t, rewardResult.onCommitState, rewardTx.ID(), numRewardOuts+2)
-		requireNoOutputUTXO(t, rewardResult.onCommitState, rewardResult.addTx.ID(), len(rewardResult.uAddTx.Outputs()))
+		requireNoOutputUTXO(t, rewardResult.onCommitState, rewardResult.rewardTxID, delegateeRewardOutputIndex+1)
+		requireNoOutputUTXO(t, rewardResult.onCommitState, rewardResult.addTxID, len(rewardResult.uAddTx.Outputs()))
 
 		commitSupply, err := rewardResult.onCommitState.GetCurrentSupply(constants.PrimaryNetworkID)
 		require.NoError(t, err)
@@ -1508,7 +1587,7 @@ func TestRewardAutoRenewedValidatorTxMaxValidatorStake(t *testing.T) {
 	require.NoError(t, rewardResult.onCommitState.Apply(env.state))
 	require.NoError(t, env.state.Commit())
 
-	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardTx.ID())
+	rewardUTXOs, err := env.state.GetRewardUTXOs(rewardResult.rewardTxID)
 	require.NoError(t, err)
 	require.Len(t, rewardUTXOs, 2)
 	require.Equal(t, wantValidationRewardUTXOAmount, rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
@@ -1533,6 +1612,9 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 		vdrPotentialReward = uint64(2_000_000)
 	)
 
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
 	// Step 1: Create the auto-renewed validator.
 	addAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
 		vdrNodeID,
@@ -1546,10 +1628,10 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 		env.config.MinStakeDuration,
 	)
 	require.NoError(t, err)
-	env.state.AddTx(addAutoRenewedValidatorTx, status.Committed)
+	diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
 
 	uAddAutoRenewedValidatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
-	avax.Produce(env.state, addAutoRenewedValidatorTx.ID(), uAddAutoRenewedValidatorTx.Outputs())
+	avax.Produce(diff, addAutoRenewedValidatorTx.ID(), uAddAutoRenewedValidatorTx.Outputs())
 
 	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
 	duration := time.Duration(uAddAutoRenewedValidatorTx.Period) * time.Second
@@ -1563,10 +1645,9 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, env.state.PutCurrentValidator(vdrStaker))
-	require.NoError(t, env.state.Commit())
+	require.NoError(t, diff.PutCurrentValidator(vdrStaker))
 
-	require.NoError(t, env.state.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
+	require.NoError(t, diff.SetStakingInfo(vdrStaker.SubnetID, vdrStaker.NodeID, state.StakingInfo{
 		AutoCompoundRewardShares: uAddAutoRenewedValidatorTx.AutoCompoundRewardShares,
 		NextPeriod:               uAddAutoRenewedValidatorTx.Period,
 	}))
@@ -1598,10 +1679,11 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, env.state.PutCurrentDelegator(delStaker))
-	env.state.AddTx(addDelegatorTx, status.Committed)
-	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
-	require.NoError(t, env.state.Commit())
+	require.NoError(t, diff.PutCurrentDelegator(delStaker))
+	diff.AddTx(addDelegatorTx, status.Committed)
+	diff.SetTimestamp(time.Unix(int64(delEndTime), 0))
+
+	require.NoError(t, diff.Apply(env.state))
 
 	// Step 3: Reward the delegator via RewardValidatorTx.
 	rewardDelegatorTx, err := newRewardValidatorTx(t, addDelegatorTx.ID())
@@ -1648,7 +1730,6 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 
 	// Commit the delegator diff.
 	require.NoError(t, delOnCommitState.Apply(env.state))
-	require.NoError(t, env.state.Commit())
 
 	// Verify reward UTXOs are correctly tracked via GetRewardUTXOs.
 	rewardUTXOs, err := env.state.GetRewardUTXOs(addDelegatorTx.ID())
