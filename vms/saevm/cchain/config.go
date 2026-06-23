@@ -14,9 +14,8 @@ import (
 )
 
 type config struct {
-	// WarpOffChainMessages encodes off-chain messages (unrelated to any
-	// on-chain event ie. block or AddressedCall) that the node is willing to
-	// sign.
+	// WarpOffChainMessages encodes messages that the node is willing to sign.
+	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
 }
 

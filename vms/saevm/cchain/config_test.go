@@ -62,10 +62,10 @@ func TestConfig_WarpMessages(t *testing.T) {
 		utils.RandomBytes(20),
 		[]byte("test"),
 	)
-	require.NoError(t, err)
+	require.NoError(t, err, "payload.NewAddressedCall(...)")
 
 	msg, err := warp.NewUnsignedMessage(constants.UnitTestID, ids.GenerateTestID(), payload.Bytes())
-	require.NoError(t, err)
+	require.NoError(t, err, "warp.NewUnsignedMessage(...)")
 
 	tests := []struct {
 		name    string
