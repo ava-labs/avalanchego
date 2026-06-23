@@ -12,6 +12,8 @@ package_group(
     name = "external_consumers",
     packages = [
         "//node",
+        "//graft/coreth/plugin/evm/customheader",
+        "//graft/coreth/plugin/evm/customtypes",
         "//tests/e2e/p",
         "//vms/transitionvm",
     ],
@@ -69,6 +71,7 @@ go_library(
         "//vms/evm/database",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
+        "//vms/saevm/cchain/dynamic",
         "//vms/saevm/cchain/state",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/txpool",
