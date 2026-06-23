@@ -44,34 +44,33 @@ func (h *SummaryHandler) Initialize(
 	h.cfg = cfg
 	h.db = types.NewEthDB(db)
 	h.snowCtx = snowCtx
+	h.genesis = genesis
 	h.stateSyncDone = make(chan struct{})
 	return nil
 }
 
-func (h *SummaryHandler) Shutdown(context.Context) error {
+func (*SummaryHandler) Shutdown(context.Context) error {
+	// TODO(alarso16): cancel any ongoing state sync
 	return nil
 }
 
 // GetLastStateSummary returns the summary of the last accepted block at
 // multiple of [syncCommitInterval] height.
 func (h *SummaryHandler) GetLastStateSummary(ctx context.Context) (*Summary, error) {
-	hash, err := h.lastAcceptedhash()
-	if err != nil {
-		return nil, err
+	hash, ok := h.lastAcceptedHash()
+	if !ok {
+		return h.GetStateSummary(ctx, 0)
 	}
 
 	lastHeight := rawdb.ReadHeaderNumber(h.db, hash)
 	if lastHeight == nil {
-		// This indicates a database inconsistency, so we don't need to return [database.ErrNotFound] directly.
+		// This indicates a database inconsistency, can be considered fatal
 		return nil, fmt.Errorf("%w: header not found for %s", database.ErrNotFound, hash)
 	}
 
 	// TODO(alarso16): Do we need to handle the last synchronous block here?
 	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.CommitInterval)
-	return &Summary{
-		blockHash: hash,
-		height:    height,
-	}, nil
+	return h.GetStateSummary(ctx, height)
 }
 
 // GetOngoingSyncStateSummary always returns [database.ErrNotFound].
@@ -80,14 +79,19 @@ func (h *SummaryHandler) GetOngoingSyncStateSummary(context.Context) (*Summary, 
 	return nil, database.ErrNotFound
 }
 
-func (h *SummaryHandler) GetStateSummary(_ context.Context, height uint64) (*Summary, error) {
-	hash := rawdb.ReadCanonicalHash(h.db, height)
-	if hash == (common.Hash{}) {
+func (h *SummaryHandler) GetStateSummary(ctx context.Context, height uint64) (*Summary, error) {
+	if height%h.cfg.CommitInterval != 0 {
+		// can't serve committed state at this height
 		return nil, database.ErrNotFound
+	}
+
+	id, err := h.GetBlockIDAtHeight(ctx, height)
+	if err != nil {
+		return nil, err
 	}
 	return &Summary{
 		height:    height,
-		blockHash: hash,
+		blockHash: common.Hash(id),
 	}, nil
 }
 
@@ -111,8 +115,8 @@ func (h *SummaryHandler) GetBlock(_ context.Context, id ids.ID) (*blocks.Block, 
 }
 
 func (h *SummaryHandler) LastAccepted(context.Context) (ids.ID, error) {
-	hash, err := h.lastAcceptedhash()
-	if err != nil {
+	hash, ok := h.lastAcceptedHash()
+	if !ok {
 		hash = h.genesis.Hash()
 	}
 	return ids.ID(hash), nil
@@ -129,12 +133,12 @@ func (h *SummaryHandler) GetBlockIDAtHeight(_ context.Context, height uint64) (i
 	return ids.ID(hash), nil
 }
 
-// lastAcceptedhash returns the hash of the last accepted block. This is safe to be
-// used since to accept the block, the settled state must have been available.
-func (h *SummaryHandler) lastAcceptedhash() (common.Hash, error) {
+// lastAcceptedHash returns the hash of the last accepted block.
+// If not found, use in-memory genesis.
+func (h *SummaryHandler) lastAcceptedHash() (common.Hash, bool) {
 	hash := rawdb.ReadHeadFastBlockHash(h.db)
 	if hash == (common.Hash{}) {
-		return common.Hash{}, database.ErrNotFound
+		return common.Hash{}, false
 	}
-	return hash, nil
+	return hash, true
 }

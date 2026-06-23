@@ -157,7 +157,7 @@ type shim struct {
 // is not expected to be initialized, but it MUST be fully initialized after
 // [ChainVM.Initialize].
 // The returned struct additionally implements [block.StateSyncableVM].
-func NewStateSyncable[SP adaptor.SummaryProperties](zeroVM ChainVM, parser Parser, summaryHandler SummaryHandler[SP]) adaptor.ChainVMWithContext {
+func NewStateSyncable[SP adaptor.SummaryProperties](zeroVM ChainVM, summaryHandler SummaryHandler[SP], parser Parser) adaptor.ChainVMWithContext {
 	o := &orchestrator[SP]{
 		SummaryHandler: summaryHandler,
 		ChainVM:        zeroVM,

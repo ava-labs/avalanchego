@@ -41,6 +41,6 @@ func (h *SummaryHandler) WaitForEvent(ctx context.Context) (common.Message, erro
 	case <-h.stateSyncDone:
 		return common.StateSyncDone, nil
 	case <-ctx.Done():
-		return 0, ctx.Err()
+		return 0, context.Cause(ctx)
 	}
 }
