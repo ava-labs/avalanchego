@@ -2,11 +2,8 @@
 
 package customtypes
 
-import (
-	"io"
-
-	"github.com/ava-labs/libevm/rlp"
-)
+import "github.com/ava-labs/libevm/rlp"
+import "io"
 
 func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 	w := rlp.NewEncoderBuffer(_w)
