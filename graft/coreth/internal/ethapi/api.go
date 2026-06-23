@@ -1282,6 +1282,9 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 	if headExtra.MinDelayExcess != nil {
 		result["minDelayExcess"] = hexutil.Uint64(*headExtra.MinDelayExcess)
 	}
+	if headExtra.MinPriceExponent != nil {
+		result["minPriceExponent"] = hexutil.Uint64(*headExtra.MinPriceExponent)
+	}
 	return result
 }
 
