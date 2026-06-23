@@ -12,14 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-<<<<<<< HEAD
-var _ snowman.Block = (*preBlock)(nil)
-=======
 var (
 	_ snowman.Block           = (*preBlock)(nil)
 	_ block.WithVerifyContext = (*preBlock)(nil)
 )
->>>>>>> StephenButtolph/tvm
 
 type preBlock struct {
 	snowman.Block
@@ -32,8 +28,6 @@ func (p *preBlock) Verify(ctx context.Context) error {
 	p.v.transitionLock.RLock()
 	defer p.v.transitionLock.RUnlock()
 
-<<<<<<< HEAD
-=======
 	if err := p.verifyPreTransition(ctx); err != nil {
 		return err
 	}
@@ -74,7 +68,6 @@ func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Contex
 //
 // Callers must hold p.v.transitionLock.
 func (p *preBlock) verifyPreTransition(ctx context.Context) error {
->>>>>>> StephenButtolph/tvm
 	parent, err := p.v.current.chain.GetBlock(ctx, p.Parent())
 	if err != nil {
 		return err
@@ -84,11 +77,7 @@ func (p *preBlock) verifyPreTransition(ctx context.Context) error {
 	if parentTime := parent.Timestamp(); !parentTime.Before(p.v.transitionTime) {
 		return errPreTransitionBlockAfterTransition
 	}
-<<<<<<< HEAD
-	return p.Block.Verify(ctx)
-=======
 	return nil
->>>>>>> StephenButtolph/tvm
 }
 
 // Accept is basically the only function that does not immediately prevent
