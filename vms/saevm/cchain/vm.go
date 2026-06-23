@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
@@ -391,7 +390,7 @@ var errNoPreference = errors.New("no preferred block")
 
 // WaitForEvent blocks until the SAE VM emits an event or the cross-chain
 // txpool has a pending transaction.
-func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	// Throttle to avoid busy looping if we appear ready to build but keep
 	// encountering errors.
 	{
