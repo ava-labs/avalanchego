@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
@@ -117,7 +118,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		ExtDataGasUsed:      big.NewInt(22),
 		BlockGasCost:        big.NewInt(23),
 		TimeMilliseconds:    utils.PointerTo[uint64](24),
-		MinDelayExcess:      utils.PointerTo(dynamic.DelayExponent(25)),
+		MinDelayExcess:      utils.PointerTo(acp226.DelayExcess(25)),
 		TargetExponent:      utils.PointerTo(dynamic.TargetExponent(26)),
 		PriceExponent:       utils.PointerTo(dynamic.PriceExponent(27)),
 		SettledHeight:       utils.PointerTo[uint64](28),
@@ -175,7 +176,7 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *types.Header:
 				assertNonZero(t, f)
-			case *dynamic.DelayExponent:
+			case *acp226.DelayExcess:
 				assertNonZero(t, f)
 			case *dynamic.TargetExponent:
 				assertNonZero(t, f)
@@ -193,7 +194,7 @@ func allFieldsSet[T interface {
 func assertNonZero[T interface {
 	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
 		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header |
-		*dynamic.DelayExponent | *dynamic.TargetExponent | *dynamic.PriceExponent | *gas.Gas
+		*acp226.DelayExcess | *dynamic.TargetExponent | *dynamic.PriceExponent | *gas.Gas
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)

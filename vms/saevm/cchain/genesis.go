@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
@@ -292,7 +291,7 @@ func (g *genesis) block() (*types.Block, error) {
 
 	if c.IsGranite(g.Timestamp) {
 		headerExtra.TimeMilliseconds = avalancheutils.PointerTo(g.Timestamp * 1000)
-		headerExtra.MinDelayExcess = avalancheutils.PointerTo(dynamic.DelayExponent(acp226.InitialDelayExcess))
+		headerExtra.MinDelayExcess = avalancheutils.PointerTo(acp226.InitialDelayExcess)
 	}
 
 	return types.NewBlock(

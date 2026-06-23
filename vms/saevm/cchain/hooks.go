@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -118,7 +119,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return now
 		},
 		desiredParams{
-			delayExponent:  headerExtra.MinDelayExcess,
+			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 			targetExponent: headerExtra.TargetExponent,
 			priceExponent:  headerExtra.PriceExponent,
 		},
@@ -306,7 +307,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 	de := b.initialDelayExponent
 	if pde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pde != nil {
-		de = *pde
+		de = dynamic.DelayExponent(*pde)
 	}
 
 	// Enforce block-building separation against the parent's MinDelayExcess.
@@ -351,7 +352,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			MinDelayExcess:   &de,
+			MinDelayExcess:   (*acp226.DelayExcess)(&de),
 			TargetExponent:   &te,
 			PriceExponent:    &pe,
 		},

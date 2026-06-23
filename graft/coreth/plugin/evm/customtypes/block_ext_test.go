@@ -90,7 +90,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *common.Hash:
 				assertDifferentPointers(t, f, fieldCp)
-			case *dynamic.DelayExponent:
+			case *acp226.DelayExcess:
 				assertDifferentPointers(t, f, fieldCp)
 			case *dynamic.TargetExponent:
 				assertDifferentPointers(t, f, fieldCp)
@@ -332,7 +332,7 @@ func TestBlockGetters(t *testing.T) {
 				ExtDataGasUsed:   big.NewInt(1),
 				BlockGasCost:     big.NewInt(2),
 				TimeMilliseconds: utils.PointerTo[uint64](3),
-				MinDelayExcess:   utils.PointerTo(dynamic.DelayExponent(4)),
+				MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
 			},
 			blockExtra: &BlockBodyExtra{
 				Version: 3,

@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 var (
@@ -350,7 +349,7 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate min delay excess: %w", err)
 	}
-	headerExtra.MinDelayExcess = (*dynamic.DelayExponent)(minDelayExcess)
+	headerExtra.MinDelayExcess = minDelayExcess
 
 	// commit the final state root
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))

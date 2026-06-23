@@ -189,7 +189,6 @@ graft_go_test(
         "//vms/evm/sync/customrawdb",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
-        "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//common/math",

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -43,7 +44,7 @@ type HeaderExtra struct {
 	ExtDataGasUsed      *big.Int
 	BlockGasCost        *big.Int
 	TimeMilliseconds    *uint64
-	MinDelayExcess      *dynamic.DelayExponent
+	MinDelayExcess      *acp226.DelayExcess
 	TargetExponent      *dynamic.TargetExponent
 	PriceExponent       *dynamic.PriceExponent
 	SettledHeight       *uint64
@@ -255,7 +256,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.ExtDataGasUsed = h.ExtDataGasUsed
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
-	extras.MinDelayExcess = (*dynamic.DelayExponent)(h.DelayExponent)
+	extras.MinDelayExcess = (*acp226.DelayExcess)(h.DelayExponent)
 	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
 	extras.PriceExponent = (*dynamic.PriceExponent)(h.PriceExponent)
 	extras.SettledHeight = h.SettledHeight
