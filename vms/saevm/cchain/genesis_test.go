@@ -431,7 +431,9 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 
 		// Added millisecond timestamps
 		upgradetest.Granite: "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
-		upgradetest.Helicon: "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
+
+		// Added the ACP-283 min price exponent
+		upgradetest.Helicon: "0x06c48c7970d52c067843fdf98ba67b67feb2a1e3adee502000b52f9047f3e6b6",
 	}
 	_ = hashes[upgradetest.Latest] // Enforce completeness at compile time.
 
@@ -573,13 +575,16 @@ func TestSetupGenesis(t *testing.T) {
 			},
 		},
 		{
+			// Etna and Fortuna share a genesis (no extra seeded fields), so
+			// un-scheduling Fortuna isolates the fork-incompatibility error
+			// without tripping a genesis-hash mismatch.
 			name: "incompatible_upgrade",
 			initial: spec{
-				upgrades: latest,
+				upgrades: upgradetest.GetConfig(upgradetest.Fortuna),
 				genesis:  localGenesis,
 			},
 			restart: spec{
-				upgrades: upgradetest.GetConfig(upgradetest.Granite),
+				upgrades: upgradetest.GetConfig(upgradetest.Etna),
 				genesis:  localGenesis,
 			},
 			wantErr: errIsType[*ethparams.ConfigCompatError](),
