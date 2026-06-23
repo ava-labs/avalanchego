@@ -147,6 +147,9 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	if h.MinDelayExcess != nil {
 		m["minDelayExcess"] = hexutil.Uint64(*h.MinDelayExcess)
 	}
+	if h.MinPriceExponent != nil {
+		m["minPriceExponent"] = hexutil.Uint64(*h.MinPriceExponent)
+	}
 }
 
 func (h *HeaderSerializable) updateFromEth(eth *ethtypes.Header) {

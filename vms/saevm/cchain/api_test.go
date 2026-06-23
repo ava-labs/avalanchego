@@ -6,6 +6,7 @@ package cchain
 import (
 	"context"
 	"maps"
+	"reflect"
 	"testing"
 
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -172,13 +173,17 @@ func TestRPCExtras(t *testing.T) {
 	require.NotNilf(t, extra.BlockGasCost, "%T.BlockGasCost", extra)
 	require.NotNilf(t, extra.TimeMilliseconds, "%T.TimeMilliseconds", extra)
 	require.NotNilf(t, extra.MinDelayExcess, "%T.MinDelayExcess", extra)
+	require.NotNilf(t, extra.MinPriceExponent, "%T.MinPriceExponent", extra)
 	wantHeaderExtras := map[string]string{
 		"extDataHash":           extra.ExtDataHash.Hex(),
 		"extDataGasUsed":        hexutil.EncodeBig(extra.ExtDataGasUsed),
 		"blockGasCost":          hexutil.EncodeBig(extra.BlockGasCost),
 		"timestampMilliseconds": hexutil.EncodeUint64(*extra.TimeMilliseconds),
 		"minDelayExcess":        hexutil.EncodeUint64(uint64(*extra.MinDelayExcess)),
+		"minPriceExponent":      hexutil.EncodeUint64(uint64(*extra.MinPriceExponent)),
 	}
+	numHeaderExtras := reflect.TypeFor[customtypes.HeaderExtra]().NumField()
+	require.Lenf(t, wantHeaderExtras, numHeaderExtras, "%T field count", customtypes.HeaderExtra{})
 
 	var (
 		wantBlockExtras = maps.Clone(wantHeaderExtras)
