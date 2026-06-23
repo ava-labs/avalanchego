@@ -25,8 +25,6 @@ import (
 
 	_ "embed"
 
-	_ "embed"
-
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
