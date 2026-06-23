@@ -14,7 +14,6 @@ go_library(
         "//utils/logging",
         "//utils/math/intmath",
         "//vms/saevm/blocks",
-        "@com_github_ava_labs_avalanchego//intmath",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//event",

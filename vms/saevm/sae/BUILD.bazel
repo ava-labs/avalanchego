@@ -170,7 +170,6 @@ go_test(
         "//database",
         "//database/memdb",
         "//ids",
-        "//intmath",
         "//snow",
         "//snow/consensus/snowman",
         "//snow/engine/common",

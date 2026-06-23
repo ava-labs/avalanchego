@@ -15,7 +15,6 @@ go_library(
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
         "//vms/saevm/types",
-        "@com_github_ava_labs_avalanchego//intmath",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/state",

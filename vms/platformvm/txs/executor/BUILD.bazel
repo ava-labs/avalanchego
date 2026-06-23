@@ -122,7 +122,6 @@ go_test(
         "//wallet/chain/p/builder",
         "//wallet/chain/p/wallet",
         "//wallet/subnet/primary/common",
-        "@com_github_ava_labs_avalanchego//intmath",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_mock//gomock",
     ],
