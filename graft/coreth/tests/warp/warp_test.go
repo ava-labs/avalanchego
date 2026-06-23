@@ -272,6 +272,23 @@ func (w *warpTest) initClients() {
 	}
 }
 
+func confirmBlock(ctx context.Context, clients []*ethclient.Client, blockNumber uint64) {
+	// Loop over each client on chain A to ensure they all have time to accept the block.
+	// Note: if we did not confirm this here, the next stage could be racy since it assumes every node
+	// has accepted the block.
+	for i, client := range clients {
+		// Loop until each node has advanced to >= the height of the block that emitted the warp log
+		for {
+			receivedBlkNum, err := client.BlockNumber(ctx)
+			require.NoError(ginkgo.GinkgoT(), err)
+			if receivedBlkNum >= blockNumber {
+				ginkgo.GinkgoLogr.Info("client accepted the block containing SendWarpMessage", "client", i, "height", receivedBlkNum)
+				break
+			}
+		}
+	}
+}
+
 func (w *warpTest) sendMessageFromSendingSubnet() {
 	require := require.New(ginkgo.GinkgoT())
 	tc := e2e.NewTestContext()
@@ -330,20 +347,9 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 	w.addressedCallUnsignedMessage = unsignedMsg
 	ginkgo.GinkgoLogr.Info("Parsed unsignedWarpMsg", "unsignedWarpMessageID", w.addressedCallUnsignedMessage.ID(), "unsignedWarpMessage", w.addressedCallUnsignedMessage)
 
-	// Loop over each client on chain A to ensure they all have time to accept the block.
-	// Note: if we did not confirm this here, the next stage could be racy since it assumes every node
+	// If we did not confirm this here, the next stage could be racy since it assumes every node
 	// has accepted the block.
-	for i, client := range w.sendingSubnetClients {
-		// Loop until each node has advanced to >= the height of the block that emitted the warp log
-		for {
-			receivedBlkNum, err := client.BlockNumber(ctx)
-			require.NoError(err)
-			if receivedBlkNum >= blockNumber {
-				ginkgo.GinkgoLogr.Info("client accepted the block containing SendWarpMessage", "client", i, "height", receivedBlkNum)
-				break
-			}
-		}
-	}
+	confirmBlock(ctx, w.sendingSubnetClients, blockNumber)
 }
 
 func (w *warpTest) aggregateSignaturesViaAPI() {
@@ -466,6 +472,10 @@ func (w *warpTest) deliverAddressedCallToReceivingSubnet() {
 	require.Empty(logs)
 	require.NoError(err)
 	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+
+	// If we did not confirm this here, the next stage could be racy since it assumes every node
+	// has accepted the block.
+	confirmBlock(ctx, w.receivingSubnetClients, receipt.BlockNumber.Uint64())
 }
 
 func (w *warpTest) deliverBlockHashPayload() {
@@ -518,6 +528,8 @@ func (w *warpTest) deliverBlockHashPayload() {
 	require.Empty(logs)
 	require.NoError(err)
 	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+
+	confirmBlock(ctx, w.receivingSubnetClients, receipt.BlockNumber.Uint64())
 }
 
 func (w *warpTest) warpLoad() {
