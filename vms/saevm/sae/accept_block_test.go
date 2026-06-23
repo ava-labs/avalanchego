@@ -54,7 +54,7 @@ func TestAcceptBlock(t *testing.T) {
 		sut.assertBlockHashInvariants(ctx, t)
 
 		lastSettled := b.LastSettled().Height()
-		var wantInMemory set.Set[uint64]
+		wantInMemory := set.Of(sut.rawVM.last.synchronous.NumberU64())
 		for i, bb := range unsettled {
 			switch {
 			case bb == nil: // settled earlier
