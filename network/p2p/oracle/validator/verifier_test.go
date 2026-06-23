@@ -13,14 +13,18 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
-// buildWarpMessage constructs a warp UnsignedMessage whose payload is the
-// ABI-encoded OracleMessage. This is what the relayer puts in the access list
-// predicate and what OracleAdapter.sol hashes for its payload-binding check.
+// buildWarpMessage constructs a warp UnsignedMessage with the canonical
+// AddressedCall{SourceAddress: nil, Payload: abi.encode(OracleMessage)} structure.
+// This mirrors what the relayer/aggregator must produce for the warp precompile
+// to accept the message on the destination chain.
 func buildWarpMessage(t *testing.T, msg *oracle.OracleMessage) *warp.UnsignedMessage {
 	t.Helper()
-	um, err := warp.NewUnsignedMessage(1, ids.GenerateTestID(), msg.Bytes())
+	ac, err := payload.NewAddressedCall(nil, msg.Bytes())
+	require.NoError(t, err)
+	um, err := warp.NewUnsignedMessage(1, ids.GenerateTestID(), ac.Bytes())
 	require.NoError(t, err)
 	return um
 }

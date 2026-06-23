@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
 const (
@@ -52,7 +53,14 @@ func (v *OracleVerifier) Verify(
 	unsignedMessage *warp.UnsignedMessage,
 	justification []byte,
 ) *common.AppError {
-	msg, err := oracle.ParseOracleMessage(unsignedMessage.Payload)
+	ac, err := payload.ParseAddressedCall(unsignedMessage.Payload)
+	if err != nil {
+		return &common.AppError{
+			Code:    errCodeParse,
+			Message: "failed to parse AddressedCall: " + err.Error(),
+		}
+	}
+	msg, err := oracle.ParseOracleMessage(ac.Payload)
 	if err != nil {
 		return &common.AppError{
 			Code:    errCodeParse,
