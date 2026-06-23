@@ -396,6 +396,23 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	return e.undoSupplyMintOnAbort(stakerToReward)
 }
 
+// RewardAutoRenewedValidatorTx processes the reward proposal for an auto-renewed
+// validator at the end of a staking cycle, populating both the commit and abort
+// branches.
+//
+// The abort branch is the same regardless of configuration: the validator is
+// removed, its principal is returned, the optimistically-minted potential reward
+// is removed from the supply, and only its accrued validation rewards and
+// delegatee rewards are paid out (the current cycle's potential reward is
+// forfeited).
+//
+// The commit branch depends on the configured next period:
+//   - NextPeriod > 0: the validator continues. Its rewards are restaked per
+//     AutoCompoundRewardShares (growing its weight up to MaxValidatorStake and
+//     withdrawing any excess) and the next cycle begins immediately.
+//   - NextPeriod == 0: the validator gracefully exits. It is removed, its
+//     principal is returned, and it receives all rewards for the cycle (current
+//     potential reward + accrued validation rewards + all delegatee rewards).
 func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRenewedValidatorTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
@@ -427,72 +444,63 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		return fmt.Errorf("failed to get staking info: %w", err)
 	}
 
-	// In onAbortState the staker is always removed.
+	// Build the abort branch (same for both configurations): remove the
+	// validator, return its principal, and undo the optimistic supply mint since
+	// the current cycle's potential reward is not granted on abort.
 	if err := e.onAbortState.DeleteCurrentValidator(staker); err != nil {
 		return fmt.Errorf("deleting current validator from abort state: %w", err)
 	}
+
+	unstakeUTXOs(addAutoRenewedValidatorTx, staker.TxID, e.onAbortState)
 
 	if err := e.undoSupplyMintOnAbort(staker); err != nil {
 		return err
 	}
 
+	// Abort: pay accrued validation + all delegatee rewards (the current
+	// cycle's potential reward is forfeited).
+	if err = e.mintRewardOnAbort(addAutoRenewedValidatorTx, stakingInfo); err != nil {
+		return fmt.Errorf("minting reward on abort: %w", err)
+	}
+
 	if stakingInfo.NextPeriod > 0 {
-		// Running auto-renewed staker: validator will continue to the next cycle.
-		// On commit: restake rewards (based on AutoCompoundRewardShares) and start new cycle.
-		// On abort: return stake + accrued rewards, forfeit current cycle's rewards.
+		// The validator continues to the next cycle.
 
-		// Create UTXOs for onAbortState.
-		if err = e.createUTXOsAutoRenewedValidatorOnAbort(addAutoRenewedValidatorTx, staker, stakingInfo); err != nil {
-			return fmt.Errorf("failed to create UTXO auto-renewed validator on abort: %w", err)
-		}
-
-		// Set onCommitState.
-		if err = e.setOnCommitStateAutoRenewedValidatorRestake(addAutoRenewedValidatorTx, staker, stakingInfo); err != nil {
+		// Commit: restake rewards per AutoCompoundRewardShares and start the
+		// next cycle. The validator stays in the set, so its stake is not
+		// returned here.
+		if err = e.restakeAutoRenewedValidatorOnCommit(addAutoRenewedValidatorTx, staker, stakingInfo); err != nil {
 			return err
 		}
 
-		// Early return because we don't need to do anything else.
 		return nil
 	}
 
-	// Graceful exit: validator requested to stop (Period == 0).
-	// Return stake + all rewards on both commit and abort paths.
-
-	// Handle staker lifecycle.
+	// Graceful exit (NextPeriod == 0): the validator stops after this cycle and
+	// is removed on both branches.
 	if err := e.onCommitState.DeleteCurrentValidator(staker); err != nil {
 		return fmt.Errorf("deleting current validator from commit state: %w", err)
 	}
 
-	// On commit (validator eligible for rewards):
-	//   - Staked tokens (returned via stake outputs)
-	//   - All delegatee rewards (AccruedDelegateeRewards + pending delegatee rewards)
-	//   - All validation rewards (PotentialReward + AccruedRewards)
-	//
-	// On abort (validator not eligible for rewards):
-	//   - Staked tokens (returned via stake outputs)
-	//   - All delegatee rewards (AccruedDelegateeRewards + pending delegatee rewards)
-	//   - Only accrued validation rewards (AccruedRewards)
-	unstakeUTXOs(addAutoRenewedValidatorTx, staker.TxID, e.onCommitState, e.onAbortState)
+	// Commit: return the principal. (The abort branch already returned it above.)
+	unstakeUTXOs(addAutoRenewedValidatorTx, staker.TxID, e.onCommitState)
 
-	if err := e.createAbortRewardUTXOs(addAutoRenewedValidatorTx, stakingInfo); err != nil {
-		return err
-	}
-
+	// Commit: pay all rewards for the cycle — the current potential reward plus
+	// any accrued validation rewards.
 	totalRewards, err := safemath.Add(staker.PotentialReward, stakingInfo.AccruedValidationRewards)
 	if err != nil {
 		return err
 	}
 
-	// DelegateeReward is the validator's commission on rewards already paid out to
-	// its delegators, earned during their successful staking periods, so it is owed
-	// to the validator even on the abort path, where the validator forfeits its own
-	// potential reward for failing to meet its eligibility requirements this cycle.
+	// On graceful exit the validator receives all delegatee rewards: the pending
+	// commission from this cycle's completed delegations (DelegateeReward) plus the
+	// commission accrued and restaked in prior cycles (AccruedDelegateeRewards).
 	totalDelegateeRewards, err := safemath.Add(stakingInfo.DelegateeReward, stakingInfo.AccruedDelegateeRewards)
 	if err != nil {
 		return err
 	}
 
-	if err = e.createRewardsUTXOs(
+	if err = e.mintRewards(
 		addAutoRenewedValidatorTx,
 		totalRewards,
 		totalDelegateeRewards,
@@ -530,7 +538,8 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		stakeAsset = stake[0].Asset
 	)
 
-	unstakeUTXOs(uValidatorTx, txID, e.onCommitState, e.onAbortState)
+	unstakeUTXOs(uValidatorTx, txID, e.onCommitState)
+	unstakeUTXOs(uValidatorTx, txID, e.onAbortState)
 
 	utxosOffset := 0
 
@@ -612,7 +621,8 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		stakeAsset = stake[0].Asset
 	)
 
-	unstakeUTXOs(uDelegatorTx, txID, e.onCommitState, e.onAbortState)
+	unstakeUTXOs(uDelegatorTx, txID, e.onCommitState)
+	unstakeUTXOs(uDelegatorTx, txID, e.onAbortState)
 
 	// We're (possibly) rewarding a delegator, so we need to fetch
 	// the validator they are delegated to.
@@ -709,28 +719,10 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	return nil
 }
 
-// createUTXOsAutoRenewedValidatorOnAbort creates UTXOs for an auto-renewed validator
-// that failed to meet eligibility requirements.
-//
-// The validator receives:
-//   - Staked tokens (returned via stake outputs)
-//   - Accrued validation rewards (from previous successful periods)
-//   - Accrued delegatee rewards + pending delegatee rewards
-//
-// The validator forfeits potential reward of the ended cycle.
-func (e *proposalTxExecutor) createUTXOsAutoRenewedValidatorOnAbort(
-	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
-	validator *state.Staker,
-	stakingInfo state.StakingInfo,
-) error {
-	unstakeUTXOs(addAutoRenewedValidatorTx, validator.TxID, e.onAbortState)
-	return e.createAbortRewardUTXOs(addAutoRenewedValidatorTx, stakingInfo)
-}
-
-// createAbortRewardUTXOs creates reward UTXOs on the abort state for an
+// mintRewardOnAbort creates reward UTXOs on the abort state for an
 // auto-renewed validator. This includes accrued validation rewards and
 // all delegatee rewards (accrued + pending).
-func (e *proposalTxExecutor) createAbortRewardUTXOs(
+func (e *proposalTxExecutor) mintRewardOnAbort(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	stakingInfo state.StakingInfo,
 ) error {
@@ -742,7 +734,7 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 		return err
 	}
 
-	if err = e.createRewardsUTXOs(
+	if err = e.mintRewards(
 		addAutoRenewedValidatorTx,
 		stakingInfo.AccruedValidationRewards,
 		totalDelegateeRewards,
@@ -754,14 +746,14 @@ func (e *proposalTxExecutor) createAbortRewardUTXOs(
 	return nil
 }
 
-// createRewardsUTXOs adds reward UTXOs to chainState at output indices starting
+// mintRewards adds reward UTXOs to chainState at output indices starting
 // after the tx's own outputs.
 //
 // It must be called at most once per chainState per execution: the output
 // indices are derived from len(e.tx.Unsigned.Outputs()) and do not account for
 // UTXOs a prior call already added to the same diff, so a second call would
 // reuse the same (txID, outputIndex) pairs and collide on UTXO IDs.
-func (e *proposalTxExecutor) createRewardsUTXOs(
+func (e *proposalTxExecutor) mintRewards(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	validationRewards uint64,
 	delegateeRewards uint64,
@@ -794,7 +786,7 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 	return nil
 }
 
-// setOnCommitStateAutoRenewedValidatorRestake processes rewards for a running
+// restakeAutoRenewedValidatorOnCommit processes rewards for a running
 // auto-renewed validator based on their AutoCompoundRewardShares configuration.
 //
 // The function:
@@ -804,7 +796,7 @@ func (e *proposalTxExecutor) createRewardsUTXOs(
 //  3. Creates UTXOs for the withdrawn portion
 //  4. Increases validator weight and accrued rewards by the restaking portion
 //  5. Updates the validator state
-func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
+func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
 	validator *state.Staker,
 	stakingInfo state.StakingInfo,
@@ -852,7 +844,7 @@ func (e *proposalTxExecutor) setOnCommitStateAutoRenewedValidatorRestake(
 		return err
 	}
 
-	if err := e.createRewardsUTXOs(
+	if err := e.mintRewards(
 		addAutoRenewedValidatorTx,
 		withdrawingRewards,
 		withdrawingDelegateeRewards,
@@ -968,7 +960,7 @@ func (e *proposalTxExecutor) newUTXO(
 
 // unstakeUTXOs creates UTXOs to unstake a staker's staked UTXOs.
 // The UTXOs are added to all provided state diffs.
-func unstakeUTXOs(stakerTx txs.PermissionlessStaker, txID ids.ID, states ...*state.Diff) {
+func unstakeUTXOs(stakerTx txs.PermissionlessStaker, txID ids.ID, state *state.Diff) {
 	outputIndexOffset := len(stakerTx.Outputs())
 
 	for i, out := range stakerTx.Stake() {
@@ -981,9 +973,7 @@ func unstakeUTXOs(stakerTx txs.PermissionlessStaker, txID ids.ID, states ...*sta
 			Out:   out.Output(),
 		}
 
-		for _, s := range states {
-			s.AddUTXO(utxo)
-		}
+		state.AddUTXO(utxo)
 	}
 }
 
