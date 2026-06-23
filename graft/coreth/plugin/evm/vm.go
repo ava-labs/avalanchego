@@ -485,10 +485,6 @@ func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
 	}
 	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
 
-	// coreth is the pre-SAE C-Chain VM and is EOL at Helicon. The C-Chain
-	// transitions to SAE at Helicon, so coreth must never activate it.
-	configExtra.NetworkUpgrades.HeliconTimestamp = nil
-
 	// If Durango is scheduled, schedule the Warp Precompile at the same time.
 	if configExtra.DurangoBlockTimestamp != nil {
 		configExtra.PrecompileUpgrades = append(configExtra.PrecompileUpgrades, extras.PrecompileUpgrade{

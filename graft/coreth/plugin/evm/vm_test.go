@@ -106,21 +106,6 @@ func newDefaultTestVM() *VM {
 	return vm
 }
 
-func TestHeliconCappedAtGranite(t *testing.T) {
-	vm := newDefaultTestVM()
-	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{Fork: utils.PointerTo(upgradetest.Helicon)})
-	defer func() { require.NoError(t, vm.Shutdown(t.Context())) }()
-
-	cfg := vm.chainConfigExtra()
-	require.Nil(t, cfg.HeliconTimestamp, "coreth must not schedule Helicon, the C-Chain transitions to SAE there")
-	require.NotNil(t, cfg.GraniteTimestamp, "coreth caps at Granite")
-
-	signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
-	b, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
-	require.NoError(t, err, "coreth must build a block when Helicon is scheduled")
-	require.NoError(t, b.Verify(t.Context()), "coreth must verify its own block when Helicon is scheduled")
-}
-
 func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond

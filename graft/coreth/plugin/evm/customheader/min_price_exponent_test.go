@@ -10,37 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestVerifyMinPriceExponent(t *testing.T) {
-	tests := []struct {
-		name    string
-		header  *types.Header
-		wantErr error
-	}{
-		{
-			name:   "unset",
-			header: &types.Header{Time: 1001},
-		},
-		{
-			name:    "rejects_set_value",
-			header:  headerWithMinPriceExponent(1001, 1000),
-			wantErr: errRemoteMinPriceExponentSet,
-		},
-	}
+	require.NoError(t, VerifyMinPriceExponent(&types.Header{Time: 1001}))
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := VerifyMinPriceExponent(test.header)
-			require.ErrorIs(t, err, test.wantErr)
-		})
-	}
-}
-
-func headerWithMinPriceExponent(time uint64, exponent dynamic.PriceExponent) *types.Header {
-	return customtypes.WithHeaderExtra(
-		&types.Header{Time: time},
-		&customtypes.HeaderExtra{MinPriceExponent: &exponent},
+	withExponent := customtypes.WithHeaderExtra(
+		&types.Header{Time: 1001},
+		&customtypes.HeaderExtra{MinPriceExponent: utils.PointerTo(dynamic.PriceExponent(1000))},
 	)
+	require.ErrorIs(t, VerifyMinPriceExponent(withExponent), errRemoteMinPriceExponentSet)
 }
