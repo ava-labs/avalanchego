@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -440,7 +441,7 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	}
 
 	txBytes := heavyTxs[0].Size() + maxTxRLPHeaderLen
-	wantTxs := maxBlockTxBytes / txBytes
+	wantTxs := blocklimit.MaxBodyBytes / txBytes
 	require.Less(t, wantTxs, uint64(numTxs), "fixture must supply more transactions than fit in the byte budget")
 
 	// Bypass mempool admission filtering so the builder backstop is exercised.

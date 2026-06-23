@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -755,9 +756,65 @@ func TestAsOp(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.tx.name, func(t *testing.T) {
 			tx := test.tx.new
-			got, err := tx.AsOp(avaxAssetID)
+			got, err := tx.AsOp(avaxAssetID, 0)
 			require.NoErrorf(t, err, "%T.AsOp(AVAXAssetID)", tx)
 			assert.Equalf(t, test.want, got, "%T.AsOp(AVAXAssetID)", tx)
+		})
+	}
+}
+
+// TestAsOpByteFloor verifies that [Tx.AsOp] floors the gas at
+// [blocklimit.MinGasForBytes] for the given block gas limit
+func TestAsOpByteFloor(t *testing.T) {
+	const (
+		// baseGas is exportTx's unfloored gas (intrinsic + per-byte +
+		// per-signature); see [TestAsOp].
+		baseGas = 11230
+		// At an 80M block gas limit the floor charges ~38 gas per byte; at 20M,
+		// ~9.5 gas per byte — below exportTx's natural gas-per-byte.
+		floorBlockGasLimit = 20_000_000
+		liveBlockGasLimit  = 80_000_000
+	)
+
+	rawTx := exportTx.new
+	raw, err := rawTx.Bytes()
+	require.NoErrorf(t, err, "%T.Bytes()", rawTx)
+	size := uint64(len(raw))
+
+	tests := []struct {
+		name          string
+		blockGasLimit uint64
+		floored       bool
+	}{
+		{name: "floorDisabledByZeroGasLimit", blockGasLimit: 0},
+		{name: "floorBelowBaseGas", blockGasLimit: floorBlockGasLimit},
+		{name: "floorBinds", blockGasLimit: 100 * liveBlockGasLimit, floored: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			floor := blocklimit.MinGasForBytes(size, tt.blockGasLimit)
+			if tt.floored {
+				require.Greaterf(t, floor, uint64(baseGas), "fixture: floor must exceed base gas to bind")
+			} else {
+				require.LessOrEqualf(t, floor, uint64(baseGas), "fixture: floor must not exceed base gas")
+			}
+
+			wantGas := max(uint64(baseGas), floor)
+			want := hook.Op{
+				ID:        exportTx.id,
+				Gas:       gas.Gas(wantGas),
+				GasFeeCap: *uint256.NewInt(1_000_000 * X2CRate / wantGas),
+				Burn: map[common.Address]hook.AccountDebit{
+					common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"): {
+						Amount:     ScaleAVAX(1_000_001),
+						MinBalance: ScaleAVAX(1_000_001),
+					},
+				},
+			}
+
+			got, err := rawTx.AsOp(avaxAssetID, tt.blockGasLimit)
+			require.NoErrorf(t, err, "%T.AsOp(_, %d)", rawTx, tt.blockGasLimit)
+			require.Equalf(t, want, got, "%T.AsOp(_, %d)", rawTx, tt.blockGasLimit)
 		})
 	}
 }
@@ -916,7 +973,7 @@ func TestAsOp_Errors(t *testing.T) {
 			tx := &Tx{
 				Unsigned: test.tx,
 			}
-			_, err := tx.AsOp(avaxAssetID)
+			_, err := tx.AsOp(avaxAssetID, 0)
 			require.ErrorIsf(t, err, test.want, "%T.AsOp(AVAXAssetID)", tx)
 		})
 	}
@@ -973,7 +1030,7 @@ func (*asOpStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int  {
 
 func FuzzAsOpCompatibility(f *testing.F) {
 	fuzz(f, func(t *testing.T, newTx *Tx) {
-		got, err := newTx.AsOp(avaxAssetID)
+		got, err := newTx.AsOp(avaxAssetID, 0)
 		if err != nil {
 			t.Skip("invalid tx")
 		}
@@ -1347,7 +1404,7 @@ func TestTransferNonAVAX(t *testing.T) {
 
 func FuzzTransferNonAVAXCompatibility(f *testing.F) {
 	fuzz(f, func(t *testing.T, newTx *Tx) {
-		op, err := newTx.AsOp(avaxAssetID)
+		op, err := newTx.AsOp(avaxAssetID, 0)
 		if err != nil {
 			t.Skip("invalid tx")
 		}

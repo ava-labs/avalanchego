@@ -7,14 +7,41 @@
 package blocklimit
 
 import (
+	"math"
 	"math/bits"
 
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 // MaxBlockBytes is the byte budget M of [Eligible]: the maximum size of a single
 // P2P message.
 const MaxBlockBytes uint64 = constants.DefaultMaxMessageSize
+
+// blockByteOverhead is the fixed per-block framing reserved below the maximum
+// message size M: the ProposerVM certificate, the block header, signature,
+// and message framing.
+const BlockByteOverhead uint64 = staking.MaxCertificateLen + 6*units.KiB
+
+// maxBlockTxBytes caps a block's serialized transaction bytes, reserving
+// [BlockByteOverhead] below the maximum message size M.
+const MaxBodyBytes = MaxBlockBytes - BlockByteOverhead
+
+// MinGasForBytes returns the minimum gas a transaction of the given serialized
+// size must consume so that exhausting the block's gas limit cannot exhaust more
+// than the byte budget [MaxBodyBytes].
+func MinGasForBytes(size, blockGasLimit uint64) uint64 {
+	if size >= MaxBodyBytes {
+		return math.MaxUint64
+	}
+	hi, lo := bits.Mul64(size, blockGasLimit)
+	q, r := bits.Div64(hi, lo, MaxBodyBytes)
+	if r != 0 {
+		q++ // round up
+	}
+	return q
+}
 
 // Eligible reports whether a transaction may be included in a block, using the
 // notation:

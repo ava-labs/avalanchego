@@ -390,7 +390,9 @@ type txData struct {
 var errAsOp = errors.New("as op")
 
 func newTxData(tx *tx.Tx, avaxAssetID ids.ID) (*txData, error) {
-	op, err := tx.AsOp(avaxAssetID)
+	// Disable the byte floor (x=0): the target block's gas limit is unknown at
+	// admission. See [tx.Tx.AsOp].
+	op, err := tx.AsOp(avaxAssetID, 0)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errAsOp, err)
 	}
