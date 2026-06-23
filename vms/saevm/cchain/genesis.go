@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
@@ -296,7 +297,12 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	if c.IsHelicon(g.Timestamp) {
+		headerExtra.TargetExponent = new(dynamic.TargetExponent)
 		headerExtra.MinPriceExponent = new(dynamic.PriceExponent)
+		headerExtra.SettledHeight = new(uint64)
+		headerExtra.SettledGasUnix = new(uint64)
+		headerExtra.SettledGasNumerator = new(gas.Gas)
+		headerExtra.SettledExcess = new(gas.Gas)
 	}
 
 	return types.NewBlock(
