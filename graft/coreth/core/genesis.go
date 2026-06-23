@@ -40,7 +40,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
@@ -342,6 +344,15 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 
 			headerExtra.MinDelayExcess = new(acp226.DelayExcess)
 			*headerExtra.MinDelayExcess = acp226.InitialDelayExcess
+		}
+
+		if confExtra.IsHelicon(g.Timestamp) {
+			headerExtra.TargetExponent = new(dynamic.TargetExponent)
+			headerExtra.MinPriceExponent = new(dynamic.PriceExponent)
+			headerExtra.SettledHeight = new(uint64)
+			headerExtra.SettledGasUnix = new(uint64)
+			headerExtra.SettledGasNumerator = new(gas.Gas)
+			headerExtra.SettledExcess = new(gas.Gas)
 		}
 	}
 
