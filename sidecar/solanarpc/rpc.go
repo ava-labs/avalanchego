@@ -48,6 +48,12 @@ type txInstruction struct {
 	Data           string `json:"data"` // base58-encoded
 }
 
+// rpcClient is the interface SolanaVerifier uses to fetch Solana transactions.
+// The only production implementation is solanaClient; tests inject a stub.
+type rpcClient interface {
+	getTransaction(ctx context.Context, sig string) (*txResult, error)
+}
+
 type solanaClient struct {
 	rpcURL     string
 	httpClient *http.Client

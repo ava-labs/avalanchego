@@ -17,7 +17,7 @@ import (
 
 // SolanaVerifier verifies OracleMessages by querying the Solana RPC.
 type SolanaVerifier struct {
-	client *solanaClient
+	client rpcClient
 }
 
 func NewSolanaVerifier(rpcURL string, httpClient *http.Client) *SolanaVerifier {

@@ -22,7 +22,7 @@ awscpu
 *.test
 
 # Built sidecar binaries
-solanarpc
+/solanarpc
 avalanchego
 tmp/
 

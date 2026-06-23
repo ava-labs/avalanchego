@@ -17,7 +17,7 @@ import (
 var _ oracle.SidecarClient = (*HTTPSidecarClient)(nil)
 
 // verifyRequest is the JSON body sent to the sidecar's /verify endpoint.
-// Fields match the proto definition in sidecar.proto.
+// Fields correspond to VerifyRequest in proto/oracle/oracle.proto.
 type verifyRequest struct {
 	// MessageBytes is the hex-encoded canonical codec encoding of OracleMessage.
 	MessageBytes string `json:"message_bytes"`
