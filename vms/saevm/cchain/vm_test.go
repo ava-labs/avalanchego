@@ -213,6 +213,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
 	})
+	lastAcceptedID, err := vm.LastAccepted(ctx)
+	require.NoErrorf(tb, err, "%T.LastAccepted()", vm)
+	require.NoErrorf(tb, vm.SetPreference(ctx, lastAcceptedID, nil), "%T.SetPreference()", vm)
+
 	require.NoErrorf(tb, vm.SetState(ctx, snow.NormalOp), "%T.SetState(%s)", vm, snow.NormalOp)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
