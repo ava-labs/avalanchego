@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -19,7 +20,7 @@ const (
 	// requests. Distinct from acp118.HandlerID (2) which is reserved for
 	// native warp. Oracle attestations require sidecar involvement and are a
 	// separate protocol.
-	SignatureRequestHandlerID uint64 = 4
+	SignatureRequestHandlerID uint64 = p2p.OracleSignatureRequestHandlerID
 
 	errCodeParse  int32 = 1
 	errCodeVerify int32 = 2

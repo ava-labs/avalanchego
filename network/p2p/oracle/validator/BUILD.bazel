@@ -11,10 +11,12 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/network/p2p/oracle/validator",
     visibility = ["//visibility:public"],
     deps = [
+        "//network/p2p",
         "//network/p2p/acp118",
         "//network/p2p/oracle",
         "//snow/engine/common",
         "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
     ],
 )
 
@@ -29,6 +31,7 @@ go_test(
         "//ids",
         "//network/p2p/oracle",
         "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
         "@com_github_stretchr_testify//require",
     ],
 )

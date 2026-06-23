@@ -499,13 +499,7 @@ func (vm *VM) Initialize(
 	}
 
 	if vm.extensionConfig.OracleVerifier != nil {
-		oracleCache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
-		oracleMeteredCache, err := metercacher.New("oracle_signature_cache", vm.sdkMetrics, oracleCache)
-		if err != nil {
-			return fmt.Errorf("failed to create oracle signature cache: %w", err)
-		}
-		oracleHandler := acp118.NewCachedHandler(oracleMeteredCache, vm.extensionConfig.OracleVerifier, vm.ctx.WarpSigner)
-		if err = vm.P2PNetwork().AddHandler(p2poracle.SignatureRequestHandlerID, oracleHandler); err != nil {
+		if err := vm.registerOracleHandler(vm.extensionConfig.OracleVerifier); err != nil {
 			return err
 		}
 	} else if vm.config.Oracle.Endpoint != "" {
@@ -518,14 +512,7 @@ func (vm *VM) Initialize(
 			allowed[sourceType] = set
 		}
 		sidecar := p2poracle.NewHTTPSidecarClient(vm.config.Oracle.Endpoint, nil)
-		oracleVerifier := p2poracle.NewOracleVerifier(sidecar, allowed)
-		oracleCache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
-		oracleMeteredCache, err := metercacher.New("oracle_signature_cache", vm.sdkMetrics, oracleCache)
-		if err != nil {
-			return fmt.Errorf("failed to create oracle signature cache: %w", err)
-		}
-		oracleHandler := acp118.NewCachedHandler(oracleMeteredCache, oracleVerifier, vm.ctx.WarpSigner)
-		if err = vm.P2PNetwork().AddHandler(p2poracle.SignatureRequestHandlerID, oracleHandler); err != nil {
+		if err := vm.registerOracleHandler(p2poracle.NewOracleVerifier(sidecar, allowed)); err != nil {
 			return err
 		}
 	}
@@ -533,6 +520,16 @@ func (vm *VM) Initialize(
 	vm.stateSyncDone = make(chan struct{})
 
 	return vm.initializeStateSync(lastAcceptedHeight)
+}
+
+func (vm *VM) registerOracleHandler(verifier acp118.Verifier) error {
+	cache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
+	meteredCache, err := metercacher.New("oracle_signature_cache", vm.sdkMetrics, cache)
+	if err != nil {
+		return fmt.Errorf("failed to create oracle signature cache: %w", err)
+	}
+	handler := acp118.NewCachedHandler(meteredCache, verifier, vm.ctx.WarpSigner)
+	return vm.P2PNetwork().AddHandler(p2poracle.SignatureRequestHandlerID, handler)
 }
 
 func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, airdropFile string) (*core.Genesis, error) {
