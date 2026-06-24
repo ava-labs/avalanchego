@@ -469,11 +469,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		// Commit: restake rewards per AutoCompoundRewardShares and start the
 		// next cycle. The validator stays in the set, so its stake is not
 		// returned here.
-		if err = e.restakeAutoRenewedValidatorOnCommit(addAutoRenewedValidatorTx, staker, stakingInfo); err != nil {
-			return err
-		}
-
-		return nil
+		return e.restakeAutoRenewedValidatorOnCommit(addAutoRenewedValidatorTx, staker, stakingInfo)
 	}
 
 	// Graceful exit (NextPeriod == 0): the validator stops after this cycle and
@@ -500,16 +496,12 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		return err
 	}
 
-	if err = e.mintRewards(
+	return e.mintRewards(
 		addAutoRenewedValidatorTx,
 		totalRewards,
 		totalDelegateeRewards,
 		e.onCommitState,
-	); err != nil {
-		return err
-	}
-
-	return nil
+	)
 }
 
 // undoSupplyMintOnAbort removes the staker's potential reward from
@@ -734,16 +726,12 @@ func (e *proposalTxExecutor) mintRewardOnAbort(
 		return err
 	}
 
-	if err = e.mintRewards(
+	return e.mintRewards(
 		addAutoRenewedValidatorTx,
 		stakingInfo.AccruedValidationRewards,
 		totalDelegateeRewards,
 		e.onAbortState,
-	); err != nil {
-		return err
-	}
-
-	return nil
+	)
 }
 
 // mintRewards adds reward UTXOs to chainState at output indices starting
