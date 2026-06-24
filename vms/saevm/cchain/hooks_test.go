@@ -40,13 +40,6 @@ func TestBlockTime(t *testing.T) {
 	require.Equal(t, int64(testTimestampSeconds), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
 }
 
-func headerWithMinPriceExponent(exp dynamic.PriceExponent) *types.Header {
-	return customtypes.WithHeaderExtra(
-		&types.Header{Number: big.NewInt(0)},
-		&customtypes.HeaderExtra{MinPriceExponent: &exp},
-	)
-}
-
 func TestGasConfigAfter(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -78,7 +71,10 @@ func TestGasConfigAfter(t *testing.T) {
 func TestBuildHeaderMinPriceExponent(t *testing.T) {
 	const parentExponent dynamic.PriceExponent = 1000
 	parentNoExponent := &types.Header{Number: big.NewInt(0)}
-	parentWith := headerWithMinPriceExponent(parentExponent)
+	parentWith := customtypes.WithHeaderExtra(
+		&types.Header{Number: big.NewInt(0)},
+		&customtypes.HeaderExtra{MinPriceExponent: utils.PointerTo(parentExponent)},
+	)
 
 	tests := []struct {
 		name    string
@@ -123,7 +119,10 @@ func TestBuildHeaderMinPriceExponent(t *testing.T) {
 
 func TestBlockRebuilderFromMinPriceExponent(t *testing.T) {
 	const parentExponent dynamic.PriceExponent = 1000
-	parent := headerWithMinPriceExponent(parentExponent)
+	parent := customtypes.WithHeaderExtra(
+		&types.Header{Number: big.NewInt(0)},
+		&customtypes.HeaderExtra{MinPriceExponent: utils.PointerTo(parentExponent)},
+	)
 
 	tests := []struct {
 		name    string
