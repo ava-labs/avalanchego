@@ -174,6 +174,10 @@ func TestRPCExtras(t *testing.T) {
 	require.NotNilf(t, extra.TimeMilliseconds, "%T.TimeMilliseconds", extra)
 	require.NotNilf(t, extra.MinDelayExcess, "%T.MinDelayExcess", extra)
 	require.NotNilf(t, extra.MinPriceExponent, "%T.MinPriceExponent", extra)
+	require.NotNilf(t, extra.SettledHeight, "%T.SettledHeight", extra)
+	require.NotNilf(t, extra.SettledGasUnix, "%T.SettledGasUnix", extra)
+	require.NotNilf(t, extra.SettledGasNumerator, "%T.SettledGasNumerator", extra)
+	require.NotNilf(t, extra.SettledExcess, "%T.SettledExcess", extra)
 	wantHeaderExtras := map[string]string{
 		"extDataHash":           extra.ExtDataHash.Hex(),
 		"extDataGasUsed":        hexutil.EncodeBig(extra.ExtDataGasUsed),
@@ -181,6 +185,10 @@ func TestRPCExtras(t *testing.T) {
 		"timestampMilliseconds": hexutil.EncodeUint64(*extra.TimeMilliseconds),
 		"minDelayExcess":        hexutil.EncodeUint64(uint64(*extra.MinDelayExcess)),
 		"minPriceExponent":      hexutil.EncodeUint64(uint64(*extra.MinPriceExponent)),
+		"settledHeight":         hexutil.EncodeUint64(*extra.SettledHeight),
+		"settledGasUnix":        hexutil.EncodeUint64(*extra.SettledGasUnix),
+		"settledGasNumerator":   hexutil.EncodeUint64(*extra.SettledGasNumerator),
+		"settledExcess":         hexutil.EncodeUint64(*extra.SettledExcess),
 	}
 	numHeaderExtras := reflect.TypeFor[customtypes.HeaderExtra]().NumField()
 	require.Lenf(t, wantHeaderExtras, numHeaderExtras, "%T field count", customtypes.HeaderExtra{})
