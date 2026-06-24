@@ -154,6 +154,7 @@ go_test(
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//ethclient",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//params",
