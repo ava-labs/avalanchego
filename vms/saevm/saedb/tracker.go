@@ -168,7 +168,7 @@ func (t *Tracker) Track(root common.Hash) {
 //
 // 1. If [Config.Archival] is true, then `executionRoot` will be committed.
 // 2. If [ShouldCommitTrieDB] based on `height`, `settledRoot` is committed.
-// 3. If there is sufficient memory pressure in HashDB, commits the oldest state to disk.
+// 3. If there is sufficient memory pressure in HashDB, flushes the oldest trie nodes to disk.
 // 4. Otherwise, nothing is committed.
 //
 // This does NOT change in-memory tracking.
@@ -205,8 +205,9 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 // [triedb.Database.Commit] and, if so, moves the oldest state to disk.
 func (t *Tracker) maybeCap(height uint64) error {
 	const (
-		maxCap           = 512 * mbToBytes
-		targetCommitSize = 20 * mbToBytes // for [triedb.Database.Commit]
+		maxCap                = 512 * mibToBytes
+		targetCommitSize      = 20 * mibToBytes                         // for [triedb.Database.Commit]
+		_                uint = targetCommitSize - ethdb.IdealBatchSize // [targetCommitSize] >= [ethdb.IdealBatchSize]
 	)
 
 	// The cap shrinks linearly as we approach the commit interval
