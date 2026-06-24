@@ -11,8 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-var _ block.StateSyncableVM = (*VM)(nil)
-
 func (v *VM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
 	v.transitionLock.RLock()
 	defer v.transitionLock.RUnlock()
@@ -75,6 +73,8 @@ func (v *VM) Shutdown(ctx context.Context) error {
 
 	return v.current.chain.Shutdown(ctx)
 }
+
+var _ block.StateSyncableVM = (*VM)(nil)
 
 func (v *VM) StateSyncEnabled(ctx context.Context) (bool, error) {
 	v.transitionLock.RLock()
