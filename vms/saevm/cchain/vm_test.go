@@ -1040,13 +1040,7 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	key := txtest.NewKey(t)
 	alloc := withMaxAllocFor(key.EthAddress())
 
-	// Build at/after ApricotPhase1 so extData commits via the header's
-	// ExtDataHash; pre-AP1, [VM.ParseBlock] rejects extData absent from
-	// UnitTestID's recorded hash set. Read the fork time from a resolved config,
-	// since [VM.Initialize] overrides the genesis schedule.
-	_, cfgProbe := newSUT(t, alloc)
-	ap1Time := *cparams.GetExtra(cfgProbe.chainConfig).ApricotPhase1BlockTimestamp
-	srcTimeOpt, srcClock := withVMTime(time.Unix(int64(ap1Time), 0)) //#nosec G115 -- ap1Time fork timestamp won't overflow for millennia
+	srcTimeOpt, srcClock := withVMTime(upgrade.InitiallyActiveTime)
 	srcDB := memdb.New()
 	srcCtx, src := newSUT(t, alloc, srcTimeOpt, withDB(srcDB))
 	w := newWallet(key, src.ctx, src.Client)
