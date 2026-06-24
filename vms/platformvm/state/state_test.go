@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -686,6 +687,102 @@ func createPermissionlessDelegatorTx(subnetID ids.ID, delegatorData txs.Validato
 				ids.GenerateTestShortID(),
 			},
 		},
+	}
+}
+
+func createStakerAndTx(
+	t testing.TB,
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+	startTime time.Time,
+	endTime time.Time,
+	weight uint64,
+	potentialReward uint64,
+) (*Staker, *txs.Tx) {
+	unsignedTx := createPermissionlessValidatorTx(t, subnetID, txs.Validator{
+		NodeID: nodeID,
+		End:    uint64(endTime.Unix()),
+		Wght:   weight,
+	})
+	tx := &txs.Tx{Unsigned: unsignedTx}
+	require.NoError(t, tx.Initialize(txs.Codec))
+
+	staker, err := NewCurrentStaker(tx.ID(), unsignedTx, startTime, potentialReward)
+	require.NoError(t, err)
+
+	return staker, tx
+}
+
+func createAutoRenewedValidatorTx(
+	t testing.TB,
+	nodeID ids.NodeID,
+	weight uint64,
+	period uint64,
+	autoCompoundRewardShares uint32,
+) *txs.AddAutoRenewedValidatorTx {
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	sig, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	return &txs.AddAutoRenewedValidatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    constants.MainnetID,
+				BlockchainID: constants.PlatformChainID,
+				Outs:         []*avax.TransferableOutput{},
+				Ins: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID:        ids.GenerateTestID(),
+							OutputIndex: 1,
+						},
+						Asset: avax.Asset{
+							ID: ids.GenerateTestID(),
+						},
+						In: &secp256k1fx.TransferInput{
+							Amt: 2 * units.KiloAvax,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{1},
+							},
+						},
+					},
+				},
+				Memo: types.JSONByteSlice{},
+			},
+		},
+		ValidatorNodeID: nodeID.Bytes(),
+		Signer:          sig,
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: ids.GenerateTestID(),
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: weight,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+					},
+				},
+			},
+		},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		ValidatorAuthority: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		DelegationShares:         reward.PercentDenominator,
+		AutoCompoundRewardShares: autoCompoundRewardShares,
+		Period:                   period,
 	}
 }
 
@@ -2493,6 +2590,105 @@ func TestSetUptimeAndSetStakingInfoBothPersist(t *testing.T) {
 	require.Equal(t, wantDelegateeReward2, stakingInfo.DelegateeReward)
 }
 
+func TestValidatorMetadataPersistsPreHelicon(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	const (
+		weight          = uint64(2_000)
+		potentialReward = uint64(500)
+	)
+	var (
+		subnetID          = constants.PrimaryNetworkID
+		nodeID            = ids.GenerateTestNodeID()
+		startTime         = genesistest.DefaultValidatorStartTime
+		endTime           = startTime.Add(24 * time.Hour)
+		wantStakingInfo   = StakingInfo{DelegateeReward: 100_000}
+		wantValidator, tx = createStakerAndTx(
+			t,
+			subnetID,
+			nodeID,
+			startTime,
+			endTime,
+			weight,
+			potentialReward,
+		)
+	)
+	state.AddTx(tx, status.Committed)
+
+	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	require.NoError(diff.PutCurrentValidator(wantValidator))
+	require.NoError(diff.SetStakingInfo(subnetID, nodeID, wantStakingInfo))
+	require.NoError(diff.Apply(state))
+
+	require.NoError(state.Commit())
+
+	reloadedState := newTestState(t, db)
+
+	gotValidator, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+	require.True(wantValidator.Equals(gotValidator))
+
+	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(wantStakingInfo, gotStakingInfo)
+}
+
+func TestResolveValidatorMetadataCodec(t *testing.T) {
+	var (
+		durangoTime = time.Unix(1000, 0)
+		heliconTime = time.Unix(2000, 0)
+	)
+
+	tests := []struct {
+		name      string
+		timestamp time.Time
+		want      uint16
+	}{
+		{
+			name:      "pre-Durango",
+			timestamp: durangoTime.Add(-time.Second),
+			want:      CodecVersion0,
+		},
+		{
+			name:      "Durango_activated",
+			timestamp: durangoTime,
+			want:      CodecVersion1,
+		},
+		{
+			name:      "between_Durango_and_Helicon",
+			timestamp: heliconTime.Add(-time.Second),
+			want:      CodecVersion1,
+		},
+		{
+			name:      "Helicon_activated",
+			timestamp: heliconTime,
+			want:      codecVersion2,
+		},
+		{
+			name:      "post-Helicon",
+			timestamp: heliconTime.Add(time.Second),
+			want:      codecVersion2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newTestState(t, memdb.New())
+			s.upgrades = upgrade.Config{
+				DurangoTime: durangoTime,
+				HeliconTime: heliconTime,
+			}
+
+			s.SetTimestamp(tt.timestamp)
+			require.Equal(t, tt.want, s.resolveValidatorMetadataCodec())
+		})
+	}
+}
+
 func TestDiffValidatorReplacement(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -4115,4 +4311,139 @@ func TestStateAndDiffIntegration_StakingInfo(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLoadCurrentValidatorsWeight verifies that a legacy (non-auto-renewed)
+// validator's weight is preserved across a state reload.
+func TestLoadCurrentValidatorsWeight(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	const (
+		weight          = uint64(2000)
+		potentialReward = uint64(500)
+	)
+	var (
+		nodeID    = ids.GenerateTestNodeID()
+		subnetID  = constants.PrimaryNetworkID
+		startTime = genesistest.DefaultValidatorStartTime
+		endTime   = startTime.Add(24 * time.Hour)
+	)
+
+	staker, tx := createStakerAndTx(t, subnetID, nodeID, startTime, endTime, weight, potentialReward)
+
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+	d.AddTx(tx, status.Committed)
+	require.NoError(d.PutCurrentValidator(staker))
+	require.NoError(d.Apply(state))
+	require.NoError(state.Commit())
+
+	// Reload state from the same database and verify the weight round-trips.
+	reloadedState := newTestState(t, db)
+
+	gotValidator, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(weight, gotValidator.Weight)
+}
+
+// TestAutoRenewedValidatorRestakeStateReload simulates an auto-renewed validator
+// restaking (delete + re-add with grown weight and updated times, plus accrued
+// rewards in its staking info) and verifies that the renewed validator and its
+// staking info are reconstructed correctly after reloading the state.
+func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	const (
+		weight                          = uint64(3000)
+		potentialReward                 = uint64(500)
+		period                          = uint64(time.Hour / time.Second)
+		autoCompoundRewardShares uint32 = .1 * reward.PercentDenominator
+
+		accruedRewards    = uint64(100)
+		accruedDelRewards = uint64(50)
+	)
+	var (
+		nodeID   = ids.GenerateTestNodeID()
+		subnetID = constants.PrimaryNetworkID
+
+		startTime = genesistest.DefaultValidatorStartTime
+		endTime   = startTime.Add(24 * time.Hour)
+	)
+
+	// Create and add the auto-renewed validator with initial times
+	autoRenewedUnsigned := createAutoRenewedValidatorTx(t, nodeID, weight, period, autoCompoundRewardShares)
+	autoRenewedTx := &txs.Tx{Unsigned: autoRenewedUnsigned}
+	require.NoError(autoRenewedTx.Initialize(txs.Codec))
+
+	autoRenewedStaker, err := NewStaker(
+		autoRenewedTx.ID(),
+		autoRenewedUnsigned,
+		startTime,
+		endTime,
+		weight,
+		potentialReward,
+	)
+	require.NoError(err)
+
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+	d.AddTx(autoRenewedTx, status.Committed)
+	require.NoError(d.PutCurrentValidator(autoRenewedStaker))
+	require.NoError(d.Apply(state))
+	require.NoError(state.Commit())
+
+	// Simulate restake: delete and re-add with updated times and weight
+	wantStartTime := endTime
+	wantEndTime := endTime.Add(time.Duration(period) * time.Second)
+	wantWeight := weight + accruedRewards + accruedDelRewards
+	wantPotentialReward := uint64(600)
+
+	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+	require.NoError(d.DeleteCurrentValidator(autoRenewedStaker))
+
+	renewedStaker, err := NewStaker(
+		autoRenewedTx.ID(),
+		autoRenewedUnsigned,
+		wantStartTime,
+		wantEndTime,
+		wantWeight,
+		wantPotentialReward,
+	)
+	require.NoError(err)
+	require.NoError(d.PutCurrentValidator(renewedStaker))
+
+	// Update staking info with accrued rewards
+	require.NoError(d.SetStakingInfo(subnetID, nodeID, StakingInfo{
+		AccruedValidationRewards: accruedRewards,
+		AccruedDelegateeRewards:  accruedDelRewards,
+		AutoCompoundRewardShares: autoCompoundRewardShares,
+		NextPeriod:               period,
+	}))
+
+	require.NoError(d.Apply(state))
+	require.NoError(state.Commit())
+
+	// Reload state from the same database
+	reloadedState := newTestState(t, db)
+
+	gotValidator, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+	require.True(wantStartTime.Equal(gotValidator.StartTime))
+	require.True(wantEndTime.Equal(gotValidator.EndTime))
+	require.Equal(wantWeight, gotValidator.Weight)
+	require.Equal(wantPotentialReward, gotValidator.PotentialReward)
+
+	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(accruedRewards, gotStakingInfo.AccruedValidationRewards)
+	require.Equal(accruedDelRewards, gotStakingInfo.AccruedDelegateeRewards)
+	require.Equal(autoCompoundRewardShares, gotStakingInfo.AutoCompoundRewardShares)
+	require.Equal(period, gotStakingInfo.NextPeriod)
 }

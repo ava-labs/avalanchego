@@ -1,0 +1,71 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "warp",
+    srcs = [
+        "storage.go",
+        "verifier.go",
+        "warp.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/warp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache/lru",
+        "//database",
+        "//database/prefixdb",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/precompile/contracts/warp",
+        "//graft/coreth/precompile/precompileconfig",
+        "//ids",
+        "//network/p2p/acp118",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@org_golang_x_sync//errgroup",
+    ],
+)
+
+go_test(
+    name = "warp_test",
+    srcs = [
+        "storage_test.go",
+        "verifier_test.go",
+        "warp_test.go",
+    ],
+    embed = [":warp"],
+    deps = [
+        "//codec",
+        "//database",
+        "//database/memdb",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/precompile/contracts/warp",
+        "//graft/coreth/precompile/precompileconfig",
+        "//ids",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//snow/snowtest",
+        "//utils",
+        "//utils/constants",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "//vms/saevm/cchain/warp/warptest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+    ],
+)
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
