@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"sync/atomic"
 	"time"
@@ -85,19 +86,31 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 // has not yet commenced asynchronous execution.
 //
 // TODO(arr4n) refactor to avoid requiring DB writes.
-func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.ExecutionResults, excessAfter gas.Gas) error {
+func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.ExecutionResults) error {
 	ethB := b.EthBlock()
 	// Receipts of a synchronous block have already been "settled" by the block
 	// itself. As the only reason to pass receipts here is for later settlement
 	// in another block, there is no need to pass anything meaningful as it
 	// would also require them to be received as an argument to MarkSynchronous.
 	target, cfg := hooks.GasConfigAfter(b.Header())
+
+	// The base fee must be capped at [math.MaxUint64] to avoid overflow in the gastime.
+	var baseFee uint64
+	switch bf := ethB.BaseFee(); {
+	case bf == nil:
+		baseFee = 0
+	case bf.IsUint64():
+		baseFee = bf.Uint64()
+	default:
+		baseFee = math.MaxUint64
+	}
+
 	execTime, err := gastime.New(
 		hooks.BlockTime(b.Header()),
 		// Target, excess, and config _after_ are a requirement of
 		// [Block.MarkExecuted].
 		target,
-		excessAfter,
+		gas.Price(baseFee),
 		cfg,
 	)
 	if err != nil {
@@ -108,9 +121,8 @@ func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.
 		receiptRoot:   ethB.ReceiptHash(),
 		stateRootPost: ethB.Root(),
 	}
-	if err := e.setBaseFee(ethB.BaseFee()); err != nil {
-		return err
-	}
+	e.baseFee.SetUint64(baseFee)
+
 	if err := b.markExecuted(db.NewBatch(), xdb, e, false, nil); err != nil {
 		return err
 	}

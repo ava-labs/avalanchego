@@ -31,11 +31,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
@@ -68,7 +70,7 @@ type SUT struct {
 	saedbConfig saedb.Config
 	chain       *blockstest.ChainBuilder
 	wallet      *saetest.Wallet
-	logger      *saetest.TBLogger
+	logger      *loggingtest.Logger
 	db          ethdb.Database
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
@@ -91,7 +93,7 @@ type (
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
-	logger := saetest.NewTBLogger(tb, logging.Warn)
+	logger := loggingtest.New(tb, logging.Warn)
 	ctx := logger.CancelOnError(tb.Context())
 
 	sutCfg := options.ApplyTo(&sutConfig{
@@ -104,7 +106,13 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
-	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, blockstest.WithTrieDBConfig(tdbConfig), blockstest.WithGasTarget(sutCfg.hooks.Target))
+
+	genOpts := []blockstest.GenesisOption{
+		blockstest.WithTrieDBConfig(tdbConfig),
+		blockstest.WithGasTarget(sutCfg.hooks.Target),
+		blockstest.WithBaseFee(1),
+	}
+	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, genOpts...)
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),
@@ -117,7 +125,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		Archival:           sutCfg.archival,
 		TrieCommitInterval: sutCfg.commitInterval,
 	}
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger)
+	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, saedbConfig, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(e.Close)
@@ -465,9 +473,7 @@ func TestGasAccounting(t *testing.T) {
 	ctx, sut := newSUT(t, withHooks(hooks))
 
 	at := func(blockTime, txs uint64, rate gas.Gas) *proxytime.Time[gas.Gas] {
-		tm := proxytime.New[gas.Gas](blockTime, rate)
-		tm.Tick(gas.Gas(txs) * gasPerTx)
-		return tm
+		return proxytime.New[gas.Gas](blockTime, gas.Gas(txs)*gasPerTx, rate)
 	}
 
 	// If this fails then all of the tests need to be adjusted. This is cleaner
@@ -695,7 +701,7 @@ func FuzzOpCodes(f *testing.F) {
 		// Ensure that the SUT [logging.Logger] remains of this type so >=WARN
 		// logs become failures.
 		//nolint:staticcheck
-		var logger *saetest.TBLogger = sut.logger
+		var logger *loggingtest.Logger = sut.logger
 		// Errors in execution (i.e. reverts) are fine, but we don't want them
 		// bubbling up any further.
 		require.NoErrorf(t, sut.execute(b, logger), "%T.execute()", sut.Executor)
@@ -1036,7 +1042,7 @@ func TestArchivalStoresAll(t *testing.T) {
 	t.Run("recover", func(t *testing.T) {
 		// Restart the chain to remove the TrieDB cache.
 		src := blocks.Source(chain.GetBlock)
-		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log)
+		e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, defaultHooks(), sut.log, prometheus.NewRegistry())
 		require.NoError(t, err, "New()")
 		t.Cleanup(func() {
 			require.NoErrorf(t, e.Close(), "%T.Close()", e)

@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
+	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -61,14 +62,26 @@ func (RulesExtra) CanExecuteTransaction(common.Address, *common.Address, libevm.
 	return nil
 }
 
+func (r RulesExtra) ShouldRefundGas() bool {
+	return !r.IsSubnetEVM
+}
+
 // MinimumGasConsumption is a no-op.
 func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
-// AccessListGas uses the default calculation.
-func (RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
-	return (ethparams.NOOPHooks{}).AccessListGas(accessList)
+// AccessListGas computes the intrinsic gas for an access list.
+// When predicaters exist, it calculates gas per-tuple, delegating to predicate
+// contracts for addresses that have them. Otherwise, it returns override=false
+// to use the default calculation.
+func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
+	rules := extras.Rules(r)
+	if !rules.PredicatersExist() {
+		return 0, false, nil
+	}
+	gas, err := evmprecompileconfig.AccessListGasWithPredicates(rules.AvalancheRules, rules.Predicaters, accessList)
+	return gas, true, err
 }
 
 var PrecompiledContractsGranite = map[common.Address]vm.PrecompiledContract{

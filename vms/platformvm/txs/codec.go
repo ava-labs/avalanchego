@@ -48,6 +48,7 @@ func init() {
 		errs.Add(
 			RegisterDurangoTypes(c),
 			RegisterEtnaTypes(c),
+			RegisterHeliconTypes(c),
 		)
 	}
 
@@ -127,5 +128,15 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&SetL1ValidatorWeightTx{}),
 		targetCodec.RegisterType(&IncreaseL1ValidatorBalanceTx{}),
 		targetCodec.RegisterType(&DisableL1ValidatorTx{}),
+	)
+}
+
+// RegisterHeliconTypes registers the type information for transactions that
+// were valid during the Helicon series of upgrades.
+func RegisterHeliconTypes(targetCodec linearcodec.Codec) error {
+	return errors.Join(
+		targetCodec.RegisterType(&AddAutoRenewedValidatorTx{}),
+		targetCodec.RegisterType(&SetAutoRenewedValidatorConfigTx{}),
+		targetCodec.RegisterType(&RewardAutoRenewedValidatorTx{}),
 	)
 }

@@ -18,7 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
@@ -59,19 +62,38 @@ func (i Input) Compare(other Input) int {
 	return i.AssetID.Compare(other.AssetID)
 }
 
+func (e *Export) inputIDs() set.Set[ids.ID] {
+	s := set.NewSet[ids.ID](len(e.Ins))
+	for _, in := range e.Ins {
+		s.Add(AccountInputID(in.Address, in.Nonce))
+	}
+	return s
+}
+
+// AccountInputID returns the Account+Nonce pair as a unique [ids.ID].
+//
+// It is safe to assume that the returned ID never conflicts with a UTXO ID.
+func AccountInputID(address common.Address, nonce uint64) ids.ID {
+	var id ids.ID
+	packer := wrappers.Packer{Bytes: id[:]} // 32 bytes long
+	packer.PackLong(nonce)                  // add 8 bytes
+	packer.PackBytes(address.Bytes())       // add 24 bytes
+	return id
+}
+
 // Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
 // inputs exceeds MaxUint64, even if the total amount burned could be
 // represented as a uint64.
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
 // practice and allows for easier fuzzing.
-func (e *Export) burned(assetID ids.ID) (uint64, error) {
+func (e *Export) burned(avaxAssetID ids.ID) (nAVAX, error) {
 	var (
-		burned uint64
+		burned nAVAX
 		err    error
 	)
 	for _, in := range e.Ins {
-		if in.AssetID == assetID {
+		if in.AssetID == avaxAssetID {
 			burned, err = math.Add(burned, in.Amount)
 			if err != nil {
 				return 0, err
@@ -79,7 +101,7 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 		}
 	}
 	for _, out := range e.ExportedOutputs {
-		if out.Asset.ID == assetID {
+		if out.Asset.ID == avaxAssetID {
 			burned, err = math.Sub(burned, out.Out.Amount())
 			if err != nil {
 				return 0, err
@@ -91,10 +113,7 @@ func (e *Export) burned(assetID ids.ID) (uint64, error) {
 
 var errOutputsNotSorted = errors.New("outputs not sorted")
 
-// SanityCheck verifies that the transaction's structural invariants hold
-// against the chain's context and that it does not produce more funds than it
-// consumes.
-func (e *Export) SanityCheck(ctx *snow.Context) error {
+func (e *Export) sanityCheck(ctx *snow.Context) error {
 	switch {
 	case e.NetworkID != ctx.NetworkID:
 		return fmt.Errorf("%w: want %d, got %d", errWrongNetworkID, ctx.NetworkID, e.NetworkID)
@@ -144,6 +163,42 @@ func (e *Export) SanityCheck(ctx *snow.Context) error {
 	return nil
 }
 
+var (
+	sigCache = secp256k1.NewRecoverCache(1024)
+
+	errIncorrectNumSignatures = errors.New("incorrect number of signatures")
+	errRecoveringPublicKey    = errors.New("recovering public key")
+	errAddressMismatch        = errors.New("signature does not match address")
+)
+
+func (e *Export) verifyCredentials(_ chainsatomic.SharedMemory, creds []Credential) error {
+	if len(e.Ins) != len(creds) {
+		return fmt.Errorf("%w: want %d, got %d", errIncorrectNumCredentials, len(e.Ins), len(creds))
+	}
+
+	fxTx, err := toFxTx(e)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errConvertingToFxTx, err)
+	}
+	for i, in := range e.Ins {
+		// TODO(StephenButtolph): Parallelize signature verification. This is
+		// non-trivial, because transactions frequently contain duplicate
+		// signatures, which are currently being cached.
+		cred := creds[i].Self()
+		if len(cred.Sigs) != 1 {
+			return fmt.Errorf("%w (%d): want 1, got %d", errIncorrectNumSignatures, i, len(cred.Sigs))
+		}
+		pk, err := sigCache.RecoverPublicKey(fxTx.Bytes(), cred.Sigs[0][:])
+		if err != nil {
+			return fmt.Errorf("%w (%d): %w", errRecoveringPublicKey, i, err)
+		}
+		if addr := pk.EthAddress(); in.Address != addr {
+			return fmt.Errorf("%w (%d): want %s, got %s", errAddressMismatch, i, in.Address, addr)
+		}
+	}
+	return nil
+}
+
 func (e *Export) numSigs() (uint64, error) {
 	return uint64(len(e.Ins)), nil
 }
@@ -160,7 +215,7 @@ func (e *Export) asOp(avaxAssetID ids.ID) (op, error) {
 
 		// Even if no AVAX is debited, non-AVAX inputs MUST increment the nonce.
 		if in.AssetID == avaxAssetID {
-			amount := scaleAVAX(in.Amount)
+			amount := ScaleAVAX(in.Amount)
 			if _, overflow := debit.Amount.AddOverflow(&debit.Amount, &amount); overflow {
 				return op{}, fmt.Errorf("%w: for address %s", errOverflow, in.Address)
 			}
@@ -187,7 +242,7 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := c.Marshal(codecVersion, utxo)
+		utxoBytes, err := MarshalUTXO(utxo)
 		if err != nil {
 			return ids.ID{}, nil, err
 		}
@@ -207,8 +262,8 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 
 var errInsufficientFunds = errors.New("insufficient funds")
 
-// TransferNonAVAX subtracts the non-AVAX balances from the statedb.
-func (e *Export) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+// transferNonAVAX subtracts the non-AVAX balances from the statedb.
+func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
 	for _, in := range e.Ins {
 		if in.AssetID == avaxAssetID {
 			continue

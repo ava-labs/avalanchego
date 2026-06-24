@@ -7,8 +7,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/event"
+	"github.com/ava-labs/libevm/libevm"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -75,6 +77,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		if err := s.MarkSettled(&vm.last.settled); err != nil {
 			return err
 		}
+		vm.metrics.markSettled(s.Height())
 	}
 
 	// I(s ∈ S) above, before I(b ∈ A) before X(b ∈ A)
@@ -135,4 +138,16 @@ func (vm *VM) RejectBlock(ctx context.Context, b *blocks.Block) error {
 // emitted after consensus acceptance via [VM.AcceptBlock].
 func (vm *VM) SubscribeAcceptedBlocks(ch chan<- *blocks.Block) event.Subscription {
 	return vm.acceptedBlocks.Subscribe(ch)
+}
+
+// SubscribeChainHeadEvent returns a new subscription for each
+// [core.ChainHeadEvent] emitted after a block has been executed.
+func (vm *VM) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return vm.exec.SubscribeChainHeadEvent(ch)
+}
+
+// LastExecutedState returns a [libevm.StateReader] backed by the post-execution
+// state of the last-executed block.
+func (vm *VM) LastExecutedState() (libevm.StateReader, error) {
+	return vm.exec.StateDB(vm.exec.LastExecuted().PostExecutionStateRoot())
 }

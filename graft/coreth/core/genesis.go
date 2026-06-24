@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
@@ -164,8 +165,8 @@ func SetupGenesisBlock(
 			// first persist leaves the trie database empty while LevelDB
 			// already has blocks beyond genesis. In this case, only recommit
 			// genesis state to the trieDB.
-			genesis.toBlock(db, triedb)
-			return genesis.Config, common.Hash{}, nil
+			_, err := genesis.toBlock(db, triedb)
+			return genesis.Config, common.Hash{}, err
 		}
 
 		_, err := genesis.Commit(db, triedb)
@@ -229,7 +230,11 @@ func (g *Genesis) IsVerkle() bool {
 // ToBlock returns the genesis block according to genesis specification.
 func (g *Genesis) ToBlock() *types.Block {
 	db := rawdb.NewMemoryDatabase()
-	return g.toBlock(db, triedb.NewDatabase(db, g.trieConfig()))
+	block, err := g.toBlock(db, triedb.NewDatabase(db, g.trieConfig()))
+	if err != nil {
+		panic(err)
+	}
+	return block
 }
 
 func (g *Genesis) trieConfig() *triedb.Config {
@@ -243,10 +248,10 @@ func (g *Genesis) trieConfig() *triedb.Config {
 }
 
 // TODO: migrate this function to "flush" for more similarity with upstream.
-func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Block {
-	statedb, err := state.New(types.EmptyRootHash, state.NewDatabaseWithNodeDB(db, triedb), nil)
+func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Block, error) {
+	statedb, err := state.New(types.EmptyRootHash, extstate.NewDatabaseWithNodeDB(db, triedb), nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	head := &types.Header{
@@ -267,7 +272,7 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	blockContext := NewBlockContext(head.Number, head.Time)
 	err = ApplyPrecompileActivations(g.Config, nil, blockContext, statedb)
 	if err != nil {
-		panic(fmt.Sprintf("unable to configure precompiles in genesis block: %v", err))
+		return nil, fmt.Errorf("unable to configure precompiles in genesis block: %v", err)
 	}
 
 	for addr, account := range g.Alloc {
@@ -345,21 +350,24 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	triedbOpt := stateconf.WithTrieDBUpdatePayload(common.Hash{}, block.Hash())
 
 	if _, err := statedb.Commit(0, false, stateconf.WithTrieDBUpdateOpts(triedbOpt)); err != nil {
-		panic(fmt.Sprintf("unable to commit genesis block to statedb: %v", err))
+		return nil, fmt.Errorf("unable to commit genesis block to statedb: %v", err)
 	}
 	// Commit newly generated states into disk if it's not empty.
 	if root != types.EmptyRootHash {
 		if err := triedb.Commit(root, true); err != nil {
-			panic(fmt.Sprintf("unable to commit genesis block: %v", err))
+			return nil, fmt.Errorf("unable to commit genesis block: %v", err)
 		}
 	}
-	return block
+	return block, nil
 }
 
 // Commit writes the block and state of a genesis specification to the database.
 // The block is committed as the canonical head block.
 func (g *Genesis) Commit(db ethdb.Database, triedb *triedb.Database) (*types.Block, error) {
-	block := g.toBlock(db, triedb)
+	block, err := g.toBlock(db, triedb)
+	if err != nil {
+		return nil, err
+	}
 	if block.Number().Sign() != 0 {
 		return nil, errors.New("can't commit genesis block with number > 0")
 	}

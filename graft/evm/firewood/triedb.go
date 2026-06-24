@@ -170,6 +170,12 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	}
 
 	initialRoot := fw.Root()
+	if initialRoot == ffi.EmptyRoot {
+		log.Debug("empty firewood database opened", "path", path)
+	} else {
+		log.Debug("firewood database opened", "root", initialRoot, "path", path)
+	}
+
 	blockHashes := make(map[common.Hash]struct{})
 	blockHashes[common.Hash{}] = struct{}{}
 	return &TrieDB{
@@ -219,6 +225,15 @@ func (t *TrieDB) SetHashAndHeight(blockHash common.Hash, height uint64) {
 	t.tree.blockHashes[blockHash] = struct{}{}
 	t.tree.height = height
 	t.tree.root = common.Hash(t.Firewood.Root())
+}
+
+// ClearAll resets the database to an empty state, without a genesis block committed.
+func (t *TrieDB) ClearAll() error {
+	if _, err := t.Firewood.Update([]ffi.BatchOp{ffi.PrefixDelete(nil)}); err != nil {
+		return fmt.Errorf("clearing database: %w", err)
+	}
+	t.SetHashAndHeight(common.Hash{}, 0)
+	return nil
 }
 
 // Scheme returns the scheme of the database.
@@ -275,10 +290,7 @@ func (t *TrieDB) Close() error {
 	t.possible = nil
 
 	// encourage finalizers to run before we wait, otherwise the database won't close properly.
-	// N.B.: this is wrapped in a user-defined function as a workaround for
-	// https://github.com/golang/go/issues/78059.
-	// See https://github.com/ava-labs/firewood/issues/1679 for full details.
-	go func() { runtime.GC() }()
+	go runtime.GC()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

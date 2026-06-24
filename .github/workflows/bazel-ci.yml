@@ -12,6 +12,9 @@ on:
         required: true
         type: string
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 
@@ -34,10 +37,19 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          echo "$NEEDS_JSON" | jq -e '
-            to_entries
-            | all(.value.result == "success")
-          ' >/dev/null
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi
 
   # Check Bazel metadata first so stale generated files fail with one
   # actionable error instead of cascading into multiple Bazel build/test
@@ -47,51 +59,47 @@ jobs:
   check-metadata:
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
       - name: Check Bazel metadata
-        uses: ./.github/actions/run-bazel-task
-        with:
-          prune_runner_disk: 'false'
-          task: bazel-check-metadata
+        shell: bash
+        run: ./scripts/run_task.sh bazel-check-metadata
 
   unit-main:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
       - name: Run unit tests with Bazel
-        uses: ./.github/actions/run-bazel-task
-        with:
-          prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
-          task: bazel-test-main
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-main
 
   unit-coreth:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
       - name: Run coreth unit tests with Bazel
-        uses: ./.github/actions/run-bazel-task
-        with:
-          prune_runner_disk: 'false'
-          task: bazel-test-coreth
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-coreth
 
   unit-subnet-evm:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
       - name: Run subnet-evm unit tests with Bazel
-        uses: ./.github/actions/run-bazel-task
-        with:
-          prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
-          task: bazel-test-subnet-evm
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-subnet-evm
 
   e2e:
     needs: check-metadata
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run e2e tests with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:

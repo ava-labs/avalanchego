@@ -24,10 +24,13 @@ on:
         required: true
         type: string
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   antithesis_subnet_evm:
     name: Run Antithesis Subnet-EVM Test Setup
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: antithesishq/antithesis-trigger-action@6c0a27302c0a3cd97d87d40bd6704e673abed4bb # v0.9
         with:

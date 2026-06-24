@@ -6,11 +6,15 @@ avalanchego monorepo.
 ## Prerequisites
 
 The `bazel` command is provided by [bazelisk](https://github.com/bazelbuild/bazelisk),
-which automatically downloads the correct Bazel version from `.bazelversion`. All
+which automatically downloads the correct Bazel version from `.bazelversion`. Most
 Taskfile targets use `./scripts/nix_run.sh bazelisk ...`, which runs in the repo's
 nix dev shell when needed and avoids nesting `nix develop` when already inside it.
 In the nix dev shell (`nix develop`), `bazel` and `bazelisk` are both on PATH directly.
 For Nix installation and repo dev shell setup, see [CONTRIBUTING.md](../CONTRIBUTING.md#nix).
+
+Some tasks (e.g. `task bazel-check-metadata`) only require tooling that is installed
+by default on GitHub Action runners (e.g. `bash`, `git`, `go`, `bazelisk`).  These
+tasks can be executed without a nix shell which in CI avoids the cost of nix installation.
 
 ## Quick Start
 
@@ -24,7 +28,7 @@ task bazel-build-opt
 # Run unit tests
 task bazel-test
 
-# Update Bazel metadata after changing Go imports
+# Update Bazel metadata after changing Go imports or Bazel module deps
 task bazel-generate-metadata
 
 # Clean build cache
@@ -70,7 +74,7 @@ go_sdk.from_file(go_mod = "//:go.mod")
 | Tool | Version | Pin Mechanism | Rationale |
 |------|---------|---------------|-----------|
 | Bazel | 8.0.1 | `.bazelversion` + bazelisk | Current LTS with native bzlmod support |
-| Go | 1.25.7 | `go.mod` via go_sdk.from_file | Single source of truth |
+| Go | 1.25.10 | `go.mod` via go_sdk.from_file | Single source of truth |
 | rules_go | 0.57.0 | `MODULE.bazel` | Go 1.25+ support (compiles `pack` from source) |
 | gazelle | 0.45.0 | `MODULE.bazel` | Compatible with rules_go 0.57.0 |
 
@@ -105,7 +109,7 @@ gazelle prefix directives.
 | File | Purpose | Safe to Delete? |
 |------|---------|-----------------|
 | `MODULE.bazel` | Bazel module definition, dependencies, patches | **No** |
-| `MODULE.bazel.lock` | Locked dependency versions | Yes (regenerated) |
+| `MODULE.bazel.lock` | Locked module/dependency resolution state | Yes (regenerated) |
 | `go.work` | Go workspace aggregating all modules (used by `go_deps`) | **No** |
 | `.bazelrc` | Bazel build flags and settings | **No** |
 | `.bazelignore` | Directories excluded from Bazel | **No** |
@@ -168,6 +172,13 @@ Run `task bazel-generate-metadata` after:
 - Changing import statements
 - Adding new packages/directories
 - Modifying `go.mod` dependencies
+- Modifying `MODULE.bazel`
+
+`task bazel-generate-metadata` also refreshes `MODULE.bazel.lock` into the
+same state later Bazel module commands expect. `bazel mod tidy` alone does not
+always fully refresh `MODULE.bazel.lock`, so a later Bazel command may rewrite
+it. Running the lockfile refresh as part of metadata generation makes that
+update happen in one predictable place instead of as a later surprise.
 
 ### How Gazelle Handles Multiple Modules
 
@@ -332,6 +343,12 @@ control rather than generating them at build time. This avoids proto
 toolchain complexity in Bazel while maintaining compatibility with the
 existing `go generate` workflow.
 
+Bazel targets that import protobuf runtime packages depend on the Go module
+`google.golang.org/protobuf` through `go_deps.from_file(go_work = "//:go.work")`
+and refer to it as `@org_golang_google_protobuf//...`. The repo does not rely
+on direct `protobuf` / `rules_proto` Bazel module dependencies for proto code
+generation.
+
 ## Common Tasks
 
 ### Building
@@ -460,6 +477,9 @@ task bazel-generate-metadata
 # Update MODULE.bazel use_repo calls
 task bazel-mod-tidy               # or: bazel mod tidy
 
+# Refresh Bazel module metadata files
+task bazel-sync-module-metadata
+
 # Clean build outputs
 task bazel-clean                  # or: bazel clean
 
@@ -470,12 +490,28 @@ task bazel-clean-all              # or: bazel clean --expunge
 task bazel-check-metadata
 ```
 
+As part of `bazel-check-metadata`, package-local `BUILD.bazel` files are
+expected to define at most one `go_library` rule. Multiple
+`go_library` rules in one directory are usually stale metadata left
+behind by a package rename or move, where Gazelle added the new rule
+without removing the old checked-in one.
+
+This repo prefers linting for that stale-rule pattern rather than
+deleting and regenerating all non-curated `BUILD.bazel` files. The lint
+is narrower and safer: it fails on the specific suspicious state we want
+to prevent, without relying on a maintained list of which BUILD files
+are safe to destroy and recreate from scratch.
+
 In CI, the Bazel workflow runs `bazel-check-metadata` before Bazel build
 and test jobs. This makes stale metadata fail with a single actionable
 error instead of surfacing later as multiple downstream Bazel failures.
 This is especially useful for pull requests tested against a moving base
 branch, where the metadata included in the PR may be stale relative to
 the current merge target.
+
+That check includes the Bazel module metadata files, so lockfile drift is
+caught in the metadata phase rather than showing up later as a surprising
+working-tree mutation.
 
 The GitHub Actions Bazel workflow also defines a single aggregate job,
 `bazel-required`, that depends on the other jobs in the workflow via
@@ -664,6 +700,8 @@ internal patch parser is strict about (unlike `git apply`).
 1. Edit the BUILD file in `.bazel/patches/build_files/<module>/`
 2. Run `task bazel-generate-patches` to regenerate `.patch` files
 3. Verify: `./scripts/nix_run.sh bazelisk build @<module>//<target>`
+   (or plain `bazelisk build @<module>//<target>` when the host already has the
+   required tools available)
 4. Commit both the BUILD file and the generated `.patch` file
 
 Patches that modify existing files (e.g., gnark-crypto's `no-sandbox`
