@@ -44,7 +44,6 @@ graft_go_test(
         "//graft/coreth/internal/blocktest",
         "//graft/coreth/params",
         "//utils",
-        "//vms/components/gas",
         "//vms/evm/acp226",
         "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
