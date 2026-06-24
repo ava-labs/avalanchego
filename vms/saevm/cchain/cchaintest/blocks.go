@@ -87,7 +87,7 @@ func WithExtDataHash(h common.Hash) BlockOption {
 }
 
 // WithBlockVersion sets the block's BlockBodyExtra Version. The default of 0 is
-// the only version accepted by the C-Chain ParseBlock. A non-zero value
+// the only version accepted by the C-Chain ParseBlock; a non-zero value
 // simulates a block declaring an unsupported version.
 func WithBlockVersion(v uint32) BlockOption {
 	return options.Func[blockProperties](func(p *blockProperties) {
@@ -117,7 +117,7 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 	}
 
 	// By default the header commits the ExtDataHash computed from the block's
-	// own ExtData. A caller-supplied hash overrides this to simulate tampering.
+	// own ExtData; a caller-supplied hash overrides this to simulate tampering.
 	extDataHash := customtypes.CalcExtDataHash(extData)
 	if props.extDataHash != nil {
 		extDataHash = *props.extDataHash

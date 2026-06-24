@@ -129,8 +129,8 @@ func (vm *VM) Initialize(
 		cfg.desired(),
 	)
 	mempoolConfig := legacypool.DefaultConfig
-	// Treat all transactions equally regardless of submission source. Locally
-	// submitted txs receive no preferential admission or pricing.
+	// Treat all transactions equally regardless of submission source — no
+	// preferential admission or pricing for locally-submitted txs.
 	mempoolConfig.NoLocals = true
 	saeConfig := sae.Config{
 		MempoolConfig: mempoolConfig,

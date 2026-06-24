@@ -133,13 +133,6 @@ func withTime(now time.Time) sutOption {
 	})
 }
 
-// withGenesisAllocFor seeds the SUT's genesis with a max balance for each addr.
-func withGenesisAllocFor(addrs ...common.Address) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
-	})
-}
-
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -591,7 +584,7 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 func TestExport(t *testing.T) {
 	sk := txtest.NewKey(t)
 	sender := sk.EthAddress()
-	ctx, sut := newSUT(t, withGenesisAllocFor(sender))
+	ctx, sut := newSUT(t, withMaxAllocFor(sender))
 
 	var (
 		w                = newWallet(sk, sut.ctx, sut.Client)
@@ -659,7 +652,7 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	for i, sk := range keys {
 		addrs[i] = sk.EthAddress()
 	}
-	ctx, sut := newSUT(t, withGenesisAllocFor(addrs...))
+	ctx, sut := newSUT(t, withMaxAllocFor(addrs...))
 
 	var (
 		preference = sut.lastAccepted(ctx, t)
@@ -702,7 +695,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 	ethSender := ethWallet.Addresses()[0]
 	exportKey := txtest.NewKey(t)
-	ctx, sut := newSUT(t, withGenesisAllocFor(ethSender, exportKey.EthAddress()))
+	ctx, sut := newSUT(t, withMaxAllocFor(ethSender, exportKey.EthAddress()))
 
 	// Tracing will error if there isn't at least one ethereum transaction in
 	// the block.
@@ -1018,7 +1011,7 @@ func TestRampMinPriceExponent(t *testing.T) {
 		addrs[i] = keys[i].EthAddress()
 	}
 	ctx, sut := newSUT(t,
-		withGenesisAllocFor(addrs...),
+		withMaxAllocFor(addrs...),
 		withPriceTarget(1_000_000_000), // 1 nAVAX target.
 	)
 
