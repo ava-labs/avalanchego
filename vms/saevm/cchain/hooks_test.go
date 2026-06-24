@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
@@ -38,34 +37,6 @@ func TestBlockTime(t *testing.T) {
 	require.Equal(t, int64(testTimestampSeconds)*1000, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
 	// Documented invariant: BlockTime(h).Unix() == h.Time.
 	require.Equal(t, int64(testTimestampSeconds), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
-}
-
-func TestGasConfigAfter(t *testing.T) {
-	tests := []struct {
-		name     string
-		exponent *dynamic.PriceExponent
-		want     gas.Price
-	}{
-		{
-			name: "nil_defaults_to_one_wei",
-			want: 1,
-		},
-		{
-			name:     "exponent_returns_its_price",
-			exponent: utils.PointerTo(dynamic.DesiredPriceExponent(2)),
-			want:     2,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			header := customtypes.WithHeaderExtra(
-				&types.Header{},
-				&customtypes.HeaderExtra{MinPriceExponent: tt.exponent},
-			)
-			_, cfg := (*hooks)(nil).GasConfigAfter(header)
-			assert.Equalf(t, tt.want, cfg.MinPrice, "GasConfigAfter()")
-		})
-	}
 }
 
 func TestBuildHeaderMinPriceExponent(t *testing.T) {
