@@ -1057,48 +1057,49 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	ctx, node := newSUT(t, alloc, timeOpt, withDB(db))
 	w := newWallet(key, node.ctx, node.Client)
 
-	// blk1 is accepted; it is settled by the (non-genesis) marker blk2 carries.
-	blk1 := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
-	require.Equal(t, uint64(1), blk1.Height(), "blk1 height")
+	// settled is accepted; it is settled by the (non-genesis) marker settler
+	// carries.
+	settled := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, uint64(1), settled.Height(), "settled height")
 
-	// blk2 settles blk1 but is built without being accepted, modelling a block
-	// later received from a peer while the node is bootstrapping.
-	clock.AdvanceToSettle(ctx, t, blk1)
+	// settler settles settled but is built without being accepted, modelling a
+	// block later received from a peer while the node is bootstrapping.
+	clock.AdvanceToSettle(ctx, t, settled)
 	require.NoErrorf(t, node.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", node.Client)
-	blk2 := node.buildVerify(ctx, t, node.lastAccepted(ctx, t))
-	require.Equal(t, uint64(2), blk2.Height(), "blk2 height")
-	require.Equal(t, blk1.ID(), blk2.LastSettled().ID(), "blk2 settled block")
-	blk2Bytes := blk2.Bytes()
+	settler := node.buildVerify(ctx, t, node.lastAccepted(ctx, t))
+	require.Equal(t, uint64(2), settler.Height(), "settler height")
+	require.Equal(t, settled.ID(), settler.LastSettled().ID(), "settler settled block")
 
 	// Restart the node: shut the VM down and reopen a fresh one on the same DB,
 	// re-entering bootstrapping as a node does on startup. The same clock carries
-	// over. The restarted VM has last-accepted blk1 and has never seen blk2.
+	// over. The restarted VM has last-accepted settled and has never seen settler.
 	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
 	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withState(snow.Bootstrapping))
-	require.Equal(t, blk1.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
+	require.Equal(t, settled.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
 
 	t.Run("valid_marker_verifies", func(t *testing.T) {
-		parsed, err := restarted.ParseBlock(restartedCtx, blk2Bytes)
-		require.NoErrorf(t, err, "%T.ParseBlock(blk2)", restarted.VM)
-		require.NoErrorf(t, restarted.VerifyBlock(restartedCtx, nil, parsed), "%T.VerifyBlock(blk2) during bootstrapping", restarted.VM)
-		require.Equal(t, blk1.ID(), parsed.LastSettled().ID(), "blk2 settled block")
+		settlerBytes := settler.Bytes()
+		parsed, err := restarted.ParseBlock(restartedCtx, settlerBytes)
+		require.NoErrorf(t, err, "%T.ParseBlock(settler)", restarted.VM)
+		require.NoErrorf(t, restarted.VerifyBlock(restartedCtx, nil, parsed), "%T.VerifyBlock(settler) during bootstrapping", restarted.VM)
+		require.Equal(t, settled.ID(), parsed.LastSettled().ID(), "settler settled block")
 	})
 
 	t.Run("tampered_marker_rejected", func(t *testing.T) {
 		// A tampered SettledHeight is caught by the marker cross-check, since
 		// bootstrapping does not rebuild by hash.
-		hdr := blk2.Header()
+		hdr := settler.Header()
 		extra := customtypes.GetHeaderExtra(hdr)
-		require.NotNil(t, extra.SettledHeight, "blk2 SettledHeight")
+		require.NotNil(t, extra.SettledHeight, "settler SettledHeight")
 		extra.SettledHeight = new(uint64)
-		tampered := blk2.EthBlock().WithSeal(hdr)
+		tampered := settler.EthBlock().WithSeal(hdr)
 		tamperedBytes, err := rlp.EncodeToBytes(tampered)
-		require.NoError(t, err, "rlp.EncodeToBytes(tampered blk2)")
+		require.NoError(t, err, "rlp.EncodeToBytes(tampered settler)")
 
 		parsed, err := restarted.ParseBlock(restartedCtx, tamperedBytes)
-		require.NoErrorf(t, err, "%T.ParseBlock(tampered blk2)", restarted.VM)
+		require.NoErrorf(t, err, "%T.ParseBlock(tampered settler)", restarted.VM)
 		err = restarted.VerifyBlock(restartedCtx, nil, parsed)
-		require.ErrorContainsf(t, err, "settled height mismatch", "%T.VerifyBlock(tampered blk2)", restarted.VM)
+		require.ErrorContainsf(t, err, "settled height mismatch", "%T.VerifyBlock(tampered settler)", restarted.VM)
 	})
 }
 
