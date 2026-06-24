@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -369,7 +370,7 @@ func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx
 
 	ticker := time.NewTicker(time.Millisecond)
 	defer ticker.Stop()
-	
+
 	// The pool updates the verification state atomically with evicting the
 	// included tx, so observing the eviction guarantees the state has been
 	// updated.
@@ -1027,7 +1028,7 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	// timestamps, which makes the hash check fail. sae's hash-mismatch error is
 	// unexported, so match on its text rather than the sentinel.
 	err = sut.VerifyBlock(ctx, nil, parsed)
-	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
+	require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
 }
 
 // During bootstrapping [VM.VerifyBlock] does not rebuild blocks, so it
@@ -1038,54 +1039,54 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	key := txtest.NewKey(t)
 	alloc := withMaxAllocFor(key.EthAddress())
 
-	srcTimeOpt, srcClock := withVMTime(upgrade.InitiallyActiveTime)
-	srcDB := memdb.New()
-	srcCtx, src := newSUT(t, alloc, srcTimeOpt, withDB(srcDB))
-	w := newWallet(key, src.ctx, src.Client)
+	timeOpt, clock := withVMTime(upgrade.InitiallyActiveTime)
+	db := memdb.New()
+	ctx, node := newSUT(t, alloc, timeOpt, withDB(db))
+	w := newWallet(key, node.ctx, node.Client)
 
-	// blk2 settles blk1; both are accepted into srcDB.
-	blk1 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
-	srcClock.AdvanceToSettle(srcCtx, t, blk1)
-	blk2 := src.issueAndExecute(srcCtx, t, w.newMinimalTx(t))
-	require.Equal(t, uint64(2), blk2.Height(), "source blk2 height")
+	// blk1 is accepted; it is settled by the (non-genesis) marker blk2 carries.
+	blk1 := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, uint64(1), blk1.Height(), "blk1 height")
 
-	// blk3 settles blk2 but is not accepted, so the receiver verifies it as a
-	// block received from a peer.
-	srcClock.AdvanceToSettle(srcCtx, t, blk2)
-	require.NoErrorf(t, src.IssueTx(srcCtx, w.newMinimalTx(t)), "%T.IssueTx()", src.Client)
-	blk3 := src.buildVerify(srcCtx, t, src.lastAccepted(srcCtx, t))
-	require.Equal(t, uint64(3), blk3.Height(), "source blk3 height")
-	require.Equal(t, blk2.ID(), blk3.LastSettled().ID(), "source blk3 settled block")
+	// blk2 settles blk1 but is built without being accepted, modelling a block
+	// later received from a peer while the node is bootstrapping.
+	clock.AdvanceToSettle(ctx, t, blk1)
+	require.NoErrorf(t, node.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", node.Client)
+	blk2 := node.buildVerify(ctx, t, node.lastAccepted(ctx, t))
+	require.Equal(t, uint64(2), blk2.Height(), "blk2 height")
+	require.Equal(t, blk1.ID(), blk2.LastSettled().ID(), "blk2 settled block")
+	blk2Bytes := blk2.Bytes()
 
-	// Receiver: a fresh VM in Bootstrapping over a copy of srcDB, last-accepted
-	// blk2, never having seen blk3.
-	rcvTimeOpt, _ := withVMTime(srcClock.Now())
-	rcvCtx, rcv := newSUT(t, alloc, rcvTimeOpt, withDB(saetest.CopyDB(t, srcDB)), withState(snow.Bootstrapping))
-	require.Equal(t, blk2.ID(), rcv.lastAccepted(rcvCtx, t), "receiver last-accepted before verify")
-	t.Run("verify_settler", func(t *testing.T) {
-		settlerBytes := settler.Bytes()
-		parsedSettler, err := sut.ParseBlock(ctx, settlerBytes)
-		require.NoErrorf(t, err, "%T.ParseBlock(settler)", sut.VM)
-		require.NoErrorf(t, sut.VerifyBlock(ctx, nil, parsedSettler), "%T.VerifyBlock(parsedSettler)", sut.VM)
-		require.Equal(t, uint64(1), parsedSettler.LastSettled().Height(), "parsedSettler.LastSettled().Height()")
+	// Restart the node: shut the VM down and reopen a fresh one on the same DB,
+	// re-entering bootstrapping as a node does on startup. The same clock carries
+	// over. The restarted VM has last-accepted blk1 and has never seen blk2.
+	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withState(snow.Bootstrapping))
+	require.Equal(t, blk1.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
+
+	t.Run("valid_marker_verifies", func(t *testing.T) {
+		parsed, err := restarted.ParseBlock(restartedCtx, blk2Bytes)
+		require.NoErrorf(t, err, "%T.ParseBlock(blk2)", restarted.VM)
+		require.NoErrorf(t, restarted.VerifyBlock(restartedCtx, nil, parsed), "%T.VerifyBlock(blk2) during bootstrapping", restarted.VM)
+		require.Equal(t, blk1.ID(), parsed.LastSettled().ID(), "blk2 settled block")
 	})
 
-	// A tampered SettledHeight is caught by the marker cross-check, since
-	// bootstrapping does not rebuild by hash.
-	hdr := blk3.Header()
-	extra := customtypes.GetHeaderExtra(hdr)
-	require.NotNil(t, extra.SettledHeight, "blk3 SettledHeight")
-	bad := *extra.SettledHeight + 1
-	extra.SettledHeight = &bad
-	customtypes.SetHeaderExtra(hdr, extra)
-	tampered := blk3.EthBlock().WithSeal(hdr)
-	buf, err := rlp.EncodeToBytes(tampered)
-	require.NoError(t, err, "rlp.EncodeToBytes(tampered blk3)")
+	t.Run("tampered_marker_rejected", func(t *testing.T) {
+		// A tampered SettledHeight is caught by the marker cross-check, since
+		// bootstrapping does not rebuild by hash.
+		hdr := blk2.Header()
+		extra := customtypes.GetHeaderExtra(hdr)
+		require.NotNil(t, extra.SettledHeight, "blk2 SettledHeight")
+		extra.SettledHeight = new(uint64)
+		tampered := blk2.EthBlock().WithSeal(hdr)
+		tamperedBytes, err := rlp.EncodeToBytes(tampered)
+		require.NoError(t, err, "rlp.EncodeToBytes(tampered blk2)")
 
-	parsed, err := rcv.ParseBlock(rcvCtx, buf)
-	require.NoErrorf(t, err, "%T.ParseBlock(tampered blk3)", rcv.VM)
-	err = rcv.VerifyBlock(rcvCtx, nil, parsed)
-	require.Contains(t, err.Error(), "settled height mismatch", "%T.VerifyBlock(tampered blk3)", rcv.VM)
+		parsed, err := restarted.ParseBlock(restartedCtx, tamperedBytes)
+		require.NoErrorf(t, err, "%T.ParseBlock(tampered blk2)", restarted.VM)
+		err = restarted.VerifyBlock(restartedCtx, nil, parsed)
+		require.ErrorContainsf(t, err, "settled height mismatch", "%T.VerifyBlock(tampered blk2)", restarted.VM)
+	})
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full

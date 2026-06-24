@@ -4,7 +4,6 @@
 package cchain
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -12,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -111,14 +109,11 @@ func TestAncestorInputIDs(t *testing.T) {
 // an absent marker. The RLP codec for these header fields is covered by coreth's
 // customtypes tests.
 func TestSettledBy(t *testing.T) {
-	newHeader := func() *types.Header {
-		return customtypes.WithHeaderExtra(&types.Header{Number: big.NewInt(1)}, &customtypes.HeaderExtra{})
-	}
 	// built returns the header of a block built carrying the given settled marker.
 	built := func(t *testing.T, settled hook.Settled) *types.Header {
 		t.Helper()
 		var b builder
-		block, err := b.BuildBlock(newHeader(), nil, nil, nil, nil, settled)
+		block, err := b.BuildBlock(&types.Header{}, nil, nil, nil, nil, settled)
 		require.NoError(t, err, "builder.BuildBlock()")
 		return block.Header()
 	}
@@ -136,7 +131,7 @@ func TestSettledBy(t *testing.T) {
 	}{
 		{
 			name:   "absent_marker",
-			header: newHeader(),
+			header: &types.Header{},
 			want:   hook.Settled{},
 		},
 		{
