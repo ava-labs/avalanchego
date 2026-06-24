@@ -79,6 +79,12 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 
 	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
+	windower.EXPECT().TimeToSlot(gomock.Any(), gomock.Any()).DoAndReturn(func(start, now time.Time) uint64 {
+		if now.Before(start) {
+			return 0
+		}
+		return uint64(now.Sub(start) / proposer.DefaultWindowDuration)
+	}).AnyTimes()
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
@@ -187,7 +193,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock before MaxVerifyDelay from parent timestamp.
 		// Check that child block is signed.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		localTime := parentBlk.Timestamp().Add(proVM.MaxVerifyDelay() - time.Second)
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -201,7 +207,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock exactly MaxVerifyDelay from parent timestamp.
 		// Check that child block is unsigned.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
+		localTime := parentBlk.Timestamp().Add(proVM.MaxVerifyDelay())
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -216,7 +222,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		// Set local clock between MaxVerifyDelay and MaxBuildDelay from parent
 		// timestamp.
 		// Check that child block is unsigned.
-		localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
+		localTime := parentBlk.Timestamp().Add((proVM.MaxVerifyDelay() + proVM.MaxBuildDelay()) / 2)
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -230,7 +236,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock after MaxBuildDelay from parent timestamp.
 		// Check that child block is unsigned.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
+		localTime := parentBlk.Timestamp().Add(proVM.MaxBuildDelay())
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -315,7 +321,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock before MaxVerifyDelay from parent timestamp.
 		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		localTime := parentBlk.Timestamp().Add(proVM.MaxVerifyDelay() - time.Second)
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
@@ -325,7 +331,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock exactly MaxVerifyDelay from parent timestamp.
 		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
+		localTime := parentBlk.Timestamp().Add(proVM.MaxVerifyDelay())
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
@@ -335,7 +341,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
 		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
+		localTime := parentBlk.Timestamp().Add((proVM.MaxVerifyDelay() + proVM.MaxBuildDelay()) / 2)
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
@@ -345,7 +351,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock after MaxBuildDelay from parent timestamp
 		// Check that child block is built and it is unsigned
-		localTime := parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
+		localTime := parentBlk.Timestamp().Add(proVM.MaxBuildDelay())
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -386,6 +392,12 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 
 	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
+	windower.EXPECT().TimeToSlot(gomock.Any(), gomock.Any()).DoAndReturn(func(start, now time.Time) uint64 {
+		if now.Before(start) {
+			return 0
+		}
+		return uint64(now.Sub(start) / proposer.DefaultWindowDuration)
+	}).AnyTimes()
 
 	vm := &VM{
 		Config: Config{

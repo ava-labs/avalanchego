@@ -755,12 +755,14 @@ func (m *manager) createAvalancheChain(
 		subnetCfg           = m.SubnetConfigs[ctx.SubnetID]
 		minBlockDelay       = m.ProposerMinBlockDelay // X-chain uses this value
 		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
+		windowDuration      = subnetCfg.ProposerWindowDuration
 	)
 	m.Log.Info("creating proposervm wrapper",
 		zap.Time("activationTime", m.Upgrades.ApricotPhase4Time),
 		zap.Uint64("minPChainHeight", m.Upgrades.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
+		zap.Duration("windowDuration", windowDuration),
 	)
 
 	// Note: this does not use [dagVM] to ensure we use the [vm]'s height index.
@@ -785,6 +787,7 @@ func (m *manager) createAvalancheChain(
 			Upgrades:            m.Upgrades,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
+			WindowDuration:      windowDuration,
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
@@ -1178,6 +1181,7 @@ func (m *manager) createSnowmanChain(
 		subnetCfg           = m.SubnetConfigs[ctx.SubnetID]
 		minBlockDelay       time.Duration // Most chains default to 0
 		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
+		windowDuration      = subnetCfg.ProposerWindowDuration
 	)
 	if ctx.ChainID == constants.PlatformChainID {
 		minBlockDelay = m.ProposerMinBlockDelay
@@ -1187,6 +1191,7 @@ func (m *manager) createSnowmanChain(
 		zap.Uint64("minPChainHeight", m.Upgrades.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
+		zap.Duration("windowDuration", windowDuration),
 	)
 
 	if m.TracingEnabled {
@@ -1207,6 +1212,7 @@ func (m *manager) createSnowmanChain(
 			Upgrades:            m.Upgrades,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
+			WindowDuration:      windowDuration,
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
