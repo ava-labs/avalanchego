@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -221,7 +222,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &now,
 			// TODO(StephenButtolph): Encode the min-delay excess.
-			MinDelayExcess: new(acp226.DelayExcess),
+			MinDelayExcess:   new(acp226.DelayExcess),
+			MinPriceExponent: new(dynamic.PriceExponent),
 		},
 	), nil
 }
