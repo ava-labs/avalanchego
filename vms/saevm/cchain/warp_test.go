@@ -209,7 +209,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 	)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
-		withContract(warpLogger, forwardAndLogCode(corethwarp.ContractAddress)),
+		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(corethwarp.ContractAddress)}),
 		withValidators(vdrs),
 	)
 
