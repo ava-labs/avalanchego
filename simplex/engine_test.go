@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -102,7 +103,9 @@ func TestSimplexEngineNilParameters(t *testing.T) {
 
 	config := configs[0]
 	config.Params = nil
-	_, err := NewEngine(ctx, config)
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	consensusCtx := snowtest.ConsensusContext(snowCtx)
+	_, err := NewEngine(ctx, consensusCtx, config)
 	require.ErrorIs(t, err, errNilSimplexParameters)
 }
 
@@ -195,7 +198,10 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 		Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		AnyTimes()
 
-	engine, err := NewEngine(ctx, config)
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	consensusCtx := snowtest.ConsensusContext(snowCtx)
+
+	engine, err := NewEngine(ctx, consensusCtx, config)
 	require.NoError(t, err)
 
 	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
@@ -861,6 +867,8 @@ func FuzzSimplexEmptyNotarizations(f *testing.F) {
 
 func setupEngineForFuzz(t *testing.T) (*Engine, []*Config) {
 	configs := createSimplexEngineConfig(t, reuseKeys)
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	consensusCtx := snowtest.ConsensusContext(snowCtx)
 
 	signer := BLSSigner{
 		chainID:   configs[0].Ctx.ChainID,
@@ -871,7 +879,7 @@ func setupEngineForFuzz(t *testing.T) (*Engine, []*Config) {
 	verifier := createVerifierForFuzz(configs[0])
 
 	ctx := t.Context()
-	engine, err := newEngineWithSignerVerifier(ctx, configs[0], signer, verifier)
+	engine, err := newEngineWithSignerVerifier(ctx, consensusCtx, configs[0], signer, verifier)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -887,8 +895,10 @@ func setupEngineForFuzz(t *testing.T) (*Engine, []*Config) {
 
 func setupEngine(t *testing.T) (*Engine, []*Config) {
 	configs := createSimplexEngineConfig(t, noKeyReuse)
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	consensusCtx := snowtest.ConsensusContext(snowCtx)
 
-	engine, err := NewEngine(t.Context(), configs[0])
+	engine, err := NewEngine(t.Context(), consensusCtx, configs[0])
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
