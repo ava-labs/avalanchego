@@ -168,7 +168,7 @@ func (t *Tx) AsOp(avaxAssetID ids.ID, blockGasLimit uint64) (hook.Op, error) {
 	}
 
 	return hook.Op{
-		ID:        t.ID(),
+		ID:        hashing.ComputeHash256Array(bytes), // reuse them to avoid re-serializing
 		Gas:       g,
 		GasFeeCap: gasPrice(burned, g),
 		Burn:      op.burn,

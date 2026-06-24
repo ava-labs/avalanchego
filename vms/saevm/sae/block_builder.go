@@ -311,9 +311,13 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			zap.Int("op_index", len(includedOps)),
 		)
 
-		// Ops are serialized into the block's ExtData and so share the body's
-		// serialized-byte budget with the EVM transactions above.
-		opBytes := uint64(tx.Size()) + maxTxRLPHeaderLen
+		// Unlike the RLP-listed EVM txs above, ops are concatenated into one
+		// length-prefixed ExtData blob: count each op's size, plus
+		// [blocklimit.OpSlicePrefix] once for the first.
+		opBytes := uint64(tx.Size())
+		if len(includedOps) == 0 {
+			opBytes += blocklimit.OpSlicePrefix
+		}
 		if includedBodyBytes+opBytes > blocklimit.MaxBodyBytes {
 			opLog.Debug("Skipping op: block byte budget reached",
 				zap.Uint64("op_bytes", opBytes),

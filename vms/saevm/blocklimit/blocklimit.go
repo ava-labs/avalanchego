@@ -19,14 +19,19 @@ import (
 // P2P message.
 const MaxBlockBytes uint64 = constants.DefaultMaxMessageSize
 
-// blockByteOverhead is the fixed per-block framing reserved below the maximum
+// BlockByteOverhead is the fixed per-block framing reserved below the maximum
 // message size M: the ProposerVM certificate, the block header, signature,
 // and message framing.
 const BlockByteOverhead uint64 = staking.MaxCertificateLen + 6*units.KiB
 
-// maxBlockTxBytes caps a block's serialized transaction bytes, reserving
+// MaxBodyBytes caps a block's serialized body bytes, reserving
 // [BlockByteOverhead] below the maximum message size M.
 const MaxBodyBytes = MaxBlockBytes - BlockByteOverhead
+
+// OpSlicePrefix is the framing prepended once to a block's ExtData op slice: a
+// 2-byte codec version and a 4-byte element count. Ops are then concatenated
+// with no per-op framing.
+const OpSlicePrefix uint64 = 2 + 4
 
 // MinGasForBytes returns the minimum gas a transaction of the given serialized
 // size must consume so that exhausting the block's gas limit cannot exhaust more
