@@ -361,9 +361,6 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	if headerExtra.TargetExponent != nil {
 		return fmt.Errorf("unexpected TargetExponent in header extra: %d", *headerExtra.TargetExponent)
 	}
-	if headerExtra.MinPriceExponent != nil {
-		return fmt.Errorf("unexpected MinPriceExponent in header extra: %d", *headerExtra.MinPriceExponent)
-	}
 	if headerExtra.SettledHeight != nil {
 		return fmt.Errorf("unexpected SettledHeight in header extra: %d", *headerExtra.SettledHeight)
 	}

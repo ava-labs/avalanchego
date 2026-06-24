@@ -21,8 +21,6 @@ import (
 	"github.com/ava-labs/libevm/triedb/hashdb"
 	"go.uber.org/zap"
 
-	_ "embed"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
@@ -171,7 +169,6 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if err := database.PutID(batch, rootKey(height), ids.ID(newRoot)); err != nil {
 		return fmt.Errorf("writing root: %w", err)
 	}
-
 	// Committing the batch atomically with shared memory prevents duplicate
 	// shared memory operations in the event of a crash.
 	//
