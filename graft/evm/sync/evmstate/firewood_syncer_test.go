@@ -147,11 +147,12 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	// Use CorethCodec as the default - the firewood syncer uses p2p directly, not the message codec,
 	// so the codec choice only affects the code request handler which is auxiliary to these tests.
 	codeRequestHandler := handlers.NewCodeRequestHandler(serverState.DiskDB(), message.CorethCodec, handlerstats.NewNoopHandlerStats())
-	serverDB := dbFromState(t, serverState)
 	mockClient := client.NewTestClient(message.CorethCodec, nil, codeRequestHandler, nil)
+
+	// Create the proof handler.
+	serverDB := dbFromState(t, serverState)
 	proofHandler, err := syncer.NewGetProofHandler(serverDB, prometheus.NewRegistry())
 	require.NoError(t, err, "syncer.NewGetProofHandler()")
-	proofClient := p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, proofHandler)
 
 	// Create the producer code queue.
 	codeQueue, err := code.NewQueue(clientState.DiskDB().(ethdb.Database))
@@ -162,6 +163,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	require.NoError(t, err, "NewCodeSyncer()")
 
 	// Create the firewood syncer.
+	proofClient := p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, proofHandler)
 	firewoodSyncer, err := NewFirewoodSyncer(
 		syncer.Config{},
 		dbFromState(t, clientState),
