@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 // Clock is a mutable, test-controlled clock used to drive the block-building and
