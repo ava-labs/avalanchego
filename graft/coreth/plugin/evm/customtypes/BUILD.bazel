@@ -19,7 +19,6 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes",
     deps = [
-        "//vms/components/gas",
         "//vms/evm/acp226",
         "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
