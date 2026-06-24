@@ -290,6 +290,8 @@ func (s *SUT) hooks() *hooks {
 		s.ctx,
 		s.state,
 		s.chainConfig,
+		0,
+		desiredParams{},
 		s.txpool.Pending,
 		warp.NewStorage(s.db),
 		s.now,
@@ -1136,6 +1138,8 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	db := memdb.New()
 	ctx, node := newSUT(t, alloc, timeOpt, withDB(db))
 	w := newWallet(key, node.ctx, node.Client)
+
+	clock.Advance(2 * time.Second)
 
 	// settled is accepted; it is settled by the (non-genesis) marker settler
 	// carries.
