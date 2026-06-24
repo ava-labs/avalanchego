@@ -10,9 +10,11 @@ import (
 	"math"
 	"math/bits"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // MaxBlockBytes is the byte budget M of [Eligible]: the maximum size of a single
@@ -29,9 +31,9 @@ const BlockByteOverhead uint64 = staking.MaxCertificateLen + 6*units.KiB
 const MaxBodyBytes = MaxBlockBytes - BlockByteOverhead
 
 // OpSlicePrefix is the framing prepended once to a block's ExtData op slice: a
-// 2-byte codec version and a 4-byte element count. Ops are then concatenated
-// with no per-op framing.
-const OpSlicePrefix uint64 = 2 + 4
+// [codec.VersionSize]-byte codec version and a [wrappers.IntLen]-byte element
+// count. Ops are then concatenated with no per-op framing.
+const OpSlicePrefix uint64 = codec.VersionSize + wrappers.IntLen
 
 // MinGasForBytes returns the minimum gas a transaction of the given serialized
 // size must consume so that exhausting the block's gas limit cannot exhaust more
