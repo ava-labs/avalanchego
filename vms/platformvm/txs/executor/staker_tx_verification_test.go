@@ -610,7 +610,7 @@ func TestGetValidatorRules(t *testing.T) {
 					HeliconMinStakeDuration: heliconMinStakeDuration,
 					MaxStakeDuration:        maxStakeDuration,
 					MinDelegationFee:        minDelegationFee,
-					UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, time.Time{}),
+					UpgradeConfig:           upgradetest.GetConfig(upgradetest.Helicon),
 				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,
