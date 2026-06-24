@@ -1066,8 +1066,7 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	require.Equal(t, blk2.ID(), rcv.lastAccepted(rcvCtx, t), "receiver last-accepted before verify")
 
 	// The correct marker verifies during bootstrapping.
-	blk3Bytes, err := rlp.EncodeToBytes(blk3.EthBlock())
-	require.NoError(t, err, "rlp.EncodeToBytes(blk3)")
+	blk3Bytes := blk3.Bytes()
 	good, err := rcv.ParseBlock(rcvCtx, blk3Bytes)
 	require.NoErrorf(t, err, "%T.ParseBlock(blk3)", rcv.VM)
 	require.NoErrorf(t, rcv.VerifyBlock(rcvCtx, nil, good), "%T.VerifyBlock(blk3) during bootstrapping", rcv.VM)
