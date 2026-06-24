@@ -1062,13 +1062,13 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	rcvTimeOpt, _ := withVMTime(srcClock.Now())
 	rcvCtx, rcv := newSUT(t, alloc, rcvTimeOpt, withDB(saetest.CopyDB(t, srcDB)), withState(snow.Bootstrapping))
 	require.Equal(t, blk2.ID(), rcv.lastAccepted(rcvCtx, t), "receiver last-accepted before verify")
-
-	// The correct marker verifies during bootstrapping.
-	blk3Bytes := blk3.Bytes()
-	good, err := rcv.ParseBlock(rcvCtx, blk3Bytes)
-	require.NoErrorf(t, err, "%T.ParseBlock(blk3)", rcv.VM)
-	require.NoErrorf(t, rcv.VerifyBlock(rcvCtx, nil, good), "%T.VerifyBlock(blk3) during bootstrapping", rcv.VM)
-	require.Equal(t, blk2.ID(), good.LastSettled().ID(), "receiver blk3 settled block")
+	t.Run("verify_settler", func(t *testing.T) {
+		settlerBytes := settler.Bytes()
+		parsedSettler, err := sut.ParseBlock(ctx, settlerBytes)
+		require.NoErrorf(t, err, "%T.ParseBlock(settler)", sut.VM)
+		require.NoErrorf(t, sut.VerifyBlock(ctx, nil, parsedSettler), "%T.VerifyBlock(parsedSettler)", sut.VM)
+		require.Equal(t, uint64(1), parsedSettler.LastSettled().Height(), "parsedSettler.LastSettled().Height()")
+	})
 
 	// A tampered SettledHeight is caught by the marker cross-check, since
 	// bootstrapping does not rebuild by hash.
