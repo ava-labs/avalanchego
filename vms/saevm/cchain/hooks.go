@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
@@ -182,20 +181,19 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 }
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
-	e := customtypes.GetHeaderExtra(h)
+	he := customtypes.GetHeaderExtra(h)
+	if he.SettledHeight == nil ||
+		he.SettledGasUnix == nil ||
+		he.SettledGasNumerator == nil ||
+		he.SettledExcess == nil {
+		return hook.Settled{}
+	}
 	return hook.Settled{
-		Height:       maybe(e.SettledHeight),
-		GasUnix:      maybe(e.SettledGasUnix),
-		GasNumerator: maybe(e.SettledGasNumerator),
-		Excess:       maybe(e.SettledExcess),
+		Height:       *he.SettledHeight,
+		GasUnix:      *he.SettledGasUnix,
+		GasNumerator: gas.Gas(*he.SettledGasNumerator),
+		Excess:       gas.Gas(*he.SettledExcess),
 	}
-}
-
-func maybe[T any](p *T) T {
-	if p != nil {
-		return *p
-	}
-	return utils.Zero[T]()
 }
 
 func (*hooks) BlockTime(h *types.Header) time.Time {
@@ -494,11 +492,13 @@ func (b *builder) BuildBlock(
 	}
 	header.Extra = warpValidityBytes
 
-	headerExtra := customtypes.GetHeaderExtra(header)
-	headerExtra.SettledHeight = &settled.Height
-	headerExtra.SettledGasUnix = &settled.GasUnix
-	headerExtra.SettledGasNumerator = &settled.GasNumerator
-	headerExtra.SettledExcess = &settled.Excess
+	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
+	he := customtypes.GetHeaderExtra(header)
+	he.SettledHeight = &settled.Height
+	he.SettledGasUnix = &settled.GasUnix
+	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
+	he.SettledExcess = (*uint64)(&settled.Excess)
+
 	return customtypes.NewBlockWithExtData(
 		header,
 		ethTxs,

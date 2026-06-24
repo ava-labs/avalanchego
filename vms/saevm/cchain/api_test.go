@@ -189,8 +189,8 @@ func TestRPCExtras(t *testing.T) {
 		"minPriceExponent":      hexutil.EncodeUint64(uint64(*extra.MinPriceExponent)),
 		"settledHeight":         hexutil.EncodeUint64(*extra.SettledHeight),
 		"settledGasUnix":        hexutil.EncodeUint64(*extra.SettledGasUnix),
-		"settledGasNumerator":   hexutil.EncodeUint64(uint64(*extra.SettledGasNumerator)),
-		"settledExcess":         hexutil.EncodeUint64(uint64(*extra.SettledExcess)),
+		"settledGasNumerator":   hexutil.EncodeUint64(*extra.SettledGasNumerator),
+		"settledExcess":         hexutil.EncodeUint64(*extra.SettledExcess),
 	}
 	numHeaderExtras := reflect.TypeFor[customtypes.HeaderExtra]().NumField()
 	require.Lenf(t, wantHeaderExtras, numHeaderExtras, "%T field count", customtypes.HeaderExtra{})

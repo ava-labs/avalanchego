@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
@@ -40,17 +39,18 @@ func WithHeaderExtra(h *ethtypes.Header, extra *HeaderExtra) *ethtypes.Header {
 // This type uses [HeaderSerializable] to encode and decode the extra fields
 // along with the upstream type for compatibility with existing network blocks.
 type HeaderExtra struct {
-	ExtDataHash         common.Hash
-	ExtDataGasUsed      *big.Int
-	BlockGasCost        *big.Int
-	TimeMilliseconds    *uint64
-	MinDelayExcess      *acp226.DelayExcess
-	TargetExponent      *dynamic.TargetExponent
-	MinPriceExponent    *dynamic.PriceExponent
+	ExtDataHash      common.Hash
+	ExtDataGasUsed   *big.Int
+	BlockGasCost     *big.Int
+	TimeMilliseconds *uint64
+	MinDelayExcess   *acp226.DelayExcess
+	TargetExponent   *dynamic.TargetExponent
+	MinPriceExponent *dynamic.PriceExponent
+
 	SettledHeight       *uint64
 	SettledGasUnix      *uint64
-	SettledGasNumerator *gas.Gas
-	SettledExcess       *gas.Gas
+	SettledGasNumerator *uint64
+	SettledExcess       *uint64
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.
@@ -247,8 +247,8 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.MinPriceExponent = (*uint64)(extras.MinPriceExponent)
 	h.SettledHeight = extras.SettledHeight
 	h.SettledGasUnix = extras.SettledGasUnix
-	h.SettledGasNumerator = (*uint64)(extras.SettledGasNumerator)
-	h.SettledExcess = (*uint64)(extras.SettledExcess)
+	h.SettledGasNumerator = extras.SettledGasNumerator
+	h.SettledExcess = extras.SettledExcess
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -261,8 +261,8 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.MinPriceExponent = (*dynamic.PriceExponent)(h.MinPriceExponent)
 	extras.SettledHeight = h.SettledHeight
 	extras.SettledGasUnix = h.SettledGasUnix
-	extras.SettledGasNumerator = (*gas.Gas)(h.SettledGasNumerator)
-	extras.SettledExcess = (*gas.Gas)(h.SettledExcess)
+	extras.SettledGasNumerator = h.SettledGasNumerator
+	extras.SettledExcess = h.SettledExcess
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -332,17 +332,10 @@ type HeaderSerializable struct {
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinPriceExponent *uint64 `json:"minPriceExponent" rlp:"optional"`
 
-	// SettledHeight was added by Helicon and is ignored in legacy headers.
-	SettledHeight *uint64 `json:"settledHeight" rlp:"optional"`
-
-	// SettledGasUnix was added by Helicon and is ignored in legacy headers.
-	SettledGasUnix *uint64 `json:"settledGasUnix" rlp:"optional"`
-
-	// SettledGasNumerator was added by Helicon and is ignored in legacy headers.
+	SettledHeight       *uint64 `json:"settledHeight"       rlp:"optional"`
+	SettledGasUnix      *uint64 `json:"settledGasUnix"      rlp:"optional"`
 	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
-
-	// SettledExcess was added by Helicon and is ignored in legacy headers.
-	SettledExcess *uint64 `json:"settledExcess" rlp:"optional"`
+	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
 }
 
 // field type overrides for gencodec

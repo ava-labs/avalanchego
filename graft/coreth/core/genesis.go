@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/libevm/common"
@@ -351,8 +350,8 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 			headerExtra.MinPriceExponent = new(dynamic.PriceExponent)
 			headerExtra.SettledHeight = new(uint64)
 			headerExtra.SettledGasUnix = new(uint64)
-			headerExtra.SettledGasNumerator = new(gas.Gas)
-			headerExtra.SettledExcess = new(gas.Gas)
+			headerExtra.SettledGasNumerator = new(uint64)
+			headerExtra.SettledExcess = new(uint64)
 		}
 	}
 

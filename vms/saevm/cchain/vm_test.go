@@ -94,9 +94,30 @@ type (
 		networkID  uint32
 		validators *warptest.Validators
 		now        func() time.Time
+		db         database.Database
+		state      snow.State
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withState controls the consensus state the SUT's VM is left in after
+// initialization. Defaults to [snow.NormalOp]. Use [snow.Bootstrapping] to
+// model a node that is still catching up and has not yet entered normal
+// operation (e.g. verifying blocks received from peers during bootstrap).
+func withState(state snow.State) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.state = state
+	})
+}
+
+// withDB initializes the SUT's VM against an existing database rather than a
+// fresh one, enabling restart simulations that reuse a prior VM's persisted
+// state.
+func withDB(db database.Database) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.db = db
+	})
+}
 
 // withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
 // balance to each address, leaving the rest of the genesis allocation intact.
@@ -139,15 +160,18 @@ func withNetworkID(id uint32) sutOption {
 	})
 }
 
-// withTime fixes the SUT's clock at now, controlling the block-building and
-// consensus time of both the cchain hooks and the underlying [sae.VM].
-func withTime(now time.Time) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.now = func() time.Time { return now }
+// withVMTime fixes the SUT's clock at startTime and returns a handle that lets
+// the test move the clock forward (e.g. past Tau to settle a block).
+func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
+	c := saetest.NewClock(startTime, time.Millisecond)
+	opt := options.Func[sutConfig](func(cfg *sutConfig) {
+		cfg.now = c.Now
 	})
+	return opt, c
 }
 
-// newSUT initializes a cchain [VM], transitions it to [snow.NormalOp], and
+// newSUT initializes a cchain [VM], transitions it to the configured
+// [snow.State] (default [snow.NormalOp]), and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
 // [NewClient] expects.
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
@@ -169,13 +193,15 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			networkID:  constants.UnitTestID,
 			validators: warptest.NewValidators(tb, 0),
 			now:        time.Now,
+			db:         memdb.New(),
+			state:      snow.NormalOp,
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
 			pushGossipPeriod: 100 * time.Millisecond,
 			now:              cfg.now,
 		}
-		db = memdb.New()
+		db = cfg.db
 	)
 
 	// The VM and shared memory MUST share an underlying database so that
@@ -218,7 +244,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	require.NoErrorf(tb, err, "%T.LastAccepted()", vm)
 	require.NoErrorf(tb, vm.SetPreference(ctx, lastAcceptedID, nil), "%T.SetPreference()", vm)
 
-	require.NoErrorf(tb, vm.SetState(ctx, snow.NormalOp), "%T.SetState(%s)", vm, snow.NormalOp)
+	require.NoErrorf(tb, vm.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
 	// need to treat our node as a special case.
@@ -382,7 +408,34 @@ func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blo
 	tb.Helper()
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
-	return s.runConsensusLoop(ctx, tb)
+	blk := s.runConsensusLoop(ctx, tb)
+	s.waitForTxPoolStateUpdate(ctx, tb, t)
+	return blk
+}
+
+// waitForTxPoolStateUpdate blocks until the txpool's verification state has
+// been updated to reflect t's executed block.
+func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx.Tx) {
+	tb.Helper()
+
+	// Bound the wait so buggy code that never advances the pool fails fast with
+	// a clear message rather than hanging until the test-wide timeout.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+
+	// The pool updates the verification state atomically with evicting the
+	// included tx, so observing the eviction guarantees the state has been
+	// updated.
+	for s.txpool.Has(t.ID()) {
+		select {
+		case <-ctx.Done():
+			require.NoErrorf(tb, ctx.Err(), "waiting for txpool to evict %s", t.ID())
+		case <-ticker.C:
+		}
+	}
 }
 
 // assertTxAccepted asserts that [Client.GetTx] returns the given tx at the
@@ -1051,7 +1104,66 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	// timestamps, which makes the hash check fail. sae's hash-mismatch error is
 	// unexported, so match on its text rather than the sentinel.
 	err = sut.VerifyBlock(ctx, nil, parsed)
-	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
+	require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
+}
+
+// During bootstrapping [VM.VerifyBlock] does not rebuild blocks, so it
+// cross-checks the header's settled marker ([hooks.SettledBy]) against the
+// recomputed last-settled block, returning errSettledHeightMismatch on
+// disagreement. This asserts a correct marker passes and a tampered one fails.
+func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
+	key := txtest.NewKey(t)
+	alloc := withMaxAllocFor(key.EthAddress())
+
+	timeOpt, clock := withVMTime(upgrade.InitiallyActiveTime)
+	db := memdb.New()
+	ctx, node := newSUT(t, alloc, timeOpt, withDB(db))
+	w := newWallet(key, node.ctx, node.Client)
+
+	// settled is accepted; it is settled by the (non-genesis) marker settler
+	// carries.
+	settled := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, uint64(1), settled.Height(), "settled height")
+
+	// settler settles settled but is built without being accepted, modelling a
+	// block later received from a peer while the node is bootstrapping.
+	clock.AdvanceToSettle(ctx, t, settled)
+	require.NoErrorf(t, node.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", node.Client)
+	settler := node.buildVerify(ctx, t, node.lastAccepted(ctx, t))
+	require.Equal(t, uint64(2), settler.Height(), "settler height")
+	require.Equal(t, settled.ID(), settler.LastSettled().ID(), "settler settled block")
+
+	// Restart the node: shut the VM down and reopen a fresh one on the same DB,
+	// re-entering bootstrapping as a node does on startup. The same clock carries
+	// over. The restarted VM has last-accepted settled and has never seen settler.
+	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withState(snow.Bootstrapping))
+	require.Equal(t, settled.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
+
+	t.Run("valid_marker_verifies", func(t *testing.T) {
+		settlerBytes := settler.Bytes()
+		parsed, err := restarted.ParseBlock(restartedCtx, settlerBytes)
+		require.NoErrorf(t, err, "%T.ParseBlock(settler)", restarted.VM)
+		require.NoErrorf(t, restarted.VerifyBlock(restartedCtx, nil, parsed), "%T.VerifyBlock(settler) during bootstrapping", restarted.VM)
+		require.Equal(t, settled.ID(), parsed.LastSettled().ID(), "settler settled block")
+	})
+
+	t.Run("tampered_marker_rejected", func(t *testing.T) {
+		// A tampered SettledHeight is caught by the marker cross-check, since
+		// bootstrapping does not rebuild by hash.
+		hdr := settler.Header()
+		extra := customtypes.GetHeaderExtra(hdr)
+		require.NotNil(t, extra.SettledHeight, "settler SettledHeight")
+		extra.SettledHeight = new(uint64)
+		tampered := settler.EthBlock().WithSeal(hdr)
+		tamperedBytes, err := rlp.EncodeToBytes(tampered)
+		require.NoError(t, err, "rlp.EncodeToBytes(tampered settler)")
+
+		parsed, err := restarted.ParseBlock(restartedCtx, tamperedBytes)
+		require.NoErrorf(t, err, "%T.ParseBlock(tampered settler)", restarted.VM)
+		err = restarted.VerifyBlock(restartedCtx, nil, parsed)
+		require.ErrorContainsf(t, err, "settled height mismatch", "%T.VerifyBlock(tampered settler)", restarted.VM)
+	})
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
@@ -1064,7 +1176,8 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 		wantMilliseconds = 1_700_000_000_123
 		wantSeconds      = wantMilliseconds / 1000
 	)
-	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), withTime(time.UnixMilli(wantMilliseconds)))
+	timeOpt, _ := withVMTime(time.UnixMilli(wantMilliseconds))
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt)
 
 	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
 	// VerifyBlock rebuilds via BlockTime(header) and requires a matching hash, so
