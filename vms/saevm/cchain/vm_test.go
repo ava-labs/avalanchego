@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"maps"
+	"math"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -50,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -425,6 +427,23 @@ func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.I
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
 	require.NoErrorf(tb, s.VerifyBlock(ctx, blockCtx, blk), "%T.VerifyBlock()", s.VM)
 	return blk
+}
+
+// verifyTampered re-seals valid with a mutated header extra and returns the
+// VerifyBlock error, exercising rebuild-and-compare against the tampered field.
+func (s *SUT) verifyTampered(ctx context.Context, tb testing.TB, valid *blocks.Block, tamper func(*customtypes.HeaderExtra)) error {
+	tb.Helper()
+
+	hdr := valid.Header()
+	extra := customtypes.GetHeaderExtra(hdr)
+	tamper(extra)
+	customtypes.SetHeaderExtra(hdr, extra)
+
+	buf, err := rlp.EncodeToBytes(valid.EthBlock().WithSeal(hdr))
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(tampered block)")
+	parsed, err := s.ParseBlock(ctx, buf)
+	require.NoErrorf(tb, err, "%T.ParseBlock(tampered block)", s.VM)
+	return s.VerifyBlock(ctx, nil, parsed)
 }
 
 // wallet builds and signs cross-chain transactions on behalf of a single key.
@@ -956,8 +975,8 @@ func TestParseBlock(t *testing.T) {
 	}
 }
 
-// TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a received
-// block whose Header.Time disagrees with TimeMilliseconds.
+// TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a block
+// whose Header.Time disagrees with TimeMilliseconds.
 func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	key := txtest.NewKey(t)
 	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
@@ -966,26 +985,30 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
 	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-	// Bump the seconds encoded in TimeMilliseconds without touching Header.Time,
-	// so Time != TimeMilliseconds/1000 while every other field stays valid.
-	hdr := valid.Header()
-	extra := customtypes.GetHeaderExtra(hdr)
-	require.NotNil(t, extra.TimeMilliseconds, "valid block TimeMilliseconds")
-	mismatched := *extra.TimeMilliseconds + 1000
-	extra.TimeMilliseconds = &mismatched
-	customtypes.SetHeaderExtra(hdr, extra)
+	// Bump TimeMilliseconds without touching Header.Time so they disagree.
+	err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
+		require.NotNil(t, e.TimeMilliseconds, "valid block TimeMilliseconds")
+		mismatched := *e.TimeMilliseconds + 1000
+		e.TimeMilliseconds = &mismatched
+	})
+	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
+}
 
-	malformed := valid.EthBlock().WithSeal(hdr)
-	buf, err := rlp.EncodeToBytes(malformed)
-	require.NoError(t, err, "rlp.EncodeToBytes(malformed block)")
+// TestVerifyBlockRejectsCheatedMinPriceExponent verifies that the VM rejects a
+// block claiming a MinPriceExponent beyond the per-block step.
+func TestVerifyBlockRejectsCheatedMinPriceExponent(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
 
-	parsed, err := sut.ParseBlock(ctx, buf)
-	require.NoError(t, err, "vm.ParseBlock(malformed block)")
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-	// When VerifyBlock rebuilds the parsed block, it recomputes the header
-	// timestamps, which makes the hash check fail. sae's hash-mismatch error is
-	// unexported, so match on its text rather than the sentinel.
-	err = sut.VerifyBlock(ctx, nil, parsed)
+	// Claim an exponent beyond what one block may move it.
+	err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
+		cheated := dynamic.PriceExponent(math.MaxUint64)
+		e.MinPriceExponent = &cheated
+	})
 	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
 }
 
@@ -1009,6 +1032,32 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 	hdr := blk.Header()
 	require.Equal(t, uint64(wantSeconds), hdr.Time, "built block Header.Time (seconds)")
 	require.Equal(t, uint64(wantMilliseconds), customtypes.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
+}
+
+// TestMinPriceExponentFlatWithoutVote verifies that without a node vote the
+// price floor stays at its initial value: each block carries the parent's
+// exponent unchanged, so the exponent stays 0 and BaseFee holds at 1 wei.
+func TestMinPriceExponentFlatWithoutVote(t *testing.T) {
+	const numBlocks = 3
+	keys := make([]*secp256k1.PrivateKey, numBlocks)
+	addrs := make([]common.Address, numBlocks)
+	for i := range keys {
+		keys[i] = txtest.NewKey(t)
+		addrs[i] = keys[i].EthAddress()
+	}
+	ctx, sut := newSUT(t, withMaxAllocFor(addrs...)) // no withPriceTarget, no vote
+
+	wantBaseFee := new(big.Int).SetUint64(uint64(initialPriceExponent.Price()))
+	for i, sk := range keys {
+		w := newWallet(sk, sut.ctx, sut.Client)
+		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+		header := blk.EthBlock().Header()
+
+		exp := customtypes.GetHeaderExtra(header).MinPriceExponent
+		require.NotNilf(t, exp, "block %d MinPriceExponent", i+1)
+		assert.Equalf(t, initialPriceExponent, *exp, "block %d MinPriceExponent", i+1)
+		assert.Equalf(t, wantBaseFee, header.BaseFee, "block %d BaseFee", i+1)
+	}
 }
 
 // TestRampMinPriceExponent verifies that a node's ACP-283 vote ramps the gas
@@ -1037,7 +1086,6 @@ func TestRampMinPriceExponent(t *testing.T) {
 		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 		header := blk.EthBlock().Header()
 
-		require.NotNilf(t, header.BaseFee, "block %d BaseFee", i+1)
 		wantBaseFee := new(big.Int).SetUint64(uint64(prevExp.Price()))
 		assert.Equalf(t, wantBaseFee, header.BaseFee, "block %d BaseFee", i+1)
 

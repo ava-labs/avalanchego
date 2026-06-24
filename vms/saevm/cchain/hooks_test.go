@@ -4,25 +4,18 @@
 package cchain
 
 import (
-	"math"
-	"math/big"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 )
 
 // When TimeMilliseconds is unset, BlockTime falls back to Header.Time's seconds.
@@ -37,96 +30,6 @@ func TestBlockTime(t *testing.T) {
 	require.Equal(t, int64(testTimestampSeconds)*1000, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
 	// Documented invariant: BlockTime(h).Unix() == h.Time.
 	require.Equal(t, int64(testTimestampSeconds), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
-}
-
-func TestBuildHeaderMinPriceExponent(t *testing.T) {
-	const parentExponent dynamic.PriceExponent = 1000
-	parentNoExponent := &types.Header{Number: big.NewInt(0)}
-	parentWith := customtypes.WithHeaderExtra(
-		&types.Header{Number: big.NewInt(0)},
-		&customtypes.HeaderExtra{MinPriceExponent: utils.PointerTo(parentExponent)},
-	)
-
-	tests := []struct {
-		name    string
-		parent  *types.Header
-		desired *dynamic.PriceExponent
-		want    dynamic.PriceExponent
-	}{
-		{
-			name:   "no_parent_no_desired_seeds_initial",
-			parent: parentNoExponent,
-			want:   initialPriceExponent,
-		},
-		{
-			name:   "parent_set_no_desired_carries",
-			parent: parentWith,
-			want:   parentExponent,
-		},
-		{
-			name:    "desired_within_cap_applied",
-			parent:  parentWith,
-			desired: utils.PointerTo(parentExponent + 500),
-			want:    parentExponent + 500,
-		},
-		{
-			name:    "desired_above_clamped",
-			parent:  parentWith,
-			desired: utils.PointerTo(dynamic.PriceExponent(math.MaxUint64)),
-			want:    parentExponent.Toward(utils.PointerTo(dynamic.PriceExponent(math.MaxUint64))),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newHooks(snowtest.Context(t, snowtest.CChainID), nil, txpool.NewPending(), time.Now, desiredParams{priceExponent: tt.desired})
-			header, err := h.BuildHeader(tt.parent)
-			require.NoError(t, err)
-			got := customtypes.GetHeaderExtra(header).MinPriceExponent
-			assert.Equalf(t, &tt.want, got, "BuildHeader()")
-		})
-	}
-}
-
-func TestBlockRebuilderFromMinPriceExponent(t *testing.T) {
-	const parentExponent dynamic.PriceExponent = 1000
-	parent := customtypes.WithHeaderExtra(
-		&types.Header{Number: big.NewInt(0)},
-		&customtypes.HeaderExtra{MinPriceExponent: utils.PointerTo(parentExponent)},
-	)
-
-	tests := []struct {
-		name    string
-		claimed dynamic.PriceExponent
-		want    dynamic.PriceExponent
-	}{
-		{
-			name:    "honest_claim_within_cap_reproduces",
-			claimed: parentExponent + 500,
-			want:    parentExponent + 500,
-		},
-		{
-			name:    "cheated_claim_above_step_clamps",
-			claimed: math.MaxUint64,
-			want:    parentExponent.Toward(utils.PointerTo(dynamic.PriceExponent(math.MaxUint64))),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			block := cchaintest.NewTestBlock(t,
-				cchaintest.WithNumber(1),
-				cchaintest.WithParent(parent.Hash()),
-				cchaintest.WithMinPriceExponent(tt.claimed),
-			)
-			h := newHooks(snowtest.Context(t, snowtest.CChainID), nil, txpool.NewPending(), time.Now, desiredParams{})
-			rb, err := h.BlockRebuilderFrom(block)
-			require.NoError(t, err)
-			rebuilt, err := rb.BuildHeader(parent)
-			require.NoError(t, err)
-			got := customtypes.GetHeaderExtra(rebuilt).MinPriceExponent
-			require.NotNil(t, got)
-			assert.Equalf(t, tt.want, *got, "rebuilder BuildHeader()")
-		})
-	}
 }
 
 func TestAncestorInputIDs(t *testing.T) {
