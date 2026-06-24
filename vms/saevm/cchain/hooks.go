@@ -351,9 +351,7 @@ func (*builder) BuildBlock(
 	// TODO(StephenButtolph): Encode warp predicate results in the header.
 	_ = blockCtx
 
-	// Encode the settled block marker into the header so [hooks.SettledBy] can
-	// recover it. HeaderExtra stores plain uint64 to keep coreth ignorant of
-	// SAE types.
+	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
 	he := customtypes.GetHeaderExtra(header)
 	he.SettledHeight = &settled.Height
 	he.SettledGasUnix = &settled.GasUnix

@@ -104,10 +104,7 @@ func TestAncestorInputIDs(t *testing.T) {
 }
 
 // Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
-// writes into the header, and returns the zero marker when the header carries
-// none. The all-zero marker is encoded as non-nil zero pointers, distinct from
-// an absent marker. The RLP codec for these header fields is covered by coreth's
-// customtypes tests.
+// writes into the header, and returns the zero marker when the header carries none.
 func TestSettledBy(t *testing.T) {
 	// built returns the header of a block built carrying the given settled marker.
 	built := func(t *testing.T, settled hook.Settled) *types.Header {

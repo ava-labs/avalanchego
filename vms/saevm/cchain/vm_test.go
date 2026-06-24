@@ -158,12 +158,8 @@ func withNetworkID(id uint32) sutOption {
 	})
 }
 
-// withVMTime fixes the SUT's clock at startTime, controlling the block-building
-// and consensus time of both the cchain hooks and the underlying [sae.VM], and
-// returns a handle that lets the test move the clock forward (e.g. past Tau to
-// settle a real block). cchain records block timestamps at millisecond
-// resolution (see [hooks.BlockTime]), so the clock rounds settle targets up to
-// the next millisecond.
+// withVMTime fixes the SUT's clock at startTime and returns a handle that lets
+// the test move the clock forward (e.g. past Tau to settle a block).
 func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	c := saetest.NewClock(startTime, time.Millisecond)
 	opt := options.Func[sutConfig](func(cfg *sutConfig) {

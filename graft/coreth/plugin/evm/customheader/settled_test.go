@@ -22,29 +22,29 @@ func settledHeader(extra *customtypes.HeaderExtra) *types.Header {
 
 func TestVerifySettled(t *testing.T) {
 	tests := []struct {
-		name        string
-		header      *types.Header
-		expectedErr error
+		name    string
+		header  *types.Header
+		wantErr error
 	}{
 		{
-			name:        "settled_height_should_fail",
-			header:      settledHeader(&customtypes.HeaderExtra{SettledHeight: utils.PointerTo[uint64](1)}),
-			expectedErr: ErrSettledMarkerSet,
+			name:    "settled_height_should_fail",
+			header:  settledHeader(&customtypes.HeaderExtra{SettledHeight: utils.PointerTo[uint64](1)}),
+			wantErr: errSettledMarkerSet,
 		},
 		{
-			name:        "settled_gas_unix_should_fail",
-			header:      settledHeader(&customtypes.HeaderExtra{SettledGasUnix: utils.PointerTo[uint64](1)}),
-			expectedErr: ErrSettledMarkerSet,
+			name:    "settled_gas_unix_should_fail",
+			header:  settledHeader(&customtypes.HeaderExtra{SettledGasUnix: utils.PointerTo[uint64](1)}),
+			wantErr: errSettledMarkerSet,
 		},
 		{
-			name:        "settled_gas_numerator_should_fail",
-			header:      settledHeader(&customtypes.HeaderExtra{SettledGasNumerator: utils.PointerTo[uint64](1)}),
-			expectedErr: ErrSettledMarkerSet,
+			name:    "settled_gas_numerator_should_fail",
+			header:  settledHeader(&customtypes.HeaderExtra{SettledGasNumerator: utils.PointerTo[uint64](1)}),
+			wantErr: errSettledMarkerSet,
 		},
 		{
-			name:        "settled_excess_should_fail",
-			header:      settledHeader(&customtypes.HeaderExtra{SettledExcess: utils.PointerTo[uint64](1)}),
-			expectedErr: ErrSettledMarkerSet,
+			name:    "settled_excess_should_fail",
+			header:  settledHeader(&customtypes.HeaderExtra{SettledExcess: utils.PointerTo[uint64](1)}),
+			wantErr: errSettledMarkerSet,
 		},
 		{
 			name: "all_settled_fields_should_fail",
@@ -54,7 +54,7 @@ func TestVerifySettled(t *testing.T) {
 				SettledGasNumerator: utils.PointerTo[uint64](3),
 				SettledExcess:       utils.PointerTo[uint64](4),
 			}),
-			expectedErr: ErrSettledMarkerSet,
+			wantErr: errSettledMarkerSet,
 		},
 		{
 			name:   "all_nil_should_work",
@@ -65,7 +65,7 @@ func TestVerifySettled(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := VerifySettled(tt.header)
-			require.ErrorIs(t, err, tt.expectedErr, "VerifySettled()")
+			require.ErrorIs(t, err, tt.wantErr, "VerifySettled()")
 		})
 	}
 }
