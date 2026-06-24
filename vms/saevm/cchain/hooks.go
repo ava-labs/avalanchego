@@ -216,7 +216,6 @@ type builder struct {
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	// TODO(StephenButtolph): Encode the ACP-176 target excess in the header.
-	// TODO(StephenButtolph): Encode the ACP-183 min price excess in the header.
 	// TODO(StephenButtolph): Enforce the minimum block time here.
 	now := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
 	minPriceExponent := priceExponent(parent).Toward(b.desired.priceExponent)
