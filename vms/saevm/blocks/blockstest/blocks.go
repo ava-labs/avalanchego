@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
 // An EthBlockOption configures the default block properties created by
@@ -138,8 +139,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, al
 	require.NoErrorf(tb, tdb.Commit(hash, true), "%T.Commit(core.SetupGenesisBlock(...))", tdb)
 
 	h := hookstest.NewStub(conf.gasTarget)
-	xdb, err := h.ExecutionResultsDB("") // ephemeral is fine, just need [database.ErrNotFound] to mark as synchronous
-	require.NoError(tb, err, "hookstest.ExecutionResultsDB()")
+	xdb := saetest.NewExecutionResultsDB()
 	b, err := blocks.RestoreSettledBlock(h, gen.ToBlock(), loggingtest.New(tb, logging.Warn), db, xdb, config)
 	require.NoError(tb, err, "blocks.RestoreSettledBlock()")
 	return b

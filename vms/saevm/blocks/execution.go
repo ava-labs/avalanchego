@@ -251,20 +251,20 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
-// said function was originally called.
+// said function was originally called.  If no execution results are found, the
+// block is assumed to be synchronous.
 //
-// If no execution results are found, the block is assumed to be synchronous.
+// Any error returned is indicative of a corrupted database.
 func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	e, err := loadExecutionResults(xdb, b.NumberU64())
-	switch {
-	case errors.Is(err, database.ErrNotFound):
-		if e, err = b.synchronousExecutionResults(hooks); err != nil {
-			return err
-		}
+	if errors.Is(err, database.ErrNotFound) {
+		e, err = b.synchronousExecutionResults(hooks)
 		b.synchronous = true
-	case err != nil:
+	}
+	if err != nil {
 		return err
 	}
+
 	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
 	if err := e.receipts.DeriveFields(
 		chainConfig,
