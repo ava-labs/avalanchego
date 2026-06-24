@@ -328,7 +328,7 @@ type HeaderSerializable struct {
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	TargetExponent *uint64 `json:"targetExponent" rlp:"optional"`
 
-	// MinPriceExponent was added by Helicon and is ignored in legacy headers.
+	// MinPriceExponent was added by Helicon (ACP-283) and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinPriceExponent *uint64 `json:"minPriceExponent" rlp:"optional"`
 
