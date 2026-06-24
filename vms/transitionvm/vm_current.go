@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+var _ block.StateSyncableVM = (*VM)(nil)
+
 func (v *VM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
 	v.transitionLock.RLock()
 	defer v.transitionLock.RUnlock()
@@ -72,4 +74,39 @@ func (v *VM) Shutdown(ctx context.Context) error {
 	defer v.transitionLock.RUnlock()
 
 	return v.current.chain.Shutdown(ctx)
+}
+
+func (v *VM) StateSyncEnabled(ctx context.Context) (bool, error) {
+	v.transitionLock.RLock()
+	defer v.transitionLock.RUnlock()
+
+	return v.current.chain.StateSyncEnabled(ctx)
+}
+
+func (v *VM) GetOngoingSyncStateSummary(ctx context.Context) (block.StateSummary, error) {
+	v.transitionLock.RLock()
+	defer v.transitionLock.RUnlock()
+
+	return v.current.chain.GetOngoingSyncStateSummary(ctx)
+}
+
+func (v *VM) GetLastStateSummary(ctx context.Context) (block.StateSummary, error) {
+	v.transitionLock.RLock()
+	defer v.transitionLock.RUnlock()
+
+	return v.current.chain.GetLastStateSummary(ctx)
+}
+
+func (v *VM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
+	v.transitionLock.RLock()
+	defer v.transitionLock.RUnlock()
+
+	return v.current.chain.ParseStateSummary(ctx, summaryBytes)
+}
+
+func (v *VM) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
+	v.transitionLock.RLock()
+	defer v.transitionLock.RUnlock()
+
+	return v.current.chain.GetStateSummary(ctx, summaryHeight)
 }
