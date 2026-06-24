@@ -141,8 +141,7 @@ func (t *Tx) InputIDs() set.Set[ids.ID] {
 //
 // blockGasLimit is the block's gas limit x. Atomic txs live in ExtData, which the
 // EVM byte budget ignores, so the gas is floored at [blocklimit.MinGasForBytes]
-// to price each tx for the body share it occupies. A zero blockGasLimit disables
-// the floor (e.g. mempool ordering, before the target block is known).
+// to price each tx for the body share it occupies.
 func (t *Tx) AsOp(avaxAssetID ids.ID, blockGasLimit uint64) (hook.Op, error) {
 	g, err := gasUsed(t.Unsigned)
 	if err != nil {
