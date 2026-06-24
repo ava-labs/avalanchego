@@ -1008,20 +1008,27 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 // TestRampMinPriceExponent verifies that each built block raises
 // MinPriceExponent toward the node's ACP-283 vote.
 func TestRampMinPriceExponent(t *testing.T) {
-	sk := txtest.NewKey(t)
+	const numBlocks = 3
+	// A distinct key per block keeps every tx at nonce 0, so none depends on a
+	// prior block's state and races the txpool's async chain-head update.
+	keys := make([]*secp256k1.PrivateKey, numBlocks)
+	addrs := make([]common.Address, numBlocks)
+	for i := range keys {
+		keys[i] = txtest.NewKey(t)
+		addrs[i] = keys[i].EthAddress()
+	}
 	ctx, sut := newSUT(t,
-		withGenesisAllocFor(sk.EthAddress()),
+		withGenesisAllocFor(addrs...),
 		withPriceTarget(1_000_000_000), // 1 nAVAX target.
 	)
-	w := newWallet(sk, sut.ctx, sut.Client)
 
-	const numBlocks = 3
 	prev := InitialPriceExponent
-	for i := 1; i <= numBlocks; i++ {
+	for i, sk := range keys {
+		w := newWallet(sk, sut.ctx, sut.Client)
 		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 		got := customtypes.GetHeaderExtra(blk.EthBlock().Header()).MinPriceExponent
-		require.NotNilf(t, got, "block %d MinPriceExponent", i)
-		require.Greaterf(t, *got, prev, "block %d MinPriceExponent should exceed parent's", i)
+		require.NotNilf(t, got, "block %d MinPriceExponent", i+1)
+		require.Greaterf(t, *got, prev, "block %d MinPriceExponent should exceed parent's", i+1)
 		prev = *got
 	}
 }
