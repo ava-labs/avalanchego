@@ -188,6 +188,7 @@ go_test(
         "//utils/logging/loggingtest",
         "//utils/set",
         "//utils/timer/mockable",
+        "//utils/units",
         "//version",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",

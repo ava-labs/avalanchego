@@ -314,7 +314,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		// Unlike the RLP-listed EVM txs above, ops are concatenated into one
 		// length-prefixed ExtData blob: count each op's size, plus
 		// [blocklimit.OpSlicePrefix] once for the first.
-		opBytes := uint64(tx.Size())
+		opBytes := uint64(tx.Size()) //#nosec G115 -- size is a non-negative byte length
 		if len(includedOps) == 0 {
 			opBytes += blocklimit.OpSlicePrefix
 		}
