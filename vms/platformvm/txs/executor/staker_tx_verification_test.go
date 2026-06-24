@@ -715,7 +715,7 @@ func TestGetDelegatorRules(t *testing.T) {
 					MinStakeDuration:        minStakeDuration,
 					HeliconMinStakeDuration: heliconMinStakeDuration,
 					MaxStakeDuration:        maxStakeDuration,
-					UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(upgradetest.Granite, time.Time{}),
+					UpgradeConfig:           upgradetest.GetConfig(upgradetest.Granite),
 				},
 				Ctx: &snow.Context{
 					AVAXAssetID: avaxAssetID,
