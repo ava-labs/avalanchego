@@ -112,6 +112,12 @@ type VM struct {
 
 	// acceptedBlocksSlotHistogram reports the slots that accepted blocks were
 	// proposed in.
+	// The histogram has the following buckets:
+	// 0, 1, 2, +Inf
+	// 0 means the block was proposed in the same slot as the expected proposer.
+	// 1 means the block was proposed in the next slot after the expected proposer.
+	// 2 means the block was proposed in the second slot after the expected proposer.
+	// +Inf means the block was proposed more than 2 slots after the expected proposer.
 	acceptedBlocksSlotHistogram prometheus.Histogram
 
 	// lastAcceptedTimestampGaugeVec reports timestamps for the last-accepted
