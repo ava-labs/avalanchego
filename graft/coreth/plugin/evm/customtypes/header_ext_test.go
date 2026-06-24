@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
@@ -180,8 +179,6 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *dynamic.PriceExponent:
 				assertNonZero(t, f)
-			case *gas.Gas:
-				assertNonZero(t, f)
 			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:
 				require.NotEmpty(t, f)
 			default:
@@ -194,7 +191,7 @@ func allFieldsSet[T interface {
 func assertNonZero[T interface {
 	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
 		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header |
-		*acp226.DelayExcess | *dynamic.TargetExponent | *dynamic.PriceExponent | *gas.Gas
+		*acp226.DelayExcess | *dynamic.TargetExponent | *dynamic.PriceExponent
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)
