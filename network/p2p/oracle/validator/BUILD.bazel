@@ -23,15 +23,26 @@ go_library(
 go_test(
     name = "validator_test",
     srcs = [
+        "handler_test.go",
         "http_sidecar_client_test.go",
         "verifier_test.go",
     ],
     embed = [":validator"],
     deps = [
+        "//cache",
+        "//cache/lru",
         "//ids",
+        "//network/p2p",
+        "//network/p2p/acp118",
         "//network/p2p/oracle",
+        "//network/p2p/p2ptest",
+        "//proto/pb/sdk",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/set",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
     ],
 )
