@@ -25,7 +25,11 @@ go_binary(
 
 go_test(
     name = "solanarpc_test",
-    srcs = ["server_test.go"],
+    srcs = [
+        "integration_test.go",
+        "server_test.go",
+        "verifier_test.go",
+    ],
     embed = [":solanarpc_lib"],
     deps = [
         "//network/p2p/oracle",

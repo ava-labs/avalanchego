@@ -30,7 +30,7 @@ func TestHTTPSidecarClient_Accept(t *testing.T) {
 		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{}"))
+		_, _ = w.Write([]byte("{}"))
 	}))
 	defer srv.Close()
 
@@ -48,10 +48,10 @@ func TestHTTPSidecarClient_Accept(t *testing.T) {
 }
 
 func TestHTTPSidecarClient_RejectWithError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"bad event"}`))
+		_, _ = w.Write([]byte(`{"error":"bad event"}`))
 	}))
 	defer srv.Close()
 
@@ -60,14 +60,15 @@ func TestHTTPSidecarClient_RejectWithError(t *testing.T) {
 		Message:       newTestMsg(t),
 		Justification: nil,
 	})
-	require.ErrorContains(t, err, "bad event")
+	require.Errorf(t, err, "expected sidecar error")
+	require.Contains(t, err.Error(), "bad event")
 }
 
 func TestHTTPSidecarClient_RejectEmptyError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("{}"))
+		_, _ = w.Write([]byte("{}"))
 	}))
 	defer srv.Close()
 
@@ -76,11 +77,12 @@ func TestHTTPSidecarClient_RejectEmptyError(t *testing.T) {
 		Message:       newTestMsg(t),
 		Justification: nil,
 	})
-	require.ErrorContains(t, err, "sidecar returned HTTP 400")
+	require.Errorf(t, err, "expected HTTP 400 error")
+	require.Contains(t, err.Error(), "sidecar returned HTTP 400")
 }
 
 func TestHTTPSidecarClient_Unreachable(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	srv.Close() // close immediately so the connection is refused
 
 	c := NewHTTPSidecarClient(srv.URL, nil)
@@ -88,5 +90,6 @@ func TestHTTPSidecarClient_Unreachable(t *testing.T) {
 		Message:       newTestMsg(t),
 		Justification: nil,
 	})
-	require.ErrorContains(t, err, "sidecar unreachable")
+	require.Errorf(t, err, "expected unreachable error")
+	require.Contains(t, err.Error(), "sidecar unreachable")
 }

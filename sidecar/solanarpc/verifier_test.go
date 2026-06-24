@@ -30,7 +30,7 @@ const (
 	testSlotV   = uint64(100)
 )
 
-func makeMsg(t *testing.T, sourceAddr string, slot uint64, payload []byte) *oracle.OracleMessage {
+func makeMsg(t *testing.T, sourceAddr string, slot uint64, payload []byte) *oracle.OracleMessage { //nolint:unparam
 	t.Helper()
 	msg, err := oracle.NewOracleMessage("solana", sourceAddr, []byte{1, 2, 3}, slot, 1, payload)
 	require.NoError(t, err)
@@ -93,9 +93,9 @@ func TestSolanaVerifier(t *testing.T) {
 			wantErr: "no instruction found for program",
 		},
 		{
-			name: "payload mismatch",
-			rpc:  &stubRPC{Tx: makeValidTx(testProgram, testSlotV, []byte("WRONG"))},
-			msg:  func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
+			name:    "payload mismatch",
+			rpc:     &stubRPC{Tx: makeValidTx(testProgram, testSlotV, []byte("WRONG"))},
+			msg:     func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
 			wantErr: "payload mismatch",
 		},
 		{
@@ -113,7 +113,8 @@ func TestSolanaVerifier(t *testing.T) {
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 			} else {
-				require.ErrorContains(t, err, tt.wantErr)
+				require.Errorf(t, err, "expected error containing %q", tt.wantErr)
+				require.Contains(t, err.Error(), tt.wantErr)
 			}
 		})
 	}

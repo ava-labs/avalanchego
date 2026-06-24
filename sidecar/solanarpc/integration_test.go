@@ -5,7 +5,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,7 +36,11 @@ func fetchRecentMemoTxSig(t *testing.T, rpcURL string) string {
 	})
 	require.NoError(t, err)
 
-	resp, err := http.Post(rpcURL, "application/json", bytes.NewReader(reqBody)) //nolint:noctx
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, rpcURL, bytes.NewReader(reqBody))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -81,7 +84,7 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 
 	// Fetch the full transaction to extract ground truth (slot, program, payload).
 	client := newSolanaClient(rpcURL, nil)
-	tx, err := client.getTransaction(context.Background(), txSig)
+	tx, err := client.getTransaction(t.Context(), txSig)
 	require.NoError(t, err)
 	require.NotNil(t, tx, "transaction not found — the signature returned by getSignaturesForAddress was not retrievable")
 
@@ -116,13 +119,15 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 	t.Run("valid transaction accepted", func(t *testing.T) {
 		msg, err := oracle.NewOracleMessage("solana", memoProgram, []byte{0}, slot, 1, instrData)
 		require.NoError(t, err)
-		require.NoError(t, verifier.Verify(context.Background(), msg, justification))
+		require.NoError(t, verifier.Verify(t.Context(), msg, justification))
 	})
 
 	t.Run("slot off by one rejected", func(t *testing.T) {
 		msg, err := oracle.NewOracleMessage("solana", memoProgram, []byte{0}, slot+1, 1, instrData)
 		require.NoError(t, err)
-		require.ErrorContains(t, verifier.Verify(context.Background(), msg, justification), "slot mismatch")
+		verifyErr := verifier.Verify(t.Context(), msg, justification)
+		require.Errorf(t, verifyErr, "expected slot mismatch error")
+		require.Contains(t, verifyErr.Error(), "slot mismatch")
 	})
 
 	t.Run("payload tampered rejected", func(t *testing.T) {
@@ -131,16 +136,17 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 		tampered[len(tampered)-1] ^= 0xFF
 		msg, err := oracle.NewOracleMessage("solana", memoProgram, []byte{0}, slot, 1, tampered)
 		require.NoError(t, err)
-		require.ErrorContains(t, verifier.Verify(context.Background(), msg, justification), "payload mismatch")
+		verifyErr := verifier.Verify(t.Context(), msg, justification)
+		require.Errorf(t, verifyErr, "expected payload mismatch error")
+		require.Contains(t, verifyErr.Error(), "payload mismatch")
 	})
 
 	t.Run("wrong program rejected", func(t *testing.T) {
 		const systemProgram = "11111111111111111111111111111111"
 		msg, err := oracle.NewOracleMessage("solana", systemProgram, []byte{0}, slot, 1, instrData)
 		require.NoError(t, err)
-		require.ErrorContains(t,
-			verifier.Verify(context.Background(), msg, justification),
-			fmt.Sprintf("no instruction found for program %q", systemProgram),
-		)
+		verifyErr := verifier.Verify(t.Context(), msg, justification)
+		require.Errorf(t, verifyErr, "expected program-not-found error")
+		require.Contains(t, verifyErr.Error(), fmt.Sprintf("no instruction found for program %q", systemProgram))
 	})
 }
