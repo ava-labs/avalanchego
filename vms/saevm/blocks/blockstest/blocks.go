@@ -137,9 +137,11 @@ func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, al
 	require.NoError(tb, err, "core.SetupGenesisBlock()")
 	require.NoErrorf(tb, tdb.Commit(hash, true), "%T.Commit(core.SetupGenesisBlock(...))", tdb)
 
-	b := NewBlock(tb, gen.ToBlock(), nil, nil)
 	h := hookstest.NewStub(conf.gasTarget)
-	require.NoErrorf(tb, b.MarkSynchronous(h), "%T.MarkSynchronous()", b)
+	xdb, err := h.ExecutionResultsDB("") // ephemeral is fine, just need [database.ErrNotFound] to mark as synchronous
+	require.NoError(tb, err, "hookstest.ExecutionResultsDB()")
+	b, err := blocks.RestoreSettledBlock(h, gen.ToBlock(), loggingtest.New(tb, logging.Warn), db, xdb, config)
+	require.NoError(tb, err, "blocks.RestoreSettledBlock()")
 	return b
 }
 

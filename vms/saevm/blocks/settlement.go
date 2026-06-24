@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"slices"
 	"sync/atomic"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
@@ -60,80 +58,6 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 	}
 	close(b.settled)
 	return nil
-}
-
-// MarkSynchronous combines [Block.MarkExecuted] and [Block.MarkSettled], and is
-// reserved for the last pre-SAE block, which MAY be the genesis block. These
-// blocks are, by definition, self-settling so require special treatment as such
-// behaviour is impossible under SAE rules.
-//
-// Arguments required by [Block.MarkExecuted] but not accepted by
-// MarkSynchronous are derived from the block to maintain invariants. The
-// `subSecondBlockTime` argument MUST follow the same constraints as the
-// respective [hook.Points] method.
-//
-// MarkSynchronous and [Block.Synchronous] are not safe for concurrent use. This
-// method MUST therefore be called *before* instantiating the SAE VM.
-//
-// Wherever MarkSynchronous results in different behaviour to
-// [Block.MarkSettled], the respective methods are documented as such. They can
-// otherwise be considered identical.
-//
-// Unlike [Block.MarkExecuted], MarkSynchronous does not call
-// [Block.SetAsHeadBlock], which MUST be done by the caller, i.f.f. the chain
-// has not yet commenced asynchronous execution. A synchronous block's execution
-// results are reconstructed from its header (see [synchronousExecutionResults])
-// and are therefore not persisted to disk.
-func (b *Block) MarkSynchronous(hooks hook.Points) error {
-	e, err := b.synchronousExecutionResults(hooks)
-	if err != nil {
-		return err
-	}
-
-	if err := b.markExecutedAfterDiskArtefacts(e, nil); err != nil {
-		return err
-	}
-	b.synchronous = true
-	return b.markSettled(nil)
-}
-
-// synchronousExecutionResults derives the post-execution artefacts of a
-// synchronous  block directly from its header. Unlike asynchronously executed
-// blocks, synchronous blocks do not persist their execution results to disk,
-// but the executions results are thus available in the header.
-func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
-	ethB := b.EthBlock()
-	target, cfg := hooks.GasConfigAfter(b.Header())
-
-	// The base fee must be capped at [math.MaxUint64] to avoid overflow in the gastime.
-	var baseFee uint64
-	switch bf := ethB.BaseFee(); {
-	case bf == nil:
-		baseFee = 0
-	case bf.IsUint64():
-		baseFee = bf.Uint64()
-	default:
-		baseFee = math.MaxUint64
-	}
-
-	execTime, err := gastime.New(
-		hooks.BlockTime(b.Header()),
-		// Target, excess, and config _after_ are a requirement of
-		// [Block.MarkExecuted].
-		target,
-		gas.Price(baseFee),
-		cfg,
-	)
-	if err != nil {
-		return nil, err
-	}
-	e := &executionResults{
-		byGas:         *execTime.Clone(),
-		receiptRoot:   ethB.ReceiptHash(),
-		stateRootPost: ethB.Root(),
-	}
-	e.baseFee.SetUint64(baseFee)
-	return e, nil
 }
 
 // WaitUntilSettled blocks until either [Block.MarkSettled] is called or the

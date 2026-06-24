@@ -150,18 +150,13 @@ func NewVM[T hook.Transaction](
 	vm.xdb = xdb
 	vm.toClose = append(vm.toClose, &xdb)
 
-	lastSync, err := blocks.New(lastSynchronous, nil, nil, snowCtx.Log)
+	// ==========  Sync -> Async  ==========
+	lastSync, err := blocks.RestoreSettledBlock(hooks, lastSynchronous, snowCtx.Log, db, xdb, chainConfig)
 	if err != nil {
-		return nil, fmt.Errorf("blocks.New([last synchronous], ...): %v", err)
+		return nil, fmt.Errorf("blocks.RestoreSettledBlock([last synchronous]): %v", err)
 	}
-
-	{ // ==========  Sync -> Async  ==========
-		if err := lastSync.MarkSynchronous(hooks); err != nil {
-			return nil, fmt.Errorf("%T{genesis}.MarkSynchronous(): %v", lastSync, err)
-		}
-		if err := canonicaliseLastSynchronous(db, lastSync); err != nil {
-			return nil, err
-		}
+	if err := canonicaliseLastSynchronous(db, lastSync); err != nil {
+		return nil, err
 	}
 
 	rec := &recovery{db, xdb, chainConfig, snowCtx.Log, hooks, cfg, lastSync}

@@ -5,6 +5,7 @@ package blocks
 
 import (
 	"math/big"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/libevm/core/types"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 )
 
 func newEthBlock(num, time uint64, parent *types.Block) *types.Block {
@@ -67,11 +67,9 @@ func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[
 		byNum[n] = b
 		blocks = append(blocks, b)
 		if synchronous {
-			// The target and excess are irrelevant for the purposes of
-			// [newChain], and non-zero sub-second time for genesis is
-			// unnecessary.
-			h := hookstest.NewStub(1)
-			require.NoError(tb, b.MarkSynchronous(h), "MarkSynchronous()")
+			var lastSettledPtr atomic.Pointer[Block]
+			require.NoErrorf(tb, b.MarkSettled(&lastSettledPtr), "MarkSettled()")
+			b.synchronous = true // avoid requiring hooks and DB to mark as synchronous
 		}
 
 		parent = byNum[n]
