@@ -358,13 +358,7 @@ func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blo
 }
 
 // waitForTxPoolStateUpdate blocks until the txpool's verification state has
-// been updated to reflect t's executed block, observed by t's eviction. The pool
-// updates the verification state used by [Txpool.Add] asynchronously, via its
-// ChainHeadEvent subscription, after [blocks.Block.WaitUntilExecuted] has
-// already returned. It does so atomically with evicting the included tx, so
-// observing the eviction guarantees a subsequent [Client.IssueTx] verifies
-// against the post-execution state rather than a stale one (e.g. a nonce that
-// hasn't yet been incremented).
+// been updated to reflect t's executed block.
 func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx.Tx) {
 	tb.Helper()
 
@@ -375,6 +369,10 @@ func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx
 
 	ticker := time.NewTicker(time.Millisecond)
 	defer ticker.Stop()
+	
+	// The pool updates the verification state atomically with evicting the
+	// included tx, so observing the eviction guarantees the state has been
+	// updated.
 	for s.txpool.Has(t.ID()) {
 		select {
 		case <-ctx.Done():
