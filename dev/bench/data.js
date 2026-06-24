@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782320122306,
+  "lastUpdate": 1782327784665,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -34074,6 +34074,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_accept_ms/ggas",
             "value": 737.4924460135092,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Rahul Muttineni",
+            "username": "rahulmutt-ava",
+            "email": "rahul.muttineni@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "dbf0f71dc19642ece69f2c9f73512799a88be27b",
+          "message": "feat(cchain): encode and decode the settled block marker (#5573)\n\nSigned-off-by: Rahul Muttineni <rahul.muttineni@avalabs.org>\nSigned-off-by: Tsvetan Dimitrov (tsvetan.dimitrov@avalabs.org)\nSigned-off-by: Tsvetan Dimitrov <tsvetan.dimitrov23@gmail.com>\nCo-authored-by: Copilot Autofix powered by AI <175728472+Copilot@users.noreply.github.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>\nCo-authored-by: maru <maru.newby@avalabs.org>\nCo-authored-by: Tsvetan Dimitrov <tsvetan.dimitrov23@gmail.com>\nCo-authored-by: Austin Larson <austin.larson@avalabs.org>",
+          "timestamp": "2026-06-24T17:52:49Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/dbf0f71dc19642ece69f2c9f73512799a88be27b"
+        },
+        "date": 1782327778595,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - mgas/s",
+            "value": 28.83873646283421,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - ms/ggas",
+            "value": 34675.583005820845,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_parse_ms/ggas",
+            "value": 66.75768352628504,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_verify_ms/ggas",
+            "value": 34559.40301818931,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
+            "value": 47.581456556158756,
             "unit": "block_accept_ms/ggas"
           }
         ]
