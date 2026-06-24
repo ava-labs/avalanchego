@@ -141,20 +141,20 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		cp.MinPriceExponent = &e
 	}
 	if h.SettledHeight != nil {
-		h := *h.SettledHeight
-		cp.SettledHeight = &h
+		v := *h.SettledHeight
+		cp.SettledHeight = &v
 	}
 	if h.SettledGasUnix != nil {
-		g := *h.SettledGasUnix
-		cp.SettledGasUnix = &g
+		v := *h.SettledGasUnix
+		cp.SettledGasUnix = &v
 	}
 	if h.SettledGasNumerator != nil {
-		g := *h.SettledGasNumerator
-		cp.SettledGasNumerator = &g
+		v := *h.SettledGasNumerator
+		cp.SettledGasNumerator = &v
 	}
 	if h.SettledExcess != nil {
-		e := *h.SettledExcess
-		cp.SettledExcess = &e
+		v := *h.SettledExcess
+		cp.SettledExcess = &v
 	}
 	SetHeaderExtra(dst, cp)
 }
