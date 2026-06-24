@@ -53,6 +53,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -78,6 +79,7 @@ type SUT struct {
 	*VM
 	*Client
 
+	db        database.Database
 	memory    *atomic.Memory
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
@@ -188,6 +190,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), //#nosec G115 -- Known non-negative
 				Difficulty: big.NewInt(0),                              // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
+				BaseFee:    big.NewInt(ethparams.Wei),
 			},
 			nodeID:     ids.GenerateTestNodeID(),
 			networkID:  constants.UnitTestID,
@@ -269,6 +272,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	sut := &SUT{
 		VM:        vm,
 		Client:    NewClient(server.URL),
+		db:        db,
 		memory:    memory,
 		sender:    appSender,
 		ethclient: ethclient.NewClient(ethRPCClient),
@@ -277,6 +281,19 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	appSender.SetSelf(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
 	return ctx, sut
+}
+
+// hooks returns a new [hooks] instance that behaves equivalently to those
+// provided to the sae VM.
+func (s *SUT) hooks() *hooks {
+	return newHooks(
+		s.ctx,
+		s.state,
+		s.chainConfig,
+		s.txpool.Pending,
+		warp.NewStorage(s.db),
+		s.now,
+	)
 }
 
 // appRequest sends request, from the SUT's p2pclient, to the SUT's p2p handler

@@ -24,14 +24,18 @@ import (
 // The VM always sets TimeMilliseconds, so this legacy decode path is only
 // reachable by exercising the hook directly.
 func TestBlockTime(t *testing.T) {
-	const testTimestampSeconds uint64 = 1_700_000_000
+	_, sut := newSUT(t)
+	hooks := sut.hooks()
 
-	header := &types.Header{Time: testTimestampSeconds}
-
-	got := (&hooks{}).BlockTime(header)
-	require.Equal(t, int64(testTimestampSeconds)*1000, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
+	const (
+		unix            = 1_700_000_000
+		unixMilli int64 = unix * 1000
+	)
+	header := &types.Header{Time: unix}
+	got := hooks.BlockTime(header)
+	require.Equal(t, unixMilli, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
 	// Documented invariant: BlockTime(h).Unix() == h.Time.
-	require.Equal(t, int64(testTimestampSeconds), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
+	require.Equal(t, int64(unix), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
 }
 
 func TestAncestorInputIDs(t *testing.T) {
@@ -106,11 +110,14 @@ func TestAncestorInputIDs(t *testing.T) {
 // Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
 // writes into the header, and returns the zero marker when the header carries none.
 func TestSettledBy(t *testing.T) {
+	_, sut := newSUT(t)
+	hooks := sut.hooks()
+
 	// built returns the header of a block built carrying the given settled marker.
 	built := func(t *testing.T, settled hook.Settled) *types.Header {
 		t.Helper()
-		var b builder
-		block, err := b.BuildBlock(&types.Header{}, nil, nil, nil, nil, settled)
+
+		block, err := hooks.BuildBlock(&types.Header{}, nil, nil, nil, nil, settled)
 		require.NoError(t, err, "builder.BuildBlock()")
 		return block.Header()
 	}
@@ -144,8 +151,7 @@ func TestSettledBy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var h hooks
-			require.Equal(t, tt.want, h.SettledBy(tt.header), "hooks.SettledBy()")
+			require.Equal(t, tt.want, hooks.SettledBy(tt.header), "hooks.SettledBy()")
 		})
 	}
 }
