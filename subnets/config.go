@@ -5,6 +5,8 @@ package subnets
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
@@ -13,9 +15,10 @@ import (
 )
 
 var (
-	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
-	errNoParametersSet                  = errors.New("consensus config must have either snowball or simplex parameters set")
-	ErrTooManyConsensusParameters       = errors.New("only one of consensusParameters, snowParameters, or simplexParameters can be set")
+	errAllowedNodesWhenNotValidatorOnly      = errors.New("allowedNodes can only be set when ValidatorOnly is true")
+	errNoParametersSet                       = errors.New("consensus config must have either snowball or simplex parameters set")
+	ErrTooManyConsensusParameters            = errors.New("only one of consensusParameters, snowParameters, or simplexParameters can be set")
+	errProposerWindowDurationNotWholeSeconds = errors.New("proposerWindowDuration must be a non-negative whole number of seconds")
 )
 
 type Config struct {
@@ -52,6 +55,30 @@ type Config struct {
 	// TODO: Move this flag once the proposervm is configurable on a per-chain
 	// basis.
 	ProposerNumHistoricalBlocks uint64 `json:"proposerNumHistoricalBlocks" yaml:"proposerNumHistoricalBlocks"`
+
+	// ProposerWindowDuration is the length of a single proposerVM slot for the
+	// chains in this Subnet. Lowering it shortens the stall that occurs when a
+	// scheduled proposer is offline (faster failover for CFT/PoA L1s), at the
+	// cost of more rejected blocks. If set to 0, the default of 5s is used.
+	//
+	// Must be a whole number of seconds: the proposerVM block timestamp is
+	// currently whole-second granular, so sub-second windows make the builder
+	// and verifier disagree about proposer slots. See [Config.ValidParameters].
+	//
+	// WARNING: This value is a network-wide consensus parameter, not a per-node
+	// tuning knob. Every validator of a Subnet's chains MUST be configured with
+	// the SAME window duration. A validator using a different value disagrees
+	// about which proposer is expected in a given slot, so it rejects the
+	// network's blocks (and vice versa) and silently fails to reach consensus
+	// with the rest of the network. Because there is no on-chain agreement on
+	// this value, it must be coordinated out-of-band and rolled out to every
+	// validator at once. It is therefore only appropriate for L1s whose
+	// validator set is operated as a unit (CFT/PoA).
+	//
+	// Note: the primary network (P/C/X chains) is unaffected by this field. It
+	// always uses the default window; see getPrimaryNetworkConfig and the fact
+	// that the primary network cannot be a tracked Subnet.
+	ProposerWindowDuration time.Duration `json:"proposerWindowDuration" yaml:"proposerWindowDuration"`
 }
 
 func boolToInt(b bool) int {
@@ -76,6 +103,19 @@ func (c *Config) ValidConsensusConfiguration() error {
 func (c *Config) ValidParameters() error {
 	if !c.ValidatorOnly && c.AllowedNodes.Len() > 0 {
 		return errAllowedNodesWhenNotValidatorOnly
+	}
+
+	// The proposerVM block timestamp is currently whole-second granular, so a
+	// proposer slot boundary (slot * windowDuration) is only representable when
+	// windowDuration is a whole number of seconds. Sub-second windows make the
+	// block builder and verifier compute different slots from the rounded
+	// timestamp, breaking proposer selection during failover. Require whole
+	// seconds (a value of 0 falls back to the 5s default).
+	//
+	// TODO: Remove this restriction once the proposerVM uses millisecond-
+	// precision block timestamps and TimeToSlot is exact at sub-second windows.
+	if c.ProposerWindowDuration < 0 || c.ProposerWindowDuration%time.Second != 0 {
+		return fmt.Errorf("%w: %s", errProposerWindowDurationNotWholeSeconds, c.ProposerWindowDuration)
 	}
 
 	if c.SnowParameters != nil {

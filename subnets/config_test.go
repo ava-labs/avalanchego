@@ -60,6 +60,30 @@ func TestValidParameters(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name: "valid whole-second proposer window duration",
+			s: Config{
+				SnowParameters:         &validParameters,
+				ProposerWindowDuration: time.Second,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "sub-second proposer window duration",
+			s: Config{
+				SnowParameters:         &validParameters,
+				ProposerWindowDuration: 500 * time.Millisecond,
+			},
+			expectedErr: errProposerWindowDurationNotWholeSeconds,
+		},
+		{
+			name: "negative proposer window duration",
+			s: Config{
+				SnowParameters:         &validParameters,
+				ProposerWindowDuration: -time.Second,
+			},
+			expectedErr: errProposerWindowDurationNotWholeSeconds,
+		},
+		{
 			name: "valid simplex parameters",
 			s: Config{
 				SimplexParameters: &simplex.Parameters{

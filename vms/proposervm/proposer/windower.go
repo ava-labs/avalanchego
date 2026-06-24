@@ -23,16 +23,23 @@ import (
 
 // Proposer list constants
 const (
-	WindowDuration = 5 * time.Second
+	// DefaultWindowDuration is the default length of a single proposer slot. It
+	// is preserved at 5s so that networks which do not explicitly configure a
+	// window duration behave byte-for-byte identically to prior versions.
+	//
+	// WARNING: The window duration is consensus-critical. Every validator of a
+	// chain MUST agree on it, otherwise they disagree about which proposer is
+	// expected in a given slot and chain liveness breaks. See [New].
+	DefaultWindowDuration = 5 * time.Second
 
-	MaxVerifyWindows = 6
-	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration // 30 seconds
+	// The following are slot *counts*; they are independent of the (now
+	// configurable) window duration. The corresponding absolute delays are
+	// exposed as methods on the windower (MaxVerifyDelay / MaxBuildDelay) since
+	// they depend on the per-chain window duration.
+	MaxVerifyWindows = 6  // MaxVerifyDelay = MaxVerifyWindows * windowDuration (30s at the default window)
+	MaxBuildWindows  = 60 // MaxBuildDelay = MaxBuildWindows * windowDuration (5m at the default window)
 
-	MaxBuildWindows = 60
-	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
-
-	MaxLookAheadSlots  = 720
-	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration // 1 hour
+	MaxLookAheadSlots = 720 // MaxLookAheadSlots * windowDuration is 1h at the default window
 )
 
 var (
@@ -46,7 +53,7 @@ type Windower interface {
 	// Proposers returns the proposer list for building a block at [blockHeight]
 	// when the validator set is defined at [pChainHeight]. The list is returned
 	// in order. The minimum delay of a validator is the index they appear times
-	// [WindowDuration].
+	// the chain's window duration.
 	Proposers(
 		ctx context.Context,
 		blockHeight,
@@ -95,24 +102,49 @@ type Windower interface {
 		nodeID ids.NodeID,
 		startSlot uint64,
 	) (time.Duration, error)
+
+	// TimeToSlot returns the slot index that [now] falls in, relative to the
+	// parent block timestamp [start], using this chain's window duration.
+	TimeToSlot(start, now time.Time) uint64
+
+	// MaxVerifyDelay is the maximum age (relative to its parent) a block may
+	// have while still requiring a specific proposer. It equals
+	// [MaxVerifyWindows] times this chain's window duration.
+	MaxVerifyDelay() time.Duration
+
+	// MaxBuildDelay is the delay after which any node may build an unsigned
+	// block. It equals [MaxBuildWindows] times this chain's window duration.
+	MaxBuildDelay() time.Duration
 }
 
 // windower interfaces with P-Chain and it is responsible for calculating the
 // delay for the block submission window of a given validator
 type windower struct {
-	state       validators.State
-	subnetID    ids.ID
-	chainSource uint64
-	logger      logging.Logger
+	state          validators.State
+	subnetID       ids.ID
+	chainSource    uint64
+	windowDuration time.Duration
+	logger         logging.Logger
 }
 
-func New(state validators.State, subnetID, chainID ids.ID, logger logging.Logger) Windower {
+// New returns a Windower whose proposer slots are [windowDuration] apart.
+//
+// WARNING: [windowDuration] is consensus-critical and MUST be identical across
+// every validator of the chain. Validators using different window durations
+// disagree about which proposer is expected for a given timestamp slot, which
+// breaks block verification and ultimately chain liveness. A value <= 0 falls
+// back to [DefaultWindowDuration] (5s).
+func New(state validators.State, subnetID, chainID ids.ID, windowDuration time.Duration, logger logging.Logger) Windower {
+	if windowDuration <= 0 {
+		windowDuration = DefaultWindowDuration
+	}
 	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
-		logger:      logger,
-		state:       state,
-		subnetID:    subnetID,
-		chainSource: w.UnpackLong(),
+		logger:         logger,
+		state:          state,
+		subnetID:       subnetID,
+		chainSource:    w.UnpackLong(),
+		windowDuration: windowDuration,
 	}
 }
 
@@ -150,7 +182,7 @@ func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint
 
 func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
-		return time.Duration(maxWindows) * WindowDuration, nil
+		return time.Duration(maxWindows) * w.windowDuration, nil
 	}
 
 	proposers, err := w.Proposers(ctx, blockHeight, pChainHeight, maxWindows)
@@ -163,9 +195,21 @@ func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, 
 		if nodeID == validatorID {
 			return delay, nil
 		}
-		delay += WindowDuration
+		delay += w.windowDuration
 	}
 	return delay, nil
+}
+
+// MaxVerifyDelay returns the maximum age (relative to its parent) a block may
+// have while still requiring a specific proposer to have produced it.
+func (w *windower) MaxVerifyDelay() time.Duration {
+	return MaxVerifyWindows * w.windowDuration
+}
+
+// MaxBuildDelay returns the delay after which any node may build an unsigned
+// block.
+func (w *windower) MaxBuildDelay() time.Duration {
+	return MaxBuildWindows * w.windowDuration
 }
 
 func (w *windower) ExpectedProposer(
@@ -226,12 +270,12 @@ func (w *windower) MinDelayForProposer(
 		}
 
 		if expectedNodeID == nodeID {
-			return time.Duration(slot) * WindowDuration, nil
+			return time.Duration(slot) * w.windowDuration, nil
 		}
 	}
 
 	// no slots scheduled for the max window we inspect. Return max delay
-	return time.Duration(maxSlot) * WindowDuration, nil
+	return time.Duration(maxSlot) * w.windowDuration, nil
 }
 
 func (w *windower) makeSampler(
@@ -288,9 +332,11 @@ func (w *windower) expectedProposer(
 	return validators[indices[0]].id, nil
 }
 
-func TimeToSlot(start, now time.Time) uint64 {
+// TimeToSlot returns the slot index that [now] falls in, relative to the parent
+// block timestamp [start], using this chain's window duration.
+func (w *windower) TimeToSlot(start, now time.Time) uint64 {
 	if now.Before(start) {
 		return 0
 	}
-	return uint64(now.Sub(start) / WindowDuration)
+	return uint64(now.Sub(start) / w.windowDuration)
 }

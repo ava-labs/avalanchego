@@ -393,7 +393,7 @@ func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
 		return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
 	}
 
-	return delay < proposer.MaxVerifyDelay, nil
+	return delay < p.vm.Windower.MaxVerifyDelay(), nil
 }
 
 func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
@@ -405,7 +405,7 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	var (
 		blkTimestamp = blk.Timestamp()
 		blkHeight    = blk.Height()
-		currentSlot  = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
+		currentSlot  = p.vm.Windower.TimeToSlot(parentTimestamp, blkTimestamp)
 		proposerID   = blk.Proposer()
 	)
 	// populate the slot for the block.
@@ -442,7 +442,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	newTimestamp time.Time,
 ) (bool, error) {
 	parentHeight := p.innerBlk.Height()
-	currentSlot := proposer.TimeToSlot(parentTimestamp, newTimestamp)
+	currentSlot := p.vm.Windower.TimeToSlot(parentTimestamp, newTimestamp)
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
 		ctx,
 		parentHeight+1,
@@ -490,7 +490,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 	newTimestamp time.Time,
 ) (bool, error) {
 	delay := newTimestamp.Sub(parentTimestamp)
-	if delay >= proposer.MaxBuildDelay {
+	if delay >= p.vm.Windower.MaxBuildDelay() {
 		return false, nil // time for any node to build an unsigned block
 	}
 
@@ -509,7 +509,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 	if delay >= minDelay {
 		// it's time for this node to propose a block. It'll be signed or
 		// unsigned depending on the delay
-		return delay < proposer.MaxVerifyDelay, nil
+		return delay < p.vm.Windower.MaxVerifyDelay(), nil
 	}
 
 	// It's not our turn to propose a block yet. This is likely caused by having
