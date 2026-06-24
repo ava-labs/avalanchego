@@ -6,6 +6,7 @@ package cchain
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/rlp"
@@ -116,10 +118,21 @@ func withDB(db database.Database) sutOption {
 }
 
 // withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
-// balance to each address.
+// balance to each address, leaving the rest of the genesis allocation intact.
 func withMaxAllocFor(addrs ...common.Address) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
+		maps.Copy(c.genesis.Alloc, saetest.MaxAllocFor(addrs...))
+	})
+}
+
+// withAccount adds an account to the SUT's genesis, leaving the rest of the
+// genesis allocation intact.
+func withAccount(addr common.Address, acc types.Account) sutOption {
+	if acc.Balance == nil {
+		acc.Balance = big.NewInt(0)
+	}
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc[addr] = acc
 	})
 }
 
@@ -1110,4 +1123,47 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 	hdr := blk.Header()
 	require.Equal(t, uint64(wantSeconds), hdr.Time, "built block Header.Time (seconds)")
 	require.Equal(t, uint64(wantMilliseconds), customtypes.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
+}
+
+// TestGasRefundsDisabled asserts that EVM gas refunds are disabled.
+func TestGasRefundsDisabled(t *testing.T) {
+	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	contract := common.Address{'c', 'o', 'd', 'e'}
+	code := []byte{ // clear storage slot 0
+		byte(vm.PUSH0), // value
+		byte(vm.PUSH0), // key
+		byte(vm.SSTORE),
+		byte(vm.STOP),
+	}
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(w.Addresses()...),
+		withAccount(contract, types.Account{
+			Code: code,
+			// Initially populate storage slot 0 with a non-zero value so that
+			// clearing it would normally provide refunds.
+			Storage: map[common.Hash]common.Hash{
+				{}: common.BytesToHash([]byte{1}),
+			},
+		}),
+	)
+
+	const wantGasUsed = ethparams.TxGas + // Intrinsic gas
+		2*vm.GasQuickStep + // two PUSH0s
+		ethparams.SstoreResetGasEIP2200 // SSTORE reset gas
+	tx := w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &contract,
+		Gas:       wantGasUsed,
+		GasFeeCap: big.NewInt(1),
+	})
+	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tx), "%T.SendTransaction()", sut.ethclient)
+	sut.waitForPendingEthTxs(ctx, t, tx)
+
+	blk := sut.runConsensusLoop(ctx, t)
+	require.Lenf(t, blk.Receipts(), 1, "%T.Receipts()", blk)
+
+	receipt := blk.Receipts()[0]
+	require.Equal(t, types.ReceiptStatusSuccessful, receipt.Status, "tx status")
+
+	const gasIfRefunded = wantGasUsed - ethparams.SstoreClearsScheduleRefundEIP3529
+	assert.Equalf(t, wantGasUsed, receipt.GasUsed, "gas charged (would be %d if refunds were enabled)", gasIfRefunded)
 }

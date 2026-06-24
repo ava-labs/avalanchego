@@ -171,18 +171,6 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	if h.MinPriceExponent != nil {
 		m["minPriceExponent"] = hexutil.Uint64(*h.MinPriceExponent)
 	}
-	if h.SettledHeight != nil {
-		m["settledHeight"] = hexutil.Uint64(*h.SettledHeight)
-	}
-	if h.SettledGasUnix != nil {
-		m["settledGasUnix"] = hexutil.Uint64(*h.SettledGasUnix)
-	}
-	if h.SettledGasNumerator != nil {
-		m["settledGasNumerator"] = hexutil.Uint64(*h.SettledGasNumerator)
-	}
-	if h.SettledExcess != nil {
-		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
-	}
 }
 
 func (h *HeaderSerializable) updateFromEth(eth *ethtypes.Header) {
