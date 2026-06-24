@@ -85,7 +85,7 @@ func TestBuildHeaderMinPriceExponent(t *testing.T) {
 		{
 			name:   "no_parent_no_desired_seeds_initial",
 			parent: parentNoExponent,
-			want:   InitialPriceExponent,
+			want:   initialPriceExponent,
 		},
 		{
 			name:   "parent_set_no_desired_carries",
@@ -111,8 +111,7 @@ func TestBuildHeaderMinPriceExponent(t *testing.T) {
 			header, err := h.BuildHeader(tt.parent)
 			require.NoError(t, err)
 			got := customtypes.GetHeaderExtra(header).MinPriceExponent
-			require.NotNil(t, got)
-			assert.Equalf(t, tt.want, *got, "BuildHeader()")
+			assert.Equalf(t, &tt.want, got, "BuildHeader()")
 		})
 	}
 }

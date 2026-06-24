@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 var errInvalidConfig = errors.New("invalid config")
@@ -33,4 +34,20 @@ func parseConfig(b []byte) (config, error) {
 		return config{}, fmt.Errorf("%w: %w", errInvalidConfig, err)
 	}
 	return c, nil
+}
+
+// desiredParams bundles this node's votes for the dynamic consensus
+// parameters. A nil field means no vote.
+type desiredParams struct {
+	priceExponent *dynamic.PriceExponent
+}
+
+// desired returns c's user-facing targets as internal exponent votes.
+func (c config) desired() desiredParams {
+	var d desiredParams
+	if c.PriceTarget != nil {
+		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
+		d.priceExponent = &e
+	}
+	return d
 }

@@ -47,22 +47,6 @@ type hooks struct {
 	state *cchainstate.State
 }
 
-// desiredParams bundles this node's votes for the dynamic consensus
-// parameters. A nil field means no vote.
-type desiredParams struct {
-	priceExponent *dynamic.PriceExponent
-}
-
-// desired returns c's user-facing targets as internal exponent votes.
-func (c config) desired() desiredParams {
-	var d desiredParams
-	if c.PriceTarget != nil {
-		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
-		d.priceExponent = &e
-	}
-	return d
-}
-
 func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
@@ -135,19 +119,24 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 	}, nil
 }
 
-// InitialPriceExponent is the C-chain's initial price exponent. The minimum
+// initialPriceExponent is the C-chain's initial price exponent. The minimum
 // price is 1 wei, so the exponent starts at 0.
-const InitialPriceExponent dynamic.PriceExponent = 0
+const initialPriceExponent dynamic.PriceExponent = 0
+
+// priceExponent returns h's ACP-283 price exponent, defaulting to
+// [initialPriceExponent] when the header does not carry one.
+func priceExponent(h *types.Header) dynamic.PriceExponent {
+	if pe := customtypes.GetHeaderExtra(h).MinPriceExponent; pe != nil {
+		return *pe
+	}
+	return initialPriceExponent
+}
 
 func (*hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	// TODO(StephenButtolph): Extract the gas target from the header (ACP-176).
-	minPrice := InitialPriceExponent.Price()
-	if exp := customtypes.GetHeaderExtra(header).MinPriceExponent; exp != nil {
-		minPrice = exp.Price()
-	}
 	return 1_000_000, gastime.GasPriceConfig{
 		TargetToExcessScaling: 87,
-		MinPrice:              minPrice,
+		MinPrice:              priceExponent(header).Price(),
 	}
 }
 
@@ -230,12 +219,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	// TODO(StephenButtolph): Encode the ACP-183 min price excess in the header.
 	// TODO(StephenButtolph): Enforce the minimum block time here.
 	now := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
-	parentExtra := customtypes.GetHeaderExtra(parent)
-	minPriceExponent := InitialPriceExponent
-	if parentExtra.MinPriceExponent != nil {
-		minPriceExponent = *parentExtra.MinPriceExponent
-	}
-	minPriceExponent = minPriceExponent.Toward(b.desired.priceExponent)
+	minPriceExponent := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),

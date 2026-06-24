@@ -1011,8 +1011,8 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 	require.Equal(t, uint64(wantMilliseconds), customtypes.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
 }
 
-// TestRampMinPriceExponent verifies that each built block raises
-// MinPriceExponent toward the node's ACP-283 vote.
+// TestRampMinPriceExponent verifies that a node's ACP-283 vote ramps the gas
+// price floor, so each built block's BaseFee exceeds its parent's.
 func TestRampMinPriceExponent(t *testing.T) {
 	const numBlocks = 3
 	// A distinct key per block keeps every tx at nonce 0, so none depends on a
@@ -1025,17 +1025,26 @@ func TestRampMinPriceExponent(t *testing.T) {
 	}
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(addrs...),
-		withPriceTarget(1_000_000_000), // 1 nAVAX target.
+		withPriceTarget(ethparams.GWei),
 	)
 
-	prev := InitialPriceExponent
+	// The floor doubles only every 3600 blocks (ACP-283), so BaseFee stays put
+	// over a few blocks. Assert BaseFee equals the floor the parent's exponent
+	// implies, and that the exponent ramps toward the vote.
+	prevExp := initialPriceExponent
 	for i, sk := range keys {
 		w := newWallet(sk, sut.ctx, sut.Client)
 		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-		got := customtypes.GetHeaderExtra(blk.EthBlock().Header()).MinPriceExponent
-		require.NotNilf(t, got, "block %d MinPriceExponent", i+1)
-		require.Greaterf(t, *got, prev, "block %d MinPriceExponent should exceed parent's", i+1)
-		prev = *got
+		header := blk.EthBlock().Header()
+
+		require.NotNilf(t, header.BaseFee, "block %d BaseFee", i+1)
+		wantBaseFee := new(big.Int).SetUint64(uint64(prevExp.Price()))
+		assert.Equalf(t, wantBaseFee, header.BaseFee, "block %d BaseFee", i+1)
+
+		exp := customtypes.GetHeaderExtra(header).MinPriceExponent
+		require.NotNilf(t, exp, "block %d MinPriceExponent", i+1)
+		assert.Greaterf(t, *exp, prevExp, "block %d MinPriceExponent should exceed parent's", i+1)
+		prevExp = *exp
 	}
 }
 
