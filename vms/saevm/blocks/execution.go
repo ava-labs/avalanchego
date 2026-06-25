@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"slices"
 	"sync/atomic"
@@ -21,8 +22,10 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -121,28 +124,19 @@ func (b *Block) MarkExecuted(
 
 	batch := db.NewBatch()
 	rawdb.WriteReceipts(batch, b.Hash(), b.NumberU64(), receipts)
-	return b.markExecuted(batch, xdb, e, true, lastExecuted)
+
+	if err := b.markExecutedOnDisk(batch, xdb, e); err != nil {
+		return err
+	}
+	return b.markExecutedInMemory(e, lastExecuted)
 }
 
-var errMarkBlockExecutedAgain = errors.New("block re-marked as executed")
-
-// markExecuted is the intersection point of [Block.MarkExecuted],
-// [Block.MarkSynchronous], and [Block.RestoreExecutionArtefacts], all of which
-// have side effects drawn from the same ordered set of events. This method
-// exists to guarantee that the correct selection and ordering of events occurs,
-// regardless of the upstream trigger. See documentation re ordering invariants
-// for more information.
+// markExecutedOnDisk updates the [saetypes.ExecutionResults] and the head block
+// in the database.
 //
 // The batch is `Write()`n (yeah, it's a word now) after all disk artefacts are
 // persisted.
-func (b *Block) markExecuted(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults, setAsHeadBlock bool, lastExecuted *atomic.Pointer[Block]) error {
-	if err := b.markExecutedOnDisk(batch, xdb, e, setAsHeadBlock); err != nil {
-		return err
-	}
-	return b.markExecutedAfterDiskArtefacts(e, lastExecuted)
-}
-
-func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults, setAsHeadBlock bool) error {
+func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults) error {
 	n := b.NumberU64()
 	if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
 		return err
@@ -150,14 +144,16 @@ func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResu
 	if err := xdb.Sync(n, n); err != nil {
 		return err
 	}
-	if setAsHeadBlock {
-		b.SetAsHeadBlock(batch)
-	}
+	b.SetAsHeadBlock(batch)
 	return batch.Write()
 }
 
-func (b *Block) markExecutedAfterDiskArtefacts(e *executionResults, lastExecuted *atomic.Pointer[Block]) error {
-	// Memory
+var errMarkBlockExecutedAgain = errors.New("block re-marked as executed")
+
+// markExecutedInMemory modifies b to allow readers of the block to see that the block has been executed.
+//
+// If the block was just executed, this MUST occur AFTER the block was marked as executed on disk.
+func (b *Block) markExecutedInMemory(e *executionResults, lastExecuted *atomic.Pointer[Block]) error {
 	if !b.execution.CompareAndSwap(nil, e) {
 		// This is fatal because we corrupted the database's head block if we
 		// got here by [Block.MarkExecuted] being called twice (an invalid use
@@ -256,9 +252,17 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
 // said function was originally called.
-func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+//
+// If no execution results are found, the block is assumed to be synchronous.
+func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	e, err := loadExecutionResults(xdb, b.NumberU64())
-	if err != nil {
+	switch {
+	case errors.Is(err, database.ErrNotFound):
+		if e, err = b.synchronousExecutionResults(hooks); err != nil {
+			return err
+		}
+		b.synchronous = true
+	case err != nil:
 		return err
 	}
 	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
@@ -273,7 +277,7 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.Execut
 	); err != nil {
 		return fmt.Errorf("deriving receipt fields: %v", err)
 	}
-	return b.markExecutedAfterDiskArtefacts(e, nil)
+	return b.markExecutedInMemory(e, nil)
 }
 
 func loadExecutionResults(xdb saetypes.ExecutionResults, blockNum uint64) (*executionResults, error) {
@@ -309,4 +313,44 @@ func PostExecutionStateRoot(xdb saetypes.ExecutionResults, blockNum uint64) (com
 // block was executed (as against the worst-case prediction).
 func ExecutionBaseFee(xdb saetypes.ExecutionResults, blockNum uint64) (*uint256.Int, error) {
 	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).cloneBaseFee)
+}
+
+// synchronousExecutionResults derives the post-execution artefacts of a
+// synchronous block. Unlike asynchronously executed blocks, synchronous blocks
+// do not persist their execution results in the [saetypes.ExecutionResults]
+// database, thus they are extracted from the header.
+func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
+	ethB := b.EthBlock()
+	target, cfg := hooks.GasConfigAfter(b.Header())
+
+	// The base fee must be capped at [math.MaxUint64] to avoid overflow in the gastime.
+	var baseFee uint64
+	switch bf := ethB.BaseFee(); {
+	case bf == nil:
+		baseFee = 0
+	case bf.IsUint64():
+		baseFee = bf.Uint64()
+	default:
+		baseFee = math.MaxUint64
+	}
+
+	execTime, err := gastime.New(
+		hooks.BlockTime(b.Header()),
+		// Target, excess, and config _after_ are a requirement of
+		// [Block.MarkExecuted].
+		target,
+		gas.Price(baseFee),
+		cfg,
+	)
+	if err != nil {
+		return nil, err
+	}
+	e := &executionResults{
+		byGas:         *execTime.Clone(),
+		receiptRoot:   ethB.ReceiptHash(),
+		stateRootPost: ethB.Root(),
+	}
+	e.baseFee.SetUint64(baseFee)
+	// receipts are populated in [Block.RestoreExecutionArtefacts] because this logic is shared.
+	return e, nil
 }

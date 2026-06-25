@@ -43,7 +43,7 @@ func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, 
 			if err != nil {
 				return nil, err
 			}
-			if err := blk.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
+			if err := blk.RestoreExecutionArtefacts(b.Hooks(), b.DB(), b.XDB(), b.ChainConfig()); err != nil {
 				return nil, err
 			}
 			return blk, nil

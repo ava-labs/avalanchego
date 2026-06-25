@@ -102,7 +102,9 @@ func TestMarkExecuted(t *testing.T) {
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
 	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
-	require.NoError(t, fromDB.RestoreExecutionArtefacts(db, xdb, saetest.ChainConfig()), "RestoreExecutionArtefacts()")
+	// The block has on-disk execution results, so no [hook.Points] are needed
+	// to reconstruct them.
+	require.NoError(t, fromDB.RestoreExecutionArtefacts(nil, db, xdb, saetest.ChainConfig()), "RestoreExecutionArtefacts()")
 	tests := []struct {
 		name           string
 		isLastExecuted bool

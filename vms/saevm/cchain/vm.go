@@ -18,8 +18,6 @@ import (
 
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
 
 	_ "embed"
@@ -113,24 +111,8 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
 	vm.chainConfig = genesis.Config
-
-	genesisBlock, err := genesis.setup(ethDB, trieDBConfig)
-	if err != nil {
+	if err := genesis.setup(ethDB, trieDBConfig); err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
-	}
-
-	var lastSync *types.Block
-	lastSyncBytes, err := state.ReadLastSync(avaDB)
-	switch {
-	case err == nil:
-		lastSync = new(types.Block)
-		if err := rlp.DecodeBytes(lastSyncBytes, lastSync); err != nil {
-			return fmt.Errorf("decoding last sync block: %w", err)
-		}
-	case errors.Is(err, avadb.ErrNotFound):
-		lastSync = genesisBlock
-	default:
-		return fmt.Errorf("reading last sync block: %w", err)
 	}
 
 	vm.state, err = state.New(snowCtx, avaDB)
@@ -163,7 +145,7 @@ func (vm *VM) Initialize(
 		},
 		Now: vm.now,
 	}
-	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, lastSync, appSender)
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}

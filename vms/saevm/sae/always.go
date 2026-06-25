@@ -9,14 +9,18 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 var _ adaptor.ChainVM[*blocks.Block] = (*SinceGenesis[hook.Transaction])(nil)
@@ -48,8 +52,8 @@ func (vm *SinceGenesis[_]) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	fxs []*common.Fx,
-	appSender common.AppSender,
+	fxs []*snowcommon.Fx,
+	appSender snowcommon.AppSender,
 ) error {
 	db := newEthDB(avaDB)
 	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
@@ -58,17 +62,28 @@ func (vm *SinceGenesis[_]) Initialize(
 	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
 		return fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
 	}
-	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
+	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
 	if err != nil {
 		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
 	}
+	canonicaliseLastSynchronous(db, hash)
 
-	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
+	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, appSender)
 	if err != nil {
 		return err
 	}
 	vm.VM = inner
 	return nil
+}
+
+// canonicaliseLastSynchronous writes the genesis block's hash
+// as finalized in the case there wasn't anything already written.
+func canonicaliseLastSynchronous(db ethdb.Database, hash ethcommon.Hash) {
+	// If any other block has been accepted then the last synchronous block
+	// must have been canonicalised in a previous initialisation.
+	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
+		rawdb.WriteFinalizedBlockHash(db, hash)
+	}
 }
 
 // Shutdown gracefully closes the VM.

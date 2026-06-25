@@ -5,12 +5,15 @@ package sae
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"iter"
 	"math"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 
@@ -19,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
 
@@ -27,13 +29,12 @@ import (
 )
 
 type recovery struct {
-	db              ethdb.Database
-	xdb             types.ExecutionResults
-	chainConfig     *params.ChainConfig
-	log             logging.Logger
-	hooks           hook.Points
-	config          Config
-	lastSynchronous *blocks.Block
+	db          ethdb.Database
+	xdb         types.ExecutionResults
+	chainConfig *params.ChainConfig
+	log         logging.Logger
+	hooks       hook.Points
+	config      Config
 }
 
 func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*blocks.Block, error) {
@@ -44,25 +45,47 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	return blocks.New(ethB, parent, nil, rec.log)
 }
 
-func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
-	num := saedb.LastHeightWithExecutionRootCommitted(
-		rec.db,
-		rec.config.DBConfig,
-		rec.hooks,
-		rec.lastSynchronous.Height(),
-	)
-	if ls := rec.lastSynchronous; num == ls.Height() {
-		return ls, nil
+var errIncompleteRecoveryState = errors.New("incomplete recovery state")
+
+// lastCommittedBlock returns the highest settled block whose post-execution
+// state is available on disk. This is required because its post-execution state
+// is the basis for the worst-case checks needed for block verifications.
+func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
+	cache := state.NewDatabaseWithConfig(rec.db, rec.config.DBConfig.TrieDBConfig)
+	defer func() {
+		retErr = errors.Join(retErr, cache.TrieDB().Close())
+	}()
+
+	lastSettledHash := rawdb.ReadFinalizedBlockHash(rec.db)
+	if lastSettledHash == (common.Hash{}) {
+		return nil, fmt.Errorf("%w: no finalized block recorded", errIncompleteRecoveryState)
+	}
+	lastSettledHeight := rawdb.ReadHeaderNumber(rec.db, lastSettledHash)
+	if lastSettledHeight == nil {
+		return nil, fmt.Errorf("%w: finalized block %#x has no number", errIncompleteRecoveryState, lastSettledHash)
 	}
 
-	b, err := rec.newCanonicalBlock(num, nil)
-	if err != nil {
-		return nil, err
+	// Search for first settled post-execution state
+	for height := *lastSettledHeight; ; height-- {
+		ethB, err := canonicalBlock(rec.db, height)
+		if err != nil {
+			return nil, err
+		}
+
+		b, err := blocks.RestoreSettledBlock(rec.hooks, ethB, rec.log, rec.db, rec.xdb, rec.chainConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil {
+			return b, nil
+		}
+
+		if b.Synchronous() {
+			// invariant expected at initialization.
+			return nil, fmt.Errorf("%w: last synchronous block %d has no available post-execution state", errIncompleteRecoveryState, height)
+		}
 	}
-	if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
-		return nil, err
-	}
-	return b, nil
 }
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
@@ -135,20 +158,18 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				}
 				return b.MarkSettled(blackhole)
 
-			case b.Height() == rec.lastSynchronous.Height()+1:
-				chain = append(chain, rec.lastSynchronous)
-
 			default:
 				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
 					return err
 				}
 				chain = append(chain, parent)
 
-				if !b.Settled() {
+				// RestoreExecutionArtefacts is only restore's the block's execution state, not settlement.
+				if !parent.Synchronous() && !b.Settled() {
 					continue
 				}
 				if err := parent.MarkSettled(blackhole); err != nil {

@@ -29,8 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
-
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // An EthBlockOption configures the default block properties created by
@@ -119,7 +117,7 @@ func WithLogger(l logging.Logger) BlockOption {
 // returns wraps [core.Genesis.ToBlock] with [NewBlock]. It assumes a nil
 // [triedb.Config] unless overridden by a [WithTrieDBConfig]. The block is
 // marked as both executed and synchronous.
-func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig, alloc types.GenesisAlloc, opts ...GenesisOption) *blocks.Block {
+func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, alloc types.GenesisAlloc, opts ...GenesisOption) *blocks.Block {
 	tb.Helper()
 	conf := &genesisConfig{
 		gasTarget: math.MaxUint64,
@@ -139,9 +137,11 @@ func NewGenesis(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults,
 	require.NoError(tb, err, "core.SetupGenesisBlock()")
 	require.NoErrorf(tb, tdb.Commit(hash, true), "%T.Commit(core.SetupGenesisBlock(...))", tdb)
 
-	b := NewBlock(tb, gen.ToBlock(), nil, nil)
 	h := hookstest.NewStub(conf.gasTarget)
-	require.NoErrorf(tb, b.MarkSynchronous(h, db, xdb), "%T.MarkSynchronous()", b)
+	xdb, err := h.ExecutionResultsDB("") // ephemeral is fine, just need [database.ErrNotFound] to mark as synchronous
+	require.NoError(tb, err, "hookstest.ExecutionResultsDB()")
+	b, err := blocks.RestoreSettledBlock(h, gen.ToBlock(), loggingtest.New(tb, logging.Warn), db, xdb, config)
+	require.NoError(tb, err, "blocks.RestoreSettledBlock()")
 	return b
 }
 
