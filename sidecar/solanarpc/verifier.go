@@ -15,6 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 )
 
+// errSourceChainUnavailable is returned when the Solana RPC cannot be reached.
+// server.go uses errors.Is against this sentinel to map the failure to
+// codes.Unavailable rather than codes.InvalidArgument.
+var errSourceChainUnavailable = errors.New("source chain unavailable")
+
 // SolanaVerifier verifies OracleMessages by querying the Solana RPC.
 type SolanaVerifier struct {
 	client rpcClient
@@ -65,7 +70,7 @@ func (v *SolanaVerifier) Verify(ctx context.Context, msg *oracle.OracleMessage, 
 
 	tx, err := v.client.getTransaction(ctx, sig)
 	if err != nil {
-		return fmt.Errorf("getTransaction RPC call failed: %w", err)
+		return fmt.Errorf("%w: getTransaction RPC call failed: %w", errSourceChainUnavailable, err)
 	}
 	if tx == nil {
 		return fmt.Errorf("transaction not found for signature %s", sig)

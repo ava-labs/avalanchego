@@ -5,7 +5,7 @@ package main
 
 import (
 	"context"
-	"strings"
+	"errors"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,8 +14,14 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
+// oracleVerifier is the domain interface Server depends on. The production
+// implementation is *SolanaVerifier; tests may inject any compatible stub.
+type oracleVerifier interface {
+	Verify(ctx context.Context, msg *oracle.OracleMessage, justification []byte) error
+}
+
 // Server implements the OracleSidecar gRPC service. It decodes each
-// VerifyRequest, forwards it to the SolanaVerifier, and maps errors to the
+// VerifyRequest, forwards it to the oracleVerifier, and maps errors to the
 // gRPC status codes documented in proto/oracle/oracle.proto:
 //
 //   - codes.OK            — event confirmed on Solana
@@ -23,10 +29,10 @@ import (
 //   - codes.Unavailable   — Solana RPC is unreachable
 type Server struct {
 	pb.UnimplementedOracleSidecarServer
-	verifier *SolanaVerifier
+	verifier oracleVerifier
 }
 
-func NewServer(v *SolanaVerifier) *Server {
+func NewServer(v oracleVerifier) *Server {
 	return &Server{verifier: v}
 }
 
@@ -37,7 +43,7 @@ func (s *Server) Verify(ctx context.Context, req *pb.VerifyRequest) (*pb.VerifyR
 	}
 
 	if err := s.verifier.Verify(ctx, msg, req.Justification); err != nil {
-		if strings.Contains(err.Error(), "RPC call failed") {
+		if errors.Is(err, errSourceChainUnavailable) {
 			return nil, status.Errorf(codes.Unavailable, "source chain unavailable: %v", err)
 		}
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
