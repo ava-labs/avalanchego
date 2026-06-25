@@ -129,16 +129,12 @@ func testRPCGetter[
 	}
 
 	t.Run(underlyingRPCMethod, func(t *testing.T) {
-		// The server may hold the same block pointer as `want` and lazily
-		// write its atomic caches when marshalling responses, racing with
-		// [cmp.Diff] reading unexported fields. Comparing a deep copy
-		// avoids sharing memory with the server.
+		// `want` aliases the server's block. RPC marshalling lazily stores its
+		// hash/size caches while [cmp.Diff], evaluating IfIn filters, copies the
+		// whole block via reflect.Value.Interface(). That non-atomic read races
+		// the store and IgnoreFields cannot stop it, so deep copy to unshare.
 		if b := (*types.Block)(want); b != nil {
-			encoded, err := rlp.EncodeToBytes(b)
-			require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", b)
-			cp := new(types.Block)
-			require.NoErrorf(t, rlp.DecodeBytes(encoded, cp), "rlp.DecodeBytes(rlp.EncodeToBytes(%T))", b)
-			want = T(cp)
+			want = T(deepCopyBlock(t, b))
 		}
 		got, err := get(ctx, arg)
 		t.Logf("%s(%v)", underlyingRPCMethod, arg)
@@ -147,6 +143,17 @@ func testRPCGetter[
 			t.Errorf("%s(%v) diff (-want +got):\n%s", underlyingRPCMethod, arg, diff)
 		}
 	})
+}
+
+// deepCopyBlock returns an RLP round-tripped copy of b that shares no memory
+// with it.
+func deepCopyBlock(t *testing.T, b *types.Block) *types.Block {
+	t.Helper()
+	encoded, err := rlp.EncodeToBytes(b)
+	require.NoErrorf(t, err, "rlp.EncodeToBytes(%T)", b)
+	cp := new(types.Block)
+	require.NoErrorf(t, rlp.DecodeBytes(encoded, cp), "rlp.DecodeBytes(%T)", cp)
+	return cp
 }
 
 func TestSubscriptions(t *testing.T) {
