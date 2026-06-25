@@ -141,7 +141,7 @@ func TestTargetExponent(t *testing.T) {
 		{
 			name:   "no_field_pre_fortuna",
 			header: &types.Header{Time: fortunaTime - 1, Number: big.NewInt(1)},
-			want:   0,
+			want:   InitialTargetExponent,
 		},
 		{
 			name:   "no_field_genesis",
