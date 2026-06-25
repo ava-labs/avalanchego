@@ -178,21 +178,10 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 	if b.LastExecuted().NumberU64() < ethB.NumberU64()-1 {
 		return nil, bCtx, nil, nil, fmt.Errorf("parent of block %d not executed yet", ethB.NumberU64())
 	}
-	parent, err := b.NewBlock(
-		// The I(E) check above guarantees D(A) of the same block; see
-		// ../docs/invariants.md for details.
-		rawdb.ReadBlock(b.DB(), ethB.ParentHash(), ethB.NumberU64()-1),
-		// Ancestry is irrelevant for the parent as we just want its
-		// post-execution artefacts.
-		nil, nil,
-	)
+	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
 	if err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("constructing parent block: %v", err)
+		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
 	}
-	if err := parent.RestoreExecutionArtefacts(b.Hooks(), b.DB(), b.XDB(), b.ChainConfig()); err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("parent %T.RestoreExecutionArtefacts(...): %v", parent, err)
-	}
-
 	block, err := b.NewBlock(ethB, parent, nil)
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)

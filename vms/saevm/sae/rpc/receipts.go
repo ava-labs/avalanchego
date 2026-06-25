@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
 
@@ -29,26 +28,7 @@ func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Rece
 // hash, checking in-memory blocks first then falling back to the database.
 // Returns nils for blocks that are not yet executed.
 func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
-	blk, err := readByNumberOrHash(
-		b,
-		numOrHash,
-		func(b *blocks.Block) *blocks.Block {
-			return b
-		},
-		func(db ethdb.Reader, h common.Hash, num uint64) (*blocks.Block, error) {
-			if num > b.LastExecuted().Height() {
-				return nil, blocks.ErrNotFound
-			}
-			blk, err := blocks.New(rawdb.ReadBlock(db, h, num), nil, nil, b.Logger())
-			if err != nil {
-				return nil, err
-			}
-			if err := blk.RestoreExecutionArtefacts(b.Hooks(), b.DB(), b.XDB(), b.ChainConfig()); err != nil {
-				return nil, err
-			}
-			return blk, nil
-		},
-	)
+	blk, err := b.restoreBlock(numOrHash)
 	switch {
 	case err != nil:
 		// The use of [notFoundIsNil] in [readByNumberOrHash] means that we know

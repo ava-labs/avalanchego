@@ -71,14 +71,14 @@ func (b *Block) WaitUntilSettled(ctx context.Context) error {
 	}
 }
 
-// Settled reports whether either of [Block.MarkSettled] or
-// [Block.MarkSynchronous] have been called without resulting in an error.
+// Settled reports whether either [Block.MarkSettled] have been called without
+// resulting in an error, or the block is restored from disk as settled.
 func (b *Block) Settled() bool {
 	return b.ancestry.Load() == nil
 }
 
-// Synchronous reports whether [Block.MarkSynchronous] has been called without
-// resulting in an error.
+// Synchronous reports whether the block was marked as synchronous during
+// [RestoreSettledBlock].
 func (b *Block) Synchronous() bool {
 	return b.synchronous
 }
@@ -107,9 +107,9 @@ func (b *Block) ParentBlock() *Block {
 
 // LastSettled returns the last-settled block at the time of b's acceptance,
 // unless [Block.MarkSettled] has been called, in which case it returns nil and
-// logs an error. If [Block.MarkSynchronous] was called instead, LastSettled
-// always returns `b` itself, without logging. Note that this value might not be
-// distinct between contiguous blocks.
+// logs an error. If the block is synchronous, LastSettled always returns `b`
+// itself, without logging. Note that this value might not be distinct between
+// contiguous blocks.
 func (b *Block) LastSettled() *Block {
 	if b.synchronous {
 		return b
@@ -126,8 +126,8 @@ func (b *Block) LastSettled() *Block {
 // therefore returns a disjoint (and possibly empty) set of historical blocks.
 //
 // It is not valid to call Settles after a call to [Block.MarkSettled] on either
-// b or its parent. If [Block.MarkSynchronous] was called instead, Settles
-// always returns a single-element slice of `b` itself.
+// b or its parent. If the block is synchronous, Settles always returns a
+// single-element slice of `b` itself.
 func (b *Block) Settles() []*Block {
 	if b.synchronous {
 		return []*Block{b}
@@ -171,8 +171,8 @@ var errIncompleteBlockHistory = errors.New("incomplete block history when determ
 // indeterminate delay.
 //
 // It is not valid to call LastToSettleAt with a parent on which
-// [Block.MarkSettled] was called directly (i.e. [Block.MarkSynchronous] does
-// not preclude the parent from usage here).
+// [Block.MarkSettled] was called directly. However, it is valid with a
+// synchronous parent.
 //
 // See the Example for [Block.WhenChildSettles] for one usage of the returned
 // block.

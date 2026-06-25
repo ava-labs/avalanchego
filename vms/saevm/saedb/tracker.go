@@ -135,9 +135,6 @@ func LastHeightWithExecutionRootCommitted(db ethdb.Database, c Config, hooks hoo
 	case head <= lastSynchronous:
 		return lastSynchronous
 
-	case c.Archival:
-		return head
-
 	default:
 		num := LastCommittedTrieDBHeight(head, c.CommitInterval())
 		if num <= lastSynchronous {

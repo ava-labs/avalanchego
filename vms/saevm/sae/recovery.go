@@ -55,14 +55,12 @@ func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
 		return ls, nil
 	}
 
-	b, err := rec.newCanonicalBlock(num, nil)
+	ethB, err := canonicalBlock(rec.db, num)
 	if err != nil {
 		return nil, err
 	}
-	if err := b.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
-		return nil, err
-	}
-	return b, nil
+	// This block is guaranteed to be settled.
+	return blocks.RestoreSettledBlock(rec.hooks, ethB, rec.log, rec.db, rec.xdb, rec.chainConfig)
 }
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
@@ -139,16 +137,18 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				chain = append(chain, rec.lastSynchronous)
 
 			default:
-				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
+				ethB, err := canonicalBlock(rec.db, b.Height()-1)
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
+				parent, err := blocks.RestoreExecutedBlock(ethB, rec.hooks, rec.db, rec.xdb, rec.chainConfig, rec.log)
+				if err != nil {
 					return err
 				}
 				chain = append(chain, parent)
 
-				if !b.Settled() {
+				// RestoreExecutedBlock will mark synchronoous blocks as settled.
+				if parent.Synchronous() || !b.Settled() {
 					continue
 				}
 				if err := parent.MarkSettled(blackhole); err != nil {

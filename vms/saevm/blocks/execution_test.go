@@ -101,10 +101,10 @@ func TestMarkExecuted(t *testing.T) {
 	lastExecuted := new(atomic.Pointer[Block])
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
-	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
-	// The block has on-disk execution results, so no [hook.Points] are needed
-	// to reconstruct them.
-	require.NoError(t, fromDB.RestoreExecutionArtefacts(nil, db, xdb, saetest.ChainConfig()), "RestoreExecutionArtefacts()")
+	// This block is NOT synchronous, so it will not be marked as settled, and no hooks are needed.
+	fromDB, err := RestoreExecutedBlock(b.EthBlock(), nil, db, xdb, saetest.ChainConfig(), loggingtest.New(t, logging.Warn))
+	require.NoError(t, err, "RecoverExecutedBlock()")
+	require.NoErrorf(t, fromDB.SetAncestors(b.ParentBlock(), b.LastSettled()), "%T.SetAncestors()", fromDB)
 	tests := []struct {
 		name           string
 		isLastExecuted bool

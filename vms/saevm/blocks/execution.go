@@ -200,6 +200,7 @@ func (b *Block) Executed() bool {
 // returns the requested value. A warning is logged if the caller is blocked for
 // longer than [saeparams.MaxQueueWallTime].
 func executionArtefact[T any](b *Block, desc string, get func(*executionResults) T) T {
+	fmt.Printf("block: %+v\n", b)
 	select {
 	case <-b.executed:
 	case <-time.After(saeparams.MaxQueueWallTime):
@@ -252,7 +253,10 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
 // said function was originally called.  If no execution results are found, the
-// block is assumed to be synchronous.
+// block is marked as synchronous.
+//
+// This function does NOT restore the block's settlement state, even if the
+// block is synchronous.
 //
 // Any error returned is indicative of a corrupted database.
 func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
