@@ -110,6 +110,11 @@ func TestParseConfig(t *testing.T) {
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
 		},
 		{
+			name: "state_sync_enabled",
+			json: `{"state-sync-enabled":false}`,
+			want: with(func(c *config) { c.StateSyncEnabled = utils.PointerTo(false) }),
+		},
+		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
 			want: with(func(c *config) {
@@ -128,6 +133,7 @@ func TestParseConfig(t *testing.T) {
 				"tx-pool-global-slots":2048,
 				"allow-unprotected-txs":true,
 				"batch-request-limit":50,
+				"state-sync-enabled":true,
 				"warp-off-chain-messages":["0x1234"]
 			}`,
 			want: config{
@@ -140,6 +146,7 @@ func TestParseConfig(t *testing.T) {
 				TxPoolGlobalSlots:    2048,
 				AllowUnprotectedTxs:  true,
 				BatchRequestLimit:    50,
+				StateSyncEnabled:     utils.PointerTo(true),
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},

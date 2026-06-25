@@ -11,22 +11,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/ava-labs/libevm/ethdb"
 
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -38,14 +40,18 @@ import (
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	cchainsync "github.com/ava-labs/avalanchego/vms/saevm/cchain/statesync"
 	ethcommon "github.com/ava-labs/libevm/common"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
+var _ adaptor.ChainVM[*blocks.Block] = (*VM)(nil)
+
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
-	*sae.VM // created by [VM.Initialize]
-	*network.Network
+	*sae.VM                    // created by [VM.SetState] as bootstrapping or normal op
+	*network.Network           // created by [VM.Initialize]
+	*cchainsync.SummaryHandler // created by [VM.Initialize]
 
 	// gossip frequencies are configurable to speed up testing.
 	pullGossipPeriod time.Duration
@@ -61,10 +67,24 @@ type VM struct {
 	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
 
+	mode                utils.Atomic[snow.State]
+	deferredArgs        *deferredInit
+	onBootstrappingOnce sync.Once
+	handlers            handlerMap
+
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
 	onClose []func(context.Context) error
+}
+
+type deferredInit struct {
+	g           *genesis
+	db          ethdb.Database
+	cfg         sae.Config
+	hooks       *hooks
+	pendingTxs  *txpool.Pending
+	warpStorage *warp.Storage
 }
 
 var ethDBPrefix = []byte("ethdb")
@@ -101,7 +121,6 @@ func (vm *VM) Initialize(
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
-
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
@@ -109,9 +128,6 @@ func (vm *VM) Initialize(
 	vm.chainConfig = genesis.Config
 
 	saeConfig := userConfig.saeConfig(vm.now)
-	if err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig); err != nil {
-		return fmt.Errorf("setting up genesis: %w", err)
-	}
 
 	vm.state, err = state.New(snowCtx, avaDB)
 	if err != nil {
@@ -136,6 +152,47 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
 	}
+
+	gBlock, err := genesis.block()
+	if err != nil {
+		return fmt.Errorf("parsing genesis block: %w", err)
+	}
+	vm.SummaryHandler, err = cchainsync.New(snowCtx, userConfig.stateSyncConfig(), ethDB, hooks, vm.state, gBlock)
+	if err != nil {
+		return fmt.Errorf("creating summary handler: %w", err)
+	}
+	vm.onClose = append(vm.onClose, vm.SummaryHandler.Shutdown)
+
+	vm.deferredArgs = &deferredInit{
+		g:           genesis,
+		db:          ethDB,
+		cfg:         saeConfig,
+		hooks:       hooks,
+		pendingTxs:  pendingTxs,
+		warpStorage: warpStorage,
+	}
+	vm.handlers = make(handlerMap)
+	return nil
+}
+
+// onBootstrapping finishes initializing the VM after all necessary state is available.
+// This MUST be called exactly once, guaranteed using VM.onBootstrappingOnce.
+func (vm *VM) onBootstrapping(ctx context.Context) error {
+	var (
+		genesis     = vm.deferredArgs.g
+		ethDB       = vm.deferredArgs.db
+		saeConfig   = vm.deferredArgs.cfg
+		snowCtx     = vm.ctx
+		hooks       = vm.deferredArgs.hooks
+		pendingTxs  = vm.deferredArgs.pendingTxs
+		warpStorage = vm.deferredArgs.warpStorage
+	)
+
+	if err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig); err != nil {
+		return fmt.Errorf("setting up genesis: %w", err)
+	}
+
+	var err error
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
@@ -208,6 +265,11 @@ func (vm *VM) Initialize(
 	if err := registerWarpHandler(vm.VM, vm.Network, warpStorage, snowCtx.WarpSigner); err != nil {
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
+
+	if err := vm.updateHandlers(ctx); err != nil {
+		return fmt.Errorf("updating HTTP handlers: %w", err)
+	}
+
 	return nil
 }
 
@@ -286,63 +348,6 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 		return nil, fmt.Errorf("%w: have %x, want %x", errExtDataHashMismatch, got, wantHeaderHash)
 	}
 	return b, nil
-}
-
-const (
-	avaxServiceName       = "avax"
-	avaxHTTPExtensionPath = "/" + avaxServiceName
-)
-
-// CreateHandlers returns the HTTP handlers exposed by the underlying SAE VM
-// augmented with the avax service at [avaxHTTPExtensionPath].
-func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	m, err := vm.VM.CreateHandlers(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating SAE handlers: %w", err)
-	}
-
-	service, err := newService(vm.ctx, vm.gossipSet, vm.pushGossiper, vm.state)
-	if err != nil {
-		return nil, fmt.Errorf("creating avax service: %w", err)
-	}
-	handler, err := rpc.NewHandler(avaxServiceName, service)
-	if err != nil {
-		return nil, fmt.Errorf("creating avax RPC handler: %w", err)
-	}
-
-	m[avaxHTTPExtensionPath] = handler
-	return m, nil
-}
-
-// WaitForEvent waits for a transaction to be in the txpool or for the SAE VM to
-// produce an event.
-func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
-	// TODO(StephenButtolph): Do not busy loop with [snowcommon.PendingTxs]. The
-	// txpools are cleared after block execution, so we may still have
-	// transactions in the txpool while blocks containing those transactions are
-	// processing.
-
-	// TODO(StephenButtolph): Wait until the minimum block delay has passed.
-
-	ctx, cancel := context.WithCancel(ctx)
-	type result struct {
-		msg snowcommon.Message
-		err error
-	}
-	results := make(chan result, 2)
-	go func() {
-		defer cancel()
-		msg, err := vm.VM.WaitForEvent(ctx)
-		results <- result{msg, err}
-	}()
-	go func() {
-		defer cancel()
-		err := vm.txpool.AwaitTxs(ctx)
-		results <- result{snowcommon.PendingTxs, err}
-	}()
-
-	r := <-results
-	return r.msg, r.err
 }
 
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse

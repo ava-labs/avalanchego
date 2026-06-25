@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -83,12 +84,14 @@ var _ saetest.Peer = (*SUT)(nil)
 // itself and an HTTP [Client] connected to an in-process [httptest.Server].
 type SUT struct {
 	*VM
+
 	*Client
+	ethclient  *ethclient.Client
+	clientOnce func()
 
 	db        database.Database
 	memory    *atomic.Memory
 	sender    *saetest.Sender
-	ethclient *ethclient.Client
 	p2pclient *saetest.CapturingPeer
 }
 
@@ -113,6 +116,8 @@ type (
 // initialization. Defaults to [snow.NormalOp]. Use [snow.Bootstrapping] to
 // model a node that is still catching up and has not yet entered normal
 // operation (e.g. verifying blocks received from peers during bootstrap).
+// Use [snow.StateSyncing] to test state-sync specific behavior.
+// Note that any RPCs will not be available until the node is bootstrapping.
 func withState(state snow.State) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.state = state
@@ -267,40 +272,58 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
 	})
-	require.NoErrorf(tb, vm.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
+
+	// This is called immediately after initialization by avalanchego, so we
+	// should test this behavior specifically.
+	handlers, err := vm.CreateHandlers(ctx)
+	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
 	// need to treat our node as a special case.
 	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
 
-	handlers, err := vm.CreateHandlers(ctx)
-	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
-
-	mux := http.NewServeMux()
-	for path, h := range handlers {
-		mux.Handle(cchainHTTPPrefix+path, h)
-	}
-	server := httptest.NewServer(mux)
-	tb.Cleanup(server.Close)
-
-	const wsHTTPPath = cchainHTTPPrefix + "/ws"
-	wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
-	ethRPCClient, err := ethrpc.Dial(wsURI)
-	require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
-	tb.Cleanup(ethRPCClient.Close)
-
 	sut := &SUT{
 		VM:        vm,
-		Client:    NewClient(server.URL),
 		db:        db,
 		memory:    memory,
 		sender:    appSender,
-		ethclient: ethclient.NewClient(ethRPCClient),
 		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
 	}
+
+	// Called from [SUT.SetState].
+	sut.clientOnce = sync.OnceFunc(func() {
+		mux := http.NewServeMux()
+		for path, h := range handlers {
+			mux.Handle(cchainHTTPPrefix+path, h)
+		}
+		server := httptest.NewServer(mux)
+		tb.Cleanup(server.Close)
+
+		const wsHTTPPath = cchainHTTPPrefix + "/ws"
+		wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
+		ethRPCClient, err := ethrpc.Dial(wsURI)
+		require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
+		tb.Cleanup(ethRPCClient.Close)
+
+		sut.Client = NewClient(server.URL)
+		sut.ethclient = ethclient.NewClient(ethRPCClient)
+	})
+	require.NoErrorf(tb, sut.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
+
 	appSender.Start(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
+
 	return ctx, sut
+}
+
+func (s *SUT) SetState(ctx context.Context, state snow.State) error {
+	if err := s.VM.SetState(ctx, state); err != nil {
+		return err
+	}
+	if state >= snow.Bootstrapping {
+		s.clientOnce()
+	}
+	return nil
 }
 
 // hooks returns a new [hooks] instance that behaves equivalently to those
