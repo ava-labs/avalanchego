@@ -79,12 +79,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 
 	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
-	windower.EXPECT().TimeToSlot(gomock.Any(), gomock.Any()).DoAndReturn(func(start, now time.Time) uint64 {
-		if now.Before(start) {
-			return 0
-		}
-		return uint64(now.Sub(start) / proposer.DefaultWindowDuration)
-	}).AnyTimes()
+	windower.EXPECT().TimeToSlot(gomock.Any(), gomock.Any()).Return(uint64(0)).AnyTimes()
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
@@ -392,12 +387,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 
 	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
-	windower.EXPECT().TimeToSlot(gomock.Any(), gomock.Any()).DoAndReturn(func(start, now time.Time) uint64 {
-		if now.Before(start) {
-			return 0
-		}
-		return uint64(now.Sub(start) / proposer.DefaultWindowDuration)
-	}).AnyTimes()
+	windower.EXPECT().TimeToSlot(gomock.Any(), gomock.Any()).Return(uint64(0)).AnyTimes()
 
 	vm := &VM{
 		Config: Config{
