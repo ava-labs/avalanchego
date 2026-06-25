@@ -2,6 +2,10 @@ name: Bazel
 
 # Top-level Bazel CI entrypoint. This workflow defines the platform matrix
 # once and invokes bazel-ci.yml once per platform.
+#
+# PRs default to the cheapest useful Bazel coverage. Applying the ci/pre-merge
+# label upgrades a PR to the same Bazel unit-test coverage as pre-merge runs so
+# contributors can reproduce merge-queue coverage before landing.
 on:
   push:
     tags:
@@ -10,6 +14,7 @@ on:
       - master
       - dev
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   merge_group:
     types: [checks_requested]
 
@@ -34,16 +39,26 @@ jobs:
         id: set-platforms
         shell: bash
         run: |
-          echo 'platforms=["linux-amd64","linux-arm64","darwin-arm64"]' >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            if jq -e '.pull_request.labels[]? | select(.name == "ci/pre-merge")' "$GITHUB_EVENT_PATH" >/dev/null; then
+              echo 'platforms=[{"platform_name":"linux-amd64-24.04","runner":"ubuntu-24.04","unit_test_mode":"race","run_e2e":true},{"platform_name":"darwin-arm64","runner":"macos-26","unit_test_mode":"race","run_e2e":true}]' >> "$GITHUB_OUTPUT"
+            else
+              echo 'platforms=[{"platform_name":"linux-amd64-24.04","runner":"ubuntu-24.04","unit_test_mode":"fast","run_e2e":true}]' >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo 'platforms=[{"platform_name":"linux-amd64-24.04","runner":"ubuntu-24.04","unit_test_mode":"race","run_e2e":true},{"platform_name":"darwin-arm64","runner":"macos-26","unit_test_mode":"race","run_e2e":true}]' >> "$GITHUB_OUTPUT"
+          fi
   matrix:
     needs: bz-define-matrix
-    name: ${{ matrix.platform }}
+    name: ${{ matrix.platform_name }}
     strategy:
       fail-fast: false
       matrix:
-        platform: ${{ fromJSON(needs.bz-define-matrix.outputs.platforms) }}
+        include: ${{ fromJSON(needs.bz-define-matrix.outputs.platforms) }}
     uses: ./.github/workflows/bazel-ci.yml
     with:
-      platform_name: ${{ matrix.platform }}
-      runner: ${{ matrix.platform == 'linux-amd64' && 'ubuntu-24.04' || matrix.platform == 'linux-arm64' && 'ubuntu-24.04-arm' || 'macos-26' }}
+      platform_name: ${{ matrix.platform_name }}
+      runner: ${{ matrix.runner }}
+      unit_test_mode: ${{ matrix.unit_test_mode }}
+      run_e2e: ${{ matrix.run_e2e }}
     secrets: inherit

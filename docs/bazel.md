@@ -25,8 +25,11 @@ task bazel-build
 # Build with optimizations
 task bazel-build-opt
 
-# Run unit tests
-task bazel-test
+# Run unit tests (default/full mode: race on, shuffle on)
+task bazel-test-race-shuffle
+
+# Fast local iteration (no race, no shuffle)
+task bazel-test-fast
 
 # Update Bazel metadata after changing Go imports or Bazel module deps
 task bazel-generate-metadata
@@ -407,7 +410,7 @@ with a few exceptions:
 
 ```bash
 # Run all unit tests (shuffle enabled, race on)
-task bazel-test                    # or: bazel test //...
+task bazel-test-race-shuffle      # or: bazel test //...
 
 # Run tests for a specific package
 bazel test //utils/...
@@ -418,6 +421,9 @@ bazel test //utils:set_test --test_filter=TestSet_Add
 # Fast local iteration (no race, no shuffle)
 task bazel-test-fast               # or: bazel test --config=fast //...
 
+# Race detection without shuffle
+task bazel-test-race              # or: bazel test --config=noshuffle //...
+
 # Collect coverage
 bazel coverage //...
 
@@ -427,22 +433,22 @@ task bazel-test-e2e
 
 #### Test Options
 
-| Option | Default | Toggle with |
-|--------|---------|-------------|
-| Race detection | ON | `--config=norace` (disable) |
-| Shuffle | ON | `--config=noshuffle` (disable) |
-| Fast mode | - | `--config=fast` (no shuffle, no race) |
+| Public mode | Behavior | Bazel config |
+|-------------|----------|--------------|
+| `race-shuffle` | race on, shuffle on | default |
+| `race` | race on, shuffle off | `--config=noshuffle` |
+| `fast` | race off, shuffle off | `--config=fast` |
 
 Examples:
 ```bash
-# Disable race detection
-bazel test --config=norace //...
+# Race detection with shuffle enabled
+task bazel-test-race-shuffle      # or: bazel test //...
 
-# Disable shuffle only
-bazel test --config=noshuffle //...
+# Race detection without shuffle
+task bazel-test-race              # or: bazel test --config=noshuffle //...
 
 # Fast mode (no shuffle, no race)
-bazel test --config=fast //...
+task bazel-test-fast              # or: bazel test --config=fast //...
 ```
 
 #### Test Timeouts
