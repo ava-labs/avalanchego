@@ -130,7 +130,8 @@ func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
 // desiredParams bundles this node's votes for the dynamic consensus
 // parameters. A nil field means no vote.
 type desiredParams struct {
-	priceExponent *dynamic.PriceExponent
+	targetExponent *dynamic.TargetExponent
+	priceExponent  *dynamic.PriceExponent
 }
 
 // desired returns c's user-facing targets as internal exponent votes.

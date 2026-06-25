@@ -111,7 +111,10 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return now
 		},
 		slices.Values(txs),
-		desiredParams{priceExponent: customtypes.GetHeaderExtra(b.Header()).MinPriceExponent},
+		desiredParams{
+			targetExponent: customtypes.GetHeaderExtra(b.Header()).TargetExponent,
+			priceExponent:  customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
+		},
 	}, nil
 }
 
@@ -135,6 +138,15 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 		return *pe
 	}
 	return dynamic.InitialPriceExponent
+}
+
+// targetExponent returns h's ACP-176 target exponent, defaulting to
+// [dynamic.InitialTargetExponent] when the header does not carry one.
+func targetExponent(h *types.Header) dynamic.TargetExponent {
+	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
+		return *te
+	}
+	return dynamic.InitialTargetExponent
 }
 
 func (*hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
@@ -241,9 +253,9 @@ type builder struct {
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
-	// TODO(StephenButtolph): Encode the ACP-176 target excess in the header.
 	// TODO(StephenButtolph): Enforce the minimum block time here.
 	now := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
+	nextTargetExponent := targetExponent(parent).Toward(b.desired.targetExponent)
 	minPriceExponent := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
@@ -266,6 +278,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			TimeMilliseconds: &now,
 			// TODO(StephenButtolph): Encode the min-delay excess.
 			MinDelayExcess:   new(acp226.DelayExcess),
+			TargetExponent:   &nextTargetExponent,
 			MinPriceExponent: &minPriceExponent,
 		},
 	), nil
