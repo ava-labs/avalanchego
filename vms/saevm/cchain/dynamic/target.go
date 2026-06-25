@@ -12,7 +12,7 @@ import "github.com/ava-labs/avalanchego/vms/components/gas"
 type TargetExponent uint64
 
 // InitialTargetExponent is the initial target exponent. Its target is the
-// 1,000,000 gas minimum.
+// 1,000,000 gas-per-second minimum.
 const InitialTargetExponent TargetExponent = 0
 
 // Target returns the target gas per second.
