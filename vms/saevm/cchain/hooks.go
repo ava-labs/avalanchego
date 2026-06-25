@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -302,8 +301,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &now,
-			// TODO(StephenButtolph): Encode the min-delay excess.
-			MinDelayExcess:   new(acp226.DelayExcess),
+			// TODO(StephenButtolph): Encode the min-delay exponent.
+			MinDelayExponent: new(dynamic.DelayExponent),
 			TargetExponent:   &te,
 			MinPriceExponent: &pe,
 		},

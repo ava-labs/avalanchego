@@ -127,8 +127,8 @@ var (
 	latestGasCapacityGauge = metrics.NewRegisteredGauge("chain/latest/gas/capacity", nil)
 	latestGasTargetGauge   = metrics.NewRegisteredGauge("chain/latest/gas/target", nil)
 
-	latestMinDelayGauge       = metrics.NewRegisteredGauge("chain/latest/mindelay", nil)
-	latestMinDelayExcessGauge = metrics.NewRegisteredGauge("chain/latest/mindelay/excess", nil)
+	latestMinDelayGauge         = metrics.NewRegisteredGauge("chain/latest/mindelay", nil)
+	latestMinDelayExponentGauge = metrics.NewRegisteredGauge("chain/latest/mindelay/excess", nil)
 
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
@@ -1140,10 +1140,10 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 	if extraConfig.IsGranite(block.Time()) {
 		extraHeader := customtypes.GetHeaderExtra(block.Header())
-		if extraHeader.MinDelayExcess != nil {
-			delayExcess := *extraHeader.MinDelayExcess
-			latestMinDelayGauge.Update(int64(delayExcess.Delay()))
-			latestMinDelayExcessGauge.Update(int64(delayExcess))
+		if extraHeader.MinDelayExponent != nil {
+			delayExponent := *extraHeader.MinDelayExponent
+			latestMinDelayGauge.Update(int64(delayExponent.Delay()))
+			latestMinDelayExponentGauge.Update(int64(delayExponent))
 		}
 	}
 	return nil

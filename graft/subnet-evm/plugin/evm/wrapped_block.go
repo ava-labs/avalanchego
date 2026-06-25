@@ -297,8 +297,8 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 
 	header := b.ethBlock.Header()
-	// Ensure MinDelayExcess is consistent with rules and minimum block delay is enforced.
-	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
+	// Ensure MinDelayExponent is consistent with rules and minimum block delay is enforced.
+	if err := customheader.VerifyMinDelayExponent(extraConfig, parent, header); err != nil {
 		return err
 	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.

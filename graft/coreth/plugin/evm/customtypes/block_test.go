@@ -33,14 +33,15 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/internal/blocktest"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
+
+	"github.com/ava-labs/avalanchego/graft/coreth/internal/blocktest"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
@@ -82,7 +83,7 @@ func TestBlockEncoding(t *testing.T) {
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
 	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
-	check("MinDelayExcess", BlockMinDelayExcess(&block), (*acp226.DelayExcess)(nil))
+	check("MinDelayExponent", BlockMinDelayExponent(&block), (*dynamic.DelayExponent)(nil))
 
 	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BlockHash", block.Hash(), common.HexToHash("0608e5d5e13c337f226b621a0b08b3d50470f1961329826fd59f5a241d1df49e"))
@@ -126,7 +127,7 @@ func TestEIP1559BlockEncoding(t *testing.T) {
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
 	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
-	check("MinDelayExcess", BlockMinDelayExcess(&block), (*acp226.DelayExcess)(nil))
+	check("MinDelayExponent", BlockMinDelayExponent(&block), (*dynamic.DelayExponent)(nil))
 
 	tx1 := types.NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(10), 50000, big.NewInt(10), nil)
 	tx1, _ = tx1.WithSignature(types.HomesteadSigner{}, common.Hex2Bytes("9bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094f8a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b100"))
@@ -194,7 +195,7 @@ func TestEIP2718BlockEncoding(t *testing.T) {
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
 	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
-	check("MinDelayExcess", BlockMinDelayExcess(&block), (*acp226.DelayExcess)(nil))
+	check("MinDelayExponent", BlockMinDelayExponent(&block), (*dynamic.DelayExponent)(nil))
 
 	// Create legacy tx.
 	to := common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87")
@@ -271,7 +272,7 @@ func TestBlockEncodingWithExtraData(t *testing.T) {
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
 	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
-	check("MinDelayExcess", BlockMinDelayExcess(&block), (*acp226.DelayExcess)(nil))
+	check("MinDelayExponent", BlockMinDelayExponent(&block), (*dynamic.DelayExponent)(nil))
 
 	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BlockHash", block.Hash(), common.HexToHash("4504ee98a94d16dbd70a35370501a3cb00c2965b012672085fbd328a72962902"))
@@ -384,7 +385,7 @@ func TestAP4BlockEncoding(t *testing.T) {
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), big.NewInt(25_000))
 	check("BlockGasCost", BlockGasCost(&block), big.NewInt(1_000_000))
 	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
-	check("MinDelayExcess", BlockMinDelayExcess(&block), (*acp226.DelayExcess)(nil))
+	check("MinDelayExponent", BlockMinDelayExponent(&block), (*dynamic.DelayExponent)(nil))
 
 	tx1 := types.NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(10), 50000, big.NewInt(10), nil)
 	tx1, _ = tx1.WithSignature(types.HomesteadSigner{}, common.Hex2Bytes("9bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094f8a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b100"))

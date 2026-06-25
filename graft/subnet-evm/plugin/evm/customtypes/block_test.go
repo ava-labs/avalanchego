@@ -33,7 +33,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
@@ -42,6 +41,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
@@ -79,7 +79,7 @@ func TestBlockEncoding(t *testing.T) {
 	check("BaseFee", block.BaseFee(), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
 	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
-	check("MinDelayExcess", BlockMinDelayExcess(&block), (*acp226.DelayExcess)(nil))
+	check("MinDelayExponent", BlockMinDelayExponent(&block), (*dynamic.DelayExponent)(nil))
 
 	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BlockHash", block.Hash(), common.HexToHash("0x0a5843ac1cb04865017cb35a57b50b07084e5fcee39b5acadade33149f4fff9e"))
@@ -122,7 +122,7 @@ func TestEIP1559BlockEncoding(t *testing.T) {
 	check("BaseFee", block.BaseFee(), new(big.Int).SetUint64(1000000000))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
 	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
-	check("MinDelayExcess", BlockMinDelayExcess(&block), (*acp226.DelayExcess)(nil))
+	check("MinDelayExponent", BlockMinDelayExponent(&block), (*dynamic.DelayExponent)(nil))
 
 	tx1 := types.NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(10), 50000, big.NewInt(10), nil)
 	tx1, _ = tx1.WithSignature(types.HomesteadSigner{}, common.Hex2Bytes("9bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094f8a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b100"))
@@ -188,7 +188,7 @@ func TestEIP2718BlockEncoding(t *testing.T) {
 	check("BaseFee", block.BaseFee(), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
 	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
-	check("MinDelayExcess", BlockMinDelayExcess(&block), (*acp226.DelayExcess)(nil))
+	check("MinDelayExponent", BlockMinDelayExponent(&block), (*dynamic.DelayExponent)(nil))
 
 	// Create legacy tx.
 	to := common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87")
@@ -319,7 +319,7 @@ func TestSubnetEVMBlockEncoding(t *testing.T) {
 	check("BaseFee", block.BaseFee(), big.NewInt(1_000_000_000))
 	check("BlockGasCost", BlockGasCost(&block), big.NewInt(100_000))
 	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
-	check("MinDelayExcess", BlockMinDelayExcess(&block), (*acp226.DelayExcess)(nil))
+	check("MinDelayExponent", BlockMinDelayExponent(&block), (*dynamic.DelayExponent)(nil))
 
 	tx1 := types.NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(10), 50000, big.NewInt(10), nil)
 	tx1, _ = tx1.WithSignature(types.HomesteadSigner{}, common.Hex2Bytes("9bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094f8a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b100"))

@@ -11,6 +11,10 @@ import "github.com/ava-labs/avalanchego/vms/components/gas"
 // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 type DelayExponent uint64
 
+// InitialDelayExponent is the ACP-226 initial delay exponent (≈2000ms),
+// seeded at the Granite activation. Equal to conversionRate * ln(2000) + 1.
+const InitialDelayExponent DelayExponent = 7_970_124
+
 // Delay returns the minimum block delay in milliseconds.
 //
 // Delay = minimum * e^(d / conversionRate)

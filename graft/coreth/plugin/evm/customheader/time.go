@@ -101,17 +101,17 @@ func VerifyTime(extraConfig *extras.ChainConfig, parent *types.Header, header *t
 	}
 
 	// Verify minimum block delay is enforced
-	// Parent might not have a min delay excess if this is the first Granite block
+	// Parent might not have a min delay exponent if this is the first Granite block
 	// in this case we cannot verify the min delay,
-	// Otherwise parent should have been verified in VerifyMinDelayExcess
-	if parentExtra.MinDelayExcess == nil {
+	// Otherwise parent should have been verified in VerifyMinDelayExponent
+	if parentExtra.MinDelayExponent == nil {
 		return nil
 	}
 
 	// This should not be underflow as we have verified that the parent's
 	// TimeMilliseconds is earlier than the header's TimeMilliseconds above.
 	actualDelayMS := headerTimeMS - parentTimeMS
-	minRequiredDelayMS := parentExtra.MinDelayExcess.Delay()
+	minRequiredDelayMS := parentExtra.MinDelayExponent.Delay()
 	if actualDelayMS < minRequiredDelayMS {
 		return fmt.Errorf("%w: actual delay %dms < required %dms",
 			ErrMinDelayNotMet,

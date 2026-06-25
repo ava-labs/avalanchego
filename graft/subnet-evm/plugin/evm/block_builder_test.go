@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestCalculateBlockBuildingDelay(t *testing.T) {
@@ -81,42 +81,42 @@ func TestCalculateBlockBuildingDelay(t *testing.T) {
 		},
 		{
 			name:                "granite_block_with_now_time",
-			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64, acp226.InitialDelayExcess),
+			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64, dynamic.InitialDelayExponent),
 			lastBuildTime:       time.Time{},
 			lastBuildParentHash: common.Hash{1},
 			expectedTimeToWait:  2000 * time.Millisecond, // should wait for initial delay
 		},
 		{
 			name:                "granite_block_with_2_seconds_before_clock_no_retry",
-			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64-2000, acp226.InitialDelayExcess),
+			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64-2000, dynamic.InitialDelayExponent),
 			lastBuildTime:       time.Time{}, // Zero time means not a retry
 			lastBuildParentHash: common.Hash{1},
 			expectedTimeToWait:  0, // should not wait for initial delay
 		},
 		{
 			name:                "granite_block_with_2_seconds_before_clock_with_retry",
-			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64-2000, acp226.InitialDelayExcess),
+			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64-2000, dynamic.InitialDelayExponent),
 			lastBuildTime:       now,
 			lastBuildParentHash: common.Hash{1},
 			expectedTimeToWait:  RetryDelay,
 		},
 		{
 			name:                "granite_with_2_seconds_before_clock_only_waits_for_retry_delay",
-			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64-2000, 0), // 0 means min delay excess which is 1
+			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64-2000, 0), // 0 means min delay exponent which is 1
 			lastBuildTime:       now,
 			lastBuildParentHash: common.Hash{1},
 			expectedTimeToWait:  RetryDelay,
 		},
 		{
 			name:                "granite_with_2_seconds_before_clock_only_waits_for_remaining_retry_delay",
-			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64-2000, 0), // 0 means min delay excess which is 1
+			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64-2000, 0), // 0 means min delay exponent which is 1
 			lastBuildTime:       now.Add(-RetryDelay / 2),                                        // Less than retry delay ago
 			lastBuildParentHash: common.Hash{1},
 			expectedTimeToWait:  RetryDelay / 2,
 		},
 		{
 			name:                "granite_with_2_seconds_after_clock",
-			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64+2000, acp226.InitialDelayExcess),
+			currentHeader:       createGraniteTestHeader(common.Hash{1}, nowMilliUint64+2000, dynamic.InitialDelayExponent),
 			lastBuildTime:       time.Time{}, // Zero time means not a retry
 			lastBuildParentHash: common.Hash{1},
 			expectedTimeToWait:  4000 * time.Millisecond,
@@ -140,7 +140,7 @@ func TestCalculateBlockBuildingDelay(t *testing.T) {
 	}
 }
 
-func createGraniteTestHeader(parentHash common.Hash, timeMilliseconds uint64, minDelayExcess acp226.DelayExcess) *types.Header {
+func createGraniteTestHeader(parentHash common.Hash, timeMilliseconds uint64, minDelayExponent dynamic.DelayExponent) *types.Header {
 	header := &types.Header{
 		Time: timeMilliseconds / 1000,
 	}
@@ -148,7 +148,7 @@ func createGraniteTestHeader(parentHash common.Hash, timeMilliseconds uint64, mi
 
 	extra := &customtypes.HeaderExtra{
 		TimeMilliseconds: &timeMilliseconds,
-		MinDelayExcess:   &minDelayExcess,
+		MinDelayExponent: &minDelayExponent,
 	}
 	customtypes.SetHeaderExtra(header, extra)
 

@@ -7,6 +7,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -59,4 +61,9 @@ func FuzzDelayExponentToward(f *testing.F) {
 
 func FuzzDesiredDelayExponent(f *testing.F) {
 	fuzzSearch(f, delayReaderCases, DesiredDelayExponent, DelayExponent.Delay)
+}
+
+func TestInitialDelayExponent(t *testing.T) {
+	require.Equal(t, uint64(2000), InitialDelayExponent.Delay(),
+		"InitialDelayExponent.Delay()")
 }

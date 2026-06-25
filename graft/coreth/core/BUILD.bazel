@@ -57,7 +57,6 @@ go_library(
         "//utils",
         "//utils/set",
         "//vms/evm/acp176",
-        "//vms/evm/acp226",
         "//vms/evm/predicate",
         "//vms/evm/sync/customrawdb",
         "//vms/saevm/cchain/dynamic",
