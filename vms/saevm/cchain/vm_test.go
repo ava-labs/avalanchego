@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -1045,7 +1046,7 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 		mismatched := *e.TimeMilliseconds + 1000
 		e.TimeMilliseconds = &mismatched
 	})
-	require.Contains(t, err.Error(), "hash mismatch", "vm.VerifyBlock(malformed block)")
+	require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
 }
 
 // TestVerifyBlockRejectsCheatedMinPriceExponent verifies that the VM rejects a
@@ -1148,70 +1149,56 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 	require.Equal(t, uint64(wantMilliseconds), customtypes.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
 }
 
-// fundedKeys returns n fresh keys and their addresses, one per block to keep
-// every tx at nonce 0.
-func fundedKeys(tb testing.TB, n int) ([]*secp256k1.PrivateKey, []common.Address) {
-	tb.Helper()
-
-	keys := make([]*secp256k1.PrivateKey, n)
-	addrs := make([]common.Address, n)
-	for i := range keys {
-		keys[i] = txtest.NewKey(tb)
-		addrs[i] = keys[i].EthAddress()
+// TestDynamicPriceExponent verifies that each built block's MinPriceExponent
+// (and the BaseFee it implies) advances toward the node's ACP-283 vote, clamped
+// to the per-block step, and stays at the initial value when there is no vote.
+func TestDynamicPriceExponent(t *testing.T) {
+	const maxDiff = 80_063_993_375_475
+	tests := []struct {
+		name    string
+		desired *gas.Price
+		want    []dynamic.PriceExponent
+	}{
+		{
+			name: "unset",
+			want: []dynamic.PriceExponent{
+				dynamic.InitialPriceExponent,
+			},
+		},
+		{
+			name:    "max_diff",
+			desired: utils.PointerTo[gas.Price](2),
+			want: []dynamic.PriceExponent{
+				maxDiff,
+				2 * maxDiff,
+			},
+		},
 	}
-	return keys, addrs
-}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			opts := []sutOption{
+				withMaxAllocFor(key.EthAddress()),
+			}
+			if test.desired != nil {
+				opts = append(opts, withPriceTarget(*test.desired))
+			}
+			ctx, sut := newSUT(t, opts...)
+			w := newWallet(key, sut.ctx, sut.Client)
 
-// TestMinPriceExponentFlatWithoutVote verifies that without a node vote the
-// price floor stays at its initial value: each block carries the parent's
-// exponent unchanged, so the exponent stays 0 and BaseFee holds at 1 wei.
-func TestMinPriceExponentFlatWithoutVote(t *testing.T) {
-	const numBlocks = 3
-	keys, addrs := fundedKeys(t, numBlocks)
-	ctx, sut := newSUT(t, withMaxAllocFor(addrs...)) // no withPriceTarget, no vote
+			for _, wantExponent := range test.want {
+				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				header := blk.Header()
 
-	wantBaseFee := new(big.Int).SetUint64(uint64(dynamic.InitialPriceExponent.Price()))
-	for i, sk := range keys {
-		w := newWallet(sk, sut.ctx, sut.Client)
-		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-		header := blk.EthBlock().Header()
+				he := customtypes.GetHeaderExtra(header)
+				require.NotNilf(t, he.MinPriceExponent, "block %d %T.MinPriceExponent", header.Number, he)
+				assert.Equalf(t, wantExponent, *he.MinPriceExponent, "block %d %T.MinPriceExponent", header.Number, he)
 
-		exp := customtypes.GetHeaderExtra(header).MinPriceExponent
-		require.NotNilf(t, exp, "block %d MinPriceExponent", i+1)
-		assert.Equalf(t, dynamic.InitialPriceExponent, *exp, "block %d MinPriceExponent", i+1)
-		require.NotNilf(t, header.BaseFee, "block %d BaseFee", i+1)
-		require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d BaseFee", i+1)
-	}
-}
-
-// TestRampMinPriceExponent verifies that a node's ACP-283 vote ramps the price
-// exponent each block, with BaseFee tracking the floor the parent's exponent
-// implies.
-func TestRampMinPriceExponent(t *testing.T) {
-	const numBlocks = 3
-	keys, addrs := fundedKeys(t, numBlocks)
-	ctx, sut := newSUT(t,
-		withMaxAllocFor(addrs...),
-		withPriceTarget(ethparams.GWei),
-	)
-
-	// The floor doubles only every 3600 blocks (ACP-283), so BaseFee stays put
-	// over a few blocks. Assert BaseFee equals the floor the parent's exponent
-	// implies, and that the exponent ramps toward the vote.
-	prevExp := dynamic.InitialPriceExponent
-	for i, sk := range keys {
-		w := newWallet(sk, sut.ctx, sut.Client)
-		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-		header := blk.EthBlock().Header()
-
-		wantBaseFee := new(big.Int).SetUint64(uint64(prevExp.Price()))
-		require.NotNilf(t, header.BaseFee, "block %d BaseFee", i+1)
-		require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d BaseFee", i+1)
-
-		exp := customtypes.GetHeaderExtra(header).MinPriceExponent
-		require.NotNilf(t, exp, "block %d MinPriceExponent", i+1)
-		assert.Greaterf(t, *exp, prevExp, "block %d MinPriceExponent should exceed parent's", i+1)
-		prevExp = *exp
+				wantBaseFee := new(big.Int).SetUint64(uint64(wantExponent.Price()))
+				require.NotNilf(t, header.BaseFee, "block %d %T.BaseFee", header.Number, header)
+				require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d %T.BaseFee", header.Number, header)
+			}
+		})
 	}
 }
 
