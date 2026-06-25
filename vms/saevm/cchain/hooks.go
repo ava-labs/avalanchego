@@ -119,17 +119,13 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 	}, nil
 }
 
-// initialPriceExponent is the C-chain's initial price exponent. The minimum
-// price is 1 wei, so the exponent starts at 0.
-const initialPriceExponent dynamic.PriceExponent = 0
-
 // priceExponent returns h's ACP-283 price exponent, defaulting to
-// [initialPriceExponent] when the header does not carry one.
+// [dynamic.InitialPriceExponent] when the header does not carry one.
 func priceExponent(h *types.Header) dynamic.PriceExponent {
 	if pe := customtypes.GetHeaderExtra(h).MinPriceExponent; pe != nil {
 		return *pe
 	}
-	return initialPriceExponent
+	return dynamic.InitialPriceExponent
 }
 
 func (*hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {

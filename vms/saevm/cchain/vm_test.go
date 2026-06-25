@@ -1056,7 +1056,7 @@ func TestMinPriceExponentFlatWithoutVote(t *testing.T) {
 	keys, addrs := fundedKeys(t, numBlocks)
 	ctx, sut := newSUT(t, withMaxAllocFor(addrs...)) // no withPriceTarget, no vote
 
-	wantBaseFee := new(big.Int).SetUint64(uint64(initialPriceExponent.Price()))
+	wantBaseFee := new(big.Int).SetUint64(uint64(dynamic.InitialPriceExponent.Price()))
 	for i, sk := range keys {
 		w := newWallet(sk, sut.ctx, sut.Client)
 		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
@@ -1064,7 +1064,7 @@ func TestMinPriceExponentFlatWithoutVote(t *testing.T) {
 
 		exp := customtypes.GetHeaderExtra(header).MinPriceExponent
 		require.NotNilf(t, exp, "block %d MinPriceExponent", i+1)
-		assert.Equalf(t, initialPriceExponent, *exp, "block %d MinPriceExponent", i+1)
+		assert.Equalf(t, dynamic.InitialPriceExponent, *exp, "block %d MinPriceExponent", i+1)
 		require.NotNilf(t, header.BaseFee, "block %d BaseFee", i+1)
 		require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d BaseFee", i+1)
 	}
@@ -1084,7 +1084,7 @@ func TestRampMinPriceExponent(t *testing.T) {
 	// The floor doubles only every 3600 blocks (ACP-283), so BaseFee stays put
 	// over a few blocks. Assert BaseFee equals the floor the parent's exponent
 	// implies, and that the exponent ramps toward the vote.
-	prevExp := initialPriceExponent
+	prevExp := dynamic.InitialPriceExponent
 	for i, sk := range keys {
 		w := newWallet(sk, sut.ctx, sut.Client)
 		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
