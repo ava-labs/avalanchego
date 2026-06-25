@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
@@ -32,10 +33,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -44,13 +47,16 @@ var _ hook.PointsG[*hookTx] = (*hooks)(nil)
 
 type hooks struct {
 	builder
-	state *cchainstate.State
+	state       *cchainstate.State
+	warpStorage *warp.Storage
 }
 
 func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
+	chainConfig *params.ChainConfig,
 	pool *txpool.Pending,
+	warpStorage *warp.Storage,
 	now func() time.Time,
 	desired desiredParams,
 ) *hooks {
@@ -72,11 +78,13 @@ func newHooks(
 	return &hooks{
 		builder{
 			ctx,
+			chainConfig,
 			now,
 			poolTxs,
 			desired,
 		},
 		state,
+		warpStorage,
 	}
 }
 
@@ -98,6 +106,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 	now := h.BlockTime(b.Header())
 	return &builder{
 		h.ctx,
+		h.chainConfig,
 		func() time.Time {
 			return now
 		},
@@ -185,6 +194,10 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 }
 
 func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+	// TODO(StephenButtolph): If the genesis was configured to be pre-Durango
+	// and this block is the first post-Durango block, we need to activate the
+	// Warp precompile. This case does not happen on Mainnet, Fuji, or the Local
+	// network, but could happen on a custom network.
 	return nil
 }
 
@@ -205,8 +218,13 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 		return fmt.Errorf("applying cross-chain state: %w", err)
 	}
 
-	// TODO(StephenButtolph): Persist produced warp messages.
-	_ = receipts
+	messages, err := warp.FromReceipts(receipts)
+	if err != nil {
+		return fmt.Errorf("parsing warp messages from receipts: %w", err)
+	}
+	if err := h.warpStorage.Add(messages...); err != nil {
+		return fmt.Errorf("storing warp messages from receipts: %w", err)
+	}
 	return nil
 }
 
@@ -214,6 +232,7 @@ var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
 type builder struct {
 	ctx          *snow.Context
+	chainConfig  *params.ChainConfig
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
 	desired      desiredParams
@@ -344,7 +363,7 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 	return s, nil
 }
 
-func (*builder) BuildBlock(
+func (b *builder) BuildBlock(
 	header *types.Header,
 	blockCtx *block.Context,
 	ethTxs []*types.Transaction,
@@ -361,8 +380,31 @@ func (*builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	// TODO(StephenButtolph): Encode warp predicate results in the header.
-	_ = blockCtx
+	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
+	rulesExtra := corethparams.GetRulesExtra(rules)
+	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
+	if err != nil {
+		return nil, fmt.Errorf("verifying warp messages: %w", err)
+	}
+
+	// TODO(StephenButtolph): Replace the predicate bytes format with an
+	// efficiently packed canoto message. The current format is extremely
+	// inefficient. There are 6 bytes of constant overhead, along with
+	// unnecessarily including the contract address and tx hash. The warp
+	// contract address is a constant, and the tx hash should be replaced with
+	// the tx index.
+	warpValidityBytes, err := warpValidity.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("serializing warp validity: %w", err)
+	}
+
+	// TODO(StephenButtolph): Remove padding for the ACP-176 fee state. The fee
+	// state is encoded in other fields.
+	header.Extra = customheader.SetPredicateBytesInExtra(
+		rulesExtra.AvalancheRules,
+		header.Extra,
+		warpValidityBytes,
+	)
 
 	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
 	he := customtypes.GetHeaderExtra(header)
