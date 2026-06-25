@@ -1,0 +1,64 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
+go_library(
+    name = "statesync",
+    srcs = [
+        "acceptor.go",
+        "handler.go",
+        "summary.canoto.go",
+        "summary.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/statesync",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//vms/saevm/adaptor",
+        "//vms/saevm/cchain/state",
+        "//vms/saevm/hook",
+        "//vms/saevm/statesync",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_stephenbuttolph_canoto//:canoto",
+    ],
+)
+
+go_test(
+    name = "statesync_test",
+    srcs = [
+        "handler_test.go",
+        "summary_test.go",
+    ],
+    embed = [":statesync"],
+    deps = [
+        "//chains/atomic",
+        "//database/memdb",
+        "//database/prefixdb",
+        "//snow/snowtest",
+        "//vms/components/avax",
+        "//vms/saevm/cchain/state",
+        "//vms/saevm/cchain/tx",
+        "//vms/saevm/hook",
+        "//vms/saevm/statesync",
+        "//vms/saevm/types",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_stretchr_testify//require",
+    ],
+)

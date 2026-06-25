@@ -51,6 +51,10 @@ func (s *Summary) Bytes() []byte {
 	return s.MarshalCanoto()
 }
 
+func (s *Summary) BlockHash() common.Hash {
+	return s.blockHash
+}
+
 func (s *Summary) Height() uint64 {
 	return s.height
 }
