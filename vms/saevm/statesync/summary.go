@@ -53,6 +53,11 @@ func (s *Summary) Bytes() []byte {
 	return s.MarshalCanoto()
 }
 
+// BlockHash returns the hash of the block represented by the [Summary].
+func (s *Summary) BlockHash() common.Hash {
+	return s.blockHash
+}
+
 // Height returns the height of the block represented by the [Summary].
 func (s *Summary) Height() uint64 {
 	return s.height
