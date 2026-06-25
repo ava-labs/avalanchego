@@ -473,9 +473,9 @@ func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, 
 	assert.Equalf(tb, wantHeight, gotHeight, "%T.GetTx() block height", s.Client)
 }
 
-// runConsensusLoop sends any configured txs, builds+verifies+accepts a block
-// under any configured block context, and waits for execution. Without txs it
-// waits for a pending-tx event, since cchain must not build empty blocks.
+// runConsensusLoop builds, verifies, accepts, and executes a block from any
+// configured txs and block context. cchain must not build empty blocks, so
+// with no txs it waits for a pending-tx event first.
 func (s *SUT) runConsensusLoop(tb testing.TB, opts ...consensusOption) *blocks.Block {
 	tb.Helper()
 
@@ -491,7 +491,7 @@ func (s *SUT) runConsensusLoop(tb testing.TB, opts ...consensusOption) *blocks.B
 }
 
 // buildVerify waits for the issued txs to become pending, then builds and
-// verifies a block on top of preferenceID via the shared consensus helper.
+// verifies a block on top of preferenceID.
 func (s *SUT) buildVerify(tb testing.TB, preferenceID ids.ID) *blocks.Block {
 	tb.Helper()
 
@@ -507,16 +507,14 @@ type (
 	consensusOption = options.Option[consensusConfig]
 )
 
-// withTxs configures [SUT.runConsensusLoop] to submit txs and wait for them to
-// become pending before building.
+// withTxs sets the txs for [SUT.runConsensusLoop] to submit before building.
 func withTxs(txs ...*types.Transaction) consensusOption {
 	return options.Func[consensusConfig](func(c *consensusConfig) {
 		c.txs = txs
 	})
 }
 
-// withBlockContext configures [SUT.runConsensusLoop] to build and verify under
-// blockCtx instead of a nil context.
+// withBlockContext sets the [block.Context] for [SUT.runConsensusLoop].
 func withBlockContext(blockCtx *block.Context) consensusOption {
 	return options.Func[consensusConfig](func(c *consensusConfig) {
 		c.blockOpts = append(c.blockOpts, vmtest.WithBlockContext(blockCtx))

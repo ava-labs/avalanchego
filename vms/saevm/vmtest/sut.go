@@ -24,8 +24,7 @@ import (
 	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
-// rawVM is the native block API common to the SAE and C-Chain VMs. Both expose
-// it directly, the latter by embedding the former.
+// rawVM is the native block API common to the SAE and C-Chain VMs.
 type rawVM interface {
 	SetPreference(context.Context, ids.ID, *block.Context) error
 	BuildBlock(context.Context, *block.Context) (*blocks.Block, error)
@@ -37,9 +36,8 @@ type rawVM interface {
 	GethRPCBackends() saerpc.GethBackends
 }
 
-// SUT is the VM-agnostic system under test. The VM type parameter lets each
-// package reach its own internals through [SUT.RawVM] while sharing the
-// consensus helpers below.
+// SUT is the VM-agnostic system under test shared by the SAE and C-Chain VM
+// tests. [SUT.RawVM] exposes the concrete VM.
 type SUT[VM rawVM] struct {
 	RawVM     VM
 	EthClient *ethclient.Client
@@ -117,8 +115,8 @@ type blockConfig struct {
 // block.
 type BlockOption = options.Option[blockConfig]
 
-// WithBlockContext sets the [block.Context] used to set the preference and to
-// build and verify the block. If unset, a nil context is used.
+// WithBlockContext sets the [block.Context] for building and verifying. If
+// unset, a nil context is used.
 func WithBlockContext(blockCtx *block.Context) BlockOption {
 	return options.Func[blockConfig](func(c *blockConfig) {
 		c.context = blockCtx
@@ -154,8 +152,8 @@ func (s *SUT[VM]) RunConsensusLoop(tb testing.TB, opts ...BlockOption) *blocks.B
 	return s.RunConsensusLoopOnPreference(tb, s.LastAcceptedID(tb), opts...)
 }
 
-// Dial dials url and returns the RPC client and an [ethclient.Client] sharing
-// its transport, which is closed during cleanup.
+// Dial returns an RPC client and an [ethclient.Client] for url, closed during
+// cleanup.
 func Dial(tb testing.TB, url string) (*rpc.Client, *ethclient.Client) {
 	tb.Helper()
 	rpcClient, err := rpc.Dial(url)

@@ -347,8 +347,7 @@ func (s *SUT) createAndVerifyBlock(tb testing.TB, preference *blocks.Block, txs 
 }
 
 // runConsensusLoopOnPreference sends txs, then builds, verifies, and accepts a
-// block on top of preference via the shared consensus helper. It does NOT wait
-// for execution - set the [VM] to [snow.Bootstrapping] for that.
+// block on top of preference. It does NOT wait for execution.
 func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
 	s.SendTxsAndWaitUntilPending(tb, txs...)
@@ -437,8 +436,8 @@ func (s *SUT) assertBlockHashInvariants(ctx context.Context, t *testing.T) {
 	})
 }
 
-// unwrap is a convenience (un)wrapper for calling [adaptor.Block.Unwrap] after
-// confirming the concrete type of `b`.
+// unwrap returns the [blocks.Block] wrapped by b, failing the test if b is not
+// an [adaptor.Block].
 func unwrap(tb testing.TB, b snowman.Block) *blocks.Block {
 	tb.Helper()
 	switch b := b.(type) {
