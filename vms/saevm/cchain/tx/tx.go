@@ -140,8 +140,8 @@ func (t *Tx) InputIDs() set.Set[ids.ID] {
 // It does not include non-AVAX balance changes or shared memory modifications.
 //
 // blockGasLimit is the block's gas limit x. Atomic txs live in ExtData, which the
-// EVM byte budget ignores, so the gas is floored at [blocklimit.MinGasForBytes]
-// to price each tx for the body share it occupies.
+// EVM byte budget ignores, so the gas is raised to a minimum of
+// [blocklimit.MinGasForBytes] to price each tx for the body share it occupies.
 func (t *Tx) AsOp(avaxAssetID ids.ID, blockGasLimit uint64) (hook.Op, error) {
 	g, err := gasUsed(t.Unsigned)
 	if err != nil {
@@ -152,8 +152,8 @@ func (t *Tx) AsOp(avaxAssetID ids.ID, blockGasLimit uint64) (hook.Op, error) {
 	if err != nil {
 		return hook.Op{}, fmt.Errorf("serializing tx: %w", err)
 	}
-	if floor := blocklimit.MinGasForBytes(uint64(len(bytes)), blockGasLimit); floor > uint64(g) {
-		g = gas.Gas(floor)
+	if minGas := blocklimit.MinGasForBytes(uint64(len(bytes)), blockGasLimit); minGas > uint64(g) {
+		g = gas.Gas(minGas)
 	}
 
 	burned, err := t.Unsigned.burned(avaxAssetID)

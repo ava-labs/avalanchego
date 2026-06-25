@@ -68,8 +68,9 @@ type Txpool struct {
 // strictly higher-fee incoming transaction.
 //
 // blockGasLimit returns the gas limit x of the next block to be built. It is
-// used to floor a transaction's gas by its serialized size (see [tx.Tx.AsOp]),
-// so that pool fee ordering tracks the gas the block builder will charge.
+// used to raise a transaction's gas to a minimum set by its serialized size
+// (see [tx.Tx.AsOp]), so that pool fee ordering tracks the gas the block builder
+// will charge.
 //
 // [Txpool.Close] MUST be called during shutdown to release allocated resources.
 func New(

@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	floorBlockGasLimit = 20_000_000 // x/M ~= 9.54 gas/byte
-	liveBlockGasLimit  = 80_000_000 // x/M ~= 38.15 gas/byte
+	lowBlockGasLimit  = 20_000_000 // x/M ~= 9.54 gas/byte
+	liveBlockGasLimit = 80_000_000 // x/M ~= 38.15 gas/byte
 )
 
 func TestEligible(t *testing.T) {
@@ -50,17 +50,17 @@ func TestEligible(t *testing.T) {
 			want:       true,
 		},
 		{
-			name:       "nonZeroCalldata_floor",
+			name:       "nonZeroCalldata_low",
 			size:       1_000,
 			gasLimit:   16_000,
-			blockLimit: floorBlockGasLimit,
+			blockLimit: lowBlockGasLimit,
 			want:       true,
 		},
 		{
-			name:       "zeroByteCalldata_floor",
+			name:       "zeroByteCalldata_low",
 			size:       1_000,
 			gasLimit:   4_000,
-			blockLimit: floorBlockGasLimit,
+			blockLimit: lowBlockGasLimit,
 		},
 		{
 			name:       "boundaryEqual",
@@ -125,7 +125,7 @@ func TestMinGasForBytes(t *testing.T) {
 		want                uint64
 	}{
 		{
-			name:          "zeroGasLimit_disablesFloor",
+			name:          "zeroGasLimit_disablesMinimum",
 			size:          1_000,
 			blockGasLimit: 0,
 			want:          0,

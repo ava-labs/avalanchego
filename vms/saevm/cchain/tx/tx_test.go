@@ -763,17 +763,17 @@ func TestAsOp(t *testing.T) {
 	}
 }
 
-// TestAsOpByteFloor verifies that [Tx.AsOp] floors the gas at
+// TestAsOpMinGasForBytes verifies that [Tx.AsOp] raises the gas to a minimum of
 // [blocklimit.MinGasForBytes] for the given block gas limit
-func TestAsOpByteFloor(t *testing.T) {
+func TestAsOpMinGasForBytes(t *testing.T) {
 	const (
-		// baseGas is exportTx's unfloored gas (intrinsic + per-byte +
+		// baseGas is exportTx's gas before the byte minimum (intrinsic + per-byte +
 		// per-signature); see [TestAsOp].
 		baseGas = 11230
-		// At an 80M block gas limit the floor charges ~38 gas per byte; at 20M,
-		// ~9.5 gas per byte — below exportTx's natural gas-per-byte.
-		floorBlockGasLimit = 20_000_000
-		liveBlockGasLimit  = 80_000_000
+		// At an 80M block gas limit the byte minimum charges ~38 gas per byte; at
+		// 20M, ~9.5 gas per byte — below exportTx's natural gas-per-byte.
+		lowBlockGasLimit  = 20_000_000
+		liveBlockGasLimit = 80_000_000
 	)
 
 	rawTx := exportTx.new
@@ -784,22 +784,22 @@ func TestAsOpByteFloor(t *testing.T) {
 	tests := []struct {
 		name          string
 		blockGasLimit uint64
-		floored       bool
+		minBinds      bool
 	}{
-		{name: "floorDisabledByZeroGasLimit", blockGasLimit: 0},
-		{name: "floorBelowBaseGas", blockGasLimit: floorBlockGasLimit},
-		{name: "floorBinds", blockGasLimit: 100 * liveBlockGasLimit, floored: true},
+		{name: "minDisabledByZeroGasLimit", blockGasLimit: 0},
+		{name: "minBelowBaseGas", blockGasLimit: lowBlockGasLimit},
+		{name: "minBinds", blockGasLimit: 100 * liveBlockGasLimit, minBinds: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			floor := blocklimit.MinGasForBytes(size, tt.blockGasLimit)
-			if tt.floored {
-				require.Greaterf(t, floor, uint64(baseGas), "fixture: floor must exceed base gas to bind")
+			minGas := blocklimit.MinGasForBytes(size, tt.blockGasLimit)
+			if tt.minBinds {
+				require.Greaterf(t, minGas, uint64(baseGas), "fixture: minGas must exceed base gas to bind")
 			} else {
-				require.LessOrEqualf(t, floor, uint64(baseGas), "fixture: floor must not exceed base gas")
+				require.LessOrEqualf(t, minGas, uint64(baseGas), "fixture: minGas must not exceed base gas")
 			}
 
-			wantGas := max(uint64(baseGas), floor)
+			wantGas := max(uint64(baseGas), minGas)
 			want := hook.Op{
 				ID:        exportTx.id,
 				Gas:       gas.Gas(wantGas),
