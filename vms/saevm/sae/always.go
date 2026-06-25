@@ -15,11 +15,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
@@ -52,8 +52,8 @@ func (vm *SinceGenesis[_]) Initialize(
 	genesisBytes []byte,
 	upgradeBytes []byte,
 	configBytes []byte,
-	fxs []*common.Fx,
-	appSender common.AppSender,
+	fxs []*snowcommon.Fx,
+	appSender snowcommon.AppSender,
 ) error {
 	db := newEthDB(avaDB)
 	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
