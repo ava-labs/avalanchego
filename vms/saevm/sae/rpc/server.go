@@ -170,10 +170,12 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		})
 	}
 
-	apis = append(apis, api{
-		// geth-specific APIs:
-		"debug", tracers.NewAPI(b),
-	})
+	if !b.config.DisableTracing {
+		apis = append(apis, api{
+			// geth-specific APIs:
+			"debug", tracers.NewAPI(b),
+		})
+	}
 
 	s := rpc.NewServer()
 	s.SetBatchLimits(batchLimit, batchResponseMaxSize)
