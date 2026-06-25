@@ -58,6 +58,7 @@ func newHooks(
 	pool *txpool.Pending,
 	warpStorage *warp.Storage,
 	now func() time.Time,
+	desired desiredParams,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -80,6 +81,7 @@ func newHooks(
 			chainConfig,
 			now,
 			poolTxs,
+			desired,
 		},
 		state,
 		warpStorage,
@@ -109,6 +111,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return now
 		},
 		slices.Values(txs),
+		desiredParams{priceExponent: customtypes.GetHeaderExtra(b.Header()).MinPriceExponent},
 	}, nil
 }
 
@@ -125,11 +128,20 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 	}, nil
 }
 
-func (*hooks) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	// TODO(StephenButtolph): Extract parameters from the header.
+// priceExponent returns h's ACP-283 price exponent, defaulting to
+// [dynamic.InitialPriceExponent] when the header does not carry one.
+func priceExponent(h *types.Header) dynamic.PriceExponent {
+	if pe := customtypes.GetHeaderExtra(h).MinPriceExponent; pe != nil {
+		return *pe
+	}
+	return dynamic.InitialPriceExponent
+}
+
+func (*hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+	// TODO(StephenButtolph): Extract the gas target from the header (ACP-176).
 	return 1_000_000, gastime.GasPriceConfig{
 		TargetToExcessScaling: 87,
-		MinPrice:              1,
+		MinPrice:              priceExponent(header).Price(),
 	}
 }
 
@@ -223,6 +235,7 @@ type builder struct {
 	chainConfig  *params.ChainConfig
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
+	desired      desiredParams
 }
 
 var errHeliconUnactivated = errors.New("helicon is not activated")
@@ -236,9 +249,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	}
 
 	// TODO(StephenButtolph): Encode the ACP-176 target excess in the header.
-	// TODO(StephenButtolph): Encode the ACP-183 min price excess in the header.
 	// TODO(StephenButtolph): Enforce the minimum block time here.
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
+	minPriceExponent := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -260,7 +273,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			TimeMilliseconds: &nowMS,
 			// TODO(StephenButtolph): Encode the min-delay excess.
 			MinDelayExcess:   new(acp226.DelayExcess),
-			MinPriceExponent: new(dynamic.PriceExponent),
+			MinPriceExponent: &minPriceExponent,
 		},
 	), nil
 }

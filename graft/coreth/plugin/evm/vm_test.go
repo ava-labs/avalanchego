@@ -2274,6 +2274,13 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 				require.NoError(t, err)
 				t.Cleanup(client.Close)
 
+				// Verify the genesis state by checking the pre-funded balances at block 0.
+				for _, addr := range vmtest.TestEthAddrs {
+					balance, err := client.BalanceAt(ctx, addr, new(big.Int).SetUint64(0))
+					require.NoErrorf(t, err, "failed to get genesis balance for %s", addr)
+					require.Equalf(t, vmtest.InitialFund, balance, "unexpected genesis balance for %s", addr)
+				}
+
 				for blockNum := uint64(0); blockNum <= numBlocks; blockNum++ {
 					// Checking the sender's nonce (which should equal the block number)
 					// verifies that the reconstructed state is both openable and correct.

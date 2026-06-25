@@ -37,7 +37,7 @@ func newTestDatabaseWithConfig(t *testing.T, cfg TrieDBConfig) state.Database {
 		require.NoError(t, tdb.Close())
 	})
 
-	return NewStateAccessor(internalState, tdb)
+	return NewStateAccessor(internalState)
 }
 
 func TestCommitEmptyGenesis(t *testing.T) {

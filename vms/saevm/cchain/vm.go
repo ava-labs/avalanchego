@@ -150,6 +150,7 @@ func (vm *VM) Initialize(
 		pendingTxs,
 		warpStorage,
 		vm.now,
+		userConfig.desired(),
 	)
 	mempoolConfig := legacypool.DefaultConfig
 	// Treat all transactions equally regardless of submission source — no
