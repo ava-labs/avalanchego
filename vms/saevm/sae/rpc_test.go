@@ -589,7 +589,7 @@ func TestEthGetters(t *testing.T) {
 	onDisk := sut.runConsensusLoop(t, createTx(t, zeroAddr))
 
 	settled := sut.runConsensusLoop(t, createTx(t, zeroAddr))
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 
 	executed := sut.runConsensusLoop(t, createTx(t, zeroAddr))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
@@ -740,7 +740,7 @@ func TestGetLogs(t *testing.T) {
 	}
 
 	settled := sut.runConsensusLoop(t, txWithLog(t))
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 
 	noLogs := sut.runConsensusLoop(t, txWithoutLog(t))
 
@@ -936,7 +936,7 @@ func TestGetReceipts(t *testing.T) {
 
 	onDisk, wantOnDisk := slice(t, 0, 2)
 	settled, wantSettled := slice(t, 2, 4)
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 	unsettled, wantUnsettled := slice(t, 4, 6)
 	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
 
@@ -1633,11 +1633,11 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 	ctx, sut := newSUT(t, 0, opt)
 
 	settled := sut.runConsensusLoop(t)
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 
 	for range 2 {
 		b := sut.runConsensusLoop(t)
-		vmTime.advanceToSettle(ctx, t, b)
+		vmTime.AdvanceToSettle(ctx, t, b)
 	}
 	_, ok := sut.RawVM.consensusCritical.Load(settled.Hash())
 	require.False(t, ok, "settled block still in VM memory")

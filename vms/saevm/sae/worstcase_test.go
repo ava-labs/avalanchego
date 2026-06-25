@@ -249,7 +249,7 @@ func TestWorstCase(t *testing.T) {
 				}
 
 				for accepted := false; !accepted; {
-					vmTime.advance(time.Millisecond * time.Duration(rng.IntN(1000*3*saeparams.TauSeconds)))
+					vmTime.Advance(time.Millisecond * time.Duration(rng.IntN(1000*3*saeparams.TauSeconds)))
 
 					require.NoError(t, sut.SetPreference(ctx, sut.LastAcceptedBlock(t).ID()), "SetPreference()")
 

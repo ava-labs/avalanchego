@@ -14,22 +14,28 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
 // When TimeMilliseconds is unset, BlockTime falls back to Header.Time's seconds.
 // The VM always sets TimeMilliseconds, so this legacy decode path is only
 // reachable by exercising the hook directly.
 func TestBlockTime(t *testing.T) {
-	const testTimestampSeconds uint64 = 1_700_000_000
+	_, sut := newSUT(t)
+	hooks := sut.hooks()
 
-	header := &types.Header{Time: testTimestampSeconds}
-
-	got := (&hooks{}).BlockTime(header)
-	require.Equal(t, int64(testTimestampSeconds)*1000, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
+	const (
+		unix            = 1_700_000_000
+		unixMilli int64 = unix * 1000
+	)
+	header := &types.Header{Time: unix}
+	got := hooks.BlockTime(header)
+	require.Equal(t, unixMilli, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
 	// Documented invariant: BlockTime(h).Unix() == h.Time.
-	require.Equal(t, int64(testTimestampSeconds), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
+	require.Equal(t, int64(unix), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
 }
 
 func TestAncestorInputIDs(t *testing.T) {
@@ -97,6 +103,55 @@ func TestAncestorInputIDs(t *testing.T) {
 			got, err := ancestorInputIDs(tt.header, tt.settled, source)
 			require.ErrorIs(t, err, tt.wantErr, "ancestorInputIDs()")
 			assert.Equal(t, tt.want, got, "ancestorInputIDs()")
+		})
+	}
+}
+
+// Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
+// writes into the header, and returns the zero marker when the header carries none.
+func TestSettledBy(t *testing.T) {
+	_, sut := newSUT(t)
+	hooks := sut.hooks()
+
+	// built returns the header of a block built carrying the given settled marker.
+	built := func(t *testing.T, settled hook.Settled) *types.Header {
+		t.Helper()
+
+		block, err := hooks.BuildBlock(&types.Header{}, nil, nil, nil, nil, settled)
+		require.NoError(t, err, "builder.BuildBlock()")
+		return block.Header()
+	}
+
+	nonzero := hook.Settled{
+		Height:       7,
+		GasUnix:      1_000,
+		GasNumerator: gas.Gas(3),
+		Excess:       gas.Gas(42),
+	}
+	tests := []struct {
+		name   string
+		header *types.Header
+		want   hook.Settled
+	}{
+		{
+			name:   "absent_marker",
+			header: &types.Header{},
+			want:   hook.Settled{},
+		},
+		{
+			name:   "zero",
+			header: built(t, hook.Settled{}),
+			want:   hook.Settled{},
+		},
+		{
+			name:   "nonzero",
+			header: built(t, nonzero),
+			want:   nonzero,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, hooks.SettledBy(tt.header), "hooks.SettledBy()")
 		})
 	}
 }

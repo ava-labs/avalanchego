@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 
@@ -108,32 +109,49 @@ func (s *SUT[VM]) SendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transa
 	s.WaitUntilTxsPending(tb, txs...)
 }
 
-// BuildVerify builds a block on top of preferenceID and verifies it, without a
-// block context.
-func (s *SUT[VM]) BuildVerify(tb testing.TB, preferenceID ids.ID) *blocks.Block {
+type blockConfig struct {
+	context *block.Context
+}
+
+// BlockOption configures the [block.Context] used when building and verifying a
+// block.
+type BlockOption = options.Option[blockConfig]
+
+// WithBlockContext sets the [block.Context] used to set the preference and to
+// build and verify the block. If unset, a nil context is used.
+func WithBlockContext(blockCtx *block.Context) BlockOption {
+	return options.Func[blockConfig](func(c *blockConfig) {
+		c.context = blockCtx
+	})
+}
+
+// BuildVerify builds a block on top of preferenceID and verifies it, using the
+// [block.Context] from opts (nil if unset).
+func (s *SUT[VM]) BuildVerify(tb testing.TB, preferenceID ids.ID, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
+	blockCtx := options.As(opts...).context
 	ctx := s.Context(tb)
-	require.NoErrorf(tb, s.RawVM.SetPreference(ctx, preferenceID, nil), "%T.SetPreference()", s.RawVM)
-	b, err := s.RawVM.BuildBlock(ctx, nil)
+	require.NoErrorf(tb, s.RawVM.SetPreference(ctx, preferenceID, blockCtx), "%T.SetPreference()", s.RawVM)
+	b, err := s.RawVM.BuildBlock(ctx, blockCtx)
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.RawVM)
-	require.NoErrorf(tb, s.RawVM.VerifyBlock(ctx, nil, b), "%T.VerifyBlock()", s.RawVM)
+	require.NoErrorf(tb, s.RawVM.VerifyBlock(ctx, blockCtx, b), "%T.VerifyBlock()", s.RawVM)
 	return b
 }
 
 // RunConsensusLoopOnPreference builds, verifies, and accepts a block on top of
 // preferenceID. It does NOT wait for execution.
-func (s *SUT[VM]) RunConsensusLoopOnPreference(tb testing.TB, preferenceID ids.ID) *blocks.Block {
+func (s *SUT[VM]) RunConsensusLoopOnPreference(tb testing.TB, preferenceID ids.ID, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
-	b := s.BuildVerify(tb, preferenceID)
+	b := s.BuildVerify(tb, preferenceID, opts...)
 	require.NoErrorf(tb, s.RawVM.AcceptBlock(s.Context(tb), b), "%T.AcceptBlock()", s.RawVM)
 	return b
 }
 
 // RunConsensusLoop is [SUT.RunConsensusLoopOnPreference] on top of the
 // last-accepted block.
-func (s *SUT[VM]) RunConsensusLoop(tb testing.TB) *blocks.Block {
+func (s *SUT[VM]) RunConsensusLoop(tb testing.TB, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
-	return s.RunConsensusLoopOnPreference(tb, s.LastAcceptedID(tb))
+	return s.RunConsensusLoopOnPreference(tb, s.LastAcceptedID(tb), opts...)
 }
 
 // Dial dials url and returns the RPC client and an [ethclient.Client] sharing

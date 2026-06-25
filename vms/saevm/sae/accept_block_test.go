@@ -46,7 +46,7 @@ func TestAcceptBlock(t *testing.T) {
 	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 	for range 100 {
 		ffMillis := 100 + rng.IntN(1000*(1+saeparams.TauSeconds))
-		vmTime.advance(time.Millisecond * time.Duration(ffMillis))
+		vmTime.Advance(time.Millisecond * time.Duration(ffMillis))
 
 		b := sut.RunConsensusLoop(t)
 		unsettled = append(unsettled, b)
