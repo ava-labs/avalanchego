@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -123,9 +124,20 @@ func (*hooks) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	}
 }
 
-func (*hooks) SettledBy(*types.Header) hook.Settled {
-	// TODO(StephenButtolph): Extract from the header.
-	return hook.Settled{}
+func (*hooks) SettledBy(h *types.Header) hook.Settled {
+	he := customtypes.GetHeaderExtra(h)
+	if he.SettledHeight == nil ||
+		he.SettledGasUnix == nil ||
+		he.SettledGasNumerator == nil ||
+		he.SettledExcess == nil {
+		return hook.Settled{}
+	}
+	return hook.Settled{
+		Height:       *he.SettledHeight,
+		GasUnix:      *he.SettledGasUnix,
+		GasNumerator: gas.Gas(*he.SettledGasNumerator),
+		Excess:       gas.Gas(*he.SettledExcess),
+	}
 }
 
 func (*hooks) BlockTime(h *types.Header) time.Time {
@@ -221,7 +233,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &now,
 			// TODO(StephenButtolph): Encode the min-delay excess.
-			MinDelayExcess: new(acp226.DelayExcess),
+			MinDelayExcess:   new(acp226.DelayExcess),
+			MinPriceExponent: new(dynamic.PriceExponent),
 		},
 	), nil
 }
@@ -337,8 +350,14 @@ func (*builder) BuildBlock(
 
 	// TODO(StephenButtolph): Encode warp predicate results in the header.
 	_ = blockCtx
-	// TODO(StephenButtolph): Encode settled in the block.
-	_ = settled
+
+	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
+	he := customtypes.GetHeaderExtra(header)
+	he.SettledHeight = &settled.Height
+	he.SettledGasUnix = &settled.GasUnix
+	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
+	he.SettledExcess = (*uint64)(&settled.Excess)
+
 	return customtypes.NewBlockWithExtData(
 		header,
 		ethTxs,
