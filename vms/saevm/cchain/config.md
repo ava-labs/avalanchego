@@ -45,7 +45,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |
 | `populate-missing-tries` | uint64 | Starting block for re-populating missing tries. Re-generation is disabled if null. | `null` |
 | `offline-pruning-enabled` | bool | Enable offline pruning. | `false` |
-| `state-scheme` | string | EXPERIMENTAL: specifies the database scheme used to store state data; one of `hash`, `firewood`, or `path`. | `hash` |
+| `state-scheme` | string | EXPERIMENTAL: specifies the database scheme used to store state data; either `hash` or `firewood`. | `hash` |
 
 ## Transaction Pool
 
