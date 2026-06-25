@@ -56,7 +56,7 @@ type config struct {
 	// BatchRequestLimit   uint64 `json:"batch-request-limit"`
 
 	// State sync
-	// StateSyncEnabled *bool  `json:"state-sync-enabled"`
+	// StateSyncEnabled bool  `json:"state-sync-enabled"`
 	// StateSyncIDs     string `json:"state-sync-ids"`
 
 	// Warp
