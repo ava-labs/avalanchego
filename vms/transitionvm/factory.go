@@ -46,8 +46,9 @@ func (f *Factory) New(log logging.Logger) (interface{}, error) {
 		postTransitionChain: post,
 		transitionTime:      f.TransitionTime,
 
-		// Populate current here so that functions that can be called before
-		// Initialize, such as Version, have a default location to route to.
+		// [VM.Version] and [VM.Shutdown] may be called before [VM.Initialize].
+		// For those methods we mark the pre-transition VM as current to handle
+		// these calls.
 		current: &current{
 			chain: pre,
 		},

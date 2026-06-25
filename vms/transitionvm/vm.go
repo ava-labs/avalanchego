@@ -36,7 +36,7 @@ type VM struct {
 	transitionTime      time.Time
 
 	// chain parameters
-	chainCtx     *snow.Context // Has modified Lock and Metrics fields
+	postChainCtx *snow.Context // Has modified Lock and Metrics fields
 	db           database.Database
 	genesisBytes []byte
 	upgradeBytes []byte
@@ -67,7 +67,7 @@ var transitionedKey = prefixdb.MakePrefix([]byte("transitioned"))
 
 func (vm *VM) Initialize(
 	ctx context.Context,
-	chainCtx *snow.Context,
+	preChainCtx *snow.Context,
 	db database.Database,
 	genesisBytes []byte,
 	upgradeBytes []byte,
@@ -76,28 +76,36 @@ func (vm *VM) Initialize(
 	appSender common.AppSender,
 ) error {
 	gatherer := metrics.NewPrefixGatherer()
-	if err := chainCtx.Metrics.Register("transition", gatherer); err != nil {
+	if err := preChainCtx.Metrics.Register("transition", gatherer); err != nil {
 		return err
 	}
 
-	vm.chainCtx = &snow.Context{
-		NetworkID:       chainCtx.NetworkID,
-		SubnetID:        chainCtx.SubnetID,
-		ChainID:         chainCtx.ChainID,
-		NodeID:          chainCtx.NodeID,
-		PublicKey:       chainCtx.PublicKey,
-		NetworkUpgrades: chainCtx.NetworkUpgrades,
-		XChainID:        chainCtx.XChainID,
-		CChainID:        chainCtx.CChainID,
-		AVAXAssetID:     chainCtx.AVAXAssetID,
-		Log:             chainCtx.Log,
-		Lock:            sync.RWMutex{},
-		SharedMemory:    chainCtx.SharedMemory,
-		BCLookup:        chainCtx.BCLookup,
-		Metrics:         gatherer,
-		WarpSigner:      chainCtx.WarpSigner,
-		ValidatorState:  chainCtx.ValidatorState,
-		ChainDataDir:    chainCtx.ChainDataDir,
+	// To avoid errors when registering metrics, SAE is provided a different
+	// gatherer than Coreth. To avoid any potential race conditions with
+	// updating the [snow.Context] during the transition, we instead create a
+	// full copy of the context and keep both copies isolated.
+	vm.postChainCtx = &snow.Context{
+		NetworkID:       preChainCtx.NetworkID,
+		SubnetID:        preChainCtx.SubnetID,
+		ChainID:         preChainCtx.ChainID,
+		NodeID:          preChainCtx.NodeID,
+		PublicKey:       preChainCtx.PublicKey,
+		NetworkUpgrades: preChainCtx.NetworkUpgrades,
+		XChainID:        preChainCtx.XChainID,
+		CChainID:        preChainCtx.CChainID,
+		AVAXAssetID:     preChainCtx.AVAXAssetID,
+		Log:             preChainCtx.Log,
+		// The lock is deprecated and already not supported by the RPCChainVM.
+		// SAE never uses this lock, so it is safe not to provide the actual
+		// lock reference here. Coreth, however, does use this lock. So, Coreth
+		// MUST get the original context rather than this copy.
+		Lock:           sync.RWMutex{},
+		SharedMemory:   preChainCtx.SharedMemory,
+		BCLookup:       preChainCtx.BCLookup,
+		Metrics:        gatherer,
+		WarpSigner:     preChainCtx.WarpSigner,
+		ValidatorState: preChainCtx.ValidatorState,
+		ChainDataDir:   preChainCtx.ChainDataDir,
 	}
 	vm.db = db
 	vm.genesisBytes = genesisBytes
@@ -109,27 +117,23 @@ func (vm *VM) Initialize(
 	vm.connections = newConnections()
 	vm.httpHandlers = newHTTPHandlers()
 
-	vm.current = &current{
-		chain: vm.preTransitionChain,
-	}
-
-	chainCtx.Log.Info("checking for last synchronous block")
+	preChainCtx.Log.Info("checking for transition marker")
 	has, err := vm.db.Has(transitionedKey)
 	if err != nil {
-		return fmt.Errorf("checking for last synchronous block: %w", err)
+		return fmt.Errorf("checking for transition marker: %w", err)
 	}
 
 	if has {
-		chainCtx.Log.Info("initializing post-transition VM")
-		if err := vm.initChain(ctx, vm.postTransitionChain, vm.chainCtx); err != nil {
+		preChainCtx.Log.Info("initializing post-transition VM")
+		if err := vm.initChain(ctx, vm.postTransitionChain, vm.postChainCtx); err != nil {
 			return fmt.Errorf("initializing post-transition VM: %w", err)
 		}
 		vm.transitioned = true
 		return nil
 	}
 
-	chainCtx.Log.Info("initializing pre-transition VM")
-	if err := vm.initChain(ctx, vm.preTransitionChain, chainCtx); err != nil {
+	preChainCtx.Log.Info("initializing pre-transition VM")
+	if err := vm.initChain(ctx, vm.preTransitionChain, preChainCtx); err != nil {
 		return fmt.Errorf("initializing pre-transition VM: %w", err)
 	}
 
@@ -149,6 +153,9 @@ func (vm *VM) Initialize(
 	return vm.transition(ctx, lastAccepted)
 }
 
+// transition handles the switch from the pre-transition VM to the
+// post-transition VM. It is assumed that the pre-transition VM is currently
+// active.
 func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	// We must cancel the context before grabbing the lock to ensure that
 	// [VM.WaitForEvent] does not block indefinitely.
@@ -158,28 +165,28 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	defer vm.transitionLock.Unlock()
 
 	lastID := last.ID()
-	vm.chainCtx.Log.Info("transitioning VMs",
-		zap.Stringer("lastID", lastID),
-		zap.Uint64("lastHeight", last.Height()),
-		zap.Time("lastTime", last.Timestamp()),
+	vm.postChainCtx.Log.Info("transitioning VMs",
+		zap.Stringer("blkID", lastID),
+		zap.Uint64("height", last.Height()),
+		zap.Time("timestamp", last.Timestamp()),
 	)
 
-	vm.chainCtx.Log.Info("shutting down pre-transition VM")
+	vm.postChainCtx.Log.Info("shutting down pre-transition VM")
 	if err := vm.preTransitionChain.Shutdown(ctx); err != nil {
 		return fmt.Errorf("closing pre-transition chain: %w", err)
 	}
 
-	vm.chainCtx.Log.Info("writing last synchronous block")
+	vm.postChainCtx.Log.Info("writing transition marker")
 	if err := vm.db.Put(transitionedKey, nil); err != nil {
-		return fmt.Errorf("saving last synchronous block: %w", err)
+		return fmt.Errorf("writing transition marker: %w", err)
 	}
 
-	vm.chainCtx.Log.Info("initializing post-transition VM")
-	if err := vm.initChain(ctx, vm.postTransitionChain, vm.chainCtx); err != nil {
+	vm.postChainCtx.Log.Info("initializing post-transition VM")
+	if err := vm.initChain(ctx, vm.postTransitionChain, vm.postChainCtx); err != nil {
 		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
 
-	vm.chainCtx.Log.Info("initializing post-transition VM preference",
+	vm.postChainCtx.Log.Info("initializing post-transition VM preference",
 		zap.Stringer("blkID", lastID),
 	)
 	if err := vm.postTransitionChain.SetPreference(ctx, lastID); err != nil {
@@ -187,10 +194,13 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 
 	vm.transitioned = true
-	vm.chainCtx.Log.Info("transition finished successfully")
+	vm.postChainCtx.Log.Info("transition finished successfully")
 	return nil
 }
 
+// initChain initializes the VM with the provided chain and context. This is
+// used for both initializing the pre-transition chain and the post-transition
+// chain.
 func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context) error {
 	var (
 		requests requests
