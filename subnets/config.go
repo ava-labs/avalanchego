@@ -5,6 +5,7 @@ package subnets
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,10 +14,26 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+const (
+	// MinProposerWindowDuration / MaxProposerWindowDuration bound an explicitly
+	// configured ProposerWindowDuration. A value of 0 means "use the default"
+	// and is always allowed.
+	//
+	// The floor is 1s because the proposerVM block timestamp is whole-second
+	// granular: a sub-second window gives no real failover benefit (the stall
+	// quantizes up to the next second) while shrinking the verify tolerance
+	// toward block-propagation time. The ceiling equals the default window
+	// (proposer.DefaultWindowDuration); a larger window only slows failover, so
+	// there is no reason to raise it above the historical 5s constant.
+	MinProposerWindowDuration = 1 * time.Second
+	MaxProposerWindowDuration = 5 * time.Second
+)
+
 var (
 	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
 	errNoParametersSet                  = errors.New("consensus config must have either snowball or simplex parameters set")
 	ErrTooManyConsensusParameters       = errors.New("only one of consensusParameters, snowParameters, or simplexParameters can be set")
+	errInvalidProposerWindowDuration    = errors.New("invalid proposerWindowDuration")
 )
 
 type Config struct {
@@ -57,7 +74,13 @@ type Config struct {
 	// ProposerWindowDuration is the length of a single proposerVM slot for the
 	// chains in this Subnet. Lowering it shortens the stall when a scheduled
 	// proposer is offline (faster failover for CFT/PoA L1s), at the cost of more
-	// rejected blocks. If set to 0, the default of 5s is used.
+	// rejected blocks. If set to 0, the default of 5s is used; any other value
+	// must be within [MinProposerWindowDuration, MaxProposerWindowDuration].
+	//
+	// As a time.Duration this is decoded from JSON as an integer number of
+	// nanoseconds (e.g. 1000000000 for 1s), the same as the other duration
+	// fields in a Subnet config (snowParameters.maxItemProcessingTime,
+	// simplexParameters.maxNetworkDelay).
 	//
 	// WARNING: This is a network-wide consensus parameter, not a per-node tuning
 	// knob. Every validator of the Subnet's chains MUST use the SAME value; a
@@ -91,6 +114,12 @@ func (c *Config) ValidConsensusConfiguration() error {
 func (c *Config) ValidParameters() error {
 	if !c.ValidatorOnly && c.AllowedNodes.Len() > 0 {
 		return errAllowedNodesWhenNotValidatorOnly
+	}
+
+	// 0 means "use the default"; any explicit value must be in range.
+	if d := c.ProposerWindowDuration; d != 0 && (d < MinProposerWindowDuration || d > MaxProposerWindowDuration) {
+		return fmt.Errorf("%w: %s is not 0 (default) or within [%s, %s]",
+			errInvalidProposerWindowDuration, d, MinProposerWindowDuration, MaxProposerWindowDuration)
 	}
 
 	if c.SnowParameters != nil {

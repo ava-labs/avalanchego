@@ -86,6 +86,54 @@ func TestValidParameters(t *testing.T) {
 			},
 			expectedErr: simplex.ErrInvalidParameters,
 		},
+		{
+			name: "proposer window duration zero uses default",
+			s: Config{
+				SnowParameters:         &validParameters,
+				ProposerWindowDuration: 0,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "proposer window duration at min boundary",
+			s: Config{
+				SnowParameters:         &validParameters,
+				ProposerWindowDuration: MinProposerWindowDuration,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "proposer window duration at max boundary",
+			s: Config{
+				SnowParameters:         &validParameters,
+				ProposerWindowDuration: MaxProposerWindowDuration,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "proposer window duration below min",
+			s: Config{
+				SnowParameters:         &validParameters,
+				ProposerWindowDuration: MinProposerWindowDuration - 1,
+			},
+			expectedErr: errInvalidProposerWindowDuration,
+		},
+		{
+			name: "proposer window duration above max",
+			s: Config{
+				SnowParameters:         &validParameters,
+				ProposerWindowDuration: MaxProposerWindowDuration + 1,
+			},
+			expectedErr: errInvalidProposerWindowDuration,
+		},
+		{
+			name: "proposer window duration negative",
+			s: Config{
+				SnowParameters:         &validParameters,
+				ProposerWindowDuration: -1,
+			},
+			expectedErr: errInvalidProposerWindowDuration,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
