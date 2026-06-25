@@ -6,7 +6,13 @@ go_library(
     srcs = ["blocklimit.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/blocklimit",
     visibility = ["//visibility:public"],
-    deps = ["//utils/constants"],
+    deps = [
+        "//codec",
+        "//staking",
+        "//utils/constants",
+        "//utils/units",
+        "//utils/wrappers",
+    ],
 )
 
 go_test(

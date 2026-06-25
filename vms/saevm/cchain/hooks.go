@@ -62,7 +62,7 @@ func newHooks(
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
-			ht, err := newHookTx(t, ctx.AVAXAssetID)
+			ht, err := newHookTx(t)
 			if err != nil {
 				ctx.Log.Warn("failed to convert tx",
 					zap.Stringer("txID", t.ID()),
@@ -96,7 +96,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 
 	txs := make([]*hookTx, len(rawTxs))
 	for i, t := range rawTxs {
-		ht, err := newHookTx(t, h.ctx.AVAXAssetID)
+		ht, err := newHookTx(t)
 		if err != nil {
 			return nil, fmt.Errorf("converting tx %s (%d): %w", t.ID(), i, err)
 		}
@@ -180,7 +180,7 @@ func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 
 	ops := make([]hook.Op, len(txs))
 	for i, t := range txs {
-		op, err := t.AsOp(h.ctx.AVAXAssetID)
+		op, err := t.AsOp(h.ctx.AVAXAssetID, b.Header().GasLimit)
 		if err != nil {
 			return nil, fmt.Errorf("converting tx %s (%d): %w", t.ID(), i, err)
 		}
@@ -330,6 +330,18 @@ func (b *builder) PotentialEndOfBlockOps(
 				continue
 			}
 
+			// Recompute the op against the block's gas limit; this MUST match
+			// [hooks.EndOfBlockOps] at execution.
+			op, err := t.tx.AsOp(b.ctx.AVAXAssetID, building.GasLimit)
+			if err != nil {
+				b.ctx.Log.Debug("failed to convert tx to op",
+					zap.Stringer("txID", t.id),
+					zap.Error(err),
+				)
+				continue
+			}
+			t.op = op
+
 			if !yield(t) {
 				return
 			}
@@ -431,20 +443,23 @@ type hookTx struct {
 	id     ids.ID
 	tx     *tx.Tx
 	inputs set.Set[ids.ID]
+	size   int
 	op     hook.Op
 }
 
-func newHookTx(t *tx.Tx, avaxAssetID ids.ID) (*hookTx, error) {
-	op, err := t.AsOp(avaxAssetID)
+func newHookTx(t *tx.Tx) (*hookTx, error) {
+	bytes, err := t.Bytes()
 	if err != nil {
 		return nil, err
 	}
 	return &hookTx{
-		id:     op.ID,
+		id:     t.ID(),
 		tx:     t,
 		inputs: t.InputIDs(),
-		op:     op,
+		size:   len(bytes),
 	}, nil
 }
 
 func (t *hookTx) AsOp() hook.Op { return t.op }
+
+func (t *hookTx) Size() int { return t.size }

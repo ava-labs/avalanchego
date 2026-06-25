@@ -154,7 +154,7 @@ func (vm *VM) Initialize(
 	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 	const maxTxPoolSize = 1024
-	vm.txpool, err = txpool.New(snowCtx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize)
+	vm.txpool, err = txpool.New(snowCtx, vm.chainConfig, pendingTxs, vm.VM, maxTxPoolSize, vm.VM.BlockGasLimit)
 	if err != nil {
 		return fmt.Errorf("creating txpool: %w", err)
 	}

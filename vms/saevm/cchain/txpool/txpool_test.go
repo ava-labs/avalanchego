@@ -144,6 +144,9 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 		NewPending(),
 		backend,
 		maxSize,
+		// A zero block gas limit disables the byte minimum so these tests order by
+		// the txs' intrinsic gas; the minimum itself is covered in tx_test.go.
+		func() uint64 { return 0 },
 	)
 	require.NoError(tb, err)
 	tb.Cleanup(pool.Close)

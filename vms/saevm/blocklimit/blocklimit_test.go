@@ -4,6 +4,7 @@
 package blocklimit_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,8 +13,8 @@ import (
 )
 
 const (
-	floorBlockGasLimit = 20_000_000 // x/M ~= 9.54 gas/byte
-	liveBlockGasLimit  = 80_000_000 // x/M ~= 38.15 gas/byte
+	lowBlockGasLimit  = 20_000_000 // x/M ~= 9.54 gas/byte
+	liveBlockGasLimit = 80_000_000 // x/M ~= 38.15 gas/byte
 )
 
 func TestEligible(t *testing.T) {
@@ -49,17 +50,17 @@ func TestEligible(t *testing.T) {
 			want:       true,
 		},
 		{
-			name:       "nonZeroCalldata_floor",
+			name:       "nonZeroCalldata_low",
 			size:       1_000,
 			gasLimit:   16_000,
-			blockLimit: floorBlockGasLimit,
+			blockLimit: lowBlockGasLimit,
 			want:       true,
 		},
 		{
-			name:       "zeroByteCalldata_floor",
+			name:       "zeroByteCalldata_low",
 			size:       1_000,
 			gasLimit:   4_000,
-			blockLimit: floorBlockGasLimit,
+			blockLimit: lowBlockGasLimit,
 		},
 		{
 			name:       "boundaryEqual",
@@ -112,6 +113,77 @@ func TestEligible(t *testing.T) {
 				tt.size,
 				tt.gasLimit,
 				tt.blockLimit,
+			)
+		})
+	}
+}
+
+func TestMinGasForBytes(t *testing.T) {
+	tests := []struct {
+		name                string
+		size, blockGasLimit uint64
+		want                uint64
+	}{
+		{
+			name:          "zeroGasLimit_disablesMinimum",
+			size:          1_000,
+			blockGasLimit: 0,
+			want:          0,
+		},
+		{
+			name:          "zeroSize",
+			size:          0,
+			blockGasLimit: liveBlockGasLimit,
+			want:          0,
+		},
+		{
+			name:          "exactDivision",
+			size:          10,
+			blockGasLimit: blocklimit.MaxBodyBytes,
+			want:          10,
+		},
+		{
+			name:          "roundsUp",
+			size:          1,
+			blockGasLimit: 1,
+			want:          1,
+		},
+		{
+			name:          "roundsUpWithRemainder",
+			size:          3,
+			blockGasLimit: blocklimit.MaxBodyBytes + 1,
+			want:          4,
+		},
+		{
+			name:          "sizeAtBudget_cannotFit",
+			size:          blocklimit.MaxBodyBytes,
+			blockGasLimit: liveBlockGasLimit,
+			want:          math.MaxUint64,
+		},
+		{
+			name:          "sizeOverBudget_cannotFit",
+			size:          blocklimit.MaxBodyBytes + 1,
+			blockGasLimit: liveBlockGasLimit,
+			want:          math.MaxUint64,
+		},
+		{
+			name:          "overflows64Bit",
+			size:          1_000,
+			blockGasLimit: blocklimit.MaxBodyBytes * 1_000_000_000_000,
+			want:          1_000_000_000_000_000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := blocklimit.MinGasForBytes(tt.size, tt.blockGasLimit)
+			require.Equal(
+				t,
+				tt.want,
+				got,
+				"MinGasForBytes(size=%d, blockGasLimit=%d)",
+				tt.size,
+				tt.blockGasLimit,
 			)
 		})
 	}

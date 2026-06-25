@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -137,10 +138,22 @@ func (t *Tx) InputIDs() set.Set[ids.ID] {
 //
 // The operation only includes state changes that impact Ethereum-native state.
 // It does not include non-AVAX balance changes or shared memory modifications.
-func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
-	gas, err := gasUsed(t.Unsigned)
+//
+// blockGasLimit is the block's gas limit x. Atomic txs live in ExtData, which the
+// EVM byte budget ignores, so the gas is raised to a minimum of
+// [blocklimit.MinGasForBytes] to price each tx for the body share it occupies.
+func (t *Tx) AsOp(avaxAssetID ids.ID, blockGasLimit uint64) (hook.Op, error) {
+	g, err := gasUsed(t.Unsigned)
 	if err != nil {
 		return hook.Op{}, fmt.Errorf("calculating gas used: %w", err)
+	}
+
+	bytes, err := t.Bytes()
+	if err != nil {
+		return hook.Op{}, fmt.Errorf("serializing tx: %w", err)
+	}
+	if minGas := blocklimit.MinGasForBytes(uint64(len(bytes)), blockGasLimit); minGas > uint64(g) {
+		g = gas.Gas(minGas)
 	}
 
 	burned, err := t.Unsigned.burned(avaxAssetID)
@@ -154,9 +167,9 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 	}
 
 	return hook.Op{
-		ID:        t.ID(),
-		Gas:       gas,
-		GasFeeCap: gasPrice(burned, gas),
+		ID:        hashing.ComputeHash256Array(bytes), // reuse them to avoid re-serializing
+		Gas:       g,
+		GasFeeCap: gasPrice(burned, g),
 		Burn:      op.burn,
 		Mint:      op.mint,
 	}, nil

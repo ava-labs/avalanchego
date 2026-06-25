@@ -7,14 +7,48 @@
 package blocklimit
 
 import (
+	"math"
 	"math/bits"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // MaxBlockBytes is the byte budget M of [Eligible]: the maximum size of a single
 // P2P message.
 const MaxBlockBytes uint64 = constants.DefaultMaxMessageSize
+
+// BlockByteOverhead is the fixed per-block framing reserved below the maximum
+// message size M: the ProposerVM certificate, the block header, signature,
+// and message framing.
+const BlockByteOverhead uint64 = staking.MaxCertificateLen + 6*units.KiB
+
+// MaxBodyBytes caps a block's serialized body bytes, reserving
+// [BlockByteOverhead] below the maximum message size M.
+const MaxBodyBytes = MaxBlockBytes - BlockByteOverhead
+
+// OpSlicePrefix is the framing prepended once to a block's ExtData op slice: a
+// [codec.VersionSize]-byte codec version and a [wrappers.IntLen]-byte element
+// count. Ops are then concatenated with no per-op framing.
+const OpSlicePrefix uint64 = codec.VersionSize + wrappers.IntLen
+
+// MinGasForBytes returns the minimum gas a transaction of the given serialized
+// size must consume so that exhausting the block's gas limit cannot exhaust more
+// than the byte budget [MaxBodyBytes].
+func MinGasForBytes(size, blockGasLimit uint64) uint64 {
+	if size >= MaxBodyBytes {
+		return math.MaxUint64
+	}
+	hi, lo := bits.Mul64(size, blockGasLimit)
+	q, r := bits.Div64(hi, lo, MaxBodyBytes)
+	if r != 0 {
+		q++ // round up
+	}
+	return q
+}
 
 // Eligible reports whether a transaction may be included in a block, using the
 // notation:
