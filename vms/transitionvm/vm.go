@@ -14,12 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 var _ Chain = (*VM)(nil)
@@ -109,10 +107,8 @@ func (v *VM) Initialize(
 	v.current = &current{
 		chain:          v.preTransitionChain,
 		consensusState: snow.Initializing,
-		connections: &connections{
-			nodes: make(map[ids.NodeID]*version.Application),
-		},
-		httpHandlers: newHTTPHandlers(),
+		connections:    newConnections(),
+		httpHandlers:   newHTTPHandlers(),
 	}
 
 	chainCtx.Log.Info("checking for last synchronous block")

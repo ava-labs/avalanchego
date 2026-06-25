@@ -19,6 +19,12 @@ type connections struct {
 	nodes map[ids.NodeID]*version.Application
 }
 
+func newConnections() *connections {
+	return &connections{
+		nodes: make(map[ids.NodeID]*version.Application),
+	}
+}
+
 func (c *connections) add(nodeID ids.NodeID, v *version.Application) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
