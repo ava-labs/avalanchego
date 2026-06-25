@@ -147,7 +147,7 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return *te, nil
 	}
 	if !config.IsFortuna(h.Time) || h.Number.Sign() == 0 {
-		return 0, nil
+		return dynamic.InitialTargetExponent, nil
 	}
 
 	// The block might be the last synchronous block running with ACP-176.
