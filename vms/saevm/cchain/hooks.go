@@ -148,13 +148,13 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 	return dynamic.InitialPriceExponent
 }
 
-func (h *hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	config := corethparams.GetExtra(h.chainConfig)
-	te, err := targetExponent(config, hdr)
+	te, err := targetExponent(config, header)
 	if err != nil {
 		h.ctx.Log.Error("failed to get target exponent",
-			zap.Stringer("blockHash", hdr.Hash()),
-			zap.Uint64("blockNumber", hdr.Number.Uint64()),
+			zap.Stringer("blockHash", header.Hash()),
+			zap.Uint64("blockNumber", header.Number.Uint64()),
 			zap.Error(err),
 		)
 		te = 0
@@ -162,7 +162,7 @@ func (h *hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConf
 
 	return te.Target(), gastime.GasPriceConfig{
 		TargetToExcessScaling: 87, // 87 ~= 60 / ln(2)
-		MinPrice:              priceExponent(hdr).Price(),
+		MinPrice:              priceExponent(header).Price(),
 	}
 }
 
