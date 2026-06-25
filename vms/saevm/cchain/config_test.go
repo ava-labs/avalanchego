@@ -35,6 +35,11 @@ func TestParseConfig(t *testing.T) {
 			want: config{PriceTarget: utils.PointerTo(gas.Price(1000))},
 		},
 		{
+			name: "explicit_zero",
+			in:   []byte(`{"min-price-target":0}`),
+			want: config{PriceTarget: utils.PointerTo(gas.Price(0))},
+		},
+		{
 			name:    "invalid_json",
 			in:      []byte(`{not json`),
 			wantErr: errInvalidConfig,
