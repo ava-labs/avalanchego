@@ -1,3 +1,4 @@
+xt, read all review comments from PR fifty three seventy-three. I want to make sure they're all addressed in preparation for getting this mergeable.
 # Repository documentation guidelines
 
 This note describes how to think about documentation in this repository.
@@ -5,9 +6,9 @@ This note describes how to think about documentation in this repository.
 The goal is to keep important knowledge out of any one person's head, out of
 one agent session, and out of scattered PR discussion.
 
-The same ideas apply to features, packages, test fixtures, integrations,
-workflows, and other parts of the repository that need more than code
-comments and tests to be understood well.
+These guidelines apply to documentation for any repository content whose
+correct use, review, or evolution requires more context than code comments and
+tests alone can provide.
 
 ## Motivation
 
@@ -28,6 +29,13 @@ implementation session and potentially include it in the documentation for
 what was implemented. Maintenance documentation that was previously hard to
 justify is now practical to produce and keep current.
 
+Making divergence easier to detect does not make repository documentation
+infallible. When code, tests, and documentation diverge, treat that divergence
+as a signal that the area needs investigation. The purpose of keeping
+repository documentation current is not to make it the sole source of truth,
+but to make important disagreements visible so they can be resolved with human
+judgment.
+
 The expectation that follows is parallel to tests: code should be adequately
 documented before it is modified for the same reasons it should be adequately
 tested before it is modified. Documentation of the maintenance layer is no
@@ -39,16 +47,23 @@ requires a documentation pass first. It does mean that when a safe change
 depends on non-obvious assumptions, preserved invariants, design rationale,
 constraints, or validation expectations that are not recoverable from code and
 tests alone, that context should be documented before or as part of the change.
-For net-new areas, add repository documentation once the surface area,
-complexity, or maintenance risk is high enough that future readers would
-otherwise need to reconstruct important reasoning from PRs, issue threads, or
-oral history.
+When work introduces a new area, or touches an existing area that lacks
+adequate repository documentation, add repository documentation once the
+surface area, complexity, or maintenance risk is high enough that future
+readers would otherwise need to reconstruct important reasoning from PRs,
+issue threads, or oral history.
 
 ## Definition
 
 Repository documentation is the subset of information a future reader needs to
 correctly understand, review, use, or evolve something in the repository, but
 which is not reliably recoverable from code and tests alone.
+
+Repository documentation may be embedded in code-adjacent material such as
+READMEs or comments, or collected in a dedicated document. A dedicated
+repository document is preferable when the context spans multiple files, tests,
+workflows, or audiences, or when readers need a discoverable entrypoint that
+is not tied to one code location.
 
 A detail belongs in repository documentation when it remains useful after the
 current task or PR is finished.
@@ -63,11 +78,12 @@ A useful default is to think about repository documentation in four layers:
 2. **How do I use it?**
    - what it does
    - how to interact with it
-   - examples, limits, and common paths
+   - who the document is for
+   - examples, limits, entrypoints, and common paths
 3. **How does it work?**
    - the right mental model
    - the important concepts, boundaries, states, or lifecycle
-   - what a smart reader might misunderstand from code alone
+   - what code alone may fail to make clear
 4. **How do I change it safely?**
    - why it is implemented this way
    - what constraints and trade-offs shaped it
@@ -76,6 +92,7 @@ A useful default is to think about repository documentation in four layers:
    - what invariants matter
    - how changes should be validated
    - what assumptions would justify revisiting the design
+   - what open questions are worth revisiting later
 
 Not every document needs all four layers equally. The point is to make sure
 these questions are answered somewhere discoverable when they matter.
@@ -98,16 +115,14 @@ Layer 4 should not be interpreted narrowly as only "validation steps" or
 future maintainer can understand why a different change may be wrong, or why it
 might only become appropriate under changed assumptions. Repository
 documentation should usually preserve enough context around meaningful
-alternatives that a future reader can understand why the current choice was made,
-even in compressed form.
+alternatives that a future reader can understand why the current choice was made.
 
 ### What this looks like in practice
 
 A concrete example of a document written in the style this guide recommends is
-[`.github/packaging/README.md`](../.github/packaging/README.md). It is a useful
-example because it documents not just how to use the RPM packaging flow, but also
-the design constraints and maintenance rationale a future maintainer would need
-to change it intentionally.
+[`.github/packaging/README.md`](../.github/packaging/README.md). It documents the RPM
+packaging flow, its design constraints, and context that may prove helpful in
+maintaining it.
 
 The document maps cleanly to the four layers:
 
@@ -121,18 +136,18 @@ The document maps cleanly to the four layers:
   main entrypoints, local build/validation commands, and CI behavior.  A reader
   who just needs to build or validate RPMs can stop there and still succeed.
 
-- **How to think about it** - the conceptual model section explains that the RPM
+- **How does it work?** - the conceptual model section explains that the RPM
   packaging code is kept separate from the source tree being packaged rather
   than treated as something that must already exist in each historical release
   tag. It also calls out the architecture-name mapping between RPM conventions
   and Docker/Go conventions. Those are important details that are not obvious
   from individual scripts alone.
 
-- **How to change it safely** - the maintenance notes preserve why builds run in
-  Rocky Linux 9, why manual tag builds overlay only `.github/packaging`, why the
-  signing path is always exercised, why dynamic glibc is the current linking
-  choice, what alternatives were considered, which invariants should be
-  preserved, and what assumptions would justify revisiting the design.
+- **How to change it safely** - the maintainer guidance preserves why builds run in
+  Rocky Linux 9, why manual tag builds copy only `.github/packaging` into the tagged
+  source tree, why the signing path is always exercised, why dynamic glibc is the
+  current linking choice, what alternatives were considered, which invariants should
+  be preserved, and what assumptions would justify revisiting the design.
 
 The document is not exhaustive in any layer. It records the parts that would be
 expensive to rediscover from code and CI configuration alone, and leaves the rest
@@ -148,7 +163,9 @@ It is not about transient artifacts like PR descriptions, review threads, or
 session notes, except to say that important information should not live only
 there.
 
-It is also not a replacement for design docs, ADRs, RFCs, or RFDs when a
+It is also not a replacement for design docs, architecture decision records
+(ADRs, as popularized by Michael Nygard), Requests for Comments (RFCs, from the
+IETF), or Requests for Discussion (RFDs, in the Oxide Computer sense) when a
 change needs pre-implementation alignment, and does not remove the need for
 stakeholder review, requirement clarification, architectural approval, or
 up-front comparison of competing approaches.
@@ -156,8 +173,8 @@ up-front comparison of competing approaches.
 Some changes need both: a design-time document to align on the intended
 direction before implementation, and repository documentation near the code
 to preserve the reasoning behind the implemented result. Design documents are
-for deciding. Repository documentation is for remembering, using, and
-evolving.
+for deciding. Repository documentation is for learning, using, remembering,
+and evolving.
 
 ## Non-goals
 
@@ -165,8 +182,8 @@ This guide deliberately does not prescribe:
 
 - **length or depth.** How long a document should be follows from the scope
   and criticality of what is being documented, not from a separate
-  heuristic. The four-layer framework and the "non-obvious and durable"
-  criterion already encode the answer.
+  heuristic. The answer depends on how much non-obvious, durable context is
+  needed to answer the four questions above.
 - **agent-specific authoring rules.** LLM tooling is what makes the
   maintenance-doc expectation practical, but this guide does not prescribe
   how agents should produce documentation content. The criteria for what
@@ -177,12 +194,12 @@ This guide deliberately does not prescribe:
 
 ## When to add or expand documentation
 
-This section is about whether a given thing deserves a dedicated document.
-The later "What belongs in repository documentation" section is about
-whether a particular detail belongs inside one.
+Use this section to decide whether something deserves a dedicated document.
+Use the later "What belongs in repository documentation" section to decide
+whether a particular detail belongs in one.
 
-Something likely deserves dedicated documentation when two or more of these are
-true:
+Something likely deserves dedicated documentation when two or more of the
+following are true:
 
 - it spans multiple code areas, tests, CI, or integrations
 - important review questions are architectural rather than syntactic
@@ -294,8 +311,7 @@ cross-cutting documents may also be linked from the repository root
 `README.md`, but `docs/README.md` is the minimum required index.
 
 When moving or renaming a document, update inbound links. Treat broken or
-missing inbound links the same way you would treat an unreferenced symbol in
-code.
+missing inbound links as maintenance issues that should be fixed when found.
 
 When exploring or modifying an unfamiliar area of the repository, readers and
 agents should start with the nearest README, then follow its links to the more
@@ -308,30 +324,16 @@ forced to carry all of it. Their primary job is to orient and point.
 
 Start simple. A single document is often enough.
 
-A useful shape - which maps directly onto the four layers above (Overview ->
-*why does this exist*, Usage -> *how do I use it*, Conceptual model -> *how
-should I think about it*, Maintenance notes -> *how do I change it safely*) -
-is:
+One useful default is to structure a document around the
+[four-layer framework](#a-four-layer-framework) above:
 
 1. **Overview**
-   - what this thing is
-   - why it exists
-   - who the document is for
 2. **Usage**
-   - behavior, usage, limits, examples, entrypoints
 3. **Conceptual model**
-   - the right way to think about the thing
-   - key concepts, boundaries, states, or lifecycle
-4. **Maintenance notes**
-   - design overview
-   - current rationale
-   - alternatives considered
-   - trade-offs shaping the decision
-   - constraints shaping the implementation
-   - validation strategy
-   - invariants / maintenance notes
-   - revisit if assumptions change
-   - open questions worth revisiting
+4. **Maintainer guidance**
+
+Use the earlier framework for the detailed questions each section should
+answer. This is a recommendation, not a rigid template.
 
 A trailing **References** section pointing to the relevant code, tests, and
 related docs is a useful close. It makes the cross-references between doc
