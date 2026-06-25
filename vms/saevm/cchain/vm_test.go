@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"google.golang.org/protobuf/proto"
 
 	// Imported for [saexec.Execute] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
@@ -37,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -45,13 +47,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
@@ -59,7 +62,6 @@ import (
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
 	ethrpc "github.com/ava-labs/libevm/rpc"
 )
@@ -77,9 +79,11 @@ type SUT struct {
 	*VM
 	*Client
 
+	db        database.Database
 	memory    *atomic.Memory
 	sender    *saetest.Sender
 	ethclient *ethclient.Client
+	p2pclient *saetest.CapturingPeer
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -90,7 +94,7 @@ type (
 		genesis    core.Genesis
 		nodeID     ids.NodeID
 		networkID  uint32
-		validators set.Set[ids.NodeID]
+		validators *warptest.Validators
 		now        func() time.Time
 		db         database.Database
 		state      snow.State
@@ -143,8 +147,8 @@ func withNodeID(id ids.NodeID) sutOption {
 	})
 }
 
-// withValidators adds each NodeID to the validator set with weight 1.
-func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
+// withValidators sets the SUT's validator set.
+func withValidators(vdrs *warptest.Validators) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.validators = vdrs
 	})
@@ -183,15 +187,17 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
 				Config:     &chainConfig,
-				Timestamp:  saeparams.TauSeconds,
-				Difficulty: big.NewInt(0), // irrelevant but required to marshal
+				Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), //#nosec G115 -- Known non-negative
+				Difficulty: big.NewInt(0),                              // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
+				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:    ids.GenerateTestNodeID(),
-			networkID: constants.UnitTestID,
-			now:       time.Now,
-			db:        memdb.New(),
-			state:     snow.NormalOp,
+			nodeID:     ids.GenerateTestNodeID(),
+			networkID:  constants.UnitTestID,
+			validators: warptest.NewValidators(tb, 0),
+			now:        time.Now,
+			db:         memdb.New(),
+			state:      snow.NormalOp,
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -210,14 +216,15 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
-	saetest.SetValidators(tb, snowCtx.ValidatorState, cfg.validators)
+	warptest.SetValidators(tb, snowCtx, cfg.validators)
 
 	chainDB := prefixdb.New([]byte("chain"), db)
 
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
 
-	appSender := saetest.NewSender(tb, cfg.validators)
+	validatorIDs := cfg.validators.NodeIDs()
+	appSender := saetest.NewSender(tb, validatorIDs)
 
 	ctx := log.CancelOnError(tb.Context())
 	require.NoErrorf(tb, vm.Initialize(
@@ -261,13 +268,65 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	sut := &SUT{
 		VM:        vm,
 		Client:    NewClient(server.URL),
+		db:        db,
 		memory:    memory,
 		sender:    appSender,
 		ethclient: ethclient.NewClient(ethRPCClient),
+		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
 	}
-	appSender.SetSelf(sut)
-	tb.Cleanup(appSender.Close)
+	appSender.Start(tb, sut)
+	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
 	return ctx, sut
+}
+
+// hooks returns a new [hooks] instance that behaves equivalently to those
+// provided to the sae VM.
+func (s *SUT) hooks() *hooks {
+	return newHooks(
+		s.ctx,
+		s.state,
+		s.chainConfig,
+		s.txpool.Pending,
+		warp.NewStorage(s.db),
+		s.now,
+	)
+}
+
+// appRequest sends request, from the SUT's p2pclient, to the SUT's p2p handler
+// registered with handlerID and unmarshals the reply into response.
+//
+// If the SUT instead responds with an [snowcommon.AppError], it is returned and
+// response is left untouched.
+//
+// appRequest is not thread-safe and should only be called from a single
+// goroutine at a time.
+func (s *SUT) appRequest(
+	ctx context.Context,
+	tb testing.TB,
+	handlerID uint64,
+	request proto.Message,
+	response proto.Message,
+) *snowcommon.AppError {
+	tb.Helper()
+
+	requestBytes, err := proto.Marshal(request)
+	require.NoErrorf(tb, err, "proto.Marshal(%T)", request)
+
+	prefixedRequest := p2p.PrefixMessage(p2p.ProtocolPrefix(handlerID), requestBytes)
+	require.NoErrorf(tb, s.AppRequest(
+		ctx,
+		s.p2pclient.NodeID(),
+		1,           // requestID
+		time.Time{}, // deadline
+		prefixedRequest,
+	), "%T.AppRequest(protocol %d)", s.VM, handlerID)
+
+	_, _, responseBytes, appErr := s.p2pclient.Response()
+	if appErr != nil {
+		return appErr
+	}
+	require.NoErrorf(tb, proto.Unmarshal(responseBytes, response), "proto.Unmarshal(%T)", response)
+	return nil
 }
 
 // assertUTXOsExist asserts that reader chain can read the expected UTXOs from
@@ -407,21 +466,21 @@ func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, 
 
 // runConsensusLoop builds a block on top of the last-accepted block, drives it
 // through verify+accept, and waits until it has been executed.
-func (s *SUT) runConsensusLoop(ctx context.Context, tb testing.TB) *blocks.Block {
+func (s *SUT) runConsensusLoop(ctx context.Context, tb testing.TB, opts ...blockOption) *blocks.Block {
 	tb.Helper()
 
-	blk := s.buildVerifyAccept(ctx, tb)
+	blk := s.buildVerifyAccept(ctx, tb, opts...)
 	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
 	return blk
 }
 
 // buildVerifyAccept builds, verifies, and accepts a block on top of the
 // last-accepted block.
-func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB) *blocks.Block {
+func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB, opts ...blockOption) *blocks.Block {
 	tb.Helper()
 
 	lastAccepted := s.lastAccepted(ctx, tb)
-	blk := s.buildVerify(ctx, tb, lastAccepted)
+	blk := s.buildVerify(ctx, tb, lastAccepted, opts...)
 	require.NoErrorf(tb, s.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.VM)
 	return blk
 }
@@ -453,20 +512,41 @@ func (s *SUT) waitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*t
 	txgossiptest.WaitUntilPending(tb, ctx, s.GethRPCBackends(), txs...)
 }
 
+type (
+	blockConfig struct {
+		context *block.Context
+	}
+	blockOption = options.Option[blockConfig]
+)
+
+// withBlockContext sets the [block.Context] used to set the preference and to
+// build and verify the block. If unset, a nil context is used.
+func withBlockContext(ctx *block.Context) blockOption {
+	return options.Func[blockConfig](func(c *blockConfig) {
+		c.context = ctx
+	})
+}
+
 // buildVerify builds and verifies a block on top of preferenceID.
-func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID) *blocks.Block {
+func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.ID, opts ...blockOption) *blocks.Block {
 	tb.Helper()
 
-	// TODO(StephenButtolph): When implementing Warp, we will need to provide
-	// meaningful block contexts.
-	var blockCtx *block.Context
-	require.NoErrorf(tb, s.SetPreference(ctx, preferenceID, blockCtx), "%T.SetPreference()", s.VM)
+	blockContext := options.As(opts...).context
+	require.NoErrorf(tb, s.SetPreference(ctx, preferenceID, blockContext), "%T.SetPreference()", s.VM)
 
 	s.waitForPendingTxs(ctx, tb)
-	blk, err := s.BuildBlock(ctx, blockCtx)
+	blk, err := s.BuildBlock(ctx, blockContext)
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
-	require.NoErrorf(tb, s.VerifyBlock(ctx, blockCtx, blk), "%T.VerifyBlock()", s.VM)
+	require.NoErrorf(tb, s.VerifyBlock(ctx, blockContext, blk), "%T.VerifyBlock()", s.VM)
 	return blk
+}
+
+// acceptAndExecute accepts blk and blocks until it has been executed.
+func (s *SUT) acceptAndExecute(ctx context.Context, tb testing.TB, blk *blocks.Block) {
+	tb.Helper()
+
+	require.NoErrorf(tb, s.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.VM)
+	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
 }
 
 // wallet builds and signs cross-chain transactions on behalf of a single key.
