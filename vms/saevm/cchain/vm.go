@@ -111,6 +111,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
 	vm.chainConfig = genesis.Config
+
 	if err := genesis.setup(ethDB, trieDBConfig); err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
