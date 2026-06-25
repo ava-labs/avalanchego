@@ -14,6 +14,9 @@ var _ oracle.SidecarClient = (*MockSidecarClient)(nil)
 // MockSidecarClient is a test double for SidecarClient. Set VerifyF to
 // control behavior per call. If VerifyF is nil, Verify returns nil (accept
 // everything). Calls are recorded in Calls for assertion.
+//
+// MockSidecarClient is not safe for concurrent use; it is intended for
+// single-threaded tests only.
 type MockSidecarClient struct {
 	// VerifyF is called by Verify if non-nil.
 	VerifyF func(ctx context.Context, event *oracle.OracleEvent) error

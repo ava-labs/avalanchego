@@ -11,6 +11,8 @@ import (
 	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 )
 
@@ -32,7 +34,7 @@ const (
 
 func makeMsg(t *testing.T, sourceAddr string, slot uint64, payload []byte) *oracle.OracleMessage { //nolint:unparam
 	t.Helper()
-	msg, err := oracle.NewOracleMessage("solana", sourceAddr, []byte{1, 2, 3}, slot, 1, payload)
+	msg, err := oracle.NewOracleMessage("solana", sourceAddr, common.Address{1, 2, 3}, slot, 1, payload)
 	require.NoError(t, err)
 	return msg
 }

@@ -23,7 +23,7 @@ type (
 
 // OracleSidecarConfig holds operator-supplied settings for the oracle sidecar verifier.
 type OracleSidecarConfig struct {
-	// Endpoint is the HTTP base URL of the sidecar process, e.g. "http://127.0.0.1:9900".
+	// Endpoint is the gRPC address of the sidecar process, e.g. "127.0.0.1:9900".
 	// If empty, the oracle verifier is not initialized from JSON config.
 	Endpoint string `json:"endpoint"`
 	// AllowedSources maps source type to allowed source addresses.

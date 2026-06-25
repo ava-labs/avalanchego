@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
@@ -70,7 +72,7 @@ func TestOracleHandler_HappyPath(t *testing.T) {
 	serverNodeID := ids.GenerateTestNodeID()
 	c := p2ptest.NewClient(t, ctx, clientNodeID, p2p.NoOpHandler{}, serverNodeID, handler)
 
-	msg, err := oracle.NewOracleMessage("solana", "addr1", []byte{1, 2, 3}, 100, 1, []byte("payload"))
+	msg, err := oracle.NewOracleMessage("solana", "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
 	require.NoError(err)
 	requestBytes, um := buildHandlerRequest(t, msg)
 
@@ -102,6 +104,7 @@ func TestOracleHandler_CacheHit(t *testing.T) {
 
 	sk, err := localsigner.New()
 	require.NoError(err)
+	pk := sk.PublicKey()
 
 	signer := warp.NewSigner(sk, testNetworkID, testChainID)
 
@@ -125,15 +128,21 @@ func TestOracleHandler_CacheHit(t *testing.T) {
 	serverNodeID := ids.GenerateTestNodeID()
 	c := p2ptest.NewClient(t, ctx, clientNodeID, p2p.NoOpHandler{}, serverNodeID, handler)
 
-	msg, err := oracle.NewOracleMessage("solana", "addr1", []byte{0xAB}, 42, 7, []byte("data"))
+	msg, err := oracle.NewOracleMessage("solana", "addr1", common.Address{0xAB}, 42, 7, []byte("data"))
 	require.NoError(err)
-	requestBytes, _ := buildHandlerRequest(t, msg)
+	requestBytes, um := buildHandlerRequest(t, msg)
 
 	for i := range 2 {
 		handled := make(chan struct{})
-		onResponse := func(_ context.Context, _ ids.NodeID, _ []byte, appErr error) {
+		onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
 			defer func() { handled <- struct{}{} }()
 			require.NoErrorf(appErr, "request %d failed unexpectedly", i)
+
+			response := &sdk.SignatureResponse{}
+			require.NoError(proto.Unmarshal(responseBytes, response))
+			sig, err := bls.SignatureFromBytes(response.Signature)
+			require.NoError(err)
+			require.True(bls.Verify(pk, sig, um.Bytes()))
 		}
 		require.NoError(c.AppRequest(ctx, set.Of(serverNodeID), requestBytes, onResponse))
 		<-handled

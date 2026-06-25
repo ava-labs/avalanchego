@@ -511,7 +511,10 @@ func (vm *VM) Initialize(
 			}
 			allowed[sourceType] = set
 		}
-		sidecar := p2poracle.NewHTTPSidecarClient(vm.config.Oracle.Endpoint, nil)
+		sidecar, err := p2poracle.NewGRPCSidecarClient(vm.config.Oracle.Endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to create oracle gRPC client: %w", err)
+		}
 		if err := vm.registerOracleHandler(p2poracle.NewOracleVerifier(sidecar, allowed)); err != nil {
 			return err
 		}

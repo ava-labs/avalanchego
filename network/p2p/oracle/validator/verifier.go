@@ -22,8 +22,9 @@ const (
 	// separate protocol.
 	SignatureRequestHandlerID uint64 = p2p.OracleSignatureRequestHandlerID
 
-	errCodeParse  int32 = 1
-	errCodeVerify int32 = 2
+	errCodeParse     int32 = 1
+	errCodeVerify    int32 = 2
+	errCodeAllowlist int32 = 3
 )
 
 // AllowedSources maps source type to the set of allowed source addresses
@@ -43,9 +44,17 @@ type OracleVerifier struct {
 var _ acp118.Verifier = (*OracleVerifier)(nil)
 
 func NewOracleVerifier(sidecar oracle.SidecarClient, allowedSources AllowedSources) *OracleVerifier {
+	copied := make(AllowedSources, len(allowedSources))
+	for sourceType, addrs := range allowedSources {
+		inner := make(map[string]struct{}, len(addrs))
+		for addr := range addrs {
+			inner[addr] = struct{}{}
+		}
+		copied[sourceType] = inner
+	}
 	return &OracleVerifier{
 		sidecar:        sidecar,
-		allowedSources: allowedSources,
+		allowedSources: copied,
 	}
 }
 
@@ -90,7 +99,7 @@ func (v *OracleVerifier) checkAllowlist(msg *oracle.OracleMessage) *common.AppEr
 	allowed, ok := v.allowedSources[msg.SourceType]
 	if !ok {
 		return &common.AppError{
-			Code:    errCodeVerify,
+			Code:    errCodeAllowlist,
 			Message: fmt.Sprintf("source type %q is not in the allowlist", msg.SourceType),
 		}
 	}
@@ -100,7 +109,7 @@ func (v *OracleVerifier) checkAllowlist(msg *oracle.OracleMessage) *common.AppEr
 	}
 	if _, ok := allowed[msg.SourceAddress]; !ok {
 		return &common.AppError{
-			Code:    errCodeVerify,
+			Code:    errCodeAllowlist,
 			Message: fmt.Sprintf("source address %q on source type %q is not in the allowlist", msg.SourceAddress, msg.SourceType),
 		}
 	}

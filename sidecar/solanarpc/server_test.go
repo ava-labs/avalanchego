@@ -4,106 +4,84 @@
 package main
 
 import (
-	"bytes"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
+	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
-// verifyingStub is a minimal SolanaVerifier with an injected rpcClient,
-// used to drive the HTTP layer tests without a real Solana RPC server.
 func newStubVerifier(rpc rpcClient) *SolanaVerifier {
 	return &SolanaVerifier{client: rpc}
 }
 
-func buildBody(t *testing.T, msg *oracle.OracleMessage, justification []byte) []byte {
-	t.Helper()
-	b, err := json.Marshal(map[string]string{
-		"message_bytes": hex.EncodeToString(msg.Bytes()),
-		"justification": hex.EncodeToString(justification),
-	})
-	require.NoError(t, err)
-	return b
-}
-
-func TestServer_Routing(t *testing.T) {
+func TestServer_Verify(t *testing.T) {
 	msg := makeMsg(t, testProgram, testSlotV, []byte("payload"))
 	justification := make([]byte, 64)
-	body := buildBody(t, msg, justification)
 
 	tests := []struct {
-		name       string
-		method     string
-		path       string
-		body       []byte
-		rpc        *stubRPC
-		wantStatus int
+		name     string
+		req      *pb.VerifyRequest
+		rpc      *stubRPC
+		wantCode codes.Code
 	}{
 		{
-			name:       "wrong path returns 404",
-			method:     http.MethodPost,
-			path:       "/notfound",
-			body:       body,
-			rpc:        &stubRPC{Tx: makeValidTx(testProgram, testSlotV, []byte("payload"))},
-			wantStatus: http.StatusNotFound,
+			name:     "invalid message bytes returns InvalidArgument",
+			req:      &pb.VerifyRequest{MessageBytes: []byte("not-abi"), Justification: justification},
+			rpc:      &stubRPC{},
+			wantCode: codes.InvalidArgument,
 		},
 		{
-			name:       "GET returns 405",
-			method:     http.MethodGet,
-			path:       "/verify",
-			body:       body,
-			rpc:        &stubRPC{Tx: makeValidTx(testProgram, testSlotV, []byte("payload"))},
-			wantStatus: http.StatusMethodNotAllowed,
+			// stubRPC.Err causes getTransaction to fail; SolanaVerifier wraps it
+			// as "getTransaction RPC call failed: ..." which triggers codes.Unavailable.
+			name:     "RPC failure returns Unavailable",
+			req:      &pb.VerifyRequest{MessageBytes: msg.Bytes(), Justification: justification},
+			rpc:      &stubRPC{Err: errors.New("connection refused")},
+			wantCode: codes.Unavailable,
 		},
 		{
-			name:       "malformed JSON body returns 400",
-			method:     http.MethodPost,
-			path:       "/verify",
-			body:       []byte("not-json"),
-			rpc:        &stubRPC{},
-			wantStatus: http.StatusBadRequest,
+			// TX is found but has wrong slot → slot mismatch error → codes.InvalidArgument.
+			name:     "verifier rejection returns InvalidArgument",
+			req:      &pb.VerifyRequest{MessageBytes: msg.Bytes(), Justification: justification},
+			rpc:      &stubRPC{Tx: makeValidTx(testProgram, testSlotV+1, []byte("payload"))},
+			wantCode: codes.InvalidArgument,
 		},
 		{
-			name:       "invalid hex message_bytes returns 400",
-			method:     http.MethodPost,
-			path:       "/verify",
-			body:       []byte(`{"message_bytes":"zzzz","justification":""}`),
-			rpc:        &stubRPC{},
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "verifier error returns 400",
-			method:     http.MethodPost,
-			path:       "/verify",
-			body:       body,
-			rpc:        &stubRPC{Err: errors.New("rpc down")},
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "valid request returns 200",
-			method:     http.MethodPost,
-			path:       "/verify",
-			body:       body,
-			rpc:        &stubRPC{Tx: makeValidTx(testProgram, testSlotV, []byte("payload"))},
-			wantStatus: http.StatusOK,
+			name:     "valid request returns OK",
+			req:      &pb.VerifyRequest{MessageBytes: msg.Bytes(), Justification: justification},
+			rpc:      &stubRPC{Tx: makeValidTx(testProgram, testSlotV, []byte("payload"))},
+			wantCode: codes.OK,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := NewServer(newStubVerifier(tt.rpc))
-			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(tt.method, tt.path, bytes.NewReader(tt.body))
-			req.Header.Set("Content-Type", "application/json")
-			srv.ServeHTTP(rec, req)
-			require.Equal(t, tt.wantStatus, rec.Code)
+			resp, err := srv.Verify(t.Context(), tt.req)
+			require.Equal(t, tt.wantCode, status.Code(err))
+			if tt.wantCode == codes.OK {
+				require.NotNil(t, resp)
+				require.NoError(t, err)
+			}
 		})
 	}
+}
+
+// TestServer_PayloadRoundtrip verifies that the bytes sent through
+// pb.VerifyRequest are identical to what oracle.ParseOracleMessage returns.
+func TestServer_PayloadRoundtrip(t *testing.T) {
+	want, err := oracle.NewOracleMessage("solana", testProgram, [20]byte{}, testSlotV, 1, []byte("payload"))
+	require.NoError(t, err)
+
+	srv := NewServer(newStubVerifier(&stubRPC{Tx: makeValidTx(testProgram, testSlotV, []byte("payload"))}))
+	resp, err := srv.Verify(t.Context(), &pb.VerifyRequest{
+		MessageBytes:  want.Bytes(),
+		Justification: make([]byte, 64),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
 }

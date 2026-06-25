@@ -20,10 +20,17 @@ import (
 var oracleMessageArgs abi.Arguments
 
 func init() {
-	stringT, _ := abi.NewType("string", "", nil)
-	addrT, _ := abi.NewType("address", "", nil)
-	uint64T, _ := abi.NewType("uint64", "", nil)
-	bytesT, _ := abi.NewType("bytes", "", nil)
+	mustType := func(t string) abi.Type {
+		typ, err := abi.NewType(t, "", nil)
+		if err != nil {
+			panic(fmt.Sprintf("invalid ABI type %q: %v", t, err))
+		}
+		return typ
+	}
+	stringT := mustType("string")
+	addrT := mustType("address")
+	uint64T := mustType("uint64")
+	bytesT := mustType("bytes")
 
 	oracleMessageArgs = abi.Arguments{
 		{Type: stringT, Name: "sourceType"},
@@ -43,8 +50,8 @@ type OracleMessage struct {
 	SourceType string
 	// SourceAddress is the program or contract address on the source chain.
 	SourceAddress string
-	// DestContract is the 20-byte destination contract address on the L1.
-	DestContract []byte
+	// DestContract is the destination contract address on the L1.
+	DestContract common.Address
 	// SourceBlockHeight is the block or slot on the source chain at which the event occurred.
 	SourceBlockHeight uint64
 	// Nonce is unique per (SourceType, SourceAddress) and is used for replay protection.
@@ -75,7 +82,7 @@ func (m *OracleMessage) initialize(b []byte) {
 func NewOracleMessage(
 	sourceType string,
 	sourceAddress string,
-	destContract []byte,
+	destContract common.Address,
 	sourceBlockHeight uint64,
 	nonce uint64,
 	payload []byte,
@@ -111,7 +118,7 @@ func ParseOracleMessage(b []byte) (*OracleMessage, error) {
 	msg := &OracleMessage{
 		SourceType:        vals[0].(string),
 		SourceAddress:     vals[1].(string),
-		DestContract:      addr.Bytes(),
+		DestContract:      addr,
 		SourceBlockHeight: vals[3].(uint64),
 		Nonce:             vals[4].(uint64),
 		Payload:           vals[5].([]byte),
@@ -124,7 +131,7 @@ func (m *OracleMessage) encode() ([]byte, error) {
 	return oracleMessageArgs.Pack(
 		m.SourceType,
 		m.SourceAddress,
-		common.BytesToAddress(m.DestContract),
+		m.DestContract,
 		m.SourceBlockHeight,
 		m.Nonce,
 		m.Payload,

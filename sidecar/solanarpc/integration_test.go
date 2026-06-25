@@ -15,6 +15,8 @@ import (
 	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 )
 
@@ -117,13 +119,13 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 	verifier := NewSolanaVerifier(rpcURL, nil)
 
 	t.Run("valid transaction accepted", func(t *testing.T) {
-		msg, err := oracle.NewOracleMessage("solana", memoProgram, []byte{0}, slot, 1, instrData)
+		msg, err := oracle.NewOracleMessage("solana", memoProgram, common.Address{}, slot, 1, instrData)
 		require.NoError(t, err)
 		require.NoError(t, verifier.Verify(t.Context(), msg, justification))
 	})
 
 	t.Run("slot off by one rejected", func(t *testing.T) {
-		msg, err := oracle.NewOracleMessage("solana", memoProgram, []byte{0}, slot+1, 1, instrData)
+		msg, err := oracle.NewOracleMessage("solana", memoProgram, common.Address{}, slot+1, 1, instrData)
 		require.NoError(t, err)
 		verifyErr := verifier.Verify(t.Context(), msg, justification)
 		require.Errorf(t, verifyErr, "expected slot mismatch error")
@@ -134,7 +136,7 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 		tampered := make([]byte, max(len(instrData), 1))
 		copy(tampered, instrData)
 		tampered[len(tampered)-1] ^= 0xFF
-		msg, err := oracle.NewOracleMessage("solana", memoProgram, []byte{0}, slot, 1, tampered)
+		msg, err := oracle.NewOracleMessage("solana", memoProgram, common.Address{}, slot, 1, tampered)
 		require.NoError(t, err)
 		verifyErr := verifier.Verify(t.Context(), msg, justification)
 		require.Errorf(t, verifyErr, "expected payload mismatch error")
@@ -143,7 +145,7 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 
 	t.Run("wrong program rejected", func(t *testing.T) {
 		const systemProgram = "11111111111111111111111111111111"
-		msg, err := oracle.NewOracleMessage("solana", systemProgram, []byte{0}, slot, 1, instrData)
+		msg, err := oracle.NewOracleMessage("solana", systemProgram, common.Address{}, slot, 1, instrData)
 		require.NoError(t, err)
 		verifyErr := verifier.Verify(t.Context(), msg, justification)
 		require.Errorf(t, verifyErr, "expected program-not-found error")

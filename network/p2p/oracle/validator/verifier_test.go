@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -37,7 +39,7 @@ func TestSignatureRequestHandlerID(t *testing.T) {
 }
 
 func TestOracleVerifier_ValidPath(t *testing.T) {
-	msg, err := oracle.NewOracleMessage("solana", "addr1", []byte{1, 2, 3}, 100, 1, []byte("payload"))
+	msg, err := oracle.NewOracleMessage("solana", "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
 	require.NoError(t, err)
 
 	um := buildWarpMessage(t, msg)
@@ -53,7 +55,7 @@ func TestOracleVerifier_ValidPath(t *testing.T) {
 }
 
 func TestOracleVerifier_SourceTypeNotAllowed(t *testing.T) {
-	msg, err := oracle.NewOracleMessage("bitcoin", "addr1", []byte{1, 2, 3}, 100, 1, []byte("payload"))
+	msg, err := oracle.NewOracleMessage("bitcoin", "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
 	require.NoError(t, err)
 
 	um := buildWarpMessage(t, msg)
@@ -65,12 +67,12 @@ func TestOracleVerifier_SourceTypeNotAllowed(t *testing.T) {
 
 	appErr := verifier.Verify(t.Context(), um, nil)
 	require.NotNil(t, appErr)
-	require.Equal(t, errCodeVerify, appErr.Code)
+	require.Equal(t, errCodeAllowlist, appErr.Code)
 	require.Empty(t, mock.Calls)
 }
 
 func TestOracleVerifier_SourceAddressNotAllowed(t *testing.T) {
-	msg, err := oracle.NewOracleMessage("solana", "unknown-addr", []byte{1, 2, 3}, 100, 1, []byte("payload"))
+	msg, err := oracle.NewOracleMessage("solana", "unknown-addr", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
 	require.NoError(t, err)
 
 	um := buildWarpMessage(t, msg)
@@ -82,12 +84,12 @@ func TestOracleVerifier_SourceAddressNotAllowed(t *testing.T) {
 
 	appErr := verifier.Verify(t.Context(), um, nil)
 	require.NotNil(t, appErr)
-	require.Equal(t, errCodeVerify, appErr.Code)
+	require.Equal(t, errCodeAllowlist, appErr.Code)
 	require.Empty(t, mock.Calls)
 }
 
 func TestOracleVerifier_EmptyInnerMapAllowsAllAddresses(t *testing.T) {
-	msg, err := oracle.NewOracleMessage("solana", "any-addr-whatsoever", []byte{1, 2, 3}, 100, 1, []byte("payload"))
+	msg, err := oracle.NewOracleMessage("solana", "any-addr-whatsoever", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
 	require.NoError(t, err)
 
 	um := buildWarpMessage(t, msg)
@@ -103,7 +105,7 @@ func TestOracleVerifier_EmptyInnerMapAllowsAllAddresses(t *testing.T) {
 }
 
 func TestOracleVerifier_SidecarReturnsError(t *testing.T) {
-	msg, err := oracle.NewOracleMessage("solana", "addr1", []byte{1, 2, 3}, 100, 1, []byte("payload"))
+	msg, err := oracle.NewOracleMessage("solana", "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
 	require.NoError(t, err)
 
 	um := buildWarpMessage(t, msg)

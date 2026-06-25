@@ -6,8 +6,11 @@ package main
 import (
 	"flag"
 	"log"
-	"net/http"
-	"time"
+	"net"
+
+	"google.golang.org/grpc"
+
+	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
 func main() {
@@ -15,16 +18,17 @@ func main() {
 	solanaRPC := flag.String("solana-rpc", "https://api.mainnet-beta.solana.com", "Solana JSON-RPC endpoint")
 	flag.Parse()
 
-	verifier := NewSolanaVerifier(*solanaRPC, nil)
-	srv := &http.Server{
-		Addr:         *addr,
-		Handler:      NewServer(verifier),
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+	lis, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatalf("failed to listen on %s: %v", *addr, err)
 	}
 
-	log.Printf("starting oracle sidecar on %s, Solana RPC: %s", *addr, *solanaRPC)
-	if err := srv.ListenAndServe(); err != nil {
+	verifier := NewSolanaVerifier(*solanaRPC, nil)
+	grpcServer := grpc.NewServer()
+	pb.RegisterOracleSidecarServer(grpcServer, NewServer(verifier))
+
+	log.Printf("starting oracle sidecar (gRPC) on %s, Solana RPC: %s", *addr, *solanaRPC)
+	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }
