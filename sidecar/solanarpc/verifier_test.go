@@ -105,6 +105,54 @@ func TestSolanaVerifier(t *testing.T) {
 			rpc:  &stubRPC{Tx: makeValidTx(testProgram, testSlotV, payload)},
 			msg:  func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
 		},
+		{
+			// Program invoked via CPI: appears in meta.innerInstructions, not
+			// in transaction.message.instructions.
+			name: "program invoked via CPI",
+			rpc: &stubRPC{Tx: &txResult{
+				Slot: testSlotV,
+				Transaction: txData{
+					Message: txMessage{
+						AccountKeys:  []string{"payer111", "routerProgram"},
+						Instructions: []txInstruction{{ProgramIDIndex: 1, Data: base58.Encode([]byte("router-data"))}},
+					},
+				},
+				Meta: txMeta{
+					InnerInstructions: []txInnerInstructionGroup{
+						{
+							Index: 0,
+							Instructions: []txInstruction{
+								{ProgramIDIndex: 2, Data: base58.Encode(payload)},
+							},
+						},
+					},
+					LoadedAddresses: txLoadedAddresses{
+						Writable: []string{testProgram},
+					},
+				},
+			}},
+			msg: func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
+		},
+		{
+			// Program address is in a v0 lookup table (meta.loadedAddresses),
+			// not in the static message.accountKeys.
+			name: "v0 program address from lookup table",
+			rpc: &stubRPC{Tx: &txResult{
+				Slot: testSlotV,
+				Transaction: txData{
+					Message: txMessage{
+						AccountKeys:  []string{"payer111"},
+						Instructions: []txInstruction{{ProgramIDIndex: 1, Data: base58.Encode(payload)}},
+					},
+				},
+				Meta: txMeta{
+					LoadedAddresses: txLoadedAddresses{
+						Writable: []string{testProgram},
+					},
+				},
+			}},
+			msg: func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
+		},
 	}
 
 	for _, tt := range tests {

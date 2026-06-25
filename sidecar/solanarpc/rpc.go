@@ -30,8 +30,24 @@ type rpcError struct {
 }
 
 type txResult struct {
-	Slot        uint64 `json:"slot"`
-	Transaction txData `json:"transaction"`
+	Slot        uint64  `json:"slot"`
+	Transaction txData  `json:"transaction"`
+	Meta        txMeta  `json:"meta"`
+}
+
+type txMeta struct {
+	InnerInstructions []txInnerInstructionGroup `json:"innerInstructions"`
+	LoadedAddresses   txLoadedAddresses          `json:"loadedAddresses"`
+}
+
+type txInnerInstructionGroup struct {
+	Index        int              `json:"index"`
+	Instructions []txInstruction  `json:"instructions"`
+}
+
+type txLoadedAddresses struct {
+	Writable []string `json:"writable"`
+	Readonly []string `json:"readonly"`
 }
 
 type txData struct {
