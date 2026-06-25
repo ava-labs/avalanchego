@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/triedb"
 
 	_ "embed"
@@ -37,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -136,17 +134,7 @@ func (vm *VM) Initialize(
 		vm.now,
 		userConfig.desired(),
 	)
-	mempoolConfig := legacypool.DefaultConfig
-	// Treat all transactions equally regardless of submission source — no
-	// preferential admission or pricing for locally-submitted txs.
-	mempoolConfig.NoLocals = true
-	saeConfig := sae.Config{
-		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			TrieDBConfig: trieDBConfig,
-		},
-		Now: vm.now,
-	}
+	saeConfig := userConfig.saeConfig(trieDBConfig, vm.now)
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, genesisBlock, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
