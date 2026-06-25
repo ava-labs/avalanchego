@@ -56,6 +56,32 @@ this configuration in order to properly allow a node in the private Subnet.
 
 :::
 
+### ProposerVM Config
+
+#### `proposerWindowDuration` (duration)
+
+The length of a single proposerVM proposer slot for the chains in this Subnet.
+Defaults to `5s` when unset or `0`.
+
+The proposerVM schedules each validator into a proposer slot, and slots are
+`proposerWindowDuration` apart. When a scheduled proposer is offline, the chain
+cannot accept a block until the next live proposer's slot opens, so a smaller
+window shortens the stall on validator failover (faster recovery for CFT/PoA
+L1s), at the cost of more rejected blocks when a slot closes before a block
+propagates. A whole number of seconds is recommended: the proposerVM block
+timestamp is second-granular, so sub-second windows give diminishing benefit.
+
+:::warning
+
+This is a network-wide consensus parameter, not a per-node tuning knob. Every
+validator of this Subnet's chains MUST use the same `proposerWindowDuration`.
+Validators with different windows disagree about which proposer is expected for a
+slot, reject each other's blocks, and break liveness. Roll it out identically to
+every validator, the same way as an upgrade time. The primary network (P/C/X) is
+unaffected and always uses the default.
+
+:::
+
 ### Consensus Config
 
 Subnet configs supports loading new consensus parameters or even consensus engines(Snowman or Simplex).
