@@ -115,17 +115,6 @@ func TestAncestorInputIDs(t *testing.T) {
 
 func TestTargetExponent(t *testing.T) {
 	const fortunaTime = 100
-	fortuna := &extras.ChainConfig{
-		NetworkUpgrades: extras.NetworkUpgrades{
-			FortunaTimestamp: utils.PointerTo[uint64](fortunaTime),
-		},
-	}
-	withField := func(te dynamic.TargetExponent) *types.Header {
-		return customtypes.WithHeaderExtra(
-			&types.Header{Number: big.NewInt(1)},
-			&customtypes.HeaderExtra{TargetExponent: &te},
-		)
-	}
 
 	tests := []struct {
 		name    string
@@ -134,19 +123,22 @@ func TestTargetExponent(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:   "header_carries_exponent",
-			header: withField(42),
-			want:   42,
+			name: "header_carries_exponent",
+			header: customtypes.WithHeaderExtra(
+				&types.Header{Number: big.NewInt(1)},
+				&customtypes.HeaderExtra{TargetExponent: utils.PointerTo[dynamic.TargetExponent](42)},
+			),
+			want: 42,
 		},
 		{
 			name:   "no_field_pre_fortuna",
 			header: &types.Header{Time: fortunaTime - 1, Number: big.NewInt(1)},
-			want:   InitialTargetExponent,
+			want:   dynamic.InitialTargetExponent,
 		},
 		{
 			name:   "no_field_genesis",
 			header: &types.Header{Time: fortunaTime, Number: big.NewInt(0)},
-			want:   InitialTargetExponent,
+			want:   dynamic.InitialTargetExponent,
 		},
 		{
 			name: "no_field_fortuna_legacy_state",
@@ -165,6 +157,12 @@ func TestTargetExponent(t *testing.T) {
 				Extra:  []byte{0x01},
 			},
 			wantErr: acp176.ErrStateInsufficientLength,
+		},
+	}
+
+	fortuna := &extras.ChainConfig{
+		NetworkUpgrades: extras.NetworkUpgrades{
+			FortunaTimestamp: utils.PointerTo[uint64](fortunaTime),
 		},
 	}
 	for _, tt := range tests {

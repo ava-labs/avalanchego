@@ -167,7 +167,7 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 			zap.Uint64("blockNumber", header.Number.Uint64()),
 			zap.Error(err),
 		)
-		te = 0
+		te = dynamic.InitialTargetExponent
 	}
 
 	return te.Target(), gastime.GasPriceConfig{
@@ -280,7 +280,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
 	te = te.Toward(b.desired.targetExponent)
-	minPriceExponent := priceExponent(parent).Toward(b.desired.priceExponent)
+	pe := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -303,7 +303,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// TODO(StephenButtolph): Encode the min-delay excess.
 			MinDelayExcess:   new(acp226.DelayExcess),
 			TargetExponent:   &te,
-			MinPriceExponent: &minPriceExponent,
+			MinPriceExponent: &pe,
 		},
 	), nil
 }
