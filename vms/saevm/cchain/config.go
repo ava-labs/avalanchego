@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
@@ -60,7 +62,7 @@ type config struct {
 	BatchRequestLimit uint64 `json:"batch-request-limit"`
 
 	// State sync
-	// StateSyncEnabled *bool `json:"state-sync-enabled"`
+	StateSyncEnabled *bool `json:"state-sync-enabled"`
 
 	// Warp
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
@@ -81,6 +83,7 @@ type config struct {
 func defaultConfig() config {
 	return config{
 		Pruning:            true,
+		StateSyncEnabled:   utils.PointerTo(false), // TODO(alarso16): change to nil once state sync is in production
 		CommitInterval:     saedb.DefaultCommitInterval,
 		TrieCleanCache:     saedb.DefaultTrieCacheSizeMiB,
 		SnapshotCache:      saedb.DefaultSnapshotCacheSizeMiB,
@@ -110,9 +113,11 @@ func parseConfig(b []byte, networkID uint32) (config, error) {
 	if err := saeCfg.DBConfig.Verify(); err != nil {
 		return config{}, err
 	}
-	if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval &&
-		constants.ProductionNetworkIDs.Contains(networkID) {
-		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
+	if constants.ProductionNetworkIDs.Contains(networkID) {
+		if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval {
+			return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
+		}
+		c.StateSyncEnabled = utils.PointerTo(false) // TODO(alarso16): remove this once state sync is in production
 	}
 	return c, nil
 }
@@ -139,6 +144,13 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			BatchRequestLimit:   c.BatchRequestLimit,
 		},
 		Now: now,
+	}
+}
+
+func (c config) stateSyncConfig() statesync.Config {
+	return statesync.Config{
+		CommitInterval: c.CommitInterval,
+		Enabled:        c.StateSyncEnabled,
 	}
 }
 

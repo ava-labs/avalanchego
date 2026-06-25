@@ -11,22 +11,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/prometheus/client_golang/prometheus"
 
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -39,14 +41,18 @@ import (
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	cchainsync "github.com/ava-labs/avalanchego/vms/saevm/cchain/statesync"
 	ethcommon "github.com/ava-labs/libevm/common"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
+var _ adaptor.ChainVM[*blocks.Block] = (*VM)(nil)
+
 // VM wraps an [sae.VM] with the cross-chain pieces specific to the C-Chain.
 type VM struct {
-	*sae.VM // created by [VM.Initialize]
-	*network.Network
+	*sae.VM                    // created by [VM.SetState] as bootstrapping or normal op
+	*network.Network           // created by [VM.Initialize]
+	*cchainsync.SummaryHandler // created by [VM.Initialize]
 
 	// gossip frequencies are configurable to speed up testing.
 	pullGossipPeriod time.Duration
@@ -63,12 +69,27 @@ type VM struct {
 	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
 
+	mode                utils.Atomic[snow.State]
+	deferredArgs        *deferredInit
+	onBootstrappingOnce sync.Once
+	handlers            handlerMap
+
 	// onClose are executed in reverse order during [VM.Shutdown]. If a resource
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
 	onClose []func(context.Context) error
 
 	lastWaitForEvent utils.Atomic[time.Time]
+}
+
+type deferredInit struct {
+	g           *genesis
+	db          ethdb.Database
+	cfg         sae.Config
+	hooks       *hooks
+	pendingTxs  *txpool.Pending
+	warpStorage *warp.Storage
+	registry    *prometheus.Registry
 }
 
 var ethDBPrefix = []byte("ethdb")
@@ -101,22 +122,11 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("parsing warp messages: %w", err)
 	}
 
-	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
-	// This meant that the database's prefix was not compacted, because the
-	// provided database was wrapped by the rpcchainvm.
-	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
-
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
 	vm.chainConfig = genesis.Config
-
-	saeConfig := userConfig.saeConfig(vm.now)
-	tdbCfg := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
-	if err := genesis.setup(ethDB, tdbCfg); err != nil {
-		return fmt.Errorf("setting up genesis: %w", err)
-	}
 
 	vm.state, err = state.New(snowCtx, avaDB)
 	if err != nil {
@@ -151,6 +161,54 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
 	}
+
+	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
+	// This meant that the database's prefix was not compacted, because the
+	// provided database was wrapped by the rpcchainvm.
+	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
+
+	if err := genesis.setup(ethDB); err != nil {
+		return fmt.Errorf("writing genesis block: %w", err)
+	}
+	vm.SummaryHandler, err = cchainsync.New(userConfig.stateSyncConfig(), ethDB, hooks, vm.state, snowCtx.Log)
+	if err != nil {
+		return fmt.Errorf("creating summary handler: %w", err)
+	}
+	vm.onClose = append(vm.onClose, vm.SummaryHandler.Shutdown)
+
+	vm.deferredArgs = &deferredInit{
+		g:           genesis,
+		db:          ethDB,
+		cfg:         userConfig.saeConfig(vm.now),
+		hooks:       hooks,
+		pendingTxs:  pendingTxs,
+		warpStorage: warpStorage,
+		registry:    reg,
+	}
+	vm.handlers = make(handlerMap)
+	return nil
+}
+
+// onBootstrapping finishes initializing the VM after all necessary state is available.
+// This MUST be called exactly once, guaranteed using VM.onBootstrappingOnce.
+func (vm *VM) onBootstrapping(ctx context.Context) error {
+	var (
+		genesis     = vm.deferredArgs.g
+		ethDB       = vm.deferredArgs.db
+		saeConfig   = vm.deferredArgs.cfg
+		snowCtx     = vm.ctx
+		hooks       = vm.deferredArgs.hooks
+		pendingTxs  = vm.deferredArgs.pendingTxs
+		warpStorage = vm.deferredArgs.warpStorage
+		reg         = vm.deferredArgs.registry
+	)
+
+	tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
+	if err := genesis.checkAndWriteState(ethDB, tdbConfig); err != nil {
+		return fmt.Errorf("setting up genesis: %w", err)
+	}
+
+	var err error
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
@@ -219,6 +277,11 @@ func (vm *VM) Initialize(
 	if err := registerWarpHandler(vm.VM, vm.Network, warpStorage, snowCtx.WarpSigner); err != nil {
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
+
+	if err := vm.updateHandlers(ctx); err != nil {
+		return fmt.Errorf("updating HTTP handlers: %w", err)
+	}
+
 	return nil
 }
 
@@ -299,111 +362,6 @@ func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error)
 	return b, nil
 }
 
-const (
-	avaxServiceName       = "avax"
-	avaxHTTPExtensionPath = "/" + avaxServiceName
-)
-
-// CreateHandlers returns the HTTP handlers exposed by the underlying SAE VM
-// augmented with the avax service at [avaxHTTPExtensionPath].
-func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	m, err := vm.VM.CreateHandlers(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating SAE handlers: %w", err)
-	}
-
-	service, err := newService(vm.ctx, vm.gossipSet, vm.pushGossiper, vm.state)
-	if err != nil {
-		return nil, fmt.Errorf("creating avax service: %w", err)
-	}
-	handler, err := rpc.NewHandler(avaxServiceName, service)
-	if err != nil {
-		return nil, fmt.Errorf("creating avax RPC handler: %w", err)
-	}
-
-	m[avaxHTTPExtensionPath] = handler
-	return m, nil
-}
-
-// earliestBuildTime returns the earliest wall-clock time at which a child of b
-// may be built.
-func earliestBuildTime(b *blocks.Block) time.Time {
-	h := b.Header()
-	return blockTime(h).Add(delayExponent(h).DelayDuration())
-}
-
-// minWaitForEventDelay is the minimum spacing between consecutive
-// [VM.WaitForEvent] returns. 100ms isn't special here, it was selected as a
-// reasonable frequency for the engine to poll on whether to build a block or
-// not.
-const minWaitForEventDelay = 100 * time.Millisecond
-
-// WaitForEvent waits until the ACP-226 minimum block delay since the preferred
-// block has elapsed, then waits for a transaction to be in the txpool or for
-// the SAE VM to produce an event.
-func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
-	// Throttle to avoid busy looping: the txpools only clear after block
-	// execution, so pending txs can re-signal while their block is processing.
-	//
-	// TODO(JonathanOppenheimer): The txpool should track preference / reorgs so
-	// we don't need this throttle.
-	throttleUntil := vm.lastWaitForEvent.Get().Add(minWaitForEventDelay)
-
-	// Pace block building on the ACP-226 minimum block delay so that the event
-	// sources are consulted when we are actually willing to build.
-	buildTime := earliestBuildTime(vm.VM.GetPreference())
-
-	until := throttleUntil
-	if buildTime.After(until) {
-		until = buildTime
-	}
-	if err := vm.waitUntil(ctx, until); err != nil {
-		return 0, err
-	}
-
-	// Race the SAE event source against the cross-chain txpool. The winner's
-	// deferred cancel unblocks the loser, whose pending call returns and delivers
-	// its discarded result to the buffered channel, so neither goroutine leaks.
-	raceCtx, cancel := context.WithCancel(ctx)
-	type result struct {
-		msg snowcommon.Message
-		err error
-	}
-	results := make(chan result, 2)
-	go func() {
-		defer cancel()
-		msg, err := vm.VM.WaitForEvent(raceCtx)
-		results <- result{msg, err}
-	}()
-	go func() {
-		defer cancel()
-		err := vm.txpool.AwaitTxs(raceCtx)
-		results <- result{snowcommon.PendingTxs, err}
-	}()
-
-	r := <-results
-	if r.err == nil {
-		vm.lastWaitForEvent.Set(vm.now())
-	}
-	return r.msg, r.err
-}
-
-// waitUntil blocks until [VM.now] reaches t, returning early with the
-// cancellation cause if ctx is canceled first.
-func (vm *VM) waitUntil(ctx context.Context, t time.Time) error {
-	timeToWait := t.Sub(vm.now())
-	if timeToWait <= 0 {
-		return nil
-	}
-	select {
-	case <-ctx.Done():
-		return context.Cause(ctx)
-	case <-time.After(timeToWait):
-		return nil
-	}
-}
-
-// Shutdown releases every resource allocated by [VM.Initialize] in reverse
 // order.
 //
 // It is idempotent and safe to call after a partially-failed [VM.Initialize].

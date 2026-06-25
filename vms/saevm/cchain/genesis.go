@@ -172,7 +172,10 @@ var (
 // It verifies that the genesis is compatible with any previously setup genesis
 // state by checking the genesis block hash along with the rules used to execute
 // the head block.
-func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
+//
+// Once the chain is ready to be initialized, one must call
+// [genesis.checkAndWriteState] to ensure the genesis state is available.
+func (g *genesis) setup(db ethdb.Database) error {
 	block, err := g.block()
 	if err != nil {
 		return fmt.Errorf("constructing genesis block: %w", err)
@@ -215,18 +218,6 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (retErr er
 		rawdb.WriteChainConfig(db, hash, g.Config)
 	}
 
-	tdb := triedb.NewDatabase(db, trieConfig)
-	defer func() {
-		retErr = errors.Join(retErr, tdb.Close())
-	}()
-
-	// Because some trie implementations prune old state, we need to defer to
-	// the trie to determine if the genesis was previously initialized.
-	if !tdb.Initialized(block.Root()) {
-		if _, err := g.writeState(db, tdb); err != nil {
-			return fmt.Errorf("writing genesis state: %w", err)
-		}
-	}
 	return nil
 }
 
@@ -336,6 +327,26 @@ func (g *genesis) root() (_ common.Hash, retErr error) {
 func activatePrecompile(statedb *state.StateDB, addr common.Address) {
 	statedb.SetNonce(addr, 1)
 	statedb.SetCode(addr, []byte{0x01})
+}
+
+// checkAndWriteState commits the genesis allocation to the state database if
+// it is not already present.
+func (g *genesis) checkAndWriteState(db ethdb.Database, trieConfig *triedb.Config) (retErr error) {
+	tdb := triedb.NewDatabase(db, trieConfig)
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+
+	root, err := g.root()
+	if err != nil {
+		return fmt.Errorf("computing genesis root: %w", err)
+	}
+	if tdb.Initialized(root) {
+		return nil
+	}
+
+	_, err = g.writeState(db, tdb)
+	return err
 }
 
 // writeState commits the genesis allocation to the state database and returns
