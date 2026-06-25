@@ -19,13 +19,25 @@ const (
 	// configured ProposerWindowDuration. A value of 0 means "use the default"
 	// and is always allowed.
 	//
-	// The floor is 1s because the proposerVM block timestamp is whole-second
-	// granular: a sub-second window gives no real failover benefit (the stall
-	// quantizes up to the next second) while shrinking the verify tolerance
-	// toward block-propagation time. The ceiling equals the default window
-	// (proposer.DefaultWindowDuration); a larger window only slows failover, so
-	// there is no reason to raise it above the historical 5s constant.
-	MinProposerWindowDuration = 1 * time.Second
+	// The hard floor is 50ms: roughly the smallest window in which a proposer
+	// can still build and propagate a block before its slot closes. Below it the
+	// builder is preempted before the block is ready and the chain wedges. It is
+	// set well under 1s to leave room for a future proposerVM that interprets its
+	// block timestamp as unix-ms (a reinterpretation of the same int64, no
+	// block-format change), which would make sub-second windows actually useful,
+	// without having to revisit this bound.
+	//
+	// NOTE: the proposerVM block timestamp is currently whole-second granular, so
+	// today a sub-second window delivers no failover benefit (the stall quantizes
+	// up to the next second) and only raises the block-rejection rate. ~1s is the
+	// practical floor in practice; values between the hard floor and 1s are
+	// accepted but are the operator's responsibility (see the consensus-parameter
+	// warning on the field).
+	//
+	// The ceiling equals the default window (proposer.DefaultWindowDuration); a
+	// larger window only slows failover, so there is no reason to raise it above
+	// the historical 5s constant.
+	MinProposerWindowDuration = 50 * time.Millisecond
 	MaxProposerWindowDuration = 5 * time.Second
 )
 
