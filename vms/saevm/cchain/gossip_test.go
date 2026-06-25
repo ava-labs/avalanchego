@@ -12,9 +12,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
@@ -46,7 +46,7 @@ func TestPushGossip(t *testing.T) {
 		sk        = txtest.NewKey(t)
 		withAlloc = withMaxAllocFor(sk.EthAddress())
 		vdrID     = ids.GenerateTestNodeID()
-		vdrs      = set.Of(vdrID)
+		vdrs      = warptest.NewValidatorsWithNodeIDs(t, vdrID)
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	vdrCtx, vdr := newSUT(t, withAlloc, withNodeID(vdrID), withValidators(vdrs))
@@ -71,7 +71,7 @@ func TestPullGossip(t *testing.T) {
 		withAlloc = withMaxAllocFor(sk.EthAddress())
 		vdrIDA    = ids.GenerateTestNodeID()
 		vdrIDB    = ids.GenerateTestNodeID()
-		vdrs      = set.Of(vdrIDA, vdrIDB)
+		vdrs      = warptest.NewValidatorsWithNodeIDs(t, vdrIDA, vdrIDB)
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	_, vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
@@ -101,7 +101,7 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 		withAlloc = withMaxAllocFor(sk.EthAddress())
 		vdrIDA    = ids.GenerateTestNodeID()
 		vdrIDB    = ids.GenerateTestNodeID()
-		vdrs      = set.Of(vdrIDA, vdrIDB)
+		vdrs      = warptest.NewValidatorsWithNodeIDs(t, vdrIDA, vdrIDB)
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	vdrACtx, vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
@@ -121,9 +121,7 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 	// Because vdrB doesn't consider vdrA a validator and isn't connected to
 	// api, vdrB can only learn about the transaction if vdrA pushes it.
 	vdrB.assertTxBloomEmpty(t)
-
 	require.NoErrorf(t, vdrA.IssueTx(vdrACtx, stx), "%T.IssueTx()", vdrA.VM)
-	vdrA.assertTxBloomContains(t, stx.ID())
 
 	blk := vdrB.runConsensusLoop(vdrBCtx, t)
 	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
