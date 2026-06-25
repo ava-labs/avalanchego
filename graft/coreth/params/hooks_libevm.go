@@ -51,6 +51,10 @@ func (RulesExtra) CanExecuteTransaction(_ common.Address, _ *common.Address, _ l
 	return nil
 }
 
+func (r RulesExtra) ShouldRefundGas() bool {
+	return !r.IsApricotPhase1
+}
+
 // MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
 func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
 	if extras.Rules(r).IsHelicon {
