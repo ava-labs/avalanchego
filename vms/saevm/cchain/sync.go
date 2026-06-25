@@ -19,15 +19,15 @@ func (*VM) StateSyncEnabled(context.Context) (bool, error) {
 
 type StateSummary struct{}
 
-func (s StateSummary) ID() ids.ID {
+func (StateSummary) ID() ids.ID {
 	panic("unimplemented")
 }
 
-func (s StateSummary) Bytes() []byte {
+func (StateSummary) Bytes() []byte {
 	panic("unimplemented")
 }
 
-func (s StateSummary) Height() uint64 {
+func (StateSummary) Height() uint64 {
 	panic("unimplemented")
 }
 
