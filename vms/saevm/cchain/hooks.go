@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -140,19 +142,36 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 	return dynamic.InitialPriceExponent
 }
 
-// targetExponent returns h's ACP-176 target exponent, defaulting to
-// [dynamic.InitialTargetExponent] when the header does not carry one.
-func targetExponent(h *types.Header) dynamic.TargetExponent {
+func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
 	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
-		return *te
+		return *te, nil
 	}
-	return dynamic.InitialTargetExponent
+	if !config.IsFortuna(h.Time) || h.Number.Sign() == 0 {
+		return 0, nil
+	}
+
+	// The block might be the last synchronous block running with ACP-176.
+	state, err := acp176.ParseState(h.Extra)
+	if err != nil {
+		return 0, fmt.Errorf("parsing fee state: %w", err)
+	}
+	return dynamic.TargetExponent(state.TargetExcess), nil
 }
 
-func (*hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	// TODO(StephenButtolph): Extract the gas target from the header (ACP-176).
-	return 1_000_000, gastime.GasPriceConfig{
-		TargetToExcessScaling: 87,
+func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+	config := corethparams.GetExtra(h.chainConfig)
+	te, err := targetExponent(config, header)
+	if err != nil {
+		h.ctx.Log.Error("failed to get target exponent",
+			zap.Stringer("blockHash", header.Hash()),
+			zap.Uint64("blockNumber", header.Number.Uint64()),
+			zap.Error(err),
+		)
+		te = 0
+	}
+
+	return te.Target(), gastime.GasPriceConfig{
+		TargetToExcessScaling: 87, // 87 ~= 60 / ln(2)
 		MinPrice:              priceExponent(header).Price(),
 	}
 }
@@ -255,7 +274,12 @@ type builder struct {
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	// TODO(StephenButtolph): Enforce the minimum block time here.
 	now := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
-	nextTargetExponent := targetExponent(parent).Toward(b.desired.targetExponent)
+	config := corethparams.GetExtra(b.chainConfig)
+	te, err := targetExponent(config, parent)
+	if err != nil {
+		return nil, fmt.Errorf("getting target exponent: %w", err)
+	}
+	te = te.Toward(b.desired.targetExponent)
 	minPriceExponent := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
@@ -278,7 +302,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			TimeMilliseconds: &now,
 			// TODO(StephenButtolph): Encode the min-delay excess.
 			MinDelayExcess:   new(acp226.DelayExcess),
-			TargetExponent:   &nextTargetExponent,
+			TargetExponent:   &te,
 			MinPriceExponent: &minPriceExponent,
 		},
 	), nil

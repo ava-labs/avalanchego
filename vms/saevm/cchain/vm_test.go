@@ -184,6 +184,12 @@ func withPriceTarget(p gas.Price) sutOption {
 	})
 }
 
+func withGasTarget(g gas.Gas) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.GasTarget = &g
+	})
+}
+
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
@@ -1279,6 +1285,71 @@ func TestDynamicPriceExponent(t *testing.T) {
 				wantBaseFee := new(big.Int).SetUint64(uint64(wantExponent.Price()))
 				require.NotNilf(t, header.BaseFee, "block %d %T.BaseFee", header.Number, header)
 				require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d %T.BaseFee", header.Number, header)
+			}
+		})
+	}
+}
+
+func TestVerifyBlockRejectsCheatedTargetExponent(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+
+	// Claim an exponent beyond what one block may move it.
+	err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
+		cheated := dynamic.TargetExponent(math.MaxUint64)
+		e.TargetExponent = &cheated
+	})
+	require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
+}
+
+// TestDynamicTargetExponent verifies that each built block's TargetExponent
+// advances toward the node's ACP-176 vote, clamped to the per-block step, and
+// stays at the initial value when there is no vote.
+func TestDynamicTargetExponent(t *testing.T) {
+	const maxDiff = 1 << 15
+	tests := []struct {
+		name    string
+		desired *gas.Gas
+		want    []dynamic.TargetExponent
+	}{
+		{
+			name: "unset",
+			want: []dynamic.TargetExponent{
+				dynamic.InitialTargetExponent,
+			},
+		},
+		{
+			name:    "max_diff",
+			desired: utils.PointerTo[gas.Gas](15_000_000),
+			want: []dynamic.TargetExponent{
+				maxDiff,
+				2 * maxDiff,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			opts := []sutOption{
+				withMaxAllocFor(key.EthAddress()),
+			}
+			if test.desired != nil {
+				opts = append(opts, withGasTarget(*test.desired))
+			}
+			ctx, sut := newSUT(t, opts...)
+			w := newWallet(key, sut.ctx, sut.Client)
+
+			for _, wantExponent := range test.want {
+				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				header := blk.Header()
+
+				he := customtypes.GetHeaderExtra(header)
+				require.NotNilf(t, he.TargetExponent, "block %d %T.TargetExponent", header.Number, he)
+				assert.Equalf(t, wantExponent, *he.TargetExponent, "block %d %T.TargetExponent", header.Number, he)
 			}
 		})
 	}
