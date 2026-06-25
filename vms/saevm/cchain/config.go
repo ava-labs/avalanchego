@@ -25,7 +25,7 @@ import (
 // config is the operator-supplied node configuration for the C-Chain, decoded
 // from the configBytes passed to [VM.Initialize].
 //
-// TODO(JonathanOpenheimer) enable and wire all remaining configs
+// TODO(JonathanOppenheimer) enable and wire all remaining configs
 type config struct {
 	// Block-building targets
 	// PriceTarget is the minimum gas price (in aAVAX) this node enforces when
