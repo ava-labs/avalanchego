@@ -83,6 +83,7 @@ type (
 		hooks          *saehookstest.Stub
 		archival       bool
 		commitInterval uint64
+		extraAlloc     types.GenesisAlloc
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -106,6 +107,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
+	for addr, acc := range sutCfg.extraAlloc {
+		alloc[addr] = acc
+	}
 
 	genOpts := []blockstest.GenesisOption{
 		blockstest.WithTrieDBConfig(tdbConfig),
@@ -154,6 +158,12 @@ func defaultHooks() *saehookstest.Stub {
 func withHooks(h *saehookstest.Stub) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.hooks = h
+	})
+}
+
+func withExtraAlloc(a types.GenesisAlloc) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.extraAlloc = a
 	})
 }
 
@@ -1053,4 +1063,81 @@ func TestArchivalStoresAll(t *testing.T) {
 			assert.NoErrorf(t, err, "%T.StateDB()", e)
 		}
 	})
+}
+
+// TestProcessBeaconBlockRoot verifies that block execution performs the
+// EIP-4788 system call, storing the header's parent beacon block root via the
+// beacon-roots contract. [Execute] is shared by live execution and tracing replay,
+// so covering it here covers both paths.
+//
+// The contract is deployed exactly as on mainnet: by sending the canonical
+// keyless ("Nick's method") presigned deployment transaction, which lands the
+// contract at [params.BeaconRootsStorageAddress]. A later block then carries a
+// parent beacon root, and its execution must populate the contract's ring
+// buffer at slot (timestamp%8191 + 8191).
+func TestProcessBeaconBlockRoot(t *testing.T) {
+	const historyBufferLength = 8191
+	beaconRoot := common.HexToHash("0xbeef")
+
+	// Canonical EIP-4788 deployment transaction (tx hash
+	// 0xdf52c2d3bbe38820fff7b5eaab3db1b91f8e1412b56497d88388fb5d4ea1fde0). Its
+	// keyless signature recovers to deployer 0x0B79..., so contract creation at
+	// nonce 0 yields [params.BeaconRootsStorageAddress].
+	deployer := common.HexToAddress("0x0B799C86a49DEeb90402691F1041aa3AF2d3C875")
+	gasPrice, _ := new(big.Int).SetString("e8d4a51000", 16)
+	deployTx := types.NewTx(&types.LegacyTx{
+		Nonce:    0,
+		GasPrice: gasPrice,
+		Gas:      0x3d090,
+		Data:     common.FromHex("0x60618060095f395ff33373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"),
+		V:        big.NewInt(0x1b),
+		R:        big.NewInt(0x539),
+		S:        big.NewInt(0x1b9b6eb1f0),
+	})
+
+	tests := []struct {
+		name       string
+		beaconRoot *common.Hash
+		wantStored common.Hash
+	}{
+		{
+			name:       "stores parent beacon root via system call",
+			beaconRoot: &beaconRoot,
+			wantStored: beaconRoot,
+		},
+		{
+			name:       "nil parent beacon root skips system call",
+			beaconRoot: nil,
+			wantStored: common.Hash{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Fund only the keyless deployer EOA; the contract itself is deployed
+			// by the transaction, not pre-allocated.
+			ctx, sut := newSUT(t, withExtraAlloc(types.GenesisAlloc{
+				deployer: {Balance: new(big.Int).Mul(big.NewInt(100), big.NewInt(params.Ether))},
+			}))
+			e := sut.Executor
+
+			deployBlock := sut.chain.NewBlock(t, types.Transactions{deployTx})
+			require.NoError(t, e.Enqueue(ctx, deployBlock), "Enqueue(deployment)")
+
+			b := sut.chain.NewBlock(t, nil, blockstest.WithEthBlockOptions(
+				blockstest.ModifyHeader(func(h *types.Header) {
+					h.ParentBeaconRoot = tt.beaconRoot
+				}),
+			))
+			require.NoError(t, e.Enqueue(ctx, b), "Enqueue(beacon)")
+			require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+
+			sdb, err := e.StateDB(b.PostExecutionStateRoot())
+			require.NoErrorf(t, err, "%T.StateDB(%T.PostExecutionStateRoot())", e, b)
+			require.NotEmptyf(t, sdb.GetCode(params.BeaconRootsStorageAddress), "beacon-roots contract deployed at %s", params.BeaconRootsStorageAddress)
+
+			rootSlot := common.BigToHash(new(big.Int).SetUint64(b.EthBlock().Time()%historyBufferLength + historyBufferLength))
+			got := sdb.GetState(params.BeaconRootsStorageAddress, rootSlot)
+			assert.Equalf(t, tt.wantStored, got, "value stored in %s ring-buffer slot %s", params.BeaconRootsStorageAddress, rootSlot)
+		})
+	}
 }
