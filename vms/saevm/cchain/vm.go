@@ -91,11 +91,11 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	cfg, err := parseConfig(configBytes)
+	userConfig, err := parseConfig(configBytes)
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
-	warpMessages, err := cfg.WarpMessages()
+	warpMessages, err := userConfig.WarpMessages()
 	if err != nil {
 		return fmt.Errorf("parsing warp messages: %w", err)
 	}
@@ -134,7 +134,7 @@ func (vm *VM) Initialize(
 		pendingTxs,
 		warpStorage,
 		vm.now,
-		cfg.desired(),
+		userConfig.desired(),
 	)
 	mempoolConfig := legacypool.DefaultConfig
 	// Treat all transactions equally regardless of submission source — no
