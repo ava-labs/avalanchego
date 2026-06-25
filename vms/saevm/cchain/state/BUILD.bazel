@@ -10,7 +10,6 @@ go_library(
     name = "state",
     srcs = [
         "codec.go",
-        "genesis.go",
         "state.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/state",

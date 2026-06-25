@@ -13,13 +13,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 )
 
 var _ Chain = (*VM)(nil)
@@ -62,6 +62,8 @@ type current struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 }
+
+var transitionedKey = prefixdb.MakePrefix([]byte("transitioned"))
 
 func (v *VM) Initialize(
 	ctx context.Context,
@@ -116,7 +118,7 @@ func (v *VM) Initialize(
 	}
 
 	chainCtx.Log.Info("checking for last synchronous block")
-	has, err := state.HasLastSync(v.db)
+	has, err := v.db.Has(transitionedKey)
 	if err != nil {
 		return fmt.Errorf("checking for last synchronous block: %w", err)
 	}
@@ -160,7 +162,6 @@ func (v *VM) transition(ctx context.Context, last snowman.Block) error {
 	defer v.transitionLock.Unlock()
 
 	lastID := last.ID()
-	lastBytes := last.Bytes()
 	v.chainCtx.Log.Info("transitioning VMs",
 		zap.Stringer("lastID", lastID),
 		zap.Uint64("lastHeight", last.Height()),
@@ -173,7 +174,7 @@ func (v *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 
 	v.chainCtx.Log.Info("writing last synchronous block")
-	if err := state.WriteLastSync(v.db, lastBytes); err != nil {
+	if err := v.db.Put(transitionedKey, nil); err != nil {
 		return fmt.Errorf("saving last synchronous block: %w", err)
 	}
 
