@@ -64,15 +64,17 @@ func MinGasForBytes(size, blockGasLimit uint64) uint64 {
 //	reject if  y/M > g/x  <->   y > g·(M/x)
 //
 // Equivalently, it must carry at least x/M gas per serialized byte.
-func Eligible(size, gasLimit, blockGasLimit uint64) bool {
+func Eligible(txBytes, gasLimit, blockGasLimit uint64) bool {
+	// Defensive check: if blockGasLimit == 0, all transactions would be
+	// incorrectly eligible
 	if blockGasLimit == 0 {
 		return false
 	}
 
-	byteHi, byteLo := bits.Mul64(size, blockGasLimit)   // y·x
-	gasHi, gasLo := bits.Mul64(gasLimit, MaxBlockBytes) // g·M
-	if byteHi != gasHi {
-		return byteHi < gasHi
+	yxHi, yxLo := bits.Mul64(txBytes, blockGasLimit)  // y·x
+	gmHi, gmLo := bits.Mul64(gasLimit, MaxBlockBytes) // g·M
+	if yxHi != gmHi {
+		return yxHi < gmHi
 	}
-	return byteLo <= gasLo
+	return yxLo <= gmLo
 }

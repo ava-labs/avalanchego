@@ -220,8 +220,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 		sender: sender,
 	}
-	sender.SetSelf(sut)
-	tb.Cleanup(sender.Close)
+	sender.Start(tb, sut)
 	return ctx, sut
 }
 
@@ -254,49 +253,20 @@ func (s *SUT) CallContext(ctx context.Context, result any, method string, args .
 	return s.rpcClient.CallContext(ctx, result, method, args...)
 }
 
-type vmTime struct {
-	time.Time
-}
-
-func (t *vmTime) now() time.Time {
-	return t.Time
-}
-
-func (t *vmTime) set(n time.Time) {
-	t.Time = n
-}
-
-func (t *vmTime) advance(d time.Duration) {
-	t.Time = t.Time.Add(d)
-}
-
-// advanceToSettle advances the time such that the next call to [vmTime.now] is
-// at or after the time required to settle `b`. Note that at least one more
-// accepted [blocks.Block] is still required to actually settle `b`.
-func (t *vmTime) advanceToSettle(ctx context.Context, tb testing.TB, b *blocks.Block) {
-	tb.Helper()
-	require.NoErrorf(tb, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	to := b.ExecutedByGasTime().AsTime().Add(saeparams.Tau)
-	if t.Before(to) {
-		t.set(to)
-	}
-}
-
 // withVMTime returns an option to configure a new SUT's "now" function along
-// with a struct to access and set the time at nanosecond resolution.
-func withVMTime(tb testing.TB, startTime time.Time) (sutOption, *vmTime) {
+// with a [saetest.Clock] to access and advance the time at nanosecond
+// resolution.
+func withVMTime(tb testing.TB, startTime time.Time) (sutOption, *saetest.Clock) {
 	tb.Helper()
-	t := &vmTime{
-		Time: startTime,
-	}
-	opt := options.Func[sutConfig](func(c *sutConfig) {
+	c := saetest.NewClock(startTime, time.Nanosecond)
+	opt := options.Func[sutConfig](func(cfg *sutConfig) {
 		// TODO(StephenButtolph) unify the time functions provided in the config
 		// and the hooks.
-		c.hooks.Now = t.now
-		c.vmConfig.Now = t.now
+		cfg.hooks.Now = c.Now
+		cfg.vmConfig.Now = c.Now
 	})
 
-	return opt, t
+	return opt, c
 }
 
 // withExecResultsDB returns an option that replaces the default
@@ -1142,7 +1112,7 @@ func TestBlockSources(t *testing.T) {
 	corrupted := sut.runConsensusLoop(t)
 	onDisk := sut.runConsensusLoop(t)
 	settled := sut.runConsensusLoop(t)
-	vmTime.advanceToSettle(ctx, t, settled)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 	unsettled := sut.runConsensusLoop(t)
 	require.NoErrorf(t, unsettled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", unsettled)
 
@@ -1227,7 +1197,7 @@ func TestSettledGasTime(t *testing.T) {
 			GasFeeCap: big.NewInt(1),
 		}))
 		if rng.Int32N(2) == 0 {
-			vmTime.advanceToSettle(ctx, t, b)
+			vmTime.AdvanceToSettle(ctx, t, b)
 		}
 		bs = append(bs, b)
 	}
