@@ -17,6 +17,7 @@ go_library(
         "//vms/saevm/blocks",
         "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",
+        "//vms/saevm/saetest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/state",
