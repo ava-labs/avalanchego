@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782406285180,
+  "lastUpdate": 1782415122942,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -34356,6 +34356,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_accept_ms/ggas",
             "value": 729.8619819987395,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "rodrigo",
+            "username": "RodrigoVillar",
+            "email": "77309055+RodrigoVillar@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "2a93974d34dda1875674354a9eb73d01d7f5a124",
+          "message": "refactor(eth): remove in-memory HashDB from reexecution (#5487)",
+          "timestamp": "2026-06-25T16:41:53Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/2a93974d34dda1875674354a9eb73d01d7f5a124"
+        },
+        "date": 1782415119278,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - mgas/s",
+            "value": 27.992472996510415,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - ms/ggas",
+            "value": 35723.88906563066,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_parse_ms/ggas",
+            "value": 73.28203206047847,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_verify_ms/ggas",
+            "value": 35592.88990267628,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
+            "value": 54.979049063610205,
             "unit": "block_accept_ms/ggas"
           }
         ]
