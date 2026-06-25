@@ -58,39 +58,33 @@ this configuration in order to properly allow a node in the private Subnet.
 
 ### ProposerVM Config
 
-#### `proposerWindowDuration` (duration, nanoseconds)
+#### `proposerWindowMilliseconds` (uint)
 
-The length of a single proposerVM proposer slot for the chains in this Subnet.
-Defaults to 5s (`5000000000`) when unset or `0`.
+The length of a single proposerVM proposer slot for the chains in this Subnet, in
+**milliseconds**. Defaults to 5s (`5000`) when unset or `0`. When set, must be
+between `50` and `5000` inclusive.
 
-This is a Go `time.Duration` decoded from JSON as an **integer number of
-nanoseconds** (e.g. `1000000000` for 1s), the same encoding as the other Subnet
-duration fields such as `snowParameters.maxItemProcessingTime` and
-`simplexParameters.maxNetworkDelay`. When set, it must be between 50ms
-(`50000000`) and 5s (`5000000000`) inclusive; `0` means use the default.
+**If you are changing this at all, you almost certainly want 1s (`1000`).** On
+current nodes that is the practical floor (see the note below), and it is already
+enough to make validator restarts and maintenance effectively invisible. For
+example:
 
-The proposerVM schedules each validator into a proposer slot, and slots are
-`proposerWindowDuration` apart. When a scheduled proposer is offline, the chain
-cannot accept a block until the next live proposer's slot opens, so a smaller
-window shortens the stall on validator failover (faster recovery for CFT/PoA
-L1s), at the cost of more rejected blocks when a slot closes before a block
-propagates.
+```json
+{ "proposerWindowMilliseconds": 1000 }
+```
 
-:::warning
-
-The proposerVM block timestamp is currently **whole-second granular**, so today a
-sub-second window gives no real failover benefit (the stall quantizes up to the
-next second) and only raises the block-rejection rate. **~1s is the practical
-floor.** Smaller values down to the 50ms hard floor are accepted to leave room for
-a future proposerVM with millisecond-precision timestamps, but on current versions
-they are the operator's responsibility.
-
-:::
+Slots are `proposerWindowMilliseconds` apart, and when a scheduled proposer is
+offline the chain stalls until the next live proposer's slot opens — so a smaller
+window speeds failover recovery (good for CFT/PoA L1s) at the cost of more
+rejected blocks. The proposerVM block timestamp is currently whole-second
+granular, so a sub-second window gives no failover benefit today (~1s is the
+practical floor); smaller values down to `50` are accepted but are the operator's
+responsibility.
 
 :::warning
 
 This is a network-wide consensus parameter, not a per-node tuning knob. Every
-validator of this Subnet's chains MUST use the same `proposerWindowDuration`.
+validator of this Subnet's chains MUST use the same `proposerWindowMilliseconds`.
 Validators with different windows disagree about which proposer is expected for a
 slot, reject each other's blocks, and break liveness. Roll it out identically to
 every validator, the same way as an upgrade time. The primary network (P/C/X) is

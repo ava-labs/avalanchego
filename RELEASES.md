@@ -24,7 +24,7 @@ NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chai
 ### Config
 
 - Added:
-  - `proposerWindowDuration` in subnet configs
+  - `proposerWindowMilliseconds` in subnet configs
 
 ### Fixes
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.

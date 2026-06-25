@@ -21,7 +21,7 @@ type Config struct {
 
 	// WindowDuration is the length of a single proposer slot. It is
 	// consensus-critical: every validator of a chain MUST use the same value
-	// (see subnets.Config.ProposerWindowDuration). A value <= 0 falls back to
+	// (see subnets.Config.ProposerWindowMilliseconds). A value <= 0 falls back to
 	// [DefaultWindowDuration] (5s).
 	WindowDuration time.Duration
 
