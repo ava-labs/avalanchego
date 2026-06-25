@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 type config struct {
@@ -26,9 +27,8 @@ type config struct {
 	// second.
 	DelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
-	// PriceTarget is the minimum gas price (in aAVAX) that this node will
-	// attempt to enforce when creating blocks. If this config is not specified,
-	// the node will default to use the parent block's minimum gas price.
+	// PriceTarget is the minimum gas price (in aAVAX) this node enforces when
+	// building blocks under ACP-283. nil means follow the parent block.
 	PriceTarget *gas.Price `json:"min-price-target,omitempty"`
 
 	// Pruning encodes whether the node should prune intermediate trie nodes.
@@ -69,4 +69,30 @@ func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
 		msgs[i] = msg
 	}
 	return msgs, nil
+}
+
+// desiredParams bundles this node's votes for the dynamic consensus
+// parameters. A nil field means no vote.
+type desiredParams struct {
+	delayExponent  *dynamic.DelayExponent
+	targetExponent *dynamic.TargetExponent
+	priceExponent  *dynamic.PriceExponent
+}
+
+// desired returns c's user-facing targets as internal exponent votes.
+func (c config) desired() desiredParams {
+	var d desiredParams
+	if c.DelayTarget != nil {
+		d.delayExponent = new(dynamic.DelayExponent)
+		*d.delayExponent = dynamic.DesiredDelayExponent(*c.DelayTarget)
+	}
+	if c.GasTarget != nil {
+		d.targetExponent = new(dynamic.TargetExponent)
+		*d.targetExponent = dynamic.DesiredTargetExponent(*c.GasTarget)
+	}
+	if c.PriceTarget != nil {
+		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
+		d.priceExponent = &e
+	}
+	return d
 }

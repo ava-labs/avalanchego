@@ -58,10 +58,10 @@ func newHooks(
 	state *cchainstate.State,
 	chainConfig *ethparams.ChainConfig,
 	initialDelayExponent dynamic.DelayExponent,
-	desired desiredParams,
 	pool *txpool.Pending,
 	warpStorage *warp.Storage,
 	now func() time.Time,
+	desired desiredParams,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -84,8 +84,8 @@ func newHooks(
 			chainConfig,
 			initialDelayExponent,
 			now,
-			desired,
 			poolTxs,
+			desired,
 		},
 		state,
 		warpStorage,
@@ -117,12 +117,12 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		func() time.Time {
 			return now
 		},
+		slices.Values(txs),
 		desiredParams{
 			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 			targetExponent: headerExtra.TargetExponent,
 			priceExponent:  headerExtra.MinPriceExponent,
 		},
-		slices.Values(txs),
 	}, nil
 }
 
@@ -137,6 +137,15 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 	return saetypes.ExecutionResults{
 		HeightIndex: db,
 	}, nil
+}
+
+// priceExponent returns h's ACP-283 price exponent, defaulting to
+// [dynamic.InitialPriceExponent] when the header does not carry one.
+func priceExponent(h *types.Header) dynamic.PriceExponent {
+	if pe := customtypes.GetHeaderExtra(h).MinPriceExponent; pe != nil {
+		return *pe
+	}
+	return dynamic.InitialPriceExponent
 }
 
 func (h *hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConfig) {
@@ -171,13 +180,6 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return 0, fmt.Errorf("parsing fee state: %w", err)
 	}
 	return dynamic.TargetExponent(state.TargetExcess), nil
-}
-
-func priceExponent(h *types.Header) dynamic.PriceExponent {
-	if pe := customtypes.GetHeaderExtra(h).MinPriceExponent; pe != nil {
-		return *pe
-	}
-	return 0
 }
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
@@ -273,22 +275,14 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 
 var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
-type desiredParams struct {
-	delayExponent  *dynamic.DelayExponent
-	targetExponent *dynamic.TargetExponent
-	priceExponent  *dynamic.PriceExponent
-}
-
 type builder struct {
 	ctx                  *snow.Context
 	chainConfig          *ethparams.ChainConfig
 	initialDelayExponent dynamic.DelayExponent
 
-	now func() time.Time
-	// When fields in [desiredParams] are set, the builder produces headers
-	// that move the corresponding network value toward the desired value.
-	desired      desiredParams
+	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
+	desired      desiredParams
 }
 
 var errHeliconUnactivated = errors.New("helicon is not activated")
@@ -330,7 +324,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
-	pe := priceExponent(parent).Toward(b.desired.priceExponent)
+	minPriceExponent := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -352,7 +346,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			TimeMilliseconds: &nowMS,
 			MinDelayExcess:   (*acp226.DelayExcess)(&de),
 			TargetExponent:   &te,
-			MinPriceExponent: &pe,
+			MinPriceExponent: &minPriceExponent,
 		},
 	), nil
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"maps"
+	"math"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -43,14 +44,17 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -91,13 +95,15 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis    core.Genesis
-		nodeID     ids.NodeID
-		networkID  uint32
-		validators *warptest.Validators
-		now        func() time.Time
-		db         database.Database
-		state      snow.State
+		genesis      core.Genesis
+		nodeID       ids.NodeID
+		networkID    uint32
+		validators   *warptest.Validators
+		now          func() time.Time
+		vmConfig     config
+		db           database.Database
+		state        snow.State
+		chainDataDir string
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -115,9 +121,10 @@ func withState(state snow.State) sutOption {
 // withDB initializes the SUT's VM against an existing database rather than a
 // fresh one, enabling restart simulations that reuse a prior VM's persisted
 // state.
-func withDB(db database.Database) sutOption {
+func withDB(db database.Database, chainDataDir string) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.db = db
+		c.chainDataDir = chainDataDir
 	})
 }
 
@@ -172,6 +179,13 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	return opt, c
 }
 
+// withPriceTarget sets [config.PriceTarget] on the SUT.
+func withPriceTarget(p gas.Price) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.PriceTarget = &p
+	})
+}
+
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
@@ -192,12 +206,13 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 				Alloc:      types.GenesisAlloc{},
 				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:     ids.GenerateTestNodeID(),
-			networkID:  constants.UnitTestID,
-			validators: warptest.NewValidators(tb, 0),
-			now:        time.Now,
-			db:         memdb.New(),
-			state:      snow.NormalOp,
+			nodeID:       ids.GenerateTestNodeID(),
+			networkID:    constants.UnitTestID,
+			validators:   warptest.NewValidators(tb, 0),
+			now:          time.Now,
+			db:           memdb.New(),
+			chainDataDir: tb.TempDir(),
+			state:        snow.NormalOp,
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -217,11 +232,15 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 	warptest.SetValidators(tb, snowCtx, cfg.validators)
+	snowCtx.ChainDataDir = cfg.chainDataDir
 
 	chainDB := prefixdb.New([]byte("chain"), db)
 
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
+
+	configBytes, err := json.Marshal(cfg.vmConfig)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.vmConfig)
 
 	validatorIDs := cfg.validators.NodeIDs()
 	appSender := saetest.NewSender(tb, validatorIDs)
@@ -233,7 +252,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		chainDB,
 		genesisBytes,
 		nil, // upgradeBytes
-		nil, // configBytes
+		configBytes,
 		nil, // fxs
 		appSender,
 	), "%T.Initialize()", vm)
@@ -291,10 +310,10 @@ func (s *SUT) hooks() *hooks {
 		s.state,
 		s.chainConfig,
 		0,
-		desiredParams{},
 		s.txpool.Pending,
 		warp.NewStorage(s.db),
 		s.now,
+		desiredParams{},
 	)
 }
 
@@ -547,6 +566,23 @@ func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.I
 	return blk
 }
 
+// verifyTampered re-seals valid with a mutated header extra and returns the
+// VerifyBlock error, exercising rebuild-and-compare against the tampered field.
+func (s *SUT) verifyTampered(ctx context.Context, tb testing.TB, valid *blocks.Block, tamper func(*customtypes.HeaderExtra)) error {
+	tb.Helper()
+
+	hdr := valid.Header()
+	extra := customtypes.GetHeaderExtra(hdr)
+	tamper(extra)
+	customtypes.SetHeaderExtra(hdr, extra)
+
+	buf, err := rlp.EncodeToBytes(valid.EthBlock().WithSeal(hdr))
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(tampered block)")
+	parsed, err := s.ParseBlock(ctx, buf)
+	require.NoErrorf(tb, err, "%T.ParseBlock(tampered block)", s.VM)
+	return s.VerifyBlock(ctx, nil, parsed)
+}
+
 // acceptAndExecute accepts blk and blocks until it has been executed.
 func (s *SUT) acceptAndExecute(ctx context.Context, tb testing.TB, blk *blocks.Block) {
 	tb.Helper()
@@ -725,9 +761,7 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 func TestExport(t *testing.T) {
 	sk := txtest.NewKey(t)
 	sender := sk.EthAddress()
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(sender)
-	}))
+	ctx, sut := newSUT(t, withMaxAllocFor(sender))
 
 	var (
 		w                = newWallet(sk, sut.ctx, sut.Client)
@@ -791,13 +825,11 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	for i := range keys {
 		keys[i] = txtest.NewKey(t)
 	}
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		addrs := make([]common.Address, len(keys))
-		for i, sk := range keys {
-			addrs[i] = sk.EthAddress()
-		}
-		c.genesis.Alloc = saetest.MaxAllocFor(addrs...)
-	}))
+	addrs := make([]common.Address, len(keys))
+	for i, sk := range keys {
+		addrs[i] = sk.EthAddress()
+	}
+	ctx, sut := newSUT(t, withMaxAllocFor(addrs...))
 
 	var (
 		preference = sut.lastAccepted(ctx, t)
@@ -840,12 +872,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	ethWallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 	ethSender := ethWallet.Addresses()[0]
 	exportKey := txtest.NewKey(t)
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(
-			ethSender,
-			exportKey.EthAddress(),
-		)
-	}))
+	ctx, sut := newSUT(t, withMaxAllocFor(ethSender, exportKey.EthAddress()))
 
 	// Tracing will error if there isn't at least one ethereum transaction in
 	// the block.
@@ -1093,8 +1120,8 @@ func TestParseBlock(t *testing.T) {
 	}
 }
 
-// TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a received
-// block whose Header.Time disagrees with TimeMilliseconds.
+// TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a block
+// whose Header.Time disagrees with TimeMilliseconds.
 func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	key := txtest.NewKey(t)
 	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
@@ -1103,26 +1130,30 @@ func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
 	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-	// Bump the seconds encoded in TimeMilliseconds without touching Header.Time,
-	// so Time != TimeMilliseconds/1000 while every other field stays valid.
-	hdr := valid.Header()
-	extra := customtypes.GetHeaderExtra(hdr)
-	require.NotNil(t, extra.TimeMilliseconds, "valid block TimeMilliseconds")
-	mismatched := *extra.TimeMilliseconds + 1000
-	extra.TimeMilliseconds = &mismatched
-	customtypes.SetHeaderExtra(hdr, extra)
+	// Bump TimeMilliseconds without touching Header.Time so they disagree.
+	err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
+		require.NotNil(t, e.TimeMilliseconds, "valid block TimeMilliseconds")
+		mismatched := *e.TimeMilliseconds + 1000
+		e.TimeMilliseconds = &mismatched
+	})
+	require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
+}
 
-	malformed := valid.EthBlock().WithSeal(hdr)
-	buf, err := rlp.EncodeToBytes(malformed)
-	require.NoError(t, err, "rlp.EncodeToBytes(malformed block)")
+// TestVerifyBlockRejectsCheatedMinPriceExponent verifies that the VM rejects a
+// block claiming a MinPriceExponent beyond the per-block step.
+func TestVerifyBlockRejectsCheatedMinPriceExponent(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
 
-	parsed, err := sut.ParseBlock(ctx, buf)
-	require.NoError(t, err, "vm.ParseBlock(malformed block)")
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-	// When VerifyBlock rebuilds the parsed block, it recomputes the header
-	// timestamps, which makes the hash check fail. sae's hash-mismatch error is
-	// unexported, so match on its text rather than the sentinel.
-	err = sut.VerifyBlock(ctx, nil, parsed)
+	// Claim an exponent beyond what one block may move it.
+	err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
+		cheated := dynamic.PriceExponent(math.MaxUint64)
+		e.MinPriceExponent = &cheated
+	})
 	require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
 }
 
@@ -1135,8 +1166,8 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	alloc := withMaxAllocFor(key.EthAddress())
 
 	timeOpt, clock := withVMTime(upgrade.InitiallyActiveTime)
-	db := memdb.New()
-	ctx, node := newSUT(t, alloc, timeOpt, withDB(db))
+	dbOpt := withDB(memdb.New(), t.TempDir())
+	ctx, node := newSUT(t, alloc, timeOpt, dbOpt)
 	w := newWallet(key, node.ctx, node.Client)
 
 	clock.Advance(2 * time.Second)
@@ -1158,7 +1189,7 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	// re-entering bootstrapping as a node does on startup. The same clock carries
 	// over. The restarted VM has last-accepted settled and has never seen settler.
 	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
-	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withState(snow.Bootstrapping))
+	restartedCtx, restarted := newSUT(t, alloc, timeOpt, dbOpt, withState(snow.Bootstrapping))
 	require.Equal(t, settled.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
 
 	t.Run("valid_marker_verifies", func(t *testing.T) {
@@ -1208,6 +1239,59 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 	hdr := blk.Header()
 	require.Equal(t, uint64(wantSeconds), hdr.Time, "built block Header.Time (seconds)")
 	require.Equal(t, uint64(wantMilliseconds), customtypes.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
+}
+
+// TestDynamicPriceExponent verifies that each built block's MinPriceExponent
+// (and the BaseFee it implies) advances toward the node's ACP-283 vote, clamped
+// to the per-block step, and stays at the initial value when there is no vote.
+func TestDynamicPriceExponent(t *testing.T) {
+	const maxDiff = 80_063_993_375_475
+	tests := []struct {
+		name    string
+		desired *gas.Price
+		want    []dynamic.PriceExponent
+	}{
+		{
+			name: "unset",
+			want: []dynamic.PriceExponent{
+				dynamic.InitialPriceExponent,
+			},
+		},
+		{
+			name:    "max_diff",
+			desired: utils.PointerTo[gas.Price](2),
+			want: []dynamic.PriceExponent{
+				maxDiff,
+				2 * maxDiff,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			opts := []sutOption{
+				withMaxAllocFor(key.EthAddress()),
+			}
+			if test.desired != nil {
+				opts = append(opts, withPriceTarget(*test.desired))
+			}
+			ctx, sut := newSUT(t, opts...)
+			w := newWallet(key, sut.ctx, sut.Client)
+
+			for _, wantExponent := range test.want {
+				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				header := blk.Header()
+
+				he := customtypes.GetHeaderExtra(header)
+				require.NotNilf(t, he.MinPriceExponent, "block %d %T.MinPriceExponent", header.Number, he)
+				assert.Equalf(t, wantExponent, *he.MinPriceExponent, "block %d %T.MinPriceExponent", header.Number, he)
+
+				wantBaseFee := new(big.Int).SetUint64(uint64(wantExponent.Price()))
+				require.NotNilf(t, header.BaseFee, "block %d %T.BaseFee", header.Number, header)
+				require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d %T.BaseFee", header.Number, header)
+			}
+		})
+	}
 }
 
 // TestGasRefundsDisabled asserts that EVM gas refunds are disabled.

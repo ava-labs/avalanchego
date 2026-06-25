@@ -159,20 +159,6 @@ func (vm *VM) Initialize(
 		return vm.state.Close()
 	})
 
-	var desired desiredParams
-	if userConfig.DelayTarget != nil {
-		desired.delayExponent = new(dynamic.DelayExponent)
-		*desired.delayExponent = dynamic.DesiredDelayExponent(*userConfig.DelayTarget)
-	}
-	if userConfig.GasTarget != nil {
-		desired.targetExponent = new(dynamic.TargetExponent)
-		*desired.targetExponent = dynamic.DesiredTargetExponent(*userConfig.GasTarget)
-	}
-	if userConfig.PriceTarget != nil {
-		desired.priceExponent = new(dynamic.PriceExponent)
-		*desired.priceExponent = dynamic.DesiredPriceExponent(*userConfig.PriceTarget)
-	}
-
 	pendingTxs := txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
@@ -180,10 +166,10 @@ func (vm *VM) Initialize(
 		vm.state,
 		vm.chainConfig,
 		vm.initialDelayExponent,
-		desired,
 		pendingTxs,
 		warpStorage,
 		vm.now,
+		userConfig.desired(),
 	)
 	mempoolConfig := legacypool.DefaultConfig
 	// Treat all transactions equally regardless of submission source — no

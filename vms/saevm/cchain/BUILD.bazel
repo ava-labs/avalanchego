@@ -161,6 +161,7 @@ go_test(
         "//vms/platformvm/warp/payload",
         "//vms/saevm/blocks",
         "//vms/saevm/cchain/cchaintest",
+        "//vms/saevm/cchain/dynamic",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/cchain/warp",

@@ -297,7 +297,7 @@ func (g *genesis) block() (*types.Block, error) {
 
 	if c.IsHelicon(g.Timestamp) {
 		headerExtra.TargetExponent = new(dynamic.TargetExponent)
-		headerExtra.MinPriceExponent = new(dynamic.PriceExponent)
+		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
 		headerExtra.SettledHeight = new(uint64)
 		headerExtra.SettledGasUnix = new(uint64)
 		headerExtra.SettledGasNumerator = new(uint64)
