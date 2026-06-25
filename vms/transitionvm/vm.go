@@ -112,9 +112,7 @@ func (v *VM) Initialize(
 		connections: &connections{
 			nodes: make(map[ids.NodeID]*version.Application),
 		},
-		httpHandlers: &httpHandlers{
-			routes: make(map[string]*httpHandler),
-		},
+		httpHandlers: newHTTPHandlers(),
 	}
 
 	chainCtx.Log.Info("checking for last synchronous block")

@@ -43,6 +43,12 @@ type httpHandlers struct {
 	routes map[string]*httpHandler
 }
 
+func newHTTPHandlers() *httpHandlers {
+	return &httpHandlers{
+		routes: make(map[string]*httpHandler),
+	}
+}
+
 // set adds all the new handlers to the collection of tracked routes. Any
 // tracked routes not included in newHandlers will still be tracked, but will
 // return 404s.
