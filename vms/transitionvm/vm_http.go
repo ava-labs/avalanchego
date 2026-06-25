@@ -85,17 +85,17 @@ func (h *httpHandlers) asInterface() map[string]http.Handler {
 	return handlers
 }
 
-func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	newHandlers, err := v.current.chain.CreateHandlers(ctx)
+	newHandlers, err := vm.current.chain.CreateHandlers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	v.current.httpHandlers.set(newHandlers)
-	return v.current.httpHandlers.asInterface(), nil
+	vm.httpHandlers.set(newHandlers)
+	return vm.httpHandlers.asInterface(), nil
 }
 
 // None of Subnet-EVM, Coreth, or SAEVM implement NewHTTPHandler, so it is left

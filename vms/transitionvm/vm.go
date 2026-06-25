@@ -44,18 +44,20 @@ type VM struct {
 	fxs          []*common.Fx
 	appSender    common.AppSender
 
-	// current state
+	// vm state
 	transitionLock sync.RWMutex
 	transitioned   bool
+	consensusState snow.State
+	connections    *connections
+	httpHandlers   *httpHandlers
 	current        *current
 }
 
+// current contains all of the chain specific values. When initializing and
+// transitioning, all of these values are overridden.
 type current struct {
-	chain          Chain
-	consensusState snow.State
-	requests       *requests
-	connections    *connections
-	httpHandlers   *httpHandlers
+	chain    Chain
+	requests *requests
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -63,7 +65,7 @@ type current struct {
 
 var transitionedKey = prefixdb.MakePrefix([]byte("transitioned"))
 
-func (v *VM) Initialize(
+func (vm *VM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
 	db database.Database,
@@ -78,7 +80,7 @@ func (v *VM) Initialize(
 		return err
 	}
 
-	v.chainCtx = &snow.Context{
+	vm.chainCtx = &snow.Context{
 		NetworkID:       chainCtx.NetworkID,
 		SubnetID:        chainCtx.SubnetID,
 		ChainID:         chainCtx.ChainID,
@@ -97,126 +99,126 @@ func (v *VM) Initialize(
 		ValidatorState:  chainCtx.ValidatorState,
 		ChainDataDir:    chainCtx.ChainDataDir,
 	}
-	v.db = db
-	v.genesisBytes = genesisBytes
-	v.upgradeBytes = upgradeBytes
-	v.configBytes = configBytes
-	v.fxs = fxs
-	v.appSender = appSender
+	vm.db = db
+	vm.genesisBytes = genesisBytes
+	vm.upgradeBytes = upgradeBytes
+	vm.configBytes = configBytes
+	vm.fxs = fxs
+	vm.appSender = appSender
 
-	v.current = &current{
-		chain:          v.preTransitionChain,
-		consensusState: snow.Initializing,
-		connections:    newConnections(),
-		httpHandlers:   newHTTPHandlers(),
+	vm.connections = newConnections()
+	vm.httpHandlers = newHTTPHandlers()
+
+	vm.current = &current{
+		chain: vm.preTransitionChain,
 	}
 
 	chainCtx.Log.Info("checking for last synchronous block")
-	has, err := v.db.Has(transitionedKey)
+	has, err := vm.db.Has(transitionedKey)
 	if err != nil {
 		return fmt.Errorf("checking for last synchronous block: %w", err)
 	}
 
 	if has {
 		chainCtx.Log.Info("initializing post-transition VM")
-		if err := v.initChain(ctx, v.postTransitionChain, v.chainCtx); err != nil {
+		if err := vm.initChain(ctx, vm.postTransitionChain, vm.chainCtx); err != nil {
 			return fmt.Errorf("initializing post-transition VM: %w", err)
 		}
-		v.transitioned = true
+		vm.transitioned = true
 		return nil
 	}
 
 	chainCtx.Log.Info("initializing pre-transition VM")
-	if err := v.initChain(ctx, v.preTransitionChain, chainCtx); err != nil {
+	if err := vm.initChain(ctx, vm.preTransitionChain, chainCtx); err != nil {
 		return fmt.Errorf("initializing pre-transition VM: %w", err)
 	}
 
 	// It's possible we crashed between accepting the last block and writing the
 	// transition flag. Or maybe the genesis block was the transition block.
-	lastAcceptedID, err := v.LastAccepted(ctx)
+	lastAcceptedID, err := vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("loading last accepted ID: %w", err)
 	}
-	lastAccepted, err := v.GetBlock(ctx, lastAcceptedID)
+	lastAccepted, err := vm.GetBlock(ctx, lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("loading last accepted block %s: %w", lastAcceptedID, err)
 	}
-	if time := lastAccepted.Timestamp(); time.Before(v.transitionTime) {
+	if time := lastAccepted.Timestamp(); time.Before(vm.transitionTime) {
 		return nil
 	}
-	return v.transition(ctx, lastAccepted)
+	return vm.transition(ctx, lastAccepted)
 }
 
-func (v *VM) transition(ctx context.Context, last snowman.Block) error {
+func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	// We must cancel the context before grabbing the lock to ensure that
 	// [VM.WaitForEvent] does not block indefinitely.
-	v.current.ctxCancel()
+	vm.current.ctxCancel()
 
-	v.transitionLock.Lock()
-	defer v.transitionLock.Unlock()
+	vm.transitionLock.Lock()
+	defer vm.transitionLock.Unlock()
 
 	lastID := last.ID()
-	v.chainCtx.Log.Info("transitioning VMs",
+	vm.chainCtx.Log.Info("transitioning VMs",
 		zap.Stringer("lastID", lastID),
 		zap.Uint64("lastHeight", last.Height()),
 		zap.Time("lastTime", last.Timestamp()),
 	)
 
-	v.chainCtx.Log.Info("shutting down pre-transition VM")
-	if err := v.preTransitionChain.Shutdown(ctx); err != nil {
+	vm.chainCtx.Log.Info("shutting down pre-transition VM")
+	if err := vm.preTransitionChain.Shutdown(ctx); err != nil {
 		return fmt.Errorf("closing pre-transition chain: %w", err)
 	}
 
-	v.chainCtx.Log.Info("writing last synchronous block")
-	if err := v.db.Put(transitionedKey, nil); err != nil {
+	vm.chainCtx.Log.Info("writing last synchronous block")
+	if err := vm.db.Put(transitionedKey, nil); err != nil {
 		return fmt.Errorf("saving last synchronous block: %w", err)
 	}
 
-	v.chainCtx.Log.Info("initializing post-transition VM")
-	if err := v.initChain(ctx, v.postTransitionChain, v.chainCtx); err != nil {
+	vm.chainCtx.Log.Info("initializing post-transition VM")
+	if err := vm.initChain(ctx, vm.postTransitionChain, vm.chainCtx); err != nil {
 		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
 
-	v.chainCtx.Log.Info("initializing post-transition VM preference",
+	vm.chainCtx.Log.Info("initializing post-transition VM preference",
 		zap.Stringer("blkID", lastID),
 	)
-	if err := v.postTransitionChain.SetPreference(ctx, lastID); err != nil {
+	if err := vm.postTransitionChain.SetPreference(ctx, lastID); err != nil {
 		return fmt.Errorf("setting post-transition preference: %w", err)
 	}
 
-	v.transitioned = true
-	v.chainCtx.Log.Info("transition finished successfully")
+	vm.transitioned = true
+	vm.chainCtx.Log.Info("transition finished successfully")
 	return nil
 }
 
-func (v *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context) error {
+func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context) error {
 	var (
 		requests requests
 		sender   = sender{
-			AppSender: v.appSender,
+			AppSender: vm.appSender,
 			requests:  &requests,
 		}
 	)
 	err := chain.Initialize(
 		ctx,
 		chainCtx,
-		v.db,
-		v.genesisBytes,
-		v.upgradeBytes,
-		v.configBytes,
-		v.fxs,
+		vm.db,
+		vm.genesisBytes,
+		vm.upgradeBytes,
+		vm.configBytes,
+		vm.fxs,
 		&sender,
 	)
 	if err != nil {
 		return fmt.Errorf("initializing chain: %w", err)
 	}
 
-	if v.current.consensusState != snow.Initializing {
-		if err := chain.SetState(ctx, v.current.consensusState); err != nil {
+	if vm.consensusState != snow.Initializing {
+		if err := chain.SetState(ctx, vm.consensusState); err != nil {
 			return fmt.Errorf("setting consensus state: %w", err)
 		}
 	}
-	if err := v.current.connections.reconnect(ctx, chain); err != nil {
+	if err := vm.connections.reconnect(ctx, chain); err != nil {
 		return fmt.Errorf("reconnecting to vm: %w", err)
 	}
 
@@ -224,10 +226,14 @@ func (v *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context)
 	if err != nil {
 		return fmt.Errorf("creating http handlers: %w", err)
 	}
-	v.current.httpHandlers.set(newHandlers)
+	vm.httpHandlers.set(newHandlers)
 
-	v.current.chain = chain
-	v.current.requests = &requests
-	v.current.ctx, v.current.ctxCancel = context.WithCancel(context.Background())
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	vm.current = &current{
+		chain:     chain,
+		requests:  &requests,
+		ctx:       ctx,
+		ctxCancel: ctxCancel,
+	}
 	return nil
 }

@@ -107,53 +107,53 @@ func (p *preBlock) Reject(ctx context.Context) error {
 	return p.Block.Reject(ctx)
 }
 
-func (v *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	b, err := v.current.chain.BuildBlock(ctx)
+	b, err := vm.current.chain.BuildBlock(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return v.wrapBlock(b), nil
+	return vm.wrapBlock(b), nil
 }
 
-func (v *VM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	b, err := v.current.chain.BuildBlockWithContext(ctx, blockCtx)
+	b, err := vm.current.chain.BuildBlockWithContext(ctx, blockCtx)
 	if err != nil {
 		return nil, err
 	}
-	return v.wrapBlock(b), nil
+	return vm.wrapBlock(b), nil
 }
 
-func (v *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	b, err := v.current.chain.ParseBlock(ctx, blockBytes)
+	b, err := vm.current.chain.ParseBlock(ctx, blockBytes)
 	if err != nil {
 		return nil, err
 	}
-	return v.wrapBlock(b), nil
+	return vm.wrapBlock(b), nil
 }
 
-func (v *VM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	b, err := v.current.chain.GetBlock(ctx, blkID)
+	b, err := vm.current.chain.GetBlock(ctx, blkID)
 	if err != nil {
 		return nil, err
 	}
-	return v.wrapBlock(b), nil
+	return vm.wrapBlock(b), nil
 }
 
-func (v *VM) wrapBlock(b snowman.Block) snowman.Block {
-	if v.transitioned {
+func (vm *VM) wrapBlock(b snowman.Block) snowman.Block {
+	if vm.transitioned {
 		return b
 	}
-	return &preBlock{b, v}
+	return &preBlock{b, vm}
 }

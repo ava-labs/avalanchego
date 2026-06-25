@@ -94,38 +94,38 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	return s.AppSender.SendAppRequest(ctx, nodeIDs, requestID, appRequestBytes)
 }
 
-func (v *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	v.current.connections.add(nodeID, version)
-	return v.current.chain.Connected(ctx, nodeID, version)
+	vm.connections.add(nodeID, version)
+	return vm.current.chain.Connected(ctx, nodeID, version)
 }
 
-func (v *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	v.current.connections.remove(nodeID)
-	return v.current.chain.Disconnected(ctx, nodeID)
+	vm.connections.remove(nodeID)
+	return vm.current.chain.Disconnected(ctx, nodeID)
 }
 
-func (v *VM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	if !v.current.requests.remove(nodeID, requestID) {
+	if !vm.current.requests.remove(nodeID, requestID) {
 		return nil
 	}
-	return v.current.chain.AppRequestFailed(ctx, nodeID, requestID, appErr)
+	return vm.current.chain.AppRequestFailed(ctx, nodeID, requestID, appErr)
 }
 
-func (v *VM) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	if !v.current.requests.remove(nodeID, requestID) {
+	if !vm.current.requests.remove(nodeID, requestID) {
 		return nil
 	}
-	return v.current.chain.AppResponse(ctx, nodeID, requestID, response)
+	return vm.current.chain.AppResponse(ctx, nodeID, requestID, response)
 }

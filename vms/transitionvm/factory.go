@@ -46,6 +46,8 @@ func (f *Factory) New(log logging.Logger) (interface{}, error) {
 		postTransitionChain: post,
 		transitionTime:      f.TransitionTime,
 
+		// Populate current here so that functions that can be called before
+		// Initialize, such as Version, have a default location to route to.
 		current: &current{
 			chain: pre,
 		},
