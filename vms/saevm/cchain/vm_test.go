@@ -274,7 +274,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		ethclient: ethclient.NewClient(ethRPCClient),
 		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
 	}
-	appSender.SetSelf(tb, sut)
+	appSender.Start(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
 	return ctx, sut
 }

@@ -22,8 +22,9 @@ var _ Peer = (*CapturingPeer)(nil)
 // AppGossip messages and exposes them for inspection. It answers inbound
 // AppRequests with [p2p.ErrUnexpected].
 type CapturingPeer struct {
-	id       ids.NodeID
-	sender   *Sender
+	id     ids.NodeID
+	sender *Sender
+	// Only popping blocks, not pushing to these queues.
 	response *buffer.UnboundedBlockingDeque[peerResponse]
 	gossip   *buffer.UnboundedBlockingDeque[peerGossip]
 }
@@ -41,7 +42,7 @@ type peerGossip struct {
 }
 
 // NewCapturingPeer returns a [CapturingPeer] with a fresh NodeID. vdrs is
-// passed through to its underlying [Sender].
+// passed through the [Sender] that it constructs.
 func NewCapturingPeer(tb testing.TB, vdrs set.Set[ids.NodeID]) *CapturingPeer {
 	p := &CapturingPeer{
 		id:       ids.GenerateTestNodeID(),
@@ -49,7 +50,7 @@ func NewCapturingPeer(tb testing.TB, vdrs set.Set[ids.NodeID]) *CapturingPeer {
 		response: buffer.NewUnboundedBlockingDeque[peerResponse](1),
 		gossip:   buffer.NewUnboundedBlockingDeque[peerGossip](1),
 	}
-	p.sender.SetSelf(tb, p)
+	p.sender.Start(tb, p)
 	return p
 }
 

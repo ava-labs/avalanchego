@@ -216,7 +216,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 		sender: sender,
 	}
-	sender.SetSelf(tb, sut)
+	sender.Start(tb, sut)
 	return ctx, sut
 }
 
