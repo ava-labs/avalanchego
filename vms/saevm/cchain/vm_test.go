@@ -1034,17 +1034,26 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 	require.Equal(t, uint64(wantMilliseconds), customtypes.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
 }
 
+// fundedKeys returns n fresh keys and their addresses, one per block to keep
+// every tx at nonce 0.
+func fundedKeys(tb testing.TB, n int) ([]*secp256k1.PrivateKey, []common.Address) {
+	tb.Helper()
+
+	keys := make([]*secp256k1.PrivateKey, n)
+	addrs := make([]common.Address, n)
+	for i := range keys {
+		keys[i] = txtest.NewKey(tb)
+		addrs[i] = keys[i].EthAddress()
+	}
+	return keys, addrs
+}
+
 // TestMinPriceExponentFlatWithoutVote verifies that without a node vote the
 // price floor stays at its initial value: each block carries the parent's
 // exponent unchanged, so the exponent stays 0 and BaseFee holds at 1 wei.
 func TestMinPriceExponentFlatWithoutVote(t *testing.T) {
 	const numBlocks = 3
-	keys := make([]*secp256k1.PrivateKey, numBlocks)
-	addrs := make([]common.Address, numBlocks)
-	for i := range keys {
-		keys[i] = txtest.NewKey(t)
-		addrs[i] = keys[i].EthAddress()
-	}
+	keys, addrs := fundedKeys(t, numBlocks)
 	ctx, sut := newSUT(t, withMaxAllocFor(addrs...)) // no withPriceTarget, no vote
 
 	wantBaseFee := new(big.Int).SetUint64(uint64(initialPriceExponent.Price()))
@@ -1056,22 +1065,17 @@ func TestMinPriceExponentFlatWithoutVote(t *testing.T) {
 		exp := customtypes.GetHeaderExtra(header).MinPriceExponent
 		require.NotNilf(t, exp, "block %d MinPriceExponent", i+1)
 		assert.Equalf(t, initialPriceExponent, *exp, "block %d MinPriceExponent", i+1)
-		assert.Equalf(t, wantBaseFee, header.BaseFee, "block %d BaseFee", i+1)
+		require.NotNilf(t, header.BaseFee, "block %d BaseFee", i+1)
+		require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d BaseFee", i+1)
 	}
 }
 
-// TestRampMinPriceExponent verifies that a node's ACP-283 vote ramps the gas
-// price floor, so each built block's BaseFee exceeds its parent's.
+// TestRampMinPriceExponent verifies that a node's ACP-283 vote ramps the price
+// exponent each block, with BaseFee tracking the floor the parent's exponent
+// implies.
 func TestRampMinPriceExponent(t *testing.T) {
 	const numBlocks = 3
-	// A distinct key per block keeps every tx at nonce 0, so none depends on a
-	// prior block's state and races the txpool's async chain-head update.
-	keys := make([]*secp256k1.PrivateKey, numBlocks)
-	addrs := make([]common.Address, numBlocks)
-	for i := range keys {
-		keys[i] = txtest.NewKey(t)
-		addrs[i] = keys[i].EthAddress()
-	}
+	keys, addrs := fundedKeys(t, numBlocks)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(addrs...),
 		withPriceTarget(ethparams.GWei),
@@ -1087,7 +1091,8 @@ func TestRampMinPriceExponent(t *testing.T) {
 		header := blk.EthBlock().Header()
 
 		wantBaseFee := new(big.Int).SetUint64(uint64(prevExp.Price()))
-		assert.Equalf(t, wantBaseFee, header.BaseFee, "block %d BaseFee", i+1)
+		require.NotNilf(t, header.BaseFee, "block %d BaseFee", i+1)
+		require.Zerof(t, wantBaseFee.Cmp(header.BaseFee), "block %d BaseFee", i+1)
 
 		exp := customtypes.GetHeaderExtra(header).MinPriceExponent
 		require.NotNilf(t, exp, "block %d MinPriceExponent", i+1)

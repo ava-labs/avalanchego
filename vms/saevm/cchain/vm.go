@@ -92,7 +92,7 @@ func (vm *VM) Initialize(
 
 	cfg, err := parseConfig(configBytes)
 	if err != nil {
-		return fmt.Errorf("parsing config: %w", err)
+		return fmt.Errorf("parsing user config: %w", err)
 	}
 
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.

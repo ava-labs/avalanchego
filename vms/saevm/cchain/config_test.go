@@ -43,11 +43,11 @@ func TestParseConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := parseConfig(tt.in)
-			require.ErrorIs(t, err, tt.wantErr)
+			require.ErrorIsf(t, err, tt.wantErr, "parseConfig(%q)", tt.in)
 			if tt.wantErr != nil {
 				return
 			}
-			require.Equal(t, tt.want, got)
+			require.Equalf(t, tt.want, got, "parseConfig(%q)", tt.in)
 		})
 	}
 }
