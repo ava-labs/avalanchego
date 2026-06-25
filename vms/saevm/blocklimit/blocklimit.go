@@ -31,6 +31,8 @@ const MaxBlockBytes uint64 = constants.DefaultMaxMessageSize
 //
 // Equivalently, it must carry at least x/M gas per serialized byte.
 func Eligible(txBytes, gasLimit, blockGasLimit uint64) bool {
+	// Defensive check: if blockGasLimit == 0, all transactions would be
+	// incorrectly eligible
 	if blockGasLimit == 0 {
 		return false
 	}
