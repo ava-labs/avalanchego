@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
@@ -36,6 +37,18 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "empty_object",
 			json: `{}`,
+		},
+		{
+			name: "price_target",
+			json: `{"min-price-target":1000}`,
+			want: config{PriceTarget: utils.PointerTo(gas.Price(1000))},
+		},
+		{
+			// An explicit 0 is a vote for the minimum, distinct from an absent
+			// field, which is no vote.
+			name: "explicit_zero",
+			json: `{"min-price-target":0}`,
+			want: config{PriceTarget: utils.PointerTo(gas.Price(0))},
 		},
 		{
 			name: "warp_off_chain_messages",

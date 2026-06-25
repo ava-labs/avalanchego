@@ -10,10 +10,16 @@ import (
 
 	"github.com/ava-labs/libevm/common/hexutil"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 type config struct {
+	// PriceTarget is the minimum gas price (in aAVAX) this node enforces when
+	// building blocks under ACP-283. nil means follow the parent block.
+	PriceTarget *gas.Price `json:"min-price-target,omitempty"`
+
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
@@ -47,4 +53,20 @@ func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
 		msgs[i] = msg
 	}
 	return msgs, nil
+}
+
+// desiredParams bundles this node's votes for the dynamic consensus
+// parameters. A nil field means no vote.
+type desiredParams struct {
+	priceExponent *dynamic.PriceExponent
+}
+
+// desired returns c's user-facing targets as internal exponent votes.
+func (c config) desired() desiredParams {
+	var d desiredParams
+	if c.PriceTarget != nil {
+		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
+		d.priceExponent = &e
+	}
+	return d
 }
