@@ -66,7 +66,6 @@ type config struct {
 // // internalConfig holds undocumented, test-only options, kept out of config.md.
 // // Don't set these unless you know what you're doing.
 // type internalConfig struct {
-
 // 	// State sync
 // 	StateSyncIDs []ids.NodeID `json:"state-sync-ids"`
 // }
