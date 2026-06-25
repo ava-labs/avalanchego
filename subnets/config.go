@@ -6,7 +6,6 @@ package subnets
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
@@ -15,37 +14,24 @@ import (
 )
 
 const (
-	// MinProposerWindowDuration / MaxProposerWindowDuration bound an explicitly
-	// configured ProposerWindowDuration. A value of 0 means "use the default"
-	// and is always allowed.
+	// Bounds for an explicitly configured ProposerWindowMilliseconds; 0 means
+	// "use the default". The 50ms floor is about the smallest window a proposer
+	// can build and propagate a block in before its slot closes. The ceiling is
+	// the default window; a larger window only slows failover.
 	//
-	// The hard floor is 50ms: roughly the smallest window in which a proposer
-	// can still build and propagate a block before its slot closes. Below it the
-	// builder is preempted before the block is ready and the chain wedges. It is
-	// set well under 1s to leave room for a future proposerVM that interprets its
-	// block timestamp as unix-ms (a reinterpretation of the same int64, no
-	// block-format change), which would make sub-second windows actually useful,
-	// without having to revisit this bound.
-	//
-	// NOTE: the proposerVM block timestamp is currently whole-second granular, so
-	// today a sub-second window delivers no failover benefit (the stall quantizes
-	// up to the next second) and only raises the block-rejection rate. ~1s is the
-	// practical floor in practice; values between the hard floor and 1s are
-	// accepted but are the operator's responsibility (see the consensus-parameter
-	// warning on the field).
-	//
-	// The ceiling equals the default window (proposer.DefaultWindowDuration); a
-	// larger window only slows failover, so there is no reason to raise it above
-	// the historical 5s constant.
-	MinProposerWindowDuration = 50 * time.Millisecond
-	MaxProposerWindowDuration = 5 * time.Second
+	// The proposerVM block timestamp is currently whole-second granular, so a
+	// sub-second window has no failover benefit today (~1s is the practical
+	// floor); the hard floor is lower so a future ms-precision proposerVM need
+	// not revisit it.
+	MinProposerWindowMilliseconds = 50
+	MaxProposerWindowMilliseconds = 5_000
 )
 
 var (
-	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
-	errNoParametersSet                  = errors.New("consensus config must have either snowball or simplex parameters set")
-	ErrTooManyConsensusParameters       = errors.New("only one of consensusParameters, snowParameters, or simplexParameters can be set")
-	errInvalidProposerWindowDuration    = errors.New("invalid proposerWindowDuration")
+	errAllowedNodesWhenNotValidatorOnly  = errors.New("allowedNodes can only be set when ValidatorOnly is true")
+	errNoParametersSet                   = errors.New("consensus config must have either snowball or simplex parameters set")
+	ErrTooManyConsensusParameters        = errors.New("only one of consensusParameters, snowParameters, or simplexParameters can be set")
+	errInvalidProposerWindowMilliseconds = errors.New("invalid proposerWindowMilliseconds")
 )
 
 type Config struct {
@@ -83,25 +69,16 @@ type Config struct {
 	// basis.
 	ProposerNumHistoricalBlocks uint64 `json:"proposerNumHistoricalBlocks" yaml:"proposerNumHistoricalBlocks"`
 
-	// ProposerWindowDuration is the length of a single proposerVM slot for the
-	// chains in this Subnet. Lowering it shortens the stall when a scheduled
-	// proposer is offline (faster failover for CFT/PoA L1s), at the cost of more
-	// rejected blocks. If set to 0, the default of 5s is used; any other value
-	// must be within [MinProposerWindowDuration, MaxProposerWindowDuration].
+	// ProposerWindowMilliseconds is the length of a single proposerVM slot for
+	// the chains in this Subnet, in milliseconds. Lowering it shortens the stall
+	// when a scheduled proposer is offline (faster failover for CFT/PoA L1s) at
+	// the cost of more rejected blocks. 0 uses the default (5s); other values
+	// must be within [MinProposerWindowMilliseconds, MaxProposerWindowMilliseconds].
 	//
-	// As a time.Duration this is decoded from JSON as an integer number of
-	// nanoseconds (e.g. 1000000000 for 1s), the same as the other duration
-	// fields in a Subnet config (snowParameters.maxItemProcessingTime,
-	// simplexParameters.maxNetworkDelay).
-	//
-	// WARNING: This is a network-wide consensus parameter, not a per-node tuning
-	// knob. Every validator of the Subnet's chains MUST use the SAME value; a
-	// validator with a different window rejects the network's blocks and
-	// silently falls out of consensus. It must be coordinated across all
-	// validators at once, so it only suits L1s whose validator set is operated
-	// as a unit. The primary network (P/C/X) is unaffected and always uses the
-	// default.
-	ProposerWindowDuration time.Duration `json:"proposerWindowDuration" yaml:"proposerWindowDuration"`
+	// WARNING: network-wide consensus parameter. Every validator of the Subnet's
+	// chains MUST use the SAME value or it falls out of consensus, so coordinate
+	// it across all validators at once. The primary network (P/C/X) is unaffected.
+	ProposerWindowMilliseconds uint64 `json:"proposerWindowMilliseconds" yaml:"proposerWindowMilliseconds"`
 }
 
 func boolToInt(b bool) int {
@@ -129,9 +106,9 @@ func (c *Config) ValidParameters() error {
 	}
 
 	// 0 means "use the default"; any explicit value must be in range.
-	if d := c.ProposerWindowDuration; d != 0 && (d < MinProposerWindowDuration || d > MaxProposerWindowDuration) {
-		return fmt.Errorf("%w: %s is not 0 (default) or within [%s, %s]",
-			errInvalidProposerWindowDuration, d, MinProposerWindowDuration, MaxProposerWindowDuration)
+	if ms := c.ProposerWindowMilliseconds; ms != 0 && (ms < MinProposerWindowMilliseconds || ms > MaxProposerWindowMilliseconds) {
+		return fmt.Errorf("%w: %dms is not 0 (default) or within [%dms, %dms]",
+			errInvalidProposerWindowMilliseconds, ms, MinProposerWindowMilliseconds, MaxProposerWindowMilliseconds)
 	}
 
 	if c.SnowParameters != nil {
