@@ -1100,7 +1100,7 @@ func TestVerifyBlockRejectsCheatedMinPriceExponent(t *testing.T) {
 
 	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
 	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	valid := sut.buildVerify(t, sut.LastAcceptedID(t))
 
 	// Claim an exponent beyond what one block may move it.
 	err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
