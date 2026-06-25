@@ -208,6 +208,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 			networkID:  constants.UnitTestID,
 			validators: warptest.NewValidators(tb, 0),
 			now:        time.Now,
+			vmConfig:   defaultConfig(),
 			db:         memdb.New(),
 			state:      snow.NormalOp,
 		}, opts...)
