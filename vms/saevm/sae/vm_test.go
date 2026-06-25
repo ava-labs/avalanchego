@@ -219,8 +219,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 		sender: sender,
 	}
-	sender.SetSelf(sut)
-	tb.Cleanup(sender.Close)
+	sender.Start(tb, sut)
 	return ctx, sut
 }
 
