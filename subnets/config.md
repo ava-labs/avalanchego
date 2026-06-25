@@ -66,16 +66,26 @@ Defaults to 5s (`5000000000`) when unset or `0`.
 This is a Go `time.Duration` decoded from JSON as an **integer number of
 nanoseconds** (e.g. `1000000000` for 1s), the same encoding as the other Subnet
 duration fields such as `snowParameters.maxItemProcessingTime` and
-`simplexParameters.maxNetworkDelay`. When set, it must be between 1s
-(`1000000000`) and 5s (`5000000000`) inclusive; `0` means use the default.
+`simplexParameters.maxNetworkDelay`. When set, it must be between 50ms
+(`50000000`) and 5s (`5000000000`) inclusive; `0` means use the default.
 
 The proposerVM schedules each validator into a proposer slot, and slots are
 `proposerWindowDuration` apart. When a scheduled proposer is offline, the chain
 cannot accept a block until the next live proposer's slot opens, so a smaller
 window shortens the stall on validator failover (faster recovery for CFT/PoA
 L1s), at the cost of more rejected blocks when a slot closes before a block
-propagates. The proposerVM block timestamp is second-granular, so the window is
-floored at 1s: sub-second windows give no real failover benefit.
+propagates.
+
+:::warning
+
+The proposerVM block timestamp is currently **whole-second granular**, so today a
+sub-second window gives no real failover benefit (the stall quantizes up to the
+next second) and only raises the block-rejection rate. **~1s is the practical
+floor.** Smaller values down to the 50ms hard floor are accepted to leave room for
+a future proposerVM with millisecond-precision timestamps, but on current versions
+they are the operator's responsibility.
+
+:::
 
 :::warning
 
