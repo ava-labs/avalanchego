@@ -18,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
-
-	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
@@ -50,20 +48,26 @@ type config struct {
 	TxPoolGlobalSlots  uint64 `json:"tx-pool-global-slots"`
 
 	// APIs
-	DisableTracingAPI bool `json:"disable-tracing-api"`
 	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
 	// AllowUnprotectedTxs bool   `json:"allow-unprotected-txs"`
 	// BatchRequestLimit   uint64 `json:"batch-request-limit"`
 
 	// State sync
-	// StateSyncEnabled bool  `json:"state-sync-enabled"`
-	// StateSyncIDs     string `json:"state-sync-ids"`
+	// StateSyncEnabled *bool `json:"state-sync-enabled"`
 
 	// Warp
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
+
+	// internalConfig
 }
+
+// // internalConfig holds undocumented, test-only options, kept out of config.md.
+// // Don't set these unless you know what you're doing.
+// type internalConfig struct {
+// 	StateSyncIDs []ids.NodeID `json:"state-sync-ids"`
+// }
 
 // defaultConfig returns the config used when an operator leaves a field unset.
 func defaultConfig() config {
@@ -90,7 +94,7 @@ func parseConfig(b []byte) (config, error) {
 
 // saeConfig translates the operator-supplied [config] into the [sae.Config]
 // consumed by [sae.NewVM].
-func (c config) saeConfig(trieDBConfig *triedb.Config, now func() time.Time) sae.Config {
+func (c config) saeConfig(now func() time.Time) sae.Config {
 	mempoolConfig := legacypool.DefaultConfig
 	mempoolConfig.NoLocals = !c.LocalTxsEnabled
 	mempoolConfig.AccountSlots = c.TxPoolAccountSlots
@@ -98,12 +102,9 @@ func (c config) saeConfig(trieDBConfig *triedb.Config, now func() time.Time) sae
 	return sae.Config{
 		MempoolConfig: mempoolConfig,
 		DBConfig: saedb.Config{
-			TrieDBConfig:       trieDBConfig,
+			TrieDBConfig:       triedb.HashDefaults,
 			Archival:           !c.Pruning,
 			TrieCommitInterval: c.CommitInterval,
-		},
-		RPCConfig: saerpc.Config{
-			DisableTracing: c.DisableTracingAPI,
 		},
 		Now: now,
 	}

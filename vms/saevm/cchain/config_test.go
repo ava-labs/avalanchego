@@ -72,11 +72,6 @@ func TestParseConfig(t *testing.T) {
 			}),
 		},
 		{
-			name: "disable_tracing_api",
-			json: `{"disable-tracing-api":true}`,
-			want: with(func(c *config) { c.DisableTracingAPI = true }),
-		},
-		{
 			name: "price_target",
 			json: `{"min-price-target":1000}`,
 			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(1000)) }),
@@ -104,7 +99,6 @@ func TestParseConfig(t *testing.T) {
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
-				"disable-tracing-api":true,
 				"warp-off-chain-messages":["0x1234"]
 			}`,
 			want: config{
@@ -114,7 +108,6 @@ func TestParseConfig(t *testing.T) {
 				LocalTxsEnabled:      true,
 				TxPoolAccountSlots:   8,
 				TxPoolGlobalSlots:    2048,
-				DisableTracingAPI:    true,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},

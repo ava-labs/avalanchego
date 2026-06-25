@@ -18,7 +18,6 @@ Default values are overridden only if specified in the given config file. It is 
   "local-txs-enabled": false,
   "tx-pool-account-slots": 16,
   "tx-pool-global-slots": 5120,
-  "disable-tracing-api": false,
   "warp-off-chain-messages": []
 }
 ```
@@ -60,7 +59,6 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `disable-tracing-api` | bool | Disable the transaction tracing API. When `true`, the following RPC calls are removed from the `debug_*` namespace: <br/> - `debug_traceChain` <br/> - `debug_traceBlockByNumber` <br/> - `debug_traceBlockByHash` <br/> - `debug_traceBlock` <br/> - `debug_traceBadBlock` <br/> - `debug_intermediateRoots` <br/> - `debug_traceTransaction` <br/> - `debug_traceCall` | `false` |
 | `api-max-blocks-per-request` | int64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
 | `allow-unprotected-txs` | bool | Allow unprotected transactions (without EIP-155 replay protection). | `false` |
 | `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
@@ -72,7 +70,6 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `state-sync-enabled` | bool | Enable state sync. | `false` |
-| `state-sync-ids` | string | Comma-separated list of state sync IDs. If not specified (or empty), peers are selected at random. | `""` |
 
 ## Warp
 
