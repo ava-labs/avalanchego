@@ -17,10 +17,24 @@ type stateAccessor struct {
 	triedb *TrieDB
 }
 
-func NewStateAccessor(db state.Database, fw *TrieDB) state.Database {
-	return &stateAccessor{
-		Database: db,
-		triedb:   fw,
+// NewStateAccessor wraps db so that its trie operations are served by the
+// Firewood accessor matching db's trie database backend:
+//
+//   - For a [TrieDB] backend, tries are served from Firewood revisions.
+//   - For the reconstructed backend created by [NewReconstructedTrieDB], tries
+//     are served from the in-place reconstructed view.
+//   - For any other backend, db is returned unchanged.
+func NewStateAccessor(db state.Database) state.Database {
+	switch backend := db.TrieDB().Backend().(type) {
+	case *TrieDB:
+		return &stateAccessor{
+			Database: db,
+			triedb:   backend,
+		}
+	case *reconstructedTrieDB:
+		return newReconstructedStateAccessor(db, backend)
+	default:
+		return db
 	}
 }
 
