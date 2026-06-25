@@ -142,6 +142,7 @@ go_test(
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/cmputils",
+        "//vms/saevm/hook",
         "//vms/saevm/params",
         "//vms/saevm/saetest",
         "//vms/saevm/saexec",
