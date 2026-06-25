@@ -962,7 +962,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	}
 }
 
-func TestMulDivRound(t *testing.T) {
+func TestMulDivFloor(t *testing.T) {
 	tests := []struct {
 		name    string
 		a       uint64
@@ -1021,18 +1021,20 @@ func TestMulDivRound(t *testing.T) {
 			wantErr: intmath.ErrOverflow,
 		},
 		{
-			name: "round_down",
+			// 100/30 = 3.33 -> 3
+			name: "floors_fraction_below_half",
 			a:    10,
 			b:    10,
 			c:    30,
 			want: 3,
 		},
 		{
-			name: "round_up",
+			// 200/30 = 6.67 -> 6
+			name: "floors_fraction_above_half",
 			a:    20,
 			b:    10,
 			c:    30,
-			want: 7,
+			want: 6,
 		},
 		{
 			name: "large_values_without_overflow",
@@ -1042,11 +1044,12 @@ func TestMulDivRound(t *testing.T) {
 			want: 150_000_000_000,
 		},
 		{
-			name: "small_a_large_c",
+			// 15/10 = 1.5 -> 1
+			name: "floors_exactly_half",
 			a:    5,
 			b:    3,
 			c:    10,
-			want: 2,
+			want: 1,
 		},
 		{
 			name: "maxUint64_*_maxUint64_/_maxUint64",
@@ -1059,7 +1062,7 @@ func TestMulDivRound(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := mulDivRound(tt.a, tt.b, tt.c)
+			got, err := mulDivFloor(tt.a, tt.b, tt.c)
 			require.ErrorIs(t, err, tt.wantErr)
 			require.Equal(t, tt.want, got)
 		})
