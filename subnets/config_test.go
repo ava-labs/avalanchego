@@ -87,60 +87,52 @@ func TestValidParameters(t *testing.T) {
 			expectedErr: simplex.ErrInvalidParameters,
 		},
 		{
-			name: "proposer window duration zero uses default",
+			name: "proposer window ms zero uses default",
 			s: Config{
-				SnowParameters:         &validParameters,
-				ProposerWindowDuration: 0,
+				SnowParameters:             &validParameters,
+				ProposerWindowMilliseconds: 0,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "proposer window duration at min boundary",
+			name: "proposer window ms at min boundary",
 			s: Config{
-				SnowParameters:         &validParameters,
-				ProposerWindowDuration: MinProposerWindowDuration,
+				SnowParameters:             &validParameters,
+				ProposerWindowMilliseconds: MinProposerWindowMilliseconds,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "proposer window duration at max boundary",
+			name: "proposer window ms at max boundary",
 			s: Config{
-				SnowParameters:         &validParameters,
-				ProposerWindowDuration: MaxProposerWindowDuration,
+				SnowParameters:             &validParameters,
+				ProposerWindowMilliseconds: MaxProposerWindowMilliseconds,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "proposer window duration sub-second within range",
+			name: "proposer window ms sub-second within range",
 			s: Config{
-				SnowParameters:         &validParameters,
-				ProposerWindowDuration: 500 * time.Millisecond,
+				SnowParameters:             &validParameters,
+				ProposerWindowMilliseconds: 500,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "proposer window duration below min",
+			name: "proposer window ms below min",
 			s: Config{
-				SnowParameters:         &validParameters,
-				ProposerWindowDuration: MinProposerWindowDuration - 1,
+				SnowParameters:             &validParameters,
+				ProposerWindowMilliseconds: MinProposerWindowMilliseconds - 1,
 			},
-			expectedErr: errInvalidProposerWindowDuration,
+			expectedErr: errInvalidProposerWindowMilliseconds,
 		},
 		{
-			name: "proposer window duration above max",
+			name: "proposer window ms above max",
 			s: Config{
-				SnowParameters:         &validParameters,
-				ProposerWindowDuration: MaxProposerWindowDuration + 1,
+				SnowParameters:             &validParameters,
+				ProposerWindowMilliseconds: MaxProposerWindowMilliseconds + 1,
 			},
-			expectedErr: errInvalidProposerWindowDuration,
-		},
-		{
-			name: "proposer window duration negative",
-			s: Config{
-				SnowParameters:         &validParameters,
-				ProposerWindowDuration: -1,
-			},
-			expectedErr: errInvalidProposerWindowDuration,
+			expectedErr: errInvalidProposerWindowMilliseconds,
 		},
 	}
 	for _, tt := range tests {

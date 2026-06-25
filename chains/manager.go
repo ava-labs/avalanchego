@@ -755,7 +755,7 @@ func (m *manager) createAvalancheChain(
 		subnetCfg           = m.SubnetConfigs[ctx.SubnetID]
 		minBlockDelay       = m.ProposerMinBlockDelay // X-chain uses this value
 		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
-		windowDuration      = subnetCfg.ProposerWindowDuration
+		windowDuration      = time.Duration(subnetCfg.ProposerWindowMilliseconds) * time.Millisecond
 	)
 	m.Log.Info("creating proposervm wrapper",
 		zap.Time("activationTime", m.Upgrades.ApricotPhase4Time),
@@ -1181,7 +1181,7 @@ func (m *manager) createSnowmanChain(
 		subnetCfg           = m.SubnetConfigs[ctx.SubnetID]
 		minBlockDelay       time.Duration // Most chains default to 0
 		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
-		windowDuration      = subnetCfg.ProposerWindowDuration
+		windowDuration      = time.Duration(subnetCfg.ProposerWindowMilliseconds) * time.Millisecond
 	)
 	if ctx.ChainID == constants.PlatformChainID {
 		minBlockDelay = m.ProposerMinBlockDelay
