@@ -234,7 +234,9 @@ func verifyBlock(ctx context.Context, blk snowman.Block, mode verifyMode) error 
 }
 
 type sutConfig struct {
-	blocksUntilTransition int
+	db             database.Database
+	state          *fakeState
+	transitionTime time.Time
 }
 
 // A sutOption overrides a default used by [newSUT].
@@ -244,7 +246,27 @@ type sutOption = options.Option[sutConfig]
 // before one reaches the transition time. Accepting the nth triggers it.
 func withBlocksUntilTransition(n int) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.blocksUntilTransition = n
+		c.transitionTime = snowmantest.GenesisTimestamp.Add(time.Duration(n) * blockInterval)
+	})
+}
+
+// withDatabase, withState, and withTransitionTime reuse a prior VM's persisted
+// state, modeling a node restart.
+func withDatabase(db database.Database) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.db = db
+	})
+}
+
+func withState(state *fakeState) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.state = state
+	})
+}
+
+func withTransitionTime(transitionTime time.Time) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.transitionTime = transitionTime
 	})
 }
 
@@ -252,37 +274,22 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	t.Helper()
 
 	cfg := options.ApplyTo(&sutConfig{
-		blocksUntilTransition: 1,
+		db:             memdb.New(),
+		state:          newFakeState(),
+		transitionTime: snowmantest.GenesisTimestamp.Add(blockInterval),
 	}, opts...)
 
-	timeUntilTransition := time.Duration(cfg.blocksUntilTransition) * blockInterval
-	return initSUT(
-		t,
-		memdb.New(),
-		newFakeState(),
-		snowmantest.GenesisTimestamp.Add(timeUntilTransition),
-	)
-}
-
-// restart rebuilds the VM against the same database and chain state, modeling a
-// node restart.
-func (s *SUT) restart(t *testing.T) *SUT {
-	t.Helper()
-	return initSUT(t, s.db, s.pre.state, s.transitionTime)
-}
-
-// initSUT builds and initializes a transition VM over the given persisted state.
-func initSUT(t *testing.T, db database.Database, state *fakeState, transitionTime time.Time) *SUT {
-	t.Helper()
-
-	pre := newFakeVM(t, "pre", state)
-	post := newFakeVM(t, "post", state)
-	vm := &VM{
-		preTransitionChain:  pre,
-		postTransitionChain: post,
-		transitionTime:      transitionTime,
+	pre := newFakeVM(t, "pre", cfg.state)
+	post := newFakeVM(t, "post", cfg.state)
+	factory := &Factory{
+		PreFactory:     fakeFactory{vm: pre},
+		PostFactory:    fakeFactory{vm: post},
+		TransitionTime: cfg.transitionTime,
 	}
-	vm.current = &current{chain: vm.preTransitionChain}
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	intf, err := factory.New(ctx.Log)
+	require.NoError(t, err)
+	vm := intf.(*VM)
 
 	appSender := &enginetest.Sender{
 		T: t,
@@ -292,8 +299,8 @@ func initSUT(t *testing.T, db database.Database, state *fakeState, transitionTim
 	}
 	require.NoError(t, vm.Initialize(
 		t.Context(),
-		snowtest.Context(t, snowtest.CChainID),
-		db,
+		ctx,
+		cfg.db,
 		nil, // genesisBytes
 		nil, // upgradeBytes
 		nil, // configBytes
@@ -306,6 +313,17 @@ func initSUT(t *testing.T, db database.Database, state *fakeState, transitionTim
 		post:      post,
 		appSender: appSender,
 	}
+}
+
+// restart rebuilds the VM against the same database and chain state, modeling a
+// node restart.
+func (s *SUT) restart(t *testing.T) *SUT {
+	t.Helper()
+	return newSUT(t,
+		withDatabase(s.db),
+		withState(s.pre.state),
+		withTransitionTime(s.transitionTime),
+	)
 }
 
 // TestInitiallyTransitioned verifies that a VM whose transition time is already
