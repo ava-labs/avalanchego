@@ -566,6 +566,7 @@ func (s *SUT) verifyTampered(ctx context.Context, tb testing.TB, valid *blocks.B
 	hdr := valid.Header()
 	extra := customtypes.GetHeaderExtra(hdr)
 	tamper(extra)
+	customtypes.SetHeaderExtra(hdr, extra)
 
 	buf, err := rlp.EncodeToBytes(valid.EthBlock().WithSeal(hdr))
 	require.NoErrorf(tb, err, "rlp.EncodeToBytes(tampered block)")
@@ -1340,8 +1341,8 @@ func TestEmptyBlocksDisallowed(t *testing.T) {
 		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
 		valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-		// In addition to removing the the block's extData, we need to update
-		// the header's ExtDataHash to allow parsing.
+		// In addition to removing the block's extData, we need to update the
+		// header's ExtDataHash to allow parsing.
 		hdr := valid.Header()
 		customtypes.GetHeaderExtra(hdr).ExtDataHash = customtypes.EmptyExtDataHash
 
