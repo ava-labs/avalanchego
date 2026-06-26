@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // TestPreTransitionRequestRouting verifies that the response to and failure of a
@@ -82,4 +83,32 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestTransitionForwardsConnections verifies that transitioning replays every
+// connection the pre-transition chain had to the post-transition chain.
+func TestTransitionForwardsConnections(t *testing.T) {
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	want := map[ids.NodeID]*version.Application{
+		ids.GenerateTestNodeID(): {Name: "avalanchego", Major: 1, Minor: 2, Patch: 3},
+		ids.GenerateTestNodeID(): {Name: "avalanchego", Major: 4, Minor: 5, Patch: 6},
+	}
+	for nodeID, v := range want {
+		require.NoError(t, sut.Connected(ctx, nodeID, v))
+	}
+
+	disconnected := ids.GenerateTestNodeID()
+	require.NoError(t, sut.Connected(ctx, disconnected, version.Current))
+	require.NoError(t, sut.Disconnected(ctx, disconnected))
+
+	got := make(map[ids.NodeID]*version.Application)
+	sut.post.VM.ConnectedF = func(_ context.Context, nodeID ids.NodeID, v *version.Application) error {
+		got[nodeID] = v
+		return nil
+	}
+	sut.BuildVerifyAccept(t, ctx) // triggers the transition
+
+	require.Equal(t, want, got)
 }
