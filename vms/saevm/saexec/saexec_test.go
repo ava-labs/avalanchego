@@ -1073,8 +1073,8 @@ func TestArchivalStoresAll(t *testing.T) {
 // The contract is deployed exactly as on mainnet: by sending the canonical
 // keyless ("Nick's method") presigned deployment transaction, which lands the
 // contract at [params.BeaconRootsStorageAddress]. A later block then carries a
-// parent beacon root, and its execution must populate the contract's ring
-// buffer at slot (timestamp%8191 + 8191).
+// parent beacon root, and we assert on the contract's observable behaviour by
+// querying it for that block's timestamp.
 func TestProcessBeaconBlockRoot(t *testing.T) {
 	beaconRoot := common.HexToHash("0xbeef")
 
@@ -1084,7 +1084,6 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 	// keyless signature recovers to deployer 0x0B79..., so contract creation at
 	// nonce 0 yields [params.BeaconRootsStorageAddress].
 	deployer := common.HexToAddress("0x0B799C86a49DEeb90402691F1041aa3AF2d3C875")
-	gasPrice, _ := new(big.Int).SetString("e8d4a51000", 16)
 	deployTx := types.NewTx(&types.LegacyTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(0xe8d4a51000),
@@ -1094,7 +1093,7 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 		R:        big.NewInt(0x539),
 		S:        big.NewInt(0x1b9b6eb1f0),
 	})
-	
+
 	t.Run("deployment_tx_sense_check", func(t *testing.T) {
 		require.Equal(t, common.HexToHash(`0xdf52c2d3bbe38820fff7b5eaab3db1b91f8e1412b56497d88388fb5d4ea1fde0`), deployTx.Hash(), "deployment tx hash matches EIP")
 		sender, err := types.Sender(types.LatestSigner(saetest.ChainConfig()), deployTx)
@@ -1105,17 +1104,18 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 	tests := []struct {
 		name       string
 		beaconRoot *common.Hash
-		wantStored common.Hash
+		wantRoot   common.Hash
+		wantErr    testerr.Want
 	}{
 		{
-			name:       "stores parent beacon root via system call",
+			name:       "stores parent beacon root, queryable via beacon-roots contract",
 			beaconRoot: &beaconRoot,
-			wantStored: beaconRoot,
+			wantRoot:   beaconRoot,
 		},
 		{
-			name:       "nil parent beacon root skips system call",
+			name:       "nil parent beacon root: nothing stored, query reverts",
 			beaconRoot: nil,
-			wantStored: common.Hash{},
+			wantErr:    testerr.Is(vm.ErrExecutionReverted),
 		},
 	}
 	for _, tt := range tests {
@@ -1132,6 +1132,7 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 
 			b := sut.chain.NewBlock(t, nil, blockstest.WithEthBlockOptions(
 				blockstest.ModifyHeader(func(h *types.Header) {
+					h.Time = 1 // non-zero timestamp is required
 					h.ParentBeaconRoot = tt.beaconRoot
 				}),
 			))
@@ -1140,11 +1141,23 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 
 			sdb, err := e.StateDB(b.PostExecutionStateRoot())
 			require.NoErrorf(t, err, "%T.StateDB(%T.PostExecutionStateRoot())", e, b)
-			require.NotEmptyf(t, sdb.GetCode(params.BeaconRootsStorageAddress), "beacon-roots contract deployed at %s", params.BeaconRootsStorageAddress)
 
-			rootSlot := common.BigToHash(new(big.Int).SetUint64(b.EthBlock().Time()%historyBufferLength + historyBufferLength))
-			got := sdb.GetState(params.BeaconRootsStorageAddress, rootSlot)
-			assert.Equalf(t, tt.wantStored, got, "value stored in %s ring-buffer slot %s", params.BeaconRootsStorageAddress, rootSlot)
+			header := b.Header()
+			blockCtx := core.NewEVMBlockContext(header, nil /*chain; unused by get()*/, &header.Coinbase)
+			evm := vm.NewEVM(blockCtx, vm.TxContext{}, sdb, saetest.ChainConfig(), vm.Config{})
+
+			got, _, err := evm.StaticCall(
+				vm.AccountRef(common.Address{}),
+				params.BeaconRootsStorageAddress,
+				uint256.NewInt(header.Time).PaddedBytes(32),
+				1e6,
+			)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Errorf("beacon-roots get() via StaticCall() %s", diff)
+			}
+			// On revert the contract returns no data, so [common.BytesToHash]
+			// yields the zero hash, matching wantRoot for the nil-root case.
+			assert.Equal(t, tt.wantRoot, common.BytesToHash(got), "parent beacon root returned by beacon-roots contract")
 		})
 	}
 }
