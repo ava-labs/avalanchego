@@ -432,8 +432,8 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		// Added millisecond timestamps
 		upgradetest.Granite: "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
 
-		// Added the ACP-283 min price exponent
-		upgradetest.Helicon: "0x06c48c7970d52c067843fdf98ba67b67feb2a1e3adee502000b52f9047f3e6b6",
+		// Added the ACP-283 min price exponent and the ACP-176 target exponent
+		upgradetest.Helicon: "0x0bcb3a33ea5ea22039312c3183f6d03d459012dff765e64cd3ec837ef11e1373",
 	}
 	_ = hashes[upgradetest.Latest] // Enforce completeness at compile time.
 

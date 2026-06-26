@@ -41,6 +41,7 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 		ParentBeaconRoot    *common.Hash     `json:"parentBeaconBlockRoot" rlp:"optional"`
 		TimeMilliseconds    *hexutil.Uint64  `json:"timestampMilliseconds" rlp:"optional"`
 		MinDelayExcess      *hexutil.Uint64  `json:"minDelayExcess" rlp:"optional"`
+		TargetExponent      *hexutil.Uint64  `json:"targetExponent" rlp:"optional"`
 		MinPriceExponent    *hexutil.Uint64  `json:"minPriceExponent" rlp:"optional"`
 		SettledHeight       *hexutil.Uint64  `json:"settledHeight"       rlp:"optional"`
 		SettledGasUnix      *hexutil.Uint64  `json:"settledGasUnix"      rlp:"optional"`
@@ -73,6 +74,7 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 	enc.ParentBeaconRoot = h.ParentBeaconRoot
 	enc.TimeMilliseconds = (*hexutil.Uint64)(h.TimeMilliseconds)
 	enc.MinDelayExcess = (*hexutil.Uint64)(h.MinDelayExcess)
+	enc.TargetExponent = (*hexutil.Uint64)(h.TargetExponent)
 	enc.MinPriceExponent = (*hexutil.Uint64)(h.MinPriceExponent)
 	enc.SettledHeight = (*hexutil.Uint64)(h.SettledHeight)
 	enc.SettledGasUnix = (*hexutil.Uint64)(h.SettledGasUnix)
@@ -109,6 +111,7 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 		ParentBeaconRoot    *common.Hash      `json:"parentBeaconBlockRoot" rlp:"optional"`
 		TimeMilliseconds    *hexutil.Uint64   `json:"timestampMilliseconds" rlp:"optional"`
 		MinDelayExcess      *hexutil.Uint64   `json:"minDelayExcess" rlp:"optional"`
+		TargetExponent      *hexutil.Uint64   `json:"targetExponent" rlp:"optional"`
 		MinPriceExponent    *hexutil.Uint64   `json:"minPriceExponent" rlp:"optional"`
 		SettledHeight       *hexutil.Uint64   `json:"settledHeight"       rlp:"optional"`
 		SettledGasUnix      *hexutil.Uint64   `json:"settledGasUnix"      rlp:"optional"`
@@ -204,6 +207,9 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 	}
 	if dec.MinDelayExcess != nil {
 		h.MinDelayExcess = (*uint64)(dec.MinDelayExcess)
+	}
+	if dec.TargetExponent != nil {
+		h.TargetExponent = (*uint64)(dec.TargetExponent)
 	}
 	if dec.MinPriceExponent != nil {
 		h.MinPriceExponent = (*uint64)(dec.MinPriceExponent)
