@@ -13,8 +13,8 @@ import (
 
 func TestEligible(t *testing.T) {
 	const (
-		strict = 80_000_000 // x/M ~= 38.15 gas/byte, Helicon's initial gas limit
-		loose  = 20_000_000 // x/M ~= 9.54 gas/byte
+		high = 80_000_000 // x/M ~= 38.15 gas/byte, Helicon's initial gas limit
+		low  = 20_000_000 // x/M ~= 9.54 gas/byte
 	)
 
 	tests := []struct {
@@ -26,40 +26,40 @@ func TestEligible(t *testing.T) {
 			name:       "zeroByteCalldata_strict",
 			size:       1_000,
 			gasLimit:   4_000,
-			blockLimit: strict,
+			blockLimit: high,
 		},
 		{
 			name:       "nonZeroCalldata_strict",
 			size:       1_000,
 			gasLimit:   16_000,
-			blockLimit: strict,
+			blockLimit: high,
 		},
 		{
 			name:       "typicalTransfer_strict",
 			size:       1_000,
 			gasLimit:   200_000,
-			blockLimit: strict,
+			blockLimit: high,
 			want:       true,
 		},
 		{
 			name:       "minTransfer_strict",
 			size:       110,
 			gasLimit:   21_000,
-			blockLimit: strict,
+			blockLimit: high,
 			want:       true,
 		},
 		{
 			name:       "nonZeroCalldata_loose",
 			size:       1_000,
 			gasLimit:   16_000,
-			blockLimit: loose,
+			blockLimit: low,
 			want:       true,
 		},
 		{
 			name:       "zeroByteCalldata_loose",
 			size:       1_000,
 			gasLimit:   4_000,
-			blockLimit: loose,
+			blockLimit: low,
 		},
 		{
 			name:       "boundaryEqual",
@@ -85,7 +85,7 @@ func TestEligible(t *testing.T) {
 			name:       "largeGasLimit",
 			size:       1_000,
 			gasLimit:   1 << 43,
-			blockLimit: strict,
+			blockLimit: high,
 			want:       true,
 		},
 		{
