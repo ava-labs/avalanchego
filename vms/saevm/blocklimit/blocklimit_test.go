@@ -11,55 +11,55 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
 )
 
-const (
-	floorBlockGasLimit = 20_000_000 // x/M ~= 9.54 gas/byte
-	liveBlockGasLimit  = 80_000_000 // x/M ~= 38.15 gas/byte
-)
-
 func TestEligible(t *testing.T) {
+	const (
+		strict = 80_000_000 // x/M ~= 38.15 gas/byte, Helicon's initial gas limit
+		loose  = 20_000_000 // x/M ~= 9.54 gas/byte
+	)
+
 	tests := []struct {
 		name                       string
 		size, gasLimit, blockLimit uint64
 		want                       bool
 	}{
 		{
-			name:       "zeroByteCalldata_live",
+			name:       "zeroByteCalldata_strict",
 			size:       1_000,
 			gasLimit:   4_000,
-			blockLimit: liveBlockGasLimit,
+			blockLimit: strict,
 		},
 		{
-			name:       "nonZeroCalldata_live",
+			name:       "nonZeroCalldata_strict",
 			size:       1_000,
 			gasLimit:   16_000,
-			blockLimit: liveBlockGasLimit,
+			blockLimit: strict,
 		},
 		{
-			name:       "typicalTransfer_live",
+			name:       "typicalTransfer_strict",
 			size:       1_000,
 			gasLimit:   200_000,
-			blockLimit: liveBlockGasLimit,
+			blockLimit: strict,
 			want:       true,
 		},
 		{
-			name:       "minTransfer_live",
+			name:       "minTransfer_strict",
 			size:       110,
 			gasLimit:   21_000,
-			blockLimit: liveBlockGasLimit,
+			blockLimit: strict,
 			want:       true,
 		},
 		{
-			name:       "nonZeroCalldata_floor",
+			name:       "nonZeroCalldata_loose",
 			size:       1_000,
 			gasLimit:   16_000,
-			blockLimit: floorBlockGasLimit,
+			blockLimit: loose,
 			want:       true,
 		},
 		{
-			name:       "zeroByteCalldata_floor",
+			name:       "zeroByteCalldata_loose",
 			size:       1_000,
 			gasLimit:   4_000,
-			blockLimit: floorBlockGasLimit,
+			blockLimit: loose,
 		},
 		{
 			name:       "boundaryEqual",
@@ -85,7 +85,7 @@ func TestEligible(t *testing.T) {
 			name:       "largeGasLimit",
 			size:       1_000,
 			gasLimit:   1 << 43,
-			blockLimit: liveBlockGasLimit,
+			blockLimit: strict,
 			want:       true,
 		},
 		{
