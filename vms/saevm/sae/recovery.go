@@ -147,7 +147,7 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				}
 				chain = append(chain, parent)
 
-				// RestoreExecutedBlock will mark synchronoous blocks as settled.
+				// RestoreExecutedBlock will mark synchronous blocks as settled.
 				if parent.Synchronous() || !b.Settled() {
 					continue
 				}

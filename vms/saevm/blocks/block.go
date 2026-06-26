@@ -103,7 +103,7 @@ func New(eth *types.Block, parent, lastSettled *Block, log logging.Logger) (*Blo
 
 // RestoreExecutedBlock constructs a new block with [New] and restores it to an
 // executed state before returning it. By definition of being executed, the
-// returned block also includes post-execution artefacts. This function should
+// returned block also includes post-execution artefacts. This function MUST
 // only be used when recovering from shutdown, since any other block that
 // needs read from disk should be in memory.
 //
@@ -116,10 +116,11 @@ func RestoreExecutedBlock(eth *types.Block, hooks hook.Points, db ethdb.Database
 	if err != nil {
 		return nil, err
 	}
-	if err := b.RestoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
+	if err := b.restoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
 		return nil, fmt.Errorf("restoring to executed state: %w", err)
 	}
 
+	// Synchronous blocks MUST be marked as settled to satisfy invariants.
 	if !b.Synchronous() {
 		return b, nil
 	}
@@ -137,7 +138,7 @@ func RestoreSettledBlock(hooks hook.Points, eth *types.Block, log logging.Logger
 	if err != nil {
 		return nil, err
 	}
-	if err := b.RestoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
+	if err := b.restoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
 		return nil, fmt.Errorf("restoring to executed state: %w", err)
 	}
 	if err := b.markSettled(nil); err != nil {

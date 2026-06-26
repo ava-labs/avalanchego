@@ -71,8 +71,8 @@ func (b *Block) WaitUntilSettled(ctx context.Context) error {
 	}
 }
 
-// Settled reports whether either [Block.MarkSettled] have been called without
-// resulting in an error, or the block is restored from disk as settled.
+// Settled reports whether [Block.MarkSettled] has been called without resulting
+// in an error, or the block is restored from disk as settled.
 func (b *Block) Settled() bool {
 	return b.ancestry.Load() == nil
 }

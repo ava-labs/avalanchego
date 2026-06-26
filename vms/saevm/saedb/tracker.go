@@ -129,7 +129,8 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 
 // LastHeightWithExecutionRootCommitted returns the greatest block height for
 // which [Tracker.MaybeCommit] called [triedb.Database.Commit] with the
-// post-execution state root of the block.
+// post-execution state root of the block, no matter whether the node was
+// archival or not.
 func LastHeightWithExecutionRootCommitted(db ethdb.Database, c Config, hooks hook.Points, lastSynchronous uint64) uint64 {
 	switch head := rawdb.ReadHeadHeader(db).Number.Uint64(); {
 	case head <= lastSynchronous:
