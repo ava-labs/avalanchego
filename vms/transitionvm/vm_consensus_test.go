@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// TestTransitionMaintainsState verifies that the consensus state set before the
+// TestTransitionMaintainsState verifies the consensus state set before the
 // transition is applied to the post-transition chain.
 func TestTransitionMaintainsState(t *testing.T) {
 	sut := newSUT(t)
@@ -28,8 +28,8 @@ func TestTransitionMaintainsState(t *testing.T) {
 	require.Equal(t, snow.NormalOp, sut.post.consensusState)
 }
 
-// TestWaitForEventForwardsToCurrentChain verifies that WaitForEvent routes to
-// whichever chain is current, before and after the transition.
+// TestWaitForEventForwardsToCurrentChain verifies WaitForEvent routes to the
+// current chain, before and after the transition.
 func TestWaitForEventForwardsToCurrentChain(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
@@ -47,9 +47,9 @@ func TestWaitForEventForwardsToCurrentChain(t *testing.T) {
 	require.Equal(t, common.StateSyncDone, msg)
 }
 
-// TestWaitForEventCanceledByTransition verifies that a WaitForEvent call blocked
-// on the pre-transition chain is canceled when the VM transitions, so the
-// transition can take the write lock instead of deadlocking against the reader.
+// TestWaitForEventCanceledByTransition verifies a WaitForEvent call blocked on
+// the pre-transition chain is canceled by the transition, so it can take the
+// write lock instead of deadlocking.
 func TestWaitForEventCanceledByTransition(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		sut := newSUT(t)

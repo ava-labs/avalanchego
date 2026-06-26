@@ -10,10 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestPostTransitionBlock verifies that blocks built after the transition are
-// handled by the post-transition chain unwrapped: they verify and accept even
-// though their parent is past the transition time, which a pre-transition block
-// could not (see TestTransitionBlockChildren).
+// TestPostTransitionBlock verifies that after the transition, blocks are built
+// and accepted by the post-transition chain.
 func TestPostTransitionBlock(t *testing.T) {
 	for _, mode := range verifyModes {
 		t.Run(mode.String(), func(t *testing.T) {
@@ -25,19 +23,20 @@ func TestPostTransitionBlock(t *testing.T) {
 	}
 }
 
+// TestTransitionBlockChildren verifies that a pre-transition block whose parent
+// is at or after the transition time fails verification.
 func TestTransitionBlockChildren(t *testing.T) {
 	for _, mode := range verifyModes {
 		t.Run(mode.String(), func(t *testing.T) {
 			sut := newSUT(t)
 			ctx := t.Context()
 
-			// Build and verify the block that reaches the transition time.
-			blk, err := sut.BuildBlock(ctx)
+			transitionBlock, err := sut.BuildBlock(ctx)
 			require.NoError(t, err)
-			require.NoError(t, verifyBlock(ctx, blk, mode))
+			require.NoError(t, verifyBlock(ctx, transitionBlock, mode))
 
-			// A child of that block sits past the transition time, so it can't
-			// be verified as a pre-transition block.
+			// A child of the transition block sits past the transition time, so
+			// it can't be verified as a pre-transition block.
 			child, err := sut.BuildBlock(ctx)
 			require.NoError(t, err)
 			require.ErrorIs(t, verifyBlock(ctx, child, mode), errPreTransitionBlockAfterTransition)
@@ -45,12 +44,12 @@ func TestTransitionBlockChildren(t *testing.T) {
 	}
 }
 
-// TestNoTransitionBeforeTime verifies that accepting a block before the
-// transition time leaves the VM on its pre-transition chain.
+// TestNoTransitionBeforeTime verifies accepting a block before the transition
+// time leaves the VM on the pre-transition chain.
 func TestNoTransitionBeforeTime(t *testing.T) {
 	for _, mode := range verifyModes {
 		t.Run(mode.String(), func(t *testing.T) {
-			// Require two blocks before transitioning; this test only accepts one.
+			// Two blocks to transition; this test accepts one.
 			sut := newSUT(t, withBlocksUntilTransition(2))
 			ctx := t.Context()
 
@@ -63,11 +62,8 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 	}
 }
 
-// TestRejectIsNoopAfterTransition verifies that rejecting a pre-transition block
-// after the transition is a noop. The engine may have verified blocks that
-// conflict with the transition-triggering block; once that block is accepted the
-// pre-transition chain shuts down, so forwarding a later Reject into it could
-// error and be treated as fatal. Reject must not forward in that case.
+// TestRejectIsNoopAfterTransition verifies rejecting a pre-transition block
+// after the transition is a noop.
 func TestRejectIsNoopAfterTransition(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
@@ -80,7 +76,7 @@ func TestRejectIsNoopAfterTransition(t *testing.T) {
 	loserBlock := sut.pre.tip
 
 	sut.pre.tip = genesis
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // Trigger the transition with a block that conflicts loser.
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // Transition with a block conflicting loser.
 
 	// Rejecting the loser must be a noop, not a fatal error.
 	loserBlock.RejectV = errors.New("reject forwarded to shut-down pre-transition chain")

@@ -25,12 +25,10 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// If the VM is being transitioned, we want to stop waiting on an event
-	// notification.
+	// Stop waiting if the VM transitions.
 	removeCancel := context.AfterFunc(vm.current.ctx, cancel)
 
-	// If the VM isn't transitioned, we must remove the cancellation of the
-	// context to avoid a memory leak.
+	// Unregister the hook on return so it doesn't leak.
 	defer removeCancel()
 
 	return vm.current.chain.WaitForEvent(ctx)

@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var (
@@ -33,11 +34,10 @@ var (
 	_ block.WithVerifyContext = (*fakeBlock)(nil)
 )
 
-// blockInterval is the amount of time fakeVM advances per built block.
+// blockInterval is how much fakeVM advances time per built block.
 const blockInterval = time.Second
 
-// fakeState is the in-memory chain state shared by the pre- and post-transition
-// fakeVMs.
+// fakeState is chain state shared by the pre- and post-transition fakeVMs.
 type fakeState struct {
 	lastAccepted *fakeBlock
 	blocks       map[ids.ID]*fakeBlock
@@ -53,7 +53,7 @@ func newFakeState() *fakeState {
 	}
 }
 
-// fakeBlock lives in its VM's memory once verified and is persisted to shared
+// fakeBlock is held in its VM's memory once verified and persisted to shared
 // state once accepted.
 type fakeBlock struct {
 	*snowmantest.Block
@@ -97,18 +97,19 @@ type fakeVM struct {
 	verified map[ids.ID]*fakeBlock
 	// tip is this VM's local building head.
 	tip *fakeBlock
-	// appSender is the sender captured in Initialize, used by sendAppRequest.
+	// appSender is captured in Initialize for sendAppRequest.
 	appSender common.AppSender
-	// consensusState is the most recent state passed to SetState.
+	// connected holds the peers currently connected to this VM.
+	connected map[ids.NodeID]*version.Application
+	// consensusState is the last state passed to SetState.
 	consensusState snow.State
-	// preference is the most recent block ID passed to SetPreference.
+	// preference is the last ID passed to SetPreference.
 	preference ids.ID
 	// chainCtx is the context captured in Initialize.
 	chainCtx *snow.Context
-	// handlers is the set of HTTP handlers returned by CreateHandlers.
+	// handlers is returned by CreateHandlers.
 	handlers map[string]http.Handler
-	// events is delivered by WaitForEvent, which otherwise blocks until its
-	// context is canceled.
+	// events feeds WaitForEvent, which otherwise blocks until canceled.
 	events chan common.Message
 }
 
@@ -122,6 +123,7 @@ func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
 		name:            name,
 		state:           state,
 		verified:        make(map[ids.ID]*fakeBlock),
+		connected:       make(map[ids.NodeID]*version.Application),
 		events:          make(chan common.Message, 1),
 	}
 }
@@ -133,10 +135,19 @@ func (vm *fakeVM) Initialize(_ context.Context, chainCtx *snow.Context, _ databa
 	return nil
 }
 
-// sendAppRequest sends an app request to nodeID through the AppSender captured
-// in Initialize.
+// sendAppRequest sends an app request via the AppSender captured in Initialize.
 func (vm *fakeVM) sendAppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	return vm.appSender.SendAppRequest(ctx, set.Of(nodeID), requestID, nil)
+}
+
+func (vm *fakeVM) Connected(_ context.Context, nodeID ids.NodeID, v *version.Application) error {
+	vm.connected[nodeID] = v
+	return nil
+}
+
+func (vm *fakeVM) Disconnected(_ context.Context, nodeID ids.NodeID) error {
+	delete(vm.connected, nodeID)
+	return nil
 }
 
 func (vm *fakeVM) SetState(_ context.Context, state snow.State) error {
@@ -153,8 +164,7 @@ func (vm *fakeVM) CreateHandlers(context.Context) (map[string]http.Handler, erro
 	return vm.handlers, nil
 }
 
-// WaitForEvent returns the next message pushed onto events, or blocks until the
-// context is canceled.
+// WaitForEvent returns the next events message, or blocks until canceled.
 func (vm *fakeVM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	select {
 	case msg := <-vm.events:
@@ -182,7 +192,8 @@ func (vm *fakeVM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, erro
 	return nil, database.ErrNotFound
 }
 
-// BuildBlock returns a child of the tip, advanced one blockInterval.
+// BuildBlock returns a child of the tip, advancing the timestamp by
+// [blockInterval].
 func (vm *fakeVM) BuildBlock(context.Context) (snowman.Block, error) {
 	child := snowmantest.BuildChild(vm.tip.Block)
 	child.TimestampV = vm.tip.Timestamp().Add(blockInterval)
@@ -195,18 +206,16 @@ func (*fakeVM) BuildBlockWithContext(context.Context, *block.Context) (snowman.B
 	return nil, errors.New("unexpectedly called BuildBlockWithContext")
 }
 
-// SUT is the system under test: an initialized transition VM whose pre- and
-// post-transition fakeVMs ("pre" and "post") share one fakeState. appSender is
-// the AppSender handed to both chains; tests configure its Send*F fields to
-// observe outbound messages.
+// SUT is an initialized transition VM whose pre- and post-transition fakeVMs
+// share one fakeState.
 type SUT struct {
 	*VM
 	pre  *fakeVM
 	post *fakeVM
 }
 
-// BuildVerifyAccept builds a block, verifies it, and accepts it. Accepting the
-// block that reaches the transition time triggers the transition.
+// BuildVerifyAccept builds, verifies, and accepts a block. Accepting one at the
+// transition time triggers the transition.
 func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode verifyMode) {
 	t.Helper()
 
@@ -251,26 +260,27 @@ type sutConfig struct {
 // A sutOption overrides a default used by [newSUT].
 type sutOption = options.Option[sutConfig]
 
-// withBlocksUntilTransition sets how many blocks must be built on genesis
-// before one reaches the transition time. Accepting the nth triggers it.
+// withBlocksUntilTransition sets how many blocks after genesis reach the
+// transition time; accepting the nth triggers it.
 func withBlocksUntilTransition(n int) sutOption {
 	return withTransitionTime(snowmantest.GenesisTimestamp.Add(time.Duration(n) * blockInterval))
 }
 
-// withDatabase, withState, and withTransitionTime reuse a prior VM's persisted
-// state, modeling a node restart.
+// withDatabase sets the database the VM is initialized with.
 func withDatabase(db database.Database) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.db = db
 	})
 }
 
+// withState sets the chain state shared by the fakeVMs.
 func withState(state *fakeState) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.state = state
 	})
 }
 
+// withTransitionTime sets the time at which the VM transitions.
 func withTransitionTime(transitionTime time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.transitionTime = transitionTime
@@ -332,8 +342,8 @@ func (s *SUT) restart(t *testing.T) *SUT {
 	)
 }
 
-// TestInitiallyTransitioned verifies that a VM whose transition time is already
-// reached at genesis routes calls to the post-transition chain.
+// TestInitiallyTransitioned verifies a VM already past its transition time at
+// genesis routes to the post-transition chain.
 func TestInitiallyTransitioned(t *testing.T) {
 	sut := newSUT(t, withBlocksUntilTransition(0))
 	ctx := t.Context()
@@ -343,8 +353,8 @@ func TestInitiallyTransitioned(t *testing.T) {
 	require.Equal(t, "post", version)
 }
 
-// TestTransition verifies that accepting a block which reaches the transition
-// time switches routing from the pre- to the post-transition chain.
+// TestTransition verifies accepting a block at the transition time switches
+// from the pre- to the post-transition chain.
 func TestTransition(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
@@ -360,9 +370,8 @@ func TestTransition(t *testing.T) {
 	require.Equal(t, "post", version)
 }
 
-// TestTransitionSetsPreference verifies that transitioning sets the
-// post-transition chain's preference to the last accepted block, so consensus
-// resumes from the right place.
+// TestTransitionSetsPreference verifies the transition sets the post-transition
+// chain's preference to the last accepted block.
 func TestTransitionSetsPreference(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
@@ -372,10 +381,8 @@ func TestTransitionSetsPreference(t *testing.T) {
 	require.Equal(t, sut.post.state.lastAccepted.ID(), sut.post.preference)
 }
 
-// TestInitializeIsolatesContext verifies that the post-transition chain is
-// initialized with its own context: a separate metrics gatherer, isolated from
-// the pre-transition chain to avoid double-registration, while still carrying
-// the shared chain values.
+// TestInitializeIsolatesContext verifies the post-transition chain gets its own
+// context and metrics gatherer while sharing the chain values.
 func TestInitializeIsolatesContext(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
@@ -387,30 +394,25 @@ func TestInitializeIsolatesContext(t *testing.T) {
 	require.Equal(t, sut.pre.chainCtx.ChainID, sut.post.chainCtx.ChainID)
 }
 
-// TestRestart verifies that the VM resumes on the correct chain after a node
-// restart, both before and after the transition.
+// TestRestart verifies the VM resumes on the correct chain after a restart,
+// before and after the transition.
 func TestRestart(t *testing.T) {
-	// Require two blocks to transition so the VM can restart with an accepted
-	// block while still on the pre-transition chain.
+	// Two blocks to transition, so we can restart while still pre-transition.
 	sut := newSUT(t, withBlocksUntilTransition(2))
 	ctx := t.Context()
 
-	// Accept one block; the VM stays on the pre-transition chain.
 	sut.BuildVerifyAccept(t, ctx, verifyNoContext)
 
-	// Restarting before the transition resumes on the pre-transition chain.
 	sut = sut.restart(t)
 	version, err := sut.Version(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "pre", version)
 
-	// Accept the block that reaches the transition time.
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext)
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 	version, err = sut.Version(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "post", version)
 
-	// Restarting after the transition resumes on the post-transition chain.
 	sut = sut.restart(t)
 	version, err = sut.Version(ctx)
 	require.NoError(t, err)

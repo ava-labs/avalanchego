@@ -14,10 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-// TestPreTransitionRequestRouting verifies that the response to and failure of a
-// request the pre-transition chain issued are delivered to it while it remains
-// current, but dropped once the VM transitions to the post-transition chain,
-// which never issued the request.
+// TestPreTransitionRequestRouting verifies a response or failure for a request
+// the pre-transition chain issued is delivered while it is current, but dropped
+// after the transition.
 func TestPreTransitionRequestRouting(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -42,8 +41,7 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 			sut := newSUT(t, withBlocksUntilTransition(blocksUntilTransition))
 			ctx := t.Context()
 
-			// The pre-transition chain issues two requests, one to be answered
-			// with a response and one with a failure.
+			// Issue two requests: one answered with a response, one with a failure.
 			nodeID := ids.GenerateTestNodeID()
 			const (
 				responseID = 1
@@ -85,8 +83,8 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 	}
 }
 
-// TestTransitionForwardsConnections verifies that transitioning replays every
-// connection the pre-transition chain had to the post-transition chain.
+// TestTransitionForwardsConnections verifies the transition replays the
+// pre-transition chain's connections to the post-transition chain.
 func TestTransitionForwardsConnections(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
@@ -103,12 +101,7 @@ func TestTransitionForwardsConnections(t *testing.T) {
 	require.NoError(t, sut.Connected(ctx, disconnected, version.Current))
 	require.NoError(t, sut.Disconnected(ctx, disconnected))
 
-	got := make(map[ids.NodeID]*version.Application)
-	sut.post.VM.ConnectedF = func(_ context.Context, nodeID ids.NodeID, v *version.Application) error {
-		got[nodeID] = v
-		return nil
-	}
 	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
-	require.Equal(t, want, got)
+	require.Equal(t, want, sut.post.connected)
 }

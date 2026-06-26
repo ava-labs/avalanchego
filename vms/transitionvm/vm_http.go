@@ -9,9 +9,7 @@ import (
 	"sync"
 )
 
-// httpHandler that wraps an existing [http.Handler]. If the existing
-// [http.Handler] is nil, this handler returns with [http.StatusNotFound].
-// Otherwise, it delegates calls to the inner handler.
+// httpHandler wraps an [http.Handler], serving 404 when it is nil.
 type httpHandler struct {
 	lock    sync.RWMutex
 	handler http.Handler
@@ -37,7 +35,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handler.ServeHTTP(w, r)
 }
 
-// httpHandlers manages an append-only collection of updateable routes.
+// httpHandlers is an append-only collection of updatable routes.
 type httpHandlers struct {
 	lock   sync.RWMutex
 	routes map[string]*httpHandler
@@ -49,9 +47,8 @@ func newHTTPHandlers() *httpHandlers {
 	}
 }
 
-// set adds all the new handlers to the collection of tracked routes. Any
-// tracked routes not included in newHandlers will still be tracked, but will
-// return 404s.
+// set rebinds tracked routes to newHandlers. Routes absent from newHandlers
+// are kept but serve 404.
 func (h *httpHandlers) set(newHandlers map[string]http.Handler) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -72,8 +69,7 @@ func (h *httpHandlers) set(newHandlers map[string]http.Handler) {
 	}
 }
 
-// asInterface returns the current collection of tracked handlers as their
-// interface type.
+// asInterface returns the tracked routes as an [http.Handler] map.
 func (h *httpHandlers) asInterface() map[string]http.Handler {
 	h.lock.RLock()
 	defer h.lock.RUnlock()

@@ -17,6 +17,9 @@ var (
 	_ block.WithVerifyContext = (*preBlock)(nil)
 )
 
+// preBlock wraps a block from the pre-transition chain. It triggers the
+// transition when a block at or after the transition time is accepted, and
+// fails verification of a block whose parent is at or after it.
 type preBlock struct {
 	snowman.Block
 	v *VM
@@ -34,10 +37,8 @@ func (p *preBlock) Verify(ctx context.Context) error {
 	return p.Block.Verify(ctx)
 }
 
-// ShouldVerifyWithContext forwards to the inner block so that blocks requiring
-// the P-Chain context (e.g. ICM predicate verification) are still verified with
-// it while wrapped by the transition VM. Blocks that don't implement
-// [block.WithVerifyContext] never require a context.
+// ShouldVerifyWithContext forwards to the inner block, or returns false if it
+// doesn't implement [block.WithVerifyContext].
 func (p *preBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
 	blkWithCtx, ok := p.Block.(block.WithVerifyContext)
 	if !ok {
@@ -48,8 +49,8 @@ func (p *preBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
 
 var errBlockDoesNotImplementWithVerifyContext = errors.New("block does not implement WithVerifyContext")
 
-// VerifyWithContext forwards to the inner block's VerifyWithContext, applying
-// the same pre-transition parent check as [preBlock.Verify].
+// VerifyWithContext forwards to the inner block after the same parent check as
+// [preBlock.Verify].
 func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Context) error {
 	p.v.transitionLock.RLock()
 	defer p.v.transitionLock.RUnlock()
@@ -64,30 +65,28 @@ func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Contex
 	return blkWithCtx.VerifyWithContext(ctx, blockCtx)
 }
 
-// verifyPreTransition ensures the block's parent is a pre-transition block.
+// verifyPreTransition ensures the parent precedes the transition time.
 //
-// Callers must hold p.v.transitionLock.
+// Callers must hold transitionLock.
 func (p *preBlock) verifyPreTransition(ctx context.Context) error {
 	parent, err := p.v.current.chain.GetBlock(ctx, p.Parent())
 	if err != nil {
 		return err
 	}
 
-	// Make sure the parent block is a pre-transition block.
 	if parentTime := parent.Timestamp(); !parentTime.Before(p.v.transitionTime) {
 		return errPreTransitionBlockAfterTransition
 	}
 	return nil
 }
 
-// Accept is basically the only function that does not immediately prevent
-// transitions. This is because Accept is the function that actually triggers
-// the transition.
+// Accept does not hold transitionLock: accepting a block at or after the
+// transition time triggers the transition, which takes the write lock itself.
 func (p *preBlock) Accept(ctx context.Context) error {
 	if err := p.Block.Accept(ctx); err != nil {
 		return err
 	}
-	if time := p.Timestamp(); time.Before(p.v.transitionTime) {
+	if p.Timestamp().Before(p.v.transitionTime) {
 		return nil
 	}
 	return p.v.transition(ctx, p.Block)
@@ -97,10 +96,8 @@ func (p *preBlock) Reject(ctx context.Context) error {
 	p.v.transitionLock.RLock()
 	defer p.v.transitionLock.RUnlock()
 
-	// If the VM transitioned with some blocks still in consensus, they are
-	// guaranteed to all be rejected. However, we don't want to run into a
-	// situation where we call into the now-closed pre-transition VM. So we just
-	// do nothing for this block.
+	// Once transitioned, the pre-transition chain is shut down. Forwarding
+	// Reject into it could return an error, which the engine treats as fatal.
 	if p.v.transitioned {
 		return nil
 	}

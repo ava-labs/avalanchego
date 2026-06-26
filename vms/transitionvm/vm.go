@@ -1,6 +1,8 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package transitionvm implements a [block.ChainVM] that switches from one
+// chain to another at a configured time.
 package transitionvm
 
 import (
@@ -22,6 +24,8 @@ import (
 
 var _ Chain = (*VM)(nil)
 
+// Chain is the VM interface that both the pre- and post-transition chains must
+// implement.
 type Chain interface {
 	block.ChainVM
 	block.BuildBlockWithContextChainVM
@@ -29,6 +33,9 @@ type Chain interface {
 	block.StateSyncableVM
 }
 
+// VM wraps a pre- and a post-transition [Chain], forwarding calls to whichever
+// is currently active and switching from the pre- to the post-transition chain
+// at the transition time.
 type VM struct {
 	// transition parameters
 	preTransitionChain  Chain
@@ -53,8 +60,8 @@ type VM struct {
 	current        *current
 }
 
-// current contains all of the chain specific values. When initializing and
-// transitioning, all of these values are overridden.
+// current holds the active chain and its per-chain state. It is replaced on
+// initialization and transition.
 type current struct {
 	chain    Chain
 	requests *requests
@@ -80,10 +87,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// To avoid errors when registering metrics, SAE is provided a different
-	// gatherer than Coreth. To avoid any potential race conditions with
-	// updating the [snow.Context] during the transition, we instead create a
-	// full copy of the context and keep both copies isolated.
+	// Give the post-transition chain its own gatherer to avoid
+	// double-registering metrics, and copy the rest of the context so the
+	// transition never races on the shared [snow.Context].
 	vm.postChainCtx = &snow.Context{
 		NetworkID:       preChainCtx.NetworkID,
 		SubnetID:        preChainCtx.SubnetID,
@@ -95,10 +101,9 @@ func (vm *VM) Initialize(
 		CChainID:        preChainCtx.CChainID,
 		AVAXAssetID:     preChainCtx.AVAXAssetID,
 		Log:             preChainCtx.Log,
-		// The lock is deprecated and already not supported by the RPCChainVM.
-		// SAE never uses this lock, so it is safe not to provide the actual
-		// lock reference here. Coreth, however, does use this lock. So, Coreth
-		// MUST get the original context rather than this copy.
+		// The lock is deprecated and unused by SAE, so this copy gets a fresh
+		// one. Coreth still uses it and MUST get the original context, not this
+		// copy.
 		Lock:           sync.RWMutex{},
 		SharedMemory:   preChainCtx.SharedMemory,
 		BCLookup:       preChainCtx.BCLookup,
@@ -137,8 +142,8 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("initializing pre-transition VM: %w", err)
 	}
 
-	// It's possible we crashed between accepting the last block and writing the
-	// transition flag. Or maybe the genesis block was the transition block.
+	// Genesis may already be past the transition time, or we may have crashed
+	// after accepting the transition block but before marking it.
 	lastAcceptedID, err := vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("loading last accepted ID: %w", err)
@@ -147,18 +152,17 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("loading last accepted block %s: %w", lastAcceptedID, err)
 	}
-	if time := lastAccepted.Timestamp(); time.Before(vm.transitionTime) {
+	if lastAccepted.Timestamp().Before(vm.transitionTime) {
 		return nil
 	}
 	return vm.transition(ctx, lastAccepted)
 }
 
-// transition handles the switch from the pre-transition VM to the
-// post-transition VM. It is assumed that the pre-transition VM is currently
-// active.
+// transition switches from the pre- to the post-transition chain. The
+// pre-transition chain must be active.
 func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
-	// We must cancel the context before grabbing the lock to ensure that
-	// [VM.WaitForEvent] does not block indefinitely.
+	// Cancel first so a blocked [VM.WaitForEvent] releases its read lock,
+	// letting us take the write lock below.
 	vm.current.ctxCancel()
 
 	vm.transitionLock.Lock()
@@ -198,9 +202,8 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	return nil
 }
 
-// initChain initializes the VM with the provided chain and context. This is
-// used for both initializing the pre-transition chain and the post-transition
-// chain.
+// initChain configures VM to dispatch the provided chain with the given
+// context.
 func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context) error {
 	var (
 		requests requests

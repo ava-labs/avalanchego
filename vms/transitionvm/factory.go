@@ -14,6 +14,7 @@ import (
 
 var _ vms.Factory = (*Factory)(nil)
 
+// Factory builds a transition [VM] from a pre- and a post-transition factory.
 type Factory struct {
 	PreFactory     vms.Factory
 	PostFactory    vms.Factory
@@ -46,9 +47,8 @@ func (f *Factory) New(log logging.Logger) (interface{}, error) {
 		postTransitionChain: post,
 		transitionTime:      f.TransitionTime,
 
-		// [VM.Version] and [VM.Shutdown] may be called before [VM.Initialize].
-		// For those methods we mark the pre-transition VM as current to handle
-		// these calls.
+		// [VM.Version] and [VM.Shutdown] may be called before [VM.Initialize],
+		// so mark the pre-transition chain current up front.
 		current: &current{
 			chain: pre,
 		},

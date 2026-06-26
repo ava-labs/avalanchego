@@ -12,16 +12,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// handler is a trivial [http.Handler] that writes a fixed marker body.
+// handler is an [http.Handler] that writes a fixed body.
 type handler string
 
 func (h handler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte(h))
 }
 
-// TestHTTPHandlers verifies that a chain transition is reflected through the
-// handlers the node captured on startup: shared routes rebind to the new
-// chain's handler and dropped routes 404 instead of panicking.
+// TestHTTPHandlers verifies a transition is reflected through the handlers
+// captured on startup: shared routes rebind and dropped routes 404.
 func TestHTTPHandlers(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
@@ -34,7 +33,7 @@ func TestHTTPHandlers(t *testing.T) {
 		"shared": handler("post-shared"),
 	}
 
-	// The node captures the handler map once on startup; we never re-read it.
+	// The node captures the handler map once on startup and never re-reads it.
 	handlers, err := sut.CreateHandlers(ctx)
 	require.NoError(t, err)
 

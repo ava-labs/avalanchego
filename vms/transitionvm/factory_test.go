@@ -14,7 +14,7 @@ import (
 
 var _ vms.Factory = fakeFactory{}
 
-// fakeFactory is a [vms.Factory] that returns a fixed value and error.
+// fakeFactory is a [vms.Factory] that returns a fixed VM.
 type fakeFactory struct {
 	vm *fakeVM
 }
@@ -23,8 +23,8 @@ func (f fakeFactory) New(logging.Logger) (interface{}, error) {
 	return f.vm, nil
 }
 
-// TestFactoryUsableBeforeInitialize verifies the documented guarantee that
-// Version and Shutdown may be called on a factory-built VM before Initialize.
+// TestFactoryUsableBeforeInitialize verifies Version and Shutdown work on a
+// factory-built VM before Initialize.
 func TestFactoryUsableBeforeInitialize(t *testing.T) {
 	f := &Factory{
 		PreFactory:  fakeFactory{vm: newFakeVM(t, "pre", newFakeState())},
@@ -35,8 +35,7 @@ func TestFactoryUsableBeforeInitialize(t *testing.T) {
 	require.NoError(t, err)
 	vm := intf.(*VM)
 
-	// New marks the pre-transition chain current, so these route to it without
-	// Initialize having been called.
+	// New marks the pre-transition chain current, so these route to it.
 	version, err := vm.Version(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "pre", version)
