@@ -6,6 +6,7 @@ package transitionvm
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -27,8 +28,9 @@ import (
 )
 
 var (
-	_ Chain         = (*fakeVM)(nil)
-	_ snowman.Block = (*fakeBlock)(nil)
+	_ Chain                   = (*fakeVM)(nil)
+	_ snowman.Block           = (*fakeBlock)(nil)
+	_ block.WithVerifyContext = (*fakeBlock)(nil)
 )
 
 // blockInterval is the amount of time fakeVM advances per built block.
@@ -66,6 +68,14 @@ func (b *fakeBlock) Verify(ctx context.Context) error {
 	return nil
 }
 
+func (*fakeBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
+	return true, nil
+}
+
+func (b *fakeBlock) VerifyWithContext(ctx context.Context, _ *block.Context) error {
+	return b.Verify(ctx)
+}
+
 func (b *fakeBlock) Accept(ctx context.Context) error {
 	if err := b.Block.Accept(ctx); err != nil {
 		return err
@@ -89,6 +99,8 @@ type fakeVM struct {
 	tip *fakeBlock
 	// appSender is the sender captured in Initialize, used by sendAppRequest.
 	appSender common.AppSender
+	// handlers is the set of HTTP handlers returned by CreateHandlers.
+	handlers map[string]http.Handler
 }
 
 func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
@@ -114,6 +126,10 @@ func (vm *fakeVM) Initialize(_ context.Context, _ *snow.Context, _ database.Data
 // in Initialize.
 func (vm *fakeVM) sendAppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	return vm.appSender.SendAppRequest(ctx, set.Of(nodeID), requestID, nil)
+}
+
+func (vm *fakeVM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
+	return vm.handlers, nil
 }
 
 func (vm *fakeVM) Version(context.Context) (string, error) {
@@ -158,8 +174,8 @@ type SUT struct {
 	appSender *enginetest.Sender
 }
 
-// BuildVerifyAccept builds a block and then verifies and accepts it. Accepting
-// the block that reaches the transition time triggers the transition.
+// BuildVerifyAccept builds a block, verifies it, and accepts it. Accepting the
+// block that reaches the transition time triggers the transition.
 func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context) {
 	t.Helper()
 
@@ -167,6 +183,32 @@ func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context) {
 	require.NoError(t, err)
 	require.NoError(t, blk.Verify(ctx))
 	require.NoError(t, blk.Accept(ctx))
+}
+
+// verifyMode selects whether a block is verified with a [block.Context].
+type verifyMode int
+
+const (
+	verifyNoContext verifyMode = iota
+	verifyWithContext
+)
+
+var verifyModes = []verifyMode{verifyNoContext, verifyWithContext}
+
+func (m verifyMode) String() string {
+	if m == verifyWithContext {
+		return "VerifyWithContext"
+	}
+	return "Verify"
+}
+
+// verifyBlock verifies blk according to mode.
+func verifyBlock(ctx context.Context, blk snowman.Block, mode verifyMode) error {
+	if mode == verifyNoContext {
+		return blk.Verify(ctx)
+	}
+	bwc := blk.(block.WithVerifyContext)
+	return bwc.VerifyWithContext(ctx, nil)
 }
 
 type sutConfig struct {

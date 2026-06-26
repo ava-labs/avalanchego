@@ -10,31 +10,42 @@ import (
 )
 
 func TestTransitionBlockChildren(t *testing.T) {
-	sut := newSUT(t)
-	ctx := t.Context()
+	for _, mode := range verifyModes {
+		t.Run(mode.String(), func(t *testing.T) {
+			sut := newSUT(t)
+			ctx := t.Context()
 
-	// Build and verify the block that reaches the transition time.
-	blk, err := sut.BuildBlock(ctx)
-	require.NoError(t, err)
-	require.NoError(t, blk.Verify(ctx))
+			// Build and verify the block that reaches the transition time.
+			blk, err := sut.BuildBlock(ctx)
+			require.NoError(t, err)
+			require.NoError(t, verifyBlock(ctx, blk, mode))
 
-	// A child of that block sits past the transition time, so it can't be
-	// verified as a pre-transition block.
-	child, err := sut.BuildBlock(ctx)
-	require.NoError(t, err)
-	require.ErrorIs(t, child.Verify(ctx), errPreTransitionBlockAfterTransition)
+			// A child of that block sits past the transition time, so it can't
+			// be verified as a pre-transition block.
+			child, err := sut.BuildBlock(ctx)
+			require.NoError(t, err)
+			require.ErrorIs(t, verifyBlock(ctx, child, mode), errPreTransitionBlockAfterTransition)
+		})
+	}
 }
 
 // TestNoTransitionBeforeTime verifies that accepting a block before the
 // transition time leaves the VM on its pre-transition chain.
 func TestNoTransitionBeforeTime(t *testing.T) {
-	// Require two blocks before transitioning; this test only accepts one.
-	sut := newSUT(t, withBlocksUntilTransition(2))
-	ctx := t.Context()
+	for _, mode := range verifyModes {
+		t.Run(mode.String(), func(t *testing.T) {
+			// Require two blocks before transitioning; this test only accepts one.
+			sut := newSUT(t, withBlocksUntilTransition(2))
+			ctx := t.Context()
 
-	sut.BuildVerifyAccept(t, ctx)
+			blk, err := sut.BuildBlock(ctx)
+			require.NoError(t, err)
+			require.NoError(t, verifyBlock(ctx, blk, mode))
+			require.NoError(t, blk.Accept(ctx))
 
-	version, err := sut.Version(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "pre", version)
+			version, err := sut.Version(ctx)
+			require.NoError(t, err)
+			require.Equal(t, "pre", version)
+		})
+	}
 }
