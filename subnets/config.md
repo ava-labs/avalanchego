@@ -62,10 +62,10 @@ this configuration in order to properly allow a node in the private Subnet.
 
 The length of a single proposerVM proposer slot for the chains in this Subnet, in
 **milliseconds**. Defaults to 5s (`5000`) when unset or `0`. When set, must be
-between `50` and `5000` inclusive.
+between `1000` (1s) and `5000` (5s) inclusive.
 
-**If you are changing this at all, you almost certainly want 1s (`1000`).** On
-current nodes that is the practical floor (see the note below), and it is already
+**If you are changing this at all, you almost certainly want 1s (`1000`).** That
+is the minimum (see the note below), and it is already
 enough to make validator restarts and maintenance effectively invisible. For
 example:
 
@@ -77,9 +77,9 @@ Slots are `proposerWindowMilliseconds` apart, and when a scheduled proposer is
 offline the chain stalls until the next live proposer's slot opens — so a smaller
 window speeds failover recovery (good for CFT/PoA L1s) at the cost of more
 rejected blocks. The proposerVM block timestamp is currently whole-second
-granular, so a sub-second window gives no failover benefit today (~1s is the
-practical floor); smaller values down to `50` are accepted but are the operator's
-responsibility.
+granular, so the slot clock only ticks once per second and a sub-second window
+gains nothing — hence the `1000`ms (1s) floor. Sub-second windows arrive in a
+follow-up PR that adds millisecond-granular timestamps.
 
 :::warning
 
