@@ -1076,7 +1076,6 @@ func TestArchivalStoresAll(t *testing.T) {
 // parent beacon root, and its execution must populate the contract's ring
 // buffer at slot (timestamp%8191 + 8191).
 func TestProcessBeaconBlockRoot(t *testing.T) {
-	const historyBufferLength = 8191
 	beaconRoot := common.HexToHash("0xbeef")
 
 	// Canonical EIP-4788 deployment transaction (tx hash
@@ -1088,12 +1087,19 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 	gasPrice, _ := new(big.Int).SetString("e8d4a51000", 16)
 	deployTx := types.NewTx(&types.LegacyTx{
 		Nonce:    0,
-		GasPrice: gasPrice,
+		GasPrice: big.NewInt(0xe8d4a51000),
 		Gas:      0x3d090,
 		Data:     common.FromHex("0x60618060095f395ff33373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"),
 		V:        big.NewInt(0x1b),
 		R:        big.NewInt(0x539),
 		S:        big.NewInt(0x1b9b6eb1f0),
+	})
+	
+	t.Run("deployment_tx_sense_check", func(t *testing.T) {
+		require.Equal(t, common.HexToHash(`0xdf52c2d3bbe38820fff7b5eaab3db1b91f8e1412b56497d88388fb5d4ea1fde0`), deployTx.Hash(), "deployment tx hash matches EIP")
+		sender, err := types.Sender(types.LatestSigner(saetest.ChainConfig()), deployTx)
+		require.NoError(t, err, "types.Sender([deployment tx])")
+		require.Equal(t, deployer, sender, "types.Sender([deployment tx])")
 	})
 
 	tests := []struct {
@@ -1117,7 +1123,7 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 			// Fund only the keyless deployer EOA; the contract itself is deployed
 			// by the transaction, not pre-allocated.
 			ctx, sut := newSUT(t, withExtraAlloc(types.GenesisAlloc{
-				deployer: {Balance: new(big.Int).Mul(big.NewInt(100), big.NewInt(params.Ether))},
+				deployer: {Balance: big.NewInt(math.MaxInt64)},
 			}))
 			e := sut.Executor
 
