@@ -4,6 +4,7 @@
 package transitionvm
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -48,4 +49,28 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 			require.Equal(t, "pre", version)
 		})
 	}
+}
+
+// TestRejectIsNoopAfterTransition verifies that rejecting a pre-transition block
+// after the transition is a noop. The engine may have verified blocks that
+// conflict with the transition-triggering block; once that block is accepted the
+// pre-transition chain shuts down, so forwarding a later Reject into it could
+// error and be treated as fatal. Reject must not forward in that case.
+func TestRejectIsNoopAfterTransition(t *testing.T) {
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	genesis := sut.pre.tip
+
+	loser, err := sut.BuildBlock(ctx)
+	require.NoError(t, err)
+	require.NoError(t, loser.Verify(ctx))
+	loserBlock := sut.pre.tip
+
+	sut.pre.tip = genesis
+	sut.BuildVerifyAccept(t, ctx) // Trigger the transition with a block that conflicts loser.
+
+	// Rejecting the loser must be a noop, not a fatal error.
+	loserBlock.RejectV = errors.New("reject forwarded to shut-down pre-transition chain")
+	require.NoError(t, loser.Reject(ctx))
 }
