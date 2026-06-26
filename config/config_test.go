@@ -1350,6 +1350,30 @@ func setupViperFlags() *viper.Viper {
 	return v
 }
 
+// TestPrimaryNetworkProposerMillisecondTimestampsIsAlwaysDefault guards the
+// invariant that the per-Subnet proposerMillisecondTimestamps setting can never
+// reach the primary network (P/C/X). Reinterpreting its whole-second block
+// history as milliseconds would fork the node off Mainnet/Fuji. Two layers
+// enforce this:
+//
+//  1. The primary network cannot be a tracked Subnet, so a user-supplied subnet
+//     config can never be routed to it (getTrackedSubnets rejects its ID).
+//  2. Its config is always rebuilt from getPrimaryNetworkConfig, which never
+//     reads the flag, so it stays false (whole seconds) regardless of input.
+func TestPrimaryNetworkProposerMillisecondTimestampsIsAlwaysDefault(t *testing.T) {
+	require := require.New(t)
+
+	// Layer 2: the primary network never reads the flag; it stays seconds.
+	require.False(getPrimaryNetworkConfig(setupViperFlags()).ProposerMillisecondTimestamps)
+
+	// Layer 1: even attempting to track the primary network (the only way a
+	// subnet config could reach it) is rejected before any config is read.
+	v := setupViperFlags()
+	v.Set(TrackSubnetsKey, constants.PrimaryNetworkID.String())
+	_, err := getTrackedSubnets(v)
+	require.ErrorIs(err, errCannotTrackPrimaryNetwork)
+}
+
 func setupViper(configFilePath string) *viper.Viper {
 	v := setupViperFlags()
 	v.SetConfigFile(configFilePath)

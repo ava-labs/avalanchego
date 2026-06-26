@@ -29,8 +29,29 @@ type Block interface {
 	Block() []byte
 	Bytes() []byte
 
-	initialize(bytes []byte) error
+	initialize(bytes []byte, millisecondTimestamps bool) error
 	verify(chainID ids.ID) error
+}
+
+// timestampToUnix and unixToTimestamp encode/decode the block's int64 Timestamp
+// field. It is historically whole-second granular; a chain configured for
+// millisecond timestamps encodes (and decodes) the same int64 as unix-millis
+// instead. The unit is a per-chain consensus parameter the caller must supply
+// because a bare int64 cannot describe its own unit. It MUST be fixed for the
+// life of a chain (set from genesis); reinterpreting second-granular history as
+// millis would misread every old block.
+func timestampToUnix(t time.Time, millisecondTimestamps bool) int64 {
+	if millisecondTimestamps {
+		return t.UnixMilli()
+	}
+	return t.Unix()
+}
+
+func unixToTimestamp(ts int64, millisecondTimestamps bool) time.Time {
+	if millisecondTimestamps {
+		return time.UnixMilli(ts)
+	}
+	return time.Unix(ts, 0)
 }
 
 type SignedBlock interface {
@@ -76,6 +97,7 @@ func (m *statelessBlockMetadata) initialize(
 	b *statelessUnsignedBlock,
 	sig []byte,
 	bytes []byte,
+	millisecondTimestamps bool,
 ) error {
 	m.bytes = bytes
 
@@ -86,7 +108,7 @@ func (m *statelessBlockMetadata) initialize(
 	unsignedBytes := bytes[:lenUnsignedBytes]
 	m.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	m.timestamp = time.Unix(b.Timestamp, 0)
+	m.timestamp = unixToTimestamp(b.Timestamp, millisecondTimestamps)
 	if len(b.Certificate) == 0 {
 		return nil
 	}
@@ -164,8 +186,8 @@ func (b *statelessBlock) Block() []byte {
 	return b.StatelessBlock.Block
 }
 
-func (b *statelessBlock) initialize(bytes []byte) error {
-	return b.statelessBlockMetadata.initialize(&b.StatelessBlock, b.Signature, bytes)
+func (b *statelessBlock) initialize(bytes []byte, millisecondTimestamps bool) error {
+	return b.statelessBlockMetadata.initialize(&b.StatelessBlock, b.Signature, bytes, millisecondTimestamps)
 }
 
 func (b *statelessBlock) verify(chainID ids.ID) error {
@@ -196,8 +218,8 @@ func (b *statelessGraniteBlock) PChainEpoch() Epoch {
 	return b.StatelessGraniteBlock.Epoch
 }
 
-func (b *statelessGraniteBlock) initialize(bytes []byte) error {
-	return b.statelessBlockMetadata.initialize(&b.StatelessGraniteBlock.StatelessBlock, b.Signature, bytes)
+func (b *statelessGraniteBlock) initialize(bytes []byte, millisecondTimestamps bool) error {
+	return b.statelessBlockMetadata.initialize(&b.StatelessGraniteBlock.StatelessBlock, b.Signature, bytes, millisecondTimestamps)
 }
 
 func (b *statelessGraniteBlock) verify(chainID ids.ID) error {
