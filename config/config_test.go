@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const chainConfigFilenameExtension = ".ex"
@@ -573,6 +574,36 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		"custom proposer window milliseconds": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"proposerWindowMilliseconds": 1000
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.Equal(uint64(1000), config.ProposerWindowMilliseconds)
+				// an unset field must still inherit the default
+				require.Equal(snowball.DefaultParameters.K, config.SnowParameters.K)
+			},
+			expectedErr: nil,
+		},
+		"unset proposer window inherits the default": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.Equal(uint64(proposervm.DefaultWindowDuration/time.Millisecond), config.ProposerWindowMilliseconds)
+			},
+			expectedErr: nil,
+		},
 		"entry with no config": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
@@ -740,6 +771,35 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			test.testF(require, subnetConfigs)
 		})
 	}
+}
+
+// TestPrimaryNetworkProposerWindowIsAlwaysDefault guards the invariant that the
+// per-Subnet proposerWindowMilliseconds setting can never alter the primary
+// network (P/C/X). Two independent layers enforce this:
+//
+//  1. The primary network cannot be a tracked Subnet, so a user-supplied subnet
+//     config can never be routed to it (getTrackedSubnets rejects its ID).
+//  2. Its config is always rebuilt from getPrimaryNetworkConfig, which pins the
+//     window to the default regardless of viper contents.
+//
+// If either layer regresses, an operator tuning an L1's window could
+// inadvertently fork the node off Mainnet/Fuji.
+func TestPrimaryNetworkProposerWindowIsAlwaysDefault(t *testing.T) {
+	require := require.New(t)
+
+	defaultWindowMS := uint64(proposervm.DefaultWindowDuration / time.Millisecond)
+
+	// Layer 2: the primary network's window is pinned to the default and never
+	// reads user input.
+	require.Equal(defaultWindowMS, getPrimaryNetworkConfig(setupViperFlags()).ProposerWindowMilliseconds)
+
+	// Layer 1: even if an operator tries to track the primary network (the only
+	// way a subnet config could reach it), it is rejected before any config is
+	// read, so proposerWindowMilliseconds has no path to the primary network.
+	v := setupViperFlags()
+	v.Set(TrackSubnetsKey, constants.PrimaryNetworkID.String())
+	_, err := getTrackedSubnets(v)
+	require.ErrorIs(err, errCannotTrackPrimaryNetwork)
 }
 
 func TestConfigWithSnowQuorumSizeKey(t *testing.T) {
