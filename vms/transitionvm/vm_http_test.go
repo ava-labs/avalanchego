@@ -21,15 +21,22 @@ func (h handler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 
 // TestHTTPHandlers verifies that a chain transition is reflected through the
 // handlers the node captured on startup: shared routes rebind to the new
-// handler and dropped routes 404 instead of panicking.
+// chain's handler and dropped routes 404 instead of panicking.
 func TestHTTPHandlers(t *testing.T) {
-	hs := newHTTPHandlers()
-	hs.set(map[string]http.Handler{
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	sut.pre.handlers = map[string]http.Handler{
 		"shared":   handler("pre-shared"),
 		"pre-only": handler("pre-only"),
-	})
-	// The node captures handlers once on startup; we never re-read this map.
-	handlers := hs.asInterface()
+	}
+	sut.post.handlers = map[string]http.Handler{
+		"shared": handler("post-shared"),
+	}
+
+	// The node captures the handler map once on startup; we never re-read it.
+	handlers, err := sut.CreateHandlers(ctx)
+	require.NoError(t, err)
 
 	type responses map[string]struct {
 		wantCode int
@@ -54,9 +61,9 @@ func TestHTTPHandlers(t *testing.T) {
 		"shared":   {wantCode: http.StatusOK, wantBody: "pre-shared"},
 		"pre-only": {wantCode: http.StatusOK, wantBody: "pre-only"},
 	})
-	hs.set(map[string]http.Handler{
-		"shared": handler("post-shared"),
-	})
+
+	sut.BuildVerifyAccept(t, ctx) // triggers the transition
+
 	assertRoutes("post-transition", responses{
 		"shared":   {wantCode: http.StatusOK, wantBody: "post-shared"},                // rebound
 		"pre-only": {wantCode: http.StatusNotFound, wantBody: "404 page not found\n"}, // dropped, now 404s
