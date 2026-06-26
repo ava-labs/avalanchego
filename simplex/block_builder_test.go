@@ -9,15 +9,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-var emptyBlacklist = simplex.Blacklist{}
+var emptyBlacklist = common.Blacklist{}
 
 func TestBlockBuilder(t *testing.T) {
 	ctx := t.Context()
@@ -30,7 +31,7 @@ func TestBlockBuilder(t *testing.T) {
 		name          string
 		block         snowman.Block
 		shouldBuild   bool
-		expectedBlock simplex.VerifiedBlock
+		expectedBlock common.VerifiedBlock
 		vmBlockBuildF func(ctx context.Context) (snowman.Block, error)
 	}{
 		{
@@ -69,9 +70,9 @@ func TestBlockBuilder(t *testing.T) {
 			count := 0
 			vm := newTestVM()
 
-			vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
+			vm.WaitForEventF = func(_ context.Context) (engcommon.Message, error) {
 				count++
-				return common.PendingTxs, nil
+				return engcommon.PendingTxs, nil
 			}
 			vm.BuildBlockF = tt.vmBlockBuildF
 
@@ -101,7 +102,7 @@ func TestBlockBuilderCancelContext(t *testing.T) {
 	child := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
-	vm.WaitForEventF = func(ctx context.Context) (common.Message, error) {
+	vm.WaitForEventF = func(ctx context.Context) (engcommon.Message, error) {
 		<-ctx.Done()
 		return 0, ctx.Err()
 	}
@@ -124,12 +125,12 @@ func TestWaitForPendingBlock(t *testing.T) {
 	vm := newTestVM()
 	genesis := newTestBlock(t, newBlockConfig{})
 	count := 0
-	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
+	vm.WaitForEventF = func(_ context.Context) (engcommon.Message, error) {
 		if count == 0 {
 			count++
-			return common.StateSyncDone, nil
+			return engcommon.StateSyncDone, nil
 		}
-		return common.PendingTxs, nil
+		return engcommon.PendingTxs, nil
 	}
 
 	bb := &BlockBuilder{
@@ -154,8 +155,8 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 		minimumExpectedDelay = initBackoff * (1<<failedAttempts - 1)
 	)
 
-	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
-		return common.PendingTxs, nil
+	vm.WaitForEventF = func(_ context.Context) (engcommon.Message, error) {
+		return engcommon.PendingTxs, nil
 	}
 
 	count := 0
@@ -195,13 +196,13 @@ func TestWaitForPendingBlockBackoff(t *testing.T) {
 	)
 
 	count := 0
-	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
+	vm.WaitForEventF = func(_ context.Context) (engcommon.Message, error) {
 		if count < failedAttempts {
 			count++
-			return common.StateSyncDone, nil
+			return engcommon.StateSyncDone, nil
 		}
 
-		return common.PendingTxs, nil
+		return engcommon.PendingTxs, nil
 	}
 
 	bb := &BlockBuilder{

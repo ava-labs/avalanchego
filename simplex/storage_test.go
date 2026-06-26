@@ -6,7 +6,7 @@ package simplex
 import (
 	"testing"
 
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -40,8 +40,8 @@ func TestStorageNew(t *testing.T) {
 			}(),
 			db: func() database.KeyValueReaderWriter {
 				db := memdb.New()
-				finalization := newTestFinalization(t, newNetworkConfigs(t, 1), simplex.BlockHeader{
-					ProtocolMetadata: simplex.ProtocolMetadata{
+				finalization := newTestFinalization(t, newNetworkConfigs(t, 1), common.BlockHeader{
+					ProtocolMetadata: common.ProtocolMetadata{
 						Round: 1,
 						Seq:   1,
 					},
@@ -92,7 +92,7 @@ func TestStorageRetrieve(t *testing.T) {
 		seq                  uint64
 		expectedBlock        *Block
 		expectedBytes        []byte
-		expectedFinalization simplex.Finalization
+		expectedFinalization common.Finalization
 		expectedErr          error
 	}{
 		{
@@ -100,15 +100,15 @@ func TestStorageRetrieve(t *testing.T) {
 			seq:                  0,
 			expectedBlock:        genesis,
 			expectedBytes:        genesisBytes,
-			expectedFinalization: simplex.Finalization{},
+			expectedFinalization: common.Finalization{},
 			expectedErr:          nil,
 		},
 		{
 			name:                 "seq not found",
 			seq:                  1,
 			expectedBlock:        nil,
-			expectedFinalization: simplex.Finalization{},
-			expectedErr:          simplex.ErrBlockNotFound,
+			expectedFinalization: common.Finalization{},
+			expectedErr:          common.ErrBlockNotFound,
 		},
 	}
 
@@ -150,22 +150,22 @@ func TestStorageIndexFails(t *testing.T) {
 	tests := []struct {
 		name          string
 		expectedError error
-		finalization  simplex.Finalization
+		finalization  common.Finalization
 		block         *Block
 	}{
 		{
 			name:          "index genesis block",
 			expectedError: errUnexpectedSeq,
 			block:         genesis,
-			finalization:  simplex.Finalization{},
+			finalization:  common.Finalization{},
 		},
 		{
 			name:          "index invalid qc",
 			expectedError: errInvalidQC,
 			block:         child1,
-			finalization: simplex.Finalization{
+			finalization: common.Finalization{
 				QC: nil, // no quorum certificate
-				Finalization: simplex.ToBeSignedFinalization{
+				Finalization: common.ToBeSignedFinalization{
 					BlockHeader: child1.BlockHeader(),
 				},
 			},
@@ -174,7 +174,7 @@ func TestStorageIndexFails(t *testing.T) {
 			name:          "mismatched digest",
 			expectedError: errMismatchedDigest,
 			block:         child1,
-			finalization: func() simplex.Finalization {
+			finalization: func() common.Finalization {
 				f := newTestFinalization(t, configs, child1.BlockHeader())
 				f.Finalization.Digest = [32]byte{1, 2, 3} // set an invalid digest
 				return f
@@ -205,9 +205,9 @@ func TestStorageIndexFails(t *testing.T) {
 			if tt.block.metadata.Seq != 0 {
 				// ensure that the block is not retrievable
 				block, finalization, err := s.Retrieve(tt.block.BlockHeader().Seq)
-				require.ErrorIs(t, err, simplex.ErrBlockNotFound)
+				require.ErrorIs(t, err, common.ErrBlockNotFound)
 				require.Nil(t, block)
-				require.Equal(t, simplex.Finalization{}, finalization)
+				require.Equal(t, common.Finalization{}, finalization)
 			}
 
 			// ensure that we haven't indexed any blocks
@@ -272,10 +272,10 @@ func TestStorageIndexSuccess(t *testing.T) {
 
 	numBlocks := 10
 	blocks := make([]*Block, 0, numBlocks+1)
-	finalizations := make([]simplex.Finalization, 0, numBlocks+1)
+	finalizations := make([]common.Finalization, 0, numBlocks+1)
 
 	blocks = append(blocks, genesis)
-	finalizations = append(finalizations, simplex.Finalization{})
+	finalizations = append(finalizations, common.Finalization{})
 
 	prev := genesis
 	for i := 0; i < numBlocks; i++ {

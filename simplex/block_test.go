@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/StephenButtolph/canoto"
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,16 +29,16 @@ func TestBlockSerialization(t *testing.T) {
 
 	b := &Block{
 		vmBlock: testBlock,
-		metadata: simplex.ProtocolMetadata{
+		metadata: common.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
 			Round:   1,
 			Seq:     1,
 			Prev:    genesisBlock.digest,
 		},
-		blacklist: simplex.Blacklist{
+		blacklist: common.Blacklist{
 			NodeCount: 3,
-			SuspectedNodes: []simplex.SuspectedNode{
+			SuspectedNodes: []common.SuspectedNode{
 				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 11},
 			},
 		},
@@ -275,6 +275,6 @@ func TestIndexBlockDigestNotFound(t *testing.T) {
 	genesis := newTestBlock(t, newBlockConfig{})
 
 	unknownDigest := ids.GenerateTestID()
-	err := genesis.blockTracker.indexBlock(ctx, simplex.Digest(unknownDigest))
+	err := genesis.blockTracker.indexBlock(ctx, common.Digest(unknownDigest))
 	require.ErrorIs(t, err, errDigestNotFound)
 }
