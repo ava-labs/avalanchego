@@ -18,9 +18,31 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
+
+func TestGenesisCustomMinDelay(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+
+	// Unset: genesis seeds the protocol default, bit-for-bit identical to today.
+	defaultConfig := params.TestGraniteChainConfig
+	defaultBlock, err := (&Genesis{Config: defaultConfig}).Commit(db, tdb)
+	require.NoError(t, err)
+	require.Equal(t, acp226.InitialDelayExcess, *customtypes.GetHeaderExtra(defaultBlock.Header()).MinDelayExcess)
+
+	// Set: genesis seeds the converged excess for the configured cadence.
+	// Copy first — TestGraniteChainConfig and its extra are shared globals.
+	const initialMinDelayMS = 5
+	customConfig := params.Copy(params.TestGraniteChainConfig)
+	params.GetExtra(&customConfig).InitialMinDelayMS = initialMinDelayMS
+	customBlock, err := (&Genesis{Config: &customConfig}).Commit(db, tdb)
+	require.NoError(t, err)
+	require.Equal(t, acp226.DesiredDelayExcess(initialMinDelayMS), *customtypes.GetHeaderExtra(customBlock.Header()).MinDelayExcess)
+}
 
 func TestGenesisEthUpgrades(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()

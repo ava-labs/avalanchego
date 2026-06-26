@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
 func TestChainConfigDescription(t *testing.T) {
@@ -166,6 +167,66 @@ func TestChainConfigVerify(t *testing.T) {
 						FortunaTime: time.Unix(4, 0),
 					},
 				}},
+			},
+			wantError: nil,
+		},
+		"valid_initial_min_delay": {
+			config: ChainConfig{
+				FeeConfig: validFeeConfig,
+				NetworkUpgrades: NetworkUpgrades{
+					SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+					DurangoTimestamp:   utils.PointerTo[uint64](2),
+					EtnaTimestamp:      utils.PointerTo[uint64](3),
+					FortunaTimestamp:   utils.PointerTo[uint64](4),
+				},
+				AvalancheContext: AvalancheContext{SnowCtx: &snow.Context{
+					NetworkUpgrades: upgrade.Config{
+						DurangoTime: time.Unix(2, 0),
+						EtnaTime:    time.Unix(3, 0),
+						FortunaTime: time.Unix(4, 0),
+					},
+				}},
+				InitialMinDelayMS: 5,
+			},
+			wantError: nil,
+		},
+		"initial_min_delay_too_high": {
+			config: ChainConfig{
+				FeeConfig: validFeeConfig,
+				NetworkUpgrades: NetworkUpgrades{
+					SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+					DurangoTimestamp:   utils.PointerTo[uint64](2),
+					EtnaTimestamp:      utils.PointerTo[uint64](3),
+					FortunaTimestamp:   utils.PointerTo[uint64](4),
+				},
+				AvalancheContext: AvalancheContext{SnowCtx: &snow.Context{
+					NetworkUpgrades: upgrade.Config{
+						DurangoTime: time.Unix(2, 0),
+						EtnaTime:    time.Unix(3, 0),
+						FortunaTime: time.Unix(4, 0),
+					},
+				}},
+				InitialMinDelayMS: 1_000_000,
+			},
+			wantError: errInitialMinDelayTooLarge,
+		},
+		"initial_min_delay_at_ceiling": {
+			config: ChainConfig{
+				FeeConfig: validFeeConfig,
+				NetworkUpgrades: NetworkUpgrades{
+					SubnetEVMTimestamp: utils.PointerTo[uint64](1),
+					DurangoTimestamp:   utils.PointerTo[uint64](2),
+					EtnaTimestamp:      utils.PointerTo[uint64](3),
+					FortunaTimestamp:   utils.PointerTo[uint64](4),
+				},
+				AvalancheContext: AvalancheContext{SnowCtx: &snow.Context{
+					NetworkUpgrades: upgrade.Config{
+						DurangoTime: time.Unix(2, 0),
+						EtnaTime:    time.Unix(3, 0),
+						FortunaTime: time.Unix(4, 0),
+					},
+				}},
+				InitialMinDelayMS: acp226.InitialDelayExcess.Delay(), // ceiling is inclusive
 			},
 			wantError: nil,
 		},

@@ -5,6 +5,7 @@ package extras
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -111,7 +113,22 @@ type ChainConfig struct {
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
+
+	// InitialMinDelayMS, if non-zero, seeds the ACP-226 minimum block delay (in
+	// milliseconds) into the genesis block instead of the default ~2000ms start.
+	// A fresh chain otherwise begins at ~2000ms and converges toward the node's
+	// min-delay-target by at most ±200 excess/block, taking thousands of blocks
+	// to settle. Seeding the starting value skips that ramp so the chain runs at
+	// its target cadence from block 1.
+	//
+	// DEBUG/BENCHMARK ONLY: intended for networks with a controlled genesis (e.g.
+	// fresh L1s under benchmark). Not for production chains. Bounds enforced in
+	// Verify; set it equal to your min-delay-target. Unset leaves behavior
+	// bit-for-bit identical to a default chain.
+	InitialMinDelayMS uint64 `json:"initialMinDelayMS,omitempty"`
 }
+
+var errInitialMinDelayTooLarge = errors.New("initialMinDelayMS too large")
 
 func (c *ChainConfig) CheckConfigCompatible(newConfig *ethparams.ChainConfig, headNumber *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {
 	if c == nil {
@@ -330,6 +347,14 @@ func (c *ChainConfig) Verify() error {
 	// Verify the network upgrades are internally consistent given the existing chainConfig.
 	if err := c.verifyNetworkUpgrades(c.SnowCtx.NetworkUpgrades); err != nil {
 		return fmt.Errorf("invalid network upgrades: %w", err)
+	}
+
+	// Cap the ACP-226 genesis min-delay seed at the protocol default start
+	// (~2000ms): seeding a slower start than default is pointless, so reject it
+	// rather than silently accept a no-op. (No floor: any nonzero value is >=1ms,
+	// the formula's minimum.)
+	if max := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > max {
+		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, max)
 	}
 
 	return nil
