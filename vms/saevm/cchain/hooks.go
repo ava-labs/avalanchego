@@ -148,30 +148,12 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 	return dynamic.InitialPriceExponent
 }
 
-func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	config := corethparams.GetExtra(h.chainConfig)
-	te, err := targetExponent(config, header)
-	if err != nil {
-		h.ctx.Log.Error("failed to get target exponent",
-			zap.Stringer("blockHash", header.Hash()),
-			zap.Uint64("blockNumber", header.Number.Uint64()),
-			zap.Error(err),
-		)
-		te = 0
-	}
-
-	return te.Target(), gastime.GasPriceConfig{
-		TargetToExcessScaling: 87, // 87 ~= 60 / ln(2)
-		MinPrice:              priceExponent(header).Price(),
-	}
-}
-
 func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
 	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
 		return *te, nil
 	}
-	if !config.IsFortuna(h.Time) || h.Number.Cmp(common.Big0) == 0 {
-		return 0, nil
+	if !config.IsFortuna(h.Time) || h.Number.Sign() == 0 {
+		return dynamic.InitialTargetExponent, nil
 	}
 
 	// The block might be the last synchronous block running with ACP-176.
@@ -180,6 +162,26 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return 0, fmt.Errorf("parsing fee state: %w", err)
 	}
 	return dynamic.TargetExponent(state.TargetExcess), nil
+}
+
+func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+	config := corethparams.GetExtra(h.chainConfig)
+	te, err := targetExponent(config, header)
+	if err != nil {
+		te = dynamic.InitialTargetExponent
+		h.ctx.Log.Error("failed to get target exponent; defaulting to the initial target exponent",
+			zap.Stringer("blockHash", header.Hash()),
+			zap.Uint64("blockNumber", header.Number.Uint64()),
+			zap.Uint64("defaultTargetExponent", uint64(te)),
+			zap.Uint64("defaultGasTarget", uint64(te.Target())),
+			zap.Error(err),
+		)
+	}
+
+	return te.Target(), gastime.GasPriceConfig{
+		TargetToExcessScaling: 87, // 87 ~= 60 / ln(2)
+		MinPrice:              priceExponent(header).Price(),
+	}
 }
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
@@ -321,10 +323,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
-
 	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
-	minPriceExponent := priceExponent(parent).Toward(b.desired.priceExponent)
+	pe := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -346,7 +347,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			TimeMilliseconds: &nowMS,
 			MinDelayExcess:   (*acp226.DelayExcess)(&de),
 			TargetExponent:   &te,
-			MinPriceExponent: &minPriceExponent,
+			MinPriceExponent: &pe,
 		},
 	), nil
 }
@@ -418,10 +419,7 @@ func (b *builder) PotentialEndOfBlockOps(
 	}
 }
 
-var (
-	errMissingBlock = errors.New("missing block")
-	errEmptyBlock   = errors.New("empty block")
-)
+var errMissingBlock = errors.New("missing block")
 
 // ancestorInputIDs returns the set of input IDs of all cross-chain transactions
 // in the block range (h, settled), both exclusive.
@@ -445,6 +443,8 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 	}
 	return s, nil
 }
+
+var errEmptyBlock = errors.New("empty block")
 
 func (b *builder) BuildBlock(
 	header *types.Header,

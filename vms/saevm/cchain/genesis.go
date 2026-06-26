@@ -204,6 +204,9 @@ func (g *genesis) setup(db ethdb.Database, trieConfig *triedb.Config) (_ *types.
 			return nil, errNoHeadHeader
 		}
 		height, timestamp := head.Number.Uint64(), head.Time
+		// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
+		// that bypasses this compatibility check; we need to make such a check
+		// unnecessary for the c-chain.
 		if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
 			return nil, fmt.Errorf("incompatible chain config: %w", err)
 		}
@@ -296,8 +299,11 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	if c.IsHelicon(g.Timestamp) {
-		headerExtra.TargetExponent = new(dynamic.TargetExponent)
+		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
 		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
+
+		// The genesis block is synchronous and thus self-settling, so its settlement
+		// markers are never read.
 		headerExtra.SettledHeight = new(uint64)
 		headerExtra.SettledGasUnix = new(uint64)
 		headerExtra.SettledGasNumerator = new(uint64)

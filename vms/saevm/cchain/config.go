@@ -7,44 +7,88 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
+// config is the operator-supplied node configuration for the C-Chain, decoded
+// from the configBytes passed to [VM.Initialize].
+//
+// TODO(JonathanOppenheimer) enable and wire all remaining configs
 type config struct {
-	// GasTarget is the target gas per second that this node will attempt to use
-	// when creating blocks. If this config is not specified, the node will
-	// default to use the parent block's target gas per second.
+	// Block-building targets
+	// PriceTarget is the minimum gas price (in aAVAX) this node enforces when
+	// building blocks under ACP-283. nil means follow the parent block.
+	PriceTarget *gas.Price `json:"min-price-target,omitempty"`
+	// GasTarget is the target gas per second this node votes for when building
+	// blocks under ACP-176. nil means follow the parent block.
 	GasTarget *gas.Gas `json:"gas-target,omitempty"`
-
 	// DelayTarget is the minimum delay between blocks (in milliseconds) that
 	// this node will attempt to use when creating blocks. If this config is not
 	// specified, the node will default to use the parent block's delay per
 	// second.
 	DelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
-	// PriceTarget is the minimum gas price (in aAVAX) this node enforces when
-	// building blocks under ACP-283. nil means follow the parent block.
-	PriceTarget *gas.Price `json:"min-price-target,omitempty"`
+	// State & trie
+	Pruning        bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
+	CommitInterval uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie; 0 uses the default (4096).
+	// TrieCleanCache       int     `json:"trie-clean-cache"`
+	// SnapshotCache        int     `json:"snapshot-cache"`
+	// AllowMissingTries    bool    `json:"allow-missing-tries"`
+	// PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"`
+	// OfflinePruning       bool    `json:"offline-pruning-enabled"`
+	// StateScheme          string  `json:"state-scheme"`
 
-	// Pruning encodes whether the node should prune intermediate trie nodes.
-	Pruning bool `json:"pruning-enabled"`
+	// Transaction pool
+	LocalTxsEnabled    bool   `json:"local-txs-enabled"`
+	TxPoolAccountSlots uint64 `json:"tx-pool-account-slots"`
+	TxPoolGlobalSlots  uint64 `json:"tx-pool-global-slots"`
 
+	// APIs
+	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
+	// AllowUnprotectedTxs bool   `json:"allow-unprotected-txs"`
+	// BatchRequestLimit   uint64 `json:"batch-request-limit"`
+
+	// State sync
+	// StateSyncEnabled *bool `json:"state-sync-enabled"`
+
+	// Warp
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
+
+	// internalConfig
+}
+
+// // internalConfig holds undocumented, test-only options, kept out of config.md.
+// // Don't set these unless you know what you're doing.
+// type internalConfig struct {
+// 	// State sync
+// 	StateSyncIDs []ids.NodeID `json:"state-sync-ids"`
+// }
+
+// defaultConfig returns the config used when an operator leaves a field unset.
+func defaultConfig() config {
+	return config{
+		Pruning:            true,
+		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
+		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
+	}
 }
 
 // parseConfig parses b as a JSON-encoded [config]. This should be preferred
 // over [json.Unmarshal] because it correctly populates default values.
 func parseConfig(b []byte) (config, error) {
-	c := config{
-		Pruning: true,
-	}
+	c := defaultConfig()
 	if len(b) == 0 {
 		return c, nil
 	}
@@ -53,6 +97,24 @@ func parseConfig(b []byte) (config, error) {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
 	}
 	return c, nil
+}
+
+// saeConfig translates the operator-supplied [config] into the [sae.Config]
+// consumed by [sae.NewVM].
+func (c config) saeConfig(now func() time.Time) sae.Config {
+	mempoolConfig := legacypool.DefaultConfig
+	mempoolConfig.NoLocals = !c.LocalTxsEnabled
+	mempoolConfig.AccountSlots = c.TxPoolAccountSlots
+	mempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
+	return sae.Config{
+		MempoolConfig: mempoolConfig,
+		DBConfig: saedb.Config{
+			TrieDBConfig:       triedb.HashDefaults,
+			Archival:           !c.Pruning,
+			TrieCommitInterval: c.CommitInterval,
+		},
+		Now: now,
+	}
 }
 
 var errParsingWarpMessage = errors.New("parsing warp message")
@@ -87,8 +149,8 @@ func (c config) desired() desiredParams {
 		*d.delayExponent = dynamic.DesiredDelayExponent(*c.DelayTarget)
 	}
 	if c.GasTarget != nil {
-		d.targetExponent = new(dynamic.TargetExponent)
-		*d.targetExponent = dynamic.DesiredTargetExponent(*c.GasTarget)
+		e := dynamic.DesiredTargetExponent(*c.GasTarget)
+		d.targetExponent = &e
 	}
 	if c.PriceTarget != nil {
 		e := dynamic.DesiredPriceExponent(*c.PriceTarget)

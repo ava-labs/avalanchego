@@ -20,6 +20,14 @@ import (
 )
 
 func TestParseConfig(t *testing.T) {
+	// with applies mod to defaultConfig() so each override case asserts that its
+	// JSON field overrides the default while the rest are preserved.
+	with := func(mod func(*config)) config {
+		c := defaultConfig()
+		mod(&c)
+		return c
+	}
+
 	tests := []struct {
 		name    string
 		json    string
@@ -33,40 +41,80 @@ func TestParseConfig(t *testing.T) {
 		},
 		{
 			name: "empty_input",
-			want: config{
-				Pruning: true,
-			},
+			want: defaultConfig(),
 		},
 		{
 			name: "empty_object",
 			json: `{}`,
-			want: config{
-				Pruning: true,
-			},
+			want: defaultConfig(),
+		},
+		{
+			name: "pruning_disabled",
+			json: `{"pruning-enabled":false}`,
+			want: with(func(c *config) { c.Pruning = false }),
+		},
+		{
+			name: "commit_interval",
+			json: `{"commit-interval":128}`,
+			want: with(func(c *config) { c.CommitInterval = 128 }),
+		},
+		{
+			name: "local_txs_enabled",
+			json: `{"local-txs-enabled":true}`,
+			want: with(func(c *config) { c.LocalTxsEnabled = true }),
+		},
+		{
+			name: "tx_pool_slots",
+			json: `{"tx-pool-account-slots":32,"tx-pool-global-slots":9000}`,
+			want: with(func(c *config) {
+				c.TxPoolAccountSlots = 32
+				c.TxPoolGlobalSlots = 9000
+			}),
 		},
 		{
 			name: "price_target",
 			json: `{"min-price-target":1000}`,
-			want: config{
-				PriceTarget: utils.PointerTo(gas.Price(1000)),
-				Pruning:     true,
-			},
+			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(1000)) }),
 		},
 		{
 			// An explicit 0 is a vote for the minimum, distinct from an absent
 			// field, which is no vote.
 			name: "explicit_zero",
 			json: `{"min-price-target":0}`,
-			want: config{
-				PriceTarget: utils.PointerTo(gas.Price(0)),
-				Pruning:     true,
-			},
+			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(0)) }),
+		},
+		{
+			name: "gas_target",
+			json: `{"gas-target":1000}`,
+			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
 		},
 		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
+			want: with(func(c *config) {
+				c.WarpOffChainMessages = []hexutil.Bytes{{0x12, 0x34}}
+			}),
+		},
+		{
+			name: "all_active_fields",
+			json: `{
+				"min-price-target":500,
+				"gas-target":1500,
+				"pruning-enabled":false,
+				"commit-interval":256,
+				"local-txs-enabled":true,
+				"tx-pool-account-slots":8,
+				"tx-pool-global-slots":2048,
+				"warp-off-chain-messages":["0x1234"]
+			}`,
 			want: config{
-				Pruning:              true,
+				PriceTarget:          utils.PointerTo(gas.Price(500)),
+				GasTarget:            utils.PointerTo(gas.Gas(1500)),
+				Pruning:              false,
+				CommitInterval:       256,
+				LocalTxsEnabled:      true,
+				TxPoolAccountSlots:   8,
+				TxPoolGlobalSlots:    2048,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},
@@ -76,9 +124,9 @@ func TestParseConfig(t *testing.T) {
 			t.Logf("parsing config:\n%s", test.json)
 			got, err := parseConfig([]byte(test.json))
 			if diff := testerr.Diff(err, test.wantErr); diff != "" {
-				t.Errorf("ParseConfig(...) error (-want +got)\n%s", diff)
+				t.Errorf("parseConfig(...) error (-want +got)\n%s", diff)
 			}
-			require.Equal(t, test.want, got, "ParseConfig(...)")
+			require.Equal(t, test.want, got, "parseConfig(...)")
 		})
 	}
 }

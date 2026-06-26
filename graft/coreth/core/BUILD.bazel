@@ -54,6 +54,7 @@ go_library(
         "//graft/evm/firewood",
         "//graft/evm/triedb/hashdb",
         "//graft/evm/triedb/pathdb",
+        "//utils",
         "//utils/set",
         "//vms/evm/acp176",
         "//vms/evm/acp226",

@@ -4,6 +4,7 @@
 package cchain
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -11,11 +12,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
@@ -107,6 +113,67 @@ func TestAncestorInputIDs(t *testing.T) {
 	}
 }
 
+func TestTargetExponent(t *testing.T) {
+	const fortunaTime = 100
+
+	tests := []struct {
+		name    string
+		header  *types.Header
+		want    dynamic.TargetExponent
+		wantErr error
+	}{
+		{
+			name: "header_carries_exponent",
+			header: customtypes.WithHeaderExtra(
+				&types.Header{Number: big.NewInt(1)},
+				&customtypes.HeaderExtra{TargetExponent: utils.PointerTo[dynamic.TargetExponent](42)},
+			),
+			want: 42,
+		},
+		{
+			name:   "no_field_pre_fortuna",
+			header: &types.Header{Time: fortunaTime - 1, Number: big.NewInt(1)},
+			want:   dynamic.InitialTargetExponent,
+		},
+		{
+			name:   "no_field_genesis",
+			header: &types.Header{Time: fortunaTime, Number: big.NewInt(0)},
+			want:   dynamic.InitialTargetExponent,
+		},
+		{
+			name: "no_field_fortuna_legacy_state",
+			header: &types.Header{
+				Time:   fortunaTime,
+				Number: big.NewInt(1),
+				Extra:  (&acp176.State{TargetExcess: 5_000}).Bytes(),
+			},
+			want: 5_000,
+		},
+		{
+			name: "no_field_fortuna_invalid_extra",
+			header: &types.Header{
+				Time:   fortunaTime,
+				Number: big.NewInt(1),
+				Extra:  []byte{0x01},
+			},
+			wantErr: acp176.ErrStateInsufficientLength,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fortuna := &extras.ChainConfig{
+				NetworkUpgrades: extras.NetworkUpgrades{
+					FortunaTimestamp: utils.PointerTo[uint64](fortunaTime),
+				},
+			}
+			got, err := targetExponent(fortuna, tt.header)
+			require.ErrorIs(t, err, tt.wantErr, "targetExponent()")
+			assert.Equal(t, tt.want, got, "targetExponent()")
+		})
+	}
+}
+
 // Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
 // writes into the header, and returns the zero marker when the header carries none.
 func TestSettledBy(t *testing.T) {
@@ -124,9 +191,9 @@ func TestSettledBy(t *testing.T) {
 
 		block, err := hooks.BuildBlock(
 			&types.Header{},
-			nil,
-			nil,
-			nil,
+			nil, // blockContext
+			nil, // ethTxs
+			nil, // receipts
 			[]*hookTx{htx},
 			settled,
 		)
