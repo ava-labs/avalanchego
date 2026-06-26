@@ -80,6 +80,7 @@ go_library(
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/sae",
+        "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
         "//vms/saevm/types",
         "//x/blockdb",
