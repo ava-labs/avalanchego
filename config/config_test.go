@@ -773,29 +773,20 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	}
 }
 
-// TestPrimaryNetworkProposerWindowIsAlwaysDefault guards the invariant that the
-// per-Subnet proposerWindowMilliseconds setting can never alter the primary
-// network (P/C/X). Two independent layers enforce this:
-//
-//  1. The primary network cannot be a tracked Subnet, so a user-supplied subnet
-//     config can never be routed to it (getTrackedSubnets rejects its ID).
-//  2. Its config is always rebuilt from getPrimaryNetworkConfig, which pins the
-//     window to the default regardless of viper contents.
-//
-// If either layer regresses, an operator tuning an L1's window could
-// inadvertently fork the node off Mainnet/Fuji.
+// TestPrimaryNetworkProposerWindowIsAlwaysDefault guards that the per-Subnet
+// proposerWindowMilliseconds setting can never alter the primary network (P/C/X)
+// and fork the node off Mainnet/Fuji. Two layers enforce this, checked below.
 func TestPrimaryNetworkProposerWindowIsAlwaysDefault(t *testing.T) {
 	require := require.New(t)
 
 	defaultWindowMS := uint64(proposervm.DefaultWindowDuration / time.Millisecond)
 
-	// Layer 2: the primary network's window is pinned to the default and never
+	// Layer 1: the primary network's window is pinned to the default and never
 	// reads user input.
 	require.Equal(defaultWindowMS, getPrimaryNetworkConfig(setupViperFlags()).ProposerWindowMilliseconds)
 
-	// Layer 1: even if an operator tries to track the primary network (the only
-	// way a subnet config could reach it), it is rejected before any config is
-	// read, so proposerWindowMilliseconds has no path to the primary network.
+	// Layer 2: tracking the primary network (the only way a subnet config could
+	// reach it) is rejected before any config is read.
 	v := setupViperFlags()
 	v.Set(TrackSubnetsKey, constants.PrimaryNetworkID.String())
 	_, err := getTrackedSubnets(v)
