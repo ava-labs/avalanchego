@@ -162,12 +162,14 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 	config := corethparams.GetExtra(h.chainConfig)
 	te, err := targetExponent(config, header)
 	if err != nil {
-		h.ctx.Log.Error("failed to get target exponent",
+		te = dynamic.InitialTargetExponent
+		h.ctx.Log.Error("failed to get target exponent; defaulting to the initial target exponent",
 			zap.Stringer("blockHash", header.Hash()),
 			zap.Uint64("blockNumber", header.Number.Uint64()),
+			zap.Uint64("defaultTargetExponent", uint64(te)),
+			zap.Uint64("defaultGasTarget", uint64(te.Target())),
 			zap.Error(err),
 		)
-		te = dynamic.InitialTargetExponent
 	}
 
 	return te.Target(), gastime.GasPriceConfig{
