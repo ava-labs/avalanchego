@@ -10,6 +10,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestPostTransitionBlock verifies that blocks built after the transition are
+// handled by the post-transition chain unwrapped: they verify and accept even
+// though their parent is past the transition time, which a pre-transition block
+// could not (see TestTransitionBlockChildren).
+func TestPostTransitionBlock(t *testing.T) {
+	for _, mode := range verifyModes {
+		t.Run(mode.String(), func(t *testing.T) {
+			sut := newSUT(t, withBlocksUntilTransition(0))
+			ctx := t.Context()
+
+			sut.BuildVerifyAccept(t, ctx, mode) // should be built unwrapped
+		})
+	}
+}
+
 func TestTransitionBlockChildren(t *testing.T) {
 	for _, mode := range verifyModes {
 		t.Run(mode.String(), func(t *testing.T) {
@@ -39,10 +54,7 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 			sut := newSUT(t, withBlocksUntilTransition(2))
 			ctx := t.Context()
 
-			blk, err := sut.BuildBlock(ctx)
-			require.NoError(t, err)
-			require.NoError(t, verifyBlock(ctx, blk, mode))
-			require.NoError(t, blk.Accept(ctx))
+			sut.BuildVerifyAccept(t, ctx, mode)
 
 			version, err := sut.Version(ctx)
 			require.NoError(t, err)
@@ -68,7 +80,7 @@ func TestRejectIsNoopAfterTransition(t *testing.T) {
 	loserBlock := sut.pre.tip
 
 	sut.pre.tip = genesis
-	sut.BuildVerifyAccept(t, ctx) // Trigger the transition with a block that conflicts loser.
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // Trigger the transition with a block that conflicts loser.
 
 	// Rejecting the loser must be a noop, not a fatal error.
 	loserBlock.RejectV = errors.New("reject forwarded to shut-down pre-transition chain")

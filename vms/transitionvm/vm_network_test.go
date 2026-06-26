@@ -52,7 +52,7 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 			require.NoError(t, sut.pre.sendAppRequest(ctx, nodeID, responseID))
 			require.NoError(t, sut.pre.sendAppRequest(ctx, nodeID, failureID))
 
-			sut.BuildVerifyAccept(t, ctx)
+			sut.BuildVerifyAccept(t, ctx, verifyNoContext)
 
 			t.Run("AppResponse", func(t *testing.T) {
 				delivered := false
@@ -108,7 +108,7 @@ func TestTransitionForwardsConnections(t *testing.T) {
 		got[nodeID] = v
 		return nil
 	}
-	sut.BuildVerifyAccept(t, ctx) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
 	require.Equal(t, want, got)
 }

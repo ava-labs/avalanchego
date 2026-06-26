@@ -62,7 +62,7 @@ func TestHTTPHandlers(t *testing.T) {
 		"pre-only": {wantCode: http.StatusOK, wantBody: "pre-only"},
 	})
 
-	sut.BuildVerifyAccept(t, ctx) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
 	assertRoutes("post-transition", responses{
 		"shared":   {wantCode: http.StatusOK, wantBody: "post-shared"},                // rebound

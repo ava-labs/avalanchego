@@ -101,6 +101,10 @@ type fakeVM struct {
 	appSender common.AppSender
 	// consensusState is the most recent state passed to SetState.
 	consensusState snow.State
+	// preference is the most recent block ID passed to SetPreference.
+	preference ids.ID
+	// chainCtx is the context captured in Initialize.
+	chainCtx *snow.Context
 	// handlers is the set of HTTP handlers returned by CreateHandlers.
 	handlers map[string]http.Handler
 	// events is delivered by WaitForEvent, which otherwise blocks until its
@@ -122,7 +126,8 @@ func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
 	}
 }
 
-func (vm *fakeVM) Initialize(_ context.Context, _ *snow.Context, _ database.Database, _, _, _ []byte, _ []*common.Fx, appSender common.AppSender) error {
+func (vm *fakeVM) Initialize(_ context.Context, chainCtx *snow.Context, _ database.Database, _, _, _ []byte, _ []*common.Fx, appSender common.AppSender) error {
+	vm.chainCtx = chainCtx
 	vm.tip = vm.state.lastAccepted
 	vm.appSender = appSender
 	return nil
@@ -136,6 +141,11 @@ func (vm *fakeVM) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 
 func (vm *fakeVM) SetState(_ context.Context, state snow.State) error {
 	vm.consensusState = state
+	return nil
+}
+
+func (vm *fakeVM) SetPreference(_ context.Context, blkID ids.ID) error {
+	vm.preference = blkID
 	return nil
 }
 
@@ -198,12 +208,12 @@ type SUT struct {
 
 // BuildVerifyAccept builds a block, verifies it, and accepts it. Accepting the
 // block that reaches the transition time triggers the transition.
-func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context) {
+func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode verifyMode) {
 	t.Helper()
 
 	blk, err := s.BuildBlock(ctx)
 	require.NoError(t, err)
-	require.NoError(t, blk.Verify(ctx))
+	require.NoError(t, verifyBlock(ctx, blk, mode))
 	require.NoError(t, blk.Accept(ctx))
 }
 
@@ -347,11 +357,38 @@ func TestTransition(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "pre", version)
 
-	sut.BuildVerifyAccept(t, ctx) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
 	version, err = sut.Version(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "post", version)
+}
+
+// TestTransitionSetsPreference verifies that transitioning sets the
+// post-transition chain's preference to the last accepted block, so consensus
+// resumes from the right place.
+func TestTransitionSetsPreference(t *testing.T) {
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
+
+	require.Equal(t, sut.post.state.lastAccepted.ID(), sut.post.preference)
+}
+
+// TestInitializeIsolatesContext verifies that the post-transition chain is
+// initialized with its own context: a separate metrics gatherer, isolated from
+// the pre-transition chain to avoid double-registration, while still carrying
+// the shared chain values.
+func TestInitializeIsolatesContext(t *testing.T) {
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition, initializing post
+
+	require.NotSame(t, sut.pre.chainCtx, sut.post.chainCtx)
+	require.NotSame(t, sut.pre.chainCtx.Metrics, sut.post.chainCtx.Metrics)
+	require.Equal(t, sut.pre.chainCtx.ChainID, sut.post.chainCtx.ChainID)
 }
 
 // TestRestart verifies that the VM resumes on the correct chain after a node
@@ -363,7 +400,7 @@ func TestRestart(t *testing.T) {
 	ctx := t.Context()
 
 	// Accept one block; the VM stays on the pre-transition chain.
-	sut.BuildVerifyAccept(t, ctx)
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext)
 
 	// Restarting before the transition resumes on the pre-transition chain.
 	sut = sut.restart(t)
@@ -372,7 +409,7 @@ func TestRestart(t *testing.T) {
 	require.Equal(t, "pre", version)
 
 	// Accept the block that reaches the transition time.
-	sut.BuildVerifyAccept(t, ctx)
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext)
 	version, err = sut.Version(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "post", version)
