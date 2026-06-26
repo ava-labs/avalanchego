@@ -61,7 +61,7 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 					return nil
 				}
 				sut.post.VM.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error {
-					require.FailNow(t, "post-transition chain received a pre-transition response")
+					t.Fatal("post-transition chain received a pre-transition response")
 					return nil
 				}
 				require.NoError(t, sut.AppResponse(ctx, nodeID, responseID, nil))
@@ -75,7 +75,7 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 					return nil
 				}
 				sut.post.VM.AppRequestFailedF = func(context.Context, ids.NodeID, uint32, *common.AppError) error {
-					require.FailNow(t, "post-transition chain received a pre-transition app error")
+					t.Fatal("post-transition chain received a pre-transition app error")
 					return nil
 				}
 				require.NoError(t, sut.AppRequestFailed(ctx, nodeID, failureID, common.ErrUndefined))

@@ -173,10 +173,10 @@ func (vm *fakeVM) LastAccepted(context.Context) (ids.ID, error) {
 }
 
 func (vm *fakeVM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-	if blk, ok := vm.state.blocks[blkID]; ok {
+	if blk, ok := vm.verified[blkID]; ok {
 		return blk, nil
 	}
-	if blk, ok := vm.verified[blkID]; ok {
+	if blk, ok := vm.state.blocks[blkID]; ok {
 		return blk, nil
 	}
 	return nil, database.ErrNotFound
@@ -201,9 +201,8 @@ func (*fakeVM) BuildBlockWithContext(context.Context, *block.Context) (snowman.B
 // observe outbound messages.
 type SUT struct {
 	*VM
-	pre       *fakeVM
-	post      *fakeVM
-	appSender *enginetest.Sender
+	pre  *fakeVM
+	post *fakeVM
 }
 
 // BuildVerifyAccept builds a block, verifies it, and accepts it. Accepting the
@@ -255,9 +254,7 @@ type sutOption = options.Option[sutConfig]
 // withBlocksUntilTransition sets how many blocks must be built on genesis
 // before one reaches the transition time. Accepting the nth triggers it.
 func withBlocksUntilTransition(n int) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.transitionTime = snowmantest.GenesisTimestamp.Add(time.Duration(n) * blockInterval)
-	})
+	return withTransitionTime(snowmantest.GenesisTimestamp.Add(time.Duration(n) * blockInterval))
 }
 
 // withDatabase, withState, and withTransitionTime reuse a prior VM's persisted
@@ -318,10 +315,9 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		appSender,
 	))
 	return &SUT{
-		VM:        vm,
-		pre:       pre,
-		post:      post,
-		appSender: appSender,
+		VM:   vm,
+		pre:  pre,
+		post: post,
 	}
 }
 
