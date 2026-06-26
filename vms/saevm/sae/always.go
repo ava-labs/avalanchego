@@ -66,7 +66,7 @@ func (vm *SinceGenesis[_]) Initialize(
 	if err != nil {
 		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
 	}
-	canonicaliseLastSynchronous(db, hash)
+	finalizeLastSynchronous(db, hash)
 
 	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, appSender)
 	if err != nil {
@@ -76,11 +76,9 @@ func (vm *SinceGenesis[_]) Initialize(
 	return nil
 }
 
-// canonicaliseLastSynchronous writes the genesis block's hash
+// finalizeLastSynchronous writes the genesis block's hash
 // as finalized in the case there wasn't anything already written.
-func canonicaliseLastSynchronous(db ethdb.Database, hash ethcommon.Hash) {
-	// If any other block has been accepted then the last synchronous block
-	// must have been canonicalised in a previous initialisation.
+func finalizeLastSynchronous(db ethdb.Database, hash ethcommon.Hash) {
 	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
 		rawdb.WriteFinalizedBlockHash(db, hash)
 	}
