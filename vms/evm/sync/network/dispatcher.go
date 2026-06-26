@@ -32,24 +32,20 @@ type Dispatcher[Req, Resp proto.Message] struct {
 	peers  *p2p.PeerTracker
 }
 
-// NewDispatcher returns a typed [Dispatcher] over client and peers.
-// Build client via [NewClient] in production.
+// NewDispatcher returns a [Dispatcher] bound to handlerID on n.
 func NewDispatcher[Req, Resp proto.Message](
-	client *p2p.Client,
+	n *p2p.Network,
+	handlerID uint64,
 	peers *p2p.PeerTracker,
 ) *Dispatcher[Req, Resp] {
-	return &Dispatcher[Req, Resp]{client: client, peers: peers}
+	return &Dispatcher[Req, Resp]{
+		client: n.NewClient(handlerID, noopSampler{}),
+		peers:  peers,
+	}
 }
 
-// NewClient returns a [p2p.Client] at handlerID on n. The sampler is a
-// no-op because [Dispatcher] always picks an explicit peer.
-func NewClient(n *p2p.Network, handlerID uint64) *p2p.Client {
-	return n.NewClient(handlerID, noopSampler{})
-}
-
-// Send selects a peer and forwards req to it. Outcome is nil on error.
-// With no peer available it returns errNoPeers unscored, otherwise it
-// scores per [SendTo].
+// Send picks a peer and forwards to [SendTo], or returns errNoPeers
+// (unscored) when none is available.
 func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*Outcome, error) {
 	nodeID, ok := d.peers.SelectPeer()
 	if !ok {
@@ -58,9 +54,9 @@ func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*
 	return d.SendTo(ctx, nodeID, req, resp)
 }
 
-// SendTo sends req to nodeID. Outcome is nil on error. The peer is
-// scored a failure only after the request is registered, so a pre-send
-// marshal or context error returns unscored.
+// SendTo sends req to nodeID. A pre-send context or marshal error
+// returns unscored, any later failure scores the peer and returns a nil
+// Outcome.
 func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -112,11 +108,10 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 	}
 }
 
-// Outcome lets the caller score a peer after validating its response.
-// At least one of Success or Failure must be called. Both are
-// idempotent, so defer outcome.Failure() plus outcome.Success() is
-// safe. Forgetting both leaves an unpaired RegisterRequest on the
-// [p2p.PeerTracker].
+// Outcome scores a peer after the caller validates its response. Call at
+// least one of Success or Failure. Both are idempotent, so a pessimistic
+// defer Failure() with Success() on the happy path is safe. Forgetting
+// both leaks the peer's RegisterRequest.
 type Outcome struct {
 	peers     *p2p.PeerTracker
 	nodeID    ids.NodeID
@@ -136,9 +131,9 @@ func (o *Outcome) Failure() {
 
 var _ p2p.NodeSampler = noopSampler{}
 
-// noopSampler is a no-op [p2p.NodeSampler]. Required because
-// [p2p.Network.NewClient] needs a non-nil sampler, but [Dispatcher]
-// always picks an explicit peer so Sample never runs.
+// noopSampler satisfies [p2p.Network.NewClient]'s non-nil sampler
+// requirement. [Dispatcher] always picks an explicit peer, so Sample
+// never runs.
 type noopSampler struct{}
 
 func (noopSampler) Sample(context.Context, int) []ids.NodeID { return nil }

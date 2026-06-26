@@ -14,10 +14,11 @@ import (
 // is the caller's responsibility.
 type Client = network.Dispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
 
-// NewClient binds a [Client] at [p2p.EVMLeafsRequestHandlerID] on n.
+// NewClient binds a [Client] at [p2p.EVMLeafRequestHandlerID] on n.
 func NewClient(n *p2p.Network, peers *p2p.PeerTracker) *Client {
 	return network.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		network.NewClient(n, p2p.EVMLeafsRequestHandlerID),
+		n,
+		p2p.EVMLeafRequestHandlerID,
 		peers,
 	)
 }

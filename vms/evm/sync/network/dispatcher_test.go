@@ -24,47 +24,35 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func TestDispatcher_SendTo(t *testing.T) {
-	ctx := t.Context()
+func TestDispatcher_Send(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1, 2, 3}}}
 	wantBytes, err := proto.Marshal(want)
 	require.NoError(t, err)
-	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		t, ctx, nodeID, echoHandler(wantBytes), newTestPeerTracker(t, nodeID),
-	)
-
-	got := &syncpb.GetLeafResponse{}
-	outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, got)
-	require.NoError(t, err)
-	require.NotNil(t, outcome)
-	outcome.Success()
-	require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
-}
-
-func TestDispatcher_FailurePaths(t *testing.T) {
-	nodeID := ids.GenerateTestNodeID()
 
 	tests := []struct {
 		name    string
 		peers   []ids.NodeID
 		handler p2p.Handler
+		want    *syncpb.GetLeafResponse
 		wantErr error
 	}{
+		{
+			name:    "round trip",
+			peers:   []ids.NodeID{nodeID},
+			handler: echoHandler(wantBytes),
+			want:    want,
+		},
 		{
 			name:    "no peer to send to",
 			handler: p2p.NoOpHandler{},
 			wantErr: errNoPeers,
 		},
 		{
-			name:  "handler returns AppError",
-			peers: []ids.NodeID{nodeID},
-			handler: p2p.TestHandler{
-				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-					return nil, &common.AppError{Code: 42, Message: "boom"}
-				},
-			},
+			name:    "handler returns AppError",
+			peers:   []ids.NodeID{nodeID},
+			handler: errorHandler(),
 			wantErr: errHandlerFailed,
 		},
 		{
@@ -78,13 +66,23 @@ func TestDispatcher_FailurePaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
+			_, tracker := newTestTracker(t, tt.peers...)
 			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-				t, ctx, nodeID, tt.handler, newTestPeerTracker(t, tt.peers...),
+				t, ctx, nodeID, tt.handler, tracker,
 			)
-			outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
-			require.ErrorIs(t, err, tt.wantErr)
-			// Transport failures auto-register, caller gets no Outcome.
-			require.Nil(t, outcome)
+
+			got := &syncpb.GetLeafResponse{}
+			outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, got)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				// Failures self-register, the caller gets no Outcome.
+				require.Nil(t, outcome)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, outcome)
+			require.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()))
 		})
 	}
 }
@@ -104,67 +102,113 @@ func TestDispatcher_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
+	_, tracker := newTestTracker(t, nodeID)
 	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		t, ctx, nodeID, handler, newTestPeerTracker(t, nodeID),
+		t, ctx, nodeID, handler, tracker,
 	)
 	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, outcome)
 }
 
-// Exercises the canonical caller pattern: defer outcome.Failure() as
-// a pessimistic default, then outcome.Success() on the happy path.
-// Idempotency makes Success win. The deferred Failure that fires
-// afterward is a no-op, and the peer stays in responsivePeers.
-//
-// NOTE: Builds its own [p2p.PeerTracker] (instead of using
-// [newTestPeerTracker]) so the test can read the responsive-peers
-// gauge from the registry.
-func TestOutcome_DeferFailureAndSuccess(t *testing.T) {
+// Cancel mid-flight (parked in SendTo's select) returns context.Canceled
+// and de-scores the peer. Pre-send cancel is TestDispatcher_ContextCancelled.
+func TestDispatcher_CancelInFlight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
-	ctx := t.Context()
-	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1}}}
-	wantBytes, err := proto.Marshal(want)
-	require.NoError(t, err)
+	reqCtx, cancel := context.WithCancel(t.Context())
 
-	reg, tracker := newRegisteredTracker(t, nodeID)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	defer close(release)
+	handler := p2p.TestHandler{
+		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+			close(entered)
+			<-release
+			return nil, nil
+		},
+	}
+
+	reg, tracker := newTestTracker(t, nodeID)
+	seedResponsive(t, reg, tracker, nodeID)
 	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		t, ctx, nodeID, echoHandler(wantBytes), tracker,
+		t, t.Context(), nodeID, handler, tracker,
 	)
 
-	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
-	require.NoError(t, err)
-	require.NotNil(t, outcome)
-
-	func() {
-		defer outcome.Failure()
-		outcome.Success()
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := c.SendTo(reqCtx, nodeID, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+		errCh <- err
 	}()
 
-	require.Equal(t, 1.0, gaugeValue(t, reg, "test_peer_tracker_num_responsive_peers"))
+	<-entered
+	cancel()
+
+	require.ErrorIs(t, <-errCh, context.Canceled)
+	require.Equal(t, 0.0, responsivePeers(t, reg))
 }
 
-func TestOutcome_DeferFailureOnly(t *testing.T) {
-	nodeID := ids.GenerateTestNodeID()
-	ctx := t.Context()
-	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1}}}
-	wantBytes, err := proto.Marshal(want)
+// Success scores the peer responsive, failure de-scores it (via
+// Outcome.Failure or SendTo's deferred RegisterFailure). De-score rows
+// seed responsive first so the drop to 0 is a real transition.
+func TestDispatcher_PeerScoring(t *testing.T) {
+	okBytes, err := proto.Marshal(&syncpb.GetLeafResponse{})
 	require.NoError(t, err)
 
-	reg, tracker := newRegisteredTracker(t, nodeID)
-	c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-		t, ctx, nodeID, echoHandler(wantBytes), tracker,
-	)
+	tests := []struct {
+		name      string
+		seed      bool
+		handler   p2p.Handler
+		wantErr   error
+		score     func(*Outcome)
+		wantPeers float64
+	}{
+		{
+			// defer Failure() is the pessimistic default, Success() wins.
+			name:      "success scores responsive",
+			handler:   echoHandler(okBytes),
+			score:     func(o *Outcome) { defer o.Failure(); o.Success() },
+			wantPeers: 1,
+		},
+		{
+			name:      "outcome failure de-scores",
+			seed:      true,
+			handler:   echoHandler(okBytes),
+			score:     func(o *Outcome) { o.Failure() },
+			wantPeers: 0,
+		},
+		{
+			name:      "handler error de-scores",
+			seed:      true,
+			handler:   errorHandler(),
+			wantErr:   errHandlerFailed,
+			wantPeers: 0,
+		},
+	}
 
-	outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
-	require.NoError(t, err)
-	require.NotNil(t, outcome)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
+			nodeID := ids.GenerateTestNodeID()
+			reg, tracker := newTestTracker(t, nodeID)
+			if tt.seed {
+				seedResponsive(t, reg, tracker, nodeID)
+			}
+			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+				t, ctx, nodeID, tt.handler, tracker,
+			)
 
-	// Validation fails, no Success call. The deferred Failure fires
-	// and the peer drops out of responsivePeers.
-	defer outcome.Failure()
+			outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.Nil(t, outcome)
+			} else {
+				require.NoError(t, err)
+				tt.score(outcome)
+			}
 
-	require.Equal(t, 0.0, gaugeValue(t, reg, "test_peer_tracker_num_responsive_peers"))
+			require.Equal(t, tt.wantPeers, responsivePeers(t, reg))
+		})
+	}
 }
 
 func echoHandler(b []byte) p2p.Handler {
@@ -175,14 +219,32 @@ func echoHandler(b []byte) p2p.Handler {
 	}
 }
 
-func newTestPeerTracker(t *testing.T, peers ...ids.NodeID) *p2p.PeerTracker {
+func errorHandler() p2p.Handler {
+	return p2p.TestHandler{
+		AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+			return nil, &common.AppError{Code: 42, Message: "boom"}
+		},
+	}
+}
+
+// seedResponsive marks nodeID responsive so a later de-score is a real
+// 1 -> 0 transition.
+func seedResponsive(t *testing.T, reg *prometheus.Registry, tracker *p2p.PeerTracker, nodeID ids.NodeID) {
 	t.Helper()
-	tracker, err := p2p.NewPeerTracker(logging.NoLog{}, "test", prometheus.NewRegistry(), nil, nil)
+	tracker.RegisterRequest(nodeID)
+	tracker.RegisterResponse(nodeID, 1)
+	require.Equal(t, 1.0, responsivePeers(t, reg))
+}
+
+func newTestTracker(t *testing.T, peers ...ids.NodeID) (*prometheus.Registry, *p2p.PeerTracker) {
+	t.Helper()
+	reg := prometheus.NewRegistry()
+	tracker, err := p2p.NewPeerTracker(logging.NoLog{}, "test_peer_tracker", reg, nil, nil)
 	require.NoError(t, err)
 	for _, nodeID := range peers {
 		tracker.Connected(nodeID, &version.Application{Major: 99})
 	}
-	return tracker
+	return reg, tracker
 }
 
 func newTestDispatcher[Req, Resp proto.Message](
@@ -193,21 +255,16 @@ func newTestDispatcher[Req, Resp proto.Message](
 	peers *p2p.PeerTracker,
 ) *Dispatcher[Req, Resp] {
 	t.Helper()
-	return NewDispatcher[Req, Resp](p2ptest.NewSelfClient(t, ctx, nodeID, h), peers)
+	return &Dispatcher[Req, Resp]{
+		client: p2ptest.NewSelfClient(t, ctx, nodeID, h),
+		peers:  peers,
+	}
 }
 
-func newRegisteredTracker(t *testing.T, nodeID ids.NodeID) (*prometheus.Registry, *p2p.PeerTracker) {
+// responsivePeers reads the num_responsive_peers gauge from reg.
+func responsivePeers(t *testing.T, reg *prometheus.Registry) float64 {
 	t.Helper()
-	reg := prometheus.NewRegistry()
-	tracker, err := p2p.NewPeerTracker(logging.NoLog{}, "test_peer_tracker", reg, nil, nil)
-	require.NoError(t, err)
-	tracker.Connected(nodeID, &version.Application{Major: 99})
-	return reg, tracker
-}
-
-// gaugeValue reads a single named gauge from reg.
-func gaugeValue(t *testing.T, reg *prometheus.Registry, name string) float64 {
-	t.Helper()
+	const name = "test_peer_tracker_num_responsive_peers"
 	mfs, err := reg.Gather()
 	require.NoError(t, err)
 	for _, mf := range mfs {

@@ -16,7 +16,8 @@ type Client = network.Dispatcher[*syncpb.GetBlockRequest, *syncpb.GetBlockRespon
 // NewClient binds a [Client] at [p2p.EVMBlockRequestHandlerID] on n.
 func NewClient(n *p2p.Network, peers *p2p.PeerTracker) *Client {
 	return network.NewDispatcher[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse](
-		network.NewClient(n, p2p.EVMBlockRequestHandlerID),
+		n,
+		p2p.EVMBlockRequestHandlerID,
 		peers,
 	)
 }
