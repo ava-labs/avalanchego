@@ -91,14 +91,27 @@ tasks:
     cmd: '{{.NIX_RUN}} ../evm/scripts/lint.sh'
 
   lint-all:
-    desc: Runs all lint checks in parallel
+    desc: Runs all lint checks
+    cmds:
+      # Phase 1: Read-only checks that are safe to parallelize.
+      - task: _lint-readonly-parallel
+      # Phase 2: Tree-mutating checks must be sequential to avoid races
+      # while rewriting generated files and verifying a clean git state.
+      - task: _lint-tree-mutating-serial
+
+  _lint-readonly-parallel:
+    internal: true
     deps:
       - lint
       - shellcheck
-      - check-generate-codec
-      - check-generate-mocks
-      - check-generate-rlp
-      - check-generate-bindings
+
+  _lint-tree-mutating-serial:
+    internal: true
+    cmds:
+      - task: check-generate-codec
+      - task: check-generate-mocks
+      - task: check-generate-rlp
+      - task: check-generate-bindings
 
   lint-all-ci:
     desc: Runs all lint checks one-by-one
