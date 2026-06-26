@@ -77,7 +77,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			return nil, err
 		}
 
-		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil {
+		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil { // if NO error
 			return b, nil
 		}
 
@@ -168,7 +168,7 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				}
 				chain = append(chain, parent)
 
-				if !b.Settled() {
+				if !b.Settled() && !parent.Synchronous() {
 					continue
 				}
 				if err := parent.MarkSettled(blackhole); err != nil {
