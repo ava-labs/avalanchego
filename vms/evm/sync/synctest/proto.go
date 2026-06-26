@@ -12,8 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
-
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 // FakeResponder is a programmable [handlers.Responder] fake. It
@@ -29,13 +27,6 @@ func (s *FakeResponder[Req, Resp]) Respond(_ context.Context, _ ids.NodeID, req 
 	s.GotReq = req
 	return s.Resp, s.Err
 }
-
-// Per-RPC [FakeResponder] aliases.
-type (
-	FakeBlockResponder = FakeResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
-	FakeCodeResponder  = FakeResponder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
-	FakeLeafResponder  = FakeResponder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
-)
 
 // MustMarshal calls [proto.Marshal] on m and fails the test on error.
 func MustMarshal(t *testing.T, m proto.Message) []byte {
