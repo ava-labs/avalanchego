@@ -419,6 +419,94 @@ func TestTimeToSlot(t *testing.T) {
 	}
 }
 
+// The window duration is consensus-critical: the per-Subnet
+// proposerWindowMilliseconds setting flows into New as [windowDuration]. The
+// tests above all pass DefaultWindowDuration, so a silent revert to the constant
+// (or a dropped <= 0 fallback) would not fail any of them. The cases below pin
+// that a non-default window actually scales the slot math and that the fallback
+// holds.
+
+func TestMinDelayForProposerCustomWindow(t *testing.T) {
+	require := require.New(t)
+
+	// A deliberately non-round, sub-second window so that no slot-index multiple
+	// of it can coincide with the DefaultWindowDuration (5s) result.
+	const customWindow = 137 * time.Millisecond
+
+	validatorIDs, vdrState := makeValidators(t, 10)
+	w := New(vdrState, subnetID, fixedChainID, customWindow, &logging.NoLog{})
+
+	var (
+		dummyCtx            = t.Context()
+		chainHeight  uint64 = 1
+		pChainHeight uint64 = 0
+		slot         uint64 = 0
+	)
+
+	// Identical fixtures to TestMinDelayForProposer: slot assignment depends only
+	// on validator sampling, not on the window, so the per-node slot indices are
+	// the same and only the multiplier (the window) differs.
+	expectedDelays := map[ids.NodeID]time.Duration{
+		validatorIDs[0]:          1 * customWindow,
+		validatorIDs[1]:          15 * customWindow,
+		validatorIDs[2]:          0 * customWindow,
+		validatorIDs[3]:          5 * customWindow,
+		validatorIDs[4]:          10 * customWindow,
+		validatorIDs[5]:          18 * customWindow,
+		validatorIDs[6]:          12 * customWindow,
+		validatorIDs[7]:          3 * customWindow,
+		validatorIDs[8]:          23 * customWindow,
+		validatorIDs[9]:          2 * customWindow,
+		ids.GenerateTestNodeID(): MaxLookAheadSlots * customWindow,
+	}
+
+	for nodeID, expectedDelay := range expectedDelays {
+		delay, err := w.MinDelayForProposer(dummyCtx, chainHeight, pChainHeight, nodeID, slot)
+		require.NoError(err)
+		require.Equal(expectedDelay, delay)
+	}
+}
+
+func TestTimeToSlotCustomWindow(t *testing.T) {
+	const customWindow = 137 * time.Millisecond
+
+	parentTime := time.Now()
+	tests := []struct {
+		timeOffset   time.Duration
+		expectedSlot uint64
+	}{
+		{timeOffset: -customWindow, expectedSlot: 0},
+		{timeOffset: 0, expectedSlot: 0},
+		{timeOffset: customWindow - time.Nanosecond, expectedSlot: 0},
+		{timeOffset: customWindow, expectedSlot: 1},
+		{timeOffset: 2 * customWindow, expectedSlot: 2},
+		{timeOffset: 10 * customWindow, expectedSlot: 10},
+	}
+	w := New(makeValidatorState(t, nil), subnetID, randomChainID, customWindow, &logging.NoLog{})
+	for _, test := range tests {
+		t.Run(test.timeOffset.String(), func(t *testing.T) {
+			slot := w.TimeToSlot(parentTime, parentTime.Add(test.timeOffset))
+			require.Equal(t, test.expectedSlot, slot)
+		})
+	}
+}
+
+func TestNewWindowDurationFallback(t *testing.T) {
+	require := require.New(t)
+
+	parentTime := time.Now()
+	// A non-positive window must fall back to DefaultWindowDuration. Beyond
+	// honoring the documented default, the fallback is what keeps TimeToSlot from
+	// dividing by zero (now.Sub(start) / w.windowDuration); if the guard in New is
+	// ever removed, these calls panic instead of silently misbehaving.
+	for _, windowDuration := range []time.Duration{0, -time.Second} {
+		w := New(makeValidatorState(t, nil), subnetID, randomChainID, windowDuration, &logging.NoLog{})
+		require.Equal(uint64(0), w.TimeToSlot(parentTime, parentTime.Add(DefaultWindowDuration-time.Nanosecond)))
+		require.Equal(uint64(1), w.TimeToSlot(parentTime, parentTime.Add(DefaultWindowDuration)))
+		require.Equal(uint64(2), w.TimeToSlot(parentTime, parentTime.Add(2*DefaultWindowDuration)))
+	}
+}
+
 // Ensure that the proposer distribution is within 3 standard deviations of the
 // expected value assuming a truly random binomial distribution.
 func TestProposerDistribution(t *testing.T) {
