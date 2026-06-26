@@ -17,8 +17,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/triedb"
 
 	_ "embed"
 
@@ -35,8 +33,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -90,14 +88,19 @@ func (vm *VM) Initialize(
 
 	vm.ctx = snowCtx
 
-	// TODO(StephenButtolph): Allow minimal user configuration via configBytes.
-	_ = configBytes
+	userConfig, err := parseConfig(configBytes)
+	if err != nil {
+		return fmt.Errorf("parsing user config: %w", err)
+	}
+	warpMessages, err := userConfig.WarpMessages()
+	if err != nil {
+		return fmt.Errorf("parsing warp messages: %w", err)
+	}
 
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
-	trieDBConfig := triedb.HashDefaults
 
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
@@ -105,7 +108,8 @@ func (vm *VM) Initialize(
 	}
 	vm.chainConfig = genesis.Config
 
-	genesisBlock, err := genesis.setup(ethDB, trieDBConfig)
+	saeConfig := userConfig.saeConfig(vm.now)
+	genesisBlock, err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig)
 	if err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}
@@ -119,23 +123,16 @@ func (vm *VM) Initialize(
 	})
 
 	pendingTxs := txpool.NewPending()
+	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
 		snowCtx,
 		vm.state,
+		vm.chainConfig,
 		pendingTxs,
+		warpStorage,
 		vm.now,
+		userConfig.desired(),
 	)
-	mempoolConfig := legacypool.DefaultConfig
-	// Treat all transactions equally regardless of submission source — no
-	// preferential admission or pricing for locally-submitted txs.
-	mempoolConfig.NoLocals = true
-	saeConfig := sae.Config{
-		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			TrieDBConfig: trieDBConfig,
-		},
-		Now: vm.now,
-	}
 	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, genesisBlock, appSender)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
@@ -205,7 +202,9 @@ func (vm *VM) Initialize(
 		gossipWG.Wait()
 		return nil
 	})
-
+	if err := registerWarpHandler(vm.VM, warpStorage, snowCtx.WarpSigner); err != nil {
+		return fmt.Errorf("registering warp signature handler: %w", err)
+	}
 	return nil
 }
 

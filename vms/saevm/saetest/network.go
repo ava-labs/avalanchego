@@ -54,6 +54,9 @@ type Sender struct {
 }
 
 // NewSender returns a [Sender] whose validator-set sampling is driven by vdrs.
+//
+// [Sender.Start] MUST be called, but it doesn't need to be called before
+// using the returned [Sender].
 func NewSender(tb testing.TB, vdrs set.Set[ids.NodeID]) *Sender {
 	return &Sender{
 		tb:    tb,
@@ -63,17 +66,16 @@ func NewSender(tb testing.TB, vdrs set.Set[ids.NodeID]) *Sender {
 	}
 }
 
-// SetSelf binds the sender to the local node. It MUST be called before any
-// other peer's handler is invoked, since [Sender] uses self's NodeID as the
-// source of every routed message.
-func (s *Sender) SetSelf(self Peer) {
+// Start starts delivering messages from self to peers.
+func (s *Sender) Start(tb testing.TB, self Peer) {
 	s.selfID = self.NodeID()
 	s.self.Put(self)
+	tb.Cleanup(s.close)
 }
 
-// Close stops sending messages and blocks until all in-flight messages are
+// close stops sending messages and blocks until all in-flight messages are
 // delivered.
-func (s *Sender) Close() {
+func (s *Sender) close() {
 	s.wgLock.Lock()
 	s.closing = true
 	s.wgLock.Unlock()
