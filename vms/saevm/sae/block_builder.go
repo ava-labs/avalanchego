@@ -140,7 +140,7 @@ const blockByteOverhead = staking.MaxCertificateLen + 6*units.KiB
 
 // maxBlockTxBytes caps a block's serialized transaction bytes, reserving
 // [blockByteOverhead] below the maximum message size M.
-const maxBlockTxBytes = blocklimit.MaxBlockBytes - blockByteOverhead
+const maxBlockTxBytes = blocklimit.SafeMaxBytes - blockByteOverhead
 
 // maxTxRLPHeaderLen bounds the RLP header that wraps each transaction as a byte
 // string in the block body: a string up to the maximum message size M needs at

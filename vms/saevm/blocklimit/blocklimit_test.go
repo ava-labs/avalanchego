@@ -4,114 +4,81 @@
 package blocklimit_test
 
 import (
+	"math"
 	"testing"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
 )
 
 func TestEligible(t *testing.T) {
-	const (
-		high = 80_000_000 // x/M ~= 38.15 gas/byte, Helicon's initial gas limit
-		low  = 20_000_000 // x/M ~= 9.54 gas/byte
-	)
+	tx := types.NewTx(&types.LegacyTx{Gas: 21_000})
+	y, g := tx.Size(), tx.Gas()
 
 	tests := []struct {
-		name                       string
-		size, gasLimit, blockLimit uint64
-		want                       bool
+		name                    string
+		blockGasLimit, maxBytes uint64
+		want                    bool
 	}{
 		{
-			name:       "zeroByteCalldata_strict",
-			size:       1_000,
-			gasLimit:   4_000,
-			blockLimit: high,
+			name:          "atBoundary",
+			blockGasLimit: g,
+			maxBytes:      y,
+			want:          true,
 		},
 		{
-			name:       "nonZeroCalldata_strict",
-			size:       1_000,
-			gasLimit:   16_000,
-			blockLimit: high,
+			name:          "blockGasLimitOneOver",
+			blockGasLimit: g + 1,
+			maxBytes:      y,
 		},
 		{
-			name:       "typicalTransfer_strict",
-			size:       1_000,
-			gasLimit:   200_000,
-			blockLimit: high,
-			want:       true,
+			name:          "maxBytesOneOver",
+			blockGasLimit: g,
+			maxBytes:      y + 1,
+			want:          true,
 		},
 		{
-			name:       "minTransfer_strict",
-			size:       110,
-			gasLimit:   21_000,
-			blockLimit: high,
-			want:       true,
+			name:          "blockGasLimitDoubled",
+			blockGasLimit: 2 * g,
+			maxBytes:      y,
 		},
 		{
-			name:       "nonZeroCalldata_loose",
-			size:       1_000,
-			gasLimit:   16_000,
-			blockLimit: low,
-			want:       true,
+			name:          "maxBytesDoubled",
+			blockGasLimit: g,
+			maxBytes:      2 * y,
+			want:          true,
 		},
 		{
-			name:       "zeroByteCalldata_loose",
-			size:       1_000,
-			gasLimit:   4_000,
-			blockLimit: low,
+			name:          "overflowingProductRejected",
+			blockGasLimit: math.MaxUint64,
+			maxBytes:      1,
 		},
 		{
-			name:       "boundaryEqual",
-			size:       100,
-			gasLimit:   100,
-			blockLimit: blocklimit.MaxBlockBytes,
-			want:       true,
-		},
-		{
-			name:       "boundaryOneByteOver",
-			size:       101,
-			gasLimit:   100,
-			blockLimit: blocklimit.MaxBlockBytes,
-		},
-		{
-			name:       "boundaryOneGasOver",
-			size:       100,
-			gasLimit:   101,
-			blockLimit: blocklimit.MaxBlockBytes,
-			want:       true,
-		},
-		{
-			name:       "largeGasLimit",
-			size:       1_000,
-			gasLimit:   1 << 43,
-			blockLimit: high,
-			want:       true,
-		},
-		{
-			name:       "largeSizeAndBlockLimit",
-			size:       1 << 32,
-			gasLimit:   1,
-			blockLimit: 1 << 32,
+			name:          "overflowingProductAccepted",
+			blockGasLimit: 1,
+			maxBytes:      math.MaxUint64,
+			want:          true,
 		},
 		{
 			name:     "zeroBlockGasLimit",
-			size:     100,
-			gasLimit: 1_000,
+			maxBytes: y,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := blocklimit.Eligible(tt.size, tt.gasLimit, tt.blockLimit)
+			got := blocklimit.Eligible(tx, tt.blockGasLimit, tt.maxBytes)
 			require.Equal(
 				t,
 				tt.want,
 				got,
-				"Eligible(size=%d, gasLimit=%d, blockGasLimit=%d)",
-				tt.size,
-				tt.gasLimit,
-				tt.blockLimit,
+				"Eligible(size=%d, gasLimit=%d, blockGasLimit=%d, maxBytes=%d)",
+				y, // size
+				g, // gasLimit
+				tt.blockGasLimit,
+				tt.maxBytes,
 			)
 		})
 	}

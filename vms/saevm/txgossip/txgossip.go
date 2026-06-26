@@ -117,7 +117,7 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	eligible := make([]*types.Transaction, 0, len(txs))
 	eligibleIdx := make([]int, 0, len(txs))
 	for i, tx := range txs {
-		if blocklimit.Eligible(tx.Size(), tx.Gas(), blockGasLimit) {
+		if blocklimit.Eligible(tx, blockGasLimit, blocklimit.SafeMaxBytes) {
 			eligible = append(eligible, tx)
 			eligibleIdx = append(eligibleIdx, i)
 			continue
