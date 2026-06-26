@@ -1326,3 +1326,35 @@ func TestGasRefundsDisabled(t *testing.T) {
 	const gasIfRefunded = wantGasUsed - ethparams.SstoreClearsScheduleRefundEIP3529
 	assert.Equalf(t, wantGasUsed, receipt.GasUsed, "gas charged (would be %d if refunds were enabled)", gasIfRefunded)
 }
+
+// TestEmptyBlocksDisallowed asserts that empty blocks are not allowed.
+func TestEmptyBlocksDisallowed(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+
+	t.Run("build", func(t *testing.T) {
+		_, err := sut.BuildBlock(ctx, nil)
+		require.ErrorIsf(t, err, errEmptyBlock, "%T.BuildBlock() should not produce empty blocks", sut)
+	})
+	t.Run("verify", func(t *testing.T) {
+		stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+		valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+
+		// In addition to removing the block's extData, we need to update the
+		// header's ExtDataHash to allow parsing.
+		hdr := valid.Header()
+		customtypes.GetHeaderExtra(hdr).ExtDataHash = customtypes.EmptyExtDataHash
+
+		emptied := valid.EthBlock().WithSeal(hdr)
+		customtypes.SetBlockExtra(emptied, new(customtypes.BlockBodyExtra))
+
+		buf, err := rlp.EncodeToBytes(emptied)
+		require.NoErrorf(t, err, "rlp.EncodeToBytes(emptied block)")
+		parsed, err := sut.ParseBlock(ctx, buf)
+		require.NoErrorf(t, err, "%T.ParseBlock(emptied block)", sut.VM)
+
+		err = sut.VerifyBlock(ctx, nil, parsed)
+		require.ErrorIsf(t, err, errEmptyBlock, "%T.VerifyBlock() should not allow empty blocks", sut.VM)
+	})
+}
