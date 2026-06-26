@@ -367,10 +367,6 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	if extraConfig.IsHelicon(header.Time) {
 		return errors.New("expected to have transitioned to SAE prior to Helicon")
 	}
-	headerExtra := customtypes.GetHeaderExtra(header)
-	if headerExtra.TargetExponent != nil {
-		return fmt.Errorf("unexpected TargetExponent in header extra: %d", *headerExtra.TargetExponent)
-	}
 
 	// If the VM is not marked as bootstrapped the other chains may also be
 	// bootstrapping and not have populated the required indices. Since
