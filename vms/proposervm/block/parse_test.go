@@ -41,7 +41,7 @@ func TestParseBlocks(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-	)
+		false)
 	require.NoError(t, err)
 
 	signedBlockBytes := signedBlock.Bytes()
@@ -87,7 +87,7 @@ func TestParseBlocks(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			results := ParseBlocks(testCase.input, chainID)
+			results := ParseBlocks(testCase.input, chainID, false)
 			for i := range testCase.output {
 				if testCase.output[i].Block == nil {
 					require.Nil(t, results[i].Block)
@@ -129,7 +129,7 @@ func TestParse(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-	)
+		false)
 	require.NoError(t, err)
 	require.IsType(t, &statelessGraniteBlock{}, signedBlock)
 
@@ -142,19 +142,19 @@ func TestParse(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-	)
+		false)
 	require.NoError(t, err)
 	require.IsType(t, &statelessBlock{}, signedZeroEpochBlock)
 
-	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpoch, innerBlockBytes)
+	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpoch, innerBlockBytes, false)
 	require.IsType(t, &statelessGraniteBlock{}, unsignedBlock)
 	require.NoError(t, err)
 
-	unsignedZeroEpochBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, Epoch{}, innerBlockBytes)
+	unsignedZeroEpochBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, Epoch{}, innerBlockBytes, false)
 	require.IsType(t, &statelessBlock{}, unsignedZeroEpochBlock)
 	require.NoError(t, err)
 
-	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, Epoch{}, innerBlockBytes)
+	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, Epoch{}, innerBlockBytes, false)
 	require.IsType(t, &statelessBlock{}, signedWithoutCertBlockIntf)
 	require.NoError(t, err)
 
@@ -221,11 +221,11 @@ func TestParse(t *testing.T) {
 			require := require.New(t)
 
 			blockBytes := test.block.Bytes()
-			parsedBlockWithoutVerification, err := ParseWithoutVerification(blockBytes)
+			parsedBlockWithoutVerification, err := ParseWithoutVerification(blockBytes, false)
 			require.NoError(err)
 			equal(require, test.block, parsedBlockWithoutVerification)
 
-			parsedBlock, err := Parse(blockBytes, test.chainID)
+			parsedBlock, err := Parse(blockBytes, test.chainID, false)
 			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr == nil {
 				equal(require, test.block, parsedBlock)
@@ -264,7 +264,7 @@ func TestParseBytes(t *testing.T) {
 			bytes, err := hex.DecodeString(test.hex)
 			require.NoError(err)
 
-			_, err = Parse(bytes, chainID)
+			_, err = Parse(bytes, chainID, false)
 			require.ErrorIs(err, test.expectedErr)
 		})
 	}

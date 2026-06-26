@@ -28,24 +28,24 @@ type state struct {
 	HeightIndex
 }
 
-func New(db *versiondb.Database) State {
+func New(db *versiondb.Database, millisecondTimestamps bool) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
 	return &state{
 		ChainState:  NewChainState(chainDB),
-		BlockState:  NewBlockState(blockDB),
+		BlockState:  NewBlockState(blockDB, millisecondTimestamps),
 		HeightIndex: NewHeightIndex(heightDB, db),
 	}
 }
 
-func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Registerer) (State, error) {
+func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Registerer, millisecondTimestamps bool) (State, error) {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
-	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics)
+	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics, millisecondTimestamps)
 	if err != nil {
 		return nil, err
 	}

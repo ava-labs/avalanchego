@@ -62,12 +62,10 @@ this configuration in order to properly allow a node in the private Subnet.
 
 The length of a single proposerVM proposer slot for the chains in this Subnet, in
 **milliseconds**. Defaults to 5s (`5000`) when unset or `0`. When set, must be
-between `1000` (1s) and `5000` (5s) inclusive.
+between `50` and `5000` (5s) inclusive.
 
-**If you are changing this at all, you almost certainly want 1s (`1000`).** That
-is the minimum (see the note below), and it is already
-enough to make validator restarts and maintenance effectively invisible. For
-example:
+**If you are changing this, 1s (`1000`) is the safe choice** — it makes validator
+restarts and maintenance effectively invisible and needs nothing else:
 
 ```json
 { "proposerWindowMilliseconds": 1000 }
@@ -76,10 +74,10 @@ example:
 Slots are `proposerWindowMilliseconds` apart, and when a scheduled proposer is
 offline the chain stalls until the next live proposer's slot opens — so a smaller
 window speeds failover recovery (good for CFT/PoA L1s) at the cost of more
-rejected blocks. The proposerVM block timestamp is currently whole-second
-granular, so the slot clock only ticks once per second and a sub-second window
-gains nothing — hence the `1000`ms (1s) floor. Sub-second windows arrive in a
-follow-up PR that adds millisecond-granular timestamps.
+rejected blocks. Going **below 1s only helps if you also set
+[`proposerMillisecondTimestamps`](#proposermillisecondtimestamps-bool)**: with the
+default whole-second timestamps the slot clock only ticks once per second, so a
+sub-second window stays quantized to ~1s and gains nothing.
 
 :::warning
 
@@ -89,6 +87,48 @@ Validators with different windows disagree about which proposer is expected for 
 slot, reject each other's blocks, and break liveness. Roll it out identically to
 every validator, the same way as an upgrade time. The primary network (P/C/X) is
 unaffected and always uses the default.
+
+:::
+
+#### `proposerMillisecondTimestamps` (bool)
+
+Interprets the proposerVM wrapper block's timestamp as **unix-milliseconds**
+instead of unix-seconds. Defaults to `false` (seconds). Existing networks are
+unaffected when this is unset.
+
+The proposerVM proposer-slot clock advances at the resolution of the wrapper
+block timestamp. With the default whole-second timestamps the clock can only
+advance in whole-second steps, so proposer rotation — and therefore how fast the
+chain recovers when a scheduled proposer is offline — is quantized to ~1s no
+matter how short the proposer window is. Setting this to `true` makes the
+timestamp millisecond-granular so that a sub-second proposer window can actually
+advance.
+
+Use it together with a sub-second [`proposerWindowMilliseconds`](#proposerwindowmilliseconds-uint):
+neither has much effect without the other. A sub-second window is still quantized
+to ~1s while timestamps are whole-second, and millisecond timestamps do nothing
+while the window stays at its 5s default.
+
+```json
+{ "proposerMillisecondTimestamps": true }
+```
+
+:::warning
+
+This is a Subnet-wide consensus parameter, not a per-node tuning knob, and it
+must be fixed for the life of the chain:
+
+- Every validator of this Subnet's chains MUST use the same value. Validators
+  that disagree decode each other's block timestamps differently, expect
+  different proposers per slot, reject each other's blocks, and break liveness.
+- It MUST be set from genesis. Enabling it on a chain that already has
+  whole-second history misreads every previously-accepted block (a unix-seconds
+  value read as unix-millis is off by a factor of 1000), corrupting the node on
+  restart. Only enable it on a fresh chain that is millisecond-granular from its
+  first block.
+
+The primary network (P/C/X) is unaffected and always uses whole-second
+timestamps.
 
 :::
 
