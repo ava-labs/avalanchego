@@ -160,13 +160,13 @@ func TestTargetExponent(t *testing.T) {
 		},
 	}
 
-	fortuna := &extras.ChainConfig{
-		NetworkUpgrades: extras.NetworkUpgrades{
-			FortunaTimestamp: utils.PointerTo[uint64](fortunaTime),
-		},
-	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			fortuna := &extras.ChainConfig{
+				NetworkUpgrades: extras.NetworkUpgrades{
+					FortunaTimestamp: utils.PointerTo[uint64](fortunaTime),
+				},
+			}
 			got, err := targetExponent(fortuna, tt.header)
 			require.ErrorIs(t, err, tt.wantErr, "targetExponent()")
 			assert.Equal(t, tt.want, got, "targetExponent()")
