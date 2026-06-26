@@ -61,13 +61,19 @@ type Chain interface {
 // Config controls which JSON-RPC namespaces are enabled and their resource
 // limits.
 type Config struct {
+	// Namespace toggles
+	EnableDBInspecting bool
+	EnableProfiling    bool
+	DisableTracing     bool
+
+	// Resource limits
 	BlocksPerBloomSection uint64
-	EnableDBInspecting    bool
-	EnableProfiling       bool
-	DisableTracing        bool
 	EVMTimeout            time.Duration
 	GasCap                uint64
-	TxFeeCap              float64 // 0 = no cap
+
+	// Transaction submission
+	TxFeeCap            float64 // 0 = no cap
+	AllowUnprotectedTxs bool
 }
 
 // A Provider provides an [rpc.Server] along with the raw geth backends that

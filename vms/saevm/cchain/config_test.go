@@ -84,6 +84,11 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(0)) }),
 		},
 		{
+			name: "allow_unprotected_txs",
+			json: `{"allow-unprotected-txs":true}`,
+			want: with(func(c *config) { c.AllowUnprotectedTxs = true }),
+		},
+		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
 			want: with(func(c *config) {
@@ -99,6 +104,7 @@ func TestParseConfig(t *testing.T) {
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
+				"allow-unprotected-txs":true,
 				"warp-off-chain-messages":["0x1234"]
 			}`,
 			want: config{
@@ -108,6 +114,7 @@ func TestParseConfig(t *testing.T) {
 				LocalTxsEnabled:      true,
 				TxPoolAccountSlots:   8,
 				TxPoolGlobalSlots:    2048,
+				AllowUnprotectedTxs:  true,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},
