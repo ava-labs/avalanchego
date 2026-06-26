@@ -190,6 +190,12 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
 
+	// The VM is only notified of preference changes, so if the consensus engine
+	// previously set the preference, we must manually set the post-transition
+	// VM's preference.
+	//
+	// Failing to due this could leave the preference uninitialized, which could
+	// cause block building to error.
 	vm.postChainCtx.Log.Info("initializing post-transition VM preference",
 		zap.Stringer("blkID", lastID),
 	)
