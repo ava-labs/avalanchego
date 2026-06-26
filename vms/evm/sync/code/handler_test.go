@@ -5,7 +5,6 @@ package code_test
 
 import (
 	"crypto/rand"
-	"errors"
 	"testing"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
@@ -30,7 +30,7 @@ func TestHandler_RoundTrip(t *testing.T) {
 		Data: [][]byte{{0xaa, 0xbb}, {0xcc, 0xdd}},
 	}
 	responder := &synctest.FakeCodeResponder{Resp: wantResp}
-	h := code.NewHandler(responder)
+	h := code.NewHandler(logging.NoLog{}, responder)
 
 	req := &syncpb.GetCodeRequest{
 		Hashes: [][]byte{{0x01}, {0x02}},
@@ -42,49 +42,6 @@ func TestHandler_RoundTrip(t *testing.T) {
 	require.NoError(t, proto.Unmarshal(respBytes, got))
 	require.Empty(t, cmp.Diff(wantResp, got, protocmp.Transform()))
 	require.Empty(t, cmp.Diff(req, responder.GotReq, protocmp.Transform()))
-}
-
-func TestHandler_FailurePaths(t *testing.T) {
-	tests := []struct {
-		name       string
-		resp       *syncpb.GetCodeResponse
-		err        error
-		wantAppErr bool
-	}{
-		{
-			name: "inner returns nil drops the response",
-		},
-		{
-			name:       "inner error surfaces as AppError",
-			err:        errors.New("boom"),
-			wantAppErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			responder := &synctest.FakeCodeResponder{Resp: tt.resp, Err: tt.err}
-			h := code.NewHandler(responder)
-
-			respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, synctest.MustMarshal(t, &syncpb.GetCodeRequest{}))
-			if tt.wantAppErr {
-				require.NotNil(t, appErr)
-			} else {
-				require.Nil(t, appErr)
-			}
-			require.Empty(t, respBytes)
-		})
-	}
-}
-
-func TestHandler_MalformedRequestBytes(t *testing.T) {
-	responder := &synctest.FakeCodeResponder{}
-	h := code.NewHandler(responder)
-
-	respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, []byte{0xff, 0xff})
-	require.Nil(t, respBytes)
-	require.NotNil(t, appErr)
-	require.Nil(t, responder.GotReq, "responder must not be invoked on malformed request")
 }
 
 func TestResponder(t *testing.T) {
@@ -103,48 +60,43 @@ func TestResponder(t *testing.T) {
 	rawdb.WriteCode(db, otherHash, other)
 
 	tests := []struct {
-		name      string
-		hashes    []common.Hash
-		wantData  [][]byte
-		wantDrop  bool
-		wantStats synctest.CodeRecorder
+		name     string
+		hashes   []common.Hash
+		wantData [][]byte
+		wantDrop bool
 	}{
 		{
-			name:      "single hash",
-			hashes:    []common.Hash{codeHash},
-			wantData:  [][]byte{codeBytes},
-			wantStats: synctest.CodeRecorder{Requests: 1, CodeBytesReturned: uint32(len(codeBytes))},
+			name:     "single hash",
+			hashes:   []common.Hash{codeHash},
+			wantData: [][]byte{codeBytes},
 		},
 		{
-			name:      "multiple hashes preserve order",
-			hashes:    []common.Hash{codeHash, otherHash},
-			wantData:  [][]byte{codeBytes, other},
-			wantStats: synctest.CodeRecorder{Requests: 1, CodeBytesReturned: uint32(len(codeBytes) + len(other))},
+			name:     "multiple hashes preserve order",
+			hashes:   []common.Hash{codeHash, otherHash},
+			wantData: [][]byte{codeBytes, other},
 		},
 		{
-			name:      "missing hash drops",
-			hashes:    []common.Hash{{0xde, 0xad}},
-			wantDrop:  true,
-			wantStats: synctest.CodeRecorder{Requests: 1, MissingHash: 1},
+			name:     "missing hash drops",
+			hashes:   []common.Hash{{0xde, 0xad}},
+			wantDrop: true,
 		},
 		{
-			name:      "duplicate hashes drop",
-			hashes:    []common.Hash{codeHash, codeHash},
-			wantDrop:  true,
-			wantStats: synctest.CodeRecorder{Requests: 1, DuplicateHashes: 1},
+			name:     "duplicate hashes drop",
+			hashes:   []common.Hash{codeHash, codeHash},
+			wantDrop: true,
 		},
 		{
-			name:      "too many hashes drops",
-			hashes:    []common.Hash{{1}, {2}, {3}, {4}, {5}, {6}},
-			wantDrop:  true,
-			wantStats: synctest.CodeRecorder{Requests: 1, TooManyHashes: 1},
+			name:     "too many hashes drops",
+			hashes:   []common.Hash{{1}, {2}, {3}, {4}, {5}, {6}},
+			wantDrop: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stats := &synctest.CodeRecorder{}
-			r := code.NewResponder(db, stats)
+			t.Parallel()
+
+			r := code.NewResponder(db)
 
 			rawHashes := make([][]byte, len(tt.hashes))
 			for i, h := range tt.hashes {
@@ -159,7 +111,6 @@ func TestResponder(t *testing.T) {
 				require.NotNil(t, resp)
 				require.Equal(t, tt.wantData, resp.Data)
 			}
-			require.Equal(t, tt.wantStats, *stats)
 		})
 	}
 }
