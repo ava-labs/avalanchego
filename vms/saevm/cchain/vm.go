@@ -114,7 +114,6 @@ func (vm *VM) Initialize(
 	// provided database was wrapped by the rpcchainvm.
 	ethDB := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
 
-	snowCtx.Log.Info("parsing genesis")
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
@@ -124,7 +123,7 @@ func (vm *VM) Initialize(
 	saeConfig := userConfig.saeConfig(vm.now)
 	genesisBlock, err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig)
 	if err != nil {
-		return fmt.Errorf("setting up genesis block: %w", err)
+		return fmt.Errorf("setting up genesis: %w", err)
 	}
 
 	snowCtx.Log.Info("establishing last synchronous block")
@@ -146,7 +145,6 @@ func (vm *VM) Initialize(
 		zap.Uint64("lastHeight", lastSync.NumberU64()),
 	)
 
-	snowCtx.Log.Info("constructing cross-chain state")
 	vm.state, err = state.New(snowCtx, avaDB)
 	if err != nil {
 		return fmt.Errorf("creating cchain state: %w", err)
