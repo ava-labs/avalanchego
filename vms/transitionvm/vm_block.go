@@ -111,49 +111,36 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
 
-	b, err := vm.current.chain.BuildBlock(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return vm.wrapBlock(b), nil
+	return vm.wrapBlock(vm.current.chain.BuildBlock(ctx))
 }
 
 func (vm *VM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
 
-	b, err := vm.current.chain.BuildBlockWithContext(ctx, blockCtx)
-	if err != nil {
-		return nil, err
-	}
-	return vm.wrapBlock(b), nil
+	return vm.wrapBlock(vm.current.chain.BuildBlockWithContext(ctx, blockCtx))
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
 
-	b, err := vm.current.chain.ParseBlock(ctx, blockBytes)
-	if err != nil {
-		return nil, err
-	}
-	return vm.wrapBlock(b), nil
+	return vm.wrapBlock(vm.current.chain.ParseBlock(ctx, blockBytes))
 }
 
 func (vm *VM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
 
-	b, err := vm.current.chain.GetBlock(ctx, blkID)
+	return vm.wrapBlock(vm.current.chain.GetBlock(ctx, blkID))
+}
+
+func (vm *VM) wrapBlock(b snowman.Block, err error) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return vm.wrapBlock(b), nil
-}
-
-func (vm *VM) wrapBlock(b snowman.Block) snowman.Block {
 	if vm.transitioned {
-		return b
+		return b, nil
 	}
-	return &preBlock{b, vm}
+	return &preBlock{b, vm}, nil
 }

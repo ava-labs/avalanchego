@@ -36,7 +36,7 @@ type VM struct {
 	transitionTime      time.Time
 
 	// chain parameters
-	postChainCtx *snow.Context // Has modified Lock and Metrics fields
+	postChainCtx *snow.Context // Has modified [snow.Context.Lock] and [snow.Context.Metrics]
 	db           database.Database
 	genesisBytes []byte
 	upgradeBytes []byte

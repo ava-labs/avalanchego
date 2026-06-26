@@ -101,6 +101,9 @@ type fakeVM struct {
 	appSender common.AppSender
 	// handlers is the set of HTTP handlers returned by CreateHandlers.
 	handlers map[string]http.Handler
+	// events is delivered by WaitForEvent, which otherwise blocks until its
+	// context is canceled.
+	events chan common.Message
 }
 
 func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
@@ -113,6 +116,7 @@ func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
 		name:            name,
 		state:           state,
 		verified:        make(map[ids.ID]*fakeBlock),
+		events:          make(chan common.Message, 1),
 	}
 }
 
@@ -130,6 +134,17 @@ func (vm *fakeVM) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 
 func (vm *fakeVM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return vm.handlers, nil
+}
+
+// WaitForEvent returns the next message pushed onto events, or blocks until the
+// context is canceled.
+func (vm *fakeVM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	select {
+	case msg := <-vm.events:
+		return msg, nil
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
 }
 
 func (vm *fakeVM) Version(context.Context) (string, error) {
