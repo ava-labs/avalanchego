@@ -18,8 +18,8 @@ var _ vms.Factory = (*Factory)(nil)
 type Factory struct{}
 
 // New creates a new C-Chain VM.
-func (*Factory) New(logger logging.Logger) (interface{}, error) {
-	logger.Info("Creating new SAE VM")
+func (*Factory) New(log logging.Logger) (interface{}, error) {
+	log.Info("Creating new C-Chain SAE VM")
 	vm := &VM{
 		pullGossipPeriod: time.Second,
 		pushGossipPeriod: 100 * time.Millisecond,
