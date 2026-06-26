@@ -177,14 +177,26 @@ func TestTargetExponent(t *testing.T) {
 // Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
 // writes into the header, and returns the zero marker when the header carries none.
 func TestSettledBy(t *testing.T) {
-	_, sut := newSUT(t)
+	key := txtest.NewKey(t)
+	_, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
 	hooks := sut.hooks()
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	htx, err := newHookTx(stx, sut.ctx.AVAXAssetID)
+	require.NoError(t, err, "newHookTx()")
 
 	// built returns the header of a block built carrying the given settled marker.
 	built := func(t *testing.T, settled hook.Settled) *types.Header {
 		t.Helper()
 
-		block, err := hooks.BuildBlock(&types.Header{}, nil, nil, nil, nil, settled)
+		block, err := hooks.BuildBlock(
+			&types.Header{},
+			nil, // blockContext
+			nil, // ethTxs
+			nil, // receipts
+			[]*hookTx{htx},
+			settled,
+		)
 		require.NoError(t, err, "builder.BuildBlock()")
 		return block.Header()
 	}
