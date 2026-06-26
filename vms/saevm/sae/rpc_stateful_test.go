@@ -212,10 +212,10 @@ func TestStatefulRPCs(t *testing.T) {
 		Data: escrow.CallDataForBalance(recipient),
 	}
 
-	vmTime.advanceToSettle(ctx, t, b)
+	vmTime.AdvanceToSettle(ctx, t, b)
 	for range 2 {
 		bb := sut.runConsensusLoop(t)
-		vmTime.advanceToSettle(ctx, t, bb)
+		vmTime.AdvanceToSettle(ctx, t, bb)
 	}
 	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
 	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
