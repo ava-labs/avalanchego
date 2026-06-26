@@ -8,12 +8,14 @@ import (
 	"errors"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -51,13 +53,14 @@ type Responder[Req, Resp ProtoMessage] interface {
 // Handler is a typed [p2p.Handler] for one EVM-sync RPC.
 type Handler[Req, Resp ProtoMessage] struct {
 	p2p.NoOpHandler
+	log       logging.Logger
 	newReq    func() Req
 	responder Responder[Req, Resp]
 }
 
 // NewHandler binds a [Responder] and a request constructor.
-func NewHandler[Req, Resp ProtoMessage](newReq func() Req, inner Responder[Req, Resp]) *Handler[Req, Resp] {
-	return &Handler[Req, Resp]{newReq: newReq, responder: inner}
+func NewHandler[Req, Resp ProtoMessage](log logging.Logger, newReq func() Req, inner Responder[Req, Resp]) *Handler[Req, Resp] {
+	return &Handler[Req, Resp]{log: log, newReq: newReq, responder: inner}
 }
 
 func (h *Handler[Req, Resp]) AppRequest(ctx context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
@@ -72,6 +75,10 @@ func (h *Handler[Req, Resp]) AppRequest(ctx context.Context, nodeID ids.NodeID, 
 		if errors.As(err, &appErr) {
 			return nil, appErr
 		}
+		h.log.Error("sync handler server error",
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(err),
+		)
 		return nil, p2p.ErrUnexpected
 	}
 	var zero Resp
@@ -81,6 +88,10 @@ func (h *Handler[Req, Resp]) AppRequest(ctx context.Context, nodeID ids.NodeID, 
 
 	respBytes, err := proto.Marshal(resp)
 	if err != nil {
+		h.log.Error("failed to marshal proto response",
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(err),
+		)
 		return nil, errMarshalResponse
 	}
 	return respBytes, nil
