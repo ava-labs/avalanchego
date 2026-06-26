@@ -33,7 +33,7 @@ func main() {
 			continue
 		}
 
-		proposerVMBlock, err := block.Parse(container.Bytes, xChainID)
+		proposerVMBlock, err := block.Parse(container.Bytes, xChainID, false)
 		if err != nil {
 			log.Fatalf("failed to parse proposervm block: %s\n", err)
 		}
