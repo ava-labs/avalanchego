@@ -16,13 +16,8 @@ import (
 const (
 	// Bounds for an explicitly configured ProposerWindowMilliseconds; 0 means
 	// "use the default". The 50ms floor is about the smallest window a proposer
-	// can build and propagate a block in before its slot closes. The ceiling is
-	// the default window; a larger window only slows failover.
-	//
-	// The proposerVM block timestamp is currently whole-second granular, so a
-	// sub-second window has no failover benefit today (~1s is the practical
-	// floor); the hard floor is lower so a future ms-precision proposerVM need
-	// not revisit it.
+	// can build and propagate a block in before its slot closes; the ceiling is
+	// the default window, since a larger window only slows failover.
 	MinProposerWindowMilliseconds = 50
 	MaxProposerWindowMilliseconds = 5_000
 )

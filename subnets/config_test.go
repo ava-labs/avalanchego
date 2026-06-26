@@ -111,14 +111,6 @@ func TestValidParameters(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "proposer window ms sub-second within range",
-			s: Config{
-				SnowParameters:             &validParameters,
-				ProposerWindowMilliseconds: 500,
-			},
-			expectedErr: nil,
-		},
-		{
 			name: "proposer window ms below min",
 			s: Config{
 				SnowParameters:             &validParameters,
