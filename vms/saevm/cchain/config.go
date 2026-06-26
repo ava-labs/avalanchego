@@ -29,7 +29,9 @@ type config struct {
 	// PriceTarget is the minimum gas price (in aAVAX) this node enforces when
 	// building blocks under ACP-283. nil means follow the parent block.
 	PriceTarget *gas.Price `json:"min-price-target,omitempty"`
-	// GasTarget      *gas.Gas   `json:"gas-target,omitempty"`
+	// GasTarget is the target gas per second this node votes for when building
+	// blocks under ACP-176. nil means follow the parent block.
+	GasTarget *gas.Gas `json:"gas-target,omitempty"`
 	// MinDelayTarget *uint64    `json:"min-delay-target,omitempty"`
 
 	// State & trie
@@ -130,12 +132,17 @@ func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
 // desiredParams bundles this node's votes for the dynamic consensus
 // parameters. A nil field means no vote.
 type desiredParams struct {
-	priceExponent *dynamic.PriceExponent
+	targetExponent *dynamic.TargetExponent
+	priceExponent  *dynamic.PriceExponent
 }
 
 // desired returns c's user-facing targets as internal exponent votes.
 func (c config) desired() desiredParams {
 	var d desiredParams
+	if c.GasTarget != nil {
+		e := dynamic.DesiredTargetExponent(*c.GasTarget)
+		d.targetExponent = &e
+	}
 	if c.PriceTarget != nil {
 		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
 		d.priceExponent = &e
