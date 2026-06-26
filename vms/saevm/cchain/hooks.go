@@ -363,6 +363,8 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 	return s, nil
 }
 
+var errEmptyBlock = errors.New("empty block")
+
 func (b *builder) BuildBlock(
 	header *types.Header,
 	blockCtx *block.Context,
@@ -371,6 +373,10 @@ func (b *builder) BuildBlock(
 	avaxTxs []*hookTx,
 	settled hook.Settled,
 ) (*types.Block, error) {
+	if len(ethTxs) == 0 && len(avaxTxs) == 0 {
+		return nil, errEmptyBlock
+	}
+
 	txs := make([]*tx.Tx, len(avaxTxs))
 	for i, avaxTx := range avaxTxs {
 		txs[i] = avaxTx.tx
