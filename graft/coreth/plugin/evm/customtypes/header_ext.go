@@ -45,6 +45,11 @@ type HeaderExtra struct {
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
 	MinPriceExponent *dynamic.PriceExponent
+
+	SettledHeight       *uint64
+	SettledGasUnix      *uint64
+	SettledGasNumerator *uint64
+	SettledExcess       *uint64
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.
@@ -130,7 +135,54 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		e := *h.MinPriceExponent
 		cp.MinPriceExponent = &e
 	}
+	if h.SettledHeight != nil {
+		v := *h.SettledHeight
+		cp.SettledHeight = &v
+	}
+	if h.SettledGasUnix != nil {
+		v := *h.SettledGasUnix
+		cp.SettledGasUnix = &v
+	}
+	if h.SettledGasNumerator != nil {
+		v := *h.SettledGasNumerator
+		cp.SettledGasNumerator = &v
+	}
+	if h.SettledExcess != nil {
+		v := *h.SettledExcess
+		cp.SettledExcess = &v
+	}
 	SetHeaderExtra(dst, cp)
+}
+
+func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
+	m["extDataHash"] = h.ExtDataHash
+	if h.ExtDataGasUsed != nil {
+		m["extDataGasUsed"] = (*hexutil.Big)(h.ExtDataGasUsed)
+	}
+	if h.BlockGasCost != nil {
+		m["blockGasCost"] = (*hexutil.Big)(h.BlockGasCost)
+	}
+	if h.TimeMilliseconds != nil {
+		m["timestampMilliseconds"] = hexutil.Uint64(*h.TimeMilliseconds)
+	}
+	if h.MinDelayExcess != nil {
+		m["minDelayExcess"] = hexutil.Uint64(*h.MinDelayExcess)
+	}
+	if h.MinPriceExponent != nil {
+		m["minPriceExponent"] = hexutil.Uint64(*h.MinPriceExponent)
+	}
+	if h.SettledHeight != nil {
+		m["settledHeight"] = hexutil.Uint64(*h.SettledHeight)
+	}
+	if h.SettledGasUnix != nil {
+		m["settledGasUnix"] = hexutil.Uint64(*h.SettledGasUnix)
+	}
+	if h.SettledGasNumerator != nil {
+		m["settledGasNumerator"] = hexutil.Uint64(*h.SettledGasNumerator)
+	}
+	if h.SettledExcess != nil {
+		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
+	}
 }
 
 func (h *HeaderSerializable) updateFromEth(eth *ethtypes.Header) {
@@ -184,6 +236,10 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.TimeMilliseconds = extras.TimeMilliseconds
 	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
 	h.MinPriceExponent = (*uint64)(extras.MinPriceExponent)
+	h.SettledHeight = extras.SettledHeight
+	h.SettledGasUnix = extras.SettledGasUnix
+	h.SettledGasNumerator = extras.SettledGasNumerator
+	h.SettledExcess = extras.SettledExcess
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -193,6 +249,10 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.TimeMilliseconds = h.TimeMilliseconds
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
 	extras.MinPriceExponent = (*dynamic.PriceExponent)(h.MinPriceExponent)
+	extras.SettledHeight = h.SettledHeight
+	extras.SettledGasUnix = h.SettledGasUnix
+	extras.SettledGasNumerator = h.SettledGasNumerator
+	extras.SettledExcess = h.SettledExcess
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -257,25 +317,34 @@ type HeaderSerializable struct {
 	// MinPriceExponent was added by Helicon (ACP-283) and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinPriceExponent *uint64 `json:"minPriceExponent" rlp:"optional"`
+
+	SettledHeight       *uint64 `json:"settledHeight"       rlp:"optional"`
+	SettledGasUnix      *uint64 `json:"settledGasUnix"      rlp:"optional"`
+	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
+	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
 }
 
 // field type overrides for gencodec
 type headerMarshaling struct {
-	Difficulty       *hexutil.Big
-	Number           *hexutil.Big
-	GasLimit         hexutil.Uint64
-	GasUsed          hexutil.Uint64
-	Time             hexutil.Uint64
-	Extra            hexutil.Bytes
-	BaseFee          *hexutil.Big
-	ExtDataGasUsed   *hexutil.Big
-	BlockGasCost     *hexutil.Big
-	Hash             common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
-	BlobGasUsed      *hexutil.Uint64
-	ExcessBlobGas    *hexutil.Uint64
-	TimeMilliseconds *hexutil.Uint64
-	MinDelayExcess   *hexutil.Uint64
-	MinPriceExponent *hexutil.Uint64
+	Difficulty          *hexutil.Big
+	Number              *hexutil.Big
+	GasLimit            hexutil.Uint64
+	GasUsed             hexutil.Uint64
+	Time                hexutil.Uint64
+	Extra               hexutil.Bytes
+	BaseFee             *hexutil.Big
+	ExtDataGasUsed      *hexutil.Big
+	BlockGasCost        *hexutil.Big
+	Hash                common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
+	BlobGasUsed         *hexutil.Uint64
+	ExcessBlobGas       *hexutil.Uint64
+	TimeMilliseconds    *hexutil.Uint64
+	MinDelayExcess      *hexutil.Uint64
+	MinPriceExponent    *hexutil.Uint64
+	SettledHeight       *hexutil.Uint64
+	SettledGasUnix      *hexutil.Uint64
+	SettledGasNumerator *hexutil.Uint64
+	SettledExcess       *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
