@@ -32,10 +32,7 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 	sut := newSUT(t, withBlocksUntilTransition(2))
 	ctx := t.Context()
 
-	blk, err := sut.BuildBlock(ctx)
-	require.NoError(t, err)
-	require.NoError(t, blk.Verify(ctx))
-	require.NoError(t, blk.Accept(ctx))
+	sut.BuildVerifyAccept(t, ctx)
 
 	version, err := sut.Version(ctx)
 	require.NoError(t, err)

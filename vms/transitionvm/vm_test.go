@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -86,6 +87,8 @@ type fakeVM struct {
 	verified map[ids.ID]*fakeBlock
 	// tip is this VM's local building head.
 	tip *fakeBlock
+	// appSender is the sender captured in Initialize, used by sendAppRequest.
+	appSender common.AppSender
 }
 
 func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
@@ -101,9 +104,16 @@ func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
 	}
 }
 
-func (vm *fakeVM) Initialize(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, []*common.Fx, common.AppSender) error {
+func (vm *fakeVM) Initialize(_ context.Context, _ *snow.Context, _ database.Database, _, _, _ []byte, _ []*common.Fx, appSender common.AppSender) error {
 	vm.tip = vm.state.lastAccepted
+	vm.appSender = appSender
 	return nil
+}
+
+// sendAppRequest sends an app request to nodeID through the AppSender captured
+// in Initialize.
+func (vm *fakeVM) sendAppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	return vm.appSender.SendAppRequest(ctx, set.Of(nodeID), requestID, nil)
 }
 
 func (vm *fakeVM) Version(context.Context) (string, error) {
@@ -138,9 +148,25 @@ func (*fakeVM) BuildBlockWithContext(context.Context, *block.Context) (snowman.B
 }
 
 // SUT is the system under test: an initialized transition VM whose pre- and
-// post-transition fakeVMs ("pre" and "post") share one fakeState.
+// post-transition fakeVMs ("pre" and "post") share one fakeState. appSender is
+// the AppSender handed to both chains; tests configure its Send*F fields to
+// observe outbound messages.
 type SUT struct {
 	*VM
+	pre       *fakeVM
+	post      *fakeVM
+	appSender *enginetest.Sender
+}
+
+// BuildVerifyAccept builds a block and then verifies and accepts it. Accepting
+// the block that reaches the transition time triggers the transition.
+func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context) {
+	t.Helper()
+
+	blk, err := s.BuildBlock(ctx)
+	require.NoError(t, err)
+	require.NoError(t, blk.Verify(ctx))
+	require.NoError(t, blk.Accept(ctx))
 }
 
 type sutConfig struct {
@@ -166,14 +192,22 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	}, opts...)
 
 	state := newFakeState()
+	pre := newFakeVM(t, "pre", state)
+	post := newFakeVM(t, "post", state)
 	timeUntilTransition := time.Duration(cfg.blocksUntilTransition) * blockInterval
 	vm := &VM{
-		preTransitionChain:  newFakeVM(t, "pre", state),
-		postTransitionChain: newFakeVM(t, "post", state),
+		preTransitionChain:  pre,
+		postTransitionChain: post,
 		transitionTime:      snowmantest.GenesisTimestamp.Add(timeUntilTransition),
 	}
 	vm.current = &current{chain: vm.preTransitionChain}
 
+	appSender := &enginetest.Sender{
+		T: t,
+		SendAppRequestF: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
+			return nil
+		},
+	}
 	require.NoError(t, vm.Initialize(
 		t.Context(),
 		snowtest.Context(t, snowtest.CChainID),
@@ -182,9 +216,14 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		nil, // upgradeBytes
 		nil, // configBytes
 		nil, // fxs
-		nil, // appSender
+		appSender,
 	))
-	return &SUT{VM: vm}
+	return &SUT{
+		VM:        vm,
+		pre:       pre,
+		post:      post,
+		appSender: appSender,
+	}
 }
 
 // TestInitiallyTransitioned verifies that a VM whose transition time is already
@@ -208,10 +247,7 @@ func TestTransition(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "pre", version)
 
-	blk, err := sut.BuildBlock(ctx)
-	require.NoError(t, err)
-	require.NoError(t, blk.Verify(ctx))
-	require.NoError(t, blk.Accept(ctx)) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx) // triggers the transition
 
 	version, err = sut.Version(ctx)
 	require.NoError(t, err)
