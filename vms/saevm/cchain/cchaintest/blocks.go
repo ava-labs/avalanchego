@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
@@ -24,14 +25,15 @@ import (
 type BlockOption = options.Option[blockProperties]
 
 type blockProperties struct {
-	number        uint64
-	timestamp     uint64
-	parent        common.Hash
-	ethTxs        []*types.Transaction
-	crossChainTxs []*tx.Tx
-	extData       *[]byte
-	extDataHash   *common.Hash
-	version       uint32
+	number           uint64
+	timestamp        uint64
+	parent           common.Hash
+	ethTxs           []*types.Transaction
+	crossChainTxs    []*tx.Tx
+	extData          *[]byte
+	extDataHash      *common.Hash
+	minPriceExponent *dynamic.PriceExponent
+	version          uint32
 }
 
 // WithNumber sets the block's header number.
@@ -93,6 +95,13 @@ func WithBlockVersion(v uint32) BlockOption {
 	})
 }
 
+// WithMinPriceExponent commits exp as the block header's ACP-283 MinPriceExponent.
+func WithMinPriceExponent(exp dynamic.PriceExponent) BlockOption {
+	return options.Func[blockProperties](func(p *blockProperties) {
+		p.minPriceExponent = &exp
+	})
+}
+
 // NewTestBlock builds a [*types.Block] from the provided options. By default the
 // block has number 1, a zero parent hash and timestamp, no Ethereum or
 // cross-chain transactions, and an ExtDataHash computed from its (empty) ExtData.
@@ -119,7 +128,10 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 			Number:     new(big.Int).SetUint64(props.number),
 			Time:       props.timestamp,
 		},
-		&customtypes.HeaderExtra{ExtDataHash: extDataHash},
+		&customtypes.HeaderExtra{
+			ExtDataHash:      extDataHash,
+			MinPriceExponent: props.minPriceExponent,
+		},
 	)
 
 	block := types.NewBlock(header, props.ethTxs, nil /* uncles */, nil /* receipts */, saetest.TrieHasher())

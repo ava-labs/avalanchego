@@ -96,6 +96,15 @@ var (
 
 	firstTxAmount = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*100))
 
+	// initialFund is the balance pre-funded to each of testEthAddrs in the test genesis.
+	initialFund = func() *big.Int {
+		v, ok := new(big.Int).SetString("0x4192927743b88000", 0)
+		if !ok {
+			panic("invalid initialFund hex literal")
+		}
+		return v
+	}()
+
 	toGenesisJSON = func(cfg *params.ChainConfig) string {
 		g := new(core.Genesis)
 		g.Difficulty = big.NewInt(0)
@@ -111,10 +120,8 @@ var (
 		// Create allocation for the test addresses
 		g.Alloc = make(types.GenesisAlloc)
 		for _, addr := range testEthAddrs {
-			balance := new(big.Int)
-			balance.SetString("0x4192927743b88000", 0)
 			g.Alloc[addr] = types.Account{
-				Balance: balance,
+				Balance: initialFund,
 			}
 		}
 
@@ -3712,6 +3719,13 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 				client, err := ethclient.Dial(server.URL)
 				require.NoError(t, err)
 				t.Cleanup(client.Close)
+
+				// Verify the genesis state by checking the pre-funded balances at block 0.
+				for _, addr := range testEthAddrs {
+					balance, err := client.BalanceAt(ctx, addr, new(big.Int).SetUint64(0))
+					require.NoErrorf(t, err, "failed to get genesis balance for %s", addr)
+					require.Equalf(t, initialFund, balance, "unexpected genesis balance for %s", addr)
+				}
 
 				for blockNum := uint64(0); blockNum <= numBlocks; blockNum++ {
 					// Checking the sender's nonce (which should equal the block number)
