@@ -498,7 +498,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
-	)
+		false)
 	require.NoError(err)
 	proBlk := postForkBlock{
 		SignedBlock: slb,
@@ -539,7 +539,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
-	)
+		false)
 	require.NoError(err)
 	proBlk1 := postForkBlock{
 		SignedBlock: slb1,
@@ -558,7 +558,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
-	)
+		false)
 	require.NoError(err)
 	proBlk2 := postForkBlock{
 		SignedBlock: slb2,
@@ -624,7 +624,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		pChainHeight,
 		statelessblock.Epoch{},
 		netcoreBlk.Bytes(),
-	)
+		false)
 	require.NoError(err)
 	netProBlk := postForkBlock{
 		SignedBlock: netSlb,
@@ -780,7 +780,7 @@ func TestPostFork_SetPreference(t *testing.T) {
 			blockPChainHeight,
 			epoch,
 			coreBlk.Bytes(),
-		)
+			false)
 		require.NoError(t, err)
 
 		return &postForkBlock{
@@ -1015,7 +1015,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		0,
 		statelessblock.Epoch{},
 		coreBlk.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -1099,7 +1099,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		0,
 		statelessblock.Epoch{},
 		coreBlk.Bytes(),
-	)
+		false)
 	require.NoError(err)
 	statelessBlock1, err := statelessblock.BuildUnsigned(
 		snowmantest.GenesisID,
@@ -1107,7 +1107,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		1,
 		statelessblock.Epoch{},
 		coreBlk.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -1264,7 +1264,7 @@ func TestInnerVMRollback(t *testing.T) {
 		0,
 		statelessblock.Epoch{},
 		coreBlk.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -1365,7 +1365,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		0,
 		statelessblock.Epoch{},
 		coreBlk0.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -1454,7 +1454,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		defaultPChainHeight,
 		statelessblock.Epoch{},
 		yBlock.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	bBlock := postForkBlock{
@@ -1519,7 +1519,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		defaultPChainHeight,
 		statelessblock.Epoch{},
 		yBlock.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	bBlock := postForkBlock{
@@ -1539,7 +1539,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		defaultPChainHeight,
 		statelessblock.Epoch{},
 		yBlock.Bytes(),
-	)
+		false)
 
 	require.NoError(err)
 
@@ -1772,7 +1772,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		defaultPChainHeight,
 		statelessblock.Epoch{},
 		yBlock.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	bBlock := postForkBlock{
@@ -2040,7 +2040,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		blkNearTipInnerBytes,   // inner blk bytes
 		vm.ctx.ChainID,         // chain ID
 		vm.StakingLeafSigner,   // key
-	)
+		false)
 	require.NoError(err)
 
 	// We will ask the inner VM to parse.
@@ -2486,7 +2486,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 		0,
 		statelessblock.Epoch{},
 		coreBlk.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -2557,7 +2557,7 @@ func TestLocalParse(t *testing.T) {
 		[]byte{1, 2, 3},
 		chainID,
 		key,
-	)
+		false)
 	require.NoError(t, err)
 
 	properlySignedBlock := signedBlock.Bytes()
@@ -2848,7 +2848,7 @@ func TestBootstrappingWithDelayedGraniteActivation(t *testing.T) {
 		currentPChainHeight,
 		statelessblock.Epoch{},
 		innerBlock1.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	block1, err := proVM.ParseBlock(t.Context(), statelessBlock1.Bytes())
@@ -2870,7 +2870,7 @@ func TestBootstrappingWithDelayedGraniteActivation(t *testing.T) {
 		innerBlock2.Bytes(),
 		ctx.ChainID,
 		pTestSigner,
-	)
+		false)
 	require.NoError(err)
 
 	block2, err := proVM.ParseBlock(t.Context(), statelessBlock2.Bytes())
@@ -2999,7 +2999,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		currentPChainHeight,
 		statelessblock.Epoch{},
 		innerBlock1.Bytes(),
-	)
+		false)
 	require.NoError(err)
 
 	block1, err := proVM.ParseBlock(t.Context(), statelessBlock1.Bytes())
@@ -3022,7 +3022,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		innerBlock2.Bytes(),
 		ctx.ChainID,
 		pTestSigner,
-	)
+		false)
 	require.NoError(err)
 
 	block2, err := proVM.ParseBlock(t.Context(), statelessBlock2.Bytes())

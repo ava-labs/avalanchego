@@ -45,7 +45,7 @@ func TestBuild(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-	)
+		false)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())
@@ -84,7 +84,7 @@ func TestBuildPreGranite(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-	)
+		false)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())
@@ -109,7 +109,7 @@ func TestBuildUnsigned(t *testing.T) {
 
 	require := require.New(t)
 
-	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpoch, innerBlockBytes)
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpoch, innerBlockBytes, false)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())
@@ -130,7 +130,7 @@ func TestBuildUnsignedPreGranite(t *testing.T) {
 
 	require := require.New(t)
 
-	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpoch, innerBlockBytes)
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpoch, innerBlockBytes, false)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())

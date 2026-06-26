@@ -277,7 +277,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
-	)
+		false)
 	require.NoError(err)
 	postForkChild := &postForkBlock{
 		SignedBlock: postForkStatelessChild,
@@ -587,7 +587,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		coreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
-	)
+		false)
 	require.NoError(err)
 
 	invalidChild, err := proVM.ParseBlock(t.Context(), slb.Bytes())
@@ -699,7 +699,7 @@ func TestPreForkBlock_NonZeroEpoch(t *testing.T) {
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
-	)
+		false)
 	require.NoError(err)
 
 	postForkChild := &postForkBlock{
