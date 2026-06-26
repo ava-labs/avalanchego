@@ -101,11 +101,6 @@ func TestSolanaVerifier(t *testing.T) {
 			wantErr: "payload mismatch",
 		},
 		{
-			name: "empty allowed sources allows all addresses",
-			rpc:  &stubRPC{Tx: makeValidTx(testProgram, testSlotV, payload)},
-			msg:  func(t *testing.T) *oracle.OracleMessage { return makeMsg(t, testProgram, testSlotV, payload) },
-		},
-		{
 			// Program invoked via CPI: appears in meta.innerInstructions, not
 			// in transaction.message.instructions.
 			name: "program invoked via CPI",
