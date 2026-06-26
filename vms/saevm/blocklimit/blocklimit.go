@@ -14,9 +14,9 @@ import (
 
 // MaxBlockBytes is the byte budget M of [Eligible]: the maximum size of a single
 // P2P message.
-const MaxBlockBytes uint64 = constants.DefaultMaxMessageSize
+const MaxBytes uint64 = constants.DefaultMaxMessageSize
 
-// Eligible reports whether a transaction may be included in a block, using the
+// Eligible reports whether a transaction MAY be included in a block, using the
 // notation:
 //
 //   - M = [MaxBlockBytes], the maximum P2P message size
@@ -27,7 +27,7 @@ const MaxBlockBytes uint64 = constants.DefaultMaxMessageSize
 // The transaction's byte share is y/M and its gas share is g/x. The rule rejects
 // the transaction if its byte share exceeds its gas share:
 //
-//	reject if  y/M > g/x  <->   y > g·(M/x)
+//	accept if  y/M < g/x  <->   y·x < g·M
 //
 // Equivalently, it must carry at least x/M gas per serialized byte.
 func Eligible(txBytes, gasLimit, blockGasLimit uint64) bool {
