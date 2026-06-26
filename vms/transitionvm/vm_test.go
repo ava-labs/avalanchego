@@ -248,14 +248,32 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		blocksUntilTransition: 1,
 	}, opts...)
 
-	state := newFakeState()
+	timeUntilTransition := time.Duration(cfg.blocksUntilTransition) * blockInterval
+	return initSUT(
+		t,
+		memdb.New(),
+		newFakeState(),
+		snowmantest.GenesisTimestamp.Add(timeUntilTransition),
+	)
+}
+
+// restart rebuilds the VM against the same database and chain state, modeling a
+// node restart.
+func (s *SUT) restart(t *testing.T) *SUT {
+	t.Helper()
+	return initSUT(t, s.db, s.pre.state, s.transitionTime)
+}
+
+// initSUT builds and initializes a transition VM over the given persisted state.
+func initSUT(t *testing.T, db database.Database, state *fakeState, transitionTime time.Time) *SUT {
+	t.Helper()
+
 	pre := newFakeVM(t, "pre", state)
 	post := newFakeVM(t, "post", state)
-	timeUntilTransition := time.Duration(cfg.blocksUntilTransition) * blockInterval
 	vm := &VM{
 		preTransitionChain:  pre,
 		postTransitionChain: post,
-		transitionTime:      snowmantest.GenesisTimestamp.Add(timeUntilTransition),
+		transitionTime:      transitionTime,
 	}
 	vm.current = &current{chain: vm.preTransitionChain}
 
@@ -268,7 +286,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	require.NoError(t, vm.Initialize(
 		t.Context(),
 		snowtest.Context(t, snowtest.CChainID),
-		memdb.New(),
+		db,
 		nil, // genesisBytes
 		nil, // upgradeBytes
 		nil, // configBytes
@@ -306,6 +324,36 @@ func TestTransition(t *testing.T) {
 
 	sut.BuildVerifyAccept(t, ctx) // triggers the transition
 
+	version, err = sut.Version(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "post", version)
+}
+
+// TestRestart verifies that the VM resumes on the correct chain after a node
+// restart, both before and after the transition.
+func TestRestart(t *testing.T) {
+	// Require two blocks to transition so the VM can restart with an accepted
+	// block while still on the pre-transition chain.
+	sut := newSUT(t, withBlocksUntilTransition(2))
+	ctx := t.Context()
+
+	// Accept one block; the VM stays on the pre-transition chain.
+	sut.BuildVerifyAccept(t, ctx)
+
+	// Restarting before the transition resumes on the pre-transition chain.
+	sut = sut.restart(t)
+	version, err := sut.Version(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "pre", version)
+
+	// Accept the block that reaches the transition time.
+	sut.BuildVerifyAccept(t, ctx)
+	version, err = sut.Version(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "post", version)
+
+	// Restarting after the transition resumes on the post-transition chain.
+	sut = sut.restart(t)
 	version, err = sut.Version(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "post", version)
