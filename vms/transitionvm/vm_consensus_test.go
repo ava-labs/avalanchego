@@ -10,8 +10,23 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
+
+// TestTransitionMaintainsState verifies that the consensus state set before the
+// transition is applied to the post-transition chain.
+func TestTransitionMaintainsState(t *testing.T) {
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	require.NoError(t, sut.SetState(ctx, snow.NormalOp))
+	require.Equal(t, snow.NormalOp, sut.pre.consensusState)
+
+	sut.BuildVerifyAccept(t, ctx) // triggers the transition
+
+	require.Equal(t, snow.NormalOp, sut.post.consensusState)
+}
 
 // TestWaitForEventForwardsToCurrentChain verifies that WaitForEvent routes to
 // whichever chain is current, before and after the transition.

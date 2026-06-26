@@ -99,6 +99,8 @@ type fakeVM struct {
 	tip *fakeBlock
 	// appSender is the sender captured in Initialize, used by sendAppRequest.
 	appSender common.AppSender
+	// consensusState is the most recent state passed to SetState.
+	consensusState snow.State
 	// handlers is the set of HTTP handlers returned by CreateHandlers.
 	handlers map[string]http.Handler
 	// events is delivered by WaitForEvent, which otherwise blocks until its
@@ -130,6 +132,11 @@ func (vm *fakeVM) Initialize(_ context.Context, _ *snow.Context, _ database.Data
 // in Initialize.
 func (vm *fakeVM) sendAppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	return vm.appSender.SendAppRequest(ctx, set.Of(nodeID), requestID, nil)
+}
+
+func (vm *fakeVM) SetState(_ context.Context, state snow.State) error {
+	vm.consensusState = state
+	return nil
 }
 
 func (vm *fakeVM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
