@@ -91,6 +91,8 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *acp226.DelayExcess:
 				assertDifferentPointers(t, f, fieldCp)
+			case *dynamic.TargetExponent:
+				assertDifferentPointers(t, f, fieldCp)
 			case *dynamic.PriceExponent:
 				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:
