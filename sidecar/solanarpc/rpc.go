@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package main
+package solanarpc
 
 import (
 	"bytes"
@@ -30,19 +30,19 @@ type rpcError struct {
 }
 
 type txResult struct {
-	Slot        uint64  `json:"slot"`
-	Transaction txData  `json:"transaction"`
-	Meta        txMeta  `json:"meta"`
+	Slot        uint64 `json:"slot"`
+	Transaction txData `json:"transaction"`
+	Meta        txMeta `json:"meta"`
 }
 
 type txMeta struct {
 	InnerInstructions []txInnerInstructionGroup `json:"innerInstructions"`
-	LoadedAddresses   txLoadedAddresses          `json:"loadedAddresses"`
+	LoadedAddresses   txLoadedAddresses         `json:"loadedAddresses"`
 }
 
 type txInnerInstructionGroup struct {
-	Index        int              `json:"index"`
-	Instructions []txInstruction  `json:"instructions"`
+	Index        int             `json:"index"`
+	Instructions []txInstruction `json:"instructions"`
 }
 
 type txLoadedAddresses struct {
