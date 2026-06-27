@@ -6,6 +6,7 @@ package transitionvm
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -20,10 +21,26 @@ var (
 // preBlock wraps a block from the pre-transition chain. It triggers the
 // transition when a block at or after the transition time is accepted, and
 // fails verification of a block whose parent is at or after it.
+//
+// The block's immutable metadata (ID, parent, bytes, height, timestamp) is
+// cached at construction so these accessors don't need to consult the wrapped
+// block.
 type preBlock struct {
-	snowman.Block
-	v *VM
+	v   *VM
+	blk snowman.Block
+
+	id        ids.ID
+	parentID  ids.ID
+	bytes     []byte
+	height    uint64
+	timestamp time.Time
 }
+
+func (p *preBlock) ID() ids.ID           { return p.id }
+func (p *preBlock) Parent() ids.ID       { return p.parentID }
+func (p *preBlock) Bytes() []byte        { return p.bytes }
+func (p *preBlock) Height() uint64       { return p.height }
+func (p *preBlock) Timestamp() time.Time { return p.timestamp }
 
 var errPreTransitionBlockAfterTransition = errors.New("pre-transition block after transition")
 
@@ -34,13 +51,13 @@ func (p *preBlock) Verify(ctx context.Context) error {
 	if err := p.verifyPreTransition(ctx); err != nil {
 		return err
 	}
-	return p.Block.Verify(ctx)
+	return p.blk.Verify(ctx)
 }
 
 // ShouldVerifyWithContext forwards to the inner block, or returns false if it
 // doesn't implement [block.WithVerifyContext].
 func (p *preBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
-	blkWithCtx, ok := p.Block.(block.WithVerifyContext)
+	blkWithCtx, ok := p.blk.(block.WithVerifyContext)
 	if !ok {
 		return false, nil
 	}
@@ -58,7 +75,7 @@ func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Contex
 	if err := p.verifyPreTransition(ctx); err != nil {
 		return err
 	}
-	blkWithCtx, ok := p.Block.(block.WithVerifyContext)
+	blkWithCtx, ok := p.blk.(block.WithVerifyContext)
 	if !ok {
 		return errBlockDoesNotImplementWithVerifyContext
 	}
@@ -69,7 +86,7 @@ func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Contex
 //
 // Callers must hold transitionLock.
 func (p *preBlock) verifyPreTransition(ctx context.Context) error {
-	parent, err := p.v.current.chain.GetBlock(ctx, p.Parent())
+	parent, err := p.v.current.chain.GetBlock(ctx, p.parentID)
 	if err != nil {
 		return err
 	}
@@ -83,13 +100,13 @@ func (p *preBlock) verifyPreTransition(ctx context.Context) error {
 // Accept does not hold transitionLock: accepting a block at or after the
 // transition time triggers the transition, which takes the write lock itself.
 func (p *preBlock) Accept(ctx context.Context) error {
-	if err := p.Block.Accept(ctx); err != nil {
+	if err := p.blk.Accept(ctx); err != nil {
 		return err
 	}
-	if p.Timestamp().Before(p.v.transitionTime) {
+	if p.timestamp.Before(p.v.transitionTime) {
 		return nil
 	}
-	return p.v.transition(ctx, p.Block)
+	return p.v.transition(ctx, p.blk)
 }
 
 func (p *preBlock) Reject(ctx context.Context) error {
@@ -101,7 +118,7 @@ func (p *preBlock) Reject(ctx context.Context) error {
 	if p.v.transitioned {
 		return nil
 	}
-	return p.Block.Reject(ctx)
+	return p.blk.Reject(ctx)
 }
 
 func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
@@ -139,5 +156,13 @@ func (vm *VM) wrapBlock(b snowman.Block, err error) (snowman.Block, error) {
 	if vm.transitioned {
 		return b, nil
 	}
-	return &preBlock{b, vm}, nil
+	return &preBlock{
+		v:         vm,
+		blk:       b,
+		id:        b.ID(),
+		parentID:  b.Parent(),
+		bytes:     b.Bytes(),
+		height:    b.Height(),
+		timestamp: b.Timestamp(),
+	}, nil
 }
