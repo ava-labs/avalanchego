@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
@@ -40,6 +41,29 @@ func init() {
 	flagVars = e2e.RegisterFlags(e2e.WithDefaultOwner("avalanchego-e2e"))
 }
 
+// upgradeConfig builds the e2e upgrade config based on when the latest upgrade
+// should activate:
+//   - activateLatestAfter < 0: leave the latest upgrade unscheduled
+//   - activateLatestAfter == 0: activate the latest upgrade from genesis
+//   - activateLatestAfter > 0: schedule the latest upgrade that duration after
+//     network start
+func upgradeConfig(activateLatestAfter time.Duration) upgrade.Config {
+	var upgrades upgrade.Config
+	switch {
+	case activateLatestAfter < 0:
+		upgrades = upgradetest.GetConfig(upgradetest.Latest - 1)
+	case activateLatestAfter == 0:
+		upgrades = upgradetest.GetConfig(upgradetest.Latest)
+	default:
+		// Schedule only the latest fork after start: set every fork to the
+		// scheduled time, then reset all prior forks to be active from genesis.
+		upgrades = upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Now().Add(activateLatestAfter))
+		upgradetest.SetTimesTo(&upgrades, upgradetest.Latest-1, upgrade.InitiallyActiveTime)
+	}
+	upgrades.GraniteEpochDuration = 4 * time.Second
+	return upgrades
+}
+
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
@@ -50,12 +74,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
-	upgradeToActivate := upgradetest.Latest
-	if !flagVars.ActivateLatest() {
-		upgradeToActivate--
-	}
-	upgrades := upgradetest.GetConfig(upgradeToActivate)
-	upgrades.GraniteEpochDuration = 4 * time.Second
+	upgrades := upgradeConfig(flagVars.ActivateLatestAfter())
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
 	)
