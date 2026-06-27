@@ -26,7 +26,7 @@ var (
 // cached at construction so these accessors don't need to consult the wrapped
 // block.
 type preBlock struct {
-	v   *VM
+	vm  *VM
 	blk snowman.Block
 
 	id        ids.ID
@@ -45,8 +45,8 @@ func (p *preBlock) Timestamp() time.Time { return p.timestamp }
 var errPreTransitionBlockAfterTransition = errors.New("pre-transition block after transition")
 
 func (p *preBlock) Verify(ctx context.Context) error {
-	p.v.transitionLock.RLock()
-	defer p.v.transitionLock.RUnlock()
+	p.vm.transitionLock.RLock()
+	defer p.vm.transitionLock.RUnlock()
 
 	if err := p.verifyPreTransition(ctx); err != nil {
 		return err
@@ -69,8 +69,8 @@ var errBlockDoesNotImplementWithVerifyContext = errors.New("block does not imple
 // VerifyWithContext forwards to the inner block after the same parent check as
 // [preBlock.Verify].
 func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Context) error {
-	p.v.transitionLock.RLock()
-	defer p.v.transitionLock.RUnlock()
+	p.vm.transitionLock.RLock()
+	defer p.vm.transitionLock.RUnlock()
 
 	if err := p.verifyPreTransition(ctx); err != nil {
 		return err
@@ -86,12 +86,12 @@ func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Contex
 //
 // Callers must hold transitionLock.
 func (p *preBlock) verifyPreTransition(ctx context.Context) error {
-	parent, err := p.v.current.chain.GetBlock(ctx, p.parentID)
+	parent, err := p.vm.current.chain.GetBlock(ctx, p.parentID)
 	if err != nil {
 		return err
 	}
 
-	if parentTime := parent.Timestamp(); !parentTime.Before(p.v.transitionTime) {
+	if parentTime := parent.Timestamp(); !parentTime.Before(p.vm.transitionTime) {
 		return errPreTransitionBlockAfterTransition
 	}
 	return nil
@@ -103,19 +103,19 @@ func (p *preBlock) Accept(ctx context.Context) error {
 	if err := p.blk.Accept(ctx); err != nil {
 		return err
 	}
-	if p.timestamp.Before(p.v.transitionTime) {
+	if p.timestamp.Before(p.vm.transitionTime) {
 		return nil
 	}
-	return p.v.transition(ctx, p.blk)
+	return p.vm.transition(ctx, p.blk)
 }
 
 func (p *preBlock) Reject(ctx context.Context) error {
-	p.v.transitionLock.RLock()
-	defer p.v.transitionLock.RUnlock()
+	p.vm.transitionLock.RLock()
+	defer p.vm.transitionLock.RUnlock()
 
 	// Once transitioned, the pre-transition chain is shut down. Forwarding
 	// Reject into it could return an error, which the engine treats as fatal.
-	if p.v.transitioned {
+	if p.vm.transitioned {
 		return nil
 	}
 	return p.blk.Reject(ctx)
@@ -157,7 +157,7 @@ func (vm *VM) wrapBlock(b snowman.Block, err error) (snowman.Block, error) {
 		return b, nil
 	}
 	return &preBlock{
-		v:         vm,
+		vm:        vm,
 		blk:       b,
 		id:        b.ID(),
 		parentID:  b.Parent(),
