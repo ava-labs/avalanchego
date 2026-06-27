@@ -735,8 +735,8 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
-	// syncing.
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
+	// syncing. Follow-only chains never hand off, so they take this path too.
+	if b.Config.FollowOnly || !b.Config.BootstrapTracker.IsBootstrapped() {
 		log("waiting for the remaining chains in this subnet to finish syncing")
 		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
 		// on the latest tip.
@@ -765,7 +765,7 @@ func (b *Bootstrapper) Timeout() error {
 	}
 	b.awaitingTimeout = false
 
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
+	if b.Config.FollowOnly || !b.Config.BootstrapTracker.IsBootstrapped() {
 		return b.restartBootstrapping(context.TODO())
 	}
 	return b.onFinished(context.TODO(), b.requestID)
