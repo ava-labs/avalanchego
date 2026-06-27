@@ -14,10 +14,12 @@ import (
 
 var _ vms.Factory = (*Factory)(nil)
 
+// Factory creates new C-Chain VMs.
 type Factory struct{}
 
-func (*Factory) New(logger logging.Logger) (interface{}, error) {
-	logger.Info("Creating new SAE VM")
+// New creates a new C-Chain VM.
+func (*Factory) New(log logging.Logger) (interface{}, error) {
+	log.Info("Creating new C-Chain SAE VM")
 	vm := &VM{
 		pullGossipPeriod: time.Second,
 		pushGossipPeriod: 100 * time.Millisecond,
@@ -29,6 +31,6 @@ func (*Factory) New(logger logging.Logger) (interface{}, error) {
 	}
 	return fullVM{
 		adaptor.Convert(vm),
-		adaptor.ConvertStateSync(vm),
+		adaptor.ConvertStateSync(&syncer{}),
 	}, nil
 }
