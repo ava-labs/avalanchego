@@ -124,6 +124,10 @@ type Bootstrapper struct {
 	// already closed once the chain has synced), so the delay actually applies
 	// instead of firing instantly and spinning the CPU.
 	followOnlyTimer common.TimeoutRegistrar
+	// followOnlyTipID is the beacon frontier a [FollowOnly] chain has already
+	// synced to. While the polled frontier still equals it there is no new
+	// block, so the re-arm just waits instead of re-fetching the same window.
+	followOnlyTipID ids.ID
 
 	tree            *interval.Tree
 	missingBlockIDs set.Set[ids.ID]
@@ -401,6 +405,18 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 }
 
 func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.ID) error {
+	// Follow-only idle guard: on a re-arm where the beacon frontier still equals
+	// the block we already synced to, there is nothing new. Skip the re-fetch /
+	// re-accept of the same window (which otherwise churns CPU + leveldb every
+	// poll) and just wait for the next poll. Catch-up (frontier is a new block)
+	// and the initial sync (b.restarted == false) fall through and fetch.
+	if b.Config.FollowOnly && b.restarted &&
+		len(acceptedBlockIDs) == 1 && acceptedBlockIDs[0] == b.followOnlyTipID {
+		b.awaitingTimeout = true
+		b.followOnlyTimer.RegisterTimeout(followOnlyPollInterval)
+		return nil
+	}
+
 	knownBlockIDs := genesis.GetCheckpoints(b.Ctx.NetworkID, b.Ctx.ChainID)
 	b.missingBlockIDs.Union(knownBlockIDs)
 	b.missingBlockIDs.Add(acceptedBlockIDs...)
@@ -750,7 +766,9 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 
 	// Follow-only chains never hand off to consensus. After catching up they
 	// re-arm on [followOnlyTimer] (non-preemptable) to keep tracking the tip.
+	// Record the synced tip so the next poll can no-op until a new block appears.
 	if b.Config.FollowOnly {
+		b.followOnlyTipID = lastAccepted.ID()
 		b.awaitingTimeout = true
 		b.followOnlyTimer.RegisterTimeout(followOnlyPollInterval)
 		return nil
