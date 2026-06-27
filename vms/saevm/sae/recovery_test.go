@@ -204,9 +204,8 @@ func TestRecoverSimple(t *testing.T) {
 				for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
 					ethB, err := canonicalBlock(sut.rawVM.db, i)
 					require.NoErrorf(t, err, "canonicalBlock(%d)", i)
-					b, err := blocks.New(ethB, nil, nil, sut.logger)
-					require.NoErrorf(t, err, "blocks.New(): height %d", ethB.NumberU64())
-					require.NoErrorf(t, b.RestoreExecutionArtefacts(sut.hooks, sut.rawVM.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig()), "%T.RestoreExecutionArtifacts(): %d", b, b.NumberU64())
+					b, err := blocks.RestoreSettledBlock(sut.hooks, ethB, sut.logger, sut.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig())
+					require.NoErrorf(t, err, "RestoreSettledBlock(%d)", i)
 
 					// If these states were available they would eventually
 					// result in an OOM as the triedb leaked memory.

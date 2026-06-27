@@ -249,13 +249,16 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 	return executionArtefact(b, "state root", (*executionResults).postExecutionStateRoot)
 }
 
-// RestoreExecutionArtefacts reloads post-execution artefacts persisted by
+// restoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
 // said function was originally called.  If no execution results are found, the
-// block is assumed to be synchronous.
+// block is marked as synchronous.
 //
-// Any error returned is indicative of a corrupted database.
-func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+// This function does NOT restore the block's settlement state, even if the
+// block is synchronous. The caller MUST mark the block as settled.
+//
+// Any error returned corrupts the block's in-memory state.
+func (b *Block) restoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	e, err := loadExecutionResults(xdb, b.NumberU64())
 	if errors.Is(err, database.ErrNotFound) {
 		e, err = b.synchronousExecutionResults(hooks)
@@ -301,16 +304,16 @@ func persistedExecutionArtefact[T any](xdb saetypes.ExecutionResults, blockNum u
 	return get(e), nil
 }
 
-// PostExecutionStateRoot mirrors the behaviour of
-// [Block.RestoreExecutionArtefacts], without requiring a full [Block], and only
-// returning the state root after execution.
+// PostExecutionStateRoot returns the post-execution state root of a block,
+// without requiring a full [Block], and only returning the state root after
+// execution.
 func PostExecutionStateRoot(xdb saetypes.ExecutionResults, blockNum uint64) (common.Hash, error) {
 	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).postExecutionStateRoot)
 }
 
-// ExecutionBaseFee mirrors the behaviour of [Block.RestoreExecutionArtefacts],
-// without requiring a full [Block], and only returning the base fee when the
-// block was executed (as against the worst-case prediction).
+// ExecutionBaseFee returns the base fee after exuection of the block without
+// requiring a full [Block], and only returning the base fee when the block was
+// executed (as against the worst-case prediction).
 func ExecutionBaseFee(xdb saetypes.ExecutionResults, blockNum uint64) (*uint256.Int, error) {
 	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).cloneBaseFee)
 }

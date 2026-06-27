@@ -62,7 +62,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	}
 	lastSettledHeight := rawdb.ReadHeaderNumber(rec.db, lastSettledHash)
 	if lastSettledHeight == nil {
-		return nil, fmt.Errorf("%w: finalized block %#x has no number", errIncompleteRecoveryState, lastSettledHash)
+		return nil, fmt.Errorf("%w: no height for finalized block", errIncompleteRecoveryState)
 	}
 
 	// Search for first settled post-execution state
@@ -77,7 +77,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			return nil, err
 		}
 
-		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil {
+		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil { // if NO error
 			return b, nil
 		}
 
@@ -159,17 +159,18 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				return b.MarkSettled(blackhole)
 
 			default:
-				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
+				ethB, err := canonicalBlock(rec.db, b.Height()-1)
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
+				parent, err := blocks.RestoreExecutedBlock(ethB, rec.hooks, rec.db, rec.xdb, rec.chainConfig, rec.log)
+				if err != nil {
 					return err
 				}
 				chain = append(chain, parent)
 
-				// RestoreExecutionArtefacts is only restore's the block's execution state, not settlement.
-				if !parent.Synchronous() && !b.Settled() {
+				// RestoreExecutedBlock will mark synchronous blocks as settled.
+				if parent.Synchronous() || !b.Settled() {
 					continue
 				}
 				if err := parent.MarkSettled(blackhole); err != nil {

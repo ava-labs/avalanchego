@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -44,4 +45,24 @@ func (b *backend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.Blo
 
 func (b *backend) GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error) {
 	return readByNumberAndHash(b, hash, number, (*blocks.Block).Body, rawdb.ReadBody)
+}
+
+// restoreBlock finds any available block by number or hash. All methods unrelated to ancestry
+// are safe to use.
+func (b *backend) restoreBlock(numOrHash rpc.BlockNumberOrHash) (*blocks.Block, error) {
+	return readByNumberOrHash(
+		b,
+		numOrHash,
+		func(b *blocks.Block) *blocks.Block {
+			return b
+		},
+		func(db ethdb.Reader, h common.Hash, num uint64) (*blocks.Block, error) {
+			if num >= b.LastSettled().Height() {
+				// We can't restore the settlement state, it should have been found in the map.
+				return nil, blocks.ErrNotFound
+			}
+			ethB := rawdb.ReadBlock(db, h, num) // readByNumberOrHash verifies this will be non-nil
+			return blocks.RestoreSettledBlock(b.Hooks(), ethB, b.Logger(), b.DB(), b.XDB(), b.ChainConfig())
+		},
+	)
 }
