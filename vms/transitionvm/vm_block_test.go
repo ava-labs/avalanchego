@@ -39,7 +39,7 @@ func TestTransitionBlockChildren(t *testing.T) {
 			// it can't be verified as a pre-transition block.
 			child, err := sut.BuildBlock(ctx)
 			require.NoError(t, err)
-			require.ErrorIs(t, verifyBlock(ctx, child, mode), errPreTransitionBlockAfterTransition)
+			require.ErrorIs(t, verifyBlock(ctx, child, mode), errPostTransitionBlockBeforeTransition)
 		})
 	}
 }

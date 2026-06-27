@@ -6,6 +6,7 @@ package transitionvm
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,8 +27,11 @@ var (
 // cached at construction so these accessors don't need to consult the wrapped
 // block.
 type preBlock struct {
-	vm  *VM
-	blk snowman.Block
+	vm *VM
+
+	lock         sync.RWMutex
+	blk          snowman.Block
+	transitioned bool
 
 	id        ids.ID
 	parentID  ids.ID
@@ -42,13 +46,14 @@ func (p *preBlock) Bytes() []byte        { return p.bytes }
 func (p *preBlock) Height() uint64       { return p.height }
 func (p *preBlock) Timestamp() time.Time { return p.timestamp }
 
-var errPreTransitionBlockAfterTransition = errors.New("pre-transition block after transition")
-
 func (p *preBlock) Verify(ctx context.Context) error {
 	p.vm.transitionLock.RLock()
 	defer p.vm.transitionLock.RUnlock()
 
-	if err := p.verifyPreTransition(ctx); err != nil {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if err := p.maybeTransition(ctx); err != nil {
 		return err
 	}
 	return p.blk.Verify(ctx)
@@ -57,6 +62,16 @@ func (p *preBlock) Verify(ctx context.Context) error {
 // ShouldVerifyWithContext forwards to the inner block, or returns false if it
 // doesn't implement [block.WithVerifyContext].
 func (p *preBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
+	p.vm.transitionLock.RLock()
+	defer p.vm.transitionLock.RUnlock()
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if err := p.maybeTransition(ctx); err != nil {
+		return false, err
+	}
+
 	blkWithCtx, ok := p.blk.(block.WithVerifyContext)
 	if !ok {
 		return false, nil
@@ -72,9 +87,13 @@ func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Contex
 	p.vm.transitionLock.RLock()
 	defer p.vm.transitionLock.RUnlock()
 
-	if err := p.verifyPreTransition(ctx); err != nil {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if err := p.maybeTransition(ctx); err != nil {
 		return err
 	}
+
 	blkWithCtx, ok := p.blk.(block.WithVerifyContext)
 	if !ok {
 		return errBlockDoesNotImplementWithVerifyContext
@@ -82,18 +101,31 @@ func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Contex
 	return blkWithCtx.VerifyWithContext(ctx, blockCtx)
 }
 
-// verifyPreTransition ensures the parent precedes the transition time.
-//
-// Callers must hold transitionLock.
-func (p *preBlock) verifyPreTransition(ctx context.Context) error {
+var errPostTransitionBlockBeforeTransition = errors.New("post-transition block before transition")
+
+func (p *preBlock) maybeTransition(ctx context.Context) error {
+	if p.transitioned {
+		return nil
+	}
+
 	parent, err := p.vm.current.chain.GetBlock(ctx, p.parentID)
 	if err != nil {
 		return err
 	}
-
-	if parentTime := parent.Timestamp(); !parentTime.Before(p.vm.transitionTime) {
-		return errPreTransitionBlockAfterTransition
+	if parentTime := parent.Timestamp(); parentTime.Before(p.vm.transitionTime) {
+		return nil
 	}
+
+	if !p.vm.transitioned {
+		return errPostTransitionBlockBeforeTransition
+	}
+
+	newBlock, err := p.vm.current.chain.ParseBlock(ctx, p.bytes)
+	if err != nil {
+		return err
+	}
+	p.blk = newBlock
+	p.transitioned = true
 	return nil
 }
 
@@ -103,7 +135,7 @@ func (p *preBlock) Accept(ctx context.Context) error {
 	if err := p.blk.Accept(ctx); err != nil {
 		return err
 	}
-	if p.timestamp.Before(p.vm.transitionTime) {
+	if p.transitioned || p.timestamp.Before(p.vm.transitionTime) {
 		return nil
 	}
 	return p.vm.transition(ctx, p.blk)
@@ -113,9 +145,12 @@ func (p *preBlock) Reject(ctx context.Context) error {
 	p.vm.transitionLock.RLock()
 	defer p.vm.transitionLock.RUnlock()
 
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
 	// Once transitioned, the pre-transition chain is shut down. Forwarding
 	// Reject into it could return an error, which the engine treats as fatal.
-	if p.vm.transitioned {
+	if p.transitioned != p.vm.transitioned {
 		return nil
 	}
 	return p.blk.Reject(ctx)
@@ -153,16 +188,14 @@ func (vm *VM) wrapBlock(b snowman.Block, err error) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	if vm.transitioned {
-		return b, nil
-	}
 	return &preBlock{
-		vm:        vm,
-		blk:       b,
-		id:        b.ID(),
-		parentID:  b.Parent(),
-		bytes:     b.Bytes(),
-		height:    b.Height(),
-		timestamp: b.Timestamp(),
+		vm:           vm,
+		blk:          b,
+		transitioned: vm.transitioned,
+		id:           b.ID(),
+		parentID:     b.Parent(),
+		bytes:        b.Bytes(),
+		height:       b.Height(),
+		timestamp:    b.Timestamp(),
 	}, nil
 }
