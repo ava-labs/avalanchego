@@ -41,24 +41,24 @@ func init() {
 	flagVars = e2e.RegisterFlags(e2e.WithDefaultOwner("avalanchego-e2e"))
 }
 
-// upgradeConfig builds the e2e upgrade config based on when the latest upgrade
-// should activate:
-//   - activateLatestAfter < 0: leave the latest upgrade unscheduled
-//   - activateLatestAfter == 0: activate the latest upgrade from genesis
-//   - activateLatestAfter > 0: schedule the latest upgrade that duration after
-//     network start
+// upgradeConfig configures the latest upgrade:
+//   - activateLatestAfter < 0: leave latest unscheduled
+//   - activateLatestAfter == 0: activate latest from genesis
+//   - activateLatestAfter > 0: schedule latest that duration after starting
 func upgradeConfig(activateLatestAfter time.Duration) upgrade.Config {
+	const previous = upgradetest.Latest - 1
 	var upgrades upgrade.Config
 	switch {
 	case activateLatestAfter < 0:
-		upgrades = upgradetest.GetConfig(upgradetest.Latest - 1)
+		upgrades = upgradetest.GetConfig(previous)
 	case activateLatestAfter == 0:
 		upgrades = upgradetest.GetConfig(upgradetest.Latest)
 	default:
-		// Schedule only the latest fork after start: set every fork to the
-		// scheduled time, then reset all prior forks to be active from genesis.
-		upgrades = upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Now().Add(activateLatestAfter))
-		upgradetest.SetTimesTo(&upgrades, upgradetest.Latest-1, upgrade.InitiallyActiveTime)
+		upgrades = upgradetest.GetConfigWithUpgradeTime(
+			upgradetest.Latest,
+			time.Now().Add(activateLatestAfter),
+		)
+		upgradetest.SetTimesTo(&upgrades, previous, upgrade.InitiallyActiveTime)
 	}
 	upgrades.GraniteEpochDuration = 4 * time.Second
 	return upgrades
