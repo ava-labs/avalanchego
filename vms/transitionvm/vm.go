@@ -122,14 +122,15 @@ func (vm *VM) Initialize(
 	vm.connections = newConnections()
 	vm.httpHandlers = newHTTPHandlers()
 
-	preChainCtx.Log.Info("checking for transition marker")
+	log := preChainCtx.Log
+	log.Info("checking for transition marker")
 	has, err := vm.db.Has(transitionedKey)
 	if err != nil {
 		return fmt.Errorf("checking for transition marker: %w", err)
 	}
 
 	if has {
-		preChainCtx.Log.Info("initializing post-transition VM")
+		log.Info("initializing post-transition VM")
 		if err := vm.initChain(ctx, vm.postTransitionChain, vm.postChainCtx); err != nil {
 			return fmt.Errorf("initializing post-transition VM: %w", err)
 		}
@@ -137,7 +138,7 @@ func (vm *VM) Initialize(
 		return nil
 	}
 
-	preChainCtx.Log.Info("initializing pre-transition VM")
+	log.Info("initializing pre-transition VM")
 	if err := vm.initChain(ctx, vm.preTransitionChain, preChainCtx); err != nil {
 		return fmt.Errorf("initializing pre-transition VM: %w", err)
 	}
@@ -169,23 +170,24 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	defer vm.transitionLock.Unlock()
 
 	lastID := last.ID()
-	vm.postChainCtx.Log.Info("transitioning VMs",
+	log := vm.postChainCtx.Log
+	log.Info("transitioning VMs",
 		zap.Stringer("blkID", lastID),
 		zap.Uint64("height", last.Height()),
 		zap.Time("timestamp", last.Timestamp()),
 	)
 
-	vm.postChainCtx.Log.Info("shutting down pre-transition VM")
+	log.Info("shutting down pre-transition VM")
 	if err := vm.preTransitionChain.Shutdown(ctx); err != nil {
 		return fmt.Errorf("closing pre-transition chain: %w", err)
 	}
 
-	vm.postChainCtx.Log.Info("writing transition marker")
+	log.Info("writing transition marker")
 	if err := vm.db.Put(transitionedKey, nil); err != nil {
 		return fmt.Errorf("writing transition marker: %w", err)
 	}
 
-	vm.postChainCtx.Log.Info("initializing post-transition VM")
+	log.Info("initializing post-transition VM")
 	if err := vm.initChain(ctx, vm.postTransitionChain, vm.postChainCtx); err != nil {
 		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
@@ -196,7 +198,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	//
 	// Failing to due this could leave the preference uninitialized, which could
 	// cause block building to error.
-	vm.postChainCtx.Log.Info("initializing post-transition VM preference",
+	log.Info("initializing post-transition VM preference",
 		zap.Stringer("blkID", lastID),
 	)
 	if err := vm.postTransitionChain.SetPreference(ctx, lastID); err != nil {
@@ -204,7 +206,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 
 	vm.transitioned = true
-	vm.postChainCtx.Log.Info("transition finished successfully")
+	log.Info("transition finished successfully")
 	return nil
 }
 
