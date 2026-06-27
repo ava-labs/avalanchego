@@ -192,6 +192,27 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
 
+	log.Info("setting post-transition VM state",
+		zap.Stringer("state", vm.consensusState),
+	)
+	if vm.consensusState != snow.Initializing {
+		if err := vm.postTransitionChain.SetState(ctx, vm.consensusState); err != nil {
+			return fmt.Errorf("setting consensus state: %w", err)
+		}
+	}
+
+	log.Info("copying connections to the post-transition VM")
+	if err := vm.connections.reconnect(ctx, vm.postTransitionChain); err != nil {
+		return fmt.Errorf("reconnecting to vm: %w", err)
+	}
+
+	log.Info("updating HTTP handlers to route to the post-transition VM")
+	newHandlers, err := vm.postTransitionChain.CreateHandlers(ctx)
+	if err != nil {
+		return fmt.Errorf("creating http handlers: %w", err)
+	}
+	vm.httpHandlers.set(newHandlers)
+
 	// The VM is only notified of preference changes, so if the consensus engine
 	// previously set the preference, we must manually set the post-transition
 	// VM's preference.
@@ -233,21 +254,6 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 	if err != nil {
 		return fmt.Errorf("initializing chain: %w", err)
 	}
-
-	if vm.consensusState != snow.Initializing {
-		if err := chain.SetState(ctx, vm.consensusState); err != nil {
-			return fmt.Errorf("setting consensus state: %w", err)
-		}
-	}
-	if err := vm.connections.reconnect(ctx, chain); err != nil {
-		return fmt.Errorf("reconnecting to vm: %w", err)
-	}
-
-	newHandlers, err := chain.CreateHandlers(ctx)
-	if err != nil {
-		return fmt.Errorf("creating http handlers: %w", err)
-	}
-	vm.httpHandlers.set(newHandlers)
 
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	vm.current = &current{
