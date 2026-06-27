@@ -33,6 +33,12 @@ const (
 	// Delay bootstrapping to avoid potential CPU burns
 	bootstrappingDelay = 10 * time.Second
 
+	// followOnlyPollInterval is how long a [FollowOnly] chain waits before
+	// re-checking the beacon frontier for new blocks. Roughly the P-chain block
+	// cadence: short enough to track the tip within a couple seconds, long
+	// enough that an idle follower polls a couple times rather than spinning.
+	followOnlyPollInterval = 2 * time.Second
+
 	// statusUpdateFrequency is how many containers should be processed between
 	// logs
 	statusUpdateFrequency = 5000
@@ -113,6 +119,12 @@ type Bootstrapper struct {
 	executedStateTransitions uint64
 	awaitingTimeout          bool
 
+	// followOnlyTimer re-arms a [FollowOnly] chain's bootstrap loop. Unlike
+	// [TimeoutRegistrar], it is NOT preempted by AllBootstrapped (which is
+	// already closed once the chain has synced), so the delay actually applies
+	// instead of firing instantly and spinning the CPU.
+	followOnlyTimer common.TimeoutRegistrar
+
 	tree            *interval.Tree
 	missingBlockIDs set.Set[ids.ID]
 
@@ -161,6 +173,8 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		}
 	}
 	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
+	// nil preemption signal => never preempted, so the re-arm delay is honored.
+	bs.followOnlyTimer = common.NewTimeoutScheduler(timeout, nil)
 
 	return bs, err
 }
@@ -734,9 +748,17 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	// Notify the subnet that this chain is synced
 	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
 
+	// Follow-only chains never hand off to consensus. After catching up they
+	// re-arm on [followOnlyTimer] (non-preemptable) to keep tracking the tip.
+	if b.Config.FollowOnly {
+		b.awaitingTimeout = true
+		b.followOnlyTimer.RegisterTimeout(followOnlyPollInterval)
+		return nil
+	}
+
 	// If the subnet hasn't finished bootstrapping, this chain should remain
-	// syncing. Follow-only chains never hand off, so they take this path too.
-	if b.Config.FollowOnly || !b.Config.BootstrapTracker.IsBootstrapped() {
+	// syncing.
+	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		log("waiting for the remaining chains in this subnet to finish syncing")
 		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
 		// on the latest tip.
