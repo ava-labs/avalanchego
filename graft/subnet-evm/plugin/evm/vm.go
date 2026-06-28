@@ -498,11 +498,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if vm.extensionConfig.OracleVerifier != nil {
-		if err := vm.registerOracleHandler(vm.extensionConfig.OracleVerifier); err != nil {
-			return err
-		}
-	} else if vm.config.Oracle.Endpoint != "" {
+	if vm.config.Oracle.Endpoint != "" {
 		sidecar, err := p2poracle.NewGRPCSidecarClient(vm.config.Oracle.Endpoint)
 		if err != nil {
 			return fmt.Errorf("failed to create oracle gRPC client: %w", err)
