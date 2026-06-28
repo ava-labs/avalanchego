@@ -29,7 +29,7 @@ var (
 type preBlock struct {
 	vm *VM
 
-	lock         sync.RWMutex
+	lock         sync.Mutex
 	blk          snowman.Block
 	transitioned bool
 
@@ -103,6 +103,8 @@ func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Contex
 
 var errPostTransitionBlockBeforeTransition = errors.New("post-transition block before transition")
 
+// If maybeTransition returns nil, then all future calls to maybeTransition will
+// also return nil and will not modify the block.
 func (p *preBlock) maybeTransition(ctx context.Context) error {
 	if p.transitioned {
 		return nil
@@ -113,7 +115,7 @@ func (p *preBlock) maybeTransition(ctx context.Context) error {
 		return err
 	}
 	if parentTime := parent.Timestamp(); parentTime.Before(p.vm.transitionTime) {
-		return nil
+		return nil // This block doesn't need to transition.
 	}
 
 	if !p.vm.transitioned {
@@ -135,6 +137,9 @@ func (p *preBlock) Accept(ctx context.Context) error {
 	if err := p.blk.Accept(ctx); err != nil {
 		return err
 	}
+	// [preBlock.lock] doesn't need to be held here because the block is
+	// immutable after either [preBlock.Verify] or [preBlock.VerifyWithContext]
+	// return nil.
 	if p.transitioned || p.timestamp.Before(p.vm.transitionTime) {
 		return nil
 	}
@@ -145,9 +150,10 @@ func (p *preBlock) Reject(ctx context.Context) error {
 	p.vm.transitionLock.RLock()
 	defer p.vm.transitionLock.RUnlock()
 
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
+	// [preBlock.lock] doesn't need to be held here because the block is
+	// immutable after either [preBlock.Verify] or [preBlock.VerifyWithContext]
+	// return nil.
+	//
 	// Once transitioned, the pre-transition chain is shut down. Forwarding
 	// Reject into it could return an error, which the engine treats as fatal.
 	if p.transitioned != p.vm.transitioned {
