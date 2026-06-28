@@ -207,7 +207,7 @@ func (w *workload) newTestContext(ctx context.Context) *tests.SimpleTestContext 
 func (w *workload) initializeCChain(ctx context.Context, chainID *big.Int) error {
 	w.cChainClients = make(map[string]*ethclient.Client, len(w.uris))
 	for _, uri := range w.uris {
-		client, err := ethclient.Dial(cChainRPCURI(uri))
+		client, err := ethclient.Dial(uri + "/ext/bc/C/rpc")
 		if err != nil {
 			return fmt.Errorf("failed to dial C-Chain RPC on %s: %w", uri, err)
 		}
@@ -215,9 +215,10 @@ func (w *workload) initializeCChain(ctx context.Context, chainID *big.Int) error
 	}
 
 	if chainID == nil {
-		client, err := w.cChainClient(w.uris[0])
+		uri := w.uris[0]
+		client, err := w.cChainClient(uri)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get C-Chain RPC client for %s: %w", uri, err)
 		}
 		chainID, err = client.ChainID(ctx)
 		if err != nil {
@@ -232,7 +233,12 @@ func (w *workload) cChainClient(uri string) (*ethclient.Client, error) {
 	if client, ok := w.cChainClients[uri]; ok {
 		return client, nil
 	}
-	return nil, fmt.Errorf("missing C-Chain RPC client for %s", uri)
+	err := errors.New("missing C-Chain RPC client")
+	assert.Unreachable("missing C-Chain RPC client", map[string]any{
+		"worker": w.id,
+		"uri":    uri,
+	})
+	return nil, err
 }
 
 func (w *workload) run(ctx context.Context) {
@@ -252,6 +258,10 @@ func (w *workload) run(ctx context.Context) {
 	})
 
 	for {
+		if ctx.Err() != nil {
+			return
+		}
+
 		w.executeTest(ctx)
 
 		val, err := rand.Int(rand.Reader, big.NewInt(int64(time.Second)))
@@ -904,19 +914,11 @@ func (w *workload) verifyPChainTxConsumedUTXOs(ctx context.Context, tx *ptxs.Tx)
 	)
 }
 
-func cChainRPCURI(nodeURI string) string {
-	return nodeURI + "/ext/bc/C/rpc"
-}
-
 func (w *workload) issueCChainTransfer(ctx context.Context) {
-	if ctx.Err() != nil {
-		return
-	}
-
 	uri := w.uris[w.id%len(w.uris)]
 	client, err := w.cChainClient(uri)
 	if err != nil {
-		w.log.Warn("failed to get C-Chain RPC client", zap.String("uri", uri), zap.Error(err))
+		w.log.Error("failed to get C-Chain RPC client", zap.String("uri", uri), zap.Error(err))
 		return
 	}
 
@@ -996,7 +998,12 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 	senderAddr := crypto.PubkeyToAddress(w.cChainKey.PublicKey)
 
 	if w.cChainID == nil {
-		return nil, errors.New("missing C-Chain chain ID")
+		err := errors.New("missing C-Chain chain ID")
+		assert.Unreachable("missing C-Chain chain ID", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
+		return nil, err
 	}
 	acceptedNonce, err := client.AcceptedNonceAt(ctx, senderAddr)
 	if err != nil {
@@ -1027,6 +1034,10 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 		Value:     value,
 	})
 	if err != nil {
+		assert.Unreachable("failed to sign C-Chain transaction", map[string]any{
+			"worker": w.id,
+			"err":    err,
+		})
 		return nil, fmt.Errorf("failed to sign transaction: %w", err)
 	}
 
@@ -1040,7 +1051,7 @@ func (w *workload) fundCChainAddress(ctx context.Context, recipientAddr ethcommo
 	uri := w.uris[0]
 	client, err := w.cChainClient(uri)
 	if err != nil {
-		return fmt.Errorf("failed to get C-Chain RPC client: %w", err)
+		return fmt.Errorf("failed to get C-Chain RPC client for %s: %w", uri, err)
 	}
 
 	tx, err := w.sendCChainTx(ctx, client, recipientAddr, new(big.Int).SetUint64(amount))
