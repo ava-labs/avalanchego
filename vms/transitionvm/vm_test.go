@@ -40,7 +40,10 @@ const blockInterval = time.Second
 // fakeState is chain state shared by the pre- and post-transition fakeVMs.
 type fakeState struct {
 	lastAccepted *fakeBlock
-	blocks       map[ids.ID]*fakeBlock
+	// blocks contains all accepted blocks
+	blocks map[ids.ID]*fakeBlock
+	// parsable contains all built blocks
+	parsable map[ids.ID]*snowmantest.Block
 }
 
 func newFakeState() *fakeState {
@@ -49,6 +52,9 @@ func newFakeState() *fakeState {
 		lastAccepted: genesis,
 		blocks: map[ids.ID]*fakeBlock{
 			genesis.ID(): genesis,
+		},
+		parsable: map[ids.ID]*snowmantest.Block{
+			genesis.ID(): snowmantest.Genesis,
 		},
 	}
 }
@@ -192,11 +198,26 @@ func (vm *fakeVM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, erro
 	return nil, database.ErrNotFound
 }
 
+// ParseBlock reconstructs a block from its bytes, which [snowmantest.BuildChild]
+// sets to the block ID. The reconstructed block is owned by this VM.
+func (vm *fakeVM) ParseBlock(_ context.Context, b []byte) (snowman.Block, error) {
+	blkID, err := ids.ToID(b)
+	if err != nil {
+		return nil, err
+	}
+	blk, ok := vm.state.parsable[blkID]
+	if !ok {
+		return nil, database.ErrNotFound
+	}
+	return &fakeBlock{Block: blk, vm: vm}, nil
+}
+
 // BuildBlock returns a child of the tip, advancing the timestamp by
 // [blockInterval].
 func (vm *fakeVM) BuildBlock(context.Context) (snowman.Block, error) {
 	child := snowmantest.BuildChild(vm.tip.Block)
 	child.TimestampV = vm.tip.Timestamp().Add(blockInterval)
+	vm.state.parsable[child.ID()] = child
 	blk := &fakeBlock{Block: child, vm: vm}
 	vm.tip = blk
 	return blk, nil

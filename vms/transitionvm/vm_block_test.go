@@ -62,6 +62,39 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 	}
 }
 
+// TestCachedBlockUpdatesAfterTransition verifies that a block which was parsed
+// and then cached by the consensus engine before the transition can be
+// correctly verified and accepted after the transition.
+func TestCachedBlockUpdatesAfterTransition(t *testing.T) {
+	for _, mode := range verifyModes {
+		t.Run(mode.String(), func(t *testing.T) {
+			sut := newSUT(t)
+			ctx := t.Context()
+
+			transitionBlock, err := sut.BuildBlock(ctx)
+			require.NoError(t, err)
+			require.NoError(t, verifyBlock(ctx, transitionBlock, mode))
+
+			// Before accepting the transition block, so before the VM
+			// transitions, generate the next block.
+			postTransitionBlock, err := sut.BuildBlock(ctx)
+			require.NoError(t, err)
+
+			// Even though the block is currently invalid, the consensus engine
+			// may cache it.
+			require.ErrorIs(t, verifyBlock(ctx, postTransitionBlock, mode), errPostTransitionBlockBeforeTransition)
+
+			require.NoError(t, transitionBlock.Accept(ctx))
+			version, err := sut.Version(ctx)
+			require.NoError(t, err)
+			require.Equal(t, "post", version)
+
+			require.NoError(t, verifyBlock(ctx, postTransitionBlock, mode))
+			require.NoError(t, postTransitionBlock.Accept(ctx))
+		})
+	}
+}
+
 // TestRejectIsNoopAfterTransition verifies rejecting a pre-transition block
 // after the transition is a noop.
 func TestRejectIsNoopAfterTransition(t *testing.T) {
