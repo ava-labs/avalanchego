@@ -36,62 +36,9 @@ func TestOracleVerifier_ValidPath(t *testing.T) {
 	um := buildWarpMessage(t, msg)
 
 	mock := &MockSidecarClient{}
-	verifier := NewOracleVerifier(mock, AllowedSources{
-		"solana": {"addr1": {}},
-	})
+	verifier := NewOracleVerifier(mock)
 
 	appErr := verifier.Verify(t.Context(), um, []byte("justification"))
-	require.Nil(t, appErr)
-	require.Len(t, mock.Calls, 1)
-}
-
-func TestOracleVerifier_SourceTypeNotAllowed(t *testing.T) {
-	msg, err := oracle.NewOracleMessage("bitcoin", "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
-	require.NoError(t, err)
-
-	um := buildWarpMessage(t, msg)
-
-	mock := &MockSidecarClient{}
-	verifier := NewOracleVerifier(mock, AllowedSources{
-		"solana": {"addr1": {}},
-	})
-
-	appErr := verifier.Verify(t.Context(), um, nil)
-	require.NotNil(t, appErr)
-	require.Equal(t, errCodeAllowlist, appErr.Code)
-	require.Empty(t, mock.Calls)
-}
-
-func TestOracleVerifier_SourceAddressNotAllowed(t *testing.T) {
-	msg, err := oracle.NewOracleMessage("solana", "unknown-addr", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
-	require.NoError(t, err)
-
-	um := buildWarpMessage(t, msg)
-
-	mock := &MockSidecarClient{}
-	verifier := NewOracleVerifier(mock, AllowedSources{
-		"solana": {"addr1": {}}, // non-empty inner map, unknown-addr not present
-	})
-
-	appErr := verifier.Verify(t.Context(), um, nil)
-	require.NotNil(t, appErr)
-	require.Equal(t, errCodeAllowlist, appErr.Code)
-	require.Contains(t, appErr.Message, "unknown-addr")
-	require.Empty(t, mock.Calls)
-}
-
-func TestOracleVerifier_EmptyInnerMapAllowsAllAddresses(t *testing.T) {
-	msg, err := oracle.NewOracleMessage("solana", "any-addr-whatsoever", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
-	require.NoError(t, err)
-
-	um := buildWarpMessage(t, msg)
-
-	mock := &MockSidecarClient{}
-	verifier := NewOracleVerifier(mock, AllowedSources{
-		"solana": {}, // empty inner map → all addresses allowed
-	})
-
-	appErr := verifier.Verify(t.Context(), um, nil)
 	require.Nil(t, appErr)
 	require.Len(t, mock.Calls, 1)
 }
@@ -102,9 +49,7 @@ func TestOracleVerifier_BadWarpPayload(t *testing.T) {
 	require.NoError(t, err)
 
 	mock := &MockSidecarClient{}
-	verifier := NewOracleVerifier(mock, AllowedSources{
-		"solana": {},
-	})
+	verifier := NewOracleVerifier(mock)
 
 	appErr := verifier.Verify(t.Context(), um, nil)
 	require.NotNil(t, appErr)

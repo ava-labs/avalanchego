@@ -7,6 +7,7 @@ import (
 	"flag"
 	"log"
 	"net"
+	"os"
 
 	"google.golang.org/grpc"
 
@@ -16,16 +17,33 @@ import (
 
 func main() {
 	addr := flag.String("addr", ":9900", "address to listen on")
-	sourceType := flag.String("source-type", "solana", "source chain type (solana)")
-	solanaRPC := flag.String("solana-rpc", "https://api.mainnet-beta.solana.com", "Solana JSON-RPC endpoint (used when --source-type=solana)")
+	verifierType := flag.String("verifier-type", "", "verifier implementation to use (e.g. solanarpc)")
+	configPath := flag.String("config-path", "", "path to verifier config file")
 	flag.Parse()
 
+	if *verifierType == "" {
+		log.Fatal("--verifier-type is required")
+	}
+
+	var configBytes []byte
+	if *configPath != "" {
+		var err error
+		configBytes, err = os.ReadFile(*configPath)
+		if err != nil {
+			log.Fatalf("failed to read config file %s: %v", *configPath, err)
+		}
+	}
+
 	var v oracleVerifier
-	switch *sourceType {
-	case "solana":
-		v = solanarpc.NewSolanaVerifier(*solanaRPC, nil)
+	switch *verifierType {
+	case "solanarpc":
+		sv, err := solanarpc.NewSolanaVerifier(configBytes, nil)
+		if err != nil {
+			log.Fatalf("invalid solanarpc config: %v", err)
+		}
+		v = sv
 	default:
-		log.Fatalf("unknown source type %q", *sourceType)
+		log.Fatalf("unknown verifier type %q", *verifierType)
 	}
 
 	lis, err := net.Listen("tcp", *addr)
@@ -36,7 +54,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	pb.RegisterOracleSidecarServer(grpcServer, NewServer(v))
 
-	log.Printf("starting oracle sidecar (gRPC) on %s, source-type: %s", *addr, *sourceType)
+	log.Printf("starting oracle sidecar (gRPC) on %s", *addr)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("server error: %v", err)
 	}

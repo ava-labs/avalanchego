@@ -5,7 +5,6 @@ package validator
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -22,40 +21,21 @@ const (
 	// separate protocol.
 	SignatureRequestHandlerID uint64 = p2p.OracleSignatureRequestHandlerID
 
-	errCodeParse     int32 = 1
-	errCodeVerify    int32 = 2
-	errCodeAllowlist int32 = 3
+	errCodeParse  int32 = 1
+	errCodeVerify int32 = 2
 )
 
-// AllowedSources maps source type to the set of allowed source addresses
-// on that source. An empty inner map means all source addresses are permitted
-// for that source type. A missing key means the source type is not permitted.
-type AllowedSources map[string]map[string]struct{}
-
 // OracleVerifier implements acp118.Verifier for oracle attestation messages.
-// It parses the OracleMessage from the warp payload, validates the source
-// against the configured allowlist, then delegates the actual verification to
-// a SidecarClient.
+// It parses the OracleMessage from the warp payload and delegates verification
+// to a SidecarClient. All source-level allowlisting is the sidecar's responsibility.
 type OracleVerifier struct {
-	sidecar        oracle.SidecarClient
-	allowedSources AllowedSources
+	sidecar oracle.SidecarClient
 }
 
 var _ acp118.Verifier = (*OracleVerifier)(nil)
 
-func NewOracleVerifier(sidecar oracle.SidecarClient, allowedSources AllowedSources) *OracleVerifier {
-	copied := make(AllowedSources, len(allowedSources))
-	for sourceType, addrs := range allowedSources {
-		inner := make(map[string]struct{}, len(addrs))
-		for addr := range addrs {
-			inner[addr] = struct{}{}
-		}
-		copied[sourceType] = inner
-	}
-	return &OracleVerifier{
-		sidecar:        sidecar,
-		allowedSources: copied,
-	}
+func NewOracleVerifier(sidecar oracle.SidecarClient) *OracleVerifier {
+	return &OracleVerifier{sidecar: sidecar}
 }
 
 func (v *OracleVerifier) Verify(
@@ -78,10 +58,6 @@ func (v *OracleVerifier) Verify(
 		}
 	}
 
-	if appErr := v.checkAllowlist(msg); appErr != nil {
-		return appErr
-	}
-
 	if err := v.sidecar.Verify(ctx, &oracle.OracleEvent{
 		Message:       msg,
 		Justification: justification,
@@ -92,26 +68,5 @@ func (v *OracleVerifier) Verify(
 		}
 	}
 
-	return nil
-}
-
-func (v *OracleVerifier) checkAllowlist(msg *oracle.OracleMessage) *common.AppError {
-	allowed, ok := v.allowedSources[msg.SourceType]
-	if !ok {
-		return &common.AppError{
-			Code:    errCodeAllowlist,
-			Message: fmt.Sprintf("source type %q is not in the allowlist", msg.SourceType),
-		}
-	}
-	// Empty inner map means all source addresses are allowed for this source type.
-	if len(allowed) == 0 {
-		return nil
-	}
-	if _, ok := allowed[msg.SourceAddress]; !ok {
-		return &common.AppError{
-			Code:    errCodeAllowlist,
-			Message: fmt.Sprintf("source address %q on source type %q is not in the allowlist", msg.SourceAddress, msg.SourceType),
-		}
-	}
 	return nil
 }

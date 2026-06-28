@@ -503,19 +503,11 @@ func (vm *VM) Initialize(
 			return err
 		}
 	} else if vm.config.Oracle.Endpoint != "" {
-		allowed := make(p2poracle.AllowedSources, len(vm.config.Oracle.AllowedSources))
-		for sourceType, addrs := range vm.config.Oracle.AllowedSources {
-			set := make(map[string]struct{}, len(addrs))
-			for _, a := range addrs {
-				set[a] = struct{}{}
-			}
-			allowed[sourceType] = set
-		}
 		sidecar, err := p2poracle.NewGRPCSidecarClient(vm.config.Oracle.Endpoint)
 		if err != nil {
 			return fmt.Errorf("failed to create oracle gRPC client: %w", err)
 		}
-		if err := vm.registerOracleHandler(p2poracle.NewOracleVerifier(sidecar, allowed)); err != nil {
+		if err := vm.registerOracleHandler(p2poracle.NewOracleVerifier(sidecar)); err != nil {
 			return err
 		}
 	}

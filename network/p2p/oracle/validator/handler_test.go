@@ -63,9 +63,7 @@ func TestOracleHandler_HappyPath(t *testing.T) {
 	signer := warp.NewSigner(sk, testNetworkID, testChainID)
 
 	mock := &MockSidecarClient{}
-	verifier := NewOracleVerifier(mock, AllowedSources{
-		"solana": {"addr1": {}},
-	})
+	verifier := NewOracleVerifier(mock)
 	handler := acp118.NewCachedHandler(&cache.Empty[ids.ID, []byte]{}, verifier, signer)
 
 	clientNodeID := ids.GenerateTestNodeID()
@@ -119,9 +117,7 @@ func TestOracleHandler_CacheHit(t *testing.T) {
 		},
 	}
 
-	verifier := NewOracleVerifier(mock, AllowedSources{
-		"solana": {"addr1": {}},
-	})
+	verifier := NewOracleVerifier(mock)
 	handler := acp118.NewCachedHandler(lru.NewCache[ids.ID, []byte](4), verifier, signer)
 
 	clientNodeID := ids.GenerateTestNodeID()

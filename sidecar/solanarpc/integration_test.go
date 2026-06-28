@@ -20,6 +20,17 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 )
 
+// newVerifier is a test helper that constructs a SolanaVerifier from a plain
+// RPC URL, marshaling it into the Config shape the verifier expects.
+func newVerifier(t *testing.T, rpcURL string) *SolanaVerifier {
+	t.Helper()
+	cfgBytes, err := json.Marshal(Config{RPCURL: rpcURL})
+	require.NoError(t, err)
+	v, err := NewSolanaVerifier(cfgBytes, nil)
+	require.NoError(t, err)
+	return v
+}
+
 // memoProgram is the Solana Memo Program v2 address. It exists on both mainnet
 // and devnet and almost always has recent transactions, making it a reliable
 // source of real on-chain data for integration testing.
@@ -222,7 +233,7 @@ func TestSolanaVerifierIntegration(t *testing.T) {
 	justification, err := base58.Decode(txSig)
 	require.NoError(t, err)
 
-	verifier := NewSolanaVerifier(rpcURL, nil)
+	verifier := newVerifier(t, rpcURL)
 
 	t.Run("valid transaction accepted", func(t *testing.T) {
 		msg, err := oracle.NewOracleMessage("solana", memoProgram, common.Address{}, slot, 1, instrData)
@@ -284,7 +295,7 @@ func TestSolanaVerifierIntegration_CPI(t *testing.T) {
 	justification, err := base58.Decode(txSig)
 	require.NoError(t, err)
 
-	verifier := NewSolanaVerifier(rpcURL, nil)
+	verifier := newVerifier(t, rpcURL)
 
 	t.Run("CPI instruction accepted", func(t *testing.T) {
 		msg, err := oracle.NewOracleMessage("solana", programAddr, common.Address{}, slot, 1, payload)
@@ -351,7 +362,7 @@ func TestSolanaVerifierIntegration_V0LoadedAddresses(t *testing.T) {
 	justification, err := base58.Decode(txSig)
 	require.NoError(t, err)
 
-	verifier := NewSolanaVerifier(rpcURL, nil)
+	verifier := newVerifier(t, rpcURL)
 
 	t.Run("loaded address not invoked returns no-instruction-found", func(t *testing.T) {
 		// Use the first loaded address as the claimed program. It is not

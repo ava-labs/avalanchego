@@ -26,9 +26,6 @@ type OracleSidecarConfig struct {
 	// Endpoint is the gRPC address of the sidecar process, e.g. "127.0.0.1:9900".
 	// If empty, the oracle verifier is not initialized from JSON config.
 	Endpoint string `json:"endpoint"`
-	// AllowedSources maps source type to allowed source addresses.
-	// An empty slice means all addresses for that source type are permitted.
-	AllowedSources map[string][]string `json:"allowed-sources"`
 }
 
 // Config ...

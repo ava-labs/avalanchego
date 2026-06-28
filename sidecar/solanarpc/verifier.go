@@ -6,6 +6,7 @@ package solanarpc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,15 +16,47 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 )
 
-// SolanaVerifier verifies OracleMessages by querying the Solana RPC.
-type SolanaVerifier struct {
-	client rpcClient
+const defaultRPCURL = "https://api.mainnet-beta.solana.com"
+
+// Config is the verifier's own configuration, parsed from the sidecar's
+// --config file. The sidecar binary treats this as opaque bytes; SolanaVerifier
+// is the authority on what fields are valid.
+type Config struct {
+	// RPCURL is the Solana JSON-RPC endpoint.
+	// Defaults to https://api.mainnet-beta.solana.com if omitted.
+	RPCURL string `json:"rpc_url"`
+	// AllowedPrograms is an optional list of Solana program addresses this
+	// sidecar will attest to. Omit or leave empty to allow all programs.
+	AllowedPrograms []string `json:"allowed_programs"`
 }
 
-func NewSolanaVerifier(rpcURL string, httpClient *http.Client) *SolanaVerifier {
-	return &SolanaVerifier{
-		client: newSolanaClient(rpcURL, httpClient),
+// SolanaVerifier verifies OracleMessages by querying the Solana RPC.
+type SolanaVerifier struct {
+	client          rpcClient
+	allowedPrograms map[string]struct{} // empty = allow all
+}
+
+// NewSolanaVerifier parses configBytes as a JSON Config and constructs a
+// SolanaVerifier. configBytes may be nil or empty, in which case defaults
+// apply (mainnet RPC, all programs allowed).
+func NewSolanaVerifier(configBytes []byte, httpClient *http.Client) (*SolanaVerifier, error) {
+	cfg := Config{RPCURL: defaultRPCURL}
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &cfg); err != nil {
+			return nil, fmt.Errorf("invalid solana verifier config: %w", err)
+		}
 	}
+	if cfg.RPCURL == "" {
+		return nil, errors.New("solana verifier config: rpc_url must not be empty")
+	}
+	allowed := make(map[string]struct{}, len(cfg.AllowedPrograms))
+	for _, p := range cfg.AllowedPrograms {
+		allowed[p] = struct{}{}
+	}
+	return &SolanaVerifier{
+		client:          newSolanaClient(cfg.RPCURL, httpClient),
+		allowedPrograms: allowed,
+	}, nil
 }
 
 // errProgramNotFound is returned by matchInstruction when no instruction in the
@@ -60,6 +93,12 @@ func matchInstruction(instrs []txInstruction, keys []string, msg *oracle.OracleM
 // transaction. The justification must be a raw 64-byte Ed25519 transaction
 // signature.
 func (v *SolanaVerifier) Verify(ctx context.Context, msg *oracle.OracleMessage, justification []byte) error {
+	if len(v.allowedPrograms) > 0 {
+		if _, ok := v.allowedPrograms[msg.SourceAddress]; !ok {
+			return fmt.Errorf("source address %q is not in the allowed programs list", msg.SourceAddress)
+		}
+	}
+
 	// Encode the raw signature bytes as base58 to use as the RPC lookup key.
 	sig := base58.Encode(justification)
 
