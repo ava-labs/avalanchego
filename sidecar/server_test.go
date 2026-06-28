@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/ava-labs/libevm/common"
-
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
+
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 

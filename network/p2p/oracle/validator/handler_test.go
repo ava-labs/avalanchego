@@ -8,10 +8,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
-
-	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"

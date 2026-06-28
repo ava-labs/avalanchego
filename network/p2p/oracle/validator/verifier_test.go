@@ -6,9 +6,8 @@ package validator
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/libevm/common"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"

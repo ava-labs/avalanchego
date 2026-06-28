@@ -65,6 +65,10 @@ func NewSolanaVerifier(configBytes []byte, httpClient *http.Client) (*SolanaVeri
 // but verification failed — the caller must not continue searching.
 var errProgramNotFound = errors.New("program not found in instruction set")
 
+// ErrInstructionNotFound is returned by Verify when no instruction in the
+// transaction (including CPI inner instructions) invokes msg.SourceAddress.
+var ErrInstructionNotFound = errors.New("no instruction found for program")
+
 // matchInstruction scans instrs for one whose program matches msg.SourceAddress
 // and whose data matches msg.Payload. Returns nil on the first match,
 // errProgramNotFound if the program isn't present, or a descriptive error if
@@ -136,5 +140,5 @@ func (v *SolanaVerifier) Verify(ctx context.Context, msg *oracle.OracleMessage, 
 		}
 	}
 
-	return fmt.Errorf("no instruction found for program %q in transaction", msg.SourceAddress)
+	return fmt.Errorf("%w %q in transaction", ErrInstructionNotFound, msg.SourceAddress)
 }

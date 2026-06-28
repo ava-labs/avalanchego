@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
+
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 

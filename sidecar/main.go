@@ -11,8 +11,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 	"github.com/ava-labs/avalanchego/sidecar/solanarpc"
+
+	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
 func main() {

@@ -8,10 +8,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 )

@@ -8,15 +8,15 @@ import (
 	"net"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"github.com/ava-labs/libevm/common"
-
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
+
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
@@ -92,7 +92,7 @@ func TestGRPCSidecarClient_RejectWithError(t *testing.T) {
 		Message:       newTestMsg(t),
 		Justification: nil,
 	})
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrSidecarRejected)
 	require.Contains(t, err.Error(), "bad event")
 }
 
@@ -107,7 +107,7 @@ func TestGRPCSidecarClient_SourceUnavailable(t *testing.T) {
 		Message:       newTestMsg(t),
 		Justification: nil,
 	})
-	require.Error(t, err)
+	require.ErrorIs(t, err, oracle.ErrSourceUnavailable)
 	require.Contains(t, err.Error(), "sidecar unreachable")
 }
 
@@ -125,6 +125,6 @@ func TestGRPCSidecarClient_Unreachable(t *testing.T) {
 		Message:       newTestMsg(t),
 		Justification: nil,
 	})
-	require.Error(t, err)
+	require.ErrorIs(t, err, oracle.ErrSourceUnavailable)
 	require.Contains(t, err.Error(), "sidecar unreachable")
 }

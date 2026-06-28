@@ -12,10 +12,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
 )
@@ -350,7 +349,7 @@ func TestSolanaVerifierIntegration_V0LoadedAddresses(t *testing.T) {
 	txSig, tx := findV0TxWithLoadedAddresses(t, rpcURL)
 	t.Logf("using v0 transaction: %s", txSig)
 
-	loaded := append(tx.Meta.LoadedAddresses.Writable, tx.Meta.LoadedAddresses.Readonly...)
+	loaded := append(append([]string(nil), tx.Meta.LoadedAddresses.Writable...), tx.Meta.LoadedAddresses.Readonly...)
 	require.NotEmpty(t, loaded, "findV0TxWithLoadedAddresses should have guaranteed non-empty loadedAddresses")
 
 	t.Logf("loadedAddresses: writable=%d readonly=%d",
@@ -372,7 +371,7 @@ func TestSolanaVerifierIntegration_V0LoadedAddresses(t *testing.T) {
 		msg, err := oracle.NewOracleMessage("solana", uninvokedAddr, common.Address{}, slot, 1, []byte("anything"))
 		require.NoError(t, err)
 		verifyErr := verifier.Verify(t.Context(), msg, justification)
-		require.Error(t, verifyErr)
+		require.ErrorIs(t, verifyErr, ErrInstructionNotFound)
 		require.Contains(t, verifyErr.Error(), "no instruction found for program")
 	})
 

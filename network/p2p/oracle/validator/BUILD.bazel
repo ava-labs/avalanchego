@@ -4,7 +4,7 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "validator",
     srcs = [
-        "http_sidecar_client.go",
+        "grpc_sidecar_client.go",
         "mock_sidecar_client.go",
         "verifier.go",
     ],
@@ -14,17 +14,22 @@ go_library(
         "//network/p2p",
         "//network/p2p/acp118",
         "//network/p2p/oracle",
+        "//proto/pb/oracle",
         "//snow/engine/common",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//credentials/insecure",
+        "@org_golang_google_grpc//status",
     ],
 )
 
 go_test(
     name = "validator_test",
     srcs = [
+        "grpc_sidecar_client_test.go",
         "handler_test.go",
-        "http_sidecar_client_test.go",
         "verifier_test.go",
     ],
     embed = [":validator"],
@@ -36,13 +41,19 @@ go_test(
         "//network/p2p/acp118",
         "//network/p2p/oracle",
         "//network/p2p/p2ptest",
+        "//proto/pb/oracle",
         "//proto/pb/sdk",
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",
         "//utils/set",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
+        "@com_github_ava_labs_libevm//common",
         "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//credentials/insecure",
+        "@org_golang_google_grpc//status",
         "@org_golang_google_protobuf//proto",
     ],
 )

@@ -5,6 +5,7 @@ package validator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"google.golang.org/grpc"
@@ -13,10 +14,15 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/ava-labs/avalanchego/network/p2p/oracle"
+
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
 var _ oracle.SidecarClient = (*GRPCSidecarClient)(nil)
+
+// ErrSidecarRejected is returned when the sidecar responds with a non-OK,
+// non-Unavailable status (i.e. the event was rejected as invalid).
+var ErrSidecarRejected = errors.New("sidecar rejected event")
 
 // GRPCSidecarClient calls a sidecar process over gRPC. It is the
 // production implementation of SidecarClient.
@@ -48,7 +54,7 @@ func (c *GRPCSidecarClient) Verify(ctx context.Context, event *oracle.OracleEven
 		return nil
 	}
 	if status.Code(err) == codes.Unavailable {
-		return fmt.Errorf("sidecar unreachable: %w", err)
+		return fmt.Errorf("sidecar unreachable: %w", oracle.ErrSourceUnavailable)
 	}
-	return fmt.Errorf("sidecar rejected event: %w", err)
+	return fmt.Errorf("%w: %w", ErrSidecarRejected, err)
 }
