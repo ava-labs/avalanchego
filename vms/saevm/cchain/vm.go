@@ -109,7 +109,7 @@ func (vm *VM) Initialize(
 	vm.chainConfig = genesis.Config
 
 	saeConfig := userConfig.saeConfig(vm.now)
-	genesisBlock, err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig)
+	genesisBlock, err := genesis.setup(ethDB, saeConfig.DBConfig.TrieDBConfig(snowCtx))
 	if err != nil {
 		return fmt.Errorf("setting up genesis: %w", err)
 	}

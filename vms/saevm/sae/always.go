@@ -6,9 +6,13 @@ package sae
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -52,23 +56,37 @@ func (vm *SinceGenesis[_]) Initialize(
 	appSender common.AppSender,
 ) error {
 	db := newEthDB(avaDB)
-	tdb := triedb.NewDatabase(db, vm.config.DBConfig.TrieDBConfig)
 
-	genesis := new(core.Genesis)
-	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
-		return fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
-	}
-	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
+	g, config, err := createGenesisBlock(db, vm.config.DBConfig.TrieDBConfig(snowCtx), genesisBytes)
 	if err != nil {
-		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
+		return err
 	}
 
-	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, genesis.ToBlock(), appSender)
+	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, g, appSender)
 	if err != nil {
 		return err
 	}
 	vm.VM = inner
 	return nil
+}
+
+func createGenesisBlock(db ethdb.Database, tdbConfig *triedb.Config, genesisBytes []byte) (_ *types.Block, _ *params.ChainConfig, err error) {
+	tdb := triedb.NewDatabase(db, tdbConfig)
+	defer func() {
+		err = errors.Join(err, tdb.Close())
+	}()
+
+	genesis := new(core.Genesis)
+	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
+		return nil, nil, fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
+	}
+
+	config, _, err := core.SetupGenesisBlock(db, tdb, genesis)
+	if err != nil {
+		return nil, nil, fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
+	}
+
+	return genesis.ToBlock(), config, nil
 }
 
 // Shutdown gracefully closes the VM.
