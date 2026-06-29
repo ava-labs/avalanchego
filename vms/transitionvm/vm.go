@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -195,6 +196,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	defer cancelDrain()
 	if err := vm.httpHandlers.drain(drainCtx); err != nil {
 		log.Warn("abandoning API requests still in flight after drain timeout",
+			zap.String("stack", utils.GetStacktrace(true)),
 			zap.Error(err),
 		)
 	}

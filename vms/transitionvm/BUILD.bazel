@@ -24,6 +24,7 @@ go_library(
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//snow/validators",
+        "//utils",
         "//utils/lock",
         "//utils/logging",
         "//utils/set",
