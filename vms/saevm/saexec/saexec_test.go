@@ -1078,11 +1078,11 @@ func TestArchivalStoresAll(t *testing.T) {
 func TestProcessBeaconBlockRoot(t *testing.T) {
 	beaconRoot := common.HexToHash("0xbeef")
 
-	// Canonical EIP-4788 deployment transaction (tx hash
-	// 0xdf52c2d3bbe38820fff7b5eaab3db1b91f8e1412b56497d88388fb5d4ea1fde0), as
-	// specified at https://eips.ethereum.org/EIPS/eip-4788#deployment. Its
-	// keyless signature recovers to deployer 0x0B79..., so contract creation at
-	// nonce 0 yields [params.BeaconRootsStorageAddress].
+	// Canonical EIP-4788 deployment transaction, reproduced field-for-field from
+	// https://eips.ethereum.org/EIPS/eip-4788#deployment. Every field MUST match
+	// the EIP exactly. This is required so the the keyless signature recovers to
+	// the canonical deployer 0x0B79..., whose nonce-0 creation lands the contract
+	// at [params.BeaconRootsStorageAddress].
 	deployer := common.HexToAddress("0x0B799C86a49DEeb90402691F1041aa3AF2d3C875")
 	deployTx := types.NewTx(&types.LegacyTx{
 		Nonce:    0,
@@ -1141,7 +1141,9 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 
 			sdb, err := e.StateDB(b.PostExecutionStateRoot())
 			require.NoErrorf(t, err, "%T.StateDB(%T.PostExecutionStateRoot())", e, b)
-			blockCtx := core.NewEVMBlockContext(b.Header(), nil /*chain; unused by get()*/, &header.Coinbase)
+
+			header := b.Header()
+			blockCtx := core.NewEVMBlockContext(header, nil /*chain; unused by get()*/, &header.Coinbase)
 			evm := vm.NewEVM(blockCtx, vm.TxContext{}, sdb, saetest.ChainConfig(), vm.Config{})
 
 			got, _, err := evm.StaticCall(
