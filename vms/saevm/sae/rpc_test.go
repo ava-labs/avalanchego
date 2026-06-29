@@ -1283,7 +1283,7 @@ func TestUnprotectedTxs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
-				c.vmConfig.RPCConfig.AllowUnprotectedTxs = tt.allowUnpretctedTxs
+				c.vmConfig.RPCConfig.AllowUnprotectedTxs = tt.allowUnprotectedTxs
 			}))
 			// HomesteadSigner produces a pre-EIP-155 (replay-unprotected) tx
 			tx := sut.wallet.SignTx(t, types.HomesteadSigner{}, 0, &types.LegacyTx{
