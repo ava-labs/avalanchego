@@ -34,12 +34,6 @@ func (b *backend) getReceipts(numOrHash rpc.BlockNumberOrHash) (types.Receipts, 
 		// The use of [notFoundIsNil] in [readByNumberOrHash] means that we know
 		// this is a "real" error, not just [blocks.ErrNotFound].
 		return nil, nil, err
-	}
-	switch {
-	case err != nil:
-		// The use of [notFoundIsNil] in [readByNumberOrHash] means that we know
-		// this is a "real" error, not just [blocks.ErrNotFound].
-		return nil, nil, err
 	case blk == nil || !blk.Executed():
 		return nil, nil, nil
 	default:
