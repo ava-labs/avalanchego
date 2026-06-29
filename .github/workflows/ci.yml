@@ -1,5 +1,9 @@
 name: Tests
 
+# PR validation keeps the overlapping Go unit-test coverage off by default because
+# Bazel covers unit tests on PRs. Applying the ci/pre-merge label opts a PR into
+# the Go unit-test shard as well so contributors can reproduce pre-merge unit
+# coverage before merge.
 on:
   push:
     tags:
@@ -8,6 +12,7 @@ on:
       - master
       - dev
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   merge_group:
     types: [checks_requested]
 
@@ -55,11 +60,18 @@ jobs:
         shell: bash
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          SKIPPABLE_JOBS_JSON: '["Unit"]'
         run: |
           failed_jobs="$(
-            jq -r '
+            jq -r --argjson skippable_jobs "$SKIPPABLE_JOBS_JSON" '
               to_entries[]
-              | select(.value.result != "success")
+              | select(
+                  .value.result != "success"
+                  and (
+                    .value.result != "skipped"
+                    or (.key as $job | ($skippable_jobs | index($job)) == null)
+                  )
+                )
               | .key
             ' <<<"$NEEDS_JSON"
           )"
@@ -71,17 +83,18 @@ jobs:
           fi
 
   Unit:
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci/pre-merge') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-26, ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm, ubuntu-24.04-arm]
+        os: [macos-26, ubuntu-24.04]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: test-unit
         shell: bash
-        run: ./scripts/run_task.sh test-unit
+        run: ./scripts/run_task.sh test-unit-race
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
   Fuzz:

@@ -1,0 +1,90 @@
+name: Scheduled Unit Tests
+
+# Scheduled unit-test coverage complements the faster PR and pre-merge workflows.
+#
+# PRs run only the Bazel workflow on the primary deployment platform with a
+# cache-friendly unit-test configuration, while pre-merge runs cover the primary
+# deployment and development platforms without shuffle. This workflow restores
+# the broader unit-test signal on a schedule by:
+#   - running both Go and Bazel unit tests
+#   - covering all currently supported CI platforms
+#   - keeping the race-shuffle behavior to better surface races and
+#     inter-test dependencies
+#   - restoring Bazel e2e coverage on linux-arm64/24.04
+#
+# To validate changes to this workflow before merge, PRs can opt in by applying
+# the ci/all-platforms label.
+on:
+  schedule:
+    - cron: '30 2 * * *' # Once a day at 02:30 UTC
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: >-
+    ${{ github.workflow }}-${{
+      github.event_name == 'pull_request'
+      && format('pr-{0}', github.event.pull_request.number)
+      || format('{0}-{1}', github.event_name, github.ref)
+    }}
+  cancel-in-progress: true
+
+jobs:
+  define-matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      bazel_platforms: ${{ steps.set-matrix.outputs.bazel_platforms }}
+      go_platforms: ${{ steps.set-matrix.outputs.go_platforms }}
+    steps:
+      - name: Define scheduled unit-test matrix
+        id: set-matrix
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] \
+            && ! jq -e '.pull_request.labels[]? | select(.name == "ci/all-platforms")' "$GITHUB_EVENT_PATH" >/dev/null; then
+            echo 'bazel_platforms=[]' >> "$GITHUB_OUTPUT"
+            echo 'go_platforms=[]' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo 'bazel_platforms=[{"platform_name":"linux-amd64-24.04","runner":"ubuntu-24.04","run_e2e":false},{"platform_name":"linux-amd64-22.04","runner":"ubuntu-22.04","run_e2e":false},{"platform_name":"linux-arm64-24.04","runner":"ubuntu-24.04-arm","run_e2e":true},{"platform_name":"linux-arm64-22.04","runner":"ubuntu-22.04-arm","run_e2e":false},{"platform_name":"darwin-arm64","runner":"macos-26","run_e2e":false}]' >> "$GITHUB_OUTPUT"
+          echo 'go_platforms=[{"os":"macos-26"},{"os":"ubuntu-22.04"},{"os":"ubuntu-24.04"},{"os":"ubuntu-22.04-arm"},{"os":"ubuntu-24.04-arm"}]' >> "$GITHUB_OUTPUT"
+
+  # Reuse the shared Bazel workflow so the scheduled runs exercise the same
+  # setup and Bazel unit-test job structure as PR and pre-merge runs, but on a
+  # wider platform matrix.
+  bazel-matrix:
+    needs: define-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.define-matrix.outputs.bazel_platforms) }}
+    uses: ./.github/workflows/bazel-ci.yml
+    with:
+      platform_name: ${{ matrix.platform_name }}
+      runner: ${{ matrix.runner }}
+      run_e2e: ${{ matrix.run_e2e }}
+    secrets: inherit
+
+  # Run the native Go unit-test path across the same platform set so scheduled
+  # runs continue validating both the Bazel and non-Bazel test entrypoints.
+  go-unit:
+    needs: define-matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.define-matrix.outputs.go_platforms) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
+      - name: test-unit
+        shell: bash
+        run: ./scripts/run_task.sh test-unit-race-shuffle

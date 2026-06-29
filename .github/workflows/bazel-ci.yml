@@ -11,6 +11,14 @@ on:
       runner:
         required: true
         type: string
+      unit_test_mode:
+        required: false
+        type: string
+        default: race-shuffle
+      run_e2e:
+        required: false
+        type: boolean
+        default: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -37,14 +45,21 @@ jobs:
         shell: bash
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          SKIPPABLE_JOBS_JSON: '["e2e"]'
         run: |
-          failed_jobs="$(
-            jq -r '
+          failed_jobs="$({
+            jq -r --argjson skippable_jobs "$SKIPPABLE_JOBS_JSON" '
               to_entries[]
-              | select(.value.result != "success")
+              | select(
+                  .value.result != "success"
+                  and (
+                    .value.result != "skipped"
+                    or (.key as $job | ($skippable_jobs | index($job)) == null)
+                  )
+                )
               | .key
             ' <<<"$NEEDS_JSON"
-          )"
+          })"
 
           if [[ -n "$failed_jobs" ]]; then
             echo "Required jobs failed:"
@@ -73,7 +88,17 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-main
+        run: |
+          case '${{ inputs.unit_test_mode }}' in
+            fast) task_name='bazel-test-main-fast' ;;
+            race) task_name='bazel-test-main-race' ;;
+            race-shuffle) task_name='bazel-test-main-race-shuffle' ;;
+            *)
+              echo "unknown unit test mode: ${{ inputs.unit_test_mode }}" >&2
+              exit 1
+              ;;
+          esac
+          ./scripts/run_task.sh "$task_name"
 
   unit-coreth:
     needs: setup
@@ -83,7 +108,17 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run coreth unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-coreth
+        run: |
+          case '${{ inputs.unit_test_mode }}' in
+            fast) task_name='bazel-test-coreth-fast' ;;
+            race) task_name='bazel-test-coreth-race' ;;
+            race-shuffle) task_name='bazel-test-coreth-race-shuffle' ;;
+            *)
+              echo "unknown unit test mode: ${{ inputs.unit_test_mode }}" >&2
+              exit 1
+              ;;
+          esac
+          ./scripts/run_task.sh "$task_name"
 
   unit-subnet-evm:
     needs: setup
@@ -93,9 +128,20 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run subnet-evm unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-subnet-evm
+        run: |
+          case '${{ inputs.unit_test_mode }}' in
+            fast) task_name='bazel-test-subnet-evm-fast' ;;
+            race) task_name='bazel-test-subnet-evm-race' ;;
+            race-shuffle) task_name='bazel-test-subnet-evm-race-shuffle' ;;
+            *)
+              echo "unknown unit test mode: ${{ inputs.unit_test_mode }}" >&2
+              exit 1
+              ;;
+          esac
+          ./scripts/run_task.sh "$task_name"
 
   e2e:
+    if: ${{ inputs.run_e2e }}
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:

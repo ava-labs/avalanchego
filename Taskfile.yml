@@ -87,9 +87,39 @@ tasks:
     desc: Run unit tests with Bazel (shuffle on, race on)
     cmd: '{{.NIX_RUN}} bazelisk test //...'
 
+  bazel-test-race-shuffle:
+    desc: Run unit tests with Bazel (shuffle on, race on)
+    cmd: '{{.NIX_RUN}} bazelisk test //...'
+
+  _bazel-test-coreth:
+    internal: true
+    vars:
+      BAZEL_CONFIG: ""
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test{{if .BAZEL_CONFIG}} --config={{.BAZEL_CONFIG}}{{end}} //graft/coreth/... //graft/evm/...'
+
   bazel-test-coreth:
     desc: Run coreth/evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/coreth/... //graft/evm/...'
+    cmds:
+      - task: _bazel-test-coreth
+
+  bazel-test-coreth-race-shuffle:
+    desc: Run coreth/evm unit tests with Bazel (shuffle on, race on)
+    cmds:
+      - task: _bazel-test-coreth
+
+  bazel-test-coreth-fast:
+    desc: Run coreth/evm unit tests with Bazel (no race, no shuffle)
+    cmds:
+      - task: _bazel-test-coreth
+        vars:
+          BAZEL_CONFIG: fast
+
+  bazel-test-coreth-race:
+    desc: Run coreth/evm unit tests with Bazel (race on, no shuffle)
+    cmds:
+      - task: _bazel-test-coreth
+        vars:
+          BAZEL_CONFIG: noshuffle
 
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary
@@ -113,13 +143,69 @@ tasks:
     desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
     cmd: '{{.NIX_RUN}} bazelisk test --config=fast //...'
 
+  bazel-test-race:
+    desc: Run unit tests with Bazel (race on, no shuffle)
+    cmd: '{{.NIX_RUN}} bazelisk test --config=noshuffle //...'
+
+  _bazel-test-main:
+    internal: true
+    vars:
+      BAZEL_CONFIG: ""
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test{{if .BAZEL_CONFIG}} --config={{.BAZEL_CONFIG}}{{end}} //... -- -//graft/...'
+
   bazel-test-main:
     desc: Run main module unit tests with Bazel (excludes graft modules)
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //... -- -//graft/...'
+    cmds:
+      - task: _bazel-test-main
+
+  bazel-test-main-race-shuffle:
+    desc: Run main module unit tests with Bazel (excludes graft modules; shuffle on, race on)
+    cmds:
+      - task: _bazel-test-main
+
+  bazel-test-main-fast:
+    desc: Run main module unit tests with Bazel (excludes graft modules; no race, no shuffle)
+    cmds:
+      - task: _bazel-test-main
+        vars:
+          BAZEL_CONFIG: fast
+
+  bazel-test-main-race:
+    desc: Run main module unit tests with Bazel (excludes graft modules; race on, no shuffle)
+    cmds:
+      - task: _bazel-test-main
+        vars:
+          BAZEL_CONFIG: noshuffle
+
+  _bazel-test-subnet-evm:
+    internal: true
+    vars:
+      BAZEL_CONFIG: ""
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test{{if .BAZEL_CONFIG}} --config={{.BAZEL_CONFIG}}{{end}} //graft/subnet-evm/...'
 
   bazel-test-subnet-evm:
     desc: Run subnet-evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/subnet-evm/...'
+    cmds:
+      - task: _bazel-test-subnet-evm
+
+  bazel-test-subnet-evm-race-shuffle:
+    desc: Run subnet-evm unit tests with Bazel (shuffle on, race on)
+    cmds:
+      - task: _bazel-test-subnet-evm
+
+  bazel-test-subnet-evm-fast:
+    desc: Run subnet-evm unit tests with Bazel (no race, no shuffle)
+    cmds:
+      - task: _bazel-test-subnet-evm
+        vars:
+          BAZEL_CONFIG: fast
+
+  bazel-test-subnet-evm-race:
+    desc: Run subnet-evm unit tests with Bazel (race on, no shuffle)
+    cmds:
+      - task: _bazel-test-subnet-evm
+        vars:
+          BAZEL_CONFIG: noshuffle
 
   build:
     desc: Builds avalanchego
@@ -547,6 +633,18 @@ tasks:
 
   test-unit:
     desc: Runs unit tests
+    # Invoking with bash ensures compatibility with CI execution on Windows
+    cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
+
+  test-unit-race-shuffle:
+    desc: Runs unit tests with race detection and shuffle enabled
+    # Invoking with bash ensures compatibility with CI execution on Windows
+    cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
+
+  test-unit-race:
+    desc: Runs unit tests with race detection and shuffle disabled
+    env:
+      NO_SHUFFLE: TRUE
     # Invoking with bash ensures compatibility with CI execution on Windows
     cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
 

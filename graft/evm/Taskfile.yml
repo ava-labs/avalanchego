@@ -21,6 +21,23 @@ tasks:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
     cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
 
+  build-test-race-shuffle:
+    desc: Run all Go tests with race detection and shuffle enabled
+    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
+  build-test-fast:
+    desc: Run all Go tests without race detection or shuffle for faster CI and local iteration
+    env:
+      NO_RACE: TRUE
+      NO_SHUFFLE: TRUE
+    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
+  build-test-race:
+    desc: Run all Go tests with race detection and shuffle disabled
+    env:
+      NO_SHUFFLE: TRUE
+    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
   check-clean-branch:
     desc: Checks that the git working tree is clean
     cmds:

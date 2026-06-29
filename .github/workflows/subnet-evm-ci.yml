@@ -1,12 +1,21 @@
 name: Subnet-EVM
 
+# PR validation skips Subnet-EVM unit tests by default. Applying the
+# ci/pre-merge label upgrades a PR to the same unit-test coverage as pre-merge
+# runs so contributors can reproduce stronger validation before landing.
+# Scheduled and manually dispatched runs restore the broader multi-platform
+# unit-test matrix.
 on:
   push:
     branches:
       - master
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   merge_group:
     types: [checks_requested]
+  schedule:
+    - cron: '40 2 * * *'
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -16,6 +25,7 @@ jobs:
     if: ${{ always() }}
     needs:
       - lint_test
+      - define-unit-test-matrix
       - unit_test
       - e2e_warp
       - e2e_load
@@ -27,14 +37,21 @@ jobs:
         shell: bash
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          SKIPPABLE_JOBS_JSON: '["unit_test"]'
         run: |
-          failed_jobs="$(
-            jq -r '
+          failed_jobs="$({
+            jq -r --argjson skippable_jobs "$SKIPPABLE_JOBS_JSON" '
               to_entries[]
-              | select(.value.result != "success")
+              | select(
+                  .value.result != "success"
+                  and (
+                    .value.result != "skipped"
+                    or (.key as $job | ($skippable_jobs | index($job)) == null)
+                  )
+                )
               | .key
             ' <<<"$NEEDS_JSON"
-          )"
+          })"
 
           if [[ -n "$failed_jobs" ]]; then
             echo "Required jobs failed:"
@@ -56,8 +73,30 @@ jobs:
       - name: Check go.mod and go.sum are up-to-date
         run: ./scripts/run_task.sh check-go-mod-tidy
 
+  define-unit-test-matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      platforms: ${{ steps.set-platforms.outputs.platforms }}
+    steps:
+      - name: Define unit-test matrix
+        id: set-platforms
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "schedule" || "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo 'platforms=[{"os":"macos-26","task_name":"build-test-race-shuffle"},{"os":"ubuntu-22.04","task_name":"build-test-race-shuffle"},{"os":"ubuntu-24.04","task_name":"build-test-race-shuffle"}]' >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            if jq -e '.pull_request.labels[]? | select(.name == "ci/pre-merge")' "$GITHUB_EVENT_PATH" >/dev/null; then
+              echo 'platforms=[{"os":"macos-26","task_name":"build-test-race"},{"os":"ubuntu-24.04","task_name":"build-test-race"}]' >> "$GITHUB_OUTPUT"
+            else
+              echo 'platforms=[]' >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo 'platforms=[{"os":"macos-26","task_name":"build-test-race"},{"os":"ubuntu-24.04","task_name":"build-test-race"}]' >> "$GITHUB_OUTPUT"
+          fi
+
   unit_test:
-    name: Unit Tests (${{ matrix.os }})
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci/pre-merge') }}
+    needs: define-unit-test-matrix
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -65,11 +104,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-26, ubuntu-22.04, ubuntu-24.04]
+        include: ${{ fromJSON(needs.define-unit-test-matrix.outputs.platforms) }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
-      - run: ./scripts/run_task.sh build-test
+      - run: ./scripts/run_task.sh ${{ matrix.task_name }}
       - run: ./scripts/run_task.sh coverage
 
   e2e_warp:
