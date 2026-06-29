@@ -62,7 +62,7 @@ func (b *backend) restoreBlock(numOrHash rpc.BlockNumberOrHash) (*blocks.Block, 
 				return nil, blocks.ErrNotFound
 			}
 			ethB := rawdb.ReadBlock(db, h, num) // readByNumberOrHash verifies this will be non-nil
-			return blocks.RestoreSettledBlock(b.Hooks(), ethB, b.Logger(), b.DB(), b.XDB(), b.ChainConfig())
+			return blocks.RestoreSettledBlock(ethB, b.Hooks(), b.Logger(), b.DB(), b.XDB(), b.ChainConfig())
 		},
 	)
 }

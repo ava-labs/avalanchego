@@ -151,7 +151,7 @@ func NewVM[T hook.Transaction](
 	vm.toClose = append(vm.toClose, &xdb)
 
 	// ==========  Sync -> Async  ==========
-	lastSync, err := blocks.RestoreSettledBlock(hooks, lastSynchronous, snowCtx.Log, db, xdb, chainConfig)
+	lastSync, err := blocks.RestoreSettledBlock(lastSynchronous, hooks, snowCtx.Log, db, xdb, chainConfig)
 	if err != nil {
 		return nil, fmt.Errorf("blocks.RestoreSettledBlock([last synchronous]): %v", err)
 	}

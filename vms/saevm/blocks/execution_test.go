@@ -102,10 +102,9 @@ func TestMarkExecuted(t *testing.T) {
 	lastExecuted := new(atomic.Pointer[Block])
 	require.NoError(t, b.MarkExecuted(db, xdb, gasTime, wallTime, baseFee.ToBig(), receipts, stateRoot, lastExecuted), "MarkExecuted()")
 
-	// This block is NOT synchronous, so it will not be marked as settled, and no hooks are needed.
-	fromDB, err := RestoreExecutedBlock(b.EthBlock(), nil, db, xdb, saetest.ChainConfig(), loggingtest.New(t, logging.Warn))
-	require.NoError(t, err, "RecoverExecutedBlock()")
-	require.NoErrorf(t, fromDB.SetAncestors(b.ParentBlock(), b.LastSettled()), "%T.SetAncestors()", fromDB)
+	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
+	// This block is NOT synchronous, so no hooks are needed.
+	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(nil, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
 	tests := []struct {
 		name           string
 		isLastExecuted bool
@@ -172,7 +171,7 @@ func TestMarkExecuted(t *testing.T) {
 	})
 }
 
-func TestRestoreExecutedBlockSynchronous(t *testing.T) {
+func TestRestoreExecutionArtefactsSynchronous(t *testing.T) {
 	// need well-formed receipt hash for invariants check.
 	ethB := types.NewBlockWithHeader(&types.Header{
 		Number:      big.NewInt(1),
@@ -186,15 +185,14 @@ func TestRestoreExecutedBlockSynchronous(t *testing.T) {
 	// An empty execution-results DB is what signals the block is synchronous.
 	xdb := saetest.NewExecutionResultsDB()
 	hooks := hookstest.NewStub(1e6)
-	b, err := RestoreExecutedBlock(ethB, hooks, db, xdb, saetest.ChainConfig(), loggingtest.New(t, logging.Warn))
-	require.NoError(t, err, "RestoreExecutedBlock()")
+	b := newBlock(t, ethB, nil, nil)
+	require.NoErrorf(t, b.RestoreExecutionArtefacts(hooks, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", b)
 
 	assert.Truef(t, b.Executed(), "%T.Executed()", b)
 	assert.Truef(t, b.Synchronous(), "%T.Synchronous()", b)
-	assert.Truef(t, b.Settled(), "%T.Settled()", b)
+	assert.Falsef(t, b.Settled(), "%T.Settled()", b)
 	// A synchronous block is its own last-settled block.
 	assert.Equalf(t, b, b.LastSettled(), "%T.LastSettled()", b)
-	require.NoErrorf(t, b.CheckInvariants(Settled), "%T.CheckInvariants(Settled)", b)
 }
 
 // selfAsHasher adds a Hash() method to a common.Hash, returning itself.

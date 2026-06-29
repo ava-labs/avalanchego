@@ -247,17 +247,19 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 	return executionArtefact(b, "state root", (*executionResults).postExecutionStateRoot)
 }
 
-// restoreExecutionArtefacts reloads post-execution artefacts persisted by
+// RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
 // said function was originally called.  If no execution results are found in
 // the [saetypes.ExecutionResults], they are instead inferred from the
 // block itself, and the block is marked as synchronous.
 //
 // This function does NOT restore the block's settlement state, even if the
-// block is synchronous. The caller MUST mark the block as settled.
+// block is synchronous. The caller MUST mark the block as settled. Because
+// this function breaks this invariant, any consumer SHOULD consider using
+// [RestoreSettledBlock] instead, if possible.
 //
 // Any error returned corrupts the block's in-memory state.
-func (b *Block) restoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
 	e, err := loadExecutionResults(xdb, b.NumberU64())
 	if errors.Is(err, database.ErrNotFound) {
 		e, err = b.synchronousExecutionResults(hooks)
@@ -350,7 +352,7 @@ func PostExecutionStateRoot(xdb saetypes.ExecutionResults, blockNum uint64) (com
 	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).postExecutionStateRoot)
 }
 
-// ExecutionBaseFee returns the base fee after exuection of the block without
+// ExecutionBaseFee returns the base fee after execution of the block without
 // requiring a full [Block]. It returns the base fee when the block was executed
 // (as against the worst-case prediction).
 func ExecutionBaseFee(xdb saetypes.ExecutionResults, blockNum uint64) (*uint256.Int, error) {
