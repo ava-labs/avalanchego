@@ -1,0 +1,77 @@
+name: 'Setup Bazel'
+description: 'Prepare Bazel CI for this job and, during initial setup, for the later Bazel CI jobs on this platform'
+
+inputs:
+  initial-setup:
+    description: 'Whether this is the initial setup pass that checks metadata, caches dependencies needed by subsequent Bazel CI jobs, and saves the resulting cache state'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - id: cache-paths
+      shell: bash
+      run: |
+        repository_cache_dir="$HOME/.cache/bazel-repository-cache"
+        go_mod_cache_dir="$HOME/.cache/bazel-go-repository-modcache"
+        mkdir -p "$repository_cache_dir" "$go_mod_cache_dir"
+        {
+          echo "repository_cache=$repository_cache_dir"
+          echo "go_mod_cache=$go_mod_cache_dir"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Perform initial setup of Bazel dependency cache
+      if: ${{ inputs.initial-setup == 'true' }}
+      uses: actions/cache@v5
+      with:
+        path: |
+          ${{ steps.cache-paths.outputs.repository_cache }}
+          ${{ steps.cache-paths.outputs.go_mod_cache }}
+        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
+        restore-keys: |
+          bazel-repo-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Restore Bazel dependency cache
+      if: ${{ inputs.initial-setup != 'true' }}
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          ${{ steps.cache-paths.outputs.repository_cache }}
+          ${{ steps.cache-paths.outputs.go_mod_cache }}
+        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
+        restore-keys: |
+          bazel-repo-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Configure Bazel to use dependency cache
+      shell: bash
+      run: |
+        cat >> "$HOME/.bazelrc" <<EOF
+        # Added by .github/actions/setup-bazel
+        common --repository_cache=${{ steps.cache-paths.outputs.repository_cache }}
+        common --repo_env=GO_REPOSITORY_USE_HOST_MODCACHE=1
+        common --repo_env=GOMODCACHE=${{ steps.cache-paths.outputs.go_mod_cache }}
+        EOF
+
+        echo 'RUN_TASK_PREFER_BAZEL=1' >> "$GITHUB_ENV"
+
+    - name: Fetch Bazel task bootstrap dependency
+      shell: bash
+      run: |
+        source ./scripts/bazel_ci_dependency_list.sh
+        while IFS= read -r target; do
+          [[ -n "${target}" ]] || continue
+          bazelisk fetch "${target}"
+        done < <(bazel_ci_bootstrap_targets)
+
+    # Bazel metadata must be consistent before any other bazel operations are
+    # performed including build dependency caching.
+    - name: Check Bazel metadata
+      if: ${{ inputs.initial-setup == 'true' }}
+      shell: bash
+      run: ./scripts/run_task.sh bazel-check-metadata
+
+    - name: Cache Bazel CI build dependencies
+      if: ${{ inputs.initial-setup == 'true' }}
+      shell: bash
+      run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
