@@ -299,7 +299,15 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	if c.IsHelicon(g.Timestamp) {
+		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
 		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
+
+		// The genesis block is synchronous and thus self-settling, so its settlement
+		// markers are never read.
+		headerExtra.SettledHeight = new(uint64)
+		headerExtra.SettledGasUnix = new(uint64)
+		headerExtra.SettledGasNumerator = new(uint64)
+		headerExtra.SettledExcess = new(uint64)
 	}
 
 	return types.NewBlock(
