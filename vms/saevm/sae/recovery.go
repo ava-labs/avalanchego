@@ -171,7 +171,7 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				}
 				chain = append(chain, parent)
 
-				if !b.Settled() {
+				if !b.Settled() && !parent.Synchronous() {
 					continue
 				}
 				if err := parent.MarkSettled(blackhole); err != nil {
