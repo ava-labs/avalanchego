@@ -1,6 +1,10 @@
 # Keep MODULE.bazel.lock up to date automatically
 common --lockfile_mode=update
 
+# Allow isolated module-extension usages so Bazel can manage repo tools from a
+# dedicated tools/external/go.mod independently of the main workspace go_deps.
+common --experimental_isolated_extension_usages
+
 # Enable platform-specific config sections (build:macos, build:linux, etc.)
 common --enable_platform_specific_config
 

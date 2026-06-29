@@ -11,9 +11,7 @@ exports_files(["BUILD.bazel"])
 
 gazelle_binary(
     name = "gazelle_bin",
-    languages = DEFAULT_LANGUAGES + [
-        "@bazel_gazelle//language/bazel/visibility",
-    ],
+    languages = DEFAULT_LANGUAGES,
 )
 
 gazelle(
