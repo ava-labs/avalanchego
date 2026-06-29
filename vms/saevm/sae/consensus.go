@@ -32,6 +32,12 @@ func (vm *VM) SetPreference(ctx context.Context, id ids.ID, _ *block.Context) er
 	return nil
 }
 
+// GetPreference returns the block the VM would currently build on top of, as
+// set by [VM.SetPreference]. It returns nil before the first SetPreference.
+func (vm *VM) GetPreference() *blocks.Block {
+	return vm.preference.Load()
+}
+
 // AcceptBlock marks the block as [accepted], resulting in:
 //   - All blocks settled by this block having their [blocks.Block.MarkSettled]
 //     method called; and

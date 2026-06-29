@@ -310,17 +310,45 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	return m, nil
 }
 
-// WaitForEvent waits for a transaction to be in the txpool or for the SAE VM to
-// produce an event.
+// earliestBuildTime returns the earliest wall-clock time at which a child of b
+// may be built: b's timestamp plus b's ACP-226 minimum block delay.
+func earliestBuildTime(b *blocks.Block) time.Time {
+	h := b.Header()
+	return blockTime(h).Add(delayExponent(h).DelayDuration())
+}
+
+// WaitForEvent waits until the ACP-226 minimum block delay since the preferred
+// block has elapsed, then waits for a transaction to be in the txpool or for
+// the SAE VM to produce an event.
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	// TODO(StephenButtolph): Do not busy loop with [snowcommon.PendingTxs]. The
 	// txpools are cleared after block execution, so we may still have
 	// transactions in the txpool while blocks containing those transactions are
 	// processing.
 
-	// TODO(StephenButtolph): Wait until the minimum block delay has passed.
+	// Pace block building on the ACP-226 minimum block delay before consulting
+	// the event sources so that the mempools are queried when we are actually
+	// willing to build.
+	if preferred := vm.VM.GetPreference(); preferred != nil {
+		if now, minTime := vm.now(), earliestBuildTime(preferred); now.Before(minTime) {
+			select {
+			case <-ctx.Done():
+				return 0, context.Cause(ctx)
+			case <-time.After(minTime.Sub(now)):
+			}
+		}
+	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	// Race the SAE VM's event source against the cross-chain txpool; whichever
+	// signals first wins.
+	//
+	// raceCtx exists to unblock the loser: it is canceled by the winner's
+	// deferred cancel as soon as either goroutine produces a result, so the
+	// other's still-pending WaitForEvent/AwaitTxs call returns promptly rather
+	// than lingering until the caller's ctx is canceled. results is buffered for
+	// both sends so the loser can always deliver its (discarded) result and
+	// exit, i.e. neither goroutine leaks.
+	raceCtx, cancel := context.WithCancel(ctx)
 	type result struct {
 		msg snowcommon.Message
 		err error
@@ -328,12 +356,12 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	results := make(chan result, 2)
 	go func() {
 		defer cancel()
-		msg, err := vm.VM.WaitForEvent(ctx)
+		msg, err := vm.VM.WaitForEvent(raceCtx)
 		results <- result{msg, err}
 	}()
 	go func() {
 		defer cancel()
-		err := vm.txpool.AwaitTxs(ctx)
+		err := vm.txpool.AwaitTxs(raceCtx)
 		results <- result{snowcommon.PendingTxs, err}
 	}()
 

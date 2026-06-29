@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -107,6 +108,8 @@ type (
 		db         database.Database
 		state      snow.State
 		upgrades   upgrade.Config
+
+		skipRPCTransport bool
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -118,6 +121,14 @@ type (
 func withState(state snow.State) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.state = state
+	})
+}
+
+// withoutRPCTransport skips the SUT's real HTTP/WebSocket transport. Required
+// under testing/synctest, where real sockets never reach a durable block.
+func withoutRPCTransport() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.skipRPCTransport = true
 	})
 }
 
@@ -179,6 +190,10 @@ func withHeliconTime(t time.Time) sutOption {
 	})
 }
 
+// testStartTime pins the SUT clock at the genesis block's ACP-226 minimum
+// delay deadline, i.e. the earliest time a child of genesis may be built.
+var testStartTime = upgrade.InitiallyActiveTime.Add(dynamic.InitialDelayExponent.DelayDuration())
+
 // withVMTime fixes the SUT's clock at startTime and returns a handle that lets
 // the test move the clock forward (e.g. past Tau to settle a block).
 func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
@@ -199,6 +214,12 @@ func withPriceTarget(p gas.Price) sutOption {
 func withGasTarget(g gas.Gas) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.GasTarget = &g
+	})
+}
+
+func withMinDelayTarget(ms uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.MinDelayTarget = &ms
 	})
 }
 
@@ -293,30 +314,33 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	// need to treat our node as a special case.
 	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
 
-	handlers, err := vm.CreateHandlers(ctx)
-	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
-
-	mux := http.NewServeMux()
-	for path, h := range handlers {
-		mux.Handle(cchainHTTPPrefix+path, h)
-	}
-	server := httptest.NewServer(mux)
-	tb.Cleanup(server.Close)
-
-	const wsHTTPPath = cchainHTTPPrefix + "/ws"
-	wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
-	ethRPCClient, err := ethrpc.Dial(wsURI)
-	require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
-	tb.Cleanup(ethRPCClient.Close)
-
 	sut := &SUT{
 		VM:        vm,
-		Client:    NewClient(server.URL),
 		db:        db,
 		memory:    memory,
 		sender:    appSender,
-		ethclient: ethclient.NewClient(ethRPCClient),
 		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
+	}
+
+	if !cfg.skipRPCTransport {
+		handlers, err := vm.CreateHandlers(ctx)
+		require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
+
+		mux := http.NewServeMux()
+		for path, h := range handlers {
+			mux.Handle(cchainHTTPPrefix+path, h)
+		}
+		server := httptest.NewServer(mux)
+		tb.Cleanup(server.Close)
+
+		const wsHTTPPath = cchainHTTPPrefix + "/ws"
+		wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
+		ethRPCClient, err := ethrpc.Dial(wsURI)
+		require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
+		tb.Cleanup(ethRPCClient.Close)
+
+		sut.Client = NewClient(server.URL)
+		sut.ethclient = ethclient.NewClient(ethRPCClient)
 	}
 	appSender.Start(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
@@ -586,21 +610,29 @@ func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.I
 	return blk
 }
 
-// verifyTampered re-seals valid with a mutated header extra and returns the
-// VerifyBlock error, exercising rebuild-and-compare against the tampered field.
-func (s *SUT) verifyTampered(ctx context.Context, tb testing.TB, valid *blocks.Block, tamper func(*customtypes.HeaderExtra)) error {
+// verifyTampered re-seals valid with a mutated header and returns the
+// VerifyBlock error, exercising rebuild-and-compare against the tampered
+// field(s). tamper receives the full header so callers can mutate both
+// [types.Header] fields (e.g. Time) and the header extra.
+func (s *SUT) verifyTampered(ctx context.Context, tb testing.TB, valid *blocks.Block, tamper func(*types.Header)) error {
 	tb.Helper()
 
 	hdr := valid.Header()
-	extra := customtypes.GetHeaderExtra(hdr)
-	tamper(extra)
-	customtypes.SetHeaderExtra(hdr, extra)
+	tamper(hdr)
 
 	buf, err := rlp.EncodeToBytes(valid.EthBlock().WithSeal(hdr))
 	require.NoErrorf(tb, err, "rlp.EncodeToBytes(tampered block)")
 	parsed, err := s.ParseBlock(ctx, buf)
 	require.NoErrorf(tb, err, "%T.ParseBlock(tampered block)", s.VM)
 	return s.VerifyBlock(ctx, nil, parsed)
+}
+
+// tamperExtra adapts a header-extra mutator into the [types.Header] mutator that
+// [SUT.verifyTampered] expects.
+func tamperExtra(mut func(*customtypes.HeaderExtra)) func(*types.Header) {
+	return func(hdr *types.Header) {
+		mut(customtypes.GetHeaderExtra(hdr))
+	}
 }
 
 // acceptAndExecute accepts blk and blocks until it has been executed.
@@ -1181,9 +1213,9 @@ func TestVerifyBlockRejectsTamperedHeader(t *testing.T) {
 			require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
 			valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-			err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
+			err := sut.verifyTampered(ctx, t, valid, tamperExtra(func(e *customtypes.HeaderExtra) {
 				tt.tamper(t, e)
-			})
+			}))
 			require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
 		})
 	}
@@ -1197,7 +1229,7 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	key := txtest.NewKey(t)
 	alloc := withMaxAllocFor(key.EthAddress())
 
-	timeOpt, clock := withVMTime(upgrade.InitiallyActiveTime)
+	timeOpt, clock := withVMTime(testStartTime)
 	db := memdb.New()
 	ctx, node := newSUT(t, alloc, timeOpt, withDB(db))
 	w := newWallet(key, node.ctx, node.Client)
@@ -1379,6 +1411,60 @@ func TestDynamicTargetExponent(t *testing.T) {
 	}
 }
 
+// TestDynamicMinDelayExcess verifies each built block's MinDelayExcess steps
+// toward the node's ACP-226 vote by at most the per-block cap, and holds at the
+// initial value with no vote.
+func TestDynamicMinDelayExcess(t *testing.T) {
+	const maxDiff = 200
+	tests := []struct {
+		name    string
+		desired *uint64
+		want    []dynamic.DelayExponent
+	}{
+		{
+			name: "unset",
+			want: []dynamic.DelayExponent{dynamic.InitialDelayExponent},
+		},
+		{
+			name:    "votes_up_capped",
+			desired: utils.PointerTo[uint64](4000), // above the ~2000ms initial
+			want: []dynamic.DelayExponent{
+				dynamic.InitialDelayExponent + maxDiff,
+				dynamic.InitialDelayExponent + 2*maxDiff,
+			},
+		},
+		{
+			name:    "votes_down_capped",
+			desired: utils.PointerTo[uint64](1000),
+			want: []dynamic.DelayExponent{
+				dynamic.InitialDelayExponent - maxDiff,
+				dynamic.InitialDelayExponent - 2*maxDiff,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			timeOpt, clock := withVMTime(testStartTime)
+			opts := []sutOption{withMaxAllocFor(key.EthAddress()), timeOpt}
+			if test.desired != nil {
+				opts = append(opts, withMinDelayTarget(*test.desired))
+			}
+			ctx, sut := newSUT(t, opts...)
+			w := newWallet(key, sut.ctx, sut.Client)
+
+			for _, wantExponent := range test.want {
+				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				he := customtypes.GetHeaderExtra(blk.Header())
+				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
+				got := dynamic.DelayExponent(*he.MinDelayExcess)
+				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExcess", blk.Height(), he)
+				clock.Advance(got.DelayDuration())
+			}
+		})
+	}
+}
+
 // TestGasRefundsDisabled asserts that EVM gas refunds are disabled.
 func TestGasRefundsDisabled(t *testing.T) {
 	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
@@ -1420,6 +1506,107 @@ func TestGasRefundsDisabled(t *testing.T) {
 
 	const gasIfRefunded = wantGasUsed - ethparams.SstoreClearsScheduleRefundEIP3529
 	assert.Equalf(t, wantGasUsed, receipt.GasUsed, "gas charged (would be %d if refunds were enabled)", gasIfRefunded)
+}
+
+func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
+	key := txtest.NewKey(t)
+	timeOpt, clock := withVMTime(testStartTime)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt)
+	w := newWallet(key, sut.ctx, sut.Client)
+
+	parent := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	clock.Set(earliestBuildTime(parent))
+	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
+	child := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+
+	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1 //#nosec G115 -- Known non-negative
+	err := sut.verifyTampered(ctx, t, child, func(hdr *types.Header) {
+		hdr.Time = earlyMS / 1000
+		tamperExtra(func(e *customtypes.HeaderExtra) {
+			e.TimeMilliseconds = &earlyMS
+		})(hdr)
+	})
+	require.ErrorIsf(t, err, errBelowMinBlockDelay, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
+}
+
+// TestWaitForEventMinDelayPacing exercises WaitForEvent's ACP-226 min-delay
+// pacing under synctest: the call stays blocked on the pacing timer until it is
+// released, either by the timer firing (returning PendingTxs) or by the context
+// being canceled (returning the cancellation cause). synctest lets us assert
+// "still blocked" without a real-time grace window.
+func TestWaitForEventMinDelayPacing(t *testing.T) {
+	type result struct {
+		msg snowcommon.Message
+		err error
+	}
+	tests := []struct {
+		name string
+		// cancelDuringDelay releases WaitForEvent by canceling its context while
+		// it is parked on the pacing timer. When false, synctest advances the
+		// fake clock to fire the timer instead.
+		cancelDuringDelay bool
+		wantMsg           snowcommon.Message
+		wantErr           error
+	}{
+		{
+			name:    "timer_fires",
+			wantMsg: snowcommon.PendingTxs,
+		},
+		{
+			name:              "context_canceled",
+			cancelDuringDelay: true,
+			wantErr:           context.Canceled,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				// Build an in-process SUT with no real RPC transport: real
+				// sockets never reach a durable block under synctest, so the
+				// txpool is primed directly via the gossip set rather than
+				// through the absent Client. The SUT is a fully-initialized VM in
+				// [snow.NormalOp] whose only block is genesis (also its current
+				// preference), with exactly one pending transaction.
+				//
+				// Do not build/execute blocks: these tests are only
+				// synctest-teardown-safe because they run no blocks (a block can
+				// reactivate a goleak-suppressed libevm shutdown race that
+				// deadlocks the bubble).
+				key := txtest.NewKey(t)
+				timeOpt, _ := withVMTime(upgrade.InitiallyActiveTime)
+				ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt, withoutRPCTransport())
+				w := newWallet(key, sut.ctx, nil)
+
+				gossipTx := toGossipTx(w.newMinimalTx(t))
+				require.NoErrorf(t, sut.gossipSet.Add(gossipTx), "%T.Add()", sut.gossipSet)
+
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+
+				done := make(chan result, 1)
+				go func() {
+					msg, err := sut.WaitForEvent(ctx)
+					done <- result{msg, err}
+				}()
+
+				// Blocked on the pacing timer until we release it.
+				synctest.Wait()
+				require.Emptyf(t, done, "%T.WaitForEvent() should be blocked on the min delay", sut.VM)
+
+				if test.cancelDuringDelay {
+					cancel()
+				}
+
+				got := <-done
+				if test.wantErr != nil {
+					require.ErrorIsf(t, got.err, test.wantErr, "%T.WaitForEvent()", sut.VM)
+				} else {
+					require.NoErrorf(t, got.err, "%T.WaitForEvent()", sut.VM)
+				}
+				require.Equalf(t, test.wantMsg, got.msg, "%T.WaitForEvent() event", sut.VM)
+			})
+		})
+	}
 }
 
 // TestEmptyBlocksDisallowed asserts that empty blocks are not allowed.
