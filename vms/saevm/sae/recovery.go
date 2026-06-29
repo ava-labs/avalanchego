@@ -59,7 +59,7 @@ func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	// This block is guaranteed to be settled.
+	// We only commit settled execution results, so this block is guaranteed to be settled.
 	return blocks.RestoreSettledBlock(rec.hooks, ethB, rec.log, rec.db, rec.xdb, rec.chainConfig)
 }
 

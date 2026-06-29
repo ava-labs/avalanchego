@@ -72,7 +72,7 @@ func (b *Block) WaitUntilSettled(ctx context.Context) error {
 }
 
 // Settled reports whether [Block.MarkSettled] has been called without resulting
-// in an error, or the block is restored from disk as settled.
+// in an error, or the block was constructed by [RestoreSettledBlock].
 func (b *Block) Settled() bool {
 	return b.ancestry.Load() == nil
 }
@@ -107,9 +107,9 @@ func (b *Block) ParentBlock() *Block {
 
 // LastSettled returns the last-settled block at the time of b's acceptance,
 // unless [Block.MarkSettled] has been called, in which case it returns nil and
-// logs an error. If the block is synchronous, LastSettled always returns `b`
-// itself, without logging. Note that this value might not be distinct between
-// contiguous blocks.
+// logs an error. Note that this value might not be distinct between contiguous
+// blocks. If the block is synchronous, LastSettled always returns b itself,
+// without logging.
 func (b *Block) LastSettled() *Block {
 	if b.synchronous {
 		return b

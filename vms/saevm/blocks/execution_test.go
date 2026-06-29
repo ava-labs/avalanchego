@@ -194,7 +194,7 @@ func TestRestoreExecutedBlockSynchronous(t *testing.T) {
 	assert.Truef(t, b.Settled(), "%T.Settled()", b)
 	// A synchronous block is its own last-settled block.
 	assert.Equalf(t, b, b.LastSettled(), "%T.LastSettled()", b)
-	require.NoError(t, b.CheckInvariants(Settled), "CheckInvariants(Settled)")
+	require.NoErrorf(t, b.CheckInvariants(Settled), "%T.CheckInvariants(Settled)", b)
 }
 
 // selfAsHasher adds a Hash() method to a common.Hash, returning itself.

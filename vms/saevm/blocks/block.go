@@ -103,9 +103,10 @@ func New(eth *types.Block, parent, lastSettled *Block, log logging.Logger) (*Blo
 
 // RestoreExecutedBlock constructs a new block with [New] and restores it to an
 // executed state before returning it. By definition of being executed, the
-// returned block also includes post-execution artefacts. This function MUST
-// only be used when recovering from shutdown, since any other block that
-// needs read from disk should be in memory.
+// returned block also includes post-execution artefacts. This function SHOULD
+// only be used when recovering from shutdown, since every other executed block
+// is either settled (use [RestoreSettledBlock]) or still available from the
+// [ConsensusCritical] mechanism.
 //
 // This function does NOT restore the block's settlement state, UNLESS the
 // block is synchronous, in which case it is marked as settled.
