@@ -45,8 +45,8 @@ VM.
 
 The transition is a point in the chain's history, not a wall-clock event. It is
 anchored to block timestamps and `transitionTime`, so every node draws the
-boundary in the same place. Blocks before it belong to the pre-transition VM;
-blocks after it belong to the post-transition VM.
+boundary in the same place. Blocks before it are executed by the pre-transition
+VM; blocks after it are executed by the post-transition VM.
 
 ```mermaid
 flowchart LR
@@ -68,7 +68,7 @@ Verification and acceptance enforce the boundary:
 
 ```mermaid
 flowchart TD
-    A["Build / Parse / Get block"] --> B["wrap in preBlock"]
+    A["Build / Parse / Get block"] --> B["wrap in block"]
     B --> C{"Verify / VerifyWithContext:<br/>maybeTransition"}
     C -->|"parent timestamp &lt; transitionTime"| D["forward Verify to the<br/>pre-transition block"]
     C -->|"parent ≥ transitionTime<br/>and VM not yet transitioned"| E["fail: errPostTransition-<br/>BlockBeforeTransition"]

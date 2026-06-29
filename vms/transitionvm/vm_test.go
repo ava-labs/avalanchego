@@ -21,17 +21,18 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
-	_ Chain                   = (*fakeVM)(nil)
-	_ snowman.Block           = (*fakeBlock)(nil)
-	_ block.WithVerifyContext = (*fakeBlock)(nil)
+	_ Chain                     = (*fakeVM)(nil)
+	_ snowman.Block             = (*fakeBlock)(nil)
+	_ smblock.WithVerifyContext = (*fakeBlock)(nil)
 )
 
 // blockInterval is how much fakeVM advances time per built block.
@@ -78,7 +79,7 @@ func (*fakeBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 	return true, nil
 }
 
-func (b *fakeBlock) VerifyWithContext(ctx context.Context, _ *block.Context) error {
+func (b *fakeBlock) VerifyWithContext(ctx context.Context, _ *smblock.Context) error {
 	return b.Verify(ctx)
 }
 
@@ -198,9 +199,10 @@ func (vm *fakeVM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, erro
 	return nil, database.ErrNotFound
 }
 
-// ParseBlock reconstructs a block from its bytes, which [snowmantest.BuildChild]
-// sets to the block ID. The reconstructed block is owned by this VM.
+// ParseBlock reconstructs a block from its bytes. The reconstructed block is
+// owned by this VM.
 func (vm *fakeVM) ParseBlock(_ context.Context, b []byte) (snowman.Block, error) {
+	// [snowmantest.BuildChild] sets the bytes to the block ID.
 	blkID, err := ids.ToID(b)
 	if err != nil {
 		return nil, err
@@ -223,7 +225,7 @@ func (vm *fakeVM) BuildBlock(context.Context) (snowman.Block, error) {
 	return blk, nil
 }
 
-func (*fakeVM) BuildBlockWithContext(context.Context, *block.Context) (snowman.Block, error) {
+func (*fakeVM) BuildBlockWithContext(context.Context, *smblock.Context) (snowman.Block, error) {
 	return nil, errors.New("unexpectedly called BuildBlockWithContext")
 }
 
@@ -246,7 +248,7 @@ func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode verifyMo
 	require.NoError(t, blk.Accept(ctx))
 }
 
-// verifyMode selects whether a block is verified with a [block.Context].
+// verifyMode selects whether a block is verified with a [smblock.Context].
 type verifyMode int
 
 const (
@@ -268,7 +270,7 @@ func verifyBlock(ctx context.Context, blk snowman.Block, mode verifyMode) error 
 	if mode == verifyNoContext {
 		return blk.Verify(ctx)
 	}
-	bwc := blk.(block.WithVerifyContext)
+	bwc := blk.(smblock.WithVerifyContext)
 	return bwc.VerifyWithContext(ctx, nil)
 }
 
@@ -408,7 +410,7 @@ func TestInitializeIsolatesContext(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition, initializing post
+	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
 	require.NotSame(t, sut.pre.chainCtx, sut.post.chainCtx)
 	require.NotSame(t, sut.pre.chainCtx.Metrics, sut.post.chainCtx.Metrics)

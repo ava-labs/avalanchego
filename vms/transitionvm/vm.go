@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package transitionvm implements a [block.ChainVM] that switches from one
+// Package transitionvm implements a [smblock.ChainVM] that switches from one
 // chain to another at a configured time.
 package transitionvm
 
@@ -19,7 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var _ Chain = (*VM)(nil)
@@ -27,10 +28,10 @@ var _ Chain = (*VM)(nil)
 // Chain is the VM interface that both the pre- and post-transition chains must
 // implement.
 type Chain interface {
-	block.ChainVM
-	block.BuildBlockWithContextChainVM
-	block.SetPreferenceWithContextChainVM
-	block.StateSyncableVM
+	smblock.ChainVM
+	smblock.BuildBlockWithContextChainVM
+	smblock.SetPreferenceWithContextChainVM
+	smblock.StateSyncableVM
 }
 
 // VM wraps a pre- and a post-transition [Chain], forwarding calls to whichever

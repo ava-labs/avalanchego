@@ -23,8 +23,8 @@ func (f fakeFactory) New(logging.Logger) (interface{}, error) {
 	return f.vm, nil
 }
 
-// TestFactoryUsableBeforeInitialize verifies Version and Shutdown work on a
-// factory-built VM before Initialize.
+// TestFactoryUsableBeforeInitialize verifies [VM.Version] and [VM.Shutdown]
+// work on a factory-built VM before Initialize.
 func TestFactoryUsableBeforeInitialize(t *testing.T) {
 	f := &Factory{
 		PreFactory:  fakeFactory{vm: newFakeVM(t, "pre", newFakeState())},
