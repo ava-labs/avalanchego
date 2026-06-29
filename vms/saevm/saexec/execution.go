@@ -196,16 +196,12 @@ func Execute(
 	header.BaseFee = baseFee.ToBig()
 
 	// EIP-4788: before processing any transactions, store the parent beacon
-	// block root via the system call, mirroring [core.StateProcessor.Process].
+	// block root, mirroring [core.StateProcessor.Process].
 	//
 	// This is part of execution and so MUST run during both live execution and
 	// intra-block (tracing) replay, which share this function, to keep the
 	// execution-derived state consistent.
-	blockCtx := core.NewEVMBlockContext(header, chainCtx, &header.Coinbase)
-	if beaconRoot := header.ParentBeaconRoot; beaconRoot != nil {
-		vmenv := vm.NewEVM(blockCtx, vm.TxContext{}, stateDB, config, vm.Config{})
-		core.ProcessBeaconBlockRoot(*beaconRoot, vmenv, stateDB)
-	}
+	core.SetBeaconBlockRoot(stateDB, header)
 
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
@@ -297,7 +293,7 @@ func Execute(
 		BaseFee:     baseFee,
 		StateDB:     stateDB,
 		Signer:      signer,
-		BlockCtx:    blockCtx,
+		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
 		Receipts:    receipts,
 		GasConsumed: blockGasConsumed,
 	}
