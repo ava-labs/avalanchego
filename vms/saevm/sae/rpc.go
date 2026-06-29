@@ -44,7 +44,6 @@ func (c chain) Mempool() *txgossip.Set         { return c.mempool }
 func (c chain) Peers() *p2p.Peers              { return c.VM.Peers }
 func (c chain) LastAccepted() *blocks.Block    { return c.last.accepted.Load() }
 func (c chain) LastSettled() *blocks.Block     { return c.last.settled.Load() }
-func (c chain) LastSynchronous() *blocks.Block { return c.last.synchronous }
 
 func (c chain) ConsensusCriticalBlock(h common.Hash) (*blocks.Block, bool) {
 	return c.consensusCritical.Load(h)

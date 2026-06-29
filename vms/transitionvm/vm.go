@@ -1,6 +1,8 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package transitionvm implements a [smblock.ChainVM] that switches from one
+// chain to another at a configured time.
 package transitionvm
 
 import (
@@ -13,31 +15,37 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var _ Chain = (*VM)(nil)
 
+// Chain is the VM interface that both the pre- and post-transition chains must
+// implement.
 type Chain interface {
-	block.ChainVM
-	block.BuildBlockWithContextChainVM
-	block.SetPreferenceWithContextChainVM
+	smblock.ChainVM
+	smblock.BuildBlockWithContextChainVM
+	smblock.SetPreferenceWithContextChainVM
+	smblock.StateSyncableVM
 }
 
+// VM wraps a pre- and a post-transition [Chain], forwarding calls to whichever
+// is currently active and switching from the pre- to the post-transition chain
+// at the transition time.
 type VM struct {
 	// transition parameters
 	preTransitionChain  Chain
 	postTransitionChain Chain
 	transitionTime      time.Time
+	drainTimeout        time.Duration
 
 	// chain parameters
-	chainCtx     *snow.Context // Has modified Lock and Metrics fields
+	postChainCtx *snow.Context // Has modified [snow.Context.Lock] and [snow.Context.Metrics]
 	db           database.Database
 	genesisBytes []byte
 	upgradeBytes []byte
@@ -45,26 +53,30 @@ type VM struct {
 	fxs          []*common.Fx
 	appSender    common.AppSender
 
-	// current state
+	// vm state
 	transitionLock sync.RWMutex
 	transitioned   bool
+	consensusState snow.State
+	connections    *connections
+	httpHandlers   *httpHandlers
 	current        *current
 }
 
+// current holds the active chain and its per-chain state. It is replaced on
+// initialization and transition.
 type current struct {
-	chain          Chain
-	consensusState snow.State
-	requests       *requests
-	connections    *connections
-	httpHandlers   *httpHandlers
+	chain    Chain
+	requests *requests
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 }
 
-func (v *VM) Initialize(
+var transitionedKey = prefixdb.MakePrefix([]byte("transitioned"))
+
+func (vm *VM) Initialize(
 	ctx context.Context,
-	chainCtx *snow.Context,
+	preChainCtx *snow.Context,
 	db database.Database,
 	genesisBytes []byte,
 	upgradeBytes []byte,
@@ -73,165 +85,204 @@ func (v *VM) Initialize(
 	appSender common.AppSender,
 ) error {
 	gatherer := metrics.NewPrefixGatherer()
-	if err := chainCtx.Metrics.Register("transition", gatherer); err != nil {
+	if err := preChainCtx.Metrics.Register("transition", gatherer); err != nil {
 		return err
 	}
 
-	v.chainCtx = &snow.Context{
-		NetworkID:       chainCtx.NetworkID,
-		SubnetID:        chainCtx.SubnetID,
-		ChainID:         chainCtx.ChainID,
-		NodeID:          chainCtx.NodeID,
-		PublicKey:       chainCtx.PublicKey,
-		NetworkUpgrades: chainCtx.NetworkUpgrades,
-		XChainID:        chainCtx.XChainID,
-		CChainID:        chainCtx.CChainID,
-		AVAXAssetID:     chainCtx.AVAXAssetID,
-		Log:             chainCtx.Log,
-		Lock:            sync.RWMutex{},
-		SharedMemory:    chainCtx.SharedMemory,
-		BCLookup:        chainCtx.BCLookup,
-		Metrics:         gatherer,
-		WarpSigner:      chainCtx.WarpSigner,
-		ValidatorState:  chainCtx.ValidatorState,
-		ChainDataDir:    chainCtx.ChainDataDir,
+	// Give the post-transition chain its own gatherer to avoid
+	// double-registering metrics, and copy the rest of the context so the
+	// transition never races on the shared [snow.Context].
+	vm.postChainCtx = &snow.Context{
+		NetworkID:       preChainCtx.NetworkID,
+		SubnetID:        preChainCtx.SubnetID,
+		ChainID:         preChainCtx.ChainID,
+		NodeID:          preChainCtx.NodeID,
+		PublicKey:       preChainCtx.PublicKey,
+		NetworkUpgrades: preChainCtx.NetworkUpgrades,
+		XChainID:        preChainCtx.XChainID,
+		CChainID:        preChainCtx.CChainID,
+		AVAXAssetID:     preChainCtx.AVAXAssetID,
+		Log:             preChainCtx.Log,
+		// The lock is deprecated and unused by SAE, so this copy gets a fresh
+		// one. Coreth still uses it and MUST get the original context, not this
+		// copy.
+		Lock:           sync.RWMutex{},
+		SharedMemory:   preChainCtx.SharedMemory,
+		BCLookup:       preChainCtx.BCLookup,
+		Metrics:        gatherer,
+		WarpSigner:     preChainCtx.WarpSigner,
+		ValidatorState: preChainCtx.ValidatorState,
+		ChainDataDir:   preChainCtx.ChainDataDir,
 	}
-	v.db = db
-	v.genesisBytes = genesisBytes
-	v.upgradeBytes = upgradeBytes
-	v.configBytes = configBytes
-	v.fxs = fxs
-	v.appSender = appSender
+	vm.db = db
+	vm.genesisBytes = genesisBytes
+	vm.upgradeBytes = upgradeBytes
+	vm.configBytes = configBytes
+	vm.fxs = fxs
+	vm.appSender = appSender
 
-	v.current = &current{
-		chain:          v.preTransitionChain,
-		consensusState: snow.Initializing,
-		connections: &connections{
-			nodes: make(map[ids.NodeID]*version.Application),
-		},
-		httpHandlers: &httpHandlers{
-			routes: make(map[string]*httpHandler),
-		},
-	}
+	vm.connections = newConnections()
+	vm.httpHandlers = newHTTPHandlers()
 
-	chainCtx.Log.Info("checking for last synchronous block")
-	has, err := state.HasLastSync(v.db)
+	log := preChainCtx.Log
+	log.Info("checking for transition marker")
+	has, err := vm.db.Has(transitionedKey)
 	if err != nil {
-		return fmt.Errorf("checking for last synchronous block: %w", err)
+		return fmt.Errorf("checking for transition marker: %w", err)
 	}
 
 	if has {
-		chainCtx.Log.Info("initializing post-transition VM")
-		if err := v.initChain(ctx, v.postTransitionChain, v.chainCtx); err != nil {
+		log.Info("initializing post-transition VM")
+		if err := vm.initChain(ctx, vm.postTransitionChain, vm.postChainCtx); err != nil {
 			return fmt.Errorf("initializing post-transition VM: %w", err)
 		}
-		v.transitioned = true
+		vm.transitioned = true
 		return nil
 	}
 
-	chainCtx.Log.Info("initializing pre-transition VM")
-	if err := v.initChain(ctx, v.preTransitionChain, chainCtx); err != nil {
+	log.Info("initializing pre-transition VM")
+	if err := vm.initChain(ctx, vm.preTransitionChain, preChainCtx); err != nil {
 		return fmt.Errorf("initializing pre-transition VM: %w", err)
 	}
 
-	// It's possible we crashed between accepting the last block and writing the
-	// transition flag. Or maybe the genesis block was the transition block.
-	lastAcceptedID, err := v.LastAccepted(ctx)
+	// Genesis may already be past the transition time, or we may have crashed
+	// after accepting the transition block but before marking it.
+	lastAcceptedID, err := vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("loading last accepted ID: %w", err)
 	}
-	lastAccepted, err := v.GetBlock(ctx, lastAcceptedID)
+	lastAccepted, err := vm.GetBlock(ctx, lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("loading last accepted block %s: %w", lastAcceptedID, err)
 	}
-	if time := lastAccepted.Timestamp(); time.Before(v.transitionTime) {
+	if lastAccepted.Timestamp().Before(vm.transitionTime) {
 		return nil
 	}
-	return v.transition(ctx, lastAccepted)
+	return vm.transition(ctx, lastAccepted)
 }
 
-func (v *VM) transition(ctx context.Context, last snowman.Block) error {
-	// We must cancel the context before grabbing the lock to ensure that
-	// [VM.WaitForEvent] does not block indefinitely.
-	v.current.ctxCancel()
+// transition switches from the pre- to the post-transition chain. The
+// pre-transition chain must be active.
+func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
+	// Cancel first so a blocked [VM.WaitForEvent] releases its read lock,
+	// letting us take the write lock below.
+	vm.current.ctxCancel()
 
-	v.transitionLock.Lock()
-	defer v.transitionLock.Unlock()
+	vm.transitionLock.Lock()
+	defer vm.transitionLock.Unlock()
 
 	lastID := last.ID()
-	lastBytes := last.Bytes()
-	v.chainCtx.Log.Info("transitioning VMs",
-		zap.Stringer("lastID", lastID),
-		zap.Uint64("lastHeight", last.Height()),
-		zap.Time("lastTime", last.Timestamp()),
+	log := vm.postChainCtx.Log
+	log.Info("transitioning VMs",
+		zap.Stringer("blkID", lastID),
+		zap.Uint64("height", last.Height()),
+		zap.Time("timestamp", last.Timestamp()),
 	)
 
-	v.chainCtx.Log.Info("shutting down pre-transition VM")
-	if err := v.preTransitionChain.Shutdown(ctx); err != nil {
+	// API requests are queued and drained during the transition to prevent APIs
+	// from hitting the pre-transition VM while it is shutting down.
+	log.Info("blocking API requests")
+	vm.httpHandlers.block()
+	defer func() {
+		log.Info("unblocking API requests")
+		vm.httpHandlers.unblock()
+	}()
+
+	log.Info("draining in-flight API requests to the pre-transition VM",
+		zap.Duration("timeout", vm.drainTimeout),
+	)
+	drainCtx, cancelDrain := context.WithTimeout(ctx, vm.drainTimeout)
+	defer cancelDrain()
+	if err := vm.httpHandlers.drain(drainCtx); err != nil {
+		log.Warn("abandoning API requests still in flight after drain timeout",
+			zap.Error(err),
+		)
+	}
+
+	log.Info("shutting down pre-transition VM")
+	if err := vm.preTransitionChain.Shutdown(ctx); err != nil {
 		return fmt.Errorf("closing pre-transition chain: %w", err)
 	}
 
-	v.chainCtx.Log.Info("writing last synchronous block")
-	if err := state.WriteLastSync(v.db, lastBytes); err != nil {
-		return fmt.Errorf("saving last synchronous block: %w", err)
+	log.Info("writing transition marker")
+	if err := vm.db.Put(transitionedKey, nil); err != nil {
+		return fmt.Errorf("writing transition marker: %w", err)
 	}
 
-	v.chainCtx.Log.Info("initializing post-transition VM")
-	if err := v.initChain(ctx, v.postTransitionChain, v.chainCtx); err != nil {
+	log.Info("initializing post-transition VM")
+	if err := vm.initChain(ctx, vm.postTransitionChain, vm.postChainCtx); err != nil {
 		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
 
-	v.chainCtx.Log.Info("initializing post-transition VM preference",
+	log.Info("setting post-transition VM state",
+		zap.Stringer("state", vm.consensusState),
+	)
+	if vm.consensusState != snow.Initializing {
+		if err := vm.postTransitionChain.SetState(ctx, vm.consensusState); err != nil {
+			return fmt.Errorf("setting consensus state: %w", err)
+		}
+	}
+
+	log.Info("copying connections to the post-transition VM")
+	if err := vm.connections.reconnect(ctx, vm.postTransitionChain); err != nil {
+		return fmt.Errorf("reconnecting to vm: %w", err)
+	}
+
+	log.Info("updating HTTP handlers to route to the post-transition VM")
+	newHandlers, err := vm.postTransitionChain.CreateHandlers(ctx)
+	if err != nil {
+		return fmt.Errorf("creating http handlers: %w", err)
+	}
+	vm.httpHandlers.set(newHandlers)
+
+	// The VM is only notified of preference changes, so if the consensus engine
+	// previously set the preference, we must manually set the post-transition
+	// VM's preference.
+	//
+	// Failing to due this could leave the preference uninitialized, which could
+	// cause block building to error.
+	log.Info("initializing post-transition VM preference",
 		zap.Stringer("blkID", lastID),
 	)
-	if err := v.postTransitionChain.SetPreference(ctx, lastID); err != nil {
+	if err := vm.postTransitionChain.SetPreference(ctx, lastID); err != nil {
 		return fmt.Errorf("setting post-transition preference: %w", err)
 	}
 
-	v.transitioned = true
-	v.chainCtx.Log.Info("transition finished successfully")
+	vm.transitioned = true
+	log.Info("transition finished successfully")
 	return nil
 }
 
-func (v *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context) error {
+// initChain configures VM to dispatch the provided chain with the given
+// context.
+func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context) error {
 	var (
 		requests requests
 		sender   = sender{
-			AppSender: v.appSender,
+			AppSender: vm.appSender,
 			requests:  &requests,
 		}
 	)
 	err := chain.Initialize(
 		ctx,
 		chainCtx,
-		v.db,
-		v.genesisBytes,
-		v.upgradeBytes,
-		v.configBytes,
-		v.fxs,
+		vm.db,
+		vm.genesisBytes,
+		vm.upgradeBytes,
+		vm.configBytes,
+		vm.fxs,
 		&sender,
 	)
 	if err != nil {
 		return fmt.Errorf("initializing chain: %w", err)
 	}
 
-	if v.current.consensusState != snow.Initializing {
-		if err := chain.SetState(ctx, v.current.consensusState); err != nil {
-			return fmt.Errorf("setting consensus state: %w", err)
-		}
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	vm.current = &current{
+		chain:     chain,
+		requests:  &requests,
+		ctx:       ctx,
+		ctxCancel: ctxCancel,
 	}
-	if err := v.current.connections.reconnect(ctx, chain); err != nil {
-		return fmt.Errorf("reconnecting to vm: %w", err)
-	}
-
-	newHandlers, err := chain.CreateHandlers(ctx)
-	if err != nil {
-		return fmt.Errorf("creating http handlers: %w", err)
-	}
-	v.current.httpHandlers.set(newHandlers)
-
-	v.current.chain = chain
-	v.current.requests = &requests
-	v.current.ctx, v.current.ctxCancel = context.WithCancel(context.Background())
 	return nil
 }

@@ -77,12 +77,6 @@ func (b *backend) GetEVM(ctx context.Context, msg *core.Message, sdb *state.Stat
 	return vm.NewEVM(*bCtx, txCtx, sdb, b.ChainConfig(), *cfg)
 }
 
-// isSynchronous reports whether the block at the given height is at or below the
-// synchronous frontier, i.e. it predates SAE and was executed by coreth.
-func (b *backend) isSynchronous(height uint64) bool {
-	return height <= b.LastSynchronous().NumberU64()
-}
-
 // StateAndHeaderByNumber performs the same faking as
 // [backend.StateAndHeaderByNumberOrHash].
 func (b *backend) StateAndHeaderByNumber(ctx context.Context, num rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
@@ -223,21 +217,10 @@ func (b *backend) stateAtTransactionSAE(ethB *types.Block, txIndex int) (*core.M
 	if b.LastExecuted().NumberU64() < ethB.NumberU64()-1 {
 		return nil, bCtx, nil, nil, fmt.Errorf("parent of block %d not executed yet", ethB.NumberU64())
 	}
-	parent, err := b.NewBlock(
-		// The I(E) check above guarantees D(A) of the same block; see
-		// ../docs/invariants.md for details.
-		rawdb.ReadBlock(b.DB(), ethB.ParentHash(), ethB.NumberU64()-1),
-		// Ancestry is irrelevant for the parent as we just want its
-		// post-execution artefacts.
-		nil, nil,
-	)
+	parent, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.ParentHash(), true /* canonical */))
 	if err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("constructing parent block: %v", err)
+		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
 	}
-	if err := parent.RestoreExecutionArtefacts(b.DB(), b.XDB(), b.ChainConfig()); err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("parent %T.RestoreExecutionArtefacts(...): %v", parent, err)
-	}
-
 	block, err := b.NewBlock(ethB, parent, nil)
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)

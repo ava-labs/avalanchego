@@ -14,10 +14,14 @@ import (
 
 var _ vms.Factory = (*Factory)(nil)
 
+// Factory builds a transition [VM] from a pre- and a post-transition factory.
 type Factory struct {
 	PreFactory     vms.Factory
 	PostFactory    vms.Factory
 	TransitionTime time.Time
+	// DrainTimeout bounds how long the transition waits for in-flight API
+	// requests to the pre-transition chain to return before shutting it down.
+	DrainTimeout time.Duration
 }
 
 var errInvalidVMType = errors.New("invalid VM type")
@@ -45,7 +49,10 @@ func (f *Factory) New(log logging.Logger) (interface{}, error) {
 		preTransitionChain:  pre,
 		postTransitionChain: post,
 		transitionTime:      f.TransitionTime,
+		drainTimeout:        f.DrainTimeout,
 
+		// [VM.Version] and [VM.Shutdown] may be called before [VM.Initialize],
+		// so mark the pre-transition chain current up front.
 		current: &current{
 			chain: pre,
 		},

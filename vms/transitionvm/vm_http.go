@@ -7,12 +7,16 @@ import (
 	"context"
 	"net/http"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/utils/lock"
 )
 
-// httpHandler that wraps an existing [http.Handler]. If the existing
-// [http.Handler] is nil, this handler returns with [http.StatusNotFound].
-// Otherwise, it delegates calls to the inner handler.
+// httpHandler wraps an [http.Handler], serving 404 when it is nil. New requests
+// pass through its parent's gate and are counted as in-flight so they can be
+// blocked and drained around a transition.
 type httpHandler struct {
+	parent *httpHandlers
+
 	lock    sync.RWMutex
 	handler http.Handler
 }
@@ -25,6 +29,14 @@ func (h *httpHandler) set(handler http.Handler) {
 }
 
 func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Park until requests are unblocked. enter returns false only if the
+	// request's context is canceled while parked, which here means the
+	// connection closed; the client is gone, so there is no response to write.
+	if !h.parent.enter(r.Context()) {
+		return
+	}
+	defer h.parent.leave()
+
 	h.lock.RLock()
 	handler := h.handler
 	h.lock.RUnlock()
@@ -37,21 +49,95 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handler.ServeHTTP(w, r)
 }
 
-// httpHandlers manages an append-only collection of updateable routes.
+// httpHandlers is an append-only collection of updatable routes. It can block
+// new requests to every route and drain the in-flight ones, so a transition can
+// quiesce the active VM's API before shutting it down.
 type httpHandlers struct {
-	lock   sync.RWMutex
-	routes map[string]*httpHandler
+	lock sync.Mutex
+	// cond is broadcast when blocked changes or inflight goes to 0, waking any
+	// waiters in enter and Drain to re-check their conditions.
+	cond     *lock.Cond
+	routes   map[string]*httpHandler
+	blocked  bool // whether new requests are parked
+	inflight int  // number of requests currently being served
 }
 
-// set adds all the new handlers to the collection of tracked routes. Any
-// tracked routes not included in newHandlers will still be tracked, but will
-// return 404s.
+func newHTTPHandlers() *httpHandlers {
+	h := &httpHandlers{
+		routes: make(map[string]*httpHandler),
+	}
+	h.cond = lock.NewCond(&h.lock)
+	return h
+}
+
+// block parks new requests to every route until [httpHandlers.unblock] is
+// called. In-flight requests are unaffected.
+func (h *httpHandlers) block() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	h.blocked = true
+}
+
+// unblock lets new requests through again, releasing any parked by
+// [httpHandlers.block].
+func (h *httpHandlers) unblock() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	h.blocked = false
+	h.cond.Broadcast()
+}
+
+// drain blocks until no requests are in flight or ctx is canceled, returning
+// ctx's error in the latter case.
+func (h *httpHandlers) drain(ctx context.Context) error {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	for h.inflight > 0 {
+		if err := h.cond.Wait(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// enter parks while requests are blocked, then registers an in-flight request.
+// If it returns true, [httpHandlers.leave] MUST be called.
+func (h *httpHandlers) enter(ctx context.Context) bool {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	for h.blocked {
+		if err := h.cond.Wait(ctx); err != nil {
+			return false
+		}
+	}
+	h.inflight++
+	return true
+}
+
+// leave records that an in-flight request returned, waking [httpHandlers.drain]
+// if none remain.
+func (h *httpHandlers) leave() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	h.inflight--
+	if h.inflight == 0 {
+		h.cond.Broadcast()
+	}
+}
+
+// set rebinds tracked routes to newHandlers. Routes absent from newHandlers
+// are kept but serve 404.
 func (h *httpHandlers) set(newHandlers map[string]http.Handler) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	for path, newHandler := range newHandlers {
-		handler := &httpHandler{}
+		handler := &httpHandler{parent: h}
 		if oldHandler, ok := h.routes[path]; ok {
 			handler = oldHandler
 		}
@@ -66,11 +152,10 @@ func (h *httpHandlers) set(newHandlers map[string]http.Handler) {
 	}
 }
 
-// asInterface returns the current collection of tracked handlers as their
-// interface type.
+// asInterface returns the tracked routes as an [http.Handler] map.
 func (h *httpHandlers) asInterface() map[string]http.Handler {
-	h.lock.RLock()
-	defer h.lock.RUnlock()
+	h.lock.Lock()
+	defer h.lock.Unlock()
 
 	handlers := make(map[string]http.Handler, len(h.routes))
 	for path, handler := range h.routes {
@@ -79,17 +164,17 @@ func (h *httpHandlers) asInterface() map[string]http.Handler {
 	return handlers
 }
 
-func (v *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	newHandlers, err := v.current.chain.CreateHandlers(ctx)
+	newHandlers, err := vm.current.chain.CreateHandlers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	v.current.httpHandlers.set(newHandlers)
-	return v.current.httpHandlers.asInterface(), nil
+	vm.httpHandlers.set(newHandlers)
+	return vm.httpHandlers.asInterface(), nil
 }
 
 // None of Subnet-EVM, Coreth, or SAEVM implement NewHTTPHandler, so it is left

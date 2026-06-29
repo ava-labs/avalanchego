@@ -43,7 +43,6 @@ type (
 		AcceptanceFrontier
 		ExecutionFrontier
 		SettlementFrontier
-		SynchronousFrontier
 	}
 	// The AcceptanceFrontier is a thread-safe view of the last accepted
 	// [Block].
@@ -57,11 +56,6 @@ type (
 	// The SettlementFrontier is a thread-safe view of the last settled [Block].
 	SettlementFrontier interface {
 		LastSettled() *Block
-	}
-	// The SynchronousFrontier is a thread-safe view of the last synchronous
-	// [Block].
-	SynchronousFrontier interface {
-		LastSynchronous() *Block
 	}
 )
 

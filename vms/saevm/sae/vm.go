@@ -16,10 +16,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
@@ -45,7 +43,9 @@ import (
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
-// provide a last-synchronous block, which MAY be the genesis.
+// ensure that the last-synchronous block (which MAY be the genesis) is
+// canonical on disk with its post-execution state committed before [NewVM] is
+// called.
 type VM struct {
 	*p2p.Network
 	Peers          *p2p.Peers
@@ -64,7 +64,6 @@ type VM struct {
 	preference atomic.Pointer[blocks.Block]
 	last       struct {
 		accepted, settled atomic.Pointer[blocks.Block]
-		synchronous       *blocks.Block
 	}
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
@@ -114,7 +113,6 @@ func NewVM[T hook.Transaction](
 	snowCtx *snow.Context,
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
-	lastSynchronous *types.Block,
 	sender snowcommon.AppSender,
 ) (_ *VM, retErr error) {
 	if cfg.Now == nil {
@@ -151,23 +149,8 @@ func NewVM[T hook.Transaction](
 	vm.xdb = xdb
 	vm.toClose = append(vm.toClose, &xdb)
 
-	lastSync, err := blocks.New(lastSynchronous, nil, nil, snowCtx.Log)
-	if err != nil {
-		return nil, fmt.Errorf("blocks.New([last synchronous], ...): %v", err)
-	}
-	vm.last.synchronous = lastSync
-
-	{ // ==========  Sync -> Async  ==========
-		if err := lastSync.MarkSynchronous(hooks, db, xdb); err != nil {
-			return nil, fmt.Errorf("%T{genesis}.MarkSynchronous(): %v", lastSync, err)
-		}
-		if err := canonicaliseLastSynchronous(db, lastSync); err != nil {
-			return nil, err
-		}
-	}
-
-	rec := &recovery{db, xdb, chainConfig, snowCtx.Log, hooks, cfg, lastSync}
 	{ // ==========  Block State  ==========
+		rec := &recovery{db, xdb, chainConfig, snowCtx.Log, hooks, cfg}
 		lastCommitted, err := rec.lastCommittedBlock()
 		if err != nil {
 			return nil, err
@@ -305,30 +288,6 @@ func NewVM[T hook.Transaction](
 	}
 
 	return vm, nil
-}
-
-// canonicaliseLastSynchronous writes all necessary information to the database
-// to have the block be considered accepted/canonical by SAE. If there are any
-// canonical blocks at a height greater than the provided block then this
-// function is a no-op, which makes it effectively idempotent with respect to
-// the rest of SAE processing.
-func canonicaliseLastSynchronous(db ethdb.Database, block *blocks.Block) error {
-	if !block.Synchronous() {
-		return fmt.Errorf("only synchronous block can be canonicalised: %d / %#x is async", block.NumberU64(), block.Hash())
-	}
-	num := block.NumberU64()
-	if rawdb.ReadCanonicalHash(db, num+1) != (common.Hash{}) {
-		// If any other block has been accepted then the last synchronous block
-		// must have been canonicalised in a previous initialisation.
-		return nil
-	}
-
-	h := block.Hash()
-	b := db.NewBatch()
-	rawdb.WriteCanonicalHash(b, h, num)
-	block.SetAsHeadBlock(b)
-	rawdb.WriteFinalizedBlockHash(b, h)
-	return b.Write()
 }
 
 // signalNewTxsToEngine subscribes to the [txpool.TxPool] to unblock

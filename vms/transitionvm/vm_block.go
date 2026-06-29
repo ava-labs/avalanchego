@@ -6,40 +6,73 @@ package transitionvm
 import (
 	"context"
 	"errors"
+	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
-	_ snowman.Block           = (*preBlock)(nil)
-	_ block.WithVerifyContext = (*preBlock)(nil)
+	_ snowman.Block             = (*block)(nil)
+	_ smblock.WithVerifyContext = (*block)(nil)
 )
 
-type preBlock struct {
-	snowman.Block
-	v *VM
+// block wraps a block produced by the currently active chain.
+//
+// On Verify, it ensures the inner block was derived from the correct chain or
+// fails verification if that isn't possible.
+//
+// On Acceptance of the transition block, it transitions the chain to the
+// post-transition chain.
+//
+// The block's immutable metadata (ID, parent, bytes, height, timestamp) is
+// cached at construction so these accessors don't need to consult the wrapped
+// block. This ensures that pre-transition blocks are safe to access even after
+// the transition.
+type block struct {
+	vm *VM
+
+	// lock is ordered after [VM.transitionLock]. The code MUST never acquire
+	// [VM.transitionLock] while holding [block.lock].
+	lock         sync.Mutex
+	blk          snowman.Block
+	transitioned bool
+
+	id        ids.ID
+	parentID  ids.ID
+	bytes     []byte
+	height    uint64
+	timestamp time.Time
 }
 
-var errPreTransitionBlockAfterTransition = errors.New("pre-transition block after transition")
+func (b *block) ID() ids.ID           { return b.id }
+func (b *block) Parent() ids.ID       { return b.parentID }
+func (b *block) Bytes() []byte        { return b.bytes }
+func (b *block) Height() uint64       { return b.height }
+func (b *block) Timestamp() time.Time { return b.timestamp }
 
-func (p *preBlock) Verify(ctx context.Context) error {
-	p.v.transitionLock.RLock()
-	defer p.v.transitionLock.RUnlock()
+func (b *block) Verify(ctx context.Context) error {
+	b.vm.transitionLock.RLock()
+	defer b.vm.transitionLock.RUnlock()
 
-	if err := p.verifyPreTransition(ctx); err != nil {
+	if err := b.maybeTransition(ctx); err != nil {
 		return err
 	}
-	return p.Block.Verify(ctx)
+	return b.blk.Verify(ctx)
 }
 
-// ShouldVerifyWithContext forwards to the inner block so that blocks requiring
-// the P-Chain context (e.g. ICM predicate verification) are still verified with
-// it while wrapped by the transition VM. Blocks that don't implement
-// [block.WithVerifyContext] never require a context.
-func (p *preBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
-	blkWithCtx, ok := p.Block.(block.WithVerifyContext)
+func (b *block) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
+	b.vm.transitionLock.RLock()
+	defer b.vm.transitionLock.RUnlock()
+
+	if err := b.maybeTransition(ctx); err != nil {
+		return false, err
+	}
+
+	blkWithCtx, ok := b.blk.(smblock.WithVerifyContext)
 	if !ok {
 		return false, nil
 	}
@@ -48,112 +81,133 @@ func (p *preBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
 
 var errBlockDoesNotImplementWithVerifyContext = errors.New("block does not implement WithVerifyContext")
 
-// VerifyWithContext forwards to the inner block's VerifyWithContext, applying
-// the same pre-transition parent check as [preBlock.Verify].
-func (p *preBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Context) error {
-	p.v.transitionLock.RLock()
-	defer p.v.transitionLock.RUnlock()
+func (b *block) VerifyWithContext(ctx context.Context, blockCtx *smblock.Context) error {
+	b.vm.transitionLock.RLock()
+	defer b.vm.transitionLock.RUnlock()
 
-	if err := p.verifyPreTransition(ctx); err != nil {
+	if err := b.maybeTransition(ctx); err != nil {
 		return err
 	}
-	blkWithCtx, ok := p.Block.(block.WithVerifyContext)
+
+	blkWithCtx, ok := b.blk.(smblock.WithVerifyContext)
 	if !ok {
 		return errBlockDoesNotImplementWithVerifyContext
 	}
 	return blkWithCtx.VerifyWithContext(ctx, blockCtx)
 }
 
-// verifyPreTransition ensures the block's parent is a pre-transition block.
+var errPostTransitionBlockBeforeTransition = errors.New("post-transition block before transition")
+
+// If maybeTransition returns nil, then all future calls to maybeTransition will
+// also return nil and will not modify the block.
 //
-// Callers must hold p.v.transitionLock.
-func (p *preBlock) verifyPreTransition(ctx context.Context) error {
-	parent, err := p.v.current.chain.GetBlock(ctx, p.Parent())
+// It is assumed that [VM.transitionLock] is held.
+func (b *block) maybeTransition(ctx context.Context) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	// Since [block.transitioned] is set to true after modifying the block, this
+	// check enforces the documented invariant that the block is only modified
+	// once.
+	if b.transitioned {
+		return nil
+	}
+
+	parent, err := b.vm.current.chain.GetBlock(ctx, b.parentID)
 	if err != nil {
 		return err
 	}
-
-	// Make sure the parent block is a pre-transition block.
-	if parentTime := parent.Timestamp(); !parentTime.Before(p.v.transitionTime) {
-		return errPreTransitionBlockAfterTransition
+	// Since both the parent and current block timestamps are assumed to be
+	// deterministic, future calls will also hit this branch and enforce the
+	// invariant that future modifications will not modify the inner block.
+	if parentTime := parent.Timestamp(); parentTime.Before(b.vm.transitionTime) {
+		return nil
 	}
+
+	if !b.vm.transitioned {
+		return errPostTransitionBlockBeforeTransition
+	}
+
+	newBlock, err := b.vm.current.chain.ParseBlock(ctx, b.bytes)
+	if err != nil {
+		return err
+	}
+	b.blk = newBlock
+	b.transitioned = true
 	return nil
 }
 
-// Accept is basically the only function that does not immediately prevent
-// transitions. This is because Accept is the function that actually triggers
-// the transition.
-func (p *preBlock) Accept(ctx context.Context) error {
-	if err := p.Block.Accept(ctx); err != nil {
+// Accept does not hold transitionLock: accepting a block at or after the
+// transition time triggers the transition, which takes the write lock itself.
+func (b *block) Accept(ctx context.Context) error {
+	if err := b.blk.Accept(ctx); err != nil {
 		return err
 	}
-	if time := p.Timestamp(); time.Before(p.v.transitionTime) {
+	// [block.lock] doesn't need to be held here because the block is
+	// immutable after either [block.Verify] or [block.VerifyWithContext]
+	// return nil.
+	if b.transitioned || b.timestamp.Before(b.vm.transitionTime) {
 		return nil
 	}
-	return p.v.transition(ctx, p.Block)
+	return b.vm.transition(ctx, b.blk)
 }
 
-func (p *preBlock) Reject(ctx context.Context) error {
-	p.v.transitionLock.RLock()
-	defer p.v.transitionLock.RUnlock()
+func (b *block) Reject(ctx context.Context) error {
+	b.vm.transitionLock.RLock()
+	defer b.vm.transitionLock.RUnlock()
 
-	// If the VM transitioned with some blocks still in consensus, they are
-	// guaranteed to all be rejected. However, we don't want to run into a
-	// situation where we call into the now-closed pre-transition VM. So we just
-	// do nothing for this block.
-	if p.v.transitioned {
+	// [block.lock] doesn't need to be held here because the block is
+	// immutable after either [block.Verify] or [block.VerifyWithContext]
+	// return nil.
+	//
+	// Once transitioned, the pre-transition chain is shut down. Forwarding
+	// Reject into it could return an error, which the engine treats as fatal.
+	if b.transitioned != b.vm.transitioned {
 		return nil
 	}
-	return p.Block.Reject(ctx)
+	return b.blk.Reject(ctx)
 }
 
-func (v *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
+func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
 
-	b, err := v.current.chain.BuildBlock(ctx)
+	return vm.wrapBlock(vm.current.chain.BuildBlock(ctx))
+}
+
+func (vm *VM) BuildBlockWithContext(ctx context.Context, blockCtx *smblock.Context) (snowman.Block, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
+
+	return vm.wrapBlock(vm.current.chain.BuildBlockWithContext(ctx, blockCtx))
+}
+
+func (vm *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
+
+	return vm.wrapBlock(vm.current.chain.ParseBlock(ctx, blockBytes))
+}
+
+func (vm *VM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
+
+	return vm.wrapBlock(vm.current.chain.GetBlock(ctx, blkID))
+}
+
+func (vm *VM) wrapBlock(b snowman.Block, err error) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return v.wrapBlock(b), nil
-}
-
-func (v *VM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
-
-	b, err := v.current.chain.BuildBlockWithContext(ctx, blockCtx)
-	if err != nil {
-		return nil, err
-	}
-	return v.wrapBlock(b), nil
-}
-
-func (v *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
-
-	b, err := v.current.chain.ParseBlock(ctx, blockBytes)
-	if err != nil {
-		return nil, err
-	}
-	return v.wrapBlock(b), nil
-}
-
-func (v *VM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
-	v.transitionLock.RLock()
-	defer v.transitionLock.RUnlock()
-
-	b, err := v.current.chain.GetBlock(ctx, blkID)
-	if err != nil {
-		return nil, err
-	}
-	return v.wrapBlock(b), nil
-}
-
-func (v *VM) wrapBlock(b snowman.Block) snowman.Block {
-	if v.transitioned {
-		return b
-	}
-	return &preBlock{b, v}
+	return &block{
+		vm:           vm,
+		blk:          b,
+		transitioned: vm.transitioned,
+		id:           b.ID(),
+		parentID:     b.Parent(),
+		bytes:        b.Bytes(),
+		height:       b.Height(),
+		timestamp:    b.Timestamp(),
+	}, nil
 }
