@@ -5,6 +5,15 @@
 ### Metrics
 
 - Added `avalanche_{vmName}_sae_last_executed_height` and `avalanche_{vmName}_sae_last_settled_height` gauges, exposing SAE async-execution and settlement heights.
+- Added SAE execution-pressure metrics:
+  - `avalanche_{vmName}_sae_execution_queue_duration_seconds` (histogram): time from a block's acceptance into the execution queue until its execution completes.
+  - `avalanche_{vmName}_sae_execute_block_duration_seconds` (histogram): wall-clock time to execute a single block, including state commit and post-execution work.
+  - `avalanche_{vmName}_sae_execution_queue_blocks` (gauge): number of accepted blocks that have not yet completed execution.
+  - `avalanche_{vmName}_sae_execution_queue_gas_limit` (gauge): sum of the gas limits of accepted blocks that have not yet completed execution.
+  - `avalanche_{vmName}_sae_executed_gas_charged_total` (counter): cumulative gas charged by executed blocks (transaction gas used plus end-of-block operation gas).
+  - `avalanche_{vmName}_sae_executed_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of executed blocks.
+- Added `avalanche_{vmName}_sae_in_memory_blocks` (gauge): number of SAE blocks still live in memory (created but not yet garbage collected).
+- Added `avalanche_{vmName}_sae_accepted_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of blocks accepted into the execution queue; the acceptance-side counterpart of `executed_gas_limit_total`.
 - Renamed Coreth and Subnet-EVM state-sync p2p metrics:
   - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
   - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
