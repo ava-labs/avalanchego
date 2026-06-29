@@ -4594,7 +4594,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 		{
 			name: "stake_too_short",
 			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
-				tx.Period = uint64(env.config.MinStakeDuration.Seconds()) - 1
+				tx.Period = uint64(env.config.HeliconMinStakeDuration.Seconds()) - 1
 			},
 			want: ErrStakeTooShort,
 		},
@@ -4907,7 +4907,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		{
 			name: "stake_too_short",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
-				tx.Period = uint64(env.config.MinStakeDuration.Seconds()) - 1
+				tx.Period = uint64(env.config.HeliconMinStakeDuration.Seconds()) - 1
 			},
 			wantErr: ErrStakeTooShort,
 		},
