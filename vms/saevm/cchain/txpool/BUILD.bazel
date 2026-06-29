@@ -36,7 +36,6 @@ go_test(
     embed = [":txpool"],
     deps = [
         "//graft/coreth/plugin/evm",
-        "//graft/coreth/plugin/evm/customtypes",
         "//ids",
         "//snow/snowtest",
         "//utils",
@@ -45,6 +44,7 @@ go_test(
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/components/avax",
+        "//vms/saevm/cchain/cchaintest",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/hook",

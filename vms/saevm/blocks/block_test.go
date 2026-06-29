@@ -22,8 +22,9 @@ import (
 
 func newEthBlock(num, time uint64, parent *types.Block) *types.Block {
 	hdr := &types.Header{
-		Number: new(big.Int).SetUint64(num),
-		Time:   time,
+		Number:  new(big.Int).SetUint64(num),
+		BaseFee: big.NewInt(1),
+		Time:    time,
 	}
 	if parent != nil {
 		hdr.ParentHash = parent.Hash()
@@ -73,7 +74,7 @@ func newChain(tb testing.TB, db ethdb.Database, xdb saetypes.ExecutionResults, s
 			// [newChain], and non-zero sub-second time for genesis is
 			// unnecessary.
 			h := hookstest.NewStub(1)
-			require.NoError(tb, b.MarkSynchronous(h, db, xdb, 0), "MarkSynchronous()")
+			require.NoError(tb, b.MarkSynchronous(h, db, xdb), "MarkSynchronous()")
 		}
 
 		parent = byNum[n]

@@ -12,35 +12,36 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
-// newBlock returns a minimal [*types.Block] whose ExtData encodes txs and
-// whose header is configured for ancestor traversal (parent hash + number).
-func newBlock(tb testing.TB, number uint64, parent common.Hash, txs ...*tx.Tx) *types.Block {
-	tb.Helper()
+// When TimeMilliseconds is unset, BlockTime falls back to Header.Time's seconds.
+// The VM always sets TimeMilliseconds, so this legacy decode path is only
+// reachable by exercising the hook directly.
+func TestBlockTime(t *testing.T) {
+	_, sut := newSUT(t)
+	hooks := sut.hooks()
 
-	extData, err := tx.MarshalSlice(txs)
-	require.NoErrorf(tb, err, "tx.MarshalSlice(%d txs)", len(txs))
-
-	return customtypes.NewBlockWithExtData(
-		&types.Header{
-			ParentHash: parent,
-			Number:     new(big.Int).SetUint64(number),
-		},
-		nil, // txs
-		nil, // uncles
-		nil, // receipts
-		saetest.TrieHasher(),
-		extData,
-		true, // setExtDataHash
+	const (
+		unix            = 1_700_000_000
+		unixMilli int64 = unix * 1000
 	)
+	header := &types.Header{Time: unix}
+	got := hooks.BlockTime(header)
+	require.Equal(t, unixMilli, got.UnixMilli(), "hooks.BlockTime(unset TimeMilliseconds).UnixMilli()")
+	// Documented invariant: BlockTime(h).Unix() == h.Time.
+	require.Equal(t, int64(unix), got.Unix(), "hooks.BlockTime(unset TimeMilliseconds).Unix()")
 }
 
 func TestAncestorInputIDs(t *testing.T) {
@@ -48,12 +49,12 @@ func TestAncestorInputIDs(t *testing.T) {
 		w       = newWallet(txtest.NewKey(t), snowtest.Context(t, snowtest.CChainID), nil)
 		genesis = common.Hash(ids.GenerateTestID())
 		tx1     = w.newMinimalTx(t)
-		block1  = newBlock(t, 1, genesis, tx1)
+		block1  = cchaintest.NewBlock(t, 1, genesis, tx1)
 		tx2     = w.newMinimalTx(t)
-		block2  = newBlock(t, 2, block1.Hash(), tx2)
+		block2  = cchaintest.NewBlock(t, 2, block1.Hash(), tx2)
 		tx3     = w.newMinimalTx(t)
-		block3  = newBlock(t, 3, block2.Hash(), tx3)
-		block4  = newBlock(t, 4, block3.Hash())
+		block3  = cchaintest.NewBlock(t, 3, block2.Hash(), tx3)
+		block4  = cchaintest.NewBlock(t, 4, block3.Hash())
 	)
 
 	tests := []struct {
@@ -108,6 +109,128 @@ func TestAncestorInputIDs(t *testing.T) {
 			got, err := ancestorInputIDs(tt.header, tt.settled, source)
 			require.ErrorIs(t, err, tt.wantErr, "ancestorInputIDs()")
 			assert.Equal(t, tt.want, got, "ancestorInputIDs()")
+		})
+	}
+}
+
+func TestTargetExponent(t *testing.T) {
+	const fortunaTime = 100
+
+	tests := []struct {
+		name    string
+		header  *types.Header
+		want    dynamic.TargetExponent
+		wantErr error
+	}{
+		{
+			name: "header_carries_exponent",
+			header: customtypes.WithHeaderExtra(
+				&types.Header{Number: big.NewInt(1)},
+				&customtypes.HeaderExtra{TargetExponent: utils.PointerTo[dynamic.TargetExponent](42)},
+			),
+			want: 42,
+		},
+		{
+			name:   "no_field_pre_fortuna",
+			header: &types.Header{Time: fortunaTime - 1, Number: big.NewInt(1)},
+			want:   dynamic.InitialTargetExponent,
+		},
+		{
+			name:   "no_field_genesis",
+			header: &types.Header{Time: fortunaTime, Number: big.NewInt(0)},
+			want:   dynamic.InitialTargetExponent,
+		},
+		{
+			name: "no_field_fortuna_legacy_state",
+			header: &types.Header{
+				Time:   fortunaTime,
+				Number: big.NewInt(1),
+				Extra:  (&acp176.State{TargetExcess: 5_000}).Bytes(),
+			},
+			want: 5_000,
+		},
+		{
+			name: "no_field_fortuna_invalid_extra",
+			header: &types.Header{
+				Time:   fortunaTime,
+				Number: big.NewInt(1),
+				Extra:  []byte{0x01},
+			},
+			wantErr: acp176.ErrStateInsufficientLength,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fortuna := &extras.ChainConfig{
+				NetworkUpgrades: extras.NetworkUpgrades{
+					FortunaTimestamp: utils.PointerTo[uint64](fortunaTime),
+				},
+			}
+			got, err := targetExponent(fortuna, tt.header)
+			require.ErrorIs(t, err, tt.wantErr, "targetExponent()")
+			assert.Equal(t, tt.want, got, "targetExponent()")
+		})
+	}
+}
+
+// Verifies that [hooks.SettledBy] decodes the marker that [builder.BuildBlock]
+// writes into the header, and returns the zero marker when the header carries none.
+func TestSettledBy(t *testing.T) {
+	key := txtest.NewKey(t)
+	_, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+	hooks := sut.hooks()
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	htx, err := newHookTx(stx, sut.ctx.AVAXAssetID)
+	require.NoError(t, err, "newHookTx()")
+
+	// built returns the header of a block built carrying the given settled marker.
+	built := func(t *testing.T, settled hook.Settled) *types.Header {
+		t.Helper()
+
+		block, err := hooks.BuildBlock(
+			&types.Header{},
+			nil, // blockContext
+			nil, // ethTxs
+			nil, // receipts
+			[]*hookTx{htx},
+			settled,
+		)
+		require.NoError(t, err, "builder.BuildBlock()")
+		return block.Header()
+	}
+
+	nonzero := hook.Settled{
+		Height:       7,
+		GasUnix:      1_000,
+		GasNumerator: gas.Gas(3),
+		Excess:       gas.Gas(42),
+	}
+	tests := []struct {
+		name   string
+		header *types.Header
+		want   hook.Settled
+	}{
+		{
+			name:   "absent_marker",
+			header: &types.Header{},
+			want:   hook.Settled{},
+		},
+		{
+			name:   "zero",
+			header: built(t, hook.Settled{}),
+			want:   hook.Settled{},
+		},
+		{
+			name:   "nonzero",
+			header: built(t, nonzero),
+			want:   nonzero,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, hooks.SettledBy(tt.header), "hooks.SettledBy()")
 		})
 	}
 }

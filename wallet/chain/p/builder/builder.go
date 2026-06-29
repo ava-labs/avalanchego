@@ -1564,7 +1564,7 @@ func (b *builder) NewAddAutoRenewedValidatorTx(
 	}
 	signerComplexity, err := fee.SignerComplexity(signer)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get signer complexity: %w", err)
+		return nil, fmt.Errorf("getting signer complexity: %w", err)
 	}
 	validatorOwnerComplexity, err := fee.OwnerComplexity(validationRewardsOwner)
 	if err != nil {

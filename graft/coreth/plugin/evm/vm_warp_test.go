@@ -929,7 +929,7 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 }
 
 func TestClearWarpDB(t *testing.T) {
-	ctx, db, genesisBytes, _ := vmtest.SetupGenesis(t, upgradetest.Latest)
+	ctx, db, genesisBytes, _ := vmtest.SetupGenesis(t, upgradetest.Granite)
 	vm := newDefaultTestVM()
 	require.NoError(t, vm.Initialize(t.Context(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{}))
 

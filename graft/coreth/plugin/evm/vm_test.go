@@ -110,10 +110,8 @@ func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf(`{"continuous-profiler-dir": %q,"continuous-profiler-frequency": "500ms"}`, profilerDir)
-	fork := upgradetest.Latest
 	vm := newDefaultTestVM()
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork:       &fork,
 		ConfigJSON: configJSON,
 	})
 	require.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
@@ -1547,7 +1545,6 @@ func TestWaitForEvent(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name     string
-		Fork     *upgradetest.Fork
 		testCase func(*testing.T, *VM)
 	}{
 		{
@@ -1713,14 +1710,8 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
-			if testCase.Fork != nil {
-				fork = *testCase.Fork
-			}
 			vm := newDefaultTestVM()
-			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-				Fork: &fork,
-			})
+			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 			testCase.testCase(t, vm)
 			require.NoError(t, vm.Shutdown(t.Context()))
 		})
@@ -1746,13 +1737,10 @@ func (*testService) Echo(str string, i int, args *echoArgs) echoResult {
 // emulates server test
 func TestCreateHandlers(t *testing.T) {
 	var (
-		ctx  = t.Context()
-		fork = upgradetest.Latest
-		vm   = newDefaultTestVM()
+		ctx = t.Context()
+		vm  = newDefaultTestVM()
 	)
-	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork: &fork,
-	})
+	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 	defer func() {
 		require.NoError(t, vm.Shutdown(ctx))
 	}()
@@ -2208,7 +2196,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			fork := upgradetest.Latest
+			fork := upgradetest.Granite
 
 			vm := newDefaultTestVM()
 			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
@@ -2285,6 +2273,13 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 				client, err := ethclient.Dial(server.URL)
 				require.NoError(t, err)
 				t.Cleanup(client.Close)
+
+				// Verify the genesis state by checking the pre-funded balances at block 0.
+				for _, addr := range vmtest.TestEthAddrs {
+					balance, err := client.BalanceAt(ctx, addr, new(big.Int).SetUint64(0))
+					require.NoErrorf(t, err, "failed to get genesis balance for %s", addr)
+					require.Equalf(t, vmtest.InitialFund, balance, "unexpected genesis balance for %s", addr)
+				}
 
 				for blockNum := uint64(0); blockNum <= numBlocks; blockNum++ {
 					// Checking the sender's nonce (which should equal the block number)
