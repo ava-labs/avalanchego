@@ -917,6 +917,8 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		t.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
 	}
 
+	t.Skip("The RPC no longer allows tracing a non-accepted block")
+
 	rpc := sut.GethRPCBackends()
 	// To rebuild the state at a particular tx, the [saexec.Execute] method is
 	// called with all preceding transactions. In turn, this calls post-block
