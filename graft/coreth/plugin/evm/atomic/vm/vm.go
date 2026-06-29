@@ -105,11 +105,6 @@ type VM struct {
 	bootstrapped avalancheutils.Atomic[bool]
 }
 
-// SetPreferenceWithContext implements [transitionvm.Chain].
-func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, _ *block.Context) error {
-	return vm.SetPreference(ctx, blkID)
-}
-
 func WrapVM(vm extension.InnerVM) *VM {
 	return &VM{InnerVM: vm}
 }
@@ -357,6 +352,14 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	log.Info("AVAX API enabled")
 	apis[avaxEndpoint] = avaxAPI
 	return apis, nil
+}
+
+// SetPreferenceWithContext implements [block.SetPreferenceWithContextChainVM].
+//
+// The context is never actually used by this implementation, so the preference
+// is just delegated to the normal SetPreference method.
+func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, _ *block.Context) error {
+	return vm.SetPreference(ctx, blkID)
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
