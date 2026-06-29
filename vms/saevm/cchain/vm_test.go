@@ -917,6 +917,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		t.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
 	}
 
+	_ = export
 	t.Skip("The RPC no longer allows tracing a non-accepted block")
 
 	rpc := sut.GethRPCBackends()
