@@ -27,6 +27,9 @@ type FakeResponder[Req, Resp handlers.ProtoMessage] struct {
 // FakeCodeResponder is the [FakeResponder] bound to the code-by-hash RPC.
 type FakeCodeResponder = FakeResponder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
 
+// FakeBlockResponder is the [FakeResponder] bound to the block-batch RPC.
+type FakeBlockResponder = FakeResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
+
 // Respond implements [handlers.Responder].
 func (s *FakeResponder[Req, Resp]) Respond(_ context.Context, _ ids.NodeID, req Req) (Resp, error) {
 	s.GotReq = req
