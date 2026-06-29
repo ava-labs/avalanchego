@@ -1230,6 +1230,7 @@ func (n *Node) initVMs() error {
 			PreFactory:     &coreth.Factory{},
 			PostFactory:    &saevm.Factory{},
 			TransitionTime: n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+			DrainTimeout:   30 * time.Second,
 		}),
 	)
 	if err != nil {

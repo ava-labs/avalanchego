@@ -325,6 +325,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		PreFactory:     fakeFactory{vm: pre},
 		PostFactory:    fakeFactory{vm: post},
 		TransitionTime: cfg.transitionTime,
+		DrainTimeout:   100 * time.Millisecond,
 	}
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	intf, err := factory.New(ctx.Log)

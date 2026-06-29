@@ -42,6 +42,7 @@ type VM struct {
 	preTransitionChain  Chain
 	postTransitionChain Chain
 	transitionTime      time.Time
+	drainTimeout        time.Duration
 
 	// chain parameters
 	postChainCtx *snow.Context // Has modified [snow.Context.Lock] and [snow.Context.Metrics]
@@ -177,6 +178,26 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 		zap.Uint64("height", last.Height()),
 		zap.Time("timestamp", last.Timestamp()),
 	)
+
+	// API requests are queued and drained during the transition to prevent APIs
+	// from hitting the pre-transition VM while it is shutting down.
+	log.Info("blocking API requests")
+	vm.httpHandlers.block()
+	defer func() {
+		log.Info("unblocking API requests")
+		vm.httpHandlers.unblock()
+	}()
+
+	log.Info("draining in-flight API requests to the pre-transition VM",
+		zap.Duration("timeout", vm.drainTimeout),
+	)
+	drainCtx, cancelDrain := context.WithTimeout(ctx, vm.drainTimeout)
+	defer cancelDrain()
+	if err := vm.httpHandlers.drain(drainCtx); err != nil {
+		log.Warn("abandoning API requests still in flight after drain timeout",
+			zap.Error(err),
+		)
+	}
 
 	log.Info("shutting down pre-transition VM")
 	if err := vm.preTransitionChain.Shutdown(ctx); err != nil {
