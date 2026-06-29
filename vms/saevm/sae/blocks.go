@@ -211,8 +211,13 @@ func (vm *VM) settledBlockFromDB(db ethdb.Reader, hash common.Hash, num uint64) 
 		return nil, database.ErrNotFound
 	}
 
+	ethB := rawdb.ReadBlock(db, hash, num)
+	if ethB == nil {
+		return nil, database.ErrNotFound
+	}
+
 	return blocks.RestoreSettledBlock(
-		rawdb.ReadBlock(db, hash, num),
+		ethB,
 		vm.hooks,
 		vm.log(),
 		vm.db,
