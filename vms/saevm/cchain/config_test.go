@@ -84,6 +84,11 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(0)) }),
 		},
 		{
+			name: "gas_target",
+			json: `{"gas-target":1000}`,
+			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
+		},
+		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
 			want: with(func(c *config) {
@@ -94,6 +99,7 @@ func TestParseConfig(t *testing.T) {
 			name: "all_active_fields",
 			json: `{
 				"min-price-target":500,
+				"gas-target":1500,
 				"pruning-enabled":false,
 				"commit-interval":256,
 				"local-txs-enabled":true,
@@ -103,6 +109,7 @@ func TestParseConfig(t *testing.T) {
 			}`,
 			want: config{
 				PriceTarget:          utils.PointerTo(gas.Price(500)),
+				GasTarget:            utils.PointerTo(gas.Gas(1500)),
 				Pruning:              false,
 				CommitInterval:       256,
 				LocalTxsEnabled:      true,

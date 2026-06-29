@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -111,7 +113,10 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return now
 		},
 		slices.Values(txs),
-		desiredParams{priceExponent: customtypes.GetHeaderExtra(b.Header()).MinPriceExponent},
+		desiredParams{
+			targetExponent: customtypes.GetHeaderExtra(b.Header()).TargetExponent,
+			priceExponent:  customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
+		},
 	}, nil
 }
 
@@ -137,10 +142,38 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 	return dynamic.InitialPriceExponent
 }
 
-func (*hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	// TODO(StephenButtolph): Extract the gas target from the header (ACP-176).
-	return 1_000_000, gastime.GasPriceConfig{
-		TargetToExcessScaling: 87,
+func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
+	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
+		return *te, nil
+	}
+	if !config.IsFortuna(h.Time) || h.Number.Sign() == 0 {
+		return dynamic.InitialTargetExponent, nil
+	}
+
+	// The block might be the last synchronous block running with ACP-176.
+	state, err := acp176.ParseState(h.Extra)
+	if err != nil {
+		return 0, fmt.Errorf("parsing fee state: %w", err)
+	}
+	return dynamic.TargetExponent(state.TargetExcess), nil
+}
+
+func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
+	config := corethparams.GetExtra(h.chainConfig)
+	te, err := targetExponent(config, header)
+	if err != nil {
+		te = dynamic.InitialTargetExponent
+		h.ctx.Log.Error("failed to get target exponent; defaulting to the initial target exponent",
+			zap.Stringer("blockHash", header.Hash()),
+			zap.Uint64("blockNumber", header.Number.Uint64()),
+			zap.Uint64("defaultTargetExponent", uint64(te)),
+			zap.Uint64("defaultGasTarget", uint64(te.Target())),
+			zap.Error(err),
+		)
+	}
+
+	return te.Target(), gastime.GasPriceConfig{
+		TargetToExcessScaling: 87, // 87 ~= 60 / ln(2)
 		MinPrice:              priceExponent(header).Price(),
 	}
 }
@@ -241,10 +274,15 @@ type builder struct {
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
-	// TODO(StephenButtolph): Encode the ACP-176 target excess in the header.
 	// TODO(StephenButtolph): Enforce the minimum block time here.
 	now := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
-	minPriceExponent := priceExponent(parent).Toward(b.desired.priceExponent)
+	config := corethparams.GetExtra(b.chainConfig)
+	te, err := targetExponent(config, parent)
+	if err != nil {
+		return nil, fmt.Errorf("getting target exponent: %w", err)
+	}
+	te = te.Toward(b.desired.targetExponent)
+	pe := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -266,7 +304,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			TimeMilliseconds: &now,
 			// TODO(StephenButtolph): Encode the min-delay excess.
 			MinDelayExcess:   new(acp226.DelayExcess),
-			MinPriceExponent: &minPriceExponent,
+			TargetExponent:   &te,
+			MinPriceExponent: &pe,
 		},
 	), nil
 }
