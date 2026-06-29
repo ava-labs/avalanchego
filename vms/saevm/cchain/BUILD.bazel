@@ -29,6 +29,7 @@ go_library(
         "genesis.go",
         "gossip.go",
         "hooks.go",
+        "sync.go",
         "vm.go",
         "warp.go",
     ],
