@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -27,11 +25,9 @@ type Config struct {
 	WriteBufferSize int
 	Clock           mockable.Clock
 	Metrics         *Metrics
-	MessageCreator  message.Creator
 
-	Log                  logging.Logger
-	InboundMsgThrottler  throttling.InboundMsgThrottler
-	Network              Network
+	Log     logging.Logger
+	Network Network
 	Router               router.InboundHandler
 	VersionCompatibility *version.Compatibility
 	MyNodeID             ids.NodeID

@@ -222,15 +222,6 @@ func New(
 		return nil, err
 	}
 
-	n.msgCreator, err = message.NewCreator(
-		networkRegisterer,
-		n.Config.NetworkConfig.CompressionType,
-		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("problem initializing message creator: %w", err)
-	}
-
 	n.vdrs = validators.NewManager()
 	if !n.Config.SybilProtectionEnabled {
 		logger.Warn("sybil control is not enforced")
@@ -244,6 +235,7 @@ func New(
 	if err := n.initNetworking(networkRegisterer); err != nil { // Set up networking layer.
 		return nil, fmt.Errorf("problem initializing networking: %w", err)
 	}
+	n.msgCreator = n.Net.MsgCreator()
 
 	n.initEventDispatchers()
 
@@ -630,7 +622,6 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
 		n.Config.UpgradeConfig.GraniteTime,
-		n.msgCreator,
 		reg,
 		n.Log,
 		listener,

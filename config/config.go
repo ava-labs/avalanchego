@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -425,6 +426,11 @@ func getNetworkConfig(
 	supportedACPs.Difference(constants.ActivatedACPs)
 	objectedACPs.Difference(constants.ActivatedACPs)
 
+	largeMessageConfig, err := getLargeMessageConfig(v)
+	if err != nil {
+		return network.Config{}, err
+	}
+
 	config := network.Config{
 		ThrottlerConfig: network.ThrottlerConfig{
 			MaxInboundConnsPerSec: maxInboundConnsPerSec,
@@ -509,6 +515,7 @@ func getNetworkConfig(
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 		PeerReadBufferSize:        int(v.GetUint(NetworkPeerReadBufferSizeKey)),
 		PeerWriteBufferSize:       int(v.GetUint(NetworkPeerWriteBufferSizeKey)),
+		LargeMessageConfig:        largeMessageConfig,
 	}
 
 	switch {
@@ -548,6 +555,73 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
 	}
 	return config, nil
+}
+
+func getLargeMessageConfig(v *viper.Viper) (network.LargeMessageConfig, error) {
+	maxSizeSet := v.IsSet(NetworkMaxMessageSizeKey)
+	allowlistSet := v.IsSet(NetworkLargeMessagePeerIDsKey)
+	if maxSizeSet && !allowlistSet || !maxSizeSet && allowlistSet {
+		return network.LargeMessageConfig{}, fmt.Errorf("set %q and %q must be set together", NetworkMaxMessageSizeKey, NetworkLargeMessagePeerIDsKey)
+	}
+
+	maxSizeKiB := v.GetUint(NetworkMaxMessageSizeKey)
+	maxSize := uint64(maxSizeKiB) * units.KiB
+	const defaultMaxMessageSizeKiB = constants.DefaultMaxMessageSize / units.KiB
+	if maxSize > math.MaxUint32 {
+		return network.LargeMessageConfig{}, fmt.Errorf(
+			"%s must be <= %d KiB",
+			NetworkMaxMessageSizeKey,
+			math.MaxUint32/units.KiB,
+		)
+	}
+	if maxSize < constants.DefaultMaxMessageSize {
+		return network.LargeMessageConfig{}, fmt.Errorf(
+			"%s must be >= %d KiB",
+			NetworkMaxMessageSizeKey,
+			defaultMaxMessageSizeKiB,
+		)
+	}
+
+	idSlice := v.GetStringSlice(NetworkLargeMessagePeerIDsKey)
+	allowlist := set.NewSet[ids.NodeID](len(idSlice))
+	for _, idStr := range idSlice {
+		idStr = strings.TrimSpace(idStr)
+		if idStr == "" {
+			continue
+		}
+		nodeID, err := ids.NodeIDFromString(idStr)
+		if err != nil {
+			return network.LargeMessageConfig{}, fmt.Errorf(
+				"couldn't parse nodeID %q for %s: %w",
+				idStr,
+				NetworkLargeMessagePeerIDsKey,
+				err,
+			)
+		}
+		allowlist.Add(nodeID)
+	}
+
+	if maxSizeSet && allowlistSet {
+		switch {
+		case allowlist.Len() == 0:
+			return network.LargeMessageConfig{}, fmt.Errorf(
+				"%s is set but empty",
+				NetworkLargeMessagePeerIDsKey,
+			)
+		case maxSizeKiB == defaultMaxMessageSizeKiB:
+			return network.LargeMessageConfig{}, fmt.Errorf(
+				"%s is set to the default %d KiB; increase %s to enable large messages",
+				NetworkMaxMessageSizeKey,
+				defaultMaxMessageSizeKiB,
+				NetworkMaxMessageSizeKey,
+			)
+		}
+	}
+
+	return network.LargeMessageConfig{
+		MaxMessageSize: uint32(maxSize),
+		Allowlist:      allowlist,
+	}, nil
 }
 
 func getBenchlistConfig(v *viper.Viper, snowballParameters *snowball.Parameters) (benchlist.Config, error) {

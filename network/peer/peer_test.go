@@ -41,6 +41,7 @@ type testPeer struct {
 
 type rawTestPeer struct {
 	config         *Config
+	stack          MessageStack
 	cert           *staking.Certificate
 	inboundMsgChan <-chan *message.InboundMessage
 }
@@ -52,6 +53,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(t, err)
 
@@ -74,13 +76,11 @@ func newConfig(t *testing.T) *Config {
 	require.NoError(err)
 
 	return &Config{
-		ReadBufferSize:       constants.DefaultNetworkPeerReadBufferSize,
-		WriteBufferSize:      constants.DefaultNetworkPeerWriteBufferSize,
-		Metrics:              metrics,
-		MessageCreator:       newMessageCreator(t),
-		Log:                  logging.NoLog{},
-		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
-		Network:              TestNetwork,
+		ReadBufferSize:  constants.DefaultNetworkPeerReadBufferSize,
+		WriteBufferSize: constants.DefaultNetworkPeerWriteBufferSize,
+		Metrics:         metrics,
+		Log:             logging.NoLog{},
+		Network:         TestNetwork,
 		Router:               nil,
 		VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 		MySubnets:            nil,
@@ -123,6 +123,7 @@ func newRawTestPeer(t *testing.T, config *Config) *rawTestPeer {
 
 	return &rawTestPeer{
 		config:         config,
+		stack:          NewTestMessageStack(newMessageCreator(t)),
 		cert:           cert,
 		inboundMsgChan: inboundMsgChan,
 	}
@@ -132,6 +133,7 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 	return &testPeer{
 		Peer: Start(
 			self.config,
+			self.stack,
 			conn,
 			peer.cert,
 			peer.config.MyNodeID,
@@ -205,7 +207,7 @@ func TestSend(t *testing.T) {
 	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
 	awaitReady(t, peer0, peer1)
 
-	outboundGetMsg, err := config0.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := rawPeer0.stack.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	require.True(peer0.Send(t.Context(), outboundGetMsg))
@@ -237,7 +239,7 @@ func TestPingUptimes(t *testing.T) {
 		require.NoError(peer0.AwaitClosed(t.Context()))
 		require.NoError(peer1.AwaitClosed(t.Context()))
 	}()
-	pingMsg, err := config0.MessageCreator.Ping(1)
+	pingMsg, err := rawPeer0.stack.MessageCreator.Ping(1)
 	require.NoError(err)
 	require.True(peer0.Send(t.Context(), pingMsg))
 
