@@ -77,7 +77,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			return nil, err
 		}
 
-		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil { // if NO error
+		if _, err := state.New(b.PostExecutionStateRoot(), cache, nil); err == nil {
 			return b, nil
 		}
 
