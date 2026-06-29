@@ -89,6 +89,16 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
 		},
 		{
+			name: "batch_request_limit",
+			json: `{"batch-request-limit":50}`,
+			want: with(func(c *config) { c.BatchRequestLimit = 50 }),
+		},
+		{
+			name: "batch_request_limit_explicit_zero",
+			json: `{"batch-request-limit":0}`, // 0 disables the batch limit
+			want: with(func(c *config) { c.BatchRequestLimit = 0 }),
+		},
+		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
 			want: with(func(c *config) {
@@ -105,6 +115,7 @@ func TestParseConfig(t *testing.T) {
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
+				"batch-request-limit":50,
 				"warp-off-chain-messages":["0x1234"]
 			}`,
 			want: config{
@@ -115,6 +126,7 @@ func TestParseConfig(t *testing.T) {
 				LocalTxsEnabled:      true,
 				TxPoolAccountSlots:   8,
 				TxPoolGlobalSlots:    2048,
+				BatchRequestLimit:    50,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},

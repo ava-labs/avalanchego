@@ -61,7 +61,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 |--------|------|-------------|---------|
 | `api-max-blocks-per-request` | int64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
 | `allow-unprotected-txs` | bool | Allow unprotected transactions (without EIP-155 replay protection). | `false` |
-| `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
+| `batch-request-limit` | int | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
 
 ## State Sync
 

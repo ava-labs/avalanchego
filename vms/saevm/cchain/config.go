@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
@@ -52,7 +54,9 @@ type config struct {
 	// APIs
 	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
 	// AllowUnprotectedTxs bool   `json:"allow-unprotected-txs"`
-	// BatchRequestLimit   uint64 `json:"batch-request-limit"`
+	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
+	// 0 = no limit. An unset config uses the default (1000).
+	BatchRequestLimit int `json:"batch-request-limit"`
 
 	// State sync
 	// StateSyncEnabled *bool `json:"state-sync-enabled"`
@@ -72,12 +76,17 @@ type config struct {
 // 	StateSyncIDs []ids.NodeID `json:"state-sync-ids"`
 // }
 
+// defaultBatchRequestLimit is the maximum number of requests per JSON-RPC batch
+// used when [config.BatchRequestLimit] is unset. 0 disables the limit.
+const defaultBatchRequestLimit = 1000
+
 // defaultConfig returns the config used when an operator leaves a field unset.
 func defaultConfig() config {
 	return config{
 		Pruning:            true,
 		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
 		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
+		BatchRequestLimit:  defaultBatchRequestLimit,
 	}
 }
 
@@ -108,6 +117,9 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			TrieDBConfig:       triedb.HashDefaults,
 			Archival:           !c.Pruning,
 			TrieCommitInterval: c.CommitInterval,
+		},
+		RPCConfig: saerpc.Config{
+			BatchRequestLimit: c.BatchRequestLimit,
 		},
 		Now: now,
 	}
