@@ -44,6 +44,7 @@ type HeaderExtra struct {
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
+	TargetExponent   *dynamic.TargetExponent
 	MinPriceExponent *dynamic.PriceExponent
 
 	SettledHeight       *uint64
@@ -131,6 +132,10 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		e := *h.MinDelayExcess
 		cp.MinDelayExcess = &e
 	}
+	if h.TargetExponent != nil {
+		e := *h.TargetExponent
+		cp.TargetExponent = &e
+	}
 	if h.MinPriceExponent != nil {
 		e := *h.MinPriceExponent
 		cp.MinPriceExponent = &e
@@ -167,6 +172,9 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	}
 	if h.MinDelayExcess != nil {
 		m["minDelayExcess"] = hexutil.Uint64(*h.MinDelayExcess)
+	}
+	if h.TargetExponent != nil {
+		m["targetExponent"] = hexutil.Uint64(*h.TargetExponent)
 	}
 	if h.MinPriceExponent != nil {
 		m["minPriceExponent"] = hexutil.Uint64(*h.MinPriceExponent)
@@ -235,6 +243,7 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.BlockGasCost = extras.BlockGasCost
 	h.TimeMilliseconds = extras.TimeMilliseconds
 	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
+	h.TargetExponent = (*uint64)(extras.TargetExponent)
 	h.MinPriceExponent = (*uint64)(extras.MinPriceExponent)
 	h.SettledHeight = extras.SettledHeight
 	h.SettledGasUnix = extras.SettledGasUnix
@@ -248,6 +257,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
 	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
+	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
 	extras.MinPriceExponent = (*dynamic.PriceExponent)(h.MinPriceExponent)
 	extras.SettledHeight = h.SettledHeight
 	extras.SettledGasUnix = h.SettledGasUnix
@@ -314,6 +324,10 @@ type HeaderSerializable struct {
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
 
+	// TargetExponent was added by Helicon and is ignored in legacy headers.
+	// We use *uint64 type here to avoid rlpgen generating incorrect code
+	TargetExponent *uint64 `json:"targetExponent" rlp:"optional"`
+
 	// MinPriceExponent was added by Helicon (ACP-283) and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinPriceExponent *uint64 `json:"minPriceExponent" rlp:"optional"`
@@ -340,6 +354,7 @@ type headerMarshaling struct {
 	ExcessBlobGas       *hexutil.Uint64
 	TimeMilliseconds    *hexutil.Uint64
 	MinDelayExcess      *hexutil.Uint64
+	TargetExponent      *hexutil.Uint64
 	MinPriceExponent    *hexutil.Uint64
 	SettledHeight       *hexutil.Uint64
 	SettledGasUnix      *hexutil.Uint64
