@@ -150,10 +150,7 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 		for {
 			switch b := lastOf(chain); {
 			case b.Synchronous():
-				if b.Settled() {
-					return nil
-				}
-				return b.MarkSettled(blackhole)
+				return nil
 
 			case b.ExecutedByGasTime().Compare(tm) <= 0:
 				if b.Settled() {
@@ -171,7 +168,7 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				}
 				chain = append(chain, parent)
 
-				if !b.Settled() {
+				if !b.Settled() && !parent.Synchronous() {
 					continue
 				}
 				if err := parent.MarkSettled(blackhole); err != nil {
