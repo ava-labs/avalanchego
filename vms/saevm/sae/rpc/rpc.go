@@ -70,7 +70,7 @@ type Config struct {
 	EVMTimeout        time.Duration
 	GasCap            uint64
 	TxFeeCap          float64 // 0 = no cap
-	BatchRequestLimit int     // 0 = no limit
+	BatchRequestLimit uint64  // 0 = no limit
 
 	// Bloom indexing
 	BlocksPerBloomSection uint64

@@ -56,7 +56,7 @@ type config struct {
 	// AllowUnprotectedTxs bool   `json:"allow-unprotected-txs"`
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
-	BatchRequestLimit int `json:"batch-request-limit"`
+	BatchRequestLimit uint64 `json:"batch-request-limit"`
 
 	// State sync
 	// StateSyncEnabled *bool `json:"state-sync-enabled"`

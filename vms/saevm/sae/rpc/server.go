@@ -5,6 +5,7 @@ package rpc
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/libevm/eth/filters"
 	"github.com/ava-labs/libevm/eth/tracers"
@@ -174,8 +175,12 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		})
 	}
 
+	if b.config.BatchRequestLimit > math.MaxInt {
+		return nil, fmt.Errorf("batch-request-limit %d exceeds max %d", b.config.BatchRequestLimit, math.MaxInt)
+	}
+
 	s := rpc.NewServer()
-	s.SetBatchLimits(b.config.BatchRequestLimit, batchResponseMaxSize)
+	s.SetBatchLimits(int(b.config.BatchRequestLimit), batchResponseMaxSize)
 	for _, api := range apis {
 		if err := s.RegisterName(api.namespace, api.api); err != nil {
 			return nil, fmt.Errorf("%T.RegisterName(%q, %T): %v", s, api.namespace, api.api, err)
