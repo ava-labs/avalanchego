@@ -43,88 +43,89 @@ func TestHandler_RoundTrip(t *testing.T) {
 	require.Empty(t, cmp.Diff(req, responder.GotReq, protocmp.Transform()))
 }
 
-func TestResponder_ReturnsRequestedParents(t *testing.T) {
-	blocks := synctest.MakeChain(t, 10)
-	provider := synctest.NewBlockMap(blocks)
-	r := block.NewResponder(provider)
-
-	tip := blocks[len(blocks)-1]
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
-		Height:     tip.NumberU64(),
-		NumParents: 5,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.Len(t, resp.Blocks, 5)
-
-	// Blocks come back tip-first, walking parents.
-	for i, raw := range resp.Blocks {
-		var b types.Block
-		require.NoError(t, rlp.DecodeBytes(raw, &b))
-		want := blocks[len(blocks)-1-i]
-		require.Equal(t, want.Hash(), b.Hash())
+func TestResponder(t *testing.T) {
+	tests := []struct {
+		name       string
+		chainLen   int
+		numParents uint32
+		noBlocks   bool
+		cancelCtx  bool
+		wantBlocks int
+		wantDrop   bool
+	}{
+		{
+			name:       "returns requested parents tip-first",
+			chainLen:   10,
+			numParents: 5,
+			wantBlocks: 5,
+		},
+		{
+			name:       "includes genesis then stops",
+			chainLen:   5,
+			numParents: 100, // more than the chain length
+			wantBlocks: 6,
+		},
+		{
+			name:       "caps parents at max",
+			chainLen:   int(block.MaxParentsPerRequest) + 10,
+			numParents: uint32(block.MaxParentsPerRequest) + 50,
+			wantBlocks: int(block.MaxParentsPerRequest),
+		},
+		{
+			name:       "missing block drops",
+			noBlocks:   true,
+			numParents: 1,
+			wantDrop:   true,
+		},
+		{
+			name:       "cancelled context drops",
+			chainLen:   50,
+			numParents: 10,
+			cancelCtx:  true,
+			wantDrop:   true,
+		},
 	}
-}
 
-func TestResponder_StopsAtGenesis(t *testing.T) {
-	blocks := synctest.MakeChain(t, 5)
-	provider := synctest.NewBlockMap(blocks)
-	r := block.NewResponder(provider)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var blocks []*types.Block
+			if !tt.noBlocks {
+				blocks = synctest.MakeChain(t, tt.chainLen)
+			}
+			r := block.NewResponder(synctest.NewBlockMap(blocks))
 
-	tip := blocks[len(blocks)-1]
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
-		Height:     tip.NumberU64(),
-		NumParents: 100, // more than the chain length
-	})
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	// Genesis is included. The walk stops on the iteration after it,
-	// when hash becomes the all-zero ParentHash of genesis.
-	require.Len(t, resp.Blocks, 6)
-}
+			ctx := t.Context()
+			if tt.cancelCtx {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel() // cancel before the responder runs
+			}
 
-func TestResponder_MissingBlockDrops(t *testing.T) {
-	provider := synctest.NewBlockMap(nil)
-	r := block.NewResponder(provider)
+			height := uint64(10)
+			if len(blocks) > 0 {
+				height = blocks[len(blocks)-1].NumberU64()
+			}
 
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
-		Height:     10,
-		NumParents: 1,
-	})
-	require.NoError(t, err)
-	require.Nil(t, resp)
-}
+			resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
+				Height:     height,
+				NumParents: tt.numParents,
+			})
+			require.NoError(t, err)
 
-func TestResponder_ParentsCappedAtMax(t *testing.T) {
-	blocks := synctest.MakeChain(t, int(block.MaxParentsPerRequest)+10)
-	provider := synctest.NewBlockMap(blocks)
-	r := block.NewResponder(provider)
+			if tt.wantDrop {
+				require.Nil(t, resp)
+				return
+			}
+			require.NotNil(t, resp)
+			require.Len(t, resp.Blocks, tt.wantBlocks)
 
-	tip := blocks[len(blocks)-1]
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
-		Height:     tip.NumberU64(),
-		NumParents: uint32(block.MaxParentsPerRequest) + 50,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.Len(t, resp.Blocks, int(block.MaxParentsPerRequest))
-}
-
-func TestResponder_CtxCancelledDrops(t *testing.T) {
-	blocks := synctest.MakeChain(t, 50)
-	provider := synctest.NewBlockMap(blocks)
-	r := block.NewResponder(provider)
-
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel() // cancel before the responder runs
-
-	tip := blocks[len(blocks)-1]
-	resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetBlockRequest{
-		Height:     tip.NumberU64(),
-		NumParents: 10,
-	})
-	require.NoError(t, err)
-	// Loop bails on the first iteration because ctx is already done.
-	// No blocks were appended, so the responder drops.
-	require.Nil(t, resp)
+			// Blocks come back tip-first, walking parents.
+			for i, raw := range resp.Blocks {
+				var b types.Block
+				require.NoError(t, rlp.DecodeBytes(raw, &b))
+				want := blocks[len(blocks)-1-i]
+				require.Equal(t, want.Hash(), b.Hash())
+			}
+		})
+	}
 }
