@@ -168,7 +168,8 @@ func (t *Tracker) Track(root common.Hash) {
 //
 // 1. If [Config.Archival] is true, then `executionRoot` will be committed.
 // 2. If [ShouldCommitTrieDB] based on `height`, `settledRoot` is committed.
-// 3. Otherwise, nothing is committed.
+// 3. If there is sufficient memory pressure in HashDB, flushes the oldest trie nodes to disk.
+// 4. Otherwise, nothing is committed.
 //
 // This does NOT change in-memory tracking.
 func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uint64) error {
@@ -187,6 +188,9 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 		commit = settledRoot
 		because = "settled"
 	default:
+		if err := t.maybeCap(height); err != nil {
+			return fmt.Errorf("triedb.Database.Cap() at block %d: %v", height, err)
+		}
 		return nil
 	}
 
@@ -195,6 +199,30 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 		return fmt.Errorf("%T.Commit(%#x) %s at end of block %d: %v", tdb, settledRoot, because, height, err)
 	}
 	return nil
+}
+
+// maybeCap checks if the in-memory state of a HashDB is too high for an efficient
+// [triedb.Database.Commit] and, if so, moves the oldest state to disk.
+func (t *Tracker) maybeCap(height uint64) error {
+	const (
+		maxCap                = 512 * mibToBytes
+		targetCommitSize      = 20 * mibToBytes                         // for [triedb.Database.Commit]
+		_                uint = targetCommitSize - ethdb.IdealBatchSize // [targetCommitSize] >= [ethdb.IdealBatchSize]
+	)
+
+	// The cap shrinks linearly as we approach the commit interval
+	commitInterval := t.config.CommitInterval()
+	distanceFromCommit := commitInterval - height%commitInterval
+	slope := common.StorageSize(maxCap-targetCommitSize) / common.StorageSize(commitInterval)
+	targetCap := common.StorageSize(distanceFromCommit)*slope + targetCommitSize
+
+	tdb := t.cache.TrieDB()
+	_, inMemory, _ := tdb.Size()
+	if inMemory <= targetCap {
+		return nil
+	}
+
+	return tdb.Cap(targetCap - ethdb.IdealBatchSize) // avoid small DB writes
 }
 
 // LastHeightWithExecutionRootCommitted returns the greatest block height for
@@ -247,24 +275,10 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 }
 
 // Close releases all resources associated with the `[triedb.Database]`
-// and persists `lastRoot` to the snapshot layer. `lastRoot` should be a
-// recent state root.
-func (t *Tracker) Close(lastRoot common.Hash) error {
-	if t.snaps == nil {
-		return t.cache.TrieDB().Close()
+// and [snapshot.Tree], if applicable.
+func (t *Tracker) Close() error {
+	if t.snaps != nil {
+		t.snaps.Release()
 	}
-
-	defer t.snaps.Release()
-
-	// We don't use [snapshot.Tree.Journal] because re-orgs are impossible under
-	// SAE so we don't mind flattening all snapshot layers to disk. Note that
-	// calling `Cap([disk root], 0)` returns an error when it's actually a
-	// no-op, so we ensure there are changes.
-	if lastRoot != t.snaps.DiskRoot() {
-		if err := t.snaps.Cap(lastRoot, 0); err != nil {
-			return fmt.Errorf("snapshot.Tree.Cap([last post-execution state root], 0): %v", err)
-		}
-	}
-
-	return nil
+	return t.cache.TrieDB().Close()
 }
