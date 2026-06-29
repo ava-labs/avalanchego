@@ -1094,12 +1094,12 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 		S:        big.NewInt(0x1b9b6eb1f0),
 	})
 
-	t.Run("deployment_tx_sense_check", func(t *testing.T) {
+	{ // test setup validation
 		require.Equal(t, common.HexToHash(`0xdf52c2d3bbe38820fff7b5eaab3db1b91f8e1412b56497d88388fb5d4ea1fde0`), deployTx.Hash(), "deployment tx hash matches EIP")
 		sender, err := types.Sender(types.LatestSigner(saetest.ChainConfig()), deployTx)
 		require.NoError(t, err, "types.Sender([deployment tx])")
 		require.Equal(t, deployer, sender, "types.Sender([deployment tx])")
-	})
+	}
 
 	tests := []struct {
 		name       string
@@ -1141,9 +1141,7 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 
 			sdb, err := e.StateDB(b.PostExecutionStateRoot())
 			require.NoErrorf(t, err, "%T.StateDB(%T.PostExecutionStateRoot())", e, b)
-
-			header := b.Header()
-			blockCtx := core.NewEVMBlockContext(header, nil /*chain; unused by get()*/, &header.Coinbase)
+			blockCtx := core.NewEVMBlockContext(b.Header(), nil /*chain; unused by get()*/, &header.Coinbase)
 			evm := vm.NewEVM(blockCtx, vm.TxContext{}, sdb, saetest.ChainConfig(), vm.Config{})
 
 			got, _, err := evm.StaticCall(

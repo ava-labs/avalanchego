@@ -197,10 +197,6 @@ func Execute(
 
 	// EIP-4788: before processing any transactions, store the parent beacon
 	// block root, mirroring [core.StateProcessor.Process].
-	//
-	// This is part of execution and so MUST run during both live execution and
-	// intra-block (tracing) replay, which share this function, to keep the
-	// execution-derived state consistent.
 	core.SetBeaconBlockRoot(stateDB, header)
 
 	signer := b.Signer(config)
