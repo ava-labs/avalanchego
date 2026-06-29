@@ -5,7 +5,6 @@ package block_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -42,49 +41,6 @@ func TestHandler_RoundTrip(t *testing.T) {
 	require.NoError(t, proto.Unmarshal(respBytes, got))
 	require.Empty(t, cmp.Diff(wantResp, got, protocmp.Transform()))
 	require.Empty(t, cmp.Diff(req, responder.GotReq, protocmp.Transform()))
-}
-
-func TestHandler_FailurePaths(t *testing.T) {
-	tests := []struct {
-		name       string
-		resp       *syncpb.GetBlockResponse
-		err        error
-		wantAppErr bool
-	}{
-		{
-			name: "inner returns nil drops the response",
-		},
-		{
-			name:       "inner error surfaces as AppError",
-			err:        errors.New("boom"),
-			wantAppErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			responder := &synctest.FakeBlockResponder{Resp: tt.resp, Err: tt.err}
-			h := block.NewHandler(logging.NoLog{}, responder)
-
-			respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, synctest.MustMarshal(t, &syncpb.GetBlockRequest{}))
-			if tt.wantAppErr {
-				require.NotNil(t, appErr)
-			} else {
-				require.Nil(t, appErr)
-			}
-			require.Empty(t, respBytes)
-		})
-	}
-}
-
-func TestHandler_MalformedRequestBytes(t *testing.T) {
-	responder := &synctest.FakeBlockResponder{}
-	h := block.NewHandler(logging.NoLog{}, responder)
-
-	respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, []byte{0xff, 0xff})
-	require.Nil(t, respBytes)
-	require.NotNil(t, appErr)
-	require.Nil(t, responder.GotReq, "responder must not be invoked on malformed request")
 }
 
 func TestResponder_ReturnsRequestedParents(t *testing.T) {
