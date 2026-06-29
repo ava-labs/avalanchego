@@ -204,7 +204,7 @@ func TestRecoverSimple(t *testing.T) {
 				for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
 					ethB, err := canonicalBlock(sut.rawVM.db, i)
 					require.NoErrorf(t, err, "canonicalBlock(%d)", i)
-					b, err := blocks.RestoreSettledBlock(sut.hooks, ethB, sut.logger, sut.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig())
+					b, err := blocks.RestoreSettledBlock(ethB, sut.hooks, sut.logger, sut.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig())
 					require.NoErrorf(t, err, "RestoreSettledBlock(%d)", i)
 
 					// If these states were available they would eventually

@@ -101,44 +101,15 @@ func New(eth *types.Block, parent, lastSettled *Block, log logging.Logger) (*Blo
 	return b, nil
 }
 
-// RestoreExecutedBlock constructs a new block with [New] and restores it to an
-// executed state before returning it. By definition of being executed, the
-// returned block also includes post-execution artefacts. This function MUST
-// only be used when recovering from shutdown, since any other block that
-// needs read from disk should be in memory.
-//
-// This function does NOT restore the block's settlement state, UNLESS the
-// block is synchronous, in which case it is marked as settled.
-//
-// Any error returned is indicative of a corrupted database.
-func RestoreExecutedBlock(eth *types.Block, hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig, log logging.Logger) (*Block, error) {
-	b, err := New(eth, nil, nil, log)
-	if err != nil {
-		return nil, err
-	}
-	if err := b.restoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
-		return nil, fmt.Errorf("restoring to executed state: %w", err)
-	}
-
-	// Synchronous blocks MUST be marked as settled to satisfy invariants.
-	if !b.Synchronous() {
-		return b, nil
-	}
-	if err := b.markSettled(nil); err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
 // RestoreSettledBlock constructs a new block with [New] and restores it to an
 // settled state before returning it. By definition of being settled, the
 // returned block also includes post-execution artefacts.
-func RestoreSettledBlock(hooks hook.Points, eth *types.Block, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
+func RestoreSettledBlock(eth *types.Block, hooks hook.Points, log logging.Logger, db ethdb.Database, xdb saetypes.ExecutionResults, config *params.ChainConfig) (*Block, error) {
 	b, err := New(eth, nil, nil, log)
 	if err != nil {
 		return nil, err
 	}
-	if err := b.restoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
+	if err := b.RestoreExecutionArtefacts(hooks, db, xdb, config); err != nil {
 		return nil, fmt.Errorf("restoring to executed state: %w", err)
 	}
 	if err := b.markSettled(nil); err != nil {

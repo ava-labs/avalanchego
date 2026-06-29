@@ -140,7 +140,7 @@ func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, al
 
 	h := hookstest.NewStub(conf.gasTarget)
 	xdb := saetest.NewExecutionResultsDB()
-	b, err := blocks.RestoreSettledBlock(h, gen.ToBlock(), loggingtest.New(tb, logging.Warn), db, xdb, config)
+	b, err := blocks.RestoreSettledBlock(gen.ToBlock(), h, loggingtest.New(tb, logging.Warn), db, xdb, config)
 	require.NoError(tb, err, "blocks.RestoreSettledBlock()")
 	return b
 }

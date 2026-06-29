@@ -72,7 +72,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			return nil, err
 		}
 
-		b, err := blocks.RestoreSettledBlock(rec.hooks, ethB, rec.log, rec.db, rec.xdb, rec.chainConfig)
+		b, err := blocks.RestoreSettledBlock(ethB, rec.hooks, rec.log, rec.db, rec.xdb, rec.chainConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -159,18 +159,16 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				return b.MarkSettled(blackhole)
 
 			default:
-				ethB, err := canonicalBlock(rec.db, b.Height()-1)
+				parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
 				if err != nil {
 					return err
 				}
-				parent, err := blocks.RestoreExecutedBlock(ethB, rec.hooks, rec.db, rec.xdb, rec.chainConfig, rec.log)
-				if err != nil {
+				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
 					return err
 				}
 				chain = append(chain, parent)
 
-				// RestoreExecutedBlock will mark synchronous blocks as settled.
-				if parent.Synchronous() || !b.Settled() {
+				if !b.Settled() {
 					continue
 				}
 				if err := parent.MarkSettled(blackhole); err != nil {
