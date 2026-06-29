@@ -61,7 +61,10 @@ func (b *backend) restoreBlock(numOrHash rpc.BlockNumberOrHash) (*blocks.Block, 
 				// We can't restore the settlement state, it should have been found in the map.
 				return nil, blocks.ErrNotFound
 			}
-			ethB := rawdb.ReadBlock(db, h, num) // readByNumberOrHash verifies this will be non-nil
+			ethB := rawdb.ReadBlock(db, h, num)
+			if ethB == nil {
+				return nil, blocks.ErrNotFound
+			}
 			return blocks.RestoreSettledBlock(ethB, b.Hooks(), b.Logger(), b.DB(), b.XDB(), b.ChainConfig())
 		},
 	)
