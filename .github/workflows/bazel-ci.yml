@@ -38,13 +38,13 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          failed_jobs="$(
+          failed_jobs="$({
             jq -r '
               to_entries[]
               | select(.value.result != "success")
               | .key
             ' <<<"$NEEDS_JSON"
-          )"
+          })"
 
           if [[ -n "$failed_jobs" ]]; then
             echo "Required jobs failed:"
@@ -73,7 +73,7 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-main
+        run: ./scripts/run_task.sh bazel-test-main-race-shuffle
 
   unit-coreth:
     needs: setup
@@ -83,7 +83,7 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run coreth unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-coreth
+        run: ./scripts/run_task.sh bazel-test-coreth-race-shuffle
 
   unit-subnet-evm:
     needs: setup
@@ -93,7 +93,7 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run subnet-evm unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-subnet-evm
+        run: ./scripts/run_task.sh bazel-test-subnet-evm-race-shuffle
 
   e2e:
     needs: setup

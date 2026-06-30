@@ -8,9 +8,9 @@ common --experimental_isolated_extension_usages
 # Enable platform-specific config sections (build:macos, build:linux, etc.)
 common --enable_platform_specific_config
 
-# Go settings - match scripts/build_test.sh defaults
+# Go settings
 
-# Test settings (match scripts/build_test.sh)
+# Shared test settings with scripts/build_test.sh (output, timeouts, HOME)
 test --test_output=errors
 # Per-category timeouts: short,moderate,long,eternal
 # "long" covers graft modules (coreth, evm, subnet-evm) via graft_go_test macro
@@ -18,23 +18,24 @@ test --test_timeout=60,120,900,3600
 # Set HOME for tests that need it (e.g., config tests that expand $HOME/.avalanchego)
 test --test_env=HOME
 
-# Race detection ON by default (matches scripts/build_test.sh)
-# Disable with: bazel build/test --config=norace //...
+# Race detection is ON by default for builds.
 build --@io_bazel_rules_go//go/config:race=true
-test --@io_bazel_rules_go//go/config:race=true
 
-# Explicit race config (kept for clarity/compat)
+# Race detection is OFF in Bazel's default test mode.
+test --@io_bazel_rules_go//go/config:race=false
+
+# Explicit race config for stronger validation.
 build:race --@io_bazel_rules_go//go/config:race=true
 test:race --@io_bazel_rules_go//go/config:race=true
+# Match the non-Bazel Go test execution model: when callers ask for race
+# validation, rerun the tests instead of reusing a prior passing Bazel test
+# result.
+test:race --nocache_test_results
 
-# Config: disable race (for faster local builds)
+# Compat alias for explicitly disabling race in builds.
 build:norace --@io_bazel_rules_go//go/config:race=false
-test:norace --@io_bazel_rules_go//go/config:race=false
 
-# Shuffle ON by default (matches build_test.sh -shuffle=on)
-# Injected via go_test wrapper in .bazel/defs.bzl (not --test_arg, which
-# would break non-Go test rules like gazelle_test).
-# Disable with: bazel test --config=noshuffle //...
+# Go tests are non-shuffled by default unless passed `-test.shuffle`.
 
 # Coverage: use `bazel coverage //...` instead of `bazel test //...`
 # This matches build_test.sh's -coverprofile/-covermode flags
@@ -62,12 +63,11 @@ try-import %workspace%/.bazelrc.local
 # Cache for faster builds
 build --disk_cache=~/.cache/bazel-disk-cache
 
-# Config: disable shuffle (for deterministic test ordering)
-# Overrides the shuffle=on injected by the go_test wrapper (last flag wins)
-test:noshuffle --test_arg=-test.shuffle=off
-
-# Config: fast local development (no shuffle, no race)
-test:fast --config=noshuffle --config=norace
+# Config: heaviest Go test mode. Inherits race and --nocache_test_results from
+# the race config.
+test:race-shuffle --config=race
+# Match `go test -shuffle=on` by enabling Go test shuffling for this mode.
+test:race-shuffle --test_arg=-test.shuffle=on
 
 # Stamp builds with git commit
 build:release --stamp
