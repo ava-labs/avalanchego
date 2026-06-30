@@ -12,6 +12,8 @@ import (
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+// All these functions just route through to the current chain.
+
 func (vm *VM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
