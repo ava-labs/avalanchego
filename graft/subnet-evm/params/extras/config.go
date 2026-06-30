@@ -115,16 +115,12 @@ type ChainConfig struct {
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
 
 	// InitialMinDelayMS, if non-zero, seeds the ACP-226 minimum block delay (in
-	// milliseconds) into the genesis block instead of the default ~2000ms start.
-	// A fresh chain otherwise begins at ~2000ms and converges toward the node's
-	// min-delay-target by at most ±200 excess/block, taking thousands of blocks
-	// to settle. Seeding the starting value skips that ramp so the chain runs at
-	// its target cadence from block 1.
+	// milliseconds) into genesis instead of the default ~2000ms start, so the
+	// chain runs at its target cadence from block 1 rather than slowly converging.
 	//
-	// DEBUG/BENCHMARK ONLY: intended for networks with a controlled genesis (e.g.
-	// fresh L1s under benchmark). Not for production chains. Bounds enforced in
-	// Verify; set it equal to your min-delay-target. Unset leaves behavior
-	// bit-for-bit identical to a default chain.
+	// DEBUG/BENCHMARK ONLY: for networks with a controlled genesis (e.g. fresh L1s
+	// under benchmark), not production. Set it equal to your min-delay-target.
+	// Unset leaves behavior bit-for-bit identical to a default chain.
 	InitialMinDelayMS uint64 `json:"initialMinDelayMS,omitempty"`
 }
 
@@ -349,10 +345,8 @@ func (c *ChainConfig) Verify() error {
 		return fmt.Errorf("invalid network upgrades: %w", err)
 	}
 
-	// Cap the ACP-226 genesis min-delay seed at the protocol default start
-	// (~2000ms): seeding a slower start than default is pointless, so reject it
-	// rather than silently accept a no-op. (No floor: any nonzero value is >=1ms,
-	// the formula's minimum.)
+	// A seed slower than the default start is a no-op; reject it rather than
+	// silently accept it.
 	if max := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > max {
 		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, max)
 	}
