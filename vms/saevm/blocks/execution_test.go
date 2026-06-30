@@ -104,6 +104,7 @@ func TestMarkExecuted(t *testing.T) {
 
 	fromDB := newBlock(t, b.EthBlock(), b.ParentBlock(), b.LastSettled())
 	// This block is NOT synchronous, so no hooks are needed.
+	// NOTE: this pattern is only acceptable in tests.
 	require.NoErrorf(t, fromDB.RestoreExecutionArtefacts(nil, db, xdb, saetest.ChainConfig()), "%T.RestoreExecutionArtefacts()", fromDB)
 	tests := []struct {
 		name           string
@@ -190,6 +191,7 @@ func TestRestoreExecutionArtefactsSynchronous(t *testing.T) {
 
 	assert.Truef(t, b.Executed(), "%T.Executed()", b)
 	assert.Truef(t, b.Synchronous(), "%T.Synchronous()", b)
+	// See method comment re user responsibility for settlement.
 	assert.Falsef(t, b.Settled(), "%T.Settled()", b)
 	// A synchronous block is its own last-settled block.
 	assert.Equalf(t, b, b.LastSettled(), "%T.LastSettled()", b)
