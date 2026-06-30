@@ -67,6 +67,7 @@ go_test(
         "//snow/consensus/snowball",
         "//subnets",
         "//utils/constants",
+        "//utils/units",
         "@com_github_spf13_pflag//:pflag",
         "@com_github_spf13_viper//:viper",
         "@com_github_stretchr_testify//require",
