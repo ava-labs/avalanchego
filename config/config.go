@@ -99,6 +99,13 @@ var (
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
 	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
+
+	errLargeMessageFlagsTogether = fmt.Errorf("%q and %q must be set together", NetworkMaxMessageSizeKey, NetworkLargeMessagePeerIDsKey)
+	errLargeMessageSizeTooLarge  = fmt.Errorf("%s must be <= %d KiB", NetworkMaxMessageSizeKey, math.MaxUint32/units.KiB)
+	errLargeMessageSizeTooSmall  = fmt.Errorf("%s must be >= %d KiB", NetworkMaxMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB)
+	errLargeMessagePeerIDsEmpty  = fmt.Errorf("%s is set but empty", NetworkLargeMessagePeerIDsKey)
+	errLargeMessageSizeIsDefault = fmt.Errorf("%s is set to the default %d KiB; increase %s to enable large messages", NetworkMaxMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB, NetworkMaxMessageSizeKey)
+	errParseLargeMessagePeerID   = fmt.Errorf("couldn't parse nodeID for %s", NetworkLargeMessagePeerIDsKey)
 )
 
 func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
@@ -561,25 +568,17 @@ func getLargeMessageConfig(v *viper.Viper) (network.LargeMessageConfig, error) {
 	maxSizeSet := v.IsSet(NetworkMaxMessageSizeKey)
 	allowlistSet := v.IsSet(NetworkLargeMessagePeerIDsKey)
 	if maxSizeSet && !allowlistSet || !maxSizeSet && allowlistSet {
-		return network.LargeMessageConfig{}, fmt.Errorf("set %q and %q must be set together", NetworkMaxMessageSizeKey, NetworkLargeMessagePeerIDsKey)
+		return network.LargeMessageConfig{}, errLargeMessageFlagsTogether
 	}
 
 	maxSizeKiB := v.GetUint(NetworkMaxMessageSizeKey)
 	maxSize := uint64(maxSizeKiB) * units.KiB
 	const defaultMaxMessageSizeKiB = constants.DefaultMaxMessageSize / units.KiB
 	if maxSize > math.MaxUint32 {
-		return network.LargeMessageConfig{}, fmt.Errorf(
-			"%s must be <= %d KiB",
-			NetworkMaxMessageSizeKey,
-			math.MaxUint32/units.KiB,
-		)
+		return network.LargeMessageConfig{}, errLargeMessageSizeTooLarge
 	}
 	if maxSize < constants.DefaultMaxMessageSize {
-		return network.LargeMessageConfig{}, fmt.Errorf(
-			"%s must be >= %d KiB",
-			NetworkMaxMessageSizeKey,
-			defaultMaxMessageSizeKiB,
-		)
+		return network.LargeMessageConfig{}, errLargeMessageSizeTooSmall
 	}
 
 	idSlice := v.GetStringSlice(NetworkLargeMessagePeerIDsKey)
@@ -591,12 +590,7 @@ func getLargeMessageConfig(v *viper.Viper) (network.LargeMessageConfig, error) {
 		}
 		nodeID, err := ids.NodeIDFromString(idStr)
 		if err != nil {
-			return network.LargeMessageConfig{}, fmt.Errorf(
-				"couldn't parse nodeID %q for %s: %w",
-				idStr,
-				NetworkLargeMessagePeerIDsKey,
-				err,
-			)
+			return network.LargeMessageConfig{}, fmt.Errorf("%w %q: %w", errParseLargeMessagePeerID, idStr, err)
 		}
 		allowlist.Add(nodeID)
 	}
@@ -604,17 +598,9 @@ func getLargeMessageConfig(v *viper.Viper) (network.LargeMessageConfig, error) {
 	if maxSizeSet && allowlistSet {
 		switch {
 		case allowlist.Len() == 0:
-			return network.LargeMessageConfig{}, fmt.Errorf(
-				"%s is set but empty",
-				NetworkLargeMessagePeerIDsKey,
-			)
+			return network.LargeMessageConfig{}, errLargeMessagePeerIDsEmpty
 		case maxSizeKiB == defaultMaxMessageSizeKiB:
-			return network.LargeMessageConfig{}, fmt.Errorf(
-				"%s is set to the default %d KiB; increase %s to enable large messages",
-				NetworkMaxMessageSizeKey,
-				defaultMaxMessageSizeKiB,
-				NetworkMaxMessageSizeKey,
-			)
+			return network.LargeMessageConfig{}, errLargeMessageSizeIsDefault
 		}
 	}
 
