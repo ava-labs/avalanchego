@@ -206,7 +206,7 @@ func TestChainConfigVerify(t *testing.T) {
 						FortunaTime: time.Unix(4, 0),
 					},
 				}},
-				InitialMinDelayMS: 1_000_000,
+				InitialMinDelayMS: acp226.InitialDelayExcess.Delay() + 1, // one past the inclusive ceiling
 			},
 			wantError: errInitialMinDelayTooLarge,
 		},

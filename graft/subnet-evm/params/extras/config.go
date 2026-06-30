@@ -345,8 +345,9 @@ func (c *ChainConfig) Verify() error {
 		return fmt.Errorf("invalid network upgrades: %w", err)
 	}
 
-	// A seed slower than the default start is a no-op; reject it rather than
-	// silently accept it.
+	// This field exists only to seed a faster-than-default cadence (to skip the
+	// slow ACP-226 warm-up); seeding slower than default has no benchmarking use,
+	// so reject it.
 	if max := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > max {
 		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, max)
 	}
