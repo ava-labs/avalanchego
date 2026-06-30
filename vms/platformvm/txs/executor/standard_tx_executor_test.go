@@ -2126,6 +2126,68 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 	}
 }
 
+func TestStandardExecutorPutStakerHeliconRewards(t *testing.T) {
+	var (
+		heliconTime = time.Unix(1_000_000, 0)
+		startTime   = heliconTime.Add(30 * 24 * time.Hour)
+		nodeID      = ids.GenerateTestNodeID()
+	)
+
+	chainState := statetest.New(t, statetest.Config{})
+	chainState.SetTimestamp(startTime)
+	onAcceptState, err := state.NewDiffOn(chainState, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	cfg := genesis.MainnetParams.StakingConfig.RewardConfig
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
+	weight := genesis.MainnetParams.StakingConfig.MinValidatorStake
+
+	supply, err := onAcceptState.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	wantConfig, err := GetRewardConfigForStakeStart(cfg, upgradeConfig, startTime)
+	require.NoError(t, err)
+	wantReward := reward.NewCalculator(wantConfig).Calculate(
+		defaultMinStakingDuration,
+		weight,
+		supply,
+	)
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	stakerTx := &txs.AddPermissionlessValidatorTx{
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			End:    uint64(startTime.Add(defaultMinStakingDuration).Unix()),
+			Wght:   weight,
+		},
+		Subnet: constants.PrimaryNetworkID,
+		Signer: pop,
+	}
+	executor := &standardTxExecutor{
+		backend: &Backend{
+			Config: &config.Internal{
+				RewardConfig:  cfg,
+				UpgradeConfig: upgradeConfig,
+			},
+			Rewards: reward.NewCalculator(cfg),
+		},
+		tx: &txs.Tx{
+			Unsigned: stakerTx,
+			TxID:     ids.GenerateTestID(),
+		},
+		state: onAcceptState,
+	}
+	require.NoError(t, executor.putStaker(stakerTx))
+
+	gotValidator, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantReward, gotValidator.PotentialReward)
+}
+
 func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	type test struct {
 		name            string
@@ -4549,6 +4611,68 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, wantUTXO, utxo)
 	}
+}
+
+func TestStandardExecutorAddAutoRenewedValidatorTxHeliconRewards(t *testing.T) {
+	var (
+		env           = newEnvironment(t, upgradetest.Latest)
+		wallet        = newWallet(t, env, walletConfig{})
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+		startTime     = env.config.UpgradeConfig.HeliconTime.Add(30 * 24 * time.Hour)
+		nodeID        = ids.GenerateTestNodeID()
+		period        = 2 * env.config.MinStakeDuration
+		weight        = 2 * env.config.MinValidatorStake
+	)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+	diff.SetTimestamp(startTime)
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	addAutoRenewedTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		nodeID,
+		weight,
+		pop,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		env.config.MinDelegationFee,
+		0,
+		period,
+	)
+	require.NoError(t, err)
+
+	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	wantRewardConfig, err := GetRewardConfigForStakeStart(
+		env.config.RewardConfig,
+		env.config.UpgradeConfig,
+		startTime,
+	)
+	require.NoError(t, err)
+	wantPotentialReward := reward.NewCalculator(wantRewardConfig).Calculate(
+		period,
+		weight,
+		currentSupply,
+	)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		addAutoRenewedTx,
+		diff,
+	)
+	require.NoError(t, err)
+
+	validator, err := diff.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantPotentialReward, validator.PotentialReward)
 }
 
 func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
