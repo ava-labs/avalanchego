@@ -18,7 +18,26 @@ tasks:
   default: '{{.NIX_RUN}} ./scripts/run_task.sh --list'
 
   build-test:
-    desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
+    desc: Run all Go tests with the default PR/local mode (no race, no shuffle)
+    env:
+      NO_RACE: TRUE
+      NO_SHUFFLE: TRUE
+    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
+  build-test-race-shuffle:
+    desc: Run all Go tests with race detection and shuffle enabled
+    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
+  build-test-race:
+    desc: Run all Go tests with race detection and shuffle disabled
+    env:
+      NO_SHUFFLE: TRUE
+    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
+
+  build-test-shuffle:
+    desc: Run all Go tests with race detection disabled and shuffle enabled
+    env:
+      NO_RACE: TRUE
     cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
 
   check-clean-branch:
