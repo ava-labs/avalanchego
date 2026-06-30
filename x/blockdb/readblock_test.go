@@ -5,6 +5,7 @@ package blockdb
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"math"
 	"sync"
@@ -21,8 +22,8 @@ func TestReadOperations(t *testing.T) {
 		name       string
 		readHeight uint64
 		noBlock    bool
-		config     *DatabaseConfig
-		setup      func(db *Database)
+		config     *Config
+		setup      func(db *Database) error
 		wantErr    error
 	}{
 		{
@@ -46,33 +47,87 @@ func TestReadOperations(t *testing.T) {
 		{
 			name:       "read valid block with non-zero minimum height",
 			readHeight: 25,
-			config: &DatabaseConfig{
+			config: &Config{
 				MinimumHeight:      20,
-				MaxDataFileSize:    DefaultMaxDataFileSize,
+				MaxDataFileSize:    defaultMaxDataFileSize,
 				CheckpointInterval: 1024,
-				MaxDataFiles:       DefaultMaxDataFileSize,
-				BlockCacheSize:     DefaultBlockCacheSize,
+				MaxDataFiles:       defaultMaxDataFiles,
+				BlockCacheSize:     defaultBlockCacheSize,
 			},
 		},
 		{
 			name:       "database closed",
 			readHeight: 1,
-			setup: func(db *Database) {
-				db.Close()
+			setup: func(db *Database) error {
+				return db.Close()
 			},
 			wantErr: database.ErrClosed,
 		},
 		{
 			name:       "height below minimum",
 			readHeight: 5,
-			config: &DatabaseConfig{
+			config: &Config{
 				MinimumHeight:      10,
-				MaxDataFileSize:    DefaultMaxDataFileSize,
+				MaxDataFileSize:    defaultMaxDataFileSize,
 				CheckpointInterval: 1024,
-				MaxDataFiles:       DefaultMaxDataFileSize,
-				BlockCacheSize:     DefaultBlockCacheSize,
+				MaxDataFiles:       defaultMaxDataFiles,
+				BlockCacheSize:     defaultBlockCacheSize,
 			},
 			wantErr: ErrInvalidBlockHeight,
+		},
+		{
+			name:       "corrupted index points to wrong block",
+			readHeight: 1,
+			setup: func(db *Database) error {
+				entry, err := db.readIndexEntry(0)
+				if err != nil {
+					return err
+				}
+				offset, err := db.indexEntryOffset(1)
+				if err != nil {
+					return err
+				}
+				return db.writeIndexEntryAt(offset, entry.Offset, entry.Size)
+			},
+			wantErr: ErrCorrupted,
+		},
+		{
+			name:       "index entry compressed size differs from block header",
+			readHeight: 0,
+			setup: func(db *Database) error {
+				entry, err := db.readIndexEntry(0)
+				if err != nil {
+					return err
+				}
+				offset, err := db.indexEntryOffset(0)
+				if err != nil {
+					return err
+				}
+				return db.writeIndexEntryAt(offset, entry.Offset, entry.Size+1)
+			},
+			wantErr: ErrCorrupted,
+		},
+		{
+			name:       "corrupted checksum in block header",
+			readHeight: 0,
+			setup: func(db *Database) error {
+				entry, err := db.readIndexEntry(0)
+				if err != nil {
+					return err
+				}
+				dataFile, localOffset, _, err := db.getDataFileAndOffset(entry.Offset)
+				if err != nil {
+					return err
+				}
+				// 12 is the byte offset of the Checksum field within the
+				// serialized blockEntryHeader (8B Height + 4B Size).
+				const checksumOffset = 12
+				var bad [8]byte
+				binary.LittleEndian.PutUint64(bad[:], 0xDEADBEEF)
+				_, err = dataFile.WriteAt(bad[:], int64(localOffset)+checksumOffset)
+				return err
+			},
+			wantErr: ErrCorrupted,
 		},
 		{
 			name:       "block is past max height",
@@ -113,7 +168,7 @@ func TestReadOperations(t *testing.T) {
 			}
 
 			if tt.setup != nil {
-				tt.setup(store)
+				require.NoError(t, tt.setup(store))
 			}
 
 			if tt.wantErr != nil {
@@ -157,21 +212,23 @@ func TestReadOperations_Concurrency(t *testing.T) {
 		require.NoError(t, store.Put(uint64(i), blocks[i]))
 	}
 
+	const goroutinesPerHeight = 3
 	var wg sync.WaitGroup
 	var errorCount atomic.Int32
 	var blockErrors atomic.Int32
 
 	for i := range numBlocks + 10 {
-		wg.Add(3) // One for each read operation
-
-		go func(height int) {
-			defer wg.Done()
-			block, err := store.Get(uint64(height))
-			if gapHeights[uint64(height)] || height >= numBlocks {
-				if err == nil || !errors.Is(err, database.ErrNotFound) {
-					errorCount.Add(1)
+		for range goroutinesPerHeight {
+			wg.Add(1)
+			go func(height int) {
+				defer wg.Done()
+				block, err := store.Get(uint64(height))
+				if gapHeights[uint64(height)] || height >= numBlocks {
+					if !errors.Is(err, database.ErrNotFound) {
+						errorCount.Add(1)
+					}
+					return
 				}
-			} else {
 				if err != nil {
 					errorCount.Add(1)
 					return
@@ -179,38 +236,8 @@ func TestReadOperations_Concurrency(t *testing.T) {
 				if !bytes.Equal(blocks[height], block) {
 					blockErrors.Add(1)
 				}
-			}
-		}(i)
-
-		go func(height int) {
-			defer wg.Done()
-			_, err := store.Get(uint64(height))
-			if gapHeights[uint64(height)] || height >= numBlocks {
-				if err == nil || !errors.Is(err, database.ErrNotFound) {
-					errorCount.Add(1)
-				}
-			} else {
-				if err != nil {
-					errorCount.Add(1)
-					return
-				}
-			}
-		}(i)
-
-		go func(height int) {
-			defer wg.Done()
-			_, err := store.Get(uint64(height))
-			if gapHeights[uint64(height)] || height >= numBlocks {
-				if err == nil || !errors.Is(err, database.ErrNotFound) {
-					errorCount.Add(1)
-				}
-			} else {
-				if err != nil {
-					errorCount.Add(1)
-					return
-				}
-			}
-		}(i)
+			}(i)
+		}
 	}
 	wg.Wait()
 
@@ -223,7 +250,7 @@ func TestHasBlock(t *testing.T) {
 	blocksCount := uint64(10)
 	gapHeight := minHeight + 5
 
-	testCases := []struct {
+	tests := []struct {
 		name     string
 		height   uint64
 		expected bool
@@ -231,44 +258,44 @@ func TestHasBlock(t *testing.T) {
 		dbClosed bool
 	}{
 		{
-			name:     "has_height",
+			name:     "has height",
 			height:   12,
 			expected: true,
 		},
 		{
-			name:     "below_minimum_height",
+			name:     "below minimum height",
 			height:   0,
 			expected: false,
 		},
 		{
-			name:     "above_max_height",
+			name:     "above max height",
 			height:   minHeight + blocksCount + 1,
 			expected: false,
 		},
 		{
-			name:     "at_max_height",
+			name:     "at max height",
 			height:   minHeight + blocksCount,
 			expected: true,
 		},
 		{
-			name:     "at_min_height",
+			name:     "at min height",
 			height:   minHeight,
 			expected: true,
 		},
 		{
-			name:     "no_block",
+			name:     "no block",
 			height:   gapHeight,
 			expected: false,
 		},
 		{
-			name:     "db_closed",
+			name:     "db closed",
 			dbClosed: true,
 			wantErr:  database.ErrClosed,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			store := newDatabase(t, DefaultConfig().WithMinimumHeight(minHeight))
 
 			for i := minHeight; i <= minHeight+blocksCount; i++ {
@@ -278,16 +305,16 @@ func TestHasBlock(t *testing.T) {
 				require.NoError(t, store.Put(i, randomBlock(t)))
 			}
 
-			if tc.dbClosed {
+			if tt.dbClosed {
 				require.NoError(t, store.Close())
 			}
 
-			has, err := store.Has(tc.height)
-			if tc.wantErr != nil {
-				require.ErrorIs(t, err, tc.wantErr)
+			has, err := store.Has(tt.height)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.expected, has)
+				require.Equal(t, tt.expected, has)
 			}
 		})
 	}

@@ -31,12 +31,10 @@ BlockDB uses a single index file and multiple data files. The index file maps bl
 │ Entry[0]        │  │  │   ├─────────────────┤
 │ - Offset ───────┼──┘  │   │     ...         │
 │ - Size          │     │   └─────────────────┘
-│ - Header Size   │     │
 ├─────────────────┤     │
 │ Entry[1]        │     │
 │ - Offset ───────┼─────┘
 │ - Size          │
-│ - Header Size   │
 ├─────────────────┤
 │     ...         │
 └─────────────────┘
@@ -66,7 +64,7 @@ Index Entry (16 bytes):
 │ Field                          │ Size    │
 ├────────────────────────────────┼─────────┤
 │ Data File Offset               │ 8 bytes │
-│ Block Data Size                │ 4 bytes │
+│ Size                           │ 4 bytes │
 │ Reserved                       │ 4 bytes │
 └────────────────────────────────┴─────────┘
 ```

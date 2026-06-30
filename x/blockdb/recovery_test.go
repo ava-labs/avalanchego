@@ -71,8 +71,8 @@ func TestRecovery_Success(t *testing.T) {
 				firstBlockOffset := uint64(sizeOfBlockEntryHeader) + uint64(firstBlockCompressedSize)
 
 				header := indexFileHeader{
-					Version:         IndexFileVersion,
-					MaxDataFileSize: 4 * 10 * 1024, // 10KB per file
+					Version:         indexFileVersion,
+					MaxDataFileSize: 10 * 1024, // 10KB per file
 					MinHeight:       0,
 					MaxHeight:       0,
 					NextWriteOffset: firstBlockOffset,
@@ -330,7 +330,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1 + 1, // make block larger than actual compressed size
-					Version:  BlockEntryVersion,
+					Version:  blockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -357,7 +357,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: 0xDEADBEEF, // Wrong checksum
 					Size:     compressedSize1,
-					Version:  BlockEntryVersion,
+					Version:  blockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -407,7 +407,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   5, // Invalid height because its below the minimum height of 10
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1,
-					Version:  BlockEntryVersion,
+					Version:  blockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -471,7 +471,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1,
-					Version:  BlockEntryVersion + 1, // Invalid version
+					Version:  blockEntryVersion + 1, // Invalid version
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -499,7 +499,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1,
-					Version:  BlockEntryVersion + 10, // version cannot be greater than current
+					Version:  blockEntryVersion + 10, // version cannot be greater than current
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -556,8 +556,8 @@ func resetIndexToBlock(store *Database, blockSize uint64, minHeight uint64) erro
 	defer indexFile.Close()
 
 	header := indexFileHeader{
-		Version:         IndexFileVersion,
-		MaxDataFileSize: DefaultMaxDataFileSize,
+		Version:         indexFileVersion,
+		MaxDataFileSize: defaultMaxDataFileSize,
 		MinHeight:       minHeight,
 		MaxHeight:       minHeight,
 		NextWriteOffset: uint64(sizeOfBlockEntryHeader) + blockSize,
