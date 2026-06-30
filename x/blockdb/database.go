@@ -288,16 +288,16 @@ func (s *Database) Close() error {
 	}
 	s.closed = true
 
-	var err error
-	if pErr := s.persistIndexHeader(); pErr != nil {
-		s.log.Error("Failed to persist index header", zap.Error(pErr))
-		err = pErr
+	err := s.persistIndexHeader()
+	if err != nil {
+		s.log.Error("Failed to persist index header", zap.Error(err))
 	}
 
 	s.closeFiles()
 
 	if rErr := s.locks.Release(); rErr != nil {
 		s.log.Error("Failed to release directory lock", zap.Error(rErr))
+		err = errors.Join(err, rErr)
 	}
 
 	s.log.Info("Block database closed successfully")

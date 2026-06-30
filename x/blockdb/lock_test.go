@@ -22,72 +22,98 @@ func tryOpenAt(t *testing.T, indexDir, dataDir string) (database.HeightIndex, er
 		WithIndexDir(indexDir).
 		WithDataDir(dataDir).
 		WithBlockCacheSize(0)
-	return New(config, logging.NoLog{})
-}
-
-// mustOpenAt opens a database with the given directories and registers a
-// cleanup that closes it. Use when the open is expected to succeed and the
-// database must be closed before the test ends.
-func mustOpenAt(t *testing.T, indexDir, dataDir string) database.HeightIndex {
-	t.Helper()
-
-	db, err := tryOpenAt(t, indexDir, dataDir)
-	require.NoError(t, err)
+	db, err := New(config, logging.NoLog{})
+	if err != nil {
+		return db, err
+	}
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())
 	})
-	return db
+	return db, nil
 }
 
-func TestLock_RejectsOverlappingOpen(t *testing.T) {
-	assertSecondOpenIsLocked := func(t *testing.T, idx1, data1, idx2, data2 string) {
-		t.Helper()
-		_ = mustOpenAt(t, idx1, data1)
-		db, err := tryOpenAt(t, idx2, data2)
-		require.Nil(t, db)
-		require.ErrorIs(t, err, errDatabaseInUse)
+func TestLock_DirectoryOverlap(t *testing.T) {
+	type dbDirs struct {
+		index string
+		data  string
 	}
 
-	t.Run("same directory", func(t *testing.T) {
-		d := t.TempDir()
-		assertSecondOpenIsLocked(t, d, d, d, d)
-	})
+	tests := []struct {
+		name    string
+		first   dbDirs
+		second  dbDirs
+		wantErr error
+	}{
+		{
+			name:    "same",
+			first:   dbDirs{index: "same", data: "same"},
+			second:  dbDirs{index: "same", data: "same"},
+			wantErr: errDatabaseInUse,
+		},
+		{
+			name:    "same_index",
+			first:   dbDirs{index: "index", data: "data1"},
+			second:  dbDirs{index: "index", data: "data2"},
+			wantErr: errDatabaseInUse,
+		},
+		{
+			name:    "same_data",
+			first:   dbDirs{index: "index1", data: "data"},
+			second:  dbDirs{index: "index2", data: "data"},
+			wantErr: errDatabaseInUse,
+		},
+		{
+			name:    "same_split_dirs",
+			first:   dbDirs{index: "index", data: "data"},
+			second:  dbDirs{index: "index", data: "data"},
+			wantErr: errDatabaseInUse,
+		},
+		{
+			name:   "different_single_dirs",
+			first:  dbDirs{index: "db1", data: "db1"},
+			second: dbDirs{index: "db2", data: "db2"},
+		},
+		{
+			name:   "different_split_dirs",
+			first:  dbDirs{index: "index1", data: "data1"},
+			second: dbDirs{index: "index2", data: "data2"},
+		},
+	}
 
-	t.Run("shared index dir, different data dirs", func(t *testing.T) {
-		idx := t.TempDir()
-		assertSecondOpenIsLocked(t, idx, t.TempDir(), idx, t.TempDir())
-	})
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			index1 := filepath.Join(dir, test.first.index)
+			data1 := filepath.Join(dir, test.first.data)
+			_, err := tryOpenAt(t, index1, data1)
+			require.NoError(t, err)
 
-	t.Run("shared data dir, different index dirs", func(t *testing.T) {
-		data := t.TempDir()
-		assertSecondOpenIsLocked(t, t.TempDir(), data, t.TempDir(), data)
-	})
-
-	t.Run("same split dirs", func(t *testing.T) {
-		idx, data := t.TempDir(), t.TempDir()
-		assertSecondOpenIsLocked(t, idx, data, idx, data)
-	})
-}
-
-func TestLock_NonOverlappingDirsBothOpen(t *testing.T) {
-	rootA, rootB := t.TempDir(), t.TempDir()
-
-	db1 := mustOpenAt(t, rootA, rootA)
-	db2 := mustOpenAt(t, rootB, rootB)
-	require.NotNil(t, db1)
-	require.NotNil(t, db2)
+			index2 := filepath.Join(dir, test.second.index)
+			data2 := filepath.Join(dir, test.second.data)
+			db2, err := tryOpenAt(t, index2, data2)
+			if test.wantErr != nil {
+				require.Nil(t, db2)
+				require.ErrorIs(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestLock_AllowsReopenAfterClose(t *testing.T) {
 	dir := t.TempDir()
 
-	db1, err := tryOpenAt(t, dir, dir)
+	config := DefaultConfig().
+		WithIndexDir(dir).
+		WithDataDir(dir).
+		WithBlockCacheSize(0)
+	db1, err := New(config, logging.NoLog{})
 	require.NoError(t, err)
 	require.NoError(t, db1.Close())
 
-	db2, err := tryOpenAt(t, dir, dir)
+	_, err = tryOpenAt(t, dir, dir)
 	require.NoError(t, err)
-	require.NoError(t, db2.Close())
 }
 
 func TestLock_AllowsOpenAfterError(t *testing.T) {
@@ -105,7 +131,6 @@ func TestLock_AllowsOpenAfterError(t *testing.T) {
 
 	require.NoError(t, os.Remove(indexPath))
 
-	db2, err := tryOpenAt(t, dir, dir)
+	_, err = tryOpenAt(t, dir, dir)
 	require.NoError(t, err)
-	require.NoError(t, db2.Close())
 }

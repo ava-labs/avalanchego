@@ -24,7 +24,7 @@ type dbLocks struct {
 
 // acquireDBLocks creates indexDir and dataDir if needed and acquires exclusive
 // file locks in each. Returns errDatabaseInUse if another process holds a lock.
-func acquireDBLocks(indexDir, dataDir string) (*dbLocks, error) {
+func acquireDBLocks(indexDir, dataDir string) (_ *dbLocks, retErr error) {
 	idx := filepath.Clean(indexDir)
 	data := filepath.Clean(dataDir)
 
@@ -36,14 +36,17 @@ func acquireDBLocks(indexDir, dataDir string) (*dbLocks, error) {
 	}
 
 	l := &dbLocks{locks: make([]heldLock, 0, len(paths))}
+	defer func() {
+		if retErr != nil {
+			_ = l.Release()
+		}
+	}()
 	for _, dir := range paths {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			_ = l.Release()
 			return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 		held, err := tryLockDir(dir)
 		if err != nil {
-			_ = l.Release()
 			return nil, err
 		}
 		l.locks = append(l.locks, held)
@@ -74,9 +77,6 @@ func tryLockDir(dir string) (heldLock, error) {
 // process can create a new LOCK file at the same path and lock it. Both
 // processes would then hold the database lock.
 func (l *dbLocks) Release() error {
-	if l == nil {
-		return nil
-	}
 	var errs []error
 	for _, h := range l.locks {
 		if err := syscall.Flock(int(h.file.Fd()), syscall.LOCK_UN); err != nil {
