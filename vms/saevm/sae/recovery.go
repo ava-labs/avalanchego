@@ -65,7 +65,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 		return nil, fmt.Errorf("%w: no height for finalized block", errIncompleteRecoveryState)
 	}
 
-	// Search for first settled post-execution state
+	// Search for highest settled post-execution state
 	for height := *lastSettledHeight; ; height-- {
 		ethB, err := canonicalBlock(rec.db, height)
 		if err != nil {
