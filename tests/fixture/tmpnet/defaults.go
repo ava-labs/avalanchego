@@ -43,10 +43,11 @@ func DefaultTmpnetFlags() FlagsMap {
 		config.HealthCheckFreqKey:               "2s",
 		config.AdminAPIEnabledKey:               "true",
 		config.IndexEnabledKey:                  "true",
-		// Disable disk checks by default since temporary networks often run in
-		// resource-constrained environments that commonly have low disk space.
+		// Disable disk and memory checks by default since temporary networks often run in
+		// resource-constrained environments that commonly have low disk space and memory.
 		config.SystemTrackerRequiredAvailableDiskSpacePercentageKey: "0",
 		config.SystemTrackerWarningAvailableDiskSpacePercentageKey:  "0",
+		config.SystemTrackerWarningAvailableMemoryPercentageKey:     "0",
 	}
 }
 

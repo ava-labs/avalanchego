@@ -67,6 +67,34 @@ func (mr *UserMockRecorder) AvailableDiskPercentage() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AvailableDiskPercentage", reflect.TypeOf((*User)(nil).AvailableDiskPercentage))
 }
 
+// AvailableMemoryBytes mocks base method.
+func (m *User) AvailableMemoryBytes() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AvailableMemoryBytes")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// AvailableMemoryBytes indicates an expected call of AvailableMemoryBytes.
+func (mr *UserMockRecorder) AvailableMemoryBytes() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AvailableMemoryBytes", reflect.TypeOf((*User)(nil).AvailableMemoryBytes))
+}
+
+// AvailableMemoryPercentage mocks base method.
+func (m *User) AvailableMemoryPercentage() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AvailableMemoryPercentage")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// AvailableMemoryPercentage indicates an expected call of AvailableMemoryPercentage.
+func (mr *UserMockRecorder) AvailableMemoryPercentage() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AvailableMemoryPercentage", reflect.TypeOf((*User)(nil).AvailableMemoryPercentage))
+}
+
 // CPUUsage mocks base method.
 func (m *User) CPUUsage() float64 {
 	m.ctrl.T.Helper()
