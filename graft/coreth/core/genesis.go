@@ -40,7 +40,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
@@ -342,6 +344,19 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 
 			headerExtra.MinDelayExcess = new(acp226.DelayExcess)
 			*headerExtra.MinDelayExcess = acp226.InitialDelayExcess
+		}
+		// Helicon: set the ACP-176 and ACP-283 exponents along with the
+		// SAE settlement markers.
+		if confExtra.IsHelicon(g.Timestamp) {
+			headerExtra.TargetExponent = utils.PointerTo(dynamic.InitialTargetExponent)
+			headerExtra.MinPriceExponent = utils.PointerTo(dynamic.InitialPriceExponent)
+
+			// The genesis block is synchronous and thus self-settling, so its settlement
+			// markers are never read.
+			headerExtra.SettledHeight = new(uint64)
+			headerExtra.SettledGasUnix = new(uint64)
+			headerExtra.SettledGasNumerator = new(uint64)
+			headerExtra.SettledExcess = new(uint64)
 		}
 	}
 

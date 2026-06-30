@@ -60,12 +60,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethparams "github.com/ava-labs/libevm/params"
 	ethrpc "github.com/ava-labs/libevm/rpc"
 )
@@ -181,6 +183,12 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.PriceTarget = &p
+	})
+}
+
+func withGasTarget(g gas.Gas) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.GasTarget = &g
 	})
 }
 
@@ -1112,41 +1120,53 @@ func TestParseBlock(t *testing.T) {
 	}
 }
 
-// TestVerifyBlockRejectsMismatchedTime verifies that the VM rejects a block
-// whose Header.Time disagrees with TimeMilliseconds.
-func TestVerifyBlockRejectsMismatchedTime(t *testing.T) {
-	key := txtest.NewKey(t)
-	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+// TestVerifyBlockRejectsTamperedHeader verifies that the VM rejects a block
+// whose header extra has been tampered with after it was built.
+func TestVerifyBlockRejectsTamperedHeader(t *testing.T) {
+	tests := []struct {
+		name   string
+		tamper func(t *testing.T, e *customtypes.HeaderExtra)
+	}{
+		{
+			name: "mismatched_time",
+			// Bump TimeMilliseconds without touching Header.Time so they disagree.
+			tamper: func(t *testing.T, e *customtypes.HeaderExtra) {
+				require.NotNil(t, e.TimeMilliseconds, "valid block TimeMilliseconds")
+				mismatched := *e.TimeMilliseconds + 1000
+				e.TimeMilliseconds = &mismatched
+			},
+		},
+		{
+			name: "cheated_min_price_exponent",
+			tamper: func(_ *testing.T, e *customtypes.HeaderExtra) {
+				cheated := dynamic.PriceExponent(math.MaxUint64)
+				e.MinPriceExponent = &cheated
+			},
+		},
+		{
+			name: "cheated_target_exponent",
+			tamper: func(_ *testing.T, e *customtypes.HeaderExtra) {
+				cheated := dynamic.TargetExponent(math.MaxUint64)
+				e.TargetExponent = &cheated
+			},
+		},
+	}
 
-	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
-	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
 
-	// Bump TimeMilliseconds without touching Header.Time so they disagree.
-	err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
-		require.NotNil(t, e.TimeMilliseconds, "valid block TimeMilliseconds")
-		mismatched := *e.TimeMilliseconds + 1000
-		e.TimeMilliseconds = &mismatched
-	})
-	require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
-}
+			stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+			require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+			valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-// TestVerifyBlockRejectsCheatedMinPriceExponent verifies that the VM rejects a
-// block claiming a MinPriceExponent beyond the per-block step.
-func TestVerifyBlockRejectsCheatedMinPriceExponent(t *testing.T) {
-	key := txtest.NewKey(t)
-	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
-
-	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
-	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-	valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-
-	// Claim an exponent beyond what one block may move it.
-	err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
-		cheated := dynamic.PriceExponent(math.MaxUint64)
-		e.MinPriceExponent = &cheated
-	})
-	require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
+			err := sut.verifyTampered(ctx, t, valid, func(e *customtypes.HeaderExtra) {
+				tt.tamper(t, e)
+			})
+			require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
+		})
+	}
 }
 
 // During bootstrapping [VM.VerifyBlock] does not rebuild blocks, so it
@@ -1284,6 +1304,61 @@ func TestDynamicPriceExponent(t *testing.T) {
 	}
 }
 
+// TestDynamicTargetExponent verifies that each built block's TargetExponent
+// advances toward the node's ACP-176 vote, clamped to the per-block step, and
+// stays at the initial value when there is no vote.
+func TestDynamicTargetExponent(t *testing.T) {
+	const maxDiff = 1 << 15
+	tests := []struct {
+		name    string
+		desired *gas.Gas
+		want    []dynamic.TargetExponent
+	}{
+		{
+			name: "unset",
+			want: []dynamic.TargetExponent{
+				dynamic.InitialTargetExponent,
+			},
+		},
+		{
+			name:    "max_diff",
+			desired: utils.PointerTo[gas.Gas](15_000_000),
+			want: []dynamic.TargetExponent{
+				maxDiff,
+				2 * maxDiff,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			opts := []sutOption{
+				withMaxAllocFor(key.EthAddress()),
+			}
+			if test.desired != nil {
+				opts = append(opts, withGasTarget(*test.desired))
+			}
+			ctx, sut := newSUT(t, opts...)
+			w := newWallet(key, sut.ctx, sut.Client)
+
+			parentExponent := dynamic.InitialTargetExponent
+			for _, wantExponent := range test.want {
+				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				header := blk.Header()
+
+				he := customtypes.GetHeaderExtra(header)
+				require.NotNilf(t, he.TargetExponent, "block %d %T.TargetExponent", header.Number, he)
+				assert.Equalf(t, wantExponent, *he.TargetExponent, "block %d %T.TargetExponent", header.Number, he)
+
+				wantGasLimit := uint64(parentExponent.Target()) * gastime.TargetToRate * saeparams.TauSeconds * saeparams.Lambda
+				assert.Equalf(t, wantGasLimit, header.GasLimit, "block %d %T.GasLimit", header.Number, header)
+
+				parentExponent = wantExponent
+			}
+		})
+	}
+}
+
 // TestGasRefundsDisabled asserts that EVM gas refunds are disabled.
 func TestGasRefundsDisabled(t *testing.T) {
 	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
@@ -1325,4 +1400,36 @@ func TestGasRefundsDisabled(t *testing.T) {
 
 	const gasIfRefunded = wantGasUsed - ethparams.SstoreClearsScheduleRefundEIP3529
 	assert.Equalf(t, wantGasUsed, receipt.GasUsed, "gas charged (would be %d if refunds were enabled)", gasIfRefunded)
+}
+
+// TestEmptyBlocksDisallowed asserts that empty blocks are not allowed.
+func TestEmptyBlocksDisallowed(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+
+	t.Run("build", func(t *testing.T) {
+		_, err := sut.BuildBlock(ctx, nil)
+		require.ErrorIsf(t, err, errEmptyBlock, "%T.BuildBlock() should not produce empty blocks", sut)
+	})
+	t.Run("verify", func(t *testing.T) {
+		stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+		valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+
+		// In addition to removing the block's extData, we need to update the
+		// header's ExtDataHash to allow parsing.
+		hdr := valid.Header()
+		customtypes.GetHeaderExtra(hdr).ExtDataHash = customtypes.EmptyExtDataHash
+
+		emptied := valid.EthBlock().WithSeal(hdr)
+		customtypes.SetBlockExtra(emptied, new(customtypes.BlockBodyExtra))
+
+		buf, err := rlp.EncodeToBytes(emptied)
+		require.NoErrorf(t, err, "rlp.EncodeToBytes(emptied block)")
+		parsed, err := sut.ParseBlock(ctx, buf)
+		require.NoErrorf(t, err, "%T.ParseBlock(emptied block)", sut.VM)
+
+		err = sut.VerifyBlock(ctx, nil, parsed)
+		require.ErrorIsf(t, err, errEmptyBlock, "%T.VerifyBlock() should not allow empty blocks", sut.VM)
+	})
 }

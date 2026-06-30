@@ -51,7 +51,7 @@ type TestVMSuite struct {
 // issuer channel, database, atomic memory, app sender, and context.
 // Expects the passed VM to be a uninitialized VM.
 func SetupTestVM(t *testing.T, vm commoneng.VM, config TestVMConfig) *TestVMSuite {
-	fork := upgradetest.Latest
+	fork := upgradetest.Granite
 	if config.Fork != nil {
 		fork = *config.Fork
 	}

@@ -27,7 +27,7 @@ tasks:
 
   bazel-build-race:
     desc: Build avalanchego with Bazel (race detection)
-    cmd: '{{.NIX_RUN}} bazelisk build --config=race //main:avalanchego'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build --config=race //main:avalanchego'
 
   bazel-build-opt:
     desc: Build avalanchego with Bazel (optimized)
@@ -73,6 +73,10 @@ tasks:
     desc: Update use_repo() in MODULE.bazel from go.mod
     cmd: '{{.NIX_RUN}} bazelisk mod tidy'
 
+  bazel-cache-ci-build-dependencies:
+    desc: Cache the build dependencies expected by the Bazel CI jobs
+    cmd: '{{.NIX_RUN}} ./scripts/cache_bazel_ci_build_dependencies.sh'
+
   bazel-sync-module-metadata:
     desc: Refresh Bazel module metadata files (MODULE.bazel and MODULE.bazel.lock)
     cmds:
@@ -85,7 +89,7 @@ tasks:
 
   bazel-test-coreth:
     desc: Run coreth/evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} bazelisk test //graft/coreth/... //graft/evm/...'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/coreth/... //graft/evm/...'
 
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary
@@ -111,11 +115,11 @@ tasks:
 
   bazel-test-main:
     desc: Run main module unit tests with Bazel (excludes graft modules)
-    cmd: '{{.NIX_RUN}} bazelisk test //... -- -//graft/...'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //... -- -//graft/...'
 
   bazel-test-subnet-evm:
     desc: Run subnet-evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} bazelisk test //graft/subnet-evm/...'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/subnet-evm/...'
 
   build:
     desc: Builds avalanchego
@@ -376,6 +380,7 @@ tasks:
       - task: lint-saevm
       - task: lint-action
       - task: lint-shell
+      - task: test-run-task-launcher
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
@@ -535,6 +540,10 @@ tasks:
     desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.
     cmds:
       - cmd: '{{.NIX_RUN}} ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh'
+
+  test-run-task-launcher:
+    desc: Tests the run_task launcher behavior
+    cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'
 
   test-unit:
     desc: Runs unit tests
