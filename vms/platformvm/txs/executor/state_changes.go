@@ -6,9 +6,11 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -22,6 +24,13 @@ var (
 	ErrChildBlockEarlierThanParent     = errors.New("proposed timestamp before current chain time")
 	ErrChildBlockAfterStakerChangeTime = errors.New("proposed timestamp later than next staker change time")
 	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
+)
+
+const (
+	// ACP-285 lowers MinConsumptionRate by 2.5 percentage points (10% to 7.5%).
+	heliconMinConsumptionRateReduction uint64 = 25_000
+	// ACP-285 applies the MinConsumptionRate reduction linearly over this duration.
+	heliconMinConsumptionRateReductionPeriod = 90 * 24 * time.Hour
 )
 
 // VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time.
@@ -172,7 +181,7 @@ func advanceTimeTo(
 				return nil, false, err
 			}
 
-			rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
+			rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID, stakerToRemove.StartTime)
 			if err != nil {
 				return nil, false, err
 			}
@@ -386,20 +395,69 @@ func GetRewardsCalculator(
 	backend *Backend,
 	parentState state.Chain,
 	subnetID ids.ID,
+	stakeStartTime time.Time,
 ) (reward.Calculator, error) {
-	if subnetID == constants.PrimaryNetworkID {
-		return backend.Rewards, nil
+	if subnetID != constants.PrimaryNetworkID {
+		transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
+		if err != nil {
+			return nil, err
+		}
+
+		return reward.NewCalculator(reward.Config{
+			MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
+			MinConsumptionRate: transformSubnet.MinConsumptionRate,
+			MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
+			SupplyCap:          transformSubnet.MaximumSupply,
+		}), nil
 	}
 
-	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
+	cfg, err := GetRewardConfigForStakeStart(backend.Config.RewardConfig, backend.Config.UpgradeConfig, stakeStartTime)
 	if err != nil {
 		return nil, err
 	}
+	if cfg == backend.Config.RewardConfig {
+		// No reduction applies, so reuse the preconfigured calculator rather
+		// than rebuilding it.
+		return backend.Rewards, nil
+	}
+	return reward.NewCalculator(cfg), nil
+}
 
-	return reward.NewCalculator(reward.Config{
-		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
-		MinConsumptionRate: transformSubnet.MinConsumptionRate,
-		MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
-		SupplyCap:          transformSubnet.MaximumSupply,
-	}), nil
+// GetRewardConfigForStakeStart returns rewardConfig with the ACP-285 linear
+// MinConsumptionRate reduction sampled once per staking period at
+// stakeStartTime. The sampled rate applies for that full period, so renewals
+// that start later in the ramp can receive lower rates. Before Helicon,
+// rewardConfig is returned unchanged.
+func GetRewardConfigForStakeStart(
+	rewardConfig reward.Config,
+	upgradeConfig upgrade.Config,
+	stakeStartTime time.Time,
+) (reward.Config, error) {
+	if !upgradeConfig.IsHeliconActivated(stakeStartTime) {
+		return rewardConfig, nil
+	}
+
+	elapsed := stakeStartTime.Sub(upgradeConfig.HeliconTime)
+	reduction := uint64(0)
+	switch {
+	case elapsed <= 0:
+	case elapsed >= heliconMinConsumptionRateReductionPeriod:
+		reduction = heliconMinConsumptionRateReduction
+	default:
+		rampedReduction := new(big.Int).SetUint64(heliconMinConsumptionRateReduction)
+		rampedReduction.Mul(rampedReduction, big.NewInt(int64(elapsed)))
+		rampedReduction.Div(rampedReduction, big.NewInt(int64(heliconMinConsumptionRateReductionPeriod)))
+		reduction = rampedReduction.Uint64()
+	}
+	minRate, err := math.Sub(rewardConfig.MinConsumptionRate, reduction)
+	if err != nil {
+		return reward.Config{}, fmt.Errorf(
+			"min consumption rate reduction (%d) exceeds configured min consumption rate (%d): %w",
+			reduction,
+			rewardConfig.MinConsumptionRate,
+			err,
+		)
+	}
+	rewardConfig.MinConsumptionRate = minRate
+	return rewardConfig, nil
 }

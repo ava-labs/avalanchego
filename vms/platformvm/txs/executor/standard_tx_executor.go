@@ -1377,13 +1377,14 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 	}
 
 	weight := tx.Weight()
+	startTime := e.state.GetTimestamp()
 
 	currentSupply, err := e.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("getting current supply: %w", err)
 	}
 
-	rewards, err := GetRewardsCalculator(e.backend, e.state, constants.PrimaryNetworkID)
+	rewards, err := GetRewardsCalculator(e.backend, e.state, constants.PrimaryNetworkID, startTime)
 	if err != nil {
 		return fmt.Errorf("getting rewards calculator: %w", err)
 	}
@@ -1401,7 +1402,6 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 	}
 	e.state.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 
-	startTime := e.state.GetTimestamp()
 	endTime := startTime.Add(duration)
 
 	staker, err := state.NewStaker(
@@ -1502,7 +1502,7 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 				return err
 			}
 
-			rewards, err := GetRewardsCalculator(e.backend, e.state, subnetID)
+			rewards, err := GetRewardsCalculator(e.backend, e.state, subnetID, chainTime)
 			if err != nil {
 				return err
 			}
