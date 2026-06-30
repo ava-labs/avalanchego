@@ -6,16 +6,35 @@ package transitionvm
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
 
-	vm.consensusState = state
+	vm.consensusState.Set(state)
 	return vm.current.chain.SetState(ctx, state)
+}
+
+func (vm *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
+
+	vm.setPreference.Set(true)
+	return vm.current.chain.SetPreference(ctx, blkID)
+}
+
+func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, blockCtx *smblock.Context) error {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
+
+	vm.setPreference.Set(true)
+	return vm.current.chain.SetPreferenceWithContext(ctx, blkID, blockCtx)
 }
 
 func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {

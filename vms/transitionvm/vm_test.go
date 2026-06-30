@@ -29,6 +29,147 @@ import (
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+// SUT is an initialized transition VM whose pre- and post-transition fakeVMs
+// share one [fakeState].
+type SUT struct {
+	*VM
+	pre  *fakeVM
+	post *fakeVM
+}
+
+// BuildVerifyAccept builds, verifies, and accepts a block. Accepting one at the
+// transition time triggers the transition.
+func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode verifyMode) {
+	t.Helper()
+
+	blk, err := s.BuildBlock(ctx)
+	require.NoErrorf(t, err, "%T.BuildBlock()", s)
+	require.NoErrorf(t, verifyBlock(ctx, blk, mode), "verifyBlock(%T, %s)", s, mode)
+	require.NoErrorf(t, blk.Accept(ctx), "%T.Accept()", blk)
+}
+
+// verifyMode selects whether a block is verified with a [smblock.Context].
+type verifyMode int
+
+const (
+	verifyNoContext verifyMode = iota
+	verifyWithContext
+)
+
+var verifyModes = []verifyMode{verifyNoContext, verifyWithContext}
+
+func (m verifyMode) String() string {
+	switch m {
+	case verifyNoContext:
+		return "Verify"
+	case verifyWithContext:
+		return "VerifyWithContext"
+	default:
+		return "Unknown"
+	}
+}
+
+// verifyBlock verifies blk according to mode.
+func verifyBlock(ctx context.Context, blk snowman.Block, mode verifyMode) error {
+	if mode == verifyNoContext {
+		return blk.Verify(ctx)
+	}
+	bwc := blk.(smblock.WithVerifyContext)
+	return bwc.VerifyWithContext(ctx, nil)
+}
+
+type sutConfig struct {
+	db             database.Database
+	state          *fakeState
+	transitionTime time.Time
+}
+
+// A sutOption overrides a default used by [newSUT].
+type sutOption = options.Option[sutConfig]
+
+// withBlocksUntilTransition sets how many blocks after genesis reach the
+// transition time; accepting the nth triggers it.
+func withBlocksUntilTransition(n int) sutOption {
+	return withTransitionTime(snowmantest.GenesisTimestamp.Add(time.Duration(n) * blockInterval))
+}
+
+// withDatabase sets the database the VM is initialized with.
+func withDatabase(db database.Database) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.db = db
+	})
+}
+
+// withState sets the chain state shared by the fakeVMs.
+func withState(state *fakeState) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.state = state
+	})
+}
+
+// withTransitionTime sets the time at which the VM transitions.
+func withTransitionTime(transitionTime time.Time) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.transitionTime = transitionTime
+	})
+}
+
+func newSUT(t *testing.T, opts ...sutOption) *SUT {
+	t.Helper()
+
+	cfg := options.ApplyTo(&sutConfig{
+		db:             memdb.New(),
+		state:          newFakeState(),
+		transitionTime: snowmantest.GenesisTimestamp.Add(blockInterval),
+	}, opts...)
+
+	pre := newFakeVM(t, "pre", cfg.state)
+	post := newFakeVM(t, "post", cfg.state)
+	factory := &Factory{
+		PreFactory:     fakeFactory{vm: pre},
+		PostFactory:    fakeFactory{vm: post},
+		TransitionTime: cfg.transitionTime,
+		DrainTimeout:   100 * time.Millisecond,
+	}
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	intf, err := factory.New(ctx.Log)
+	require.NoErrorf(t, err, "%T.New()", factory)
+	vm := intf.(*VM)
+
+	appSender := &enginetest.Sender{
+		T: t,
+		SendAppRequestF: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
+			return nil
+		},
+	}
+	require.NoErrorf(t, vm.Initialize(
+		t.Context(),
+		ctx,
+		cfg.db,
+		nil, // genesisBytes
+		nil, // upgradeBytes
+		nil, // configBytes
+		nil, // fxs
+		appSender,
+	), "%T.Initialize()", vm)
+	return &SUT{
+		VM:   vm,
+		pre:  pre,
+		post: post,
+	}
+}
+
+// restart rebuilds the VM against the same database and chain state, modeling a
+// node restart.
+func (s *SUT) restart(t *testing.T) *SUT {
+	t.Helper()
+	return newSUT(t,
+		withDatabase(s.db),
+		withState(s.pre.state),
+		withTransitionTime(s.transitionTime),
+	)
+}
+
 var (
 	_ Chain                     = (*fakeVM)(nil)
 	_ snowman.Block             = (*fakeBlock)(nil)
@@ -92,7 +233,7 @@ func (b *fakeBlock) Accept(ctx context.Context) error {
 	return nil
 }
 
-// fakeVM is a minimal in-memory [Chain] backed by a shared fakeState.
+// fakeVM is a minimal in-memory [Chain] backed by a shared [fakeState].
 type fakeVM struct {
 	*blocktest.VM
 	*blocktest.SetPreferenceVM
@@ -171,7 +312,7 @@ func (vm *fakeVM) CreateHandlers(context.Context) (map[string]http.Handler, erro
 	return vm.handlers, nil
 }
 
-// WaitForEvent returns the next events message, or blocks until canceled.
+// WaitForEvent returns the next event's message, or blocks until canceled.
 func (vm *fakeVM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	select {
 	case msg := <-vm.events:
@@ -229,143 +370,6 @@ func (*fakeVM) BuildBlockWithContext(context.Context, *smblock.Context) (snowman
 	return nil, errors.New("unexpectedly called BuildBlockWithContext")
 }
 
-// SUT is an initialized transition VM whose pre- and post-transition fakeVMs
-// share one fakeState.
-type SUT struct {
-	*VM
-	pre  *fakeVM
-	post *fakeVM
-}
-
-// BuildVerifyAccept builds, verifies, and accepts a block. Accepting one at the
-// transition time triggers the transition.
-func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode verifyMode) {
-	t.Helper()
-
-	blk, err := s.BuildBlock(ctx)
-	require.NoError(t, err)
-	require.NoError(t, verifyBlock(ctx, blk, mode))
-	require.NoError(t, blk.Accept(ctx))
-}
-
-// verifyMode selects whether a block is verified with a [smblock.Context].
-type verifyMode int
-
-const (
-	verifyNoContext verifyMode = iota
-	verifyWithContext
-)
-
-var verifyModes = []verifyMode{verifyNoContext, verifyWithContext}
-
-func (m verifyMode) String() string {
-	if m == verifyWithContext {
-		return "VerifyWithContext"
-	}
-	return "Verify"
-}
-
-// verifyBlock verifies blk according to mode.
-func verifyBlock(ctx context.Context, blk snowman.Block, mode verifyMode) error {
-	if mode == verifyNoContext {
-		return blk.Verify(ctx)
-	}
-	bwc := blk.(smblock.WithVerifyContext)
-	return bwc.VerifyWithContext(ctx, nil)
-}
-
-type sutConfig struct {
-	db             database.Database
-	state          *fakeState
-	transitionTime time.Time
-}
-
-// A sutOption overrides a default used by [newSUT].
-type sutOption = options.Option[sutConfig]
-
-// withBlocksUntilTransition sets how many blocks after genesis reach the
-// transition time; accepting the nth triggers it.
-func withBlocksUntilTransition(n int) sutOption {
-	return withTransitionTime(snowmantest.GenesisTimestamp.Add(time.Duration(n) * blockInterval))
-}
-
-// withDatabase sets the database the VM is initialized with.
-func withDatabase(db database.Database) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.db = db
-	})
-}
-
-// withState sets the chain state shared by the fakeVMs.
-func withState(state *fakeState) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.state = state
-	})
-}
-
-// withTransitionTime sets the time at which the VM transitions.
-func withTransitionTime(transitionTime time.Time) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.transitionTime = transitionTime
-	})
-}
-
-func newSUT(t *testing.T, opts ...sutOption) *SUT {
-	t.Helper()
-
-	cfg := options.ApplyTo(&sutConfig{
-		db:             memdb.New(),
-		state:          newFakeState(),
-		transitionTime: snowmantest.GenesisTimestamp.Add(blockInterval),
-	}, opts...)
-
-	pre := newFakeVM(t, "pre", cfg.state)
-	post := newFakeVM(t, "post", cfg.state)
-	factory := &Factory{
-		PreFactory:     fakeFactory{vm: pre},
-		PostFactory:    fakeFactory{vm: post},
-		TransitionTime: cfg.transitionTime,
-		DrainTimeout:   100 * time.Millisecond,
-	}
-	ctx := snowtest.Context(t, snowtest.CChainID)
-	intf, err := factory.New(ctx.Log)
-	require.NoError(t, err)
-	vm := intf.(*VM)
-
-	appSender := &enginetest.Sender{
-		T: t,
-		SendAppRequestF: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
-			return nil
-		},
-	}
-	require.NoError(t, vm.Initialize(
-		t.Context(),
-		ctx,
-		cfg.db,
-		nil, // genesisBytes
-		nil, // upgradeBytes
-		nil, // configBytes
-		nil, // fxs
-		appSender,
-	))
-	return &SUT{
-		VM:   vm,
-		pre:  pre,
-		post: post,
-	}
-}
-
-// restart rebuilds the VM against the same database and chain state, modeling a
-// node restart.
-func (s *SUT) restart(t *testing.T) *SUT {
-	t.Helper()
-	return newSUT(t,
-		withDatabase(s.db),
-		withState(s.pre.state),
-		withTransitionTime(s.transitionTime),
-	)
-}
-
 // TestInitiallyTransitioned verifies a VM already past its transition time at
 // genesis routes to the post-transition chain.
 func TestInitiallyTransitioned(t *testing.T) {
@@ -373,8 +377,8 @@ func TestInitiallyTransitioned(t *testing.T) {
 	ctx := t.Context()
 
 	version, err := sut.Version(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "post", version)
+	require.NoErrorf(t, err, "%T.Version()", sut)
+	require.Equalf(t, "post", version, "%T.Version()", sut)
 }
 
 // TestTransition verifies accepting a block at the transition time switches
@@ -384,14 +388,14 @@ func TestTransition(t *testing.T) {
 	ctx := t.Context()
 
 	version, err := sut.Version(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "pre", version)
+	require.NoErrorf(t, err, "%T.Version()", sut)
+	require.Equalf(t, "pre", version, "%T.Version()", sut)
 
 	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
 	version, err = sut.Version(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "post", version)
+	require.NoErrorf(t, err, "%T.Version()", sut)
+	require.Equalf(t, "post", version, "%T.Version()", sut)
 }
 
 // TestTransitionSetsPreference verifies the transition sets the post-transition
@@ -402,7 +406,7 @@ func TestTransitionSetsPreference(t *testing.T) {
 
 	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
-	require.Equal(t, sut.post.state.lastAccepted.ID(), sut.post.preference)
+	require.Equalf(t, sut.post.state.lastAccepted.ID(), sut.post.preference, "%T.preference", sut.post)
 }
 
 // TestInitializeIsolatesContext verifies the post-transition chain gets its own
@@ -413,9 +417,9 @@ func TestInitializeIsolatesContext(t *testing.T) {
 
 	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
-	require.NotSame(t, sut.pre.chainCtx, sut.post.chainCtx)
-	require.NotSame(t, sut.pre.chainCtx.Metrics, sut.post.chainCtx.Metrics)
-	require.Equal(t, sut.pre.chainCtx.ChainID, sut.post.chainCtx.ChainID)
+	require.NotSamef(t, sut.pre.chainCtx, sut.post.chainCtx, "%T.chainCtx", sut.post)
+	require.NotSamef(t, sut.pre.chainCtx.Metrics, sut.post.chainCtx.Metrics, "%T.chainCtx.Metrics", sut.post)
+	require.Equalf(t, sut.pre.chainCtx.ChainID, sut.post.chainCtx.ChainID, "%T.chainCtx.ChainID", sut.post)
 }
 
 // TestRestart verifies the VM resumes on the correct chain after a restart,
@@ -429,16 +433,16 @@ func TestRestart(t *testing.T) {
 
 	sut = sut.restart(t)
 	version, err := sut.Version(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "pre", version)
+	require.NoErrorf(t, err, "%T.Version()", sut)
+	require.Equalf(t, "pre", version, "%T.Version()", sut)
 
 	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 	version, err = sut.Version(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "post", version)
+	require.NoErrorf(t, err, "%T.Version()", sut)
+	require.Equalf(t, "post", version, "%T.Version()", sut)
 
 	sut = sut.restart(t)
 	version, err = sut.Version(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "post", version)
+	require.NoErrorf(t, err, "%T.Version()", sut)
+	require.Equalf(t, "post", version, "%T.Version()", sut)
 }

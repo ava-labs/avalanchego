@@ -54,7 +54,7 @@ func TestHTTPHandlers(t *testing.T) {
 
 	// The node captures the handler map once on startup and never re-reads it.
 	handlers, err := sut.CreateHandlers(ctx)
-	require.NoError(t, err)
+	require.NoErrorf(t, err, "%T.CreateHandlers()", sut)
 
 	type responses map[string]struct {
 		wantCode int
@@ -98,7 +98,7 @@ func TestHTTPHandlersBlockUnblock(t *testing.T) {
 		route := handlers.routes["rpc"]
 
 		// Served normally before block.
-		require.Equal(t, "val", serve(route).Body.String())
+		require.Equalf(t, "val", serve(route).Body.String(), "serve(%T)", route)
 
 		handlers.block()
 
@@ -116,12 +116,12 @@ func TestHTTPHandlersBlockUnblock(t *testing.T) {
 			result <- serve(route)
 		}()
 		synctest.Wait()
-		require.Empty(t, result, "request was served while blocked")
+		require.Emptyf(t, result, "serve(%T) was served while blocked", route)
 		handlers.unblock()
-		require.Equal(t, "val", (<-result).Body.String())
+		require.Equalf(t, "val", (<-result).Body.String(), "serve(%T)", route)
 
 		// Served normally after unblock.
-		require.Equal(t, "val", serve(route).Body.String())
+		require.Equalf(t, "val", serve(route).Body.String(), "serve(%T)", route)
 	})
 }
 
@@ -135,7 +135,7 @@ func TestHTTPHandlersDrain(t *testing.T) {
 		route := handlers.routes["rpc"]
 
 		// Draining with no in-flight requests returns immediately.
-		require.NoError(t, handlers.drain(t.Context()))
+		require.NoErrorf(t, handlers.drain(t.Context()), "%T.drain()", handlers)
 
 		// Draining with in-flight requests blocks until the context is
 		// cancelled.
@@ -143,10 +143,10 @@ func TestHTTPHandlersDrain(t *testing.T) {
 		synctest.Wait() // The request is now in flight, blocked in the handler.
 		cancelledCtx, cancel := context.WithCancel(t.Context())
 		go cancel()
-		require.ErrorIs(t, handlers.drain(cancelledCtx), context.Canceled)
+		require.ErrorIsf(t, handlers.drain(cancelledCtx), context.Canceled, "%T.drain()", handlers)
 
 		// Draining with in-flight requests blocks until the request returns.
 		go close(release)
-		require.NoError(t, handlers.drain(t.Context()))
+		require.NoErrorf(t, handlers.drain(t.Context()), "%T.drain()", handlers)
 	})
 }

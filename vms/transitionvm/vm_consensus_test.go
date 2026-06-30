@@ -20,12 +20,12 @@ func TestTransitionMaintainsState(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
 
-	require.NoError(t, sut.SetState(ctx, snow.NormalOp))
-	require.Equal(t, snow.NormalOp, sut.pre.consensusState)
+	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState()", sut)
+	require.Equalf(t, snow.NormalOp, sut.pre.consensusState, "%T.consensusState", sut.pre)
 
 	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
-	require.Equal(t, snow.NormalOp, sut.post.consensusState)
+	require.Equalf(t, snow.NormalOp, sut.post.consensusState, "%T.consensusState", sut.post)
 }
 
 // TestWaitForEventForwardsToCurrentChain verifies WaitForEvent routes to the
@@ -36,15 +36,15 @@ func TestWaitForEventForwardsToCurrentChain(t *testing.T) {
 
 	sut.pre.events <- common.PendingTxs
 	msg, err := sut.WaitForEvent(ctx)
-	require.NoError(t, err)
-	require.Equal(t, common.PendingTxs, msg)
+	require.NoErrorf(t, err, "%T.WaitForEvent()", sut)
+	require.Equalf(t, common.PendingTxs, msg, "%T.WaitForEvent()", sut)
 
 	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
 	sut.post.events <- common.StateSyncDone
 	msg, err = sut.WaitForEvent(ctx)
-	require.NoError(t, err)
-	require.Equal(t, common.StateSyncDone, msg)
+	require.NoErrorf(t, err, "%T.WaitForEvent()", sut)
+	require.Equalf(t, common.StateSyncDone, msg, "%T.WaitForEvent()", sut)
 }
 
 // TestWaitForEventCanceledByTransition verifies a WaitForEvent call blocked on
@@ -64,6 +64,6 @@ func TestWaitForEventCanceledByTransition(t *testing.T) {
 
 		synctest.Wait()                                // wait until WaitForEvent is durably blocked
 		sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition, canceling the wait
-		require.ErrorIs(t, <-errs, context.Canceled)
+		require.ErrorIsf(t, <-errs, context.Canceled, "%T.WaitForEvent()", sut)
 	})
 }

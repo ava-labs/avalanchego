@@ -57,7 +57,8 @@ type VM struct {
 	// vm state
 	transitionLock sync.RWMutex
 	transitioned   bool
-	consensusState snow.State
+	consensusState utils.Atomic[snow.State]
+	setPreference  utils.Atomic[bool]
 	connections    *connections
 	httpHandlers   *httpHandlers
 	current        *current
@@ -189,6 +190,10 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 		vm.httpHandlers.unblock()
 	}()
 
+	// Draining the in-flight API requests blocks, but does not block forever.
+	// Websockets are long-lived connections which are not able to be gracefully
+	// terminated during the transition. This means that websocket connections
+	// can (and will) cause this to timeout during the transition.
 	log.Info("draining in-flight API requests to the pre-transition VM",
 		zap.Duration("timeout", vm.drainTimeout),
 	)
@@ -216,11 +221,11 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
 
-	log.Info("setting post-transition VM state",
-		zap.Stringer("state", vm.consensusState),
-	)
-	if vm.consensusState != snow.Initializing {
-		if err := vm.postTransitionChain.SetState(ctx, vm.consensusState); err != nil {
+	if state := vm.consensusState.Get(); state != snow.Initializing {
+		log.Info("setting post-transition VM state",
+			zap.Stringer("state", state),
+		)
+		if err := vm.postTransitionChain.SetState(ctx, state); err != nil {
 			return fmt.Errorf("setting consensus state: %w", err)
 		}
 	}
@@ -237,17 +242,19 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 	vm.httpHandlers.set(newHandlers)
 
-	// The VM is only notified of preference changes, so if the consensus engine
-	// previously set the preference, we must manually set the post-transition
-	// VM's preference.
-	//
-	// Failing to due this could leave the preference uninitialized, which could
-	// cause block building to error.
-	log.Info("initializing post-transition VM preference",
-		zap.Stringer("blkID", lastID),
-	)
-	if err := vm.postTransitionChain.SetPreference(ctx, lastID); err != nil {
-		return fmt.Errorf("setting post-transition preference: %w", err)
+	if vm.setPreference.Get() {
+		// The VM is only notified of preference changes, so if the consensus
+		// engine previously set the preference, we must manually set the
+		// post-transition VM's preference.
+		//
+		// Failing to due this could leave the preference uninitialized, which
+		// could cause block building to error.
+		log.Info("initializing post-transition VM preference",
+			zap.Stringer("blkID", lastID),
+		)
+		if err := vm.postTransitionChain.SetPreference(ctx, lastID); err != nil {
+			return fmt.Errorf("setting post-transition preference: %w", err)
+		}
 	}
 
 	vm.transitioned = true

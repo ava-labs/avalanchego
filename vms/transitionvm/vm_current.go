@@ -47,20 +47,6 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 	return vm.current.chain.GetBlockIDAtHeight(ctx, height)
 }
 
-func (vm *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-
-	return vm.current.chain.SetPreference(ctx, blkID)
-}
-
-func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, blockCtx *smblock.Context) error {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-
-	return vm.current.chain.SetPreferenceWithContext(ctx, blkID, blockCtx)
-}
-
 func (vm *VM) Version(ctx context.Context) (string, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()

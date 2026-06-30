@@ -32,14 +32,14 @@ func TestTransitionBlockChildren(t *testing.T) {
 			ctx := t.Context()
 
 			transitionBlock, err := sut.BuildBlock(ctx)
-			require.NoError(t, err)
-			require.NoError(t, verifyBlock(ctx, transitionBlock, mode))
+			require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+			require.NoErrorf(t, verifyBlock(ctx, transitionBlock, mode), "verifyBlock(%T, %s)", transitionBlock, mode)
 
 			// A child of the transition block sits past the transition time, so
 			// it can't be verified as a pre-transition block.
 			child, err := sut.BuildBlock(ctx)
-			require.NoError(t, err)
-			require.ErrorIs(t, verifyBlock(ctx, child, mode), errPostTransitionBlockBeforeTransition)
+			require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+			require.ErrorIsf(t, verifyBlock(ctx, child, mode), errPostTransitionBlockBeforeTransition, "verifyBlock(%T, %s)", child, mode)
 		})
 	}
 }
@@ -56,8 +56,8 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 			sut.BuildVerifyAccept(t, ctx, mode)
 
 			version, err := sut.Version(ctx)
-			require.NoError(t, err)
-			require.Equal(t, "pre", version)
+			require.NoErrorf(t, err, "%T.Version()", sut)
+			require.Equalf(t, "pre", version, "%T.Version()", sut)
 		})
 	}
 }
@@ -72,25 +72,25 @@ func TestCachedBlockUpdatesAfterTransition(t *testing.T) {
 			ctx := t.Context()
 
 			transitionBlock, err := sut.BuildBlock(ctx)
-			require.NoError(t, err)
-			require.NoError(t, verifyBlock(ctx, transitionBlock, mode))
+			require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+			require.NoErrorf(t, verifyBlock(ctx, transitionBlock, mode), "verifyBlock(%T, %s)", transitionBlock, mode)
 
 			// Before accepting the transition block, so before the VM
 			// transitions, generate the next block.
 			postTransitionBlock, err := sut.BuildBlock(ctx)
-			require.NoError(t, err)
+			require.NoErrorf(t, err, "%T.BuildBlock()", sut)
 
 			// Even though the block is currently invalid, the consensus engine
 			// may cache it.
-			require.ErrorIs(t, verifyBlock(ctx, postTransitionBlock, mode), errPostTransitionBlockBeforeTransition)
+			require.ErrorIsf(t, verifyBlock(ctx, postTransitionBlock, mode), errPostTransitionBlockBeforeTransition, "verifyBlock(%T, %s)", postTransitionBlock, mode)
 
-			require.NoError(t, transitionBlock.Accept(ctx))
+			require.NoErrorf(t, transitionBlock.Accept(ctx), "%T.Accept()", transitionBlock)
 			version, err := sut.Version(ctx)
-			require.NoError(t, err)
-			require.Equal(t, "post", version)
+			require.NoErrorf(t, err, "%T.Version()", sut)
+			require.Equalf(t, "post", version, "%T.Version()", sut)
 
-			require.NoError(t, verifyBlock(ctx, postTransitionBlock, mode))
-			require.NoError(t, postTransitionBlock.Accept(ctx))
+			require.NoErrorf(t, verifyBlock(ctx, postTransitionBlock, mode), "verifyBlock(%T, %s)", postTransitionBlock, mode)
+			require.NoErrorf(t, postTransitionBlock.Accept(ctx), "%T.Accept()", postTransitionBlock)
 		})
 	}
 }
@@ -104,8 +104,8 @@ func TestRejectIsNoopAfterTransition(t *testing.T) {
 	genesis := sut.pre.tip
 
 	loser, err := sut.BuildBlock(ctx)
-	require.NoError(t, err)
-	require.NoError(t, loser.Verify(ctx))
+	require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+	require.NoErrorf(t, loser.Verify(ctx), "%T.Verify()", loser)
 	loserBlock := sut.pre.tip
 
 	sut.pre.tip = genesis
@@ -113,5 +113,5 @@ func TestRejectIsNoopAfterTransition(t *testing.T) {
 
 	// Rejecting the loser must be a noop, not a fatal error.
 	loserBlock.RejectV = errors.New("reject forwarded to shut-down pre-transition chain")
-	require.NoError(t, loser.Reject(ctx))
+	require.NoErrorf(t, loser.Reject(ctx), "%T.Reject()", loser)
 }

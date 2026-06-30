@@ -19,8 +19,6 @@ blocks:
 - The **post-transition VM must serve all pre-transition blocks**: a switched
   node still serves history to bootstrapping peers.
 
-Implementing the [`Chain`](vm.go) interface is necessary but not sufficient.
-
 ## Usage
 
 Construct one from a [`Factory`](factory.go) with the two factories and the switch
@@ -31,6 +29,7 @@ n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Facto
     PreFactory:     &coreth.Factory{},
     PostFactory:    &saevm.Factory{},
     TransitionTime: n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+    DrainTimeout:   15 * time.Second,
 })
 ```
 
@@ -42,28 +41,28 @@ VM.
 
 ### One chain, two eras
 
-The transition is a point in the chain's history, not a wall-clock event. It is
-anchored to block timestamps and `transitionTime`, so every node draws the
-boundary in the same place. The pre-transition VM executes blocks before it; the
+The transition block is the first block in a chain whose timestamp is at or past
+the `transitionTime`. Every node draws the boundary in the same place. The
+pre-transition VM executes blocks up to and including the transition block; the
 post-transition VM executes blocks after.
 
 ```mermaid
 flowchart LR
     g(["genesis"]) --> pre["blocks built by the<br/>pre-transition VM"]
-    pre -. "transitionTime" .-> post["blocks built by the<br/>post-transition VM"]
+    pre --> tb["transition block built<br/>by the pre-transition VM"]
+    tb --> post["blocks built by the<br/>post-transition VM"]
     post --> tip(["tip"])
 
     classDef preCls stroke:#e8820c,stroke-width:2px,color:#e8820c;
     classDef postCls stroke:#2ca02c,stroke-width:2px,color:#2ca02c;
+    classDef boundaryCls stroke:#e8820c,stroke-width:4px,color:#e8820c;
     class pre preCls;
+    class tb boundaryCls;
     class post postCls;
 ```
 
-The pre-transition VM may never extend the chain past the boundary: a block whose
-parent lies in the post-transition era is refused until the node switches, so the
-two VMs never disagree about who owns a stretch of history. A node switches when
-it accepts the first block at or after `transitionTime`. Verification and
-acceptance enforce this:
+The pre-transition VM may never extend the chain past the transition block — all
+descendants of the transition block are refused until the node transitions:
 
 ```mermaid
 flowchart TD
@@ -113,9 +112,10 @@ flowchart TB
     class post postCls;
 ```
 
-Three things carry over:
+Four things carry over:
 
-- consensus state and block preference (the engine expects them to stick),
+- the current consensus state (the engine expects it to stick),
+- the block preference (the VM is only told of new preferences),
 - the set of connected peers (the p2p layer won't re-announce them),
 - registered HTTP routes (the node mounts these at startup).
 
@@ -129,6 +129,7 @@ request it never sent is fatal to the consensus engine.
 
 ```mermaid
 sequenceDiagram
+    autonumber
     participant Peer
     participant VM as TransitionVM
     participant Pre as pre-transition VM

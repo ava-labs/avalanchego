@@ -47,8 +47,8 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 				responseID = 1
 				failureID  = 2
 			)
-			require.NoError(t, sut.pre.sendAppRequest(ctx, nodeID, responseID))
-			require.NoError(t, sut.pre.sendAppRequest(ctx, nodeID, failureID))
+			require.NoErrorf(t, sut.pre.sendAppRequest(ctx, nodeID, responseID), "%T.sendAppRequest()", sut.pre)
+			require.NoErrorf(t, sut.pre.sendAppRequest(ctx, nodeID, failureID), "%T.sendAppRequest()", sut.pre)
 
 			sut.BuildVerifyAccept(t, ctx, verifyNoContext)
 
@@ -62,8 +62,8 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 					t.Fatal("post-transition chain received a pre-transition response")
 					return nil
 				}
-				require.NoError(t, sut.AppResponse(ctx, nodeID, responseID, nil))
-				require.Equal(t, !test.transitions, delivered)
+				require.NoErrorf(t, sut.AppResponse(ctx, nodeID, responseID, nil), "%T.AppResponse()", sut)
+				require.Equalf(t, !test.transitions, delivered, "%T.AppResponse()", sut)
 			})
 
 			t.Run("AppRequestFailed", func(t *testing.T) {
@@ -76,8 +76,8 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 					t.Fatal("post-transition chain received a pre-transition app error")
 					return nil
 				}
-				require.NoError(t, sut.AppRequestFailed(ctx, nodeID, failureID, common.ErrUndefined))
-				require.Equal(t, !test.transitions, delivered)
+				require.NoErrorf(t, sut.AppRequestFailed(ctx, nodeID, failureID, common.ErrUndefined), "%T.AppRequestFailed()", sut)
+				require.Equalf(t, !test.transitions, delivered, "%T.AppRequestFailed()", sut)
 			})
 		})
 	}
@@ -94,14 +94,14 @@ func TestTransitionForwardsConnections(t *testing.T) {
 		ids.GenerateTestNodeID(): {Name: "avalanchego", Major: 4, Minor: 5, Patch: 6},
 	}
 	for nodeID, v := range want {
-		require.NoError(t, sut.Connected(ctx, nodeID, v))
+		require.NoErrorf(t, sut.Connected(ctx, nodeID, v), "%T.Connected()", sut)
 	}
 
 	disconnected := ids.GenerateTestNodeID()
-	require.NoError(t, sut.Connected(ctx, disconnected, version.Current))
-	require.NoError(t, sut.Disconnected(ctx, disconnected))
+	require.NoErrorf(t, sut.Connected(ctx, disconnected, version.Current), "%T.Connected()", sut)
+	require.NoErrorf(t, sut.Disconnected(ctx, disconnected), "%T.Disconnected()", sut)
 
 	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
 
-	require.Equal(t, want, sut.post.connected)
+	require.Equalf(t, want, sut.post.connected, "%T.post.connected", sut)
 }

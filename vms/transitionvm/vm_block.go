@@ -36,7 +36,7 @@ type block struct {
 	vm *VM
 
 	// lock is ordered after [VM.transitionLock]. The code MUST never acquire
-	// [VM.transitionLock] while holding [block.lock].
+	// [VM.transitionLock] while holding `block.lock`.
 	lock         sync.Mutex
 	blk          snowman.Block
 	transitioned bool
@@ -143,7 +143,7 @@ func (b *block) Accept(ctx context.Context) error {
 	if err := b.blk.Accept(ctx); err != nil {
 		return err
 	}
-	// [block.lock] doesn't need to be held here because the block is
+	// `block.lock` doesn't need to be held here because the block is
 	// immutable after either [block.Verify] or [block.VerifyWithContext]
 	// return nil.
 	if b.transitioned || b.timestamp.Before(b.vm.transitionTime) {
@@ -156,7 +156,7 @@ func (b *block) Reject(ctx context.Context) error {
 	b.vm.transitionLock.RLock()
 	defer b.vm.transitionLock.RUnlock()
 
-	// [block.lock] doesn't need to be held here because the block is
+	// `block.lock` doesn't need to be held here because the block is
 	// immutable after either [block.Verify] or [block.VerifyWithContext]
 	// return nil.
 	//
