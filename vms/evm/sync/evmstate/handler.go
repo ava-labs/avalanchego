@@ -81,11 +81,11 @@ func (r *responder) Respond(ctx context.Context, nodeID ids.NodeID, req *syncpb.
 		log.Debug("invalid leaf request, dropping", "nodeID", nodeID, "request", req)
 		return nil, nil
 	}
-	b := newBuild(r, nodeID, req)
-	if b == nil {
+	q := newQuery(r, nodeID, req)
+	if q == nil {
 		return nil, nil
 	}
-	return b.run(ctx, nodeID)
+	return q.run(ctx, nodeID)
 }
 
 // validateRequest reports whether req has a valid shape.
@@ -108,8 +108,8 @@ func validateRequest(req *syncpb.GetLeafRequest, trieKeyLength int) bool {
 	return true
 }
 
-// build holds one in-flight leaf request.
-type build struct {
+// query holds one in-flight leaf request.
+type query struct {
 	startKey []byte
 	endKey   []byte
 	rootHash common.Hash
@@ -123,9 +123,9 @@ type build struct {
 	resp *syncpb.GetLeafResponse
 }
 
-// newBuild opens the trie and returns a per-request build, or nil
+// newQuery opens the trie and returns a per-request query, or nil
 // if the trie root is missing.
-func newBuild(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *build {
+func newQuery(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *query {
 	// TODO(powerslider): We should know the state root that accounts correspond to,
 	// as this information will be necessary to access storage tries
 	// when the trie is path based.
@@ -137,7 +137,7 @@ func newBuild(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *buil
 	}
 
 	limit := min(uint16(req.GetKeyLimit()), MaxLeavesLimit)
-	return &build{
+	return &query{
 		startKey: req.GetStartKey(),
 		endKey:   req.GetEndKey(),
 		rootHash: root,
@@ -153,11 +153,11 @@ func newBuild(r *responder, nodeID ids.NodeID, req *syncpb.GetLeafRequest) *buil
 	}
 }
 
-// build runs the response pipeline (snapshot fast path, trie fill-in,
-// range proof) and mutates [build.resp].
-func (b *build) build(ctx context.Context) error {
-	if b.snapshot != nil {
-		done, err := b.fillFromSnapshot(ctx)
+// collect runs the response pipeline (snapshot fast path, trie fill-in,
+// range proof) and mutates [query.resp].
+func (q *query) collect(ctx context.Context) error {
+	if q.snapshot != nil {
+		done, err := q.fillFromSnapshot(ctx)
 		if err != nil {
 			return err
 		}
@@ -166,50 +166,50 @@ func (b *build) build(ctx context.Context) error {
 		}
 		// Snapshot didn't satisfy the response on its own. Trie
 		// iteration will regenerate the proof at the end.
-		b.resp.ProofVals = nil
+		q.resp.ProofVals = nil
 	}
 
-	if len(b.resp.Keys) < int(b.limit) {
-		more, err := b.fillFromTrie(ctx, b.endKey)
+	if len(q.resp.Keys) < int(q.limit) {
+		more, err := q.fillFromTrie(ctx, q.endKey)
 		if err != nil {
 			return err
 		}
-		if len(b.startKey) == 0 && !more {
+		if len(q.startKey) == 0 && !more {
 			// Whole trie. Root suffices, no proof.
 			return nil
 		}
 	}
 
-	proof, err := b.generateRangeProof(b.startKey, b.resp.Keys)
+	proof, err := q.generateRangeProof(q.startKey, q.resp.Keys)
 	if err != nil {
 		return err
 	}
 	defer proof.Close()
 
-	b.resp.ProofVals, err = iteratorValues(proof)
+	q.resp.ProofVals, err = iteratorValues(proof)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// run executes the build pipeline. Returns nil to signal a late drop
+// run executes the collect pipeline. Returns nil to signal a late drop
 // (pipeline error or ctx cancelled before any leaves were read).
-func (b *build) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, error) {
-	if err := b.build(ctx); err != nil {
+func (q *query) run(ctx context.Context, nodeID ids.NodeID) (*syncpb.GetLeafResponse, error) {
+	if err := q.collect(ctx); err != nil {
 		log.Debug("failed to serve leaf request", "nodeID", nodeID, "err", err)
 		return nil, nil
 	}
-	if len(b.resp.Keys) == 0 && ctx.Err() != nil {
+	if len(q.resp.Keys) == 0 && ctx.Err() != nil {
 		log.Debug("context err set before any leaves were iterated", "nodeID", nodeID, "ctxErr", ctx.Err())
-		return nil, nil
+		return nil, nil //nolint:nilerr // a cancelled context with no leaves read drops the request rather than faulting the peer
 	}
-	return b.resp, nil
+	return q.resp, nil
 }
 
 // fillFromSnapshot reads from the snapshot. Returns true if the
 // response is complete.
-func (b *build) fillFromSnapshot(ctx context.Context) (bool, error) {
+func (q *query) fillFromSnapshot(ctx context.Context) (bool, error) {
 	// Reserve time for the trie fallback.
 	snapCtx := ctx
 	if deadline, ok := ctx.Deadline(); ok {
@@ -219,23 +219,23 @@ func (b *build) fillFromSnapshot(ctx context.Context) (bool, error) {
 		defer cancel()
 	}
 
-	snapKeys, snapVals, err := b.readFromSnapshot(snapCtx)
+	snapKeys, snapVals, err := q.readFromSnapshot(snapCtx)
 	if err != nil {
 		return false, err
 	}
 
 	// Fast path: validate the entire range against the trie in one shot.
-	proof, ok, more, err := b.isRangeValid(snapKeys, snapVals, false)
+	proof, ok, more, err := q.isRangeValid(snapKeys, snapVals, false)
 	if err != nil {
 		return false, err
 	}
 	defer proof.Close()
 	if ok {
-		b.resp.Keys, b.resp.Values = snapKeys, snapVals
-		if len(b.startKey) == 0 && !more {
+		q.resp.Keys, q.resp.Values = snapKeys, snapVals
+		if len(q.startKey) == 0 && !more {
 			return true, nil
 		}
-		b.resp.ProofVals, err = iteratorValues(proof)
+		q.resp.ProofVals, err = iteratorValues(proof)
 		if err != nil {
 			return false, err
 		}
@@ -258,7 +258,7 @@ func (b *build) fillFromSnapshot(ctx context.Context) (bool, error) {
 	hasGap := false
 	for i := 0; i < len(snapKeys); i += snapshotSegmentLen {
 		segmentEnd := min(i+snapshotSegmentLen, len(snapKeys))
-		segProof, segOK, _, err := b.isRangeValid(snapKeys[i:segmentEnd], snapVals[i:segmentEnd], hasGap)
+		segProof, segOK, _, err := q.isRangeValid(snapKeys[i:segmentEnd], snapVals[i:segmentEnd], hasGap)
 		if err != nil {
 			return false, err
 		}
@@ -273,23 +273,23 @@ func (b *build) fillFromSnapshot(ctx context.Context) (bool, error) {
 			// snapKeys[i], then drop the trailing entry. snapKeys[i]
 			// is also the first entry we are about to append from the
 			// snapshot, and it must not be duplicated.
-			if _, err := b.fillFromTrie(ctx, snapKeys[i]); err != nil {
+			if _, err := q.fillFromTrie(ctx, snapKeys[i]); err != nil {
 				return false, err
 			}
-			if len(b.resp.Keys) >= int(b.limit) || ctx.Err() != nil {
+			if len(q.resp.Keys) >= int(q.limit) || ctx.Err() != nil {
 				break
 			}
-			b.resp.Keys = b.resp.Keys[:len(b.resp.Keys)-1]
-			b.resp.Values = b.resp.Values[:len(b.resp.Values)-1]
+			q.resp.Keys = q.resp.Keys[:len(q.resp.Keys)-1]
+			q.resp.Values = q.resp.Values[:len(q.resp.Values)-1]
 		}
 		hasGap = false
 
 		// Trim the segment to fit the remaining limit.
-		segmentEnd = min(segmentEnd, i+int(b.limit)-len(b.resp.Keys))
-		b.resp.Keys = append(b.resp.Keys, snapKeys[i:segmentEnd]...)
-		b.resp.Values = append(b.resp.Values, snapVals[i:segmentEnd]...)
+		segmentEnd = min(segmentEnd, i+int(q.limit)-len(q.resp.Keys))
+		q.resp.Keys = append(q.resp.Keys, snapKeys[i:segmentEnd]...)
+		q.resp.Values = append(q.resp.Values, snapVals[i:segmentEnd]...)
 
-		if len(b.resp.Keys) >= int(b.limit) {
+		if len(q.resp.Keys) >= int(q.limit) {
 			break
 		}
 	}
@@ -297,24 +297,24 @@ func (b *build) fillFromSnapshot(ctx context.Context) (bool, error) {
 }
 
 // readFromSnapshot pulls leaves in [startKey, endKey], capped at
-// [build.limit]. Storage reads scope to [build.account].
-func (b *build) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte, error) {
-	startHash := common.BytesToHash(b.startKey)
+// [query.limit]. Storage reads scope to [query.account].
+func (q *query) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte, error) {
+	startHash := common.BytesToHash(q.startKey)
 	var snapIt ethdb.Iterator
-	if b.account == (common.Hash{}) {
-		snapIt = b.snapshot.AccountIterator(startHash)
+	if q.account == (common.Hash{}) {
+		snapIt = q.snapshot.AccountIterator(startHash)
 	} else {
-		snapIt = b.snapshot.StorageIterator(b.account, startHash)
+		snapIt = q.snapshot.StorageIterator(q.account, startHash)
 	}
 	defer snapIt.Release()
 
-	keys := make([][]byte, 0, b.limit)
-	vals := make([][]byte, 0, b.limit)
+	keys := make([][]byte, 0, q.limit)
+	vals := make([][]byte, 0, q.limit)
 	for snapIt.Next() {
-		if len(b.endKey) > 0 && bytes.Compare(snapIt.Key(), b.endKey) > 0 {
+		if len(q.endKey) > 0 && bytes.Compare(snapIt.Key(), q.endKey) > 0 {
 			break
 		}
-		if len(keys) >= int(b.limit) || ctx.Err() != nil {
+		if len(keys) >= int(q.limit) || ctx.Err() != nil {
 			break
 		}
 		keys = append(keys, snapIt.Key())
@@ -323,10 +323,10 @@ func (b *build) readFromSnapshot(ctx context.Context) ([][]byte, [][]byte, error
 	return keys, vals, snapIt.Error()
 }
 
-// fillFromTrie iterates the trie from [build.nextKey] up to end
+// fillFromTrie iterates the trie from [query.nextKey] up to end
 // (exclusive). Returns true if the trie has more keys past the response.
-func (b *build) fillFromTrie(ctx context.Context, end []byte) (bool, error) {
-	nodeIt, err := b.trie.NodeIterator(b.nextKey())
+func (q *query) fillFromTrie(ctx context.Context, end []byte) (bool, error) {
+	nodeIt, err := q.trie.NodeIterator(q.nextKey())
 	if err != nil {
 		return false, err
 	}
@@ -338,41 +338,41 @@ func (b *build) fillFromTrie(ctx context.Context, end []byte) (bool, error) {
 			more = true
 			break
 		}
-		if len(b.resp.Keys) >= int(b.limit) || ctx.Err() != nil {
+		if len(q.resp.Keys) >= int(q.limit) || ctx.Err() != nil {
 			more = true
 			break
 		}
-		b.resp.Keys = append(b.resp.Keys, it.Key)
-		b.resp.Values = append(b.resp.Values, it.Value)
+		q.resp.Keys = append(q.resp.Keys, it.Key)
+		q.resp.Values = append(q.resp.Values, it.Value)
 	}
 	return more, it.Err
 }
 
 // nextKey returns the trie iteration start: a byte-incremented copy
 // of the last response key, or the request start when empty.
-func (b *build) nextKey() []byte {
-	if len(b.resp.Keys) == 0 {
-		return b.startKey
+func (q *query) nextKey() []byte {
+	if len(q.resp.Keys) == 0 {
+		return q.startKey
 	}
-	next := common.CopyBytes(b.resp.Keys[len(b.resp.Keys)-1])
+	next := common.CopyBytes(q.resp.Keys[len(q.resp.Keys)-1])
 	incrementBytes(next)
 	return next
 }
 
 // generateRangeProof returns a Merkle range proof for [start, last].
 // Empty start substitutes the cached zero-key.
-func (b *build) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
+func (q *query) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Database, error) {
 	proof := memorydb.New()
 	if len(start) == 0 {
-		start = b.zeroKey
+		start = q.zeroKey
 	}
-	if err := b.trie.Prove(start, proof); err != nil {
+	if err := q.trie.Prove(start, proof); err != nil {
 		_ = proof.Close()
 		return nil, err
 	}
 	if len(keys) > 0 {
 		end := keys[len(keys)-1]
-		if err := b.trie.Prove(end, proof); err != nil {
+		if err := q.trie.Prove(end, proof); err != nil {
 			_ = proof.Close()
 			return nil, err
 		}
@@ -382,30 +382,30 @@ func (b *build) generateRangeProof(start []byte, keys [][]byte) (*memorydb.Datab
 
 // verifyRangeProof returns whether the trie has more keys past the
 // last verified key.
-func (b *build) verifyRangeProof(keys, vals [][]byte, start []byte, proof *memorydb.Database) (bool, error) {
+func (q *query) verifyRangeProof(keys, vals [][]byte, start []byte, proof *memorydb.Database) (bool, error) {
 	if len(start) == 0 {
-		start = b.zeroKey
+		start = q.zeroKey
 	}
-	return trie.VerifyRangeProof(b.rootHash, start, keys, vals, proof)
+	return trie.VerifyRangeProof(q.rootHash, start, keys, vals, proof)
 }
 
 // isRangeValid generates and verifies a range proof for the supplied
 // keys/vals. With hasGap=true the proof validates standalone starting
 // at keys[0]. With hasGap=false the proof starts at nextKey(), so the
 // keys can be appended to the response directly.
-func (b *build) isRangeValid(keys, vals [][]byte, hasGap bool) (*memorydb.Database, bool, bool, error) {
+func (q *query) isRangeValid(keys, vals [][]byte, hasGap bool) (*memorydb.Database, bool, bool, error) {
 	var startKey []byte
 	if hasGap {
 		startKey = keys[0]
 	} else {
-		startKey = b.nextKey()
+		startKey = q.nextKey()
 	}
 
-	proof, err := b.generateRangeProof(startKey, keys)
+	proof, err := q.generateRangeProof(startKey, keys)
 	if err != nil {
 		return nil, false, false, err
 	}
-	more, proofErr := b.verifyRangeProof(keys, vals, startKey, proof)
+	more, proofErr := q.verifyRangeProof(keys, vals, startKey, proof)
 	return proof, proofErr == nil, more, nil
 }
 
