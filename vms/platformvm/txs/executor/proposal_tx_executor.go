@@ -26,7 +26,12 @@ const (
 	// SyncBound is the synchrony bound used for safe decision making
 	SyncBound = 10 * time.Second
 
-	MaxValidatorWeightFactor = 5
+	// MaxValidatorWeightFactor is the maximum ratio of total validator weight
+	// (self-stake + delegations) to self-stake for Primary Network validators.
+	// A value of 25 means a validator can accept up to 24x its self-stake in
+	// delegations (e.g. 2,000 AVAX self-stake → up to 48,000 AVAX delegated).
+	// Implements ACP-247 (Delegation Multiplier Increase).
+	MaxValidatorWeightFactor = 25
 )
 
 var (
