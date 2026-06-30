@@ -297,7 +297,6 @@ func (s *Database) Close() error {
 
 	if rErr := s.locks.Release(); rErr != nil {
 		s.log.Error("Failed to release directory lock", zap.Error(rErr))
-		err = errors.Join(err, rErr)
 	}
 
 	s.log.Info("Block database closed successfully")

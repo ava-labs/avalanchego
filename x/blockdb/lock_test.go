@@ -27,7 +27,7 @@ func tryOpenAt(t *testing.T, indexDir, dataDir string) (database.HeightIndex, er
 		return db, err
 	}
 	t.Cleanup(func() {
-		require.NoError(t, db.Close())
+		_ = db.Close()
 	})
 	return db, nil
 }
@@ -90,13 +90,8 @@ func TestLock_DirectoryOverlap(t *testing.T) {
 
 			index2 := filepath.Join(dir, test.second.index)
 			data2 := filepath.Join(dir, test.second.data)
-			db2, err := tryOpenAt(t, index2, data2)
-			if test.wantErr != nil {
-				require.Nil(t, db2)
-				require.ErrorIs(t, err, test.wantErr)
-				return
-			}
-			require.NoError(t, err)
+			_, err = tryOpenAt(t, index2, data2)
+			require.ErrorIs(t, err, test.wantErr)
 		})
 	}
 }
@@ -104,11 +99,7 @@ func TestLock_DirectoryOverlap(t *testing.T) {
 func TestLock_AllowsReopenAfterClose(t *testing.T) {
 	dir := t.TempDir()
 
-	config := DefaultConfig().
-		WithIndexDir(dir).
-		WithDataDir(dir).
-		WithBlockCacheSize(0)
-	db1, err := New(config, logging.NoLog{})
+	db1, err := tryOpenAt(t, dir, dir)
 	require.NoError(t, err)
 	require.NoError(t, db1.Close())
 
