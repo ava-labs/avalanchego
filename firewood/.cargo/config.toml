@@ -1,0 +1,2 @@
+[alias]
+build-static-ffi = "build --frozen --profile maxperf --package firewood-ffi --features ethhash,logger"

@@ -1,0 +1,194 @@
+// Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE.md for licensing terms.
+
+use firewood::api::{self, BoxKeyValueIter, DbView, HashKey, IntoBatchIter, Proposal as _};
+
+use crate::{IteratorHandle, iterator::CreateIteratorResult, metrics::MetricsContextExt};
+
+/// An opaque wrapper around a Proposal that also retains a reference to the
+/// database handle it was created from.
+#[derive(Debug)]
+pub struct ProposalHandle<'db> {
+    hash_key: Option<HashKey>,
+    proposal: firewood::db::Proposal<'db>,
+    handle: &'db crate::DatabaseHandle,
+}
+
+impl<'db> DbView for ProposalHandle<'db> {
+    type Iter<'view>
+        = <firewood::db::Proposal<'db> as DbView>::Iter<'view>
+    where
+        Self: 'view;
+
+    fn root_hash(&self) -> Option<HashKey> {
+        self.proposal.root_hash()
+    }
+
+    fn val<K: api::KeyType>(&self, key: K) -> Result<Option<firewood::Value>, api::Error> {
+        self.proposal.val(key)
+    }
+
+    fn single_key_proof<K: api::KeyType>(&self, key: K) -> Result<api::FrozenProof, api::Error> {
+        self.proposal.single_key_proof(key)
+    }
+
+    fn range_proof<K: api::KeyType>(
+        &self,
+        first_key: Option<K>,
+        last_key: Option<K>,
+        limit: Option<std::num::NonZeroUsize>,
+    ) -> Result<api::FrozenRangeProof, api::Error> {
+        self.proposal.range_proof(first_key, last_key, limit)
+    }
+
+    fn iter_option<K: api::KeyType>(
+        &self,
+        first_key: Option<K>,
+    ) -> Result<Self::Iter<'_>, api::Error> {
+        self.proposal.iter_option(first_key)
+    }
+
+    fn dump_to_string(&self) -> Result<String, api::Error> {
+        self.proposal.dump_to_string()
+    }
+}
+
+impl ProposalHandle<'_> {
+    /// Returns the root hash of the proposal.
+    #[must_use]
+    pub fn hash_key(&self) -> Option<crate::HashKey> {
+        self.hash_key.clone().map(Into::into)
+    }
+
+    /// Consume and commit a proposal.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if committing the proposal fails or if the
+    /// proposal is empty.
+    pub fn commit_proposal(self) -> Result<Option<HashKey>, api::Error> {
+        let ProposalHandle {
+            hash_key,
+            proposal,
+            handle: _,
+        } = self;
+
+        proposal.commit()?;
+
+        Ok(hash_key)
+    }
+
+    /// Consume and commit a proposal, rebasing if the parent is stale.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the proposal's parent revision cannot be found
+    /// or if the commit fails.
+    pub fn commit_proposal_with_rebase(self) -> Result<Option<HashKey>, api::Error> {
+        self.proposal.commit_with_rebase()
+    }
+
+    /// Creates an iterator on the proposal starting from the given key.
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn iter_from(&self, first_key: Option<&[u8]>) -> CreateIteratorResult<'_> {
+        let it = self
+            .iter_option(first_key)
+            .expect("infallible; see issue #1329");
+        CreateIteratorResult(IteratorHandle::new(
+            self.proposal.view(),
+            Box::new(it) as BoxKeyValueIter<'_>,
+            self.handle.metrics_context(),
+        ))
+    }
+}
+
+#[derive(Debug)]
+pub struct CreateProposalResult<'db> {
+    pub handle: ProposalHandle<'db>,
+}
+
+impl<'db> CreateProposalResult<'db> {
+    pub(crate) fn new(
+        handle: &'db crate::DatabaseHandle,
+        f: impl FnOnce() -> Result<firewood::db::Proposal<'db>, api::Error>,
+    ) -> Result<Self, api::Error> {
+        let proposal = f()?;
+
+        let hash_key = proposal.root_hash();
+
+        Ok(CreateProposalResult {
+            handle: ProposalHandle {
+                hash_key,
+                proposal,
+                handle,
+            },
+        })
+    }
+}
+
+/// A trait that abstracts over database handles and proposal handles for creating proposals.
+///
+/// This trait allows functions to work with both [`DatabaseHandle`] and [`ProposalHandle`]
+/// uniformly when creating new proposals. It provides a common interface for:
+/// - Getting the underlying database handle
+/// - Creating proposals from key-value pairs
+///
+/// This abstraction enables proposal chaining (creating proposals on top of other proposals)
+/// while maintaining a consistent API.
+///
+/// [`DatabaseHandle`]: crate::DatabaseHandle
+pub trait CView<'db> {
+    /// Returns a reference to the database handle that is ultimately used to
+    /// create the proposal. For the database handle, this returns itself. For,
+    /// a proposal handle, this returns the handle that was used to create the
+    /// proposal.
+    fn handle(&self) -> &'db crate::DatabaseHandle;
+
+    /// Create a [`firewood::db::Proposal`] with the provided key-value pairs.
+    ///
+    /// # Errors
+    ///
+    /// This function will return a database error if the proposal could not be
+    /// created.
+    fn create_proposal(
+        self,
+        values: impl IntoBatchIter,
+    ) -> Result<firewood::db::Proposal<'db>, api::Error>;
+
+    /// Create a [`ProposalHandle`] from the values.
+    ///
+    /// # Errors
+    ///
+    /// This function will return a database error if the proposal could not be
+    /// created or if the proposal is empty.
+    fn create_proposal_handle(
+        self,
+        values: impl IntoBatchIter,
+    ) -> Result<CreateProposalResult<'db>, api::Error>
+    where
+        Self: Sized,
+    {
+        let handle = self.handle();
+        CreateProposalResult::new(handle, || self.create_proposal(values))
+    }
+}
+
+impl<'db> CView<'db> for &ProposalHandle<'db> {
+    fn handle(&self) -> &'db crate::DatabaseHandle {
+        self.handle
+    }
+
+    fn create_proposal(
+        self,
+        values: impl IntoBatchIter,
+    ) -> Result<firewood::db::Proposal<'db>, api::Error> {
+        self.proposal.propose(values)
+    }
+}
+
+impl crate::MetricsContextExt for ProposalHandle<'_> {
+    fn metrics_context(&self) -> Option<firewood_metrics::MetricsContext> {
+        self.handle.metrics_context()
+    }
+}
