@@ -7,15 +7,16 @@ import (
 	"context"
 	"time"
 
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-var _ simplex.BlockBuilder = (*BlockBuilder)(nil)
+var _ common.BlockBuilder = (*BlockBuilder)(nil)
 
 type BlockBuilder struct {
 	log          logging.Logger
@@ -30,7 +31,7 @@ const (
 
 // BuildBlock continuously tries to build a block until the context is cancelled. If there are no blocks to be built, it will wait for an event from the VM.
 // It returns false if the context was cancelled, otherwise it returns the built block and true.
-func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.ProtocolMetadata, blacklist simplex.Blacklist) (simplex.VerifiedBlock, bool) {
+func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata common.ProtocolMetadata, blacklist common.Blacklist) (common.VerifiedBlock, bool) {
 	for curWait := initBackoff; ; curWait = backoff(ctx, curWait) {
 		if ctx.Err() != nil {
 			b.log.Debug("Context cancelled, stopping block building", zap.Error(ctx.Err()))
@@ -78,7 +79,7 @@ func (b *BlockBuilder) waitForPendingBlock(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if msg == common.PendingTxs {
+		if msg == engcommon.PendingTxs {
 			return nil
 		}
 		b.log.Warn("Received unexpected message", zap.Stringer("message", msg))

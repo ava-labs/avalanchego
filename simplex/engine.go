@@ -10,20 +10,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
+	"github.com/ava-labs/simplex/simplex"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-var _ common.Engine = (*Engine)(nil)
+var _ engcommon.Engine = (*Engine)(nil)
 
 var (
 	errUnknownMessageType   = errors.New("unknown message type")
@@ -32,18 +33,18 @@ var (
 
 type Engine struct {
 	// list of NoOpsHandler for messages dropped by engine
-	common.AllGetsServer
-	common.StateSummaryFrontierHandler
-	common.AcceptedStateSummaryHandler
-	common.AcceptedFrontierHandler
-	common.AcceptedHandler
-	common.AncestorsHandler
-	common.PutHandler
-	common.QueryHandler
-	common.ChitsHandler
+	engcommon.AllGetsServer
+	engcommon.StateSummaryFrontierHandler
+	engcommon.AcceptedStateSummaryHandler
+	engcommon.AcceptedFrontierHandler
+	engcommon.AcceptedHandler
+	engcommon.AncestorsHandler
+	engcommon.PutHandler
+	engcommon.QueryHandler
+	engcommon.ChitsHandler
 
 	// Handler that passes application messages to the VM
-	common.AppHandler
+	engcommon.AppHandler
 	validators.Connector
 	vm block.ChainVM
 
@@ -125,22 +126,26 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 	}
 
 	epochConfig := simplex.EpochConfig{
-		MaxProposalWait:     config.Params.MaxNetworkDelay,
-		MaxRebroadcastWait:  config.Params.MaxRebroadcastWait,
-		QCDeserializer:      qcDeserializer,
-		Logger:              config.Log,
-		ID:                  config.Ctx.NodeID[:],
-		Signer:              &signer,
-		Verifier:            &verifier,
-		BlockDeserializer:   blockDeserializer,
-		SignatureAggregator: signatureAggregator,
-		Comm:                comm,
-		Storage:             storage,
-		WAL:                 config.WAL,
-		BlockBuilder:        blockBuilder,
-		Epoch:               simplexBlock.metadata.Epoch,
-		StartTime:           time.Now(),
-		ReplicationEnabled:  true,
+		MaxProposalWait:    config.Params.MaxNetworkDelay,
+		MaxRebroadcastWait: config.Params.MaxRebroadcastWait,
+		QCDeserializer:     qcDeserializer,
+		Logger:             config.Log,
+		ID:                 config.Ctx.NodeID[:],
+		Signer:             &signer,
+		Verifier:           &verifier,
+		BlockDeserializer:  blockDeserializer,
+		// avalanchego's simplex integration is PoA (one node = one vote), so the
+		// aggregator is independent of the per-epoch weighted node set.
+		SignatureAggregatorCreator: func(_ []common.Node) common.SignatureAggregator {
+			return signatureAggregator
+		},
+		Comm:               comm,
+		Storage:            storage,
+		WAL:                config.WAL,
+		BlockBuilder:       blockBuilder,
+		Epoch:              simplexBlock.metadata.Epoch,
+		StartTime:          time.Now(),
+		ReplicationEnabled: true,
 	}
 
 	epoch, err := simplex.NewEpoch(epochConfig)
@@ -149,15 +154,15 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 	}
 
 	return &Engine{
-		AllGetsServer:               common.NewNoOpAllGetsServer(config.Log),
-		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
-		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
-		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
-		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Log),
-		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Log),
-		PutHandler:                  common.NewNoOpPutHandler(config.Log),
-		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
-		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+		AllGetsServer:               engcommon.NewNoOpAllGetsServer(config.Log),
+		StateSummaryFrontierHandler: engcommon.NewNoOpStateSummaryFrontierHandler(config.Log),
+		AcceptedStateSummaryHandler: engcommon.NewNoOpAcceptedStateSummaryHandler(config.Log),
+		AcceptedFrontierHandler:     engcommon.NewNoOpAcceptedFrontierHandler(config.Log),
+		AcceptedHandler:             engcommon.NewNoOpAcceptedHandler(config.Log),
+		AncestorsHandler:            engcommon.NewNoOpAncestorsHandler(config.Log),
+		PutHandler:                  engcommon.NewNoOpPutHandler(config.Log),
+		QueryHandler:                engcommon.NewNoOpQueryHandler(config.Log),
+		ChitsHandler:                engcommon.NewNoOpChitsHandler(config.Log),
 		AppHandler:                  config.VM,
 		Connector:                   config.VM,
 		vm:                          config.VM,
@@ -218,7 +223,7 @@ func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simple
 	return e.epoch.HandleMessage(simplexMsg, nodeID[:])
 }
 
-func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*simplex.Message, error) {
+func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*common.Message, error) {
 	if msg == nil {
 		return nil, errNilField
 	}
@@ -256,7 +261,7 @@ func (*Engine) Gossip(_ context.Context) error {
 
 // Notify is a no-op because the Simplex engine does not need to be notified of any events from the VM.
 // This is because the Simplex instance listens to the VM events by directly calling `WaitForEvent` when needed.
-func (*Engine) Notify(_ context.Context, _ common.Message) error {
+func (*Engine) Notify(_ context.Context, _ engcommon.Message) error {
 	return nil
 }
 

@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -20,9 +20,9 @@ import (
 )
 
 var (
-	_ simplex.BlockDeserializer = (*blockDeserializer)(nil)
-	_ simplex.Block             = (*Block)(nil)
-	_ simplex.VerifiedBlock     = (*Block)(nil)
+	_ common.BlockDeserializer = (*blockDeserializer)(nil)
+	_ common.Block             = (*Block)(nil)
+	_ common.VerifiedBlock     = (*Block)(nil)
 
 	errDigestNotFound         = errors.New("digest not found in block tracker")
 	errMismatchedPrevDigest   = errors.New("prev digest does not match block parent")
@@ -32,20 +32,20 @@ var (
 )
 
 type Block struct {
-	digest simplex.Digest
+	digest common.Digest
 
 	// metadata contains protocol metadata for the block
-	metadata simplex.ProtocolMetadata
+	metadata common.ProtocolMetadata
 
 	// the parsed block
 	vmBlock snowman.Block
 
 	blockTracker *blockTracker
 
-	blacklist simplex.Blacklist
+	blacklist common.Blacklist
 }
 
-func newBlock(metadata simplex.ProtocolMetadata, blacklist simplex.Blacklist, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
+func newBlock(metadata common.ProtocolMetadata, blacklist common.Blacklist, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
 	block := &Block{
 		metadata:     metadata,
 		vmBlock:      vmBlock,
@@ -70,8 +70,8 @@ type canotoSimplexBlock struct {
 }
 
 // BlockHeader returns the block header for the block.
-func (b *Block) BlockHeader() simplex.BlockHeader {
-	return simplex.BlockHeader{
+func (b *Block) BlockHeader() common.BlockHeader {
+	return common.BlockHeader{
 		ProtocolMetadata: b.metadata,
 		Digest:           b.digest,
 	}
@@ -88,12 +88,20 @@ func (b *Block) Bytes() ([]byte, error) {
 	return cBlock.MarshalCanoto(), nil
 }
 
-func (b *Block) Blacklist() simplex.Blacklist {
+func (b *Block) Blacklist() common.Blacklist {
 	return b.blacklist
 }
 
+// SealingBlockInfo returns information derived from a sealing block (the
+// validator set of the new epoch and the previous sealing block hash).
+//
+// TODO: implement epoch reconfiguration / sealing blocks.
+func (*Block) SealingBlockInfo() *common.SealingBlockInfo {
+	return nil
+}
+
 // Verify verifies the block.
-func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
+func (b *Block) Verify(ctx context.Context) (common.VerifiedBlock, error) {
 	// we should not verify the genesis block
 	if b.metadata.Seq == 0 {
 		return nil, errGenesisVerification
@@ -125,7 +133,7 @@ func (b *Block) verifyParentMatchesPrevBlock() error {
 	return nil
 }
 
-func computeDigest(bytes []byte) simplex.Digest {
+func computeDigest(bytes []byte) common.Digest {
 	return hashing.ComputeHash256Array(bytes)
 }
 
@@ -134,14 +142,14 @@ type blockDeserializer struct {
 	blockTracker *blockTracker
 }
 
-func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) (simplex.Block, error) {
+func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) (common.Block, error) {
 	var canotoBlock canotoSimplexBlock
 
 	if err := canotoBlock.UnmarshalCanoto(bytes); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal block: %w", err)
 	}
 
-	md, err := simplex.ProtocolMetadataFromBytes(canotoBlock.Metadata)
+	md, err := common.ProtocolMetadataFromBytes(canotoBlock.Metadata)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseMetadata, err)
 	}
@@ -151,7 +159,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 		return nil, err
 	}
 
-	var blacklist simplex.Blacklist
+	var blacklist common.Blacklist
 	err = blacklist.FromBytes(canotoBlock.Blacklist)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseBlacklist, err)
@@ -165,7 +173,7 @@ type blockTracker struct {
 	lock sync.Mutex
 
 	// tracks the simplex digests to the blocks that have been verified
-	simplexDigestsToBlock map[simplex.Digest]*Block
+	simplexDigestsToBlock map[common.Digest]*Block
 
 	// handles block acceptance and rejection of inner blocks
 	tree tree.Tree
@@ -176,7 +184,7 @@ type blockTracker struct {
 func newBlockTracker(vm block.ChainVM) *blockTracker {
 	return &blockTracker{
 		tree:                  tree.New(),
-		simplexDigestsToBlock: make(map[simplex.Digest]*Block),
+		simplexDigestsToBlock: make(map[common.Digest]*Block),
 		vm:                    vm,
 	}
 }
@@ -187,7 +195,7 @@ func (bt *blockTracker) init(latestBlock *Block) {
 	bt.simplexDigestsToBlock[latestBlock.digest] = latestBlock
 }
 
-func (bt *blockTracker) getBlockByDigest(digest simplex.Digest) (*Block, bool) {
+func (bt *blockTracker) getBlockByDigest(digest common.Digest) (*Block, bool) {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 
@@ -222,7 +230,7 @@ func (bt *blockTracker) verifyAndTrackBlock(ctx context.Context, block *Block) e
 }
 
 // indexBlock calls accept on the block with the given digest, and reject on competing blocks.
-func (bt *blockTracker) indexBlock(ctx context.Context, digest simplex.Digest) error {
+func (bt *blockTracker) indexBlock(ctx context.Context, digest common.Digest) error {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 

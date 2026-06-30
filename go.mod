@@ -21,7 +21,7 @@ require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpcreflect v1.3.0
 	github.com/DataDog/zstd v1.5.2
-	github.com/StephenButtolph/canoto v0.18.0
+	github.com/StephenButtolph/canoto v0.19.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100
 	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
@@ -95,7 +95,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/avalanchego/graft/evm v1.14.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.6.0
-	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
+	github.com/ava-labs/simplex v0.0.0-20260624150949-60db8a058259
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5 // indirect
@@ -192,7 +192,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

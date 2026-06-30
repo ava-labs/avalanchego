@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	_               simplex.Storage = (*Storage)(nil)
-	genesisMetadata                 = simplex.ProtocolMetadata{
+	_               common.Storage = (*Storage)(nil)
+	genesisMetadata                = common.ProtocolMetadata{
 		Version: 0,
 		Epoch:   0,
 		Round:   0,
@@ -49,7 +49,7 @@ type Storage struct {
 	genesisBlock *Block
 
 	// lastIndexed is the last indexed block digest.
-	lastIndexedDigest simplex.Digest
+	lastIndexedDigest common.Digest
 
 	// deserializer is used to deserialize quorum certificates from bytes.
 	deserializer *QCDeserializer
@@ -105,36 +105,36 @@ func (s *Storage) NumBlocks() uint64 {
 }
 
 // Retrieve returns the block and finalization at [seq].
-// If [seq] is not found, returns simplex.ErrBlockNotFound.
-func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, error) {
+// If [seq] is not found, returns common.ErrBlockNotFound.
+func (s *Storage) Retrieve(seq uint64) (common.VerifiedBlock, common.Finalization, error) {
 	// The genesis block doesn't have a finalization, so we need to handle it specifically.
 	if seq == 0 {
-		return s.genesisBlock, simplex.Finalization{}, nil
+		return s.genesisBlock, common.Finalization{}, nil
 	}
 
 	block, err := getBlock(context.TODO(), s.vm, seq)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			return nil, simplex.Finalization{}, simplex.ErrBlockNotFound
+			return nil, common.Finalization{}, common.ErrBlockNotFound
 		}
 		s.log.Error("Error retrieving block from storage", zap.Uint64("seq", seq), zap.Error(err))
-		return nil, simplex.Finalization{}, err
+		return nil, common.Finalization{}, err
 	}
 
 	finalization, err := s.retrieveFinalization(seq)
 	if err != nil {
-		return nil, simplex.Finalization{}, err
+		return nil, common.Finalization{}, err
 	}
 
 	blacklist, err := s.retrieveBlacklist(seq)
 	if err != nil {
-		return nil, simplex.Finalization{}, err
+		return nil, common.Finalization{}, err
 	}
 
 	vb, err := newBlock(finalization.Finalization.ProtocolMetadata, blacklist, block, s.blockTracker)
 	if err != nil {
 		s.log.Error("failed to create simplex block", zap.Uint64("seq", seq), zap.Error(err))
-		return nil, simplex.Finalization{}, err
+		return nil, common.Finalization{}, err
 	}
 
 	return vb, finalization, nil
@@ -142,7 +142,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 
 // Index indexes the finalization in the storage.
 // It stores the finalization bytes and increments numBlocks.
-func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finalization simplex.Finalization) error {
+func (s *Storage) Index(ctx context.Context, block common.VerifiedBlock, finalization common.Finalization) error {
 	bh := block.BlockHeader()
 	numBlocks := s.numBlocks.Load()
 	if numBlocks != bh.Seq {
@@ -217,7 +217,7 @@ func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTra
 		metadata:     genesisMetadata,
 		blockTracker: blockTracker,
 		vmBlock:      snowmanGenesis,
-		blacklist:    simplex.NewBlacklist(uint16(len(config.Params.InitialValidators))),
+		blacklist:    common.NewBlacklist(uint16(len(config.Params.InitialValidators))),
 	}
 
 	// set the digest
@@ -232,37 +232,37 @@ func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTra
 
 // retrieveFinalization retrieves the finalization at [seq].
 // If the finalization is not found, it returns false.
-func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, error) {
+func (s *Storage) retrieveFinalization(seq uint64) (common.Finalization, error) {
 	finalizationBytes, err := s.db.Get(finalizationKey(seq))
 	if err != nil {
 		if err == database.ErrNotFound {
-			return simplex.Finalization{}, simplex.ErrBlockNotFound
+			return common.Finalization{}, common.ErrBlockNotFound
 		}
 		s.log.Debug("Failed to retrieve finalization", zap.Uint64("seq", seq), zap.Error(err))
-		return simplex.Finalization{}, err
+		return common.Finalization{}, err
 	}
 
 	var canotoFinalization canotoFinalization
 	if err := canotoFinalization.UnmarshalCanoto(finalizationBytes); err != nil {
-		return simplex.Finalization{}, err
+		return common.Finalization{}, err
 	}
 
 	return canotoFinalization.toFinalization(s.deserializer)
 }
 
-func (s *Storage) retrieveBlacklist(seq uint64) (simplex.Blacklist, error) {
+func (s *Storage) retrieveBlacklist(seq uint64) (common.Blacklist, error) {
 	blacklistBytes, err := s.db.Get(blacklistKey(seq))
 	if err != nil {
 		if err == database.ErrNotFound {
-			return simplex.Blacklist{}, nil
+			return common.Blacklist{}, nil
 		}
 		s.log.Debug("Failed to retrieve blacklist", zap.Uint64("seq", seq), zap.Error(err))
-		return simplex.Blacklist{}, err
+		return common.Blacklist{}, err
 	}
 
-	var blacklist simplex.Blacklist
+	var blacklist common.Blacklist
 	if err := blacklist.FromBytes(blacklistBytes); err != nil {
-		return simplex.Blacklist{}, fmt.Errorf("failed to parse blacklist: %w", err)
+		return common.Blacklist{}, fmt.Errorf("failed to parse blacklist: %w", err)
 	}
 	return blacklist, nil
 }
@@ -276,8 +276,8 @@ func getBlock(ctx context.Context, vm block.ChainVM, height uint64) (snowman.Blo
 	return vm.GetBlock(ctx, id)
 }
 
-// finalizationToBytes serializes the simplex.Finalization into bytes.
-func finalizationToBytes(finalization simplex.Finalization) []byte {
+// finalizationToBytes serializes the common.Finalization into bytes.
+func finalizationToBytes(finalization common.Finalization) []byte {
 	cFinalization := canotoFinalization{
 		Finalization: finalization.Finalization.Bytes(),
 		QC:           finalization.QC.Bytes(),
@@ -292,16 +292,16 @@ type canotoFinalization struct {
 	canotoData canotoData_canotoFinalization
 }
 
-// finalizationFromBytes deserialized the bytes into a simplex.Finalization.
-func (c *canotoFinalization) toFinalization(d *QCDeserializer) (simplex.Finalization, error) {
-	var finalization simplex.Finalization
+// finalizationFromBytes deserialized the bytes into a common.Finalization.
+func (c *canotoFinalization) toFinalization(d *QCDeserializer) (common.Finalization, error) {
+	var finalization common.Finalization
 	if err := finalization.Finalization.FromBytes(c.Finalization); err != nil {
-		return simplex.Finalization{}, err
+		return common.Finalization{}, err
 	}
 
 	qc, err := d.DeserializeQuorumCertificate(c.QC)
 	if err != nil {
-		return simplex.Finalization{}, err
+		return common.Finalization{}, err
 	}
 
 	finalization.QC = qc

@@ -6,22 +6,23 @@ package simplex
 import (
 	"testing"
 
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-var testSimplexMessage = simplex.Message{
-	VoteMessage: &simplex.Vote{
-		Vote: simplex.ToBeSignedVote{
-			BlockHeader: simplex.BlockHeader{
-				ProtocolMetadata: simplex.ProtocolMetadata{
+var testSimplexMessage = common.Message{
+	VoteMessage: &common.Vote{
+		Vote: common.ToBeSignedVote{
+			BlockHeader: common.BlockHeader{
+				ProtocolMetadata: common.ProtocolMetadata{
 					Version: 1,
 					Epoch:   1,
 					Round:   1,
@@ -29,7 +30,7 @@ var testSimplexMessage = simplex.Message{
 				},
 			},
 		},
-		Signature: simplex.Signature{
+		Signature: common.Signature{
 			Signer: []byte("dummy_node_id"),
 			Value:  []byte("dummy_signature"),
 		},
@@ -46,7 +47,7 @@ func TestCommSendMessage(t *testing.T) {
 
 	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
 	require.NoError(t, err)
-	expectedSendConfig := common.SendConfig{
+	expectedSendConfig := engcommon.SendConfig{
 		NodeIDs: set.Of(destinationNodeID),
 	}
 	sender := config.Sender.(*sendermock.ExternalSender)
@@ -65,15 +66,15 @@ func TestCommBroadcast(t *testing.T) {
 	require.NoError(t, err)
 	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
 	require.NoError(t, err)
-	nodes := make([]ids.NodeID, 0, len(comm.Nodes()))
-	for _, node := range comm.Nodes() {
-		if node.Equals(config.Ctx.NodeID[:]) {
+	nodes := make([]ids.NodeID, 0, len(comm.Validators()))
+	for _, node := range comm.Validators() {
+		if node.Id.Equals(config.Ctx.NodeID[:]) {
 			continue // skip the sending node
 		}
-		nodes = append(nodes, ids.NodeID(node))
+		nodes = append(nodes, ids.NodeID(node.Id))
 	}
 
-	expectedSendConfig := common.SendConfig{
+	expectedSendConfig := engcommon.SendConfig{
 		NodeIDs: set.Of(nodes...),
 	}
 
@@ -97,15 +98,15 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 	chainID := ids.GenerateTestID()
 	tests := []struct {
 		name string
-		resp *simplex.VerifiedReplicationResponse
+		resp *common.VerifiedReplicationResponse
 	}{
 		{
 			name: "nil latest round",
-			resp: &simplex.VerifiedReplicationResponse{
-				Data: []simplex.VerifiedQuorumRound{
+			resp: &common.VerifiedReplicationResponse{
+				Data: []common.VerifiedQuorumRound{
 					{
 						VerifiedBlock: &Block{
-							metadata: simplex.ProtocolMetadata{},
+							metadata: common.ProtocolMetadata{},
 							vmBlock:  snowmantest.Genesis,
 						},
 					},
@@ -115,18 +116,18 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 		},
 		{
 			name: "empty seqs",
-			resp: &simplex.VerifiedReplicationResponse{
-				Data:        []simplex.VerifiedQuorumRound{},
+			resp: &common.VerifiedReplicationResponse{
+				Data:        []common.VerifiedQuorumRound{},
 				LatestRound: nil,
 			},
 		},
 		{
 			name: "non-nil latest round",
-			resp: &simplex.VerifiedReplicationResponse{
-				Data: []simplex.VerifiedQuorumRound{},
-				LatestRound: &simplex.VerifiedQuorumRound{
+			resp: &common.VerifiedReplicationResponse{
+				Data: []common.VerifiedQuorumRound{},
+				LatestRound: &common.VerifiedQuorumRound{
 					VerifiedBlock: &Block{
-						metadata: simplex.ProtocolMetadata{},
+						metadata: common.ProtocolMetadata{},
 						vmBlock:  snowmantest.Genesis,
 					},
 				},
