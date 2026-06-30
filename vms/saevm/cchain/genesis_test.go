@@ -619,8 +619,8 @@ func TestSetupGenesis(t *testing.T) {
 			require.NoErrorf(t, g.setup(db, trieConfig), "%T.setup(initial)", g)
 
 			block, err := g.block()
-			genesisHash := block.Hash()
 			require.NoErrorf(t, err, "%T.block()", g)
+			genesisHash := block.Hash()
 			gotConfig := rawdb.ReadChainConfig(db, genesisHash)
 			cmpBaseConfig := cmp.Options{
 				cmpopts.IgnoreUnexported(corethparams.ChainConfig{}),
