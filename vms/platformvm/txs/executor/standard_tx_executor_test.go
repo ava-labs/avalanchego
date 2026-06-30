@@ -4911,7 +4911,7 @@ func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
 	_, _, _, err = StandardTx(
 		&env.backend,
 		state.PickFeeCalculator(env.config, env.state),
-		newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), 1),
+		newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), time.Unix(1, 0)),
 		diff,
 	)
 	require.ErrorIs(t, err, ErrWrongTxType)
