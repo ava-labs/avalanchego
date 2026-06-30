@@ -22,7 +22,9 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -2301,6 +2303,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 					require.Equalf(t, vmtest.InitialFund, balance, "unexpected genesis balance for %s", addr)
 				}
 
+				proofAddr := vmtest.TestEthAddrs[0]
 				for blockNum := uint64(0); blockNum <= numBlocks; blockNum++ {
 					// Checking the sender's nonce (which should equal the block number)
 					// verifies that the reconstructed state is both openable and correct.
@@ -2356,7 +2359,71 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 						require.NoErrorf(t, rpcClient.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "failed to get intermediate roots at block %d", blockNum)
 						require.Equalf(t, []common.Hash{block.Root()}, roots, "unexpected intermediate roots at block %d", blockNum)
 					}
+
+					// eth_getProof: fetch and cryptographically verify an account
+					// proof at this historical block. Depending on the subtest, this
+					// exercises either the committed-revision path (commit-interval=1,
+					// every block persisted on disk) or the reconstructed-revision path
+					// (commit-interval=10, re-execution from the nearest persisted
+					// ancestor).
+					var proofResult struct {
+						AccountProof []string       `json:"accountProof"`
+						Balance      *hexutil.Big   `json:"balance"`
+						CodeHash     common.Hash    `json:"codeHash"`
+						Nonce        hexutil.Uint64 `json:"nonce"`
+						StorageHash  common.Hash    `json:"storageHash"`
+					}
+					require.NoErrorf(t, rpcClient.CallContext(ctx, &proofResult, "eth_getProof", proofAddr, []string{}, blockNumOrHash), "eth_getProof failed at block %d", blockNum)
+
+					// The sender's nonce equals the block height; it is an EOA
+					// with no code and no storage.
+					require.Equalf(t, blockNum, uint64(proofResult.Nonce), "unexpected proof nonce at block %d", blockNum)
+					require.Equalf(t, types.EmptyCodeHash, proofResult.CodeHash, "unexpected proof code hash at block %d", blockNum)
+					require.Equalf(t, types.EmptyRootHash, proofResult.StorageHash, "unexpected proof storage hash at block %d", blockNum)
+
+					// Verify the account proof against the block's state root.
+					proofBlock := vm.blockChain.GetBlockByNumber(blockNum)
+					require.NotNilf(t, proofBlock, "missing block %d", blockNum)
+					proofDB := memorydb.New()
+					for _, node := range proofResult.AccountProof {
+						nodeBytes, err := hexutil.Decode(node)
+						require.NoError(t, err)
+						require.NoError(t, proofDB.Put(crypto.Keccak256(nodeBytes), nodeBytes))
+					}
+					provenValue, err := trie.VerifyProof(proofBlock.Root(), crypto.Keccak256(proofAddr.Bytes()), proofDB)
+					require.NoErrorf(t, err, "account proof verification failed at block %d", blockNum)
+					require.NotEmptyf(t, provenValue, "expected an inclusion proof at block %d", blockNum)
+					// The proof leaf (from Firewood) must agree with the
+					// scalar fields the RPC reports (which come from statedb).
+					var provenAccount types.StateAccount
+					require.NoErrorf(t, rlp.DecodeBytes(provenValue, &provenAccount), "failed to decode proven account at block %d", blockNum)
+					require.Equalf(t, blockNum, provenAccount.Nonce, "proven account nonce mismatch at block %d", blockNum)
 				}
+
+				// eth_getProof exclusion proof: an address never touched by the
+				// workload must produce a valid proof-of-absence.
+				rpcClient := client.Client()
+				absentAddr := common.HexToAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+				lastBlockNumOrHash := rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(numBlocks))
+				var absentResult struct {
+					AccountProof []string       `json:"accountProof"`
+					Balance      *hexutil.Big   `json:"balance"`
+					Nonce        hexutil.Uint64 `json:"nonce"`
+				}
+				require.NoError(t, rpcClient.CallContext(ctx, &absentResult, "eth_getProof", absentAddr, []string{}, lastBlockNumOrHash))
+				require.Zero(t, uint64(absentResult.Nonce), "absent account must have zero nonce")
+
+				absentDB := memorydb.New()
+				for _, node := range absentResult.AccountProof {
+					nodeBytes, err := hexutil.Decode(node)
+					require.NoError(t, err)
+					require.NoError(t, absentDB.Put(crypto.Keccak256(nodeBytes), nodeBytes))
+				}
+				lastBlock := vm.blockChain.GetBlockByNumber(numBlocks)
+				require.NotNil(t, lastBlock)
+				absentValue, err := trie.VerifyProof(lastBlock.Root(), crypto.Keccak256(absentAddr.Bytes()), absentDB)
+				require.NoError(t, err)
+				require.Empty(t, absentValue, "expected an exclusion proof for an untouched address")
 			})
 		})
 	}

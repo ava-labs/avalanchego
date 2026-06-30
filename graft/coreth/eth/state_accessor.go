@@ -342,6 +342,11 @@ func (eth *Ethereum) firewoodReconstructedState(ctx context.Context, header *typ
 		)
 	}
 
+	// Reopen a clean StateDB against the same reconstructed view, now with
+	// normal root computation enabled. extstate wraps the reconstructed trie
+	// DB in a Firewood accessor that implements firewood.Prover, so the
+	// returned state can serve trie-node proofs via eth_getProof (including for
+	// reconstructed genesis).
 	returnTrieDB := firewood.NewReconstructedTrieDB(fwDB, recon, true /* computeRootOnHash */)
 	cache, err = state.New(header.Root, extstate.NewDatabaseWithNodeDB(eth.chainDb, returnTrieDB), nil)
 	if err != nil {
