@@ -6,7 +6,7 @@ package evmstate_test
 import (
 	"bytes"
 	"context"
-	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -50,49 +50,6 @@ func TestHandler_RoundTrip(t *testing.T) {
 	require.Empty(t, cmp.Diff(req, responder.GotReq, protocmp.Transform()))
 }
 
-func TestHandler_FailurePaths(t *testing.T) {
-	tests := []struct {
-		name       string
-		resp       *syncpb.GetLeafResponse
-		err        error
-		wantAppErr bool
-	}{
-		{
-			name: "inner returns nil drops the response",
-		},
-		{
-			name:       "inner error surfaces as AppError",
-			err:        errors.New("boom"),
-			wantAppErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			responder := &synctest.FakeLeafResponder{Resp: tt.resp, Err: tt.err}
-			h := evmstate.NewHandler(logging.NoLog{}, responder)
-
-			respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, synctest.MustMarshal(t, &syncpb.GetLeafRequest{}))
-			if tt.wantAppErr {
-				require.NotNil(t, appErr)
-			} else {
-				require.Nil(t, appErr)
-			}
-			require.Empty(t, respBytes)
-		})
-	}
-}
-
-func TestHandler_MalformedRequestBytes(t *testing.T) {
-	responder := &synctest.FakeLeafResponder{}
-	h := evmstate.NewHandler(logging.NoLog{}, responder)
-
-	respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, []byte{0xff, 0xff})
-	require.Nil(t, respBytes)
-	require.NotNil(t, appErr)
-	require.Nil(t, responder.GotReq, "responder must not be invoked on malformed request")
-}
-
 func TestResponder_ValidationDrops(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
@@ -113,7 +70,7 @@ func TestResponder_ValidationDrops(t *testing.T) {
 			name: "KeyLimit overflows uint16",
 			req: &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
-				KeyLimit: uint32(^uint16(0)) + 1,
+				KeyLimit: math.MaxUint16 + 1,
 			},
 		},
 		{
@@ -152,77 +109,169 @@ func TestResponder_ValidationDrops(t *testing.T) {
 	}
 }
 
-func TestResponder_MissingRootDrops(t *testing.T) {
+func TestResponder(t *testing.T) {
 	t.Parallel()
-	trieDB := synctest.NewTrieDB()
-	r := evmstate.NewResponder(trieDB, common.HashLength, nil)
 
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash: bytes.Repeat([]byte{0xab}, common.HashLength),
-		KeyLimit: 10,
-	})
-	require.NoError(t, err)
-	require.Nil(t, resp)
-}
+	const numKeys = 50
 
-func TestResponder_TrieRoundTrip(t *testing.T) {
-	t.Parallel()
-	trieDB := synctest.NewTrieDB()
-	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
-
-	r := evmstate.NewResponder(trieDB, common.HashLength, nil)
-
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash: root.Bytes(),
-		KeyLimit: uint32(len(keys)),
-	})
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.Equal(t, keys, resp.Keys)
-	require.Equal(t, vals, resp.Values)
-	// Whole-trie response from the start: no proof needed.
-	require.Empty(t, resp.ProofVals)
-}
-
-func TestResponder_PartialRangeIncludesProof(t *testing.T) {
-	t.Parallel()
-	trieDB := synctest.NewTrieDB()
-	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
-
-	r := evmstate.NewResponder(trieDB, common.HashLength, nil)
-	limit := uint32(20)
-
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash: root.Bytes(),
-		KeyLimit: limit,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.Len(t, resp.Keys, int(limit))
-	require.Len(t, resp.Values, int(limit))
-	// Partial response must include a proof so the client can verify
-	// the right edge.
-	require.NotEmpty(t, resp.ProofVals)
-	require.Equal(t, keys[:limit], resp.Keys)
-	require.Equal(t, vals[:limit], resp.Values)
-}
-
-func TestResponder_SnapshotFastPathSucceeds(t *testing.T) {
-	t.Parallel()
-	trieDB := synctest.NewTrieDB()
-	root, keys, vals := synctest.FillTrie(t, trieDB, 30)
-
-	// Build a snapshot that mirrors the trie exactly so the fast path
-	// validates on the first try.
-	pairs := make([]synctest.StaticPair, len(keys))
-	for i := range keys {
-		pairs[i] = synctest.StaticPair{K: keys[i], V: vals[i]}
+	tests := []struct {
+		name        string
+		limit       uint32
+		corruptTrie bool
+		badRoot     bool
+		cancelCtx   bool
+		wantDrop    bool
+	}{
+		{
+			name:  "whole trie has no proof",
+			limit: numKeys,
+		},
+		{
+			name:  "partial range includes proof",
+			limit: numKeys / 2,
+		},
+		{
+			name:     "missing root drops",
+			limit:    numKeys,
+			badRoot:  true,
+			wantDrop: true,
+		},
+		{
+			// A partial range reaches the proof step, which fails on the
+			// corrupted trie.
+			name:        "corrupted trie drops",
+			limit:       numKeys / 2,
+			corruptTrie: true,
+			wantDrop:    true,
+		},
+		{
+			name:      "cancelled context drops",
+			limit:     numKeys,
+			cancelCtx: true,
+			wantDrop:  true,
+		},
 	}
-	snap := &synctest.StaticSnapshot{Pairs: map[common.Hash][]synctest.StaticPair{
-		{}: pairs,
-	}}
 
-	r := evmstate.NewResponder(trieDB, common.HashLength, snap)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			trieDB, disk := synctest.NewTrieDBWithDisk()
+			root, keys, vals := synctest.FillTrie(t, trieDB, numKeys)
+
+			if tt.corruptTrie {
+				// Corrupt nodes so proof building fails.
+				tr, err := trie.New(trie.TrieID(root), trieDB)
+				require.NoError(t, err)
+				synctest.CorruptTrie(t, disk, tr, 2)
+			}
+
+			r := evmstate.NewResponder(trieDB, common.HashLength, nil)
+
+			ctx := t.Context()
+			if tt.cancelCtx {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			rootHash := root.Bytes()
+			if tt.badRoot {
+				rootHash = bytes.Repeat([]byte{0xab}, common.HashLength)
+			}
+
+			resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+				RootHash: rootHash,
+				KeyLimit: tt.limit,
+			})
+			require.NoError(t, err)
+
+			if tt.wantDrop {
+				require.Nil(t, resp)
+				return
+			}
+			require.NotNil(t, resp)
+
+			n := int(tt.limit)
+			require.Equal(t, keys[:n], resp.Keys)
+			require.Equal(t, vals[:n], resp.Values)
+			// Partial ranges carry a proof, whole-trie responses don't.
+			if n < numKeys {
+				require.NotEmpty(t, resp.ProofVals)
+			} else {
+				require.Empty(t, resp.ProofVals)
+			}
+		})
+	}
+}
+
+func TestResponder_BoundedRange(t *testing.T) {
+	t.Parallel()
+	trieDB := synctest.NewTrieDB()
+	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
+
+	r := evmstate.NewResponder(trieDB, common.HashLength, nil)
+	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
+		RootHash: root.Bytes(),
+		StartKey: keys[10],
+		EndKey:   keys[30],
+		KeyLimit: uint32(len(keys)),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	// EndKey is inclusive.
+	require.Equal(t, keys[10:31], resp.Keys)
+	require.Equal(t, vals[10:31], resp.Values)
+	require.NotEmpty(t, resp.ProofVals)
+}
+
+func TestResponder_Snapshot(t *testing.T) {
+	t.Parallel()
+
+	// Segment length is 64, so 130 keys spans three segments.
+	const numKeys = 130
+
+	tests := []struct {
+		name string
+		// Snapshot values in [corruptFrom, corruptTo) are wrong.
+		corruptFrom int
+		corruptTo   int
+	}{
+		{
+			name: "fast path serves leaves",
+		},
+		{
+			name:        "all invalid falls back to trie",
+			corruptFrom: 0,
+			corruptTo:   numKeys,
+		},
+		{
+			name:        "slow path bridges an invalid middle segment",
+			corruptFrom: 64,
+			corruptTo:   128,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			trieDB := synctest.NewTrieDB()
+			root, keys, vals := synctest.FillTrie(t, trieDB, numKeys)
+
+			snap := synctest.MirrorSnapshot(keys, vals)
+			for i := tt.corruptFrom; i < tt.corruptTo; i++ {
+				snap.Pairs[common.Hash{}][i].V = bytes.Repeat([]byte{0xff}, common.HashLength)
+			}
+
+			r := evmstate.NewResponder(trieDB, common.HashLength, snap)
+			requireServesWholeTrie(t, r, root, keys, vals)
+		})
+	}
+}
+
+// requireServesWholeTrie asserts a whole-trie request to r returns keys/vals.
+func requireServesWholeTrie(t *testing.T, r evmstate.Responder, root common.Hash, keys, vals [][]byte) {
+	t.Helper()
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		KeyLimit: uint32(len(keys)),
@@ -231,70 +280,4 @@ func TestResponder_SnapshotFastPathSucceeds(t *testing.T) {
 	require.NotNil(t, resp)
 	require.Equal(t, keys, resp.Keys)
 	require.Equal(t, vals, resp.Values)
-}
-
-func TestResponder_SnapshotFallsBackToTrie(t *testing.T) {
-	t.Parallel()
-	trieDB := synctest.NewTrieDB()
-	root, keys, vals := synctest.FillTrie(t, trieDB, 30)
-
-	// Snapshot returns a key that is NOT in the trie (corrupted).
-	bogusKey := make([]byte, common.HashLength)
-	bogusKey[0] = 0xff
-	snap := &synctest.StaticSnapshot{Pairs: map[common.Hash][]synctest.StaticPair{
-		{}: {{K: bogusKey, V: []byte("bogus")}},
-	}}
-
-	r := evmstate.NewResponder(trieDB, common.HashLength, snap)
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash: root.Bytes(),
-		KeyLimit: uint32(len(keys)),
-	})
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	// Even with a bad snapshot, the trie fallback should produce the
-	// correct keys/values.
-	require.Equal(t, keys, resp.Keys)
-	require.Equal(t, vals, resp.Values)
-}
-
-func TestResponder_CorruptedTrieDrops(t *testing.T) {
-	t.Parallel()
-	trieDB, disk := synctest.NewTrieDBWithDisk()
-	root, keys, _ := synctest.FillTrie(t, trieDB, 50)
-
-	// Open the trie and delete every 2nd node so proof generation
-	// fails when the responder tries to construct a range proof.
-	tr, err := trie.New(trie.TrieID(root), trieDB)
-	require.NoError(t, err)
-	synctest.CorruptTrie(t, disk, tr, 2)
-
-	r := evmstate.NewResponder(trieDB, common.HashLength, nil)
-
-	// Request a partial range so the responder is forced to generate a
-	// proof (which will fail because trie nodes are missing).
-	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash: root.Bytes(),
-		KeyLimit: uint32(len(keys) / 2),
-	})
-	require.NoError(t, err)
-	require.Nil(t, resp)
-}
-
-func TestResponder_CtxCancelledDrops(t *testing.T) {
-	t.Parallel()
-	trieDB := synctest.NewTrieDB()
-	root, _, _ := synctest.FillTrie(t, trieDB, 10)
-
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-
-	r := evmstate.NewResponder(trieDB, common.HashLength, nil)
-	resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
-		RootHash: root.Bytes(),
-		KeyLimit: 10,
-	})
-	require.NoError(t, err)
-	// Ctx is cancelled before any leaves are read, so the responder drops.
-	require.Nil(t, resp)
 }

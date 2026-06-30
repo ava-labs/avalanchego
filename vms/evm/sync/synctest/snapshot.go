@@ -15,11 +15,20 @@ type StaticPair struct {
 	K, V []byte
 }
 
-// StaticSnapshot is an in-memory [evmstate.SnapshotProvider]. Pairs is
-// keyed by account ([common.Hash]{} for the account trie) and each
-// slice must be sorted ascending by K.
+// StaticSnapshot is an in-memory [evmstate.SnapshotProvider]. Each account's
+// pairs ([common.Hash]{} is the account trie) must be sorted by key.
 type StaticSnapshot struct {
 	Pairs map[common.Hash][]StaticPair
+}
+
+// MirrorSnapshot returns a [StaticSnapshot] of the account trie.
+// keys must be sorted.
+func MirrorSnapshot(keys, vals [][]byte) *StaticSnapshot {
+	pairs := make([]StaticPair, len(keys))
+	for i := range keys {
+		pairs[i] = StaticPair{K: keys[i], V: vals[i]}
+	}
+	return &StaticSnapshot{Pairs: map[common.Hash][]StaticPair{{}: pairs}}
 }
 
 func (s *StaticSnapshot) AccountIterator(start common.Hash) ethdb.Iterator {
@@ -33,7 +42,6 @@ func (s *StaticSnapshot) StorageIterator(account, start common.Hash) ethdb.Itera
 type kvIter struct {
 	pairs []StaticPair
 	idx   int
-	err   error
 }
 
 func newKVIter(all []StaticPair, start []byte) *kvIter {
@@ -45,9 +53,6 @@ func newKVIter(all []StaticPair, start []byte) *kvIter {
 }
 
 func (it *kvIter) Next() bool {
-	if it.err != nil {
-		return false
-	}
 	it.idx++
 	return it.idx < len(it.pairs)
 }
@@ -66,5 +71,5 @@ func (it *kvIter) Value() []byte {
 	return it.pairs[it.idx].V
 }
 
-func (it *kvIter) Error() error { return it.err }
-func (*kvIter) Release()        {}
+func (*kvIter) Error() error { return nil }
+func (*kvIter) Release()     {}
