@@ -92,7 +92,6 @@ go_test(
         "//utils/iterator",
         "//utils/logging",
         "//utils/math",
-        "//utils/math/intmath",
         "//utils/set",
         "//utils/timer/mockable",
         "//utils/units",

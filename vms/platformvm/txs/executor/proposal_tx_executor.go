@@ -45,7 +45,6 @@ var (
 	errShouldBeAutoRenewedStaker     = errors.New("expected auto renewed staker")
 	errInvalidTimestamp              = errors.New("invalid timestamp")
 	errUnexpectedStakerTxType        = errors.New("unexpected staker transaction type")
-	errDivideByZero                  = errors.New("divide by zero")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -810,7 +809,32 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	}
 
 	if totalRestakingRewards > restakingCapacity {
-		restakingValidationRewards, err = mulDivFloor(restakingValidationRewards, restakingCapacity, totalRestakingRewards)
+		// Let V be the validation rewards, D be the delegatee rewards, C be the
+		// restaking capacity, and T = V + D. This branch means C < T. After
+		// computing V' = floor(V * C / T), the delegatee restake is D' = C - V'.
+		//
+		// Proving D' cannot exceed D:
+		//   D' - D = (C - V') - (T - V)
+		//          = (C - T) + (V - V')
+		// Because V' = floor(V * C / T):
+		//   V' > V * C / T - 1
+		//   -V' < -(V * C / T - 1)
+		//   -V' < -V * C / T + 1
+		//   V - V' < V - V * C / T + 1
+		//   V - V' < V * (1 - C / T) + 1
+		//   V - V' < V * (T / T - C / T) + 1
+		//   V - V' < V * (T - C) / T + 1
+		// Since V <= T:
+		//   V - V' < T - C + 1
+		//   V - V' <= T - C
+		// Substitute that bound into D' - D:
+		//   D' - D <= (C - T) + (T - C)
+		//          <= 0
+		// Therefore D' <= D.
+		//
+		// Therefore assigning the remaining capacity to delegatee rewards cannot
+		// increase them, and the later withdrawal subtraction cannot underflow.
+		restakingValidationRewards, _, err = intmath.MulDiv(restakingValidationRewards, restakingCapacity, totalRestakingRewards)
 		if err != nil {
 			return err
 		}
@@ -1004,21 +1028,4 @@ func getNextStakerToReward(chainState state.Chain, tx txs.RewardTx) (*txs.Tx, *s
 	}
 
 	return stakerTx, stakerToReward, nil
-}
-
-// mulDivFloor computes (a * b) / c with full precision. The result is floored.
-// Returns errDivideByZero if c is zero, or intmath.ErrOverflow if the result exceeds uint64.
-func mulDivFloor(a, b, c uint64) (uint64, error) {
-	// intmath.MulDiv reports a zero denominator as an overflow, so check it
-	// first to preserve the distinct error.
-	if c == 0 {
-		return 0, errDivideByZero
-	}
-
-	quo, _, err := intmath.MulDiv(a, b, c)
-	if err != nil {
-		return 0, err
-	}
-
-	return quo, nil
 }
