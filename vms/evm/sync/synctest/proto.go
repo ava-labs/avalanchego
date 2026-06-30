@@ -24,6 +24,9 @@ type FakeResponder[Req, Resp handlers.ProtoMessage] struct {
 	GotReq Req
 }
 
+// FakeLeafResponder is the [FakeResponder] bound to the leaf-range RPC.
+type FakeLeafResponder = FakeResponder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
+
 // FakeCodeResponder is the [FakeResponder] bound to the code-by-hash RPC.
 type FakeCodeResponder = FakeResponder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
 
