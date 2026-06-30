@@ -26,8 +26,8 @@ type Config struct {
 	Clock           mockable.Clock
 	Metrics         *Metrics
 
-	Log     logging.Logger
-	Network Network
+	Log                  logging.Logger
+	Network              Network
 	Router               router.InboundHandler
 	VersionCompatibility *version.Compatibility
 	MyNodeID             ids.NodeID

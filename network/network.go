@@ -253,11 +253,11 @@ func NewNetwork(
 	}
 
 	peerConfig := &peer.Config{
-		ReadBufferSize:  config.PeerReadBufferSize,
-		WriteBufferSize: config.PeerWriteBufferSize,
-		Metrics:         peerMetrics,
-		Log:             log,
-		Network:         nil, // This is set below.
+		ReadBufferSize:         config.PeerReadBufferSize,
+		WriteBufferSize:        config.PeerWriteBufferSize,
+		Metrics:                peerMetrics,
+		Log:                    log,
+		Network:                nil, // This is set below.
 		Router:                 router,
 		VersionCompatibility:   version.GetCompatibility(minCompatibleTime),
 		MyNodeID:               config.MyNodeID,

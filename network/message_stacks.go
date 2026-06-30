@@ -92,10 +92,10 @@ func newMessageStacks(
 	stacks := &MessageStacks{
 		allowlist: config.LargeMessageConfig.Allowlist,
 		Default: peer.MessageStack{
-			MaxFrameSize:      constants.DefaultMaxMessageSize,
-			MessageCreator:    defaultCreator,
-			InboundMsgThrottler:  defaultInbound,
-			OutboundThrottler: defaultOutbound,
+			MaxFrameSize:        constants.DefaultMaxMessageSize,
+			MessageCreator:      defaultCreator,
+			InboundMsgThrottler: defaultInbound,
+			OutboundThrottler:   defaultOutbound,
 		},
 	}
 
@@ -164,10 +164,10 @@ func newMessageStacks(
 	}
 
 	stacks.Elevated = peer.MessageStack{
-		MaxFrameSize:      config.LargeMessageConfig.MaxMessageSize,
-		MessageCreator:    largeCreator,
-		InboundMsgThrottler:  largeInbound,
-		OutboundThrottler: largeOutbound,
+		MaxFrameSize:        config.LargeMessageConfig.MaxMessageSize,
+		MessageCreator:      largeCreator,
+		InboundMsgThrottler: largeInbound,
+		OutboundThrottler:   largeOutbound,
 	}
 	return stacks, nil
 }

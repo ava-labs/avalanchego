@@ -76,11 +76,11 @@ func newConfig(t *testing.T) *Config {
 	require.NoError(err)
 
 	return &Config{
-		ReadBufferSize:  constants.DefaultNetworkPeerReadBufferSize,
-		WriteBufferSize: constants.DefaultNetworkPeerWriteBufferSize,
-		Metrics:         metrics,
-		Log:             logging.NoLog{},
-		Network:         TestNetwork,
+		ReadBufferSize:       constants.DefaultNetworkPeerReadBufferSize,
+		WriteBufferSize:      constants.DefaultNetworkPeerWriteBufferSize,
+		Metrics:              metrics,
+		Log:                  logging.NoLog{},
+		Network:              TestNetwork,
 		Router:               nil,
 		VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 		MySubnets:            nil,

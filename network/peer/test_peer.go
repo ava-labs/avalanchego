@@ -109,9 +109,9 @@ func StartTestPeer(
 
 	peer := Start(
 		&Config{
-			Metrics: metrics,
-			Log:     logging.NoLog{},
-			Network: TestNetwork,
+			Metrics:              metrics,
+			Log:                  logging.NoLog{},
+			Network:              TestNetwork,
 			Router:               router,
 			VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 			MySubnets:            set.Set[ids.ID]{},
