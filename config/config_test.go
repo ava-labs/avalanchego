@@ -925,7 +925,7 @@ func TestGetStakingConfig(t *testing.T) {
 		{
 			name:      "custom network defaults HeliconMinStakeDuration to MinStakeDuration",
 			networkID: constants.LocalID,
-			minStake:  30 * time.Minute,
+			minStake:  60 * time.Minute,
 		},
 	}
 
