@@ -1,12 +1,20 @@
 name: Subnet-EVM
 
+# Default PRs run Subnet-EVM Warp and load E2E tests on Ubuntu 24.04 amd64.
+# The ci/pre-merge label runs unit and E2E tests on Ubuntu 24.04 amd64 and
+# macOS 26 arm64. Scheduled and manual runs test all five CI platforms with
+# race-shuffle and run Warp and load E2E tests.
 on:
   push:
     branches:
       - master
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   merge_group:
     types: [checks_requested]
+  schedule:
+    - cron: '40 2 * * *'
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -16,6 +24,7 @@ jobs:
     if: ${{ always() }}
     needs:
       - lint_test
+      - define-unit-test-matrix
       - unit_test
       - e2e_warp
       - e2e_load
@@ -27,14 +36,21 @@ jobs:
         shell: bash
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          SKIPPABLE_JOBS_JSON: '["lint_test", "unit_test", "e2e_warp", "e2e_load", "test_build_image", "test_build_antithesis_images"]'
         run: |
-          failed_jobs="$(
-            jq -r '
+          failed_jobs="$({
+            jq -r --argjson skippable_jobs "$SKIPPABLE_JOBS_JSON" '
               to_entries[]
-              | select(.value.result != "success")
+              | select(
+                  .value.result != "success"
+                  and (
+                    .value.result != "skipped"
+                    or (.key as $job | ($skippable_jobs | index($job)) == null)
+                  )
+                )
               | .key
             ' <<<"$NEEDS_JSON"
-          )"
+          })"
 
           if [[ -n "$failed_jobs" ]]; then
             echo "Required jobs failed:"
@@ -43,6 +59,7 @@ jobs:
           fi
 
   lint_test:
+    if: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
     name: Lint
     runs-on: ubuntu-24.04
     defaults:
@@ -57,8 +74,35 @@ jobs:
       - name: Check go.mod and go.sum are up-to-date
         run: ./scripts/run_task.sh check-go-mod-tidy
 
+  define-unit-test-matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      platforms: ${{ steps.set-platforms.outputs.platforms }}
+      e2e_platforms: ${{ steps.set-platforms.outputs.e2e_platforms }}
+    steps:
+      - name: Define unit-test matrix
+        id: set-platforms
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "schedule" || "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo 'platforms=[{"os":"ubuntu-22.04","task_name":"build-test-race-shuffle"},{"os":"ubuntu-24.04","task_name":"build-test-race-shuffle"},{"os":"ubuntu-22.04-arm","task_name":"build-test-race-shuffle"},{"os":"ubuntu-24.04-arm","task_name":"build-test-race-shuffle"},{"os":"macos-26","task_name":"build-test-race-shuffle"}]' >> "$GITHUB_OUTPUT"
+            echo 'e2e_platforms=[{"os":"ubuntu-22.04"},{"os":"ubuntu-24.04"},{"os":"ubuntu-22.04-arm"},{"os":"ubuntu-24.04-arm"},{"os":"macos-26"}]' >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            if jq -e '.pull_request.labels[]? | select(.name == "ci/pre-merge")' "$GITHUB_EVENT_PATH" >/dev/null; then
+              echo 'platforms=[{"os":"macos-26","task_name":"build-test"},{"os":"ubuntu-24.04","task_name":"build-test"}]' >> "$GITHUB_OUTPUT"
+              echo 'e2e_platforms=[{"os":"macos-26"},{"os":"ubuntu-24.04"}]' >> "$GITHUB_OUTPUT"
+            else
+              echo 'platforms=[]' >> "$GITHUB_OUTPUT"
+              echo 'e2e_platforms=[{"os":"ubuntu-24.04"}]' >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo 'platforms=[{"os":"macos-26","task_name":"build-test"},{"os":"ubuntu-24.04","task_name":"build-test"}]' >> "$GITHUB_OUTPUT"
+            echo 'e2e_platforms=[{"os":"macos-26"},{"os":"ubuntu-24.04"}]' >> "$GITHUB_OUTPUT"
+          fi
+
   unit_test:
-    name: Unit Tests (${{ matrix.os }})
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci/pre-merge') }}
+    needs: define-unit-test-matrix
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -66,16 +110,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-26, ubuntu-22.04, ubuntu-24.04]
+        include: ${{ fromJSON(needs.define-unit-test-matrix.outputs.platforms) }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
-      - run: ./scripts/run_task.sh build-test
+      - run: ./scripts/run_task.sh ${{ matrix.task_name }}
       - run: ./scripts/run_task.sh coverage
 
   e2e_warp:
-    name: e2e warp tests
-    runs-on: ubuntu-24.04
+    needs: define-unit-test-matrix
+    name: e2e warp tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.define-unit-test-matrix.outputs.e2e_platforms) }}
     steps:
       - name: Git checkout
         uses: actions/checkout@v5
@@ -86,7 +135,7 @@ jobs:
         with:
           run: ./scripts/run_task.sh test-e2e-warp-ci
           working_directory: ./graft/subnet-evm
-          artifact_prefix: warp
+          artifact_prefix: warp-${{ matrix.os }}
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
@@ -97,8 +146,13 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e_load:
-    name: e2e load tests
-    runs-on: ubuntu-24.04
+    needs: define-unit-test-matrix
+    name: e2e load tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.define-unit-test-matrix.outputs.e2e_platforms) }}
     steps:
       - name: Git checkout
         uses: actions/checkout@v5
@@ -109,7 +163,7 @@ jobs:
         with:
           run: ./scripts/run_task.sh test-e2e-load-ci
           working_directory: ./graft/subnet-evm
-          artifact_prefix: load
+          artifact_prefix: load-${{ matrix.os }}
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
@@ -120,6 +174,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   test_build_image:
+    if: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
     name: Image build
     runs-on: ubuntu-24.04
     defaults:
@@ -133,6 +188,7 @@ jobs:
         run: ./scripts/run_task.sh test-build-image
 
   test_build_antithesis_images:
+    if: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
     name: Build Antithesis images
     runs-on: ubuntu-24.04
     steps:
