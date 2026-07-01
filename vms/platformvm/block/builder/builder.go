@@ -326,7 +326,7 @@ func buildBlock(
 	if shouldReward {
 		stakerTx, _, err := parentState.GetTx(stakerTxID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getting staker tx: %w", err)
 		}
 
 		rewardValidatorTx, err := newRewardTxForStaker(builder.txExecutorBackend.Ctx, stakerTx, timestamp)

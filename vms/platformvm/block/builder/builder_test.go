@@ -273,6 +273,9 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(env.state.PutCurrentValidator(staker))
+	// The builder only needs the current staker to choose the reward tx type,
+	// but auto-renewed validators normally also have staking info. Keep the
+	// directly constructed state consistent with StandardTx execution.
 	require.NoError(env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
 		NextPeriod: uint64(stakePeriod / time.Second),
 	}))
