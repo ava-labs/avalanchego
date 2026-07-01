@@ -1,9 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
-# gazelle:exclude accept_block_test.go
-# gazelle:exclude worstcase_test.go
-
 go_library(
     name = "sae",
     srcs = [
@@ -53,6 +50,7 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/txpool",
         "@com_github_ava_labs_libevm//core/txpool/legacypool",
         "@com_github_ava_labs_libevm//core/types",
@@ -72,6 +70,7 @@ go_library(
 go_test(
     name = "sae_test",
     srcs = [
+        "accept_block_test.go",
         "always_test.go",
         "networked_test.go",
         "recovery_test.go",
@@ -82,6 +81,7 @@ go_test(
         "rpc_test.go",
         "tx_test.go",
         "vm_test.go",
+        "worstcase_test.go",
     ],
     embed = [":sae"],
     deps = [
@@ -105,13 +105,15 @@ go_test(
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/hook/hookstest",
+        "//vms/saevm/intmath",
         "//vms/saevm/params",
         "//vms/saevm/sae/rpc",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
         "//vms/saevm/saetest/escrow",
-        "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/types",
+        "//vms/saevm/vmtest",
+        "//vms/saevm/worstcase",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
@@ -160,11 +162,10 @@ go_test(
         "rpc_receipts_test.go",
         "rpc_stateful_test.go",
         "rpc_test.go",
-        "tx_test.go",
         "vm_test.go",
         "worstcase_test.go",
     ],
-    args = ["-test.run=TestAcceptBlock|TestSubscriptions|TestWorstCase"],
+    args = ["-test.run=TestSubscriptions|TestAcceptBlock|TestWorstCase"],
     embed = [":sae"],
     env = {"SAEVM_TEST_FLAKY": "1"},
     flaky = True,
@@ -175,17 +176,13 @@ go_test(
         "//snow",
         "//snow/consensus/snowman",
         "//snow/engine/common",
-        "//snow/engine/enginetest",
         "//snow/engine/snowman/block",
         "//snow/snowtest",
-        "//snow/validators",
-        "//snow/validators/validatorstest",
         "//utils",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//utils/math/intmath",
         "//utils/set",
-        "//utils/timer/mockable",
         "//version",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
@@ -200,6 +197,7 @@ go_test(
         "//vms/saevm/saetest/escrow",
         "//vms/saevm/txgossip/txgossiptest",
         "//vms/saevm/types",
+        "//vms/saevm/vmtest",
         "//vms/saevm/worstcase",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//:libevm",
@@ -230,8 +228,6 @@ go_test(
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
         "@com_github_holiman_uint256//:uint256",
-        "@com_github_prometheus_client_golang//prometheus",
-        "@com_github_prometheus_client_model//go",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",

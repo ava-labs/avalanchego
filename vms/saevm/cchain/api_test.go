@@ -229,7 +229,7 @@ func TestRPCExtras(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
-			client := sut.ethclient.Client()
+			client := sut.EthClient.Client()
 			var got map[string]any
 			err := client.CallContext(ctx, &got, tt.method, tt.args...)
 			require.NoErrorf(t, err, "%s(%v)", tt.method, tt.args)

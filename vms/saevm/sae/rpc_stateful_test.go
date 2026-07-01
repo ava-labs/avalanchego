@@ -40,7 +40,7 @@ import (
 // [blocks.ErrNonCanonicalBlock], while non-state lookups return nil (not found).
 func TestStateQueryOnNonCanonicalBlock(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
-	b := unwrap(t, sut.createAndVerifyBlock(t, sut.lastAcceptedBlock(t)))
+	b := unwrap(t, sut.createAndVerifyBlock(t, sut.LastAcceptedBlock(t)))
 
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -217,7 +217,7 @@ func TestStatefulRPCs(t *testing.T) {
 		bb := sut.runConsensusLoop(t)
 		vmTime.AdvanceToSettle(ctx, t, bb)
 	}
-	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
+	_, ok := sut.RawVM.consensusCritical.Load(b.Hash())
 	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
 
 	storageKey := escrow.StorageKeyForBalance(recipient)
