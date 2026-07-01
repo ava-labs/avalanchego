@@ -73,6 +73,7 @@ go_library(
         "//network/p2p",
         "//network/p2p/acp118",
         "//network/p2p/gossip",
+        "//network/p2p/oracle/validator",
         "//snow",
         "//snow/consensus/snowman",
         "//snow/engine/common",

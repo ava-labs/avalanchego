@@ -1,0 +1,40 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "sidecar_lib",
+    srcs = [
+        "main.go",
+        "server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/sidecar",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//network/p2p/oracle",
+        "//proto/pb/oracle",
+        "//sidecar/solanarpc",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+    ],
+)
+
+go_binary(
+    name = "sidecar",
+    embed = [":sidecar_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "sidecar_test",
+    srcs = ["server_test.go"],
+    embed = [":sidecar_lib"],
+    deps = [
+        "//network/p2p/oracle",
+        "//proto/pb/oracle",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+    ],
+)

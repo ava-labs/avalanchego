@@ -85,6 +85,7 @@ import (
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
+	p2poracle "github.com/ava-labs/avalanchego/network/p2p/oracle/validator"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -497,9 +498,29 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	if vm.config.Oracle.Endpoint != "" {
+		sidecar, err := p2poracle.NewGRPCSidecarClient(vm.config.Oracle.Endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to create oracle gRPC client: %w", err)
+		}
+		if err := vm.registerOracleHandler(p2poracle.NewOracleVerifier(sidecar)); err != nil {
+			return err
+		}
+	}
+
 	vm.stateSyncDone = make(chan struct{})
 
 	return vm.initializeStateSync(lastAcceptedHeight)
+}
+
+func (vm *VM) registerOracleHandler(verifier acp118.Verifier) error {
+	cache := lru.NewCache[ids.ID, []byte](warpSignatureCacheSize)
+	meteredCache, err := metercacher.New("oracle_signature_cache", vm.sdkMetrics, cache)
+	if err != nil {
+		return fmt.Errorf("failed to create oracle signature cache: %w", err)
+	}
+	handler := acp118.NewCachedHandler(meteredCache, verifier, vm.ctx.WarpSigner)
+	return vm.P2PNetwork().AddHandler(p2poracle.SignatureRequestHandlerID, handler)
 }
 
 func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, airdropFile string) (*core.Genesis, error) {
