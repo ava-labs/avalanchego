@@ -76,17 +76,13 @@ type config struct {
 // 	StateSyncIDs []ids.NodeID `json:"state-sync-ids"`
 // }
 
-// defaultBatchRequestLimit is the maximum number of requests per JSON-RPC batch
-// used when [config.BatchRequestLimit] is unset. 0 disables the limit.
-const defaultBatchRequestLimit = 1000
-
 // defaultConfig returns the config used when an operator leaves a field unset.
 func defaultConfig() config {
 	return config{
 		Pruning:            true,
 		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
 		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
-		BatchRequestLimit:  defaultBatchRequestLimit,
+		BatchRequestLimit:  1000, // matches geth / libevm's node.DefaultConfig
 	}
 }
 
