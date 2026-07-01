@@ -238,7 +238,8 @@ func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) e
 // AfterExecutingTransaction credits the base-fee burn (GasUsed * baseFee) to
 // [constants.BlackholeAddr], which libevm's state transition otherwise discards.
 func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, r *types.Receipt) error {
-	burned := new(uint256.Int).Mul(uint256.NewInt(r.GasUsed), &baseFee)
+	burned := new(uint256.Int).SetUint64(r.GasUsed)
+	burned.Mul(burned, &baseFee)
 	db.AddBalance(constants.BlackholeAddr, burned)
 	return nil
 }
