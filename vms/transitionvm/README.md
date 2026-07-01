@@ -197,8 +197,8 @@ flowchart TD
     t --> cc["chain snow.Context.Lock<br/>(managed copy)"]
     cc --> b["block.lock"]
     cc --> c["connections.lock"]
-    t --> r["requests.lock"]
-    t --> hs["httpHandlers.lock"]
+    cc --> r["requests.lock"]
+    cc --> hs["httpHandlers.lock"]
     hs --> h["httpHandler.lock"]
 
     classDef ctxCls stroke:#1f77b4,stroke-width:2px,color:#1f77b4;
