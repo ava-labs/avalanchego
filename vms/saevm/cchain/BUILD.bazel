@@ -171,6 +171,7 @@ go_test(
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/params",
+        "//vms/saevm/sae/rpc",
         "//vms/saevm/saetest",
         "//vms/saevm/saexec",
         "//vms/saevm/txgossip/txgossiptest",
