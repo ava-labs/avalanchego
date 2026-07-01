@@ -53,7 +53,9 @@ type config struct {
 	// APIs
 	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
 	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
-	// BatchRequestLimit   uint64 `json:"batch-request-limit"`
+	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
+	// 0 = no limit. An unset config uses the default (1000).
+	BatchRequestLimit uint64 `json:"batch-request-limit"`
 
 	// State sync
 	// StateSyncEnabled *bool `json:"state-sync-enabled"`
@@ -79,6 +81,7 @@ func defaultConfig() config {
 		Pruning:            true,
 		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
 		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
+		BatchRequestLimit:  1000, // matches geth / libevm's node.DefaultConfig
 	}
 }
 
@@ -92,6 +95,9 @@ func parseConfig(b []byte) (config, error) {
 
 	if err := json.Unmarshal(b, &c); err != nil {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+	}
+	if err := c.saeConfig(nil).RPCConfig.Verify(); err != nil {
+		return config{}, err
 	}
 	return c, nil
 }
@@ -112,6 +118,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 		},
 		RPCConfig: rpc.Config{
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
+			BatchRequestLimit:   c.BatchRequestLimit,
 		},
 		Now: now,
 	}

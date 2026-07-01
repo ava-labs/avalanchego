@@ -92,6 +92,10 @@ var _ io.Closer = (*closerFunc)(nil)
 func (f closerFunc) Close() error { return f() }
 
 // A Config configures construction of a new [VM].
+//
+// TODO(JonathanOppenheimer): add a Verify method that checks all sub-configs
+// (e.g. [rpc.Config.Verify]) and call it from [NewVM] so the VM doesn't
+// assume its caller validated the config.
 type Config struct {
 	MempoolConfig legacypool.Config
 	DBConfig      saedb.Config
