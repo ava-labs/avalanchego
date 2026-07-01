@@ -39,7 +39,7 @@ type SUT struct {
 
 // BuildVerifyAccept builds, verifies, and accepts a block. Accepting one at the
 // transition time triggers the transition.
-func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode verifyMode) {
+func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode contextMode) {
 	t.Helper()
 
 	blk, err := s.BuildBlock(ctx)
@@ -48,34 +48,43 @@ func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode verifyMo
 	require.NoErrorf(t, blk.Accept(ctx), "%T.Accept()", blk)
 }
 
-// verifyMode selects whether a block is verified with a [smblock.Context].
-type verifyMode int
+// contextMode selects whether an operation is performed with a
+// [smblock.Context].
+type contextMode int
 
 const (
-	verifyNoContext verifyMode = iota
-	verifyWithContext
+	noContext contextMode = iota
+	withContext
 )
 
-var verifyModes = []verifyMode{verifyNoContext, verifyWithContext}
+var contextModes = []contextMode{noContext, withContext}
 
-func (m verifyMode) String() string {
+func (m contextMode) String() string {
 	switch m {
-	case verifyNoContext:
-		return "Verify"
-	case verifyWithContext:
-		return "VerifyWithContext"
+	case noContext:
+		return "NoContext"
+	case withContext:
+		return "WithContext"
 	default:
 		return "Unknown"
 	}
 }
 
 // verifyBlock verifies blk according to mode.
-func verifyBlock(ctx context.Context, blk snowman.Block, mode verifyMode) error {
-	if mode == verifyNoContext {
+func verifyBlock(ctx context.Context, blk snowman.Block, mode contextMode) error {
+	if mode == noContext {
 		return blk.Verify(ctx)
 	}
 	bwc := blk.(smblock.WithVerifyContext)
 	return bwc.VerifyWithContext(ctx, nil)
+}
+
+// setPreference sets vm's preference to blkID according to mode.
+func setPreference(ctx context.Context, vm *VM, blkID ids.ID, mode contextMode) error {
+	if mode == noContext {
+		return vm.SetPreference(ctx, blkID)
+	}
+	return vm.SetPreferenceWithContext(ctx, blkID, nil)
 }
 
 type sutConfig struct {
@@ -236,7 +245,6 @@ func (b *fakeBlock) Accept(ctx context.Context) error {
 // fakeVM is a minimal in-memory [Chain] backed by a shared [fakeState].
 type fakeVM struct {
 	*blocktest.VM
-	*blocktest.SetPreferenceVM
 	*blocktest.StateSyncableVM
 
 	name  string
@@ -251,7 +259,8 @@ type fakeVM struct {
 	connected map[ids.NodeID]*version.Application
 	// consensusState is the last state passed to SetState.
 	consensusState snow.State
-	// preference is the last ID passed to SetPreference.
+	// preference is the last ID passed to SetPreference or
+	// SetPreferenceWithContext.
 	preference ids.ID
 	// chainCtx is the context captured in Initialize.
 	chainCtx *snow.Context
@@ -266,7 +275,6 @@ func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
 		VM: &blocktest.VM{
 			VM: enginetest.VM{T: t},
 		},
-		SetPreferenceVM: &blocktest.SetPreferenceVM{T: t},
 		StateSyncableVM: &blocktest.StateSyncableVM{T: t},
 		name:            name,
 		state:           state,
@@ -304,6 +312,11 @@ func (vm *fakeVM) SetState(_ context.Context, state snow.State) error {
 }
 
 func (vm *fakeVM) SetPreference(_ context.Context, blkID ids.ID) error {
+	vm.preference = blkID
+	return nil
+}
+
+func (vm *fakeVM) SetPreferenceWithContext(_ context.Context, blkID ids.ID, _ *smblock.Context) error {
 	vm.preference = blkID
 	return nil
 }
@@ -391,22 +404,44 @@ func TestTransition(t *testing.T) {
 	require.NoErrorf(t, err, "%T.Version()", sut)
 	require.Equalf(t, "pre", version, "%T.Version()", sut)
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 
 	version, err = sut.Version(ctx)
 	require.NoErrorf(t, err, "%T.Version()", sut)
 	require.Equalf(t, "post", version, "%T.Version()", sut)
 }
 
+// TestTransitionSkipsPreference verifies the transition doesn't set the
+// post-transition chain's preference if the preference wasn't set before the
+// transition.
+func TestTransitionSkipsPreference(t *testing.T) {
+	for _, mode := range contextModes {
+		t.Run(mode.String(), func(t *testing.T) {
+			sut := newSUT(t)
+			ctx := t.Context()
+
+			sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+			require.Zerof(t, sut.post.preference, "%T.preference", sut.post)
+		})
+	}
+}
+
 // TestTransitionSetsPreference verifies the transition sets the post-transition
-// chain's preference to the last accepted block.
+// chain's preference if the preference was set before the transition.
 func TestTransitionSetsPreference(t *testing.T) {
-	sut := newSUT(t)
-	ctx := t.Context()
+	for _, mode := range contextModes {
+		t.Run(mode.String(), func(t *testing.T) {
+			sut := newSUT(t)
+			ctx := t.Context()
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
+			lastAcceptedID, err := sut.LastAccepted(ctx)
+			require.NoErrorf(t, err, "%T.LastAccepted()", sut)
+			require.NoErrorf(t, setPreference(ctx, sut.VM, lastAcceptedID, mode), "setPreference(%s)", mode)
 
-	require.Equalf(t, sut.post.state.lastAccepted.ID(), sut.post.preference, "%T.preference", sut.post)
+			sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+			require.Equalf(t, sut.post.state.lastAccepted.ID(), sut.post.preference, "%T.preference", sut.post)
+		})
+	}
 }
 
 // TestInitializeIsolatesContext verifies the post-transition chain gets its own
@@ -415,7 +450,7 @@ func TestInitializeIsolatesContext(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 
 	require.NotSamef(t, sut.pre.chainCtx, sut.post.chainCtx, "%T.chainCtx", sut.post)
 	require.NotSamef(t, sut.pre.chainCtx.Metrics, sut.post.chainCtx.Metrics, "%T.chainCtx.Metrics", sut.post)
@@ -429,14 +464,14 @@ func TestRestart(t *testing.T) {
 	sut := newSUT(t, withBlocksUntilTransition(2))
 	ctx := t.Context()
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext)
+	sut.BuildVerifyAccept(t, ctx, noContext)
 
 	sut = sut.restart(t)
 	version, err := sut.Version(ctx)
 	require.NoErrorf(t, err, "%T.Version()", sut)
 	require.Equalf(t, "pre", version, "%T.Version()", sut)
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 	version, err = sut.Version(ctx)
 	require.NoErrorf(t, err, "%T.Version()", sut)
 	require.Equalf(t, "post", version, "%T.Version()", sut)

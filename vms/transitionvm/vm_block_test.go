@@ -13,7 +13,7 @@ import (
 // TestPostTransitionBlock verifies that after the transition, blocks are built
 // and accepted by the post-transition chain.
 func TestPostTransitionBlock(t *testing.T) {
-	for _, mode := range verifyModes {
+	for _, mode := range contextModes {
 		t.Run(mode.String(), func(t *testing.T) {
 			sut := newSUT(t, withBlocksUntilTransition(0))
 			ctx := t.Context()
@@ -26,7 +26,7 @@ func TestPostTransitionBlock(t *testing.T) {
 // TestTransitionBlockChildren verifies that a pre-transition block whose parent
 // is at or after the transition time fails verification.
 func TestTransitionBlockChildren(t *testing.T) {
-	for _, mode := range verifyModes {
+	for _, mode := range contextModes {
 		t.Run(mode.String(), func(t *testing.T) {
 			sut := newSUT(t)
 			ctx := t.Context()
@@ -47,7 +47,7 @@ func TestTransitionBlockChildren(t *testing.T) {
 // TestNoTransitionBeforeTime verifies accepting a block before the transition
 // time leaves the VM on the pre-transition chain.
 func TestNoTransitionBeforeTime(t *testing.T) {
-	for _, mode := range verifyModes {
+	for _, mode := range contextModes {
 		t.Run(mode.String(), func(t *testing.T) {
 			// Two blocks to transition; this test accepts one.
 			sut := newSUT(t, withBlocksUntilTransition(2))
@@ -66,7 +66,7 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 // and then cached by the consensus engine before the transition can be
 // correctly verified and accepted after the transition.
 func TestCachedBlockUpdatesAfterTransition(t *testing.T) {
-	for _, mode := range verifyModes {
+	for _, mode := range contextModes {
 		t.Run(mode.String(), func(t *testing.T) {
 			sut := newSUT(t)
 			ctx := t.Context()
@@ -109,7 +109,7 @@ func TestRejectIsNoopAfterTransition(t *testing.T) {
 	loserBlock := sut.pre.tip
 
 	sut.pre.tip = genesis
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // Transition with a block conflicting loser.
+	sut.BuildVerifyAccept(t, ctx, noContext) // Transition with a block conflicting loser.
 
 	// Rejecting the loser must be a noop, not a fatal error.
 	loserBlock.RejectV = errors.New("reject forwarded to shut-down pre-transition chain")

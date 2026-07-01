@@ -23,7 +23,7 @@ func TestTransitionMaintainsState(t *testing.T) {
 	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState()", sut)
 	require.Equalf(t, snow.NormalOp, sut.pre.consensusState, "%T.consensusState", sut.pre)
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 
 	require.Equalf(t, snow.NormalOp, sut.post.consensusState, "%T.consensusState", sut.post)
 }
@@ -39,7 +39,7 @@ func TestWaitForEventForwardsToCurrentChain(t *testing.T) {
 	require.NoErrorf(t, err, "%T.WaitForEvent()", sut)
 	require.Equalf(t, common.PendingTxs, msg, "%T.WaitForEvent()", sut)
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 
 	sut.post.events <- common.StateSyncDone
 	msg, err = sut.WaitForEvent(ctx)
@@ -63,7 +63,7 @@ func TestWaitForEventCanceledByTransition(t *testing.T) {
 		}()
 
 		synctest.Wait()                                // wait until WaitForEvent is durably blocked
-		sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition, canceling the wait
+		sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition, canceling the wait
 		require.ErrorIsf(t, <-errs, context.Canceled, "%T.WaitForEvent()", sut)
 	})
 }
