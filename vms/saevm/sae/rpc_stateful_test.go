@@ -93,6 +93,37 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 	}...)
 }
 
+// TestStateAtPreSAEBlock verifies that state queries succeed against a
+// synchronous (pre-SAE) block once it has been evicted from memory and must be
+// restored from disk.
+func TestStateAtPreSAEBlock(t *testing.T) {
+	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, opt)
+
+	// Settle blocks until genesis is evicted from memory, forcing state queries
+	// onto the on-disk restore path.
+	for range 3 {
+		vmTime.AdvanceToSettle(ctx, t, sut.runConsensusLoop(t))
+	}
+	_, ok := sut.rawVM.consensusCritical.Load(sut.genesis.Hash())
+	require.Falsef(t, ok, "genesis %#x still in VM memory", sut.genesis.Hash())
+
+	addr := sut.wallet.Addresses()[0]
+	want := (*hexutil.Big)(new(uint256.Int).SetAllOne().ToBig()) // [saetest.MaxAllocFor]
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getBalance",
+			args:   []any{addr, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(sut.genesis.Number().Int64()))},
+			want:   want,
+		},
+		{
+			method: "eth_getBalance",
+			args:   []any{addr, rpc.BlockNumberOrHashWithHash(sut.genesis.Hash(), true)},
+			want:   want,
+		},
+	}...)
+}
+
 func TestDebugTrace(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
