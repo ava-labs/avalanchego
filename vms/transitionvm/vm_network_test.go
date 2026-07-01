@@ -132,7 +132,7 @@ func TestAppGossipGrabsCtxLock(t *testing.T) {
 		sut.ctx.Lock.Lock()
 		defer sut.ctx.Lock.Unlock()
 
-		// Allow
+		// Allow the AppGossip to proceed.
 		go close(blocked)
 		sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 	})
