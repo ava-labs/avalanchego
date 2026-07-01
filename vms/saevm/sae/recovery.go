@@ -55,14 +55,12 @@ func (rec *recovery) lastCommittedBlock() (*blocks.Block, error) {
 		return ls, nil
 	}
 
-	b, err := rec.newCanonicalBlock(num, nil)
+	ethB, err := canonicalBlock(rec.db, num)
 	if err != nil {
 		return nil, err
 	}
-	if err := b.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
-		return nil, err
-	}
-	return b, nil
+	// We only commit settled execution results, so this block is guaranteed to be settled.
+	return blocks.RestoreSettledBlock(ethB, rec.hooks, rec.log, rec.db, rec.xdb, rec.chainConfig)
 }
 
 func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Block, error] {
@@ -143,7 +141,7 @@ func (rec *recovery) consensusCriticalBlocks(exec *saexec.Executor) (_ *syncMap[
 				if err != nil {
 					return err
 				}
-				if err := parent.RestoreExecutionArtefacts(rec.db, rec.xdb, rec.chainConfig); err != nil {
+				if err := parent.RestoreExecutionArtefacts(rec.hooks, rec.db, rec.xdb, rec.chainConfig); err != nil {
 					return err
 				}
 				chain = append(chain, parent)

@@ -17,9 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
-
-	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
@@ -53,7 +52,7 @@ type config struct {
 
 	// APIs
 	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
-	// AllowUnprotectedTxs bool   `json:"allow-unprotected-txs"`
+	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
 	BatchRequestLimit uint64 `json:"batch-request-limit"`
@@ -117,8 +116,9 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			Archival:           !c.Pruning,
 			TrieCommitInterval: c.CommitInterval,
 		},
-		RPCConfig: saerpc.Config{
-			BatchRequestLimit: c.BatchRequestLimit,
+		RPCConfig: rpc.Config{
+			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
+			BatchRequestLimit:   c.BatchRequestLimit,
 		},
 		Now: now,
 	}

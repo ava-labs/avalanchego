@@ -112,7 +112,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		blockstest.WithGasTarget(sutCfg.hooks.Target),
 		blockstest.WithBaseFee(1),
 	}
-	genesis := blockstest.NewGenesis(tb, db, xdb, config, alloc, genOpts...)
+	genesis := blockstest.NewGenesis(tb, db, config, alloc, genOpts...)
 
 	blockOpts := blockstest.WithBlockOptions(
 		blockstest.WithLogger(logger),

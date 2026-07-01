@@ -68,13 +68,14 @@ type Config struct {
 	DisableTracing     bool
 
 	// Resource limits
-	EVMTimeout        time.Duration
-	GasCap            uint64
-	TxFeeCap          float64 // 0 = no cap
-	BatchRequestLimit uint64  // 0 = no limit
-
-	// Bloom indexing
 	BlocksPerBloomSection uint64
+	EVMTimeout            time.Duration
+	GasCap                uint64
+	BatchRequestLimit     uint64 // 0 = no limit
+
+	// Transaction submission
+	TxFeeCap            float64 // 0 = no cap
+	AllowUnprotectedTxs bool
 }
 
 // ErrBatchRequestLimitTooLarge means [Config.BatchRequestLimit] overflows an int.
