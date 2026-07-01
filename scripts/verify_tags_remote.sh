@@ -22,12 +22,15 @@ fi
 VERSION="${1:?Usage: verify_tags_remote.sh <version>}"
 REMOTE="${GIT_REMOTE:-origin}"
 
-if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib_version.sh
+source "$REPO_ROOT/scripts/lib_version.sh"
+
+if [[ ! "$VERSION" =~ $SEMVER_REGEX ]]; then
     echo "Error: Version must match vX.Y.Z or vX.Y.Z-suffix" >&2
     exit 1
 fi
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib_go_modules.sh"
 
 TAGS=()
