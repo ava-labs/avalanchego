@@ -9,8 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var NoOpCalculator Calculator = TestCalculator{}
-
 type TestCalculator struct {
 	Percent float64
 	Err     error

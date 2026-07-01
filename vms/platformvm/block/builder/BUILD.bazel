@@ -83,7 +83,6 @@ go_test(
         "//vms/platformvm/utxo",
         "//vms/platformvm/validators",
         "//vms/secp256k1fx",
-        "//vms/types",
         "//wallet/chain/p/wallet",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",

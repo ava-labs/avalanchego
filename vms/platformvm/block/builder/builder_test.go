@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/types"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -226,45 +225,12 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 		require.NoError(env.state.DeleteCurrentValidator(staker))
 	}
 
-	var (
-		nodeID      = ids.GenerateTestNodeID()
-		stakePeriod = 24 * time.Hour
-		startTime   = genesistest.DefaultValidatorStartTime
-		endTime     = startTime.Add(stakePeriod)
-	)
-
-	sk, err := localsigner.New()
-	require.NoError(err)
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
-
-	// Build the AddAutoRenewedValidatorTx directly
-	addTx, err := txs.NewSigned(&txs.AddAutoRenewedValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-		}},
-		ValidatorNodeID: types.JSONByteSlice(nodeID.Bytes()),
-		Signer:          pop,
-		StakeOuts: []*avax.TransferableOutput{
-			{
-				Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: env.config.MinValidatorStake,
-				},
-			},
-		},
-		ValidatorRewardsOwner:    &secp256k1fx.OutputOwners{},
-		DelegatorRewardsOwner:    &secp256k1fx.OutputOwners{},
-		ValidatorAuthority:       &secp256k1fx.OutputOwners{},
-		DelegationShares:         reward.PercentDenominator,
-		AutoCompoundRewardShares: reward.PercentDenominator,
-		Period:                   uint64(stakePeriod / time.Second),
-	}, txs.Codec, nil)
-	require.NoError(err)
-
+	addTx := newAddAutoRenewedValidatorTx(t)
 	txID := addTx.ID()
 	validatorTx := addTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+
+	startTime := genesistest.DefaultValidatorStartTime
+	endTime := startTime.Add(time.Duration(validatorTx.Period) * time.Second)
 
 	// Add the tx and staker directly to state
 	env.state.AddTx(addTx, status.Committed)
@@ -277,7 +243,7 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 	// but auto-renewed validators normally also have staking info. Keep the
 	// directly constructed state consistent with StandardTx execution.
 	require.NoError(env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
-		NextPeriod: uint64(stakePeriod / time.Second),
+		NextPeriod: validatorTx.Period,
 	}))
 	require.NoError(env.state.Commit())
 
