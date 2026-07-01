@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -89,9 +88,20 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	}
 
 	numOrHash.RequireCanonical = true
-	num, hash, err := blocks.ResolveRPCNumberOrHash(b, numOrHash)
+	_, hash, err := blocks.ResolveRPCNumberOrHash(b, numOrHash)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Restoring the block (rather than reading artifacts from the database
+	// directly) also handles synchronous (pre-SAE) blocks, whose results are
+	// derived from the header by [blocks.Block.RestoreExecutionArtefacts].
+	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(hash, true))
+	if err != nil {
+		return nil, nil, err
+	}
+	if bl == nil {
+		return nil, nil, blocks.ErrNotFound
 	}
 
 	// The API implementations expect this to be synchronous, sourcing the state
@@ -100,28 +110,9 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	//
 	// TODO(arr4n) the above assumption is brittle under geth/libevm updates;
 	// devise an approach to ensure that it is confirmed on each.
-	var hdr *types.Header
-	if bl, ok := b.ConsensusCriticalBlock(hash); ok {
-		hdr = bl.Header()
-		hdr.Root = bl.PostExecutionStateRoot()
-		hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
-	} else {
-		hdr = rawdb.ReadHeader(b.DB(), hash, num)
-
-		// TODO(arr4n) export [blocks.executionResults] to avoid multiple
-		// database reads and canoto unmarshallings here.
-		var err error
-		hdr.Root, err = blocks.PostExecutionStateRoot(b.XDB(), num)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		bf, err := blocks.ExecutionBaseFee(b.XDB(), num)
-		if err != nil {
-			return nil, nil, err
-		}
-		hdr.BaseFee = bf.ToBig()
-	}
+	hdr := bl.Header()
+	hdr.Root = bl.PostExecutionStateRoot()
+	hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
 
 	sdb, err := b.StateDB(hdr.Root)
 	if err != nil {
@@ -216,7 +207,16 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 func (b *backend) postExecutionStateRoot(hash common.Hash, num uint64) (common.Hash, error) {
 	switch bl, ok := b.ConsensusCriticalBlock(hash); {
 	case !ok:
-		return blocks.PostExecutionStateRoot(b.XDB(), num)
+		// Restore from disk. This handles synchronous (pre-SAE) blocks, whose
+		// execution results are derived from the header rather than persisted.
+		restored, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(hash, true))
+		if err != nil {
+			return common.Hash{}, err
+		}
+		if restored == nil {
+			return common.Hash{}, blocks.ErrNotFound
+		}
+		return restored.PostExecutionStateRoot(), nil
 	case bl.Executed():
 		return bl.PostExecutionStateRoot(), nil
 	default:
