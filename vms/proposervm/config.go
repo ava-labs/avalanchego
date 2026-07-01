@@ -31,4 +31,7 @@ type Config struct {
 
 	// Registerer for prometheus metrics
 	Registerer prometheus.Registerer
+
+	FallbackNonValidatorCanPropose bool
+	FallbackProposerMaxWaitTime    time.Duration
 }
