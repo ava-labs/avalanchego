@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
@@ -51,7 +52,7 @@ type config struct {
 
 	// APIs
 	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
-	// AllowUnprotectedTxs bool   `json:"allow-unprotected-txs"`
+	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
 	// BatchRequestLimit   uint64 `json:"batch-request-limit"`
 
 	// State sync
@@ -108,6 +109,9 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			TrieDBConfig:       triedb.HashDefaults,
 			Archival:           !c.Pruning,
 			TrieCommitInterval: c.CommitInterval,
+		},
+		RPCConfig: rpc.Config{
+			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
 		},
 		Now: now,
 	}
