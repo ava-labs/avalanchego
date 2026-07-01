@@ -49,6 +49,7 @@ var (
 	ErrNoPendingBlocks           = errors.New("no pending blocks")
 	errMissingPreferredState     = errors.New("missing preferred block state")
 	errCalculatingNextStakerTime = errors.New("failed calculating next staker time")
+	errUnexpectedStakerTxType    = errors.New("unexpected staker transaction type")
 )
 
 type Builder interface {
@@ -661,11 +662,17 @@ func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
 // auto-renewed, and thus are rewarded with a [txs.RewardAutoRenewedValidatorTx];
 // all other stakers are rewarded with a [txs.RewardValidatorTx].
 func newRewardTxForStaker(ctx *snow.Context, stakerTx *txs.Tx, timestamp time.Time) (*txs.Tx, error) {
-	if _, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx); ok {
+	switch utx := stakerTx.Unsigned.(type) {
+	case *txs.AddAutoRenewedValidatorTx:
 		return newRewardAutoRenewedValidatorTx(ctx, stakerTx.ID(), uint64(timestamp.Unix()))
+	case *txs.AddValidatorTx,
+		*txs.AddDelegatorTx,
+		*txs.AddPermissionlessValidatorTx,
+		*txs.AddPermissionlessDelegatorTx:
+		return NewRewardValidatorTx(ctx, stakerTx.ID())
+	default:
+		return nil, fmt.Errorf("%w: %T", errUnexpectedStakerTxType, utx)
 	}
-
-	return NewRewardValidatorTx(ctx, stakerTx.ID())
 }
 
 // newRewardAutoRenewedValidatorTx returns a signed
