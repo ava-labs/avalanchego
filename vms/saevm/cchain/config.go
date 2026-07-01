@@ -101,6 +101,9 @@ func parseConfig(b []byte) (config, error) {
 	if err := json.Unmarshal(b, &c); err != nil {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
 	}
+	if err := c.saeConfig(nil).RPCConfig.Verify(); err != nil {
+		return config{}, err
+	}
 	return c, nil
 }
 

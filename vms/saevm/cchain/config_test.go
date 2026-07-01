@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -97,6 +99,11 @@ func TestParseConfig(t *testing.T) {
 			name: "batch_request_limit_explicit_zero",
 			json: `{"batch-request-limit":0}`, // 0 disables the batch limit
 			want: with(func(c *config) { c.BatchRequestLimit = 0 }),
+		},
+		{
+			name:    "batch_request_limit_too_large",
+			json:    `{"batch-request-limit":9223372036854775808}`, // math.MaxInt64 + 1
+			wantErr: testerr.Is(saerpc.ErrBatchRequestLimitTooLarge),
 		},
 		{
 			name: "warp_off_chain_messages",

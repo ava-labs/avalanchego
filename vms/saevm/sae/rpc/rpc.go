@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"time"
 
 	"github.com/ava-labs/libevm/accounts"
@@ -76,6 +77,17 @@ type Config struct {
 	BlocksPerBloomSection uint64
 }
 
+// ErrBatchRequestLimitTooLarge means [Config.BatchRequestLimit] overflows an int.
+var ErrBatchRequestLimitTooLarge = errors.New("batch request limit exceeds max")
+
+// Verify checks that all values in c are within usable bounds.
+func (c Config) Verify() error {
+	if c.BatchRequestLimit > math.MaxInt {
+		return fmt.Errorf("%w: %d > %d", ErrBatchRequestLimitTooLarge, c.BatchRequestLimit, math.MaxInt)
+	}
+	return nil
+}
+
 // A Provider provides an [rpc.Server] along with the raw geth backends that
 // handle the RPC requests.
 type Provider struct {
@@ -86,6 +98,10 @@ type Provider struct {
 
 // New constructs a new [Provider].
 func New(chain Chain, config Config) (*Provider, error) {
+	if err := config.Verify(); err != nil {
+		return nil, err
+	}
+
 	price, err := gasprice.NewEstimator(&estimatorBackend{chain}, chain.Logger(), gasprice.DefaultConfig())
 	if err != nil {
 		return nil, fmt.Errorf("gasprice.NewEstimator(...): %v", err)
