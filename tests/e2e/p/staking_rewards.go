@@ -324,9 +324,9 @@ func getRewardConfig(tc tests.TestContext, client *admin.Client) reward.Config {
 
 	rawNodeConfigMap, err := client.GetConfig(tc.DefaultContext())
 	require.NoError(err)
-	nodeConfigMap, ok := rawNodeConfigMap.(map[string]interface{})
+	nodeConfigMap, ok := rawNodeConfigMap.(map[string]any)
 	require.True(ok)
-	stakingConfigMap, ok := nodeConfigMap["stakingConfig"].(map[string]interface{})
+	stakingConfigMap, ok := nodeConfigMap["stakingConfig"].(map[string]any)
 	require.True(ok)
 
 	var rewardConfig reward.Config

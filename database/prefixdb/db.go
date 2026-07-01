@@ -232,7 +232,7 @@ func (db *Database) isClosed() bool {
 	return db.closed
 }
 
-func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
+func (db *Database) HealthCheck(ctx context.Context) (any, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 

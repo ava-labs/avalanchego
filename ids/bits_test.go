@@ -74,12 +74,12 @@ func TestEqualSubsetAll3Bytes(t *testing.T) {
 	t.Logf("seed: %d", seed)
 	id1 := ID{}.Prefix(seed)
 
-	for i := 0; i < BitsPerByte; i++ {
+	for i := range BitsPerByte {
 		for j := i; j < BitsPerByte; j++ {
 			for k := j; k < BitsPerByte; k++ {
 				id2 := ID{uint8(i), uint8(j), uint8(k)}
 
-				for start := 0; start < BitsPerByte*3; start++ {
+				for start := range BitsPerByte * 3 {
 					for end := start; end <= BitsPerByte*3; end++ {
 						require.Equal(t, Check(start, end, id1, id2), EqualSubset(start, end, id1, id2))
 					}

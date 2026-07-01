@@ -29,7 +29,7 @@ import (
 func addTxs(t testing.TB, codec codec.Manager, acceptedAtomicTxDB database.Database, fromHeight uint64, toHeight uint64, txsPerHeight int, txMap map[uint64][]*atomic.Tx) {
 	for height := fromHeight; height < toHeight; height++ {
 		txs := make([]*atomic.Tx, 0, txsPerHeight)
-		for i := 0; i < txsPerHeight; i++ {
+		for range txsPerHeight {
 			tx := atomictest.NewTestTx()
 			txs = append(txs, tx)
 			txBytes, err := codec.Marshal(atomic.CodecVersion, tx)
@@ -92,7 +92,7 @@ func verifyTxs(t testing.TB, repo *AtomicRepository, txMap map[uint64][]*atomic.
 		utils.Sort(expectedTxs)
 
 		txIDs := set.Set[ids.ID]{}
-		for i := 0; i < len(txs); i++ {
+		for i := range txs {
 			require.Equalf(t, expectedTxs[i].ID().Hex(), txs[i].ID().Hex(), "wrong txID at height=%d idx=%d", height, i)
 			txIDs.Add(txs[i].ID())
 		}

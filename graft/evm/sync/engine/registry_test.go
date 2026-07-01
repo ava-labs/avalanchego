@@ -197,7 +197,7 @@ func TestSyncerRegistry_ConcurrentStart(t *testing.T) {
 
 		releaseCh := make(chan struct{})
 
-		for i := 0; i < numBarrierSyncers; i++ {
+		for i := range numBarrierSyncers {
 			name := fmt.Sprintf("BarrierSyncer-%d", i)
 			require.NoError(t, registry.Register(NewBarrierSyncer(name, &allStartedWG, releaseCh)))
 		}
@@ -263,7 +263,7 @@ func TestSyncerRegistry_FirstErrorWinsAcrossMany(t *testing.T) {
 		)
 		allErrorSyncersStartedWG.Add(numErrorSyncers)
 
-		for i := 0; i < numErrorSyncers; i++ {
+		for i := range numErrorSyncers {
 			trigger := make(chan struct{})
 			triggers = append(triggers, trigger)
 			errInstance := errors.New("boom")
@@ -373,7 +373,7 @@ func TestSyncerRegistry_EarlyReturnOnAlreadyCancelledContext(t *testing.T) {
 		// Register syncers (they should never start).
 		const numSyncers = 2
 		mockSyncers := make([]*mockSyncer, numSyncers)
-		for i := 0; i < numSyncers; i++ {
+		for i := range numSyncers {
 			name := fmt.Sprintf("Syncer-%d", i)
 			mockSyncer := newMockSyncer(name, nil)
 			mockSyncers[i] = mockSyncer
@@ -443,7 +443,7 @@ func registerCancelAwareSyncers(t *testing.T, registry *SyncerRegistry, numSynce
 	t.Helper()
 	var startedWG sync.WaitGroup
 	startedWG.Add(numSyncers)
-	for i := 0; i < numSyncers; i++ {
+	for i := range numSyncers {
 		name := fmt.Sprintf("Syncer-%d", i)
 		require.NoError(t, registry.Register(NewCancelAwareSyncer(name, &startedWG, timeout)))
 	}

@@ -120,7 +120,7 @@ func (db *Database) Close() error {
 	return updateError(db.pebbleDB.Close())
 }
 
-func (db *Database) HealthCheck(_ context.Context) (interface{}, error) {
+func (db *Database) HealthCheck(_ context.Context) (any, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -290,8 +290,8 @@ func keyRange(start, prefix []byte) *pebble.IterOptions {
 // Assumes the Database uses bytes.Compare for key comparison and not a custom
 // comparer.
 func prefixToUpperBound(prefix []byte) []byte {
-	for i := len(prefix) - 1; i >= 0; i-- {
-		if prefix[i] != 0xFF {
+	for i, v := range slices.Backward(prefix) {
+		if v != 0xFF {
 			upperBound := make([]byte, i+1)
 			copy(upperBound, prefix)
 			upperBound[i]++

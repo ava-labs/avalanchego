@@ -188,7 +188,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				startPrimaryWithBLS,
 				startSubnetValidator,
 			),
-		).SuchThat(func(v interface{}) bool {
+		).SuchThat(func(v any) bool {
 			list := v.([]uint8)
 			return len(list) > 0 && list[0] == startPrimaryWithBLS
 		}),
@@ -507,7 +507,7 @@ func TestTimestampListGenerator(t *testing.T) {
 		gen.SliceOf(gen.OneConstOf(
 			startPrimaryWithBLS,
 			startSubnetValidator,
-		)).SuchThat(func(v interface{}) bool {
+		)).SuchThat(func(v any) bool {
 			list := v.([]uint8)
 			return len(list) > 0 && list[0] == startPrimaryWithBLS
 		}),
@@ -558,7 +558,7 @@ func TestTimestampListGenerator(t *testing.T) {
 		gen.SliceOf(gen.OneConstOf(
 			startPrimaryWithBLS,
 			startSubnetValidator,
-		)).SuchThat(func(v interface{}) bool {
+		)).SuchThat(func(v any) bool {
 			list := v.([]uint8)
 			return len(list) > 0 && list[0] == startPrimaryWithBLS
 		}),
@@ -595,7 +595,7 @@ func TestTimestampListGenerator(t *testing.T) {
 		gen.SliceOf(gen.OneConstOf(
 			startPrimaryWithBLS,
 			startSubnetValidator,
-		)).SuchThat(func(v interface{}) bool {
+		)).SuchThat(func(v any) bool {
 			list := v.([]uint8)
 			return len(list) > 0 && list[0] == startPrimaryWithBLS
 		}),

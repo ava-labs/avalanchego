@@ -29,7 +29,7 @@ func TestBytesPool(t *testing.T) {
 	require := require.New(t)
 
 	p := NewBytesPool()
-	for i := 0; i < 128; i++ {
+	for i := range 128 {
 		bytes := p.Get(i)
 		require.NotNil(bytes)
 		require.Len(*bytes, i)
@@ -69,7 +69,7 @@ func BenchmarkBytesPool_Descending(b *testing.B) {
 func BenchmarkBytesPool_Ascending(b *testing.B) {
 	p := NewBytesPool()
 	for i := 0; i < b.N; i++ {
-		for size := 0; size < 100_000; size++ {
+		for size := range 100_000 {
 			p.Put(p.Get(size))
 		}
 	}

@@ -913,7 +913,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 	return err == nil, err
 }
 
-func (db *merkleDB) HealthCheck(ctx context.Context) (interface{}, error) {
+func (db *merkleDB) HealthCheck(ctx context.Context) (any, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 

@@ -33,7 +33,7 @@ func TestUnmarshalConfig(t *testing.T) {
 		},
 		{
 			"integer durations parsed",
-			[]byte(fmt.Sprintf(`{"api-max-duration": "%v", "continuous-profiler-frequency": "%v"}`, 1*time.Minute, 2*time.Minute)),
+			fmt.Appendf(nil, `{"api-max-duration": "%v", "continuous-profiler-frequency": "%v"}`, 1*time.Minute, 2*time.Minute),
 			Config{APIMaxDuration: Duration{1 * time.Minute}, ContinuousProfilerFrequency: Duration{2 * time.Minute}},
 			false,
 		},

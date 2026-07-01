@@ -469,10 +469,7 @@ func getSpendableAVAXWithFee(
 		// Use the entire [balance] as an input, but if the required [amount]
 		// is less than the balance, update the [inputAmount] to spend the
 		// minimum amount to finish the transaction.
-		inputAmount := balance
-		if amount < balance {
-			inputAmount = amount
-		}
+		inputAmount := min(amount, balance)
 		nonce := state.GetNonce(addr)
 
 		inputs = append(inputs, EVMInput{

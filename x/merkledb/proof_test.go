@@ -1595,13 +1595,13 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Make a random range proof.
 		startProofLen := rand.Intn(32)
 		startProof := make([]ProofNode, startProofLen)
-		for i := 0; i < startProofLen; i++ {
+		for i := range startProofLen {
 			startProof[i] = newRandomProofNode(rand)
 		}
 
 		endProofLen := rand.Intn(32)
 		endProof := make([]ProofNode, endProofLen)
-		for i := 0; i < endProofLen; i++ {
+		for i := range endProofLen {
 			endProof[i] = newRandomProofNode(rand)
 		}
 
@@ -1635,13 +1635,13 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Make a random change proof.
 		startProofLen := rand.Intn(32)
 		startProof := make([]ProofNode, startProofLen)
-		for i := 0; i < startProofLen; i++ {
+		for i := range startProofLen {
 			startProof[i] = newRandomProofNode(rand)
 		}
 
 		endProofLen := rand.Intn(32)
 		endProof := make([]ProofNode, endProofLen)
-		for i := 0; i < endProofLen; i++ {
+		for i := range endProofLen {
 			endProof[i] = newRandomProofNode(rand)
 		}
 
@@ -1666,7 +1666,7 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 func generateKeyChanges(rand *rand.Rand, numKeyChanges int, includeNone bool) []KeyChange {
 	keyChanges := make([]KeyChange, numKeyChanges)
-	for i := 0; i < numKeyChanges; i++ {
+	for i := range numKeyChanges {
 		var key []byte
 		// length 0 is decoded as nil
 		if keyLen := rand.Intn(32); keyLen != 0 {
@@ -2032,7 +2032,7 @@ func Benchmark_ChangeProofs(b *testing.B) {
 	db, err := getBasicDB()
 	require.NoError(b, err)
 
-	for i := 0; i < historyChanges; i++ {
+	for i := range historyChanges {
 		batch := db.NewBatch()
 		for range changesPerHistory {
 			key := make([]byte, rand.Intn(keyMaxLen))

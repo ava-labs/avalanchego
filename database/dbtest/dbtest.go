@@ -485,7 +485,7 @@ func TestBatchReplay(t *testing.T, db database.Database) {
 	require.NoError(batch.Delete(key2))
 	require.NoError(batch.Put(key1, value2))
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		mockBatch := databasemock.NewBatch(ctrl)
 		gomock.InOrder(
 			mockBatch.EXPECT().Put(key1, value1).Times(1),
@@ -1164,12 +1164,12 @@ func runConcurrentBatches(
 	valueSize int,
 ) error {
 	batches := make([]database.Batch, 0, numBatches)
-	for i := 0; i < numBatches; i++ {
+	for range numBatches {
 		batches = append(batches, db.NewBatch())
 	}
 
 	for _, batch := range batches {
-		for i := 0; i < keysPerBatch; i++ {
+		for range keysPerBatch {
 			key := utils.RandomBytes(keySize)
 			value := utils.RandomBytes(valueSize)
 			if err := batch.Put(key, value); err != nil {

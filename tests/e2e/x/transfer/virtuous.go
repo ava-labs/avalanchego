@@ -300,7 +300,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				}
 			}
 
-			for i := 0; i < totalRounds; i++ {
+			for i := range totalRounds {
 				runFunc(i)
 			}
 

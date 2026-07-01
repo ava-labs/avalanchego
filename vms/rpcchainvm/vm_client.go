@@ -529,7 +529,7 @@ func (vm *VMClient) SetPreference(ctx context.Context, blkID ids.ID) error {
 	return err
 }
 
-func (vm *VMClient) HealthCheck(ctx context.Context) (interface{}, error) {
+func (vm *VMClient) HealthCheck(ctx context.Context) (any, error) {
 	// HealthCheck is a special case, where we want to fail fast instead of block.
 	failFast := grpc.WaitForReady(false)
 	health, err := vm.client.Health(ctx, &emptypb.Empty{}, failFast)

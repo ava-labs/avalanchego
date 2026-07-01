@@ -19,7 +19,7 @@ type mockClient struct {
 	onCall func()
 }
 
-func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, replyIntf interface{}, _ ...rpc.Option) error {
+func (mc *mockClient) SendRequest(_ context.Context, _ string, _ any, replyIntf any, _ ...rpc.Option) error {
 	reply := replyIntf.(*IsBootstrappedResponse)
 	*reply = mc.reply
 	mc.onCall()

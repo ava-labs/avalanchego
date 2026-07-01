@@ -225,7 +225,7 @@ func generateTestNodes(t testing.TB, num uint64, opts ...testNodeConfigOption) [
 	}
 
 	nodes := make([]*testNode, num)
-	for i := uint64(0); i < num; i++ {
+	for i := range num {
 		var ls *localsigner.LocalSigner
 		var err error
 		var pk []byte

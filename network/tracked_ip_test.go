@@ -84,7 +84,7 @@ func TestTrackedIP(t *testing.T) {
 	ip.increaseDelay(time.Second, time.Minute)
 	require.LessOrEqual(ip.getDelay(), 32*time.Second)
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		ip.increaseDelay(time.Second, time.Minute)
 		require.LessOrEqual(ip.getDelay(), time.Minute)
 	}

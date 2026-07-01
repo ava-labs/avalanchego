@@ -53,6 +53,6 @@ func (out *TransferOutput) Verify() error {
 	}
 }
 
-func (out *TransferOutput) Owners() interface{} {
+func (out *TransferOutput) Owners() any {
 	return &out.OutputOwners
 }

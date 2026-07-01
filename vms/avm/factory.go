@@ -15,6 +15,6 @@ type Factory struct {
 	config.Config
 }
 
-func (f *Factory) New(logging.Logger) (interface{}, error) {
+func (f *Factory) New(logging.Logger) (any, error) {
 	return &VM{Config: f.Config}, nil
 }

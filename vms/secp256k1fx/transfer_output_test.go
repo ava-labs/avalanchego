@@ -215,7 +215,7 @@ func TestOutputAddresses(t *testing.T) {
 
 func TestTransferOutputState(t *testing.T) {
 	require := require.New(t)
-	intf := interface{}(&TransferOutput{})
+	intf := any(&TransferOutput{})
 	_, ok := intf.(verify.State)
 	require.True(ok)
 }

@@ -13,7 +13,7 @@ import (
 )
 
 // Requires all values in a struct to be initialized
-func verifyInitializedStruct(tb testing.TB, s interface{}) {
+func verifyInitializedStruct(tb testing.TB, s any) {
 	tb.Helper()
 
 	require := require.New(tb)

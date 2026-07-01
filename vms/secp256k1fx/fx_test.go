@@ -620,7 +620,7 @@ func TestFxVerifyOperation(t *testing.T) {
 		},
 	}
 
-	utxos := []interface{}{utxo}
+	utxos := []any{utxo}
 	require.NoError(fx.VerifyOperation(tx, op, cred, utxos))
 }
 
@@ -671,7 +671,7 @@ func TestFxVerifyOperationUnknownTx(t *testing.T) {
 		},
 	}
 
-	utxos := []interface{}{utxo}
+	utxos := []any{utxo}
 	err := fx.VerifyOperation(nil, op, cred, utxos)
 	require.ErrorIs(err, ErrWrongTxType)
 }
@@ -701,7 +701,7 @@ func TestFxVerifyOperationUnknownOperation(t *testing.T) {
 		},
 	}
 
-	utxos := []interface{}{utxo}
+	utxos := []any{utxo}
 	err := fx.VerifyOperation(tx, nil, cred, utxos)
 	require.ErrorIs(err, ErrWrongOpType)
 }
@@ -749,7 +749,7 @@ func TestFxVerifyOperationUnknownCredential(t *testing.T) {
 		},
 	}
 
-	utxos := []interface{}{utxo}
+	utxos := []any{utxo}
 	err := fx.VerifyOperation(tx, op, nil, utxos)
 	require.ErrorIs(err, ErrWrongCredentialType)
 }
@@ -802,7 +802,7 @@ func TestFxVerifyOperationWrongNumberOfUTXOs(t *testing.T) {
 		},
 	}
 
-	utxos := []interface{}{utxo, utxo}
+	utxos := []any{utxo, utxo}
 	err := fx.VerifyOperation(tx, op, cred, utxos)
 	require.ErrorIs(err, ErrWrongNumberOfUTXOs)
 }
@@ -847,7 +847,7 @@ func TestFxVerifyOperationUnknownUTXOType(t *testing.T) {
 		},
 	}
 
-	utxos := []interface{}{nil}
+	utxos := []any{nil}
 	err := fx.VerifyOperation(tx, op, cred, utxos)
 	require.ErrorIs(err, ErrWrongUTXOType)
 }
@@ -897,7 +897,7 @@ func TestFxVerifyOperationInvalidOperationVerify(t *testing.T) {
 		},
 	}
 
-	utxos := []interface{}{utxo}
+	utxos := []any{utxo}
 	err := fx.VerifyOperation(tx, op, cred, utxos)
 	require.ErrorIs(err, ErrOutputUnspendable)
 }
@@ -945,7 +945,7 @@ func TestFxVerifyOperationMismatchedMintOutputs(t *testing.T) {
 		},
 	}
 
-	utxos := []interface{}{utxo}
+	utxos := []any{utxo}
 	err := fx.VerifyOperation(tx, op, cred, utxos)
 	require.ErrorIs(err, ErrWrongMintCreated)
 }

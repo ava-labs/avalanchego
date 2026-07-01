@@ -314,7 +314,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 	subnetID := ids.GenerateTestID()
 	numNodes := 10_000
 	getValidatorOutputs := make([]*validators.GetValidatorOutput, 0, numNodes)
-	for i := 0; i < numNodes; i++ {
+	for range numNodes {
 		nodeID := ids.GenerateTestNodeID()
 		blsPrivateKey, err := localsigner.New()
 		require.NoError(b, err)
@@ -328,7 +328,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 
 	for _, size := range []int{0, 1, 10, 100, 1_000, 10_000} {
 		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
-		for i := 0; i < size; i++ {
+		for i := range size {
 			validator := getValidatorOutputs[i]
 			getValidatorsOutput[validator.NodeID] = validator
 		}

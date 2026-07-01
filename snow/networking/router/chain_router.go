@@ -671,14 +671,14 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 // HealthCheck returns results of router health checks. Returns:
 // 1) Information about health check results
 // 2) An error if the health check reports unhealthy
-func (cr *ChainRouter) HealthCheck(context.Context) (interface{}, error) {
+func (cr *ChainRouter) HealthCheck(context.Context) (any, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
 	numOutstandingReqs := cr.timedRequests.Len()
 	isOutstandingReqs := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
 	healthy := isOutstandingReqs
-	details := map[string]interface{}{
+	details := map[string]any{
 		"outstandingRequests": numOutstandingReqs,
 	}
 

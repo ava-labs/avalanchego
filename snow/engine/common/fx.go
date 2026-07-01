@@ -8,5 +8,5 @@ import "github.com/ava-labs/avalanchego/ids"
 // Fx wraps an instance of a feature extension
 type Fx struct {
 	ID ids.ID
-	Fx interface{}
+	Fx any
 }

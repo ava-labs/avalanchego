@@ -36,7 +36,7 @@ func FillAccountsWithOverlappingStorage(
 	t *testing.T, r *rand.Rand, s state.Database, root common.Hash, numAccounts int, numOverlappingStorageRoots int,
 ) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
 	storageRoots := make([]common.Hash, 0, numOverlappingStorageRoots)
-	for i := 0; i < numOverlappingStorageRoots; i++ {
+	for range numOverlappingStorageRoots {
 		storageRoot, _, _ := GenerateIndependentTrie(t, r, s.TrieDB(), 16, common.HashLength)
 		storageRoots = append(storageRoots, storageRoot)
 	}
@@ -174,7 +174,7 @@ func FillAccounts(
 	tr, err := s.OpenTrie(root)
 	require.NoError(t, err)
 
-	for i := 0; i < numAccounts; i++ {
+	for i := range numAccounts {
 		key := utilstest.NewKey(t)
 		acc := types.StateAccount{
 			Nonce:    uint64(r.Intn(maxNonce)),

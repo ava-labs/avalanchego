@@ -482,7 +482,7 @@ func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalanc
 	require.Len(txTraceResults, 2)
 	blockTxTraceResultBytes, err := json.Marshal(txTraceResults[1].Result)
 	require.NoError(err)
-	unmarshalResults := make(map[string]interface{})
+	unmarshalResults := make(map[string]any)
 	require.NoError(json.Unmarshal(blockTxTraceResultBytes, &unmarshalResults))
 	require.Empty(unmarshalResults["returnValue"])
 
@@ -815,7 +815,7 @@ func testReceiveWarpMessage(
 	require.Len(txTraceResults, 1)
 	blockTxTraceResultBytes, err := json.Marshal(txTraceResults[0].Result)
 	require.NoError(err)
-	unmarshalResults := make(map[string]interface{})
+	unmarshalResults := make(map[string]any)
 	require.NoError(json.Unmarshal(blockTxTraceResultBytes, &unmarshalResults))
 	require.Equal(common.Bytes2Hex(expectedOutput), unmarshalResults["returnValue"])
 

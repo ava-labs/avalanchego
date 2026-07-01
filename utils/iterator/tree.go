@@ -29,9 +29,7 @@ func FromTree[T any](btree *btree.BTreeG[T]) Iterator[T] {
 		next:    make(chan T),
 		release: make(chan struct{}),
 	}
-	it.wg.Add(1)
-	go func() {
-		defer it.wg.Done()
+	it.wg.Go(func() {
 		btree.Ascend(func(i T) bool {
 			select {
 			case it.next <- i:
@@ -41,7 +39,7 @@ func FromTree[T any](btree *btree.BTreeG[T]) Iterator[T] {
 			}
 		})
 		close(it.next)
-	}()
+	})
 	return it
 }
 

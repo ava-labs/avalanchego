@@ -379,7 +379,7 @@ func TestCreateAssetTxSerializationAgain(t *testing.T) {
 func TestCreateAssetTxNotState(t *testing.T) {
 	require := require.New(t)
 
-	intf := interface{}(&CreateAssetTx{})
+	intf := any(&CreateAssetTx{})
 	_, ok := intf.(verify.State)
 	require.False(ok, "should not be marked as state")
 }

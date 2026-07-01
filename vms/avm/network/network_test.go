@@ -155,7 +155,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				m, err := xmempool.New("", prometheus.NewRegistry())
 				require.NoError(t, err)
 
-				for i := 0; i < 1024; i++ {
+				for range 1024 {
 					tx := &txs.Tx{Unsigned: &txs.BaseTx{}}
 					bytes := make([]byte, mempool.MaxTxSize)
 					tx.SetBytes(bytes, bytes)

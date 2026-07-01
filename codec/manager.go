@@ -46,16 +46,16 @@ type Manager interface {
 	// using the codec with the given version.
 	// RegisterCodec must have been called with that version.
 	// If [value] is nil, returns [ErrMarshalNil]
-	Size(version uint16, value interface{}) (int, error)
+	Size(version uint16, value any) (int, error)
 
 	// Marshal the given value using the codec with the given version.
 	// RegisterCodec must have been called with that version.
-	Marshal(version uint16, source interface{}) (destination []byte, err error)
+	Marshal(version uint16, source any) (destination []byte, err error)
 
 	// Unmarshal the given bytes into the given destination. [destination] must
 	// be a pointer or an interface. Returns the version of the codec that
 	// produces the given bytes.
-	Unmarshal(source []byte, destination interface{}) (version uint16, err error)
+	Unmarshal(source []byte, destination any) (version uint16, err error)
 }
 
 // NewManager returns a new codec manager.
@@ -90,7 +90,7 @@ func (m *manager) RegisterCodec(version uint16, codec Codec) error {
 	return nil
 }
 
-func (m *manager) Size(version uint16, value interface{}) (int, error) {
+func (m *manager) Size(version uint16, value any) (int, error) {
 	if value == nil {
 		return 0, ErrMarshalNil // can't marshal nil
 	}
@@ -110,7 +110,7 @@ func (m *manager) Size(version uint16, value interface{}) (int, error) {
 }
 
 // To marshal an interface, [value] must be a pointer to the interface.
-func (m *manager) Marshal(version uint16, value interface{}) ([]byte, error) {
+func (m *manager) Marshal(version uint16, value any) ([]byte, error) {
 	if value == nil {
 		return nil, ErrMarshalNil // can't marshal nil
 	}
@@ -135,7 +135,7 @@ func (m *manager) Marshal(version uint16, value interface{}) ([]byte, error) {
 
 // Unmarshal unmarshals [bytes] into [dest], where [dest] must be a pointer or
 // interface.
-func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
+func (m *manager) Unmarshal(bytes []byte, dest any) (uint16, error) {
 	if dest == nil {
 		return 0, ErrUnmarshalNil
 	}

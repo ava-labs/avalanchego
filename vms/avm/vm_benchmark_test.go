@@ -25,7 +25,7 @@ func getAllUTXOsBenchmark(b *testing.B, utxoCount int, randSrc rand.Source) {
 
 	addr := ids.GenerateTestShortID()
 
-	for i := 0; i < utxoCount; i++ {
+	for range utxoCount {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.GenerateTestID(),

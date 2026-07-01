@@ -418,7 +418,7 @@ func TestReliableMessages(t *testing.T) {
 	}
 	queriesToSend := 1000
 	awaiting := make([]chan struct{}, queriesToSend)
-	for i := 0; i < queriesToSend; i++ {
+	for i := range queriesToSend {
 		awaiting[i] = make(chan struct{}, 1)
 	}
 	bootstrapper.QueryFailedF = func(_ context.Context, _ ids.NodeID, reqID uint32) error {
@@ -451,7 +451,7 @@ func TestReliableMessages(t *testing.T) {
 	h.Start(t.Context(), false)
 
 	go func() {
-		for i := 0; i < queriesToSend; i++ {
+		for i := range queriesToSend {
 			vdrIDs := set.Of(ids.BuildTestNodeID([]byte{1}))
 
 			sender.SendPullQuery(t.Context(), vdrIDs, uint32(i), ids.Empty, 0)
@@ -580,7 +580,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			}
 			queriesToSend := 2
 			awaiting := make([]chan struct{}, queriesToSend)
-			for i := 0; i < queriesToSend; i++ {
+			for i := range queriesToSend {
 				awaiting[i] = make(chan struct{}, 1)
 			}
 			bootstrapper.QueryFailedF = func(_ context.Context, _ ids.NodeID, reqID uint32) error {
@@ -612,7 +612,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			h.Start(t.Context(), false)
 
 			go func() {
-				for i := 0; i < queriesToSend; i++ {
+				for i := range queriesToSend {
 					// Send a pull query to some random peer that won't respond
 					// because they don't exist. This will almost immediately trigger
 					// a query failed message

@@ -315,7 +315,7 @@ func TestCoherenceOfExpectedProposerAndMinDelayForProposer(t *testing.T) {
 		pChainHeight uint64 = 0
 	)
 
-	for slot := uint64(0); slot < 3*MaxLookAheadSlots; slot++ {
+	for slot := range uint64(3 * MaxLookAheadSlots) {
 		proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
 		require.NoError(err)
 
@@ -438,8 +438,8 @@ func TestProposerDistribution(t *testing.T) {
 		// in the analysis.
 		proposerFrequency[validatorID] = 0
 	}
-	for chainHeight := uint64(0); chainHeight < numChainHeights; chainHeight++ {
-		for slot := uint64(0); slot < numSlots; slot++ {
+	for chainHeight := range numChainHeights {
+		for slot := range numSlots {
 			proposerID, err := w.ExpectedProposer(dummyCtx, chainHeight, pChainHeight, slot)
 			require.NoError(err)
 			proposerFrequency[proposerID]++

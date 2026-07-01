@@ -158,7 +158,7 @@ type serializedNetworkConfig struct {
 	PrimarySubnetConfig  ConfigMap               `json:"primarySubnetConfig,omitempty"`
 	PrimaryChainConfigs  map[string]ConfigMap    `json:"primaryChainConfigs,omitempty"`
 	DefaultFlags         FlagsMap                `json:"defaultFlags,omitempty"`
-	DefaultRuntimeConfig NodeRuntimeConfig       `json:"defaultRuntimeConfig,omitempty"`
+	DefaultRuntimeConfig NodeRuntimeConfig       `json:"defaultRuntimeConfig"`
 	PreFundedKeys        []*secp256k1.PrivateKey `json:"preFundedKeys,omitempty"`
 }
 

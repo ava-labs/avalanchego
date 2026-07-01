@@ -357,7 +357,7 @@ func InsertLongForkedChainTest(t *testing.T, create createFunc) {
 		require.Equal(len(chain1)+len(chain2), blockchain.snaps.NumBlockLayers(), "incorrect snapshot layer count")
 	}
 
-	for i := 0; i < len(chain2); i++ {
+	for i := range chain2 {
 		require.NoError(blockchain.Reject(chain2[i]))
 
 		if blockchain.snaps != nil {
@@ -467,7 +467,7 @@ func AcceptNonCanonicalBlockTest(t *testing.T, create createFunc) {
 	require.NoError(blockchain.Accept(chain2[0]))
 	blockchain.DrainAcceptorQueue()
 
-	for i := 0; i < len(chain1); i++ {
+	for i := range chain1 {
 		require.NoError(blockchain.Reject(chain1[i]))
 		require.False(blockchain.HasBlock(chain1[i].Hash(), chain1[i].NumberU64()))
 	}

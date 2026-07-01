@@ -18,7 +18,7 @@ import (
 func TestServiceResponses(t *testing.T) {
 	require := require.New(t)
 
-	check := CheckerFunc(func(context.Context) (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (any, error) {
 		return "", nil
 	})
 
@@ -106,7 +106,7 @@ func TestServiceResponses(t *testing.T) {
 }
 
 func TestServiceTagResponse(t *testing.T) {
-	check := CheckerFunc(func(context.Context) (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (any, error) {
 		return "", nil
 	})
 

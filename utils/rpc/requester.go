@@ -11,7 +11,7 @@ import (
 var _ EndpointRequester = (*avalancheEndpointRequester)(nil)
 
 type EndpointRequester interface {
-	SendRequest(ctx context.Context, method string, params interface{}, reply interface{}, options ...Option) error
+	SendRequest(ctx context.Context, method string, params any, reply any, options ...Option) error
 }
 
 type avalancheEndpointRequester struct {
@@ -27,8 +27,8 @@ func NewEndpointRequester(uri string) EndpointRequester {
 func (e *avalancheEndpointRequester) SendRequest(
 	ctx context.Context,
 	method string,
-	params interface{},
-	reply interface{},
+	params any,
+	reply any,
 	options ...Option,
 ) error {
 	uri, err := url.Parse(e.uri)

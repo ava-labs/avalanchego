@@ -71,7 +71,7 @@ linters:
     # - iotamixing
     - mirror
     - misspell
-    # - modernize
+    - modernize
     - nakedret
     - nilerr
     # - noctx
@@ -268,3 +268,6 @@ linters:
         linters:
           - gosec
           - prealloc
+      - path: "^graft/"
+        linters:
+          - modernize
