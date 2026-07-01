@@ -8,12 +8,17 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -233,4 +238,28 @@ func TestSettledBy(t *testing.T) {
 			require.Equal(t, tt.want, hooks.SettledBy(tt.header), "hooks.SettledBy()")
 		})
 	}
+}
+
+// TestAfterExecutingTransactionBurn verifies that GasUsed * baseFee is added to
+// the blackhole's existing balance.
+func TestAfterExecutingTransactionBurn(t *testing.T) {
+	const (
+		initial = 1_000 // pre-existing blackhole balance
+		gasUsed = params.TxGas
+		baseFee = 100
+	)
+
+	db, err := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	require.NoError(t, err, "state.New()")
+	db.AddBalance(constants.BlackholeAddr, uint256.NewInt(initial))
+
+	err = new(hooks).AfterExecutingTransaction(db, *uint256.NewInt(baseFee), &types.Receipt{GasUsed: gasUsed})
+	require.NoError(t, err, "hooks.AfterExecutingTransaction()")
+
+	assert.Equalf(
+		t,
+		uint256.NewInt(initial+gasUsed*baseFee),
+		db.GetBalance(constants.BlackholeAddr),
+		"blackhole balance after burning gasUsed=%d * baseFee=%d", gasUsed, baseFee,
+	)
 }

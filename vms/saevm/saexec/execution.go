@@ -246,6 +246,10 @@ func Execute(
 			r.Put(&Receipt{receipt, signer, tx})
 		}
 		receipts[ti] = receipt
+
+		if err := hooks.AfterExecutingTransaction(stateDB, *baseFee, receipt); err != nil {
+			return nil, fmt.Errorf("after-transaction hook: %w", err)
+		}
 	}
 
 	numTxs := len(b.Transactions())
