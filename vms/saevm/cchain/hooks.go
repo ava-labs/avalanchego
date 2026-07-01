@@ -16,13 +16,12 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
-	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
@@ -43,6 +42,7 @@ import (
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var _ hook.PointsG[*hookTx] = (*hooks)(nil)
@@ -56,7 +56,8 @@ type hooks struct {
 func newHooks(
 	ctx *snow.Context,
 	state *cchainstate.State,
-	chainConfig *params.ChainConfig,
+	chainConfig *ethparams.ChainConfig,
+	initialDelayExponent dynamic.DelayExponent,
 	pool *txpool.Pending,
 	warpStorage *warp.Storage,
 	now func() time.Time,
@@ -81,6 +82,7 @@ func newHooks(
 		builder{
 			ctx,
 			chainConfig,
+			initialDelayExponent,
 			now,
 			poolTxs,
 			desired,
@@ -105,17 +107,21 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		txs[i] = ht
 	}
 
-	now := h.BlockTime(b.Header())
+	header := b.Header()
+	headerExtra := customtypes.GetHeaderExtra(header)
+	now := h.BlockTime(header)
 	return &builder{
 		h.ctx,
 		h.chainConfig,
+		h.initialDelayExponent,
 		func() time.Time {
 			return now
 		},
 		slices.Values(txs),
 		desiredParams{
-			targetExponent: customtypes.GetHeaderExtra(b.Header()).TargetExponent,
-			priceExponent:  customtypes.GetHeaderExtra(b.Header()).MinPriceExponent,
+			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
+			targetExponent: headerExtra.TargetExponent,
+			priceExponent:  headerExtra.MinPriceExponent,
 		},
 	}, nil
 }
@@ -226,7 +232,15 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error {
+func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, _ *types.Transaction, r *types.Receipt) error {
+	var burned uint256.Int
+	burned.SetUint64(r.GasUsed)
+	burned.Mul(&burned, &baseFee)
+	db.AddBalance(constants.BlackholeAddr, &burned)
+	return nil
+}
+
+func (*hooks) BeforeExecutingBlock(ethparams.Rules, *state.StateDB, *types.Block) error {
 	// TODO(StephenButtolph): If the genesis was configured to be pre-Durango
 	// and this block is the first post-Durango block, we need to activate the
 	// Warp precompile. This case does not happen on Mainnet, Fuji, or the Local
@@ -264,8 +278,10 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 var _ hook.BlockBuilder[*hookTx] = (*builder)(nil)
 
 type builder struct {
-	ctx          *snow.Context
-	chainConfig  *params.ChainConfig
+	ctx                  *snow.Context
+	chainConfig          *ethparams.ChainConfig
+	initialDelayExponent dynamic.DelayExponent
+
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
 	desired      desiredParams
@@ -281,13 +297,33 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		return nil, errHeliconUnactivated
 	}
 
-	// TODO(StephenButtolph): Enforce the minimum block time here.
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
+
+	de := b.initialDelayExponent
+	if pde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pde != nil {
+		de = dynamic.DelayExponent(*pde)
+	}
+
+	// Enforce block-building separation against the parent's MinDelayExcess.
+	{
+		parentTimeMS := customtypes.HeaderTimeMilliseconds(parent)
+		if nowMS < parentTimeMS {
+			return nil, fmt.Errorf("current time is before parent timestamp: now=%d parentTime=%d", nowMS, parentTimeMS)
+		}
+
+		delay := nowMS - parentTimeMS
+		minDelay := de.Delay()
+		if delay < minDelay {
+			return nil, fmt.Errorf("block building separation not satisfied: delay=%d minDelay=%d", delay, minDelay)
+		}
+	}
+
 	config := corethparams.GetExtra(b.chainConfig)
 	te, err := targetExponent(config, parent)
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
+	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
 	return customtypes.WithHeaderExtra(
@@ -309,8 +345,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			// TODO(StephenButtolph): Encode the min-delay excess.
-			MinDelayExcess:   new(acp226.DelayExcess),
+			MinDelayExcess:   (*acp226.DelayExcess)(&de),
 			TargetExponent:   &te,
 			MinPriceExponent: &pe,
 		},
@@ -326,7 +361,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 // SAE will perform additional checks on the transactions to ensure they are
 // valid with respect to the worst-case state.
 func (b *builder) PotentialEndOfBlockOps(
-	ctx context.Context,
+	_ context.Context,
 	building *types.Header,
 	settledHash common.Hash,
 	source saetypes.BlockSource,
@@ -449,14 +484,7 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
-
-	// TODO(StephenButtolph): Remove padding for the ACP-176 fee state. The fee
-	// state is encoded in other fields.
-	header.Extra = customheader.SetPredicateBytesInExtra(
-		rulesExtra.AvalancheRules,
-		header.Extra,
-		warpValidityBytes,
-	)
+	header.Extra = warpValidityBytes
 
 	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
 	he := customtypes.GetHeaderExtra(header)

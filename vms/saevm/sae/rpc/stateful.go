@@ -17,10 +17,13 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
@@ -88,40 +91,24 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		return nil, nil, errors.New("state not available for pending block")
 	}
 
-	numOrHash.RequireCanonical = true
-	num, hash, err := blocks.ResolveRPCNumberOrHash(b, numOrHash)
+	bl, err := b.restoreBlock(numOrHash)
 	if err != nil {
 		return nil, nil, err
+	}
+	if bl == nil {
+		return nil, nil, fmt.Errorf("%w: %v", blocks.ErrNotFound, numOrHash)
 	}
 
 	// The API implementations expect this to be synchronous, sourcing the state
 	// root and the base fee from fields. At the time of writing, the returned
-	// header's hash is never used so it's safe to modify it.
+	// header's hash is never used so it's safe to modify it. [Block.Header]
+	// returns a copy, so mutating it does not affect the restored block.
 	//
 	// TODO(arr4n) the above assumption is brittle under geth/libevm updates;
 	// devise an approach to ensure that it is confirmed on each.
-	var hdr *types.Header
-	if bl, ok := b.ConsensusCriticalBlock(hash); ok {
-		hdr = bl.Header()
-		hdr.Root = bl.PostExecutionStateRoot()
-		hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
-	} else {
-		hdr = rawdb.ReadHeader(b.DB(), hash, num)
-
-		// TODO(arr4n) export [blocks.executionResults] to avoid multiple
-		// database reads and canoto unmarshallings here.
-		var err error
-		hdr.Root, err = blocks.PostExecutionStateRoot(b.XDB(), num)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		bf, err := blocks.ExecutionBaseFee(b.XDB(), num)
-		if err != nil {
-			return nil, nil, err
-		}
-		hdr.BaseFee = bf.ToBig()
-	}
+	hdr := bl.Header()
+	hdr.Root = bl.PostExecutionStateRoot()
+	hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
 
 	sdb, err := b.StateDB(hdr.Root)
 	if err != nil {
@@ -143,12 +130,15 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	root, err := b.postExecutionStateRoot(block.Hash(), block.NumberU64())
+	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(block.Hash(), true /* canonical */))
 	if err != nil {
 		return nil, nil, err
 	}
+	if bl == nil {
+		return nil, nil, fmt.Errorf("%w: block %d (%#x)", blocks.ErrNotFound, block.NumberU64(), block.Hash())
+	}
 
-	sdb, err := b.StateDB(root)
+	sdb, err := b.StateDB(bl.PostExecutionStateRoot())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -160,8 +150,12 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 // the state just before the target transaction, then returns the message and
 // block context needed for tracing.
 //
-// Replay calls [saexec.Execute] - the same pipeline used by
-// [saexec.Executor] - with [noEndOfBlockOps] to suppress end-of-block
+// Pre-Helicon blocks were executed by coreth and replay under coreth's
+// historical rules ([stateAtTransactionPreSAE]) while post-Helicon blocks replay
+// under SAE rules ([stateAtTransactionSAE]).
+//
+// The Post-Helicon replay path calls [saexec.Execute] - the same pipeline used
+// by [saexec.Executor] - with [noEndOfBlockOps] to suppress end-of-block
 // operations and [saexec.NullReceiptStore] to skip receipt broadcasting.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
@@ -175,6 +169,34 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))
 	}
 
+	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(ethB.Hash(), true /* canonical */))
+	if err != nil {
+		return nil, bCtx, nil, nil, err
+	}
+	if bl == nil {
+		return nil, bCtx, nil, nil, fmt.Errorf("%w: block %d (%#x)", blocks.ErrNotFound, ethB.NumberU64(), ethB.Hash())
+	}
+
+	// Pre-Helicon blocks predate SAE and replay under coreth's rules instead.
+	if bl.Synchronous() {
+		parent := rawdb.ReadBlock(b.DB(), ethB.ParentHash(), ethB.NumberU64()-1)
+		if parent == nil {
+			return nil, bCtx, nil, nil, fmt.Errorf("parent block %d (%#x) of synchronous block %d not found", ethB.NumberU64()-1, ethB.ParentHash(), ethB.NumberU64())
+		}
+		return stateAtTransactionPreSAE(b, b.Hooks(), b.ChainContext(), b.ChainConfig(), ethB, parent.Root(), txIndex)
+	}
+	return b.stateAtTransactionSAE(ethB, txIndex)
+}
+
+// stateAtTransactionSAE returns the execution environment of the transaction at
+// txIndex within a post-Helicon (SAE) block, replaying the preceding
+// transactions via [saexec.Execute] with [noEndOfBlockOps] and
+// [saexec.NullReceiptStore] to skip end-of-block operations and receipt
+// broadcasting.
+//
+// txIndex MUST be in range as [backend.StateAtTransaction] validates it.
+func (b *backend) stateAtTransactionSAE(ethB *types.Block, txIndex int) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
+	var bCtx vm.BlockContext
 	if b.LastExecuted().NumberU64() < ethB.NumberU64()-1 {
 		return nil, bCtx, nil, nil, fmt.Errorf("parent of block %d not executed yet", ethB.NumberU64())
 	}
@@ -203,23 +225,90 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, err
 	}
 
-	msg, err := core.TransactionToMessage(txs[txIndex], result.Signer, result.BaseFee.ToBig())
+	msg, err := core.TransactionToMessage(ethB.Transactions()[txIndex], result.Signer, result.BaseFee.ToBig())
 	if err != nil {
 		return nil, bCtx, nil, nil, err
 	}
 	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
 }
 
-// postExecutionStateRoot returns the post-execution state root for the block
-// identified by hash and number, checking in-memory blocks first, then falling
-// back to disk.
-func (b *backend) postExecutionStateRoot(hash common.Hash, num uint64) (common.Hash, error) {
-	switch bl, ok := b.ConsensusCriticalBlock(hash); {
-	case !ok:
-		return blocks.PostExecutionStateRoot(b.XDB(), num)
-	case bl.Executed():
-		return bl.PostExecutionStateRoot(), nil
-	default:
-		return common.Hash{}, fmt.Errorf("post-execution state root unavailable for block %d (%#x)", num, hash)
+// stateAtTransactionPreSAE returns the execution environment of the transaction
+// at txIndex within a pre-Helicon block, replaying the preceding transactions
+// under coreth's historical execution rules. Each transaction is charged at the
+// block's header base fee, not a value derived from the SAE gas clock.
+//
+// The replay mirrors coreth's (*Ethereum).stateAtTransaction in
+// graft/coreth/eth/state_accessor.go, with one addition: coreth credits the
+// burned base fee to the (blackhole) coinbase from inside its registered libevm
+// hooks, whereas libevm's [core.ApplyMessage] simply discards it. We therefore
+// apply [hook.Points.AfterExecutingTransaction] after each replayed transaction.
+//
+// txIndex MUST be in range as [backend.StateAtTransaction] validates it.
+func stateAtTransactionPreSAE(
+	opener saedb.StateDBOpener,
+	hooks hook.Points,
+	chainCtx core.ChainContext,
+	cfg *params.ChainConfig,
+	ethB *types.Block,
+	parentRoot common.Hash,
+	txIndex int,
+) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
+	statedb, err := opener.StateDB(parentRoot)
+	if err != nil {
+		return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("opening pre-Helicon parent state at %#x (tracing pre-Helicon blocks requires an archival node): %w", parentRoot, err)
 	}
+
+	// SAE's ChainContext has no consensus engine, so the coinbase is supplied as
+	// the block author explicitly.
+	coinbase := ethB.Coinbase()
+	blockCtx := core.NewEVMBlockContext(ethB.Header(), chainCtx, &coinbase)
+
+	// ethB.BaseFee() is nil before EIP-1559.
+	baseFeeBig := ethB.BaseFee()
+	var baseFee uint256.Int
+	if baseFeeBig != nil {
+		baseFee.SetFromBig(baseFeeBig)
+	}
+
+	blockNumber := ethB.Number()
+	signer := types.MakeSigner(cfg, blockNumber, ethB.Time())
+	eip158 := cfg.IsEIP158(blockNumber)
+	txs := ethB.Transactions()
+
+	// EIP-4788: the parent beacon block root is stored via a system call at the
+	// start of the block, before any transactions. It MUST be replayed here to
+	// reproduce the pre-transaction state, mirroring the equivalent call in
+	// [saexec.Execute] used for post-Helicon blocks.
+	if beaconRoot := ethB.BeaconRoot(); beaconRoot != nil {
+		vmenv := vm.NewEVM(blockCtx, vm.TxContext{}, statedb, cfg, vm.Config{})
+		core.ProcessBeaconBlockRoot(*beaconRoot, vmenv, statedb)
+	}
+
+	// Replay transactions 0..txIndex-1 to produce the state just before the
+	// target transaction.
+	for idx, tx := range txs[:txIndex] {
+		msg, err := core.TransactionToMessage(tx, signer, baseFeeBig)
+		if err != nil {
+			return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("converting transaction %#x to message: %v", tx.Hash(), err)
+		}
+		vmenv := vm.NewEVM(blockCtx, core.NewEVMTxContext(msg), statedb, cfg, vm.Config{})
+		statedb.SetTxContext(tx.Hash(), idx)
+		result, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas()))
+		if err != nil {
+			return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
+		}
+		// Credit the base-fee burn to the blackhole.
+		receipt := &types.Receipt{GasUsed: result.UsedGas}
+		if err := hooks.AfterExecutingTransaction(statedb, baseFee, tx, receipt); err != nil {
+			return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("after-transaction hook for %#x: %v", tx.Hash(), err)
+		}
+		// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect.
+		statedb.Finalise(eip158)
+	}
+
+	msg, err := core.TransactionToMessage(txs[txIndex], signer, baseFeeBig)
+	if err != nil {
+		return nil, vm.BlockContext{}, nil, nil, fmt.Errorf("converting transaction %#x to message: %v", txs[txIndex].Hash(), err)
+	}
+	return msg, blockCtx, statedb, noopRelease, nil
 }

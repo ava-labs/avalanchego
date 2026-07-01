@@ -14,9 +14,11 @@ import (
 	"net/http"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
 
 	_ "embed"
 
@@ -24,13 +26,17 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -47,9 +53,10 @@ import (
 type VM struct {
 	*sae.VM // created by [VM.Initialize]
 
-	// gossip frequencies are configurable to speed up testing.
-	pullGossipPeriod time.Duration
-	pushGossipPeriod time.Duration
+	// These are configurable to speed up testing.
+	pullGossipPeriod     time.Duration
+	pushGossipPeriod     time.Duration
+	initialDelayExponent dynamic.DelayExponent
 
 	// now is the clock provided to the [sae.VM] and is used for block building.
 	now func() time.Time
@@ -65,6 +72,9 @@ type VM struct {
 	// depends on another resource, it MUST be added AFTER the resource it
 	// depends on.
 	onClose []func(context.Context) error
+
+	preference       atomic.Pointer[blocks.Block]
+	lastWaitForEvent utils.Atomic[time.Time]
 }
 
 var ethDBPrefix = []byte("ethdb")
@@ -127,6 +137,7 @@ func (vm *VM) Initialize(
 		snowCtx,
 		vm.state,
 		vm.chainConfig,
+		vm.initialDelayExponent,
 		pendingTxs,
 		warpStorage,
 		vm.now,
@@ -310,15 +321,51 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	return m, nil
 }
 
-// WaitForEvent waits for a transaction to be in the txpool or for the SAE VM to
-// produce an event.
-func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
-	// TODO(StephenButtolph): Do not busy loop with [snowcommon.PendingTxs]. The
-	// txpools are cleared after block execution, so we may still have
-	// transactions in the txpool while blocks containing those transactions are
-	// processing.
+func (vm *VM) SetPreference(ctx context.Context, id ids.ID, bCtx *block.Context) error {
+	b, err := vm.GetBlock(ctx, id)
+	if err != nil {
+		return err
+	}
+	vm.preference.Store(b)
+	return vm.VM.SetPreference(ctx, id, bCtx)
+}
 
-	// TODO(StephenButtolph): Wait until the minimum block delay has passed.
+var errNoPreference = errors.New("no preferred block")
+
+// WaitForEvent blocks until the SAE VM emits an event or the cross-chain
+// txpool has a pending transaction.
+func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
+	// Throttle to avoid busy looping if we appear ready to build but keep
+	// encountering errors.
+	{
+		defer func() {
+			vm.lastWaitForEvent.Set(time.Now())
+		}()
+
+		const minimumDelay = 100 * time.Millisecond
+		sinceLastCall := time.Since(vm.lastWaitForEvent.Get())
+		timeToWait := minimumDelay - sinceLastCall
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(timeToWait):
+		}
+	}
+
+	// Wait until we are allowed to build a block on top of the preference.
+	{
+		parent := vm.preference.Load()
+		if parent == nil {
+			return 0, errNoPreference
+		}
+
+		minTime := minNextBlockTime(parent.Header())
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(time.Until(minTime)):
+		}
+	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	type result struct {
@@ -339,6 +386,19 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 
 	r := <-results
 	return r.msg, r.err
+}
+
+// minNextBlockTime returns the earliest wall-clock time at which a child of h
+// is allowed by h's [acp226.DelayExcess].
+func minNextBlockTime(h *types.Header) time.Time {
+	e := customtypes.GetHeaderExtra(h)
+	if e.MinDelayExcess == nil {
+		return time.Time{}
+	}
+
+	mde := *e.MinDelayExcess
+	delay := time.Duration(mde.Delay()) * time.Millisecond //#nosec G115 -- delay excess is verified by consensus
+	return customtypes.BlockTime(h).Add(delay)
 }
 
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse

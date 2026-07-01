@@ -195,6 +195,17 @@ func Execute(
 	b.CheckBaseFeeBound(baseFee)
 	header.BaseFee = baseFee.ToBig()
 
+	// EIP-4788: before processing any transactions, store the parent beacon
+	// block root via the system call. This mirrors [core.StateProcessor.Process]
+	// in coreth and is part of execution, so it MUST run during both actual and
+	// intra-block (tracing) execution to keep execution-derived state consistent.
+	// [core.NewEVMBlockContext] requires header.BaseFee, so it is built here.
+	blockCtx := core.NewEVMBlockContext(header, chainCtx, &header.Coinbase)
+	if beaconRoot := header.ParentBeaconRoot; beaconRoot != nil {
+		vmenv := vm.NewEVM(blockCtx, vm.TxContext{}, stateDB, config, vm.Config{})
+		core.ProcessBeaconBlockRoot(*beaconRoot, vmenv, stateDB)
+	}
+
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
 	var blockGasConsumed gas.Gas
@@ -242,10 +253,15 @@ func Execute(
 		tip := tx.EffectiveGasTipValue(header.BaseFee)
 		receipt.EffectiveGasPrice = tip.Add(header.BaseFee, tip)
 
+		// Store the receipt as soon as possible to minimize user latency.
 		if r, ok := receiptStore.Load(tx.Hash()); ok {
 			r.Put(&Receipt{receipt, signer, tx})
 		}
 		receipts[ti] = receipt
+
+		if err := hooks.AfterExecutingTransaction(stateDB, *baseFee, tx, receipt); err != nil {
+			return nil, fmt.Errorf("after-transaction hook: %v", err)
+		}
 	}
 
 	numTxs := len(b.Transactions())
@@ -285,7 +301,7 @@ func Execute(
 		BaseFee:     baseFee,
 		StateDB:     stateDB,
 		Signer:      signer,
-		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
+		BlockCtx:    blockCtx,
 		Receipts:    receipts,
 		GasConsumed: blockGasConsumed,
 	}

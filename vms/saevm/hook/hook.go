@@ -78,6 +78,8 @@ type Points interface {
 	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
 	// so that consumers can use a single concrete type for both SAE and libevm hooks.
 	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
+	// AfterExecutingTransaction is called immediately after executing the transaction.
+	AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, tx *types.Transaction, r *types.Receipt) error
 	// BeforeExecutingBlock is called immediately prior to executing the block.
 	BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) error
 	// AfterExecutingBlock is called immediately after executing the block.

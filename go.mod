@@ -25,8 +25,11 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100
 	github.com/ava-labs/avalanchego/graft/coreth v1.14.2
+	github.com/ava-labs/avalanchego/graft/evm v1.14.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.14.2
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.6.0
 	github.com/ava-labs/libevm v1.13.15-0.20260622141141-097921408ecf
+	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -56,7 +59,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cast v1.9.2
 	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.6
+	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.1
 	github.com/supranational/blst v0.3.14
@@ -72,7 +75,7 @@ require (
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.49.0
-	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
+	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	golang.org/x/net v0.52.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.41.0
@@ -93,9 +96,6 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/avalanchego/graft/evm v1.14.2
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.6.0
-	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5 // indirect
@@ -210,14 +210,14 @@ tool (
 	go.uber.org/mock/mockgen
 )
 
-replace github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
+replace (
+	github.com/ava-labs/avalanchego/graft/coreth => ./graft/coreth
+	github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
+	github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
 
-replace github.com/ava-labs/avalanchego/graft/subnet-evm => ./graft/subnet-evm
-
-replace github.com/ava-labs/avalanchego/graft/evm => ./graft/evm
-
-// Workaround for genproto ambiguous import conflict.
-// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
-// Modern packages use split modules (genproto/googleapis/rpc, etc.).
-// Force use of newer split genproto to resolve ambiguity.
-replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1
+	// Workaround for genproto ambiguous import conflict.
+	// cockroachdb/errors@v1.9.1 -> gogo/status@v1.1.0 requires old monolithic genproto.
+	// Modern packages use split modules (genproto/googleapis/rpc, etc.).
+	// Force use of newer split genproto to resolve ambiguity.
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1
+)

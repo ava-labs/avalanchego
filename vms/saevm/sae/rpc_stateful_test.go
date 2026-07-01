@@ -46,7 +46,7 @@ func TestStateQueryOnNonCanonicalBlock(t *testing.T) {
 		{
 			method:  "eth_getBalance",
 			args:    []any{sut.wallet.Addresses()[0], rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
-			wantErr: testerr.Contains(blocks.ErrNonCanonicalBlock.Error()),
+			wantErr: testerr.Contains(blocks.ErrNotFound.Error()),
 		},
 		{
 			method: "eth_getBlockByHash",
