@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -66,7 +65,12 @@ func (vm *SinceGenesis[_]) Initialize(
 	if err != nil {
 		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
 	}
-	finalizeLastSynchronous(db, hash)
+
+	// [NewVM] assumes that the genesis block is "finalized", which does not
+	// happen in [core.SetupGenesisBlock]. This MUST only happen once.
+	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
+		rawdb.WriteFinalizedBlockHash(db, hash)
+	}
 
 	inner, err := NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, appSender)
 	if err != nil {
@@ -74,14 +78,6 @@ func (vm *SinceGenesis[_]) Initialize(
 	}
 	vm.VM = inner
 	return nil
-}
-
-// finalizeLastSynchronous writes the genesis block's hash
-// as finalized in the case there wasn't anything already written.
-func finalizeLastSynchronous(db ethdb.Database, hash ethcommon.Hash) {
-	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
-		rawdb.WriteFinalizedBlockHash(db, hash)
-	}
 }
 
 // Shutdown gracefully closes the VM.
