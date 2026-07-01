@@ -108,6 +108,13 @@ tasks:
         vars:
           BAZEL_CONFIG: race-shuffle
 
+  bazel-test-shuffle:
+    desc: Run unit tests with Bazel (race off, shuffle on)
+    cmds:
+      - task: _bazel-test
+        vars:
+          BAZEL_CONFIG: shuffle
+
   _bazel-test-coreth:
     internal: true
     vars:
@@ -132,6 +139,13 @@ tasks:
       - task: _bazel-test-coreth
         vars:
           BAZEL_CONFIG: race-shuffle
+
+  bazel-test-coreth-shuffle:
+    desc: Run coreth/evm unit tests with Bazel (race off, shuffle on)
+    cmds:
+      - task: _bazel-test-coreth
+        vars:
+          BAZEL_CONFIG: shuffle
 
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary
@@ -176,6 +190,13 @@ tasks:
         vars:
           BAZEL_CONFIG: race-shuffle
 
+  bazel-test-main-shuffle:
+    desc: Run main module unit tests with Bazel (excludes graft modules; race off, shuffle on)
+    cmds:
+      - task: _bazel-test-main
+        vars:
+          BAZEL_CONFIG: shuffle
+
   _bazel-test-subnet-evm:
     internal: true
     vars:
@@ -200,6 +221,13 @@ tasks:
       - task: _bazel-test-subnet-evm
         vars:
           BAZEL_CONFIG: race-shuffle
+
+  bazel-test-subnet-evm-shuffle:
+    desc: Run subnet-evm unit tests with Bazel (race off, shuffle on)
+    cmds:
+      - task: _bazel-test-subnet-evm
+        vars:
+          BAZEL_CONFIG: shuffle
 
   build:
     desc: Builds avalanchego

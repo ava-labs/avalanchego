@@ -28,6 +28,9 @@ task bazel-build-opt
 # Run unit tests (default Bazel mode: no race, no shuffle)
 task bazel-test
 
+# Shuffle-only validation
+task bazel-test-shuffle
+
 # Stronger validation with race detection and shuffle
 task bazel-test-race-shuffle
 
@@ -404,6 +407,7 @@ same defaults.
 
 - `bazel test //...` and `task bazel-test` use the default Bazel mode:
   race off, shuffle off.
+- `task bazel-test-shuffle` uses race off, shuffle on.
 - `scripts/build_test.sh` uses race on, shuffle on.
 - The reusable GitHub Actions Bazel workflow runs its unit-test jobs with the
   `race-shuffle` mode.
@@ -432,6 +436,9 @@ bazel test //utils:set_test --test_filter=TestSet_Add
 # Race detection without shuffle
 task bazel-test-race              # or: bazel test --config=race //...
 
+# Shuffle without race detection
+task bazel-test-shuffle           # or: bazel test --config=shuffle //...
+
 # Collect coverage
 bazel coverage //...
 
@@ -449,6 +456,7 @@ task bazel-test-e2e
 | default (`bazel-test`) | race off, shuffle off | Bazel default | fastest normal local Bazel iteration |
 | `race` | race on, shuffle off | `--config=race` | stronger local validation without order randomization |
 | `race-shuffle` | race on, shuffle on | `--config=race-shuffle` | strongest local validation; also used by Bazel CI unit-test jobs |
+| `shuffle` | race off, shuffle on | `--config=shuffle` | order-randomization checks without race overhead |
 
 Examples:
 ```bash
@@ -457,6 +465,9 @@ task bazel-test                   # or: bazel test //...
 
 # Race detection without shuffle
 task bazel-test-race              # or: bazel test --config=race //...
+
+# Shuffle without race detection
+task bazel-test-shuffle           # or: bazel test --config=shuffle //...
 
 # Race detection with shuffle enabled
 task bazel-test-race-shuffle      # or: bazel test --config=race-shuffle //...

@@ -63,8 +63,15 @@ try-import %workspace%/.bazelrc.local
 # Cache for faster builds
 build --disk_cache=~/.cache/bazel-disk-cache
 
-# Config: heaviest Go test mode. Inherits race and --nocache_test_results from
-# the race config.
+# Explicit shuffle config for order-randomization validation.
+test:shuffle --test_arg=-test.shuffle=on
+# Match the non-Bazel Go test execution model: when callers ask for shuffle
+# validation, rerun the tests instead of reusing a prior passing Bazel test
+# result.
+test:shuffle --nocache_test_results
+
+# Explicit race+shuffle config for strongest validation. Inherits race and
+# --nocache_test_results from the race config.
 test:race-shuffle --config=race
 # Match `go test -shuffle=on` by enabling Go test shuffling for this mode.
 test:race-shuffle --test_arg=-test.shuffle=on
