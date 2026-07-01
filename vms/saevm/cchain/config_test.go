@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -94,6 +95,21 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
 		},
 		{
+			name: "batch_request_limit",
+			json: `{"batch-request-limit":50}`,
+			want: with(func(c *config) { c.BatchRequestLimit = 50 }),
+		},
+		{
+			name: "batch_request_limit_explicit_zero",
+			json: `{"batch-request-limit":0}`, // 0 disables the batch limit
+			want: with(func(c *config) { c.BatchRequestLimit = 0 }),
+		},
+		{
+			name:    "batch_request_limit_too_large",
+			json:    `{"batch-request-limit":9223372036854775808}`, // math.MaxInt64 + 1
+			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
+		},
+		{
 			name: "warp_off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
 			want: with(func(c *config) {
@@ -111,6 +127,7 @@ func TestParseConfig(t *testing.T) {
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
 				"allow-unprotected-txs":true,
+				"batch-request-limit":50,
 				"warp-off-chain-messages":["0x1234"]
 			}`,
 			want: config{
@@ -122,6 +139,7 @@ func TestParseConfig(t *testing.T) {
 				TxPoolAccountSlots:   8,
 				TxPoolGlobalSlots:    2048,
 				AllowUnprotectedTxs:  true,
+				BatchRequestLimit:    50,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},
