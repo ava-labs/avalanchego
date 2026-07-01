@@ -992,26 +992,34 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	assert.Equalf(t, *wantBalance, sut.balance(t, sender), "sender balance reflects gas charged")
 }
 
-// TestFeesBurnedToBlackhole verifies that [hooks.AfterExecutingTransaction] is
-// wired into the VM's per-transaction execution path, burning the base fee to
-// the blackhole once per transaction.
+// TestFeesBurnedToBlackhole verifies that each transaction's full fee — the
+// tip, paid to the coinbase (the blackhole), and the base fee, credited by
+// [hooks.AfterExecutingTransaction] — is burned before the next transaction
+// executes. Every transaction calls a contract that logs BALANCE(blackhole),
+// which MUST already include all preceding fees.
 func TestFeesBurnedToBlackhole(t *testing.T) {
 	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
-	sender := w.Addresses()[0]
 
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(sender)
-	}))
+	contract := common.Address{'c', 'o', 'd', 'e'}
+	code := saetest.LogTopOfStackAfter(
+		saetest.Push(t, evmconstants.BlackholeAddr[:]),
+		saetest.Ops(vm.BALANCE),
+	)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(w.Addresses()...),
+		withAccount(contract, types.Account{Code: code}),
+	)
 
-	// With a GasFeeCap of 1 and a zero tip, the effective gas price is 1, so the
-	// burn per transaction is exactly GasUsed.
-	const numTxs = 3
-	txs := make([]*types.Transaction, numTxs)
+	// With a base fee and tip of 1 each (the base fee is asserted on the block
+	// below), every transaction credits 2*GasUsed to the blackhole.
+	const feePerGas = 2
+	txs := make([]*types.Transaction, 2)
 	for i := range txs {
 		txs[i] = w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-			To:        &common.Address{},
-			Gas:       ethparams.TxGas,
-			GasFeeCap: big.NewInt(1),
+			To:        &contract,
+			Gas:       1e6,
+			GasTipCap: big.NewInt(1),
+			GasFeeCap: big.NewInt(feePerGas),
 		})
 		require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, txs[i]), "%T.SendTransaction()", sut.ethclient)
 	}
@@ -1019,16 +1027,17 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 
 	preBurn := sut.balance(t, evmconstants.BlackholeAddr)
 	blk := sut.runConsensusLoop(ctx, t)
-	require.Lenf(t, blk.Receipts(), numTxs, "%T.Receipts()", blk)
+	require.Zerof(t, big.NewInt(1).Cmp(blk.EthBlock().BaseFee()), "%T base fee", blk)
+	receipts := blk.Receipts()
+	require.Lenf(t, receipts, len(txs), "%T.Receipts()", blk)
 
-	var wantBurned uint64
-	for _, r := range blk.Receipts() {
-		wantBurned += r.GasUsed
+	want := preBurn
+	for i, r := range receipts {
+		got := saetest.SoleLog(t, r).Topics[0]
+		assert.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
+		want.AddUint64(&want, feePerGas*r.GasUsed)
 	}
-	require.NotZero(t, wantBurned, "total gas burned")
-
-	wantBalance := new(uint256.Int).Add(&preBurn, uint256.NewInt(wantBurned))
-	assert.Equalf(t, *wantBalance, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance reflects burned base fees")
+	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
 }
 
 // TestParseBlock verifies that the cchain ParseBlock override accepts
