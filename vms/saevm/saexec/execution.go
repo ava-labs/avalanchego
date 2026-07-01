@@ -248,7 +248,7 @@ func Execute(
 		receipts[ti] = receipt
 
 		if err := hooks.AfterExecutingTransaction(stateDB, *baseFee, receipt); err != nil {
-			return nil, fmt.Errorf("after-transaction hook: %w", err)
+			return nil, fmt.Errorf("after-transaction hook [%d](%#x): %w", ti, tx.Hash(), err)
 		}
 	}
 
