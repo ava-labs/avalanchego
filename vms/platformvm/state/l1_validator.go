@@ -180,10 +180,10 @@ func (v L1Validator) effectiveNodeID() ids.NodeID {
 }
 
 func (v L1Validator) effectivePublicKey() *bls.PublicKey {
-	if v.IsActive() {
-		return bls.PublicKeyFromValidUncompressedBytes(v.PublicKey)
+	if !v.IsActive() {
+		return nil
 	}
-	return nil
+	return bls.PublicKeyFromValidUncompressedBytes(v.PublicKey)
 }
 
 func (v L1Validator) effectivePublicKeyBytes() []byte {
@@ -414,15 +414,15 @@ func (a *activeL1Validators) newIterator() iterator.Iterator[L1Validator] {
 
 func (a *activeL1Validators) addStakersToValidatorManager(vdrs validators.Manager) error {
 	for validationID, l1Validator := range a.lookup {
-		pk := bls.PublicKeyFromValidUncompressedBytes(l1Validator.PublicKey)
-		if err := vdrs.AddStaker(l1Validator.SubnetID, l1Validator.NodeID, pk, validationID, l1Validator.Weight); err != nil {
+		vdr := l1Validator // Create a copy to take address of
+		if err := vdrs.AddStaker(vdr.SubnetID, vdr.NodeID, vdr.effectivePublicKey(), validationID, vdr.Weight); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func addL1ValidatorToValidatorManager(vdrs validators.Manager, l1Validator L1Validator) error {
+func addL1ValidatorToValidatorManager(vdrs validators.Manager, l1Validator *L1Validator) error {
 	nodeID := l1Validator.effectiveNodeID()
 	if vdrs.GetWeight(l1Validator.SubnetID, nodeID) != 0 {
 		return vdrs.AddWeight(l1Validator.SubnetID, nodeID, l1Validator.Weight)

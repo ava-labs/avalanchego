@@ -233,13 +233,11 @@ func TestGetWarpValidatorSets(t *testing.T) {
 	expectedPrimaryNetworkWithAllValidators := validators.WarpSet{
 		Validators: []*validators.Warp{
 			{
-				PublicKey:      pk0,
 				PublicKeyBytes: pk0Bytes,
 				Weight:         1,
 				NodeIDs:        []ids.NodeID{primaryStaker0.NodeID},
 			},
 			{
-				PublicKey:      pk1,
 				PublicKeyBytes: pk1Bytes,
 				Weight:         1,
 				NodeIDs:        []ids.NodeID{primaryStaker1.NodeID},
@@ -258,7 +256,6 @@ func TestGetWarpValidatorSets(t *testing.T) {
 			constants.PrimaryNetworkID: {
 				Validators: []*validators.Warp{
 					{
-						PublicKey:      pk0,
 						PublicKeyBytes: pk0Bytes,
 						Weight:         1,
 						NodeIDs:        []ids.NodeID{primaryStaker0.NodeID},
@@ -269,7 +266,6 @@ func TestGetWarpValidatorSets(t *testing.T) {
 			subnetID: {
 				Validators: []*validators.Warp{
 					{
-						PublicKey:      pk0,
 						PublicKeyBytes: pk0Bytes,
 						Weight:         1,
 						NodeIDs:        []ids.NodeID{subnetStaker0.NodeID},
@@ -286,7 +282,6 @@ func TestGetWarpValidatorSets(t *testing.T) {
 			subnetID: {
 				Validators: []*validators.Warp{
 					{
-						PublicKey:      pk0,
 						PublicKeyBytes: pk0Bytes,
 						Weight:         1,
 						NodeIDs:        []ids.NodeID{subnetStaker0.NodeID},
