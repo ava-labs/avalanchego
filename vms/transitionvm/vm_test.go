@@ -33,6 +33,7 @@ import (
 // share one [fakeState].
 type SUT struct {
 	*VM
+	ctx  *snow.Context
 	pre  *fakeVM
 	post *fakeVM
 }
@@ -163,6 +164,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	), "%T.Initialize()", vm)
 	return &SUT{
 		VM:   vm,
+		ctx:  ctx,
 		pre:  pre,
 		post: post,
 	}

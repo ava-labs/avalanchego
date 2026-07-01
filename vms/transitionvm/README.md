@@ -61,7 +61,7 @@ flowchart LR
     class post postCls;
 ```
 
-The pre-transition VM may never extend the chain past the transition block — all
+The pre-transition VM may never extend the chain past the transition block; all
 descendants of the transition block are refused until the node transitions:
 
 ```mermaid
@@ -178,22 +178,45 @@ call, so it cannot hold the read lock without deadlocking against the writer loc
 it is about to request. Instead it relies on the wrapped block being immutable
 once verified.
 
+### The chain's context lock
+
+The chain grabs its `snow.Context.Lock` itself on async paths (gossip mempool, tx
+API). The transition holds the engine's lock (it runs inside `Accept`) while
+taking `transitionLock` as writer. So if the chain shared the engine's lock, a
+gossip handler holding `transitionLock` and blocking on that lock would deadlock
+the transition. `copyContext` gives each chain its own lock.
+
 ### Lock order
 
 An arrow from lock A to lock B means B is acquired while holding A:
 
 ```mermaid
 flowchart TD
-    t["transitionLock"]
-    t --> b["block.lock"]
-    t --> c["connections.lock"]
+    e["snow.Context.Lock<br/>(engine)"]
+    e --> t["transitionLock"]
+    t --> cc["chain snow.Context.Lock<br/>(managed copy)"]
+    cc --> b["block.lock"]
+    cc --> c["connections.lock"]
     t --> r["requests.lock"]
     t --> hs["httpHandlers.lock"]
     hs --> h["httpHandler.lock"]
+
+    classDef ctxCls stroke:#1f77b4,stroke-width:2px,color:#1f77b4;
+    class e,cc ctxCls;
 ```
 
-`transitionLock` is outermost and nothing re-enters it; the only nesting among
-the rest is `httpHandlers.lock` over `httpHandler.lock`.
+The two blue nodes are `snow.Context.Lock`s that cross the wrapper↔chain
+boundary; the rest are internal to the wrapper.
+
+The engine's `snow.Context.Lock` is not the wrapper's. The engine holds it around
+the calls it dispatches synchronously, so it sits above `transitionLock`; the
+wrapper never acquires it.
+
+The chain's `snow.Context.Lock` is the per-chain copy the wrapper manages. A
+forward the engine dispatches under its lock takes `transitionLock` (read) and
+then this copy (write); the wrapped chain re-enters the copy on its own
+asynchronous (gossip, app messages) and HTTP (admin, tx APIs) paths, which reach
+it without `transitionLock` held.
 
 The line-level mechanics are commented at their call sites in [`vm.go`](vm.go),
 [`vm_block.go`](vm_block.go), [`vm_network.go`](vm_network.go), and

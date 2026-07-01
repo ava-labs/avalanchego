@@ -16,6 +16,8 @@ import (
 func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
 
 	vm.consensusState.Set(state)
 	return vm.current.chain.SetState(ctx, state)
@@ -24,6 +26,8 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 func (vm *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
 
 	vm.setPreference.Set(true)
 	return vm.current.chain.SetPreference(ctx, blkID)
@@ -32,6 +36,8 @@ func (vm *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
 func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, blockCtx *smblock.Context) error {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
 
 	vm.setPreference.Set(true)
 	return vm.current.chain.SetPreferenceWithContext(ctx, blkID, blockCtx)

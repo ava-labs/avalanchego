@@ -57,6 +57,8 @@ func (b *block) Timestamp() time.Time { return b.timestamp }
 func (b *block) Verify(ctx context.Context) error {
 	b.vm.transitionLock.RLock()
 	defer b.vm.transitionLock.RUnlock()
+	b.vm.current.chainCtx.Lock.Lock()
+	defer b.vm.current.chainCtx.Lock.Unlock()
 
 	if err := b.maybeTransition(ctx); err != nil {
 		return err
@@ -67,6 +69,8 @@ func (b *block) Verify(ctx context.Context) error {
 func (b *block) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
 	b.vm.transitionLock.RLock()
 	defer b.vm.transitionLock.RUnlock()
+	b.vm.current.chainCtx.Lock.Lock()
+	defer b.vm.current.chainCtx.Lock.Unlock()
 
 	if err := b.maybeTransition(ctx); err != nil {
 		return false, err
@@ -84,6 +88,8 @@ var errBlockDoesNotImplementWithVerifyContext = errors.New("block does not imple
 func (b *block) VerifyWithContext(ctx context.Context, blockCtx *smblock.Context) error {
 	b.vm.transitionLock.RLock()
 	defer b.vm.transitionLock.RUnlock()
+	b.vm.current.chainCtx.Lock.Lock()
+	defer b.vm.current.chainCtx.Lock.Unlock()
 
 	if err := b.maybeTransition(ctx); err != nil {
 		return err
@@ -140,7 +146,10 @@ func (b *block) maybeTransition(ctx context.Context) error {
 // Accept does not hold transitionLock: accepting a block at or after the
 // transition time triggers the transition, which takes the write lock itself.
 func (b *block) Accept(ctx context.Context) error {
-	if err := b.blk.Accept(ctx); err != nil {
+	b.vm.current.chainCtx.Lock.Lock()
+	err := b.blk.Accept(ctx)
+	b.vm.current.chainCtx.Lock.Unlock()
+	if err != nil {
 		return err
 	}
 	// `block.lock` doesn't need to be held here because the block is
@@ -155,6 +164,8 @@ func (b *block) Accept(ctx context.Context) error {
 func (b *block) Reject(ctx context.Context) error {
 	b.vm.transitionLock.RLock()
 	defer b.vm.transitionLock.RUnlock()
+	b.vm.current.chainCtx.Lock.Lock()
+	defer b.vm.current.chainCtx.Lock.Unlock()
 
 	// `block.lock` doesn't need to be held here because the block is
 	// immutable after either [block.Verify] or [block.VerifyWithContext]
@@ -171,6 +182,8 @@ func (b *block) Reject(ctx context.Context) error {
 func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
 
 	return vm.wrapBlock(vm.current.chain.BuildBlock(ctx))
 }
@@ -178,6 +191,8 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 func (vm *VM) BuildBlockWithContext(ctx context.Context, blockCtx *smblock.Context) (snowman.Block, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
 
 	return vm.wrapBlock(vm.current.chain.BuildBlockWithContext(ctx, blockCtx))
 }
@@ -185,6 +200,8 @@ func (vm *VM) BuildBlockWithContext(ctx context.Context, blockCtx *smblock.Conte
 func (vm *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
 
 	return vm.wrapBlock(vm.current.chain.ParseBlock(ctx, blockBytes))
 }
@@ -192,6 +209,8 @@ func (vm *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block,
 func (vm *VM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
 
 	return vm.wrapBlock(vm.current.chain.GetBlock(ctx, blkID))
 }

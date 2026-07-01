@@ -68,6 +68,7 @@ type VM struct {
 // initialization and transition.
 type current struct {
 	chain    Chain
+	chainCtx *snow.Context
 	requests *requests
 
 	ctx       context.Context
@@ -78,7 +79,7 @@ var transitionedKey = prefixdb.MakePrefix([]byte("transitioned"))
 
 func (vm *VM) Initialize(
 	ctx context.Context,
-	preChainCtx *snow.Context,
+	engineChainCtx *snow.Context,
 	db database.Database,
 	genesisBytes []byte,
 	upgradeBytes []byte,
@@ -86,36 +87,17 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	gatherer := metrics.NewPrefixGatherer()
-	if err := preChainCtx.Metrics.Register("transition", gatherer); err != nil {
-		return err
-	}
+	preChainCtx := copyContext(engineChainCtx)
 
 	// Give the post-transition chain its own gatherer to avoid
 	// double-registering metrics, and copy the rest of the context so the
 	// transition never races on the shared [snow.Context].
-	vm.postChainCtx = &snow.Context{
-		NetworkID:       preChainCtx.NetworkID,
-		SubnetID:        preChainCtx.SubnetID,
-		ChainID:         preChainCtx.ChainID,
-		NodeID:          preChainCtx.NodeID,
-		PublicKey:       preChainCtx.PublicKey,
-		NetworkUpgrades: preChainCtx.NetworkUpgrades,
-		XChainID:        preChainCtx.XChainID,
-		CChainID:        preChainCtx.CChainID,
-		AVAXAssetID:     preChainCtx.AVAXAssetID,
-		Log:             preChainCtx.Log,
-		// The lock is deprecated and unused by SAE, so this copy gets a fresh
-		// one. Coreth still uses it and MUST get the original context, not this
-		// copy.
-		Lock:           sync.RWMutex{},
-		SharedMemory:   preChainCtx.SharedMemory,
-		BCLookup:       preChainCtx.BCLookup,
-		Metrics:        gatherer,
-		WarpSigner:     preChainCtx.WarpSigner,
-		ValidatorState: preChainCtx.ValidatorState,
-		ChainDataDir:   preChainCtx.ChainDataDir,
+	vm.postChainCtx = copyContext(engineChainCtx)
+	vm.postChainCtx.Metrics = metrics.NewPrefixGatherer()
+	if err := preChainCtx.Metrics.Register("transition", vm.postChainCtx.Metrics); err != nil {
+		return err
 	}
+
 	vm.db = db
 	vm.genesisBytes = genesisBytes
 	vm.upgradeBytes = upgradeBytes
@@ -163,6 +145,30 @@ func (vm *VM) Initialize(
 	return vm.transition(ctx, lastAccepted)
 }
 
+// copyContext returns a new context with all the same fields except for
+// [snow.Context.Lock], which can not be copied.
+func copyContext(ctx *snow.Context) *snow.Context {
+	return &snow.Context{
+		NetworkID:       ctx.NetworkID,
+		SubnetID:        ctx.SubnetID,
+		ChainID:         ctx.ChainID,
+		NodeID:          ctx.NodeID,
+		PublicKey:       ctx.PublicKey,
+		NetworkUpgrades: ctx.NetworkUpgrades,
+		XChainID:        ctx.XChainID,
+		CChainID:        ctx.CChainID,
+		AVAXAssetID:     ctx.AVAXAssetID,
+		Log:             ctx.Log,
+		Lock:            sync.RWMutex{}, // The lock is not copied
+		SharedMemory:    ctx.SharedMemory,
+		BCLookup:        ctx.BCLookup,
+		Metrics:         ctx.Metrics,
+		WarpSigner:      ctx.WarpSigner,
+		ValidatorState:  ctx.ValidatorState,
+		ChainDataDir:    ctx.ChainDataDir,
+	}
+}
+
 // transition switches from the pre- to the post-transition chain. The
 // pre-transition chain must be active.
 func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
@@ -207,7 +213,10 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 
 	log.Info("shutting down pre-transition VM")
-	if err := vm.preTransitionChain.Shutdown(ctx); err != nil {
+	vm.current.chainCtx.Lock.Lock()
+	err := vm.preTransitionChain.Shutdown(ctx)
+	vm.current.chainCtx.Lock.Unlock()
+	if err != nil {
 		return fmt.Errorf("closing pre-transition chain: %w", err)
 	}
 
@@ -220,6 +229,9 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	if err := vm.initChain(ctx, vm.postTransitionChain, vm.postChainCtx); err != nil {
 		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
+
+	vm.postChainCtx.Lock.Lock()
+	defer vm.postChainCtx.Lock.Unlock()
 
 	if state := vm.consensusState.Get(); state != snow.Initializing {
 		log.Info("setting post-transition VM state",
@@ -265,6 +277,9 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 // initChain configures VM to dispatch the provided chain with the given
 // context.
 func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context) error {
+	chainCtx.Lock.Lock()
+	defer chainCtx.Lock.Unlock()
+
 	var (
 		requests requests
 		sender   = sender{
@@ -289,6 +304,7 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	vm.current = &current{
 		chain:     chain,
+		chainCtx:  chainCtx,
 		requests:  &requests,
 		ctx:       ctx,
 		ctxCancel: ctxCancel,

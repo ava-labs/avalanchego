@@ -6,6 +6,7 @@ package transitionvm
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 
 	"github.com/stretchr/testify/require"
 
@@ -104,4 +105,35 @@ func TestTransitionForwardsConnections(t *testing.T) {
 	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 
 	require.Equalf(t, want, sut.post.connected, "%T.post.connected", sut)
+}
+
+// TestAppGossipGrabsCtxLock verifies that the pre-transition VM can grab its
+// ctx.Lock during AppGossip.
+func TestAppGossipGrabsCtxLock(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		sut := newSUT(t)
+		ctx := t.Context()
+
+		blocked := make(chan struct{})
+		sut.pre.VM.AppGossipF = func(context.Context, ids.NodeID, []byte) error {
+			<-blocked // Block with [VM.transitionLock] held.
+
+			sut.pre.chainCtx.Lock.Lock()
+			defer sut.pre.chainCtx.Lock.Unlock()
+
+			return nil // Verify tx here
+		}
+
+		go sut.AppGossip(ctx, ids.GenerateTestNodeID(), nil)
+
+		synctest.Wait() // [VM.transitionLock] is held and gossip is waiting on blocked.
+
+		// The engine holds ctx.Lock across Accept.
+		sut.ctx.Lock.Lock()
+		defer sut.ctx.Lock.Unlock()
+
+		// Allow
+		go close(blocked)
+		sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+	})
 }

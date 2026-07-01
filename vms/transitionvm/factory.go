@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 )
@@ -52,9 +53,12 @@ func (f *Factory) New(log logging.Logger) (interface{}, error) {
 		drainTimeout:        f.DrainTimeout,
 
 		// [VM.Version] and [VM.Shutdown] may be called before [VM.Initialize],
-		// so mark the pre-transition chain current up front.
+		// so mark the pre-transition chain current up front. The placeholder
+		// context supplies a lock for the methods that acquire one; [initChain]
+		// replaces it with the real per-chain context during [VM.Initialize].
 		current: &current{
-			chain: pre,
+			chain:    pre,
+			chainCtx: &snow.Context{},
 		},
 	}, nil
 }
