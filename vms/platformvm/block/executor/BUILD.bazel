@@ -24,6 +24,7 @@ go_library(
         "//snow/engine/snowman/block",
         "//snow/uptime",
         "//snow/validators",
+        "//upgrade",
         "//utils/constants",
         "//utils/logging",
         "//utils/math",

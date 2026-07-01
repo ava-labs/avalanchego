@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -31,11 +32,16 @@ var (
 	errFailedCalculatingUptime            = errors.New("failed calculating uptime")
 )
 
+// ACP-267 raises the Primary Network uptime requirement to 90% (from 80%) for
+// validations that start at or after Helicon activates.
+const acp267UptimeRequirement = .9
+
 // options supports build new option blocks
 type options struct {
 	// inputs populated before calling this struct's methods:
 	log                     logging.Logger
 	primaryUptimePercentage float64
+	upgradeConfig           upgrade.Config
 	uptimes                 uptime.Calculator
 	state                   state.Chain
 
@@ -173,6 +179,8 @@ func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
+	} else if o.upgradeConfig.IsHeliconActivated(primaryNetworkValidator.StartTime) {
+		expectedUptimePercentage = acp267UptimeRequirement
 	}
 
 	uptime, err := o.uptimes.CalculateUptimePercentFrom(
