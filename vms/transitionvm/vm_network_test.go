@@ -121,7 +121,7 @@ func TestAppGossipGrabsCtxLock(t *testing.T) {
 			sut.pre.chainCtx.Lock.Lock()
 			defer sut.pre.chainCtx.Lock.Unlock()
 
-			return nil // Verify tx here
+			return nil // Coreth verifies txs here
 		}
 
 		go sut.AppGossip(ctx, ids.GenerateTestNodeID(), nil)
