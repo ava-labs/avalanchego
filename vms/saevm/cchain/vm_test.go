@@ -1010,8 +1010,6 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 		withAccount(contract, types.Account{Code: code}),
 	)
 
-	// With a base fee and tip of 1 each (the base fee is asserted on the block
-	// below), every transaction credits 2*GasUsed to the blackhole.
 	const feePerGas = 2
 	txs := make([]*types.Transaction, 2)
 	for i := range txs {
@@ -1019,7 +1017,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 			To:        &contract,
 			Gas:       1e6,
 			GasTipCap: big.NewInt(1),
-			GasFeeCap: big.NewInt(feePerGas),
+			GasFeeCap: big.NewInt(2),
 		})
 		require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, txs[i]), "%T.SendTransaction()", sut.ethclient)
 	}
