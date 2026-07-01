@@ -62,6 +62,7 @@ go_test(
     deps = [
         "//chains",
         "//config/node",
+        "//genesis",
         "//ids",
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
