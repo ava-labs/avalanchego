@@ -62,7 +62,7 @@ func TestWaitForEventCanceledByTransition(t *testing.T) {
 			errs <- err
 		}()
 
-		synctest.Wait()                                // wait until WaitForEvent is durably blocked
+		synctest.Wait()                          // wait until WaitForEvent is durably blocked
 		sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition, canceling the wait
 		require.ErrorIsf(t, <-errs, context.Canceled, "%T.WaitForEvent()", sut)
 	})
