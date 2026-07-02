@@ -29,7 +29,6 @@ go_library(
         "//tests",
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
-        "//upgrade",
         "//utils",
         "//utils/buffer",
         "//utils/constants",
