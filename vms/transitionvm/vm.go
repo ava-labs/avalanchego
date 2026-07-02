@@ -220,6 +220,11 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 		return fmt.Errorf("closing pre-transition chain: %w", err)
 	}
 
+	// Since shutdown finished without error for the pre-transition VM, we
+	// expect all DB writes to have been flushed. So it is now safe to write the
+	// transition marker. The transition marker MUST be written before
+	// initializing the post-transition VM, because the post-transition VM may
+	// perform disk operations that are incompatible with the pre-transition VM.
 	log.Info("writing transition marker")
 	if err := vm.db.Put(transitionedKey, nil); err != nil {
 		return fmt.Errorf("writing transition marker: %w", err)

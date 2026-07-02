@@ -174,6 +174,23 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	}
 
 	vm.httpHandlers.set(newHandlers)
+
+	// The engine only calls [VM.CreateHandlers] once. The transitionVM assumes
+	// that the routes exposed by the pre-transition VM are a super-set of the
+	// routes exposed by the post-transition VM.
+	//
+	// Coreth registers:
+	// - /rpc (always)
+	// - /ws (always)
+	// - /avax (always)
+	// - /admin (sometimes)
+	//
+	// CChain VM registers:
+	// - /rpc (always)
+	// - /ws (always)
+	// - /avax (always)
+	//
+	// So Coreth's routes are a super-set of the CChain VM's routes.
 	return vm.httpHandlers.asInterface(), nil
 }
 
