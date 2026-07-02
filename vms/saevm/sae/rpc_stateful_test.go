@@ -94,31 +94,6 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 	}...)
 }
 
-// TestStateAtPreSAEBlock verifies that state queries succeed against a
-// synchronous (pre-SAE) block once it has been evicted from memory and must be
-// restored from disk.
-func TestStateAtPreSAEBlock(t *testing.T) {
-	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 1, opt)
-
-	sut.settleUntilEvicted(t, vmTime, sut.genesis.Hash())
-
-	addr := sut.wallet.Addresses()[0]
-	want := (*hexutil.Big)(new(uint256.Int).SetAllOne().ToBig()) // [saetest.MaxAllocFor]
-	sut.testRPC(ctx, t, []rpcTest{
-		{
-			method: "eth_getBalance",
-			args:   []any{addr, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(sut.genesis.Number().Int64()))},
-			want:   want,
-		},
-		{
-			method: "eth_getBalance",
-			args:   []any{addr, rpc.BlockNumberOrHashWithHash(sut.genesis.Hash(), true)},
-			want:   want,
-		},
-	}...)
-}
-
 // txTraceResult is the per-transaction result returned by geth's
 // debug_traceBlock* RPCs.
 type txTraceResult struct {
@@ -127,10 +102,10 @@ type txTraceResult struct {
 	Error  string                  `json:"error"`
 }
 
-// TestReceiptsAndTracingAtPreSAEBlock verifies receipt and tracing RPCs
-// against block 1 once it and the synchronous (pre-SAE) genesis have been
-// evicted from memory: tracing block 1 replays on the restored genesis state.
-func TestReceiptsAndTracingAtPreSAEBlock(t *testing.T) {
+// TestRPCsAtPreSAEBlock verifies state, receipt, and tracing RPCs once block
+// 1 and the synchronous (pre-SAE) genesis have been evicted from memory and
+// restored from disk: tracing block 1 replays on the restored genesis state.
+func TestRPCsAtPreSAEBlock(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, 2, opt)
 
@@ -184,7 +159,18 @@ func TestReceiptsAndTracingAtPreSAEBlock(t *testing.T) {
 		},
 	}
 
+	genesisBalance := (*hexutil.Big)(new(uint256.Int).SetAllOne().ToBig()) // [saetest.MaxAllocFor]
 	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getBalance",
+			args:   []any{sut.wallet.Addresses()[0], rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(sut.genesis.Number().Int64()))},
+			want:   genesisBalance,
+		},
+		{
+			method: "eth_getBalance",
+			args:   []any{sut.wallet.Addresses()[0], rpc.BlockNumberOrHashWithHash(sut.genesis.Hash(), true)},
+			want:   genesisBalance,
+		},
 		{
 			method: "eth_getBlockReceipts",
 			args:   []any{hexutil.Uint64(sut.genesis.NumberU64())},
