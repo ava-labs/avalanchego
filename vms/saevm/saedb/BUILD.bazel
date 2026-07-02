@@ -11,9 +11,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//utils/logging",
-        "//vms/saevm/hook",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/state/snapshot",
         "@com_github_ava_labs_libevm//ethdb",

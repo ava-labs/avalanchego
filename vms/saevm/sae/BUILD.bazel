@@ -56,6 +56,7 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/txpool",
         "@com_github_ava_labs_libevm//core/txpool/legacypool",
         "@com_github_ava_labs_libevm//core/types",

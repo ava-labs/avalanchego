@@ -19,10 +19,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config/node"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -911,6 +913,37 @@ func TestGetStakingSigner(t *testing.T) {
 			if tt.expectedErr == nil {
 				require.Equal(tt.expectedSignerConfig, config.StakingSignerConfig)
 			}
+		})
+	}
+}
+
+func TestGetStakingConfig_Helicon(t *testing.T) {
+	tests := []struct {
+		name string
+		set  *time.Duration
+		want time.Duration
+	}{
+		{
+			name: "default",
+			want: genesis.LocalParams.HeliconMinStakeDuration,
+		},
+		{
+			name: "overridden",
+			set:  utils.PointerTo(15 * time.Minute),
+			want: 15 * time.Minute,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := setupViperFlags()
+			v.Set(DataDirKey, t.TempDir())
+			if tt.set != nil {
+				v.Set(HeliconMinStakeDurationKey, *tt.set)
+			}
+
+			config, err := getStakingConfig(v, constants.LocalID)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, config.HeliconMinStakeDuration)
 		})
 	}
 }
