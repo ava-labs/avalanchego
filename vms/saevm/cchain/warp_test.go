@@ -352,7 +352,8 @@ func TestReceiveWarpMessage(t *testing.T) {
 				return
 			}
 
-			log := saetest.SoleLog(t, receipt)
+			require.Lenf(t, receipt.Logs, 1, "%T.Logs", receipt)
+			log := receipt.Logs[0]
 			assert.Equalf(t, tt.wantLogData, log.Data, "%T.Data (warp precompile output)", log)
 		})
 	}

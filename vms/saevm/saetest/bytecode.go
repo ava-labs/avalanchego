@@ -7,7 +7,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +32,7 @@ func Push(tb testing.TB, data []byte) []byte {
 
 // LogTopOfStackAfter returns runtime bytecode that executes the concatenated
 // fragments and then emits its sole log, with the value on top of the stack
-// as the only topic. Retrieve the log with [SoleLog].
+// as the only topic.
 func LogTopOfStackAfter(fragments ...[]byte) []byte {
 	return slices.Concat(
 		slices.Concat(fragments...),
@@ -43,12 +42,4 @@ func LogTopOfStackAfter(fragments ...[]byte) []byte {
 			vm.STOP,
 		),
 	)
-}
-
-// SoleLog returns the only log emitted by r's transaction, failing tb if
-// there is not exactly one.
-func SoleLog(tb testing.TB, r *types.Receipt) *types.Log {
-	tb.Helper()
-	require.Lenf(tb, r.Logs, 1, "%T.Logs", r)
-	return r.Logs[0]
 }

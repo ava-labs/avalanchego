@@ -701,7 +701,9 @@ func TestGasAccounting(t *testing.T) {
 		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		require.Lenf(t, b.Receipts(), 1, "%T.Receipts()", b)
 
-		got := saetest.SoleLog(t, b.Receipts()[0]).Topics[0]
+		receipt := b.Receipts()[0]
+		require.Lenf(t, receipt.Logs, 1, "%T.Logs", receipt)
+		got := receipt.Logs[0].Topics[0]
 		want := common.BytesToHash(binary.BigEndian.AppendUint64(nil, finalPrice))
 		assert.Equal(t, want, got)
 	})

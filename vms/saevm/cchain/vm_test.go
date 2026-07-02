@@ -1029,7 +1029,8 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 
 	want := preBurn
 	for i, r := range receipts {
-		got := saetest.SoleLog(t, r).Topics[0]
+		require.Lenf(t, r.Logs, 1, "%T.Logs", r)
+		got := r.Logs[0].Topics[0]
 		assert.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
 		want.AddUint64(&want, feePerGas*r.GasUsed)
 	}
