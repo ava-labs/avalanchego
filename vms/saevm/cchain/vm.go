@@ -152,7 +152,7 @@ func (vm *VM) Initialize(
 		userConfig.desired(),
 		vm.metrics,
 	)
-	vm.Network, err = network.New(snowCtx, appSender)
+	vm.Network, err = network.New(userConfig.networkConfig(), snowCtx, appSender)
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
 	}

@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "network",
@@ -7,9 +8,25 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//api/metrics",
+        "//ids",
         "//network/p2p",
         "//snow",
         "//snow/engine/common",
         "//snow/validators",
+        "//utils/set",
+    ],
+)
+
+go_test(
+    name = "network_test",
+    srcs = ["network_test.go"],
+    embed = [":network"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//snow/engine/enginetest",
+        "//snow/snowtest",
+        "//utils/set",
+        "@com_github_stretchr_testify//require",
     ],
 )

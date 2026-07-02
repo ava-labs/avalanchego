@@ -67,7 +67,7 @@ func (vm *SinceGenesis[_]) Initialize(
 		return err
 	}
 
-	vm.Network, err = network.New(snowCtx, appSender)
+	vm.Network, err = network.New(network.Config{}, snowCtx, appSender)
 	if err != nil {
 		return fmt.Errorf("network.New(...): %v", err)
 	}
