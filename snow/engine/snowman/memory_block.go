@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
+	"github.com/ava-labs/avalanchego/utils/lock"
 )
 
 var _ snowman.Block = (*memoryBlock)(nil)
@@ -16,9 +17,9 @@ var _ snowman.Block = (*memoryBlock)(nil)
 type memoryBlock struct {
 	snowman.Block
 
-	tree     ancestor.Tree
-	metrics  *metrics
-	onAccept func()
+	tree               ancestor.Tree
+	metrics            *metrics
+	chainHeightUpdater *lock.ProgressSubscription[uint64]
 }
 
 // Accept accepts the underlying block & removes sibling subtrees
@@ -28,7 +29,7 @@ func (mb *memoryBlock) Accept(ctx context.Context) error {
 	if err := mb.Block.Accept(ctx); err != nil {
 		return err
 	}
-	mb.onAccept()
+	mb.chainHeightUpdater.SetProgress(mb.Height())
 	return nil
 }
 

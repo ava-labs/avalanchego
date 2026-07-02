@@ -253,8 +253,6 @@ type manager struct {
 	ids.Aliaser
 	ManagerConfig
 
-	pChainProgress *lock.ProgressSubscription[uint64]
-
 	// Those notified when a chain is created
 	registrants []Registrant
 
@@ -617,6 +615,9 @@ func (m *manager) createAvalancheChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
+
+	// We initialize the chain height to 0 for this chain because it's never read later.
+	ctx.ChainHeightUpdater = lock.NewProgressSubscription[uint64](0)
 
 	ctx.State.Set(snow.EngineState{
 		Type:  p2ppb.EngineType_ENGINE_TYPE_DAG,
@@ -1116,9 +1117,6 @@ func (m *manager) createSnowmanChain(
 	if m.TracingEnabled {
 		messageSender = sender.Trace(messageSender, m.Tracer)
 	}
-
-	var pchainProgressUpdater smeng.PChainProgressUpdater
-
 	var bootstrapFunc func()
 	// If [m.validatorState] is nil then we are creating the P-Chain. Since the
 	// P-Chain is the first chain to be created, we can use it to initialize
@@ -1248,15 +1246,11 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
-	if ctx.ChainID == constants.PlatformChainID {
-		lastAcceptedHeight, err := getLastAcceptedHeight(vm)
-		if err != nil {
-			return nil, fmt.Errorf("error while getting last accepted height: %w", err)
-		}
-
-		m.pChainProgress = lock.NewProgressSubscription(lastAcceptedHeight)
-		pchainProgressUpdater = m.pChainProgress
+	lastAcceptedHeight, err := getLastAcceptedHeight(context.TODO(), vm)
+	if err != nil {
+		return nil, fmt.Errorf("error while getting last accepted height: %w", err)
 	}
+	ctx.ChainHeightUpdater = lock.NewProgressSubscription[uint64](lastAcceptedHeight)
 
 	bootstrapWeight, err := beacons.TotalWeight(ctx.SubnetID)
 	if err != nil {
@@ -1363,16 +1357,15 @@ func (m *manager) createSnowmanChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
-		Ctx:                   ctx,
-		AllGetsServer:         snowGetHandler,
-		VM:                    vm,
-		Sender:                messageSender,
-		Validators:            vdrs,
-		ConnectedValidators:   connectedValidators,
-		Params:                consensusParams,
-		Consensus:             consensus,
-		PartialSync:           m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
-		PChainProgressUpdater: pchainProgressUpdater,
+		Ctx:                 ctx,
+		AllGetsServer:       snowGetHandler,
+		VM:                  vm,
+		Sender:              messageSender,
+		Validators:          vdrs,
+		ConnectedValidators: connectedValidators,
+		Params:              consensusParams,
+		Consensus:           consensus,
+		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
 	var engine common.Engine
 	engine, err = smeng.New(engineConfig)
@@ -1615,8 +1608,8 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	return vmGatherer, nil
 }
 
-func getLastAcceptedHeight(vm block.ChainVM) (uint64, error) {
-	lastAcceptedBlock, err := vm.LastAccepted(context.Background())
+func getLastAcceptedHeight(ctx context.Context, vm block.ChainVM) (uint64, error) {
+	lastAcceptedBlock, err := vm.LastAccepted(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("error while determining last accepted block ID: %w", err)
 	}
