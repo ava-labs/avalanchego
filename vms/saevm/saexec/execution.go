@@ -195,6 +195,10 @@ func Execute(
 	b.CheckBaseFeeBound(baseFee)
 	header.BaseFee = baseFee.ToBig()
 
+	// EIP-4788: before processing any transactions, store the parent beacon
+	// block root, mirroring [core.StateProcessor.Process].
+	core.SetBeaconBlockRoot(stateDB, header)
+
 	signer := b.Signer(config)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
 	var blockGasConsumed gas.Gas
