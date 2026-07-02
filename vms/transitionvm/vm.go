@@ -264,7 +264,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 		// engine previously set the preference, we must manually set the
 		// post-transition VM's preference.
 		//
-		// Failing to due this could leave the preference uninitialized, which
+		// Failing to do this could leave the preference uninitialized, which
 		// could cause block building to error.
 		log.Info("initializing post-transition VM preference",
 			zap.Stringer("blkID", lastID),
