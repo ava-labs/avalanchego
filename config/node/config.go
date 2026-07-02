@@ -177,6 +177,11 @@ type Config struct {
 
 	TrackedSubnets set.Set[ids.ID] `json:"trackedSubnets"`
 
+	// PChainFollowOnly makes the P-chain follow the tip read-only without ever
+	// joining consensus. Used for an isolated node that tracks the P-chain
+	// through a single trusted peer/gateway listed in Bootstrappers.
+	PChainFollowOnly bool `json:"pChainFollowOnly"`
+
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
 	// building a snowman++ block on the P-chain and the X-chain. All other
 	// chains are expected to perform their own block production throttling.
