@@ -16,8 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/libevm/core/rawdb"
-
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -29,13 +27,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/types"
 
 	avadb "github.com/ava-labs/avalanchego/database"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -102,7 +100,7 @@ func (vm *VM) Initialize(
 	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
 	// This meant that the database's prefix was not compacted, because the
 	// provided database was wrapped by the rpcchainvm.
-	ethDB := rawdb.NewDatabase(database.New(prefixdb.NewNested(ethDBPrefix, avaDB)))
+	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
 
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
