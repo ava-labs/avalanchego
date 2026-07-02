@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "evmstate",
+    srcs = ["client.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/evmstate",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//network/p2p",
+        "//proto/pb/sync",
+        "//vms/evm/sync/network",
+    ],
+)
