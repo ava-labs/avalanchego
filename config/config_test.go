@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const chainConfigFilenameExtension = ".ex"
@@ -1288,6 +1290,111 @@ func TestResolveConsensusMode(t *testing.T) {
 			require.Equal(t, tt.want, resolveConsensusMode(&tt.input))
 		})
 	}
+}
+
+func TestGetLargeMessageConfig(t *testing.T) {
+	const defaultKiB = uint(constants.DefaultMaxMessageSize / units.KiB)
+	validID := ids.GenerateTestNodeID()
+
+	tests := []struct {
+		name             string
+		maxSizeKiB       *uint
+		peerIDs          *[]string
+		wantErr          error
+		wantEnabled      bool
+		wantMaxSize      uint32
+		wantAllowlistLen int
+	}{
+		{
+			name:             "neither set is disabled",
+			wantEnabled:      false,
+			wantMaxSize:      constants.DefaultMaxMessageSize,
+			wantAllowlistLen: 0,
+		},
+		{
+			name:       "only max size set",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			wantErr:    errLargeMessageFlagsTogether,
+		},
+		{
+			name:    "only peer ids set",
+			peerIDs: &[]string{validID.String()},
+			wantErr: errLargeMessageFlagsTogether,
+		},
+		{
+			name:             "valid elevated config",
+			maxSizeKiB:       ptr(2 * defaultKiB),
+			peerIDs:          &[]string{validID.String()},
+			wantEnabled:      true,
+			wantMaxSize:      2 * constants.DefaultMaxMessageSize,
+			wantAllowlistLen: 1,
+		},
+		{
+			name:       "size below default",
+			maxSizeKiB: ptr(defaultKiB / 2),
+			peerIDs:    &[]string{validID.String()},
+			wantErr:    errLargeMessageSizeTooSmall,
+		},
+		{
+			name:       "size equal to default",
+			maxSizeKiB: ptr(defaultKiB),
+			peerIDs:    &[]string{validID.String()},
+			wantErr:    errLargeMessageSizeIsDefault,
+		},
+		{
+			name:       "size exceeds uint32",
+			maxSizeKiB: ptr(uint(math.MaxUint32/units.KiB) + 1),
+			peerIDs:    &[]string{validID.String()},
+			wantErr:    errLargeMessageSizeTooLarge,
+		},
+		{
+			name:       "peer ids set but empty",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			peerIDs:    &[]string{},
+			wantErr:    errLargeMessagePeerIDsEmpty,
+		},
+		{
+			name:       "peer ids only whitespace",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			peerIDs:    &[]string{" ", ""},
+			wantErr:    errLargeMessagePeerIDsEmpty,
+		},
+		{
+			name:       "invalid peer id",
+			maxSizeKiB: ptr(2 * defaultKiB),
+			peerIDs:    &[]string{"not-a-node-id"},
+			wantErr:    errParseLargeMessagePeerID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			v := setupViperFlags()
+			if tt.maxSizeKiB != nil {
+				v.Set(NetworkMaxMessageSizeKey, *tt.maxSizeKiB)
+			}
+			if tt.peerIDs != nil {
+				v.Set(NetworkLargeMessagePeerIDsKey, *tt.peerIDs)
+			}
+
+			cfg, err := getLargeMessageConfig(v)
+			if tt.wantErr != nil {
+				require.ErrorIs(err, tt.wantErr)
+				return
+			}
+
+			require.NoError(err)
+			require.Equal(tt.wantEnabled, cfg.Enabled())
+			require.Equal(tt.wantMaxSize, cfg.MaxMessageSize)
+			require.Equal(tt.wantAllowlistLen, cfg.Allowlist.Len())
+		})
+	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }
 
 func setupViperFlags() *viper.Viper {

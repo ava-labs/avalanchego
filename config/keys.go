@@ -115,6 +115,8 @@ const (
 	NetworkRequireValidatorToConnectKey                  = "network-require-validator-to-connect"
 	NetworkPeerReadBufferSizeKey                         = "network-peer-read-buffer-size"
 	NetworkPeerWriteBufferSizeKey                        = "network-peer-write-buffer-size"
+	NetworkMaxMessageSizeKey                             = "network-max-message-size"
+	NetworkLargeMessagePeerIDsKey                        = "network-large-message-peer-ids"
 	NetworkTCPProxyEnabledKey                            = "network-tcp-proxy-enabled"
 	NetworkTCPProxyReadTimeoutKey                        = "network-tcp-proxy-read-timeout"
 	NetworkTLSKeyLogFileKey                              = "network-tls-key-log-file-unsafe"
