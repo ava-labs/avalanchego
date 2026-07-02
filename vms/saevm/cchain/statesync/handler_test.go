@@ -16,6 +16,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -23,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -50,7 +53,7 @@ func newSUT(t *testing.T, settleLag, lastExecuted uint64) *SUT {
 	t.Helper()
 
 	// Apply a distinct atomic root at every executed height.
-	st := newState(t)
+	st, snowCtx := newState(t)
 	var build exportBuilder
 	for h := uint64(1); h <= lastExecuted; h++ {
 		require.NoErrorf(t, st.Apply(h, []*tx.Tx{build.newExport()}), "Apply(%d)", h)
@@ -66,12 +69,16 @@ func newSUT(t *testing.T, settleLag, lastExecuted uint64) *SUT {
 		writeBlock(ethDB, newBlock(h))
 	}
 
+	net, err := network.New(snowCtx, &enginetest.Sender{})
+	require.NoError(t, err, "network.New()")
+
 	handler, err := New(
 		saestatesync.Config{DBConfig: saedb.Config{CommitInterval: commitInterval}},
 		ethDB,
+		net,
 		hookStub{lag: settleLag},
 		st,
-		loggingtest.New(t, logging.Debug),
+		snowCtx,
 	)
 	require.NoError(t, err, "New()")
 	t.Cleanup(func() {
@@ -86,7 +93,7 @@ func newSUT(t *testing.T, settleLag, lastExecuted uint64) *SUT {
 
 // newState returns a [state.State] backed by a fresh db with working shared
 // memory, ready for [state.State.Apply].
-func newState(t *testing.T) *state.State {
+func newState(t *testing.T) (*state.State, *snow.Context) {
 	t.Helper()
 
 	db := memdb.New()
@@ -95,10 +102,11 @@ func newState(t *testing.T) *state.State {
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	snowCtx.SharedMemory = mem.NewSharedMemory(snowtest.CChainID)
+	snowCtx.Log = loggingtest.New(t, logging.Debug)
 
 	st, err := state.New(snowCtx, prefixdb.New([]byte("chain"), db))
 	require.NoError(t, err, "state.New()")
-	return st
+	return st, snowCtx
 }
 
 func writeBlock(ethDB ethdb.Database, blk *types.Block) {

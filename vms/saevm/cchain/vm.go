@@ -175,7 +175,7 @@ func (vm *VM) Initialize(
 	if err := genesis.setup(ethDB); err != nil {
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
-	vm.SummaryHandler, err = cchainsync.New(userConfig.stateSyncConfig(), ethDB, hooks, vm.state, snowCtx.Log)
+	vm.SummaryHandler, err = cchainsync.New(userConfig.stateSyncConfig(), ethDB, vm.Network, hooks, vm.state, snowCtx)
 	if err != nil {
 		return fmt.Errorf("creating summary handler: %w", err)
 	}
