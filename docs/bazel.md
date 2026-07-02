@@ -25,8 +25,14 @@ task bazel-build
 # Build with optimizations
 task bazel-build-opt
 
-# Run unit tests
+# Run unit tests (default Bazel mode: no race, no shuffle)
 task bazel-test
+
+# Shuffle-only validation
+task bazel-test-shuffle
+
+# Stronger validation with race detection and shuffle
+task bazel-test-race-shuffle
 
 # Update Bazel metadata after changing Go imports or Bazel module deps
 task bazel-generate-metadata
@@ -396,8 +402,20 @@ bazel build //...
 
 ### Testing
 
-By default, `bazel test` matches `scripts/build_test.sh` behavior,
-with a few exceptions:
+This repository exposes multiple test entrypoints, and they do not all use the
+same defaults.
+
+- `bazel test //...` and `task bazel-test` use the default Bazel mode:
+  race off, shuffle off.
+- `task bazel-test-shuffle` uses race off, shuffle on.
+- `scripts/build_test.sh` uses race on, shuffle on.
+- The reusable GitHub Actions Bazel workflow runs its unit-test jobs with the
+  `race-shuffle` mode.
+
+The default Bazel entrypoints favor cheaper local iteration. The non-Bazel
+unit-test path and Bazel CI unit-test jobs use stronger validation modes.
+
+Other behavior still roughly aligns:
 
 - The script passes `-tags test` to `go test`; currently there are no
   `//go:build test` files in this repo, so it has no effect.
@@ -406,8 +424,8 @@ with a few exceptions:
   out of `bazel test //...`.
 
 ```bash
-# Run all unit tests (shuffle enabled, race on)
-task bazel-test                    # or: bazel test //...
+# Run all unit tests in the default Bazel mode (no race, no shuffle)
+task bazel-test                   # or: bazel test //...
 
 # Run tests for a specific package
 bazel test //utils/...
@@ -415,11 +433,17 @@ bazel test //utils/...
 # Run specific test functions (target:test_name + filter)
 bazel test //utils:set_test --test_filter=TestSet_Add
 
-# Fast local iteration (no race, no shuffle)
-task bazel-test-fast               # or: bazel test --config=fast //...
+# Race detection without shuffle
+task bazel-test-race              # or: bazel test --config=race //...
+
+# Shuffle without race detection
+task bazel-test-shuffle           # or: bazel test --config=shuffle //...
 
 # Collect coverage
 bazel coverage //...
+
+# Race detection with shuffle enabled
+task bazel-test-race-shuffle      # or: bazel test --config=race-shuffle //...
 
 # Run E2E tests (requires built binary)
 task bazel-test-e2e
@@ -427,22 +451,26 @@ task bazel-test-e2e
 
 #### Test Options
 
-| Option | Default | Toggle with |
-|--------|---------|-------------|
-| Race detection | ON | `--config=norace` (disable) |
-| Shuffle | ON | `--config=noshuffle` (disable) |
-| Fast mode | - | `--config=fast` (no shuffle, no race) |
+| Public mode | Behavior | Bazel config | Typical use |
+|-------------|----------|--------------|-------------|
+| default (`bazel-test`) | race off, shuffle off | Bazel default | fastest normal local Bazel iteration |
+| `race` | race on, shuffle off | `--config=race` | stronger local validation without order randomization |
+| `race-shuffle` | race on, shuffle on | `--config=race-shuffle` | strongest local validation; also used by Bazel CI unit-test jobs |
+| `shuffle` | race off, shuffle on | `--config=shuffle` | order-randomization checks without race overhead |
 
 Examples:
 ```bash
-# Disable race detection
-bazel test --config=norace //...
+# Default repo task mode (no shuffle, no race)
+task bazel-test                   # or: bazel test //...
 
-# Disable shuffle only
-bazel test --config=noshuffle //...
+# Race detection without shuffle
+task bazel-test-race              # or: bazel test --config=race //...
 
-# Fast mode (no shuffle, no race)
-bazel test --config=fast //...
+# Shuffle without race detection
+task bazel-test-shuffle           # or: bazel test --config=shuffle //...
+
+# Race detection with shuffle enabled
+task bazel-test-race-shuffle      # or: bazel test --config=race-shuffle //...
 ```
 
 #### Test Timeouts
