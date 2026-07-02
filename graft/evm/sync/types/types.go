@@ -8,6 +8,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 )
 
 // Syncer is the common interface for all sync operations.
@@ -39,6 +41,20 @@ type LeafClient interface {
 	// GetLeafs synchronously sends the given request, returning a parsed LeafsResponse or error.
 	// Note: this verifies the response including the range proofs.
 	GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error)
+}
+
+type BlockClient interface {
+	// GetBlocks synchronously retrieves blocks starting with specified common.Hash and height up to specified parents
+	// specified range from height to height-parents is inclusive
+	GetBlocks(ctx context.Context, blockHash common.Hash, height uint64, parents uint16) ([]*types.Block, error)
+}
+
+// CodeClient is the interface for fetching contract code by hash from the network.
+type CodeClient interface {
+	// GetCode synchronously retrieves the code corresponding to the given hashes,
+	// returning the code bytes in the same order as the requested hashes.
+	// Note: this verifies each returned code blob hashes to its requested hash.
+	GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error)
 }
 
 // Extender is an interface that allows for extending the state sync process.

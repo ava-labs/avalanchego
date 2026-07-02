@@ -19,7 +19,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
@@ -81,7 +80,7 @@ func WithBatchSize(n uint) SyncerOption {
 	})
 }
 
-func NewSyncer(client client.Client, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...SyncerOption) (types.Syncer, error) {
+func NewSyncer(client types.LeafClient, db ethdb.Database, root common.Hash, codeQueue *code.Queue, leafsRequestSize uint16, leafsRequestType message.LeafsRequestType, opts ...SyncerOption) (types.Syncer, error) {
 	if leafsRequestSize == 0 {
 		return nil, errLeafsRequestSizeRequired
 	}

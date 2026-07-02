@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 
+	synctypes "github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -76,13 +77,8 @@ type Network interface {
 // Client synchronously fetches data from the network to fulfill state sync requests.
 // Repeatedly requests failed requests until the context to the request is expired.
 type Client interface {
-	// GetLeafs synchronously sends the given request, returning a parsed LeafsResponse or error
-	// Note: this verifies the response including the range proofs.
-	GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error)
-
-	// GetBlocks synchronously retrieves blocks starting with specified common.Hash and height up to specified parents
-	// specified range from height to height-parents is inclusive
-	GetBlocks(ctx context.Context, blockHash common.Hash, height uint64, parents uint16) ([]*types.Block, error)
+	synctypes.LeafClient
+	synctypes.BlockClient
 
 	// GetCode synchronously retrieves code associated with the given hashes
 	GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error)
