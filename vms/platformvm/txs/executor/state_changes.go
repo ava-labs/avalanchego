@@ -416,6 +416,8 @@ func GetRewardsCalculator(
 		return reward.NewCalculator(cfg), nil
 	}
 
+	// Non-primary reward-bearing stakers are permissionless stakers. They can
+	// only exist on transformed subnets, so the transform tx must exist.
 	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
 	if err != nil {
 		return nil, err
