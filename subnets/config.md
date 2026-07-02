@@ -56,6 +56,42 @@ this configuration in order to properly allow a node in the private Subnet.
 
 :::
 
+### ProposerVM Config
+
+#### `proposerWindowMilliseconds` (uint)
+
+The length of a single proposerVM proposer slot for the chains in this Subnet, in
+**milliseconds**. Defaults to 5s (`5000`) when unset or `0`. When set, must be
+between `1000` (1s) and `5000` (5s) inclusive.
+
+**If you are changing this at all, you almost certainly want 1s (`1000`).** That
+is the minimum (see the note below), and it is already
+enough to make validator restarts and maintenance effectively invisible. For
+example:
+
+```json
+{ "proposerWindowMilliseconds": 1000 }
+```
+
+Slots are `proposerWindowMilliseconds` apart, and when a scheduled proposer is
+offline the chain stalls until the next live proposer's slot opens — so a smaller
+window speeds failover recovery (good for CFT/PoA L1s) at the cost of more
+rejected blocks. The proposerVM block timestamp is currently whole-second
+granular, so the slot clock only ticks once per second and a sub-second window
+gains nothing — hence the `1000`ms (1s) floor. Sub-second windows arrive in a
+follow-up PR that adds millisecond-granular timestamps.
+
+:::warning
+
+This is a network-wide consensus parameter, not a per-node tuning knob. Every
+validator of this Subnet's chains MUST use the same `proposerWindowMilliseconds`.
+Validators with different windows disagree about which proposer is expected for a
+slot, reject each other's blocks, and break liveness. Roll it out identically to
+every validator, the same way as an upgrade time. The primary network (P/C/X) is
+unaffected and always uses the default.
+
+:::
+
 ### Consensus Config
 
 Subnet configs supports loading new consensus parameters or even consensus engines(Snowman or Simplex).

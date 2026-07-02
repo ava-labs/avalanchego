@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -240,7 +239,7 @@ func (vm *VM) waitForProposerWindow() error {
 	)
 	for {
 		now := vm.Clock.Time().Truncate(time.Second)
-		slot := proposer.TimeToSlot(parentTimestamp, now)
+		slot := vm.TimeToSlot(parentTimestamp, now)
 		delay, err := vm.MinDelayForProposer(
 			ctx,
 			childBlockHeight,
@@ -1474,7 +1473,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		return zBlock, nil
 	}
 	require.NoError(proVM.SetPreference(t.Context(), bBlock.ID()))
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
+	proVM.Set(proVM.Time().Add(proVM.MaxBuildDelay()))
 	cBlock, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	coreVM.BuildBlockF = nil
@@ -1535,7 +1534,7 @@ func TestTooFarAdvanced(t *testing.T) {
 
 	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
-		aBlock.Timestamp().Add(proposer.MaxVerifyDelay),
+		aBlock.Timestamp().Add(proVM.MaxVerifyDelay()),
 		defaultPChainHeight,
 		statelessblock.Epoch{},
 		yBlock.Bytes(),
@@ -2521,7 +2520,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 		t.Context(),
 		statefulBlock.Height()+1,
 		statelessBlock.PChainHeight(),
-		proposer.TimeToSlot(parentTimestamp, currentTime),
+		proVM.TimeToSlot(parentTimestamp, currentTime),
 		parentTimestamp,
 	)
 	require.NoError(err)
