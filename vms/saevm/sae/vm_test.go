@@ -423,7 +423,7 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	require.NoError(t, err, "blockBuilder.build()")
 
 	builtTxs := built.Transactions()
-	require.Len(t, builtTxs, int(wantTxs), "built block included unexpected transaction count")
+	require.Equal(t, wantTxs, uint64(len(builtTxs)), "built block included unexpected transaction count")
 	for i, tx := range builtTxs {
 		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
 	}
