@@ -65,7 +65,6 @@ type VM struct {
 	preference atomic.Pointer[blocks.Block]
 	last       struct {
 		accepted, settled atomic.Pointer[blocks.Block]
-		synchronous       uint64
 	}
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
@@ -94,6 +93,10 @@ var _ io.Closer = (*closerFunc)(nil)
 func (f closerFunc) Close() error { return f() }
 
 // A Config configures construction of a new [VM].
+//
+// TODO(JonathanOppenheimer): add a Verify method that checks all sub-configs
+// (e.g. [rpc.Config.Verify]) and call it from [NewVM] so the VM doesn't
+// assume its caller validated the config.
 type Config struct {
 	MempoolConfig legacypool.Config
 	DBConfig      saedb.Config
@@ -152,19 +155,13 @@ func NewVM[T hook.Transaction](
 	vm.xdb = xdb
 	vm.toClose = append(vm.toClose, &xdb)
 
-	lastSync, err := blocks.New(lastSynchronous, nil, nil, snowCtx.Log)
+	// ==========  Sync -> Async  ==========
+	lastSync, err := blocks.RestoreSettledBlock(lastSynchronous, hooks, snowCtx.Log, db, xdb, chainConfig)
 	if err != nil {
-		return nil, fmt.Errorf("blocks.New([last synchronous], ...): %v", err)
+		return nil, fmt.Errorf("blocks.RestoreSettledBlock([last synchronous]): %v", err)
 	}
-	vm.last.synchronous = lastSync.Height()
-
-	{ // ==========  Sync -> Async  ==========
-		if err := lastSync.MarkSynchronous(hooks, db, xdb); err != nil {
-			return nil, fmt.Errorf("%T{genesis}.MarkSynchronous(): %v", lastSync, err)
-		}
-		if err := canonicaliseLastSynchronous(db, lastSync); err != nil {
-			return nil, err
-		}
+	if err := canonicaliseLastSynchronous(db, lastSync); err != nil {
+		return nil, err
 	}
 
 	rec := &recovery{db, xdb, chainConfig, snowCtx.Log, hooks, cfg, lastSync}

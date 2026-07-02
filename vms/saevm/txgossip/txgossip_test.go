@@ -86,15 +86,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	genesis := blockstest.NewGenesis(
-		t,
-		db,
-		xdb,
-		config,
-		saetest.MaxAllocFor(wallet.Addresses()...),
-		blockstest.WithGasTarget(testGasTarget),
-		blockstest.WithBaseFee(params.Wei),
-	)
+	genesis := blockstest.NewGenesis(t, db, config, saetest.MaxAllocFor(wallet.Addresses()...))
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 

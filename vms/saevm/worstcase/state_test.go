@@ -58,7 +58,6 @@ func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
 	genesis := blockstest.NewGenesis(
 		tb,
 		db,
-		saetest.NewExecutionResultsDB(),
 		config,
 		alloc,
 		blockstest.WithGasTarget(initialGasTarget),

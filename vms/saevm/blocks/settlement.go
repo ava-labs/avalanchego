@@ -7,19 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"slices"
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
-	"github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 type ancestry struct {
@@ -64,72 +60,6 @@ func (b *Block) markSettled(lastSettled *atomic.Pointer[Block]) error {
 	return nil
 }
 
-// MarkSynchronous combines [Block.MarkExecuted] and [Block.MarkSettled], and is
-// reserved for the last pre-SAE block, which MAY be the genesis block. These
-// blocks are, by definition, self-settling so require special treatment as such
-// behaviour is impossible under SAE rules.
-//
-// Arguments required by [Block.MarkExecuted] but not accepted by
-// MarkSynchronous are derived from the block to maintain invariants. The
-// `subSecondBlockTime` argument MUST follow the same constraints as the
-// respective [hook.Points] method.
-//
-// MarkSynchronous and [Block.Synchronous] are not safe for concurrent use. This
-// method MUST therefore be called *before* instantiating the SAE VM.
-//
-// Wherever MarkSynchronous results in different behaviour to
-// [Block.MarkSettled], the respective methods are documented as such. They can
-// otherwise be considered identical.
-//
-// Unlike [Block.MarkExecuted], MarkSynchronous does not call
-// [Block.SetAsHeadBlock], which MUST be done by the caller, i.f.f. the chain
-// has not yet commenced asynchronous execution.
-//
-// TODO(arr4n) refactor to avoid requiring DB writes.
-func (b *Block) MarkSynchronous(hooks hook.Points, db ethdb.Database, xdb types.ExecutionResults) error {
-	ethB := b.EthBlock()
-	// Receipts of a synchronous block have already been "settled" by the block
-	// itself. As the only reason to pass receipts here is for later settlement
-	// in another block, there is no need to pass anything meaningful as it
-	// would also require them to be received as an argument to MarkSynchronous.
-	target, cfg := hooks.GasConfigAfter(b.Header())
-
-	// The base fee must be capped at [math.MaxUint64] to avoid overflow in the gastime.
-	var baseFee uint64
-	switch bf := ethB.BaseFee(); {
-	case bf == nil:
-		baseFee = 0
-	case bf.IsUint64():
-		baseFee = bf.Uint64()
-	default:
-		baseFee = math.MaxUint64
-	}
-
-	execTime, err := gastime.New(
-		hooks.BlockTime(b.Header()),
-		// Target, excess, and config _after_ are a requirement of
-		// [Block.MarkExecuted].
-		target,
-		gas.Price(baseFee),
-		cfg,
-	)
-	if err != nil {
-		return err
-	}
-	e := &executionResults{
-		byGas:         *execTime.Clone(),
-		receiptRoot:   ethB.ReceiptHash(),
-		stateRootPost: ethB.Root(),
-	}
-	e.baseFee.SetUint64(baseFee)
-
-	if err := b.markExecuted(db.NewBatch(), xdb, e, false, nil); err != nil {
-		return err
-	}
-	b.synchronous = true
-	return b.markSettled(nil)
-}
-
 // WaitUntilSettled blocks until either [Block.MarkSettled] is called or the
 // [context.Context] is cancelled.
 func (b *Block) WaitUntilSettled(ctx context.Context) error {
@@ -141,14 +71,14 @@ func (b *Block) WaitUntilSettled(ctx context.Context) error {
 	}
 }
 
-// Settled reports whether either of [Block.MarkSettled] or
-// [Block.MarkSynchronous] have been called without resulting in an error.
+// Settled reports whether [Block.MarkSettled] has been called without resulting
+// in an error, or the block was constructed by [RestoreSettledBlock].
 func (b *Block) Settled() bool {
 	return b.ancestry.Load() == nil
 }
 
-// Synchronous reports whether [Block.MarkSynchronous] has been called without
-// resulting in an error.
+// Synchronous reports whether the block was marked as synchronous during
+// [RestoreSettledBlock] or [Block.RestoreExecutionArtefacts].
 func (b *Block) Synchronous() bool {
 	return b.synchronous
 }
@@ -177,9 +107,9 @@ func (b *Block) ParentBlock() *Block {
 
 // LastSettled returns the last-settled block at the time of b's acceptance,
 // unless [Block.MarkSettled] has been called, in which case it returns nil and
-// logs an error. If [Block.MarkSynchronous] was called instead, LastSettled
-// always returns `b` itself, without logging. Note that this value might not be
-// distinct between contiguous blocks.
+// logs an error. Note that this value might not be distinct between contiguous
+// blocks. If the block is synchronous, LastSettled always returns b itself,
+// without logging.
 func (b *Block) LastSettled() *Block {
 	if b.synchronous {
 		return b
@@ -196,8 +126,8 @@ func (b *Block) LastSettled() *Block {
 // therefore returns a disjoint (and possibly empty) set of historical blocks.
 //
 // It is not valid to call Settles after a call to [Block.MarkSettled] on either
-// b or its parent. If [Block.MarkSynchronous] was called instead, Settles
-// always returns a single-element slice of `b` itself.
+// b or its parent. If the block is synchronous, Settles always returns a
+// single-element slice of `b` itself.
 func (b *Block) Settles() []*Block {
 	if b.synchronous {
 		return []*Block{b}
@@ -241,8 +171,8 @@ var errIncompleteBlockHistory = errors.New("incomplete block history when determ
 // indeterminate delay.
 //
 // It is not valid to call LastToSettleAt with a parent on which
-// [Block.MarkSettled] was called directly (i.e. [Block.MarkSynchronous] does
-// not preclude the parent from usage here).
+// [Block.MarkSettled] was called directly. However, it is valid with a
+// synchronous parent.
 //
 // See the Example for [Block.WhenChildSettles] for one usage of the returned
 // block.

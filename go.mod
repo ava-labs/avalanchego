@@ -11,7 +11,6 @@ module github.com/ava-labs/avalanchego
 //   - CONTRIBUTING.md
 //   - README.md
 //   - RELEASES.md
-//   - docs/bazel.md
 //   - nix/go/default.nix (update version and sha256 for supported arches)
 //
 // - If updating between minor versions (e.g. 1.25.x -> 1.26.x):
@@ -95,7 +94,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/avalanchego/graft/evm v1.14.2
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.6.0
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.7.0
 	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
