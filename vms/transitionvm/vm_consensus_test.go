@@ -5,6 +5,7 @@ package transitionvm
 
 import (
 	"context"
+	"math"
 	"testing"
 	"testing/synctest"
 
@@ -26,6 +27,21 @@ func TestTransitionMaintainsState(t *testing.T) {
 	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 
 	require.Equalf(t, snow.NormalOp, sut.post.consensusState, "%T.consensusState", sut.post)
+}
+
+// TestTransitionSkipsInitializingState verifies the transition doesn't forward
+// the consensus state if the state was never set.
+func TestTransitionSkipsInitializingState(t *testing.T) {
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	// A forwarded SetState would overwrite this sentinel.
+	const unset snow.State = math.MaxUint8
+	sut.post.consensusState = unset
+
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+
+	require.Equalf(t, unset, sut.post.consensusState, "%T.consensusState", sut.post)
 }
 
 // TestWaitForEventForwardsToCurrentChain verifies WaitForEvent routes to the

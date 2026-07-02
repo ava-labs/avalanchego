@@ -85,6 +85,38 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 	}
 }
 
+// TestRequestIDCollisionAcrossTransition verifies that when the
+// post-transition chain reuses a request ID the pre-transition chain sent, the
+// first response is delivered to the post-transition chain and the second is
+// dropped.
+func TestRequestIDCollisionAcrossTransition(t *testing.T) {
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	nodeID := ids.GenerateTestNodeID()
+	const requestID = 1
+
+	// The pre-transition chain's request is still unanswered at the
+	// transition.
+	require.NoErrorf(t, sut.pre.sendAppRequest(ctx, nodeID, requestID), "%T.sendAppRequest()", sut.pre)
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+	require.NoErrorf(t, sut.post.sendAppRequest(ctx, nodeID, requestID), "%T.sendAppRequest()", sut.post)
+
+	delivered := 0
+	sut.post.VM.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error {
+		delivered++
+		return nil
+	}
+	sut.pre.VM.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error {
+		t.Fatal("pre-transition chain received a response after the transition")
+		return nil
+	}
+	for range 2 {
+		require.NoErrorf(t, sut.AppResponse(ctx, nodeID, requestID, nil), "%T.AppResponse()", sut)
+		require.Equalf(t, 1, delivered, "%T.AppResponse()", sut)
+	}
+}
+
 // TestTransitionForwardsConnections verifies the transition replays the
 // pre-transition chain's connections to the post-transition chain.
 func TestTransitionForwardsConnections(t *testing.T) {

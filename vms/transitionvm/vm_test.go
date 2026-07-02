@@ -71,12 +71,22 @@ func (m contextMode) String() string {
 	}
 }
 
-// verifyBlock verifies blk according to mode.
+var errShouldVerifyWithoutContext = errors.New("unexpectedly should verify without context")
+
+// verifyBlock verifies blk according to mode. The withContext mode requires
+// blk to report that it should be verified with a context.
 func verifyBlock(ctx context.Context, blk snowman.Block, mode contextMode) error {
 	if mode == noContext {
 		return blk.Verify(ctx)
 	}
 	bwc := blk.(smblock.WithVerifyContext)
+	should, err := bwc.ShouldVerifyWithContext(ctx)
+	if err != nil {
+		return err
+	}
+	if !should {
+		return errShouldVerifyWithoutContext
+	}
 	return bwc.VerifyWithContext(ctx, nil)
 }
 
@@ -480,6 +490,25 @@ func TestRestart(t *testing.T) {
 
 	sut = sut.restart(t)
 	version, err = sut.Version(ctx)
+	require.NoErrorf(t, err, "%T.Version()", sut)
+	require.Equalf(t, "post", version, "%T.Version()", sut)
+}
+
+// TestRestartWithoutTransitionMarker verifies a restart after accepting the
+// transition block, but before writing the transition marker, re-runs the
+// transition during initialization.
+func TestRestartWithoutTransitionMarker(t *testing.T) {
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+
+	// Model a crash after accepting the transition block but before writing
+	// the transition marker.
+	require.NoErrorf(t, sut.db.Delete(transitionedKey), "%T.Delete()", sut.db)
+
+	sut = sut.restart(t)
+	version, err := sut.Version(ctx)
 	require.NoErrorf(t, err, "%T.Version()", sut)
 	require.Equalf(t, "post", version, "%T.Version()", sut)
 }
