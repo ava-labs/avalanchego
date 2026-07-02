@@ -85,9 +85,26 @@ func setupGenesis(db ethdb.Database, tdbConfig *triedb.Config, genesisBytes []by
 	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
 		return nil, fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
 	}
+
+	priorAccepted := rawdb.ReadHeadFastBlockHash(db)
+	priorBlock := rawdb.ReadHeadBlockHash(db)
+	priorHeader := rawdb.ReadHeadHeaderHash(db)
+
 	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
 	if err != nil {
 		return nil, fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
+	}
+
+	// These could have been clobbered by [core.SetupGenesisBlock] if the
+	// genesis state hadn't been committed.
+	if priorAccepted != (ethcommon.Hash{}) {
+		rawdb.WriteHeadFastBlockHash(db, priorAccepted)
+	}
+	if priorBlock != (ethcommon.Hash{}) {
+		rawdb.WriteHeadBlockHash(db, priorBlock)
+	}
+	if priorHeader != (ethcommon.Hash{}) {
+		rawdb.WriteHeadHeaderHash(db, priorHeader)
 	}
 
 	// [NewVM] assumes that the genesis block is "finalized", which does not

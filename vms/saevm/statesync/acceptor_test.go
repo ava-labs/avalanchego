@@ -5,17 +5,23 @@ package statesync
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
-// TestStateSyncEnabled checks that various configs and states will correctly
-// initiate state sync or skip it, and WaitForEvent matches this behavior.
+// TestStateSyncEnabled checks that the configured value is reported back by
+// [SummaryHandler.StateSyncEnabled].
 func TestStateSyncEnabled(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -43,65 +49,220 @@ func TestStateSyncEnabled(t *testing.T) {
 	}
 }
 
-func TestAcceptSummary(t *testing.T) {
-	const numBlocks = defaultCommitInterval
-
+// TestAcceptSummarySkips checks the two cases in which
+// [SummaryHandler.AcceptSummary] refuses to state sync.
+func TestAcceptSummarySkips(t *testing.T) {
 	tests := []struct {
-		name          string
-		summaryHeight uint64
-		opts          []sutOption
-		want          block.StateSyncMode
+		name       string
+		newHandler func(t *testing.T) *SummaryHandler
+		getSummary func(t *testing.T, sh *SummaryHandler) *Summary
 	}{
 		{
-			name:          "genesis_summary_skipped",
-			summaryHeight: 0,
-			want:          block.StateSyncSkipped,
+			name: "summary_at_genesis_height",
+			newHandler: func(t *testing.T) *SummaryHandler {
+				return newSUT(t).SummaryHandler
+			},
+			getSummary: func(*testing.T, *SummaryHandler) *Summary {
+				return &Summary{}
+			},
 		},
 		{
-			name:          "non-genesis_summary_starts_sync",
-			summaryHeight: numBlocks,
-			opts:          []sutOption{withoutInitialization()},
-			want:          block.StateSyncStatic,
-		},
-		{
-			name:          "sync_skipped_if_blocks_accepted",
-			summaryHeight: numBlocks,
-			opts:          []sutOption{withNumBlocks(1)},
-			want:          block.StateSyncSkipped,
-		},
-		{
-			name:          "sync_started_only_genesis_accepted",
-			summaryHeight: numBlocks,
-			want:          block.StateSyncStatic,
+			name: "blocks_already_accepted",
+			newHandler: func(t *testing.T) *SummaryHandler {
+				vm := newVM(t)
+				vm.acceptBlocks(t, defaultCommitInterval)
+				return vm.summaryHandler
+			},
+			getSummary: func(t *testing.T, sh *SummaryHandler) *Summary {
+				s, err := sh.GetLastStateSummary(t.Context())
+				require.NoErrorf(t, err, "%T.GetLastStateSummary()", sh)
+				require.NotZerof(t, s.Height(), "%T.GetLastStateSummary().Height()", sh)
+				return s
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			src := newSUT(t, withNumBlocks(numBlocks))
-			s, err := src.GetStateSummary(t.Context(), tt.summaryHeight)
-			require.NoErrorf(t, err, "%T.GetStateSummary(%d)", src.SummaryHandler, tt.summaryHeight)
+			sh := tt.newHandler(t)
+			s := tt.getSummary(t, sh)
 
-			sut := newSUT(t, append(tt.opts, withEnabled(true))...)
-			mode, err := sut.AcceptSummary(t.Context(), s)
-			require.NoErrorf(t, err, "%T.AcceptSummary()", sut.SummaryHandler)
-			require.Equalf(t, tt.want, mode, "%T.AcceptSummary()", sut.SummaryHandler)
-
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-			var (
-				wantMsg = common.StateSyncDone
-				wantErr error
-			)
-			if tt.want == block.StateSyncSkipped {
-				cancel()
-				wantMsg = 0
-				wantErr = context.Canceled
-			}
-			msg, err := sut.WaitForEvent(ctx)
-			assert.ErrorIsf(t, err, wantErr, "%T.WaitForEvent()", sut.SummaryHandler) //nolint:testifylint // msg is informative
-			assert.Equalf(t, wantMsg, msg, "%T.WaitForEvent()", sut.SummaryHandler)
+			mode, err := sh.AcceptSummary(t.Context(), s)
+			require.NoErrorf(t, err, "%T.AcceptSummary()", sh)
+			require.Equalf(t, block.StateSyncSkipped, mode, "%T.AcceptSummary()", sh)
 		})
 	}
+}
+
+func TestWaitForEventCanceled(t *testing.T) {
+	sut := newSUT(t)
+
+	type waitResult struct {
+		msg common.Message
+		err error
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan waitResult, 1)
+	go func() {
+		msg, err := sut.WaitForEvent(ctx)
+		done <- waitResult{msg: msg, err: err}
+	}()
+
+	cancel()
+	r := <-done
+	assert.ErrorIsf(t, r.err, context.Canceled, "%T.WaitForEvent()", sut.SummaryHandler) //nolint:testifylint // msg is informative
+	assert.Equalf(t, common.Message(0), r.msg, "%T.WaitForEvent()", sut.SummaryHandler)
+}
+
+// TestStateSyncEndToEnd syncs a fresh node from a source with non-trivial
+// code and storage, verifies everything reached the synced disk, then starts
+// a VM over the synced database and keeps accepting blocks to prove that
+// settlement of the synced state was persisted correctly.
+func TestStateSyncEndToEnd(t *testing.T) {
+	t.Parallel()
+
+	const numBlocks = defaultCommitInterval + 2
+	sourceVM := newVM(t)
+	sourceVM.acceptBlocks(t, numBlocks)
+
+	// Handler to state sync
+	xdb := saetest.NewExecutionResultsDB()
+	db := memdb.New()
+	client := newSUT(t, withDatabase(db), withXDB(xdb))
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+	ctx := t.Context()
+
+	summary, err := sourceVM.summaryHandler.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.summaryHandler)
+	require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
+
+	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
+
+	// During the sync, the network continued processing
+	sourceVM.acceptBlocks(t, numBlocks)
+
+	// catch up a new VM
+	clientVM := newVM(t,
+		withDatabase(db),
+		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
+		withTime(sourceVM.clock.Now()),
+	)
+	lastHeight := sourceVM.lastAcceptedBlock(t).Height()
+	for height := summary.Height() + 1; height <= lastHeight; height++ {
+		b := sourceVM.blockAtHeight(t, height)
+		parsed, err := clientVM.ParseBlock(ctx, b.Bytes())
+		require.NoErrorf(t, err, "ParseBlock(%d)", b.Height())
+		require.NoErrorf(t, clientVM.VerifyBlock(ctx, nil, parsed), "VerifyBlock(%d)", b.Height())
+		require.NoErrorf(t, clientVM.AcceptBlock(ctx, parsed), "AcceptBlock(%d)", b.Height())
+		require.NoErrorf(t, parsed.WaitUntilExecuted(ctx), "WaitUntilExecuted(%d)", b.Height())
+	}
+
+	sourceHead, err := sourceVM.LastAccepted(ctx)
+	require.NoError(t, err, "source LastAccepted()")
+	clientHead, err := clientVM.LastAccepted(ctx)
+	require.NoError(t, err, "client LastAccepted()")
+	require.Equal(t, sourceHead, clientHead, "client VM caught up to the source head")
+}
+
+// TestStateSyncWithSettlementLag syncs a fresh node from a source
+// whose head settles a block more than one height back.
+func TestStateSyncWithSettlementLag(t *testing.T) {
+	t.Parallel()
+
+	sourceVM := newVM(t)
+	ctx := t.Context()
+
+	b1 := sourceVM.acceptBlock(t)
+	b2 := sourceVM.acceptBlock(t)
+	sourceVM.clock.AdvanceToSettle(ctx, t, b1)
+	b3 := sourceVM.acceptBlock(t)
+	sourceVM.clock.AdvanceToSettle(ctx, t, b2)
+	b4 := sourceVM.acceptBlock(t)
+
+	// Test invariants
+	require.Equal(t, b1.Height(), sourceVM.hooks.SettledBy(b3.Header()).Height, "SettledBy(b3)")
+	require.Equal(t, b2.Height(), sourceVM.hooks.SettledBy(b4.Header()).Height, "SettledBy(b4)")
+
+	xdb := saetest.NewExecutionResultsDB()
+	db := memdb.New()
+	client := newSUT(t, withDatabase(db), withXDB(xdb))
+	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+	summary, err := sourceVM.summaryHandler.GetLastStateSummary(ctx)
+	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.summaryHandler)
+	require.Equal(t, b4.Height(), summary.Height(), "summary at last commit boundary")
+
+	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+
+	// Recovery inside VM initialization must reconstruct the settlement of
+	// blocks 3 and 4, which settled blocks below the synced last settled block.
+	clientVM := newVM(t,
+		withDatabase(db),
+		withXDB(saetest.CloneExecutionResultsDB(t, xdb)),
+		withTime(sourceVM.clock.Now()),
+	)
+
+	head, err := clientVM.LastAccepted(ctx)
+	require.NoError(t, err, "client LastAccepted()")
+	require.Equal(t, ids.ID(b4.Hash()), head, "client VM recovered the synced head")
+}
+
+func TestShutdownCancelsMidSync(t *testing.T) {
+	t.Parallel()
+
+	sut := newSUT(t)
+
+	// No peers are connected, so the sync stalls until canceled.
+	mode, err := sut.AcceptSummary(t.Context(), NewSummary(ethcommon.Hash{0xde, 0xad}, defaultCommitInterval))
+	require.NoErrorf(t, err, "%T.AcceptSummary()", sut.SummaryHandler)
+	require.Equalf(t, block.StateSyncStatic, mode, "%T.AcceptSummary()", sut.SummaryHandler)
+
+	require.NoErrorf(t, sut.Shutdown(t.Context()), "%T.Shutdown()", sut.SummaryHandler)
+
+	msg, err := sut.WaitForEvent(t.Context())
+	require.NoErrorf(t, err, "%T.WaitForEvent()", sut.SummaryHandler)
+	require.Equal(t, common.StateSyncDone, msg, "WaitForEvent()")
+	require.ErrorIsf(t, sut.Error(), context.Canceled, "%T.Error()", sut.SummaryHandler)
+}
+
+// FuzzSyncErrorSurfacedViaError checks that any error in the sync process
+// gracefully fatals,
+func FuzzSyncErrorSurfacedViaError(f *testing.F) {
+	for _, failAfter := range []int{0, 1, 4, 16, 64, math.MaxInt} {
+		f.Add(failAfter)
+	}
+	f.Fuzz(func(t *testing.T, failAfter int) {
+		ctx := t.Context()
+
+		source := newVM(t)
+		source.acceptBlocks(t, defaultCommitInterval+2)
+
+		fdb := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
+		client := newSUT(t, withDatabase(fdb))
+		saetest.ConnectTo[saetest.Peer](t, client, source)
+
+		summary, err := source.summaryHandler.GetLastStateSummary(ctx)
+		require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.summaryHandler)
+
+		// Setup (e.g. the genesis commit) is done; arm the write budget.
+		fdb.SetFailAfter(failAfter)
+
+		err = client.syncTo(ctx, t, summary)
+		if !fdb.Failed() {
+			require.NoErrorf(t, err, "%T.syncTo", client)
+			return
+		}
+		require.ErrorIsf(t, err, saetest.ErrInjected, "%T.Error()", client)
+
+		// Any error should be recoverable.
+		t.Run("second_try", func(t *testing.T) {
+			fdb.SetFailAfter(math.MaxInt)
+			client := newSUT(t, withDatabase(fdb))
+			saetest.ConnectTo[saetest.Peer](t, client, source)
+			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo()", client)
+		})
+	})
 }

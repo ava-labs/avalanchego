@@ -5,7 +5,6 @@ package blocks
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"sync/atomic"
 	"testing"
@@ -194,17 +193,6 @@ func errAll(wants ...testerr.Want) testerr.Want {
 	})
 }
 
-// errIsNot requires that the error does NOT wrap `target`; a nil error
-// trivially satisfies this.
-func errIsNot(target error) testerr.Want {
-	return testerr.Func(func(got error) string {
-		if errors.Is(got, target) {
-			return testerr.DiffMessage(got, "error that is not %v", target)
-		}
-		return ""
-	})
-}
-
 func TestRestoreExecutionArtefacts(t *testing.T) {
 	const height = 2
 	asynchronous := hook.Settled{Height: height - 1}
@@ -224,12 +212,13 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		settled  hook.Settled
-		txs      []*types.Transaction
-		hookOpts []hookstest.HookOption
-		setupDBs func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block)
-		wantErr  testerr.Want
+		name             string
+		settled          hook.Settled
+		txs              []*types.Transaction
+		hookOpts         []hookstest.HookOption
+		checkSynchronous bool
+		setupDBs         func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block)
+		wantErr          testerr.Want
 	}{
 		{
 			name:    "asynchronous_missing_execution_results",
@@ -255,18 +244,15 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 			),
 		},
 		{
-			name:     "asynchronous_missing_receipts",
+			name:     "state_sync_missing_receipts",
 			settled:  asynchronous,
 			txs:      []*types.Transaction{types.NewTx(&types.LegacyTx{Gas: params.TxGas})},
 			setupDBs: markExecuted,
-			wantErr: errAll(
-				errIsNot(ErrMissingExecutionResults),
-				testerr.Contains("deriving receipt fields"),
-			),
 		},
 		{
-			name:     "synchronous_ignores_execution_results",
-			setupDBs: putCorruptResults,
+			name:             "synchronous_ignores_execution_results",
+			setupDBs:         putCorruptResults,
+			checkSynchronous: true,
 		},
 		{
 			name:     "synchronous_gas_time_error",
@@ -300,7 +286,7 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("%T.RestoreExecutionArtefacts() %s", b, diff)
 			}
-			if tt.wantErr != nil {
+			if !tt.checkSynchronous {
 				return
 			}
 
