@@ -130,6 +130,7 @@ go_test(
         "//graft/coreth/plugin/evm",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contracts/warp",
+        "//graft/evm/constants",
         "//graft/evm/utils",
         "//ids",
         "//network/p2p",

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
@@ -231,6 +232,15 @@ func (*hooks) BeforeExecutingBlock(params.Rules, *state.StateDB, *types.Block) e
 	// and this block is the first post-Durango block, we need to activate the
 	// Warp precompile. This case does not happen on Mainnet, Fuji, or the Local
 	// network, but could happen on a custom network.
+	return nil
+}
+
+// AfterExecutingTransaction credits the base-fee burn (GasUsed * baseFee) to
+// [constants.BlackholeAddr], which libevm's state transition otherwise discards.
+func (*hooks) AfterExecutingTransaction(db *state.StateDB, baseFee uint256.Int, r *types.Receipt) error {
+	burned := new(uint256.Int).SetUint64(r.GasUsed)
+	burned.Mul(burned, &baseFee)
+	db.AddBalance(constants.BlackholeAddr, burned)
 	return nil
 }
 
