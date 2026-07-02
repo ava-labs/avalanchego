@@ -12,18 +12,21 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -208,6 +211,59 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	rewardUTXOs, err := env.state.GetRewardUTXOs(txID)
 	require.NoError(err)
 	require.NotEmpty(rewardUTXOs)
+}
+
+func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t, upgradetest.Latest)
+
+	// Remove genesis validators so our auto-renewed validator is the only staker
+	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
+	require.NoError(err)
+	for _, staker := range iterator.ToSlice(currentStakerIterator) {
+		require.NoError(env.state.DeleteCurrentValidator(staker))
+	}
+
+	addTx := newAddAutoRenewedValidatorTx(t)
+	txID := addTx.ID()
+	validatorTx := addTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+
+	startTime := genesistest.DefaultValidatorStartTime
+	endTime := startTime.Add(time.Duration(validatorTx.Period) * time.Second)
+
+	// Add the tx and staker directly to state
+	env.state.AddTx(addTx, status.Committed)
+
+	staker, err := state.NewStaker(txID, validatorTx, startTime, endTime, validatorTx.Weight(), 0)
+	require.NoError(err)
+
+	require.NoError(env.state.PutCurrentValidator(staker))
+	// The builder only needs the current staker to choose the reward tx type,
+	// but auto-renewed validators normally also have staking info. Keep the
+	// directly constructed state consistent with StandardTx execution.
+	require.NoError(env.state.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
+		NextPeriod: validatorTx.Period,
+	}))
+	require.NoError(env.state.Commit())
+
+	// Advance time to the validator's end time so it should be rewarded
+	env.state.SetTimestamp(endTime)
+	env.backend.Clk.Set(endTime)
+
+	// Build the block
+	blk, err := env.Builder.BuildBlock(t.Context())
+	require.NoError(err)
+
+	proposalBlk := blk.(*blockexecutor.Block).Block
+	require.IsType(&block.BanffProposalBlock{}, proposalBlk)
+
+	proposalTxs := proposalBlk.Txs()
+	require.Len(proposalTxs, 1)
+
+	wantTx, err := newRewardAutoRenewedValidatorTx(env.ctx, txID, uint64(endTime.Unix()))
+	require.NoError(err)
+	require.Equal(wantTx, proposalTxs[0])
 }
 
 func TestBuildBlockAdvanceTime(t *testing.T) {
@@ -616,4 +672,182 @@ func TestGetNextStakerToReward(t *testing.T) {
 			require.Equal(tt.expectedShouldReward, shouldReward)
 		})
 	}
+}
+
+func TestNewRewardTxForStaker(t *testing.T) {
+	tests := []struct {
+		name         string
+		stakerTxFunc func(t testing.TB) *txs.Tx
+		wantTxType   any
+		wantErr      error
+	}{
+		{
+			name:         "add_auto_renewed_validator_tx_returns_reward_auto_renewed_validator_tx",
+			stakerTxFunc: newAddAutoRenewedValidatorTx,
+			wantTxType:   &txs.RewardAutoRenewedValidatorTx{},
+		},
+		{
+			name:         "add_permissionless_validator_tx_returns_reward_validator_tx",
+			stakerTxFunc: newAddPermissionlessValidatorTx,
+			wantTxType:   &txs.RewardValidatorTx{},
+		},
+		{
+			name:         "add_validator_tx_returns_reward_validator_tx",
+			stakerTxFunc: newAddValidatorTx,
+			wantTxType:   &txs.RewardValidatorTx{},
+		},
+		{
+			name:         "add_delegator_tx_returns_reward_validator_tx",
+			stakerTxFunc: newAddDelegatorTx,
+			wantTxType:   &txs.RewardValidatorTx{},
+		},
+		{
+			name: "create_subnet_tx_returns_error",
+			stakerTxFunc: func(t testing.TB) *txs.Tx {
+				utx := &txs.CreateSubnetTx{
+					BaseTx: txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							NetworkID:    constants.UnitTestID,
+							BlockchainID: ids.GenerateTestID(),
+						},
+					},
+					Owner: &secp256k1fx.OutputOwners{},
+				}
+
+				tx, err := txs.NewSigned(utx, txs.Codec, nil)
+				require.NoError(t, err)
+				return tx
+			},
+			wantErr: errUnexpectedStakerTxType,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := snowtest.Context(t, snowtest.PChainID)
+			stakerTx := tt.stakerTxFunc(t)
+			timestamp := time.Unix(1000, 0)
+
+			rewardTx, err := newRewardTxForStaker(ctx, stakerTx, timestamp)
+			require.ErrorIs(t, err, tt.wantErr)
+
+			if tt.wantErr == nil {
+				require.IsType(t, tt.wantTxType, rewardTx.Unsigned)
+				require.Equal(t, stakerTx.ID(), rewardTx.Unsigned.(txs.RewardTx).StakerTxID())
+
+				if utx, ok := rewardTx.Unsigned.(*txs.RewardAutoRenewedValidatorTx); ok {
+					require.Equal(t, uint64(timestamp.Unix()), utx.Timestamp)
+				}
+			}
+		})
+	}
+}
+
+func newAddPermissionlessValidatorTx(t testing.TB) *txs.Tx {
+	t.Helper()
+
+	utx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    constants.UnitTestID,
+				BlockchainID: ids.GenerateTestID(),
+			},
+		},
+		Validator: txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			End:    uint64(genesistest.DefaultValidatorStartTime.Add(time.Hour).Unix()),
+			Wght:   2,
+		},
+		Subnet:                ids.GenerateTestID(),
+		Signer:                &signer.Empty{},
+		StakeOuts:             []*avax.TransferableOutput{},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+		DelegationShares:      reward.PercentDenominator,
+	}
+
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	require.NoError(t, err)
+	return tx
+}
+
+func newAddValidatorTx(t testing.TB) *txs.Tx {
+	t.Helper()
+
+	utx := &txs.AddValidatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    constants.UnitTestID,
+				BlockchainID: ids.GenerateTestID(),
+			},
+		},
+		Validator: txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			End:    uint64(genesistest.DefaultValidatorStartTime.Add(time.Hour).Unix()),
+			Wght:   2,
+		},
+		StakeOuts:        []*avax.TransferableOutput{},
+		RewardsOwner:     &secp256k1fx.OutputOwners{},
+		DelegationShares: reward.PercentDenominator,
+	}
+
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	require.NoError(t, err)
+	return tx
+}
+
+func newAddDelegatorTx(t testing.TB) *txs.Tx {
+	t.Helper()
+
+	utx := &txs.AddDelegatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    constants.UnitTestID,
+				BlockchainID: ids.GenerateTestID(),
+			},
+		},
+		Validator: txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			End:    uint64(genesistest.DefaultValidatorStartTime.Add(time.Hour).Unix()),
+			Wght:   2,
+		},
+		StakeOuts:              []*avax.TransferableOutput{},
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
+	}
+
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	require.NoError(t, err)
+	return tx
+}
+
+func newAddAutoRenewedValidatorTx(t testing.TB) *txs.Tx {
+	t.Helper()
+
+	utx := &txs.AddAutoRenewedValidatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    constants.UnitTestID,
+				BlockchainID: ids.GenerateTestID(),
+			},
+		},
+		ValidatorNodeID: ids.GenerateTestNodeID().Bytes(),
+		Period:          1,
+		Signer:          &signer.Empty{},
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{ID: ids.GenerateTestID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 2,
+				},
+			},
+		},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{},
+		DelegationShares:      reward.PercentDenominator,
+		ValidatorAuthority:    &secp256k1fx.OutputOwners{},
+	}
+
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	require.NoError(t, err)
+	return tx
 }
