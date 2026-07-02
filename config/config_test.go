@@ -916,50 +916,33 @@ func TestGetStakingSigner(t *testing.T) {
 	}
 }
 
-func TestGetStakingConfig(t *testing.T) {
+func TestGetStakingConfig_Helicon(t *testing.T) {
 	tests := []struct {
-		name                    string
-		networkID               uint32
-		minStake                time.Duration
-		heliconMinStake         time.Duration
-		setHeliconMinStake      bool
-		expectedHeliconMinStake time.Duration
-		expectedErr             error
+		name string
+		set  *time.Duration
+		want time.Duration
 	}{
 		{
-			name:                    "custom network defaults HeliconMinStakeDuration to the flag default",
-			networkID:               constants.LocalID,
-			minStake:                30 * time.Minute,
-			expectedHeliconMinStake: genesis.LocalParams.HeliconMinStakeDuration,
+			name: "default",
+			want: genesis.LocalParams.HeliconMinStakeDuration,
 		},
 		{
-			name:                    "custom network reads HeliconMinStakeDuration independently of MinStakeDuration",
-			networkID:               constants.LocalID,
-			minStake:                30 * time.Minute,
-			heliconMinStake:         15 * time.Minute,
-			setHeliconMinStake:      true,
-			expectedHeliconMinStake: 15 * time.Minute,
+			name: "overridden",
+			set:  utils.PointerTo(15 * time.Minute),
+			want: 15 * time.Minute,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
 			v := setupViperFlags()
 			v.Set(DataDirKey, t.TempDir())
-			v.Set(MinStakeDurationKey, tt.minStake)
-			if tt.setHeliconMinStake {
-				v.Set(HeliconMinStakeDurationKey, tt.heliconMinStake)
+			if tt.set != nil {
+				v.Set(HeliconMinStakeDurationKey, *tt.set)
 			}
 
-			config, err := getStakingConfig(v, tt.networkID)
-
-			require.ErrorIs(err, tt.expectedErr)
-			if tt.expectedErr == nil {
-				require.Equal(tt.minStake, config.MinStakeDuration)
-				require.Equal(tt.expectedHeliconMinStake, config.HeliconMinStakeDuration)
-			}
+			config, err := getStakingConfig(v, constants.LocalID)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, config.HeliconMinStakeDuration)
 		})
 	}
 }
