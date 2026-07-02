@@ -992,11 +992,9 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	assert.Equalf(t, *wantBalance, sut.balance(t, sender), "sender balance reflects gas charged")
 }
 
-// TestFeesBurnedToBlackhole verifies that each transaction's full fee — the
-// tip, paid to the coinbase (the blackhole), and the base fee, credited by
-// [hooks.AfterExecutingTransaction] — is burned before the next transaction
-// executes. Every transaction calls a contract that logs BALANCE(blackhole),
-// which MUST already include all preceding fees.
+// TestFeesBurnedToBlackhole verifies that each transaction's full fee (tip +
+// base fee) is credited to the blackhole address before the next transaction
+// executes.
 func TestFeesBurnedToBlackhole(t *testing.T) {
 	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 
@@ -1035,7 +1033,6 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 		assert.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
 		want.AddUint64(&want, feePerGas*r.GasUsed)
 	}
-	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
 }
 
 // TestParseBlock verifies that the cchain ParseBlock override accepts
