@@ -104,6 +104,11 @@ func (b *block) VerifyWithContext(ctx context.Context, blockCtx *smblock.Context
 
 var errPostTransitionBlockBeforeTransition = errors.New("post-transition block before transition")
 
+// maybeTransition updates the block to reference the post-transition VM if the
+// block's ancestry includes the transition block. It returns an error if the
+// block should be updated to reference the post-transition VM but isn't able
+// to yet.
+//
 // If maybeTransition returns nil, then all future calls to maybeTransition will
 // also return nil and will not modify the block.
 //
