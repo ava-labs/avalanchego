@@ -364,6 +364,10 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 		return err
 	}
 
+	if extraConfig.IsHelicon(header.Time) {
+		return errors.New("expected to have transitioned to SAE prior to Helicon")
+	}
+
 	// If the VM is not marked as bootstrapped the other chains may also be
 	// bootstrapping and not have populated the required indices. Since
 	// bootstrapping only verifies blocks that have been canonically accepted by

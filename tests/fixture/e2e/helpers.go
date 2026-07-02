@@ -133,7 +133,7 @@ func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) *ethclient.Clien
 		zap.String("URI", nodeURI.URI),
 	)
 	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
-	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
+	uri := fmt.Sprintf("http://%s/ext/bc/C/rpc", nodeAddress)
 	client, err := ethclient.Dial(uri)
 	require.NoError(tc, err)
 	return client

@@ -82,11 +82,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
+	"github.com/ava-labs/avalanchego/vms/transitionvm"
 
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	coreth "github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	saevm "github.com/ava-labs/avalanchego/vms/saevm/cchain"
 )
 
 const (
@@ -1225,7 +1227,12 @@ func (n *Node) initVMs() error {
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Factory{
+			PreFactory:     &coreth.Factory{},
+			PostFactory:    &saevm.Factory{},
+			TransitionTime: n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+			DrainTimeout:   15 * time.Second,
+		}),
 	)
 	if err != nil {
 		return err
