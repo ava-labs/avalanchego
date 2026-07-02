@@ -116,6 +116,6 @@ conditioned on meeting uptime requirements and is forfeited on abort.
 
 ## API
 
-The `GetStakers` endpoint embeds an `AutoRenewedConfig` only for auto-renewed validators. The config contains `validatorAuthority`, `nextPeriod`, and `autoCompoundRewardShares`.
+The `GetCurrentValidators` endpoint embeds an `AutoRenewedConfig` only for auto-renewed validators. The config contains `validatorAuthority`, `nextPeriod`, and `autoCompoundRewardShares`.
 
 RPC consumers need this metadata to distinguish auto-renewed validators from fixed-term validators and to show the validator's pending next-cycle behavior. Wallets, staking dashboards, and operators can use it to display whether the validator will renew or exit at the next cycle boundary, what percentage of rewards will be restaked in the next cycle, and which authority can update the configuration.
