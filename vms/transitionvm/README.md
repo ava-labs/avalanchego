@@ -197,8 +197,9 @@ flowchart TD
     t --> cc["chain snow.Context.Lock<br/>(managed copy)"]
     cc --> b["block.lock"]
     cc --> c["connections.lock"]
-    cc --> r["requests.lock"]
     cc --> hs["httpHandlers.lock"]
+    b --> r["requests.lock"]
+    c --> r
     hs --> h["httpHandler.lock"]
 
     classDef ctxCls stroke:#1f77b4,stroke-width:2px,color:#1f77b4;
@@ -217,6 +218,12 @@ forward the engine dispatches under its lock takes `transitionLock` (read) and
 then this copy (write); the wrapped chain re-enters the copy on its own
 asynchronous (gossip, app messages) and HTTP (admin, tx APIs) paths, which reach
 it without `transitionLock` held.
+
+Any call into the chain may send an app request, which the wrapper's sender
+records under `requests.lock`. So `requests.lock` sits below every lock held
+around such a call. The chain's own lock always is. `block.lock` is, because
+`maybeTransition` fetches and re-parses through the chain. `connections.lock`
+is, because `reconnect` replays connections into the chain.
 
 The line-level mechanics are commented at their call sites in [`vm.go`](vm.go),
 [`vm_block.go`](vm_block.go), [`vm_network.go`](vm_network.go), and
