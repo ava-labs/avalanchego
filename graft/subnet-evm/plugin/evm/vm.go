@@ -78,9 +78,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
@@ -599,10 +599,10 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 		return err
 	}
 
-	var desiredDelayExcess *acp226.DelayExcess
+	var desiredDelayExponent *dynamic.DelayExponent
 	if vm.config.MinDelayTarget != nil {
-		desiredDelayExcess = new(acp226.DelayExcess)
-		*desiredDelayExcess = acp226.DesiredDelayExcess(*vm.config.MinDelayTarget)
+		desiredDelayExponent = new(dynamic.DelayExponent)
+		*desiredDelayExponent = dynamic.DesiredDelayExponent(*vm.config.MinDelayTarget)
 	}
 
 	vm.eth, err = eth.New(
@@ -614,7 +614,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 		lastAcceptedHash,
 		dummy.NewDummyEngine(
 			dummy.Mode{},
-			desiredDelayExcess,
+			desiredDelayExponent,
 		),
 		vm.clock,
 	)

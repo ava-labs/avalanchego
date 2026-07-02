@@ -17,7 +17,7 @@ go_library(
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/evm/utils",
         "//vms/components/gas",
-        "//vms/evm/acp226",
+        "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",

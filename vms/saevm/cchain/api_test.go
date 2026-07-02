@@ -172,7 +172,7 @@ func TestRPCExtras(t *testing.T) {
 	require.NotNilf(t, extra.ExtDataGasUsed, "%T.ExtDataGasUsed", extra)
 	require.NotNilf(t, extra.BlockGasCost, "%T.BlockGasCost", extra)
 	require.NotNilf(t, extra.TimeMilliseconds, "%T.TimeMilliseconds", extra)
-	require.NotNilf(t, extra.MinDelayExcess, "%T.MinDelayExcess", extra)
+	require.NotNilf(t, extra.MinDelayExponent, "%T.MinDelayExponent", extra)
 	require.NotNilf(t, extra.TargetExponent, "%T.TargetExponent", extra)
 	require.NotNilf(t, extra.MinPriceExponent, "%T.MinPriceExponent", extra)
 	require.NotNilf(t, extra.SettledHeight, "%T.SettledHeight", extra)
@@ -184,7 +184,7 @@ func TestRPCExtras(t *testing.T) {
 		"extDataGasUsed":        hexutil.EncodeBig(extra.ExtDataGasUsed),
 		"blockGasCost":          hexutil.EncodeBig(extra.BlockGasCost),
 		"timestampMilliseconds": hexutil.EncodeUint64(*extra.TimeMilliseconds),
-		"minDelayExcess":        hexutil.EncodeUint64(uint64(*extra.MinDelayExcess)),
+		"minDelayExcess":        hexutil.EncodeUint64(uint64(*extra.MinDelayExponent)),
 		"targetExponent":        hexutil.EncodeUint64(uint64(*extra.TargetExponent)),
 		"minPriceExponent":      hexutil.EncodeUint64(uint64(*extra.MinPriceExponent)),
 		"settledHeight":         hexutil.EncodeUint64(*extra.SettledHeight),

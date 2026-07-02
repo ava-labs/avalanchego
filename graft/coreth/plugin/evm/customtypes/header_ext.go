@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -43,7 +42,7 @@ type HeaderExtra struct {
 	ExtDataGasUsed   *big.Int
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
-	MinDelayExcess   *acp226.DelayExcess
+	MinDelayExponent *dynamic.DelayExponent
 	TargetExponent   *dynamic.TargetExponent
 	MinPriceExponent *dynamic.PriceExponent
 
@@ -128,9 +127,9 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		m := *h.TimeMilliseconds
 		cp.TimeMilliseconds = &m
 	}
-	if h.MinDelayExcess != nil {
-		e := *h.MinDelayExcess
-		cp.MinDelayExcess = &e
+	if h.MinDelayExponent != nil {
+		e := *h.MinDelayExponent
+		cp.MinDelayExponent = &e
 	}
 	if h.TargetExponent != nil {
 		e := *h.TargetExponent
@@ -170,8 +169,8 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	if h.TimeMilliseconds != nil {
 		m["timestampMilliseconds"] = hexutil.Uint64(*h.TimeMilliseconds)
 	}
-	if h.MinDelayExcess != nil {
-		m["minDelayExcess"] = hexutil.Uint64(*h.MinDelayExcess)
+	if h.MinDelayExponent != nil {
+		m["minDelayExcess"] = hexutil.Uint64(*h.MinDelayExponent)
 	}
 	if h.TargetExponent != nil {
 		m["targetExponent"] = hexutil.Uint64(*h.TargetExponent)
@@ -242,7 +241,7 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.ExtDataGasUsed = extras.ExtDataGasUsed
 	h.BlockGasCost = extras.BlockGasCost
 	h.TimeMilliseconds = extras.TimeMilliseconds
-	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
+	h.MinDelayExponent = (*uint64)(extras.MinDelayExponent)
 	h.TargetExponent = (*uint64)(extras.TargetExponent)
 	h.MinPriceExponent = (*uint64)(extras.MinPriceExponent)
 	h.SettledHeight = extras.SettledHeight
@@ -256,7 +255,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.ExtDataGasUsed = h.ExtDataGasUsed
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
-	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
+	extras.MinDelayExponent = (*dynamic.DelayExponent)(h.MinDelayExponent)
 	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
 	extras.MinPriceExponent = (*dynamic.PriceExponent)(h.MinPriceExponent)
 	extras.SettledHeight = h.SettledHeight
@@ -320,9 +319,9 @@ type HeaderSerializable struct {
 	// TimeMilliseconds was added by Granite and is ignored in legacy headers.
 	TimeMilliseconds *uint64 `json:"timestampMilliseconds" rlp:"optional"`
 
-	// MinDelayExcess was added by Granite and is ignored in legacy headers.
+	// MinDelayExponent was added by Granite and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
+	MinDelayExponent *uint64 `json:"minDelayExcess" rlp:"optional"`
 
 	// TargetExponent was added by Helicon and is ignored in legacy headers.
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
@@ -353,7 +352,7 @@ type headerMarshaling struct {
 	BlobGasUsed         *hexutil.Uint64
 	ExcessBlobGas       *hexutil.Uint64
 	TimeMilliseconds    *hexutil.Uint64
-	MinDelayExcess      *hexutil.Uint64
+	MinDelayExponent    *hexutil.Uint64
 	TargetExponent      *hexutil.Uint64
 	MinPriceExponent    *hexutil.Uint64
 	SettledHeight       *hexutil.Uint64

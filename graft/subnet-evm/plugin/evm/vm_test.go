@@ -65,10 +65,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -3531,42 +3531,42 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 	}
 }
 
-func TestMinDelayExcessInHeader(t *testing.T) {
+func TestMinDelayExponentInHeader(t *testing.T) {
 	tests := []struct {
-		name                   string
-		fork                   upgradetest.Fork
-		desiredMinDelay        *uint64
-		expectedMinDelayExcess *acp226.DelayExcess
+		name                     string
+		fork                     upgradetest.Fork
+		desiredMinDelay          *uint64
+		expectedMinDelayExponent *dynamic.DelayExponent
 	}{
 		{
-			name:                   "pre_granite_no_min_delay_excess",
-			fork:                   upgradetest.Fortuna,
-			desiredMinDelay:        nil,
-			expectedMinDelayExcess: nil,
+			name:                     "pre_granite_no_min_delay_exponent",
+			fork:                     upgradetest.Fortuna,
+			desiredMinDelay:          nil,
+			expectedMinDelayExponent: nil,
 		},
 		{
-			name:                   "pre_granite_min_delay_excess",
-			fork:                   upgradetest.Fortuna,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](1000),
-			expectedMinDelayExcess: nil,
+			name:                     "pre_granite_min_delay_exponent",
+			fork:                     upgradetest.Fortuna,
+			desiredMinDelay:          avalancheutils.PointerTo[uint64](1000),
+			expectedMinDelayExponent: nil,
 		},
 		{
-			name:                   "granite_first_block_initial_delay_excess",
-			fork:                   upgradetest.Granite,
-			desiredMinDelay:        nil,
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess),
+			name:                     "granite_first_block_initial_delay_exponent",
+			fork:                     upgradetest.Granite,
+			desiredMinDelay:          nil,
+			expectedMinDelayExponent: avalancheutils.PointerTo(dynamic.InitialDelayExponent),
 		},
 		{
-			name:                   "granite_with_excessive_desired_min_delay_excess",
-			fork:                   upgradetest.Granite,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](4000),
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
+			name:                     "granite_with_excessive_desired_min_delay_exponent",
+			fork:                     upgradetest.Granite,
+			desiredMinDelay:          avalancheutils.PointerTo[uint64](4000),
+			expectedMinDelayExponent: avalancheutils.PointerTo(dynamic.InitialDelayExponent + 200),
 		},
 		{
-			name:                   "granite_with_zero_desired_min_delay_excess",
-			fork:                   upgradetest.Granite,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](0),
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
+			name:                     "granite_with_zero_desired_min_delay_exponent",
+			fork:                     upgradetest.Granite,
+			desiredMinDelay:          avalancheutils.PointerTo[uint64](0),
+			expectedMinDelayExponent: avalancheutils.PointerTo(dynamic.InitialDelayExponent - 200),
 		},
 	}
 
@@ -3598,11 +3598,11 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 			blk, err := vm.vm.BuildBlock(ctx)
 			require.NoError(err)
 
-			// Check the min delay excess in the header
+			// Check the min delay exponent in the header
 			ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
 			headerExtra := customtypes.GetHeaderExtra(ethBlock.Header())
 
-			require.Equal(test.expectedMinDelayExcess, headerExtra.MinDelayExcess, "expected %s, got %s", test.expectedMinDelayExcess, headerExtra.MinDelayExcess)
+			require.Equal(test.expectedMinDelayExponent, headerExtra.MinDelayExponent, "expected %s, got %s", test.expectedMinDelayExponent, headerExtra.MinDelayExponent)
 		})
 	}
 }

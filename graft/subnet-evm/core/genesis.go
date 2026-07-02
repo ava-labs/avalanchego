@@ -34,15 +34,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/evm/firewood"
-	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
@@ -53,10 +44,21 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/log"
-	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
+
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 //go:generate go tool gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
@@ -384,8 +386,8 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 			headerExtra.TimeMilliseconds = new(uint64)
 			*headerExtra.TimeMilliseconds = g.Timestamp * 1000
 
-			headerExtra.MinDelayExcess = new(acp226.DelayExcess)
-			*headerExtra.MinDelayExcess = acp226.InitialDelayExcess
+			headerExtra.MinDelayExponent = new(dynamic.DelayExponent)
+			*headerExtra.MinDelayExponent = dynamic.InitialDelayExponent
 		}
 	}
 
