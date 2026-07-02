@@ -5,6 +5,7 @@ package extras
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -111,7 +113,18 @@ type ChainConfig struct {
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
+
+	// InitialMinDelayMS, if non-zero, seeds the ACP-226 minimum block delay (in
+	// milliseconds) into genesis instead of the default ~2000ms start, so the
+	// chain runs at its target cadence from block 1 rather than slowly converging.
+	//
+	// DEBUG/BENCHMARK ONLY: for networks with a controlled genesis (e.g. fresh L1s
+	// under benchmark), not production. Set it equal to your min-delay-target.
+	// Unset leaves behavior bit-for-bit identical to a default chain.
+	InitialMinDelayMS uint64 `json:"initialMinDelayMS,omitempty"`
 }
+
+var errInitialMinDelayTooLarge = errors.New("initialMinDelayMS too large")
 
 func (c *ChainConfig) CheckConfigCompatible(newConfig *ethparams.ChainConfig, headNumber *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {
 	if c == nil {
@@ -330,6 +343,13 @@ func (c *ChainConfig) Verify() error {
 	// Verify the network upgrades are internally consistent given the existing chainConfig.
 	if err := c.verifyNetworkUpgrades(c.SnowCtx.NetworkUpgrades); err != nil {
 		return fmt.Errorf("invalid network upgrades: %w", err)
+	}
+
+	// This field exists only to seed a faster-than-default cadence (to skip the
+	// slow ACP-226 warm-up); seeding slower than default has no benchmarking use,
+	// so reject it.
+	if max := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > max {
+		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, max)
 	}
 
 	return nil

@@ -384,8 +384,13 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 			headerExtra.TimeMilliseconds = new(uint64)
 			*headerExtra.TimeMilliseconds = g.Timestamp * 1000
 
+			// Seed the ACP-226 min-delay excess (see ChainConfig.InitialMinDelayMS).
+			initialMinDelayExcess := acp226.InitialDelayExcess
+			if confExtra.InitialMinDelayMS != 0 {
+				initialMinDelayExcess = acp226.DesiredDelayExcess(confExtra.InitialMinDelayMS)
+			}
 			headerExtra.MinDelayExcess = new(acp226.DelayExcess)
-			*headerExtra.MinDelayExcess = acp226.InitialDelayExcess
+			*headerExtra.MinDelayExcess = initialMinDelayExcess
 		}
 	}
 
