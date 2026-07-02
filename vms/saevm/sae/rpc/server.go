@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/libevm/libevm/debug"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rpc"
+
+	"github.com/ava-labs/avalanchego/network/p2p"
 )
 
 // Taken as the default from geth / libevm's `node.DefaultConfig`.
@@ -22,7 +24,7 @@ func (p *Provider) Server() *rpc.Server {
 	return p.server
 }
 
-func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
+func (b *backend) server(peers *p2p.Peers, filter *filters.FilterAPI) (*rpc.Server, error) {
 	type api struct {
 		namespace string
 		api       any
@@ -39,7 +41,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 		// - net_listening
 		// - net_peerCount
 		// - net_version
-		{"net", newNetAPI(b.Peers(), b.ChainConfig().ChainID.Uint64())},
+		{"net", newNetAPI(peers, b.ChainConfig().ChainID.Uint64())},
 		// geth-specific APIs:
 		// - txpool_content
 		// - txpool_contentFrom
