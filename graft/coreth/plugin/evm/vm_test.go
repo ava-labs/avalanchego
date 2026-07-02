@@ -2154,21 +2154,19 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 func TestHeliconBlockValidation(t *testing.T) {
 	ctx := t.Context()
 
-	extConfig := defaultExtensions()
-	heliconTime := upgrade.InitiallyActiveTime.Add(5 * time.Second)
-	extConfig.Clock.Set(heliconTime)
-	vm := &VM{}
-	require.NoError(t, vm.SetExtensionConfig(extConfig))
+	// The chain config's upgrade schedule is derived from the snow context, so
+	// scheduling Helicon only requires updating the context.
+	snowCtx, prefixedDB, genesisBytes, _ := vmtest.SetupGenesis(t, upgradetest.Granite)
 
-	// Snow context must match chain config
-	snowCtx, prefixedDB, _, _ := vmtest.SetupGenesis(t, upgradetest.Granite)
+	heliconTime := upgrade.InitiallyActiveTime.Add(5 * time.Second)
 	snowCtx.NetworkUpgrades.HeliconTime = heliconTime
 
+	vm := newDefaultTestVM()
 	err := vm.Initialize(
 		ctx,
 		snowCtx,
 		prefixedDB,
-		[]byte(vmtest.GenesisJSON(params.TestGraniteChainConfig)),
+		genesisBytes,
 		nil,
 		nil,
 		nil,
@@ -2181,6 +2179,7 @@ func TestHeliconBlockValidation(t *testing.T) {
 		require.NoErrorf(t, vm.Shutdown(ctx), "%T.Shutdown()", vm)
 	}()
 
+	vm.clock.Set(heliconTime)
 	signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
 	blk, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
 	require.NoError(t, err)
