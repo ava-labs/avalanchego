@@ -422,7 +422,7 @@ func TestTransitionSkipsPreference(t *testing.T) {
 			sut := newSUT(t)
 			ctx := t.Context()
 
-			sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+			sut.BuildVerifyAccept(t, ctx, mode) // triggers the transition
 			require.Zerof(t, sut.post.preference, "%T.preference", sut.post)
 		})
 	}
