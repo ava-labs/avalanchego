@@ -4,6 +4,8 @@
 package p
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -18,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -314,6 +317,113 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
+
+	ginkgo.It("should require 90 percent uptime for primary validators after Helicon", func() {
+		env := e2e.GetEnv(tc)
+		network := env.GetNetwork()
+		upgradeConfig := getUpgradeConfig(tc, network)
+		if !upgradeConfig.IsHeliconActivated(time.Now()) {
+			ginkgo.Skip("Helicon is not active")
+		}
+
+		tc.By("adding an ephemeral node to use as the short-lived validator")
+		testNode := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
+		e2e.WaitForHealthy(tc, testNode)
+
+		tc.By("retrieving the validator node ID and proof of possession")
+		testNodeURI := testNode.GetAccessibleURI()
+		testInfoClient := info.NewClient(testNodeURI)
+		testNodeID, testPOP, err := testInfoClient.GetNodeID(tc.DefaultContext())
+		require.NoError(err)
+
+		tc.By("creating the staking wallet and reward key")
+		nodeURI := env.GetRandomNodeURI()
+		rewardKey := e2e.NewPrivateKey(tc)
+		keychain := env.NewKeychain()
+		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
+		pWallet := baseWallet.P()
+		pContext := pWallet.Builder().Context()
+
+		tc.By("adding the ephemeral node as a primary validator", func() {
+			const (
+				targetValidationPeriod = 90 * time.Second
+				delegationPercent      = 0.10
+				delegationShare        = reward.PercentDenominator * delegationPercent
+				weight                 = 2_000 * units.Avax
+			)
+
+			e2e.OutputWalletBalances(tc, baseWallet)
+
+			endTime := time.Now().Add(targetValidationPeriod)
+			_, err := pWallet.IssueAddPermissionlessValidatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: testNodeID,
+						End:    uint64(endTime.Unix()),
+						Wght:   weight,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
+				testPOP,
+				pContext.AVAXAssetID,
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{rewardKey.Address()},
+				},
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{rewardKey.Address()},
+				},
+				delegationShare,
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+		})
+
+		tc.By("waiting for the ephemeral node to enter the current validator set")
+		pvmClient := platformvm.NewClient(nodeURI.URI)
+		testValidator := waitForCurrentValidator(tc, pvmClient, testNodeID)
+		actualStartTime := time.Unix(int64(testValidator.StartTime), 0)
+		actualEndTime := time.Unix(int64(testValidator.EndTime), 0)
+		actualValidationPeriod := actualEndTime.Sub(actualStartTime)
+		require.Positive(actualValidationPeriod)
+
+		const targetUptimePercent = 85.0
+		stopTime := actualStartTime.Add(time.Duration(
+			targetUptimePercent / 100 * float64(actualValidationPeriod),
+		))
+		require.Greater(stopTime, time.Now())
+
+		tc.By("stopping the validator after 80 percent uptime but before the 90 percent ACP-267 requirement", func() {
+			time.Sleep(time.Until(stopTime))
+			require.NoError(testNode.Stop(tc.DefaultContext()))
+
+			tc.Eventually(func() bool {
+				currentValidator, ok := getCurrentValidator(tc, pvmClient, testNodeID)
+				if !ok || currentValidator.Connected == nil || currentValidator.Uptime == nil {
+					return false
+				}
+				uptime := *currentValidator.Uptime
+				return !*currentValidator.Connected && uptime >= 80 && uptime < 90
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "validator did not report disconnected uptime between 80 and 90 percent")
+		})
+
+		tc.By("waiting for the validator period to end", func() {
+			time.Sleep(time.Until(actualEndTime))
+			tc.Eventually(func() bool {
+				_, ok := getCurrentValidator(tc, pvmClient, testNodeID)
+				return !ok
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "validator remained in the current validator set after its end time")
+		})
+
+		tc.By("checking that the reward address received no P-Chain reward", func() {
+			rewardKeychain := secp256k1fx.NewKeychain(rewardKey)
+			rewardWallet := e2e.NewWallet(tc, rewardKeychain, nodeURI)
+			balances, err := rewardWallet.P().Builder().GetBalance()
+			require.NoError(err)
+			require.Zero(balances[pContext.AVAXAssetID])
+		})
+	})
 })
 
 // TODO(marun) Enable GetConfig to return *node.Config directly. Currently, due
@@ -335,4 +445,48 @@ func getRewardConfig(tc tests.TestContext, client *admin.Client) reward.Config {
 		&rewardConfig,
 	))
 	return rewardConfig
+}
+
+func getUpgradeConfig(tc tests.TestContext, network *tmpnet.Network) upgrade.Config {
+	require := require.New(tc)
+
+	upgradeFileContent, ok := network.DefaultFlags[config.UpgradeFileContentKey]
+	require.True(ok)
+
+	upgradeBytes, err := base64.StdEncoding.DecodeString(upgradeFileContent)
+	require.NoError(err)
+
+	var upgradeConfig upgrade.Config
+	require.NoError(json.Unmarshal(upgradeBytes, &upgradeConfig))
+	return upgradeConfig
+}
+
+func waitForCurrentValidator(
+	tc tests.TestContext,
+	client *platformvm.Client,
+	nodeID ids.NodeID,
+) platformvm.ClientPermissionlessValidator {
+	var currentValidator platformvm.ClientPermissionlessValidator
+	tc.Eventually(func() bool {
+		var ok bool
+		currentValidator, ok = getCurrentValidator(tc, client, nodeID)
+		return ok
+	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "validator did not enter the current validator set")
+	return currentValidator
+}
+
+func getCurrentValidator(
+	tc tests.TestContext,
+	client *platformvm.Client,
+	nodeID ids.NodeID,
+) (platformvm.ClientPermissionlessValidator, bool) {
+	validators, err := client.GetCurrentValidators(
+		tc.DefaultContext(),
+		constants.PrimaryNetworkID,
+		[]ids.NodeID{nodeID},
+	)
+	if err != nil || len(validators) != 1 {
+		return platformvm.ClientPermissionlessValidator{}, false
+	}
+	return validators[0], true
 }
