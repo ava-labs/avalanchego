@@ -87,7 +87,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	defaultFlags := tmpnet.FlagsMap{
 		config.UpgradeFileContentKey: upgradeBase64,
 		// Ensure a min stake duration compatible with testing staking logic
-		config.MinStakeDurationKey: "1s",
+		config.MinStakeDurationKey:        "2s",
+		config.HeliconMinStakeDurationKey: "1s",
 	}
 	defaultFlags.SetDefaults(tmpnet.DefaultE2EFlags())
 
