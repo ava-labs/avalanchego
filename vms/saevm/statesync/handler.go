@@ -18,15 +18,19 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
+	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 // Config provides all user-configurable information for the [SummaryHandler].
 type Config struct {
-	CommitInterval uint64
-	Enabled        *bool
+	CommitInterval         uint64
+	Enabled                *bool
+	ExtraBlockVerification syncblock.BlockVerifier
 }
 
 var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
@@ -34,12 +38,18 @@ var _ adaptor.SyncableVM[*Summary] = (*SummaryHandler)(nil)
 // SummaryHandler implements [adaptor.SyncableVM] and provides the consensus-
 // critical block getters for [adaptor.ChainVM].
 type SummaryHandler struct {
-	cfg     Config
-	db      ethdb.Database
-	snowCtx *snow.Context
-	genesis *ethtypes.Block
+	cfg        Config
+	db         ethdb.Database
+	snowCtx    *snow.Context
+	genesis    *ethtypes.Block
+	network    *network.Network
+	hooks      hook.Points
+	cancelSync context.CancelFunc
 
 	stateSyncDone chan struct{}
+	// syncErr is set by the [AcceptSummary] goroutine before stateSyncDone is
+	// closed, and read by [SummaryHandler.Error] after observing that close.
+	syncErr error
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and
@@ -50,20 +60,35 @@ func New(
 	snowCtx *snow.Context,
 	db ethdb.Database,
 	genesis *ethtypes.Block,
+	network *network.Network,
+	hooks hook.Points,
 ) (*SummaryHandler, error) {
 	h := &SummaryHandler{
 		cfg:           cfg,
 		db:            db,
 		snowCtx:       snowCtx,
+		network:       network,
 		genesis:       genesis,
+		hooks:         hooks,
 		stateSyncDone: make(chan struct{}),
 	}
 	return h, nil
 }
 
 // Shutdown cancels any ongoing sync.
-func (*SummaryHandler) Shutdown(context.Context) error {
-	// TODO(alarso16): cancel any ongoing state sync
+func (h *SummaryHandler) Shutdown(ctx context.Context) error {
+	if h.cancelSync == nil {
+		// no sync was ever started
+		return nil
+	}
+	h.cancelSync()
+
+	select {
+	case <-h.stateSyncDone:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
 	return nil
 }
 

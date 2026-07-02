@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
 
@@ -41,6 +42,7 @@ func New(
 	snowCtx *snow.Context,
 	cfg statesync.Config,
 	db ethdb.Database,
+	network *network.Network,
 	hooks hook.Points,
 	state *state.State,
 	genesis *types.Block,
@@ -50,6 +52,8 @@ func New(
 		snowCtx,
 		db,
 		genesis,
+		network,
+		hooks,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating SAE statesync handler: %v", err)

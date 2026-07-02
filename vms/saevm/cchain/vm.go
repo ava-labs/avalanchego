@@ -157,7 +157,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("parsing genesis block: %w", err)
 	}
-	vm.SummaryHandler, err = cchainsync.New(snowCtx, userConfig.stateSyncConfig(), ethDB, hooks, vm.state, gBlock)
+	vm.SummaryHandler, err = cchainsync.New(snowCtx, userConfig.stateSyncConfig(), ethDB, vm.Network, hooks, vm.state, gBlock)
 	if err != nil {
 		return fmt.Errorf("creating summary handler: %w", err)
 	}

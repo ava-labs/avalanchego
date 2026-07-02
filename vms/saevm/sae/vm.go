@@ -101,6 +101,8 @@ type Config struct {
 	Now func() time.Time // defaults to [time.Now] if nil
 }
 
+const ExecutionResultsDir = "sae_execution_results"
+
 // NewVM returns a new [VM] that is ready for use immediately upon return.
 // [VM.Shutdown] MUST be called to release resources.
 //
@@ -141,7 +143,7 @@ func NewVM[T hook.Transaction](
 	}()
 
 	xdb, err := hooks.ExecutionResultsDB(
-		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
+		filepath.Join(snowCtx.ChainDataDir, ExecutionResultsDir),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %v", hooks, snowCtx.ChainDataDir, err)

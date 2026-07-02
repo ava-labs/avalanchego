@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -23,6 +25,7 @@ type Network struct {
 	*p2p.Network
 	ValidatorPeers *p2p.Validators
 	Peers          *p2p.Peers
+	PeerTracker    *p2p.PeerTracker
 }
 
 // New creates the P2P network with a registered validator set.
@@ -42,14 +45,21 @@ func New(
 		snowCtx.ValidatorState,
 		maxValidatorSetStaleness,
 	)
-	const namespace = "p2p"
+	peerTracker, err := p2p.NewPeerTracker(
+		snowCtx.Log,
+		"peer_tracker",
+		reg,
+		set.Of(snowCtx.NodeID),
+		nil,
+	)
 	network, err := p2p.NewNetwork(
 		snowCtx.Log,
 		sender,
 		reg,
-		namespace,
+		"p2p",
 		peers,
 		validatorPeers,
+		&connectablePeerTracker{peerTracker},
 	)
 	if err != nil {
 		return nil, err
@@ -58,5 +68,16 @@ func New(
 		Network:        network,
 		Peers:          peers,
 		ValidatorPeers: validatorPeers,
+		PeerTracker:    peerTracker,
 	}, nil
+}
+
+var _ p2p.ConnectionHandler = (*connectablePeerTracker)(nil)
+
+type connectablePeerTracker struct {
+	*p2p.PeerTracker
+}
+
+func (c *connectablePeerTracker) Connected(nodeID ids.NodeID) {
+	c.PeerTracker.Connected(nodeID, nil)
 }

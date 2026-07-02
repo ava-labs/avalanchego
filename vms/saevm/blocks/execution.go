@@ -74,6 +74,18 @@ func (e *executionResults) setBaseFee(bf *big.Int) error {
 	return nil
 }
 
+func (b *Block) PersistStateSynced(db ethdb.Database, xdb saetypes.ExecutionResults, stateRoot common.Hash, gt *gastime.Time) error {
+	e := &executionResults{
+		byGas:         *gt.Clone(),
+		stateRootPost: stateRoot,
+		// receipts and base fee are unknown, since the block was not executed.
+		// this is only used by RPCs, so they can safely be left empty.
+		receiptRoot: types.EmptyReceiptsHash,
+	}
+
+	return b.markExecutedOnDisk(db.NewBatch(), xdb, e)
+}
+
 // MarkExecuted marks the block as having been executed at the specified time(s)
 // and with the specified results. It also sets the chain's head block to b. The
 // [gastime.Time] MUST have already been scaled to the target applicable after
@@ -270,17 +282,20 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 	}
 
 	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
-	if err := e.receipts.DeriveFields(
-		chainConfig,
-		b.Hash(),
-		b.NumberU64(),
-		b.BuildTime(),
-		e.baseFee.ToBig(),
-		nil, // SAE does not support blob transactions.
-		b.Transactions(),
-	); err != nil {
-		return fmt.Errorf("deriving receipt fields: %v", err)
+	if len(e.receipts) > 0 {
+		if err := e.receipts.DeriveFields(
+			chainConfig,
+			b.Hash(),
+			b.NumberU64(),
+			b.BuildTime(),
+			e.baseFee.ToBig(),
+			nil, // SAE does not support blob transactions.
+			b.Transactions(),
+		); err != nil {
+			return fmt.Errorf("deriving receipt fields: %v", err)
+		}
 	}
+
 	return b.markExecutedAfterDiskArtefacts(e, nil)
 }
 

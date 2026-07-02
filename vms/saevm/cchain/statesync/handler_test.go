@@ -164,6 +164,7 @@ func newHandler(t *testing.T, ethDB ethdb.Database, st *state.State, hooks hook.
 		snowCtx,
 		saestatesync.Config{CommitInterval: commitInterval},
 		ethDB,
+		nil, // network: TODO unused by these tests
 		hooks,
 		st,
 		genesis,

@@ -10,6 +10,8 @@ import (
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -64,15 +66,9 @@ func (vm *SinceGenesis[_]) Initialize(
 	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
 		return fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
 	}
-	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
+	config, err := writeGenesis(db, tdb, genesis)
 	if err != nil {
-		return fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
-	}
-
-	// [NewVM] assumes that the genesis block is "finalized", which does not
-	// happen in [core.SetupGenesisBlock]. This MUST only happen once.
-	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
-		rawdb.WriteFinalizedBlockHash(db, hash)
+		return err
 	}
 
 	vm.Network, err = network.New(snowCtx, appSender)
@@ -84,6 +80,39 @@ func (vm *SinceGenesis[_]) Initialize(
 		return err
 	}
 	return nil
+}
+
+// writeGenesis sets up the genesis block and reconciles the chain's head
+// pointers with what state sync may have already recorded, returning the chain
+// config.
+func writeGenesis(db ethdb.Database, tdb *triedb.Database, genesis *core.Genesis) (*params.ChainConfig, error) {
+	priorAccepted := rawdb.ReadHeadFastBlockHash(db)
+	priorBlock := rawdb.ReadHeadBlockHash(db)
+	priorHeader := rawdb.ReadHeadHeaderHash(db)
+
+	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
+	if err != nil {
+		return nil, fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
+	}
+
+	// These could have been clobbered by [core.SetupGenesisBlock]
+	if priorAccepted != (ethcommon.Hash{}) {
+		rawdb.WriteHeadFastBlockHash(db, priorAccepted)
+	}
+	if priorBlock != (ethcommon.Hash{}) {
+		rawdb.WriteHeadBlockHash(db, priorBlock)
+	}
+	if priorHeader != (ethcommon.Hash{}) {
+		rawdb.WriteHeadHeaderHash(db, priorHeader)
+	}
+
+	// [NewVM] assumes that the genesis block is "finalized", which does not
+	// happen in [core.SetupGenesisBlock]. This MUST only happen once.
+	if rawdb.ReadFinalizedBlockHash(db) == (ethcommon.Hash{}) {
+		rawdb.WriteFinalizedBlockHash(db, hash)
+	}
+
+	return config, nil
 }
 
 // Shutdown gracefully closes the VM.

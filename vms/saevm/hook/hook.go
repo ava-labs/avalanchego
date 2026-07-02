@@ -216,8 +216,6 @@ type Settled struct {
 
 // SettledGasTime is a helper that given a header and its settler, returns the
 // [gastime.Time] associated with the post-execution state of the header.
-//
-// TODO(alarso16): This should be moved to the state sync logic once implemented.
 func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
 	target, cfg := h.GasConfigAfter(settled)
 	s := h.SettledBy(settler)
