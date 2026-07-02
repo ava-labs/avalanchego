@@ -399,13 +399,14 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	opt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, numTxs, opt)
 
+	calldata := make([]byte, calldataSize)
 	heavyTxs := make([]*types.Transaction, numTxs)
 	for i := range heavyTxs {
 		heavyTxs[i] = sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       params.TxGas + params.TxDataZeroGas*calldataSize,
 			GasFeeCap: big.NewInt(1),
-			Data:      make([]byte, calldataSize),
+			Data:      calldata,
 		})
 	}
 
@@ -422,7 +423,7 @@ func TestBuildBlockByteBackstop(t *testing.T) {
 	require.NoError(t, err, "blockBuilder.build()")
 
 	builtTxs := built.Transactions()
-	require.Equal(t, wantTxs, uint64(len(builtTxs)), "built block included unexpected transaction count")
+	require.Len(t, builtTxs, int(wantTxs), "built block included unexpected transaction count")
 	for i, tx := range builtTxs {
 		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
 	}
