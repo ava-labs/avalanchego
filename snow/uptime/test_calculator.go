@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+// TestCalculator is a [Calculator] stub for tests that returns the configured
+// Percent and Err from every method.
 type TestCalculator struct {
 	Percent float64
 	Err     error
