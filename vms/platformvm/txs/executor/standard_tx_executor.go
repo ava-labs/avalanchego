@@ -1377,13 +1377,20 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 	}
 
 	weight := tx.Weight()
+	stakeStartTime := e.state.GetTimestamp()
 
 	currentSupply, err := e.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("getting current supply: %w", err)
 	}
 
-	rewards, err := GetRewardsCalculator(e.backend, e.state, constants.PrimaryNetworkID)
+	rewards, err := GetRewardsCalculator(
+		e.backend.Config.RewardConfig,
+		e.backend.Config.UpgradeConfig,
+		e.state,
+		constants.PrimaryNetworkID,
+		stakeStartTime,
+	)
 	if err != nil {
 		return fmt.Errorf("getting rewards calculator: %w", err)
 	}
@@ -1401,13 +1408,12 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedVal
 	}
 	e.state.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 
-	startTime := e.state.GetTimestamp()
-	endTime := startTime.Add(duration)
+	endTime := stakeStartTime.Add(duration)
 
 	staker, err := state.NewStaker(
 		e.tx.ID(),
 		tx,
-		startTime,
+		stakeStartTime,
 		endTime,
 		weight,
 		potentialReward,
@@ -1491,6 +1497,10 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 		}
 		staker, err = state.NewPendingStaker(txID, scheduledStakerTx)
 	} else {
+		// Post-Durango, stakers are immediately added to the current staker
+		// set. Their [StartTime] is the current chain time.
+		stakeStartTime := chainTime
+
 		// Only calculate the potentialReward for permissionless stakers.
 		// Recall that we only need to check if this is a permissioned
 		// validator as there are no permissioned delegators
@@ -1502,14 +1512,18 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 				return err
 			}
 
-			rewards, err := GetRewardsCalculator(e.backend, e.state, subnetID)
+			rewards, err := GetRewardsCalculator(
+				e.backend.Config.RewardConfig,
+				e.backend.Config.UpgradeConfig,
+				e.state,
+				subnetID,
+				stakeStartTime,
+			)
 			if err != nil {
 				return err
 			}
 
-			// Post-Durango, stakers are immediately added to the current staker
-			// set. Their [StartTime] is the current chain time.
-			stakeDuration := stakerTx.EndTime().Sub(chainTime)
+			stakeDuration := stakerTx.EndTime().Sub(stakeStartTime)
 			potentialReward = rewards.Calculate(
 				stakeDuration,
 				stakerTx.Weight(),
@@ -1519,7 +1533,7 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.BoundedStaker) error {
 			e.state.SetCurrentSupply(subnetID, currentSupply+potentialReward)
 		}
 
-		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
+		staker, err = state.NewCurrentStaker(txID, stakerTx, stakeStartTime, potentialReward)
 	}
 	if err != nil {
 		return err

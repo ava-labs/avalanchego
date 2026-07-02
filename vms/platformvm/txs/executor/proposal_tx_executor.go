@@ -887,7 +887,14 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 		return err
 	}
 
-	rewards, err := GetRewardsCalculator(e.backend, e.onCommitState, validator.SubnetID)
+	stakeStartTime := validator.EndTime
+	rewards, err := GetRewardsCalculator(
+		e.backend.Config.RewardConfig,
+		e.backend.Config.UpgradeConfig,
+		e.onCommitState,
+		validator.SubnetID,
+		stakeStartTime,
+	)
 	if err != nil {
 		return err
 	}
@@ -911,11 +918,11 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 
 	e.onCommitState.SetCurrentSupply(validator.SubnetID, newCurrentSupply)
 
-	newEndTime := validator.EndTime.Add(duration)
+	newEndTime := stakeStartTime.Add(duration)
 
 	// Update validator by deleting and putting back.
 	renewedValidator := *validator
-	renewedValidator.StartTime = renewedValidator.EndTime
+	renewedValidator.StartTime = stakeStartTime
 	renewedValidator.EndTime = newEndTime
 	renewedValidator.NextTime = newEndTime
 	renewedValidator.PotentialReward = newPotentialReward
