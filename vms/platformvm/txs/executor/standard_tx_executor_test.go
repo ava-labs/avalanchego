@@ -4364,6 +4364,72 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	}
 }
 
+// TestHeliconMinStakeDurationValidator verifies that the Helicon upgrade lowers
+// the primary network validator minimum staking duration.
+func TestHeliconMinStakeDurationValidator(t *testing.T) {
+	type test struct {
+		name        string
+		fork        upgradetest.Fork
+		expectedErr error
+	}
+	tests := []test{
+		{
+			name:        "pre-Helicon 12h stake rejected",
+			fork:        upgradetest.Granite,
+			expectedErr: ErrStakeTooShort,
+		},
+		{
+			name:        "post-Helicon 12h stake accepted",
+			fork:        upgradetest.Helicon,
+			expectedErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			env := newEnvironment(t, tt.fork)
+			env.ctx.Lock.Lock()
+			defer env.ctx.Lock.Unlock()
+
+			chainTime := env.state.GetTimestamp()
+			nodeID := ids.GenerateTestNodeID()
+			sk, err := localsigner.New()
+			require.NoError(err)
+			pop, err := signer.NewProofOfPossession(sk)
+			require.NoError(err)
+
+			rewardsOwner := &secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			}
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueAddPermissionlessValidatorTx(
+				&txs.SubnetValidator{
+					Validator: txs.Validator{
+						NodeID: nodeID,
+						End:    uint64(chainTime.Add(defaultHeliconMinStakingDuration).Unix()),
+						Wght:   env.config.MinValidatorStake,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
+				pop,
+				env.ctx.AVAXAssetID,
+				rewardsOwner,
+				rewardsOwner,
+				reward.PercentDenominator,
+			)
+			require.NoError(err)
+
+			onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(err)
+
+			feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
+			_, _, _, err = StandardTx(&env.backend, feeCalculator, tx, onAcceptState)
+			require.ErrorIs(err, tt.expectedErr)
+		})
+	}
+}
+
 func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	var (
 		env           = newEnvironment(t, upgradetest.Latest)
@@ -4528,7 +4594,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 		{
 			name: "stake_too_short",
 			update: func(tx *txs.AddAutoRenewedValidatorTx, _ *state.Diff) {
-				tx.Period = uint64(env.config.MinStakeDuration.Seconds()) - 1
+				tx.Period = uint64(env.config.HeliconMinStakeDuration.Seconds()) - 1
 			},
 			want: ErrStakeTooShort,
 		},
@@ -4841,7 +4907,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		{
 			name: "stake_too_short",
 			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
-				tx.Period = uint64(env.config.MinStakeDuration.Seconds()) - 1
+				tx.Period = uint64(env.config.HeliconMinStakeDuration.Seconds()) - 1
 			},
 			wantErr: ErrStakeTooShort,
 		},
