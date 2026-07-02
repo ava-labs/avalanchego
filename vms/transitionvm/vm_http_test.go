@@ -102,7 +102,7 @@ func TestHTTPHandlersBlockUnblock(t *testing.T) {
 
 		handlers.block()
 
-		// Cancelled requests exit gracfully while blocked.
+		// Cancelled requests exit gracefully while blocked.
 		ctx, cancel := context.WithCancel(t.Context())
 		go cancel()
 		route.ServeHTTP(
