@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
@@ -90,7 +91,7 @@ func TestSettlementInvariants(t *testing.T) {
 		assert.NoError(t, b.WaitUntilSettled(t.Context()), "WaitUntilSettled()")
 		assert.NoError(t, b.CheckInvariants(Settled), "CheckInvariants(Settled)")
 
-		rec := saetest.NewLogRecorder(logging.Warn)
+		rec := loggingtest.NewRecorder(logging.Warn)
 		b.log = rec
 		assertNumErrorLogs := func(t *testing.T, want int) {
 			t.Helper()
@@ -107,7 +108,7 @@ func TestSettlementInvariants(t *testing.T) {
 			t.FailNow()
 		}
 
-		want := []*saetest.LogRecord{
+		want := []*loggingtest.Record{
 			{
 				Level: logging.Error,
 				Msg:   getParentOfSettledErrMsg,
@@ -152,7 +153,7 @@ func TestSettles(t *testing.T) {
 		8: nil,
 		9: {4, 5, 6, 7},
 	}
-	blocks := newChain(t, rawdb.NewMemoryDatabase(), saetest.NewExecutionResultsDB(), 0, 10, lastSettledAtHeight)
+	blocks := newChain(t, 0, 10, lastSettledAtHeight)
 
 	numsToBlocks := func(nums ...uint64) []*Block {
 		bs := make([]*Block, len(nums))
@@ -219,7 +220,7 @@ func TestSettles(t *testing.T) {
 func TestLastToSettleAt(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	blocks := newChain(t, db, xdb, 0, 30, nil)
+	blocks := newChain(t, 0, 30, nil)
 	t.Run("helper_invariants", func(t *testing.T) {
 		for i, b := range blocks {
 			require.Equal(t, uint64(i), b.Height()) //#nosec G115 -- Slice index won't overflow
@@ -351,8 +352,7 @@ func TestLastToSettleAt(t *testing.T) {
 		require.Equal(t, proxytime.FractionalSecond[gas.Gas]{Numerator: 1, Denominator: 10}, tm.Fraction())
 		blocks[24].markExecutedForTests(t, db, xdb, tm)
 
-		partiallyExecutedAt := proxytime.New[gas.Gas](27, 100)
-		partiallyExecutedAt.Tick(1)
+		partiallyExecutedAt := proxytime.New[gas.Gas](27, 1, 100)
 		blocks[25].SetInterimExecutionTime(partiallyExecutedAt)
 
 		tests = append(tests, testCase{

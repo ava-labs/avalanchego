@@ -12,8 +12,8 @@ go_library(
     deps = [
         "//cache/lru",
         "//utils/logging",
+        "//utils/math/intmath",
         "//vms/saevm/blocks",
-        "//vms/saevm/intmath",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//event",
@@ -29,6 +29,7 @@ go_test(
     embed = [":gasprice"],
     deps = [
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//vms/saevm/blocks",
         "//vms/saevm/blocks/blockstest",
         "//vms/saevm/gastime",

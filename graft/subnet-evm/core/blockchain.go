@@ -326,6 +326,7 @@ type BlockChain struct {
 	blockProcFeed     event.Feed
 	txAcceptedFeed    event.Feed
 	scope             event.SubscriptionScope
+	genesis           *Genesis
 	genesisBlock      *types.Block
 
 	// This mutex synchronizes chain write operations.
@@ -429,6 +430,7 @@ func NewBlockChain(
 	log.Info("")
 
 	bc := &BlockChain{
+		genesis:             genesis,
 		chainConfig:         chainConfig,
 		cacheConfig:         cacheConfig,
 		db:                  db,
@@ -447,7 +449,7 @@ func NewBlockChain(
 		quit:                make(chan struct{}),
 		acceptedLogsCache:   NewFIFOCache[common.Hash, [][]*types.Log](cacheConfig.AcceptedCacheSize),
 	}
-	bc.stateCache = state.NewDatabaseWithNodeDB(bc.db, bc.triedb)
+	bc.stateCache = extstate.NewDatabaseWithNodeDB(bc.db, bc.triedb)
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
@@ -545,6 +547,7 @@ func (bc *BlockChain) batchBlockAcceptedIndices(batch ethdb.Batch, b *types.Bloc
 	if err := customrawdb.WriteAcceptorTip(batch, b.Hash()); err != nil {
 		return fmt.Errorf("%w: failed to write acceptor tip key", err)
 	}
+	rawdb.WriteFinalizedBlockHash(batch, b.Hash())
 	return nil
 }
 
@@ -1922,7 +1925,12 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		}
 
 		if current.NumberU64() == 0 {
-			return errors.New("genesis state is missing")
+			// Try committing genesis state, and reprocess from there
+			if err := bc.recommitGenesis(); err != nil {
+				return fmt.Errorf("failed to recommit genesis state to reprocess: %w", err)
+			}
+			hasState = true
+			break
 		}
 		parent := bc.GetBlock(current.ParentHash(), current.NumberU64()-1)
 		if parent == nil {
@@ -2018,6 +2026,20 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 
 	if !commitEvery && previousRoot != (common.Hash{}) {
 		return triedb.Commit(previousRoot, true)
+	}
+	return nil
+}
+
+func (bc *BlockChain) recommitGenesis() error {
+	if tdb, ok := bc.triedb.Backend().(*firewood.TrieDB); ok {
+		// clear all state, allows rebuilding genesis on top
+		if err := tdb.ClearAll(); err != nil {
+			return err
+		}
+	}
+
+	if _, err := bc.genesis.toBlock(bc.db, bc.triedb); err != nil {
+		return fmt.Errorf("commit genesis block: %w", err)
 	}
 	return nil
 }
@@ -2231,7 +2253,7 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	bc.hc.SetCurrentHeader(block.Header())
 
 	lastAcceptedHash := block.Hash()
-	bc.stateCache = state.NewDatabaseWithNodeDB(bc.db, bc.triedb)
+	bc.stateCache = extstate.NewDatabaseWithNodeDB(bc.db, bc.triedb)
 
 	if err := bc.loadLastState(lastAcceptedHash); err != nil {
 		return err

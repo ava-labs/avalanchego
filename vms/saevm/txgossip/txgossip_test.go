@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
 	"math/rand/v2"
@@ -16,11 +17,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth"
+	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
@@ -35,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -72,18 +76,18 @@ func newWallet(tb testing.TB, numAccounts uint) *saetest.Wallet {
 
 func newSUT(t *testing.T, numAccounts uint) SUT {
 	t.Helper()
-	logger := saetest.NewTBLogger(t, logging.Warn)
+	logger := loggingtest.New(t, logging.Warn)
 
 	wallet := newWallet(t, numAccounts)
 	config := saetest.ChainConfig()
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	genesis := blockstest.NewGenesis(t, db, xdb, config, saetest.MaxAllocFor(wallet.Addresses()...))
+	genesis := blockstest.NewGenesis(t, db, config, saetest.MaxAllocFor(wallet.Addresses()...))
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, saedb.Config{}, hookstest.NewStub(1e6), logger)
+	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, saedb.Config{}, hookstest.NewStub(1e6), logger, prometheus.NewRegistry())
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)
@@ -142,7 +146,7 @@ func TestExecutorIntegration(t *testing.T) {
 	for _, tx := range signedTxs {
 		require.NoErrorf(t, s.Add(Transaction{tx}), "%T.Add()", s.set)
 	}
-	txgossiptest.WaitUntilPending(t, ctx, s.Pool, signedTxs...)
+	txgossiptest.WaitUntilPending(t, ctx, poolMempool{s.Pool}, signedTxs...)
 
 	t.Run("Iterate_after_Add", func(t *testing.T) {
 		require.Lenf(t, slices.Collect(s.Iterate), numTxs, "slices.Collect(%T.Iterate)", s.Set)
@@ -267,7 +271,7 @@ func TestP2PIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := saetest.NewTBLogger(t, logging.Debug)
+			logger := loggingtest.New(t, logging.Debug)
 			ctx := logger.CancelOnError(t.Context())
 
 			sendID := ids.GenerateTestNodeID()
@@ -310,7 +314,7 @@ func TestP2PIntegration(t *testing.T) {
 
 			require.NoErrorf(t, send.Add(txViaGossip), "%T.Add()", send.Set)
 			require.NoErrorf(t, send.SendTx(ctx, txViaRPC.Transaction), "%T.SendTx()", send.Set)
-			txgossiptest.WaitUntilPending(t, ctx, send.Pool, txViaRPC.Transaction, txViaGossip.Transaction)
+			txgossiptest.WaitUntilPending(t, ctx, poolMempool{send.Pool}, txViaRPC.Transaction, txViaGossip.Transaction)
 
 			t.Run("confirm_setup", func(t *testing.T) {
 				for _, tx := range bothTxs {
@@ -431,4 +435,20 @@ func FuzzEffectiveGasTip(f *testing.F) {
 			t.Errorf("%T.effectiveGasTip(...) got %v; want %v", ltx, got, want)
 		}
 	})
+}
+
+// poolMempool adapts a raw [*txpool.TxPool] to [txgossiptest.Mempool], the
+// only shape these tests have access to without a geth RPC backend.
+type poolMempool struct {
+	pool *txpool.TxPool
+}
+
+func (m poolMempool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
+	return m.pool.SubscribeTransactions(ch, true /*reorgs ignored by legacypool*/)
+}
+
+func (m poolMempool) GetPoolTransactions() (types.Transactions, error) {
+	pendingByAddr, _ := m.pool.Content()
+	txs := slices.Collect(maps.Values(pendingByAddr))
+	return slices.Concat(txs...), nil
 }

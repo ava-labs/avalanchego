@@ -24,16 +24,24 @@ var (
 // Like [accountTrie], it accumulates BatchOps from writes. Unlike [accountTrie],
 // Hash() chains Reconstruct() calls instead of creating proposals.
 //
+// If computeRootOnHash is true, Hash and Commit apply pending writes and then
+// compute the updated reconstructed root. Otherwise, they apply pending writes
+// but return the previously cached root, avoiding the expensive root computation
+// when the caller only needs Hash as a state-flush point and validates the final
+// root separately.
+//
 // Not concurrent-safe (matching Reconstructed's guarantees).
 type reconstructedAccountTrie struct {
 	baseTrie
-	recon *ffi.Reconstructed
+	recon             *ffi.Reconstructed
+	computeRootOnHash bool
 }
 
 // newReconstructedAccountTrie creates a new reconstructed account trie.
 // The caller retains ownership of the [ffi.Reconstructed] handle and must ensure
 // it outlives the trie.
-func newReconstructedAccountTrie(recon *ffi.Reconstructed) (*reconstructedAccountTrie, error) {
+// computeRootOnHash controls whether Hash and Commit update the cached root.
+func newReconstructedAccountTrie(recon *ffi.Reconstructed, computeRootOnHash bool) (*reconstructedAccountTrie, error) {
 	if recon == nil {
 		return nil, errNilReconstructed
 	}
@@ -43,12 +51,16 @@ func newReconstructedAccountTrie(recon *ffi.Reconstructed) (*reconstructedAccoun
 			root:      common.Hash(recon.Root()),
 			dirtyKeys: make(map[string][]byte),
 		},
-		recon: recon,
+		recon:             recon,
+		computeRootOnHash: computeRootOnHash,
 	}, nil
 }
 
-// Hash returns the current hash of the reconstructed trie.
-// This will chain Reconstruct() with the accumulated ops to compute the new root.
+// Hash applies the accumulated ops to the reconstructed trie and returns a root.
+// If computeRootOnHash is true, the cached root is refreshed from the
+// reconstructed trie after applying the ops. If computeRootOnHash is false, the
+// ops are applied but the cached root is returned unchanged, avoiding root
+// computation until the caller validates the final root separately.
 // If there are no changes since the last call, the cached root is returned.
 // On error, the zero hash is returned.
 func (r *reconstructedAccountTrie) Hash() common.Hash {
@@ -66,7 +78,9 @@ func (r *reconstructedAccountTrie) hash() (common.Hash, error) {
 		if err := r.recon.Reconstruct(r.updateOps); err != nil {
 			return common.Hash{}, err
 		}
-		r.root = common.Hash(r.recon.Root())
+		if r.computeRootOnHash {
+			r.root = common.Hash(r.recon.Root())
+		}
 		// Unlike accountTrie, updateOps must be cleared because Reconstruct()
 		// is incremental (mutates in place), whereas createProposals() replays
 		// all ops from the parent root each time.
@@ -77,15 +91,38 @@ func (r *reconstructedAccountTrie) hash() (common.Hash, error) {
 	return r.root, nil
 }
 
-// Commit returns the new root hash of the trie and an empty [trienode.NodeSet].
-// No persistence occurs; reconstructed views exist only in memory and are not
-// committed to the Firewood database.
+// Commit applies the accumulated ops to the reconstructed trie and returns a
+// root with an empty [trienode.NodeSet]. If computeRootOnHash is true, the
+// cached root is refreshed from the reconstructed trie after applying the ops.
+// If computeRootOnHash is false, the ops are applied but the cached root is
+// returned unchanged. No persistence occurs; reconstructed views exist only in
+// memory and are not committed to the Firewood database.
 func (r *reconstructedAccountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	hash, err := r.hash()
 	if err != nil {
 		return common.Hash{}, nil, err
 	}
 	return hash, trienode.NewNodeSet(common.Hash{}), nil
+}
+
+// Copy returns an independent copy of the reconstructed trie backed by a cloned
+// [ffi.Reconstructed] handle.
+func (r *reconstructedAccountTrie) Copy() (*reconstructedAccountTrie, error) {
+	clonedRecon, err := r.recon.Clone()
+	if err != nil {
+		return nil, err
+	}
+
+	base := r.baseTrie.copy()
+	// The copied baseTrie inherits the original's reader (pointing at the
+	// original's Reconstructed); rebind it to the clone so reads on the copy
+	// observe the clone's view rather than the original's.
+	base.reader = &reconstructedReader{reconstructed: clonedRecon}
+	return &reconstructedAccountTrie{
+		baseTrie:          *base,
+		recon:             clonedRecon,
+		computeRootOnHash: r.computeRootOnHash,
+	}, nil
 }
 
 var _ database.Reader = (*reconstructedReader)(nil)

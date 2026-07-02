@@ -36,6 +36,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
@@ -254,7 +255,11 @@ func (g *Genesis) IsVerkle() bool {
 // ToBlock returns the genesis block according to genesis specification.
 func (g *Genesis) ToBlock() *types.Block {
 	db := rawdb.NewMemoryDatabase()
-	return g.toBlock(db, triedb.NewDatabase(db, g.trieConfig()))
+	block, err := g.toBlock(db, triedb.NewDatabase(db, g.trieConfig()))
+	if err != nil {
+		panic(err)
+	}
+	return block
 }
 
 func (g *Genesis) trieConfig() *triedb.Config {
@@ -268,20 +273,20 @@ func (g *Genesis) trieConfig() *triedb.Config {
 }
 
 // TODO: migrate this function to "flush" for more similarity with upstream.
-func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Block {
-	statedb, err := state.New(types.EmptyRootHash, state.NewDatabaseWithNodeDB(db, triedb), nil)
+func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Block, error) {
+	statedb, err := state.New(types.EmptyRootHash, extstate.NewDatabaseWithNodeDB(db, triedb), nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if g.AirdropHash != (common.Hash{}) {
 		t := time.Now()
 		h := common.BytesToHash(crypto.Keccak256(g.AirdropData))
 		if g.AirdropHash != h {
-			panic(fmt.Sprintf("expected standard allocation %s but got %s", g.AirdropHash, h))
+			return nil, fmt.Errorf("expected standard allocation %s but got %s", g.AirdropHash, h)
 		}
 		airdrop := []*Airdrop{}
 		if err := json.Unmarshal(g.AirdropData, &airdrop); err != nil {
-			panic(err)
+			return nil, err
 		}
 		airdropAmount := uint256.MustFromBig(g.AirdropAmount)
 		for _, alloc := range airdrop {
@@ -312,7 +317,7 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	blockContext := NewBlockContext(head.Number, head.Time)
 	err = ApplyPrecompileActivations(g.Config, nil, blockContext, statedb)
 	if err != nil {
-		panic(fmt.Sprintf("unable to configure precompiles in genesis block: %v", err))
+		return nil, fmt.Errorf("unable to configure precompiles in genesis block: %v", err)
 	}
 
 	// Do custom allocation after airdrop in case an address shows up in standard
@@ -389,21 +394,24 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	triedbOpt := stateconf.WithTrieDBUpdatePayload(common.Hash{}, block.Hash())
 
 	if _, err := statedb.Commit(0, false, stateconf.WithTrieDBUpdateOpts(triedbOpt)); err != nil {
-		panic(fmt.Sprintf("unable to commit genesis block to statedb: %v", err))
+		return nil, fmt.Errorf("unable to commit genesis block to statedb: %v", err)
 	}
 	// Commit newly generated states into disk if it's not empty.
 	if root != types.EmptyRootHash {
 		if err := triedb.Commit(root, true); err != nil {
-			panic(fmt.Sprintf("unable to commit genesis block: %v", err))
+			return nil, fmt.Errorf("unable to commit genesis block: %v", err)
 		}
 	}
-	return block
+	return block, nil
 }
 
 // Commit writes the block and state of a genesis specification to the database.
 // The block is committed as the canonical head block.
 func (g *Genesis) Commit(db ethdb.Database, triedb *triedb.Database) (*types.Block, error) {
-	block := g.toBlock(db, triedb)
+	block, err := g.toBlock(db, triedb)
+	if err != nil {
+		return nil, err
+	}
 	if block.Number().Sign() != 0 {
 		return nil, errors.New("can't commit genesis block with number > 0")
 	}
@@ -420,6 +428,7 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *triedb.Database) (*types.Blo
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
+	rawdb.WriteFinalizedBlockHash(batch, block.Hash())
 	customrawdb.WriteChainConfig(batch, block.Hash(), config, params.GetExtra(config).UpgradeConfig)
 	if err := batch.Write(); err != nil {
 		return nil, fmt.Errorf("failed to write genesis block: %w", err)

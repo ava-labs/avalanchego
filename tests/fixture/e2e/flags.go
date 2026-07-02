@@ -40,7 +40,7 @@ type FlagVars struct {
 	stopNetwork    bool
 	restartNetwork bool
 
-	activateLatest bool
+	activateLatestAfter time.Duration
 }
 
 func (v *FlagVars) NetworkCmd() (NetworkCmd, error) {
@@ -120,8 +120,8 @@ func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	return 0
 }
 
-func (v *FlagVars) ActivateLatest() bool {
-	return v.activateLatest
+func (v *FlagVars) ActivateLatestAfter() time.Duration {
+	return v.activateLatestAfter
 }
 
 type DefaultOption func(*DefaultOptions)
@@ -214,11 +214,11 @@ func RegisterFlags(ops ...DefaultOption) *FlagVars {
 		"[optional] stop an existing network started with --reuse-network and exit without executing any tests.",
 	)
 
-	flag.BoolVar(
-		&vars.activateLatest,
-		"activate-latest",
-		false,
-		"[optional] activate all upgrades up to and including the latest upgrade",
+	flag.DurationVar(
+		&vars.activateLatestAfter,
+		"activate-latest-after",
+		-1,
+		"[optional] controls activation of the latest upgrade: <0 leaves it unscheduled, 0 activates it from genesis, >0 schedules it that duration after network start",
 	)
 
 	return &vars

@@ -12,6 +12,10 @@ on:
         required: true
         type: string
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BAZEL_CI_ENFORCE_DEPENDENCY_LIST: 1
+
 permissions:
   contents: read
 
@@ -22,7 +26,7 @@ jobs:
   bazel-required:
     if: ${{ always() }}
     needs:
-      - check-metadata
+      - setup
       - unit-main
       - unit-coreth
       - unit-subnet-evm
@@ -34,64 +38,69 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          echo "$NEEDS_JSON" | jq -e '
-            to_entries
-            | all(.value.result == "success")
-          ' >/dev/null
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
 
-  # Check Bazel metadata first so stale generated files fail with one
-  # actionable error instead of cascading into multiple Bazel build/test
-  # failures. This is especially important when PRs are tested against
-  # the current base branch and the metadata included in the PR is stale
-  # relative to it.
-  check-metadata:
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi
+
+  # Prepare Bazel CI for this platform before the later jobs run. Similar in intent to
+  # setup-go, this job uses setup-bazel to check Bazel metadata and prepare cache
+  # state for the dependencies that subsequent jobs are expected to need. That shifts
+  # network access into one upfront step instead of having each later job discover
+  # missing dependencies on its own.
+  setup:
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Check Bazel metadata
-        uses: ./.github/actions/run-bazel-task
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
         with:
-          prune_runner_disk: 'false'
-          task: bazel-check-metadata
+          initial-setup: true
 
   unit-main:
-    needs: check-metadata
+    needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
       - name: Run unit tests with Bazel
-        uses: ./.github/actions/run-bazel-task
-        with:
-          prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
-          task: bazel-test-main
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-main
 
   unit-coreth:
-    needs: check-metadata
+    needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
       - name: Run coreth unit tests with Bazel
-        uses: ./.github/actions/run-bazel-task
-        with:
-          prune_runner_disk: 'false'
-          task: bazel-test-coreth
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-coreth
 
   unit-subnet-evm:
-    needs: check-metadata
+    needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
       - name: Run subnet-evm unit tests with Bazel
-        uses: ./.github/actions/run-bazel-task
-        with:
-          prune_runner_disk: ${{ inputs.platform_name == 'darwin-arm64' && 'false' || 'true' }}
-          task: bazel-test-subnet-evm
+        shell: bash
+        run: ./scripts/run_task.sh bazel-test-subnet-evm
 
   e2e:
-    needs: check-metadata
+    needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
       - name: Run e2e tests with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
