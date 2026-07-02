@@ -87,21 +87,14 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		return nil, nil, errors.New("state not available for pending block")
 	}
 
-	numOrHash.RequireCanonical = true
-	_, hash, err := blocks.ResolveRPCNumberOrHash(b, numOrHash)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// Restoring the block (rather than reading artifacts from the database
 	// directly) also handles synchronous (pre-SAE) blocks, whose results are
 	// derived from the header by [blocks.Block.RestoreExecutionArtefacts].
-	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(hash, true))
+	// State queries MUST surface resolution errors such as
+	// [blocks.ErrNonCanonicalBlock], hence restoreBlockOrErr.
+	bl, err := b.restoreBlockOrErr(numOrHash)
 	if err != nil {
 		return nil, nil, err
-	}
-	if bl == nil {
-		return nil, nil, blocks.ErrNotFound
 	}
 
 	// The API implementations expect this to be synchronous, sourcing the state
