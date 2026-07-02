@@ -547,6 +547,7 @@ func (bc *BlockChain) batchBlockAcceptedIndices(batch ethdb.Batch, b *types.Bloc
 	if err := customrawdb.WriteAcceptorTip(batch, b.Hash()); err != nil {
 		return fmt.Errorf("%w: failed to write acceptor tip key", err)
 	}
+	rawdb.WriteFinalizedBlockHash(batch, b.Hash())
 	return nil
 }
 
