@@ -104,6 +104,8 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
 
 	vm.connections.add(nodeID, version)
 	return vm.current.chain.Connected(ctx, nodeID, version)
@@ -112,6 +114,8 @@ func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version
 func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
 
 	vm.connections.remove(nodeID)
 	return vm.current.chain.Disconnected(ctx, nodeID)

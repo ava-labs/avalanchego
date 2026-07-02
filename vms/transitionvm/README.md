@@ -19,8 +19,6 @@ blocks:
 - The **post-transition VM must serve all pre-transition blocks**: a switched
   node still serves history to bootstrapping peers.
 
-Implementing the [`Chain`](vm.go) interface is necessary but not sufficient.
-
 ## Usage
 
 Construct one from a [`Factory`](factory.go) with the two factories and the switch
@@ -31,6 +29,7 @@ n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Facto
     PreFactory:     &coreth.Factory{},
     PostFactory:    &saevm.Factory{},
     TransitionTime: n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+    DrainTimeout:   15 * time.Second,
 })
 ```
 
@@ -42,28 +41,28 @@ VM.
 
 ### One chain, two eras
 
-The transition is a point in the chain's history, not a wall-clock event. It is
-anchored to block timestamps and `transitionTime`, so every node draws the
-boundary in the same place. The pre-transition VM executes blocks before it; the
+The transition block is the first block in a chain whose timestamp is at or past
+the `transitionTime`. Every node draws the boundary in the same place. The
+pre-transition VM executes blocks up to and including the transition block; the
 post-transition VM executes blocks after.
 
 ```mermaid
 flowchart LR
     g(["genesis"]) --> pre["blocks built by the<br/>pre-transition VM"]
-    pre -. "transitionTime" .-> post["blocks built by the<br/>post-transition VM"]
+    pre --> tb["transition block built<br/>by the pre-transition VM"]
+    tb --> post["blocks built by the<br/>post-transition VM"]
     post --> tip(["tip"])
 
     classDef preCls stroke:#e8820c,stroke-width:2px,color:#e8820c;
     classDef postCls stroke:#2ca02c,stroke-width:2px,color:#2ca02c;
+    classDef boundaryCls stroke:#e8820c,stroke-width:4px,color:#e8820c;
     class pre preCls;
+    class tb boundaryCls;
     class post postCls;
 ```
 
-The pre-transition VM may never extend the chain past the boundary: a block whose
-parent lies in the post-transition era is refused until the node switches, so the
-two VMs never disagree about who owns a stretch of history. A node switches when
-it accepts the first block at or after `transitionTime`. Verification and
-acceptance enforce this:
+The pre-transition VM may never extend the chain past the transition block; all
+descendants of the transition block are refused until the node transitions:
 
 ```mermaid
 flowchart TD
@@ -113,9 +112,10 @@ flowchart TB
     class post postCls;
 ```
 
-Three things carry over:
+Four things carry over:
 
-- consensus state and block preference (the engine expects them to stick),
+- the current consensus state (the engine expects it to stick),
+- the block preference (the VM is only told of new preferences),
 - the set of connected peers (the p2p layer won't re-announce them),
 - registered HTTP routes (the node mounts these at startup).
 
@@ -129,6 +129,7 @@ request it never sent is fatal to the consensus engine.
 
 ```mermaid
 sequenceDiagram
+    autonumber
     participant Peer
     participant VM as TransitionVM
     participant Pre as pre-transition VM
@@ -177,22 +178,52 @@ call, so it cannot hold the read lock without deadlocking against the writer loc
 it is about to request. Instead it relies on the wrapped block being immutable
 once verified.
 
+### The chain's context lock
+
+The chain grabs its `snow.Context.Lock` itself on async paths (gossip mempool, tx
+API). The transition holds the engine's lock (it runs inside `Accept`) while
+taking `transitionLock` as writer. So if the chain shared the engine's lock, a
+gossip handler holding `transitionLock` and blocking on that lock would deadlock
+the transition. `copyContext` gives each chain its own lock.
+
 ### Lock order
 
 An arrow from lock A to lock B means B is acquired while holding A:
 
 ```mermaid
 flowchart TD
-    t["transitionLock"]
-    t --> b["block.lock"]
-    t --> c["connections.lock"]
-    t --> r["requests.lock"]
-    t --> hs["httpHandlers.lock"]
+    e["snow.Context.Lock<br/>(engine)"]
+    e --> t["transitionLock"]
+    t --> cc["chain snow.Context.Lock<br/>(managed copy)"]
+    cc --> b["block.lock"]
+    cc --> c["connections.lock"]
+    cc --> hs["httpHandlers.lock"]
+    b --> r["requests.lock"]
+    c --> r
     hs --> h["httpHandler.lock"]
+
+    classDef ctxCls stroke:#1f77b4,stroke-width:2px,color:#1f77b4;
+    class e,cc ctxCls;
 ```
 
-`transitionLock` is outermost and nothing re-enters it; the only nesting among
-the rest is `httpHandlers.lock` over `httpHandler.lock`.
+The two blue nodes are `snow.Context.Lock`s that cross the wrapper↔chain
+boundary; the rest are internal to the wrapper.
+
+The engine's `snow.Context.Lock` is not the wrapper's. The engine holds it around
+the calls it dispatches synchronously, so it sits above `transitionLock`; the
+wrapper never acquires it.
+
+The chain's `snow.Context.Lock` is the per-chain copy the wrapper manages. A
+forward the engine dispatches under its lock takes `transitionLock` (read) and
+then this copy (write); the wrapped chain re-enters the copy on its own
+asynchronous (gossip, app messages) and HTTP (admin, tx APIs) paths, which reach
+it without `transitionLock` held.
+
+Any call into the chain may send an app request, which the wrapper's sender
+records under `requests.lock`. So `requests.lock` sits below every lock held
+around such a call. The chain's own lock always is. `block.lock` is, because
+`maybeTransition` fetches and re-parses through the chain. `connections.lock`
+is, because `reconnect` replays connections into the chain.
 
 The line-level mechanics are commented at their call sites in [`vm.go`](vm.go),
 [`vm_block.go`](vm_block.go), [`vm_network.go`](vm_network.go), and

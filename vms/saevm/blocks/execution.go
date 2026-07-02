@@ -254,9 +254,9 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 // block itself, and the block is marked as synchronous.
 //
 // This function does NOT restore the block's settlement state, even if the
-// block is synchronous. The caller MUST mark the block as settled. Because
-// this function breaks this invariant, any consumer SHOULD consider using
-// [RestoreSettledBlock] instead, if possible.
+// block is synchronous. The caller MUST mark the block as settled if and when
+// appropriate. Because this function breaks this invariant, any consumer
+// SHOULD consider using [RestoreSettledBlock] instead, if possible.
 //
 // Any error returned corrupts the block's in-memory state.
 func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {

@@ -45,8 +45,6 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	return blocks.New(ethB, parent, nil, rec.log)
 }
 
-var errIncompleteRecoveryState = errors.New("incomplete recovery state")
-
 // lastCommittedBlock returns the highest settled block whose post-execution
 // state is available on disk. This is required because its post-execution state
 // is the basis for the worst-case checks needed for block verifications.
@@ -58,14 +56,24 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 
 	lastSettledHash := rawdb.ReadFinalizedBlockHash(rec.db)
 	if lastSettledHash == (common.Hash{}) {
-		return nil, fmt.Errorf("%w: no finalized block recorded", errIncompleteRecoveryState)
+		return nil, errors.New("no finalized block recorded")
 	}
 	lastSettledHeight := rawdb.ReadHeaderNumber(rec.db, lastSettledHash)
 	if lastSettledHeight == nil {
-		return nil, fmt.Errorf("%w: no height for finalized block", errIncompleteRecoveryState)
+		return nil, fmt.Errorf("no height for finalized block %s", lastSettledHash)
 	}
 
-	// Search for first settled post-execution state
+	// Search for highest settled post-execution state
+	// Invariant: The state is written to disk AFTER the block is written to
+	// disk. Therefore, the state can only lag behind the block read.
+	// Additionally, we assume any block has been written atomically, so
+	// if the last settled height was found, the underlying block is present.
+	// At minimum, [NewVM] requires a genesis block to be written (which is
+	// synchronous by definition).
+	//
+	// There's no reasonable cap on how far back to search, since the distance
+	// between the settler and settled block is unbounded, and node crashes
+	// must be accounted for.
 	for height := *lastSettledHeight; ; height-- {
 		ethB, err := canonicalBlock(rec.db, height)
 		if err != nil {
@@ -82,8 +90,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 		}
 
 		if b.Synchronous() {
-			// invariant expected at initialization.
-			return nil, fmt.Errorf("%w: last synchronous block %d has no available post-execution state", errIncompleteRecoveryState, height)
+			return nil, fmt.Errorf("last synchronous block %d has no available post-execution state", height)
 		}
 	}
 }

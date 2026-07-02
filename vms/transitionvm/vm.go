@@ -57,7 +57,8 @@ type VM struct {
 	// vm state
 	transitionLock sync.RWMutex
 	transitioned   bool
-	consensusState snow.State
+	consensusState utils.Atomic[snow.State]
+	setPreference  utils.Atomic[bool]
 	connections    *connections
 	httpHandlers   *httpHandlers
 	current        *current
@@ -67,6 +68,7 @@ type VM struct {
 // initialization and transition.
 type current struct {
 	chain    Chain
+	chainCtx *snow.Context
 	requests *requests
 
 	ctx       context.Context
@@ -77,7 +79,7 @@ var transitionedKey = prefixdb.MakePrefix([]byte("transitioned"))
 
 func (vm *VM) Initialize(
 	ctx context.Context,
-	preChainCtx *snow.Context,
+	engineChainCtx *snow.Context,
 	db database.Database,
 	genesisBytes []byte,
 	upgradeBytes []byte,
@@ -85,36 +87,17 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	gatherer := metrics.NewPrefixGatherer()
-	if err := preChainCtx.Metrics.Register("transition", gatherer); err != nil {
-		return err
-	}
+	preChainCtx := copyContext(engineChainCtx)
 
 	// Give the post-transition chain its own gatherer to avoid
 	// double-registering metrics, and copy the rest of the context so the
 	// transition never races on the shared [snow.Context].
-	vm.postChainCtx = &snow.Context{
-		NetworkID:       preChainCtx.NetworkID,
-		SubnetID:        preChainCtx.SubnetID,
-		ChainID:         preChainCtx.ChainID,
-		NodeID:          preChainCtx.NodeID,
-		PublicKey:       preChainCtx.PublicKey,
-		NetworkUpgrades: preChainCtx.NetworkUpgrades,
-		XChainID:        preChainCtx.XChainID,
-		CChainID:        preChainCtx.CChainID,
-		AVAXAssetID:     preChainCtx.AVAXAssetID,
-		Log:             preChainCtx.Log,
-		// The lock is deprecated and unused by SAE, so this copy gets a fresh
-		// one. Coreth still uses it and MUST get the original context, not this
-		// copy.
-		Lock:           sync.RWMutex{},
-		SharedMemory:   preChainCtx.SharedMemory,
-		BCLookup:       preChainCtx.BCLookup,
-		Metrics:        gatherer,
-		WarpSigner:     preChainCtx.WarpSigner,
-		ValidatorState: preChainCtx.ValidatorState,
-		ChainDataDir:   preChainCtx.ChainDataDir,
+	vm.postChainCtx = copyContext(engineChainCtx)
+	vm.postChainCtx.Metrics = metrics.NewPrefixGatherer()
+	if err := preChainCtx.Metrics.Register("transition", vm.postChainCtx.Metrics); err != nil {
+		return err
 	}
+
 	vm.db = db
 	vm.genesisBytes = genesisBytes
 	vm.upgradeBytes = upgradeBytes
@@ -162,6 +145,30 @@ func (vm *VM) Initialize(
 	return vm.transition(ctx, lastAccepted)
 }
 
+// copyContext returns a new context with all the same fields except for
+// [snow.Context.Lock], which can not be copied.
+func copyContext(ctx *snow.Context) *snow.Context {
+	return &snow.Context{
+		NetworkID:       ctx.NetworkID,
+		SubnetID:        ctx.SubnetID,
+		ChainID:         ctx.ChainID,
+		NodeID:          ctx.NodeID,
+		PublicKey:       ctx.PublicKey,
+		NetworkUpgrades: ctx.NetworkUpgrades,
+		XChainID:        ctx.XChainID,
+		CChainID:        ctx.CChainID,
+		AVAXAssetID:     ctx.AVAXAssetID,
+		Log:             ctx.Log,
+		Lock:            sync.RWMutex{}, // The lock is not copied
+		SharedMemory:    ctx.SharedMemory,
+		BCLookup:        ctx.BCLookup,
+		Metrics:         ctx.Metrics,
+		WarpSigner:      ctx.WarpSigner,
+		ValidatorState:  ctx.ValidatorState,
+		ChainDataDir:    ctx.ChainDataDir,
+	}
+}
+
 // transition switches from the pre- to the post-transition chain. The
 // pre-transition chain must be active.
 func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
@@ -189,6 +196,10 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 		vm.httpHandlers.unblock()
 	}()
 
+	// Draining the in-flight API requests blocks, but does not block forever.
+	// Websockets are long-lived connections which are not able to be gracefully
+	// terminated during the transition. This means that websocket connections
+	// can (and will) cause this to timeout during the transition.
 	log.Info("draining in-flight API requests to the pre-transition VM",
 		zap.Duration("timeout", vm.drainTimeout),
 	)
@@ -202,10 +213,18 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 
 	log.Info("shutting down pre-transition VM")
-	if err := vm.preTransitionChain.Shutdown(ctx); err != nil {
+	vm.current.chainCtx.Lock.Lock()
+	err := vm.preTransitionChain.Shutdown(ctx)
+	vm.current.chainCtx.Lock.Unlock()
+	if err != nil {
 		return fmt.Errorf("closing pre-transition chain: %w", err)
 	}
 
+	// Since shutdown finished without error for the pre-transition VM, we
+	// expect all DB writes to have been flushed. So it is now safe to write the
+	// transition marker. The transition marker MUST be written before
+	// initializing the post-transition VM, because the post-transition VM may
+	// perform disk operations that are incompatible with the pre-transition VM.
 	log.Info("writing transition marker")
 	if err := vm.db.Put(transitionedKey, nil); err != nil {
 		return fmt.Errorf("writing transition marker: %w", err)
@@ -216,11 +235,14 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 		return fmt.Errorf("initializing post-transition VM: %w", err)
 	}
 
-	log.Info("setting post-transition VM state",
-		zap.Stringer("state", vm.consensusState),
-	)
-	if vm.consensusState != snow.Initializing {
-		if err := vm.postTransitionChain.SetState(ctx, vm.consensusState); err != nil {
+	vm.postChainCtx.Lock.Lock()
+	defer vm.postChainCtx.Lock.Unlock()
+
+	if state := vm.consensusState.Get(); state != snow.Initializing {
+		log.Info("setting post-transition VM state",
+			zap.Stringer("state", state),
+		)
+		if err := vm.postTransitionChain.SetState(ctx, state); err != nil {
 			return fmt.Errorf("setting consensus state: %w", err)
 		}
 	}
@@ -237,17 +259,19 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 	vm.httpHandlers.set(newHandlers)
 
-	// The VM is only notified of preference changes, so if the consensus engine
-	// previously set the preference, we must manually set the post-transition
-	// VM's preference.
-	//
-	// Failing to due this could leave the preference uninitialized, which could
-	// cause block building to error.
-	log.Info("initializing post-transition VM preference",
-		zap.Stringer("blkID", lastID),
-	)
-	if err := vm.postTransitionChain.SetPreference(ctx, lastID); err != nil {
-		return fmt.Errorf("setting post-transition preference: %w", err)
+	if vm.setPreference.Get() {
+		// The VM is only notified of preference changes, so if the consensus
+		// engine previously set the preference, we must manually set the
+		// post-transition VM's preference.
+		//
+		// Failing to do this could leave the preference uninitialized, which
+		// could cause block building to error.
+		log.Info("initializing post-transition VM preference",
+			zap.Stringer("blkID", lastID),
+		)
+		if err := vm.postTransitionChain.SetPreference(ctx, lastID); err != nil {
+			return fmt.Errorf("setting post-transition preference: %w", err)
+		}
 	}
 
 	vm.transitioned = true
@@ -258,6 +282,9 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 // initChain configures VM to dispatch the provided chain with the given
 // context.
 func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context) error {
+	chainCtx.Lock.Lock()
+	defer chainCtx.Lock.Unlock()
+
 	var (
 		requests requests
 		sender   = sender{
@@ -282,6 +309,7 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	vm.current = &current{
 		chain:     chain,
+		chainCtx:  chainCtx,
 		requests:  &requests,
 		ctx:       ctx,
 		ctxCancel: ctxCancel,

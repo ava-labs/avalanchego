@@ -175,7 +175,7 @@ func NewTestNetworkConfig(
 		TrackedSubnets:               trackedSubnets,
 		Beacons:                      validators.NewManager(),
 		Validators:                   currentValidators,
-		UptimeCalculator:             uptime.NoOpCalculator,
+		UptimeCalculator:             uptime.TestCalculator{},
 		UptimeMetricFreq:             constants.DefaultUptimeMetricFreq,
 		RequireValidatorToConnect:    constants.DefaultNetworkRequireValidatorToConnect,
 		MaximumInboundMessageTimeout: constants.DefaultNetworkMaximumInboundTimeout,

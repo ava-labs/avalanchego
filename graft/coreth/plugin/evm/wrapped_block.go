@@ -57,6 +57,7 @@ var (
 	errParentBeaconRootNonEmpty            = errors.New("invalid non-empty parentBeaconRoot")
 	errBlobGasUsedNilInCancun              = errors.New("blob gas used must not be nil in Cancun")
 	errBlobsNotEnabled                     = errors.New("blobs not enabled on avalanche networks")
+	errIsHeliconBlock                      = errors.New("helicon blocks are not valid pre-SAE")
 )
 
 var (
@@ -365,7 +366,7 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 
 	if extraConfig.IsHelicon(header.Time) {
-		return errors.New("expected to have transitioned to SAE prior to Helicon")
+		return errIsHeliconBlock
 	}
 
 	// If the VM is not marked as bootstrapped the other chains may also be

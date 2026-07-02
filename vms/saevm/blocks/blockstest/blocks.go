@@ -15,7 +15,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -133,15 +132,14 @@ func NewGenesis(tb testing.TB, db ethdb.Database, config *params.ChainConfig, al
 		BaseFee:   new(big.Int).SetUint64(conf.baseFee),
 	}
 
-	tdb := state.NewDatabaseWithConfig(db, conf.tdbConfig).TrieDB()
-	_, hash, err := core.SetupGenesisBlock(db, tdb, gen)
+	tdb := triedb.NewDatabase(db, conf.tdbConfig)
+	_, _, err := core.SetupGenesisBlock(db, tdb, gen)
 	require.NoError(tb, err, "core.SetupGenesisBlock()")
-	require.NoErrorf(tb, tdb.Commit(hash, true), "%T.Commit(core.SetupGenesisBlock(...))", tdb)
 
 	h := hookstest.NewStub(conf.gasTarget)
 	xdb := saetest.NewExecutionResultsDB()
 	b, err := blocks.RestoreSettledBlock(gen.ToBlock(), h, loggingtest.New(tb, logging.Warn), db, xdb, config)
-	require.NoError(tb, err, "blocks.RestoreSettledBlock()")
+	require.NoError(tb, err, "blocks.RestoreSettledBlock([genesis]...)")
 	return b
 }
 

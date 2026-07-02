@@ -32,13 +32,13 @@ func TestFactoryUsableBeforeInitialize(t *testing.T) {
 	}
 
 	intf, err := f.New(logging.NoLog{})
-	require.NoError(t, err)
+	require.NoErrorf(t, err, "%T.New()", f)
 	vm := intf.(*VM)
 
 	// New marks the pre-transition chain current, so these route to it.
 	version, err := vm.Version(t.Context())
-	require.NoError(t, err)
-	require.Equal(t, "pre", version)
+	require.NoErrorf(t, err, "%T.Version()", vm)
+	require.Equalf(t, "pre", version, "%T.Version()", vm)
 
-	require.NoError(t, vm.Shutdown(t.Context()))
+	require.NoErrorf(t, vm.Shutdown(t.Context()), "%T.Shutdown()", vm)
 }

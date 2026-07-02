@@ -54,7 +54,7 @@ func TestHTTPHandlers(t *testing.T) {
 
 	// The node captures the handler map once on startup and never re-reads it.
 	handlers, err := sut.CreateHandlers(ctx)
-	require.NoError(t, err)
+	require.NoErrorf(t, err, "%T.CreateHandlers()", sut)
 
 	type responses map[string]struct {
 		wantCode int
@@ -80,7 +80,7 @@ func TestHTTPHandlers(t *testing.T) {
 		"pre-only": {wantCode: http.StatusOK, wantBody: "pre-only"},
 	})
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 
 	assertRoutes("post-transition", responses{
 		"shared":   {wantCode: http.StatusOK, wantBody: "post-shared"},                // rebound
@@ -98,11 +98,11 @@ func TestHTTPHandlersBlockUnblock(t *testing.T) {
 		route := handlers.routes["rpc"]
 
 		// Served normally before block.
-		require.Equal(t, "val", serve(route).Body.String())
+		require.Equalf(t, "val", serve(route).Body.String(), "serve(%T)", route)
 
 		handlers.block()
 
-		// Cancelled requests exit gracfully while blocked.
+		// Cancelled requests exit gracefully while blocked.
 		ctx, cancel := context.WithCancel(t.Context())
 		go cancel()
 		route.ServeHTTP(
@@ -116,12 +116,12 @@ func TestHTTPHandlersBlockUnblock(t *testing.T) {
 			result <- serve(route)
 		}()
 		synctest.Wait()
-		require.Empty(t, result, "request was served while blocked")
+		require.Emptyf(t, result, "serve(%T) was served while blocked", route)
 		handlers.unblock()
-		require.Equal(t, "val", (<-result).Body.String())
+		require.Equalf(t, "val", (<-result).Body.String(), "serve(%T)", route)
 
 		// Served normally after unblock.
-		require.Equal(t, "val", serve(route).Body.String())
+		require.Equalf(t, "val", serve(route).Body.String(), "serve(%T)", route)
 	})
 }
 
@@ -135,7 +135,7 @@ func TestHTTPHandlersDrain(t *testing.T) {
 		route := handlers.routes["rpc"]
 
 		// Draining with no in-flight requests returns immediately.
-		require.NoError(t, handlers.drain(t.Context()))
+		require.NoErrorf(t, handlers.drain(t.Context()), "%T.drain()", handlers)
 
 		// Draining with in-flight requests blocks until the context is
 		// cancelled.
@@ -143,10 +143,52 @@ func TestHTTPHandlersDrain(t *testing.T) {
 		synctest.Wait() // The request is now in flight, blocked in the handler.
 		cancelledCtx, cancel := context.WithCancel(t.Context())
 		go cancel()
-		require.ErrorIs(t, handlers.drain(cancelledCtx), context.Canceled)
+		require.ErrorIsf(t, handlers.drain(cancelledCtx), context.Canceled, "%T.drain()", handlers)
 
 		// Draining with in-flight requests blocks until the request returns.
 		go close(release)
-		require.NoError(t, handlers.drain(t.Context()))
+		require.NoErrorf(t, handlers.drain(t.Context()), "%T.drain()", handlers)
+	})
+}
+
+// TestTransitionAbandonsStuckAPIRequests verifies a transition proceeds past
+// the drain timeout while an API request is stuck in the pre-transition
+// chain, and that a request parked during the transition is served by the
+// post-transition chain.
+func TestTransitionAbandonsStuckAPIRequests(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		sut := newSUT(t)
+		ctx := t.Context()
+
+		release := make(chan struct{})
+		defer close(release)
+
+		sut.pre.handlers = map[string]http.Handler{
+			"rpc": blockingHandler{release: release},
+		}
+		sut.post.handlers = map[string]http.Handler{
+			"rpc": handler("post"),
+		}
+
+		handlers, err := sut.CreateHandlers(ctx)
+		require.NoErrorf(t, err, "%T.CreateHandlers()", sut)
+		route := handlers["rpc"]
+
+		go serve(route)
+		synctest.Wait() // The request is in flight, blocked in the handler.
+
+		// Accepting the transition block blocks new API requests and waits for
+		// the stuck one until the drain timeout.
+		blk, err := sut.BuildBlock(ctx)
+		require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+		require.NoErrorf(t, blk.Verify(ctx), "%T.Verify()", blk)
+		go func() {
+			assert.NoErrorf(t, blk.Accept(ctx), "%T.Accept()", blk)
+		}()
+		synctest.Wait() // The transition is now waiting on the drain.
+
+		// The parked request is served by the post-transition chain after
+		// abandoning the stuck request.
+		require.Equalf(t, "post", serve(route).Body.String(), "serve(%T)", route)
 	})
 }

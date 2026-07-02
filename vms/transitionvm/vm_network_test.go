@@ -6,7 +6,9 @@ package transitionvm
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -47,10 +49,10 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 				responseID = 1
 				failureID  = 2
 			)
-			require.NoError(t, sut.pre.sendAppRequest(ctx, nodeID, responseID))
-			require.NoError(t, sut.pre.sendAppRequest(ctx, nodeID, failureID))
+			require.NoErrorf(t, sut.pre.sendAppRequest(ctx, nodeID, responseID), "%T.sendAppRequest()", sut.pre)
+			require.NoErrorf(t, sut.pre.sendAppRequest(ctx, nodeID, failureID), "%T.sendAppRequest()", sut.pre)
 
-			sut.BuildVerifyAccept(t, ctx, verifyNoContext)
+			sut.BuildVerifyAccept(t, ctx, noContext)
 
 			t.Run("AppResponse", func(t *testing.T) {
 				delivered := false
@@ -62,8 +64,8 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 					t.Fatal("post-transition chain received a pre-transition response")
 					return nil
 				}
-				require.NoError(t, sut.AppResponse(ctx, nodeID, responseID, nil))
-				require.Equal(t, !test.transitions, delivered)
+				require.NoErrorf(t, sut.AppResponse(ctx, nodeID, responseID, nil), "%T.AppResponse()", sut)
+				require.Equalf(t, !test.transitions, delivered, "%T.AppResponse()", sut)
 			})
 
 			t.Run("AppRequestFailed", func(t *testing.T) {
@@ -76,10 +78,42 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 					t.Fatal("post-transition chain received a pre-transition app error")
 					return nil
 				}
-				require.NoError(t, sut.AppRequestFailed(ctx, nodeID, failureID, common.ErrUndefined))
-				require.Equal(t, !test.transitions, delivered)
+				require.NoErrorf(t, sut.AppRequestFailed(ctx, nodeID, failureID, common.ErrUndefined), "%T.AppRequestFailed()", sut)
+				require.Equalf(t, !test.transitions, delivered, "%T.AppRequestFailed()", sut)
 			})
 		})
+	}
+}
+
+// TestRequestIDCollisionAcrossTransition verifies that when the
+// post-transition chain reuses a request ID the pre-transition chain sent, the
+// first response is delivered to the post-transition chain and the second is
+// dropped.
+func TestRequestIDCollisionAcrossTransition(t *testing.T) {
+	sut := newSUT(t)
+	ctx := t.Context()
+
+	nodeID := ids.GenerateTestNodeID()
+	const requestID = 1
+
+	// The pre-transition chain's request is still unanswered at the
+	// transition.
+	require.NoErrorf(t, sut.pre.sendAppRequest(ctx, nodeID, requestID), "%T.sendAppRequest()", sut.pre)
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+	require.NoErrorf(t, sut.post.sendAppRequest(ctx, nodeID, requestID), "%T.sendAppRequest()", sut.post)
+
+	delivered := 0
+	sut.post.VM.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error {
+		delivered++
+		return nil
+	}
+	sut.pre.VM.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error {
+		t.Fatal("pre-transition chain received a response after the transition")
+		return nil
+	}
+	for range 2 {
+		require.NoErrorf(t, sut.AppResponse(ctx, nodeID, requestID, nil), "%T.AppResponse()", sut)
+		require.Equalf(t, 1, delivered, "%T.AppResponse()", sut)
 	}
 }
 
@@ -94,14 +128,47 @@ func TestTransitionForwardsConnections(t *testing.T) {
 		ids.GenerateTestNodeID(): {Name: "avalanchego", Major: 4, Minor: 5, Patch: 6},
 	}
 	for nodeID, v := range want {
-		require.NoError(t, sut.Connected(ctx, nodeID, v))
+		require.NoErrorf(t, sut.Connected(ctx, nodeID, v), "%T.Connected()", sut)
 	}
 
 	disconnected := ids.GenerateTestNodeID()
-	require.NoError(t, sut.Connected(ctx, disconnected, version.Current))
-	require.NoError(t, sut.Disconnected(ctx, disconnected))
+	require.NoErrorf(t, sut.Connected(ctx, disconnected, version.Current), "%T.Connected()", sut)
+	require.NoErrorf(t, sut.Disconnected(ctx, disconnected), "%T.Disconnected()", sut)
 
-	sut.BuildVerifyAccept(t, ctx, verifyNoContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
 
-	require.Equal(t, want, sut.post.connected)
+	require.Equalf(t, want, sut.post.connected, "%T.post.connected", sut)
+}
+
+// TestAppGossipGrabsCtxLock verifies that the pre-transition VM can grab its
+// ctx.Lock during AppGossip.
+func TestAppGossipGrabsCtxLock(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		sut := newSUT(t)
+		ctx := t.Context()
+
+		blocked := make(chan struct{})
+		sut.pre.VM.AppGossipF = func(context.Context, ids.NodeID, []byte) error {
+			<-blocked // Block with [VM.transitionLock] held.
+
+			sut.pre.chainCtx.Lock.Lock()
+			defer sut.pre.chainCtx.Lock.Unlock()
+
+			return nil // Coreth verifies txs here
+		}
+
+		go func() {
+			assert.NoError(t, sut.AppGossip(ctx, ids.GenerateTestNodeID(), nil), "%T.AppGossip()", sut)
+		}()
+
+		synctest.Wait() // [VM.transitionLock] is held and gossip is waiting on blocked.
+
+		// The engine holds ctx.Lock across Accept.
+		sut.ctx.Lock.Lock()
+		defer sut.ctx.Lock.Unlock()
+
+		// Allow the AppGossip to proceed.
+		go close(blocked)
+		sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+	})
 }
