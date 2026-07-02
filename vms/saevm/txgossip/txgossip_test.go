@@ -47,7 +47,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
-	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 )
 
 const testGasTarget = 4_000_000
@@ -86,7 +85,14 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
-	genesis := blockstest.NewGenesis(t, db, config, saetest.MaxAllocFor(wallet.Addresses()...))
+	genesis := blockstest.NewGenesis(
+		t,
+		db,
+		config,
+		saetest.MaxAllocFor(wallet.Addresses()...),
+		blockstest.WithGasTarget(testGasTarget),
+		blockstest.WithBaseFee(params.Wei),
+	)
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
@@ -108,9 +114,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())
 	pool := newTxPool(t, bc)
-	set, err := NewSet(pool, func() uint64 {
-		return uint64(worstcase.SafeMaxBlockSize(exec.LastExecuted().ExecutedByGasTime()))
-	}, gossip.BloomSetConfig{})
+	set, err := NewSet(exec, pool, gossip.BloomSetConfig{})
 	require.NoError(t, err, "NewSet()")
 	t.Cleanup(func() {
 		assert.NoErrorf(t, pool.Close(), "%T.Close()", pool)

@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
+	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 )
 
 // errInsufficientGasPerByte is returned for a transaction that carries fewer
@@ -70,14 +72,17 @@ type Set struct {
 
 // NewSet returns a new Set. Use [gossip.BloomSet.Add] or [Set.SendTx] to add
 // transactions to the pool, which SHOULD NOT be populated directly.
+//
+// Transactions are vetted against the gas limit of the next block, derived
+// from exec's last-executed block; see [blocklimit.Eligible].
 func NewSet(
+	exec *saexec.Executor,
 	pool *txpool.TxPool,
-	blockGasLimit func() uint64,
 	config gossip.BloomSetConfig,
 ) (*Set, error) {
 	s := &txSet{
-		pool:          pool,
-		blockGasLimit: blockGasLimit,
+		exec: exec,
+		pool: pool,
 	}
 	bs, err := gossip.NewBloomSet(s, config)
 	if err != nil {
@@ -93,8 +98,14 @@ func NewSet(
 var _ gossip.Set[Transaction] = (*txSet)(nil)
 
 type txSet struct {
-	pool          *txpool.TxPool
-	blockGasLimit func() uint64
+	exec *saexec.Executor
+	pool *txpool.TxPool
+}
+
+// blockGasLimit returns the worst-case gas limit of the next block, based on
+// the gas clock of the last-executed block.
+func (s *txSet) blockGasLimit() uint64 {
+	return uint64(worstcase.SafeMaxBlockSize(s.exec.LastExecuted().ExecutedByGasTime()))
 }
 
 func (s *txSet) Add(tx Transaction) error {
