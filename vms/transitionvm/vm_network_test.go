@@ -8,6 +8,7 @@ import (
 	"testing"
 	"testing/synctest"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -124,7 +125,9 @@ func TestAppGossipGrabsCtxLock(t *testing.T) {
 			return nil // Coreth verifies txs here
 		}
 
-		go sut.AppGossip(ctx, ids.GenerateTestNodeID(), nil)
+		go func() {
+			assert.NoError(t, sut.AppGossip(ctx, ids.GenerateTestNodeID(), nil), "%T.AppGossip()", sut)
+		}()
 
 		synctest.Wait() // [VM.transitionLock] is held and gossip is waiting on blocked.
 
