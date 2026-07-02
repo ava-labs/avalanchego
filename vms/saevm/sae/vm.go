@@ -15,11 +15,13 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -98,6 +100,8 @@ type Config struct {
 	Now func() time.Time `json:"-"`
 }
 
+const ExecutionResultsDir = "sae_execution_results"
+
 // NewVM returns a new [VM] that is ready for use immediately upon return.
 // [VM.Shutdown] MUST be called to release resources.
 //
@@ -135,7 +139,7 @@ func NewVM[T hook.Transaction](
 
 	// ==========  Execution Results DB  ==========
 	xdb, err := hooks.ExecutionResultsDB(
-		filepath.Join(snowCtx.ChainDataDir, "sae_execution_results"),
+		filepath.Join(snowCtx.ChainDataDir, ExecutionResultsDir),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %v", hooks, snowCtx.ChainDataDir, err)
@@ -351,6 +355,11 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 func (vm *VM) numPendingTxs() int {
 	p, _ := vm.mempool.Pool.Stats()
 	return p
+}
+
+// EVMState returns direct access to the databases that control the EVM state.
+func (vm *VM) EVMState() (*triedb.Database, *snapshot.Tree) {
+	return vm.exec.TrieDB(), vm.exec.Snapshot()
 }
 
 // SetState notifies the VM of a transition in the state lifecycle.

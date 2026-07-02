@@ -152,7 +152,7 @@ func (vm *VM) Initialize(
 		userConfig.desired(),
 		vm.metrics,
 	)
-	vm.Network, err = network.New(snowCtx, appSender)
+	vm.Network, err = network.New(network.Config{}, snowCtx, appSender)
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
 	}
@@ -165,7 +165,14 @@ func (vm *VM) Initialize(
 	if err := genesis.verifyAndWriteBlock(ethDB); err != nil {
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
-	vm.SummaryHandler, err = statesync.New(userConfig.stateSyncConfig(), ethDB, hooks, vm.state, snowCtx.Log)
+	vm.SummaryHandler, err = statesync.New(
+		userConfig.stateSyncConfig(),
+		ethDB,
+		snowCtx,
+		vm.Network,
+		hooks,
+		vm.state,
+	)
 	if err != nil {
 		return fmt.Errorf("creating summary handler: %w", err)
 	}

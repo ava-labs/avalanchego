@@ -67,7 +67,7 @@ func (vm *SinceGenesis[_]) Initialize(
 		return err
 	}
 
-	vm.Network, err = network.New(snowCtx, appSender)
+	vm.Network, err = network.New(network.Config{}, snowCtx, appSender)
 	if err != nil {
 		return fmt.Errorf("network.New(...): %v", err)
 	}
@@ -85,9 +85,28 @@ func setupGenesis(db ethdb.Database, tdbConfig *triedb.Config, genesisBytes []by
 	if err := json.Unmarshal(genesisBytes, genesis); err != nil {
 		return nil, fmt.Errorf("json.Unmarshal(%T): %v", genesis, err)
 	}
+
+	// writeGenesis sets up the genesis block and reconciles the chain's head
+	// pointers with what state sync may have already recorded, returning the chain
+	// config.
+	priorAccepted := rawdb.ReadHeadFastBlockHash(db)
+	priorBlock := rawdb.ReadHeadBlockHash(db)
+	priorHeader := rawdb.ReadHeadHeaderHash(db)
+
 	config, hash, err := core.SetupGenesisBlock(db, tdb, genesis)
 	if err != nil {
 		return nil, fmt.Errorf("core.SetupGenesisBlock(...): %v", err)
+	}
+
+	// These could have been clobbered by [core.SetupGenesisBlock]
+	if priorAccepted != (ethcommon.Hash{}) {
+		rawdb.WriteHeadFastBlockHash(db, priorAccepted)
+	}
+	if priorBlock != (ethcommon.Hash{}) {
+		rawdb.WriteHeadBlockHash(db, priorBlock)
+	}
+	if priorHeader != (ethcommon.Hash{}) {
+		rawdb.WriteHeadHeaderHash(db, priorHeader)
 	}
 
 	// [NewVM] assumes that the genesis block is "finalized", which does not
