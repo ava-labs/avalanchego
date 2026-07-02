@@ -47,10 +47,18 @@ func (b *backend) GetBody(ctx context.Context, hash common.Hash, number rpc.Bloc
 	return readByNumberAndHash(b, hash, number, (*blocks.Block).Body, rawdb.ReadBody)
 }
 
-// restoreBlock finds any available block by number or hash. All methods unrelated to ancestry
-// are safe to use.
+// restoreBlock finds any available block by number or hash, mapping not-found
+// errors to a nil block. All methods unrelated to ancestry are safe to use.
 func (b *backend) restoreBlock(numOrHash rpc.BlockNumberOrHash) (*blocks.Block, error) {
-	return readByNumberOrHash(
+	return notFoundIsNil(b.restoreBlockOrErr(numOrHash))
+}
+
+// restoreBlockOrErr is [backend.restoreBlock] except that not-found errors
+// (e.g. [blocks.ErrNonCanonicalBlock]) are propagated instead of mapped to a
+// nil block.
+func (b *backend) restoreBlockOrErr(numOrHash rpc.BlockNumberOrHash) (*blocks.Block, error) {
+	numOrHash.RequireCanonical = true
+	return blocks.FromNumberOrHash(
 		b,
 		numOrHash,
 		func(b *blocks.Block) *blocks.Block {
