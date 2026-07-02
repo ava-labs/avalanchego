@@ -6,6 +6,9 @@ package saetest
 import (
 	"slices"
 	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -32,6 +35,18 @@ func NewHeightIndexDB() ClonableHeightIndex {
 // NewExecutionResultsDB wraps and returns a [NewHeightIndexDB].
 func NewExecutionResultsDB() types.ExecutionResults {
 	return types.ExecutionResults{HeightIndex: NewHeightIndexDB()}
+}
+
+// CloneExecutionResultsDB returns a copy of an [types.ExecutionResults]
+// created by [NewExecutionResultsDB]. Unlike a real on-disk database, the test
+// double can't be re-opened once closed, but it can be copied; the copy is
+// open regardless of whether the original was closed.
+func CloneExecutionResultsDB(tb testing.TB, xdb types.ExecutionResults) types.ExecutionResults {
+	tb.Helper()
+	clonable, ok := xdb.HeightIndex.(ClonableHeightIndex)
+	require.Truef(tb, ok, "%T.HeightIndex is not a ClonableHeightIndex", xdb)
+	xdb.HeightIndex = clonable.Clone()
+	return xdb
 }
 
 type hIndex struct {
