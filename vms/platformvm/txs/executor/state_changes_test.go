@@ -408,19 +408,21 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
 
+	rewardConfig := reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .1 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
 	updated, err := AdvanceTimeTo(
 		&Backend{
 			Config: &config.Internal{
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+				RewardConfig:       rewardConfig,
 				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
 			},
-			Rewards: reward.NewCalculator(reward.Config{
-				MaxConsumptionRate: .12 * reward.PercentDenominator,
-				MinConsumptionRate: .1 * reward.PercentDenominator,
-				MintingPeriod:      365 * 24 * time.Hour,
-				SupplyCap:          720 * units.MegaAvax,
-			}),
+			Rewards: reward.NewCalculator(rewardConfig),
 		},
 		s,
 		startTime,
@@ -486,12 +488,13 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
 
-	rewards := reward.NewCalculator(reward.Config{
+	rewardConfig := reward.Config{
 		MaxConsumptionRate: .12 * reward.PercentDenominator,
 		MinConsumptionRate: .1 * reward.PercentDenominator,
 		MintingPeriod:      365 * 24 * time.Hour,
 		SupplyCap:          720 * units.MegaAvax,
-	})
+	}
+	rewards := reward.NewCalculator(rewardConfig)
 
 	initialSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
@@ -505,6 +508,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 			Config: &config.Internal{
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+				RewardConfig:       rewardConfig,
 				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
 			},
 			Rewards: rewards,
@@ -532,7 +536,6 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 func TestGetRewardConfigForStakeStartRamp(t *testing.T) {
 	var (
 		heliconTime   = time.Unix(1_000_000, 0)
-		baseConfig    = genesis.MainnetParams.StakingConfig.RewardConfig
 		upgradeConfig = upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
 	)
 
@@ -581,7 +584,7 @@ func TestGetRewardConfigForStakeStartRamp(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := baseConfig
+			cfg := genesis.MainnetParams.StakingConfig.RewardConfig
 			if tt.configuredMinRate != 0 {
 				cfg.MinConsumptionRate = tt.configuredMinRate
 			}
@@ -591,17 +594,16 @@ func TestGetRewardConfigForStakeStartRamp(t *testing.T) {
 				upgradeConfig,
 				heliconTime.Add(tt.offset),
 			)
+			require.ErrorIs(t, err, tt.wantErr)
 			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
 				return
 			}
-			require.NoError(t, err)
 			require.Equal(t, tt.want, got.MinConsumptionRate)
 		})
 	}
 }
 
-func TestGetRewardsCalculatorUsesTransformSubnetConfig(t *testing.T) {
+func TestGetRewardsCalculatorTransformSubnetBypassesPrimaryNetworkRewardConfig(t *testing.T) {
 	const (
 		stakeDuration                 = 14 * 24 * time.Hour
 		weight                        = units.MegaAvax
@@ -625,12 +627,8 @@ func TestGetRewardsCalculatorUsesTransformSubnetConfig(t *testing.T) {
 	}})
 
 	rewards, err := GetRewardsCalculator(
-		&Backend{
-			Config: &config.Internal{
-				RewardConfig:  baseConfig,
-				UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
-			},
-		},
+		baseConfig,
+		upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
 		transformedState,
 		transformedSubnet,
 		heliconTime.Add(heliconMinConsumptionRateReductionPeriod),
@@ -645,62 +643,4 @@ func TestGetRewardsCalculatorUsesTransformSubnetConfig(t *testing.T) {
 
 	got := rewards.Calculate(stakeDuration, weight, supply)
 	require.Equal(t, want, got)
-}
-
-func TestAdvanceTimeToHeliconRewards(t *testing.T) {
-	const (
-		weight        = units.MegaAvax
-		stakeDuration = 14 * 24 * time.Hour
-	)
-
-	heliconTime := time.Unix(1_000_000, 0)
-	startTime := heliconTime.Add(30 * 24 * time.Hour)
-	newChainTime := startTime.Add(time.Hour)
-	nodeID := ids.GenerateTestNodeID()
-	baseConfig := genesis.MainnetParams.StakingConfig.RewardConfig
-	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
-	chainState := statetest.New(t, statetest.Config{})
-	chainState.SetTimestamp(heliconTime.Add(-time.Second))
-
-	require.NoError(t, chainState.PutPendingValidator(&state.Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    nodeID,
-		SubnetID:  constants.PrimaryNetworkID,
-		Weight:    weight,
-		StartTime: startTime,
-		EndTime:   startTime.Add(stakeDuration),
-		NextTime:  startTime,
-		Priority:  txs.PrimaryNetworkValidatorPendingPriority,
-	}))
-
-	supply, err := chainState.GetCurrentSupply(constants.PrimaryNetworkID)
-	require.NoError(t, err)
-
-	wantConfig, err := GetRewardConfigForStakeStart(baseConfig, upgradeConfig, startTime)
-	require.NoError(t, err)
-	wantReward := reward.NewCalculator(wantConfig).Calculate(
-		stakeDuration,
-		weight,
-		supply,
-	)
-
-	updated, err := AdvanceTimeTo(
-		&Backend{
-			Config: &config.Internal{
-				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
-				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-				RewardConfig:       baseConfig,
-				UpgradeConfig:      upgradeConfig,
-			},
-			Rewards: reward.NewCalculator(baseConfig),
-		},
-		chainState,
-		newChainTime,
-	)
-	require.NoError(t, err)
-	require.True(t, updated)
-
-	gotValidator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(t, err)
-	require.Equal(t, wantReward, gotValidator.PotentialReward)
 }

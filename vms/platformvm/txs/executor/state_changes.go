@@ -181,7 +181,13 @@ func advanceTimeTo(
 				return nil, false, err
 			}
 
-			rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID, stakerToRemove.StartTime)
+			rewards, err := GetRewardsCalculator(
+				backend.Config.RewardConfig,
+				backend.Config.UpgradeConfig,
+				parentState,
+				stakerToRemove.SubnetID,
+				stakerToRemove.StartTime,
+			)
 			if err != nil {
 				return nil, false, err
 			}
@@ -391,36 +397,35 @@ func advanceValidatorFeeState(
 	return changed, nil
 }
 
+// GetRewardsCalculator returns the reward calculator for a staker on subnetID.
+// For primary network stakers, stakeStartTime is the start of the staking
+// period whose potential reward is being calculated. Non-primary network
+// stakers use their subnet's transformation config.
 func GetRewardsCalculator(
-	backend *Backend,
+	rewardConfig reward.Config,
+	upgradeConfig upgrade.Config,
 	parentState state.Chain,
 	subnetID ids.ID,
 	stakeStartTime time.Time,
 ) (reward.Calculator, error) {
-	if subnetID != constants.PrimaryNetworkID {
-		transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
+	if subnetID == constants.PrimaryNetworkID {
+		cfg, err := GetRewardConfigForStakeStart(rewardConfig, upgradeConfig, stakeStartTime)
 		if err != nil {
 			return nil, err
 		}
-
-		return reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
-			MinConsumptionRate: transformSubnet.MinConsumptionRate,
-			MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
-			SupplyCap:          transformSubnet.MaximumSupply,
-		}), nil
+		return reward.NewCalculator(cfg), nil
 	}
 
-	cfg, err := GetRewardConfigForStakeStart(backend.Config.RewardConfig, backend.Config.UpgradeConfig, stakeStartTime)
+	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
 	if err != nil {
 		return nil, err
 	}
-	if cfg == backend.Config.RewardConfig {
-		// No reduction applies, so reuse the preconfigured calculator rather
-		// than rebuilding it.
-		return backend.Rewards, nil
-	}
-	return reward.NewCalculator(cfg), nil
+	return reward.NewCalculator(reward.Config{
+		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
+		MinConsumptionRate: transformSubnet.MinConsumptionRate,
+		MintingPeriod:      rewardConfig.MintingPeriod,
+		SupplyCap:          transformSubnet.MaximumSupply,
+	}), nil
 }
 
 // GetRewardConfigForStakeStart returns rewardConfig with the ACP-285 linear
@@ -437,13 +442,9 @@ func GetRewardConfigForStakeStart(
 		return rewardConfig, nil
 	}
 
-	elapsed := stakeStartTime.Sub(upgradeConfig.HeliconTime)
-	reduction := uint64(0)
-	switch {
-	case elapsed <= 0:
-	case elapsed >= heliconMinConsumptionRateReductionPeriod:
-		reduction = heliconMinConsumptionRateReduction
-	default:
+	reduction := heliconMinConsumptionRateReduction
+	if reductionEndTime := upgradeConfig.HeliconTime.Add(heliconMinConsumptionRateReductionPeriod); stakeStartTime.Before(reductionEndTime) {
+		elapsed := stakeStartTime.Sub(upgradeConfig.HeliconTime)
 		rampedReduction := new(big.Int).SetUint64(heliconMinConsumptionRateReduction)
 		rampedReduction.Mul(rampedReduction, big.NewInt(int64(elapsed)))
 		rampedReduction.Div(rampedReduction, big.NewInt(int64(heliconMinConsumptionRateReductionPeriod)))
