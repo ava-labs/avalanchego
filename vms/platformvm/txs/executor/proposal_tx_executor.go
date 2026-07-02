@@ -359,7 +359,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	// Dispatch on the concrete staker type. Only these four are rewarded here.
 	//
 	// [*txs.AddAutoRenewedValidatorTx] also implements [txs.ValidatorTx] but is
-	// rewarded through RewardAutoRenewedValidatorTx.
+	// rewarded through [txs.RewardAutoRenewedValidatorTx].
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case *txs.AddValidatorTx, *txs.AddPermissionlessValidatorTx:
 		if err := e.rewardValidatorTx(uStakerTx.(txs.ValidatorTx), stakerToReward); err != nil {
@@ -788,7 +788,7 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	validator *state.Staker,
 	stakingInfo state.StakingInfo,
 ) error {
-	// Ignore the withdrawn portions from reward.Split because the restaked
+	// Ignore the withdrawn portions from [reward.Split] because the restaked
 	// amounts may be capped below. Withdrawn rewards are computed later from the
 	// difference between total rewards and the amounts actually restaked.
 	restakingValidationRewards, _ := reward.Split(validator.PotentialReward, stakingInfo.AutoCompoundRewardShares)
