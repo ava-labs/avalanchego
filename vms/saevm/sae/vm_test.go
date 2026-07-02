@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -130,6 +131,8 @@ var chainID = ids.GenerateTestID()
 func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
+	const testGasTarget = 4_000_000
+
 	mempoolConf := legacypool.DefaultConfig // copies
 	mempoolConf.Journal = "/dev/null"
 
@@ -137,7 +140,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	xdb := saetest.NewExecutionResultsDB()
 	conf := options.ApplyTo(&sutConfig{
-		hooks: hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
+		hooks: hookstest.NewStub(testGasTarget, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
 			return xdb, nil
 		})),
 		vmConfig: Config{
@@ -386,6 +389,44 @@ func (s *SUT) buildAndParseBlock(tb testing.TB, preference *blocks.Block, txs ..
 	b, err := s.ParseBlock(ctx, proposed.Bytes())
 	require.NoError(tb, err, "ParseBlock(BuildBlock().Bytes())")
 	return b
+}
+
+func TestBuildBlockByteBackstop(t *testing.T) {
+	const (
+		numTxs       = 20
+		calldataSize = 120 * units.KiB
+	)
+	opt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, numTxs, opt)
+
+	calldata := make([]byte, calldataSize)
+	heavyTxs := make([]*types.Transaction, numTxs)
+	for i := range heavyTxs {
+		heavyTxs[i] = sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas + params.TxDataZeroGas*calldataSize,
+			GasFeeCap: big.NewInt(1),
+			Data:      calldata,
+		})
+	}
+
+	txBytes := heavyTxs[0].Size() + maxTxRLPHeaderLen
+	wantTxs := maxBlockTxBytes / txBytes
+	require.Less(t, wantTxs, uint64(numTxs), "fixture must supply more transactions than fit in the byte budget")
+
+	// Bypass mempool admission filtering so the builder backstop is exercised.
+	errs := sut.rawVM.mempool.Pool.Add(heavyTxs, true /*local*/, false /*sync*/)
+	require.NoError(t, errors.Join(errs...), "TxPool.Add()")
+	txgossiptest.WaitUntilPending(t, ctx, sut.rawVM.GethRPCBackends(), heavyTxs...)
+
+	built, err := sut.rawVM.blockBuilder.build(ctx, nil, sut.genesis)
+	require.NoError(t, err, "blockBuilder.build()")
+
+	builtTxs := built.Transactions()
+	require.Equal(t, wantTxs, uint64(len(builtTxs)), "built block included unexpected transaction count")
+	for i, tx := range builtTxs {
+		require.Equalf(t, heavyTxs[i].Hash(), tx.Hash(), "built.Transactions()[%d].Hash()", i)
+	}
 }
 
 // createAndVerifyBlock calls [SUT.buildAndParseBlock] with the provided

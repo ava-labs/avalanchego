@@ -120,7 +120,7 @@ func (s *State) StartBlock(h *types.Header) error {
 	s.clock.BeforeBlock(s.hooks.BlockTime(h))
 	s.blockSize = 0
 
-	s.maxBlockSize = safeMaxBlockSize(s.clock)
+	s.maxBlockSize = SafeMaxBlockSize(s.clock)
 	if maxOpenQSize := saeparams.MaxFullBlocksInOpenQueue * s.maxBlockSize; s.qSize > maxOpenQSize {
 		return fmt.Errorf("%w: current size %d exceeds maximum size for accepting new blocks %d", ErrQueueFull, s.qSize, maxOpenQSize)
 	}
@@ -142,10 +142,10 @@ func (s *State) StartBlock(h *types.Header) error {
 	return nil
 }
 
-// safeMaxBlockSize returns the maximum block size for the clock's rate,
-// possibly capping it so a full closed queue still fits in [gas.Gas]. At the
-// time of writing, the cap is ~6e17, so capping is exceedingly unlikely.
-func safeMaxBlockSize(clock *gastime.Time) gas.Gas {
+// SafeMaxBlockSize returns the per-block gas limit ω_B for the clock's rate,
+// capping it so a full closed queue still fits in [gas.Gas] (the cap is ~6e17,
+// so capping is exceedingly unlikely).
+func SafeMaxBlockSize(clock *gastime.Time) gas.Gas {
 	const (
 		maxGasSecondsInClosedQueue         = saeparams.MaxFullBlocksInClosedQueue * maxGasSecondsPerBlock
 		maxGasInClosedQueue        gas.Gas = math.MaxUint64

@@ -17,7 +17,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocklimit"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
@@ -129,6 +132,20 @@ var (
 	errBlockTimeAfterMaximum = errors.New("block time after maximum allowed time")
 	errExecutionLagging      = errors.New("execution lagging for settlement")
 )
+
+// blockByteOverhead is the fixed per-block framing reserved below the maximum
+// message size M: the ProposerVM certificate, the block header, signature,
+// and message framing.
+const blockByteOverhead = staking.MaxCertificateLen + 6*units.KiB
+
+// maxBlockTxBytes caps a block's serialized transaction bytes, reserving
+// [blockByteOverhead] below the maximum message size M.
+const maxBlockTxBytes = blocklimit.SafeMaxBytes - blockByteOverhead
+
+// maxTxRLPHeaderLen bounds the RLP header that wraps each transaction as a byte
+// string in the block body: a string up to the maximum message size M needs at
+// most a 4-byte header.
+const maxTxRLPHeaderLen = 4
 
 // buildWithTxs implements the block-building logic shared by [blockBuilder.build]
 // and [blockBuilder.rebuild]. The block context MAY be nil.
@@ -245,7 +262,8 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		candidates = pendingTxs(txpool.PendingFilter{
 			BaseFee: state.BaseFee(),
 		})
-		included []*types.Transaction
+		included        []*types.Transaction
+		includedTxBytes uint64
 	)
 	for _, ltx := range candidates {
 		// If we don't have enough gas remaining in the block for the minimum
@@ -265,6 +283,21 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			continue
 		}
 
+		// Skip transactions that would push the EVM transactions past their
+		// serialized-byte budget, even if mempool admission accepted more bytes
+		// than the gas-per-byte rule intends.
+		//
+		// A transaction's contribution to the block body is its
+		// own size plus the RLP header wrapping it.
+		txBytes := tx.Size() + maxTxRLPHeaderLen
+		if includedTxBytes+txBytes > maxBlockTxBytes {
+			txLog.Debug("Skipping transaction: block byte budget reached",
+				zap.Uint64("tx_bytes", txBytes),
+				zap.Uint64("included_tx_bytes", includedTxBytes),
+			)
+			continue
+		}
+
 		// The [saexec.Executor] checks the worst-case balance before tx
 		// execution so we MUST record it at the equivalent point, before
 		// ApplyTx().
@@ -274,6 +307,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		}
 		txLog.Trace("Including transaction")
 		included = append(included, tx)
+		includedTxBytes += txBytes
 	}
 	var includedOps []T
 	for tx := range builder.PotentialEndOfBlockOps(ctx, hdr, lastSettled.Hash(), b.source) {

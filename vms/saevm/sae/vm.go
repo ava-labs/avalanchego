@@ -210,7 +210,7 @@ func NewVM[T hook.Transaction](
 			return nil, err
 		}
 		conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
-		pool, err := txgossip.NewSet(txPool, conf)
+		pool, err := txgossip.NewSet(vm.exec, txPool, conf)
 		if err != nil {
 			return nil, err
 		}
