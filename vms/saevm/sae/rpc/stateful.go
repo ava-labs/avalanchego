@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/rpc"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
@@ -87,11 +86,6 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		return nil, nil, errors.New("state not available for pending block")
 	}
 
-	// Restoring the block (rather than reading artifacts from the database
-	// directly) also handles synchronous (pre-SAE) blocks, whose results are
-	// derived from the header by [blocks.Block.RestoreExecutionArtefacts].
-	// State queries MUST surface resolution errors such as
-	// [blocks.ErrNonCanonicalBlock], hence restoreBlockOrErr.
 	bl, err := b.restoreBlockOrErr(numOrHash)
 	if err != nil {
 		return nil, nil, err
@@ -127,12 +121,12 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	root, err := b.postExecutionStateRoot(block.Hash(), block.NumberU64())
+	bl, err := b.restoreBlockOrErr(rpc.BlockNumberOrHashWithHash(block.Hash(), true /* canonical */))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sdb, err := b.StateDB(root)
+	sdb, err := b.StateDB(bl.PostExecutionStateRoot())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -192,27 +186,4 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, err
 	}
 	return msg, result.BlockCtx, result.StateDB, noopRelease, nil
-}
-
-// postExecutionStateRoot returns the post-execution state root for the block
-// identified by hash and number, checking in-memory blocks first, then falling
-// back to disk.
-func (b *backend) postExecutionStateRoot(hash common.Hash, num uint64) (common.Hash, error) {
-	switch bl, ok := b.ConsensusCriticalBlock(hash); {
-	case !ok:
-		// Restore from disk. This handles synchronous (pre-SAE) blocks, whose
-		// execution results are derived from the header rather than persisted.
-		restored, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(hash, true))
-		if err != nil {
-			return common.Hash{}, err
-		}
-		if restored == nil {
-			return common.Hash{}, blocks.ErrNotFound
-		}
-		return restored.PostExecutionStateRoot(), nil
-	case bl.Executed():
-		return bl.PostExecutionStateRoot(), nil
-	default:
-		return common.Hash{}, fmt.Errorf("post-execution state root unavailable for block %d (%#x)", num, hash)
-	}
 }
