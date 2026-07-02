@@ -168,36 +168,36 @@ func TestSetRejectsLowGasPerByte(t *testing.T) {
 	tests := []struct {
 		name    string
 		tx      *types.Transaction
-		submit  func(*types.Transaction) error
+		submit  func(context.Context, *types.Transaction) error
 		wantErr error
 	}{
 		{
 			name:   "gossip/eligible",
 			tx:     transfer(0),
-			submit: func(tx *types.Transaction) error { return s.Add(Transaction{tx}) },
+			submit: func(_ context.Context, tx *types.Transaction) error { return s.Add(Transaction{tx}) },
 		},
 		{
 			name:    "gossip/ineligible",
 			tx:      calldataHeavy(1),
-			submit:  func(tx *types.Transaction) error { return s.Add(Transaction{tx}) },
+			submit:  func(_ context.Context, tx *types.Transaction) error { return s.Add(Transaction{tx}) },
 			wantErr: errInsufficientGasPerByte,
 		},
 		{
 			name:   "rpc/eligible",
 			tx:     transfer(2),
-			submit: func(tx *types.Transaction) error { return s.SendTx(t.Context(), tx) },
+			submit: s.SendTx,
 		},
 		{
 			name:    "rpc/ineligible",
 			tx:      calldataHeavy(3),
-			submit:  func(tx *types.Transaction) error { return s.SendTx(t.Context(), tx) },
+			submit:  s.SendTx,
 			wantErr: errInsufficientGasPerByte,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.submit(tt.tx)
+			err := tt.submit(t.Context(), tt.tx)
 			require.ErrorIs(t, err, tt.wantErr)
 			if tt.wantErr != nil {
 				require.False(t, s.Has(Transaction{tt.tx}.GossipID()), "Has(Transaction.GossipID())")
