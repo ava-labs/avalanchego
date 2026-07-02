@@ -4,6 +4,7 @@
 package sae
 
 import (
+	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
@@ -100,13 +101,7 @@ func TestStateAtPreSAEBlock(t *testing.T) {
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	ctx, sut := newSUT(t, 1, opt)
 
-	// Settle blocks until genesis is evicted from memory, forcing state queries
-	// onto the on-disk restore path.
-	for range 3 {
-		vmTime.AdvanceToSettle(ctx, t, sut.runConsensusLoop(t))
-	}
-	_, ok := sut.rawVM.consensusCritical.Load(sut.genesis.Hash())
-	require.Falsef(t, ok, "genesis %#x still in VM memory", sut.genesis.Hash())
+	sut.settleUntilEvicted(t, vmTime, sut.genesis.Hash())
 
 	addr := sut.wallet.Addresses()[0]
 	want := (*hexutil.Big)(new(uint256.Int).SetAllOne().ToBig()) // [saetest.MaxAllocFor]
@@ -120,6 +115,97 @@ func TestStateAtPreSAEBlock(t *testing.T) {
 			method: "eth_getBalance",
 			args:   []any{addr, rpc.BlockNumberOrHashWithHash(sut.genesis.Hash(), true)},
 			want:   want,
+		},
+	}...)
+}
+
+// txTraceResult is the per-transaction result returned by geth's
+// debug_traceBlock* RPCs.
+type txTraceResult struct {
+	TxHash common.Hash             `json:"txHash"`
+	Result *logger.ExecutionResult `json:"result"`
+	Error  string                  `json:"error"`
+}
+
+// TestReceiptsAndTracingAtPreSAEBlock verifies receipt and tracing RPCs
+// against block 1 once it and the synchronous (pre-SAE) genesis have been
+// evicted from memory: tracing block 1 replays on the restored genesis state.
+func TestReceiptsAndTracingAtPreSAEBlock(t *testing.T) {
+	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 2, opt)
+
+	// Distinct senders so the mempool pends both txs
+	deployTx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		Gas:      1e6,
+		GasPrice: big.NewInt(2),
+		Data:     escrow.CreationCode(),
+	})
+	escrowAddr := crypto.CreateAddress(sut.wallet.Addresses()[0], 0)
+	depositTx := sut.wallet.SetNonceAndSign(t, 1, &types.LegacyTx{
+		To:       &escrowAddr,
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     escrow.CallDataToDeposit(common.Address{'r', 'e', 'c', 'v'}),
+		Value:    big.NewInt(42),
+	})
+	b1 := sut.runConsensusLoop(t, deployTx, depositTx)
+
+	receipts := b1.Receipts() // blocks until executed
+	require.Lenf(t, receipts, 2, "%T.Receipts()", b1)
+	require.Equalf(t, deployTx.Hash(), receipts[0].TxHash, "%T.Receipts()[0].TxHash", b1)
+	require.Equalf(t, depositTx.Hash(), receipts[1].TxHash, "%T.Receipts()[1].TxHash", b1)
+
+	// Pre-eviction responses to compare against their restored equivalents.
+	rawRPC := func(method string, arg any) json.RawMessage {
+		var raw json.RawMessage
+		require.NoErrorf(t, sut.CallContext(ctx, &raw, method, arg), "CallContext(%q, %v)", method, arg)
+		return raw
+	}
+	liveBlockReceipts := rawRPC("eth_getBlockReceipts", b1.Hash())
+	liveTxReceipt := rawRPC("eth_getTransactionReceipt", depositTx.Hash())
+
+	sut.settleUntilEvicted(t, vmTime, sut.genesis.Hash(), b1.Hash())
+
+	require.JSONEq(t, string(liveBlockReceipts), string(rawRPC("eth_getBlockReceipts", b1.Hash())), "eth_getBlockReceipts() after eviction")
+	require.JSONEq(t, string(liveTxReceipt), string(rawRPC("eth_getTransactionReceipt", depositTx.Hash())), "eth_getTransactionReceipt() after eviction")
+
+	ignoreStructLogs := cmpopts.IgnoreFields(logger.ExecutionResult{}, "StructLogs")
+	wantTraces := []txTraceResult{
+		{
+			TxHash: deployTx.Hash(),
+			Result: &logger.ExecutionResult{
+				Gas:         receipts[0].GasUsed,
+				ReturnValue: common.Bytes2Hex(escrow.ByteCode()),
+			},
+		},
+		{
+			TxHash: depositTx.Hash(),
+			Result: &logger.ExecutionResult{Gas: receipts[1].GasUsed},
+		},
+	}
+
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getBlockReceipts",
+			args:   []any{hexutil.Uint64(sut.genesis.NumberU64())},
+			want:   []*types.Receipt{},
+		},
+		{
+			method: "eth_getBlockReceipts",
+			args:   []any{sut.genesis.Hash()},
+			want:   []*types.Receipt{},
+		},
+		{
+			method:       "debug_traceBlockByNumber",
+			args:         []any{hexutil.Uint64(b1.NumberU64())},
+			want:         wantTraces,
+			extraCmpOpts: cmp.Options{ignoreStructLogs},
+		},
+		{
+			method:       "debug_traceTransaction",
+			args:         []any{depositTx.Hash()},
+			want:         *wantTraces[1].Result,
+			extraCmpOpts: cmp.Options{ignoreStructLogs},
 		},
 	}...)
 }
@@ -147,11 +233,7 @@ func TestDebugTrace(t *testing.T) {
 		cmpopts.IgnoreFields(logger.StructLogRes{}, "Gas", "GasCost"),
 	}
 
-	want := []struct {
-		TxHash common.Hash             `json:"txHash"`
-		Result *logger.ExecutionResult `json:"result"`
-		Error  string                  `json:"error"`
-	}{
+	want := []txTraceResult{
 		{
 			TxHash: deployTx.Hash(),
 			Result: &logger.ExecutionResult{
@@ -243,13 +325,7 @@ func TestStatefulRPCs(t *testing.T) {
 		Data: escrow.CallDataForBalance(recipient),
 	}
 
-	vmTime.AdvanceToSettle(ctx, t, b)
-	for range 2 {
-		bb := sut.runConsensusLoop(t)
-		vmTime.AdvanceToSettle(ctx, t, bb)
-	}
-	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
-	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
+	sut.settleUntilEvicted(t, vmTime, b.Hash())
 
 	storageKey := escrow.StorageKeyForBalance(recipient)
 	storageKeyHex := storageKey.Hex()

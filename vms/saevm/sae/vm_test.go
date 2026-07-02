@@ -11,6 +11,7 @@ import (
 	"math/rand/v2"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -422,6 +423,20 @@ func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Blo
 func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
 	return s.runConsensusLoopOnPreference(tb, s.lastAcceptedBlock(tb), txs...)
+}
+
+// settleUntilEvicted settles consensus blocks until every block in evict has
+// been evicted from VM memory, forcing RPCs onto the on-disk restore path.
+func (s *SUT) settleUntilEvicted(tb testing.TB, vmTime *saetest.Clock, evict ...common.Hash) {
+	tb.Helper()
+	inMemory := func(h common.Hash) bool {
+		_, ok := s.rawVM.consensusCritical.Load(h)
+		return ok
+	}
+	for i := 0; slices.ContainsFunc(evict, inMemory); i++ {
+		require.Lessf(tb, i, 10, "blocks %x still in VM memory after settling %d blocks", evict, i)
+		vmTime.AdvanceToSettle(s.context(tb), tb, s.runConsensusLoop(tb))
+	}
 }
 
 // deployEscrow signs and runs a deploy tx for the escrow contract from

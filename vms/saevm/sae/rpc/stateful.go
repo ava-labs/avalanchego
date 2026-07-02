@@ -86,7 +86,7 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		return nil, nil, errors.New("state not available for pending block")
 	}
 
-	bl, err := b.restoreBlockOrErr(numOrHash)
+	bl, err := b.restoreBlock(numOrHash)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -121,7 +121,7 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, tracers.StateReleaseFunc, error) {
-	bl, err := b.restoreBlockOrErr(rpc.BlockNumberOrHashWithHash(block.Hash(), true /* canonical */))
+	bl, err := b.restoreBlock(rpc.BlockNumberOrHashWithHash(block.Hash(), true /* canonical */))
 	if err != nil {
 		return nil, nil, err
 	}
