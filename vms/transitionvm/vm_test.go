@@ -51,25 +51,14 @@ func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode contextM
 
 // contextMode selects whether an operation is performed with a
 // [smblock.Context].
-type contextMode int
+type contextMode string
 
 const (
-	noContext contextMode = iota
-	withContext
+	noContext   contextMode = "NoContext"
+	withContext contextMode = "WithContext"
 )
 
 var contextModes = []contextMode{noContext, withContext}
-
-func (m contextMode) String() string {
-	switch m {
-	case noContext:
-		return "NoContext"
-	case withContext:
-		return "WithContext"
-	default:
-		return "Unknown"
-	}
-}
 
 var errShouldVerifyWithoutContext = errors.New("unexpectedly should verify without context")
 
@@ -189,6 +178,17 @@ func (s *SUT) restart(t *testing.T) *SUT {
 		withState(s.pre.state),
 		withTransitionTime(s.transitionTime),
 	)
+}
+
+// restart rebuilds the VM against the same database and chain state, modeling a
+// node restart.
+func (s *SUT) requireVersion(t *testing.T, want string) {
+	t.Helper()
+	ctx := t.Context()
+
+	got, err := s.Version(ctx)
+	require.NoErrorf(t, err, "%T.Version()", s)
+	require.Equalf(t, want, got, "%T.Version()", s)
 }
 
 var (
@@ -399,11 +399,7 @@ func (*fakeVM) BuildBlockWithContext(context.Context, *smblock.Context) (snowman
 // genesis routes to the post-transition chain.
 func TestInitiallyTransitioned(t *testing.T) {
 	sut := newSUT(t, withBlocksUntilTransition(0))
-	ctx := t.Context()
-
-	version, err := sut.Version(ctx)
-	require.NoErrorf(t, err, "%T.Version()", sut)
-	require.Equalf(t, "post", version, "%T.Version()", sut)
+	sut.requireVersion(t, "post")
 }
 
 // TestTransition verifies accepting a block at the transition time switches
@@ -412,15 +408,9 @@ func TestTransition(t *testing.T) {
 	sut := newSUT(t)
 	ctx := t.Context()
 
-	version, err := sut.Version(ctx)
-	require.NoErrorf(t, err, "%T.Version()", sut)
-	require.Equalf(t, "pre", version, "%T.Version()", sut)
-
+	sut.requireVersion(t, "pre")
 	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
-
-	version, err = sut.Version(ctx)
-	require.NoErrorf(t, err, "%T.Version()", sut)
-	require.Equalf(t, "post", version, "%T.Version()", sut)
+	sut.requireVersion(t, "post")
 }
 
 // TestTransitionSkipsPreference verifies the transition doesn't set the
@@ -428,7 +418,7 @@ func TestTransition(t *testing.T) {
 // transition.
 func TestTransitionSkipsPreference(t *testing.T) {
 	for _, mode := range contextModes {
-		t.Run(mode.String(), func(t *testing.T) {
+		t.Run(string(mode), func(t *testing.T) {
 			sut := newSUT(t)
 			ctx := t.Context()
 
@@ -442,7 +432,7 @@ func TestTransitionSkipsPreference(t *testing.T) {
 // chain's preference if the preference was set before the transition.
 func TestTransitionSetsPreference(t *testing.T) {
 	for _, mode := range contextModes {
-		t.Run(mode.String(), func(t *testing.T) {
+		t.Run(string(mode), func(t *testing.T) {
 			sut := newSUT(t)
 			ctx := t.Context()
 
@@ -479,19 +469,13 @@ func TestRestart(t *testing.T) {
 	sut.BuildVerifyAccept(t, ctx, noContext)
 
 	sut = sut.restart(t)
-	version, err := sut.Version(ctx)
-	require.NoErrorf(t, err, "%T.Version()", sut)
-	require.Equalf(t, "pre", version, "%T.Version()", sut)
+	sut.requireVersion(t, "pre")
 
 	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
-	version, err = sut.Version(ctx)
-	require.NoErrorf(t, err, "%T.Version()", sut)
-	require.Equalf(t, "post", version, "%T.Version()", sut)
+	sut.requireVersion(t, "post")
 
 	sut = sut.restart(t)
-	version, err = sut.Version(ctx)
-	require.NoErrorf(t, err, "%T.Version()", sut)
-	require.Equalf(t, "post", version, "%T.Version()", sut)
+	sut.requireVersion(t, "post")
 }
 
 // TestRestartWithoutTransitionMarker verifies a restart after accepting the
@@ -508,7 +492,5 @@ func TestRestartWithoutTransitionMarker(t *testing.T) {
 	require.NoErrorf(t, sut.db.Delete(transitionedKey), "%T.Delete()", sut.db)
 
 	sut = sut.restart(t)
-	version, err := sut.Version(ctx)
-	require.NoErrorf(t, err, "%T.Version()", sut)
-	require.Equalf(t, "post", version, "%T.Version()", sut)
+	sut.requireVersion(t, "post")
 }

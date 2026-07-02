@@ -71,8 +71,6 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return vm.current.chain.Shutdown(ctx)
 }
 
-var _ smblock.StateSyncableVM = (*VM)(nil)
-
 func (vm *VM) StateSyncEnabled(ctx context.Context) (bool, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()

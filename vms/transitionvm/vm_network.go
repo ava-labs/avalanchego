@@ -53,8 +53,6 @@ func (c *connections) reconnect(ctx context.Context, connector validators.Connec
 	return nil
 }
 
-var _ common.AppSender = (*sender)(nil)
-
 // request identifies an outbound app request by peer and ID.
 //
 //nolint:unused // False positive
@@ -87,6 +85,8 @@ func (r *requests) remove(nodeID ids.NodeID, requestID uint32) bool {
 	r.set.Remove(req)
 	return had
 }
+
+var _ common.AppSender = (*sender)(nil)
 
 // sender is a [common.AppSender] that records each request the chain sends, so
 // the VM can drop responses and failures for requests the chain never made.

@@ -67,9 +67,7 @@ func TestHTTPHandlers(t *testing.T) {
 			h, ok := handlers[path]
 			require.Truef(t, ok, "%s: %s", phase, path)
 
-			w := httptest.NewRecorder()
-			r := httptest.NewRequest(http.MethodGet, "/", nil)
-			h.ServeHTTP(w, r)
+			w := serve(h)
 			assert.Equalf(t, want.wantCode, w.Code, "%s: %s", phase, path)
 			assert.Equalf(t, want.wantBody, w.Body.String(), "%s: %s", phase, path)
 		}

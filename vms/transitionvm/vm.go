@@ -285,13 +285,7 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 	chainCtx.Lock.Lock()
 	defer chainCtx.Lock.Unlock()
 
-	var (
-		requests requests
-		sender   = sender{
-			AppSender: vm.appSender,
-			requests:  &requests,
-		}
-	)
+	var requests requests
 	err := chain.Initialize(
 		ctx,
 		chainCtx,
@@ -300,7 +294,10 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 		vm.upgradeBytes,
 		vm.configBytes,
 		vm.fxs,
-		&sender,
+		&sender{
+			AppSender: vm.appSender,
+			requests:  &requests,
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("initializing chain: %w", err)
