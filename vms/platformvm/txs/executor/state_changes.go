@@ -239,8 +239,9 @@ func advanceTimeTo(
 		// Invariant: Permissioned stakers are encountered first for a given
 		//            timestamp because their priority is the smallest.
 		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorCurrentPriority {
-			// Permissionless stakers are removed by the RewardValidatorTx, not
-			// an AdvanceTimeTx.
+			// Permissionless stakers are removed by the RewardValidatorTx (or a
+			// RewardAutoRenewedValidatorTx for auto-renewed validators), not an
+			// AdvanceTimeTx.
 			break
 		}
 
