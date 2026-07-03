@@ -169,6 +169,5 @@ func BuildOption(
 		return nil, err
 	}
 
-	// Options carry no timestamp, so the unit is irrelevant.
 	return block, block.initialize(bytes, false)
 }

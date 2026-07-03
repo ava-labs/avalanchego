@@ -658,7 +658,8 @@ func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pCh
 			buff,
 			chainID,
 			key,
-			false)
+			false,
+		)
 		require.NoError(t, err)
 
 		return signedBlock.Bytes()

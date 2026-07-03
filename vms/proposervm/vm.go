@@ -46,8 +46,8 @@ const (
 	httpPathEndpoint = "/proposervm"
 	HTTPHeaderRoute  = "proposervm"
 
-	// DefaultMinBlockDelay should be kept as whole seconds because block
-	// timestamps are only specific to the second.
+	// DefaultMinBlockDelay should be kept as whole seconds because the chains
+	// it applies to (P and X) use second-granular block timestamps.
 	DefaultMinBlockDelay = time.Second
 	// DefaultWindowDuration is the default proposer slot length.
 	DefaultWindowDuration = proposer.DefaultWindowDuration
@@ -487,9 +487,8 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	}
 }
 
-// timestampGranularity is the resolution to which locally-built block
-// timestamps are truncated: milliseconds when the chain is configured for
-// millisecond timestamps, seconds otherwise.
+// timestampGranularity is the truncation unit for locally-built block
+// timestamps.
 func (vm *VM) timestampGranularity() time.Duration {
 	if vm.MillisecondTimestamps {
 		return time.Millisecond

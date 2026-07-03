@@ -30,10 +30,8 @@ type Config struct {
 
 	// MillisecondTimestamps interprets the wrapper block's int64 timestamp as
 	// unix-milliseconds instead of unix-seconds, letting sub-second proposer
-	// windows actually advance. It is a per-chain consensus parameter and MUST
-	// be identical across all of the chain's validators and fixed from genesis;
-	// flipping it on a chain with second-granular history misreads old blocks.
-	// Defaults to false (seconds), so existing networks are unchanged.
+	// windows actually advance. Consensus-critical and fixed from genesis; see
+	// subnets.Config.ProposerMillisecondTimestamps. Defaults to false (seconds).
 	MillisecondTimestamps bool
 
 	// Block signer

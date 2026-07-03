@@ -41,7 +41,8 @@ func TestParseBlocks(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-		false)
+		false,
+	)
 	require.NoError(t, err)
 
 	signedBlockBytes := signedBlock.Bytes()
@@ -129,7 +130,8 @@ func TestParse(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-		false)
+		false,
+	)
 	require.NoError(t, err)
 	require.IsType(t, &statelessGraniteBlock{}, signedBlock)
 
@@ -142,7 +144,8 @@ func TestParse(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-		false)
+		false,
+	)
 	require.NoError(t, err)
 	require.IsType(t, &statelessBlock{}, signedZeroEpochBlock)
 

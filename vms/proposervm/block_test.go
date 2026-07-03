@@ -445,7 +445,8 @@ func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
-		false)
+		false,
+	)
 	require.NoError(err)
 	proBlk := postForkBlock{
 		SignedBlock: slb,
@@ -557,7 +558,8 @@ func TestPostGraniteBlock_EpochMatches(t *testing.T) {
 				coreChildBlk.Bytes(),
 				proVM.ctx.ChainID,
 				proVM.StakingLeafSigner,
-				false)
+				false,
+			)
 			require.NoError(err)
 
 			blockBytes := statelessBlock.Bytes()

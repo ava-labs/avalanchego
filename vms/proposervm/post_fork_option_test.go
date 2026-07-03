@@ -437,7 +437,8 @@ func TestOptionTimestampValidity(t *testing.T) {
 		0,
 		block.Epoch{},
 		coreOracleBlk.Bytes(),
-		false)
+		false,
+	)
 	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
