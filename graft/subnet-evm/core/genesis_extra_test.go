@@ -28,7 +28,7 @@ func TestGenesisCustomMinDelay(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
 
-	// Unset: genesis seeds the protocol default, identical to a default chain.
+	// Unset: genesis seeds the protocol default.
 	defaultConfig := params.TestGraniteChainConfig
 	defaultBlock, err := (&Genesis{Config: defaultConfig}).Commit(db, tdb)
 	require.NoError(t, err)
