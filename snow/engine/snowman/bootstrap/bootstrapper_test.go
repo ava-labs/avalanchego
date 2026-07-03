@@ -540,6 +540,71 @@ func TestRestartBootstrapping(t *testing.T) {
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
 }
 
+func TestBootstrapperFollowOnlyNeverHandsOff(t *testing.T) {
+	require := require.New(t)
+
+	config, peerID, sender, vm, _ := newConfig(t)
+	config.FollowOnly = true
+
+	blks := snowmantest.BuildChain(2)
+	initializeVMWithBlockchain(vm, blks)
+
+	onFinishedCalled := false
+	bs, err := New(
+		config,
+		func(context.Context, uint32) error {
+			onFinishedCalled = true
+			return nil
+		},
+	)
+	require.NoError(err)
+	// A follow-only chain must re-arm on its own non-preemptable timer, never
+	// on the shared registrar (which is preempted once the subnet is
+	// bootstrapped and would fire instantly).
+	bs.TimeoutRegistrar = &enginetest.Timer{T: t, CantRegisterTimout: true}
+	rearms := 0
+	bs.followOnlyTimer = &enginetest.Timer{
+		RegisterTimeoutF: func(delay time.Duration) {
+			require.Equal(followOnlyPollInterval, delay)
+			rearms++
+		},
+	}
+
+	require.NoError(bs.Start(t.Context(), 0))
+
+	// Catching up to the current frontier reports the chain as synced but
+	// never hands off to consensus.
+	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[0:1])))
+	require.True(config.BootstrapTracker.IsBootstrapped())
+	require.False(onFinishedCalled)
+	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
+	require.Equal(1, rearms)
+
+	// The poll tick routes back through restartBootstrapping even though the
+	// subnet reports bootstrapped.
+	require.NoError(bs.Timeout())
+
+	// An idle poll (frontier unchanged) doesn't re-fetch, it just re-arms.
+	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[0:1])))
+	require.False(onFinishedCalled)
+	require.Equal(2, rearms)
+
+	// A new frontier falls through the idle guard and fetches the new block.
+	var requestID uint32
+	sender.SendGetAncestorsF = func(_ context.Context, nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
+		require.Equal(peerID, nodeID)
+		require.Equal(blks[1].ID(), blkID)
+		requestID = reqID
+	}
+	require.NoError(bs.Timeout())
+	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[1:2])))
+	require.NoError(bs.Ancestors(t.Context(), peerID, requestID, blocksToBytes(blks[1:2])))
+	snowmantest.RequireStatusIs(require, snowtest.Accepted, blks...)
+	require.False(onFinishedCalled)
+	require.Equal(snow.Bootstrapping, config.Ctx.State.Get().State)
+	require.Equal(3, rearms)
+}
+
 func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	require := require.New(t)
 
