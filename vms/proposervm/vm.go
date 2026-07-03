@@ -163,6 +163,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
+	if err := baseState.VerifyTimestampUnit(vm.MillisecondTimestamps); err != nil {
+		return err
+	}
 	if vm.WindowDuration <= 0 {
 		vm.WindowDuration = DefaultWindowDuration
 	}
