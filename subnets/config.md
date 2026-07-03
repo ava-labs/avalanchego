@@ -129,6 +129,12 @@ must be fixed for the life of the chain:
   value read as unix-millis is off by a factor of 1000), corrupting the node on
   restart. Only enable it on a fresh chain that is millisecond-granular from its
   first block.
+- With a sub-second window, proposer rotation is only advisory against
+  misbehaving validators. Block verification tolerates timestamps up to 10s in
+  the future as a clock-drift allowance, which at a 50ms window is ~200 slots,
+  so a modified node can timestamp ahead and claim a future slot immediately.
+  Safety is unaffected. Use sub-second windows only on chains where all
+  validators are trusted, which is the intended CFT/PoA setting.
 
 The primary network (P/C/X) is unaffected and always uses whole-second
 timestamps.
