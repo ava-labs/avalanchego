@@ -19,9 +19,8 @@ type Config struct {
 	// Configurable minimal delay among blocks issued consecutively
 	MinBlkDelay time.Duration
 
-	// WindowDuration is the length of a single proposer slot. It is
-	// consensus-critical: every validator of a chain MUST use the same value
-	// (see subnets.Config.ProposerWindowMilliseconds). A value <= 0 falls back to
+	// WindowDuration is the length of a single proposer slot. Consensus-critical;
+	// see subnets.Config.ProposerWindowMilliseconds. A value <= 0 falls back to
 	// [DefaultWindowDuration] (5s).
 	WindowDuration time.Duration
 

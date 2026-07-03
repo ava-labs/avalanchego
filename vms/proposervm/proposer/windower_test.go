@@ -419,18 +419,14 @@ func TestTimeToSlot(t *testing.T) {
 	}
 }
 
-// The window duration is consensus-critical: the per-Subnet
-// proposerWindowMilliseconds setting flows into New as [windowDuration]. The
-// tests above all pass DefaultWindowDuration, so a silent revert to the constant
-// (or a dropped <= 0 fallback) would not fail any of them. The cases below pin
-// that a non-default window actually scales the slot math and that the fallback
-// holds.
-
+// TestMinDelayForProposerCustomWindow pins that a non-default window scales the
+// slot math; every other test passes DefaultWindowDuration, so a silent revert
+// to the constant would not fail them.
 func TestMinDelayForProposerCustomWindow(t *testing.T) {
 	require := require.New(t)
 
-	// A deliberately non-round, sub-second window so that no slot-index multiple
-	// of it can coincide with the DefaultWindowDuration (5s) result.
+	// Non-round so that no slot-index multiple of it coincides with a
+	// DefaultWindowDuration result.
 	const customWindow = 137 * time.Millisecond
 
 	validatorIDs, vdrState := makeValidators(t, 10)
@@ -443,9 +439,8 @@ func TestMinDelayForProposerCustomWindow(t *testing.T) {
 		slot         uint64 = 0
 	)
 
-	// Identical fixtures to TestMinDelayForProposer: slot assignment depends only
-	// on validator sampling, not on the window, so the per-node slot indices are
-	// the same and only the multiplier (the window) differs.
+	// Same fixtures as TestMinDelayForProposer: slot indices depend only on
+	// validator sampling, so only the multiplier (the window) differs.
 	expectedDelays := map[ids.NodeID]time.Duration{
 		validatorIDs[0]:          1 * customWindow,
 		validatorIDs[1]:          15 * customWindow,
@@ -495,10 +490,8 @@ func TestNewWindowDurationFallback(t *testing.T) {
 	require := require.New(t)
 
 	parentTime := time.Now()
-	// A non-positive window must fall back to DefaultWindowDuration. Beyond
-	// honoring the documented default, the fallback is what keeps TimeToSlot from
-	// dividing by zero (now.Sub(start) / w.windowDuration); if the guard in New is
-	// ever removed, these calls panic instead of silently misbehaving.
+	// A non-positive window falls back to DefaultWindowDuration; the fallback is
+	// also what keeps TimeToSlot's division from panicking on a zero window.
 	for _, windowDuration := range []time.Duration{0, -time.Second} {
 		w := New(makeValidatorState(t, nil), subnetID, randomChainID, windowDuration, &logging.NoLog{})
 		require.Equal(uint64(0), w.TimeToSlot(parentTime, parentTime.Add(DefaultWindowDuration-time.Nanosecond)))
