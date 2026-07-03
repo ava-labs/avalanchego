@@ -4,6 +4,7 @@
 package block
 
 import (
+	"encoding/hex"
 	"testing"
 	"time"
 
@@ -32,7 +33,6 @@ func TestMillisecondTimestampRoundTrip(t *testing.T) {
 		require.NoError(err)
 		require.Equal(tsMillis, blk.Timestamp())
 
-		// Re-parsing with the same unit reproduces the ms-precise timestamp.
 		parsed, err := Parse(blk.Bytes(), chainID, true)
 		require.NoError(err)
 		require.Equal(tsMillis, parsed.(SignedBlock).Timestamp())
@@ -43,15 +43,14 @@ func TestMillisecondTimestampRoundTrip(t *testing.T) {
 
 		blk, err := BuildUnsigned(parentID, tsMillis, 2, Epoch{}, []byte{3}, false)
 		require.NoError(err)
-		// The .123 is lost; the timestamp rounds down to the whole second.
 		require.Equal(tsMillis.Truncate(time.Second), blk.Timestamp())
 	})
 
 	t.Run("unit mismatch misreads the timestamp", func(t *testing.T) {
 		require := require.New(t)
 
-		// A block written as seconds but parsed as millis (the footgun the
-		// per-chain immutability contract forbids) yields a wildly wrong time.
+		// A block written as seconds but parsed as millis is misread; the unit
+		// must be fixed for the life of the chain.
 		secondsBlk, err := BuildUnsigned(parentID, tsMillis, 2, Epoch{}, []byte{3}, false)
 		require.NoError(err)
 
@@ -60,19 +59,14 @@ func TestMillisecondTimestampRoundTrip(t *testing.T) {
 		require.NotEqual(secondsBlk.Timestamp(), misread.(SignedBlock).Timestamp())
 	})
 
-	t.Run("default seconds bytes are unchanged by the feature", func(t *testing.T) {
+	t.Run("seconds encoding is byte-stable", func(t *testing.T) {
 		require := require.New(t)
 
-		// Whole-second timestamp: the ms and seconds encodings must be identical,
-		// so existing networks are bit-for-bit unaffected when the flag is off.
-		wholeSecond := time.Unix(1_700_000_000, 0)
-		secondsBlk, err := BuildUnsigned(parentID, wholeSecond, 2, Epoch{}, []byte{3}, false)
+		// Golden bytes pin that the flag-off encoding is unchanged by this
+		// feature, so existing networks are bit-for-bit unaffected.
+		const goldenHex = "0000000000000100000000000000000000000000000000000000000000000000000000000000000000006553f100000000000000000200000000000000010300000000"
+		blk, err := BuildUnsigned(parentID, time.Unix(1_700_000_000, 0), 2, Epoch{}, []byte{3}, false)
 		require.NoError(err)
-		millisBlk, err := BuildUnsigned(parentID, wholeSecond, 2, Epoch{}, []byte{3}, true)
-		require.NoError(err)
-		// Same wall-clock whole second, but seconds=1.7e9 vs millis=1.7e12 on the
-		// wire, so the bytes necessarily differ - confirming the unit is the only
-		// thing that changes and that it is a genuine consensus parameter.
-		require.NotEqual(secondsBlk.Bytes(), millisBlk.Bytes())
+		require.Equal(goldenHex, hex.EncodeToString(blk.Bytes()))
 	})
 }

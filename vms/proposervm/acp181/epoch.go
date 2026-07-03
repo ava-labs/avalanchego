@@ -27,6 +27,9 @@ func NewEpoch(
 	if parentEpoch == (block.Epoch{}) {
 		// If the parent was not assigned an epoch, then the child is the first
 		// block of the initial epoch.
+		// Epoch start times stay second-granular even on chains with millisecond
+		// block timestamps: they are only compared as decoded time.Time values,
+		// never against raw timestamp ints, so the coarser unit is safe.
 		return block.Epoch{
 			PChainHeight: parentPChainHeight,
 			Number:       1,

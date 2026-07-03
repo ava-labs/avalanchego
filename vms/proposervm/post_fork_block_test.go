@@ -68,7 +68,8 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		innerOracleBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
-		false)
+		false,
+	)
 	require.NoError(err)
 	proBlk = postForkBlock{
 		SignedBlock: slb,
@@ -149,7 +150,8 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 			pChainHeight,
 			block.Epoch{},
 			childCoreBlk.Bytes(),
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -165,7 +167,8 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 			pChainHeight,
 			block.Epoch{},
 			childCoreBlk.Bytes(),
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -246,7 +249,8 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -265,7 +269,8 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
@@ -366,7 +371,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -391,7 +397,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -413,7 +420,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -434,7 +442,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -452,7 +461,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			pChainHeight,
 			block.Epoch{},
 			childCoreBlk.Bytes(),
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -472,7 +482,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -558,7 +569,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -577,7 +589,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -595,7 +608,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -614,7 +628,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -632,7 +647,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
 			proVM.StakingLeafSigner,
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -739,7 +755,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlkPChainHeight-1,
 			block.Epoch{},
 			childCoreBlk.Bytes(),
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -755,7 +772,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlkPChainHeight,
 			block.Epoch{},
 			childCoreBlk.Bytes(),
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -770,7 +788,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlkPChainHeight+1,
 			block.Epoch{},
 			childCoreBlk.Bytes(),
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -786,7 +805,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			currPChainHeight,
 			block.Epoch{},
 			childCoreBlk.Bytes(),
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 
@@ -801,7 +821,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			currPChainHeight*2,
 			block.Epoch{},
 			childCoreBlk.Bytes(),
-			false)
+			false,
+		)
 		require.NoError(err)
 		childBlk.SignedBlock = childSlb
 		err = childBlk.Verify(t.Context())
@@ -1059,7 +1080,8 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
 		proVM.StakingLeafSigner,
-		false)
+		false,
+	)
 	require.NoError(err)
 
 	invalidChild, err := proVM.ParseBlock(t.Context(), statelessChild.Bytes())
@@ -1108,7 +1130,8 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		4,
 		block.Epoch{},
 		coreBlk.Bytes(),
-		false)
+		false,
+	)
 	require.NoError(err)
 
 	invalidChild, err := proVM.ParseBlock(t.Context(), statelessChild.Bytes())

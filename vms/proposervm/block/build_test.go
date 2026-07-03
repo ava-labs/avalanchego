@@ -45,7 +45,8 @@ func TestBuild(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-		false)
+		false,
+	)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())
@@ -84,7 +85,8 @@ func TestBuildPreGranite(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
-		false)
+		false,
+	)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())

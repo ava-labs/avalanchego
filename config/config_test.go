@@ -590,6 +590,20 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		"proposer millisecond timestamps": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"proposerMillisecondTimestamps": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.True(config.ProposerMillisecondTimestamps)
+			},
+			expectedErr: nil,
+		},
 		"unset proposer window inherits the default": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
@@ -773,16 +787,19 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	}
 }
 
-// TestPrimaryNetworkProposerWindowIsAlwaysDefault guards that the per-Subnet
-// proposerWindowMilliseconds setting can never alter the primary network (P/C/X).
-func TestPrimaryNetworkProposerWindowIsAlwaysDefault(t *testing.T) {
+// TestPrimaryNetworkProposerConfigIsAlwaysDefault guards that the per-Subnet
+// proposerWindowMilliseconds and proposerMillisecondTimestamps settings can
+// never alter the primary network (P/C/X).
+func TestPrimaryNetworkProposerConfigIsAlwaysDefault(t *testing.T) {
 	require := require.New(t)
 
 	defaultWindowMS := uint64(proposervm.DefaultWindowDuration / time.Millisecond)
 
-	// Layer 1: the primary network's window is pinned to the default and never
-	// reads user input.
-	require.Equal(defaultWindowMS, getPrimaryNetworkConfig(setupViperFlags()).ProposerWindowMilliseconds)
+	// Layer 1: the primary network's proposer config is pinned to the defaults
+	// and never reads user input.
+	primaryCfg := getPrimaryNetworkConfig(setupViperFlags())
+	require.Equal(defaultWindowMS, primaryCfg.ProposerWindowMilliseconds)
+	require.False(primaryCfg.ProposerMillisecondTimestamps)
 
 	// Layer 2: tracking the primary network (the only way a subnet config could
 	// reach it) is rejected before any config is read.
@@ -1348,30 +1365,6 @@ func setupViperFlags() *viper.Viper {
 		log.Fatal(err)
 	}
 	return v
-}
-
-// TestPrimaryNetworkProposerMillisecondTimestampsIsAlwaysDefault guards the
-// invariant that the per-Subnet proposerMillisecondTimestamps setting can never
-// reach the primary network (P/C/X). Reinterpreting its whole-second block
-// history as milliseconds would fork the node off Mainnet/Fuji. Two layers
-// enforce this:
-//
-//  1. The primary network cannot be a tracked Subnet, so a user-supplied subnet
-//     config can never be routed to it (getTrackedSubnets rejects its ID).
-//  2. Its config is always rebuilt from getPrimaryNetworkConfig, which never
-//     reads the flag, so it stays false (whole seconds) regardless of input.
-func TestPrimaryNetworkProposerMillisecondTimestampsIsAlwaysDefault(t *testing.T) {
-	require := require.New(t)
-
-	// Layer 2: the primary network never reads the flag; it stays seconds.
-	require.False(getPrimaryNetworkConfig(setupViperFlags()).ProposerMillisecondTimestamps)
-
-	// Layer 1: even attempting to track the primary network (the only way a
-	// subnet config could reach it) is rejected before any config is read.
-	v := setupViperFlags()
-	v.Set(TrackSubnetsKey, constants.PrimaryNetworkID.String())
-	_, err := getTrackedSubnets(v)
-	require.ErrorIs(err, errCannotTrackPrimaryNetwork)
 }
 
 func setupViper(configFilePath string) *viper.Viper {

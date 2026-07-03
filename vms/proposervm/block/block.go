@@ -33,13 +33,11 @@ type Block interface {
 	verify(chainID ids.ID) error
 }
 
-// timestampToUnix and unixToTimestamp encode/decode the block's int64 Timestamp
-// field. It is historically whole-second granular; a chain configured for
-// millisecond timestamps encodes (and decodes) the same int64 as unix-millis
-// instead. The unit is a per-chain consensus parameter the caller must supply
-// because a bare int64 cannot describe its own unit. It MUST be fixed for the
-// life of a chain (set from genesis); reinterpreting second-granular history as
-// millis would misread every old block.
+// timestampToUnix encodes the block's int64 Timestamp field: historically
+// whole unix-seconds, unix-millis when the chain is configured for millisecond
+// timestamps. A bare int64 cannot describe its own unit, so the caller supplies
+// the chain's fixed-from-genesis setting; see
+// subnets.Config.ProposerMillisecondTimestamps.
 func timestampToUnix(t time.Time, millisecondTimestamps bool) int64 {
 	if millisecondTimestamps {
 		return t.UnixMilli()
@@ -47,6 +45,7 @@ func timestampToUnix(t time.Time, millisecondTimestamps bool) int64 {
 	return t.Unix()
 }
 
+// unixToTimestamp decodes what [timestampToUnix] encodes.
 func unixToTimestamp(ts int64, millisecondTimestamps bool) time.Time {
 	if millisecondTimestamps {
 		return time.UnixMilli(ts)

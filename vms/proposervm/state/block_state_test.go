@@ -41,7 +41,8 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 		innerBlockBytes,
 		chainID,
 		key,
-		false)
+		false,
+	)
 	require.NoError(err)
 
 	_, err = bs.GetBlock(b.ID())
