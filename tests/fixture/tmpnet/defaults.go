@@ -30,7 +30,8 @@ const (
 	DefaultPreFundedKeyCount = 50
 
 	// A short minimum stake duration enables testing of staking logic.
-	DefaultMinStakeDuration = "1s"
+	DefaultMinStakeDuration        = "2s"
+	DefaultHeliconMinStakeDuration = "1s"
 
 	defaultConfigFilename = "config.json"
 )

@@ -344,6 +344,11 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
 		return err
 	}
+	// Ensure TargetExponent is unset. The ACP-176 field belongs to SAE and
+	// must never appear on a coreth block.
+	if err := customheader.VerifyTargetExponent(header); err != nil {
+		return err
+	}
 	// Ensure MinPriceExponent is unset. The ACP-283 field belongs to SAE and
 	// must never appear on a coreth block.
 	if err := customheader.VerifyMinPriceExponent(header); err != nil {
@@ -351,6 +356,11 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.
 	if err := customheader.VerifyTime(extraConfig, parent, header, b.vm.clock.Time()); err != nil {
+		return err
+	}
+	// Ensure settled block marker fields are unset. The fields belong to SAE
+	// and must never appear on a coreth block.
+	if err := customheader.VerifySettled(header); err != nil {
 		return err
 	}
 

@@ -11,8 +11,8 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/avalanchego v1.14.2
 	github.com/ava-labs/avalanchego/graft/evm v1.14.2
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.6.0
-	github.com/ava-labs/libevm v1.13.15-0.20260430210457-c891ff86e981
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.7.0
+	github.com/ava-labs/libevm v1.13.15-0.20260622141141-097921408ecf
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
 	github.com/gorilla/rpc v1.2.0

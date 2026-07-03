@@ -5,13 +5,18 @@ package cchain
 
 import (
 	"context"
+	"maps"
+	"reflect"
 	"testing"
 
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
@@ -144,5 +149,93 @@ func TestGetUTXOsPagination(t *testing.T) {
 	got := sut.Client.getAllUTXOs(ctx, t, sourceChain, pageSize, addr)
 	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
 		t.Errorf("paginated UTXOs (-want +got):\n%s", diff)
+	}
+}
+
+// TestRPCExtras verifies that the libevm hooks correctly populate block and
+// header extras.
+func TestRPCExtras(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+	w := newWallet(key, sut.ctx, sut.Client)
+
+	// A cross-chain export gives the built block non-empty extData, so
+	// extDataHash and blockExtraData carry meaningful (non-default) values.
+	blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+
+	var (
+		blockNumber = hexutil.EncodeUint64(blk.NumberU64())
+		eth         = blk.EthBlock()
+		blockHash   = eth.Hash()
+		extra       = customtypes.GetHeaderExtra(blk.Header())
+	)
+	require.NotNilf(t, extra.ExtDataGasUsed, "%T.ExtDataGasUsed", extra)
+	require.NotNilf(t, extra.BlockGasCost, "%T.BlockGasCost", extra)
+	require.NotNilf(t, extra.TimeMilliseconds, "%T.TimeMilliseconds", extra)
+	require.NotNilf(t, extra.MinDelayExcess, "%T.MinDelayExcess", extra)
+	require.NotNilf(t, extra.TargetExponent, "%T.TargetExponent", extra)
+	require.NotNilf(t, extra.MinPriceExponent, "%T.MinPriceExponent", extra)
+	require.NotNilf(t, extra.SettledHeight, "%T.SettledHeight", extra)
+	require.NotNilf(t, extra.SettledGasUnix, "%T.SettledGasUnix", extra)
+	require.NotNilf(t, extra.SettledGasNumerator, "%T.SettledGasNumerator", extra)
+	require.NotNilf(t, extra.SettledExcess, "%T.SettledExcess", extra)
+	wantHeaderExtras := map[string]string{
+		"extDataHash":           extra.ExtDataHash.Hex(),
+		"extDataGasUsed":        hexutil.EncodeBig(extra.ExtDataGasUsed),
+		"blockGasCost":          hexutil.EncodeBig(extra.BlockGasCost),
+		"timestampMilliseconds": hexutil.EncodeUint64(*extra.TimeMilliseconds),
+		"minDelayExcess":        hexutil.EncodeUint64(uint64(*extra.MinDelayExcess)),
+		"targetExponent":        hexutil.EncodeUint64(uint64(*extra.TargetExponent)),
+		"minPriceExponent":      hexutil.EncodeUint64(uint64(*extra.MinPriceExponent)),
+		"settledHeight":         hexutil.EncodeUint64(*extra.SettledHeight),
+		"settledGasUnix":        hexutil.EncodeUint64(*extra.SettledGasUnix),
+		"settledGasNumerator":   hexutil.EncodeUint64(*extra.SettledGasNumerator),
+		"settledExcess":         hexutil.EncodeUint64(*extra.SettledExcess),
+	}
+	numHeaderExtras := reflect.TypeFor[customtypes.HeaderExtra]().NumField()
+	require.Lenf(t, wantHeaderExtras, numHeaderExtras, "%T field count", customtypes.HeaderExtra{})
+
+	var (
+		wantBlockExtras = maps.Clone(wantHeaderExtras)
+		extData         = customtypes.BlockExtData(eth)
+	)
+	wantBlockExtras["blockExtraData"] = hexutil.Encode(extData)
+
+	tests := []struct {
+		method string
+		args   []any
+		want   map[string]string
+	}{
+		{
+			method: "eth_getHeaderByNumber",
+			args:   []any{blockNumber},
+			want:   wantHeaderExtras,
+		},
+		{
+			method: "eth_getHeaderByHash",
+			args:   []any{blockHash},
+			want:   wantHeaderExtras,
+		},
+		{
+			method: "eth_getBlockByNumber",
+			args:   []any{blockNumber, true},
+			want:   wantBlockExtras,
+		},
+		{
+			method: "eth_getBlockByHash",
+			args:   []any{blockHash, true},
+			want:   wantBlockExtras,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			client := sut.ethclient.Client()
+			var got map[string]any
+			err := client.CallContext(ctx, &got, tt.method, tt.args...)
+			require.NoErrorf(t, err, "%s(%v)", tt.method, tt.args)
+			for k, want := range tt.want {
+				assert.Equalf(t, want, got[k], "field %q", k)
+			}
+		})
 	}
 }
