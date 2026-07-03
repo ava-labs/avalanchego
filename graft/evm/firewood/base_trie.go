@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb/database"
+
+	"github.com/ava-labs/avalanchego/graft/evm/firewood/statehistory"
 )
 
 var (
@@ -33,6 +35,13 @@ type baseTrie struct {
 	dirtyKeys  map[string][]byte
 	updateOps  []ffi.BatchOp
 	hasChanges bool
+
+	// captureHistory mirrors every update into historyOps for the state
+	// history store ([ffi.BatchOp] fields are unexported, so the ops cannot
+	// be introspected later). Only set when the owning [TrieDB] has state
+	// history enabled; reconstructed (replay) tries never capture.
+	captureHistory bool
+	historyOps     []statehistory.Op
 }
 
 // GetAccount returns the state account associated with an address.
@@ -120,6 +129,9 @@ func (a *baseTrie) UpdateAccount(addr common.Address, account *types.StateAccoun
 	}
 	a.dirtyKeys[string(key)] = data
 	a.updateOps = append(a.updateOps, ffi.Put(key, data))
+	if a.captureHistory {
+		a.historyOps = append(a.historyOps, statehistory.Op{Kind: statehistory.OpPut, Key: key, Value: data})
+	}
 	a.hasChanges = true // Mark that there are changes to commit
 	return nil
 }
@@ -141,6 +153,9 @@ func (a *baseTrie) UpdateStorage(addr common.Address, key []byte, value []byte) 
 	// Queue the keys and values for later commit
 	a.dirtyKeys[string(combinedKey[:])] = data
 	a.updateOps = append(a.updateOps, ffi.Put(combinedKey[:], data))
+	if a.captureHistory {
+		a.historyOps = append(a.historyOps, statehistory.Op{Kind: statehistory.OpPut, Key: combinedKey[:], Value: data})
+	}
 	a.hasChanges = true // Mark that there are changes to commit
 	return nil
 }
@@ -151,7 +166,10 @@ func (a *baseTrie) DeleteAccount(addr common.Address) error {
 	// Queue the key for deletion
 	a.dirtyKeys[string(key)] = nil
 	a.updateOps = append(a.updateOps, ffi.PrefixDelete(key)) // Remove all storage
-	a.hasChanges = true                                      // Mark that there are changes to commit
+	if a.captureHistory {
+		a.historyOps = append(a.historyOps, statehistory.Op{Kind: statehistory.OpDestruct, Key: key})
+	}
+	a.hasChanges = true // Mark that there are changes to commit
 	return nil
 }
 
@@ -166,6 +184,9 @@ func (a *baseTrie) DeleteStorage(addr common.Address, key []byte) error {
 	// Queue the key for deletion
 	a.dirtyKeys[string(combinedKey[:])] = nil
 	a.updateOps = append(a.updateOps, ffi.Delete(combinedKey[:]))
+	if a.captureHistory {
+		a.historyOps = append(a.historyOps, statehistory.Op{Kind: statehistory.OpDelete, Key: combinedKey[:]})
+	}
 	a.hasChanges = true // Mark that there are changes to commit
 	return nil
 }
@@ -202,11 +223,13 @@ func (*baseTrie) Prove([]byte, ethdb.KeyValueWriter) error {
 // The [database.Reader] is shared, since it is read-only.
 func (a *baseTrie) copy() *baseTrie {
 	newBase := &baseTrie{
-		reader:     a.reader,
-		root:       a.root,
-		hasChanges: a.hasChanges,
-		dirtyKeys:  make(map[string][]byte, len(a.dirtyKeys)),
-		updateOps:  slices.Clone(a.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
+		reader:         a.reader,
+		root:           a.root,
+		hasChanges:     a.hasChanges,
+		dirtyKeys:      make(map[string][]byte, len(a.dirtyKeys)),
+		updateOps:      slices.Clone(a.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
+		captureHistory: a.captureHistory,
+		historyOps:     slices.Clone(a.historyOps), // each Op is read-only, safe to shallow copy
 	}
 	for k, v := range a.dirtyKeys {
 		newBase.dirtyKeys[k] = slices.Clone(v)
