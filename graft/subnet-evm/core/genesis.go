@@ -61,7 +61,10 @@ import (
 
 //go:generate go tool gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
 
-var errGenesisNoConfig = errors.New("genesis has no chain configuration")
+var (
+	errGenesisNoConfig               = errors.New("genesis has no chain configuration")
+	errInitialMinDelayWithoutGranite = errors.New("initialMinDelayMS requires Granite to be active at genesis")
+)
 
 // Deprecated: use types.Account instead.
 type GenesisAccount = types.Account
@@ -461,8 +464,14 @@ func (g *Genesis) Verify() error {
 			g.GasLimit,
 		)
 	}
+	confExtra := params.GetExtra(g.Config)
+	// InitialMinDelayMS is seeded into the genesis header's ACP-226 excess,
+	// which only exists when Granite is active at genesis.
+	if confExtra.InitialMinDelayMS != 0 && !confExtra.IsGranite(g.Timestamp) {
+		return errInitialMinDelayWithoutGranite
+	}
 	// Verify config
-	if err := params.GetExtra(g.Config).Verify(); err != nil {
+	if err := confExtra.Verify(); err != nil {
 		return err
 	}
 	return nil

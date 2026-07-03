@@ -28,20 +28,29 @@ func TestGenesisCustomMinDelay(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
 
-	// Unset: genesis seeds the protocol default, bit-for-bit identical to today.
+	// Unset: genesis seeds the protocol default, identical to a default chain.
 	defaultConfig := params.TestGraniteChainConfig
 	defaultBlock, err := (&Genesis{Config: defaultConfig}).Commit(db, tdb)
 	require.NoError(t, err)
 	require.Equal(t, acp226.InitialDelayExcess, *customtypes.GetHeaderExtra(defaultBlock.Header()).MinDelayExcess)
 
 	// Set: genesis seeds the converged excess for the configured cadence.
-	// Copy first — TestGraniteChainConfig and its extra are shared globals.
+	// Copy first: TestGraniteChainConfig and its extra are shared globals.
 	const initialMinDelayMS = 5
 	customConfig := params.Copy(params.TestGraniteChainConfig)
 	params.GetExtra(&customConfig).InitialMinDelayMS = initialMinDelayMS
 	customBlock, err := (&Genesis{Config: &customConfig}).Commit(db, tdb)
 	require.NoError(t, err)
 	require.Equal(t, acp226.DesiredDelayExcess(initialMinDelayMS), *customtypes.GetHeaderExtra(customBlock.Header()).MinDelayExcess)
+
+	// Set without Granite active at genesis: Verify rejects the genesis.
+	preGraniteConfig := params.Copy(params.TestFortunaChainConfig)
+	params.GetExtra(&preGraniteConfig).InitialMinDelayMS = initialMinDelayMS
+	preGraniteGenesis := &Genesis{
+		Config:   &preGraniteConfig,
+		GasLimit: params.GetExtra(&preGraniteConfig).FeeConfig.GasLimit.Uint64(),
+	}
+	require.ErrorIs(t, preGraniteGenesis.Verify(), errInitialMinDelayWithoutGranite)
 }
 
 func TestGenesisEthUpgrades(t *testing.T) {

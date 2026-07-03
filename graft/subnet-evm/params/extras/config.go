@@ -115,12 +115,9 @@ type ChainConfig struct {
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
 
 	// InitialMinDelayMS, if non-zero, seeds the ACP-226 minimum block delay (in
-	// milliseconds) into genesis instead of the default ~2000ms start, so the
-	// chain runs at its target cadence from block 1 rather than slowly converging.
-	//
-	// DEBUG/BENCHMARK ONLY: for networks with a controlled genesis (e.g. fresh L1s
-	// under benchmark), not production. Set it equal to your min-delay-target.
-	// Unset leaves behavior bit-for-bit identical to a default chain.
+	// milliseconds) into the genesis block instead of the default ~2000ms start.
+	// DEBUG/BENCHMARK ONLY: for controlled-genesis networks, not production.
+	// Requires Granite to be active at genesis. Set it equal to min-delay-target.
 	InitialMinDelayMS uint64 `json:"initialMinDelayMS,omitempty"`
 }
 
@@ -345,11 +342,9 @@ func (c *ChainConfig) Verify() error {
 		return fmt.Errorf("invalid network upgrades: %w", err)
 	}
 
-	// This field exists only to seed a faster-than-default cadence (to skip the
-	// slow ACP-226 warm-up); seeding slower than default has no benchmarking use,
-	// so reject it.
-	if max := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > max {
-		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, max)
+	// Only faster-than-default seeds are useful; reject the rest.
+	if maxDelayMS := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > maxDelayMS {
+		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, maxDelayMS)
 	}
 
 	return nil
