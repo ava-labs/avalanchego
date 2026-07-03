@@ -774,8 +774,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 }
 
 // TestPrimaryNetworkProposerWindowIsAlwaysDefault guards that the per-Subnet
-// proposerWindowMilliseconds setting can never alter the primary network (P/C/X)
-// and fork the node off Mainnet/Fuji. Two layers enforce this, checked below.
+// proposerWindowMilliseconds setting can never alter the primary network (P/C/X).
 func TestPrimaryNetworkProposerWindowIsAlwaysDefault(t *testing.T) {
 	require := require.New(t)
 

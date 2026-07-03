@@ -49,8 +49,7 @@ const (
 	// DefaultMinBlockDelay should be kept as whole seconds because block
 	// timestamps are only specific to the second.
 	DefaultMinBlockDelay = time.Second
-	// DefaultWindowDuration is the default proposer slot length. It is preserved
-	// at 5s for full backwards compatibility.
+	// DefaultWindowDuration is the default proposer slot length.
 	DefaultWindowDuration = proposer.DefaultWindowDuration
 	// DefaultNumHistoricalBlocks as 0 results in never deleting any historical
 	// blocks.

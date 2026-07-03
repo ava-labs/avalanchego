@@ -29,7 +29,7 @@ const (
 	// validators of a chain agree on it.
 	DefaultWindowDuration = 5 * time.Second
 
-	// Slot counts, independent of the (now configurable) window duration. The
+	// Slot counts, independent of the window duration. The
 	// matching absolute delays depend on the window and are windower methods
 	// (MaxVerifyDelay, MaxBuildDelay).
 	MaxVerifyWindows = 6  // 30s at the default window
@@ -126,9 +126,8 @@ type windower struct {
 // New returns a Windower whose proposer slots are [windowDuration] apart. A
 // value <= 0 falls back to [DefaultWindowDuration] (5s).
 //
-// WARNING: [windowDuration] is consensus-critical and MUST be identical across
-// every validator of the chain; divergent values break proposer selection and
-// chain liveness.
+// Invariant: [windowDuration] must be identical across every validator of the
+// chain; divergent values break proposer selection and chain liveness.
 func New(state validators.State, subnetID, chainID ids.ID, windowDuration time.Duration, logger logging.Logger) Windower {
 	if windowDuration <= 0 {
 		windowDuration = DefaultWindowDuration

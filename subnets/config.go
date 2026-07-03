@@ -73,9 +73,9 @@ type Config struct {
 	// the cost of more rejected blocks. 0 uses the default (5s); other values
 	// must be within [MinProposerWindowMilliseconds, MaxProposerWindowMilliseconds].
 	//
-	// WARNING: network-wide consensus parameter. Every validator of the Subnet's
-	// chains MUST use the SAME value or it falls out of consensus, so coordinate
-	// it across all validators at once. The primary network (P/C/X) is unaffected.
+	// Invariant: this is a network-wide consensus parameter, not a per-node
+	// knob. Every validator of the Subnet's chains must use the same value or
+	// the Subnet loses liveness. The primary network (P/C/X) is unaffected.
 	ProposerWindowMilliseconds uint64 `json:"proposerWindowMilliseconds" yaml:"proposerWindowMilliseconds"`
 }
 
@@ -103,7 +103,6 @@ func (c *Config) ValidParameters() error {
 		return errAllowedNodesWhenNotValidatorOnly
 	}
 
-	// 0 means "use the default"; any explicit value must be in range.
 	if ms := c.ProposerWindowMilliseconds; ms != 0 && (ms < MinProposerWindowMilliseconds || ms > MaxProposerWindowMilliseconds) {
 		return fmt.Errorf("%w: %dms is not 0 (default) or within [%dms, %dms]",
 			errInvalidProposerWindowMilliseconds, ms, MinProposerWindowMilliseconds, MaxProposerWindowMilliseconds)
