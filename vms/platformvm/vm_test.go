@@ -79,8 +79,9 @@ const (
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
 	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
 
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMaxStakingDuration = 365 * 24 * time.Hour
+	defaultMinStakingDuration        = 48 * time.Hour
+	defaultHeliconMinStakingDuration = 12 * time.Hour
+	defaultMaxStakingDuration        = 365 * 24 * time.Hour
 )
 
 var (
@@ -131,19 +132,20 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 	// to ensure test independence
 	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
 	vm := &VM{Internal: config.Internal{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		SybilProtectionEnabled: true,
-		Validators:             validators.NewManager(),
-		DynamicFeeConfig:       defaultDynamicFeeConfig,
-		ValidatorFeeConfig:     defaultValidatorFeeConfig,
-		MinValidatorStake:      defaultMinValidatorStake,
-		MaxValidatorStake:      defaultMaxValidatorStake,
-		MinDelegatorStake:      defaultMinDelegatorStake,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(f, latestForkTime),
+		Chains:                  chains.TestManager,
+		UptimeLockedCalculator:  uptime.NewLockedCalculator(),
+		SybilProtectionEnabled:  true,
+		Validators:              validators.NewManager(),
+		DynamicFeeConfig:        defaultDynamicFeeConfig,
+		ValidatorFeeConfig:      defaultValidatorFeeConfig,
+		MinValidatorStake:       defaultMinValidatorStake,
+		MaxValidatorStake:       defaultMaxValidatorStake,
+		MinDelegatorStake:       defaultMinDelegatorStake,
+		MinStakeDuration:        defaultMinStakingDuration,
+		MaxStakeDuration:        defaultMaxStakingDuration,
+		HeliconMinStakeDuration: defaultHeliconMinStakingDuration,
+		RewardConfig:            defaultRewardConfig,
+		UpgradeConfig:           upgradetest.GetConfigWithUpgradeTime(f, latestForkTime),
 	}}
 
 	db := memdb.New()
