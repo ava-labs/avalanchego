@@ -163,6 +163,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
+	if err := baseState.VerifyTimestampUnit(vm.MillisecondTimestamps); err != nil {
+		return err
+	}
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.Config.WindowDuration, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
