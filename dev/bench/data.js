@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783168893685,
+  "lastUpdate": 1783173331543,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -36753,6 +36753,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
             "value": 152.9471612724066,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Austin Larson",
+            "username": "alarso16",
+            "email": "78000745+alarso16@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "d8a8473be2811d5749fb92b478fe1de9c926e164",
+          "message": "Remove last synchronous from `NewVM` (#5556)",
+          "timestamp": "2026-07-02T15:18:58Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/d8a8473be2811d5749fb92b478fe1de9c926e164"
+        },
+        "date": 1783173328295,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - mgas/s",
+            "value": 61.91538227780339,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - ms/ggas",
+            "value": 16151.075277435528,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_parse_ms/ggas",
+            "value": 65.78959337183292,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_verify_ms/ggas",
+            "value": 16038.443862896598,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
+            "value": 45.13251749745216,
             "unit": "block_accept_ms/ggas"
           }
         ]
