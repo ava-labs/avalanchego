@@ -171,6 +171,11 @@ type Config struct {
 	TransactionHistory uint64 `toml:",omitempty"` // The maximum number of blocks from head whose tx indices are reserved.
 	StateHistory       uint64 `toml:",omitempty"` // The maximum number of blocks from head whose state histories are reserved.
 
+	// StateHistoryEnabled records flat state history rows for every block and
+	// serves historical state reads from them. Requires the Firewood state
+	// scheme.
+	StateHistoryEnabled bool
+
 	// State scheme represents the scheme used to store ethereum states and trie
 	// nodes on top. It can be 'hash', 'path', or none which means use the scheme
 	// consistent with persistent state.

@@ -36,6 +36,7 @@ go_library(
         "//graft/coreth/params",
         "//graft/evm/core/state/pruner",
         "//graft/evm/firewood",
+        "//graft/evm/firewood/statehistory",
         "//graft/evm/rpc",
         "//utils/timer/mockable",
         "//version",

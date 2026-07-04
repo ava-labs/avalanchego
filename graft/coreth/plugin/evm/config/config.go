@@ -183,6 +183,13 @@ type Config struct {
 
 	// Database Scheme
 	StateScheme string `json:"state-scheme"`
+
+	// StateHistoryEnabled records flat state history rows for every accepted
+	// block and serves historical state reads from them. Requires the
+	// Firewood state scheme with pruning enabled (an archive node already
+	// retains every revision) and a chain captured from genesis; incompatible
+	// with state sync.
+	StateHistoryEnabled bool `json:"state-history-enabled"`
 }
 
 // GetConfig returns a new config object with the default values set and the
