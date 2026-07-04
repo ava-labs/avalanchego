@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (
@@ -28,24 +29,24 @@ type state struct {
 	HeightIndex
 }
 
-func New(db *versiondb.Database) State {
+func New(db *versiondb.Database, getInnerBytes func(ids.ID) ([]byte, error)) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
 	return &state{
 		ChainState:  NewChainState(chainDB),
-		BlockState:  NewBlockState(blockDB),
+		BlockState:  NewBlockState(blockDB, getInnerBytes),
 		HeightIndex: NewHeightIndex(heightDB, db),
 	}
 }
 
-func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Registerer) (State, error) {
+func NewMetered(db *versiondb.Database, namespace string, metrics prometheus.Registerer, getInnerBytes func(ids.ID) ([]byte, error)) (State, error) {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
 	heightDB := prefixdb.New(heightIndexPrefix, db)
 
-	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics)
+	blockState, err := NewMeteredBlockState(blockDB, namespace, metrics, getInnerBytes)
 	if err != nil {
 		return nil, err
 	}

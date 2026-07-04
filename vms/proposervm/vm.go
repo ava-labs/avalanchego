@@ -156,11 +156,6 @@ func (vm *VM) Initialize(
 ) error {
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
-	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
-	if err != nil {
-		return err
-	}
-	vm.State = baseState
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
@@ -188,6 +183,28 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
+
+	// The inner VM's capabilities are only known once it has initialized. When
+	// it durably retains every accepted block's bytes (retrievable via
+	// GetBlock), store accepted blocks without their inner bytes and
+	// reconstruct them on read, instead of persisting a second copy of every
+	// inner block.
+	var getInnerBytes func(ids.ID) ([]byte, error)
+	if r, ok := vm.ChainVM.(block.RetainsAcceptedBlocksVM); ok && r.RetainsAcceptedBlocks() {
+		chainCtx.Log.Info("inner VM retains accepted blocks; storing blocks without inner bytes")
+		getInnerBytes = func(innerID ids.ID) ([]byte, error) {
+			innerBlk, err := vm.ChainVM.GetBlock(context.Background(), innerID)
+			if err != nil {
+				return nil, err
+			}
+			return innerBlk.Bytes(), nil
+		}
+	}
+	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer, getInnerBytes)
+	if err != nil {
+		return err
+	}
+	vm.State = baseState
 
 	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
 		return fmt.Errorf("failed to repair accepted chain by height: %w", err)
@@ -830,7 +847,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	if err := vm.State.PutBlock(blk.getStatelessBlk()); err != nil {
+	if err := vm.State.PutBlock(blk.getStatelessBlk(), blk.getInnerBlk().ID()); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {
