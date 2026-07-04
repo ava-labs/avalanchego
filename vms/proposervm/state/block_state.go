@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -30,6 +32,7 @@ var (
 	errBlockWrongVersion     = errors.New("wrong version")
 	errShortBlockRecord      = errors.New("block record too short to contain a codec version")
 	errInnerBlockUnavailable = errors.New("inner block unavailable for deduplicated block")
+	errRestoredBlockMismatch = errors.New("restored block bytes do not match original")
 
 	_ BlockState = (*blockState)(nil)
 )
@@ -54,6 +57,13 @@ type blockState struct {
 	// read by looking them up by inner block ID. nil disables deduplication and
 	// preserves the legacy full-block storage format.
 	getInnerBytes func(innerID ids.ID) ([]byte, error)
+
+	// log, when non-nil, reports every dedup fallback at error level. A
+	// fallback has no legitimate data-dependent cause (the write-time
+	// round-trip is pure in-memory container mechanics), so it can only be a
+	// strip/restore code bug for some container shape and must not go
+	// unnoticed.
+	log logging.Logger
 
 	// numDedupStored counts blocks written in the deduplicated (inner-bytes
 	// stripped) format; numDedupFallback counts blocks for which stripping did
@@ -88,15 +98,16 @@ func cachedBlockSize(_ ids.ID, bw *blockWrapper) int {
 	return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*constants.PointerOverhead
 }
 
-func NewBlockState(db database.Database, getInnerBytes func(ids.ID) ([]byte, error)) BlockState {
+func NewBlockState(db database.Database, getInnerBytes func(ids.ID) ([]byte, error), log logging.Logger) BlockState {
 	return &blockState{
 		blkCache:      lru.NewSizedCache(blockCacheSize, cachedBlockSize),
 		db:            db,
 		getInnerBytes: getInnerBytes,
+		log:           log,
 	}
 }
 
-func NewMeteredBlockState(db database.Database, namespace string, metrics prometheus.Registerer, getInnerBytes func(ids.ID) ([]byte, error)) (BlockState, error) {
+func NewMeteredBlockState(db database.Database, namespace string, metrics prometheus.Registerer, getInnerBytes func(ids.ID) ([]byte, error), log logging.Logger) (BlockState, error) {
 	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
 		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
@@ -110,6 +121,7 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 		blkCache:      blkCache,
 		db:            db,
 		getInnerBytes: getInnerBytes,
+		log:           log,
 	}
 
 	// Only register dedup counters when deduplication is enabled, so the legacy
@@ -238,15 +250,24 @@ func (s *blockState) PutBlock(blk block.Block, innerID ids.ID) error {
 	blkID := blk.ID()
 
 	if s.getInnerBytes != nil {
-		if storedBytes, cached, ok := tryStripBlock(blk, innerID); ok {
+		storedBytes, cached, err := tryStripBlock(blk, innerID)
+		if err == nil {
 			s.blkCache.Put(blkID, cached)
 			if s.numDedupStored != nil {
 				s.numDedupStored.Inc()
 			}
 			return s.db.Put(blkID[:], storedBytes)
 		}
-		// Could not safely strip the inner bytes (round-trip mismatch); fall
-		// through to full storage. Correctness is never traded for the saving.
+		// Could not safely strip the inner bytes; fall through to full storage
+		// so correctness is never traded for the saving. This has no legitimate
+		// data-dependent cause and can only be a strip/restore code bug for
+		// some container shape, so it must not go unnoticed.
+		if s.log != nil {
+			s.log.Error("failed to deduplicate accepted block; stored full block",
+				zap.Stringer("blkID", blkID),
+				zap.Error(err),
+			)
+		}
 		if s.numDedupFallback != nil {
 			s.numDedupFallback.Inc()
 		}
@@ -267,18 +288,22 @@ func (s *blockState) PutBlock(blk block.Block, innerID ids.ID) error {
 }
 
 // tryStripBlock attempts to build a deduplicated record for [blk]. It returns
-// ok=false if stripping the inner bytes does not round-trip back to the exact
-// original block bytes, in which case the caller must store the full block.
-func tryStripBlock(blk block.Block, innerID ids.ID) ([]byte, *blockWrapper, bool) {
+// an error describing the cause if stripping the inner bytes does not
+// round-trip back to the exact original block bytes, in which case the caller
+// must store the full block.
+func tryStripBlock(blk block.Block, innerID ids.ID) ([]byte, *blockWrapper, error) {
 	fullBytes := blk.Bytes()
 	strippedBytes, err := block.StripInnerBytes(fullBytes)
 	if err != nil {
-		return nil, nil, false
+		return nil, nil, fmt.Errorf("stripping inner bytes: %w", err)
 	}
 
 	restored, err := block.RestoreInnerBytes(strippedBytes, blk.Block())
-	if err != nil || !bytes.Equal(restored, fullBytes) {
-		return nil, nil, false
+	if err != nil {
+		return nil, nil, fmt.Errorf("restoring inner bytes: %w", err)
+	}
+	if !bytes.Equal(restored, fullBytes) {
+		return nil, nil, errRestoredBlockMismatch
 	}
 
 	wrapper := dedupBlockWrapper{
@@ -288,7 +313,7 @@ func tryStripBlock(blk block.Block, innerID ids.ID) ([]byte, *blockWrapper, bool
 	}
 	storedBytes, err := Codec.Marshal(CodecVersionDedup, &wrapper)
 	if err != nil {
-		return nil, nil, false
+		return nil, nil, fmt.Errorf("marshalling deduplicated record: %w", err)
 	}
 
 	cached := &blockWrapper{
@@ -296,7 +321,7 @@ func tryStripBlock(blk block.Block, innerID ids.ID) ([]byte, *blockWrapper, bool
 		Status: choices.Accepted,
 		block:  blk,
 	}
-	return storedBytes, cached, true
+	return storedBytes, cached, nil
 }
 
 func (s *blockState) DeleteBlock(blkID ids.ID) error {

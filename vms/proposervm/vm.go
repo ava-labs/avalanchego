@@ -200,7 +200,7 @@ func (vm *VM) Initialize(
 			return innerBlk.Bytes(), nil
 		}
 	}
-	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer, getInnerBytes)
+	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer, getInnerBytes, chainCtx.Log)
 	if err != nil {
 		return err
 	}
