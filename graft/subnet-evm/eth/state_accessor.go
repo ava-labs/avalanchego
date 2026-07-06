@@ -298,37 +298,39 @@ func (eth *Ethereum) firewoodReconstructedState(ctx context.Context, header *typ
 		}
 	}()
 
-	// Build a replay-mode state database backed by the reconstructed view. The
-	// reconstructed revision is mutated in place across blocks, so a single database
-	// remains valid for the whole replay. Root hashing is deferred until after replay,
-	// when the target root is validated once against the requested header.
-	replayTrieDB := firewood.NewReconstructedTrieDB(fwDB, recon, false /* computeRootOnHash */)
-	cache, err := state.New(current.Root, extstate.NewDatabaseWithNodeDB(eth.chainDb, replayTrieDB), nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Re-execute blocks forward from current+1 to the target block.
-	for current.Number.Uint64() < header.Number.Uint64() {
-		if err := ctx.Err(); err != nil {
+	// Re-execute blocks forward from current+1 to the target block, if any.
+	if current.Number.Uint64() < header.Number.Uint64() {
+		// Build a replay-mode state database backed by the reconstructed view. The
+		// reconstructed revision is mutated in place across blocks, so a single database
+		// remains valid for the whole replay. Root hashing is deferred until after replay,
+		// when the target root is validated once against the requested header.
+		replayTrieDB := firewood.NewReconstructedTrieDB(fwDB, recon, false /* computeRootOnHash */)
+		cache, err := state.New(current.Root, extstate.NewDatabaseWithNodeDB(eth.chainDb, replayTrieDB), nil)
+		if err != nil {
 			return nil, nil, err
 		}
 
-		next := current.Number.Uint64() + 1
-		nextBlock := eth.blockchain.GetBlockByNumber(next)
-		if nextBlock == nil {
-			return nil, nil, fmt.Errorf("block %d not found", next)
-		}
+		for current.Number.Uint64() < header.Number.Uint64() {
+			if err := ctx.Err(); err != nil {
+				return nil, nil, err
+			}
 
-		_, _, _, err := eth.blockchain.Processor().Process(nextBlock, current, cache, vm.Config{})
-		if err != nil {
-			return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
-		}
+			next := current.Number.Uint64() + 1
+			nextBlock := eth.blockchain.GetBlockByNumber(next)
+			if nextBlock == nil {
+				return nil, nil, fmt.Errorf("block %d not found", next)
+			}
 
-		// Flush the block's writes into the reconstructed view. The returned root
-		// is ignored; the final root is computed from recon once after replay.
-		cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
-		current = nextBlock.Header()
+			_, _, _, err := eth.blockchain.Processor().Process(nextBlock, current, cache, vm.Config{})
+			if err != nil {
+				return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
+			}
+
+			// Flush the block's writes into the reconstructed view. The returned root
+			// is ignored; the final root is computed from recon once after replay.
+			cache.IntermediateRoot(eth.blockchain.Config().IsEIP158(nextBlock.Number()))
+			current = nextBlock.Header()
+		}
 	}
 
 	// Root computation was deferred during replay; compute it once now and
@@ -343,7 +345,7 @@ func (eth *Ethereum) firewoodReconstructedState(ctx context.Context, header *typ
 	}
 
 	returnTrieDB := firewood.NewReconstructedTrieDB(fwDB, recon, true /* computeRootOnHash */)
-	cache, err = state.New(header.Root, extstate.NewDatabaseWithNodeDB(eth.chainDb, returnTrieDB), nil)
+	cache, err := state.New(header.Root, extstate.NewDatabaseWithNodeDB(eth.chainDb, returnTrieDB), nil)
 	if err != nil {
 		return nil, nil, err
 	}
