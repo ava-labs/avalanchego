@@ -26,7 +26,6 @@ go_library(
         "//vms/platformvm/txs",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary",
-        "//wallet/subnet/primary/common",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
         "@com_github_stretchr_testify//require",
     ],

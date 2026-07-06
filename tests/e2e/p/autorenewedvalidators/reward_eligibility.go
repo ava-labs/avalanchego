@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", func() {
@@ -69,6 +68,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			delegator1FundingKey = e2e.NewPrivateKey(tc)
 			delegator2RewardKey  = e2e.NewPrivateKey(tc)
 			delegator2FundingKey = e2e.NewPrivateKey(tc)
+			validatorFundingKey  = e2e.NewPrivateKey(tc)
 
 			rewardKeys = []*secp256k1.PrivateKey{
 				validationRewardKey,
@@ -77,20 +77,21 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 				delegator2RewardKey,
 			}
 
-			keychain      = env.NewKeychain()
-			walletNodeURI = env.GetRandomNodeURI()
-			pWallet       = e2e.NewWallet(tc, keychain, walletNodeURI).P()
-			pContext      = pWallet.Builder().Context()
-			pvmClient     = platformvm.NewClient(walletNodeURI.URI)
-			adminClient   = admin.NewClient(walletNodeURI.URI)
-			rewardConfig  = p.GetRewardConfig(tc, adminClient)
-			calculator    = reward.NewCalculator(rewardConfig)
-			stakingHelper = stakingHelper{tc: tc, require: require, pvmClient: pvmClient}
+			fundingKeychain   = env.NewKeychain()
+			validatorKeychain = secp256k1fx.NewKeychain(validatorFundingKey)
+			walletNodeURI     = env.GetRandomNodeURI()
+			fundingPWallet    = e2e.NewWallet(tc, fundingKeychain, walletNodeURI).P()
+			pContext          = fundingPWallet.Builder().Context()
+			pvmClient         = platformvm.NewClient(walletNodeURI.URI)
+			adminClient       = admin.NewClient(walletNodeURI.URI)
+			rewardConfig      = p.GetRewardConfig(tc, adminClient)
+			calculator        = reward.NewCalculator(rewardConfig)
+			stakingHelper     = stakingHelper{tc: tc, require: require, pvmClient: pvmClient}
 		)
 
 		configOwner := &secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keychain.Keys[0].Address()},
+			Addrs:     []ids.ShortID{validatorFundingKey.Address()},
 		}
 		validationRewardsOwner := &secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -100,6 +101,27 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			Threshold: 1,
 			Addrs:     []ids.ShortID{delegationRewardKey.Address()},
 		}
+
+		tc.By("funding validator wallet", func() {
+			_, err = fundingPWallet.IssueBaseTx(
+				[]*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: pContext.AVAXAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: weight + delegator1Weight + delegator2Weight + 10*units.Avax,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{validatorFundingKey.Address()},
+							},
+						},
+					},
+				},
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+		})
+
+		pWallet := e2e.NewWallet(tc, validatorKeychain, walletNodeURI).P()
 
 		tc.By("retrieving supply before adding the validator")
 		supplyAtValidatorStart, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
@@ -202,8 +224,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			for _, rewardKey := range rewardKeys {
 				rewardKeychain := secp256k1fx.NewKeychain(rewardKey)
 				rewardPWallet := e2e.NewWallet(tc, rewardKeychain, walletNodeURI).P()
-				// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
-				balances, err := rewardPWallet.Builder().GetBalance(common.WithStakeableLocked())
+				balances, err := rewardPWallet.Builder().GetBalance()
 				require.NoError(err)
 				rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
 			}
@@ -237,7 +258,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		})
 
 		tc.By("funding delegator2 wallet", func() {
-			pWallet = e2e.NewWallet(tc, keychain, walletNodeURI).P()
+			pWallet = e2e.NewWallet(tc, validatorKeychain, walletNodeURI).P()
 			_, err = pWallet.IssueBaseTx(
 				[]*avax.TransferableOutput{
 					{
@@ -294,8 +315,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		})
 
 		tc.By("retrieving wallet balance before validator exits")
-		// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
-		fundedKeyBalancesBeforeExit, err := pWallet.Builder().GetBalance(common.WithStakeableLocked())
+		fundedKeyBalancesBeforeExit, err := pWallet.Builder().GetBalance()
 		require.NoError(err)
 
 		tc.By("waiting for the second staking cycle to complete", func() {
@@ -315,8 +335,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			for _, rewardKey := range rewardKeys {
 				rewardKeychain := secp256k1fx.NewKeychain(rewardKey)
 				rewardPWallet := e2e.NewWallet(tc, rewardKeychain, walletNodeURI).P()
-				// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
-				balances, err := rewardPWallet.Builder().GetBalance(common.WithStakeableLocked())
+				balances, err := rewardPWallet.Builder().GetBalance()
 				require.NoError(err)
 				rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
 			}
@@ -334,9 +353,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 
 		tc.By("checking stake was returned", func() {
 			// Refresh wallet to get updated UTXOs after validator exit
-			pWallet = e2e.NewWallet(tc, keychain, walletNodeURI).P()
-			// Include stakeable-locked UTXOs in balance since the prefunded wallet stakes with locked UTXOs.
-			fundedKeyBalances, err := pWallet.Builder().GetBalance(common.WithStakeableLocked())
+			pWallet = e2e.NewWallet(tc, validatorKeychain, walletNodeURI).P()
+			fundedKeyBalances, err := pWallet.Builder().GetBalance()
 			require.NoError(err)
 
 			require.Equal(fundedKeyBalancesBeforeExit[pContext.AVAXAssetID]+weight, fundedKeyBalances[pContext.AVAXAssetID])
