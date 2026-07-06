@@ -1,3 +1,6 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package cli
 
 import (
@@ -5,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ava-labs/pgp-bridge/config"
+	"github.com/ava-labs/avalanchego/tools/pgp-bridge/config"
 )
 
 // parseArgs builds a fresh command tree, resolves the target subcommand for the

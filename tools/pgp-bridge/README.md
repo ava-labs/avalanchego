@@ -41,7 +41,7 @@ For non-credential inputs, precedence is **flag > env var > built-in default**.
 **Credentials are never passed as flags.** Secrets on the command line leak
 through process listings (`ps`/`/proc`), shell history, and CI logs, so
 `pgp-bridge` resolves credentials only through the
-[AWS SDK for Go v2](https://aws.github.io/aws-sdk-go-v2/) default credential
+[AWS SDK for Go v2](https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/config) default credential
 chain: the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`
 environment variables, shared config/credentials files, IAM roles, and SSO.
 Region is taken from `--aws-region` if given, otherwise `AWS_REGION` /

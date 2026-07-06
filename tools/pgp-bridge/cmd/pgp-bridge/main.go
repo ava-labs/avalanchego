@@ -1,9 +1,12 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package main
 
 import (
 	"os"
 
-	"github.com/ava-labs/pgp-bridge/internal/cli"
+	"github.com/ava-labs/avalanchego/tools/pgp-bridge/internal/cli"
 )
 
 func main() {

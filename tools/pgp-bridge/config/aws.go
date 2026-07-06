@@ -1,3 +1,6 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package config
 
 // AWSConfig holds the KMS endpoint configuration. Credentials are resolved by

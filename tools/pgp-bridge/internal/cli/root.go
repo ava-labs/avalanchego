@@ -1,3 +1,6 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package cli
 
 import (
@@ -6,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/ava-labs/pgp-bridge/config"
-	"github.com/ava-labs/pgp-bridge/internal/kms"
+	"github.com/ava-labs/avalanchego/tools/pgp-bridge/config"
+	"github.com/ava-labs/avalanchego/tools/pgp-bridge/internal/kms"
 )
 
 // NewRootCmd builds the pgp-bridge command tree: it registers the persistent

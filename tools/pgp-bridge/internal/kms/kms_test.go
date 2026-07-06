@@ -1,3 +1,6 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package kms
 
 import (
@@ -21,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/pgp-bridge/config"
+	"github.com/ava-labs/avalanchego/tools/pgp-bridge/config"
 )
 
 const (

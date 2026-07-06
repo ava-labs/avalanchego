@@ -1,6 +1,6 @@
-module github.com/ava-labs/pgp-bridge
+module github.com/ava-labs/avalanchego/tools/pgp-bridge
 
-go 1.25
+go 1.25.10
 
 require (
 	github.com/ProtonMail/go-crypto v1.4.1
