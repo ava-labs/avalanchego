@@ -13,14 +13,12 @@ The C-Chain is composed of three major components:
 ```mermaid
 flowchart TB
     subgraph avago["AvalancheGo"]
-        direction LR
         consensus["Consensus"]
         network["Network"]
         apiserver["API Server"]
     end
 
     subgraph sae["SAE"]
-        direction LR
         execution["Execution"]
         p2pn["P2P Network"]
         rpc["/rpc"]
@@ -28,7 +26,6 @@ flowchart TB
     end
 
     subgraph cchain["C-Chain"]
-        direction LR
         hook["Hooks"]
         warp["Warp"]
         db[("Database")]
