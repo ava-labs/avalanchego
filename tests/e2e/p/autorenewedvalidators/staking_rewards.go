@@ -51,6 +51,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			network = env.GetNetwork()
 		)
 
+		requireHeliconActivated(tc, require, info.NewClient(env.GetRandomNodeURI().URI))
+
 		tc.By("adding an ephemeral node")
 		node := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
 
