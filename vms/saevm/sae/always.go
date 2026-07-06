@@ -79,10 +79,7 @@ func (vm *SinceGenesis[_]) Initialize(
 		return fmt.Errorf("network.New(...): %v", err)
 	}
 	vm.VM, err = NewVM(ctx, vm.hooks, vm.config, snowCtx, config, db, vm.Network)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Shutdown gracefully closes the VM.

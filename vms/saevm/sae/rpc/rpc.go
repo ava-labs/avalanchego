@@ -42,8 +42,9 @@ type Chain interface {
 	ChainConfig() *params.ChainConfig
 
 	// Consensus and block-building
-	blocks.Chain
+	Peers() *p2p.Peers
 	Mempool() *txgossip.Set
+	blocks.Chain
 	ChainContext() core.ChainContext
 
 	// Execution results and replay
@@ -97,10 +98,11 @@ type Provider struct {
 }
 
 // New constructs a new [Provider].
-func New(chain Chain, peers *p2p.Peers, config Config) (*Provider, error) {
+func New(chain Chain, config Config) (*Provider, error) {
 	if err := config.Verify(); err != nil {
 		return nil, err
 	}
+
 	price, err := gasprice.NewEstimator(&estimatorBackend{chain}, chain.Logger(), gasprice.DefaultConfig())
 	if err != nil {
 		return nil, fmt.Errorf("gasprice.NewEstimator(...): %v", err)
@@ -135,7 +137,7 @@ func New(chain Chain, peers *p2p.Peers, config Config) (*Provider, error) {
 		filters.NewFilterSystem(back, filters.Config{}),
 		false, /*isLightClient*/
 	)
-	srv, err := back.server(peers, filter)
+	srv, err := back.server(filter)
 	if err != nil {
 		filters.CloseAPI(filter)
 		return nil, errors.Join(err, back.close())

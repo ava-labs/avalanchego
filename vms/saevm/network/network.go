@@ -1,6 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package network provides the P2P network for the SAE VM.
 package network
 
 import (
@@ -19,6 +20,8 @@ var (
 	_ common.AppHandler    = (*Network)(nil)
 )
 
+// Network contains the [p2p.Network] and all coupled state for use by the SAE
+// VM. It should only be constructed with [New].
 type Network struct {
 	*p2p.Network
 	ValidatorPeers *p2p.Validators

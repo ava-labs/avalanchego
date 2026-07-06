@@ -48,6 +48,7 @@ import (
 // canonical on disk with its post-execution state committed before [NewVM] is
 // called.
 type VM struct {
+	network *network.Network
 	hooks   hook.Points
 	config  Config
 	snowCtx *snow.Context
@@ -128,6 +129,7 @@ func NewVM[T hook.Transaction](
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
 	vm := &VM{
+		network: network,
 		hooks:   hooks,
 		config:  cfg,
 		snowCtx: snowCtx,
@@ -271,7 +273,7 @@ func NewVM[T hook.Transaction](
 	}
 
 	{ // ==========  RPC Provider  ==========
-		r, err := rpc.New(chain{vm, vm.exec}, network.Peers, cfg.RPCConfig)
+		r, err := rpc.New(vm.chain(), cfg.RPCConfig)
 		if err != nil {
 			return nil, err
 		}
