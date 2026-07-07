@@ -117,6 +117,8 @@ go_test(
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//consensus/beacon",
+        "@com_github_ava_labs_libevm//consensus/ethash",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
