@@ -143,6 +143,13 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			require.NoError(err)
 		})
 
+		potentialValidationReward1 := calculator.Calculate(stakingPeriod, weight, supplyAtValidatorStart)
+		tc.By("checking supply was increased by the validator's potential reward", func() {
+			supply, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
+			require.NoError(err)
+			require.Equal(supplyAtValidatorStart+potentialValidationReward1, supply)
+		})
+
 		tc.By("funding delegator1 wallet", func() {
 			_, err = pWallet.IssueBaseTx(
 				[]*avax.TransferableOutput{
@@ -210,6 +217,16 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			actualDelegator1Period = time.Duration(delegator.EndTime-delegator.StartTime) * time.Second
 		})
 
+		potentialDelegationReward1 := calculator.Calculate(actualDelegator1Period, delegator1Weight, supplyAtDelegator1Start)
+
+		tc.By("retrieving supply for the second cycle")
+		supplyAtCycle2Start, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
+		require.NoError(err)
+
+		tc.By("checking supply was increased by delegator1's potential reward", func() {
+			require.Equal(supplyAtDelegator1Start+potentialDelegationReward1, supplyAtCycle2Start)
+		})
+
 		tc.By("waiting for the first staking cycle to complete", func() {
 			stakingHelper.waitForStakingCycleEnd(nodeID)
 		})
@@ -229,12 +246,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 				rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
 			}
 
-			// Calculate expected rewards
-			potentialValidationReward := calculator.Calculate(stakingPeriod, weight, supplyAtValidatorStart)
-			potentialDelegationReward := calculator.Calculate(actualDelegator1Period, delegator1Weight, supplyAtDelegator1Start)
-
-			expectedDelegateeReward1, expectedDelegator1Reward = reward.Split(potentialDelegationReward, delegationShares)
-			compoundedValidationRewards1, expectedValidationReward1 = reward.Split(potentialValidationReward, autoCompoundRewardShares)
+			expectedDelegateeReward1, expectedDelegator1Reward = reward.Split(potentialDelegationReward1, delegationShares)
+			compoundedValidationRewards1, expectedValidationReward1 = reward.Split(potentialValidationReward1, autoCompoundRewardShares)
 			compoundedDelegateeRewards1, expectedDelegateeReward1 = reward.Split(expectedDelegateeReward1, autoCompoundRewardShares)
 
 			require.Equal(
@@ -257,6 +270,14 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			require.Equal(expectedWeight, validators[0].Weight)
 		})
 
+		cycle2ValidatorWeight := weight + compoundedValidationRewards1 + compoundedDelegateeRewards1
+		potentialValidationReward2 := calculator.Calculate(stakingPeriod, cycle2ValidatorWeight, supplyAtCycle2Start)
+		tc.By("checking supply was increased by the second cycle's potential reward on renewal", func() {
+			supply, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
+			require.NoError(err)
+			require.Equal(supplyAtCycle2Start+potentialValidationReward2, supply)
+		})
+
 		tc.By("funding delegator2 wallet", func() {
 			pWallet = e2e.NewWallet(tc, validatorKeychain, walletNodeURI).P()
 			_, err = pWallet.IssueBaseTx(
@@ -276,6 +297,10 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			)
 			require.NoError(err)
 		})
+
+		tc.By("retrieving supply before adding delegator2")
+		supplyAtDelegator2Start, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
+		require.NoError(err)
 
 		tc.By("adding delegator2 for the second staking cycle with same end time as validator", func() {
 			delegator2Keychain := secp256k1fx.NewKeychain(delegator2FundingKey)
@@ -314,6 +339,22 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "delegator2 not active")
 		})
 
+		var potentialDelegationReward2 uint64
+		tc.By("checking supply was increased by delegator2's potential reward", func() {
+			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
+			require.NoError(err)
+			require.Len(validators, 1)
+			require.Len(validators[0].Delegators, 1)
+
+			delegator2 := validators[0].Delegators[0]
+			actualDelegator2Period := time.Duration(delegator2.EndTime-delegator2.StartTime) * time.Second
+			potentialDelegationReward2 = calculator.Calculate(actualDelegator2Period, delegator2Weight, supplyAtDelegator2Start)
+
+			supply, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
+			require.NoError(err)
+			require.Equal(supplyAtDelegator2Start+potentialDelegationReward2, supply)
+		})
+
 		tc.By("retrieving wallet balance before validator exits")
 		fundedKeyBalancesBeforeExit, err := pWallet.Builder().GetBalance()
 		require.NoError(err)
@@ -328,6 +369,16 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 				require.NoError(err)
 				return len(validators) == 0
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "validator should have been removed due to uptime failure")
+		})
+
+		tc.By("checking unearned potential rewards were burned on the failed cycle", func() {
+			supply, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
+			require.NoError(err)
+
+			// Neither the validator nor delegator2 earned their second-cycle
+			// potential rewards, so both optimistic supply mints are reverted.
+			supplyBeforeCycleEnd := supplyAtDelegator2Start + potentialDelegationReward2
+			require.Equal(supplyBeforeCycleEnd-potentialValidationReward2-potentialDelegationReward2, supply)
 		})
 
 		tc.By("checking reward balances after second cycle", func() {

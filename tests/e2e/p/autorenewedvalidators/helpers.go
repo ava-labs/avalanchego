@@ -27,7 +27,7 @@ func (h *stakingHelper) waitForStakingCycleEnd(nodeID ids.NodeID) {
 	validators, err := h.pvmClient.GetCurrentValidators(h.tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
 	h.require.NoError(err)
 	h.require.Len(validators, 1)
-	initialWeight := validators[0].Weight
+	initialStartTime := validators[0].StartTime
 
 	h.tc.Eventually(func() bool {
 		validators, err = h.pvmClient.GetCurrentValidators(h.tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
@@ -37,7 +37,9 @@ func (h *stakingHelper) waitForStakingCycleEnd(nodeID ids.NodeID) {
 		}
 		h.require.Len(validators, 1)
 
-		return validators[0].Weight != initialWeight
+		// A renewal re-adds the validator with its start time set to the
+		// previous cycle's end time, so a start time change marks a new cycle start.
+		return validators[0].StartTime != initialStartTime
 	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "node failed to finish staking cycle")
 }
 
