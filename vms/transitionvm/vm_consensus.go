@@ -29,7 +29,7 @@ func (vm *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
 	vm.current.chainCtx.Lock.Lock()
 	defer vm.current.chainCtx.Lock.Unlock()
 
-	vm.setPreference.Set(true)
+	vm.preferenceSet.Set(true)
 	return vm.current.chain.SetPreference(ctx, blkID)
 }
 
@@ -39,7 +39,7 @@ func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, blockC
 	vm.current.chainCtx.Lock.Lock()
 	defer vm.current.chainCtx.Lock.Unlock()
 
-	vm.setPreference.Set(true)
+	vm.preferenceSet.Set(true)
 	return vm.current.chain.SetPreferenceWithContext(ctx, blkID, blockCtx)
 }
 

@@ -117,7 +117,7 @@ func (b *block) maybeTransition(ctx context.Context) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	// Since [block.transitioned] is set to true after modifying the block, this
+	// Since `block.transitioned` is set to true after modifying the block, this
 	// check enforces the documented invariant that the block is only modified
 	// once.
 	if b.transitioned {
@@ -128,14 +128,12 @@ func (b *block) maybeTransition(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Since both the parent and current block timestamps are assumed to be
-	// deterministic, future calls will also hit this branch and enforce the
+	// The parent timestamp is deterministic, so preTransition enforces the
 	// invariant that future modifications will not modify the inner block.
-	if parentTime := parent.Timestamp(); parentTime.Before(b.vm.transitionTime) {
+	switch preTransition := parent.Timestamp().Before(b.vm.transitionTime); {
+	case preTransition:
 		return nil
-	}
-
-	if !b.vm.transitioned {
+	case !b.vm.transitioned:
 		return errPostTransitionBlockBeforeTransition
 	}
 
@@ -157,13 +155,12 @@ func (b *block) Accept(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// `block.lock` doesn't need to be held here because the block is
-	// immutable after either [block.Verify] or [block.VerifyWithContext]
-	// return nil.
-	if b.transitioned || b.timestamp.Before(b.vm.transitionTime) {
-		return nil
+	// `block.lock` doesn't need to be held here because the block is immutable
+	// after either `block.Verify` or `block.VerifyWithContext` return nil.
+	if !b.vm.transitioned && !b.timestamp.Before(b.vm.transitionTime) {
+		return b.vm.transition(ctx, b.blk)
 	}
-	return b.vm.transition(ctx, b.blk)
+	return nil
 }
 
 func (b *block) Reject(ctx context.Context) error {
@@ -172,9 +169,8 @@ func (b *block) Reject(ctx context.Context) error {
 	b.vm.current.chainCtx.Lock.Lock()
 	defer b.vm.current.chainCtx.Lock.Unlock()
 
-	// `block.lock` doesn't need to be held here because the block is
-	// immutable after either [block.Verify] or [block.VerifyWithContext]
-	// return nil.
+	// `block.lock` doesn't need to be held here because the block is immutable
+	// after either `block.Verify` or `block.VerifyWithContext` return nil.
 	//
 	// Once transitioned, the pre-transition chain is shut down. Forwarding
 	// Reject into it could return an error, which the engine treats as fatal.

@@ -41,7 +41,7 @@ func (c *connections) remove(nodeID ids.NodeID) {
 	delete(c.nodes, nodeID)
 }
 
-func (c *connections) reconnect(ctx context.Context, connector validators.Connector) error {
+func (c *connections) addConnectionsTo(ctx context.Context, connector validators.Connector) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
