@@ -55,51 +55,42 @@ func (b *block) Height() uint64       { return b.height }
 func (b *block) Timestamp() time.Time { return b.timestamp }
 
 func (b *block) Verify(ctx context.Context) error {
-	b.vm.transitionLock.RLock()
-	defer b.vm.transitionLock.RUnlock()
-	b.vm.current.chainCtx.Lock.Lock()
-	defer b.vm.current.chainCtx.Lock.Unlock()
-
-	if err := b.maybeTransition(ctx); err != nil {
-		return err
-	}
-	return b.blk.Verify(ctx)
+	return b.vm.withLocks(func() error {
+		if err := b.maybeTransition(ctx); err != nil {
+			return err
+		}
+		return b.blk.Verify(ctx)
+	})
 }
 
 func (b *block) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
-	b.vm.transitionLock.RLock()
-	defer b.vm.transitionLock.RUnlock()
-	b.vm.current.chainCtx.Lock.Lock()
-	defer b.vm.current.chainCtx.Lock.Unlock()
+	return withLocks(b.vm, func() (bool, error) {
+		if err := b.maybeTransition(ctx); err != nil {
+			return false, err
+		}
 
-	if err := b.maybeTransition(ctx); err != nil {
-		return false, err
-	}
-
-	blkWithCtx, ok := b.blk.(smblock.WithVerifyContext)
-	if !ok {
-		return false, nil
-	}
-	return blkWithCtx.ShouldVerifyWithContext(ctx)
+		blkWithCtx, ok := b.blk.(smblock.WithVerifyContext)
+		if !ok {
+			return false, nil
+		}
+		return blkWithCtx.ShouldVerifyWithContext(ctx)
+	})
 }
 
 var errBlockDoesNotImplementWithVerifyContext = errors.New("block does not implement WithVerifyContext")
 
 func (b *block) VerifyWithContext(ctx context.Context, blockCtx *smblock.Context) error {
-	b.vm.transitionLock.RLock()
-	defer b.vm.transitionLock.RUnlock()
-	b.vm.current.chainCtx.Lock.Lock()
-	defer b.vm.current.chainCtx.Lock.Unlock()
+	return b.vm.withLocks(func() error {
+		if err := b.maybeTransition(ctx); err != nil {
+			return err
+		}
 
-	if err := b.maybeTransition(ctx); err != nil {
-		return err
-	}
-
-	blkWithCtx, ok := b.blk.(smblock.WithVerifyContext)
-	if !ok {
-		return errBlockDoesNotImplementWithVerifyContext
-	}
-	return blkWithCtx.VerifyWithContext(ctx, blockCtx)
+		blkWithCtx, ok := b.blk.(smblock.WithVerifyContext)
+		if !ok {
+			return errBlockDoesNotImplementWithVerifyContext
+		}
+		return blkWithCtx.VerifyWithContext(ctx, blockCtx)
+	})
 }
 
 var errPostTransitionBlockBeforeTransition = errors.New("post-transition block before transition")
@@ -164,56 +155,43 @@ func (b *block) Accept(ctx context.Context) error {
 }
 
 func (b *block) Reject(ctx context.Context) error {
-	b.vm.transitionLock.RLock()
-	defer b.vm.transitionLock.RUnlock()
-	b.vm.current.chainCtx.Lock.Lock()
-	defer b.vm.current.chainCtx.Lock.Unlock()
-
-	// `block.lock` doesn't need to be held here because the block is immutable
-	// after either `block.Verify` or `block.VerifyWithContext` return nil.
-	//
-	// Once transitioned, the pre-transition chain is shut down. Forwarding
-	// Reject into it could return an error, which the engine treats as fatal.
-	if b.transitioned != b.vm.transitioned {
-		return nil
-	}
-	return b.blk.Reject(ctx)
+	return b.vm.withLocks(func() error {
+		// `block.lock` doesn't need to be held here because the block is
+		// immutable after either `block.Verify` or `block.VerifyWithContext`
+		// return nil.
+		//
+		// Once transitioned, the pre-transition chain is shut down. Forwarding
+		// Reject into it could return an error, which the engine treats as
+		// fatal.
+		if b.transitioned != b.vm.transitioned {
+			return nil
+		}
+		return b.blk.Reject(ctx)
+	})
 }
 
 func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-	vm.current.chainCtx.Lock.Lock()
-	defer vm.current.chainCtx.Lock.Unlock()
-
-	return vm.wrapBlock(vm.current.chain.BuildBlock(ctx))
+	return withLocks(vm, func() (snowman.Block, error) {
+		return vm.wrapBlock(vm.current.chain.BuildBlock(ctx))
+	})
 }
 
 func (vm *VM) BuildBlockWithContext(ctx context.Context, blockCtx *smblock.Context) (snowman.Block, error) {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-	vm.current.chainCtx.Lock.Lock()
-	defer vm.current.chainCtx.Lock.Unlock()
-
-	return vm.wrapBlock(vm.current.chain.BuildBlockWithContext(ctx, blockCtx))
+	return withLocks(vm, func() (snowman.Block, error) {
+		return vm.wrapBlock(vm.current.chain.BuildBlockWithContext(ctx, blockCtx))
+	})
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-	vm.current.chainCtx.Lock.Lock()
-	defer vm.current.chainCtx.Lock.Unlock()
-
-	return vm.wrapBlock(vm.current.chain.ParseBlock(ctx, blockBytes))
+	return withLocks(vm, func() (snowman.Block, error) {
+		return vm.wrapBlock(vm.current.chain.ParseBlock(ctx, blockBytes))
+	})
 }
 
 func (vm *VM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-	vm.current.chainCtx.Lock.Lock()
-	defer vm.current.chainCtx.Lock.Unlock()
-
-	return vm.wrapBlock(vm.current.chain.GetBlock(ctx, blkID))
+	return withLocks(vm, func() (snowman.Block, error) {
+		return vm.wrapBlock(vm.current.chain.GetBlock(ctx, blkID))
+	})
 }
 
 func (vm *VM) wrapBlock(b snowman.Block, err error) (snowman.Block, error) {

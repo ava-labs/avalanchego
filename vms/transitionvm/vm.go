@@ -321,3 +321,23 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 	}
 	return nil
 }
+
+// withLocks acquires the transition and current chain context locks before
+// executing the provided function.
+//
+// See the README for an explanation of the locking order requirements.
+func (vm *VM) withLocks(f func() error) error {
+	_, err := withLocks(vm, func() (struct{}, error) {
+		return struct{}{}, f()
+	})
+	return err
+}
+
+func withLocks[T any](vm *VM, f func() (T, error)) (T, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
+
+	return f()
+}
