@@ -14,6 +14,14 @@
   - `avalanche_{vmName}_sae_executed_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of executed blocks.
 - Added `avalanche_{vmName}_sae_in_memory_blocks` (gauge): number of SAE blocks still live in memory (created but not yet garbage collected).
 - Added `avalanche_{vmName}_sae_accepted_gas_limit_total` (counter): cumulative gas limit (worst-case gas) of blocks accepted into the execution queue; the acceptance-side counterpart of `executed_gas_limit_total`.
+- Added SAE gas-time and pricing metrics:
+  - `avalanche_{vmName}_sae_last_executed_gas_time_timestamp_seconds` (gauge): gas time reached by the latest executed block, as a Unix timestamp.
+  - `avalanche_{vmName}_sae_gas_time_wall_time_gap_seconds` (gauge): gas time minus wall time, observed when the latest block finished executing; negative when gas time lags the wall clock.
+  - `avalanche_{vmName}_sae_accepted_base_fee` (gauge): worst-case base fee admitted by consensus for the latest block accepted into the execution queue.
+  - `avalanche_{vmName}_sae_executed_base_fee` (gauge): base fee realized by execution of the latest executed block.
+  - `avalanche_{vmName}_sae_accepted_gas_excess` (gauge): worst-case gas excess admitted by consensus for the latest block accepted into the execution queue.
+  - `avalanche_{vmName}_sae_executed_gas_excess` (gauge): gas excess realized by execution of the latest executed block.
+  - `avalanche_{vmName}_sae_gas_target` (gauge): ACP-176 gas target in force as of the latest block accepted into the execution queue.
 - Renamed Coreth and Subnet-EVM state-sync p2p metrics:
   - `avalanche_{vmName}_eth_net_tracked_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_tracked_peers`
   - `avalanche_{vmName}_eth_net_responsive_peers` -> `avalanche_{vmName}_sdk_sync_peer_tracker_num_responsive_peers`
