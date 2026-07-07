@@ -1,6 +1,6 @@
 # Reproducing the multi-party staking flow end-to-end
 
-FOR P-CHAIN TXN BUILDING, SEE: cmd/multipartystake/TX_INTERNALS.md
+FOR P-CHAIN TXN BUILDING: cmd/multipartystake/TX_INTERNALS.md
 
 All commands below assume `cwd = /Users/meag.fitz/repos/avalanchego`.
 
