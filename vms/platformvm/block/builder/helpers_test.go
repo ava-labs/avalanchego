@@ -131,7 +131,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		Fx:           res.fx,
 		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()

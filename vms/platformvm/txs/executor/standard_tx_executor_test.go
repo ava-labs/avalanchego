@@ -2173,7 +2173,6 @@ func TestStandardExecutorPutStakerHeliconRewards(t *testing.T) {
 				RewardConfig:  cfg,
 				UpgradeConfig: upgradeConfig,
 			},
-			Rewards: reward.NewCalculator(cfg),
 		},
 		tx: &txs.Tx{
 			Unsigned: stakerTx,
@@ -2186,6 +2185,10 @@ func TestStandardExecutorPutStakerHeliconRewards(t *testing.T) {
 	gotValidator, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 	require.Equal(t, wantReward, gotValidator.PotentialReward)
+
+	gotSupply, err := onAcceptState.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+	require.Equal(t, supply+wantReward, gotSupply)
 }
 
 func TestStandardExecutorTransformSubnetTx(t *testing.T) {
@@ -4529,7 +4532,15 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 
-	wantPotentialReward := env.backend.Rewards.Calculate(
+	rewards, err := GetRewardsCalculator(
+		env.config.RewardConfig,
+		env.config.UpgradeConfig,
+		env.state,
+		constants.PrimaryNetworkID,
+		env.state.GetTimestamp(),
+	)
+	require.NoError(t, err)
+	wantPotentialReward := rewards.Calculate(
 		period,
 		weight,
 		currentSupply,

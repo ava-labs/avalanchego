@@ -126,7 +126,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		Fx:           fx,
 		FlowChecker:  utxosVerifier,
 		Uptimes:      uptimes,
-		Rewards:      rewards,
 	}
 
 	env := &environment{
