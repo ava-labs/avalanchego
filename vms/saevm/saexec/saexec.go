@@ -76,9 +76,9 @@ func New(
 		return nil, err
 	}
 
-	m, err := newMetrics(reg, lastExecuted.Height())
+	m, err := newMetrics(reg, lastExecuted, hooks)
 	if err != nil {
-		return nil, fmt.Errorf("registering saexec metrics: %w", err)
+		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}
 
 	e := &Executor{
