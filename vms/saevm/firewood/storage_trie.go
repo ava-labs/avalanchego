@@ -6,6 +6,7 @@ package firewood
 import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie/trienode"
 )
 
@@ -35,8 +36,10 @@ func (*storageTrie) Hash() common.Hash {
 	return common.Hash{}
 }
 
-// Copy returns nil, as storage tries do not need to be copied separately.
-// All usage of a copied storage trie should first ensure it is non-nil.
-func (*storageTrie) Copy() *storageTrie {
-	return nil
+// Prove writes the inclusion or exclusion proof for the already hashed key to
+// the provided writer.
+//
+// TODO(alarso16): Implement.
+func (*storageTrie) Prove([]byte, ethdb.KeyValueWriter) error {
+	return errProveNotImplemented
 }

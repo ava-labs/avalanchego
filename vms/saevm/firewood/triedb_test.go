@@ -433,30 +433,30 @@ func TestMultipleProposals(t *testing.T) {
 func TestInvalidConfig(t *testing.T) {
 	tests := []struct {
 		name    string
-		cfg     func(TrieDBConfig) TrieDBConfig
+		cfg     func(Config) Config
 		wantErr error
 	}{
 		{
 			name: "empty directory",
-			cfg: func(cfg TrieDBConfig) TrieDBConfig {
-				cfg.DatabaseDir = ""
+			cfg: func(cfg Config) Config {
+				cfg.Directory = ""
 				return cfg
 			},
-			wantErr: errDatabaseDirNotProvided,
+			wantErr: errDirNotProvided,
 		},
 		{
 			name: "file instead of directory",
-			cfg: func(cfg TrieDBConfig) TrieDBConfig {
+			cfg: func(cfg Config) Config {
 				file := t.TempDir() + "/file"
 				require.NoError(t, os.WriteFile(file, []byte("not a directory"), 0o600))
-				cfg.DatabaseDir = file
+				cfg.Directory = file
 				return cfg
 			},
 			wantErr: errNotDirectory,
 		},
 		{
 			name: "too few revisions",
-			cfg: func(cfg TrieDBConfig) TrieDBConfig {
+			cfg: func(cfg Config) Config {
 				cfg.RevisionsInMemory = 1
 				return cfg
 			},
@@ -464,12 +464,20 @@ func TestInvalidConfig(t *testing.T) {
 		},
 		{
 			name: "commit interval too big",
-			cfg: func(cfg TrieDBConfig) TrieDBConfig {
+			cfg: func(cfg Config) Config {
 				cfg.DeferredCommitInterval = 5
 				cfg.RevisionsInMemory = 5
 				return cfg
 			},
 			wantErr: errCommitIntervalTooBig,
+		},
+		{
+			name: "no logger",
+			cfg: func(cfg Config) Config {
+				cfg.Log = nil
+				return cfg
+			},
+			wantErr: errNoLogger,
 		},
 	}
 
@@ -482,10 +490,10 @@ func TestInvalidConfig(t *testing.T) {
 	}
 }
 
-func TestNoLoggerPanics(t *testing.T) {
+func TestNoLoggerPanicsInBackendConstructor(t *testing.T) {
 	cfg := DefaultConfig(t.TempDir(), nil)
 	require.Panics(t, func() {
-		_, _ = New(cfg)
+		_ = cfg.BackendConstructor(rawdb.NewMemoryDatabase())
 	}, "New()")
 }
 

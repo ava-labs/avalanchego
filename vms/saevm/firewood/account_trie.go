@@ -4,11 +4,10 @@
 package firewood
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"go.uber.org/zap"
 )
@@ -73,13 +72,10 @@ func (a *accountTrie) hash() (common.Hash, error) {
 		return a.root, nil
 	}
 
-	proposal, err := a.tdb.trieHash(a.parentRoot, a.updateOps)
-	switch {
-	case err != nil:
+	proposal, err := a.tdb.newProposal(a.parentRoot, a.updateOps)
+	// TODO(#5506): Create [ffi.Reconstructed] to allow stateful RPCs.
+	if err != nil {
 		return common.Hash{}, err
-	case proposal == nil:
-		// TODO(#5506): Create [ffi.Reconstructed] to allow stateful RPCs.
-		return common.Hash{}, fmt.Errorf("base revision %#x is not proposable", a.parentRoot)
 	}
 
 	// Best effort drop of previous reader (and thus any associated proposal).
@@ -112,6 +108,14 @@ func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 
 	a.tdb.trieCommit(a.pending)
 	return hash, trienode.NewNodeSet(common.Hash{}), nil
+}
+
+// Prove writes the inclusion or exclusion proof for the already hashed key to
+// the provided writer.
+//
+// TODO(alarso16): Implement.
+func (*accountTrie) Prove([]byte, ethdb.KeyValueWriter) error {
+	return errProveNotImplemented
 }
 
 // Copy creates a copy of the [accountTrie].

@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/libevm/triedb/database"
 	"go.uber.org/zap"
 
-	_ "github.com/ava-labs/libevm/trie"
+	_ "github.com/ava-labs/libevm/trie" // comment resolution
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -37,13 +37,13 @@ import (
 const firewoodDir = graft.FirewoodDir
 
 var (
-	_ triedb.DBConstructor = TrieDBConfig{}.BackendConstructor
+	_ triedb.DBConstructor = Config{}.BackendConstructor
 	_ triedb.HashDB        = (*TrieDB)(nil)
 )
 
-// TrieDBConfig holds the configuration for creating a [TrieDB].
-type TrieDBConfig struct {
-	DatabaseDir       string
+// Config holds the configuration for creating a [TrieDB].
+type Config struct {
+	Directory         string
 	Log               logging.Logger
 	CacheSizeBytes    uint
 	RevisionsInMemory uint // must be >= 2
@@ -59,9 +59,9 @@ type TrieDBConfig struct {
 //   - CacheSizeBytes: 1MiB
 //   - RevisionsInMemory: 128
 //   - DeferredCommitInterval: 64
-func DefaultConfig(dir string, log logging.Logger) TrieDBConfig {
-	return TrieDBConfig{
-		DatabaseDir:            dir,
+func DefaultConfig(dir string, log logging.Logger) Config {
+	return Config{
+		Directory:              dir,
 		Log:                    log,
 		CacheSizeBytes:         1024 * 1024,
 		RevisionsInMemory:      128,
@@ -72,26 +72,31 @@ func DefaultConfig(dir string, log logging.Logger) TrieDBConfig {
 // BackendConstructor can be supplied as a [triedb.DBConstructor].
 // It creates a new Firewood database with the given configuration.
 // Any error during creation will cause the program to exit.
-func (c TrieDBConfig) BackendConstructor(ethdb.Database) triedb.DBOverride {
+func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
 	db, err := New(c)
 	if err != nil {
-		c.Log.Fatal("creating firewood database", zap.Error(err))
+		if c.Log == nil {
+			panic(fmt.Errorf("creating firewood database: %w", err))
+		} else {
+			c.Log.Fatal("creating firewood database", zap.Error(err))
+		}
 	}
 	return db
 }
 
 var (
-	errDatabaseDirNotProvided = errors.New("DatabaseDir must be provided")
-	errTooFewRevisions        = errors.New("RevisionsInMemory must be >= 2")
-	errCommitIntervalTooBig   = errors.New("DeferredCommitInterval must be < RevisionsInMemory")
-	errNotDirectory           = errors.New("database directory path is not a directory")
+	errNoLogger             = errors.New("Log must be provided")       //nolint:staticcheck // false positive
+	errDirNotProvided       = errors.New("Directory must be provided") //nolint:staticcheck // false positive
+	errTooFewRevisions      = errors.New("RevisionsInMemory must be >= 2")
+	errCommitIntervalTooBig = errors.New("DeferredCommitInterval must be < RevisionsInMemory")
+	errNotDirectory         = errors.New("database directory path is not a directory")
 )
 
-func (c TrieDBConfig) Validate() error {
+func (c Config) Validate() error {
 	if c.Log == nil {
-		panic("TrieDBConfig.Log must be set")
+		return errNoLogger
 	}
-	if err := validateDir(c.DatabaseDir); err != nil {
+	if err := validateDir(c.Directory); err != nil {
 		return err
 	}
 	if c.RevisionsInMemory < 2 {
@@ -106,7 +111,7 @@ func (c TrieDBConfig) Validate() error {
 // validateDir ensures that the given directory exists and is a directory.
 func validateDir(dir string) error {
 	if dir == "" {
-		return errDatabaseDirNotProvided
+		return errDirNotProvided
 	}
 
 	switch info, err := os.Stat(dir); {
@@ -153,7 +158,7 @@ type proposalRef struct {
 	child  *proposalRef
 }
 
-func New(config TrieDBConfig) (*TrieDB, error) {
+func New(config Config) (*TrieDB, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -171,16 +176,16 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		options = append(options, ffi.WithExpensiveMetrics())
 	}
 
-	path := filepath.Join(config.DatabaseDir, firewoodDir)
+	path := filepath.Join(config.Directory, firewoodDir)
 	fw, err := ffi.New(path, ffi.EthereumNodeHashing, options...)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
 	if root := common.Hash(fw.Root()); root == types.EmptyRootHash {
-		config.Log.Debug("empty firewood database opened", zap.String("path", path))
+		config.Log.Info("empty firewood database opened", zap.String("path", path))
 	} else {
-		config.Log.Debug("firewood database opened", zap.Stringer("root", root), zap.String("path", path))
+		config.Log.Info("firewood database opened", zap.Stringer("root", root), zap.String("path", path))
 	}
 
 	return &TrieDB{
@@ -197,13 +202,13 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 //
 // TODO(alarso16): Force drop all pending revisions on close once supported.
 func (t *TrieDB) Close() error {
-	var err error
+	errs := make([]error, 0, len(t.committable)+2)
 	for _, proposal := range t.committable {
-		err = errors.Join(err, proposal.p.Drop())
+		errs = append(errs, proposal.p.Drop())
 	}
 	t.committable = nil
 	if t.pending != nil {
-		err = errors.Join(err, t.pending.p.Drop())
+		errs = append(errs, t.pending.p.Drop())
 		t.pending = nil
 	}
 
@@ -212,7 +217,9 @@ func (t *TrieDB) Close() error {
 	go runtime.GC()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	return errors.Join(err, t.Firewood.Close(ctx))
+	errs = append(errs, t.Firewood.Close(ctx))
+
+	return errors.Join(errs...)
 }
 
 // Initialized indicates whether any state has been committed, typically used to
@@ -316,11 +323,10 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	return err
 }
 
-// trieHash creates a new proposal from either a committable proposal or the tip of the database.
+// newProposal creates a new proposal from either a committable proposal or the tip of the database.
 // Returns (non-nil, nil) if a proposal was successfully created.
-// Returns (nil, nil) if the parent revision cannot be used as the base for a proposal.
 // Returns (nil, err) for any error.
-func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*proposalRef, error) {
+func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*proposalRef, error) {
 	parent, foundProposal := t.committable[parentRoot]
 	var propose func([]ffi.BatchOp) (*ffi.Proposal, error)
 	switch {
@@ -328,13 +334,8 @@ func (t *TrieDB) trieHash(parentRoot common.Hash, batchOps []ffi.BatchOp) (*prop
 		propose = parent.p.Propose
 	case parentRoot == common.Hash(t.Firewood.Root()):
 		propose = t.Firewood.Propose
-		parent = nil // nothing else would be required to be committed first
 	default:
-		// check if a reconstruction could be made
-		if rev, err := t.Firewood.Revision(ffi.Hash(parentRoot)); err == nil {
-			return nil, rev.Drop()
-		}
-		return nil, fmt.Errorf("parent root %+x not found in database", parentRoot)
+		return nil, fmt.Errorf("parent root %+x is not proposable", parentRoot)
 	}
 
 	proposal, err := propose(batchOps)

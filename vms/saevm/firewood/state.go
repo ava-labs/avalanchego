@@ -1,6 +1,9 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package firewood implements a single-tier trie for the EVM in a database
+// with built-in merkleization. See github.com/ava-labs/firewood for more
+// details.
 package firewood
 
 import (
@@ -60,7 +63,7 @@ func (s *stateAccessor) CopyTrie(t state.Trie) state.Trie {
 	case *accountTrie:
 		return t.Copy()
 	case *storageTrie:
-		// The storage trie just wraps the account trie, and the [state.StateDB] will reopen as necessary
+		// The storage trie just wraps the base trie, and the [state.StateDB] will reopen as necessary
 		return nil
 	default:
 		// Returning nil may cause a panic downstream, but this should never happen.
