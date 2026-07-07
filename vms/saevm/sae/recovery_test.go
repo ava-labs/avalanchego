@@ -138,6 +138,10 @@ func TestRecoverSimple(t *testing.T) {
 		archival  bool
 	}{
 		{
+			name:      "genesis",
+			numBlocks: 0,
+		},
+		{
 			name:      "archival",
 			numBlocks: 10,
 			archival:  true,

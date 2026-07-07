@@ -31,15 +31,15 @@ While it also has a notion of a "safe" block (with reduced probability of re-org
 
 #### Mapping
 
-| SAE      | `rawdb`   |
-| -------- | --------- |
-| Accepted | Canonical |
-| Executed | Head      |
-| Settled  | Finalized |
+| SAE      | `rawdb`             |
+| -------- | ------------------- |
+| Accepted | Canonical, HeadFast |
+| Executed | Head                |
+| Settled  | Finalized           |
 
 #### Rationale
 
-* Accepted and canonical are effectively identical concepts, save for nuanced differences between the consensus mechanisms.
+* Accepted and canonical are effectively identical concepts, save for nuanced differences between the consensus mechanisms. `libevm`'s `HeadFast` denotes a recorded block whose state has not yet been executed; this aligns with SAE's definition of Accepted and is convenient for indexing the last-accepted block.
 
 * From an API perspective, we treat "latest" (i.e. the chain head) as the last-executed block.
 Mirroring this on disk allows for simple integration with the upstream API implementations.
