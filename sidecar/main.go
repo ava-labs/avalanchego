@@ -19,16 +19,13 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
-// buildVerifier instantiates the correct verifier implementation for a source
-// type given its raw JSON config body. Add a case here when registering a new
-// source type in network/p2p/oracle/message.go (KnownSourceTypes).
+// Add a case here when registering a new source type in
+// network/p2p/oracle/message.go (KnownSourceTypes).
 func buildVerifier(sourceType string, body json.RawMessage) (oracleVerifier, error) {
 	switch sourceType {
 	case oracle.SourceTypeSolana:
 		return solanarpc.NewSolanaVerifier(body, nil)
 	default:
-		// Unreachable if the caller has already cross-checked against
-		// oracle.IsKnownSourceType, but kept as defense-in-depth.
 		return nil, fmt.Errorf("no verifier implementation for source type %q", sourceType)
 	}
 }

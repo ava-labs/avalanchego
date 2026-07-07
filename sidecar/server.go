@@ -15,28 +15,17 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
-// oracleVerifier is the domain interface Server depends on. Any implementation
-// that can confirm or deny whether an OracleMessage occurred on its source chain
-// satisfies this interface.
 type oracleVerifier interface {
 	Verify(ctx context.Context, msg *oracle.OracleMessage, justification []byte) error
 }
 
-// Server implements the OracleSidecar gRPC service. It routes each
-// VerifyRequest to the verifier registered for the message's SourceType and
-// maps errors to the gRPC status codes documented in proto/oracle/oracle.proto:
-//
-//   - codes.OK              — event confirmed on source chain
-//   - codes.InvalidArgument — event cannot be confirmed (bad payload, unknown source type, …)
-//   - codes.Unavailable     — source chain RPC is unreachable
+// Server routes each VerifyRequest to the verifier registered for
+// msg.SourceType. Unknown source types return InvalidArgument.
 type Server struct {
 	pb.UnimplementedOracleSidecarServer
 	verifiers map[string]oracleVerifier
 }
 
-// NewServer constructs a Server that dispatches to one verifier per source
-// type. Messages whose SourceType is not present in verifiers are rejected
-// with InvalidArgument.
 func NewServer(verifiers map[string]oracleVerifier) *Server {
 	return &Server{verifiers: verifiers}
 }

@@ -13,28 +13,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-// SourceTypeSolana identifies the Solana verifier. Add a new const here when
-// adding a new source-chain verifier, and register it in KnownSourceTypes.
 const SourceTypeSolana = "solana"
 
 // KnownSourceTypes is the compile-time set of source types this build supports.
-// Both the validator's config loader and the sidecar's main check configured
-// entries against this set at startup; anything not listed here causes a
-// startup error rather than a silent misroute at runtime.
+// The validator config loader and the sidecar main both cross-check configured
+// entries against this set at startup, turning typos into boot failures.
 var KnownSourceTypes = map[string]struct{}{
 	SourceTypeSolana: {},
 }
 
-// IsKnownSourceType reports whether s is a source type this build knows about.
 func IsKnownSourceType(s string) bool {
 	_, ok := KnownSourceTypes[s]
 	return ok
 }
 
-// oracleMessageArgs defines the ABI encoding for OracleMessage.
-// The warp payload is abi.encode(sourceType, sourceAddress, destContract,
-// sourceBlockHeight, nonce, payload) — identical to abi.encode of the
-// individual fields in Solidity, which is what OracleAdapter.sol expects.
 var oracleMessageArgs abi.Arguments
 
 func init() {
@@ -60,35 +52,24 @@ func init() {
 	}
 }
 
-// OracleMessage is the application-level payload attested by validators.
-// It is ABI-encoded as the warp UnsignedMessage payload so that OracleAdapter.sol
-// can verify it on-chain without a custom decoder.
+// OracleMessage is ABI-encoded as the warp UnsignedMessage payload so
+// OracleAdapter.sol can decode it natively.
+// Nonce is unique per (SourceType, SourceAddress) for on-chain replay protection.
 type OracleMessage struct {
-	// SourceType identifies the external source (e.g. "solana", "bitcoin", "price-feed").
-	SourceType string
-	// SourceAddress is the program or contract address on the source chain.
-	SourceAddress string
-	// DestContract is the destination contract address on the L1.
-	DestContract common.Address
-	// SourceBlockHeight is the block or slot on the source chain at which the event occurred.
+	SourceType        string
+	SourceAddress     string
+	DestContract      common.Address
 	SourceBlockHeight uint64
-	// Nonce is unique per (SourceType, SourceAddress) and is used for replay protection.
-	// The on-chain adapter keys processed messages on keccak256(sourceType, sourceAddress, nonce).
-	Nonce uint64
-	// Payload is the application-level data being transferred.
-	Payload []byte
+	Nonce             uint64
+	Payload           []byte
 
 	bytes []byte
 }
 
-// Bytes returns the ABI-encoded representation of the message. This is what
-// goes into the warp UnsignedMessage payload and what OracleAdapter.sol hashes
-// for the payload-binding check.
 func (m *OracleMessage) Bytes() []byte {
 	return m.bytes
 }
 
-// ID returns a hash of the message bytes, used as a content identifier.
 func (m *OracleMessage) ID() ids.ID {
 	return hashing.ComputeHash256Array(m.bytes)
 }

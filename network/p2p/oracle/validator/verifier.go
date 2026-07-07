@@ -15,26 +15,16 @@ import (
 )
 
 const (
-	// SignatureRequestHandlerID is the p2p handler ID for oracle attestation
-	// requests. Distinct from acp118.HandlerID (2) which is reserved for
-	// native warp. Oracle attestations require sidecar involvement and are a
-	// separate protocol.
+	// Distinct from acp118.HandlerID (2, native warp) so oracle attestations
+	// can evolve independently of the warp signing protocol.
 	SignatureRequestHandlerID uint64 = p2p.OracleSignatureRequestHandlerID
 
 	errCodeParse  int32 = 1
 	errCodeVerify int32 = 2
 )
 
-// OracleVerifier implements acp118.Verifier for oracle attestation messages.
-// It parses the OracleMessage from the warp payload, rejects source types the
-// local sidecar has not declared support for, and otherwise delegates
-// verification to a SidecarClient.
-//
-// The allowed-source-type set exists so that a node can fast-reject signature
-// requests for chains its sidecar cannot handle (e.g. a Bitcoin request
-// arriving at a Solana-only node), before doing any RPC work. The set is
-// derived from the sidecar's own config file — see sidecar/config and the
-// wiring in graft/subnet-evm/plugin/evm/vm.go.
+// OracleVerifier fast-rejects unsupported source types then delegates to the sidecar.
+// allowedSources is derived from the sidecar config; a nil/empty set rejects everything.
 type OracleVerifier struct {
 	sidecar        oracle.SidecarClient
 	allowedSources map[string]struct{}
@@ -42,9 +32,6 @@ type OracleVerifier struct {
 
 var _ acp118.Verifier = (*OracleVerifier)(nil)
 
-// NewOracleVerifier constructs an OracleVerifier that will reject any message
-// whose SourceType is not in allowed. A nil or empty allowed set rejects all
-// messages — callers must pass at least one source type to enable verification.
 func NewOracleVerifier(sidecar oracle.SidecarClient, allowed map[string]struct{}) *OracleVerifier {
 	return &OracleVerifier{sidecar: sidecar, allowedSources: allowed}
 }
