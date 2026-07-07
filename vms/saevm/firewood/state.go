@@ -25,6 +25,9 @@ func init() {
 	state.RegisterDatabaseInterceptor(interceptor)
 }
 
+// interceptor takes any arbitrary [state.Database] and, if it is backed by
+// Firewood, returns a wrapped version that will return a different
+// [state.Trie] implementation.
 func interceptor(db state.Database) state.Database {
 	if tdb, ok := db.TrieDB().Backend().(*TrieDB); ok {
 		return &stateAccessor{
@@ -61,12 +64,13 @@ func (*stateAccessor) OpenStorageTrie(stateRoot common.Hash, addr common.Address
 func (s *stateAccessor) CopyTrie(t state.Trie) state.Trie {
 	switch t := t.(type) {
 	case *accountTrie:
-		return t.Copy()
+		return t.Copy() // MUST NOT be nil
 	case *storageTrie:
-		// The storage trie just wraps the base trie, and the [state.StateDB] will reopen as necessary
+		// The storage trie wraps the base trie, and the [state.StateDB] will
+		// reopen as necessary. It is impossible to obtain a reference to the
+		// copied base trie, so nil is the best we can do.
 		return nil
 	default:
-		// Returning nil may cause a panic downstream, but this should never happen.
 		s.triedb.log.Fatal("unknown trie type", zap.String("type", fmt.Sprintf("%T", t)))
 		return nil
 	}

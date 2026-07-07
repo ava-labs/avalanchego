@@ -16,7 +16,7 @@ import (
 )
 
 func accountKey(addr common.Address) []byte {
-	return crypto.Keccak256Hash(addr.Bytes()).Bytes() // inlined so allocation is avoided
+	return crypto.Keccak256Hash(addr.Bytes()).Bytes()
 }
 
 func storageKey(addr common.Address, key []byte) []byte {
@@ -50,49 +50,45 @@ var (
 //
 // Not concurrent-safe.
 type baseTrie struct {
-	reader trieReader
-	root   common.Hash
-
-	updateOps  []ffi.BatchOp
-	hasChanges bool
+	reader    trieReader
+	updateOps []ffi.BatchOp
 }
 
 // GetAccount returns the state account associated with an address.
 // Returns (nil, nil) if the account does not exist.
-func (a *baseTrie) GetAccount(addr common.Address) (*types.StateAccount, error) {
-	accountBytes, err := a.reader.Get(accountKey(addr))
+func (b *baseTrie) GetAccount(addr common.Address) (*types.StateAccount, error) {
+	accountBytes, err := b.reader.Get(accountKey(addr))
 	if err != nil || accountBytes == nil {
 		return nil, err
 	}
 
-	// Decode the account node
 	account := new(types.StateAccount)
 	err = rlp.DecodeBytes(accountBytes, account)
 	return account, err
 }
 
-// UpdateAccount replaces or creates the state account associated with an address.
-func (a *baseTrie) UpdateAccount(addr common.Address, account *types.StateAccount) error {
+// UpdateAccount replaces or creates the state account associated with an
+// address. The [types.StateAccount.Root] is ignored, and will be replaced
+// adhoc when creating the new proposal.
+func (b *baseTrie) UpdateAccount(addr common.Address, account *types.StateAccount) error {
 	data, err := rlp.EncodeToBytes(account)
 	if err != nil {
 		return err
 	}
-	a.updateOps = append(a.updateOps, ffi.Put(accountKey(addr), data))
-	a.hasChanges = true
+	b.updateOps = append(b.updateOps, ffi.Put(accountKey(addr), data))
 	return nil
 }
 
 // DeleteAccount removes the state account associated with an address AND its storage trie.
-func (a *baseTrie) DeleteAccount(addr common.Address) error {
-	a.updateOps = append(a.updateOps, ffi.PrefixDelete(accountKey(addr)))
-	a.hasChanges = true
+func (b *baseTrie) DeleteAccount(addr common.Address) error {
+	b.updateOps = append(b.updateOps, ffi.PrefixDelete(accountKey(addr)))
 	return nil
 }
 
 // GetStorage returns the value associated with a storage key for a given account address.
 // Returns (nil, nil) if the slot does not exist.
-func (a *baseTrie) GetStorage(addr common.Address, key []byte) ([]byte, error) {
-	storageBytes, err := a.reader.Get(storageKey(addr, key))
+func (b *baseTrie) GetStorage(addr common.Address, key []byte) ([]byte, error) {
+	storageBytes, err := b.reader.Get(storageKey(addr, key))
 	if err != nil || storageBytes == nil {
 		return nil, err
 	}
@@ -103,21 +99,19 @@ func (a *baseTrie) GetStorage(addr common.Address, key []byte) ([]byte, error) {
 }
 
 // UpdateStorage replaces or creates the value associated with a storage key for a given account address.
-func (a *baseTrie) UpdateStorage(addr common.Address, key []byte, value []byte) error {
+func (b *baseTrie) UpdateStorage(addr common.Address, key []byte, value []byte) error {
 	data, err := rlp.EncodeToBytes(value)
 	if err != nil {
 		return err
 	}
 
-	a.updateOps = append(a.updateOps, ffi.Put(storageKey(addr, key), data))
-	a.hasChanges = true
+	b.updateOps = append(b.updateOps, ffi.Put(storageKey(addr, key), data))
 	return nil
 }
 
 // DeleteStorage removes the value associated with a storage key for a given account address.
-func (a *baseTrie) DeleteStorage(addr common.Address, key []byte) error {
-	a.updateOps = append(a.updateOps, ffi.Delete(storageKey(addr, key)))
-	a.hasChanges = true
+func (b *baseTrie) DeleteStorage(addr common.Address, key []byte) error {
+	b.updateOps = append(b.updateOps, ffi.Delete(storageKey(addr, key)))
 	return nil
 }
 
@@ -140,12 +134,10 @@ func (*baseTrie) GetKey([]byte) []byte {
 }
 
 // copy creates a copy of the baseTrie fields with the given reader.
-func (a *baseTrie) copy(reader trieReader) *baseTrie {
+func (b *baseTrie) copy(reader trieReader) *baseTrie {
 	return &baseTrie{
-		reader:     reader,
-		root:       a.root,
-		hasChanges: len(a.updateOps) > 0,
-		updateOps:  slices.Clone(a.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
+		reader:    reader,
+		updateOps: slices.Clone(b.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
 	}
 }
 

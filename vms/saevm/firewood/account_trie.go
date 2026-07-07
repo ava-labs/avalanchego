@@ -31,9 +31,11 @@ var _ state.Trie = (*accountTrie)(nil)
 // Note this is not concurrent safe.
 type accountTrie struct {
 	*baseTrie
-	parentRoot common.Hash
-	pending    *proposalRef
-	tdb        *TrieDB
+	parentRoot   common.Hash
+	root         common.Hash
+	pending      *proposalRef
+	tdb          *TrieDB
+	lastHashSize int
 }
 
 func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
@@ -42,8 +44,9 @@ func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
 		return nil, err
 	}
 	return &accountTrie{
-		baseTrie:   &baseTrie{reader: reader, root: root},
+		baseTrie:   &baseTrie{reader: reader},
 		parentRoot: root,
+		root:       root,
 		tdb:        db,
 	}, nil
 }
@@ -59,55 +62,54 @@ func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
 // Hash cannot return an error, so if any error is encountered, it will be
 // logged at error level and the zero hash is returned.
 func (a *accountTrie) Hash() common.Hash {
-	hash, err := a.hash()
-	if err != nil {
+	if err := a.updateProposal(); err != nil {
 		a.tdb.log.Error("hashing account trie", zap.Error(err))
 		return common.Hash{}
 	}
-	return hash
+	return a.root
 }
 
-func (a *accountTrie) hash() (common.Hash, error) {
-	if !a.hasChanges {
-		return a.root, nil
+// updateProposal checks whether the pending proposal is out of date, and if it
+// is, creates a new proposal with the addiotional changes and updates the
+// internal state.
+func (a *accountTrie) updateProposal() error {
+	if a.lastHashSize == len(a.updateOps) {
+		return nil
 	}
 
 	proposal, err := a.tdb.newProposal(a.parentRoot, a.updateOps)
 	// TODO(#5506): Create [ffi.Reconstructed] to allow stateful RPCs.
 	if err != nil {
-		return common.Hash{}, err
-	}
-
-	// Best effort drop of previous reader (and thus any associated proposal).
-	// Use new proposal for all future reads.
-	if err := a.reader.Drop(); err != nil {
-		a.tdb.log.Warn("dropping previous trie reader", zap.Error(err))
+		return err
 	}
 
 	a.pending = proposal
 	a.reader = proposal.p
 	a.root = proposal.root
-	a.hasChanges = false // Avoid re-hashing until next update
-	return a.root, nil
+	a.lastHashSize = len(a.updateOps) // Avoid re-hashing until next update
+	return nil
 }
 
-// Commit returns the new root hash of the trie and an empty [trienode.NodeSet].
+// Commit returns the new root hash of the trie and a nil [trienode.NodeSet].
 // The boolean input is ignored, as it is a relic of the StateTrie implementation.
 // If the changes are not yet already tracked by the [TrieDB], they are created.
+//
+// The nil nodeset is not merged in [state.StateDB.Commit] and the merged
+// nodeset is ignored by [TrieDB.Update], since all changes are tracked by the
+// [ffi.Proposal].
 func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	// Creates proposal as side effect.
-	hash, err := a.hash()
-	if err != nil {
+	if err := a.updateProposal(); err != nil {
 		return common.Hash{}, nil, err
 	}
 
-	// The [state.StateDB] will only call [triedb.Database.Update] if the returned root differs from the parent.
-	if hash == a.parentRoot {
-		return a.parentRoot, nil, nil
+	// The [state.StateDB] only calls [triedb.Database.Update] when the root
+	// differs from the parent. Also, a.pending is only non-nil when the root
+	// has changed.
+	if a.root != a.parentRoot {
+		a.tdb.trieCommit(a.pending)
 	}
-
-	a.tdb.trieCommit(a.pending)
-	return hash, trienode.NewNodeSet(common.Hash{}), nil
+	return a.root, nil, nil
 }
 
 // Prove writes the inclusion or exclusion proof for the already hashed key to
@@ -120,6 +122,9 @@ func (*accountTrie) Prove([]byte, ethdb.KeyValueWriter) error {
 
 // Copy creates a copy of the [accountTrie].
 func (a *accountTrie) Copy() *accountTrie {
+	// This revision MUST be copied because it could refer to a proposal held
+	// by this account trie. If the proposal is committed, the reader will no
+	// longer be valid. However, an [ffi.Revision] will still be valid.
 	reader, err := a.tdb.Firewood.Revision(ffi.Hash(a.parentRoot))
 	if err != nil {
 		a.tdb.log.Error("creating trie copy", zap.Error(err))
@@ -128,6 +133,7 @@ func (a *accountTrie) Copy() *accountTrie {
 	return &accountTrie{
 		baseTrie:   a.baseTrie.copy(reader),
 		parentRoot: a.parentRoot,
+		root:       a.root,
 		tdb:        a.tdb,
 	}
 }
