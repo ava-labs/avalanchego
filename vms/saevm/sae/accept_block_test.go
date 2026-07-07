@@ -41,8 +41,8 @@ func TestAcceptBlock(t *testing.T) {
 	// Causes [VM.AcceptBlock] to wait until the block has executed.
 	require.NoError(t, sut.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
 
-	unsettled := []*blocks.Block{sut.genesis}
-	sut.genesis = nil // allow it to be GCd when appropriate
+	unsettled := []*blocks.Block{sut.initialSettled}
+	sut.initialSettled = nil // allow it to be GCd when appropriate
 
 	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 	for range 100 {

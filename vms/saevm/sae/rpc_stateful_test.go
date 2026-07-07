@@ -4,7 +4,6 @@
 package sae
 
 import (
-	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -30,6 +30,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -102,98 +104,258 @@ type txTraceResult struct {
 	Error  string                  `json:"error"`
 }
 
-// TestRPCsAtPreSAEBlock verifies state, receipt, and tracing RPCs once block
-// 1 and the synchronous (pre-SAE) genesis have been evicted from memory and
-// restored from disk: tracing block 1 replays on the restored genesis state.
-func TestRPCsAtPreSAEBlock(t *testing.T) {
-	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 2, opt)
+// depositLogPC is the program counter, in [escrow.ByteCode], of the LOG1
+// opcode for `emit Deposit()`. Verified by [depositLogOnlyCmpOpts].
+const depositLogPC = 185
 
-	// Distinct senders so the mempool pends both txs
-	deployTx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(2),
-		Data:     escrow.CreationCode(),
-	})
-	escrowAddr := crypto.CreateAddress(sut.wallet.Addresses()[0], 0)
-	depositTx := sut.wallet.SetNonceAndSign(t, 1, &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(common.Address{'r', 'e', 'c', 'v'}),
-		Value:    big.NewInt(42),
-	})
-	b1 := sut.runConsensusLoop(t, deployTx, depositTx)
-
-	receipts := b1.Receipts() // blocks until executed
-	require.Lenf(t, receipts, 2, "%T.Receipts()", b1)
-	require.Equalf(t, deployTx.Hash(), receipts[0].TxHash, "%T.Receipts()[0].TxHash", b1)
-	require.Equalf(t, depositTx.Hash(), receipts[1].TxHash, "%T.Receipts()[1].TxHash", b1)
-
-	// Pre-eviction responses to compare against their restored equivalents.
-	rawRPC := func(method string, arg any) json.RawMessage {
-		var raw json.RawMessage
-		require.NoErrorf(t, sut.CallContext(ctx, &raw, method, arg), "CallContext(%q, %v)", method, arg)
-		return raw
+// depositLogOnlyCmpOpts returns cmp options that limit a trace comparison to
+// the [depositLogPC] entry, ignoring its gas fields; asserting a full trace
+// would just be copy-pasted test output.
+func depositLogOnlyCmpOpts(tb testing.TB) cmp.Options {
+	tb.Helper()
+	require.Equal(tb, vm.LOG1, vm.OpCode(escrow.ByteCode()[depositLogPC]), "Bad test setup; program counter LOG1 for `emit Deposit()`")
+	return cmp.Options{
+		cmpopts.IgnoreSliceElements(func(r logger.StructLogRes) bool {
+			return r.Pc != depositLogPC || r.Op != vm.LOG1.String()
+		}),
+		cmpopts.IgnoreFields(logger.StructLogRes{}, "Gas", "GasCost"),
 	}
-	liveBlockReceipts := rawRPC("eth_getBlockReceipts", b1.Hash())
-	liveTxReceipt := rawRPC("eth_getTransactionReceipt", depositTx.Hash())
+}
 
-	sut.settleUntilEvicted(t, vmTime, sut.genesis.Hash(), b1.Hash())
-
-	require.JSONEq(t, string(liveBlockReceipts), string(rawRPC("eth_getBlockReceipts", b1.Hash())), "eth_getBlockReceipts() after eviction")
-	require.JSONEq(t, string(liveTxReceipt), string(rawRPC("eth_getTransactionReceipt", depositTx.Hash())), "eth_getTransactionReceipt() after eviction")
-
-	ignoreStructLogs := cmpopts.IgnoreFields(logger.ExecutionResult{}, "StructLogs")
-	wantTraces := []txTraceResult{
-		{
-			TxHash: deployTx.Hash(),
-			Result: &logger.ExecutionResult{
-				Gas:         receipts[0].GasUsed,
-				ReturnValue: common.Bytes2Hex(escrow.ByteCode()),
-			},
+// deployTraceResult returns the expected trace, under
+// [depositLogOnlyCmpOpts], of an [escrow.CreationCode] deployment.
+func deployTraceResult(tx *types.Transaction, gasUsed uint64) []txTraceResult {
+	return []txTraceResult{{
+		TxHash: tx.Hash(),
+		Result: &logger.ExecutionResult{
+			Gas:         gasUsed,
+			ReturnValue: common.Bytes2Hex(escrow.ByteCode()),
+			StructLogs:  []logger.StructLogRes{},
 		},
-		{
-			TxHash: depositTx.Hash(),
-			Result: &logger.ExecutionResult{Gas: receipts[1].GasUsed},
-		},
-	}
+	}}
+}
 
+// depositTraceResult returns the expected trace, under
+// [depositLogOnlyCmpOpts], of an [escrow.CallDataToDeposit] call.
+func depositTraceResult(tx *types.Transaction, gasUsed uint64, recipient common.Address, depositVal uint64) []txTraceResult {
+	return []txTraceResult{{
+		TxHash: tx.Hash(),
+		Result: &logger.ExecutionResult{
+			Gas: gasUsed,
+			StructLogs: []logger.StructLogRes{{
+				Pc:    depositLogPC,
+				Op:    vm.LOG1.String(),
+				Depth: 1,
+				Stack: utils.PointerTo([]string{
+					escrow.DepositEvent(recipient, uint256.NewInt(depositVal)).Topics[0].String(),
+					"0x40", "0x80", // arbitrary memory locations selected by Solidity
+				}),
+			}},
+		},
+	}}
+}
+
+// TestRPCsWithSynchronousHistory verifies state, receipt, and tracing RPCs on
+// a chain seeded with synchronous (pre-SAE) history, as inherited from a
+// migrated chain (e.g. the C-Chain), plus an asynchronous block built on the
+// synchronous frontier.
+func TestRPCsWithSynchronousHistory(t *testing.T) {
+	const (
+		numSyncBlocks    = 2
+		escrowDepositVal = 42
+	)
+	recipient := common.Address{'r', 'e', 'c', 'v'}
+	var (
+		escrowAddr   common.Address
+		syncChain    []*types.Block
+		syncReceipts []types.Receipts
+	)
+	seedOpt := withSynchronousChain(numSyncBlocks, func(w *saetest.Wallet, i int, bg *core.BlockGen) {
+		switch i {
+		case 0:
+			escrowAddr = crypto.CreateAddress(w.Addresses()[0], 0)
+			bg.AddTx(w.SetNonceAndSign(t, 0, &types.LegacyTx{
+				Gas:      1e6,
+				GasPrice: big.NewInt(1),
+				Data:     escrow.CreationCode(),
+			}))
+		case 1:
+			bg.AddTx(w.SetNonceAndSign(t, 0, &types.LegacyTx{
+				To:       &escrowAddr,
+				Gas:      1e6,
+				GasPrice: big.NewInt(1),
+				Data:     escrow.CallDataToDeposit(recipient),
+				Value:    big.NewInt(escrowDepositVal),
+			}))
+		}
+	}, &syncChain, &syncReceipts)
+
+	// The VM's clock MUST NOT be before the seeded chain's tip, whose
+	// timestamp is dictated by [core.GenerateChain]'s 10-second block gap.
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds+10*numSyncBlocks, 0))
+	ctx, sut := newSUT(t, 1, seedOpt, timeOpt)
+
+	deploy, deposit := syncChain[0], syncChain[1]
+	frontier := sut.lastAcceptedBlock(t)
+	require.Equalf(t, deposit.Hash(), frontier.Hash(), "%T.lastAcceptedBlock() after initialization on seeded chain", sut)
+	require.Truef(t, frontier.Synchronous(), "%T.Synchronous()", frontier)
+
+	deployTx := deploy.Transactions()[0]
+	depositTx := deposit.Transactions()[0]
+
+	ignore := depositLogOnlyCmpOpts(t)
+	wantDeployTrace := deployTraceResult(deployTx, syncReceipts[0][0].GasUsed)
+	wantDepositTrace := depositTraceResult(depositTx, syncReceipts[1][0].GasUsed, recipient, escrowDepositVal)
+
+	sender := sut.wallet.Addresses()[0]
+	genesisHash := deploy.ParentHash()
 	genesisBalance := (*hexutil.Big)(new(uint256.Int).SetAllOne().ToBig()) // [saetest.MaxAllocFor]
-	sut.testRPC(ctx, t, []rpcTest{
+	tests := []rpcTest{
+		// Synchronous genesis (no receipts).
 		{
 			method: "eth_getBalance",
-			args:   []any{sut.wallet.Addresses()[0], rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(sut.genesis.Number().Int64()))},
+			args:   []any{sender, rpc.BlockNumberOrHashWithNumber(0)},
 			want:   genesisBalance,
 		},
 		{
 			method: "eth_getBalance",
-			args:   []any{sut.wallet.Addresses()[0], rpc.BlockNumberOrHashWithHash(sut.genesis.Hash(), true)},
+			args:   []any{sender, rpc.BlockNumberOrHashWithHash(genesisHash, true)},
 			want:   genesisBalance,
 		},
 		{
 			method: "eth_getBlockReceipts",
-			args:   []any{hexutil.Uint64(sut.genesis.NumberU64())},
+			args:   []any{hexutil.Uint64(0)},
 			want:   []*types.Receipt{},
 		},
 		{
 			method: "eth_getBlockReceipts",
-			args:   []any{sut.genesis.Hash()},
+			args:   []any{genesisHash},
 			want:   []*types.Receipt{},
+		},
+		// Synchronous blocks.
+		{
+			method: "eth_getBalance",
+			args:   []any{escrowAddr, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(deposit.Number().Int64()))},
+			want:   hexBig(escrowDepositVal),
+		},
+		{
+			method: "eth_getBalance",
+			args:   []any{escrowAddr, rpc.BlockNumberOrHashWithHash(deposit.Hash(), true)},
+			want:   hexBig(escrowDepositVal),
+		},
+		{
+			method: "eth_getTransactionCount",
+			args:   []any{sender, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(deploy.Number().Int64()))},
+			want:   hexutil.Uint64(1),
+		},
+		{
+			method: "eth_getTransactionCount",
+			args:   []any{sender, rpc.BlockNumberOrHashWithHash(deposit.Hash(), true)},
+			want:   hexutil.Uint64(2),
+		},
+		{
+			method: "eth_getBlockReceipts",
+			args:   []any{deploy.Hash()},
+			want:   []*types.Receipt(syncReceipts[0]),
+			// nil Logs are served as an empty slice.
+			extraCmpOpts: cmp.Options{cmputils.NilSlicesAreEmpty[[]*types.Log]()},
+		},
+		{
+			method: "eth_getBlockReceipts",
+			args:   []any{hexutil.Uint64(deposit.NumberU64())},
+			want:   []*types.Receipt(syncReceipts[1]),
+		},
+		{
+			method: "eth_getTransactionReceipt",
+			args:   []any{depositTx.Hash()},
+			want:   syncReceipts[1][0],
+		},
+		// Traces re-execute sync blocks.
+		{
+			method:       "debug_traceBlockByNumber",
+			args:         []any{hexutil.Uint64(deploy.NumberU64())},
+			want:         wantDeployTrace,
+			extraCmpOpts: ignore,
 		},
 		{
 			method:       "debug_traceBlockByNumber",
-			args:         []any{hexutil.Uint64(b1.NumberU64())},
-			want:         wantTraces,
-			extraCmpOpts: cmp.Options{ignoreStructLogs},
+			args:         []any{hexutil.Uint64(deposit.NumberU64())},
+			want:         wantDepositTrace,
+			extraCmpOpts: ignore,
+		},
+		{
+			method:       "debug_traceBlockByHash",
+			args:         []any{deposit.Hash()},
+			want:         wantDepositTrace,
+			extraCmpOpts: ignore,
 		},
 		{
 			method:       "debug_traceTransaction",
 			args:         []any{depositTx.Hash()},
-			want:         *wantTraces[1].Result,
-			extraCmpOpts: cmp.Options{ignoreStructLogs},
+			want:         *wantDepositTrace[0].Result,
+			extraCmpOpts: ignore,
+		},
+		// Re-executing a sync block reproduces its header state root.
+		{
+			method: "debug_intermediateRoots",
+			args:   []any{deploy.Hash()},
+			want:   []common.Hash{deploy.Root()},
+		},
+		{
+			method: "debug_intermediateRoots",
+			args:   []any{deposit.Hash()},
+			want:   []common.Hash{deposit.Root()},
+		},
+	}
+
+	t.Run("synchronous_frontier_in_memory", func(t *testing.T) {
+		sut.testRPC(ctx, t, tests...)
+	})
+
+	// Asynchronous blocks MUST build on the synchronous frontier.
+	deposit2Tx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &escrowAddr,
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     escrow.CallDataToDeposit(recipient),
+		Value:    big.NewInt(escrowDepositVal),
+	})
+	async := sut.runConsensusLoop(t, deposit2Tx)
+	asyncReceipts := async.Receipts() // blocks until executed
+	require.Lenf(t, asyncReceipts, 1, "%T.Receipts()", async)
+
+	sut.settleUntilEvicted(t, vmTime, deposit.Hash(), async.Hash())
+
+	// The restored async block, built on a sync parent.
+	wantAsyncTrace := depositTraceResult(deposit2Tx, asyncReceipts[0].GasUsed, recipient, escrowDepositVal)
+	tests = append(tests, []rpcTest{
+		{
+			method: "eth_getBlockReceipts",
+			args:   []any{async.Hash()},
+			want:   []*types.Receipt(asyncReceipts),
+		},
+		{
+			method: "eth_getTransactionReceipt",
+			args:   []any{deposit2Tx.Hash()},
+			want:   asyncReceipts[0],
+		},
+		{
+			method:       "debug_traceBlockByNumber",
+			args:         []any{hexutil.Uint64(async.NumberU64())},
+			want:         wantAsyncTrace,
+			extraCmpOpts: ignore,
+		},
+		{
+			method:       "debug_traceTransaction",
+			args:         []any{deposit2Tx.Hash()},
+			want:         *wantAsyncTrace[0].Result,
+			extraCmpOpts: ignore,
 		},
 	}...)
+
+	t.Run("synchronous_frontier_on_disk", func(t *testing.T) {
+		sut.testRPC(ctx, t, tests...)
+	})
 }
 
 func TestDebugTrace(t *testing.T) {
@@ -205,46 +367,9 @@ func TestDebugTrace(t *testing.T) {
 	recipient := common.Address{'r', 'e', 'c', 'v'}
 	depositBlock, depositTx := sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 
-	// Specifying the entire trace would be excessive and uninformative so we
-	// select a precise location of an event associated with the deposit()
-	// function on the contract.
-	const logPC = 185
-	require.Equal(t, vm.LOG1, vm.OpCode(escrow.ByteCode()[logPC]), "Bad test setup; program counter LOG1 for `emit Deposit()`")
-	ignore := cmp.Options{
-		cmpopts.IgnoreSliceElements(func(r logger.StructLogRes) bool {
-			return r.Pc != logPC || r.Op != vm.LOG1.String()
-		}),
-		// Any precise amount of gas left at the time of OpCode execution would
-		// be copy-pasted from the test output.
-		cmpopts.IgnoreFields(logger.StructLogRes{}, "Gas", "GasCost"),
-	}
-
-	want := []txTraceResult{
-		{
-			TxHash: deployTx.Hash(),
-			Result: &logger.ExecutionResult{
-				Gas:         deployBlock.Receipts()[0].GasUsed,
-				ReturnValue: common.Bytes2Hex(escrow.ByteCode()),
-				StructLogs:  []logger.StructLogRes{},
-			},
-		},
-		{
-			TxHash: depositTx.Hash(),
-			Result: &logger.ExecutionResult{
-				Gas: depositBlock.Receipts()[0].GasUsed,
-				StructLogs: []logger.StructLogRes{{
-					Pc:    logPC,
-					Op:    vm.LOG1.String(),
-					Depth: 1,
-					Stack: utils.PointerTo([]string{
-						escrow.DepositEvent(recipient, uint256.NewInt(escrowDepositVal)).Topics[0].String(),
-						"0x40", "0x80", // arbitrary memory locations selected by Solidity
-					}),
-				}},
-			},
-		},
-	}
-	wantDeploy, wantDeposit := want[:1], want[1:]
+	ignore := depositLogOnlyCmpOpts(t)
+	wantDeploy := deployTraceResult(deployTx, deployBlock.Receipts()[0].GasUsed)
+	wantDeposit := depositTraceResult(depositTx, depositBlock.Receipts()[0].GasUsed, recipient, escrowDepositVal)
 
 	tests := []rpcTest{
 		{
@@ -282,15 +407,18 @@ func TestDebugTrace(t *testing.T) {
 			args:    []any{common.Hash{}},
 			wantErr: testerr.Contains("not found"),
 		},
-	}
-
-	for _, tx := range want {
-		tests = append(tests, rpcTest{
+		{
 			method:       "debug_traceTransaction",
-			args:         []any{tx.TxHash},
-			want:         *tx.Result,
+			args:         []any{deployTx.Hash()},
+			want:         *wantDeploy[0].Result,
 			extraCmpOpts: ignore,
-		})
+		},
+		{
+			method:       "debug_traceTransaction",
+			args:         []any{depositTx.Hash()},
+			want:         *wantDeposit[0].Result,
+			extraCmpOpts: ignore,
+		},
 	}
 
 	sut.testRPC(ctx, t, tests...)

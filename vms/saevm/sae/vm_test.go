@@ -18,6 +18,8 @@ import (
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/consensus/beacon"
+	"github.com/ava-labs/libevm/consensus/ethash"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -84,12 +86,12 @@ type SUT struct {
 	*ethclient.Client
 	rpcClient *rpc.Client
 
-	rawVM   *VM
-	genesis *blocks.Block
-	wallet  *saetest.Wallet
-	db      ethdb.Database
-	hooks   *hookstest.Stub
-	logger  *loggingtest.Logger
+	rawVM          *VM
+	initialSettled *blocks.Block
+	wallet         *saetest.Wallet
+	db             ethdb.Database
+	hooks          *hookstest.Stub
+	logger         *loggingtest.Logger
 
 	sender *saetest.Sender
 }
@@ -107,6 +109,7 @@ type (
 		precompiles map[common.Address]libevm.PrecompiledContract
 		nodeID      ids.NodeID
 		validators  set.Set[ids.NodeID]
+		preInit     func(tb testing.TB, wallet *saetest.Wallet, genesis *core.Genesis, db ethdb.Database)
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -156,6 +159,11 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		nodeID: ids.GenerateTestNodeID(),
 	}, opts...)
 
+	wallet := saetest.NewWalletWithKeyChain(keys, types.LatestSigner(conf.genesis.Config))
+	if conf.preInit != nil {
+		conf.preInit(tb, wallet, &conf.genesis, newEthDB(conf.db))
+	}
+
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
 	snow := adaptor.Convert(vm)
 	tb.Cleanup(func() {
@@ -202,18 +210,15 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	rpcClient, ethClient := dialRPC(ctx, tb, snow)
 	sut := &SUT{
-		ChainVM:   snow,
-		Client:    ethClient,
-		rpcClient: rpcClient,
-		rawVM:     vm.VM,
-		genesis:   vm.last.settled.Load(),
-		wallet: saetest.NewWalletWithKeyChain(
-			keys,
-			types.LatestSigner(conf.genesis.Config),
-		),
-		db:     newEthDB(conf.db),
-		hooks:  conf.hooks,
-		logger: logger,
+		ChainVM:        snow,
+		Client:         ethClient,
+		rpcClient:      rpcClient,
+		rawVM:          vm.VM,
+		initialSettled: vm.last.settled.Load(),
+		wallet:         wallet,
+		db:             newEthDB(conf.db),
+		hooks:          conf.hooks,
+		logger:         logger,
 
 		sender: sender,
 	}
@@ -264,6 +269,41 @@ func withVMTime(tb testing.TB, startTime time.Time) (sutOption, *saetest.Clock) 
 	})
 
 	return opt, c
+}
+
+// withSynchronousChain returns an option that seeds the SUT's database with n
+// canonical synchronous blocks, mimicking a database inherited from a
+// synchronous-execution chain.
+
+// TODO(JonathanOppenheimer): seeded blocks are plain EVM. Test real atomic txs,
+// and precompiles via a transitionvm e2e?
+func withSynchronousChain(n int, gen func(*saetest.Wallet, int, *core.BlockGen), chain *[]*types.Block, receipts *[]types.Receipts) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.preInit = func(tb testing.TB, wallet *saetest.Wallet, genesis *core.Genesis, db ethdb.Database) {
+			tb.Helper()
+
+			engine := beacon.New(ethash.NewFaker())
+			_, *chain, *receipts = core.GenerateChainWithGenesis(genesis, engine, n, func(i int, bg *core.BlockGen) {
+				bg.SetPoS() // genesis.Config is post-merge
+				gen(wallet, i, bg)
+			})
+
+			// Inserting into a [core.BlockChain] persists the blocks exactly
+			// as a synchronous-execution chain would have. Archive mode
+			// (dirty cache disabled) commits every block's state, as [NewVM]
+			// requires.
+			bc, err := core.NewBlockChain(db, &core.CacheConfig{
+				TrieDirtyDisabled: true,
+				StateScheme:       rawdb.HashScheme,
+			}, genesis, nil, engine, vm.Config{}, nil, nil)
+			require.NoError(tb, err, "core.NewBlockChain()")
+			defer bc.Stop()
+
+			_, err = bc.InsertChain(*chain)
+			require.NoErrorf(tb, err, "%T.InsertChain()", bc)
+			bc.SetFinalized((*chain)[n-1].Header())
+		}
+	})
 }
 
 // withExecResultsDB returns an option that replaces the default
@@ -585,8 +625,8 @@ func TestIntegration(t *testing.T) {
 		t.Run("WaitForEvent_with_existing_txs", testWaitForEvent)
 	}
 
-	b := sut.runConsensusLoopOnPreference(t, sut.genesis)
-	assert.Equal(t, sut.genesis.ID(), b.Parent(), "BuildBlock() builds on preference")
+	b := sut.runConsensusLoopOnPreference(t, sut.initialSettled)
+	assert.Equal(t, sut.initialSettled.ID(), b.Parent(), "BuildBlock() builds on preference")
 	require.Lenf(t, b.Transactions(), numTxs, "%T.Transactions()", b)
 
 	require.NoError(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
@@ -1163,7 +1203,7 @@ func TestSettledGasTime(t *testing.T) {
 	const numBlocks = 100
 	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 	bs := make([]*blocks.Block, 0, numBlocks+1)
-	bs = append(bs, sut.genesis)
+	bs = append(bs, sut.initialSettled)
 	for range numBlocks {
 		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        nil, // contract creation
