@@ -6,7 +6,6 @@ package firewood
 import (
 	"encoding/binary"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -437,22 +436,12 @@ func TestInvalidConfig(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "empty directory",
+			name: "empty path",
 			cfg: func(cfg Config) Config {
-				cfg.Directory = ""
+				cfg.Path = ""
 				return cfg
 			},
-			wantErr: errDirNotProvided,
-		},
-		{
-			name: "file instead of directory",
-			cfg: func(cfg Config) Config {
-				file := t.TempDir() + "/file"
-				require.NoError(t, os.WriteFile(file, []byte("not a directory"), 0o600))
-				cfg.Directory = file
-				return cfg
-			},
-			wantErr: errNotDirectory,
+			wantErr: errPathNotProvided,
 		},
 		{
 			name: "too few revisions",

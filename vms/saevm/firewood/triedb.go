@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"runtime"
 	"slices"
 	"time"
@@ -20,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
-	"github.com/ava-labs/libevm/metrics"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
@@ -30,11 +27,7 @@ import (
 	_ "github.com/ava-labs/libevm/trie" // comment resolution
 
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	graft "github.com/ava-labs/avalanchego/graft/evm/firewood"
 )
-
-const firewoodDir = graft.FirewoodDir
 
 var (
 	_ triedb.DBConstructor = Config{}.BackendConstructor
@@ -43,7 +36,7 @@ var (
 
 // Config holds the configuration for creating a [TrieDB].
 type Config struct {
-	Directory         string
+	Path              string
 	Log               logging.Logger
 	CacheSizeBytes    uint
 	RevisionsInMemory uint // must be >= 2
@@ -59,9 +52,9 @@ type Config struct {
 //   - CacheSizeBytes: 1MiB
 //   - RevisionsInMemory: 128
 //   - DeferredCommitInterval: 64
-func DefaultConfig(dir string, log logging.Logger) Config {
+func DefaultConfig(path string, log logging.Logger) Config {
 	return Config{
-		Directory:              dir,
+		Path:                   path,
 		Log:                    log,
 		CacheSizeBytes:         1024 * 1024,
 		RevisionsInMemory:      128,
@@ -85,19 +78,18 @@ func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
 }
 
 var (
-	errNoLogger             = errors.New("Log must be provided")       //nolint:staticcheck // false positive
-	errDirNotProvided       = errors.New("Directory must be provided") //nolint:staticcheck // false positive
+	errNoLogger             = errors.New("Log must be provided")  //nolint:staticcheck // false positive
+	errPathNotProvided      = errors.New("Path must be provided") //nolint:staticcheck // false positive
 	errTooFewRevisions      = errors.New("RevisionsInMemory must be >= 2")
 	errCommitIntervalTooBig = errors.New("DeferredCommitInterval must be < RevisionsInMemory")
-	errNotDirectory         = errors.New("database directory path is not a directory")
 )
 
 func (c Config) Validate() error {
 	if c.Log == nil {
 		return errNoLogger
 	}
-	if err := validateDir(c.Directory); err != nil {
-		return err
+	if c.Path == "" {
+		return errPathNotProvided
 	}
 	if c.RevisionsInMemory < 2 {
 		return fmt.Errorf("%w: got %d", errTooFewRevisions, c.RevisionsInMemory)
@@ -105,22 +97,6 @@ func (c Config) Validate() error {
 	if c.DeferredCommitInterval >= uint64(c.RevisionsInMemory) {
 		return fmt.Errorf("%w: %d >= %d", errCommitIntervalTooBig, c.DeferredCommitInterval, c.RevisionsInMemory)
 	}
-	return nil
-}
-
-// validateDir ensures that the given directory exists and is a directory.
-func validateDir(dir string) error {
-	if dir == "" {
-		return errDirNotProvided
-	}
-
-	switch info, err := os.Stat(dir); {
-	case err != nil:
-		return fmt.Errorf("os.Stat() on database directory: %w", err)
-	case !info.IsDir():
-		return fmt.Errorf("%w: %q", errNotDirectory, dir)
-	}
-
 	return nil
 }
 
@@ -168,24 +144,21 @@ func New(config Config) (*TrieDB, error) {
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithDeferredPersistenceCommitCount(config.DeferredCommitInterval),
+		ffi.WithExpensiveMetrics(),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
 	}
-	if metrics.EnabledExpensive {
-		options = append(options, ffi.WithExpensiveMetrics())
-	}
 
-	path := filepath.Join(config.Directory, firewoodDir)
-	fw, err := ffi.New(path, ffi.EthereumNodeHashing, options...)
+	fw, err := ffi.New(config.Path, ffi.EthereumNodeHashing, options...)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
 	if root := common.Hash(fw.Root()); root == types.EmptyRootHash {
-		config.Log.Info("empty firewood database opened", zap.String("path", path))
+		config.Log.Info("empty firewood database opened", zap.String("path", config.Path))
 	} else {
-		config.Log.Info("firewood database opened", zap.Stringer("root", root), zap.String("path", path))
+		config.Log.Info("firewood database opened", zap.Stringer("root", root), zap.String("path", config.Path))
 	}
 
 	return &TrieDB{
