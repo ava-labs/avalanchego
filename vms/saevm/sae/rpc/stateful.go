@@ -99,11 +99,7 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 	// devise an approach to ensure that it is confirmed on each.
 	hdr := bl.Header()
 	hdr.Root = bl.PostExecutionStateRoot()
-	// Synchronous headers already carry their base fee, which MAY be nil
-	// (pre-London) and MUST NOT be replaced with a non-nil zero.
-	if !bl.Synchronous() {
-		hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
-	}
+	hdr.BaseFee = bl.ExecutedBaseFee().ToBig()
 
 	sdb, err := b.StateDB(hdr.Root)
 	if err != nil {

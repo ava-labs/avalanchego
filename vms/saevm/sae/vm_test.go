@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -282,26 +283,34 @@ func withSynchronousChain(n int, gen func(*saetest.Wallet, int, *core.BlockGen),
 		c.preInit = func(tb testing.TB, wallet *saetest.Wallet, genesis *core.Genesis, db ethdb.Database) {
 			tb.Helper()
 
-			engine := beacon.New(ethash.NewFaker())
-			_, *chain, *receipts = core.GenerateChainWithGenesis(genesis, engine, n, func(i int, bg *core.BlockGen) {
+			// [core.GenerateChain] commits every block's state to `db` in
+			// archive (hash) mode, as [NewVM] requires, but nothing else.
+			tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+			defer func() {
+				require.NoErrorf(tb, tdb.Close(), "%T.Close()", tdb)
+			}()
+			_, err := genesis.Commit(db, tdb)
+			require.NoErrorf(tb, err, "%T.Commit()", genesis)
+
+			*chain, *receipts = core.GenerateChain(genesis.Config, genesis.ToBlock(), beacon.New(ethash.NewFaker()), db, n, func(i int, bg *core.BlockGen) {
 				bg.SetPoS() // genesis.Config is post-merge
 				gen(wallet, i, bg)
 			})
 
-			// Inserting into a [core.BlockChain] persists the blocks exactly
-			// as a synchronous-execution chain would have. Archive mode
-			// (dirty cache disabled) commits every block's state, as [NewVM]
-			// requires.
-			bc, err := core.NewBlockChain(db, &core.CacheConfig{
-				TrieDirtyDisabled: true,
-				StateScheme:       rawdb.HashScheme,
-			}, genesis, nil, engine, vm.Config{}, nil, nil)
-			require.NoError(tb, err, "core.NewBlockChain()")
-			defer bc.Stop()
-
-			_, err = bc.InsertChain(*chain)
-			require.NoErrorf(tb, err, "%T.InsertChain()", bc)
-			bc.SetFinalized((*chain)[n-1].Header())
+			// Persist the blocks as a synchronous-execution chain would have,
+			// mirroring [core.BlockChain.InsertChain] and
+			// [core.BlockChain.SetFinalized].
+			for i, b := range *chain {
+				rawdb.WriteBlock(db, b)
+				rawdb.WriteReceipts(db, b.Hash(), b.NumberU64(), (*receipts)[i])
+				rawdb.WriteCanonicalHash(db, b.Hash(), b.NumberU64())
+				rawdb.WriteTxLookupEntriesByBlock(db, b)
+			}
+			tip := (*chain)[n-1].Hash()
+			rawdb.WriteHeadHeaderHash(db, tip)
+			rawdb.WriteHeadBlockHash(db, tip)
+			rawdb.WriteHeadFastBlockHash(db, tip)
+			rawdb.WriteFinalizedBlockHash(db, tip)
 		}
 	})
 }
