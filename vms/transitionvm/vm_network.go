@@ -53,18 +53,10 @@ func (c *connections) addConnectionsTo(ctx context.Context, connector validators
 	return nil
 }
 
-// request identifies an outbound app request by peer and ID.
-//
-//nolint:unused // False positive
-type request struct {
-	nodeID    ids.NodeID
-	requestID uint32
-}
-
 // requests is the set of unanswered outbound app requests.
 type requests struct {
 	lock sync.Mutex
-	set  set.Set[request]
+	set  set.Set[common.Request]
 }
 
 func (r *requests) add(nodeIDs set.Set[ids.NodeID], requestID uint32) {
@@ -72,7 +64,10 @@ func (r *requests) add(nodeIDs set.Set[ids.NodeID], requestID uint32) {
 	defer r.lock.Unlock()
 
 	for nodeID := range nodeIDs {
-		r.set.Add(request{nodeID, requestID})
+		r.set.Add(common.Request{
+			NodeID:    nodeID,
+			RequestID: requestID,
+		})
 	}
 }
 
@@ -80,7 +75,10 @@ func (r *requests) remove(nodeID ids.NodeID, requestID uint32) bool {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	req := request{nodeID, requestID}
+	req := common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	}
 	had := r.set.Contains(req)
 	r.set.Remove(req)
 	return had
