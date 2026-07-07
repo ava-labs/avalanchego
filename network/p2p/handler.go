@@ -27,6 +27,10 @@ const (
 	// SignatureRequestHandlerID is specified in ACP-118: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request
 	SignatureRequestHandlerID
 	FirewoodProofHandlerID
+	// OracleSignatureRequestHandlerID is the handler ID for oracle attestation
+	// signature requests. Distinct from SignatureRequestHandlerID (ACP-118)
+	// which is reserved for native warp.
+	OracleSignatureRequestHandlerID
 )
 
 var (
