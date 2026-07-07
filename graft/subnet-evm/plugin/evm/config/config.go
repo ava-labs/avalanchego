@@ -26,6 +26,11 @@ type OracleSidecarConfig struct {
 	// Endpoint is the gRPC address of the sidecar process, e.g. "127.0.0.1:9900".
 	// If empty, the oracle verifier is not initialized from JSON config.
 	Endpoint string `json:"endpoint"`
+	// SidecarConfigPath is the path to the sidecar's own config file. The
+	// validator reads it to derive the set of source types this node will
+	// sign attestations for. If empty when Endpoint is set, the oracle
+	// handler is not registered.
+	SidecarConfigPath string `json:"sidecar-config-path"`
 }
 
 // Config ...

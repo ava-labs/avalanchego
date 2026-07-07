@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//network/p2p/oracle",
         "//proto/pb/oracle",
+        "//sidecar/config",
         "//sidecar/solanarpc",
         "@org_golang_google_grpc//:grpc",
         "@org_golang_google_grpc//codes",

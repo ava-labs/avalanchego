@@ -26,16 +26,27 @@ const (
 )
 
 // OracleVerifier implements acp118.Verifier for oracle attestation messages.
-// It parses the OracleMessage from the warp payload and delegates verification
-// to a SidecarClient. All source-level allowlisting is the sidecar's responsibility.
+// It parses the OracleMessage from the warp payload, rejects source types the
+// local sidecar has not declared support for, and otherwise delegates
+// verification to a SidecarClient.
+//
+// The allowed-source-type set exists so that a node can fast-reject signature
+// requests for chains its sidecar cannot handle (e.g. a Bitcoin request
+// arriving at a Solana-only node), before doing any RPC work. The set is
+// derived from the sidecar's own config file — see sidecar/config and the
+// wiring in graft/subnet-evm/plugin/evm/vm.go.
 type OracleVerifier struct {
-	sidecar oracle.SidecarClient
+	sidecar        oracle.SidecarClient
+	allowedSources map[string]struct{}
 }
 
 var _ acp118.Verifier = (*OracleVerifier)(nil)
 
-func NewOracleVerifier(sidecar oracle.SidecarClient) *OracleVerifier {
-	return &OracleVerifier{sidecar: sidecar}
+// NewOracleVerifier constructs an OracleVerifier that will reject any message
+// whose SourceType is not in allowed. A nil or empty allowed set rejects all
+// messages — callers must pass at least one source type to enable verification.
+func NewOracleVerifier(sidecar oracle.SidecarClient, allowed map[string]struct{}) *OracleVerifier {
+	return &OracleVerifier{sidecar: sidecar, allowedSources: allowed}
 }
 
 func (v *OracleVerifier) Verify(
@@ -55,6 +66,13 @@ func (v *OracleVerifier) Verify(
 		return &common.AppError{
 			Code:    errCodeParse,
 			Message: "failed to parse OracleMessage: " + err.Error(),
+		}
+	}
+
+	if _, ok := v.allowedSources[msg.SourceType]; !ok {
+		return &common.AppError{
+			Code:    errCodeVerify,
+			Message: "source type not supported by this node: " + msg.SourceType,
 		}
 	}
 

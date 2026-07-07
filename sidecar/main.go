@@ -4,59 +4,87 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net"
-	"os"
 
 	"google.golang.org/grpc"
 
+	"github.com/ava-labs/avalanchego/network/p2p/oracle"
+	"github.com/ava-labs/avalanchego/sidecar/config"
 	"github.com/ava-labs/avalanchego/sidecar/solanarpc"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/oracle"
 )
 
+// buildVerifier instantiates the correct verifier implementation for a source
+// type given its raw JSON config body. Add a case here when registering a new
+// source type in network/p2p/oracle/message.go (KnownSourceTypes).
+func buildVerifier(sourceType string, body json.RawMessage) (oracleVerifier, error) {
+	switch sourceType {
+	case oracle.SourceTypeSolana:
+		return solanarpc.NewSolanaVerifier(body, nil)
+	default:
+		// Unreachable if the caller has already cross-checked against
+		// oracle.IsKnownSourceType, but kept as defense-in-depth.
+		return nil, fmt.Errorf("no verifier implementation for source type %q", sourceType)
+	}
+}
+
 func main() {
-	addr := flag.String("addr", ":9900", "address to listen on")
-	verifierType := flag.String("verifier-type", "", "verifier implementation to use (e.g. solanarpc)")
-	configPath := flag.String("config-path", "", "path to verifier config file")
+	addr := flag.String("addr", "", "address to listen on (overrides bind_addr in config)")
+	configPath := flag.String("config-path", "", "path to sidecar config file (required)")
 	flag.Parse()
 
-	if *verifierType == "" {
-		log.Fatal("--verifier-type is required")
+	if *configPath == "" {
+		log.Fatal("--config-path is required")
 	}
 
-	var configBytes []byte
-	if *configPath != "" {
-		var err error
-		configBytes, err = os.ReadFile(*configPath)
-		if err != nil {
-			log.Fatalf("failed to read config file %s: %v", *configPath, err)
-		}
-	}
-
-	var v oracleVerifier
-	switch *verifierType {
-	case "solanarpc":
-		sv, err := solanarpc.NewSolanaVerifier(configBytes, nil)
-		if err != nil {
-			log.Fatalf("invalid solanarpc config: %v", err)
-		}
-		v = sv
-	default:
-		log.Fatalf("unknown verifier type %q", *verifierType)
-	}
-
-	lis, err := net.Listen("tcp", *addr)
+	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Fatalf("failed to listen on %s: %v", *addr, err)
+		log.Fatalf("failed to load sidecar config: %v", err)
+	}
+
+	verifiers := make(map[string]oracleVerifier, len(cfg.Verifiers))
+	for sourceType, body := range cfg.Verifiers {
+		if !oracle.IsKnownSourceType(sourceType) {
+			log.Fatalf("sidecar config declares unknown source type %q; register it in network/p2p/oracle first", sourceType)
+		}
+		v, err := buildVerifier(sourceType, body)
+		if err != nil {
+			log.Fatalf("failed to build %q verifier: %v", sourceType, err)
+		}
+		verifiers[sourceType] = v
+	}
+
+	bindAddr := cfg.BindAddr
+	if *addr != "" {
+		bindAddr = *addr
+	}
+	if bindAddr == "" {
+		log.Fatal("no bind address: set --addr or bind_addr in config")
+	}
+
+	lis, err := net.Listen("tcp", bindAddr)
+	if err != nil {
+		log.Fatalf("failed to listen on %s: %v", bindAddr, err)
 	}
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterOracleSidecarServer(grpcServer, NewServer(v))
+	pb.RegisterOracleSidecarServer(grpcServer, NewServer(verifiers))
 
-	log.Printf("starting oracle sidecar (gRPC) on %s", *addr)
+	log.Printf("starting oracle sidecar (gRPC) on %s with verifiers %v", bindAddr, keys(verifiers))
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+func keys(m map[string]oracleVerifier) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }

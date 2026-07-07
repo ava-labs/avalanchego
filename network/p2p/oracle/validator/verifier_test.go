@@ -28,14 +28,18 @@ func buildWarpMessage(t *testing.T, msg *oracle.OracleMessage) *warp.UnsignedMes
 	return um
 }
 
+func allowSolana() map[string]struct{} {
+	return map[string]struct{}{oracle.SourceTypeSolana: {}}
+}
+
 func TestOracleVerifier_ValidPath(t *testing.T) {
-	msg, err := oracle.NewOracleMessage("solana", "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
+	msg, err := oracle.NewOracleMessage(oracle.SourceTypeSolana, "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
 	require.NoError(t, err)
 
 	um := buildWarpMessage(t, msg)
 
 	mock := &MockSidecarClient{}
-	verifier := NewOracleVerifier(mock)
+	verifier := NewOracleVerifier(mock, allowSolana())
 
 	appErr := verifier.Verify(t.Context(), um, []byte("justification"))
 	require.Nil(t, appErr)
@@ -48,10 +52,42 @@ func TestOracleVerifier_BadWarpPayload(t *testing.T) {
 	require.NoError(t, err)
 
 	mock := &MockSidecarClient{}
-	verifier := NewOracleVerifier(mock)
+	verifier := NewOracleVerifier(mock, allowSolana())
 
 	appErr := verifier.Verify(t.Context(), um, nil)
 	require.NotNil(t, appErr)
 	require.Equal(t, errCodeParse, appErr.Code)
+	require.Empty(t, mock.Calls)
+}
+
+func TestOracleVerifier_UnsupportedSourceType(t *testing.T) {
+	// Message claims a source type the node does not support. The verifier
+	// must reject without ever calling the sidecar.
+	msg, err := oracle.NewOracleMessage("bitcoin", "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
+	require.NoError(t, err)
+
+	um := buildWarpMessage(t, msg)
+
+	mock := &MockSidecarClient{}
+	verifier := NewOracleVerifier(mock, allowSolana())
+
+	appErr := verifier.Verify(t.Context(), um, []byte("justification"))
+	require.NotNil(t, appErr)
+	require.Equal(t, errCodeVerify, appErr.Code)
+	require.Empty(t, mock.Calls)
+}
+
+func TestOracleVerifier_EmptyAllowedRejectsAll(t *testing.T) {
+	msg, err := oracle.NewOracleMessage(oracle.SourceTypeSolana, "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
+	require.NoError(t, err)
+
+	um := buildWarpMessage(t, msg)
+
+	mock := &MockSidecarClient{}
+	verifier := NewOracleVerifier(mock, nil)
+
+	appErr := verifier.Verify(t.Context(), um, []byte("justification"))
+	require.NotNil(t, appErr)
+	require.Equal(t, errCodeVerify, appErr.Code)
 	require.Empty(t, mock.Calls)
 }

@@ -62,14 +62,14 @@ func TestOracleHandler_HappyPath(t *testing.T) {
 	signer := warp.NewSigner(sk, testNetworkID, testChainID)
 
 	mock := &MockSidecarClient{}
-	verifier := NewOracleVerifier(mock)
+	verifier := NewOracleVerifier(mock, map[string]struct{}{oracle.SourceTypeSolana: {}})
 	handler := acp118.NewCachedHandler(&cache.Empty[ids.ID, []byte]{}, verifier, signer)
 
 	clientNodeID := ids.GenerateTestNodeID()
 	serverNodeID := ids.GenerateTestNodeID()
 	c := p2ptest.NewClient(t, ctx, clientNodeID, p2p.NoOpHandler{}, serverNodeID, handler)
 
-	msg, err := oracle.NewOracleMessage("solana", "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
+	msg, err := oracle.NewOracleMessage(oracle.SourceTypeSolana, "addr1", common.Address{1, 2, 3}, 100, 1, []byte("payload"))
 	require.NoError(err)
 	requestBytes, um := buildHandlerRequest(t, msg)
 
@@ -116,14 +116,14 @@ func TestOracleHandler_CacheHit(t *testing.T) {
 		},
 	}
 
-	verifier := NewOracleVerifier(mock)
+	verifier := NewOracleVerifier(mock, map[string]struct{}{oracle.SourceTypeSolana: {}})
 	handler := acp118.NewCachedHandler(lru.NewCache[ids.ID, []byte](4), verifier, signer)
 
 	clientNodeID := ids.GenerateTestNodeID()
 	serverNodeID := ids.GenerateTestNodeID()
 	c := p2ptest.NewClient(t, ctx, clientNodeID, p2p.NoOpHandler{}, serverNodeID, handler)
 
-	msg, err := oracle.NewOracleMessage("solana", "addr1", common.Address{0xAB}, 42, 7, []byte("data"))
+	msg, err := oracle.NewOracleMessage(oracle.SourceTypeSolana, "addr1", common.Address{0xAB}, 42, 7, []byte("data"))
 	require.NoError(err)
 	requestBytes, um := buildHandlerRequest(t, msg)
 

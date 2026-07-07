@@ -22,20 +22,23 @@ type oracleVerifier interface {
 	Verify(ctx context.Context, msg *oracle.OracleMessage, justification []byte) error
 }
 
-// Server implements the OracleSidecar gRPC service. It decodes each
-// VerifyRequest, forwards it to the oracleVerifier, and maps errors to the
-// gRPC status codes documented in proto/oracle/oracle.proto:
+// Server implements the OracleSidecar gRPC service. It routes each
+// VerifyRequest to the verifier registered for the message's SourceType and
+// maps errors to the gRPC status codes documented in proto/oracle/oracle.proto:
 //
-//   - codes.OK             — event confirmed on source chain
-//   - codes.InvalidArgument — event cannot be confirmed (bad payload, wrong slot, …)
-//   - codes.Unavailable    — source chain RPC is unreachable
+//   - codes.OK              — event confirmed on source chain
+//   - codes.InvalidArgument — event cannot be confirmed (bad payload, unknown source type, …)
+//   - codes.Unavailable     — source chain RPC is unreachable
 type Server struct {
 	pb.UnimplementedOracleSidecarServer
-	verifier oracleVerifier
+	verifiers map[string]oracleVerifier
 }
 
-func NewServer(v oracleVerifier) *Server {
-	return &Server{verifier: v}
+// NewServer constructs a Server that dispatches to one verifier per source
+// type. Messages whose SourceType is not present in verifiers are rejected
+// with InvalidArgument.
+func NewServer(verifiers map[string]oracleVerifier) *Server {
+	return &Server{verifiers: verifiers}
 }
 
 func (s *Server) Verify(ctx context.Context, req *pb.VerifyRequest) (*pb.VerifyResponse, error) {
@@ -44,7 +47,12 @@ func (s *Server) Verify(ctx context.Context, req *pb.VerifyRequest) (*pb.VerifyR
 		return nil, status.Errorf(codes.InvalidArgument, "failed to parse OracleMessage: %v", err)
 	}
 
-	if err := s.verifier.Verify(ctx, msg, req.Justification); err != nil {
+	v, ok := s.verifiers[msg.SourceType]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "no verifier registered for source type %q", msg.SourceType)
+	}
+
+	if err := v.Verify(ctx, msg, req.Justification); err != nil {
 		if errors.Is(err, oracle.ErrSourceUnavailable) {
 			return nil, status.Errorf(codes.Unavailable, "source chain unavailable: %v", err)
 		}

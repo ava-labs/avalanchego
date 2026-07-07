@@ -13,6 +13,24 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+// SourceTypeSolana identifies the Solana verifier. Add a new const here when
+// adding a new source-chain verifier, and register it in KnownSourceTypes.
+const SourceTypeSolana = "solana"
+
+// KnownSourceTypes is the compile-time set of source types this build supports.
+// Both the validator's config loader and the sidecar's main check configured
+// entries against this set at startup; anything not listed here causes a
+// startup error rather than a silent misroute at runtime.
+var KnownSourceTypes = map[string]struct{}{
+	SourceTypeSolana: {},
+}
+
+// IsKnownSourceType reports whether s is a source type this build knows about.
+func IsKnownSourceType(s string) bool {
+	_, ok := KnownSourceTypes[s]
+	return ok
+}
+
 // oracleMessageArgs defines the ABI encoding for OracleMessage.
 // The warp payload is abi.encode(sourceType, sourceAddress, destContract,
 // sourceBlockHeight, nonce, payload) — identical to abi.encode of the
