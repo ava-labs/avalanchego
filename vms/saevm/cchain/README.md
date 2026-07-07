@@ -61,9 +61,11 @@ Hooks are the seam through which SAE calls into C-Chain-specific code. SAE invok
 
 ## What `cchain` adds
 
-### Block format extensions
+### Block format changes
 
-`cchain` extends the standard Ethereum block format. The C-Chain transitioned to this VM from coreth on the same database and block format, so historical blocks must keep parsing and hashing identically and vestigial fields cannot be removed.
+`cchain` modifies the standard Ethereum block format. The C-Chain transitioned to this VM from coreth on the same database and block format, so historical blocks must keep parsing and hashing identically and vestigial fields cannot be removed.
+
+#### Block header changes
 
 The block header gains the following extra fields:
 
@@ -79,14 +81,22 @@ The block header gains the following extra fields:
 - `settledGasNumerator` — sub-second numerator of the settled block's gas time.
 - `settledExcess` — gas excess after executing the settled block.
 
-The `settled*` fields track ACP-194 settlement and are required by SAE rather than C-Chain-specific.
+The block header removes a field:
+
+- `withdrawalsHash` — Avalanche has no beacon-chain withdrawals.
+
+The existing `extra` header field is repurposed to carry the Warp predicate verification results described under [Warp messaging](#warp-messaging).
+
+#### Block body changes
 
 The block body adds two extra fields:
 
 - `version` — legacy format version. Always 0, enforced at parse time.
 - `extData` — the encoded cross-chain transactions described under [Cross-chain transactions](#cross-chain-transactions).
 
-The standard `extra` field carries the Warp predicate verification results described under [Warp messaging](#warp-messaging).
+The block body removes a field:
+
+- `withdrawals` — Avalanche has no beacon-chain withdrawals.
 
 ### Cross-chain transactions
 
