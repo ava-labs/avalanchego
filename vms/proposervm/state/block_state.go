@@ -29,9 +29,12 @@ import (
 const blockCacheSize = 64 * units.MiB
 
 var (
-	errBlockWrongVersion     = errors.New("wrong version")
-	errShortBlockRecord      = errors.New("block record too short to contain a codec version")
-	errInnerBlockUnavailable = errors.New("inner block unavailable for deduplicated block")
+	errBlockWrongVersion = errors.New("wrong version")
+	errShortBlockRecord  = errors.New("block record too short to contain a codec version")
+	// ErrInnerBlockUnavailable is returned when a deduplicated block record
+	// cannot be reconstructed because the inner VM does not have its inner
+	// block.
+	ErrInnerBlockUnavailable = errors.New("inner block unavailable for deduplicated block")
 	errRestoredBlockMismatch = errors.New("restored block bytes do not match original")
 
 	_ BlockState = (*blockState)(nil)
@@ -204,7 +207,7 @@ func (s *blockState) parseStored(blkID ids.ID, storedBytes []byte) (*blockWrappe
 
 func (s *blockState) parseDedupBlock(blkID ids.ID, storedBytes []byte) (*blockWrapper, error) {
 	if s.getInnerBytes == nil {
-		return nil, errInnerBlockUnavailable
+		return nil, ErrInnerBlockUnavailable
 	}
 
 	wrapper := dedupBlockWrapper{}
@@ -218,7 +221,7 @@ func (s *blockState) parseDedupBlock(blkID ids.ID, storedBytes []byte) (*blockWr
 
 	innerBytes, err := s.getInnerBytes(wrapper.InnerID)
 	if err != nil {
-		return nil, fmt.Errorf("%w: inner block %s: %w", errInnerBlockUnavailable, wrapper.InnerID, err)
+		return nil, fmt.Errorf("%w: inner block %s: %w", ErrInnerBlockUnavailable, wrapper.InnerID, err)
 	}
 
 	fullBytes, err := block.RestoreInnerBytes(wrapper.StrippedBlock, innerBytes)
@@ -236,7 +239,7 @@ func (s *blockState) parseDedupBlock(blkID ids.ID, storedBytes []byte) (*blockWr
 	// inner bytes and the block originally stored, rather than serving a block
 	// that doesn't match its ID.
 	if blk.ID() != blkID {
-		return nil, fmt.Errorf("%w: reconstructed block %s does not match key %s", errInnerBlockUnavailable, blk.ID(), blkID)
+		return nil, fmt.Errorf("%w: reconstructed block %s does not match key %s", ErrInnerBlockUnavailable, blk.ID(), blkID)
 	}
 
 	return &blockWrapper{

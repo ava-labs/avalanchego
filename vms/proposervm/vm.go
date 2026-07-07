@@ -647,25 +647,38 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get last accepted: %w", err)
 	}
-	proLastAccepted, err := vm.getPostForkBlock(ctx, proLastAcceptedID)
-	if err != nil {
-		return fmt.Errorf("failed to get last accepted block: %w", err)
-	}
-
-	proLastAcceptedHeight := proLastAccepted.Height()
 	innerLastAcceptedHeight := innerLastAccepted.Height()
-	if proLastAcceptedHeight < innerLastAcceptedHeight {
-		return fmt.Errorf("proposervm height index (%d) should never be lower than the inner height index (%d)", proLastAcceptedHeight, innerLastAcceptedHeight)
-	}
-	if proLastAcceptedHeight == innerLastAcceptedHeight {
-		// There is nothing to repair - as the heights match
-		return nil
-	}
+	proLastAccepted, err := vm.getPostForkBlock(ctx, proLastAcceptedID)
+	switch {
+	case errors.Is(err, state.ErrInnerBlockUnavailable):
+		// The last accepted block is a deduplicated record whose inner block
+		// the inner VM doesn't have. This happens when the node shut down
+		// uncleanly between the proposervm accepting the block and the inner
+		// VM durably accepting it, which leaves the proposervm's last
+		// accepted above the inner VM's. Roll back to the inner VM's height
+		// without reading the unreconstructable block.
+		vm.ctx.Log.Warn("repairing accepted chain with unreconstructable last accepted block",
+			zap.Stringer("blkID", proLastAcceptedID),
+			zap.Uint64("innerHeight", innerLastAcceptedHeight),
+			zap.Error(err),
+		)
+	case err != nil:
+		return fmt.Errorf("failed to get last accepted block: %w", err)
+	default:
+		proLastAcceptedHeight := proLastAccepted.Height()
+		if proLastAcceptedHeight < innerLastAcceptedHeight {
+			return fmt.Errorf("proposervm height index (%d) should never be lower than the inner height index (%d)", proLastAcceptedHeight, innerLastAcceptedHeight)
+		}
+		if proLastAcceptedHeight == innerLastAcceptedHeight {
+			// There is nothing to repair - as the heights match
+			return nil
+		}
 
-	vm.ctx.Log.Info("repairing accepted chain by height",
-		zap.Uint64("outerHeight", proLastAcceptedHeight),
-		zap.Uint64("innerHeight", innerLastAcceptedHeight),
-	)
+		vm.ctx.Log.Info("repairing accepted chain by height",
+			zap.Uint64("outerHeight", proLastAcceptedHeight),
+			zap.Uint64("innerHeight", innerLastAcceptedHeight),
+		)
+	}
 
 	// The inner vm must be behind the proposer vm, so we must roll the
 	// proposervm back.
