@@ -76,3 +76,44 @@ func TestNewTracker(t *testing.T) {
 		})
 	}
 }
+
+func TestProtectTrieIndex(t *testing.T) {
+	tests := []struct {
+		name    string
+		runs    []Config // node runs against the same DB; only the last may error
+		wantErr error
+	}{
+		{
+			name: "archival",
+			runs: []Config{{Archival: true}},
+		},
+		{
+			name: "pruning_fresh_db",
+			runs: []Config{{}},
+		},
+		{
+			name:    "pruning_after_archival",
+			runs:    []Config{{Archival: true}, {}},
+			wantErr: ErrRefuseToCorruptArchiver,
+		},
+		{
+			name: "pruning_after_archival_allowed",
+			runs: []Config{{Archival: true}, {AllowMissingTries: true}},
+		},
+		{
+			name:    "archival_history_outlives_allowed_pruning_run",
+			runs:    []Config{{Archival: true}, {AllowMissingTries: true}, {}},
+			wantErr: ErrRefuseToCorruptArchiver,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+			for _, c := range tt.runs[:len(tt.runs)-1] {
+				require.NoError(t, protectTrieIndex(db, c), "protectTrieIndex(%+v)", c)
+			}
+			last := tt.runs[len(tt.runs)-1]
+			require.ErrorIs(t, protectTrieIndex(db, last), tt.wantErr, "protectTrieIndex(%+v)", last)
+		})
+	}
+}
