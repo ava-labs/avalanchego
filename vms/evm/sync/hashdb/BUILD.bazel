@@ -2,11 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
 go_library(
-    name = "evmstate",
+    name = "hashdb",
     srcs = [
         "client.go",
+        "evm_syncer.go",
         "handler.go",
-        "hashdb_syncer.go",
         "keys.go",
         "leaf_fetcher.go",
         "leaf_store.go",
@@ -15,7 +15,7 @@ go_library(
         "trie_scheduler.go",
         "trie_sync_stats.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/evmstate",
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/hashdb",
     visibility = ["//visibility:public"],
     deps = [
         "//database",
@@ -48,17 +48,17 @@ go_library(
 )
 
 go_test(
-    name = "evmstate_test",
+    name = "hashdb_test",
     srcs = [
+        "evm_syncer_test.go",
         "handler_test.go",
-        "hashdb_syncer_test.go",
         "keys_test.go",
         "leaf_fetcher_test.go",
         "leaf_store_test.go",
         "state_trie_test.go",
         "trie_queue_test.go",
     ],
-    embed = [":evmstate"],
+    embed = [":hashdb"],
     deps = [
         "//ids",
         "//network/p2p",

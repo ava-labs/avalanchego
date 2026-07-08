@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
@@ -29,12 +30,12 @@ func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 	root, keys, vals := synctest.FillTrieDistributed(t, trieDB, 3000)
 
 	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
-	require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, trieDB, common.HashLength))
+	require.NoError(t, RegisterHandler(loggingtest.New(t, logging.Debug), net, trieDB, common.HashLength, p2p.EVMLeafRequestHandlerID))
 
 	target := rawdb.NewMemoryDatabase()
 	leaves := newStorageLeafStore(target, []common.Hash{account})
 
-	tasks := make(chan task, 64)
+	tasks := make(chan Task, 64)
 	st, err := newStateTrie(target, root, account, leaves, stateTrieConfig{
 		numSegments: numStorageTrieSegments,
 		threshold:   1,
@@ -44,7 +45,7 @@ func TestStateTrie_SegmentedStorageReconstruct(t *testing.T) {
 	require.NoError(t, err)
 	tasks <- st.segments[0]
 
-	require.NoError(t, newLeafFetcher(loggingtest.New(t, logging.Debug), NewClient(net, tracker), tasks, 4).sync(ctx))
+	require.NoError(t, NewLeafFetcher(loggingtest.New(t, logging.Debug), NewClient(net, tracker, p2p.EVMLeafRequestHandlerID), tasks, 4).Sync(ctx))
 
 	require.Greater(t, len(st.segments), 1, "the storage trie must have split into segments")
 	requireReconstructed(t, target, root, keys, vals)

@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"bytes"
@@ -75,7 +75,7 @@ func withLeafResponder(r leafResponder) sutOption {
 // SUT is the system under test: both syncers wired to a loopback network. Prefer
 // [SUT.sync] and [SUT.Target] over reaching into the fields.
 type SUT struct {
-	state  *HashDBSyncer
+	state  *EVMSyncer
 	code   *code.Syncer
 	target ethdb.Database
 }
@@ -95,14 +95,14 @@ func newSUT(t *testing.T, ctx context.Context, trieDB *triedb.Database, root com
 		require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID,
 			handlers.NewHandler(log, cfg.leafResponder)))
 	} else {
-		require.NoError(t, RegisterHandler(log, net, trieDB, common.HashLength))
+		require.NoError(t, RegisterHandler(log, net, trieDB, common.HashLength, p2p.EVMLeafRequestHandlerID))
 	}
 	require.NoError(t, code.RegisterHandler(log, net, cfg.codeDB))
 
 	codeSyncer, err := code.NewSyncer(loggingtest.New(t, logging.Debug), code.NewClient(net, tracker), cfg.target)
 	require.NoError(t, err)
 
-	state, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker), cfg.target, root, codeSyncer)
+	state, err := NewEVMSyncer(loggingtest.New(t, logging.Debug), NewClient(net, tracker, p2p.EVMLeafRequestHandlerID), cfg.target, root, codeSyncer)
 	require.NoError(t, err)
 	if cfg.threshold > 0 {
 		state.threshold = cfg.threshold
@@ -219,7 +219,7 @@ func TestHashDBSyncer_SegmentsStorageTrie(t *testing.T) {
 }
 
 // Another root's leaves in the snapshot must fail the root check, and pass once
-// wiped. See the precondition on [NewHashDBSyncer].
+// wiped. See the precondition on [NewEVMSyncer].
 func TestHashDBSyncer_RejectsStaleSnapshot(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
@@ -310,7 +310,7 @@ func TestHashDBSyncer_StorageTrieDoneReturnsSlot(t *testing.T) {
 			require.NoError(t, scheduler.queueStorage(t.Context(), root, &stateTrie{}))
 			require.Empty(t, scheduler.slots, "the trie holds the only slot")
 
-			s := &HashDBSyncer{
+			s := &EVMSyncer{
 				scheduler: scheduler,
 				stats:     newTrieSyncStats(loggingtest.New(t, logging.Debug)),
 				trieQueue: newTrieQueue(db),
@@ -391,7 +391,7 @@ func TestNewHashDBSyncer_Validation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, tt.root, tt.code)
+			_, err := NewEVMSyncer(loggingtest.New(t, logging.Debug), nil, db, tt.root, tt.code)
 			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
@@ -405,7 +405,7 @@ func TestHashDBSyncer_FinalizeBeforeSync(t *testing.T) {
 	codeSyncer, err := code.NewSyncer(loggingtest.New(t, logging.Debug), nil, db)
 	require.NoError(t, err)
 
-	s, err := NewHashDBSyncer(loggingtest.New(t, logging.Debug), nil, db, common.HexToHash("0xabc"), codeSyncer)
+	s, err := NewEVMSyncer(loggingtest.New(t, logging.Debug), nil, db, common.HexToHash("0xabc"), codeSyncer)
 	require.NoError(t, err)
 	require.NoError(t, s.Finalize())
 }
