@@ -43,7 +43,7 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 	_tmp4 := obj.ExcessBlobGas != nil
 	_tmp5 := obj.ParentBeaconRoot != nil
 	_tmp6 := obj.TimeMilliseconds != nil
-	_tmp7 := obj.MinDelayExcess != nil
+	_tmp7 := obj.MinDelayExponent != nil
 	if _tmp1 || _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 {
 		if obj.BaseFee == nil {
 			w.Write(rlp.EmptyString)
@@ -93,10 +93,10 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 		}
 	}
 	if _tmp7 {
-		if obj.MinDelayExcess == nil {
+		if obj.MinDelayExponent == nil {
 			w.Write([]byte{0x80})
 		} else {
-			w.WriteUint64((*obj.MinDelayExcess))
+			w.WriteUint64((*obj.MinDelayExponent))
 		}
 	}
 	w.ListEnd(_tmp0)

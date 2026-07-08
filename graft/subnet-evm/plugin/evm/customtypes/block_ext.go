@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -29,8 +29,8 @@ func BlockTimeMilliseconds(b *ethtypes.Block) *uint64 {
 	return &cp
 }
 
-func BlockMinDelayExcess(b *ethtypes.Block) *acp226.DelayExcess {
-	e := GetHeaderExtra(b.Header()).MinDelayExcess
+func BlockMinDelayExponent(b *ethtypes.Block) *dynamic.DelayExponent {
+	e := GetHeaderExtra(b.Header()).MinDelayExponent
 	if e == nil {
 		return nil
 	}

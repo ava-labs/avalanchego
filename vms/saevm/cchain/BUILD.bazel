@@ -72,7 +72,6 @@ go_library(
         "//vms/components/avax",
         "//vms/components/gas",
         "//vms/evm/acp176",
-        "//vms/evm/acp226",
         "//vms/evm/database",
         "//vms/platformvm/warp",
         "//vms/saevm/adaptor",
