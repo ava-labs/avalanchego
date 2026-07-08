@@ -23,7 +23,7 @@ NOTE: `{vmName}` is `evm` for Coreth/C-Chain and `subnetevm` for Subnet-EVM chai
 
 ### Config
 
-- Added `initialMinDelayMS` to Subnet-EVM genesis `config`: seeds the ACP-226 minimum block delay at genesis instead of the ~2000ms default, so a controlled-genesis chain runs at its target cadence from block 1. Debug/benchmark use; unset leaves behavior unchanged.
+- Added optional `initialMinDelayMS` to the Subnet-EVM genesis `config` to seed the ACP-226 minimum block delay at genesis.
 
 ### Fixes
 - Updated minimum Go version from `v1.25.8` to `v1.25.10`.
