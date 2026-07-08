@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"go.uber.org/zap"
 
+	_ "github.com/ava-labs/libevm/trie" // comment resolution
+
 	// Need metrics registration from init function.
 	// TODO(alarso16): Move metrics initialization after deletion of graft.
 	graft "github.com/ava-labs/avalanchego/graft/evm/firewood"
@@ -25,9 +27,12 @@ func init() {
 	state.RegisterDatabaseInterceptor(interceptor)
 }
 
-// interceptor takes any arbitrary [state.Database] and, if it is backed by
-// Firewood, returns a wrapped version that will return a different
-// [state.Trie] implementation.
+// interceptor overrides the results of [state.NewDatabase],
+// [state.NewDatabaseWithConfig], and [state.NewDatabaseWithNodeDB].
+//
+// If db is backed by a firewood [TrieDB], interceptor wraps db in a
+// [stateAccessor], whose tries are [accountTrie] and [storageTrie] rather than
+// the normal [trie.StateTrie]. Otherwise db is returned unchanged.
 func interceptor(db state.Database) state.Database {
 	if tdb, ok := db.TrieDB().Backend().(*TrieDB); ok {
 		return &stateAccessor{
@@ -45,16 +50,16 @@ type stateAccessor struct {
 
 // OpenTrie opens the main account trie.
 func (s *stateAccessor) OpenTrie(root common.Hash) (state.Trie, error) {
-	return newAccountTrie(root, s.triedb)
+	return newAccountTrie(root, s.triedb, nil /*ops*/)
 }
 
 // OpenStorageTrie opens a wrapped version of the account trie.
 //
 //nolint:revive // removing names loses context.
-func (*stateAccessor) OpenStorageTrie(stateRoot common.Hash, addr common.Address, accountRoot common.Hash, self state.Trie) (state.Trie, error) {
-	accountTrie, ok := self.(*accountTrie)
+func (*stateAccessor) OpenStorageTrie(stateRoot common.Hash, addr common.Address, accountRoot common.Hash, tr state.Trie) (state.Trie, error) {
+	accountTrie, ok := tr.(*accountTrie)
 	if !ok {
-		return nil, fmt.Errorf("invalid account trie type: %T", self)
+		return nil, fmt.Errorf("invalid account trie type: %T", tr)
 	}
 	return newStorageTrie(accountTrie.baseTrie), nil
 }
@@ -66,9 +71,14 @@ func (s *stateAccessor) CopyTrie(t state.Trie) state.Trie {
 	case *accountTrie:
 		return t.Copy() // MUST NOT be nil
 	case *storageTrie:
-		// The storage trie wraps the base trie, and the [state.StateDB] will
-		// reopen as necessary. It is impossible to obtain a reference to the
-		// copied base trie, so nil is the best we can do.
+		// Before the [state.StateDB] accesses a storageTrie, it first checks to
+		// see if it is nil. For nil storageTries, the stateDB will open it with
+		// [stateAccessor.OpenStorageTrie]. By returning nil here, during
+		// [state.StateDB.Copy], all the storageTries will get set to nil and
+		// later reopened on top of the copied [accountTrie].
+		//
+		// There is no cleaner way to share the same baseTrie with all the
+		// storageTries and the accountTrie.
 		return nil
 	default:
 		s.triedb.log.Fatal("unknown trie type", zap.String("type", fmt.Sprintf("%T", t)))

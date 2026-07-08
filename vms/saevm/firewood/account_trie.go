@@ -4,6 +4,8 @@
 package firewood
 
 import (
+	"slices"
+
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
@@ -38,13 +40,13 @@ type accountTrie struct {
 	lastHashSize int
 }
 
-func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
+func newAccountTrie(root common.Hash, db *TrieDB, currentOps []ffi.BatchOp) (*accountTrie, error) {
 	reader, err := db.Firewood.Revision(ffi.Hash(root))
 	if err != nil {
 		return nil, err
 	}
 	return &accountTrie{
-		baseTrie:   &baseTrie{reader: reader},
+		baseTrie:   &baseTrie{reader: reader, updateOps: currentOps},
 		parentRoot: root,
 		root:       root,
 		tdb:        db,
@@ -124,16 +126,11 @@ func (*accountTrie) Prove([]byte, ethdb.KeyValueWriter) error {
 func (a *accountTrie) Copy() *accountTrie {
 	// This revision MUST be copied because it could refer to a proposal held
 	// by this account trie. If the proposal is committed, the reader will no
-	// longer be valid. However, an [ffi.Revision] will still be valid.
-	reader, err := a.tdb.Firewood.Revision(ffi.Hash(a.parentRoot))
+	// no longer be valid. However, an [ffi.Revision] will still be valid.
+	tr, err := newAccountTrie(a.parentRoot, a.tdb, slices.Clone(a.updateOps))
 	if err != nil {
-		a.tdb.log.Error("creating trie copy", zap.Error(err))
+		a.tdb.log.Error("copying account trie", zap.Error(err))
 		return nil
 	}
-	return &accountTrie{
-		baseTrie:   a.baseTrie.copy(reader),
-		parentRoot: a.parentRoot,
-		root:       a.root,
-		tdb:        a.tdb,
-	}
+	return tr
 }

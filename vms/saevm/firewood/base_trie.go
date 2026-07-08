@@ -5,7 +5,6 @@ package firewood
 
 import (
 	"errors"
-	"slices"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
@@ -131,14 +130,6 @@ func (*baseTrie) UpdateContractCode(common.Address, common.Hash, []byte) error {
 // the provided hashed key that was previously used to store a value.
 func (*baseTrie) GetKey([]byte) []byte {
 	return nil
-}
-
-// copy creates a copy of the baseTrie fields with the given reader.
-func (b *baseTrie) copy(reader trieReader) *baseTrie {
-	return &baseTrie{
-		reader:    reader,
-		updateOps: slices.Clone(b.updateOps), // each ffi.BatchOp is read-only, safe to shallow copy
-	}
 }
 
 var (
