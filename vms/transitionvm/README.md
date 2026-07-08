@@ -26,10 +26,10 @@ time:
 
 ```go
 n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Factory{
-    PreFactory:     &coreth.Factory{},
-    PostFactory:    &saevm.Factory{},
-    TransitionTime: n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
-    DrainTimeout:   15 * time.Second,
+    PreFactory:      &coreth.Factory{},
+    PostFactory:     &saevm.Factory{},
+    TransitionTime:  n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+    APIDrainTimeout: 15 * time.Second,
 })
 ```
 
