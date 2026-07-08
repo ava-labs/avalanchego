@@ -113,12 +113,7 @@ type ChainConfig struct {
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
-
-	// InitialMinDelayMS, if non-zero, seeds the ACP-226 minimum block delay (in
-	// milliseconds) into the genesis block instead of the default ~2000ms start.
-	// DEBUG/BENCHMARK ONLY: for controlled-genesis networks, not production.
-	// Requires Granite to be active at genesis. Set it equal to min-delay-target.
-	InitialMinDelayMS uint64 `json:"initialMinDelayMS,omitempty"`
+	InitialMinDelayMS  uint64               `json:"initialMinDelayMS,omitempty"` // Seeds the ACP-226 min block delay at genesis, for benchmarking.
 }
 
 var errInitialMinDelayTooLarge = errors.New("initialMinDelayMS too large")
@@ -342,7 +337,6 @@ func (c *ChainConfig) Verify() error {
 		return fmt.Errorf("invalid network upgrades: %w", err)
 	}
 
-	// Only faster-than-default seeds are useful; reject the rest.
 	if maxDelayMS := acp226.InitialDelayExcess.Delay(); c.InitialMinDelayMS > maxDelayMS {
 		return fmt.Errorf("%w: %d exceeds %d", errInitialMinDelayTooLarge, c.InitialMinDelayMS, maxDelayMS)
 	}

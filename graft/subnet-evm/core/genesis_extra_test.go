@@ -28,14 +28,12 @@ func TestGenesisCustomMinDelay(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
 
-	// Unset: genesis seeds the protocol default.
 	defaultConfig := params.TestGraniteChainConfig
 	defaultBlock, err := (&Genesis{Config: defaultConfig}).Commit(db, tdb)
 	require.NoError(t, err)
 	require.Equal(t, acp226.InitialDelayExcess, *customtypes.GetHeaderExtra(defaultBlock.Header()).MinDelayExcess)
 
-	// Set: genesis seeds the converged excess for the configured cadence.
-	// Copy first: TestGraniteChainConfig and its extra are shared globals.
+	// TestGraniteChainConfig and its extra are shared globals, copy before mutating.
 	const initialMinDelayMS = 5
 	customConfig := params.Copy(params.TestGraniteChainConfig)
 	params.GetExtra(&customConfig).InitialMinDelayMS = initialMinDelayMS
