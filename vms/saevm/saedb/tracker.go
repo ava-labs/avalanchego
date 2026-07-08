@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
@@ -41,10 +42,11 @@ const (
 
 // Config allows parameterization of the TrieDB and when state is committed.
 type Config struct {
-	TrieCacheMiB     uint64 // size of the TrieDB cache
-	SnapshotCacheMiB uint64 // size of the snapshot cache - if 0, snapshots are disabled
-	Archival         bool   // if true, will store every state on disk
-	CommitInterval   uint64 // MUST be set to a non-zero value
+	TrieCacheMiB      uint64 // size of the TrieDB cache
+	SnapshotCacheMiB  uint64 // size of the snapshot cache - if 0, snapshots are disabled
+	Archival          bool   // if true, will store every state on disk
+	CommitInterval    uint64 // MUST be set to a non-zero value
+	AllowMissingTries bool   // allow switching from archival to pruning on a DB that ran archival
 }
 
 func (c Config) Verify() error {
@@ -101,6 +103,9 @@ var (
 // NewTracker provides a new [Tracker] on the underlying database.
 func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log logging.Logger) (*Tracker, error) {
 	if err := c.Verify(); err != nil {
+		return nil, err
+	}
+	if err := protectTrieIndex(db, c); err != nil {
 		return nil, err
 	}
 	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig())
@@ -215,4 +220,23 @@ func (t *Tracker) Close(lastRoot common.Hash) error {
 	}
 
 	return errors.Join(errs...)
+}
+
+var ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
+
+func protectTrieIndex(db ethdb.KeyValueStore, c Config) error {
+	if c.Archival {
+		return customrawdb.WritePruningDisabled(db)
+	}
+	pruningDisabled, err := customrawdb.HasPruningDisabled(db)
+	if err != nil {
+		return fmt.Errorf("failed to check if the chain has been run with pruning disabled: %w", err)
+	}
+	if !pruningDisabled {
+		return nil
+	}
+	if !c.AllowMissingTries {
+		return ErrRefuseToCorruptArchiver
+	}
+	return nil
 }

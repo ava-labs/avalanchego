@@ -36,87 +36,110 @@ func TestParseConfig(t *testing.T) {
 		want      config
 		wantErr   testerr.Want
 	}{
+		// Defaults and errors
 		{
-			name:    "invalid_json",
+			name:    "defaults/invalid_json",
 			json:    "invalid",
 			wantErr: errIsType[*json.SyntaxError](),
 		},
 		{
-			name: "empty_input",
+			name: "defaults/empty_input",
 			want: defaultConfig(),
 		},
 		{
-			name: "empty_object",
+			name: "defaults/empty_object",
 			json: `{}`,
 			want: defaultConfig(),
 		},
+
+		// Block building
 		{
-			name: "pruning_disabled",
-			json: `{"pruning-enabled":false}`,
-			want: with(func(c *config) { c.Pruning = false }),
-		},
-		{
-			name: "local_txs_enabled",
-			json: `{"local-txs-enabled":true}`,
-			want: with(func(c *config) { c.LocalTxsEnabled = true }),
-		},
-		{
-			name: "tx_pool_slots",
-			json: `{"tx-pool-account-slots":32,"tx-pool-global-slots":9000}`,
-			want: with(func(c *config) {
-				c.TxPoolAccountSlots = 32
-				c.TxPoolGlobalSlots = 9000
-			}),
-		},
-		{
-			name: "price_target",
+			name: "block_building/min_price_target",
 			json: `{"min-price-target":1000}`,
 			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(1000)) }),
 		},
 		{
 			// An explicit 0 is a vote for the minimum, distinct from an absent
 			// field, which is no vote.
-			name: "explicit_zero",
+			name: "block_building/min_price_target_explicit_zero",
 			json: `{"min-price-target":0}`,
 			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(0)) }),
 		},
 		{
-			name: "allow_unprotected_txs",
+			name: "block_building/gas_target",
+			json: `{"gas-target":1000}`,
+			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
+		},
+
+		// State & trie
+		{
+			name: "state/pruning_disabled",
+			json: `{"pruning-enabled":false}`,
+			want: with(func(c *config) { c.Pruning = false }),
+		},
+		{
+			name: "state/commit_interval",
+			json: `{"commit-interval":128}`,
+			want: with(func(c *config) { c.CommitInterval = 128 }),
+		},
+		{
+			name: "state/allow_missing_tries",
+			json: `{"allow-missing-tries":true}`,
+			want: with(func(c *config) { c.AllowMissingTries = true }),
+		},
+
+		// Transaction pool
+		{
+			name: "tx_pool/local_txs_enabled",
+			json: `{"local-txs-enabled":true}`,
+			want: with(func(c *config) { c.LocalTxsEnabled = true }),
+		},
+		{
+			name: "tx_pool/slots",
+			json: `{"tx-pool-account-slots":32,"tx-pool-global-slots":9000}`,
+			want: with(func(c *config) {
+				c.TxPoolAccountSlots = 32
+				c.TxPoolGlobalSlots = 9000
+			}),
+		},
+
+		// APIs
+		{
+			name: "api/allow_unprotected_txs",
 			json: `{"allow-unprotected-txs":true}`,
 			want: with(func(c *config) { c.AllowUnprotectedTxs = true }),
 		},
 		{
-			name: "gas_target",
-			json: `{"gas-target":1000}`,
-			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
-		},
-		{
-			name: "batch_request_limit",
+			name: "api/batch_request_limit",
 			json: `{"batch-request-limit":50}`,
 			want: with(func(c *config) { c.BatchRequestLimit = 50 }),
 		},
 		{
-			name: "batch_request_limit_explicit_zero",
+			name: "api/batch_request_limit_explicit_zero",
 			json: `{"batch-request-limit":0}`, // 0 disables the batch limit
 			want: with(func(c *config) { c.BatchRequestLimit = 0 }),
 		},
 		{
-			name:    "batch_request_limit_too_large",
+			name:    "api/batch_request_limit_too_large",
 			json:    `{"batch-request-limit":9223372036854775808}`, // math.MaxInt64 + 1
 			wantErr: testerr.Is(rpc.ErrBatchRequestLimitTooLarge),
 		},
+
+		// Warp
 		{
 			name: "min_delay_target",
 			json: `{"min-delay-target":2000}`,
 			want: with(func(c *config) { c.MinDelayTarget = utils.PointerTo[uint64](2000) }),
 		},
 		{
-			name: "warp_off_chain_messages",
+			name: "warp/off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
 			want: with(func(c *config) {
 				c.WarpOffChainMessages = []hexutil.Bytes{{0x12, 0x34}}
 			}),
 		},
+
+		// All active fields
 		{
 			name:      "commit_interval_production_network",
 			json:      `{"commit-interval":256}`,
@@ -146,6 +169,7 @@ func TestParseConfig(t *testing.T) {
 				"gas-target":1500,
 				"min-delay-target":3000,
 				"pruning-enabled":false,
+				"allow-missing-tries":true,
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
@@ -162,6 +186,7 @@ func TestParseConfig(t *testing.T) {
 				MinDelayTarget:       utils.PointerTo[uint64](3000),
 				Pruning:              false,
 				CommitInterval:       256,
+				AllowMissingTries:    true,
 				LocalTxsEnabled:      true,
 				TxPoolAccountSlots:   8,
 				TxPoolGlobalSlots:    2048,
