@@ -58,7 +58,7 @@ type VM struct {
 	transitionLock sync.RWMutex
 	transitioned   bool
 	consensusState utils.Atomic[snow.State]
-	setPreference  utils.Atomic[bool]
+	preferenceSet  utils.Atomic[bool]
 	connections    *connections
 	httpHandlers   *httpHandlers
 	current        *current
@@ -197,9 +197,14 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	}()
 
 	// Draining the in-flight API requests blocks, but does not block forever.
+	//
 	// Websockets are long-lived connections which are not able to be gracefully
 	// terminated during the transition. This means that websocket connections
 	// can (and will) cause this to timeout during the transition.
+	//
+	// Blocking at all on the consensus thread is discuraged, but APIs are not
+	// recommended to be run on validators at all, so a reasonably short
+	// blocking period is fine here.
 	log.Info("draining in-flight API requests to the pre-transition VM",
 		zap.Duration("timeout", vm.drainTimeout),
 	)
@@ -238,6 +243,9 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	vm.postChainCtx.Lock.Lock()
 	defer vm.postChainCtx.Lock.Unlock()
 
+	// The consensus engine never sets the state to [snow.Initializing], it is
+	// the implicit default value. We only forward the current state if it has
+	// been set.
 	if state := vm.consensusState.Get(); state != snow.Initializing {
 		log.Info("setting post-transition VM state",
 			zap.Stringer("state", state),
@@ -248,7 +256,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 
 	log.Info("copying connections to the post-transition VM")
-	if err := vm.connections.reconnect(ctx, vm.postTransitionChain); err != nil {
+	if err := vm.connections.addConnectionsTo(ctx, vm.postTransitionChain); err != nil {
 		return fmt.Errorf("reconnecting to vm: %w", err)
 	}
 
@@ -259,7 +267,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	}
 	vm.httpHandlers.set(newHandlers)
 
-	if vm.setPreference.Get() {
+	if vm.preferenceSet.Get() {
 		// The VM is only notified of preference changes, so if the consensus
 		// engine previously set the preference, we must manually set the
 		// post-transition VM's preference.
@@ -285,13 +293,7 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 	chainCtx.Lock.Lock()
 	defer chainCtx.Lock.Unlock()
 
-	var (
-		requests requests
-		sender   = sender{
-			AppSender: vm.appSender,
-			requests:  &requests,
-		}
-	)
+	var requests requests
 	err := chain.Initialize(
 		ctx,
 		chainCtx,
@@ -300,7 +302,10 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 		vm.upgradeBytes,
 		vm.configBytes,
 		vm.fxs,
-		&sender,
+		&sender{
+			AppSender: vm.appSender,
+			requests:  &requests,
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("initializing chain: %w", err)
@@ -315,4 +320,24 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 		ctxCancel: ctxCancel,
 	}
 	return nil
+}
+
+// withLocks acquires the transition and current chain context locks before
+// executing the provided function.
+//
+// See the README for an explanation of the locking order requirements.
+func (vm *VM) withLocks(f func() error) error {
+	_, err := withLocks(vm, func() (struct{}, error) {
+		return struct{}{}, f()
+	})
+	return err
+}
+
+func withLocks[T any](vm *VM, f func() (T, error)) (T, error) {
+	vm.transitionLock.RLock()
+	defer vm.transitionLock.RUnlock()
+	vm.current.chainCtx.Lock.Lock()
+	defer vm.current.chainCtx.Lock.Unlock()
+
+	return f()
 }

@@ -14,7 +14,7 @@ import (
 // and accepted by the post-transition chain.
 func TestPostTransitionBlock(t *testing.T) {
 	for _, mode := range contextModes {
-		t.Run(mode.String(), func(t *testing.T) {
+		t.Run(string(mode), func(t *testing.T) {
 			sut := newSUT(t, withBlocksUntilTransition(0))
 			ctx := t.Context()
 
@@ -27,7 +27,7 @@ func TestPostTransitionBlock(t *testing.T) {
 // is at or after the transition time fails verification.
 func TestTransitionBlockChildren(t *testing.T) {
 	for _, mode := range contextModes {
-		t.Run(mode.String(), func(t *testing.T) {
+		t.Run(string(mode), func(t *testing.T) {
 			sut := newSUT(t)
 			ctx := t.Context()
 
@@ -48,16 +48,13 @@ func TestTransitionBlockChildren(t *testing.T) {
 // time leaves the VM on the pre-transition chain.
 func TestNoTransitionBeforeTime(t *testing.T) {
 	for _, mode := range contextModes {
-		t.Run(mode.String(), func(t *testing.T) {
+		t.Run(string(mode), func(t *testing.T) {
 			// Two blocks to transition; this test accepts one.
 			sut := newSUT(t, withBlocksUntilTransition(2))
 			ctx := t.Context()
 
 			sut.BuildVerifyAccept(t, ctx, mode)
-
-			version, err := sut.Version(ctx)
-			require.NoErrorf(t, err, "%T.Version()", sut)
-			require.Equalf(t, "pre", version, "%T.Version()", sut)
+			sut.requireVersion(t, "pre")
 		})
 	}
 }
@@ -67,7 +64,7 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 // correctly verified and accepted after the transition.
 func TestCachedBlockUpdatesAfterTransition(t *testing.T) {
 	for _, mode := range contextModes {
-		t.Run(mode.String(), func(t *testing.T) {
+		t.Run(string(mode), func(t *testing.T) {
 			sut := newSUT(t)
 			ctx := t.Context()
 
@@ -85,9 +82,7 @@ func TestCachedBlockUpdatesAfterTransition(t *testing.T) {
 			require.ErrorIsf(t, verifyBlock(ctx, postTransitionBlock, mode), errPostTransitionBlockBeforeTransition, "verifyBlock(%T, %s)", postTransitionBlock, mode)
 
 			require.NoErrorf(t, transitionBlock.Accept(ctx), "%T.Accept()", transitionBlock)
-			version, err := sut.Version(ctx)
-			require.NoErrorf(t, err, "%T.Version()", sut)
-			require.Equalf(t, "post", version, "%T.Version()", sut)
+			sut.requireVersion(t, "post")
 
 			require.NoErrorf(t, verifyBlock(ctx, postTransitionBlock, mode), "verifyBlock(%T, %s)", postTransitionBlock, mode)
 			require.NoErrorf(t, postTransitionBlock.Accept(ctx), "%T.Accept()", postTransitionBlock)

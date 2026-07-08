@@ -41,7 +41,7 @@ func (c *connections) remove(nodeID ids.NodeID) {
 	delete(c.nodes, nodeID)
 }
 
-func (c *connections) reconnect(ctx context.Context, connector validators.Connector) error {
+func (c *connections) addConnectionsTo(ctx context.Context, connector validators.Connector) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -53,20 +53,10 @@ func (c *connections) reconnect(ctx context.Context, connector validators.Connec
 	return nil
 }
 
-var _ common.AppSender = (*sender)(nil)
-
-// request identifies an outbound app request by peer and ID.
-//
-//nolint:unused // False positive
-type request struct {
-	nodeID    ids.NodeID
-	requestID uint32
-}
-
 // requests is the set of unanswered outbound app requests.
 type requests struct {
 	lock sync.Mutex
-	set  set.Set[request]
+	set  set.Set[common.Request]
 }
 
 func (r *requests) add(nodeIDs set.Set[ids.NodeID], requestID uint32) {
@@ -74,7 +64,10 @@ func (r *requests) add(nodeIDs set.Set[ids.NodeID], requestID uint32) {
 	defer r.lock.Unlock()
 
 	for nodeID := range nodeIDs {
-		r.set.Add(request{nodeID, requestID})
+		r.set.Add(common.Request{
+			NodeID:    nodeID,
+			RequestID: requestID,
+		})
 	}
 }
 
@@ -82,11 +75,16 @@ func (r *requests) remove(nodeID ids.NodeID, requestID uint32) bool {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	req := request{nodeID, requestID}
+	req := common.Request{
+		NodeID:    nodeID,
+		RequestID: requestID,
+	}
 	had := r.set.Contains(req)
 	r.set.Remove(req)
 	return had
 }
+
+var _ common.AppSender = (*sender)(nil)
 
 // sender is a [common.AppSender] that records each request the chain sends, so
 // the VM can drop responses and failures for requests the chain never made.
@@ -102,23 +100,17 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-	vm.current.chainCtx.Lock.Lock()
-	defer vm.current.chainCtx.Lock.Unlock()
-
-	vm.connections.add(nodeID, version)
-	return vm.current.chain.Connected(ctx, nodeID, version)
+	return vm.withLocks(func() error {
+		vm.connections.add(nodeID, version)
+		return vm.current.chain.Connected(ctx, nodeID, version)
+	})
 }
 
 func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-	vm.current.chainCtx.Lock.Lock()
-	defer vm.current.chainCtx.Lock.Unlock()
-
-	vm.connections.remove(nodeID)
-	return vm.current.chain.Disconnected(ctx, nodeID)
+	return vm.withLocks(func() error {
+		vm.connections.remove(nodeID)
+		return vm.current.chain.Disconnected(ctx, nodeID)
+	})
 }
 
 func (vm *VM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {

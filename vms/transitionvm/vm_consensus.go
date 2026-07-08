@@ -14,33 +14,24 @@ import (
 )
 
 func (vm *VM) SetState(ctx context.Context, state snow.State) error {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-	vm.current.chainCtx.Lock.Lock()
-	defer vm.current.chainCtx.Lock.Unlock()
-
-	vm.consensusState.Set(state)
-	return vm.current.chain.SetState(ctx, state)
+	return vm.withLocks(func() error {
+		vm.consensusState.Set(state)
+		return vm.current.chain.SetState(ctx, state)
+	})
 }
 
 func (vm *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-	vm.current.chainCtx.Lock.Lock()
-	defer vm.current.chainCtx.Lock.Unlock()
-
-	vm.setPreference.Set(true)
-	return vm.current.chain.SetPreference(ctx, blkID)
+	return vm.withLocks(func() error {
+		vm.preferenceSet.Set(true)
+		return vm.current.chain.SetPreference(ctx, blkID)
+	})
 }
 
 func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, blockCtx *smblock.Context) error {
-	vm.transitionLock.RLock()
-	defer vm.transitionLock.RUnlock()
-	vm.current.chainCtx.Lock.Lock()
-	defer vm.current.chainCtx.Lock.Unlock()
-
-	vm.setPreference.Set(true)
-	return vm.current.chain.SetPreferenceWithContext(ctx, blkID, blockCtx)
+	return vm.withLocks(func() error {
+		vm.preferenceSet.Set(true)
+		return vm.current.chain.SetPreferenceWithContext(ctx, blkID, blockCtx)
+	})
 }
 
 func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
