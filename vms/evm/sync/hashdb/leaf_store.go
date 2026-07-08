@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"context"
@@ -31,7 +31,7 @@ type storageRegistry interface {
 // leafStore is the seam the reconstruction writes leaves through, and reads them back
 // from in key order. What a leaf means differs for accounts and storage.
 type leafStore interface {
-	writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error
+	writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch LeafBatch) error
 	iterateLeaves(seek common.Hash) ethdb.Iterator
 }
 
@@ -52,7 +52,7 @@ func newAccountLeafStore(db ethdb.KeyValueStore, codeQueue codeEnqueuer, trieQue
 
 // writeLeaves writes account snapshots, discovering storage tries and code as it goes.
 // Batch capping is the segment's job.
-func (s *accountLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
+func (s *accountLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch LeafBatch) error {
 	var codeHashes []common.Hash
 	for i, key := range batch.keys {
 		accountHash := common.BytesToHash(key)
@@ -102,7 +102,7 @@ func newStorageLeafStore(db ethdb.KeyValueStore, accounts []common.Hash) *storag
 
 // writeLeaves writes each leaf once per sharing account. Batch capping is the
 // segment's job.
-func (s *storageLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch leafBatch) error {
+func (s *storageLeafStore) writeLeaves(ctx context.Context, db ethdb.KeyValueWriter, batch LeafBatch) error {
 	for _, account := range s.accounts {
 		if err := ctx.Err(); err != nil {
 			return err

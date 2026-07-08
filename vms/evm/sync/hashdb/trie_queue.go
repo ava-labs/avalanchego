@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"errors"
@@ -35,7 +35,7 @@ func newTrieQueue(db ethdb.Database) *trieQueue {
 // root differs from root, then records root as the current target.
 //
 // It clears markers only. The snapshots are the caller's to wipe, see
-// [NewHashDBSyncer], because leaves left there still count as resume progress.
+// [NewEVMSyncer], because leaves left there still count as resume progress.
 func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash) error {
 	persistedRoot, err := customrawdb.ReadSyncRoot(t.db)
 	switch {
