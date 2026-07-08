@@ -208,6 +208,10 @@ func TestRPCsWithSynchronousHistory(t *testing.T) {
 	wantDepositTrace := depositTraceResult(depositTx, syncReceipts[1][0].GasUsed, recipient, escrowDepositVal)
 
 	sender := sut.wallet.Addresses()[0]
+	balanceCall := map[string]any{
+		"to":   escrowAddr,
+		"data": hexutil.Bytes(escrow.CallDataForBalance(recipient)),
+	}
 	genesisHash := deploy.ParentHash()
 	genesisBalance := (*hexutil.Big)(new(uint256.Int).SetAllOne().ToBig()) // [saetest.MaxAllocFor]
 	tests := []rpcTest{
@@ -244,6 +248,16 @@ func TestRPCsWithSynchronousHistory(t *testing.T) {
 			want:   hexBig(escrowDepositVal),
 		},
 		{
+			method: "eth_call",
+			args:   []any{balanceCall, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(deploy.Number().Int64()))},
+			want:   hexutil.Bytes(make([]byte, 32)),
+		},
+		{
+			method: "eth_call",
+			args:   []any{balanceCall, rpc.BlockNumberOrHashWithHash(deposit.Hash(), true)},
+			want:   hexutil.Bytes(uint256.NewInt(escrowDepositVal).PaddedBytes(32)),
+		},
+		{
 			method: "eth_getTransactionCount",
 			args:   []any{sender, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(deploy.Number().Int64()))},
 			want:   hexutil.Uint64(1),
@@ -254,10 +268,9 @@ func TestRPCsWithSynchronousHistory(t *testing.T) {
 			want:   hexutil.Uint64(2),
 		},
 		{
-			method: "eth_getBlockReceipts",
-			args:   []any{deploy.Hash()},
-			want:   []*types.Receipt(syncReceipts[0]),
-			// nil Logs are served as an empty slice.
+			method:       "eth_getBlockReceipts",
+			args:         []any{deploy.Hash()},
+			want:         []*types.Receipt(syncReceipts[0]),
 			extraCmpOpts: cmp.Options{cmputils.NilSlicesAreEmpty[[]*types.Log]()},
 		},
 		{
