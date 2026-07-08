@@ -400,8 +400,8 @@ func (vm *fakeVM) ParseBlock(_ context.Context, b []byte) (snowman.Block, error)
 func (vm *fakeVM) BuildBlock(context.Context) (snowman.Block, error) {
 	child := snowmantest.BuildChild(vm.tip.Block)
 	child.TimestampV = vm.tip.Timestamp().Add(blockInterval)
-	// Store a copy, mutations to the built block must not be visible to
-	// blocks later parsed from the same bytes.
+	// Blocks are shared across the VMs through the state, but we want each
+	// parsed copy to be isolated, like in production, so we store a copy.
 	parsable := *child
 	vm.state.parsable[child.ID()] = &parsable
 	blk := &fakeBlock{Block: child, vm: vm}
