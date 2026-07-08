@@ -169,13 +169,17 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if err := database.PutID(batch, rootKey(height), ids.ID(newRoot)); err != nil {
 		return fmt.Errorf("writing root: %w", err)
 	}
-	// Committing the batch atomically with shared memory prevents duplicate
-	// shared memory operations in the event of a crash.
-	//
-	// TODO(StephenButtolph): Skip applying shared memory operations for bonus
-	// blocks.
-	if err := s.snowCtx.SharedMemory.Apply(ops, batch); err != nil {
-		return fmt.Errorf("applying shared memory: %w", err)
+
+	if s.isBonus(height) {
+		if err := batch.Write(); err != nil {
+			return fmt.Errorf("writing bonus block batch: %w", err)
+		}
+	} else {
+		// Committing the batch atomically with shared memory prevents duplicate
+		// shared memory operations in the event of a crash.
+		if err := s.snowCtx.SharedMemory.Apply(ops, batch); err != nil {
+			return fmt.Errorf("applying shared memory: %w", err)
+		}
 	}
 
 	s.snowCtx.Log.Debug("updated atomic trie",

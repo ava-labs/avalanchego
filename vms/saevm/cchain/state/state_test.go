@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -104,14 +105,28 @@ func withLegacyBackend() sutOption {
 	})
 }
 
-func newState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
-	ctx := snowtest.Context(tb, snowtest.CChainID)
-	ctx.Log = loggingtest.New(tb, logging.Debug)
-	ctx.SharedMemory = sm
+// withNetworkID configures the SUT's snow context to use the given network ID.
+func withNetworkID(networkID uint32) sutOption {
+	return options.Func[sutProperties](func(p *sutProperties) {
+		p.new = newStateWithNetworkID(networkID)
+	})
+}
 
-	s, err := New(ctx, db)
-	require.NoErrorf(tb, err, "New(%T, %T)", ctx, db)
-	return s
+func newState(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
+	return newStateWithNetworkID(constants.UnitTestID)(tb, db, sm)
+}
+
+func newStateWithNetworkID(networkID uint32) func(testing.TB, *prefixdb.Database, chainsatomic.SharedMemory) stateImpl {
+	return func(tb testing.TB, db *prefixdb.Database, sm chainsatomic.SharedMemory) stateImpl {
+		ctx := snowtest.Context(tb, snowtest.CChainID)
+		ctx.NetworkID = networkID
+		ctx.Log = loggingtest.New(tb, logging.Debug)
+		ctx.SharedMemory = sm
+
+		s, err := New(ctx, db)
+		require.NoErrorf(tb, err, "New(%T, %T)", ctx, db)
+		return s
+	}
 }
 
 // oldState drives the legacy [oldstate] package behind a surface that mirrors
@@ -401,6 +416,68 @@ func TestApply(t *testing.T) {
 					sut.assertHasTxs(t, test.blocks[:i+1])
 				}
 			}
+		})
+	}
+}
+
+// TestApply_BonusBlock verifies that a block's atomic operations are skipped for
+// shared memory (but still written to the trie) only when the network is mainnet
+// AND the height is a known bonus block.
+func TestApply_BonusBlock(t *testing.T) {
+	const (
+		bonusHeight    uint64 = 102972
+		nonBonusHeight uint64 = 102971
+	)
+	_, containsBonusHeight := mainnetBonusBlocks[bonusHeight]
+	require.Truef(t, containsBonusHeight, "bonusHeight=%d must be a known bonus block", bonusHeight)
+	_, containsNonBonusHeight := mainnetBonusBlocks[nonBonusHeight]
+	require.Falsef(t, containsNonBonusHeight, "nonBonusHeight=%d must not be a known bonus block", nonBonusHeight)
+
+	tests := []struct {
+		name              string
+		networkID         uint32
+		height            uint64
+		wantSkipSharedMem bool
+	}{
+		{
+			name:              "mainnet_bonus_height",
+			networkID:         constants.MainnetID,
+			height:            bonusHeight,
+			wantSkipSharedMem: true,
+		},
+		{
+			name:              "mainnet_non_bonus_height",
+			networkID:         constants.MainnetID,
+			height:            nonBonusHeight,
+			wantSkipSharedMem: false,
+		},
+		{
+			name:              "non_mainnet_bonus_height",
+			networkID:         constants.FujiID,
+			height:            bonusHeight,
+			wantSkipSharedMem: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var build builder
+			s := newSUT(t, withNetworkID(test.networkID))
+			s.apply(t, block{height: test.height, txs: []*tx.Tx{build.newExport()}})
+
+			// The tx is always written to the trie regardless of bonus status.
+			root, err := s.GetRoot(test.height)
+			require.NoErrorf(t, err, "%T.GetRoot(%d)", s.stateImpl, test.height)
+			require.NotEqualf(t, types.EmptyRootHash, root, "%T.GetRoot(%d) should be updated", s.stateImpl, test.height)
+
+			// Shared memory is only skipped for mainnet bonus blocks.
+			it := s.sharedMemoryDB.NewIterator()
+			defer it.Release()
+			hasSharedMem := it.Next()
+			require.NoError(t, it.Error())
+			require.Equal(t, !test.wantSkipSharedMem, hasSharedMem, "shared memory written")
 		})
 	}
 }

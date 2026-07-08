@@ -9,9 +9,11 @@ package(default_visibility = [
 go_library(
     name = "state",
     srcs = [
+        "bonus_blocks.go",
         "codec.go",
         "state.go",
     ],
+    embedsrcs = ["bonus_blocks.json"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/state",
     deps = [
         "//chains/atomic",
@@ -22,6 +24,7 @@ go_library(
         "//graft/coreth/plugin/evm/atomic/state",
         "//ids",
         "//snow",
+        "//utils/constants",
         "//utils/units",
         "//utils/wrappers",
         "//vms/evm/database",
@@ -51,6 +54,7 @@ go_test(
         "//graft/coreth/plugin/evm/atomic/state",
         "//ids",
         "//snow/snowtest",
+        "//utils/constants",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/components/avax",
