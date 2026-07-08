@@ -135,10 +135,10 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	pre := newFakeVM(t, "pre", cfg.state)
 	post := newFakeVM(t, "post", cfg.state)
 	factory := &Factory{
-		PreFactory:     fakeFactory{vm: pre},
-		PostFactory:    fakeFactory{vm: post},
-		TransitionTime: cfg.transitionTime,
-		DrainTimeout:   100 * time.Millisecond,
+		PreFactory:      fakeFactory{vm: pre},
+		PostFactory:     fakeFactory{vm: post},
+		TransitionTime:  cfg.transitionTime,
+		APIDrainTimeout: 100 * time.Millisecond,
 	}
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	intf, err := factory.New(ctx.Log)
@@ -180,8 +180,7 @@ func (s *SUT) restart(t *testing.T) *SUT {
 	)
 }
 
-// restart rebuilds the VM against the same database and chain state, modeling a
-// node restart.
+// requireVersion asserts that the VM's version matches the expected value.
 func (s *SUT) requireVersion(t *testing.T, want string) {
 	t.Helper()
 	ctx := t.Context()
@@ -258,6 +257,7 @@ func (b *fakeBlock) Accept(ctx context.Context) error {
 type fakeVM struct {
 	*blocktest.VM
 	*blocktest.StateSyncableVM
+	initialized bool
 
 	name  string
 	state *fakeState
@@ -296,10 +296,25 @@ func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
 	}
 }
 
-func (vm *fakeVM) Initialize(_ context.Context, chainCtx *snow.Context, _ database.Database, _, _, _ []byte, _ []*common.Fx, appSender common.AppSender) error {
+func (vm *fakeVM) Initialize(
+	_ context.Context,
+	chainCtx *snow.Context,
+	_ database.Database,
+	_ []byte,
+	_ []byte,
+	_ []byte,
+	_ []*common.Fx,
+	appSender common.AppSender,
+) error {
+	if vm.initialized {
+		return errors.New("duplicate initialization")
+	}
+
 	vm.chainCtx = chainCtx
 	vm.tip = vm.state.lastAccepted
 	vm.appSender = appSender
+
+	vm.initialized = true
 	return nil
 }
 
@@ -385,7 +400,10 @@ func (vm *fakeVM) ParseBlock(_ context.Context, b []byte) (snowman.Block, error)
 func (vm *fakeVM) BuildBlock(context.Context) (snowman.Block, error) {
 	child := snowmantest.BuildChild(vm.tip.Block)
 	child.TimestampV = vm.tip.Timestamp().Add(blockInterval)
-	vm.state.parsable[child.ID()] = child
+	// Store a copy, mutations to the built block must not be visible to
+	// blocks later parsed from the same bytes.
+	parsable := *child
+	vm.state.parsable[child.ID()] = &parsable
 	blk := &fakeBlock{Block: child, vm: vm}
 	vm.tip = blk
 	return blk, nil
@@ -456,7 +474,12 @@ func TestInitializeIsolatesContext(t *testing.T) {
 
 	require.NotSamef(t, sut.pre.chainCtx, sut.post.chainCtx, "%T.chainCtx", sut.post)
 	require.NotSamef(t, sut.pre.chainCtx.Metrics, sut.post.chainCtx.Metrics, "%T.chainCtx.Metrics", sut.post)
-	require.Equalf(t, sut.pre.chainCtx.ChainID, sut.post.chainCtx.ChainID, "%T.chainCtx.ChainID", sut.post)
+
+	sut.ctx.Metrics = nil
+	sut.pre.chainCtx.Metrics = nil
+	sut.post.chainCtx.Metrics = nil
+	require.Equalf(t, sut.ctx, sut.pre.chainCtx, "%T.chainCtx", sut.pre)
+	require.Equalf(t, sut.ctx, sut.post.chainCtx, "%T.chainCtx", sut.post)
 }
 
 // TestRestart verifies the VM resumes on the correct chain after a restart,

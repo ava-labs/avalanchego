@@ -38,14 +38,21 @@ func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	vm.transitionLock.RLock()
 	defer vm.transitionLock.RUnlock()
 
+	done := make(chan struct{})
+	defer close(done)
+
+	// don't access [VM.current] in the goroutine, as we no longer hold the
+	// transition lock there.
+	transitioning := vm.current.transitioning
+
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// Stop waiting if the VM transitions.
-	removeCancel := context.AfterFunc(vm.current.ctx, cancel)
-
-	// Unregister the hook on return so it doesn't leak.
-	defer removeCancel()
+	go func() {
+		select {
+		case <-done:
+		case <-transitioning:
+		}
+		cancel()
+	}()
 
 	return vm.current.chain.WaitForEvent(ctx)
 }

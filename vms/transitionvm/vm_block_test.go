@@ -18,7 +18,7 @@ func TestPostTransitionBlock(t *testing.T) {
 			sut := newSUT(t, withBlocksUntilTransition(0))
 			ctx := t.Context()
 
-			sut.BuildVerifyAccept(t, ctx, mode) // should be built unwrapped
+			sut.BuildVerifyAccept(t, ctx, mode)
 		})
 	}
 }
@@ -84,10 +84,42 @@ func TestCachedBlockUpdatesAfterTransition(t *testing.T) {
 			require.NoErrorf(t, transitionBlock.Accept(ctx), "%T.Accept()", transitionBlock)
 			sut.requireVersion(t, "post")
 
+			sut.pre.tip.VerifyV = errors.New("verify forwarded to stale pre-transition block")
 			require.NoErrorf(t, verifyBlock(ctx, postTransitionBlock, mode), "verifyBlock(%T, %s)", postTransitionBlock, mode)
 			require.NoErrorf(t, postTransitionBlock.Accept(ctx), "%T.Accept()", postTransitionBlock)
 		})
 	}
+}
+
+// TestRejectForwardedToPreTransitionChain verifies rejecting a pre-transition
+// block before the transition is forwarded to the pre-transition chain.
+func TestRejectForwardedToPreTransitionChain(t *testing.T) {
+	// Two blocks to transition, so the built block is pre-transition.
+	sut := newSUT(t, withBlocksUntilTransition(2))
+	ctx := t.Context()
+
+	blk, err := sut.BuildBlock(ctx)
+	require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+	require.NoErrorf(t, blk.Verify(ctx), "%T.Verify()", blk)
+
+	errRejected := errors.New("rejected by pre-transition chain")
+	sut.pre.tip.RejectV = errRejected
+	require.ErrorIsf(t, blk.Reject(ctx), errRejected, "%T.Reject()", blk)
+}
+
+// TestRejectForwardedToPostTransitionChain verifies rejecting a post-transition
+// block after the transition is forwarded to the post-transition chain.
+func TestRejectForwardedToPostTransitionChain(t *testing.T) {
+	sut := newSUT(t, withBlocksUntilTransition(0))
+	ctx := t.Context()
+
+	blk, err := sut.BuildBlock(ctx)
+	require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+	require.NoErrorf(t, blk.Verify(ctx), "%T.Verify()", blk)
+
+	errRejected := errors.New("rejected by post-transition chain")
+	sut.post.tip.RejectV = errRejected
+	require.ErrorIsf(t, blk.Reject(ctx), errRejected, "%T.Reject()", blk)
 }
 
 // TestRejectIsNoopAfterTransition verifies rejecting a pre-transition block

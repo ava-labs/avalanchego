@@ -43,7 +43,7 @@ type VM struct {
 	preTransitionChain  Chain
 	postTransitionChain Chain
 	transitionTime      time.Time
-	drainTimeout        time.Duration
+	apiDrainTimeout     time.Duration
 
 	// chain parameters
 	postChainCtx *snow.Context // Has modified [snow.Context.Lock] and [snow.Context.Metrics]
@@ -71,8 +71,9 @@ type current struct {
 	chainCtx *snow.Context
 	requests *requests
 
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	// transitioning is closed when the chain is in the process of
+	// transitioning.
+	transitioning chan struct{}
 }
 
 var transitionedKey = prefixdb.MakePrefix([]byte("transitioned"))
@@ -172,9 +173,9 @@ func copyContext(ctx *snow.Context) *snow.Context {
 // transition switches from the pre- to the post-transition chain. The
 // pre-transition chain must be active.
 func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
-	// Cancel first so a blocked [VM.WaitForEvent] releases its read lock,
-	// letting us take the write lock below.
-	vm.current.ctxCancel()
+	// Mark as transitioning so a blocked [VM.WaitForEvent] releases its read
+	// lock, letting us take the write lock below.
+	close(vm.current.transitioning)
 
 	vm.transitionLock.Lock()
 	defer vm.transitionLock.Unlock()
@@ -202,13 +203,13 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	// terminated during the transition. This means that websocket connections
 	// can (and will) cause this to timeout during the transition.
 	//
-	// Blocking at all on the consensus thread is discuraged, but APIs are not
+	// Blocking at all on the consensus thread is discouraged, but APIs are not
 	// recommended to be run on validators at all, so a reasonably short
 	// blocking period is fine here.
 	log.Info("draining in-flight API requests to the pre-transition VM",
-		zap.Duration("timeout", vm.drainTimeout),
+		zap.Duration("timeout", vm.apiDrainTimeout),
 	)
-	drainCtx, cancelDrain := context.WithTimeout(ctx, vm.drainTimeout)
+	drainCtx, cancelDrain := context.WithTimeout(ctx, vm.apiDrainTimeout)
 	defer cancelDrain()
 	if err := vm.httpHandlers.drain(drainCtx); err != nil {
 		log.Warn("abandoning API requests still in flight after drain timeout",
@@ -311,13 +312,11 @@ func (vm *VM) initChain(ctx context.Context, chain Chain, chainCtx *snow.Context
 		return fmt.Errorf("initializing chain: %w", err)
 	}
 
-	ctx, ctxCancel := context.WithCancel(context.Background())
 	vm.current = &current{
-		chain:     chain,
-		chainCtx:  chainCtx,
-		requests:  &requests,
-		ctx:       ctx,
-		ctxCancel: ctxCancel,
+		chain:         chain,
+		chainCtx:      chainCtx,
+		requests:      &requests,
+		transitioning: make(chan struct{}),
 	}
 	return nil
 }
