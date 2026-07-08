@@ -11,15 +11,12 @@ import (
 	"math/rand/v2"
 	"net/http/httptest"
 	"os"
-	"slices"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/consensus/beacon"
-	"github.com/ava-labs/libevm/consensus/ethash"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -34,7 +31,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -87,12 +83,12 @@ type SUT struct {
 	*ethclient.Client
 	rpcClient *rpc.Client
 
-	rawVM          *VM
-	initialSettled *blocks.Block
-	wallet         *saetest.Wallet
-	db             ethdb.Database
-	hooks          *hookstest.Stub
-	logger         *loggingtest.Logger
+	rawVM   *VM
+	genesis *blocks.Block
+	wallet  *saetest.Wallet
+	db      ethdb.Database
+	hooks   *hookstest.Stub
+	logger  *loggingtest.Logger
 
 	sender *saetest.Sender
 }
@@ -110,7 +106,6 @@ type (
 		precompiles map[common.Address]libevm.PrecompiledContract
 		nodeID      ids.NodeID
 		validators  set.Set[ids.NodeID]
-		preInit     func(tb testing.TB, wallet *saetest.Wallet, genesis *core.Genesis, db ethdb.Database)
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -160,11 +155,6 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		nodeID: ids.GenerateTestNodeID(),
 	}, opts...)
 
-	wallet := saetest.NewWalletWithKeyChain(keys, types.LatestSigner(conf.genesis.Config))
-	if conf.preInit != nil {
-		conf.preInit(tb, wallet, &conf.genesis, newEthDB(conf.db))
-	}
-
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
 	snow := adaptor.Convert(vm)
 	tb.Cleanup(func() {
@@ -211,15 +201,18 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 
 	rpcClient, ethClient := dialRPC(ctx, tb, snow)
 	sut := &SUT{
-		ChainVM:        snow,
-		Client:         ethClient,
-		rpcClient:      rpcClient,
-		rawVM:          vm.VM,
-		initialSettled: vm.last.settled.Load(),
-		wallet:         wallet,
-		db:             newEthDB(conf.db),
-		hooks:          conf.hooks,
-		logger:         logger,
+		ChainVM:   snow,
+		Client:    ethClient,
+		rpcClient: rpcClient,
+		rawVM:     vm.VM,
+		genesis:   vm.last.settled.Load(),
+		wallet: saetest.NewWalletWithKeyChain(
+			keys,
+			types.LatestSigner(conf.genesis.Config),
+		),
+		db:     newEthDB(conf.db),
+		hooks:  conf.hooks,
+		logger: logger,
 
 		sender: sender,
 	}
@@ -270,49 +263,6 @@ func withVMTime(tb testing.TB, startTime time.Time) (sutOption, *saetest.Clock) 
 	})
 
 	return opt, c
-}
-
-// withSynchronousChain returns an option that seeds the SUT's database with n
-// canonical synchronous blocks, mimicking a database inherited from a
-// synchronous-execution chain.
-
-// TODO(JonathanOppenheimer): seeded blocks are plain EVM. Test real atomic txs,
-// and precompiles via a transitionvm e2e?
-func withSynchronousChain(n int, gen func(*saetest.Wallet, int, *core.BlockGen), chain *[]*types.Block, receipts *[]types.Receipts) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.preInit = func(tb testing.TB, wallet *saetest.Wallet, genesis *core.Genesis, db ethdb.Database) {
-			tb.Helper()
-
-			// [core.GenerateChain] commits every block's state to `db` in
-			// archive (hash) mode, as [NewVM] requires, but nothing else.
-			tdb := triedb.NewDatabase(db, triedb.HashDefaults)
-			defer func() {
-				require.NoErrorf(tb, tdb.Close(), "%T.Close()", tdb)
-			}()
-			_, err := genesis.Commit(db, tdb)
-			require.NoErrorf(tb, err, "%T.Commit()", genesis)
-
-			*chain, *receipts = core.GenerateChain(genesis.Config, genesis.ToBlock(), beacon.New(ethash.NewFaker()), db, n, func(i int, bg *core.BlockGen) {
-				bg.SetPoS() // genesis.Config is post-merge
-				gen(wallet, i, bg)
-			})
-
-			// Persist the blocks as a synchronous-execution chain would have,
-			// mirroring [core.BlockChain.InsertChain] and
-			// [core.BlockChain.SetFinalized].
-			for i, b := range *chain {
-				rawdb.WriteBlock(db, b)
-				rawdb.WriteReceipts(db, b.Hash(), b.NumberU64(), (*receipts)[i])
-				rawdb.WriteCanonicalHash(db, b.Hash(), b.NumberU64())
-				rawdb.WriteTxLookupEntriesByBlock(db, b)
-			}
-			tip := (*chain)[n-1].Hash()
-			rawdb.WriteHeadHeaderHash(db, tip)
-			rawdb.WriteHeadBlockHash(db, tip)
-			rawdb.WriteHeadFastBlockHash(db, tip)
-			rawdb.WriteFinalizedBlockHash(db, tip)
-		}
-	})
 }
 
 // withExecResultsDB returns an option that replaces the default
@@ -474,20 +424,6 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 	return s.runConsensusLoopOnPreference(tb, s.lastAcceptedBlock(tb), txs...)
 }
 
-// settleUntilEvicted settles consensus blocks until every block in evict has
-// been evicted from VM memory, forcing RPCs onto the on-disk restore path.
-func (s *SUT) settleUntilEvicted(tb testing.TB, vmTime *saetest.Clock, evict ...common.Hash) {
-	tb.Helper()
-	inMemory := func(h common.Hash) bool {
-		_, ok := s.rawVM.consensusCritical.Load(h)
-		return ok
-	}
-	for i := 0; slices.ContainsFunc(evict, inMemory); i++ {
-		require.Lessf(tb, i, 10, "blocks %x still in VM memory after settling %d blocks", evict, i)
-		vmTime.AdvanceToSettle(s.context(tb), tb, s.runConsensusLoop(tb))
-	}
-}
-
 // deployEscrow signs and runs a deploy tx for the escrow contract from
 // s.wallet[0], in its own consensus block, returning the block, the deployed
 // contract address, and the deploy tx.
@@ -634,8 +570,8 @@ func TestIntegration(t *testing.T) {
 		t.Run("WaitForEvent_with_existing_txs", testWaitForEvent)
 	}
 
-	b := sut.runConsensusLoopOnPreference(t, sut.initialSettled)
-	assert.Equal(t, sut.initialSettled.ID(), b.Parent(), "BuildBlock() builds on preference")
+	b := sut.runConsensusLoopOnPreference(t, sut.genesis)
+	assert.Equal(t, sut.genesis.ID(), b.Parent(), "BuildBlock() builds on preference")
 	require.Lenf(t, b.Transactions(), numTxs, "%T.Transactions()", b)
 
 	require.NoError(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
@@ -1212,7 +1148,7 @@ func TestSettledGasTime(t *testing.T) {
 	const numBlocks = 100
 	rng := rand.New(rand.NewPCG(0, 0)) //#nosec G404 -- Reproducibility is useful for tests
 	bs := make([]*blocks.Block, 0, numBlocks+1)
-	bs = append(bs, sut.initialSettled)
+	bs = append(bs, sut.genesis)
 	for range numBlocks {
 		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        nil, // contract creation

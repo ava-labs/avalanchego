@@ -51,7 +51,7 @@ func newNetworkedSUTs(tb testing.TB, numValidators, numNonValidators int) *netwo
 	// network will exhibit very weird behavior.
 	_, expectedSUT := newSUT(tb, numAccounts)
 	for selfID, sut := range net.allNodes() {
-		require.Equalf(tb, expectedSUT.initialSettled.ID(), sut.initialSettled.ID(), "genesis ID for node %s", selfID)
+		require.Equalf(tb, expectedSUT.genesis.ID(), sut.genesis.ID(), "genesis ID for node %s", selfID)
 	}
 
 	// Fully connect the validator clique.
