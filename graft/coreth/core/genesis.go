@@ -399,6 +399,7 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *triedb.Database) (*types.Blo
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
+	rawdb.WriteHeadFastBlockHash(batch, block.Hash())
 	rawdb.WriteFinalizedBlockHash(batch, block.Hash())
 	rawdb.WriteChainConfig(batch, block.Hash(), config)
 	if err := batch.Write(); err != nil {
