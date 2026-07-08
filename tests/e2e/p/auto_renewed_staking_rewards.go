@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package autorenewedvalidators
+package p
 
 import (
 	"time"
@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests/e2e/p"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -26,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
-var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() {
+var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", func() {
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
@@ -50,7 +49,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			network = env.GetNetwork()
 		)
 
-		requireHeliconActivated(tc, require, info.NewClient(env.GetRandomNodeURI().URI))
+		RequireHeliconActivated(tc, require, info.NewClient(env.GetRandomNodeURI().URI))
 
 		tc.By("adding an ephemeral node")
 		node := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
@@ -88,9 +87,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			pContext          = fundingPWallet.Builder().Context()
 			pvmClient         = platformvm.NewClient(nodeURI)
 			adminClient       = admin.NewClient(nodeURI)
-			rewardConfig      = p.GetRewardConfig(tc, adminClient)
+			rewardConfig      = GetRewardConfig(tc, adminClient)
 			calculator        = reward.NewCalculator(rewardConfig)
-			stakingHelper     = stakingHelper{tc: tc, require: require, pvmClient: pvmClient}
 		)
 
 		configOwner := &secp256k1fx.OutputOwners{
@@ -277,14 +275,19 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
 			require.NoError(err)
 			require.Len(validators, 1)
-			require.Equal(uint64(updatedStakingPeriod.Seconds()), validators[0].AutoRenewedConfig.NextPeriod)
-			require.Equal(autoCompoundedRewardShares, validators[0].AutoRenewedConfig.AutoCompoundRewardShares)
-			require.Equal(uint32(1), validators[0].AutoRenewedConfig.ValidatorAuthority.Threshold)
-			require.Equal([]ids.ShortID{validatorFundingKey.Address()}, validators[0].AutoRenewedConfig.ValidatorAuthority.Addresses)
+			require.Equal(&platformvm.ClientAutoRenewedConfig{
+				ValidatorAuthority: &platformvm.ClientOwner{
+					Locktime:  0,
+					Threshold: 1,
+					Addresses: []ids.ShortID{validatorFundingKey.Address()},
+				},
+				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
+				AutoCompoundRewardShares: autoCompoundedRewardShares,
+			}, validators[0].AutoRenewedConfig)
 		})
 
 		tc.By("waiting for the first staking cycle to complete", func() {
-			stakingHelper.waitForStakingCycleEnd(nodeID)
+			WaitForAutoRenewedCycleEnd(tc, require, pvmClient, nodeID)
 		})
 
 		chainTimeAtCycle1End, err := pvmClient.GetTimestamp(tc.DefaultContext())
@@ -364,10 +367,15 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
 			require.NoError(err)
 			require.Len(validators, 1)
-			require.Equal(uint64(updatedStakingPeriod.Seconds()), validators[0].AutoRenewedConfig.NextPeriod)
-			require.Equal(updatedAutoCompoundedRewardShares, validators[0].AutoRenewedConfig.AutoCompoundRewardShares)
-			require.Equal(uint32(1), validators[0].AutoRenewedConfig.ValidatorAuthority.Threshold)
-			require.Equal([]ids.ShortID{validatorFundingKey.Address()}, validators[0].AutoRenewedConfig.ValidatorAuthority.Addresses)
+			require.Equal(&platformvm.ClientAutoRenewedConfig{
+				ValidatorAuthority: &platformvm.ClientOwner{
+					Locktime:  0,
+					Threshold: 1,
+					Addresses: []ids.ShortID{validatorFundingKey.Address()},
+				},
+				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
+				AutoCompoundRewardShares: updatedAutoCompoundedRewardShares,
+			}, validators[0].AutoRenewedConfig)
 		})
 
 		tc.By("retrieving supply before adding delegator2")
@@ -429,7 +437,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 		})
 
 		tc.By("waiting for the second staking cycle to complete", func() {
-			stakingHelper.waitForStakingCycleEnd(nodeID)
+			WaitForAutoRenewedCycleEnd(tc, require, pvmClient, nodeID)
 		})
 
 		chainTimeAtCycle2End, err := pvmClient.GetTimestamp(tc.DefaultContext())
@@ -512,7 +520,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 		require.NoError(err)
 
 		tc.By("waiting for the third staking cycle to complete", func() {
-			stakingHelper.waitForStakingCycleEnd(nodeID)
+			WaitForAutoRenewedCycleEnd(tc, require, pvmClient, nodeID)
 		})
 
 		tc.By("verifying the validator has exited the validator set", func() {
@@ -600,7 +608,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validator] [Staking Rewards]", func() 
 		})
 
 		tc.By("waiting for the re-added validator's staking cycle to complete", func() {
-			stakingHelper.waitForStakingCycleEnd(nodeID)
+			WaitForAutoRenewedCycleEnd(tc, require, pvmClient, nodeID)
 		})
 
 		tc.By("checking supply was increased by the re-added validator's renewal", func() {

@@ -19,7 +19,6 @@ go_test(
         "//tests/e2e/c",
         "//tests/e2e/faultinjection",
         "//tests/e2e/p",
-        "//tests/e2e/p/autorenewedvalidators",
         "//tests/e2e/vms",
         "//tests/e2e/x",
         "//tests/e2e/x/transfer",

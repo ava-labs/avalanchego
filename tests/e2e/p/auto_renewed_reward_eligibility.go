@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package autorenewedvalidators
+package p
 
 import (
 	"time"
@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests/e2e/p"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -46,7 +45,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			network = env.GetNetwork()
 		)
 
-		requireHeliconActivated(tc, require, info.NewClient(env.GetRandomNodeURI().URI))
+		RequireHeliconActivated(tc, require, info.NewClient(env.GetRandomNodeURI().URI))
 
 		tc.By("adding an ephemeral node")
 		node := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
@@ -84,9 +83,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			pContext          = fundingPWallet.Builder().Context()
 			pvmClient         = platformvm.NewClient(walletNodeURI.URI)
 			adminClient       = admin.NewClient(walletNodeURI.URI)
-			rewardConfig      = p.GetRewardConfig(tc, adminClient)
+			rewardConfig      = GetRewardConfig(tc, adminClient)
 			calculator        = reward.NewCalculator(rewardConfig)
-			stakingHelper     = stakingHelper{tc: tc, require: require, pvmClient: pvmClient}
 		)
 
 		configOwner := &secp256k1fx.OutputOwners{
@@ -228,7 +226,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		})
 
 		tc.By("waiting for the first staking cycle to complete", func() {
-			stakingHelper.waitForStakingCycleEnd(nodeID)
+			WaitForAutoRenewedCycleEnd(tc, require, pvmClient, nodeID)
 		})
 
 		tc.By("stopping the validator node to fail uptime check in the second cycle", func() {
@@ -360,7 +358,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		require.NoError(err)
 
 		tc.By("waiting for the second staking cycle to complete", func() {
-			stakingHelper.waitForStakingCycleEnd(nodeID)
+			WaitForAutoRenewedCycleEnd(tc, require, pvmClient, nodeID)
 		})
 
 		tc.By("verifying the validator is no longer in the current set due to uptime failure", func() {

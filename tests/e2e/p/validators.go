@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package autorenewedvalidators
+package p
 
 import (
 	"time"
@@ -17,33 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
-type stakingHelper struct {
-	tc        *e2e.GinkgoTestContext
-	require   *require.Assertions
-	pvmClient *platformvm.Client
-}
-
-func (h *stakingHelper) waitForStakingCycleEnd(nodeID ids.NodeID) {
-	validators, err := h.pvmClient.GetCurrentValidators(h.tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-	h.require.NoError(err)
-	h.require.Len(validators, 1)
-	initialStartTime := validators[0].StartTime
-
-	h.tc.Eventually(func() bool {
-		validators, err = h.pvmClient.GetCurrentValidators(h.tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-		h.require.NoError(err)
-		if len(validators) == 0 {
-			return true
-		}
-		h.require.Len(validators, 1)
-
-		// A renewal re-adds the validator with its start time set to the
-		// previous cycle's end time, so a start time change marks a new cycle start.
-		return validators[0].StartTime != initialStartTime
-	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "node failed to finish staking cycle")
-}
-
-func requireHeliconActivated(
+func RequireHeliconActivated(
 	tc *e2e.GinkgoTestContext,
 	assertions *require.Assertions,
 	infoClient *info.Client,
@@ -67,4 +41,29 @@ func requireHeliconActivated(
 
 		return upgrades.IsHeliconActivated(time.Now())
 	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "Helicon should have activated")
+}
+
+func WaitForAutoRenewedCycleEnd(
+	tc *e2e.GinkgoTestContext,
+	require *require.Assertions,
+	pvmClient *platformvm.Client,
+	nodeID ids.NodeID,
+) {
+	validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
+	require.NoError(err)
+	require.Len(validators, 1)
+	initialStartTime := validators[0].StartTime
+
+	tc.Eventually(func() bool {
+		validators, err = pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
+		require.NoError(err)
+		if len(validators) == 0 {
+			return true
+		}
+		require.Len(validators, 1)
+
+		// A renewal re-adds the validator with its start time set to the
+		// previous cycle's end time, so a start time change marks a new cycle start.
+		return validators[0].StartTime != initialStartTime
+	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "node failed to finish staking cycle")
 }
