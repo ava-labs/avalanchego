@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate_test
+package hashdb_test
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -32,7 +32,7 @@ func TestHandler_RoundTrip(t *testing.T) {
 		ProofVals: [][]byte{{0xcc}},
 	}
 	responder := &synctest.FakeLeafResponder{Resp: wantResp}
-	h := evmstate.NewHandler(logging.NoLog{}, responder)
+	h := hashdb.NewHandler(logging.NoLog{}, responder)
 
 	req := &syncpb.GetLeafRequest{
 		RootHash:    []byte{0xde, 0xad},
@@ -101,7 +101,7 @@ func TestResponder_ValidationDrops(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := evmstate.NewResponder(trieDB, common.HashLength, nil)
+			r := hashdb.NewResponder(trieDB, common.HashLength, nil)
 			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), tt.req)
 			require.NoError(t, err)
 			require.Nil(t, resp)
@@ -166,7 +166,7 @@ func TestResponder(t *testing.T) {
 				synctest.CorruptTrie(t, disk, tr, 2)
 			}
 
-			r := evmstate.NewResponder(trieDB, common.HashLength, nil)
+			r := hashdb.NewResponder(trieDB, common.HashLength, nil)
 
 			ctx := t.Context()
 			if tt.cancelCtx {
@@ -210,7 +210,7 @@ func TestResponder_BoundedRange(t *testing.T) {
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
 
-	r := evmstate.NewResponder(trieDB, common.HashLength, nil)
+	r := hashdb.NewResponder(trieDB, common.HashLength, nil)
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		StartKey: keys[10],
@@ -263,14 +263,14 @@ func TestResponder_Snapshot(t *testing.T) {
 				snap.Pairs[common.Hash{}][i].V = bytes.Repeat([]byte{0xff}, common.HashLength)
 			}
 
-			r := evmstate.NewResponder(trieDB, common.HashLength, snap)
+			r := hashdb.NewResponder(trieDB, common.HashLength, snap)
 			requireServesWholeTrie(t, r, root, keys, vals)
 		})
 	}
 }
 
 // requireServesWholeTrie asserts a whole-trie request to r returns keys/vals.
-func requireServesWholeTrie(t *testing.T, r evmstate.Responder, root common.Hash, keys, vals [][]byte) {
+func requireServesWholeTrie(t *testing.T, r hashdb.Responder, root common.Hash, keys, vals [][]byte) {
 	t.Helper()
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),

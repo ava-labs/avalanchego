@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -15,10 +15,10 @@ import (
 type Client = network.Dispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
 
 // NewClient binds a [Client] at [p2p.EVMLeafRequestHandlerID] on n.
-func NewClient(n *p2p.Network, peers *p2p.PeerTracker) *Client {
+func NewClient(n *p2p.Network, peers *p2p.PeerTracker, id uint64) *Client {
 	return network.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
 		n,
-		p2p.EVMLeafRequestHandlerID,
+		id,
 		peers,
 	)
 }

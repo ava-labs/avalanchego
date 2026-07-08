@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"bytes"
@@ -118,11 +118,11 @@ func validLeafRequest(t *testing.T) (message.LeafsRequest, *syncpb.GetLeafRespon
 
 // newTestGetter wires a getter whose client talks to a single in-memory peer
 // serving h at the leaf-request handler ID.
-func newTestGetter(t *testing.T, h p2p.Handler) *getter {
+func newTestGetter(t *testing.T, h p2p.Handler) *Getter {
 	t.Helper()
 	net, tracker := synctest.NewLoopbackNetwork(t, p2p.EVMLeafRequestHandlerID, h)
-	return &getter{
-		client: NewClient(net, tracker),
+	return &Getter{
+		client: NewClient(net, tracker, p2p.EVMLeafRequestHandlerID),
 		log:    loggingtest.New(t, logging.Debug),
 	}
 }

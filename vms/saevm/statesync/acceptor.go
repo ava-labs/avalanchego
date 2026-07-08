@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -121,7 +121,7 @@ func (h *SummaryHandler) stateSync(ctx context.Context, s *Summary) error {
 		return fmt.Errorf("creating code syncer: %w", err)
 	}
 
-	evmSyncer, err := evmstate.NewSyncer(h.network.Network, h.network.PeerTracker, h.db, hdr.Root, codeQueue, evmstate.Config{
+	evmSyncer, err := hashdb.NewEVMSyncer(h.network.Network, h.network.PeerTracker, h.db, hdr.Root, codeQueue, hashdb.Config{
 		Log: h.snowCtx.Log,
 	})
 	if err != nil {

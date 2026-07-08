@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate
+package hashdb
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// Config carries the optional knobs for [NewSyncer]. Log defaults to
+// Config carries the optional knobs for [NewEVMSyncer]. Log defaults to
 // [logging.NoLog].
 type Config struct {
 	Log     logging.Logger
@@ -43,32 +43,36 @@ const (
 	requestSize      = 1024
 )
 
-// NewSyncer builds an EVM state syncer that fetches trie leaves from peers on
+// NewEVMSyncer builds an EVM state syncer that fetches trie leaves from peers on
 // n, verifying each range proof before handing the leaves to the underlying
 // graft state syncer.
-func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, db ethdb.Database, root common.Hash, codeQueue *code.Queue, cfg Config) (types.Syncer, error) {
+func NewEVMSyncer(n *p2p.Network, pt *p2p.PeerTracker, db ethdb.Database, root common.Hash, codeQueue *code.Queue, cfg Config) (types.Syncer, error) {
 	log := cfg.Log
 	if log == nil {
 		log = logging.NoLog{}
 	}
-	g := &getter{
-		client: NewClient(n, pt),
-		log:    log,
-	}
+	g := NewGetter(n, pt, p2p.EVMLeafRequestHandlerID, log)
 	return evmstate.NewSyncer(g, db, root, codeQueue, requestSize, leafsRequestType, cfg.Options...)
 }
 
-var _ types.LeafClient = (*getter)(nil)
+var _ types.LeafClient = (*Getter)(nil)
 
-type getter struct {
+type Getter struct {
 	client *Client
 	log    logging.Logger
+}
+
+func NewGetter(n *p2p.Network, pt *p2p.PeerTracker, handlerID uint64, log logging.Logger) *Getter {
+	return &Getter{
+		client: NewClient(n, pt, handlerID),
+		log:    log,
+	}
 }
 
 // GetLeafs implements [types.LeafClient]. It translates req to the proto
 // wire request and retries until it receives a response whose range proof
 // verifies against the requested root, or the context is cancelled.
-func (g *getter) GetLeafs(ctx context.Context, req message.LeafsRequest) (message.LeafsResponse, error) {
+func (g *Getter) GetLeafs(ctx context.Context, req message.LeafsRequest) (message.LeafsResponse, error) {
 	protoReq := &syncpb.GetLeafRequest{
 		RootHash:    req.RootHash().Bytes(),
 		AccountHash: req.AccountHash().Bytes(),
@@ -109,7 +113,7 @@ var (
 // checkResponse verifies that resp contains at most the requested number of
 // leaves and that the key/value pairs form a valid Merkle range proof rooted
 // at the requested root, over the requested [StartKey, lastKey] range.
-func (g *getter) checkResponse(req *syncpb.GetLeafRequest, resp *syncpb.GetLeafResponse) (message.LeafsResponse, error) {
+func (g *Getter) checkResponse(req *syncpb.GetLeafRequest, resp *syncpb.GetLeafResponse) (message.LeafsResponse, error) {
 	limit := int(req.GetKeyLimit())
 	if len(resp.Keys) > limit || len(resp.Values) > limit {
 		return message.LeafsResponse{}, errTooManyLeaves

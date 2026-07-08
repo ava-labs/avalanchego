@@ -151,7 +151,11 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	if err != nil {
 		return fmt.Errorf("merging atomic ops: %w", err)
 	}
-	newRoot, err := applyTrie(s.trieDB, s.currentRoot, height, ops)
+	keys, vals, err := toKeyValues(ops, height)
+	if err != nil {
+		return fmt.Errorf("converting atomic ops to key-values: %w", err)
+	}
+	newRoot, err := applyTrie(s.trieDB, s.currentRoot, keys, vals)
 	if err != nil {
 		return fmt.Errorf("applying trie on root %s: %w", s.currentRoot, err)
 	}
@@ -162,6 +166,10 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 			return fmt.Errorf("writing tx %s: %w", t.ID(), err)
 		}
 	}
+	return s.writeToSharedMemory(batch, height, newRoot, ops)
+}
+
+func (s *State) writeToSharedMemory(batch database.Batch, height uint64, newRoot common.Hash, ops map[ids.ID]*chainsatomic.Requests) error {
 	if err := database.PutUInt64(batch, lastHeightKey, height); err != nil {
 		return fmt.Errorf("writing last height: %w", err)
 	}
@@ -205,24 +213,55 @@ func atomicRequests(txs []*tx.Tx) (map[ids.ID]*chainsatomic.Requests, error) {
 		if err != nil {
 			return nil, fmt.Errorf("getting atomic requests for tx %s: %w", t.ID(), err)
 		}
-		if existing, ok := ops[chainID]; ok {
-			existing.PutRequests = append(existing.PutRequests, req.PutRequests...)
-			existing.RemoveRequests = append(existing.RemoveRequests, req.RemoveRequests...)
-		} else {
-			ops[chainID] = req
-		}
+		mergeRequests(ops, chainID, req)
 	}
 	return ops, nil
+}
+
+// mergeRequests merges req into ops under chainID, concatenating the put and
+// remove requests when chainID is already present.
+func mergeRequests(ops map[ids.ID]*chainsatomic.Requests, chainID ids.ID, req *chainsatomic.Requests) {
+	if existing, ok := ops[chainID]; ok {
+		existing.PutRequests = append(existing.PutRequests, req.PutRequests...)
+		existing.RemoveRequests = append(existing.RemoveRequests, req.RemoveRequests...)
+	} else {
+		ops[chainID] = req
+	}
+}
+
+const keyLength = state.TrieKeyLength
+
+func toKeyValues(ops map[ids.ID]*chainsatomic.Requests, height uint64) ([][]byte, [][]byte, error) {
+	keys := make([][]byte, 0, len(ops))
+	vals := make([][]byte, 0, len(ops))
+
+	for chainID, requests := range ops {
+		v, err := c.Marshal(codecVersion, requests)
+		if err != nil {
+			return nil, nil, fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
+		}
+
+		k := make([]byte, keyLength)
+		binary.BigEndian.PutUint64(k, height)
+		copy(k[wrappers.LongLen:], chainID[:])
+
+		keys = append(keys, k)
+		vals = append(vals, v)
+	}
+	return keys, vals, nil
 }
 
 var errCleanTrieAfterUpdates = errors.New("clean trie after updates")
 
 // applyTrie writes the per-chain ops into the trie rooted at oldRoot, flushes
 // the resulting trie to disk, and returns the new root.
-func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops map[ids.ID]*chainsatomic.Requests) (common.Hash, error) {
+func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, keys, vals [][]byte) (common.Hash, error) {
 	// Most blocks don't have atomic requests, so we avoid any unnecessary trie
 	// operations in that case.
-	if len(ops) == 0 {
+	if len(keys) != len(vals) {
+		return common.Hash{}, fmt.Errorf("keys and values length mismatch: %d vs %d", len(keys), len(vals))
+	}
+	if len(keys) == 0 {
 		return oldRoot, nil
 	}
 
@@ -233,18 +272,12 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops 
 
 	// Since each map entry corresponds to a different entry in the trie, the
 	// trie root is order-independent.
-	for chainID, requests := range ops {
-		v, err := c.Marshal(codecVersion, requests)
-		if err != nil {
-			return common.Hash{}, fmt.Errorf("marshaling atomic requests for chain %s: %w", chainID, err)
+	for i, k := range keys {
+		if len(k) != keyLength {
+			return common.Hash{}, fmt.Errorf("unexpected key length %d, expected %d", len(k), keyLength)
 		}
-
-		const keyLength = state.TrieKeyLength
-		k := make([]byte, keyLength)
-		binary.BigEndian.PutUint64(k, height)
-		copy(k[wrappers.LongLen:], chainID[:])
-		if err := tr.Update(k, v); err != nil {
-			return common.Hash{}, fmt.Errorf("inserting trie key for chain %s: %w", chainID, err)
+		if err := tr.Update(k, vals[i]); err != nil {
+			return common.Hash{}, fmt.Errorf("inserting trie key: %w", err)
 		}
 	}
 
@@ -258,7 +291,7 @@ func applyTrie(trieDB *triedb.Database, oldRoot common.Hash, height uint64, ops 
 	if nodes == nil {
 		return common.Hash{}, errCleanTrieAfterUpdates
 	}
-	if err := trieDB.Update(newRoot, oldRoot, height, trienode.NewWithNodeSet(nodes), nil); err != nil {
+	if err := trieDB.Update(newRoot, oldRoot, 0 /*unused*/, trienode.NewWithNodeSet(nodes), nil); err != nil {
 		return common.Hash{}, fmt.Errorf("updating trieDB with new nodes: %w", err)
 	}
 
