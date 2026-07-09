@@ -1,0 +1,72 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+package(default_visibility = [
+    "//graft/coreth:__subpackages__",
+    "//graft/coreth:external_consumers",
+])
+
+go_library(
+    name = "upgradechain",
+    srcs = ["upgradechain.go"],
+    embedsrcs = ["fixture.json"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgradechain",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//upgrade",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+    ],
+)
+
+graft_go_test(
+    name = "upgradechain_test",
+    srcs = [
+        "blocks_test.go",
+        "generate_test.go",
+    ],
+    embed = [":upgradechain"],
+    deps = [
+        "//chains/atomic",
+        "//graft/coreth/core/extstate",
+        "//graft/coreth/eth/tracers",
+        "//graft/coreth/nativeasset",
+        "//graft/coreth/params",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/params/paramstest",
+        "//graft/coreth/plugin/evm",
+        "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/atomic/vm",
+        "//graft/coreth/plugin/evm/vmtest",
+        "//graft/coreth/precompile/contracts/warp",
+        "//graft/evm/constants",
+        "//graft/evm/rpc",
+        "//ids",
+        "//snow",
+        "//snow/consensus/snowman",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//upgrade",
+        "//upgrade/upgradetest",
+        "//utils/constants",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/units",
+        "//vms/components/avax",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "//vms/saevm/cchain/warp/warptest",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_stretchr_testify//require",
+    ],
+)

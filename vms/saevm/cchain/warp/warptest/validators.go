@@ -49,15 +49,33 @@ func NewValidators(tb testing.TB, n int) *Validators {
 func NewValidatorsWithNodeIDs(tb testing.TB, nodeIDs ...ids.NodeID) *Validators {
 	tb.Helper()
 
+	blsSigners := make([]bls.Signer, len(nodeIDs))
+	for i := range blsSigners {
+		sk, err := localsigner.New()
+		require.NoError(tb, err, "localsigner.New()")
+		blsSigners[i] = sk
+	}
+	return newValidators(nodeIDs, blsSigners)
+}
+
+// NewValidatorsWithSigners creates one validator per signer, each with weight
+// 1 and a NodeID derived from its index, so the result is deterministic in the
+// signers.
+func NewValidatorsWithSigners(blsSigners ...bls.Signer) *Validators {
+	nodeIDs := make([]ids.NodeID, len(blsSigners))
+	for i := range nodeIDs {
+		nodeIDs[i] = ids.NodeID{byte(i + 1)}
+	}
+	return newValidators(nodeIDs, blsSigners)
+}
+
+func newValidators(nodeIDs []ids.NodeID, blsSigners []bls.Signer) *Validators {
 	var (
 		vdrs    = make([]*validators.Warp, len(nodeIDs))
 		signers = make(map[string]bls.Signer, len(nodeIDs))
 	)
 	for i, nodeID := range nodeIDs {
-		sk, err := localsigner.New()
-		require.NoError(tb, err, "localsigner.New()")
-
-		pk := sk.PublicKey()
+		pk := blsSigners[i].PublicKey()
 		pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 		vdrs[i] = &validators.Warp{
 			PublicKey:      pk,
@@ -65,12 +83,25 @@ func NewValidatorsWithNodeIDs(tb testing.TB, nodeIDs ...ids.NodeID) *Validators 
 			Weight:         1,
 			NodeIDs:        []ids.NodeID{nodeID},
 		}
-		signers[string(pkBytes)] = sk
+		signers[string(pkBytes)] = blsSigners[i]
 	}
 	utils.Sort(vdrs)
 	return &Validators{
 		validators: vdrs,
 		signers:    signers,
+	}
+}
+
+// WarpSet returns the set as a [validators.WarpSet] whose TotalWeight is the
+// sum of every validator's weight.
+func (v *Validators) WarpSet() validators.WarpSet {
+	var totalWeight uint64
+	for _, vdr := range v.validators {
+		totalWeight += vdr.Weight
+	}
+	return validators.WarpSet{
+		Validators:  v.validators,
+		TotalWeight: totalWeight,
 	}
 }
 
@@ -154,10 +185,7 @@ func SetValidators(tb testing.TB, ctx *snow.Context, vdrs *Validators) {
 	}
 	vdrState.GetWarpValidatorSetsF = func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
 		return map[ids.ID]validators.WarpSet{
-			ctx.SubnetID: {
-				Validators:  vdrs.validators,
-				TotalWeight: uint64(len(vdrs.validators)),
-			},
+			ctx.SubnetID: vdrs.WarpSet(),
 		}, nil
 	}
 }

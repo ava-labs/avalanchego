@@ -126,6 +126,7 @@ go_test(
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//eth/filters",
+        "@com_github_ava_labs_libevm//eth/tracers/js",
         "@com_github_ava_labs_libevm//eth/tracers/logger",
         "@com_github_ava_labs_libevm//ethclient",
         "@com_github_ava_labs_libevm//ethclient/gethclient",

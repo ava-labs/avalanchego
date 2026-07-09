@@ -140,18 +140,40 @@ type (
 
 	// ExecutionResults holds the outputs of [Execute].
 	ExecutionResults struct {
-		BaseFee     *uint256.Int
-		StateDB     *state.StateDB
-		Signer      types.Signer
-		BlockCtx    vm.BlockContext
-		Receipts    types.Receipts
-		GasConsumed gas.Gas
-		FinishBy    struct {
+		BaseFee           *uint256.Int
+		StateDB           *state.StateDB
+		Signer            types.Signer
+		BlockCtx          vm.BlockContext
+		Receipts          types.Receipts
+		GasConsumed       gas.Gas
+		IntermediateRoots []common.Hash
+		FinishBy          struct {
 			Gas  *gastime.Time
 			Wall time.Time
 		}
 	}
 )
+
+// An ExecuteOption configures optional [Execute] behaviour.
+type ExecuteOption func(*executeConfig)
+
+type executeConfig struct {
+	baseFee           *uint256.Int
+	intermediateRoots bool
+}
+
+// WithIntermediateRoots records each executed transaction's post-state root in
+// [ExecutionResults.IntermediateRoots]. This is expensive; intended for RPC
+// replay only.
+func WithIntermediateRoots() ExecuteOption {
+	return func(c *executeConfig) { c.intermediateRoots = true }
+}
+
+// WithBaseFee sets the base fee to execute the block with instead of deriving
+// it from the gas clock.
+func WithBaseFee(baseFee *uint256.Int) ExecuteOption {
+	return func(c *executeConfig) { c.baseFee = baseFee }
+}
 
 // Execute executes the transactions in the [blocks.Block], beginning from the
 // post-execution state of the [blocks.Block.ParentBlock]. `maxNumTxs` limits
@@ -171,8 +193,14 @@ func Execute(
 	chainCtx core.ChainContext,
 	receiptStore ReceiptStore,
 	log logging.Logger,
+	opts ...ExecuteOption,
 ) (*ExecutionResults, error) {
 	log.Debug("Executing block")
+
+	var cfg executeConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
 
 	parent := b.ParentBlock()
 	header := b.Header()
@@ -186,12 +214,14 @@ func Execute(
 		return nil, err
 	}
 
-	rules := config.Rules(b.Number(), true /*isMerge*/, b.BuildTime())
-	if err := hooks.BeforeExecutingBlock(rules, stateDB, b.EthBlock()); err != nil {
+	if err := hooks.BeforeExecutingBlock(stateDB, parent.Header(), b.EthBlock()); err != nil {
 		return nil, fmt.Errorf("before-block hook: %v", err)
 	}
 
-	baseFee := gasClock.BaseFee()
+	baseFee := cfg.baseFee
+	if baseFee == nil {
+		baseFee = gasClock.BaseFee()
+	}
 	b.CheckBaseFeeBound(baseFee)
 	header.BaseFee = baseFee.ToBig()
 
@@ -205,6 +235,7 @@ func Execute(
 	txs = txs[:min(len(txs), maxNumTxs)]
 	receipts := make(types.Receipts, len(txs))
 
+	var intermediateRoots []common.Hash
 	for ti, tx := range txs {
 		stateDB.SetTxContext(tx.Hash(), ti)
 		b.CheckSenderBalanceBound(stateDB, signer, tx)
@@ -256,6 +287,10 @@ func Execute(
 			burned.Mul(burned, baseFee)
 			stateDB.AddBalance(*burnAddr, burned)
 		}
+
+		if cfg.intermediateRoots {
+			intermediateRoots = append(intermediateRoots, stateDB.IntermediateRoot(config.IsEIP158(b.Number())))
+		}
 	}
 
 	numTxs := len(b.Transactions())
@@ -292,12 +327,13 @@ func Execute(
 	)
 
 	r := &ExecutionResults{
-		BaseFee:     baseFee,
-		StateDB:     stateDB,
-		Signer:      signer,
-		BlockCtx:    core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
-		Receipts:    receipts,
-		GasConsumed: blockGasConsumed,
+		BaseFee:           baseFee,
+		StateDB:           stateDB,
+		Signer:            signer,
+		BlockCtx:          core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
+		Receipts:          receipts,
+		GasConsumed:       blockGasConsumed,
+		IntermediateRoots: intermediateRoots,
 	}
 	r.FinishBy.Gas = gasClock
 	r.FinishBy.Wall = endTime

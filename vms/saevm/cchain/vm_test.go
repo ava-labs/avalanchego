@@ -98,14 +98,16 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis    core.Genesis
-		nodeID     ids.NodeID
-		networkID  uint32
-		validators *warptest.Validators
-		now        func() time.Time
-		vmConfig   config
-		db         database.Database
-		state      snow.State
+		genesis     core.Genesis
+		genesisJSON []byte
+		upgrades    *upgrade.Config
+		nodeID      ids.NodeID
+		networkID   uint32
+		validators  *warptest.Validators
+		now         func() time.Time
+		vmConfig    config
+		db          database.Database
+		state       snow.State
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -145,6 +147,22 @@ func withAccount(addr common.Address, acc types.Account) sutOption {
 	}
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Alloc[addr] = acc
+	})
+}
+
+// withGenesisJSON passes the given bytes to [VM.Initialize] verbatim instead
+// of marshalling the [sutConfig.genesis] struct.
+func withGenesisJSON(b []byte) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesisJSON = b
+	})
+}
+
+// withUpgrades overrides the network upgrade schedule, which defaults to
+// every upgrade being active from genesis.
+func withUpgrades(u upgrade.Config) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.upgrades = &u
 	})
 }
 
@@ -236,14 +254,21 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx.NodeID = cfg.nodeID
 	snowCtx.NetworkID = cfg.networkID
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
+	if cfg.upgrades != nil {
+		snowCtx.NetworkUpgrades = *cfg.upgrades
+	}
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 	warptest.SetValidators(tb, snowCtx, cfg.validators)
 
 	chainDB := prefixdb.New([]byte("chain"), db)
 
-	genesisBytes, err := json.Marshal(cfg.genesis)
-	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
+	genesisBytes := cfg.genesisJSON
+	if genesisBytes == nil {
+		var err error
+		genesisBytes, err = json.Marshal(cfg.genesis)
+		require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
+	}
 
 	configBytes, err := json.Marshal(cfg.vmConfig)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.vmConfig)

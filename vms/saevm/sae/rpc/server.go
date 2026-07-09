@@ -169,8 +169,8 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 
 	if !b.config.DisableTracing {
 		apis = append(apis, api{
-			// geth-specific APIs:
-			"debug", tracers.NewAPI(b),
+			// geth-specific APIs, with SAE overrides (see [tracersAPI]):
+			"debug", &tracersAPI{tracers.NewAPI(b), b},
 		})
 	}
 
