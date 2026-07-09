@@ -12,11 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -630,15 +630,14 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 	heliconTime := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
 
 	type test struct {
-		name      string
-		fork      upgradetest.Fork
-		startTime time.Time
-		uptime    float64
-		want      block.Block
+		name              string
+		fork              upgradetest.Fork
+		startTime         time.Time
+		uptime            float64
+		wantPrefersCommit bool
 	}
 
-	const uptimeWindow = 1000 * time.Second
-	newBlock := func(t *testing.T, tt test) *Block {
+	newBlock := func(t *testing.T, tt test) (*Block, [2]snowman.Block) {
 		t.Helper()
 
 		var (
@@ -656,91 +655,114 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 				NodeID:    nodeID,
 				SubnetID:  constants.PrimaryNetworkID,
 			}
-			now = tt.startTime.Add(uptimeWindow)
+			proposalTimestamp = tt.startTime.Add(time.Hour)
 		)
+
+		rewardValidatorTx, err := newRewardValidatorTx(t, stakerTxID)
+		require.NoError(t, err)
+
+		statelessProposalBlock, err := block.NewBanffProposalBlock(
+			proposalTimestamp,
+			ids.GenerateTestID(),
+			1,
+			rewardValidatorTx,
+			nil,
+		)
+		require.NoError(t, err)
 
 		chainState := statetest.New(t, statetest.Config{})
 		chainState.AddTx(stakerTx, status.Committed)
 		require.NoError(t, chainState.PutCurrentValidator(staker))
 
-		clk := &mockable.Clock{}
-		clk.Set(now)
-		uptimeState := uptime.NewTestState()
-		uptimeState.AddNode(nodeID, tt.startTime)
-		require.NoError(t, uptimeState.SetUptime(
-			nodeID,
-			time.Duration(tt.uptime*float64(uptimeWindow)),
-			now,
-		))
-
 		ctx := snowtest.Context(t, snowtest.PChainID)
 
-		return &Block{
-			Block: &block.BanffProposalBlock{
-				ApricotProposalBlock: block.ApricotProposalBlock{
-					Tx: &txs.Tx{
-						Unsigned: &txs.RewardValidatorTx{
-							TxID: stakerTxID,
-						},
-					},
-				},
+		manager := &manager{
+			backend: &backend{
+				state: chainState,
+				ctx:   ctx,
 			},
-			manager: &manager{
-				backend: &backend{
-					state: chainState,
-					ctx:   ctx,
+			txExecutorBackend: &executor.Backend{
+				Config: &config.Internal{
+					UptimePercentage: .8,
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(
+						tt.fork,
+						heliconTime,
+					),
 				},
-				txExecutorBackend: &executor.Backend{
-					Config: &config.Internal{
-						UptimePercentage: .8,
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(
-							tt.fork,
-							heliconTime,
-						),
-					},
-					Uptimes: uptime.NewManager(uptimeState, clk),
+				Uptimes: uptime.TestCalculator{
+					Percent: tt.uptime,
 				},
 			},
 		}
+
+		statelessCommitBlock, err := block.NewBanffCommitBlock(
+			statelessProposalBlock.Timestamp(),
+			statelessProposalBlock.ID(),
+			statelessProposalBlock.Height()+1,
+		)
+		require.NoError(t, err)
+
+		statelessAbortBlock, err := block.NewBanffAbortBlock(
+			statelessProposalBlock.Timestamp(),
+			statelessProposalBlock.ID(),
+			statelessProposalBlock.Height()+1,
+		)
+		require.NoError(t, err)
+
+		expectedOptions := [2]snowman.Block{
+			manager.NewBlock(statelessAbortBlock),
+			manager.NewBlock(statelessCommitBlock),
+		}
+		if tt.wantPrefersCommit {
+			expectedOptions = [2]snowman.Block{
+				manager.NewBlock(statelessCommitBlock),
+				manager.NewBlock(statelessAbortBlock),
+			}
+		}
+
+		return &Block{
+			Block:   statelessProposalBlock,
+			manager: manager,
+		}, expectedOptions
 	}
 
 	tests := []test{
 		{
-			name:      "pre_helicon",
-			fork:      upgradetest.Helicon,
-			startTime: heliconTime.Add(-time.Second),
-			uptime:    .85,
-			want:      &block.BanffCommitBlock{},
+			name:              "pre_helicon",
+			fork:              upgradetest.Helicon,
+			startTime:         heliconTime.Add(-time.Second),
+			uptime:            .85,
+			wantPrefersCommit: true,
 		},
 		{
-			name:      "at_helicon",
-			fork:      upgradetest.Helicon,
-			startTime: heliconTime,
-			uptime:    .85,
-			want:      &block.BanffAbortBlock{},
+			name:              "at_helicon",
+			fork:              upgradetest.Helicon,
+			startTime:         heliconTime,
+			uptime:            .85,
+			wantPrefersCommit: false,
 		},
 		{
-			name:      "post_helicon",
-			fork:      upgradetest.Helicon,
-			startTime: heliconTime.Add(time.Hour),
-			uptime:    .9,
-			want:      &block.BanffCommitBlock{},
+			name:              "post_helicon",
+			fork:              upgradetest.Helicon,
+			startTime:         heliconTime.Add(time.Hour),
+			uptime:            .9,
+			wantPrefersCommit: true,
 		},
 		{
-			name:      "without_helicon",
-			fork:      upgradetest.Granite,
-			startTime: heliconTime.Add(time.Hour),
-			uptime:    .85,
-			want:      &block.BanffCommitBlock{},
+			name:              "without_helicon",
+			fork:              upgradetest.Granite,
+			startTime:         heliconTime.Add(time.Hour),
+			uptime:            .85,
+			wantPrefersCommit: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			blk := newBlock(t, tt)
+			blk, expectedOptions := newBlock(t, tt)
 			options, err := blk.Options(t.Context())
 			require.NoError(t, err)
-			require.IsType(t, tt.want, options[0].(*Block).Block)
+			require.Equal(t, expectedOptions, options)
 		})
 	}
 }
