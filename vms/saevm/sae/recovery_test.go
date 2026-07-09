@@ -138,6 +138,10 @@ func TestRecoverSimple(t *testing.T) {
 		archival  bool
 	}{
 		{
+			name:      "genesis",
+			numBlocks: 0,
+		},
+		{
 			name:      "archival",
 			numBlocks: 10,
 			archival:  true,
@@ -188,40 +192,43 @@ func TestRecoverSimple(t *testing.T) {
 
 			requireConsensusCriticalBlocks(t, src, sut)
 
-			if tt.archival {
-				return
+			if !tt.archival {
+				// For non-archival nodes, states outside [lastSettled, lastExecuted]
+				// must not be accessible, except at CommitTrieDBEvery boundaries
+				// where the settled state was written to disk.
+				t.Run("unavailable_outside_window", func(t *testing.T) {
+					lastSettled := sut.rawVM.last.settled.Load().NumberU64()
+					committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
+					lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
+					require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
+
+					for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
+						ethB, err := canonicalBlock(sut.rawVM.db, i)
+						require.NoErrorf(t, err, "canonicalBlock(%d)", i)
+						b, err := blocks.RestoreSettledBlock(ethB, sut.hooks, sut.logger, sut.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig())
+						require.NoErrorf(t, err, "RestoreSettledBlock(%d)", i)
+
+						// If these states were available they would eventually
+						// result in an OOM as the triedb leaked memory.
+						root := b.PostExecutionStateRoot()
+						_, err = sut.rawVM.exec.StateDB(root)
+						want := testerr.As(func(got *trie.MissingNodeError) string {
+							if got.NodeHash != root {
+								return fmt.Sprintf("%T for hash %#x", got, root)
+							}
+							return ""
+						})
+						if diff := testerr.Diff(err, want); diff != "" {
+							t.Errorf("%T.StateDB([post-execution root of block %d]) %s", sut.rawVM.exec, b.NumberU64(), diff)
+						}
+					}
+				})
 			}
 
-			// For non-archival nodes, states outside [lastSettled, lastExecuted]
-			// must not be accessible, except at CommitTrieDBEvery boundaries
-			// where the settled state was written to disk.
-			t.Run("unavailable_outside_window", func(t *testing.T) {
-				lastSettled := sut.rawVM.last.settled.Load().NumberU64()
-				committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
-				lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
-				require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
-
-				for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
-					ethB, err := canonicalBlock(sut.rawVM.db, i)
-					require.NoErrorf(t, err, "canonicalBlock(%d)", i)
-					b, err := blocks.New(ethB, nil, nil, sut.logger)
-					require.NoErrorf(t, err, "blocks.New(): height %d", ethB.NumberU64())
-					require.NoErrorf(t, b.RestoreExecutionArtefacts(sut.rawVM.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig()), "%T.RestoreExecutionArtifacts(): %d", b, b.NumberU64())
-
-					// If these states were available they would eventually
-					// result in an OOM as the triedb leaked memory.
-					root := b.PostExecutionStateRoot()
-					_, err = sut.rawVM.exec.StateDB(root)
-					want := testerr.As(func(got *trie.MissingNodeError) string {
-						if got.NodeHash != root {
-							return fmt.Sprintf("%T for hash %#x", got, root)
-						}
-						return ""
-					})
-					if diff := testerr.Diff(err, want); diff != "" {
-						t.Errorf("%T.StateDB([post-execution root of block %d]) %s", sut.rawVM.exec, b.NumberU64(), diff)
-					}
-				}
+			t.Run("settle_after_recovery", func(t *testing.T) {
+				vmTime.AdvanceToSettle(ctx, t, sut.lastAcceptedBlock(t))
+				b := sut.runConsensusLoop(t)
+				require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 			})
 		})
 	}

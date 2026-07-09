@@ -25,6 +25,7 @@ go_binary(
         "nocmpopts",
         "prod",
     ],
+    pgoprofile = "default.pgo",
     visibility = ["//visibility:public"],
     x_defs = {
         # keep
