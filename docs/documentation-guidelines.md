@@ -356,10 +356,12 @@ still fairly short, a TOC makes the structure visible up front, helps readers
 jump to the part they need, and makes it easier to notice when the document's
 shape has drifted.
 
-A trailing **References** section pointing to the relevant code, tests, and
-related docs is often useful. It makes the links between the document and the
-code explicit, supports the discoverability conventions above, and helps
-reviewers see what parts of the repository the document covers.
+Use inline links when a link supports the sentence where it appears. An inline
+link keeps the reference with the explanation that gives it meaning.
+
+Add a trailing **References** section only when a link needs an explanation that
+would be difficult to place inline. Do not use a References section as an
+indirection that makes readers search for the relevant link.
 
 A README near the code can do more than explain usage. It can also preserve
 non-obvious context a future maintainer would otherwise need to reconstruct

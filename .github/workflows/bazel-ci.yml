@@ -27,7 +27,7 @@ jobs:
     if: ${{ always() }}
     needs:
       - setup
-      - unit-main
+      - unit-avalanchego
       - unit-coreth
       - unit-subnet-evm
       - e2e
@@ -65,15 +65,15 @@ jobs:
         with:
           initial-setup: true
 
-  unit-main:
+  unit-avalanchego:
     needs: setup
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-bazel
-      - name: Run unit tests with Bazel
+      - name: Run AvalancheGo unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-main
+        run: ./scripts/run_task.sh bazel-test-unit-avalanchego
 
   unit-coreth:
     needs: setup
@@ -83,7 +83,7 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run coreth unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-coreth
+        run: ./scripts/run_task.sh bazel-test-unit-coreth
 
   unit-subnet-evm:
     needs: setup
@@ -93,7 +93,7 @@ jobs:
       - uses: ./.github/actions/setup-bazel
       - name: Run subnet-evm unit tests with Bazel
         shell: bash
-        run: ./scripts/run_task.sh bazel-test-subnet-evm
+        run: ./scripts/run_task.sh bazel-test-unit-subnet-evm
 
   e2e:
     needs: setup
