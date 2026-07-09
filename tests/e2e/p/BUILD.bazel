@@ -49,7 +49,6 @@ go_library(
         "//vms/platformvm/reward",
         "//vms/platformvm/signer",
         "//vms/platformvm/txs",
-        "//vms/platformvm/txs/executor",
         "//vms/platformvm/validators",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/message",

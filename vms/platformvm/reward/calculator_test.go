@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -21,12 +22,15 @@ const (
 	defaultMinValidatorStake = 5 * units.MilliAvax
 )
 
-var defaultConfig = Config{
-	MaxConsumptionRate: .12 * PercentDenominator,
-	MinConsumptionRate: .10 * PercentDenominator,
-	MintingPeriod:      365 * 24 * time.Hour,
-	SupplyCap:          720 * units.MegaAvax,
-}
+var (
+	defaultStakeStartTime = time.Unix(1_000_000, 0)
+	defaultConfig         = Config{
+		MaxConsumptionRate: .12 * PercentDenominator,
+		MinConsumptionRate: .10 * PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
+)
 
 func TestLongerDurationBonus(t *testing.T) {
 	c := NewCalculator(defaultConfig)
@@ -34,14 +38,14 @@ func TestLongerDurationBonus(t *testing.T) {
 	totalDuration := 365 * 24 * time.Hour
 	shortBalance := units.KiloAvax
 	for i := 0; i < int(totalDuration/shortDuration); i++ {
-		r := c.Calculate(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
+		r := c.Calculate(defaultStakeStartTime, shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
 		shortBalance += r
 	}
-	reward := c.Calculate(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
+	reward := c.Calculate(defaultStakeStartTime, totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
 	shortBalance += reward
 
 	longBalance := units.KiloAvax
-	longBalance += c.Calculate(totalDuration, longBalance, 359*units.MegaAvax+longBalance)
+	longBalance += c.Calculate(defaultStakeStartTime, totalDuration, longBalance, 359*units.MegaAvax+longBalance)
 	require.Less(t, shortBalance, longBalance, "should promote stakers to stake longer")
 }
 
@@ -124,11 +128,84 @@ func TestRewards(t *testing.T) {
 		)
 		t.Run(name, func(t *testing.T) {
 			reward := c.Calculate(
+				defaultStakeStartTime,
 				test.duration,
 				test.stakeAmount,
 				test.existingAmount,
 			)
 			require.Equal(t, test.expectedReward, reward)
+		})
+	}
+}
+
+func TestPrimaryNetworkCalculatorHeliconRewards(t *testing.T) {
+	const heliconReductionPeriod = 90 * 24 * time.Hour
+
+	heliconTime := time.Unix(1_000_000, 0)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
+
+	tests := []struct {
+		name               string
+		minConsumptionRate uint64
+		stakeStartTime     time.Time
+		expectedReward     uint64
+	}{
+		{
+			name:               "before_helicon",
+			minConsumptionRate: 100_000,
+			stakeStartTime:     heliconTime.Add(-time.Second),
+			expectedReward:     274122724713,
+		},
+		{
+			name:               "at_helicon",
+			minConsumptionRate: 100_000,
+			stakeStartTime:     heliconTime,
+			expectedReward:     274122724713,
+		},
+		{
+			name:               "one_third_ramp",
+			minConsumptionRate: 100_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 3),
+			expectedReward:     251355136048,
+		},
+		{
+			name:               "at_ramp_end",
+			minConsumptionRate: 100_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod),
+			expectedReward:     205817226496,
+		},
+		{
+			name:               "after_ramp",
+			minConsumptionRate: 100_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod + time.Second),
+			expectedReward:     205817226496,
+		},
+		{
+			name:               "custom_min_rate_above_target",
+			minConsumptionRate: 80_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod / 2),
+			expectedReward:     212647776318,
+		},
+		{
+			name:               "custom_min_rate_below_target",
+			minConsumptionRate: 10_000,
+			stakeStartTime:     heliconTime.Add(heliconReductionPeriod),
+			expectedReward:     28222931131,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := defaultConfig
+			cfg.MinConsumptionRate = tt.minConsumptionRate
+			c := NewPrimaryNetworkCalculator(cfg, upgradeConfig)
+
+			reward := c.Calculate(
+				tt.stakeStartTime,
+				defaultMinStakingDuration,
+				units.MegaAvax,
+				360*units.MegaAvax,
+			)
+			require.Equal(t, tt.expectedReward, reward)
 		})
 	}
 }
@@ -145,6 +222,7 @@ func TestRewardsOverflow(t *testing.T) {
 		SupplyCap:          maxSupply,
 	})
 	reward := c.Calculate(
+		defaultStakeStartTime,
 		defaultMinStakingDuration,
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,
@@ -164,6 +242,7 @@ func TestRewardsMint(t *testing.T) {
 		SupplyCap:          maxSupply,
 	})
 	rewards := c.Calculate(
+		defaultStakeStartTime,
 		defaultMinStakingDuration,
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,

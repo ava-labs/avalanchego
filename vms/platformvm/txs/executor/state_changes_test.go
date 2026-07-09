@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -408,19 +407,18 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
 
-	rewardConfig := reward.Config{
-		MaxConsumptionRate: .12 * reward.PercentDenominator,
-		MinConsumptionRate: .1 * reward.PercentDenominator,
-		MintingPeriod:      365 * 24 * time.Hour,
-		SupplyCap:          720 * units.MegaAvax,
-	}
 	updated, err := AdvanceTimeTo(
 		&Backend{
 			Config: &config.Internal{
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-				RewardConfig:       rewardConfig,
-				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+				RewardConfig: reward.Config{
+					MaxConsumptionRate: .12 * reward.PercentDenominator,
+					MinConsumptionRate: .1 * reward.PercentDenominator,
+					MintingPeriod:      365 * 24 * time.Hour,
+					SupplyCap:          720 * units.MegaAvax,
+				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
 			},
 		},
 		s,
@@ -499,8 +497,8 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 	require.NoError(t, err)
 
 	duration := endTime.Sub(startTime)
-	wantDelegatorReward := rewards.Calculate(duration, delegatorWeight, initialSupply)
-	wantValidatorReward := rewards.Calculate(duration, validatorWeight, initialSupply+wantDelegatorReward)
+	wantDelegatorReward := rewards.Calculate(startTime, duration, delegatorWeight, initialSupply)
+	wantValidatorReward := rewards.Calculate(startTime, duration, validatorWeight, initialSupply+wantDelegatorReward)
 
 	_, err = AdvanceTimeTo(
 		&Backend{
@@ -531,109 +529,52 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 	require.Equal(t, initialSupply+wantDelegatorReward+wantValidatorReward, gotSupply)
 }
 
-func TestGetRewardConfigForStakeStartRamp(t *testing.T) {
+func TestGetRewardsCalculatorTransformedSubnetConfig(t *testing.T) {
+	const heliconRampDuration = 90 * 24 * time.Hour
 	heliconTime := time.Unix(1_000_000, 0)
+	postRampStartTime := heliconTime.Add(heliconRampDuration + time.Second)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
 
-	tests := []struct {
-		name              string
-		configuredMinRate uint64
-		stakeStartTime    time.Time
-		want              uint64
-		wantErr           error
-	}{
-		{
-			name:           "before_helicon",
-			stakeStartTime: heliconTime.Add(-time.Second),
-			want:           100_000,
-		},
-		{
-			name:           "at_helicon",
-			stakeStartTime: heliconTime,
-			want:           100_000,
-		},
-		{
-			name:           "one_third_ramp",
-			stakeStartTime: heliconTime.Add(30 * 24 * time.Hour),
-			want:           91_667,
-		},
-		{
-			name:           "mid_ramp",
-			stakeStartTime: heliconTime.Add(45 * 24 * time.Hour),
-			want:           87_500,
-		},
-		{
-			name:           "at_ramp_end",
-			stakeStartTime: heliconTime.Add(heliconMinConsumptionRateReductionPeriod),
-			want:           75_000,
-		},
-		{
-			name:           "after_ramp",
-			stakeStartTime: heliconTime.Add(heliconMinConsumptionRateReductionPeriod + time.Second),
-			want:           75_000,
-		},
-		{
-			name:              "min_consumption_rate_underflow",
-			configuredMinRate: heliconMinConsumptionRateReduction - 1,
-			stakeStartTime:    heliconTime.Add(heliconMinConsumptionRateReductionPeriod),
-			wantErr:           math.ErrUnderflow,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := genesis.MainnetParams.StakingConfig.RewardConfig
-			if tt.configuredMinRate != 0 {
-				cfg.MinConsumptionRate = tt.configuredMinRate
-			}
+	primaryConfig := genesis.MainnetParams.StakingConfig.RewardConfig
+	transformConfig := primaryConfig
+	// Set MinConsumptionRate above the ACP-285 target so primary network
+	// reward upgrades would alter the reward if applied.
+	transformConfig.MinConsumptionRate = 90_000
 
-			got, err := GetRewardConfigForStakeStart(
-				cfg,
-				upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
-				tt.stakeStartTime,
-			)
-			require.ErrorIs(t, err, tt.wantErr)
-			require.Equal(t, tt.want, got.MinConsumptionRate)
-		})
-	}
-}
-
-func TestGetRewardsCalculatorTransformSubnetBypassesPrimaryNetworkRewardConfig(t *testing.T) {
-	const (
-		stakeDuration                 = 14 * 24 * time.Hour
-		weight                        = units.MegaAvax
-		supply                        = 5 * units.MegaAvax
-		transformedMinConsumptionRate = 42_000
-	)
-	var (
-		heliconTime       = time.Unix(1_000_000, 0)
-		baseConfig        = genesis.MainnetParams.StakingConfig.RewardConfig
-		wantConfig        = baseConfig
-		transformedSubnet = ids.GenerateTestID()
-		transformedState  = statetest.New(t, statetest.Config{})
-	)
-	wantConfig.MinConsumptionRate = transformedMinConsumptionRate
-
+	transformedSubnet := ids.GenerateTestID()
+	transformedState := statetest.New(t, statetest.Config{})
 	transformedState.AddSubnetTransformation(&txs.Tx{Unsigned: &txs.TransformSubnetTx{
 		Subnet:             transformedSubnet,
-		MaxConsumptionRate: wantConfig.MaxConsumptionRate,
-		MinConsumptionRate: wantConfig.MinConsumptionRate,
-		MaximumSupply:      wantConfig.SupplyCap,
+		MaxConsumptionRate: transformConfig.MaxConsumptionRate,
+		MinConsumptionRate: transformConfig.MinConsumptionRate,
+		MaximumSupply:      transformConfig.SupplyCap,
 	}})
 
 	rewards, err := GetRewardsCalculator(
-		baseConfig,
-		upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime),
+		primaryConfig,
+		upgradeConfig,
 		transformedState,
 		transformedSubnet,
-		heliconTime.Add(heliconMinConsumptionRateReductionPeriod),
 	)
 	require.NoError(t, err)
 
-	want := reward.NewCalculator(wantConfig).Calculate(
+	const (
+		stakeDuration = 14 * 24 * time.Hour
+		stakedAmount  = units.MegaAvax
+		currentSupply = 5 * units.MegaAvax
+	)
+	want := reward.NewCalculator(transformConfig).Calculate(
+		postRampStartTime,
 		stakeDuration,
-		weight,
-		supply,
+		stakedAmount,
+		currentSupply,
 	)
 
-	got := rewards.Calculate(stakeDuration, weight, supply)
+	got := rewards.Calculate(
+		postRampStartTime,
+		stakeDuration,
+		stakedAmount,
+		currentSupply,
+	)
 	require.Equal(t, want, got)
 }

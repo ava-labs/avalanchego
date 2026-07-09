@@ -51,9 +51,21 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var defaultValidatorNodeID = ids.GenerateTestNodeID()
+var (
+	defaultValidatorNodeID = ids.GenerateTestNodeID()
+	defaultRewardConfig    = reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .1 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
+)
 
 func newTestState(t testing.TB, db database.Database) *State {
+	return newTestStateWithUpgrade(t, db, upgradetest.GetConfig(upgradetest.Latest))
+}
+
+func newTestStateWithUpgrade(t testing.TB, db database.Database, upgradeConfig upgrade.Config) *State {
 	s, err := New(
 		db,
 		genesistest.NewBytes(t, genesistest.Config{
@@ -61,7 +73,7 @@ func newTestState(t testing.TB, db database.Database) *State {
 		}),
 		prometheus.NewRegistry(),
 		validators.NewManager(),
-		upgradetest.GetConfig(upgradetest.Latest),
+		upgradeConfig,
 		&config.Default,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
@@ -69,12 +81,7 @@ func newTestState(t testing.TB, db database.Database) *State {
 			Log:       logging.NoLog{},
 		},
 		metrics.Noop,
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
+		defaultRewardConfig,
 	)
 	require.NoError(t, err)
 	return s
@@ -110,6 +117,37 @@ func TestStateSyncGenesis(t *testing.T) {
 	require.Empty(
 		iterator.ToSlice(delegatorIterator),
 	)
+}
+
+func TestNewInitializesGenesisValidatorsWithPrimaryNetworkRewards(t *testing.T) {
+	const heliconRampMidpoint = 45 * 24 * time.Hour
+
+	startTime := genesistest.DefaultValidatorStartTime
+	duration := genesistest.DefaultValidatorDuration
+	heliconTime := startTime.Add(-heliconRampMidpoint)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(
+		upgradetest.Helicon,
+		heliconTime,
+	)
+	s := newTestStateWithUpgrade(t, memdb.New(), upgradeConfig)
+
+	wantReward := reward.NewPrimaryNetworkCalculator(defaultRewardConfig, upgradeConfig).Calculate(
+		startTime,
+		duration,
+		genesistest.DefaultValidatorWeight,
+		genesistest.InitialSupply,
+	)
+	genericReward := reward.NewCalculator(defaultRewardConfig).Calculate(
+		startTime,
+		duration,
+		genesistest.DefaultValidatorWeight,
+		genesistest.InitialSupply,
+	)
+	require.NotEqual(t, wantReward, genericReward)
+
+	staker, err := s.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(t, err)
+	require.Equal(t, wantReward, staker.PotentialReward)
 }
 
 // Whenever we add or remove a staker, a number of on-disk data structures

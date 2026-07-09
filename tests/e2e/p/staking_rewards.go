@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -274,26 +273,21 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			upgrades, err := alphaInfoClient.Upgrades(tc.DefaultContext())
 			require.NoError(err)
 
-		var (
-			adminClient  = admin.NewClient(nodeURI.URI)
-			rewardConfig = GetRewardConfig(tc, adminClient)
+			var (
+				adminClient  = admin.NewClient(nodeURI.URI)
+				rewardConfig = GetRewardConfig(tc, adminClient)
+				calculator   = reward.NewPrimaryNetworkCalculator(rewardConfig, *upgrades)
 
-			// ACP-285 reduces the primary network MinConsumptionRate after
-				// Helicon based on each staker's start time, so build a reward
-				// calculator per staker.
+				// ACP-285 reduces the primary network MinConsumptionRate after
+				// Helicon based on each staker's start time.
 				alphaStartTime = time.Unix(int64(alphaValidator.StartTime), 0)
 				gammaStartTime = time.Unix(int64(gammaDelegator.StartTime), 0)
 			)
 
-			validatorRewardConfig, err := executor.GetRewardConfigForStakeStart(rewardConfig, *upgrades, alphaStartTime)
-			require.NoError(err)
-			delegatorRewardConfig, err := executor.GetRewardConfigForStakeStart(rewardConfig, *upgrades, gammaStartTime)
-			require.NoError(err)
-
 			var (
-				expectedValidationReward = reward.NewCalculator(validatorRewardConfig).Calculate(actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
+				expectedValidationReward = calculator.Calculate(alphaStartTime, actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
 
-				potentialDelegationReward                      = reward.NewCalculator(delegatorRewardConfig).Calculate(actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
+				potentialDelegationReward                      = calculator.Calculate(gammaStartTime, actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
 				expectedDelegationFee, expectedDelegatorReward = reward.Split(potentialDelegationReward, delegationShare)
 			)
 

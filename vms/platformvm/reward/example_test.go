@@ -15,6 +15,7 @@ func ExampleNewCalculator() {
 		day             = 24 * time.Hour
 		week            = 7 * day
 		stakingDuration = 4 * week
+		stakeStartTime  = 0
 
 		stakeAmount = 100_000 * units.Avax // 100k AVAX
 
@@ -31,7 +32,7 @@ func ExampleNewCalculator() {
 		mainnetCalculator = NewCalculator(mainnetRewardConfig)
 	)
 
-	potentialReward := mainnetCalculator.Calculate(stakingDuration, stakeAmount, currentSupply)
+	potentialReward := mainnetCalculator.Calculate(time.Unix(stakeStartTime, 0), stakingDuration, stakeAmount, currentSupply)
 
 	fmt.Printf("Staking %d nAVAX for %s with the current supply of %d nAVAX would have a potential reward of %d nAVAX",
 		stakeAmount,

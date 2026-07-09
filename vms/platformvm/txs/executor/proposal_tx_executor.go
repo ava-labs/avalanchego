@@ -887,13 +887,11 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 		return err
 	}
 
-	stakeStartTime := validator.EndTime
 	rewards, err := GetRewardsCalculator(
 		e.backend.Config.RewardConfig,
 		e.backend.Config.UpgradeConfig,
 		e.onCommitState,
 		validator.SubnetID,
-		stakeStartTime,
 	)
 	if err != nil {
 		return err
@@ -905,7 +903,10 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	}
 
 	duration := time.Duration(stakingInfo.NextPeriod) * time.Second
+	// A renewed staking period starts when the current period ends.
+	stakeStartTime := validator.EndTime
 	newPotentialReward := rewards.Calculate(
+		stakeStartTime,
 		duration,
 		newWeight,
 		currentSupply,

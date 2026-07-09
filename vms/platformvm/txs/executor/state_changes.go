@@ -6,7 +6,6 @@ package executor
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,13 +23,6 @@ var (
 	ErrChildBlockEarlierThanParent     = errors.New("proposed timestamp before current chain time")
 	ErrChildBlockAfterStakerChangeTime = errors.New("proposed timestamp later than next staker change time")
 	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
-)
-
-const (
-	// ACP-285 lowers MinConsumptionRate by 2.5 percentage points (10% to 7.5%).
-	heliconMinConsumptionRateReduction uint64 = 25_000
-	// ACP-285 applies the MinConsumptionRate reduction linearly over this duration.
-	heliconMinConsumptionRateReductionPeriod = 90 * 24 * time.Hour
 )
 
 // VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time.
@@ -186,13 +178,13 @@ func advanceTimeTo(
 				backend.Config.UpgradeConfig,
 				parentState,
 				stakerToRemove.SubnetID,
-				stakerToRemove.StartTime,
 			)
 			if err != nil {
 				return nil, false, err
 			}
 
 			potentialReward := rewards.Calculate(
+				stakerToRemove.StartTime,
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
 				supply,
@@ -398,22 +390,15 @@ func advanceValidatorFeeState(
 }
 
 // GetRewardsCalculator returns the reward calculator for a staker on subnetID.
-// For primary network stakers, stakeStartTime is the start of the staking
-// period whose potential reward is being calculated. Non-primary network
-// stakers use their subnet's transformation config.
+// Non-primary network stakers use their subnet's transformation config.
 func GetRewardsCalculator(
 	rewardConfig reward.Config,
 	upgradeConfig upgrade.Config,
 	parentState state.Chain,
 	subnetID ids.ID,
-	stakeStartTime time.Time,
 ) (reward.Calculator, error) {
 	if subnetID == constants.PrimaryNetworkID {
-		cfg, err := GetRewardConfigForStakeStart(rewardConfig, upgradeConfig, stakeStartTime)
-		if err != nil {
-			return nil, err
-		}
-		return reward.NewCalculator(cfg), nil
+		return reward.NewPrimaryNetworkCalculator(rewardConfig, upgradeConfig), nil
 	}
 
 	// Non-primary reward-bearing stakers are permissionless stakers. They can
@@ -428,39 +413,4 @@ func GetRewardsCalculator(
 		MintingPeriod:      rewardConfig.MintingPeriod,
 		SupplyCap:          transformSubnet.MaximumSupply,
 	}), nil
-}
-
-// GetRewardConfigForStakeStart returns rewardConfig with the ACP-285 linear
-// MinConsumptionRate reduction sampled once per staking period at
-// stakeStartTime. The sampled rate applies for that full period, so renewals
-// that start later in the ramp can receive lower rates. Before Helicon,
-// rewardConfig is returned unchanged.
-func GetRewardConfigForStakeStart(
-	rewardConfig reward.Config,
-	upgradeConfig upgrade.Config,
-	stakeStartTime time.Time,
-) (reward.Config, error) {
-	if !upgradeConfig.IsHeliconActivated(stakeStartTime) {
-		return rewardConfig, nil
-	}
-
-	reduction := heliconMinConsumptionRateReduction
-	if reductionEndTime := upgradeConfig.HeliconTime.Add(heliconMinConsumptionRateReductionPeriod); stakeStartTime.Before(reductionEndTime) {
-		elapsed := stakeStartTime.Sub(upgradeConfig.HeliconTime)
-		rampedReduction := new(big.Int).SetUint64(heliconMinConsumptionRateReduction)
-		rampedReduction.Mul(rampedReduction, big.NewInt(int64(elapsed)))
-		rampedReduction.Div(rampedReduction, big.NewInt(int64(heliconMinConsumptionRateReductionPeriod)))
-		reduction = rampedReduction.Uint64()
-	}
-	minRate, err := math.Sub(rewardConfig.MinConsumptionRate, reduction)
-	if err != nil {
-		return reward.Config{}, fmt.Errorf(
-			"min consumption rate reduction (%d) exceeds configured min consumption rate (%d): %w",
-			reduction,
-			rewardConfig.MinConsumptionRate,
-			err,
-		)
-	}
-	rewardConfig.MinConsumptionRate = minRate
-	return rewardConfig, nil
 }
