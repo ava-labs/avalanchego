@@ -5,22 +5,15 @@
 load("@io_bazel_rules_go//go:def.bzl", _go_test = "go_test")
 
 def go_test(**kwargs):
-    """go_test wrapper that enables shuffle by default.
+    """Repo-owned go_test wrapper.
 
-    This wrapper exists because .bazelrc --test_arg applies to test
-    targets for all languages / rules, which don't understand Go's test
-    flags. By wrapping go_test and injecting shuffle via args, it only
-    applies to Go test binaries.
-
-    All go_test targets are routed through this wrapper via
+    All root-module go_test targets are routed through this wrapper via
     `gazelle:map_kind go_test go_test //.bazel:defs.bzl` in the root
     BUILD.bazel.
 
-    Override with: bazel test --test_arg=-test.shuffle=off //...
+    Keep this as a thin pass-through so the repo retains a single Go-test
+    hook for Gazelle and any future Go-specific policy.
     """
-    args = list(kwargs.pop("args", []))
-    args.append("-test.shuffle=on")
-    kwargs["args"] = args
     _go_test(**kwargs)
 
 def graft_go_test(**kwargs):
