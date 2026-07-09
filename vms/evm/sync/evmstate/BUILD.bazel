@@ -47,6 +47,7 @@ go_test(
         "//vms/evm/sync/synctest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//trie",
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_stretchr_testify//require",
