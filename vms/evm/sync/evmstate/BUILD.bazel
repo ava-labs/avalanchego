@@ -1,13 +1,56 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "evmstate",
-    srcs = ["client.go"],
+    srcs = [
+        "client.go",
+        "handler.go",
+        "syncer.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/evmstate",
     visibility = ["//visibility:public"],
     deps = [
+        "//ids",
         "//network/p2p",
         "//proto/pb/sync",
+        "//utils/logging",
+        "//vms/evm/sync/handlers",
         "//vms/evm/sync/network",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state/snapshot",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//ethdb/memorydb",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//triedb",
+    ],
+)
+
+go_test(
+    name = "evmstate_test",
+    srcs = [
+        "handler_test.go",
+        "syncer_test.go",
+    ],
+    embed = [":evmstate"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//proto/pb/sync",
+        "//snow/engine/common",
+        "//utils/logging",
+        "//vms/evm/sync/handlers",
+        "//vms/evm/sync/synctest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
     ],
 )
