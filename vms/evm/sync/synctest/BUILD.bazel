@@ -13,7 +13,6 @@ go_library(
     deps = [
         "//ids",
         "//network/p2p",
-        "//proto/pb/sync",
         "//snow/engine/common",
         "//snow/engine/enginetest",
         "//utils/logging",

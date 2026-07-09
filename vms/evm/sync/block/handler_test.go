@@ -1,47 +1,21 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package block_test
+package block
 
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/block"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
-
-func TestHandler_RoundTrip(t *testing.T) {
-	wantResp := &syncpb.GetBlockResponse{
-		Blocks: [][]byte{{0xaa}, {0xbb}, {0xcc}},
-	}
-	responder := &synctest.FakeBlockResponder{Resp: wantResp}
-	h := block.NewHandler(logging.NoLog{}, responder)
-
-	req := &syncpb.GetBlockRequest{
-		Height:     42,
-		NumParents: 3,
-	}
-	respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, synctest.MustMarshal(t, req))
-	require.Nil(t, appErr)
-
-	got := &syncpb.GetBlockResponse{}
-	require.NoError(t, proto.Unmarshal(respBytes, got))
-	require.Empty(t, cmp.Diff(wantResp, got, protocmp.Transform()))
-	require.Empty(t, cmp.Diff(req, responder.GotReq, protocmp.Transform()))
-}
 
 func TestResponder(t *testing.T) {
 	tests := []struct {
@@ -67,9 +41,9 @@ func TestResponder(t *testing.T) {
 		},
 		{
 			name:       "caps parents at max",
-			chainLen:   int(block.MaxParentsPerRequest) + 10,
-			numParents: uint32(block.MaxParentsPerRequest) + 50,
-			wantBlocks: int(block.MaxParentsPerRequest),
+			chainLen:   int(MaxParentsPerRequest) + 10,
+			numParents: uint32(MaxParentsPerRequest) + 50,
+			wantBlocks: int(MaxParentsPerRequest),
 		},
 		{
 			name:       "missing block drops",
@@ -92,7 +66,7 @@ func TestResponder(t *testing.T) {
 			if !tt.noBlocks {
 				blocks = synctest.MakeChain(t, tt.chainLen)
 			}
-			r := block.NewResponder(synctest.NewBlockMap(blocks))
+			r := newResponder(synctest.NewBlockMap(blocks))
 
 			ctx := t.Context()
 			if tt.cancelCtx {
