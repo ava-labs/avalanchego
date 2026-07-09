@@ -9,9 +9,9 @@ go_library(
     deps = [
         "//ids",
         "//snow/engine/snowman/block",
+        "//utils/math/intmath",
         "//vms/components/gas",
         "//vms/saevm/gastime",
-        "//vms/saevm/intmath",
         "//vms/saevm/params",
         "//vms/saevm/proxytime",
         "//vms/saevm/types",

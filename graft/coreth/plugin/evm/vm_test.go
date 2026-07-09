@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -109,10 +110,8 @@ func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf(`{"continuous-profiler-dir": %q,"continuous-profiler-frequency": "500ms"}`, profilerDir)
-	fork := upgradetest.Latest
 	vm := newDefaultTestVM()
 	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork:       &fork,
 		ConfigJSON: configJSON,
 	})
 	require.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
@@ -1546,7 +1545,6 @@ func TestWaitForEvent(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name     string
-		Fork     *upgradetest.Fork
 		testCase func(*testing.T, *VM)
 	}{
 		{
@@ -1712,14 +1710,8 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
-			if testCase.Fork != nil {
-				fork = *testCase.Fork
-			}
 			vm := newDefaultTestVM()
-			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-				Fork: &fork,
-			})
+			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 			testCase.testCase(t, vm)
 			require.NoError(t, vm.Shutdown(t.Context()))
 		})
@@ -1745,13 +1737,10 @@ func (*testService) Echo(str string, i int, args *echoArgs) echoResult {
 // emulates server test
 func TestCreateHandlers(t *testing.T) {
 	var (
-		ctx  = t.Context()
-		fork = upgradetest.Latest
-		vm   = newDefaultTestVM()
+		ctx = t.Context()
+		vm  = newDefaultTestVM()
 	)
-	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork: &fork,
-	})
+	vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 	defer func() {
 		require.NoError(t, vm.Shutdown(ctx))
 	}()
@@ -2207,7 +2196,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			fork := upgradetest.Latest
+			fork := upgradetest.Granite
 
 			vm := newDefaultTestVM()
 			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
@@ -2285,12 +2274,58 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 				require.NoError(t, err)
 				t.Cleanup(client.Close)
 
+				// Verify the genesis state by checking the pre-funded balances at block 0.
+				for _, addr := range vmtest.TestEthAddrs {
+					balance, err := client.BalanceAt(ctx, addr, new(big.Int).SetUint64(0))
+					require.NoErrorf(t, err, "failed to get genesis balance for %s", addr)
+					require.Equalf(t, vmtest.InitialFund, balance, "unexpected genesis balance for %s", addr)
+				}
+
 				for blockNum := uint64(0); blockNum <= numBlocks; blockNum++ {
 					// Checking the sender's nonce (which should equal the block number)
 					// verifies that the reconstructed state is both openable and correct.
 					nonce, err := client.NonceAt(ctx, vmtest.TestEthAddrs[0], new(big.Int).SetUint64(blockNum))
 					require.NoError(t, err)
 					require.Equal(t, blockNum, nonce, "nonce at height %d", blockNum)
+
+					blockNumOrHash := rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(blockNum))
+					to := vmtest.TestEthAddrs[1]
+					callArg := map[string]any{
+						"from":     vmtest.TestEthAddrs[0],
+						"to":       &to,
+						"value":    (*hexutil.Big)(big.NewInt(1)),
+						"gas":      hexutil.Uint64(ethparams.TxGas),
+						"gasPrice": (*hexutil.Big)(vmtest.InitialBaseFee),
+					}
+
+					// eth_estimateGas params.
+					var (
+						gasResult            hexutil.Uint64
+						estimateGasRPCMethod = "eth_estimateGas"
+					)
+
+					rpcClient := client.Client()
+					// Verify that eth_estimateGas works.
+					require.NoErrorf(t, rpcClient.CallContext(ctx, &gasResult, estimateGasRPCMethod, callArg, blockNumOrHash), "failed to estimate gas at block %d", blockNum)
+					require.Equalf(t, ethparams.TxGas, uint64(gasResult), "unexpected gas estimate at block %d", blockNum)
+
+					// eth_createAccessList params.
+					var (
+						createAccessListRPCMethod = "eth_createAccessList"
+						accessListResult          struct {
+							Accesslist *types.AccessList `json:"accessList"`
+							Error      string            `json:"error,omitempty"`
+							GasUsed    hexutil.Uint64    `json:"gasUsed"`
+						}
+					)
+
+					// Verify that eth_createAccessList works.
+					require.NoErrorf(t, rpcClient.CallContext(ctx, &accessListResult, createAccessListRPCMethod, callArg, blockNumOrHash), "failed to create access list at block %d", blockNum)
+					require.Emptyf(t, accessListResult.Error, "unexpected VM error at block %d", blockNum)
+					require.NotNilf(t, accessListResult.Accesslist, "missing access list at block %d", blockNum)
+					// An EOA-to-EOA transfer does not touch any storage slots, and should not produce an access list.
+					require.Emptyf(t, *accessListResult.Accesslist, "unexpected access list at block %d", blockNum)
+					require.Equalf(t, ethparams.TxGas, uint64(accessListResult.GasUsed), "unexpected gas used at block %d", blockNum)
 				}
 			})
 		})

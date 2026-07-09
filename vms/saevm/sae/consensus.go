@@ -59,6 +59,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		rawdb.WriteTxLookupEntriesByBlock(batch, b.EthBlock())
 		// D(b ∈ A)
 		rawdb.WriteCanonicalHash(batch, b.Hash(), b.NumberU64())
+		rawdb.WriteHeadFastBlockHash(batch, b.Hash())
 
 		if err := batch.Write(); err != nil {
 			return err
@@ -77,6 +78,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		if err := s.MarkSettled(&vm.last.settled); err != nil {
 			return err
 		}
+		vm.metrics.markSettled(s.Height())
 	}
 
 	// I(s ∈ S) above, before I(b ∈ A) before X(b ∈ A)

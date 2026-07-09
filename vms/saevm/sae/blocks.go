@@ -212,27 +212,18 @@ func (vm *VM) settledBlockFromDB(db ethdb.Reader, hash common.Hash, num uint64) 
 	}
 
 	ethB := rawdb.ReadBlock(db, hash, num)
-	if num > vm.last.synchronous {
-		return blocks.RestoreSettledBlock(
-			ethB,
-			vm.log(),
-			vm.db,
-			vm.xdb,
-			vm.exec.ChainConfig(),
-		)
+	if ethB == nil {
+		return nil, database.ErrNotFound
 	}
 
-	b, err := vm.blockBuilder.new(ethB, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	// Excess is only used for executing the next block, which can never
-	// be the case if `b` isn't actually the last synchronous block, so
-	// passing the same value for all is OK.
-	if err := b.MarkSynchronous(vm.hooks, vm.db, vm.xdb, vm.config.ExcessAfterLastSynchronous); err != nil {
-		return nil, err
-	}
-	return b, nil
+	return blocks.RestoreSettledBlock(
+		ethB,
+		vm.hooks,
+		vm.log(),
+		vm.db,
+		vm.xdb,
+		vm.exec.ChainConfig(),
+	)
 }
 
 // GetBlock returns the block with the given ID, or [database.ErrNotFound].
@@ -257,7 +248,7 @@ func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (*blocks.Block, error) {
 	if errors.Is(err, blocks.ErrNotFound) {
 		return nil, database.ErrNotFound
 	}
-	return b, nil
+	return b, err
 }
 
 // GetBlockIDAtHeight returns the accepted block at the given height, or

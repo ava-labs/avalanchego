@@ -13,8 +13,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -32,9 +35,10 @@ import (
 // The type is unexported but its methods are exported because gorilla RPC
 // reflects on them to dispatch requests.
 type service struct {
-	ctx    *snow.Context
-	txpool *txpool.Txpool
-	state  *state.State
+	ctx          *snow.Context
+	gossipSet    *gossip.BloomSet[*gossipTx]
+	pushGossiper *gossip.PushGossiper[*gossipTx]
+	state        *state.State
 
 	chainAlias  string
 	hrp         string
@@ -43,7 +47,8 @@ type service struct {
 
 func newService(
 	ctx *snow.Context,
-	pool *txpool.Txpool,
+	gossipSet *gossip.BloomSet[*gossipTx],
+	pushGossiper *gossip.PushGossiper[*gossipTx],
 	db *state.State,
 ) (*service, error) {
 	chainAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
@@ -58,9 +63,10 @@ func newService(
 	}
 
 	return &service{
-		ctx:    ctx,
-		txpool: pool,
-		state:  db,
+		ctx:          ctx,
+		gossipSet:    gossipSet,
+		pushGossiper: pushGossiper,
+		state:        db,
 
 		chainAlias:  chainAlias,
 		hrp:         hrp,
@@ -217,11 +223,14 @@ func (s *service) IssueTx(_ *http.Request, args *api.FormattedTx, resp *api.JSON
 	if err != nil {
 		return err
 	}
-	if err := s.txpool.Add(t); err != nil {
+	gossipTx := toGossipTx(t)
+	if err := s.gossipSet.Add(gossipTx); err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
 		return fmt.Errorf("%w: %w", errIssuingTx, err)
 	}
 
-	// TODO(StephenButtolph): Push gossip the tx.
+	// Always push, even if already in the pool. Otherwise a malicious RPC could
+	// suppress a tx from being efficiently gossiped to validators.
+	s.pushGossiper.Add(gossipTx)
 
 	resp.TxID = t.ID()
 	return nil
@@ -255,6 +264,43 @@ func (s *service) GetAtomicTx(_ *http.Request, args *api.GetTxArgs, resp *GetTxR
 	}
 	resp.Encoding = args.Encoding
 	resp.Height = json.Uint64(height)
+	return nil
+}
+
+// TxStatus is the response returned by [service.GetAtomicTxStatus].
+//
+// It MUST be exported for gorilla RPC to publicly expose
+// [service.GetAtomicTxStatus].
+type TxStatus struct {
+	Status choices.Status `json:"status"`
+	Height *json.Uint64   `json:"blockHeight,omitempty"`
+}
+
+// GetAtomicTxStatus reports whether txID has been accepted on the C-Chain and,
+// if so, the block height at which it was accepted.
+//
+// Deprecated: prefer [service.GetAtomicTx], which returns the transaction along
+// with its height in a single call. This endpoint reflects whether the tx has
+// been written to state, which can briefly precede the corresponding block
+// being fully executed.
+func (s *service) GetAtomicTxStatus(_ *http.Request, args *api.JSONTxID, resp *TxStatus) error {
+	s.ctx.Log.Debug("deprecated API called",
+		zap.String("service", "avax"),
+		zap.String("method", "getAtomicTxStatus"),
+		zap.Stringer("txID", args.TxID),
+	)
+
+	_, height, err := s.state.GetTx(args.TxID)
+	if errors.Is(err, database.ErrNotFound) {
+		resp.Status = choices.Unknown
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %w", errFetchingTx, err)
+	}
+
+	resp.Status = choices.Accepted
+	resp.Height = (*json.Uint64)(&height)
 	return nil
 }
 

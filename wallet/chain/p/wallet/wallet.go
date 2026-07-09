@@ -316,7 +316,6 @@ type Wallet interface {
 	// - validatorNodeID is the node ID of the validator.
 	// - weight is the amount of nAVAX to stake.
 	// - signer is the BLS key for this validator.
-	// - assetID specifies the asset to stake.
 	// - validationRewardsOwner specifies the owner of all the validation
 	//   rewards this validator earns.
 	// - delegationRewardsOwner specifies the owner of all the rewards this

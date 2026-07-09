@@ -1940,11 +1940,11 @@ func (s *State) loadCurrentValidators() error {
 		case *txs.AddAutoRenewedValidatorTx:
 			weight, err := safemath.Add(stakerTx.Weight(), metadata.AccruedValidationRewards)
 			if err != nil {
-				return fmt.Errorf("overflow computing weight: %w", err)
+				return fmt.Errorf("adding accrued validation rewards: %w", err)
 			}
 			weight, err = safemath.Add(weight, metadata.AccruedDelegateeRewards)
 			if err != nil {
-				return fmt.Errorf("overflow computing weight: %w", err)
+				return fmt.Errorf("adding accrued delegatee rewards: %w", err)
 			}
 
 			staker, err = NewStaker(
@@ -2297,17 +2297,14 @@ func (s *State) write(updateValidators bool, height uint64) error {
 }
 
 func (s *State) resolveValidatorMetadataCodec() uint16 {
-	ts := s.GetTimestamp()
-
-	if s.upgrades.IsHeliconActivated(ts) {
+	switch ts := s.GetTimestamp(); {
+	case s.upgrades.IsHeliconActivated(ts):
 		return codecVersion2
-	}
-
-	if s.upgrades.IsDurangoActivated(ts) {
+	case s.upgrades.IsDurangoActivated(ts):
 		return CodecVersion1
+	default:
+		return CodecVersion0
 	}
-
-	return CodecVersion0
 }
 
 func (s *State) Close() error {

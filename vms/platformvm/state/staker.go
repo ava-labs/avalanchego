@@ -94,6 +94,8 @@ func (s *Staker) Less(than *Staker) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
+// NewCurrentStaker returns a current Staker built from a [txs.BoundedStaker]
+// transaction, deriving its EndTime and Weight.
 func NewCurrentStaker(
 	txID ids.ID,
 	staker txs.BoundedStaker,
@@ -103,6 +105,8 @@ func NewCurrentStaker(
 	return NewStaker(txID, staker, startTime, staker.EndTime(), staker.Weight(), potentialReward)
 }
 
+// NewPendingStaker returns a pending Staker built from a [txs.ScheduledStaker]
+// transaction.
 func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
@@ -122,12 +126,15 @@ func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) 
 	}, nil
 }
 
+// NewStaker returns a raw Staker built from explicitly provided startTime,
+// endTime, weight, and potentialReward, rather than deriving them from
+// [txs.Staker]. It is mostly used to build auto-renewed validators.
 func NewStaker(
 	txID ids.ID,
 	staker txs.Staker,
 	startTime time.Time,
 	endTime time.Time,
-	weight uint64, // we need this, because staker.Weight() returns the initial weight (without any accrued rewards)
+	weight uint64,
 	potentialReward uint64,
 ) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
