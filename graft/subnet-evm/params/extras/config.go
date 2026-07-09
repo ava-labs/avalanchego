@@ -116,8 +116,6 @@ type ChainConfig struct {
 	InitialMinDelayMS  uint64               `json:"initialMinDelayMS,omitempty"` // Seeds the ACP-226 min block delay at genesis, for benchmarking.
 }
 
-var errInitialMinDelayTooLarge = errors.New("initialMinDelayMS too large")
-
 func (c *ChainConfig) CheckConfigCompatible(newConfig *ethparams.ChainConfig, headNumber *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {
 	if c == nil {
 		return nil
@@ -316,6 +314,8 @@ func checkForks(forks []fork) error {
 	}
 	return nil
 }
+
+var errInitialMinDelayTooLarge = errors.New("initialMinDelayMS too large")
 
 // Verify verifies chain config.
 func (c *ChainConfig) Verify() error {

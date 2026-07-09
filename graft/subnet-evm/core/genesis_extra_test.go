@@ -25,21 +25,33 @@ import (
 )
 
 func TestGenesisCustomMinDelay(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+	tests := map[string]struct {
+		initialMinDelayMS uint64
+		wantDelayExcess   acp226.DelayExcess
+	}{
+		"default": {
+			initialMinDelayMS: 0,
+			wantDelayExcess:   acp226.InitialDelayExcess,
+		},
+		"custom": {
+			initialMinDelayMS: 5,
+			wantDelayExcess:   acp226.DesiredDelayExcess(5),
+		},
+	}
 
-	defaultConfig := params.TestGraniteChainConfig
-	defaultBlock, err := (&Genesis{Config: defaultConfig}).Commit(db, tdb)
-	require.NoError(t, err)
-	require.Equal(t, acp226.InitialDelayExcess, *customtypes.GetHeaderExtra(defaultBlock.Header()).MinDelayExcess)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+			tdb := triedb.NewDatabase(db, triedb.HashDefaults)
 
-	// TestGraniteChainConfig and its extra are shared globals, copy before mutating.
-	const initialMinDelayMS = 5
-	customConfig := params.Copy(params.TestGraniteChainConfig)
-	params.GetExtra(&customConfig).InitialMinDelayMS = initialMinDelayMS
-	customBlock, err := (&Genesis{Config: &customConfig}).Commit(db, tdb)
-	require.NoError(t, err)
-	require.Equal(t, acp226.DesiredDelayExcess(initialMinDelayMS), *customtypes.GetHeaderExtra(customBlock.Header()).MinDelayExcess)
+			// TestGraniteChainConfig and its extra are shared globals, copy before mutating.
+			config := params.Copy(params.TestGraniteChainConfig)
+			params.GetExtra(&config).InitialMinDelayMS = test.initialMinDelayMS
+			block, err := (&Genesis{Config: &config}).Commit(db, tdb)
+			require.NoError(t, err)
+			require.Equal(t, test.wantDelayExcess, *customtypes.GetHeaderExtra(block.Header()).MinDelayExcess)
+		})
+	}
 }
 
 func TestGenesisEthUpgrades(t *testing.T) {
