@@ -36,7 +36,6 @@ var (
 	ErrOverDelegated                   = errors.New("validator would be over delegated")
 	ErrIsNotTransformSubnetTx          = errors.New("is not a transform subnet tx")
 	ErrTimestampNotBeforeStartTime     = errors.New("chain timestamp not before start time")
-	ErrAlreadyValidator                = errors.New("already a validator")
 	ErrDuplicateValidator              = errors.New("duplicate validator")
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
@@ -605,24 +604,29 @@ func verifyAddAutoRenewedValidatorTx(
 		return nil
 	}
 
+	validatorRules, err := getValidatorRules(backend, chainState, tx.SubnetID())
+	if err != nil {
+		return err
+	}
+
 	switch {
-	case tx.Weight() < backend.Config.MinValidatorStake:
+	case tx.Weight() < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
 		return ErrWeightTooSmall
 
-	case tx.Weight() > backend.Config.MaxValidatorStake:
+	case tx.Weight() > validatorRules.maxValidatorStake:
 		// Ensure validator isn't staking too much
 		return ErrWeightTooLarge
 
-	case tx.Shares() < backend.Config.MinDelegationFee:
+	case tx.Shares() < validatorRules.minDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
 		return ErrInsufficientDelegationFee
 
-	case tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
+	case tx.Period < uint64(validatorRules.minStakeDuration/time.Second):
 		// Ensure staking length is not too short
 		return ErrStakeTooShort
 
-	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
+	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
 		// Ensure staking length is not too long
 		return ErrStakeTooLong
 	}
@@ -631,7 +635,7 @@ func verifyAddAutoRenewedValidatorTx(
 		return err
 	}
 
-	_, err := verifySpend(backend, feeCalculator, chainState, tx, sTx.Creds)
+	_, err = verifySpend(backend, feeCalculator, chainState, tx, sTx.Creds)
 	return err
 }
 
@@ -657,11 +661,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, errMissingStakerTx
-		}
-
-		return nil, fmt.Errorf("error getting staker tx: %w", err)
+		return nil, fmt.Errorf("getting staker tx: %w", err)
 	}
 
 	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
@@ -671,11 +671,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 
 	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, errMissingValidator
-		}
-
-		return nil, fmt.Errorf("failed to get validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
+		return nil, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
 	}
 
 	if tx.TxID != validator.TxID {
@@ -689,10 +685,15 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return validator, nil
 	}
 
+	validatorRules, err := getValidatorRules(backend, chainState, autoRenewedStakerTx.SubnetID())
+	if err != nil {
+		return nil, fmt.Errorf("getting validator rules: %w", err)
+	}
+
 	switch {
-	case tx.Period > 0 && tx.Period < uint64(backend.Config.MinStakeDuration/time.Second):
+	case tx.Period > 0 && tx.Period < uint64(validatorRules.minStakeDuration/time.Second):
 		return nil, ErrStakeTooShort
-	case tx.Period > uint64(backend.Config.MaxStakeDuration/time.Second):
+	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
 		return nil, ErrStakeTooLong
 	}
 

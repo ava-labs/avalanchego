@@ -867,7 +867,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, ErrAlreadyValidator)
+		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
 	{
@@ -915,7 +915,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			onCommitState,
 			onAbortState,
 		)
-		require.ErrorIs(err, ErrAlreadyValidator)
+		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
 	{

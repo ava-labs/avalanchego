@@ -1010,7 +1010,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, ErrAlreadyValidator)
+		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
 	{
@@ -1049,7 +1049,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, ErrAlreadyValidator)
+		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
 	{
