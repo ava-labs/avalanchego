@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 
@@ -38,15 +39,14 @@ const (
 	snapshotSegmentLen = 64
 )
 
-// Handler serves [syncpb.GetLeafRequest] over [p2p.EVMLeafRequestHandlerID].
-type Handler = handlers.Handler[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
-
-// Responder serves leaf-range requests.
-type Responder = handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
-
-// NewHandler wires resp into a [Handler].
-func NewHandler(log logging.Logger, resp Responder) *Handler {
-	return handlers.NewHandler(log, func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} }, resp)
+// RegisterHandler serves leaf-range requests at [p2p.EVMLeafRequestHandlerID] on net.
+func RegisterHandler(net *p2p.Network, log logging.Logger, trieDB *triedb.Database, trieKeyLength int, snapshot SnapshotReader) error {
+	h := handlers.NewHandler(
+		log,
+		func() *syncpb.GetLeafRequest { return &syncpb.GetLeafRequest{} },
+		newResponder(trieDB, trieKeyLength, snapshot),
+	)
+	return net.AddHandler(p2p.EVMLeafRequestHandlerID, h)
 }
 
 // SnapshotReader yields a root-scoped account iterator, satisfied by
@@ -56,8 +56,8 @@ type SnapshotReader interface {
 }
 
 var (
-	_ Responder      = (*responder)(nil)
-	_ SnapshotReader = (*snapshot.Tree)(nil)
+	_ handlers.Responder[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse] = (*responder)(nil)
+	_ SnapshotReader                                                      = (*snapshot.Tree)(nil)
 )
 
 // responder is bound to one (trieDB, key-length, snapshot) tuple.
@@ -67,11 +67,11 @@ type responder struct {
 	trieKeyLength int
 }
 
-func NewResponder(
+func newResponder(
 	trieDB *triedb.Database,
 	trieKeyLength int,
 	snapshot SnapshotReader,
-) Responder {
+) *responder {
 	return &responder{
 		trieDB:        trieDB,
 		snapshot:      snapshot,
