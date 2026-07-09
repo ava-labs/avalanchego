@@ -246,6 +246,21 @@ func withArchival() sutOption {
 	})
 }
 
+// withCommitInterval sets the interval at which trie roots are persisted.
+func withCommitInterval(n uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.CommitInterval = n
+	})
+}
+
+// withStateSyncDisabled clears [config.StateSyncEnabled], which defaults to
+// true.
+func withStateSyncDisabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateSyncEnabled = false
+	})
+}
+
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -626,6 +641,17 @@ func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB, opts ...bloc
 	return blk
 }
 
+// blockAtHeight returns the accepted block at the given height.
+func (s *SUT) blockAtHeight(ctx context.Context, tb testing.TB, height uint64) *blocks.Block {
+	tb.Helper()
+
+	id, err := s.GetBlockIDAtHeight(ctx, height)
+	require.NoErrorf(tb, err, "%T.GetBlockIDAtHeight(%d)", s.VM, height)
+	blk, err := s.GetBlock(ctx, id)
+	require.NoErrorf(tb, err, "%T.GetBlock(%s)", s.VM, id)
+	return blk
+}
+
 // lastAccepted returns the ID of the last-accepted block.
 func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	tb.Helper()
@@ -633,6 +659,15 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	id, err := s.LastAccepted(ctx)
 	require.NoErrorf(tb, err, "%T.LastAccepted()", s.VM)
 	return id
+}
+
+// lastAcceptedHeight returns the height of the last-accepted block.
+func (s *SUT) lastAcceptedHeight(ctx context.Context, tb testing.TB) uint64 {
+	tb.Helper()
+
+	blk, err := s.GetBlock(ctx, s.lastAccepted(ctx, tb))
+	require.NoErrorf(tb, err, "%T.GetBlock(last accepted)", s.VM)
+	return blk.Height()
 }
 
 // unblockWaitForEvent advances the [withVMTime] clock to ensure that
@@ -689,6 +724,19 @@ func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.I
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
 	require.NoErrorf(tb, s.VerifyBlock(ctx, blockContext, blk), "%T.VerifyBlock()", s.VM)
 	return blk
+}
+
+// parseVerifyAccept drives a block produced by another node through
+// this SUT's consensus surface, as the engine would during bootstrapping or
+// normal operation.
+func (s *SUT) parseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.Block) *blocks.Block {
+	tb.Helper()
+
+	parsed, err := s.ParseBlock(ctx, blk.Bytes())
+	require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Height())
+	require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Height())
+	require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Height())
+	return parsed
 }
 
 // verifyTampered re-seals valid with a mutated header and returns the
@@ -810,7 +858,7 @@ func (w *wallet) newImportTx(
 	sourceChain ids.ID,
 	to common.Address,
 	fee uint64,
-) (*tx.Tx, *tx.Import) {
+) *tx.Tx {
 	tb.Helper()
 
 	var (
@@ -852,7 +900,7 @@ func (w *wallet) newImportTx(
 			AssetID: avaxAssetID,
 		}},
 	}
-	return w.sign(tb, imp, len(inputs)), imp
+	return w.sign(tb, imp, len(inputs))
 }
 
 // sign wraps u in a [tx.Tx] with numCreds copies of a single-sig credential
@@ -939,7 +987,7 @@ func TestImport(t *testing.T) {
 		receiver = txtest.NewKey(t).EthAddress()
 	)
 	const txFee = 50
-	signedImport, _ := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	blk := sut.issueAndExecute(ctx, t, signedImport)
 	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())
@@ -990,6 +1038,15 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 	}
 }
 
+func assertBlockIncludes(tb testing.TB, blk *blocks.Block, ethTxs types.Transactions, stxs []*tx.Tx) {
+	if diff := cmp.Diff(ethTxs, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
+		tb.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
+	}
+	if diff := cmp.Diff(stxs, blockTxs(tb, blk), txtest.CmpOpt()); diff != "" {
+		tb.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
+	}
+}
+
 // blockTxs returns every cross-chain tx encoded in the block.
 func blockTxs(tb testing.TB, blk *blocks.Block) []*tx.Tx {
 	tb.Helper()
@@ -1034,12 +1091,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
 
 	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-	if diff := cmp.Diff(types.Transactions{tracedTx}, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
-		t.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
-	}
-	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
-	}
+	assertBlockIncludes(t, blk, types.Transactions{tracedTx}, []*tx.Tx{signedExport})
 
 	rpc := sut.GethRPCBackends()
 	// To rebuild the state at a particular tx, the [saexec.Execute] method is
