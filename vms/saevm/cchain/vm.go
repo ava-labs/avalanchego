@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -26,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -288,6 +290,13 @@ func (vm *VM) Initialize(
 				return fmt.Errorf("registering warp signature handler: %w", err)
 			}
 		}
+
+		// TODO(alarso16): Find a way to wire in Firewood.
+		if saeConfig.DBConfig.Scheme != customrawdb.FirewoodScheme {
+			if err := vm.RegisterServer(triedb.NewDatabase(ethDB, tdbConfig)); err != nil {
+				return fmt.Errorf("registering state sync server: %w", err)
+			}
+		}
 		return nil
 	}
 
@@ -315,6 +324,9 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	if state >= snow.Bootstrapping {
 		var err error
 		vm.finishInitializeOnce.Do(func() {
+			if err = vm.SummaryHandler.Error(); err != nil {
+				return
+			}
 			err = vm.finishInitialize(ctx)
 		})
 		if err != nil {
