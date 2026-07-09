@@ -92,14 +92,6 @@ var (
 	warpSourceChainID = ids.ID{'w', 'a', 'r', 'p', '-', 's', 'o', 'u', 'r', 'c', 'e'}
 	antAssetID        = ids.ID{'a', 'n', 't', '-', 'a', 's', 's', 'e', 't'}
 	transferRecipient = common.Address{0xde, 0xad}
-
-	// counterCreationCode deploys a 26-byte contract: called with empty
-	// call data it increments its storage slot 0; called with any call data
-	// it returns the slot's value as a 32-byte word.
-	//	CALLDATASIZE; PUSH1 0x0e; JUMPI
-	//	PUSH1 0; SLOAD; PUSH1 1; ADD; PUSH1 0; SSTORE; STOP
-	//	JUMPDEST; PUSH1 0; SLOAD; PUSH1 0; MSTORE; PUSH1 32; PUSH1 0; RETURN
-	counterCreationCode = common.Hex2Bytes("7936600e57600054600101600055005b60005460005260206000f3600052601a6006f3")
 )
 
 func blsSigner(t *testing.T, scalar byte) *localsigner.LocalSigner {

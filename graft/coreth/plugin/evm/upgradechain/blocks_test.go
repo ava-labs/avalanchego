@@ -5,11 +5,13 @@ package upgradechain
 
 import (
 	"math/big"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
@@ -27,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	corethatomic "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
@@ -46,12 +49,7 @@ func (g *generator) buildAllBlocks(t *testing.T) {
 	// exercised by consuming tests.
 	g.setClock(t, upgrades.ApricotPhase3Time.Add(10*time.Second))
 	g.buildEthBlock(t, "apricotPhase3", "counter-contract deploy and AVAX transfer under dynamic fees",
-		g.signedTx(t, &types.LegacyTx{
-			Nonce:    g.nonce(),
-			Gas:      100_000,
-			GasPrice: vmtest.InitialBaseFee,
-			Data:     counterCreationCode,
-		}),
+		g.counterDeployTx(t),
 		g.transferTx(t, 1),
 	)
 
@@ -290,6 +288,31 @@ func (g *generator) dynamicFeeTransferTx(t *testing.T, n int64) *types.Transacti
 	})
 }
 
+// counterDeployTx returns a transaction deploying the counter contract: with
+// empty call data it increments its storage slot 0; with any call data it
+// returns the slot's value as a 32-byte word.
+func (g *generator) counterDeployTx(t *testing.T) *types.Transaction {
+	t.Helper()
+	runtime := slices.Concat(
+		saetest.Ops(vm.CALLDATASIZE, vm.PUSH1, 14, vm.JUMPI), // jump to the JUMPDEST at offset 14
+		saetest.Ops(vm.PUSH1, 0, vm.SLOAD, vm.PUSH1, 1, vm.ADD, vm.PUSH1, 0, vm.SSTORE, vm.STOP),
+		saetest.Ops(vm.JUMPDEST, vm.PUSH1, 0, vm.SLOAD, vm.PUSH1, 0, vm.MSTORE, vm.PUSH1, 32, vm.PUSH1, 0, vm.RETURN),
+	)
+	// Creation code: the runtime code PUSHed as one word, MSTOREd
+	// (right-aligned) at offset 0, and returned from there.
+	creation := slices.Concat(
+		saetest.Push(t, runtime),
+		saetest.Ops(vm.PUSH1, 0, vm.MSTORE),
+		saetest.Ops(vm.PUSH1, vm.OpCode(len(runtime)), vm.PUSH1, vm.OpCode(32-len(runtime)), vm.RETURN),
+	)
+	return g.signedTx(t, &types.LegacyTx{
+		Nonce:    g.nonce(),
+		Gas:      100_000,
+		GasPrice: vmtest.InitialBaseFee,
+		Data:     creation,
+	})
+}
+
 func (g *generator) counterIncrementTx(t *testing.T) *types.Transaction {
 	t.Helper()
 	return g.signedTx(t, &types.LegacyTx{
@@ -310,10 +333,11 @@ func (g *generator) storageClearTx(t *testing.T) *types.Transaction {
 		Nonce:    g.nonce(),
 		Gas:      100_000,
 		GasPrice: vmtest.InitialBaseFee,
-		// PUSH1 1; PUSH1 0; SSTORE   slot 0: 0 -> 1
-		// PUSH1 0; PUSH1 0; SSTORE   slot 0: 1 -> 0, accruing the refund
-		// STOP
-		Data: common.Hex2Bytes("6001600055600060005500"),
+		Data: saetest.Ops(
+			vm.PUSH1, 1, vm.PUSH1, 0, vm.SSTORE, // slot 0: 0 -> 1
+			vm.PUSH1, 0, vm.PUSH1, 0, vm.SSTORE, // slot 0: 1 -> 0, accruing the refund
+			vm.STOP,
+		),
 	})
 }
 
