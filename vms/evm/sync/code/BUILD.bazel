@@ -14,6 +14,7 @@ go_library(
         "//ids",
         "//network/p2p",
         "//proto/pb/sync",
+        "//utils/constants",
         "//utils/logging",
         "//vms/evm/sync/customrawdb",
         "//vms/evm/sync/handlers",

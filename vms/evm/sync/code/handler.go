@@ -10,17 +10,21 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-// MaxHashesPerRequest caps the hashes per request.
-const MaxHashesPerRequest = 5
+// MaxHashesPerRequest caps the hashes per request so a response of that many
+// max-size contracts stays within the p2p message limit, with headroom for
+// proto framing and the other message fields.
+const MaxHashesPerRequest = constants.MaxContainersLen / params.MaxCodeSize
 
 // RegisterHandler serves code-by-hash requests at [p2p.EVMCodeRequestHandlerID] on net.
 func RegisterHandler(net *p2p.Network, log logging.Logger, codeReader ethdb.KeyValueReader) error {
@@ -51,16 +55,8 @@ func (r *responder) Respond(_ context.Context, nodeID ids.NodeID, req *syncpb.Ge
 	}
 
 	data := make([][]byte, len(hashes))
-	seen := make(map[common.Hash]struct{}, len(hashes))
 	for i, raw := range hashes {
 		hash := common.BytesToHash(raw)
-		// A duplicate hash drops the whole request by design rather than being de-duplicated.
-		if _, ok := seen[hash]; ok {
-			log.Debug("duplicate code hashes requested, dropping request", "nodeID", nodeID)
-			return nil, nil
-		}
-		seen[hash] = struct{}{}
-
 		data[i] = rawdb.ReadCode(r.codeReader, hash)
 		if len(data[i]) == 0 {
 			log.Debug("requested code not found, dropping request", "nodeID", nodeID, "hash", hash)
