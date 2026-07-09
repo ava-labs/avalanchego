@@ -5,6 +5,7 @@ package saetest
 
 import (
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 
@@ -30,6 +31,37 @@ func CopyDB(tb testing.TB, src database.Database) database.Database {
 	}
 	require.NoErrorf(tb, it.Error(), "%T.Error() after database copy", it)
 	return dst
+}
+
+// RequireEqualDBs asserts that got holds exactly the same key/value pairs as
+// want.
+func RequireEqualDBs(tb testing.TB, want, got database.Database, msgAndArgs ...any) {
+	tb.Helper()
+
+	require.Equal(tb, dbEntries(tb, want), dbEntries(tb, got), msgAndArgs...)
+}
+
+type dbEntry struct {
+	Key   []byte
+	Value []byte
+}
+
+// dbEntries returns every key/value pair in db, in iteration order.
+func dbEntries(tb testing.TB, db database.Database) []dbEntry {
+	tb.Helper()
+
+	it := db.NewIterator()
+	defer it.Release()
+
+	var out []dbEntry
+	for it.Next() {
+		out = append(out, dbEntry{
+			Key:   slices.Clone(it.Key()),
+			Value: slices.Clone(it.Value()),
+		})
+	}
+	require.NoErrorf(tb, it.Error(), "%T.Error()", it)
+	return out
 }
 
 // FlakyDB fails every mutating op after a configured number of them. A Put, a

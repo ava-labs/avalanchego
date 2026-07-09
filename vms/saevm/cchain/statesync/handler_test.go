@@ -45,7 +45,7 @@ type (
 	// SUT bundles a [SummaryHandler] with the state it was built over. It is driven
 	// entirely through hand-populated storage, with no VM.
 	SUT struct {
-		*SummaryHandler
+		*Handler
 		state *state.State
 	}
 
@@ -124,9 +124,12 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		st,
 	)
 	require.NoError(t, err, "New()")
+	t.Cleanup(func() {
+		require.NoErrorf(t, handler.Shutdown(context.WithoutCancel(t.Context())), "%T.Shutdown()", handler)
+	})
 	return &SUT{
-		SummaryHandler: handler,
-		state:          st,
+		Handler: handler,
+		state:   st,
 	}
 }
 
@@ -248,7 +251,7 @@ func TestAcceptSummary(t *testing.T) {
 }
 
 // TestStateSyncEnabled checks that the configured value is reported back by
-// [SummaryHandler.StateSyncEnabled].
+// [Handler.StateSyncEnabled].
 func TestStateSyncEnabled(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -270,8 +273,8 @@ func TestStateSyncEnabled(t *testing.T) {
 			sut := newSUT(t, withEnabled(tt.enabled))
 
 			gotEnabled, err := sut.StateSyncEnabled(t.Context())
-			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.SummaryHandler)
-			assert.Equalf(t, tt.enabled, gotEnabled, "%T.StateSyncEnabled()", sut.SummaryHandler)
+			require.NoErrorf(t, err, "%T.StateSyncEnabled()", sut.Handler)
+			assert.Equalf(t, tt.enabled, gotEnabled, "%T.StateSyncEnabled()", sut.Handler)
 		})
 	}
 }
