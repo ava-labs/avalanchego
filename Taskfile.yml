@@ -17,6 +17,11 @@ vars:
   # Task entrypoints run through the repo's nix wrapper so they use the pinned
   # dev-shell toolchain when nix is available, without depending on cwd.
   NIX_RUN: '{{printf "%s/scripts/nix_run.sh" .TASKFILE_DIR}}'
+  # Shared Bazel test command template.
+  # YAML `&bazel_test_cmd` defines the template once; tasks reuse it with
+  # `cmd: *bazel_test_cmd`, and Task then renders that template using the
+  # task-local `BAZEL_CONFIG` and `TARGETS` vars.
+  BAZEL_TEST_CMD: &bazel_test_cmd '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test{{if .BAZEL_CONFIG}} --config={{.BAZEL_CONFIG}}{{end}} {{.TARGETS}}'
 
 tasks:
   default: './scripts/run_task.sh --list'
@@ -25,13 +30,13 @@ tasks:
     desc: Build avalanchego with Bazel
     cmd: '{{.NIX_RUN}} bazelisk build //main:avalanchego'
 
-  bazel-build-race:
-    desc: Build avalanchego with Bazel (race detection)
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build --config=race //main:avalanchego'
-
   bazel-build-opt:
     desc: Build avalanchego with Bazel (optimized)
     cmd: '{{.NIX_RUN}} bazelisk build --compilation_mode=opt //main:avalanchego'
+
+  bazel-build-race:
+    desc: Build avalanchego with Bazel (race detection)
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build --config=race //main:avalanchego'
 
   bazel-check-metadata:
     desc: Checks Bazel metadata is current (requires clean git tree)
@@ -53,10 +58,15 @@ tasks:
     desc: Format BUILD.bazel files with buildifier
     cmd: '{{.NIX_RUN}} bazelisk run @buildifier_prebuilt//:buildifier -- -r .'
 
+  bazel-gazelle-generate:
+    desc: Regenerate BUILD files with Gazelle (all modules)
+    cmd: '{{.NIX_RUN}} bazelisk run //:gazelle'
+
   bazel-generate-metadata:
     desc: Regenerate Bazel metadata for this source tree
     cmds:
       - task: bazel-gazelle-generate
+      - task: bazel-generate-unit-test-suites
       - task: bazel-fmt
       - task: bazel-generate-patches
       - task: bazel-sync-module-metadata
@@ -65,9 +75,9 @@ tasks:
     desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
     cmd: '{{.NIX_RUN}} ./scripts/generate_bazel_patches.sh'
 
-  bazel-gazelle-generate:
-    desc: Regenerate BUILD files with Gazelle (all modules)
-    cmd: '{{.NIX_RUN}} bazelisk run //:gazelle'
+  bazel-generate-unit-test-suites:
+    desc: Regenerate Bazel unit-test shard suite metadata
+    cmd: '{{.NIX_RUN}} bazelisk run //tools/generate-bazel-unit-test-suites'
 
   bazel-mod-tidy:
     desc: Update use_repo() in MODULE.bazel from go.mod
@@ -84,12 +94,60 @@ tasks:
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
   bazel-test:
-    desc: Run unit tests with Bazel (shuffle on, race on)
-    cmd: '{{.NIX_RUN}} bazelisk test //...'
+    desc: Run all generated unit-test shards with Bazel (no race, no shuffle - default Bazel mode)
+    vars:
+      BAZEL_CONFIG: ''
+      TARGETS: '//:unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-race:
+    desc: Run all generated unit-test shards with Bazel (race on, no shuffle)
+    vars:
+      BAZEL_CONFIG: race
+      TARGETS: '//:unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-race-shuffle:
+    desc: Run all generated unit-test shards with Bazel (race on, shuffle on)
+    vars:
+      BAZEL_CONFIG: race-shuffle
+      TARGETS: '//:unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-shuffle:
+    desc: Run all generated unit-test shards with Bazel (race off, shuffle on)
+    vars:
+      BAZEL_CONFIG: shuffle
+      TARGETS: '//:unit_tests'
+    cmd: *bazel_test_cmd
 
   bazel-test-coreth:
-    desc: Run coreth/evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/coreth/... //graft/evm/...'
+    desc: Run coreth/evm unit tests with Bazel (no race, no shuffle)
+    vars:
+      BAZEL_CONFIG: ''
+      TARGETS: '//:coreth_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-coreth-race:
+    desc: Run coreth/evm unit tests with Bazel (race on, no shuffle)
+    vars:
+      BAZEL_CONFIG: race
+      TARGETS: '//:coreth_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-coreth-race-shuffle:
+    desc: Run coreth/evm unit tests with Bazel (race on, shuffle on)
+    vars:
+      BAZEL_CONFIG: race-shuffle
+      TARGETS: '//:coreth_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-coreth-shuffle:
+    desc: Run coreth/evm unit tests with Bazel (race off, shuffle on)
+    vars:
+      BAZEL_CONFIG: shuffle
+      TARGETS: '//:coreth_unit_tests'
+    cmd: *bazel_test_cmd
 
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary
@@ -109,17 +167,67 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
-  bazel-test-fast:
-    desc: Run unit tests with Bazel (no race, no shuffle - faster local iteration)
-    cmd: '{{.NIX_RUN}} bazelisk test --config=fast //...'
-
+  # Bazel unit-test shard tasks are intentionally limited to Go unit tests.
+  # Go-only flags such as `-test.shuffle` should fail loudly if a non-Go test
+  # target slips into any shard; fix shard membership rather than broadening
+  # flag compatibility. Keep `//:gazelle_test` out of the main shard.
+  # Despite the name, the main shard may also include tests for repo-owned
+  # Bazel patches on external dependencies.
   bazel-test-main:
-    desc: Run main module unit tests with Bazel (excludes graft modules)
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //... -- -//graft/...'
+    desc: Run the main Bazel unit-test shard (non-graft code plus patched-dependency checks; no race, no shuffle)
+    vars:
+      BAZEL_CONFIG: ''
+      TARGETS: '//:main_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-main-race:
+    desc: Run the main Bazel unit-test shard (non-graft code plus patched-dependency checks; race on, no shuffle)
+    vars:
+      BAZEL_CONFIG: race
+      TARGETS: '//:main_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-main-race-shuffle:
+    desc: Run the main Bazel unit-test shard (non-graft code plus patched-dependency checks; race on, shuffle on)
+    vars:
+      BAZEL_CONFIG: race-shuffle
+      TARGETS: '//:main_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-main-shuffle:
+    desc: Run the main Bazel unit-test shard (non-graft code plus patched-dependency checks; race off, shuffle on)
+    vars:
+      BAZEL_CONFIG: shuffle
+      TARGETS: '//:main_unit_tests'
+    cmd: *bazel_test_cmd
 
   bazel-test-subnet-evm:
-    desc: Run subnet-evm unit tests with Bazel
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh test //graft/subnet-evm/...'
+    desc: Run subnet-evm unit tests with Bazel (no race, no shuffle)
+    vars:
+      BAZEL_CONFIG: ''
+      TARGETS: '//:subnet_evm_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-subnet-evm-race:
+    desc: Run subnet-evm unit tests with Bazel (race on, no shuffle)
+    vars:
+      BAZEL_CONFIG: race
+      TARGETS: '//:subnet_evm_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-subnet-evm-race-shuffle:
+    desc: Run subnet-evm unit tests with Bazel (race on, shuffle on)
+    vars:
+      BAZEL_CONFIG: race-shuffle
+      TARGETS: '//:subnet_evm_unit_tests'
+    cmd: *bazel_test_cmd
+
+  bazel-test-subnet-evm-shuffle:
+    desc: Run subnet-evm unit tests with Bazel (race off, shuffle on)
+    vars:
+      BAZEL_CONFIG: shuffle
+      TARGETS: '//:subnet_evm_unit_tests'
+    cmd: *bazel_test_cmd
 
   build:
     desc: Builds avalanchego
@@ -186,15 +294,21 @@ tasks:
       - task: bazel-fmt
       - task: check-clean-branch
 
+  check-bazel-gazelle-generate:
+    desc: Check that generated BUILD files are up-to-date
+    cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
+
   check-bazel-generate-patches:
     desc: Checks that generated patches are up-to-date (requires a clean working tree)
     cmds:
       - task: bazel-generate-patches
       - task: check-clean-branch
 
-  check-bazel-gazelle-generate:
-    desc: Check that generated BUILD files are up-to-date
-    cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
+  check-bazel-generate-unit-test-suites:
+    desc: Checks that generated Bazel unit-test shard suites are up-to-date (requires a clean working tree)
+    cmds:
+      - task: bazel-generate-unit-test-suites
+      - task: check-clean-branch
 
   check-bazel-module-metadata:
     desc: Checks that Bazel module metadata is up-to-date (requires a clean working tree)
