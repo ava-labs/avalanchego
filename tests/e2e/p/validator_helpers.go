@@ -27,8 +27,7 @@ import (
 
 // autoRenewedValidatorFixture bundles the state shared by the auto-renewed validator specs.
 type autoRenewedValidatorFixture struct {
-	tc      *e2e.GinkgoTestContext
-	require *require.Assertions
+	tc *e2e.GinkgoTestContext
 
 	validatorNode       *tmpnet.Node
 	randomWalletNodeURI tmpnet.NodeURI
@@ -59,7 +58,6 @@ type autoRenewedValidatorFixture struct {
 // node mid-test.
 func newAutoRenewedValidatorFixture(
 	tc *e2e.GinkgoTestContext,
-	require *require.Assertions,
 	env *e2e.TestEnvironment,
 	fundingAmount uint64,
 ) *autoRenewedValidatorFixture {
@@ -82,7 +80,6 @@ func newAutoRenewedValidatorFixture(
 
 	f := &autoRenewedValidatorFixture{
 		tc:                  tc,
-		require:             require,
 		validatorNode:       node,
 		randomWalletNodeURI: walletNodeURI,
 		fundingPWallet:      fundingPWallet,
@@ -108,18 +105,18 @@ func (f *autoRenewedValidatorFixture) addValidatorAndCheckSupplyMint(
 	delegationShares uint32,
 	autoCompoundRewardShares uint32,
 	period time.Duration,
-) (ids.ID, uint64, uint64) {
+) (txID ids.ID, potentialReward uint64, supply uint64) {
 	pvmClient := platformvm.NewClient(f.randomWalletNodeURI.URI)
 	calculator := reward.NewCalculator(GetRewardConfig(f.tc, admin.NewClient(f.randomWalletNodeURI.URI)))
 
-	supplyBefore := currentSupply(f.tc, f.require, pvmClient)
+	supplyBefore := currentSupply(f.tc, pvmClient)
 
 	// A fresh wallet reflects the current UTXO set, including any stake
 	// returned by a previous exit of the fixture's validator.
 	wallet := e2e.NewWallet(f.tc, secp256k1fx.NewKeychain(f.validatorFundingKey), f.randomWalletNodeURI).P()
 
 	nodeID, nodePOP, err := info.NewClient(f.validatorNode.GetAccessibleURI()).GetNodeID(f.tc.DefaultContext())
-	f.require.NoError(err)
+	require.NoError(f.tc, err)
 
 	validationRewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -146,10 +143,10 @@ func (f *autoRenewedValidatorFixture) addValidatorAndCheckSupplyMint(
 		period,
 		f.tc.WithDefaultContext(),
 	)
-	f.require.NoError(err)
+	require.NoError(f.tc, err)
 
-	potentialReward := calculator.Calculate(period, weight, supplyBefore)
-	f.require.Equal(supplyBefore+potentialReward, currentSupply(f.tc, f.require, pvmClient))
+	potentialReward = calculator.Calculate(period, weight, supplyBefore)
+	require.Equal(f.tc, supplyBefore+potentialReward, currentSupply(f.tc, pvmClient))
 
 	return tx.ID(), potentialReward, supplyBefore
 }
@@ -174,7 +171,7 @@ func (f *autoRenewedValidatorFixture) setValidatorConfig(
 		period,
 		f.tc.WithDefaultContext(),
 	)
-	f.require.NoError(err)
+	require.NoError(f.tc, err)
 }
 
 // fundKey transfers amount from the pre-funded wallet to key.
@@ -194,7 +191,7 @@ func (f *autoRenewedValidatorFixture) fundKey(key *secp256k1.PrivateKey, amount 
 		},
 		f.tc.WithDefaultContext(),
 	)
-	f.require.NoError(err)
+	require.NoError(f.tc, err)
 }
 
 // addDelegator delegates weight to the fixture's validator until endTime,
@@ -204,7 +201,7 @@ func (f *autoRenewedValidatorFixture) addDelegator(
 	fundingKey, rewardKey *secp256k1.PrivateKey,
 	weight, endTime uint64,
 ) uint64 {
-	supplyBefore := currentSupply(f.tc, f.require, platformvm.NewClient(f.randomWalletNodeURI.URI))
+	supplyBefore := currentSupply(f.tc, platformvm.NewClient(f.randomWalletNodeURI.URI))
 
 	wallet := e2e.NewWallet(f.tc, secp256k1fx.NewKeychain(fundingKey), f.randomWalletNodeURI).P()
 
@@ -225,7 +222,7 @@ func (f *autoRenewedValidatorFixture) addDelegator(
 		rewardsOwner,
 		f.tc.WithDefaultContext(),
 	)
-	f.require.NoError(err)
+	require.NoError(f.tc, err)
 
 	return supplyBefore
 }
@@ -234,7 +231,6 @@ func (f *autoRenewedValidatorFixture) addDelegator(
 // network validator with nodeID, requiring that it exists.
 func currentValidator(
 	tc *e2e.GinkgoTestContext,
-	require *require.Assertions,
 	pvmClient *platformvm.Client,
 	nodeID ids.NodeID,
 ) platformvm.ClientPermissionlessValidator {
@@ -243,8 +239,8 @@ func currentValidator(
 		constants.PrimaryNetworkID,
 		[]ids.NodeID{nodeID},
 	)
-	require.NoError(err)
-	require.Len(validators, 1)
+	require.NoError(tc, err)
+	require.Len(tc, validators, 1)
 	return validators[0]
 }
 
@@ -252,7 +248,6 @@ func currentValidator(
 // active delegator and returns the delegator's actual staking period.
 func waitForOneActiveDelegator(
 	tc *e2e.GinkgoTestContext,
-	require *require.Assertions,
 	pvmClient *platformvm.Client,
 	nodeID ids.NodeID,
 ) time.Duration {
@@ -262,62 +257,45 @@ func waitForOneActiveDelegator(
 			constants.PrimaryNetworkID,
 			[]ids.NodeID{nodeID},
 		)
-		require.NoError(err)
+		require.NoError(tc, err)
 		return len(validators) == 1 && len(validators[0].Delegators) == 1
 	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "no active delegators")
 
-	validator := currentValidator(tc, require, pvmClient, nodeID)
-	require.Len(validator.Delegators, 1)
+	validator := currentValidator(tc, pvmClient, nodeID)
+	require.Len(tc, validator.Delegators, 1)
 	delegator := validator.Delegators[0]
 	return time.Duration(delegator.EndTime-delegator.StartTime) * time.Second
 }
 
 // requireValidatorRemoved waits until the validator with nodeID is no longer
 // in the current validator set.
-func requireValidatorRemoved(
-	tc *e2e.GinkgoTestContext,
-	require *require.Assertions,
-	pvmClient *platformvm.Client,
-	nodeID ids.NodeID,
-	msg string,
-) {
+func requireValidatorRemoved(tc *e2e.GinkgoTestContext, pvmClient *platformvm.Client, nodeID ids.NodeID, msg string) {
 	tc.Eventually(func() bool {
 		validators, err := pvmClient.GetCurrentValidators(
 			tc.DefaultContext(),
 			constants.PrimaryNetworkID,
 			[]ids.NodeID{nodeID},
 		)
-		require.NoError(err)
+		require.NoError(tc, err)
 		return len(validators) == 0
 	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, msg)
 }
 
-func waitForAutoRenewedCycleEnd(
-	tc *e2e.GinkgoTestContext,
-	require *require.Assertions,
-	pvmClient *platformvm.Client,
-	nodeID ids.NodeID,
-) {
-	validators, err := pvmClient.GetCurrentValidators(
-		tc.DefaultContext(),
-		constants.PrimaryNetworkID,
-		[]ids.NodeID{nodeID},
-	)
-	require.NoError(err)
-	require.Len(validators, 1)
-	initialStartTime := validators[0].StartTime
+func waitForAutoRenewedCycleEnd(tc *e2e.GinkgoTestContext, pvmClient *platformvm.Client, nodeID ids.NodeID) {
+	validator := currentValidator(tc, pvmClient, nodeID)
+	initialStartTime := validator.StartTime
 
 	tc.Eventually(func() bool {
-		validators, err = pvmClient.GetCurrentValidators(
+		validators, err := pvmClient.GetCurrentValidators(
 			tc.DefaultContext(),
 			constants.PrimaryNetworkID,
 			[]ids.NodeID{nodeID},
 		)
-		require.NoError(err)
+		require.NoError(tc, err)
 		if len(validators) == 0 {
 			return true
 		}
-		require.Len(validators, 1)
+		require.Len(tc, validators, 1)
 
 		// A renewal re-adds the validator with its start time set to the
 		// previous cycle's end time, so a start time change marks a new cycle start.

@@ -256,13 +256,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		// stopped fails its uptime check at end time and burns its (and its
 		// delegator's) potential rewards from the supply mid-spec.
 		tc.By("waiting for the added validator and delegator to be settled", func() {
-			requireValidatorRemoved(
-				tc,
-				require,
-				platformvm.NewClient(nodeURI.URI),
-				nodeID,
-				"validator should have been settled at its end time",
-			)
+			requireValidatorRemoved(tc, platformvm.NewClient(nodeURI.URI), nodeID, "validator should have been settled at its end time")
 		})
 
 		tc.By("stopping validator node to free up resources for a bootstrap check")

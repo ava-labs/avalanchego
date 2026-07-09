@@ -18,10 +18,7 @@ import (
 )
 
 var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", func() {
-	var (
-		tc      = e2e.NewTestContext()
-		require = require.New(tc)
-	)
+	tc := e2e.NewTestContext()
 
 	ginkgo.It("should reward eligible stakers and not reward ineligible ones", func() {
 		const (
@@ -40,14 +37,9 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 
 		env := e2e.GetEnv(tc)
 
-		requireHeliconActivated(tc, require, info.NewClient(env.GetRandomNodeURI().URI))
+		requireHeliconActivated(tc, info.NewClient(env.GetRandomNodeURI().URI))
 
-		f := newAutoRenewedValidatorFixture(
-			tc,
-			require,
-			env,
-			validatorWeight+gasAmount, // funding amount
-		)
+		f := newAutoRenewedValidatorFixture(tc, env, validatorWeight+gasAmount)
 
 		pvmClient := platformvm.NewClient(f.randomWalletNodeURI.URI)
 		rewardsCalculator := reward.NewCalculator(GetRewardConfig(f.tc, admin.NewClient(f.randomWalletNodeURI.URI)))
@@ -74,7 +66,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 				delegator1FundingKey,
 				delegator1RewardKey,
 				delegator1Weight,
-				currentValidator(tc, require, pvmClient, f.validatorNode.NodeID).EndTime,
+				currentValidator(tc, pvmClient, f.validatorNode.NodeID).EndTime,
 			)
 		})
 
@@ -83,21 +75,21 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			delegator1PotentialRewards uint64
 		)
 		tc.By("verifying delegator1 is active and checking the supply mint", func() {
-			supplyBeforeSecondCycle = currentSupply(tc, require, pvmClient)
-			delegator1StakingDuration := waitForOneActiveDelegator(tc, require, pvmClient, f.validatorNode.NodeID)
+			supplyBeforeSecondCycle = currentSupply(tc, pvmClient)
+			delegator1StakingDuration := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
 			delegator1PotentialRewards = rewardsCalculator.Calculate(delegator1StakingDuration, delegator1Weight, supplyBeforeDelegator1)
-			require.Equal(supplyBeforeDelegator1+delegator1PotentialRewards, supplyBeforeSecondCycle)
+			require.Equal(tc, supplyBeforeDelegator1+delegator1PotentialRewards, supplyBeforeSecondCycle)
 		})
 
 		tc.By("retrieving delegator1 wallet balance before delegation ends")
-		delegator1BalanceBeforeExit := balanceOf(tc, require, f.randomWalletNodeURI, delegator1FundingKey)
+		delegator1BalanceBeforeExit := balanceOf(tc, f.randomWalletNodeURI, delegator1FundingKey)
 
 		tc.By("waiting for the first staking cycle to complete", func() {
-			waitForAutoRenewedCycleEnd(tc, require, pvmClient, f.validatorNode.NodeID)
+			waitForAutoRenewedCycleEnd(tc, pvmClient, f.validatorNode.NodeID)
 		})
 
 		tc.By("stopping the validator node to fail uptime check in the second cycle", func() {
-			require.NoError(f.validatorNode.Stop(tc.DefaultContext()))
+			require.NoError(tc, f.validatorNode.Stop(tc.DefaultContext()))
 		})
 
 		var (
@@ -113,19 +105,19 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			restakingValidationRewards, withdrawnValidationRewards = reward.Split(validatorFirstCyclePotentialRewards, autoCompoundRewardShares)
 			restakingDelegateeRewards, withdrawnDelegateeRewards = reward.Split(delegateeReward, autoCompoundRewardShares)
 
-			require.Equal(withdrawnValidationRewards, balanceOf(tc, require, f.randomWalletNodeURI, f.validationRewardKey))
-			require.Equal(withdrawnDelegateeRewards, balanceOf(tc, require, f.randomWalletNodeURI, f.delegationRewardKey))
+			require.Equal(tc, withdrawnValidationRewards, balanceOf(tc, f.randomWalletNodeURI, f.validationRewardKey))
+			require.Equal(tc, withdrawnDelegateeRewards, balanceOf(tc, f.randomWalletNodeURI, f.delegationRewardKey))
 
 			expectedDelegator1Balance := delegator1Reward
-			require.Equal(expectedDelegator1Balance, balanceOf(tc, require, f.randomWalletNodeURI, delegator1RewardKey))
-			require.Zero(balanceOf(tc, require, f.randomWalletNodeURI, delegator2RewardKey)) // delegator2 not active yet
+			require.Equal(tc, expectedDelegator1Balance, balanceOf(tc, f.randomWalletNodeURI, delegator1RewardKey))
+			require.Zero(tc, balanceOf(tc, f.randomWalletNodeURI, delegator2RewardKey)) // delegator2 not active yet
 
 			expectedValidatorWeight := validatorWeight + restakingValidationRewards + restakingDelegateeRewards
-			require.Equal(expectedValidatorWeight, currentValidator(tc, require, pvmClient, f.validatorNode.NodeID).Weight)
+			require.Equal(tc, expectedValidatorWeight, currentValidator(tc, pvmClient, f.validatorNode.NodeID).Weight)
 		})
 
 		tc.By("checking delegator1 stake was returned", func() {
-			require.Equal(delegator1BalanceBeforeExit+delegator1Weight, balanceOf(tc, require, f.randomWalletNodeURI, delegator1FundingKey))
+			require.Equal(tc, delegator1BalanceBeforeExit+delegator1Weight, balanceOf(tc, f.randomWalletNodeURI, delegator1FundingKey))
 		})
 
 		var validatorSecondCyclePotentialRewards uint64
@@ -137,7 +129,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 				expectedValidatorWeight,
 				supplyBeforeSecondCycle,
 			)
-			require.Equal(supplyBeforeSecondCycle+validatorSecondCyclePotentialRewards, currentSupply(tc, require, pvmClient))
+			require.Equal(tc, supplyBeforeSecondCycle+validatorSecondCyclePotentialRewards, currentSupply(tc, pvmClient))
 		})
 
 		var supplyBeforeDelegator2 uint64
@@ -147,7 +139,7 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 				delegator2FundingKey,
 				delegator2RewardKey,
 				delegator2Weight,
-				currentValidator(tc, require, pvmClient, f.validatorNode.NodeID).EndTime,
+				currentValidator(tc, pvmClient, f.validatorNode.NodeID).EndTime,
 			)
 		})
 
@@ -156,46 +148,46 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 			supplyAfterDelegator2      uint64
 		)
 		tc.By("verifying delegator2 is active and checking the supply mint", func() {
-			supplyAfterDelegator2 = currentSupply(tc, require, pvmClient)
-			actualDelegator2Period := waitForOneActiveDelegator(tc, require, pvmClient, f.validatorNode.NodeID)
+			supplyAfterDelegator2 = currentSupply(tc, pvmClient)
+			actualDelegator2Period := waitForOneActiveDelegator(tc, pvmClient, f.validatorNode.NodeID)
 			delegator2PotentialRewards = rewardsCalculator.Calculate(actualDelegator2Period, delegator2Weight, supplyBeforeDelegator2)
-			require.Equal(supplyBeforeDelegator2+delegator2PotentialRewards, supplyAfterDelegator2)
+			require.Equal(tc, supplyBeforeDelegator2+delegator2PotentialRewards, supplyAfterDelegator2)
 		})
 
 		tc.By("retrieving delegator2 wallet balance before delegation ends")
-		delegator2BalanceBeforeExit := balanceOf(tc, require, f.randomWalletNodeURI, delegator2FundingKey)
+		delegator2BalanceBeforeExit := balanceOf(tc, f.randomWalletNodeURI, delegator2FundingKey)
 
 		tc.By("retrieving wallet balance before validator exits")
-		fundedKeyBalanceBeforeExit := balanceOf(tc, require, f.randomWalletNodeURI, f.validatorFundingKey)
+		fundedKeyBalanceBeforeExit := balanceOf(tc, f.randomWalletNodeURI, f.validatorFundingKey)
 
 		tc.By("waiting for the second staking cycle to complete", func() {
-			waitForAutoRenewedCycleEnd(tc, require, pvmClient, f.validatorNode.NodeID)
+			waitForAutoRenewedCycleEnd(tc, pvmClient, f.validatorNode.NodeID)
 		})
 
 		tc.By("verifying the validator is no longer in the current set due to uptime failure", func() {
-			requireValidatorRemoved(tc, require, pvmClient, f.validatorNode.NodeID, "validator should have been removed due to uptime failure")
+			requireValidatorRemoved(tc, pvmClient, f.validatorNode.NodeID, "validator should have been removed due to uptime failure")
 		})
 
 		tc.By("checking unearned potential rewards were burned on the failed cycle", func() {
 			// Neither the validator nor delegator2 earned their second-cycle
 			// potential rewards, so both optimistic supply mints are reverted.
 			expectedSupply := supplyAfterDelegator2 - validatorSecondCyclePotentialRewards - delegator2PotentialRewards
-			require.Equal(expectedSupply, currentSupply(tc, require, pvmClient))
+			require.Equal(tc, expectedSupply, currentSupply(tc, pvmClient))
 		})
 
 		tc.By("checking reward balances after second cycle", func() {
-			require.Equal(restakingValidationRewards+withdrawnValidationRewards, balanceOf(tc, require, f.randomWalletNodeURI, f.validationRewardKey))
-			require.Equal(restakingDelegateeRewards+withdrawnDelegateeRewards, balanceOf(tc, require, f.randomWalletNodeURI, f.delegationRewardKey))
-			require.Equal(delegator1Reward, balanceOf(tc, require, f.randomWalletNodeURI, delegator1RewardKey))
-			require.Zero(balanceOf(tc, require, f.randomWalletNodeURI, delegator2RewardKey))
+			require.Equal(tc, restakingValidationRewards+withdrawnValidationRewards, balanceOf(tc, f.randomWalletNodeURI, f.validationRewardKey))
+			require.Equal(tc, restakingDelegateeRewards+withdrawnDelegateeRewards, balanceOf(tc, f.randomWalletNodeURI, f.delegationRewardKey))
+			require.Equal(tc, delegator1Reward, balanceOf(tc, f.randomWalletNodeURI, delegator1RewardKey))
+			require.Zero(tc, balanceOf(tc, f.randomWalletNodeURI, delegator2RewardKey))
 		})
 
 		tc.By("checking delegator2 stake was returned", func() {
-			require.Equal(delegator2BalanceBeforeExit+delegator2Weight, balanceOf(tc, require, f.randomWalletNodeURI, delegator2FundingKey))
+			require.Equal(tc, delegator2BalanceBeforeExit+delegator2Weight, balanceOf(tc, f.randomWalletNodeURI, delegator2FundingKey))
 		})
 
 		tc.By("checking stake was returned", func() {
-			require.Equal(fundedKeyBalanceBeforeExit+validatorWeight, balanceOf(tc, require, f.randomWalletNodeURI, f.validatorFundingKey))
+			require.Equal(tc, fundedKeyBalanceBeforeExit+validatorWeight, balanceOf(tc, f.randomWalletNodeURI, f.validatorFundingKey))
 		})
 
 		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
