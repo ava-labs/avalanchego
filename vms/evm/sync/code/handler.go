@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 
@@ -21,26 +22,24 @@ import (
 // MaxHashesPerRequest caps the hashes per request.
 const MaxHashesPerRequest = 5
 
-type (
-	// Handler serves [syncpb.GetCodeRequest] over [p2p.EVMCodeRequestHandlerID].
-	Handler = handlers.Handler[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
-	// Responder serves code-by-hash requests.
-	Responder = handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse]
-)
-
-// NewHandler wires resp into a [Handler].
-func NewHandler(log logging.Logger, resp Responder) *Handler {
-	return handlers.NewHandler(log, func() *syncpb.GetCodeRequest { return &syncpb.GetCodeRequest{} }, resp)
+// RegisterHandler serves code-by-hash requests at [p2p.EVMCodeRequestHandlerID] on net.
+func RegisterHandler(net *p2p.Network, log logging.Logger, codeReader ethdb.KeyValueReader) error {
+	h := handlers.NewHandler(
+		log,
+		func() *syncpb.GetCodeRequest { return &syncpb.GetCodeRequest{} },
+		newResponder(codeReader),
+	)
+	return net.AddHandler(p2p.EVMCodeRequestHandlerID, h)
 }
 
-var _ Responder = (*responder)(nil)
+var _ handlers.Responder[*syncpb.GetCodeRequest, *syncpb.GetCodeResponse] = (*responder)(nil)
 
 // responder reads code by hash via [rawdb.ReadCode].
 type responder struct {
 	codeReader ethdb.KeyValueReader
 }
 
-func NewResponder(codeReader ethdb.KeyValueReader) Responder {
+func newResponder(codeReader ethdb.KeyValueReader) *responder {
 	return &responder{codeReader: codeReader}
 }
 
