@@ -2,13 +2,22 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "synctest",
-    srcs = ["proto.go"],
+    srcs = [
+        "network.go",
+        "proto.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/sync/synctest",
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
-        "//proto/pb/sync",
+        "//network/p2p",
+        "//snow/engine/common",
+        "//snow/engine/enginetest",
+        "//utils/logging",
+        "//utils/set",
+        "//version",
         "//vms/evm/sync/handlers",
+        "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
     ],
