@@ -87,18 +87,11 @@ func TestSyncer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			nodeID := ids.GenerateTestNodeID()
 
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, tt.numKeys)
-
-			net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
 			handler, requests := countingLeafHandler(trieDB)
-			require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, handler))
-
-			target := rawdb.NewMemoryDatabase()
-			syncer, err := NewSyncer(NewClient(net, tracker), target, root, common.Hash{})
-			require.NoError(t, err)
+			syncer, target := newSyncer(t, ctx, root, handler)
 			require.NoError(t, syncer.Sync(ctx))
 
 			require.Equal(t, tt.wantRequests, requests.Load())
@@ -131,12 +124,10 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	nodeID := ids.GenerateTestNodeID()
 
 	trieDB := synctest.NewTrieDB()
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
 
-	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
 	// Every response is tampered. Cancel after a few retries, no wall-clock wait.
 	tampering := flakyLeafHandler(trieDB, -1)
 	var attempts atomic.Int32
@@ -148,11 +139,7 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 			return tampering.AppRequest(c, n, d, b)
 		},
 	}
-	require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, handler))
-
-	target := rawdb.NewMemoryDatabase()
-	syncer, err := NewSyncer(NewClient(net, tracker), target, root, common.Hash{})
-	require.NoError(t, err)
+	syncer, target := newSyncer(t, ctx, root, handler)
 	require.ErrorIs(t, syncer.Sync(ctx), context.Canceled, "tampered leaves must never be accepted")
 
 	// Nothing accepted, target stays empty.
@@ -164,21 +151,27 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 func TestSyncer_RecoversAfterBadResponses(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	nodeID := ids.GenerateTestNodeID()
 
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
 
-	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
 	// Corrupt the first two responses, then serve correctly.
-	require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, flakyLeafHandler(trieDB, 2)))
-
-	target := rawdb.NewMemoryDatabase()
-	syncer, err := NewSyncer(NewClient(net, tracker), target, root, common.Hash{})
-	require.NoError(t, err)
+	syncer, target := newSyncer(t, ctx, root, flakyLeafHandler(trieDB, 2))
 	require.NoError(t, syncer.Sync(ctx), "the re-request loop must recover after transient bad responses")
 
 	requireReconstructed(t, target, root, keys, vals)
+}
+
+// newSyncer wires a loopback network serving handler and returns a syncer for the
+// trie at root together with its target db.
+func newSyncer(t *testing.T, ctx context.Context, root common.Hash, handler p2p.Handler) (*Syncer, ethdb.Database) {
+	t.Helper()
+	net, tracker := synctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+	require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, handler))
+	target := rawdb.NewMemoryDatabase()
+	syncer, err := NewSyncer(NewClient(net, tracker), target, root, common.Hash{})
+	require.NoError(t, err)
+	return syncer, target
 }
 
 // requireReconstructed asserts every pair is queryable through the trie rebuilt
