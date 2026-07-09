@@ -57,6 +57,7 @@ tasks:
     desc: Regenerate Bazel metadata for this source tree
     cmds:
       - task: bazel-gazelle-generate
+      - task: bazel-generate-unit-test-suites
       - task: bazel-fmt
       - task: bazel-generate-patches
       - task: bazel-sync-module-metadata
@@ -64,6 +65,10 @@ tasks:
   bazel-generate-patches:
     desc: Regenerate .patch files from BUILD files in .bazel/patches/build_files/
     cmd: '{{.NIX_RUN}} ./scripts/generate_bazel_patches.sh'
+
+  bazel-generate-unit-test-suites:
+    desc: Regenerate Bazel unit-test shard suite metadata
+    cmd: '{{.NIX_RUN}} bazelisk run //tools/generate-bazel-unit-test-suites'
 
   bazel-gazelle-generate:
     desc: Regenerate BUILD files with Gazelle (all modules)
@@ -195,6 +200,12 @@ tasks:
   check-bazel-gazelle-generate:
     desc: Check that generated BUILD files are up-to-date
     cmd: '{{.NIX_RUN}} bazelisk test //:gazelle_test'
+
+  check-bazel-generate-unit-test-suites:
+    desc: Checks that generated Bazel unit-test shard suites are up-to-date (requires a clean working tree)
+    cmds:
+      - task: bazel-generate-unit-test-suites
+      - task: check-clean-branch
 
   check-bazel-module-metadata:
     desc: Checks that Bazel module metadata is up-to-date (requires a clean working tree)

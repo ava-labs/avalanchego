@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "generate_bazel_unit_test_suites_lib",
+    srcs = [
+        "generator.go",
+        "main.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tools/generate-bazel-unit-test-suites",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "generate-bazel-unit-test-suites",
+    embed = [":generate_bazel_unit_test_suites_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "generate_bazel_unit_test_suites_test",
+    srcs = ["generator_test.go"],
+    embed = [":generate_bazel_unit_test_suites_lib"],
+)
