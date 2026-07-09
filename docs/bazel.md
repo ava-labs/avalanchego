@@ -25,8 +25,18 @@ task bazel-build
 # Build with optimizations
 task bazel-build-opt
 
-# Run unit tests
+# Run unit tests in the fastest normal local mode
+# (`race` off means no extra concurrency-bug checking;
+# `shuffle` off means tests keep their normal order)
 task bazel-test
+
+# Run unit tests in random order to catch order-dependent failures
+# (`shuffle` on, `race` off)
+task bazel-test-shuffle
+
+# Run the strongest routine unit-test validation
+# (`race` on checks for concurrency bugs; `shuffle` on randomizes test order)
+task bazel-test-race-shuffle
 
 # Update Bazel metadata after changing Go imports or Bazel module deps
 task bazel-generate-metadata
@@ -82,25 +92,47 @@ When checking or updating a version, use those files as the source of truth.
 
 ### Repository tools and external-dependency fetches
 
-Bazel CI uses two separate Gazelle `go_deps` extension instances:
+This setup exists so CI can prepare the dependencies it needs in a predictable
+way, without accidentally depending on one developer's local checkout details.
 
-- the main `go_deps` instance reads `go.work` for the workspace modules and the
-  external repos they import
-- the isolated `tool_go_deps` instance reads `tools/external/go.mod` for
-  repo-owned helper tools that CI may need to launch before other Bazel tasks
+In plain terms, CI has two different jobs to do before the real Bazel work
+starts:
+
+1. fetch the repo's own helper tools that Bazel needs early
+2. fetch the external dependencies that later build and test jobs are expected
+   to use
+
+The repo keeps those inputs separate on purpose. That lets CI warm the caches
+it needs without scanning developer-specific files or local workspace layout.
+
+For most contributors, the practical rule is simple: if you change how CI
+starts Bazel tasks or which tests and builds CI runs, make sure the setup step
+can still fetch the tools and downloaded code CI needs without depending on
+anything that only exists in your personal checkout.
+
+Under the hood, the repo uses two separate Bazel dependency setups.
+`go_deps` is Bazel's way to turn Go module metadata into downloaded code that
+Bazel can build against.
+
+- the main `go_deps` setup reads `go.work` for the repo's Go modules and the
+  third-party code they import
+- the isolated `tool_go_deps` setup reads `tools/external/go.mod` for a small
+  set of repo-owned helper tools that CI may need before other Bazel tasks
 
 That split is intentional. The CI setup path needs to fetch the Bazel-owned
-`//tools/external:task` bootstrap target and warm external dependency caches
-without also depending on whatever local workspace state happens to exist in a
-particular checkout.
+`//tools/external:task` tool CI uses to start repo tasks and warm dependency
+caches without also depending on whatever local workspace state happens to
+exist in a particular checkout.
 
-For the same reason, `MODULE.bazel` intentionally omits `use_repo` bindings for
-workspace modules such as `avalanchego` and `graft/*`. Those modules are built
-from the local source tree, so binding their generated local-path repos is not
-needed for normal builds. Omitting them also keeps broad fetches such as
-`bazel fetch //...` from traversing personal workspace state like local
-symlinks or repo-adjacent directories while trying to prepare external
-repositories for CI.
+For the same reason, `MODULE.bazel` intentionally avoids extra wiring for
+local modules such as `avalanchego` and `graft/*`. The plain-language goal is
+simple: when CI fetches dependencies, it should stay focused on shared external
+code and repo-owned tools, not wander into developer-local details such as
+symlinks or nearby checkout directories.
+
+For maintainers who need the Bazel-specific detail: this means `MODULE.bazel`
+does not add extra `use_repo` bindings for modules Bazel is already building
+directly from this checkout.
 
 If future Bazel changes appear to make this split unnecessary, treat that as a
 behavioral change to validate rather than a cleanup to apply mechanically. The
@@ -112,12 +144,15 @@ machine-specific workspace state.
 
 | Factor | Bazel 7 | Bazel 8 |
 |--------|---------|---------|
-| bzlmod | Optional | Default |
+| built-in module system (`bzlmod`) | Optional | Default |
 | LTS status | Older | Current |
 | WORKSPACE | Default | Deprecated (still works) |
 
-Bazel 8 is the current LTS with native bzlmod support. bzlmod replaces
-the legacy use of WORKSPACE files.
+Bazel 8 is the current long-term support release. It uses Bazel's newer
+built-in module and dependency system, `bzlmod`, by default. In practice,
+that means newer Bazel setups are centered on `MODULE.bazel` instead of the
+older `WORKSPACE`-based dependency setup, though `WORKSPACE` still works for
+now.
 
 ### Multi-Module Structure
 
@@ -149,6 +184,10 @@ gazelle prefix directives.
 | `.bazel/patches/build_files/` | Source BUILD files for generated patches | **No** |
 | `scripts/generate_bazel_patches.sh` | Generates `.patch` files from `build_files/` | **No** |
 | `.bazel/defs.bzl` | Custom test macros for graft module timeouts | **No** |
+| `.bazel/test_shards.json` | Checked-in source of truth for the named unit-test groups used by Bazel CI | **No** |
+| `.bazel/generated_test_suites.bzl` | Generated Bazel test target lists expanded from `test_shards.json` | Yes (regenerated) |
+| `.bazel/test_suites.bzl` | Macro that declares the root-level `unit_tests` and per-group `test_suite` targets | **No** |
+| `tools/generate-bazel-unit-test-suites/` | Bazel-run generator for `.bazel/generated_test_suites.bzl` from `test_shards.json` | **No** |
 | `scripts/bazel_workspace_status.sh` | Git commit stamping for releases | **No** |
 
 ### BUILD.bazel Files with Custom Content
@@ -343,10 +382,11 @@ boundaries.
 
 **Solution:** Sandbox relaxation via `tags = ["no-sandbox"]` on the
 bls12-381 `fp` and `fr` targets, allowing the Go assembler to resolve
-relative includes from the full source tree in the execroot. Only
-bls12-381 is patched since it's the only curve in the dependency graph.
-This is simpler than duplicating assembly files or providing custom
-BUILD files for the entire module.
+relative includes from the full source tree in the execroot (the temporary
+build working tree Bazel creates for an action). Only bls12-381 is patched
+since it's the only curve in the dependency graph. This is simpler than
+duplicating assembly files or providing custom BUILD files for the entire
+module.
 See [rules_go#3636](https://github.com/bazel-contrib/rules_go/issues/3636)).
 ```python
 go_deps.module_override(
@@ -396,8 +436,76 @@ bazel build //...
 
 ### Testing
 
-By default, `bazel test` matches `scripts/build_test.sh` behavior,
-with a few exceptions:
+This repository exposes multiple test entrypoints, and they do not all use the
+same defaults.
+
+For readers who do not already know the Go/Bazel test flags:
+- **race** means Go's race detector is enabled. It helps catch concurrency bugs,
+  but it makes tests slower.
+- **shuffle** means Go runs tests in random order. It helps catch hidden
+  dependencies between tests.
+- a **shard** is just one named subset of the full unit-test suite that CI can
+  run separately.
+
+- `task bazel-test` runs `//:unit_tests` in the default Bazel mode:
+  race off, shuffle off.
+- `task bazel-test-shuffle` runs `//:unit_tests` with race off, shuffle on.
+- `scripts/build_test.sh` uses race on, shuffle on.
+- The reusable GitHub Actions Bazel workflow runs its unit-test jobs with the
+  `race-shuffle` mode.
+
+The default Bazel entrypoints favor cheaper local iteration. The non-Bazel
+unit-test path and Bazel CI unit-test jobs use stronger validation modes.
+
+Root-level Bazel test suites provide named targets for the CI unit-test groups:
+
+- `//:main_unit_tests` - the main shard: non-`graft/` tests plus repo-owned
+  patched-dependency checks
+- `//:coreth_unit_tests` - the combined Coreth and EVM graft-module tests
+- `//:subnet_evm_unit_tests` - the Subnet-EVM graft-module tests
+
+The checked-in definitions for those groups live in `.bazel/test_shards.json`.
+Most new Go unit tests do not require any edit to that file; they are picked up
+automatically by the existing queries. Edit `test_shards.json` only when you
+want to change which test group a test belongs to, add or remove a specific
+thing to leave out, or create another named test group. After changing that
+file, run `task bazel-generate-unit-test-suites` to refresh
+`.bazel/generated_test_suites.bzl`.
+
+Use `//:unit_tests` to run all generated unit-test shards. This does not mean
+every test target in the repository: manual tests and metadata checks such as
+`//:gazelle_test` stay outside this target.
+
+`task bazel-test`, `task bazel-test-race`, `task bazel-test-shuffle`, and
+`task bazel-test-race-shuffle` run `//:unit_tests`. The `task
+bazel-test-main*`, `task bazel-test-coreth*`, and `task
+bazel-test-subnet-evm*` commands run the shard suite targets directly, so
+local Task execution and CI use the same shard definitions.
+
+The main shard is the unit-test group for code outside `graft/`. It mostly
+contains Go unit tests from the main AvalancheGo module. It can also include
+tests for external dependencies that AvalancheGo patches locally under
+`.bazel/patches`. AvalancheGo does not own those upstream packages, but it does
+own the local Bazel patches, so CI runs those tests to make sure the patches
+still work.
+
+These Bazel unit-test groups are intended to run Go tests only.
+
+The maintainer rules are:
+
+- keep non-Go tests out of these shard definitions
+- keep `manual` tests out of these shard definitions
+- keep metadata checks such as `//:gazelle_test` out of these shard definitions
+- if a shard accidentally picks up an incompatible target, fix the shard
+  definition rather than broadening the test flags
+
+This matters because CI passes Go-specific flags such as `-test.shuffle` to
+these shard suites on purpose. Suite generation also enforces that policy:
+`//:gazelle_test` is explicitly excluded, generation fails if any unit-test
+query selects a non-`go_test` target, and `manual`-tagged tests are filtered
+out when the generated suites are written.
+
+Other behavior still roughly aligns:
 
 - The script passes `-tags test` to `go test`; currently there are no
   `//go:build test` files in this repo, so it has no effect.
@@ -406,8 +514,19 @@ with a few exceptions:
   out of `bazel test //...`.
 
 ```bash
-# Run all unit tests (shuffle enabled, race on)
-task bazel-test                    # or: bazel test //...
+# Run all generated unit-test shards in the default Bazel mode
+# (no race, no shuffle)
+task bazel-test                   # or: bazel test //:unit_tests
+
+# Run all generated unit-test shards with stronger validation
+bazel test --config=race-shuffle //:unit_tests
+
+# Run the generated main-module unit-test shard
+bazel test --config=race-shuffle //:main_unit_tests
+
+# Run the generated graft-module unit-test shards
+bazel test --config=race-shuffle //:coreth_unit_tests
+bazel test --config=race-shuffle //:subnet_evm_unit_tests
 
 # Run tests for a specific package
 bazel test //utils/...
@@ -415,11 +534,17 @@ bazel test //utils/...
 # Run specific test functions (target:test_name + filter)
 bazel test //utils:set_test --test_filter=TestSet_Add
 
-# Fast local iteration (no race, no shuffle)
-task bazel-test-fast               # or: bazel test --config=fast //...
+# Race detection without shuffle
+task bazel-test-race              # or: bazel test --config=race //:unit_tests
+
+# Shuffle without race detection
+task bazel-test-shuffle           # or: bazel test --config=shuffle //:unit_tests
 
 # Collect coverage
 bazel coverage //...
+
+# Race detection with shuffle enabled
+task bazel-test-race-shuffle      # or: bazel test --config=race-shuffle //:unit_tests
 
 # Run E2E tests (requires built binary)
 task bazel-test-e2e
@@ -427,22 +552,26 @@ task bazel-test-e2e
 
 #### Test Options
 
-| Option | Default | Toggle with |
-|--------|---------|-------------|
-| Race detection | ON | `--config=norace` (disable) |
-| Shuffle | ON | `--config=noshuffle` (disable) |
-| Fast mode | - | `--config=fast` (no shuffle, no race) |
+| Public mode | Behavior | Bazel config | Typical use |
+|-------------|----------|--------------|-------------|
+| default (`bazel-test`) | race off, shuffle off | Bazel default | fastest normal local Bazel iteration |
+| `race` | race on, shuffle off | `--config=race` | stronger local validation without order randomization |
+| `race-shuffle` | race on, shuffle on | `--config=race-shuffle` | strongest local validation; also used by Bazel CI unit-test jobs |
+| `shuffle` | race off, shuffle on | `--config=shuffle` | order-randomization checks without race overhead |
 
 Examples:
 ```bash
-# Disable race detection
-bazel test --config=norace //...
+# Default repo task mode (no shuffle, no race)
+task bazel-test                   # or: bazel test //:unit_tests
 
-# Disable shuffle only
-bazel test --config=noshuffle //...
+# Race detection without shuffle
+task bazel-test-race              # or: bazel test --config=race //:unit_tests
 
-# Fast mode (no shuffle, no race)
-bazel test --config=fast //...
+# Shuffle without race detection
+task bazel-test-shuffle           # or: bazel test --config=shuffle //:unit_tests
+
+# Race detection with shuffle enabled
+task bazel-test-race-shuffle      # or: bazel test --config=race-shuffle //:unit_tests
 ```
 
 #### Test Timeouts
@@ -465,8 +594,8 @@ category (120s). See Custom Test Macros for how this is wired up.
 
 Tests that are not unit tests (e2e tests, integration tests, load
 tests) must have `tags = ["manual"]` in their BUILD.bazel file. This
-excludes them from `bazel test //...` which should only run unit
-tests.
+keeps them out of broad commands such as `bazel test //...` unless they are
+named explicitly. For the repo's unit-test-only entrypoint, use `//:unit_tests`.
 
 This roughly mirrors the behavior of `scripts/build_test.sh`, which excludes these directories via grep:
 ```bash
@@ -504,6 +633,9 @@ go_test(
 # Regenerate Bazel metadata
 task bazel-generate-metadata
 
+# Regenerate only the unit-test shard suite metadata
+task bazel-generate-unit-test-suites
+
 # Update MODULE.bazel use_repo calls
 task bazel-mod-tidy               # or: bazel mod tidy
 
@@ -519,6 +651,19 @@ task bazel-clean-all              # or: bazel clean --expunge
 # CI/local: verify Bazel metadata is current
 task bazel-check-metadata
 ```
+
+The checked-in definitions for these unit-test groups live in
+`.bazel/test_shards.json`. Most new Go unit tests are picked up automatically
+by the existing queries, so you usually do not need to edit that file. Change
+it when you are changing which test group a test belongs to, adding or
+removing a specific thing to leave out, or defining another named test group.
+
+The `bazel-generate-unit-test-suites` task expands those definitions into the
+generated `.bazel/generated_test_suites.bzl` file consumed by the root
+`BUILD.bazel`. Generation filters out targets tagged `manual` so the generated
+suites behave the same way as `bazel test //...` for those tests, even though
+the generated suites list test labels explicitly. It also validates that every
+unit-test group only selects `go_test` targets.
 
 As part of `bazel-check-metadata`, package-local `BUILD.bazel` files are
 expected to define at most one `go_library` rule. Multiple
@@ -594,7 +739,7 @@ therefore enables both:
 ### Cache key
 
 The GitHub Actions cache key is:
-`bazel-repo-${runner.os}-${runner.arch}-${hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh')}`
+`bazel-repo-${runner.os}-${runner.arch}-${hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh', '.bazel/generated_test_suites.bzl')}`
 with a same-platform restore prefix of
 `bazel-repo-${runner.os}-${runner.arch}-`.
 
@@ -605,15 +750,28 @@ That split is intentional:
   dependency set changes
 - `scripts/bazel_ci_dependency_list.sh` invalidates the cache when the
   checked-in Bazel CI target patterns used by setup change
+- `.bazel/generated_test_suites.bzl` invalidates the cache when the generated
+  unit-test shard contents change; CI setup fetches dependencies for the shard
+  suite targets, and this file records which tests each shard contains
 - the broader same-platform restore key still gives a useful warm start
   because these caches store downloaded dependency data, not per-run
   build outputs
 
 ### Checked-in list of Bazel CI target patterns used to prepare the build dependency cache
 
+This section describes the small checked-in list that tells CI which Bazel
+builds or test suites it should prepare ahead of time.
+
+Before the real Bazel jobs start, CI does a prep step that warms the shared
+download caches for the exact Bazel targets the workflow plans to use later.
+
 This setup is similar in spirit to `actions/setup-go`: before the later Bazel
 CI jobs run, prepare cache state for the build dependencies they are expected
 to need so those jobs do not each discover missing dependencies on their own.
+
+Here, a Bazel "target pattern" just means the Bazel label or label expression
+that a CI job asks Bazel to build or test, such as `//main:avalanchego` or
+`//:main_unit_tests`.
 
 The setup action first restores any previously saved dependency data,
 configures Bazel to use it, and fetches the Bazel-owned
@@ -629,17 +787,32 @@ That checked-in list names both:
 - the Bazel target patterns whose build dependencies the later CI jobs are
   expected to need
 
+The unit-test entries in that list are the shard suite targets. The generated
+file `.bazel/generated_test_suites.bzl` records which tests each shard
+contains. It is part of the cache key so changing a shard's tests causes setup
+to refresh and save the dependency cache before the later test jobs run.
+
 The list should cover what `bazel-ci.yml` actually runs, rather than trying to
 fetch everything Bazel could possibly reach. This avoids missing dependencies
 needed by the real CI jobs while also avoiding broader fetches that download
 unrelated repos and toolchains.
 
-A related design constraint is that this setup path must stay focused on
-external dependencies, not local workspace-module discovery. The isolated
-`tool_go_deps` extension and the omission of workspace-module `use_repo`
-bindings in `MODULE.bazel` are part of the same design: they let the setup job
-fetch Bazel-owned repo tools and warm caches for later jobs without making
-`bazel fetch` walk machine-specific workspace state.
+Another important rule is that this setup path should fetch shared external
+inputs for CI, not inspect developer-specific files or machine-specific repo
+layout. In practice, CI should warm the caches it needs without depending on
+whatever extra directories, symlinks, or local modules happen to exist in one
+developer's checkout.
+
+Two implementation choices preserve that behavior. First, CI uses a separate
+`tool_go_deps` definition for the helper tools it needs early. Second,
+`MODULE.bazel` avoids extra wiring for modules Bazel is already building from
+this checkout. Together, those choices let the setup job fetch the repo helper
+tools Bazel needs and warm caches for later jobs without making `bazel fetch`
+walk files or paths that only exist on one developer machine.
+
+For maintainers who need the Bazel-specific detail: that second point means
+`MODULE.bazel` does not add extra `use_repo` bindings for workspace modules
+that are already built from the local source tree.
 
 ### Enforcement
 
@@ -665,8 +838,9 @@ preserve these invariants:
   expected to consume
 - the checked-in dependency list matches the Bazel target patterns actually run
   by `bazel-ci.yml`
-- cache-prefetch behavior stays focused on external repositories and does not
-  start depending on developer-specific workspace state
+- the cache setup step stays focused on external repositories and does not
+  start depending on files or paths that only exist in a developer's local
+  checkout
 
 Validate changes proportionally:
 
@@ -680,6 +854,9 @@ Validate changes proportionally:
 - if you change which Bazel CI commands or target patterns the workflow runs,
   update `scripts/bazel_ci_dependency_list.sh` in the same change rather than
   letting CI discover the mismatch later
+- if you change which tests are in a generated unit-test shard, keep
+  `.bazel/generated_test_suites.bzl` current so the Bazel CI cache key changes
+  with the shard contents
 - if you change `MODULE.bazel` or `MODULE.bazel.lock`, rerun the normal Bazel
   metadata workflow and confirm the setup path still reaches repo tools and
   external repos without traversing unintended local workspace state
