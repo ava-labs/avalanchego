@@ -12,6 +12,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -77,6 +79,8 @@ func TestSyncer(t *testing.T) {
 		{name: "single batch", numKeys: 50, wantRequests: 1},
 		{name: "exact limit", numKeys: int(MaxLeavesLimit), wantRequests: 1},
 		{name: "multiple batches", numKeys: int(MaxLeavesLimit) + 50, wantRequests: 2},
+		// Crosses IdealBatchSize, forcing a mid-sync flush.
+		{name: "spans batch flush", numKeys: 5000, wantRequests: 5},
 	}
 
 	for _, tt := range tests {
@@ -98,11 +102,7 @@ func TestSyncer(t *testing.T) {
 			require.NoError(t, syncer.Sync(ctx))
 
 			require.Equal(t, tt.wantRequests, requests.Load())
-			for i, k := range keys {
-				got, err := target.Get(k)
-				require.NoError(t, err)
-				require.Equal(t, vals[i], got)
-			}
+			requireReconstructed(t, target, root, keys, vals)
 		})
 	}
 }
@@ -129,7 +129,7 @@ func TestSyncer_ContextCancelled(t *testing.T) {
 }
 
 func TestSyncer_RejectsTamperedResponse(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	nodeID := ids.GenerateTestNodeID()
 
@@ -137,12 +137,28 @@ func TestSyncer_RejectsTamperedResponse(t *testing.T) {
 	root, _, _ := synctest.FillTrie(t, trieDB, 50)
 
 	net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-	// Every response is tampered, so the syncer never accepts one.
-	require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, flakyLeafHandler(trieDB, -1)))
+	// Every response is tampered. Cancel after a few retries, no wall-clock wait.
+	tampering := flakyLeafHandler(trieDB, -1)
+	var attempts atomic.Int32
+	handler := p2p.TestHandler{
+		AppRequestF: func(c context.Context, n ids.NodeID, d time.Time, b []byte) ([]byte, *avacommon.AppError) {
+			if attempts.Add(1) >= 3 {
+				cancel()
+			}
+			return tampering.AppRequest(c, n, d, b)
+		},
+	}
+	require.NoError(t, net.AddHandler(p2p.EVMLeafRequestHandlerID, handler))
 
-	syncer, err := NewSyncer(NewClient(net, tracker), rawdb.NewMemoryDatabase(), root, common.Hash{})
+	target := rawdb.NewMemoryDatabase()
+	syncer, err := NewSyncer(NewClient(net, tracker), target, root, common.Hash{})
 	require.NoError(t, err)
-	require.ErrorIs(t, syncer.Sync(ctx), context.DeadlineExceeded, "tampered leaves must never be accepted")
+	require.ErrorIs(t, syncer.Sync(ctx), context.Canceled, "tampered leaves must never be accepted")
+
+	// Nothing accepted, target stays empty.
+	it := target.NewIterator(nil, nil)
+	defer it.Release()
+	require.False(t, it.Next(), "tampered responses must not write to the target")
 }
 
 func TestSyncer_RecoversAfterBadResponses(t *testing.T) {
@@ -162,8 +178,17 @@ func TestSyncer_RecoversAfterBadResponses(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, syncer.Sync(ctx), "the re-request loop must recover after transient bad responses")
 
+	requireReconstructed(t, target, root, keys, vals)
+}
+
+// requireReconstructed asserts every pair is queryable through the trie rebuilt
+// into target at root.
+func requireReconstructed(t *testing.T, target ethdb.Database, root common.Hash, keys, vals [][]byte) {
+	t.Helper()
+	tr, err := trie.New(trie.TrieID(root), triedb.NewDatabase(target, nil))
+	require.NoError(t, err)
 	for i, k := range keys {
-		got, err := target.Get(k)
+		got, err := tr.Get(k)
 		require.NoError(t, err)
 		require.Equal(t, vals[i], got)
 	}

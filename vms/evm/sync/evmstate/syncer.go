@@ -25,11 +25,11 @@ var (
 	errTooManyLeaves     = errors.New("more leaves returned than requested")
 	errInvalidRangeProof = errors.New("invalid range proof")
 	errMoreWithoutKeys   = errors.New("more leaves reported but none returned")
+	errRootMismatch      = errors.New("reconstructed root does not match target")
 )
 
-// Syncer reconstructs the trie at root by fetching its leaves in key order and
-// writing each (key, value) pair to db. It verifies every response with a range
-// proof, scores the peer, and re-requests on failure.
+// Syncer reconstructs the trie at root, rebuilding range-proof-verified leaves
+// into db with a [trie.StackTrie] and checking the committed root matches.
 type Syncer struct {
 	client  *Client
 	db      ethdb.KeyValueStore
@@ -37,8 +37,7 @@ type Syncer struct {
 	account common.Hash
 }
 
-// NewSyncer returns a [Syncer] that reconstructs the trie at root, fetching its
-// leaves from peers through c and writing them to db. account is empty for the
+// NewSyncer returns a [Syncer] for the trie at root. account is empty for the
 // account trie, non-empty for a storage trie.
 func NewSyncer(c *Client, db ethdb.KeyValueStore, root, account common.Hash) (*Syncer, error) {
 	if root == (common.Hash{}) {
@@ -47,9 +46,17 @@ func NewSyncer(c *Client, db ethdb.KeyValueStore, root, account common.Hash) (*S
 	return &Syncer{client: c, db: db, root: root, account: account}, nil
 }
 
-// Sync walks the key range left to right, fetching and writing each verified
-// batch, until the range is exhausted or ctx ends.
+// Sync walks the key range left to right into a StackTrie, then commits and
+// fails if the reconstructed root does not match.
 func (s *Syncer) Sync(ctx context.Context) error {
+	batch := s.db.NewBatch()
+	stack := trie.NewStackTrie(&trie.StackTrieOptions{
+		Writer: func(path []byte, hash common.Hash, blob []byte) {
+			rawdb.WriteTrieNode(batch, s.account, path, hash, blob, rawdb.HashScheme)
+		},
+	})
+
+	// TODO(powerslider): segment large tries and resume across restarts.
 	var start []byte
 	for {
 		if err := ctx.Err(); err != nil {
@@ -61,25 +68,32 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			return fmt.Errorf("could not get leaves from %x: %w", start, err)
 		}
 
-		batch := s.db.NewBatch()
+		// TODO(powerslider): recurse into storage tries and code.
 		for i, k := range keys {
-			if err := batch.Put(k, vals[i]); err != nil {
+			if err := stack.Update(k, vals[i]); err != nil {
 				return err
 			}
 		}
-		if err := batch.Write(); err != nil {
-			return err
+		if batch.ValueSize() > ethdb.IdealBatchSize {
+			if err := batch.Write(); err != nil {
+				return err
+			}
+			batch.Reset()
 		}
 
-		if !more {
-			return nil
+		if more {
+			if len(keys) == 0 {
+				// more with no keys would loop forever.
+				return errMoreWithoutKeys
+			}
+			start = nextRangeKey(keys[len(keys)-1])
+			continue
 		}
-		if len(keys) == 0 {
-			// A peer reporting more leaves while returning none would loop
-			// forever, treat it as a fault.
-			return errMoreWithoutKeys
+
+		if root := stack.Commit(); root != s.root {
+			return fmt.Errorf("%w: got %x want %x", errRootMismatch, root, s.root)
 		}
-		start = nextRangeKey(keys[len(keys)-1])
+		return batch.Write()
 	}
 }
 
