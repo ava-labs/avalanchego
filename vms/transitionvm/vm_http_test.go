@@ -161,14 +161,14 @@ func TestHTTPHandlersDrain(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		testUnblocking(t,
 			func(t *testing.T) {
-				require.ErrorIsf(t, handlers.drain(ctx), context.Canceled, "%T.drain() with cancelled context")
+				require.ErrorIsf(t, handlers.drain(ctx), context.Canceled, "%T.drain() with cancelled context", handlers)
 			},
 			cancel,
 		)
 
 		testUnblocking(t,
 			func(t *testing.T) {
-				require.NoErrorf(t, handlers.drain(t.Context()), "%T.drain() after final in-flight request")
+				require.NoErrorf(t, handlers.drain(t.Context()), "%T.drain() after final in-flight request", handlers)
 			},
 			func() {
 				close(release)
