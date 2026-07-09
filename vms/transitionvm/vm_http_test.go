@@ -41,7 +41,7 @@ func serve(h http.Handler) *httptest.ResponseRecorder {
 // TestHTTPHandlers verifies a transition is reflected through the handlers
 // captured on startup: shared routes rebind and dropped routes 404.
 func TestHTTPHandlers(t *testing.T) {
-	sut := newSUT(t, withBlocksUntilTransition(1))
+	sut := newSUT(t, 1)
 	ctx := t.Context()
 
 	sut.pre.handlers = map[string]http.Handler{
@@ -54,7 +54,7 @@ func TestHTTPHandlers(t *testing.T) {
 
 	// The node captures the handler map once on startup and never re-reads it.
 	handlers, err := sut.CreateHandlers(ctx)
-	require.NoErrorf(t, err, "%T.CreateHandlers()", sut)
+	require.NoErrorf(t, err, "%T.CreateHandlers()", sut.VM)
 
 	type responses map[string]struct {
 		wantCode int
@@ -78,7 +78,7 @@ func TestHTTPHandlers(t *testing.T) {
 		"pre-only": {wantCode: http.StatusOK, wantBody: "pre-only"},
 	})
 
-	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext)
 
 	assertRoutes("post-transition", responses{
 		"shared":   {wantCode: http.StatusOK, wantBody: "post-shared"},                // rebound
@@ -155,7 +155,7 @@ func TestHTTPHandlersDrain(t *testing.T) {
 // post-transition chain.
 func TestTransitionAbandonsStuckAPIRequests(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		sut := newSUT(t, withBlocksUntilTransition(1))
+		sut := newSUT(t, 1)
 		ctx := t.Context()
 
 		release := make(chan struct{})
@@ -169,7 +169,7 @@ func TestTransitionAbandonsStuckAPIRequests(t *testing.T) {
 		}
 
 		handlers, err := sut.CreateHandlers(ctx)
-		require.NoErrorf(t, err, "%T.CreateHandlers()", sut)
+		require.NoErrorf(t, err, "%T.CreateHandlers()", sut.VM)
 		route := handlers["rpc"]
 
 		go serve(route)
@@ -178,7 +178,7 @@ func TestTransitionAbandonsStuckAPIRequests(t *testing.T) {
 		// Accepting the transition block blocks new API requests and waits for
 		// the stuck one until the drain timeout.
 		blk, err := sut.BuildBlock(ctx)
-		require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+		require.NoErrorf(t, err, "%T.BuildBlock()", sut.VM)
 		require.NoErrorf(t, blk.Verify(ctx), "%T.Verify()", blk)
 		go func() {
 			assert.NoErrorf(t, blk.Accept(ctx), "%T.Accept()", blk)

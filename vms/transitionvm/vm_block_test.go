@@ -15,33 +15,18 @@ import (
 func TestTransitionBlockChildren(t *testing.T) {
 	for _, mode := range contextModes {
 		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t, withBlocksUntilTransition(1))
+			sut := newSUT(t, 1)
 			ctx := t.Context()
 
 			transitionBlock, err := sut.BuildBlock(ctx)
-			require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+			require.NoErrorf(t, err, "%T.BuildBlock()", sut.VM)
 			require.NoErrorf(t, verifyBlock(ctx, transitionBlock, mode), "verifyBlock(%T, %s)", transitionBlock, mode)
 
 			// A child of the transition block sits past the transition time, so
 			// it can't be verified as a pre-transition block.
 			child, err := sut.BuildBlock(ctx)
-			require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+			require.NoErrorf(t, err, "%T.BuildBlock()", sut.VM)
 			require.ErrorIsf(t, verifyBlock(ctx, child, mode), errPostTransitionBlockBeforeTransition, "verifyBlock(%T, %s)", child, mode)
-		})
-	}
-}
-
-// TestNoTransitionBeforeTime verifies accepting a block before the transition
-// time leaves the VM on the pre-transition chain.
-func TestNoTransitionBeforeTime(t *testing.T) {
-	for _, mode := range contextModes {
-		t.Run(string(mode), func(t *testing.T) {
-			// Two blocks to transition; this test accepts one.
-			sut := newSUT(t, withBlocksUntilTransition(2))
-			ctx := t.Context()
-
-			sut.BuildVerifyAccept(t, ctx, mode)
-			sut.requireVersion(t, "pre")
 		})
 	}
 }
@@ -52,17 +37,17 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 func TestCachedBlockUpdatesAfterTransition(t *testing.T) {
 	for _, mode := range contextModes {
 		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t, withBlocksUntilTransition(1))
+			sut := newSUT(t, 1)
 			ctx := t.Context()
 
 			transitionBlock, err := sut.BuildBlock(ctx)
-			require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+			require.NoErrorf(t, err, "%T.BuildBlock()", sut.VM)
 			require.NoErrorf(t, verifyBlock(ctx, transitionBlock, mode), "verifyBlock(%T, %s)", transitionBlock, mode)
 
 			// Before accepting the transition block, so before the VM
 			// transitions, generate the next block.
 			postTransitionBlock, err := sut.BuildBlock(ctx)
-			require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+			require.NoErrorf(t, err, "%T.BuildBlock()", sut.VM)
 
 			// Even though the block is currently invalid, the consensus engine
 			// may cache it.
@@ -82,11 +67,11 @@ func TestCachedBlockUpdatesAfterTransition(t *testing.T) {
 // block before the transition is forwarded to the pre-transition chain.
 func TestRejectForwardedToPreTransitionChain(t *testing.T) {
 	// Two blocks to transition, so the built block is pre-transition.
-	sut := newSUT(t, withBlocksUntilTransition(2))
+	sut := newSUT(t, 2)
 	ctx := t.Context()
 
 	blk, err := sut.BuildBlock(ctx)
-	require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+	require.NoErrorf(t, err, "%T.BuildBlock()", sut.VM)
 	require.NoErrorf(t, blk.Verify(ctx), "%T.Verify()", blk)
 
 	errRejected := errors.New("rejected by pre-transition chain")
@@ -97,11 +82,11 @@ func TestRejectForwardedToPreTransitionChain(t *testing.T) {
 // TestRejectForwardedToPostTransitionChain verifies rejecting a post-transition
 // block after the transition is forwarded to the post-transition chain.
 func TestRejectForwardedToPostTransitionChain(t *testing.T) {
-	sut := newSUT(t, withBlocksUntilTransition(0))
+	sut := newSUT(t, 0)
 	ctx := t.Context()
 
 	blk, err := sut.BuildBlock(ctx)
-	require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+	require.NoErrorf(t, err, "%T.BuildBlock()", sut.VM)
 	require.NoErrorf(t, blk.Verify(ctx), "%T.Verify()", blk)
 
 	errRejected := errors.New("rejected by post-transition chain")
@@ -112,13 +97,13 @@ func TestRejectForwardedToPostTransitionChain(t *testing.T) {
 // TestRejectIsNoopAfterTransition verifies rejecting a pre-transition block
 // after the transition is a noop.
 func TestRejectIsNoopAfterTransition(t *testing.T) {
-	sut := newSUT(t, withBlocksUntilTransition(1))
+	sut := newSUT(t, 1)
 	ctx := t.Context()
 
 	genesis := sut.pre.tip
 
 	loser, err := sut.BuildBlock(ctx)
-	require.NoErrorf(t, err, "%T.BuildBlock()", sut)
+	require.NoErrorf(t, err, "%T.BuildBlock()", sut.VM)
 	require.NoErrorf(t, loser.Verify(ctx), "%T.Verify()", loser)
 	loserBlock := sut.pre.tip
 

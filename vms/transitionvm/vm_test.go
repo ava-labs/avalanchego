@@ -33,9 +33,10 @@ import (
 // share one [fakeState].
 type SUT struct {
 	*VM
-	ctx  *snow.Context
-	pre  *fakeVM
-	post *fakeVM
+	ctx                   *snow.Context
+	pre                   *fakeVM
+	post                  *fakeVM
+	blocksUntilTransition int
 }
 
 // BuildVerifyAccept builds, verifies, and accepts a block. Accepting one at the
@@ -97,19 +98,12 @@ func setPreference(t *testing.T, ctx context.Context, vm *VM, blkID ids.ID, mode
 }
 
 type sutConfig struct {
-	db             database.Database
-	state          *fakeState
-	transitionTime time.Time
+	db    database.Database
+	state *fakeState
 }
 
 // A sutOption overrides a default used by [newSUT].
 type sutOption = options.Option[sutConfig]
-
-// withBlocksUntilTransition sets how many blocks after genesis must be accepted
-// to reach the transition.
-func withBlocksUntilTransition(n int) sutOption {
-	return withTransitionTime(snowmantest.GenesisTimestamp.Add(time.Duration(n) * blockInterval))
-}
 
 // withDatabase sets the database the VM is initialized with.
 func withDatabase(db database.Database) sutOption {
@@ -125,20 +119,14 @@ func withState(state *fakeState) sutOption {
 	})
 }
 
-// withTransitionTime sets the time at which the VM transitions.
-func withTransitionTime(transitionTime time.Time) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.transitionTime = transitionTime
-	})
-}
-
-func newSUT(t *testing.T, opts ...sutOption) *SUT {
+// newSUT initializes a transition VM that transitions after accepting
+// blocksUntilTransition blocks on top of the genesis block.
+func newSUT(t *testing.T, blocksUntilTransition int, opts ...sutOption) *SUT {
 	t.Helper()
 
 	cfg := options.ApplyTo(&sutConfig{
-		db:             memdb.New(),
-		state:          newFakeState(),
-		transitionTime: snowmantest.GenesisTimestamp.Add(blockInterval),
+		db:    memdb.New(),
+		state: newFakeState(),
 	}, opts...)
 
 	pre := newFakeVM(t, "pre", cfg.state)
@@ -146,7 +134,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	factory := &Factory{
 		PreFactory:      fakeFactory{vm: pre},
 		PostFactory:     fakeFactory{vm: post},
-		TransitionTime:  cfg.transitionTime,
+		TransitionTime:  snowmantest.GenesisTimestamp.Add(time.Duration(blocksUntilTransition) * blockInterval),
 		APIDrainTimeout: 100 * time.Millisecond,
 	}
 	ctx := snowtest.Context(t, snowtest.CChainID)
@@ -171,10 +159,11 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		appSender,
 	), "%T.Initialize()", vm)
 	return &SUT{
-		VM:   vm,
-		ctx:  ctx,
-		pre:  pre,
-		post: post,
+		VM:                    vm,
+		ctx:                   ctx,
+		pre:                   pre,
+		post:                  post,
+		blocksUntilTransition: blocksUntilTransition,
 	}
 }
 
@@ -182,10 +171,9 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 // node restart.
 func (s *SUT) restart(t *testing.T) *SUT {
 	t.Helper()
-	return newSUT(t,
+	return newSUT(t, s.blocksUntilTransition,
 		withDatabase(s.db),
 		withState(s.pre.state),
-		withTransitionTime(s.transitionTime),
 	)
 }
 
@@ -315,10 +303,6 @@ func (vm *fakeVM) Initialize(
 	return nil
 }
 
-func (vm *fakeVM) sendAppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	return vm.appSender.SendAppRequest(ctx, set.Of(nodeID), requestID, nil)
-}
-
 func (vm *fakeVM) Connected(_ context.Context, nodeID ids.NodeID, v *version.Application) error {
 	vm.connected[nodeID] = v
 	return nil
@@ -411,7 +395,7 @@ func (*fakeVM) BuildBlockWithContext(context.Context, *smblock.Context) (snowman
 // TestInitiallyTransitioned verifies a VM already past its transition time at
 // genesis routes to the post-transition chain.
 func TestInitiallyTransitioned(t *testing.T) {
-	sut := newSUT(t, withBlocksUntilTransition(0))
+	sut := newSUT(t, 0)
 	sut.requireVersion(t, "post")
 }
 
@@ -420,7 +404,7 @@ func TestInitiallyTransitioned(t *testing.T) {
 func TestTransition(t *testing.T) {
 	for _, mode := range contextModes {
 		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t, withBlocksUntilTransition(1))
+			sut := newSUT(t, 1)
 			ctx := t.Context()
 
 			sut.requireVersion(t, "pre")
@@ -440,10 +424,10 @@ func TestTransition(t *testing.T) {
 func TestTransitionSkipsPreference(t *testing.T) {
 	for _, mode := range contextModes {
 		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t, withBlocksUntilTransition(1))
+			sut := newSUT(t, 1)
 			ctx := t.Context()
 
-			sut.BuildVerifyAccept(t, ctx, mode) // triggers the transition
+			sut.BuildVerifyAccept(t, ctx, mode)
 			require.Zerof(t, sut.post.preference, "%T.preference", sut.post)
 		})
 	}
@@ -454,14 +438,14 @@ func TestTransitionSkipsPreference(t *testing.T) {
 func TestTransitionSetsPreference(t *testing.T) {
 	for _, mode := range contextModes {
 		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t, withBlocksUntilTransition(1))
+			sut := newSUT(t, 1)
 			ctx := t.Context()
 
 			lastAcceptedID, err := sut.LastAccepted(ctx)
-			require.NoErrorf(t, err, "%T.LastAccepted()", sut)
+			require.NoErrorf(t, err, "%T.LastAccepted()", sut.VM)
 			setPreference(t, ctx, sut.VM, lastAcceptedID, mode)
 
-			sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+			sut.BuildVerifyAccept(t, ctx, noContext)
 			require.Equalf(t, sut.post.state.lastAccepted.ID(), sut.post.preference, "%T.preference", sut.post)
 		})
 	}
@@ -470,10 +454,7 @@ func TestTransitionSetsPreference(t *testing.T) {
 // TestInitializeIsolatesContext verifies the post-transition chain gets its own
 // context and metrics gatherer while sharing the chain values.
 func TestInitializeIsolatesContext(t *testing.T) {
-	sut := newSUT(t, withBlocksUntilTransition(1))
-	ctx := t.Context()
-
-	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+	sut := newSUT(t, 0)
 
 	require.NotSamef(t, sut.pre.chainCtx, sut.post.chainCtx, "%T.chainCtx", sut.post)
 	require.NotSamef(t, sut.pre.chainCtx.Metrics, sut.post.chainCtx.Metrics, "%T.chainCtx.Metrics", sut.post)
@@ -488,8 +469,7 @@ func TestInitializeIsolatesContext(t *testing.T) {
 // TestRestart verifies the VM resumes on the correct chain after a restart,
 // before and after the transition.
 func TestRestart(t *testing.T) {
-	// Two blocks to transition, so we can restart while still pre-transition.
-	sut := newSUT(t, withBlocksUntilTransition(2))
+	sut := newSUT(t, 2)
 	ctx := t.Context()
 
 	sut.BuildVerifyAccept(t, ctx, noContext)
@@ -497,7 +477,7 @@ func TestRestart(t *testing.T) {
 	sut = sut.restart(t)
 	sut.requireVersion(t, "pre")
 
-	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext)
 	sut.requireVersion(t, "post")
 
 	t.Run("with_transition_marker", func(t *testing.T) {
