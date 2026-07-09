@@ -33,20 +33,25 @@ import (
 // share one [fakeState].
 type SUT struct {
 	*VM
-	ctx  *snow.Context
-	pre  *fakeVM
-	post *fakeVM
+	ctx                   *snow.Context
+	pre                   *fakeVM
+	post                  *fakeVM
+	blocksUntilTransition int
 }
 
 // BuildVerifyAccept builds, verifies, and accepts a block. Accepting one at the
 // transition time triggers the transition.
-func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode contextMode) {
+func (s *SUT) BuildVerifyAccept(t *testing.T, ctx context.Context, mode contextMode) *block {
 	t.Helper()
 
 	blk, err := s.BuildBlock(ctx)
 	require.NoErrorf(t, err, "%T.BuildBlock()", s)
 	require.NoErrorf(t, verifyBlock(ctx, blk, mode), "verifyBlock(%T, %s)", s, mode)
 	require.NoErrorf(t, blk.Accept(ctx), "%T.Accept()", blk)
+
+	unwrapped, ok := blk.(*block)
+	require.Truef(t, ok, "expected *block, got %T", blk)
+	return unwrapped
 }
 
 // contextMode selects whether an operation is performed with a
@@ -80,27 +85,25 @@ func verifyBlock(ctx context.Context, blk snowman.Block, mode contextMode) error
 }
 
 // setPreference sets vm's preference to blkID according to mode.
-func setPreference(ctx context.Context, vm *VM, blkID ids.ID, mode contextMode) error {
+func setPreference(t *testing.T, ctx context.Context, vm *VM, blkID ids.ID, mode contextMode) {
+	t.Helper()
+
+	var err error
 	if mode == noContext {
-		return vm.SetPreference(ctx, blkID)
+		err = vm.SetPreference(ctx, blkID)
+	} else {
+		err = vm.SetPreferenceWithContext(ctx, blkID, nil)
 	}
-	return vm.SetPreferenceWithContext(ctx, blkID, nil)
+	require.NoErrorf(t, err, "setPreference(%s)", mode)
 }
 
 type sutConfig struct {
-	db             database.Database
-	state          *fakeState
-	transitionTime time.Time
+	db    database.Database
+	state *fakeState
 }
 
 // A sutOption overrides a default used by [newSUT].
 type sutOption = options.Option[sutConfig]
-
-// withBlocksUntilTransition sets how many blocks after genesis reach the
-// transition time; accepting the nth triggers it.
-func withBlocksUntilTransition(n int) sutOption {
-	return withTransitionTime(snowmantest.GenesisTimestamp.Add(time.Duration(n) * blockInterval))
-}
 
 // withDatabase sets the database the VM is initialized with.
 func withDatabase(db database.Database) sutOption {
@@ -116,20 +119,14 @@ func withState(state *fakeState) sutOption {
 	})
 }
 
-// withTransitionTime sets the time at which the VM transitions.
-func withTransitionTime(transitionTime time.Time) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.transitionTime = transitionTime
-	})
-}
-
-func newSUT(t *testing.T, opts ...sutOption) *SUT {
+// newSUT initializes a transition VM that transitions after accepting
+// blocksUntilTransition blocks on top of the genesis block.
+func newSUT(t *testing.T, blocksUntilTransition int, opts ...sutOption) *SUT {
 	t.Helper()
 
 	cfg := options.ApplyTo(&sutConfig{
-		db:             memdb.New(),
-		state:          newFakeState(),
-		transitionTime: snowmantest.GenesisTimestamp.Add(blockInterval),
+		db:    memdb.New(),
+		state: newFakeState(),
 	}, opts...)
 
 	pre := newFakeVM(t, "pre", cfg.state)
@@ -137,7 +134,7 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 	factory := &Factory{
 		PreFactory:      fakeFactory{vm: pre},
 		PostFactory:     fakeFactory{vm: post},
-		TransitionTime:  cfg.transitionTime,
+		TransitionTime:  snowmantest.GenesisTimestamp.Add(time.Duration(blocksUntilTransition) * blockInterval),
 		APIDrainTimeout: 100 * time.Millisecond,
 	}
 	ctx := snowtest.Context(t, snowtest.CChainID)
@@ -162,10 +159,11 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 		appSender,
 	), "%T.Initialize()", vm)
 	return &SUT{
-		VM:   vm,
-		ctx:  ctx,
-		pre:  pre,
-		post: post,
+		VM:                    vm,
+		ctx:                   ctx,
+		pre:                   pre,
+		post:                  post,
+		blocksUntilTransition: blocksUntilTransition,
 	}
 }
 
@@ -173,10 +171,9 @@ func newSUT(t *testing.T, opts ...sutOption) *SUT {
 // node restart.
 func (s *SUT) restart(t *testing.T) *SUT {
 	t.Helper()
-	return newSUT(t,
+	return newSUT(t, s.blocksUntilTransition,
 		withDatabase(s.db),
 		withState(s.pre.state),
-		withTransitionTime(s.transitionTime),
 	)
 }
 
@@ -202,20 +199,18 @@ const blockInterval = time.Second
 // fakeState is chain state shared by the pre- and post-transition fakeVMs.
 type fakeState struct {
 	lastAccepted *fakeBlock
-	// blocks contains all accepted blocks
-	blocks map[ids.ID]*fakeBlock
-	// parsable contains all built blocks
-	parsable map[ids.ID]*snowmantest.Block
+	accepted     map[ids.ID]*fakeBlock
+	built        map[ids.ID]*snowmantest.Block
 }
 
 func newFakeState() *fakeState {
 	genesis := &fakeBlock{Block: snowmantest.Genesis}
 	return &fakeState{
 		lastAccepted: genesis,
-		blocks: map[ids.ID]*fakeBlock{
+		accepted: map[ids.ID]*fakeBlock{
 			genesis.ID(): genesis,
 		},
-		parsable: map[ids.ID]*snowmantest.Block{
+		built: map[ids.ID]*snowmantest.Block{
 			genesis.ID(): snowmantest.Genesis,
 		},
 	}
@@ -249,7 +244,7 @@ func (b *fakeBlock) Accept(ctx context.Context) error {
 		return err
 	}
 	b.vm.state.lastAccepted = b
-	b.vm.state.blocks[b.ID()] = b
+	b.vm.state.accepted[b.ID()] = b
 	return nil
 }
 
@@ -259,27 +254,17 @@ type fakeVM struct {
 	*blocktest.StateSyncableVM
 	initialized bool
 
-	name  string
-	state *fakeState
-	// verified holds blocks verified but not yet accepted.
-	verified map[ids.ID]*fakeBlock
-	// tip is this VM's local building head.
-	tip *fakeBlock
-	// appSender is captured in Initialize for sendAppRequest.
-	appSender common.AppSender
-	// connected holds the peers currently connected to this VM.
-	connected map[ids.NodeID]*version.Application
-	// consensusState is the last state passed to SetState.
+	name           string
+	state          *fakeState
+	verified       map[ids.ID]*fakeBlock
+	tip            *fakeBlock // tip is this VM's local building head.
+	appSender      common.AppSender
+	connected      map[ids.NodeID]*version.Application
 	consensusState snow.State
-	// preference is the last ID passed to SetPreference or
-	// SetPreferenceWithContext.
-	preference ids.ID
-	// chainCtx is the context captured in Initialize.
-	chainCtx *snow.Context
-	// handlers is returned by CreateHandlers.
-	handlers map[string]http.Handler
-	// events feeds WaitForEvent, which otherwise blocks until canceled.
-	events chan common.Message
+	preference     ids.ID
+	chainCtx       *snow.Context
+	handlers       map[string]http.Handler // handlers is returned by CreateHandlers.
+	events         chan common.Message     // events feeds WaitForEvent.
 }
 
 func newFakeVM(t *testing.T, name string, state *fakeState) *fakeVM {
@@ -318,11 +303,6 @@ func (vm *fakeVM) Initialize(
 	return nil
 }
 
-// sendAppRequest sends an app request via the AppSender captured in Initialize.
-func (vm *fakeVM) sendAppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	return vm.appSender.SendAppRequest(ctx, set.Of(nodeID), requestID, nil)
-}
-
 func (vm *fakeVM) Connected(_ context.Context, nodeID ids.NodeID, v *version.Application) error {
 	vm.connected[nodeID] = v
 	return nil
@@ -352,7 +332,6 @@ func (vm *fakeVM) CreateHandlers(context.Context) (map[string]http.Handler, erro
 	return vm.handlers, nil
 }
 
-// WaitForEvent returns the next event's message, or blocks until canceled.
 func (vm *fakeVM) WaitForEvent(ctx context.Context) (common.Message, error) {
 	select {
 	case msg := <-vm.events:
@@ -374,25 +353,10 @@ func (vm *fakeVM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, erro
 	if blk, ok := vm.verified[blkID]; ok {
 		return blk, nil
 	}
-	if blk, ok := vm.state.blocks[blkID]; ok {
+	if blk, ok := vm.state.accepted[blkID]; ok {
 		return blk, nil
 	}
 	return nil, database.ErrNotFound
-}
-
-// ParseBlock reconstructs a block from its bytes. The reconstructed block is
-// owned by this VM.
-func (vm *fakeVM) ParseBlock(_ context.Context, b []byte) (snowman.Block, error) {
-	// [snowmantest.BuildChild] sets the bytes to the block ID.
-	blkID, err := ids.ToID(b)
-	if err != nil {
-		return nil, err
-	}
-	blk, ok := vm.state.parsable[blkID]
-	if !ok {
-		return nil, database.ErrNotFound
-	}
-	return &fakeBlock{Block: blk, vm: vm}, nil
 }
 
 // BuildBlock returns a child of the tip, advancing the timestamp by
@@ -403,10 +367,25 @@ func (vm *fakeVM) BuildBlock(context.Context) (snowman.Block, error) {
 	// Blocks are shared across the VMs through the state, but we want each
 	// parsed copy to be isolated, like in production, so we store a copy.
 	parsable := *child
-	vm.state.parsable[child.ID()] = &parsable
+	vm.state.built[child.ID()] = &parsable
 	blk := &fakeBlock{Block: child, vm: vm}
 	vm.tip = blk
 	return blk, nil
+}
+
+// ParseBlock reconstructs a block from its bytes. The reconstructed block is
+// owned by this VM.
+func (vm *fakeVM) ParseBlock(_ context.Context, b []byte) (snowman.Block, error) {
+	// [snowmantest.BuildChild] sets the bytes to the block ID.
+	blkID, err := ids.ToID(b)
+	if err != nil {
+		return nil, err
+	}
+	blk, ok := vm.state.built[blkID]
+	if !ok {
+		return nil, database.ErrNotFound
+	}
+	return &fakeBlock{Block: blk, vm: vm}, nil
 }
 
 func (*fakeVM) BuildBlockWithContext(context.Context, *smblock.Context) (snowman.Block, error) {
@@ -416,19 +395,27 @@ func (*fakeVM) BuildBlockWithContext(context.Context, *smblock.Context) (snowman
 // TestInitiallyTransitioned verifies a VM already past its transition time at
 // genesis routes to the post-transition chain.
 func TestInitiallyTransitioned(t *testing.T) {
-	sut := newSUT(t, withBlocksUntilTransition(0))
+	sut := newSUT(t, 0)
 	sut.requireVersion(t, "post")
 }
 
 // TestTransition verifies accepting a block at the transition time switches
 // from the pre- to the post-transition chain.
 func TestTransition(t *testing.T) {
-	sut := newSUT(t)
-	ctx := t.Context()
+	for _, mode := range contextModes {
+		t.Run(string(mode), func(t *testing.T) {
+			sut := newSUT(t, 1)
+			ctx := t.Context()
 
-	sut.requireVersion(t, "pre")
-	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
-	sut.requireVersion(t, "post")
+			sut.requireVersion(t, "pre")
+			preB := sut.BuildVerifyAccept(t, ctx, noContext)
+			require.Falsef(t, preB.transitioned, "pre-transition %T.transitioned", preB)
+
+			sut.requireVersion(t, "post")
+			postB := sut.BuildVerifyAccept(t, ctx, noContext)
+			require.Truef(t, postB.transitioned, "post-transition %T.transitioned", postB)
+		})
+	}
 }
 
 // TestTransitionSkipsPreference verifies the transition doesn't set the
@@ -437,10 +424,10 @@ func TestTransition(t *testing.T) {
 func TestTransitionSkipsPreference(t *testing.T) {
 	for _, mode := range contextModes {
 		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t)
+			sut := newSUT(t, 1)
 			ctx := t.Context()
 
-			sut.BuildVerifyAccept(t, ctx, mode) // triggers the transition
+			sut.BuildVerifyAccept(t, ctx, mode)
 			require.Zerof(t, sut.post.preference, "%T.preference", sut.post)
 		})
 	}
@@ -451,14 +438,14 @@ func TestTransitionSkipsPreference(t *testing.T) {
 func TestTransitionSetsPreference(t *testing.T) {
 	for _, mode := range contextModes {
 		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t)
+			sut := newSUT(t, 1)
 			ctx := t.Context()
 
 			lastAcceptedID, err := sut.LastAccepted(ctx)
-			require.NoErrorf(t, err, "%T.LastAccepted()", sut)
-			require.NoErrorf(t, setPreference(ctx, sut.VM, lastAcceptedID, mode), "setPreference(%s)", mode)
+			require.NoErrorf(t, err, "%T.LastAccepted()", sut.VM)
+			setPreference(t, ctx, sut.VM, lastAcceptedID, mode)
 
-			sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+			sut.BuildVerifyAccept(t, ctx, noContext)
 			require.Equalf(t, sut.post.state.lastAccepted.ID(), sut.post.preference, "%T.preference", sut.post)
 		})
 	}
@@ -467,10 +454,7 @@ func TestTransitionSetsPreference(t *testing.T) {
 // TestInitializeIsolatesContext verifies the post-transition chain gets its own
 // context and metrics gatherer while sharing the chain values.
 func TestInitializeIsolatesContext(t *testing.T) {
-	sut := newSUT(t)
-	ctx := t.Context()
-
-	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+	sut := newSUT(t, 0)
 
 	require.NotSamef(t, sut.pre.chainCtx, sut.post.chainCtx, "%T.chainCtx", sut.post)
 	require.NotSamef(t, sut.pre.chainCtx.Metrics, sut.post.chainCtx.Metrics, "%T.chainCtx.Metrics", sut.post)
@@ -485,8 +469,7 @@ func TestInitializeIsolatesContext(t *testing.T) {
 // TestRestart verifies the VM resumes on the correct chain after a restart,
 // before and after the transition.
 func TestRestart(t *testing.T) {
-	// Two blocks to transition, so we can restart while still pre-transition.
-	sut := newSUT(t, withBlocksUntilTransition(2))
+	sut := newSUT(t, 2)
 	ctx := t.Context()
 
 	sut.BuildVerifyAccept(t, ctx, noContext)
@@ -494,26 +477,24 @@ func TestRestart(t *testing.T) {
 	sut = sut.restart(t)
 	sut.requireVersion(t, "pre")
 
-	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+	sut.BuildVerifyAccept(t, ctx, noContext)
 	sut.requireVersion(t, "post")
 
-	sut = sut.restart(t)
-	sut.requireVersion(t, "post")
-}
+	t.Run("with_transition_marker", func(t *testing.T) {
+		sut = sut.restart(t)
+		sut.requireVersion(t, "post")
+	})
 
-// TestRestartWithoutTransitionMarker verifies a restart after accepting the
-// transition block, but before writing the transition marker, re-runs the
-// transition during initialization.
-func TestRestartWithoutTransitionMarker(t *testing.T) {
-	sut := newSUT(t)
-	ctx := t.Context()
+	t.Run("without_transition_marker", func(t *testing.T) {
+		// Model a crash after accepting the transition block but before writing
+		// the transition marker.
+		require.NoErrorf(t, sut.db.Delete(transitionedKey), "%T.Delete()", sut.db)
 
-	sut.BuildVerifyAccept(t, ctx, noContext) // triggers the transition
+		sut = sut.restart(t)
+		sut.requireVersion(t, "post")
 
-	// Model a crash after accepting the transition block but before writing
-	// the transition marker.
-	require.NoErrorf(t, sut.db.Delete(transitionedKey), "%T.Delete()", sut.db)
-
-	sut = sut.restart(t)
-	sut.requireVersion(t, "post")
+		got, err := sut.db.Has(transitionedKey)
+		require.NoErrorf(t, err, "%T.Has([transition marker])", sut.db)
+		require.Truef(t, got, "%T.Has([transition marker]) after restart without it", sut.db)
+	})
 }
