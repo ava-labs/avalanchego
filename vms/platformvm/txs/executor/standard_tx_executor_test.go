@@ -4435,7 +4435,6 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 	}
 
 	createL1Tx, err := wallet.IssueCreateL1Tx(
-		"Test L1",
 		vmID,
 		nil,
 		genesisData,
@@ -4475,7 +4474,6 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 			name: "invalid memo length",
 			tx: func() *txs.Tx {
 				tx, err := wallet.IssueCreateL1Tx(
-					"Test L1",
 					vmID,
 					nil,
 					genesisData,
@@ -4562,7 +4560,6 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 							},
 						},
 					},
-					ChainName:      "Test L1",
 					VMID:           vmID,
 					GenesisData:    genesisData,
 					ManagerChainID: managerChainID,

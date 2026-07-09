@@ -93,7 +93,7 @@ func (vm *VM) Initialize(
 
 	vm.chainContext = chainContext
 	vm.db = db
-	g, err := genesis.Parse(genesisBytes)
+in builder 	g, err := genesis.Parse(genesisBytes)
 	if err != nil {
 		return fmt.Errorf("failed to parse genesis bytes: %w", err)
 	}

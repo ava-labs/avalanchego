@@ -164,8 +164,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 				0x00, 0x00, 0x00, 0x05,
 				// length of memo
 				0x00, 0x00, 0x00, 0x00,
-				// length of chain name (uint16, empty string)
-				0x00, 0x00,
 				// vmID
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
@@ -258,7 +256,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 						Memo: types.JSONByteSlice("😅\nwell that's\x01\x23\x45!"),
 					},
 				},
-				ChainName:      "Test L1",
 				VMID:           vmID,
 				GenesisData:    []byte("genesis"),
 				ManagerChainID: managerChainID,
@@ -413,10 +410,6 @@ func TestCreateL1TxSerialization(t *testing.T) {
 				0xf0, 0x9f, 0x98, 0x85, 0x0a, 0x77, 0x65, 0x6c,
 				0x6c, 0x20, 0x74, 0x68, 0x61, 0x74, 0x27, 0x73,
 				0x01, 0x23, 0x45, 0x21,
-				// length of chain name "Test L1" = 7 (uint16)
-				0x00, 0x07,
-				// chain name "Test L1"
-				0x54, 0x65, 0x73, 0x74, 0x20, 0x4c, 0x31,
 				// vmID
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
 				0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
@@ -570,16 +563,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 				Validators: validValidators,
 			},
 			expectedErr: errInvalidVMID,
-		},
-		{
-			name: "name too long",
-			tx: &CreateL1Tx{
-				BaseTx:     validBaseTx,
-				ChainName:  string(make([]byte, MaxNameLen+1)),
-				VMID:       validVMID,
-				Validators: validValidators,
-			},
-			expectedErr: errNameTooLong,
 		},
 		{
 			name: "address too long",
@@ -786,7 +769,6 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			name: "passes verification with all fields",
 			tx: &CreateL1Tx{
 				BaseTx:         validBaseTx,
-				ChainName:      "Test L1",
 				VMID:           validVMID,
 				GenesisData:    make([]byte, units.KiB),
 				ManagerChainID: ids.GenerateTestID(),

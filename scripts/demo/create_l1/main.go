@@ -35,7 +35,6 @@ import (
 func main() {
 	networkDir := flag.String("network-dir", filepath.Join(os.Getenv("HOME"), ".tmpnet/networks/latest"), "path to tmpnet network directory")
 	nodeIndex := flag.Int("node-index", 0, "index of the node to use as validator and wallet target")
-	chainName := flag.String("chain-name", "DemoL1", "name for the new chain")
 	flag.Parse()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -108,7 +107,6 @@ func main() {
 
 	var createL1Tx *txs.Tx
 	createL1Tx, err = pWallet.IssueCreateL1Tx(
-		*chainName,
 		timestampVMID,
 		nil,
 		[]byte{},

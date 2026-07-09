@@ -888,7 +888,6 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		var createL1Tx *txs.Tx
 		tc.By("issuing a CreateL1Tx", func() {
 			tx, err := pWallet.IssueCreateL1Tx(
-				"No Permissions",
 				constants.XSVMID,
 				nil,
 				genesisBytes,

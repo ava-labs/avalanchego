@@ -838,7 +838,6 @@ func TestCreateL1Chain(t *testing.T) {
 
 	wallet := newWallet(t, vm, walletConfig{})
 	tx, err := wallet.IssueCreateL1Tx(
-		"Test L1",
 		vmID,
 		nil,
 		genesisData,

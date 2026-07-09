@@ -204,7 +204,6 @@ var (
 	}
 	IntrinsicCreateL1TxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
-			wrappers.ShortLen + // chainName length
 			ids.IDLen + // vmID
 			wrappers.IntLen + // genesis length
 			ids.IDLen + // managerChainID
@@ -827,11 +826,7 @@ func (c *complexityVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 }
 
 func (c *complexityVisitor) CreateL1Tx(tx *txs.CreateL1Tx) error {
-	bandwidth, err := math.Add(uint64(0), uint64(len(tx.ChainName)))
-	if err != nil {
-		return err
-	}
-	bandwidth, err = math.Add(bandwidth, uint64(len(tx.GenesisData)))
+	bandwidth, err := math.Add(uint64(0), uint64(len(tx.GenesisData)))
 	if err != nil {
 		return err
 	}

@@ -506,7 +506,7 @@ func handleCreateL1(w http.ResponseWriter, r *http.Request) {
 
 	send("step", `{"step":4,"label":"Build + sign CreateL1Tx (XSVM chain)","status":"active"}`)
 	createL1Tx, err := wallet.P().IssueCreateL1Tx(
-		chainName, constants.XSVMID, nil, genesisBytes, ids.Empty, []byte{},
+		constants.XSVMID, nil, genesisBytes, ids.Empty, []byte{},
 		[]*txs.CreateL1Validator{{
 			NodeID: nodeID.Bytes(), Weight: units.Schmeckle, Balance: units.Avax, Signer: *pop,
 		}},

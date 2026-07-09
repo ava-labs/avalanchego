@@ -155,14 +155,12 @@ type Builder interface {
 	// NewCreateL1Tx atomically creates a subnet, a chain, and converts the
 	// subnet to a Permissionless L1 in a single transaction.
 	//
-	// - [chainName] is the name of the chain
 	// - [vmID] is the ID of the VM the chain runs
 	// - [genesisData] is the genesis data for the chain
 	// - [chainID] specifies which chain the validator manager is deployed on
 	// - [address] specifies the address of the validator manager
 	// - [validators] specifies the initial L1 validators
 	NewCreateL1Tx(
-		chainName string,
 		vmID ids.ID,
 		genesisData []byte,
 		chainID ids.ID,
@@ -877,7 +875,6 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 }
 
 func (b *builder) NewCreateL1Tx(
-	chainName string,
 	vmID ids.ID,
 	genesisData []byte,
 	chainID ids.ID,
@@ -904,12 +901,7 @@ func (b *builder) NewCreateL1Tx(
 
 	memo := ops.Memo()
 
-
-	additionalBytes, err := math.Add(uint64(len(memo)), uint64(len(chainName)))
-	if err != nil {
-		return nil, err
-	}
-	additionalBytes, err = math.Add(additionalBytes, uint64(len(genesisData)))
+	additionalBytes, err := math.Add(uint64(len(memo)), uint64(len(genesisData)))
 	if err != nil {
 		return nil, err
 	}
@@ -954,7 +946,6 @@ func (b *builder) NewCreateL1Tx(
 			Outs:         outputs,
 			Memo:         memo,
 		}},
-		ChainName:      chainName,
 		VMID:           vmID,
 		GenesisData:    genesisData,
 		ManagerChainID: chainID,

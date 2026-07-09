@@ -24,9 +24,6 @@ type CreateL1Tx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 
-	// A human readable name for the chain; need not be unique
-	ChainName string `serialize:"true" json:"chainName"`
-
 	// ID of the VM running on the chain
 	VMID ids.ID `serialize:"true" json:"vmID"`
 
@@ -53,8 +50,6 @@ func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.VMID == ids.Empty:
 		return errInvalidVMID
-	case len(tx.ChainName) > MaxNameLen:
-		return errNameTooLong
 	case len(tx.ManagerAddress) > MaxSubnetAddressLength:
 		return ErrAddressTooLong
 	case len(tx.Validators) == 0:
