@@ -81,7 +81,7 @@ var (
 	errCommitIntervalTooBig = errors.New("DeferredCommitInterval must be < RevisionsInMemory")
 )
 
-func (c Config) Validate() error {
+func (c Config) validate() error {
 	switch {
 	case c.Log == nil:
 		return errNoLogger
@@ -131,7 +131,7 @@ type proposalRef struct {
 }
 
 func New(config Config) (*TrieDB, error) {
-	if err := config.Validate(); err != nil {
+	if err := config.validate(); err != nil {
 		return nil, err
 	}
 

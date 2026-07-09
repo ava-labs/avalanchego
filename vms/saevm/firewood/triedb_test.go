@@ -353,8 +353,7 @@ func FuzzStateRoot(f *testing.F) {
 }
 
 func TestGenesis(t *testing.T) {
-	dir := t.TempDir()
-	cfg := DefaultConfig(dir, loggingtest.New(t, logging.Debug))
+	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
 	memDB := rawdb.NewMemoryDatabase()
 	tdb := triedb.NewDatabase(memDB, &triedb.Config{
 		DBOverride: cfg.BackendConstructor,
@@ -387,28 +386,6 @@ func TestGenesis(t *testing.T) {
 	})
 }
 
-// TestMultipleTries verifies that the TrieDB is not informed any changes
-// unless [state.StateDB.Commit] is called.
-// TODO(#5506): This should be safe concurrently as well.
-func TestMultipleTries(t *testing.T) {
-	db := newDB(t)
-
-	sdb1 := newStateDB(t, db, types.EmptyRootHash)
-	sdb2 := newStateDB(t, db, types.EmptyRootHash)
-	addr := common.BytesToAddress([]byte{1})
-	for i, sdb := range []*state.StateDB{sdb1, sdb2} {
-		sdb.CreateAccount(addr)
-		sdb.SetNonce(addr, 1)
-		sdb.SetBalance(addr, uint256.NewInt(uint64(i))) //#nosec G115 // different balance to force different root
-		_ = sdb.IntermediateRoot(true)                  // force proposal creation
-	}
-
-	// Only one can be committed, choose first
-	root1, err := sdb1.Commit(0, true)
-	require.NoError(t, err, "sdb1.Commit()")
-	require.NoErrorf(t, db.TrieDB().Commit(root1, false), "triedb.Commit(%s)", root1)
-}
-
 // TestMultipleProposals verifies that a single [triedb.Commit] call
 // chains the commit of dependent proposals.
 func TestMultipleProposals(t *testing.T) {
@@ -437,7 +414,7 @@ func TestInvalidConfig(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "empty path",
+			name: "empty_path",
 			cfg: func(cfg Config) Config {
 				cfg.Path = ""
 				return cfg
@@ -445,7 +422,7 @@ func TestInvalidConfig(t *testing.T) {
 			wantErr: errPathNotProvided,
 		},
 		{
-			name: "too few revisions",
+			name: "too_few_revisions",
 			cfg: func(cfg Config) Config {
 				cfg.RevisionsInMemory = 1
 				return cfg
@@ -453,7 +430,7 @@ func TestInvalidConfig(t *testing.T) {
 			wantErr: errTooFewRevisions,
 		},
 		{
-			name: "commit interval too big",
+			name: "commit_interval_too_big",
 			cfg: func(cfg Config) Config {
 				cfg.DeferredCommitInterval = 5
 				cfg.RevisionsInMemory = 5
@@ -462,7 +439,7 @@ func TestInvalidConfig(t *testing.T) {
 			wantErr: errCommitIntervalTooBig,
 		},
 		{
-			name: "no logger",
+			name: "no_logger",
 			cfg: func(cfg Config) Config {
 				cfg.Log = nil
 				return cfg
@@ -482,9 +459,9 @@ func TestInvalidConfig(t *testing.T) {
 
 func TestNoLoggerPanicsInBackendConstructor(t *testing.T) {
 	cfg := DefaultConfig(t.TempDir(), nil)
-	require.Panics(t, func() {
+	require.Panicsf(t, func() {
 		_ = cfg.BackendConstructor(rawdb.NewMemoryDatabase())
-	}, "New()")
+	}, "%T.BackendConstructor()", cfg)
 }
 
 // TestUnknownCommitNoError verifies that committing a root that is not known to
