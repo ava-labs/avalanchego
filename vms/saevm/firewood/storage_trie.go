@@ -33,7 +33,9 @@ func newStorageTrie(base *baseTrie) *storageTrie {
 //
 // The nil nodeset is not merged in [state.StateDB.Commit] and the merged
 // nodeset is ignored by [TrieDB.Update], since all changes are tracked by the
-// [ffi.Proposal].
+// [ffi.Proposal]. The boolean input was intended to indicate whether to add
+// the values as a leaf in the nodeset (corresponding to whether the caller
+// expects this to be an account trie or not).
 func (*storageTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	return common.Hash{}, nil, nil
 }

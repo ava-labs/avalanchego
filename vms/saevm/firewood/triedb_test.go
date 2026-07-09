@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func mustNewDB(t *testing.T) state.Database {
+func newDB(t *testing.T) state.Database {
 	t.Helper()
 
 	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
@@ -38,13 +38,13 @@ func mustNewDB(t *testing.T) state.Database {
 	return db
 }
 
-func mustNewStateDB(t *testing.T, db state.Database, root common.Hash) *state.StateDB {
+func newStateDB(t *testing.T, db state.Database, root common.Hash) *state.StateDB {
 	t.Helper()
 
-	st, err := state.New(root, db, nil)
+	sdb, err := state.New(root, db, nil)
 	require.NoErrorf(t, err, "state.New(%s, %T)", root, db)
 
-	return st
+	return sdb
 }
 
 // accountModel is the in-memory reference for a single account.
@@ -79,12 +79,12 @@ type SUT struct {
 }
 
 func newSUT(t *testing.T) *SUT {
-	fwDB := mustNewDB(t)
+	fwDB := newDB(t)
 	hashDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
 	root := types.EmptyRootHash
-	fwState := mustNewStateDB(t, fwDB, root)
-	hashState := mustNewStateDB(t, hashDB, root)
+	fwState := newStateDB(t, fwDB, root)
+	hashState := newStateDB(t, hashDB, root)
 	return &SUT{
 		fwDB:      fwDB,
 		fwState:   fwState,
@@ -224,8 +224,8 @@ func (s *SUT) stateDBCommit(t *testing.T) {
 	s.lastRoot = fwRoot
 	s.blockNum++
 
-	s.fwState = mustNewStateDB(t, s.fwDB, s.lastRoot)
-	s.hashState = mustNewStateDB(t, s.hashDB, s.lastRoot)
+	s.fwState = newStateDB(t, s.fwDB, s.lastRoot)
+	s.hashState = newStateDB(t, s.hashDB, s.lastRoot)
 	s.finaliseTx() // Commit calls Finalise
 }
 
@@ -390,10 +390,10 @@ func TestGenesis(t *testing.T) {
 // unless [state.StateDB.Commit] is called.
 // TODO(#5506): This should be safe concurrently as well.
 func TestMultipleTries(t *testing.T) {
-	db := mustNewDB(t)
+	db := newDB(t)
 
-	sdb1 := mustNewStateDB(t, db, types.EmptyRootHash)
-	sdb2 := mustNewStateDB(t, db, types.EmptyRootHash)
+	sdb1 := newStateDB(t, db, types.EmptyRootHash)
+	sdb2 := newStateDB(t, db, types.EmptyRootHash)
 	addr := common.BytesToAddress([]byte{1})
 	for i, sdb := range []*state.StateDB{sdb1, sdb2} {
 		sdb.CreateAccount(addr)
@@ -411,13 +411,13 @@ func TestMultipleTries(t *testing.T) {
 // TestMultipleProposals verifies that a single [triedb.Commit] call
 // chains the commit of dependent proposals.
 func TestMultipleProposals(t *testing.T) {
-	db := mustNewDB(t)
+	db := newDB(t)
 
 	const numBlocks = 5
 	lastRoot := types.EmptyRootHash
 	for i := range numBlocks {
 		addr := common.BytesToAddress([]byte{byte(i)})
-		sdb := mustNewStateDB(t, db, lastRoot)
+		sdb := newStateDB(t, db, lastRoot)
 		sdb.CreateAccount(addr)
 		sdb.SetNonce(addr, 1)
 		sdb.SetBalance(addr, uint256.NewInt(0))
@@ -487,7 +487,7 @@ func TestNoLoggerPanicsInBackendConstructor(t *testing.T) {
 }
 
 func TestReadSafety(t *testing.T) {
-	db := mustNewDB(t)
+	db := newDB(t)
 
 	var (
 		addrWithDeletedKey = common.BytesToAddress([]byte{1})
@@ -499,7 +499,7 @@ func TestReadSafety(t *testing.T) {
 	)
 
 	// Tx1
-	sdb := mustNewStateDB(t, db, types.EmptyRootHash)
+	sdb := newStateDB(t, db, types.EmptyRootHash)
 	sdb.CreateAccount(addrWithDeletedKey)
 	sdb.SetNonce(addrWithDeletedKey, 1)
 	sdb.SetBalance(addrWithDeletedKey, bal)

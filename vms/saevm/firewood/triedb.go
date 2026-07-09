@@ -47,11 +47,7 @@ type Config struct {
 	// TODO(alarso16): Should metrics match the old implementation? Do we need libevm's registration?
 }
 
-// DefaultConfig returns a sensible TrieDBConfig with the given directory.
-// The default config is:
-//   - CacheSizeBytes: 1MiB
-//   - RevisionsInMemory: 128
-//   - DeferredCommitInterval: 64
+// DefaultConfig returns a sensible Config with the given directory.
 func DefaultConfig(path string, log logging.Logger) Config {
 	return Config{
 		Path:                   path,
@@ -62,9 +58,10 @@ func DefaultConfig(path string, log logging.Logger) Config {
 	}
 }
 
-// BackendConstructor can be supplied as a [triedb.DBConstructor].
-// It creates a new Firewood database with the given configuration.
-// Any error during creation will cause the program to exit.
+// BackendConstructor can be supplied as a [triedb.DBConstructor].  It creates a
+// new Firewood database with the given configuration.  If no logger is
+// provided, it will panic. If any other error occurs, the error will be logged
+// as [logging.Fatal] and will return nil.
 func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
 	db, err := New(c)
 	if err != nil {
@@ -85,19 +82,18 @@ var (
 )
 
 func (c Config) Validate() error {
-	if c.Log == nil {
+	switch {
+	case c.Log == nil:
 		return errNoLogger
-	}
-	if c.Path == "" {
+	case c.Path == "":
 		return errPathNotProvided
-	}
-	if c.RevisionsInMemory < 2 {
+	case c.RevisionsInMemory < 2:
 		return fmt.Errorf("%w: got %d", errTooFewRevisions, c.RevisionsInMemory)
-	}
-	if c.DeferredCommitInterval >= uint64(c.RevisionsInMemory) {
+	case c.DeferredCommitInterval >= uint64(c.RevisionsInMemory):
 		return fmt.Errorf("%w: %d >= %d", errCommitIntervalTooBig, c.DeferredCommitInterval, c.RevisionsInMemory)
+	default:
+		return nil
 	}
-	return nil
 }
 
 // TrieDB is a triedb.DBOverride implementation backed by Firewood.
