@@ -150,6 +150,7 @@ graft_go_test(
         "//upgrade/upgradetest",
         "//utils",
         "//utils/set",
+        "//vms/evm/acp226",
         "//vms/evm/predicate",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//accounts/abi",
