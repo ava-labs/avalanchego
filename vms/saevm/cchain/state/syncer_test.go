@@ -50,7 +50,7 @@ func runSyncRoundTrip(t *testing.T, blocks []block) {
 	require.Equal(t, target, gotRoot, "GetRoot(%d)", targetHeight)
 
 	// Shared memory was applied identically to the source.
-	require.Equal(t, dbEntries(t, srcSUT.sharedMemoryDB), dbEntries(t, dstSUT.sharedMemoryDB), "shared memory")
+	saetest.RequireEqualDBs(t, srcSUT.sharedMemoryDB, dstSUT.sharedMemoryDB, "shared memory")
 }
 
 // syncServer serves a source state's atomic trie to an in-memory p2p peer.
@@ -178,7 +178,7 @@ func TestSyncer_BonusBlock(t *testing.T) {
 			// non-skipped blocks.
 			want := newSUT(t, withNetworkID(test.networkID))
 			want.apply(t, test.wantBlocks...)
-			require.Equal(t, dbEntries(t, want.sharedMemoryDB), dbEntries(t, dstSUT.sharedMemoryDB), "shared memory")
+			saetest.RequireEqualDBs(t, want.sharedMemoryDB, dstSUT.sharedMemoryDB, "shared memory")
 		})
 	}
 }
@@ -266,7 +266,7 @@ func TestSyncer_Crash(t *testing.T) {
 			require.NoError(t, server.syncInto(t.Context(), got.stateImpl.(*State), target, targetHeight), "re-run Sync()")
 
 			require.Equal(t, targetHeight, got.CurrentHeight(), "CurrentHeight()")
-			require.Equal(t, dbEntries(t, srcSUT.sharedMemoryDB), dbEntries(t, got.sharedMemoryDB), "shared memory")
+			saetest.RequireEqualDBs(t, srcSUT.sharedMemoryDB, got.sharedMemoryDB, "shared memory")
 		})
 	}
 }
