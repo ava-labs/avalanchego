@@ -35,7 +35,7 @@ type accountTrie struct {
 	*baseTrie
 	parentRoot   common.Hash
 	root         common.Hash
-	pending      *proposalRef
+	pending      *ffi.Proposal
 	tdb          *TrieDB
 	lastHashSize int
 }
@@ -86,8 +86,8 @@ func (a *accountTrie) updateProposal() error {
 	}
 
 	a.pending = proposal
-	a.reader = proposal.p
-	a.root = proposal.root
+	a.reader = proposal
+	a.root = common.Hash(proposal.Root())
 	a.lastHashSize = len(a.updateOps) // Avoid re-hashing until next update
 	return nil
 }

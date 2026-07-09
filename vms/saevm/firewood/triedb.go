@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"slices"
 	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -26,6 +25,7 @@ import (
 
 	_ "github.com/ava-labs/libevm/trie" // comment resolution
 
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -114,8 +114,8 @@ type TrieDB struct {
 	// and the latest state can be modified at any time during execution.
 	Firewood *ffi.Database
 
-	pending     *proposalRef
-	committable map[common.Hash]*proposalRef
+	pending     *ffi.Proposal
+	committable *linked.Hashmap[common.Hash, *ffi.Proposal]
 
 	log logging.Logger
 }
@@ -159,7 +159,7 @@ func New(config Config) (*TrieDB, error) {
 
 	return &TrieDB{
 		Firewood:    fw,
-		committable: make(map[common.Hash]*proposalRef),
+		committable: linked.NewHashmap[common.Hash, *ffi.Proposal](),
 		log:         config.Log,
 	}, nil
 }
@@ -171,13 +171,13 @@ func New(config Config) (*TrieDB, error) {
 //
 // TODO(alarso16): Force drop all pending revisions on close once supported.
 func (t *TrieDB) Close() error {
-	errs := make([]error, 0, len(t.committable)+2)
-	for _, proposal := range t.committable {
-		errs = append(errs, proposal.p.Drop())
+	errs := make([]error, 0, t.committable.Len()+2)
+	for it := t.committable.NewIterator(); it.Next(); {
+		errs = append(errs, it.Value().Drop())
 	}
-	t.committable = nil
+	t.committable.Clear()
 	if t.pending != nil {
-		errs = append(errs, t.pending.p.Drop())
+		errs = append(errs, t.pending.Drop())
 		t.pending = nil
 	}
 
@@ -219,30 +219,11 @@ func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, node
 		return fmt.Errorf("no pending proposal to update for root %s", root)
 	}
 
-	if possible.root != root {
-		return fmt.Errorf("proposal root %s does not match update root %s", possible.root, root)
+	if gotRoot := common.Hash(possible.Root()); gotRoot != root {
+		return fmt.Errorf("proposal root %s does not match update root %s", gotRoot, root)
 	}
 
-	if possible.parent != nil && possible.parent.root != parent {
-		return fmt.Errorf("proposal parent root %s does not match update parent %s", possible.parent.root, parent)
-	}
-
-	t.committable[root] = possible
-
-	if possible.parent == nil {
-		// parent is disk, base of linked list
-		return nil
-	}
-
-	parentRef := possible.parent
-	if parentRef.p != nil {
-		// parent hasn't been committed yet, link together in list
-		parentRef.child = possible
-	} else {
-		// parent proposal is already committed, detach from list
-		possible.parent = nil
-	}
-
+	t.committable.Put(root, possible) // appends to list
 	return nil
 }
 
@@ -250,80 +231,60 @@ func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, node
 // been previously provided to [TrieDB.Update]. any error returned from this
 // function should be treated as fatal.
 func (t *TrieDB) Commit(root common.Hash, report bool) error {
-	p, ok := t.committable[root]
-	if !ok {
-		// If this state root is available only on disk, we must have already committed it.
-		rev, err := t.Firewood.Revision(ffi.Hash(root))
-		if errors.Is(err, ffi.ErrRevisionNotFound) {
-			return fmt.Errorf("no committable proposal found for root %s", root)
-		} else if err != nil {
-			return fmt.Errorf("retrieving revision for root %s: %w", root, err)
-		}
-		return rev.Drop()
-	}
-	if child := p.child; child != nil {
-		child.parent = nil // detach from doubly-linked list
+	if _, ok := t.committable.Get(root); !ok {
+		return nil
 	}
 
-	// Walk back the proposal chain and collect all proposals to apply in order.
-	var proposals []*ffi.Proposal
-	for cur := p; cur != nil; cur = cur.parent {
-		proposals = append(proposals, cur.p)
-		cur.p = nil
-		delete(t.committable, cur.root)
+	// Iterator iterates from oldest to newest
+	var committed []common.Hash
+	for it := t.committable.NewIterator(); it.Next(); {
+		if err := it.Value().Commit(); err != nil {
+			return fmt.Errorf("committing proposal for root %s: %w", it.Key(), err)
+		}
+		committed = append(committed, it.Key())
+		if it.Key() == root {
+			// Guaranteed to be hit because of the above check
+			break
+		}
 	}
 
-	var err error
-	for _, proposal := range slices.Backward(proposals) {
-		if err != nil {
-			// If a previous proposal failed to commit, we need to drop this proposal to avoid a leak.
-			err = errors.Join(err, proposal.Drop())
-			continue
-		}
-		err = proposal.Commit()
+	for _, root := range committed {
+		t.committable.Delete(root)
 	}
 
 	log := t.log.Debug
 	if report {
 		log = t.log.Info
 	}
-	log("committing proposal", zap.Stringer("root", root), zap.Int("numProposals", len(proposals)))
+	log("committing proposal",
+		zap.Stringer("root", root),
+		zap.Int("totalCommitted", len(committed)),
+		zap.Int("numProposals", t.committable.Len()),
+	)
 
-	return err
+	return nil
 }
 
 // newProposal creates a new proposal from either a committable proposal or the tip of the database.
-// Returns (non-nil, nil) if a proposal was successfully created.
-// Returns (nil, err) for any error.
-func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*proposalRef, error) {
-	parent, foundProposal := t.committable[parentRoot]
+func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*ffi.Proposal, error) {
 	var propose func([]ffi.BatchOp) (*ffi.Proposal, error)
-	switch {
+	switch parent, foundProposal := t.committable.Get(parentRoot); {
 	case foundProposal:
-		propose = parent.p.Propose
+		propose = parent.Propose
 	case parentRoot == common.Hash(t.Firewood.Root()):
 		propose = t.Firewood.Propose
 	default:
 		return nil, fmt.Errorf("parent root %+x is not proposable", parentRoot)
 	}
 
-	proposal, err := propose(batchOps)
-	if err != nil {
-		return nil, fmt.Errorf("creating proposal: %w", err)
-	}
-
-	return &proposalRef{
-		p:      proposal,
-		root:   common.Hash(proposal.Root()),
-		parent: parent,
-	}, nil
+	return propose(batchOps)
 }
 
 // trieCommit considers the provided proposal as canonical.
 // Should be called on [state.Trie.Commit].
 //
 // p MUST not be nil.
-func (t *TrieDB) trieCommit(p *proposalRef) {
+func (t *TrieDB) trieCommit(p *ffi.Proposal) {
 	t.pending = p
 }
 

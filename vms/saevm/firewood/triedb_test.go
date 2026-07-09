@@ -265,6 +265,7 @@ func FuzzStateRoot(f *testing.F) {
 		{
 			opCreateAccount,
 			opStateDBCommit,
+			opDiskCommit,
 		},
 		{
 			opCreateAccount,
@@ -484,6 +485,13 @@ func TestNoLoggerPanicsInBackendConstructor(t *testing.T) {
 	require.Panics(t, func() {
 		_ = cfg.BackendConstructor(rawdb.NewMemoryDatabase())
 	}, "New()")
+}
+
+// TestUnknownCommitNoError verifies that committing a root that is not known to
+// the TrieDB does not error. This is required for recovery in the VM.
+func TestUnknownCommitNoError(t *testing.T) {
+	db := newDB(t)
+	require.NoErrorf(t, db.TrieDB().Commit(common.Hash{0x1}, false), "triedb.Commit(%s)", common.Hash{0x1})
 }
 
 func TestReadSafety(t *testing.T) {
