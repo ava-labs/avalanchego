@@ -147,7 +147,6 @@ type Wallet interface {
 	// - [validators] specifies the initial L1 validators
 	IssueCreateL1Tx(
 		vmID ids.ID,
-		fxIDs []ids.ID,
 		genesisData []byte,
 		chainID ids.ID,
 		address []byte,
@@ -508,7 +507,6 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 
 func (w *wallet) IssueCreateL1Tx(
 	vmID ids.ID,
-	fxIDs []ids.ID,
 	genesisData []byte,
 	chainID ids.ID,
 	address []byte,

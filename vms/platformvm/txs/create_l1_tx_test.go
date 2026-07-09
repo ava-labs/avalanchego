@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -791,33 +790,4 @@ func TestCreateL1TxSyntacticVerify(t *testing.T) {
 			require.True(test.tx.SyntacticallyVerified)
 		})
 	}
-}
-
-func TestCreateL1TxBlockchainID(t *testing.T) {
-	subnetID := ids.ID{
-		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-		0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
-		0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
-		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
-	}
-
-	// Compute the expected blockchainID manually per the ACP spec:
-	// SHA256(subnetID[32] || 0x00[1]) = SHA256(33 bytes)
-	packer := wrappers.Packer{Bytes: make([]byte, ids.IDLen+1)}
-	packer.PackFixedBytes(subnetID[:])
-	packer.PackByte(0x00)
-	expected := ids.ID(hashing.ComputeHash256Array(packer.Bytes))
-
-	tx := &CreateL1Tx{}
-	blockchainID := tx.BlockchainID(subnetID)
-
-	require := require.New(t)
-	require.Equal(expected, blockchainID)
-
-	// Verify it differs from both the subnetID and validationID derivation.
-	// validationID = subnetID.Append(0) = SHA256(subnetID[32] || chainIndex[4]) = SHA256(36 bytes)
-	// blockchainID = SHA256(subnetID[32] || 0x00[1]) = SHA256(33 bytes), they are always distinct
-	validationID := subnetID.Append(0)
-	require.NotEqual(validationID, blockchainID)
-	require.NotEqual(subnetID, blockchainID)
 }

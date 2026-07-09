@@ -889,7 +889,6 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		tc.By("issuing a CreateL1Tx", func() {
 			tx, err := pWallet.IssueCreateL1Tx(
 				constants.XSVMID,
-				nil,
 				genesisBytes,
 				managerChainID,
 				address,

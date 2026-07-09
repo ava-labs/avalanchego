@@ -9,8 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -26,7 +24,6 @@ type CreateL1Tx struct {
 
 	// ID of the VM running on the chain
 	VMID ids.ID `serialize:"true" json:"vmID"`
-
 
 	// Byte representation of genesis state of the chain
 	GenesisData []byte `serialize:"true" json:"genesisData"`
@@ -71,15 +68,6 @@ func (tx *CreateL1Tx) SyntacticVerify(ctx *snow.Context) error {
 
 	tx.SyntacticallyVerified = true
 	return nil
-}
-
-// BlockchainID returns the blockchainID for the chain created by this tx.
-// Defined as SHA256(subnetID || 0x00) per ACP-191.
-func (*CreateL1Tx) BlockchainID(subnetID ids.ID) ids.ID {
-	packer := wrappers.Packer{Bytes: make([]byte, ids.IDLen+1)}
-	packer.PackFixedBytes(subnetID[:])
-	packer.PackByte(0x00)
-	return hashing.ComputeHash256Array(packer.Bytes)
 }
 
 func (tx *CreateL1Tx) Visit(visitor Visitor) error {

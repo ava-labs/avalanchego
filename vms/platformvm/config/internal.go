@@ -119,7 +119,7 @@ func (c *Internal) CreateL1Chain(subnetID ids.ID, tx *txs.CreateL1Tx) {
 	}
 
 	c.Chains.QueueChainCreation(chains.ChainParameters{
-		ID:          tx.BlockchainID(subnetID),
+		ID:          subnetID,
 		SubnetID:    subnetID,
 		GenesisData: tx.GenesisData,
 		VMID:        tx.VMID,

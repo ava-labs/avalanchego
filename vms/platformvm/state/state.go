@@ -3191,7 +3191,7 @@ func (s *State) writeSubnetOwners() error {
 			return fmt.Errorf("failed to write subnet owner: %w", err)
 		}
 	}
-	return nil 
+	return nil
 }
 
 func (s *State) writeSubnetToL1Conversions() error {

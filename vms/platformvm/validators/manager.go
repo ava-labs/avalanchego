@@ -326,11 +326,14 @@ func (m *Manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 			err,
 		)
 	}
-	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
-	if !ok {
+	switch chain := chainTx.Unsigned.(type) {
+	case *txs.CreateChainTx:
+		return chain.SubnetID, nil
+	case *txs.CreateL1Tx:
+		return chainID, nil
+	default:
 		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
 	}
-	return chain.SubnetID, nil
 }
 
 // OnAcceptedBlockID registers the ID of the latest accepted block.

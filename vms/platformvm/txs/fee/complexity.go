@@ -409,7 +409,6 @@ func ConvertSubnetToL1ValidatorComplexity(l1Validators ...*txs.ConvertSubnetToL1
 	return complexity, nil
 }
 
-
 func convertSubnetToL1ValidatorComplexity(l1Validator *txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
 	complexity := gas.Dimensions{
 		gas.Bandwidth: intrinsicConvertSubnetToL1ValidatorBandwidth,

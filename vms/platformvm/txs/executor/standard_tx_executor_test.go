@@ -4436,7 +4436,6 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 
 	createL1Tx, err := wallet.IssueCreateL1Tx(
 		vmID,
-		nil,
 		genesisData,
 		managerChainID,
 		managerAddress,
@@ -4475,7 +4474,6 @@ func TestStandardExecutorCreateL1Tx(t *testing.T) {
 			tx: func() *txs.Tx {
 				tx, err := wallet.IssueCreateL1Tx(
 					vmID,
-					nil,
 					genesisData,
 					managerChainID,
 					managerAddress,

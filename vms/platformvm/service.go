@@ -1236,38 +1236,20 @@ func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatus
 
 func (s *Service) nodeValidates(blockchainID ids.ID) bool {
 	chainTx, _, err := s.vm.state.GetTx(blockchainID)
-	if err == nil {
-		if chain, ok := chainTx.Unsigned.(*txs.CreateChainTx); ok {
-			_, isValidator := s.vm.Validators.GetValidator(chain.SubnetID, s.vm.ctx.NodeID)
-			return isValidator
-		}
-	}
-
-	// For CreateL1Tx chains, the chainID = SHA256(subnetID || 0x00) and is
-	// not the same as the txID, so GetTx above fails. Find the subnetID by
-	// scanning all known subnets for a CreateL1Tx whose derived BlockchainID
-	// matches, then check the in-memory validator set.
-	subnetIDs, err := s.vm.state.GetSubnetIDs()
 	if err != nil {
 		return false
 	}
-	for _, subnetID := range subnetIDs {
-		chains, err := s.vm.state.GetChains(subnetID)
-		if err != nil {
-			continue
-		}
-		for _, tx := range chains {
-			l1Tx, ok := tx.Unsigned.(*txs.CreateL1Tx)
-			if !ok {
-				continue
-			}
-			if l1Tx.BlockchainID(subnetID) == blockchainID {
-				_, isValidator := s.vm.Validators.GetValidator(subnetID, s.vm.ctx.NodeID)
-				return isValidator
-			}
-		}
+	var subnetID ids.ID
+	switch chain := chainTx.Unsigned.(type) {
+	case *txs.CreateChainTx:
+		subnetID = chain.SubnetID
+	case *txs.CreateL1Tx:
+		subnetID = blockchainID
+	default:
+		return false
 	}
-	return false
+	_, isValidator := s.vm.Validators.GetValidator(subnetID, s.vm.ctx.NodeID)
+	return isValidator
 }
 
 func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.ID) (bool, error) {
@@ -1290,8 +1272,12 @@ func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.I
 	if err != nil {
 		return false, err
 	}
-	_, ok = tx.Unsigned.(*txs.CreateChainTx)
-	return ok, nil
+	switch tx.Unsigned.(type) {
+	case *txs.CreateChainTx, *txs.CreateL1Tx:
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
 // ValidatedByArgs is the arguments for calling ValidatedBy
@@ -1351,8 +1337,10 @@ func (s *Service) Validates(_ *http.Request, args *ValidatesArgs, response *Vali
 				err,
 			)
 		}
-		_, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
-		if !ok {
+		switch subnetTx.Unsigned.(type) {
+		case *txs.CreateSubnetTx, *txs.CreateL1Tx:
+
+		default:
 			return fmt.Errorf("%q is not a subnet", args.SubnetID)
 		}
 	}
@@ -1419,16 +1407,24 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 
 		for _, chainTx := range chains {
 			chainID := chainTx.ID()
-			chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
-			if !ok {
-				return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chainTx.Unsigned)
+
+			switch chain := chainTx.Unsigned.(type) {
+			case *txs.CreateChainTx:
+				response.Blockchains = append(response.Blockchains, APIBlockchain{
+					ID:       chainID,
+					Name:     chain.ChainName,
+					SubnetID: subnetID,
+					VMID:     chain.VMID,
+				})
+			case *txs.CreateL1Tx:
+				response.Blockchains = append(response.Blockchains, APIBlockchain{
+					ID:       chainID,
+					SubnetID: subnetID,
+					VMID:     chain.VMID,
+				})
+			default:
+				return fmt.Errorf("expected a chain-creating tx type but got %T", chainTx.Unsigned)
 			}
-			response.Blockchains = append(response.Blockchains, APIBlockchain{
-				ID:       chainID,
-				Name:     chain.ChainName,
-				SubnetID: subnetID,
-				VMID:     chain.VMID,
-			})
 		}
 	}
 
