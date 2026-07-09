@@ -25,39 +25,6 @@ import (
 	pwallet "github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 )
 
-func waitForAutoRenewedCycleEnd(
-	tc *e2e.GinkgoTestContext,
-	require *require.Assertions,
-	pvmClient *platformvm.Client,
-	nodeID ids.NodeID,
-) {
-	validators, err := pvmClient.GetCurrentValidators(
-		tc.DefaultContext(),
-		constants.PrimaryNetworkID,
-		[]ids.NodeID{nodeID},
-	)
-	require.NoError(err)
-	require.Len(validators, 1)
-	initialStartTime := validators[0].StartTime
-
-	tc.Eventually(func() bool {
-		validators, err = pvmClient.GetCurrentValidators(
-			tc.DefaultContext(),
-			constants.PrimaryNetworkID,
-			[]ids.NodeID{nodeID},
-		)
-		require.NoError(err)
-		if len(validators) == 0 {
-			return true
-		}
-		require.Len(validators, 1)
-
-		// A renewal re-adds the validator with its start time set to the
-		// previous cycle's end time, so a start time change marks a new cycle start.
-		return validators[0].StartTime != initialStartTime
-	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "node failed to finish staking cycle")
-}
-
 // autoRenewedValidatorFixture bundles the state shared by the auto-renewed validator specs.
 type autoRenewedValidatorFixture struct {
 	tc      *e2e.GinkgoTestContext
@@ -323,4 +290,37 @@ func requireValidatorRemoved(
 		require.NoError(err)
 		return len(validators) == 0
 	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, msg)
+}
+
+func waitForAutoRenewedCycleEnd(
+	tc *e2e.GinkgoTestContext,
+	require *require.Assertions,
+	pvmClient *platformvm.Client,
+	nodeID ids.NodeID,
+) {
+	validators, err := pvmClient.GetCurrentValidators(
+		tc.DefaultContext(),
+		constants.PrimaryNetworkID,
+		[]ids.NodeID{nodeID},
+	)
+	require.NoError(err)
+	require.Len(validators, 1)
+	initialStartTime := validators[0].StartTime
+
+	tc.Eventually(func() bool {
+		validators, err = pvmClient.GetCurrentValidators(
+			tc.DefaultContext(),
+			constants.PrimaryNetworkID,
+			[]ids.NodeID{nodeID},
+		)
+		require.NoError(err)
+		if len(validators) == 0 {
+			return true
+		}
+		require.Len(validators, 1)
+
+		// A renewal re-adds the validator with its start time set to the
+		// previous cycle's end time, so a start time change marks a new cycle start.
+		return validators[0].StartTime != initialStartTime
+	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "node failed to finish staking cycle")
 }
