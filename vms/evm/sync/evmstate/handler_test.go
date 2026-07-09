@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evmstate_test
+package evmstate
 
 import (
 	"bytes"
@@ -9,47 +9,16 @@ import (
 	"errors"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
-
-func TestHandler_RoundTrip(t *testing.T) {
-	wantResp := &syncpb.GetLeafResponse{
-		Keys:      [][]byte{{0x01}, {0x02}},
-		Values:    [][]byte{{0xaa}, {0xbb}},
-		ProofVals: [][]byte{{0xcc}},
-	}
-	responder := &synctest.FakeLeafResponder{Resp: wantResp}
-	h := evmstate.NewHandler(logging.NoLog{}, responder)
-
-	req := &syncpb.GetLeafRequest{
-		RootHash:    []byte{0xde, 0xad},
-		AccountHash: []byte{0xbe, 0xef},
-		StartKey:    []byte{0x10},
-		EndKey:      []byte{0x20},
-		KeyLimit:    16,
-	}
-	respBytes, appErr := h.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, synctest.MustMarshal(t, req))
-	require.Nil(t, appErr)
-
-	got := &syncpb.GetLeafResponse{}
-	require.NoError(t, proto.Unmarshal(respBytes, got))
-	require.Empty(t, cmp.Diff(wantResp, got, protocmp.Transform()))
-	require.Empty(t, cmp.Diff(req, responder.GotReq, protocmp.Transform()))
-}
 
 func TestResponder_ValidationDrops(t *testing.T) {
 	t.Parallel()
@@ -102,7 +71,7 @@ func TestResponder_ValidationDrops(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := evmstate.NewResponder(trieDB, common.HashLength, nil)
+			r := newResponder(trieDB, common.HashLength, nil)
 			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), tt.req)
 			require.NoError(t, err)
 			require.Nil(t, resp)
@@ -129,7 +98,7 @@ func TestResponder_Serves(t *testing.T) {
 			trieDB := synctest.NewTrieDB()
 			root, keys, vals := synctest.FillTrie(t, trieDB, numKeys)
 
-			r := evmstate.NewResponder(trieDB, common.HashLength, nil)
+			r := newResponder(trieDB, common.HashLength, nil)
 			resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: root.Bytes(),
 				KeyLimit: tt.limit,
@@ -190,7 +159,7 @@ func TestResponder_Drops(t *testing.T) {
 				cancel()
 			}
 
-			r := evmstate.NewResponder(trieDB, common.HashLength, nil)
+			r := newResponder(trieDB, common.HashLength, nil)
 			resp, err := r.Respond(ctx, ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 				RootHash: rootHash,
 				KeyLimit: tt.limit,
@@ -206,7 +175,7 @@ func TestResponder_BoundedRange(t *testing.T) {
 	trieDB := synctest.NewTrieDB()
 	root, keys, vals := synctest.FillTrie(t, trieDB, 50)
 
-	r := evmstate.NewResponder(trieDB, common.HashLength, nil)
+	r := newResponder(trieDB, common.HashLength, nil)
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
 		StartKey: keys[10],
@@ -253,14 +222,14 @@ func TestResponder_Snapshot(t *testing.T) {
 				snap.Err = errors.New("snapshot unavailable")
 			}
 
-			r := evmstate.NewResponder(trieDB, common.HashLength, snap)
+			r := newResponder(trieDB, common.HashLength, snap)
 			requireServesWholeTrie(t, r, root, keys, vals)
 		})
 	}
 }
 
 // requireServesWholeTrie asserts a whole-trie request to r returns keys/vals.
-func requireServesWholeTrie(t *testing.T, r evmstate.Responder, root common.Hash, keys, vals [][]byte) {
+func requireServesWholeTrie(t *testing.T, r *responder, root common.Hash, keys, vals [][]byte) {
 	t.Helper()
 	resp, err := r.Respond(t.Context(), ids.GenerateTestNodeID(), &syncpb.GetLeafRequest{
 		RootHash: root.Bytes(),
