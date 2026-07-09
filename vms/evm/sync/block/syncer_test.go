@@ -5,6 +5,7 @@ package block
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -98,6 +100,7 @@ func TestSyncer(t *testing.T) {
 		fromHeight    uint64
 		blocksToFetch uint64
 		wantHeights   []int
+		wantRequests  int32 // requests the syncer must send to peers
 	}{
 		{
 			name:          "all from network",
@@ -105,6 +108,7 @@ func TestSyncer(t *testing.T) {
 			fromHeight:    5,
 			blocksToFetch: 3,
 			wantHeights:   []int{3, 4, 5},
+			wantRequests:  1,
 		},
 		{
 			name:          "some already on disk",
@@ -113,6 +117,27 @@ func TestSyncer(t *testing.T) {
 			fromHeight:    5,
 			blocksToFetch: 3,
 			wantHeights:   []int{3, 4, 5},
+			wantRequests:  1,
+		},
+		{
+			name:          "all already on disk",
+			numBlocks:     10,
+			onDisk:        []int{3, 4, 5},
+			fromHeight:    5,
+			blocksToFetch: 3,
+			wantHeights:   []int{3, 4, 5},
+			wantRequests:  0,
+		},
+		{
+			// The tip is missing, so the skip stops immediately and the
+			// on-disk ancestors are refetched.
+			name:          "tip missing refetches suffix",
+			numBlocks:     10,
+			onDisk:        []int{3, 4},
+			fromHeight:    5,
+			blocksToFetch: 3,
+			wantHeights:   []int{3, 4, 5},
+			wantRequests:  1,
 		},
 		{
 			name:          "single block",
@@ -120,6 +145,7 @@ func TestSyncer(t *testing.T) {
 			fromHeight:    7,
 			blocksToFetch: 1,
 			wantHeights:   []int{7},
+			wantRequests:  1,
 		},
 		{
 			// blocksToFetch exceeds MaxParentsPerRequest, so this drives more
@@ -129,6 +155,7 @@ func TestSyncer(t *testing.T) {
 			fromHeight:    70,
 			blocksToFetch: 70,
 			wantHeights:   []int{1, 7, 64, 70},
+			wantRequests:  2,
 		},
 		{
 			name:          "stops at genesis",
@@ -136,6 +163,7 @@ func TestSyncer(t *testing.T) {
 			fromHeight:    10,
 			blocksToFetch: 30,
 			wantHeights:   []int{0, 1, 5, 10},
+			wantRequests:  1,
 		},
 	}
 
@@ -152,13 +180,16 @@ func TestSyncer(t *testing.T) {
 			}
 
 			net, tracker := synctest.NewSelfNetwork(t, ctx, nodeID)
-			require.NoError(t, RegisterHandler(net, logging.NoLog{}, synctest.NewBlockMap(blocks)))
+			handler, requests := countingHandler(blocks)
+			require.NoError(t, net.AddHandler(p2p.EVMBlockRequestHandlerID, handler))
 
 			tip := blocks[tt.fromHeight]
 			syncer, err := NewSyncer(NewClient(net, tracker), target, tip.Hash(), tt.fromHeight, tt.blocksToFetch)
 			require.NoError(t, err)
 			require.NoError(t, syncer.Sync(ctx))
 
+			// Skipped blocks must never be requested from peers.
+			require.Equal(t, tt.wantRequests, requests.Load())
 			for _, h := range tt.wantHeights {
 				want := blocks[h]
 				require.NotNil(t, rawdb.ReadBlock(target, want.Hash(), want.NumberU64()), "block %d missing", h)
@@ -230,6 +261,24 @@ func tamperingHandler(t *testing.T, wrong *types.Block) p2p.Handler {
 	}
 }
 
+// countingHandler serves blocks and counts how many requests it receives, so a
+// test can assert the syncer never asked for blocks it already had.
+func countingHandler(blocks []*types.Block) (p2p.Handler, *atomic.Int32) {
+	inner := handlers.NewHandler(
+		logging.NoLog{},
+		func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} },
+		newResponder(synctest.NewBlockMap(blocks)),
+	)
+	var requests atomic.Int32
+	h := p2p.TestHandler{
+		AppRequestF: func(c context.Context, n ids.NodeID, d time.Time, b []byte) ([]byte, *avacommon.AppError) {
+			requests.Add(1)
+			return inner.AppRequest(c, n, d, b)
+		},
+	}
+	return h, &requests
+}
+
 func writeBlock(db ethdb.Database, block *types.Block) {
 	batch := db.NewBatch()
 	rawdb.WriteBlock(batch, block)
@@ -240,7 +289,7 @@ func writeBlock(db ethdb.Database, block *types.Block) {
 func encodeTipFirst(t *testing.T, blocks []*types.Block, n int) [][]byte {
 	t.Helper()
 	raw := make([][]byte, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		b, err := rlp.EncodeToBytes(blocks[len(blocks)-1-i])
 		require.NoError(t, err)
 		raw[i] = b
