@@ -8,12 +8,16 @@ package statesync
 import (
 	"context"
 	"fmt"
+	"sync"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
@@ -29,10 +33,19 @@ var _ adaptor.SyncableVM[*summary] = (*SummaryHandler)(nil)
 type SummaryHandler struct {
 	*statesync.SummaryHandler
 
-	hooks hook.Points
-	state *state.State
-	ethDB ethdb.Database
-	log   logging.Logger
+	hooks   hook.Points
+	state   *state.State
+	ethDB   ethdb.Database
+	network *network.Network
+	log     logging.Logger
+
+	// Lifecycle management, mirroring the embedded handler: err MUST only be
+	// written before stateSyncDone is closed and only read after.
+	mu      sync.Mutex
+	stopped bool
+	cancel  context.CancelFunc
+	err     utils.Atomic[error]
+	done    chan struct{}
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and
@@ -57,11 +70,40 @@ func New(
 	}
 	return &SummaryHandler{
 		SummaryHandler: inner,
+		network:        network,
+		log:            snowCtx.Log,
 		state:          state,
 		hooks:          hooks,
 		ethDB:          db,
-		log:            snowCtx.Log,
+		done:           make(chan struct{}),
 	}, nil
+}
+
+// Shutdown cancels any ongoing state sync (both the embedded handler's and
+// the atomic trie's) and waits for the sync goroutine to exit, returning early
+// with the context's error if ctx expires first. After Shutdown, no new sync
+// can be started.
+func (h *SummaryHandler) Shutdown(ctx context.Context) error {
+	h.mu.Lock()
+	h.stopped = true
+	cancel := h.cancel
+	h.mu.Unlock()
+
+	if err := h.SummaryHandler.Shutdown(ctx); err != nil {
+		return err
+	}
+
+	if cancel == nil {
+		// no sync was ever started
+		return nil
+	}
+	cancel()
+	select {
+	case <-h.done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // GetStateSummary is the same as [statesync.SummaryHandler.GetStateSummary],
@@ -91,15 +133,16 @@ func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, err
 		return nil, err
 	}
 
-	hdr := rawdb.ReadHeader(h.ethDB, base.AcceptedHash, base.AcceptedHeight)
-	if hdr == nil {
-		h.log.Error("missing header",
+	settledHeight, err := h.settledHeight(base.AcceptedHash, base.AcceptedHeight)
+	if err != nil {
+		h.log.Error("getting settled height for summary",
 			zap.Uint64("acceptedHeight", base.AcceptedHeight),
 			zap.Stringer("acceptedHash", base.AcceptedHash),
+			zap.Error(err),
 		)
-		return nil, fmt.Errorf("missing header %d with hash %s", base.AcceptedHeight, base.AcceptedHash)
+		return nil, err
 	}
-	settledHeight := h.hooks.SettledBy(hdr).Height
+
 	root, err := h.state.GetRoot(settledHeight)
 	if err != nil {
 		h.log.Error("getting settled cross-chain state root",
@@ -114,4 +157,12 @@ func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, err
 		summary:     *base,
 		settledRoot: root,
 	}, nil
+}
+
+func (h *SummaryHandler) settledHeight(hash common.Hash, height uint64) (uint64, error) {
+	hdr := rawdb.ReadHeader(h.ethDB, hash, height)
+	if hdr == nil {
+		return 0, database.ErrNotFound
+	}
+	return h.hooks.SettledBy(hdr).Height, nil
 }
