@@ -11,17 +11,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", func() {
@@ -32,383 +25,179 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 
 	ginkgo.It("should reward eligible stakers and not reward ineligible ones", func() {
 		const (
-			weight                   = 2_000 * units.Avax
-			delegator1Weight         = 1_000 * units.Avax
-			delegator2Weight         = 500 * units.Avax
+			// Validator's data
+			validatorWeight          = 2_000 * units.Avax
 			delegationShares         = uint32(reward.PercentDenominator * 0.10) // 10%
 			autoCompoundRewardShares = uint32(reward.PercentDenominator * 0.40) // 40%
 			stakingPeriod            = 20 * time.Second
+
+			// Delegators' weights
+			delegator1Weight = 1_000 * units.Avax
+			delegator2Weight = 500 * units.Avax
+
+			gasAmount = 1 * units.Avax
 		)
 
-		var (
-			env     = e2e.GetEnv(tc)
-			network = env.GetNetwork()
+		env := e2e.GetEnv(tc)
+
+		requireHeliconActivated(tc, require, info.NewClient(env.GetRandomNodeURI().URI))
+
+		f := newAutoRenewedValidatorFixture(
+			tc,
+			require,
+			env,
+			validatorWeight+gasAmount, // funding amount
 		)
 
-		RequireHeliconActivated(tc, require, info.NewClient(env.GetRandomNodeURI().URI))
+		pvmClient := platformvm.NewClient(f.randomWalletNodeURI.URI)
+		rewardsCalculator := reward.NewCalculator(GetRewardConfig(f.tc, admin.NewClient(f.randomWalletNodeURI.URI)))
 
-		tc.By("adding an ephemeral node")
-		node := e2e.AddEphemeralNode(tc, network, tmpnet.NewEphemeralNode(tmpnet.FlagsMap{}))
-
-		tc.By("waiting until node is healthy")
-		e2e.WaitForHealthy(tc, node)
-
-		tc.By("retrieving node id and proof of possession")
-		nodeURI := node.GetAccessibleURI()
-		infoClient := info.NewClient(nodeURI)
-		nodeID, nodePOP, err := infoClient.GetNodeID(tc.DefaultContext())
-		require.NoError(err)
-
-		tc.By("creating keys and wallets")
 		var (
-			validationRewardKey  = e2e.NewPrivateKey(tc)
-			delegationRewardKey  = e2e.NewPrivateKey(tc)
 			delegator1RewardKey  = e2e.NewPrivateKey(tc)
 			delegator1FundingKey = e2e.NewPrivateKey(tc)
 			delegator2RewardKey  = e2e.NewPrivateKey(tc)
 			delegator2FundingKey = e2e.NewPrivateKey(tc)
-			validatorFundingKey  = e2e.NewPrivateKey(tc)
-
-			rewardKeys = []*secp256k1.PrivateKey{
-				validationRewardKey,
-				delegationRewardKey,
-				delegator1RewardKey,
-				delegator2RewardKey,
-			}
-
-			fundingKeychain   = env.NewKeychain()
-			validatorKeychain = secp256k1fx.NewKeychain(validatorFundingKey)
-			walletNodeURI     = env.GetRandomNodeURI()
-			fundingPWallet    = e2e.NewWallet(tc, fundingKeychain, walletNodeURI).P()
-			pContext          = fundingPWallet.Builder().Context()
-			pvmClient         = platformvm.NewClient(walletNodeURI.URI)
-			adminClient       = admin.NewClient(walletNodeURI.URI)
-			rewardConfig      = GetRewardConfig(tc, adminClient)
-			calculator        = reward.NewCalculator(rewardConfig)
 		)
 
-		configOwner := &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{validatorFundingKey.Address()},
-		}
-		validationRewardsOwner := &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{validationRewardKey.Address()},
-		}
-		delegationRewardsOwner := &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{delegationRewardKey.Address()},
-		}
+		tc.By("adding the node as an auto renewed validator and checking the supply mint")
+		_, validatorFirstCyclePotentialRewards, _ := f.addValidatorAndCheckSupplyMint(
+			validatorWeight,
+			delegationShares,
+			autoCompoundRewardShares,
+			stakingPeriod,
+		)
 
-		tc.By("funding validator wallet", func() {
-			_, err = fundingPWallet.IssueBaseTx(
-				[]*avax.TransferableOutput{
-					{
-						Asset: avax.Asset{ID: pContext.AVAXAssetID},
-						Out: &secp256k1fx.TransferOutput{
-							Amt: weight + delegator1Weight + delegator2Weight + 10*units.Avax,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{validatorFundingKey.Address()},
-							},
-						},
-					},
-				},
-				tc.WithDefaultContext(),
+		var supplyBeforeDelegator1 uint64
+		tc.By("funding and adding delegator1 for the first staking cycle with same end time as validator", func() {
+			f.fundKey(delegator1FundingKey, delegator1Weight+units.Avax)
+			supplyBeforeDelegator1 = f.addDelegator(
+				delegator1FundingKey,
+				delegator1RewardKey,
+				delegator1Weight,
+				currentValidator(tc, require, pvmClient, f.validatorNode.NodeID).EndTime,
 			)
-			require.NoError(err)
 		})
 
-		pWallet := e2e.NewWallet(tc, validatorKeychain, walletNodeURI).P()
-
-		tc.By("retrieving supply before adding the validator")
-		supplyAtValidatorStart, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
-		require.NoError(err)
-
-		tc.By("adding the node as an auto renewed validator", func() {
-			_, err := pWallet.IssueAddAutoRenewedValidatorTx(
-				nodeID,
-				weight,
-				nodePOP,
-				validationRewardsOwner,
-				delegationRewardsOwner,
-				configOwner,
-				delegationShares,
-				autoCompoundRewardShares,
-				stakingPeriod,
-				tc.WithDefaultContext(),
-			)
-			require.NoError(err)
+		var (
+			supplyBeforeSecondCycle    uint64
+			delegator1PotentialRewards uint64
+		)
+		tc.By("verifying delegator1 is active and checking the supply mint", func() {
+			supplyBeforeSecondCycle = currentSupply(tc, require, pvmClient)
+			delegator1StakingDuration := waitForOneActiveDelegator(tc, require, pvmClient, f.validatorNode.NodeID)
+			delegator1PotentialRewards = rewardsCalculator.Calculate(delegator1StakingDuration, delegator1Weight, supplyBeforeDelegator1)
+			require.Equal(supplyBeforeDelegator1+delegator1PotentialRewards, supplyBeforeSecondCycle)
 		})
 
-		potentialValidationReward1 := calculator.Calculate(stakingPeriod, weight, supplyAtValidatorStart)
-		tc.By("checking supply was increased by the validator's potential reward", func() {
-			supply, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
-			require.NoError(err)
-			require.Equal(supplyAtValidatorStart+potentialValidationReward1, supply)
-		})
-
-		tc.By("funding delegator1 wallet", func() {
-			_, err = pWallet.IssueBaseTx(
-				[]*avax.TransferableOutput{
-					{
-						Asset: avax.Asset{ID: pContext.AVAXAssetID},
-						Out: &secp256k1fx.TransferOutput{
-							Amt: delegator1Weight + units.Avax,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{delegator1FundingKey.Address()},
-							},
-						},
-					},
-				},
-				tc.WithDefaultContext(),
-			)
-			require.NoError(err)
-		})
-
-		tc.By("retrieving supply before adding delegator1")
-		supplyAtDelegator1Start, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
-		require.NoError(err)
-
-		tc.By("adding delegator1 for the first staking cycle with same end time as validator", func() {
-			delegator1Keychain := secp256k1fx.NewKeychain(delegator1FundingKey)
-			delegator1PWallet := e2e.NewWallet(tc, delegator1Keychain, walletNodeURI).P()
-
-			// Get validator's end time to enable configuring delegator1 to delegate for the entire cycle
-			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-			require.NoError(err)
-			require.Len(validators, 1)
-			validatorEndTime := validators[0].EndTime
-
-			_, err = delegator1PWallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
-						NodeID: nodeID,
-						End:    validatorEndTime,
-						Wght:   delegator1Weight,
-					},
-					Subnet: constants.PrimaryNetworkID,
-				},
-				pContext.AVAXAssetID,
-				&secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{delegator1RewardKey.Address()},
-				},
-				tc.WithDefaultContext(),
-			)
-			require.NoError(err)
-		})
-
-		var actualDelegator1Period time.Duration
-		tc.By("verifying the validator and delegator1 are active", func() {
-			tc.Eventually(func() bool {
-				validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-				require.NoError(err)
-				return len(validators) == 1 && len(validators[0].Delegators) == 1
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "validator and delegator1 not active")
-
-			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-			require.NoError(err)
-			require.Len(validators, 1)
-			delegator := validators[0].Delegators[0]
-			actualDelegator1Period = time.Duration(delegator.EndTime-delegator.StartTime) * time.Second
-		})
-
-		potentialDelegationReward1 := calculator.Calculate(actualDelegator1Period, delegator1Weight, supplyAtDelegator1Start)
-
-		tc.By("retrieving supply for the second cycle")
-		supplyAtCycle2Start, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
-		require.NoError(err)
-
-		tc.By("checking supply was increased by delegator1's potential reward", func() {
-			require.Equal(supplyAtDelegator1Start+potentialDelegationReward1, supplyAtCycle2Start)
-		})
+		tc.By("retrieving delegator1 wallet balance before delegation ends")
+		delegator1BalanceBeforeExit := balanceOf(tc, require, f.randomWalletNodeURI, delegator1FundingKey)
 
 		tc.By("waiting for the first staking cycle to complete", func() {
-			WaitForAutoRenewedCycleEnd(tc, require, pvmClient, nodeID)
+			waitForAutoRenewedCycleEnd(tc, require, pvmClient, f.validatorNode.NodeID)
 		})
 
 		tc.By("stopping the validator node to fail uptime check in the second cycle", func() {
-			require.NoError(node.Stop(tc.DefaultContext()))
+			require.NoError(f.validatorNode.Stop(tc.DefaultContext()))
 		})
 
-		var expectedValidationReward1, expectedDelegateeReward1, expectedDelegator1Reward, compoundedValidationRewards1, compoundedDelegateeRewards1 uint64
-		tc.By("checking reward balances after first cycle", func() {
-			rewardBalances := make(map[ids.ShortID]uint64, len(rewardKeys))
-			for _, rewardKey := range rewardKeys {
-				rewardKeychain := secp256k1fx.NewKeychain(rewardKey)
-				rewardPWallet := e2e.NewWallet(tc, rewardKeychain, walletNodeURI).P()
-				balances, err := rewardPWallet.Builder().GetBalance()
-				require.NoError(err)
-				rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
-			}
+		var (
+			restakingValidationRewards, restakingDelegateeRewards uint64
+			withdrawnValidationRewards, withdrawnDelegateeRewards uint64
+			delegator1Reward                                      uint64
+		)
 
-			expectedDelegateeReward1, expectedDelegator1Reward = reward.Split(potentialDelegationReward1, delegationShares)
-			compoundedValidationRewards1, expectedValidationReward1 = reward.Split(potentialValidationReward1, autoCompoundRewardShares)
-			compoundedDelegateeRewards1, expectedDelegateeReward1 = reward.Split(expectedDelegateeReward1, autoCompoundRewardShares)
+		tc.By("checking reward balances and validator's weight after first cycle", func() {
+			var delegateeReward uint64
 
-			require.Equal(
-				map[ids.ShortID]uint64{
-					validationRewardKey.Address(): expectedValidationReward1,
-					delegationRewardKey.Address(): expectedDelegateeReward1,
-					delegator1RewardKey.Address(): expectedDelegator1Reward,
-					delegator2RewardKey.Address(): 0, // delegator2 not active yet
-				},
-				rewardBalances,
-			)
+			delegateeReward, delegator1Reward = reward.Split(delegator1PotentialRewards, delegationShares)
+			restakingValidationRewards, withdrawnValidationRewards = reward.Split(validatorFirstCyclePotentialRewards, autoCompoundRewardShares)
+			restakingDelegateeRewards, withdrawnDelegateeRewards = reward.Split(delegateeReward, autoCompoundRewardShares)
+
+			require.Equal(withdrawnValidationRewards, balanceOf(tc, require, f.randomWalletNodeURI, f.validationRewardKey))
+			require.Equal(withdrawnDelegateeRewards, balanceOf(tc, require, f.randomWalletNodeURI, f.delegationRewardKey))
+
+			expectedDelegator1Balance := delegator1Reward
+			require.Equal(expectedDelegator1Balance, balanceOf(tc, require, f.randomWalletNodeURI, delegator1RewardKey))
+			require.Zero(balanceOf(tc, require, f.randomWalletNodeURI, delegator2RewardKey)) // delegator2 not active yet
+
+			expectedValidatorWeight := validatorWeight + restakingValidationRewards + restakingDelegateeRewards
+			require.Equal(expectedValidatorWeight, currentValidator(tc, require, pvmClient, f.validatorNode.NodeID).Weight)
 		})
 
-		tc.By("checking validator weight increased by compounded rewards", func() {
-			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-			require.NoError(err)
-			require.Len(validators, 1)
-
-			expectedWeight := weight + compoundedValidationRewards1 + compoundedDelegateeRewards1
-			require.Equal(expectedWeight, validators[0].Weight)
+		tc.By("checking delegator1 stake was returned", func() {
+			require.Equal(delegator1BalanceBeforeExit+delegator1Weight, balanceOf(tc, require, f.randomWalletNodeURI, delegator1FundingKey))
 		})
 
-		cycle2ValidatorWeight := weight + compoundedValidationRewards1 + compoundedDelegateeRewards1
-		potentialValidationReward2 := calculator.Calculate(stakingPeriod, cycle2ValidatorWeight, supplyAtCycle2Start)
+		var validatorSecondCyclePotentialRewards uint64
 		tc.By("checking supply was increased by the second cycle's potential reward on renewal", func() {
-			supply, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
-			require.NoError(err)
-			require.Equal(supplyAtCycle2Start+potentialValidationReward2, supply)
-		})
+			expectedValidatorWeight := validatorWeight + restakingValidationRewards + restakingDelegateeRewards
 
-		tc.By("funding delegator2 wallet", func() {
-			pWallet = e2e.NewWallet(tc, validatorKeychain, walletNodeURI).P()
-			_, err = pWallet.IssueBaseTx(
-				[]*avax.TransferableOutput{
-					{
-						Asset: avax.Asset{ID: pContext.AVAXAssetID},
-						Out: &secp256k1fx.TransferOutput{
-							Amt: delegator2Weight + units.Avax,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{delegator2FundingKey.Address()},
-							},
-						},
-					},
-				},
-				tc.WithDefaultContext(),
+			validatorSecondCyclePotentialRewards = rewardsCalculator.Calculate(
+				stakingPeriod,
+				expectedValidatorWeight,
+				supplyBeforeSecondCycle,
 			)
-			require.NoError(err)
+			require.Equal(supplyBeforeSecondCycle+validatorSecondCyclePotentialRewards, currentSupply(tc, require, pvmClient))
 		})
 
-		tc.By("retrieving supply before adding delegator2")
-		supplyAtDelegator2Start, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
-		require.NoError(err)
-
-		tc.By("adding delegator2 for the second staking cycle with same end time as validator", func() {
-			delegator2Keychain := secp256k1fx.NewKeychain(delegator2FundingKey)
-			delegator2PWallet := e2e.NewWallet(tc, delegator2Keychain, walletNodeURI).P()
-
-			// Get validator's end time so delegator2 delegates for the entire remaining period
-			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-			require.NoError(err)
-			require.Len(validators, 1)
-			validatorEndTime := validators[0].EndTime
-
-			_, err = delegator2PWallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
-						NodeID: nodeID,
-						End:    validatorEndTime,
-						Wght:   delegator2Weight,
-					},
-					Subnet: constants.PrimaryNetworkID,
-				},
-				pContext.AVAXAssetID,
-				&secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{delegator2RewardKey.Address()},
-				},
-				tc.WithDefaultContext(),
+		var supplyBeforeDelegator2 uint64
+		tc.By("funding and adding delegator2 for the second staking cycle with same end time as validator", func() {
+			f.fundKey(delegator2FundingKey, delegator2Weight+units.Avax)
+			supplyBeforeDelegator2 = f.addDelegator(
+				delegator2FundingKey,
+				delegator2RewardKey,
+				delegator2Weight,
+				currentValidator(tc, require, pvmClient, f.validatorNode.NodeID).EndTime,
 			)
-			require.NoError(err)
 		})
 
-		tc.By("verifying delegator2 is active", func() {
-			tc.Eventually(func() bool {
-				validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-				require.NoError(err)
-				return len(validators) == 1 && len(validators[0].Delegators) == 1
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "delegator2 not active")
+		var (
+			delegator2PotentialRewards uint64
+			supplyAfterDelegator2      uint64
+		)
+		tc.By("verifying delegator2 is active and checking the supply mint", func() {
+			supplyAfterDelegator2 = currentSupply(tc, require, pvmClient)
+			actualDelegator2Period := waitForOneActiveDelegator(tc, require, pvmClient, f.validatorNode.NodeID)
+			delegator2PotentialRewards = rewardsCalculator.Calculate(actualDelegator2Period, delegator2Weight, supplyBeforeDelegator2)
+			require.Equal(supplyBeforeDelegator2+delegator2PotentialRewards, supplyAfterDelegator2)
 		})
 
-		var potentialDelegationReward2 uint64
-		tc.By("checking supply was increased by delegator2's potential reward", func() {
-			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-			require.NoError(err)
-			require.Len(validators, 1)
-			require.Len(validators[0].Delegators, 1)
-
-			delegator2 := validators[0].Delegators[0]
-			actualDelegator2Period := time.Duration(delegator2.EndTime-delegator2.StartTime) * time.Second
-			potentialDelegationReward2 = calculator.Calculate(actualDelegator2Period, delegator2Weight, supplyAtDelegator2Start)
-
-			supply, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
-			require.NoError(err)
-			require.Equal(supplyAtDelegator2Start+potentialDelegationReward2, supply)
-		})
+		tc.By("retrieving delegator2 wallet balance before delegation ends")
+		delegator2BalanceBeforeExit := balanceOf(tc, require, f.randomWalletNodeURI, delegator2FundingKey)
 
 		tc.By("retrieving wallet balance before validator exits")
-		fundedKeyBalancesBeforeExit, err := pWallet.Builder().GetBalance()
-		require.NoError(err)
+		fundedKeyBalanceBeforeExit := balanceOf(tc, require, f.randomWalletNodeURI, f.validatorFundingKey)
 
 		tc.By("waiting for the second staking cycle to complete", func() {
-			WaitForAutoRenewedCycleEnd(tc, require, pvmClient, nodeID)
+			waitForAutoRenewedCycleEnd(tc, require, pvmClient, f.validatorNode.NodeID)
 		})
 
 		tc.By("verifying the validator is no longer in the current set due to uptime failure", func() {
-			tc.Eventually(func() bool {
-				validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-				require.NoError(err)
-				return len(validators) == 0
-			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "validator should have been removed due to uptime failure")
+			requireValidatorRemoved(tc, require, pvmClient, f.validatorNode.NodeID, "validator should have been removed due to uptime failure")
 		})
 
 		tc.By("checking unearned potential rewards were burned on the failed cycle", func() {
-			supply, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
-			require.NoError(err)
-
 			// Neither the validator nor delegator2 earned their second-cycle
 			// potential rewards, so both optimistic supply mints are reverted.
-			supplyBeforeCycleEnd := supplyAtDelegator2Start + potentialDelegationReward2
-			require.Equal(supplyBeforeCycleEnd-potentialValidationReward2-potentialDelegationReward2, supply)
+			expectedSupply := supplyAfterDelegator2 - validatorSecondCyclePotentialRewards - delegator2PotentialRewards
+			require.Equal(expectedSupply, currentSupply(tc, require, pvmClient))
 		})
 
 		tc.By("checking reward balances after second cycle", func() {
-			rewardBalances := make(map[ids.ShortID]uint64, len(rewardKeys))
-			for _, rewardKey := range rewardKeys {
-				rewardKeychain := secp256k1fx.NewKeychain(rewardKey)
-				rewardPWallet := e2e.NewWallet(tc, rewardKeychain, walletNodeURI).P()
-				balances, err := rewardPWallet.Builder().GetBalance()
-				require.NoError(err)
-				rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
-			}
+			require.Equal(restakingValidationRewards+withdrawnValidationRewards, balanceOf(tc, require, f.randomWalletNodeURI, f.validationRewardKey))
+			require.Equal(restakingDelegateeRewards+withdrawnDelegateeRewards, balanceOf(tc, require, f.randomWalletNodeURI, f.delegationRewardKey))
+			require.Equal(delegator1Reward, balanceOf(tc, require, f.randomWalletNodeURI, delegator1RewardKey))
+			require.Zero(balanceOf(tc, require, f.randomWalletNodeURI, delegator2RewardKey))
+		})
 
-			require.Equal(
-				map[ids.ShortID]uint64{
-					validationRewardKey.Address(): expectedValidationReward1 + compoundedValidationRewards1,
-					delegationRewardKey.Address(): expectedDelegateeReward1 + compoundedDelegateeRewards1,
-					delegator1RewardKey.Address(): expectedDelegator1Reward,
-					delegator2RewardKey.Address(): 0,
-				},
-				rewardBalances,
-			)
+		tc.By("checking delegator2 stake was returned", func() {
+			require.Equal(delegator2BalanceBeforeExit+delegator2Weight, balanceOf(tc, require, f.randomWalletNodeURI, delegator2FundingKey))
 		})
 
 		tc.By("checking stake was returned", func() {
-			// Refresh wallet to get updated UTXOs after validator exit
-			pWallet = e2e.NewWallet(tc, validatorKeychain, walletNodeURI).P()
-			fundedKeyBalances, err := pWallet.Builder().GetBalance()
-			require.NoError(err)
-
-			require.Equal(fundedKeyBalancesBeforeExit[pContext.AVAXAssetID]+weight, fundedKeyBalances[pContext.AVAXAssetID])
+			require.Equal(fundedKeyBalanceBeforeExit+validatorWeight, balanceOf(tc, require, f.randomWalletNodeURI, f.validatorFundingKey))
 		})
 
-		_ = e2e.CheckBootstrapIsPossible(tc, network)
+		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })

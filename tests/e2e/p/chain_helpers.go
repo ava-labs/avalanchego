@@ -10,14 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func RequireHeliconActivated(
+func requireHeliconActivated(
 	tc *e2e.GinkgoTestContext,
 	assertions *require.Assertions,
 	infoClient *info.Client,
@@ -43,27 +45,22 @@ func RequireHeliconActivated(
 	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "Helicon should have activated")
 }
 
-func WaitForAutoRenewedCycleEnd(
+// balanceOf returns the AVAX balance of key.
+func balanceOf(
 	tc *e2e.GinkgoTestContext,
 	require *require.Assertions,
-	pvmClient *platformvm.Client,
-	nodeID ids.NodeID,
-) {
-	validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
+	walletNodeURI tmpnet.NodeURI,
+	key *secp256k1.PrivateKey,
+) uint64 {
+	wallet := e2e.NewWallet(tc, secp256k1fx.NewKeychain(key), walletNodeURI).P()
+	balances, err := wallet.Builder().GetBalance()
 	require.NoError(err)
-	require.Len(validators, 1)
-	initialStartTime := validators[0].StartTime
+	return balances[wallet.Builder().Context().AVAXAssetID]
+}
 
-	tc.Eventually(func() bool {
-		validators, err = pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, []ids.NodeID{nodeID})
-		require.NoError(err)
-		if len(validators) == 0 {
-			return true
-		}
-		require.Len(validators, 1)
-
-		// A renewal re-adds the validator with its start time set to the
-		// previous cycle's end time, so a start time change marks a new cycle start.
-		return validators[0].StartTime != initialStartTime
-	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "node failed to finish staking cycle")
+// currentSupply returns the primary network's current supply.
+func currentSupply(tc *e2e.GinkgoTestContext, require *require.Assertions, pvmClient *platformvm.Client) uint64 {
+	supply, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
+	require.NoError(err)
+	return supply
 }
