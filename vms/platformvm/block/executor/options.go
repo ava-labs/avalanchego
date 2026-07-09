@@ -32,10 +32,6 @@ var (
 	errFailedCalculatingUptime            = errors.New("failed calculating uptime")
 )
 
-// ACP-267 raises the Primary Network uptime requirement to 90% (from 80%) for
-// validations that start at or after Helicon activates.
-const acp267UptimeRequirement = .9
-
 // options supports build new option blocks
 type options struct {
 	// inputs populated before calling this struct's methods:
@@ -180,7 +176,9 @@ func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
 	} else if o.upgradeConfig.IsHeliconActivated(primaryNetworkValidator.StartTime) {
-		expectedUptimePercentage = acp267UptimeRequirement
+		// ACP-267 requires 90% uptime for Primary Network validators that start at
+		// or after Helicon activation.
+		expectedUptimePercentage = .9
 	}
 
 	uptime, err := o.uptimes.CalculateUptimePercentFrom(

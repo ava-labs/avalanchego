@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -637,7 +636,7 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 		wantPrefersCommit bool
 	}
 
-	newBlock := func(t *testing.T, tt test) (*Block, [2]snowman.Block) {
+	newBlock := func(t *testing.T, tt test) *Block {
 		t.Helper()
 
 		var (
@@ -661,7 +660,7 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 		rewardValidatorTx, err := newRewardValidatorTx(t, stakerTxID)
 		require.NoError(t, err)
 
-		statelessProposalBlock, err := block.NewBanffProposalBlock(
+		proposalBlock, err := block.NewBanffProposalBlock(
 			proposalTimestamp,
 			ids.GenerateTestID(),
 			1,
@@ -695,35 +694,10 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 			},
 		}
 
-		statelessCommitBlock, err := block.NewBanffCommitBlock(
-			statelessProposalBlock.Timestamp(),
-			statelessProposalBlock.ID(),
-			statelessProposalBlock.Height()+1,
-		)
-		require.NoError(t, err)
-
-		statelessAbortBlock, err := block.NewBanffAbortBlock(
-			statelessProposalBlock.Timestamp(),
-			statelessProposalBlock.ID(),
-			statelessProposalBlock.Height()+1,
-		)
-		require.NoError(t, err)
-
-		expectedOptions := [2]snowman.Block{
-			manager.NewBlock(statelessAbortBlock),
-			manager.NewBlock(statelessCommitBlock),
-		}
-		if tt.wantPrefersCommit {
-			expectedOptions = [2]snowman.Block{
-				manager.NewBlock(statelessCommitBlock),
-				manager.NewBlock(statelessAbortBlock),
-			}
-		}
-
 		return &Block{
-			Block:   statelessProposalBlock,
+			Block:   proposalBlock,
 			manager: manager,
-		}, expectedOptions
+		}
 	}
 
 	tests := []test{
@@ -759,10 +733,32 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			blk, expectedOptions := newBlock(t, tt)
+			blk := newBlock(t, tt)
 			options, err := blk.Options(t.Context())
 			require.NoError(t, err)
-			require.Equal(t, expectedOptions, options)
+
+			proposalBlock := blk.Block.(*block.BanffProposalBlock)
+			commitBlock, err := block.NewBanffCommitBlock(
+				proposalBlock.Timestamp(),
+				proposalBlock.ID(),
+				proposalBlock.Height()+1,
+			)
+			require.NoError(t, err)
+
+			abortBlock, err := block.NewBanffAbortBlock(
+				proposalBlock.Timestamp(),
+				proposalBlock.ID(),
+				proposalBlock.Height()+1,
+			)
+			require.NoError(t, err)
+
+			var wantPreferred, wantAlternate block.Block = abortBlock, commitBlock
+			if tt.wantPrefersCommit {
+				wantPreferred, wantAlternate = commitBlock, abortBlock
+			}
+
+			require.Equal(t, wantPreferred, options[0].(*Block).Block)
+			require.Equal(t, wantAlternate, options[1].(*Block).Block)
 		})
 	}
 }
