@@ -144,32 +144,47 @@ func TestTransitionForwardsConnections(t *testing.T) {
 // TestAppGossipCanGrabCtxLock verifies that the pre-transition VM can grab its
 // ctx.Lock during AppGossip.
 func TestAppGossipCanGrabCtxLock(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		sut := newSUT(t, 1)
-		ctx := t.Context()
+	tests := []struct {
+		name                  string
+		blocksUntilTransition int
+	}{
+		{
+			name:                  "with_transition",
+			blocksUntilTransition: 1,
+		},
+		{
+			name:                  "without_transition",
+			blocksUntilTransition: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				sut := newSUT(t, tt.blocksUntilTransition)
+				ctx := t.Context()
 
-		blocked := make(chan struct{})
-		sut.pre.VM.AppGossipF = func(context.Context, ids.NodeID, []byte) error {
-			<-blocked // Block with [VM.transitionLock] held.
+				sut.pre.VM.AppGossipF = func(context.Context, ids.NodeID, []byte) error {
+					sut.pre.chainCtx.Lock.Lock()
+					defer sut.pre.chainCtx.Lock.Unlock()
 
-			sut.pre.chainCtx.Lock.Lock()
-			defer sut.pre.chainCtx.Lock.Unlock()
+					return nil // Coreth verifies txs here
+				}
 
-			return nil // Coreth verifies txs here
-		}
+				sut.ctx.Lock.Lock() // Taken by the consensus thread
 
-		go func() {
-			assert.NoError(t, sut.AppGossip(ctx, ids.GenerateTestNodeID(), nil), "%T.AppGossip()", sut.VM)
-		}()
+				done := make(chan struct{})
+				go func() {
+					assert.NoError(t, sut.AppGossip(ctx, ids.GenerateTestNodeID(), nil), "%T.AppGossip()", sut.VM)
+					close(done)
+				}()
+				synctest.Wait() // pre-transition gossip is blocked
 
-		synctest.Wait() // [VM.transitionLock] is held and gossip is waiting on blocked.
+				// On the consensus thread, the transition lock is grabbed
+				sut.BuildVerifyAccept(t, ctx, noContext)
 
-		// The engine holds ctx.Lock across Accept.
-		sut.ctx.Lock.Lock()
-		defer sut.ctx.Lock.Unlock()
-
-		// Allow the AppGossip to proceed.
-		go close(blocked)
-		sut.BuildVerifyAccept(t, ctx, noContext)
-	})
+				sut.ctx.Lock.Unlock()
+				<-done // pre-transition gossip should have returned
+			})
+		})
+	}
 }
