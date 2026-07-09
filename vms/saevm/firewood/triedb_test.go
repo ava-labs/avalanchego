@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -33,7 +34,7 @@ func newDB(t *testing.T) state.Database {
 		DBOverride: cfg.BackendConstructor,
 	})
 	t.Cleanup(func() {
-		require.NoError(t, db.TrieDB().Close(), "triedb.Close()")
+		assert.NoError(t, db.TrieDB().Close(), "triedb.Close()")
 	})
 	return db
 }
@@ -69,6 +70,8 @@ func (m *fuzzModel) selectAddr(param byte) common.Address {
 }
 
 type SUT struct {
+	r *reader
+
 	fwDB, hashDB       state.Database
 	fwState, hashState *state.StateDB
 
@@ -78,7 +81,7 @@ type SUT struct {
 	model    *fuzzModel
 }
 
-func newSUT(t *testing.T) *SUT {
+func newSUT(t *testing.T, r *reader) *SUT {
 	fwDB := newDB(t)
 	hashDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
@@ -86,6 +89,7 @@ func newSUT(t *testing.T) *SUT {
 	fwState := newStateDB(t, fwDB, root)
 	hashState := newStateDB(t, hashDB, root)
 	return &SUT{
+		r:         r,
 		fwDB:      fwDB,
 		fwState:   fwState,
 		hashDB:    hashDB,
@@ -107,35 +111,40 @@ func (s *SUT) nextHash() common.Hash {
 // createAccount creates an account, modelling an EVM contract deployment. When
 // an account has been destructed earlier in the current transaction, that
 // accound could be resurrected.
-func (s *SUT) createAccount(param byte) {
+func (s *SUT) createAccount(t *testing.T) {
+	param := s.r.byte()
 	var addr common.Address
 	if len(s.model.destructedThisTx) > 0 && param&1 == 0 {
 		// choose a previously destructed account to resurrect.
 		i := int(param>>1) % len(s.model.destructedThisTx)
 		addr = s.model.destructedThisTx[i]
+		t.Logf("resurrecting destructed account (addr=%s)", addr.Hex())
 		s.model.destructedThisTx = utils.DeleteIndex(s.model.destructedThisTx, i)
 	} else {
 		addr = common.BytesToAddress(s.nextHash().Bytes())
+		t.Logf("creating new account (addr=%s)", addr.Hex())
 	}
 
-	bal := uint256.NewInt(100)
 	s.model.accounts[addr] = &accountModel{
-		nonce:   1,
-		balance: bal.Clone(),
+		nonce:   0,
+		balance: uint256.NewInt(0),
 	}
 	s.model.addrs = append(s.model.addrs, addr)
 	s.model.createdThisTx.Add(addr)
 
 	s.fwState.CreateAccount(addr)
-	s.fwState.SetNonce(addr, 1)
-	s.fwState.SetBalance(addr, bal)
 	s.hashState.CreateAccount(addr)
-	s.hashState.SetNonce(addr, 1)
-	s.hashState.SetBalance(addr, bal)
+
 }
 
-func (s *SUT) updateAccount(param byte) {
+func (s *SUT) updateAccount(t *testing.T) {
+	if len(s.model.addrs) == 0 {
+		return
+	}
+
+	param := s.r.byte()
 	addr := s.model.selectAddr(param)
+	t.Logf("updating account (addr=%s)", addr.Hex())
 	acc := s.model.accounts[addr]
 	acc.nonce++
 	acc.balance = new(uint256.Int).Add(acc.balance, uint256.NewInt(1))
@@ -151,7 +160,12 @@ func (s *SUT) updateAccount(param byte) {
 // only actually destructs the account — and so only updates the model — when the
 // account was created in the current transaction. On a pre-existing account it
 // is a no-op and the account remains live.
-func (s *SUT) selfDestruct6780(param byte) {
+func (s *SUT) selfDestruct6780() {
+	if len(s.model.addrs) == 0 {
+		return
+	}
+
+	param := s.r.byte()
 	i := int(param) % len(s.model.addrs)
 	addr := s.model.addrs[i]
 
@@ -168,8 +182,14 @@ func (s *SUT) selfDestruct6780(param byte) {
 	s.model.addrs = utils.DeleteIndex(s.model.addrs, i)
 }
 
-func (s *SUT) setStorage(param byte) {
+func (s *SUT) setStorage(t *testing.T) {
+	if len(s.model.addrs) == 0 {
+		return
+	}
+
+	param := s.r.byte()
 	addr := s.model.selectAddr(param)
+	t.Logf("setting storage for %s", addr.Hex())
 	key := s.nextHash()
 	val := s.nextHash()
 	s.model.accounts[addr].storage = append(s.model.accounts[addr].storage, key)
@@ -178,18 +198,49 @@ func (s *SUT) setStorage(param byte) {
 	s.hashState.SetState(addr, key, val)
 }
 
-func (s *SUT) deleteStorage(param byte) {
-	addr := s.model.selectAddr(param)
+func (s *SUT) deleteStorage() {
+	if len(s.model.addrs) == 0 {
+		return
+	}
+
+	addr := s.model.selectAddr(s.r.byte())
 	storage := s.model.accounts[addr].storage
 	if len(storage) == 0 {
 		return
 	}
-	i := int(param) % len(storage)
+	i := int(s.r.byte()) % len(storage)
 	key := storage[i]
 	s.model.accounts[addr].storage = utils.DeleteIndex(storage, i)
 
 	s.fwState.SetState(addr, key, common.Hash{})
 	s.hashState.SetState(addr, key, common.Hash{})
+}
+
+func (s *SUT) read(t *testing.T) {
+	if len(s.model.addrs) == 0 {
+		return
+	}
+
+	addr := s.model.selectAddr(s.r.byte())
+	require.Equal(t, s.hashState.GetNonce(addr), s.fwState.GetNonce(addr), "nonce mismatch for %s", addr)
+
+	storage := s.model.accounts[addr].storage
+	if len(storage) == 0 {
+		return
+	}
+	i := int(s.r.byte()) % len(storage)
+	key := storage[i]
+
+	require.Equal(t,
+		s.hashState.GetState(addr, key),
+		s.fwState.GetState(addr, key),
+		"storage mismatch for %s[%s]", addr, key,
+	)
+	require.Equal(t,
+		s.hashState.GetCommittedState(addr, key),
+		s.fwState.GetCommittedState(addr, key),
+		"committed storage mismatch for %s[%s]", addr, key,
+	)
 }
 
 // finaliseTx resets the model's per-transaction tracking to mirror
@@ -246,6 +297,7 @@ const (
 	opSelfDestruct6780             // SELFDESTRUCT (EIP-6780) an account; no-op unless created this tx
 	opSetStorage                   // write a new storage slot on an existing account
 	opDeleteStorage                // zero out an existing storage slot on an existing account
+	opRead                         // read an existing account's nonce and a storage slot
 	opFinalise                     // end the current transaction without computing a root
 	opIntermediateRoot             // verify all account and storage hashes match the model
 	opStateDBCommit                // commit pending changes; root changes iff state changed
@@ -253,6 +305,27 @@ const (
 	opCopyStateDB                  // copies statedb for future ops
 	maxOp
 )
+
+type reader struct {
+	stream []byte
+}
+
+func (r *reader) op() byte {
+	return r.byte() % maxOp
+}
+
+func (r *reader) byte() byte {
+	if len(r.stream) == 0 {
+		return 0
+	}
+	b := r.stream[0]
+	r.stream = r.stream[1:]
+	return b
+}
+
+func (r *reader) empty() bool {
+	return len(r.stream) == 0
+}
 
 // FuzzStateRoot compares the state root of an arbitrary sequence of operations on
 // a Firewood-backed [state.StateDB] against a reference HashDB.
@@ -263,36 +336,36 @@ func FuzzStateRoot(f *testing.F) {
 			opDiskCommit,
 		},
 		{
-			opCreateAccount,
+			opCreateAccount, 0,
 			opStateDBCommit,
 			opDiskCommit,
 		},
 		{
-			opCreateAccount,
-			opUpdateAccount,
-			opSetStorage,
+			opCreateAccount, 0,
+			opUpdateAccount, 0,
+			opSetStorage, 0,
 			opStateDBCommit,
 			opDiskCommit,
 		},
 		{
-			opCreateAccount,
-			opSetStorage,
+			opCreateAccount, 0,
+			opSetStorage, 0,
 			opIntermediateRoot,
-			opDeleteStorage,
+			opDeleteStorage, 0 /*acct*/, 0, /*idx*/
 			opStateDBCommit,
 		},
 		{
-			opCreateAccount,
+			opCreateAccount, 0,
 			opFinalise,
-			opSelfDestruct6780,
+			opSelfDestruct6780, 0,
 			opStateDBCommit,
 		},
 		{
-			opCreateAccount,
-			opSetStorage,
-			opSelfDestruct6780,
-			opCreateAccount, // resurrects the just-destructed account
-			opSetStorage,
+			opCreateAccount, 0,
+			opSetStorage, 0,
+			opSelfDestruct6780, 0,
+			opCreateAccount, 1, // resurrects the just-destructed account
+			opSetStorage, 0,
 			opStateDBCommit,
 		},
 	}
@@ -300,35 +373,29 @@ func FuzzStateRoot(f *testing.F) {
 		f.Add(tt)
 	}
 
-	f.Fuzz(func(t *testing.T, steps []byte) {
-		sut := newSUT(t)
-		for _, step := range steps {
-			op := step % maxOp
-			param := step / maxOp
-			switch op {
+	f.Fuzz(func(t *testing.T, stream []byte) {
+		r := &reader{stream: stream}
+		sut := newSUT(t, r)
+		for !r.empty() {
+			switch r.op() {
 			case opCreateAccount:
 				t.Log("create account")
-				sut.createAccount(param)
+				sut.createAccount(t)
 			case opUpdateAccount:
-				if len(sut.model.addrs) > 0 {
-					t.Log("update account")
-					sut.updateAccount(param)
-				}
+				t.Log("update account")
+				sut.updateAccount(t)
 			case opSelfDestruct6780:
-				if len(sut.model.addrs) > 0 {
-					t.Log("delete account")
-					sut.selfDestruct6780(param)
-				}
+				t.Log("delete account")
+				sut.selfDestruct6780()
 			case opSetStorage:
-				if len(sut.model.addrs) > 0 {
-					t.Log("set storage")
-					sut.setStorage(param)
-				}
+				t.Log("set storage")
+				sut.setStorage(t)
 			case opDeleteStorage:
-				if len(sut.model.addrs) > 0 {
-					t.Log("delete storage")
-					sut.deleteStorage(param)
-				}
+				t.Log("delete storage")
+				sut.deleteStorage()
+			case opRead:
+				t.Log("read")
+				sut.read(t)
 			case opFinalise:
 				t.Log("finalise (end transaction)")
 				sut.finalise()
@@ -344,8 +411,6 @@ func FuzzStateRoot(f *testing.F) {
 			case opCopyStateDB:
 				t.Log("copy StateDB")
 				sut.copyStateDB()
-			default:
-				t.Skip("invalid operation")
 			}
 		}
 		sut.intermediateRoot(t) // final flush to tries and verify all pending state
@@ -469,41 +534,4 @@ func TestNoLoggerPanicsInBackendConstructor(t *testing.T) {
 func TestUnknownCommitNoError(t *testing.T) {
 	db := newDB(t)
 	require.NoErrorf(t, db.TrieDB().Commit(common.Hash{0x1}, false), "triedb.Commit(%s)", common.Hash{0x1})
-}
-
-func TestReadSafety(t *testing.T) {
-	db := newDB(t)
-
-	var (
-		addrWithDeletedKey = common.BytesToAddress([]byte{1})
-		deletedKey         = common.BytesToHash([]byte{1})
-		createdAddr        = common.BytesToAddress([]byte{2})
-		createdKey         = common.BytesToHash([]byte{2})
-		val                = common.BytesToHash([]byte{3})
-		bal                = uint256.NewInt(100)
-	)
-
-	// Tx1
-	sdb := newStateDB(t, db, types.EmptyRootHash)
-	sdb.CreateAccount(addrWithDeletedKey)
-	sdb.SetNonce(addrWithDeletedKey, 1)
-	sdb.SetBalance(addrWithDeletedKey, bal)
-	sdb.SetState(addrWithDeletedKey, deletedKey, val)
-	_ = sdb.IntermediateRoot(true)
-
-	// Tx2
-	sdb.SetState(addrWithDeletedKey, deletedKey, common.Hash{}) // delete the key
-	sdb.CreateAccount(createdAddr)
-	sdb.SetNonce(createdAddr, 1)
-	sdb.SetBalance(createdAddr, bal)
-	sdb.SetState(createdAddr, createdKey, val)
-	_ = sdb.IntermediateRoot(true)
-
-	require.Equal(t, common.Hash{}, sdb.GetState(addrWithDeletedKey, deletedKey), "deleted key should be zero")
-	require.Equal(t, val, sdb.GetState(createdAddr, createdKey), "created key should have value")
-
-	for _, addr := range []common.Address{addrWithDeletedKey, createdAddr} {
-		gotBal := sdb.GetBalance(addr)
-		require.Zerof(t, gotBal.Cmp(bal), "%s balance: got %#x, want %#x", addr, gotBal, bal)
-	}
 }
