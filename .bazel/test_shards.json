@@ -1,0 +1,19 @@
+{
+  "shards": [
+    {
+      "name": "main_unit_tests",
+      "description": "Main non-graft unit-test shard. Includes root-module Go tests and patched dependency checks; excludes graft modules and gazelle_test.",
+      "query": "tests(//... except //graft/... except //:gazelle_test except //:unit_tests except //:main_unit_tests except //:coreth_unit_tests except //:subnet_evm_unit_tests)"
+    },
+    {
+      "name": "coreth_unit_tests",
+      "description": "Coreth and EVM graft-module unit tests.",
+      "query": "tests(//graft/coreth/... union //graft/evm/...)"
+    },
+    {
+      "name": "subnet_evm_unit_tests",
+      "description": "Subnet-EVM graft-module unit tests.",
+      "query": "tests(//graft/subnet-evm/...)"
+    }
+  ]
+}

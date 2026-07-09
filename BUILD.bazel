@@ -1,4 +1,5 @@
 load("@bazel_gazelle//:def.bzl", "DEFAULT_LANGUAGES", "gazelle", "gazelle_binary", "gazelle_test")
+load("//.bazel:test_suites.bzl", "unit_test_suites")
 
 exports_files(["BUILD.bazel"])
 
@@ -25,3 +26,5 @@ gazelle_test(
     gazelle = ":gazelle_bin",
     workspace = "//:BUILD.bazel",
 )
+
+unit_test_suites()
