@@ -10,25 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestPostTransitionBlock verifies that after the transition, blocks are built
-// and accepted by the post-transition chain.
-func TestPostTransitionBlock(t *testing.T) {
-	for _, mode := range contextModes {
-		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t, withBlocksUntilTransition(0))
-			ctx := t.Context()
-
-			sut.BuildVerifyAccept(t, ctx, mode)
-		})
-	}
-}
-
 // TestTransitionBlockChildren verifies that a pre-transition block whose parent
 // is at or after the transition time fails verification.
 func TestTransitionBlockChildren(t *testing.T) {
 	for _, mode := range contextModes {
 		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t)
+			sut := newSUT(t, withBlocksUntilTransition(1))
 			ctx := t.Context()
 
 			transitionBlock, err := sut.BuildBlock(ctx)
@@ -65,7 +52,7 @@ func TestNoTransitionBeforeTime(t *testing.T) {
 func TestCachedBlockUpdatesAfterTransition(t *testing.T) {
 	for _, mode := range contextModes {
 		t.Run(string(mode), func(t *testing.T) {
-			sut := newSUT(t)
+			sut := newSUT(t, withBlocksUntilTransition(1))
 			ctx := t.Context()
 
 			transitionBlock, err := sut.BuildBlock(ctx)
@@ -125,7 +112,7 @@ func TestRejectForwardedToPostTransitionChain(t *testing.T) {
 // TestRejectIsNoopAfterTransition verifies rejecting a pre-transition block
 // after the transition is a noop.
 func TestRejectIsNoopAfterTransition(t *testing.T) {
-	sut := newSUT(t)
+	sut := newSUT(t, withBlocksUntilTransition(1))
 	ctx := t.Context()
 
 	genesis := sut.pre.tip

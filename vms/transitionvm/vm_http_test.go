@@ -41,7 +41,7 @@ func serve(h http.Handler) *httptest.ResponseRecorder {
 // TestHTTPHandlers verifies a transition is reflected through the handlers
 // captured on startup: shared routes rebind and dropped routes 404.
 func TestHTTPHandlers(t *testing.T) {
-	sut := newSUT(t)
+	sut := newSUT(t, withBlocksUntilTransition(1))
 	ctx := t.Context()
 
 	sut.pre.handlers = map[string]http.Handler{
@@ -155,7 +155,7 @@ func TestHTTPHandlersDrain(t *testing.T) {
 // post-transition chain.
 func TestTransitionAbandonsStuckAPIRequests(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		sut := newSUT(t)
+		sut := newSUT(t, withBlocksUntilTransition(1))
 		ctx := t.Context()
 
 		release := make(chan struct{})

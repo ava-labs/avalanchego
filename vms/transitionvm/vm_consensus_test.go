@@ -18,7 +18,7 @@ import (
 // TestTransitionMaintainsState verifies the consensus state set before the
 // transition is applied to the post-transition chain.
 func TestTransitionMaintainsState(t *testing.T) {
-	sut := newSUT(t)
+	sut := newSUT(t, withBlocksUntilTransition(1))
 	ctx := t.Context()
 
 	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState()", sut)
@@ -32,7 +32,7 @@ func TestTransitionMaintainsState(t *testing.T) {
 // TestTransitionSkipsInitializingState verifies the transition doesn't forward
 // the consensus state if the state was never set.
 func TestTransitionSkipsInitializingState(t *testing.T) {
-	sut := newSUT(t)
+	sut := newSUT(t, withBlocksUntilTransition(1))
 	ctx := t.Context()
 
 	// A forwarded SetState would overwrite this sentinel.
@@ -47,7 +47,7 @@ func TestTransitionSkipsInitializingState(t *testing.T) {
 // TestWaitForEventForwardsToCurrentChain verifies WaitForEvent routes to the
 // current chain, before and after the transition.
 func TestWaitForEventForwardsToCurrentChain(t *testing.T) {
-	sut := newSUT(t)
+	sut := newSUT(t, withBlocksUntilTransition(1))
 	ctx := t.Context()
 
 	sut.pre.events <- common.PendingTxs
@@ -68,7 +68,7 @@ func TestWaitForEventForwardsToCurrentChain(t *testing.T) {
 // write lock instead of deadlocking.
 func TestWaitForEventCanceledByTransition(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		sut := newSUT(t)
+		sut := newSUT(t, withBlocksUntilTransition(1))
 		ctx := t.Context()
 
 		// pre.events is left empty, so WaitForEvent blocks.

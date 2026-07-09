@@ -90,7 +90,7 @@ func TestPreTransitionRequestRouting(t *testing.T) {
 // first response is delivered to the post-transition chain and the second is
 // dropped.
 func TestRequestIDCollisionAcrossTransition(t *testing.T) {
-	sut := newSUT(t)
+	sut := newSUT(t, withBlocksUntilTransition(1))
 	ctx := t.Context()
 
 	nodeID := ids.GenerateTestNodeID()
@@ -120,7 +120,7 @@ func TestRequestIDCollisionAcrossTransition(t *testing.T) {
 // TestTransitionForwardsConnections verifies the transition replays the
 // pre-transition chain's connections to the post-transition chain.
 func TestTransitionForwardsConnections(t *testing.T) {
-	sut := newSUT(t)
+	sut := newSUT(t, withBlocksUntilTransition(1))
 	ctx := t.Context()
 
 	want := map[ids.NodeID]*version.Application{
@@ -144,7 +144,7 @@ func TestTransitionForwardsConnections(t *testing.T) {
 // ctx.Lock during AppGossip.
 func TestAppGossipGrabsCtxLock(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		sut := newSUT(t)
+		sut := newSUT(t, withBlocksUntilTransition(1))
 		ctx := t.Context()
 
 		blocked := make(chan struct{})
