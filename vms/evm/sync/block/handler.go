@@ -12,32 +12,33 @@ import (
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const (
-	// MaxParentsPerRequest caps the parent count per response.
+	// MaxParentsPerRequest bounds the parent walk per request. A block has no
+	// fixed size, so targetResponseBytes bounds the response, and this only
+	// caps how many blocks the handler looks up and encodes for one request.
 	MaxParentsPerRequest = uint16(64)
 
-	// targetResponseBytes is the soft cap on total RLP bytes per
-	// response, set just under 1 MiB.
-	targetResponseBytes = units.MiB - units.KiB
+	// targetResponseBytes caps the total block bytes per response at the usable
+	// p2p message budget.
+	targetResponseBytes = constants.MaxContainersLen
 )
 
-type (
-	// Handler serves [syncpb.GetBlockRequest] over [p2p.EVMBlockRequestHandlerID].
-	Handler = handlers.Handler[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
-	// Responder serves block-batch requests.
-	Responder = handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
-)
-
-// NewHandler wires resp into a [Handler].
-func NewHandler(log logging.Logger, resp Responder) *Handler {
-	return handlers.NewHandler(log, func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} }, resp)
+// RegisterHandler serves block-batch requests at [p2p.EVMBlockRequestHandlerID] on net.
+func RegisterHandler(net *p2p.Network, log logging.Logger, blocks Provider) error {
+	h := handlers.NewHandler(
+		log,
+		func() *syncpb.GetBlockRequest { return &syncpb.GetBlockRequest{} },
+		newResponder(blocks),
+	)
+	return net.AddHandler(p2p.EVMBlockRequestHandlerID, h)
 }
 
 // Provider returns blocks by (hash, height) or by canonical height.
@@ -47,7 +48,7 @@ type Provider interface {
 	GetBlockByHeight(height uint64) *types.Block
 }
 
-var _ Responder = (*responder)(nil)
+var _ handlers.Responder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse] = (*responder)(nil)
 
 // responder walks the parent chain from the canonical block at the
 // requested height.
@@ -55,7 +56,7 @@ type responder struct {
 	blocks Provider
 }
 
-func NewResponder(blocks Provider) Responder {
+func newResponder(blocks Provider) *responder {
 	return &responder{blocks: blocks}
 }
 

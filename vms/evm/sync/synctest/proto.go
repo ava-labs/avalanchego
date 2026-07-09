@@ -12,8 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
-
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 // FakeResponder is a programmable [handlers.Responder] fake. It
@@ -23,9 +21,6 @@ type FakeResponder[Req, Resp handlers.ProtoMessage] struct {
 	Err    error
 	GotReq Req
 }
-
-// FakeBlockResponder is the [FakeResponder] bound to the block-batch RPC.
-type FakeBlockResponder = FakeResponder[*syncpb.GetBlockRequest, *syncpb.GetBlockResponse]
 
 // Respond implements [handlers.Responder].
 func (s *FakeResponder[Req, Resp]) Respond(_ context.Context, _ ids.NodeID, req Req) (Resp, error) {
