@@ -1598,11 +1598,7 @@ func TestWaitForEventMinDelayPacing(t *testing.T) {
 				}
 
 				got := <-done
-				if test.wantErr != nil {
-					require.ErrorIsf(t, got.err, test.wantErr, "%T.WaitForEvent()", sut.VM)
-				} else {
-					require.NoErrorf(t, got.err, "%T.WaitForEvent()", sut.VM)
-				}
+				require.ErrorIsf(t, got.err, test.wantErr, "%T.WaitForEvent()", sut.VM)
 				require.Equalf(t, test.wantMsg, got.msg, "%T.WaitForEvent() event", sut.VM)
 			})
 		})
