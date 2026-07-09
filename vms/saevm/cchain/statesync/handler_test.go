@@ -4,6 +4,7 @@
 package statesync
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -27,11 +29,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	saestatesync "github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
+}
 
 // commitInterval is the trie commit interval used by every handler under test.
 const commitInterval = 4
@@ -82,7 +89,7 @@ func newSUT(t *testing.T, settleLag, lastExecuted uint64) *SUT {
 	)
 	require.NoError(t, err, "New()")
 	t.Cleanup(func() {
-		require.NoErrorf(t, handler.Shutdown(t.Context()), "%T.Shutdown()", handler)
+		require.NoErrorf(t, handler.Shutdown(context.WithoutCancel(t.Context())), "%T.Shutdown()", handler)
 	})
 	return &SUT{
 		SummaryHandler: handler,

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -69,21 +70,21 @@ type config struct {
 	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
 
-	// internalConfig
+	internalConfig
 }
 
-// // internalConfig holds undocumented, test-only options, kept out of config.md.
-// // Don't set these unless you know what you're doing.
-// type internalConfig struct {
-// 	// State sync
-// 	StateSyncIDs []ids.NodeID `json:"state-sync-ids"`
-// }
+// internalConfig holds undocumented, test-only options, kept out of config.md.
+// Don't set these unless you know what you're doing.
+type internalConfig struct {
+	// State sync
+	StateSyncIDs []ids.NodeID `json:"state-sync-ids"`
+}
 
 // defaultConfig returns the config used when an operator leaves a field unset.
 func defaultConfig() config {
 	return config{
 		Pruning:                      true,
-		StateSyncEnabled:             false, // TODO(alarso16): change to nil once state sync is in production
+		StateSyncEnabled:             true,
 		CommitInterval:               saedb.DefaultCommitInterval,
 		TrieCleanCache:               saedb.DefaultTrieCacheSizeMiB,
 		SnapshotCache:                saedb.DefaultSnapshotCacheSizeMiB,
@@ -118,7 +119,6 @@ func parseConfig(b []byte, networkID uint32) (config, error) {
 		if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval {
 			return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 		}
-		c.StateSyncEnabled = false // TODO(alarso16): remove this once state sync is in production
 	}
 	return c, nil
 }

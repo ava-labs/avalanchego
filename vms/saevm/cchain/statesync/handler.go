@@ -8,11 +8,15 @@ package statesync
 import (
 	"context"
 	"fmt"
+	"sync"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -28,14 +32,26 @@ var _ adaptor.SyncableVM[*summary] = (*SummaryHandler)(nil)
 type SummaryHandler struct {
 	*statesync.SummaryHandler
 
-	hooks         hook.Points
-	state         *state.State
-	ethDB         ethdb.Database
+	network *network.Network
+	log     logging.Logger
+
+	hooks hook.Points
+	state *state.State
+	ethDB ethdb.Database
+
+	// Lifecycle management, mirroring the embedded handler: err MUST only be
+	// written before stateSyncDone is closed and only read after.
+	mu            sync.Mutex
+	stopped       bool
+	cancel        context.CancelFunc
+	err           error
 	stateSyncDone chan struct{}
 }
 
 // New constructs a new [SummaryHandler] with the given configuration and
 // database.
+//
+// TODO(alarso16): Add extra block verification
 func New(
 	cfg statesync.Config,
 	db ethdb.Database,
@@ -56,6 +72,8 @@ func New(
 	}
 	return &SummaryHandler{
 		SummaryHandler: inner,
+		network:        network,
+		log:            snowCtx.Log,
 		state:          state,
 		hooks:          hooks,
 		ethDB:          db,
@@ -63,13 +81,32 @@ func New(
 	}, nil
 }
 
-// Shutdown cancels any ongoing state sync.
+// Shutdown cancels any ongoing state sync (both the embedded handler's and
+// the atomic trie's) and waits for the sync goroutine to exit, returning early
+// with the context's error if ctx expires first. After Shutdown, no new sync
+// can be started.
 func (h *SummaryHandler) Shutdown(ctx context.Context) error {
+	h.mu.Lock()
+	h.stopped = true
+	cancel := h.cancel
+	h.mu.Unlock()
+
+	// The embedded handler is shut down first: cancelling its sync unblocks
+	// our goroutine's wait on its result.
 	if err := h.SummaryHandler.Shutdown(ctx); err != nil {
 		return err
 	}
-	// TODO(alarso16): cancel any ongoing state sync
-	return nil
+	if cancel == nil {
+		// no sync was ever started
+		return nil
+	}
+	cancel()
+	select {
+	case <-h.stateSyncDone:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // GetStateSummary is the same as [statesync.SummaryHandler.GetStateSummary],
@@ -96,11 +133,10 @@ func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, err
 		return nil, err
 	}
 
-	hdr := rawdb.ReadHeader(h.ethDB, base.BlockHash(), base.Height())
-	if hdr == nil {
-		return nil, fmt.Errorf("can't find header for block %s at height %d", base.BlockHash(), base.Height())
+	settledHeight, err := h.settledHeight(base.BlockHash(), base.Height())
+	if err != nil {
+		return nil, err
 	}
-	settledHeight := h.hooks.SettledBy(hdr).Height
 
 	root, err := h.state.GetRoot(settledHeight)
 	if err != nil {
@@ -110,4 +146,12 @@ func (h *SummaryHandler) wrap(base *statesync.Summary, err error) (*summary, err
 		summary:     *base,
 		settledRoot: root,
 	}, nil
+}
+
+func (h *SummaryHandler) settledHeight(hash common.Hash, height uint64) (uint64, error) {
+	hdr := rawdb.ReadHeader(h.ethDB, hash, height)
+	if hdr == nil {
+		return 0, database.ErrNotFound
+	}
+	return h.hooks.SettledBy(hdr).Height, nil
 }

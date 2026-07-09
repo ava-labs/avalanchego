@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
@@ -33,6 +34,11 @@ func TestParseConfig(t *testing.T) {
 		mod(&c)
 		return c
 	}
+
+	shortID := ids.GenerateTestShortID()
+	nodeIDStr := fmt.Sprintf("NodeID-%s", shortID)
+	nodeID, err := ids.NodeIDFromString(nodeIDStr)
+	require.NoErrorf(t, err, "ids.NodeIDFromString(%q)", nodeIDStr)
 
 	tests := []struct {
 		name      string
@@ -182,11 +188,13 @@ func TestParseConfig(t *testing.T) {
 			json: `{"state-sync-enabled":true}`,
 			want: with(func(c *config) { c.StateSyncEnabled = true }),
 		},
+
+		// internalConfig
 		{
-			name:      "state_sync_not_enabled_on_production_network",
-			networkID: constants.MainnetID,
+			name: "internal/state_sync_ids",
+			json: fmt.Sprintf(`{"state-sync-ids":["%s"]}`, nodeIDStr),
 			want: with(func(c *config) {
-				c.StateSyncEnabled = false
+				c.StateSyncIDs = []ids.NodeID{nodeID}
 			}),
 		},
 

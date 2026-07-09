@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -286,6 +287,10 @@ func (vm *VM) onBootstrapping(ctx context.Context) error {
 
 	if err := vm.updateHandlers(ctx); err != nil {
 		return fmt.Errorf("updating HTTP handlers: %w", err)
+	}
+
+	if err := vm.RegisterServer(triedb.NewDatabase(ethDB, tdbConfig)); err != nil {
+		return fmt.Errorf("registering state sync server: %w", err)
 	}
 
 	return nil
