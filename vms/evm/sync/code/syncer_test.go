@@ -83,9 +83,10 @@ func TestSyncer(t *testing.T) {
 		name          string
 		numFromSource int
 		numOnDisk     int
+		perReq        int
 	}{
 		{name: "single blob", numFromSource: 1},
-		{name: "batches across requests", numFromSource: 12},
+		{name: "batches across requests", numFromSource: 12, perReq: 4},
 		{name: "skips code already on disk", numFromSource: 3, numOnDisk: 2},
 	}
 
@@ -120,7 +121,11 @@ func TestSyncer(t *testing.T) {
 			}
 			close(ch)
 
-			require.NoError(t, NewSyncer(NewClient(net, tracker), target, ch).Sync(ctx))
+			var opts []SyncerOption
+			if tt.perReq > 0 {
+				opts = append(opts, WithCodeHashesPerRequest(tt.perReq))
+			}
+			require.NoError(t, NewSyncer(NewClient(net, tracker), target, ch, opts...).Sync(ctx))
 
 			for hash, code := range want {
 				require.Equal(t, code, rawdb.ReadCode(target, hash))

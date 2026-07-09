@@ -47,13 +47,13 @@ func TestResponder(t *testing.T) {
 			wantDrop: true,
 		},
 		{
-			name:     "duplicate hashes drop",
+			name:     "duplicate hashes served",
 			hashes:   []common.Hash{codeHash, codeHash},
-			wantDrop: true,
+			wantData: [][]byte{codeBytes, codeBytes},
 		},
 		{
 			name:     "too many hashes drops",
-			hashes:   []common.Hash{{1}, {2}, {3}, {4}, {5}, {6}},
+			hashes:   make([]common.Hash, MaxHashesPerRequest+1),
 			wantDrop: true,
 		},
 	}
